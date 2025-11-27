@@ -12,6 +12,8 @@ export default function TableSelectionPlugin() {
   const ctrlRef = useRef(false)
   const draggingRef = useRef(false)
   const menuRef = useRef(null)
+  const [hoverTable, setHoverTable] = useState(null)
+  const [addBtnPos, setAddBtnPos] = useState(null)
 
   useEffect(() => {
     const onMode = (e) => { setActive(!!e.detail); if (!e.detail) setBoxes([]) }
@@ -62,11 +64,21 @@ export default function TableSelectionPlugin() {
     }
     const onUp = () => { draggingRef.current = false; startRef.current = null }
     const onLeave = () => { draggingRef.current = false }
+    const onOver = (e) => {
+      const table = e.target.closest('table')
+      if (!table) { setHoverTable(null); setAddBtnPos(null); return }
+      const rootRect = root.getBoundingClientRect()
+      const tRect = table.getBoundingClientRect()
+      const idx = Array.from(root.querySelectorAll('table')).indexOf(table)
+      setHoverTable(idx)
+      setAddBtnPos({ x: tRect.right - rootRect.left + root.scrollLeft + 6, y: tRect.top - rootRect.top + root.scrollTop + tRect.height / 2 })
+    }
 
     root.addEventListener('mousedown', onDown)
     root.addEventListener('mousemove', onMove)
     root.addEventListener('mouseup', onUp)
     root.addEventListener('mouseleave', onLeave)
+    root.addEventListener('mouseover', onOver)
     window.addEventListener('keydown', onKey)
     window.addEventListener('keyup', onKey)
     return () => {
@@ -76,6 +88,7 @@ export default function TableSelectionPlugin() {
       root.removeEventListener('mouseleave', onLeave)
       window.removeEventListener('keydown', onKey)
       window.removeEventListener('keyup', onKey)
+      root.removeEventListener('mouseover', onOver)
     }
   }, [active])
 
@@ -249,6 +262,19 @@ export default function TableSelectionPlugin() {
     if (menuRef.current) menuRef.current.style.display = 'none'
   }
 
+  const addColForTable = (tIndex) => {
+    editor.update(() => {
+      const tables = []
+      const walk = (node) => { const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
+      walk($getRoot())
+      const table = tables[tIndex]
+      if (!table) return
+      const rows = table.getChildren()
+      const headerState = (() => { const first = rows[0]?.getChildren()?.[0]; try { return first?.getHeaderState?.() ?? 0 } catch { return 0 } })()
+      rows.forEach((row, ri) => { const cell = $createTableCellNode(); cell.append($createParagraphNode()); try { if (ri === 0) cell.setHeaderState?.(headerState) } catch {}; row.append(cell) })
+    })
+  }
+
   const doDelCol = () => {
     const { tIndex, ci } = readInfo()
     editor.update(() => {
@@ -289,6 +315,9 @@ export default function TableSelectionPlugin() {
       {outlines.map((b, i) => (
         <div key={i} className="table-selection-outline" style={{ position: 'absolute', left: b.x, top: b.y, width: b.w, height: b.h }} />
       ))}
+      {addBtnPos && hoverTable !== null && (
+        <button onClick={() => addColForTable(hoverTable)} className="table-add-col-btn" style={{ pointerEvents: 'auto', position: 'absolute', left: addBtnPos.x, top: addBtnPos.y, transform: 'translateY(-50%)' }}>+列</button>
+      )}
     </div>
   )
 }
