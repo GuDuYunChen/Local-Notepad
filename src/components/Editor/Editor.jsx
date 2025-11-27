@@ -112,7 +112,6 @@ export default function Editor({ initialContent, onChange, readOnly }) {
       <div className="editor-shell">
         <ToolbarPlugin />
         <PasteImagePlugin />
-        <TableSelectionPlugin />
         <div className="editor-container">
           <RichTextPlugin
             contentEditable={<ContentEditable className="editor-input" />}
@@ -127,6 +126,7 @@ export default function Editor({ initialContent, onChange, readOnly }) {
           <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
           <OnChangePlugin onChange={onChange} />
           <LoadContentPlugin content={initialContent} />
+          <TableSelectionPlugin />
         </div>
       </div>
     </LexicalComposer>

@@ -23,11 +23,11 @@ export default function TableSelectionPlugin() {
 
   useEffect(() => {
     if (!active) return
-    const root = document.querySelector('.editor-input')
-    if (!root) return
+    const container = document.querySelector('.editor-container')
+    if (!container) return
 
     const getCell = (el) => {
-      while (el && el !== root) { if (el.tagName === 'TD') return el; el = el.parentElement }
+      while (el && el !== container) { if (el.tagName === 'TD') return el; el = el.parentElement }
       return null
     }
     const indexOf = (cell) => {
@@ -35,7 +35,7 @@ export default function TableSelectionPlugin() {
       const table = row?.parentElement
       const rIdx = Array.from(table.children).indexOf(row)
       const cIdx = Array.from(row.children).indexOf(cell)
-      const tableIndex = Array.from(root.querySelectorAll('table')).indexOf(table)
+      const tableIndex = Array.from(container.querySelectorAll('table')).indexOf(table)
       return { r: rIdx, c: cIdx, table, tableIndex }
     }
 
@@ -67,34 +67,34 @@ export default function TableSelectionPlugin() {
     const onOver = (e) => {
       const table = e.target.closest('table')
       if (!table) { setHoverTable(null); setAddBtnPos(null); return }
-      const rootRect = root.getBoundingClientRect()
+      const rootRect = container.getBoundingClientRect()
       const tRect = table.getBoundingClientRect()
-      const idx = Array.from(root.querySelectorAll('table')).indexOf(table)
+      const idx = Array.from(container.querySelectorAll('table')).indexOf(table)
       setHoverTable(idx)
-      setAddBtnPos({ x: tRect.right - rootRect.left + root.scrollLeft + 6, y: tRect.top - rootRect.top + root.scrollTop + tRect.height / 2 })
+      setAddBtnPos({ x: tRect.right - rootRect.left + 6, y: tRect.top - rootRect.top + tRect.height / 2 })
     }
 
-    root.addEventListener('mousedown', onDown)
-    root.addEventListener('mousemove', onMove)
-    root.addEventListener('mouseup', onUp)
-    root.addEventListener('mouseleave', onLeave)
-    root.addEventListener('mouseover', onOver)
+    container.addEventListener('mousedown', onDown)
+    container.addEventListener('mousemove', onMove)
+    container.addEventListener('mouseup', onUp)
+    container.addEventListener('mouseleave', onLeave)
+    container.addEventListener('mouseover', onOver)
     window.addEventListener('keydown', onKey)
     window.addEventListener('keyup', onKey)
     return () => {
-      root.removeEventListener('mousedown', onDown)
-      root.removeEventListener('mousemove', onMove)
-      root.removeEventListener('mouseup', onUp)
-      root.removeEventListener('mouseleave', onLeave)
+      container.removeEventListener('mousedown', onDown)
+      container.removeEventListener('mousemove', onMove)
+      container.removeEventListener('mouseup', onUp)
+      container.removeEventListener('mouseleave', onLeave)
       window.removeEventListener('keydown', onKey)
       window.removeEventListener('keyup', onKey)
-      root.removeEventListener('mouseover', onOver)
+      container.removeEventListener('mouseover', onOver)
     }
   }, [active])
 
   useEffect(() => {
-    const root = document.querySelector('.editor-input')
-    if (!root) return
+    const container = document.querySelector('.editor-container')
+    if (!container) return
     const onContext = (e) => {
       const cell = e.target.closest('td')
       const table = e.target.closest('table')
@@ -102,7 +102,7 @@ export default function TableSelectionPlugin() {
       e.preventDefault()
       const ri = Array.from(cell.parentElement.parentElement.children).indexOf(cell.parentElement)
       const ci = Array.from(cell.parentElement.children).indexOf(cell)
-      const tIndex = Array.from(root.querySelectorAll('table')).indexOf(table)
+      const tIndex = Array.from(container.querySelectorAll('table')).indexOf(table)
       const menu = getMenu()
       menu.style.left = `${e.clientX}px`
       menu.style.top = `${e.clientY}px`
@@ -114,9 +114,9 @@ export default function TableSelectionPlugin() {
       if (!m) return
       if (!m.contains(e.target)) m.style.display = 'none'
     }
-    root.addEventListener('contextmenu', onContext)
+    container.addEventListener('contextmenu', onContext)
     document.addEventListener('click', onClickDoc)
-    return () => { root.removeEventListener('contextmenu', onContext); document.removeEventListener('click', onClickDoc) }
+    return () => { container.removeEventListener('contextmenu', onContext); document.removeEventListener('click', onClickDoc) }
   }, [])
 
   const getMenu = () => {
@@ -146,8 +146,8 @@ export default function TableSelectionPlugin() {
 
   const doRowColSelect = (type) => {
     const { tIndex, ri, ci } = readInfo()
-    const root = document.querySelector('.editor-input')
-    const tables = root ? Array.from(root.querySelectorAll('table')) : []
+    const container = document.querySelector('.editor-container')
+    const tables = container ? Array.from(container.querySelectorAll('table')) : []
     const table = tables[tIndex]
     if (!table) return
     if (type === 'row') {
@@ -290,20 +290,20 @@ export default function TableSelectionPlugin() {
   }
 
   const outlines = (() => {
-    const root = document.querySelector('.editor-input')
-    if (!root) return []
-    const tables = Array.from(root.querySelectorAll('table'))
+    const container = document.querySelector('.editor-container')
+    if (!container) return []
+    const tables = Array.from(container.querySelectorAll('table'))
     return rects.map(r => {
       const table = tables[r.tableIndex]
       if (!table) return null
-      const host = root.getBoundingClientRect()
+      const host = container.getBoundingClientRect()
       const tlCell = table.rows[r.r1]?.children?.[r.c1]
       const brCell = table.rows[r.r2]?.children?.[r.c2]
       if (!tlCell || !brCell) return null
       const tl = tlCell.getBoundingClientRect()
       const br = brCell.getBoundingClientRect()
-      const x = tl.left - host.left + root.scrollLeft
-      const y = tl.top - host.top + root.scrollTop
+      const x = tl.left - host.left
+      const y = tl.top - host.top
       const w = br.right - tl.left
       const h = br.bottom - tl.top
       return { x, y, w, h }
