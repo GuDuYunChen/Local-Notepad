@@ -97,6 +97,12 @@
   align-self: center;
 }
 
+.editor-toolbar .group-label {
+  font-size: 12px;
+  color: var(--muted);
+  margin-right: 6px;
+}
+
 /* Specific button styles */
 .editor-toolbar .btn.fw-bold { font-weight: bold; }
 .editor-toolbar .btn.fst-italic { font-style: italic; }
@@ -214,6 +220,18 @@
 .table-context-menu { position: fixed; z-index: 1000; background: #fff; border: 1px solid #ddd; box-shadow: 0 6px 24px rgba(0,0,0,.12); border-radius: 8px; padding: 6px; display: none; }
 .table-context-menu .item { padding: 6px 10px; font-size: 13px; cursor: pointer; border-radius: 6px; }
 .table-context-menu .item:hover { background: rgba(0,0,0,0.06); }
+
+/* 表格首列使用现有背景色，其余列为白色；首行强制白底 */
+.editor-table tr td:first-child { background-color: #f2f3f5; }
+.editor-table tr:first-child td { background-color: #fff !important; }
+
+/* 尺寸选择面板 */
+.size-picker { position: absolute; top: 110%; left: 0; background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 8px; z-index: 20; box-shadow: 0 6px 24px rgba(0,0,0,.12); }
+.size-row { display: flex; }
+.size-cell { width: 18px; height: 18px; margin: 2px; background: #f3f4f6; border-radius: 4px; transition: background .15s ease, transform .15s ease; }
+.size-cell.active { background: rgba(126,91,239,0.25); transform: scale(0.98); }
+.size-overlay { position: absolute; background: rgba(126,91,239,0.15); outline: 2px solid rgba(126,91,239,0.8); border-radius: 6px; pointer-events: none; transition: all .1s ease; }
+.size-label { margin-top: 8px; font-size: 12px; color: #666; text-align: right; }
 
 /* Image */
 .editor-image {

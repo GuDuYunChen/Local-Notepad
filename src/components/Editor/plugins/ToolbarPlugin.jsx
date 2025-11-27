@@ -119,12 +119,17 @@ export default function ToolbarPlugin() {
       while (table && !(table instanceof TableNode)) { table = table.getParent() }
       if (!table) return
       const rows = table.getChildren()
-      for (const r of rows) {
+      const sampleHeader = (() => {
+        const firstCell = rows[0]?.getChildren()?.[0]
+        try { return typeof firstCell?.getHeaderState === 'function' ? firstCell.getHeaderState() : 0 } catch { return 0 }
+      })()
+      rows.forEach((row, ri) => {
         const cell = $createTableCellNode()
         const p = $createParagraphNode()
         cell.append(p)
-        r.append(cell)
-      }
+        try { if (ri === 0 && typeof cell.setHeaderState === 'function') cell.setHeaderState(sampleHeader) } catch {}
+        row.append(cell)
+      })
     })
   }
 
@@ -286,72 +291,120 @@ export default function ToolbarPlugin() {
 
   return (
     <div className="editor-toolbar">
-      <button disabled={!canUndo} onClick={() => editor.dispatchCommand(UNDO_COMMAND)} className="btn">
-        Undo
-      </button>
-      <button disabled={!canRedo} onClick={() => editor.dispatchCommand(REDO_COMMAND)} className="btn">
-        Redo
-      </button>
+      <div className="toolbar-group">
+        <span className="group-label">历史</span>
+        <button disabled={!canUndo} onClick={() => editor.dispatchCommand(UNDO_COMMAND)} className="btn">Undo</button>
+        <button disabled={!canRedo} onClick={() => editor.dispatchCommand(REDO_COMMAND)} className="btn">Redo</button>
+      </div>
       <span className="divider" />
-      <select 
-        value={fontFamily} 
-        onChange={e => { setFontFamily(e.target.value); applyStyle('font-family', e.target.value); }}
-        className="select"
-      >
-        {FontOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
-      <select 
-        value={fontSize} 
-        onChange={e => { setFontSize(e.target.value); applyStyle('font-size', e.target.value); }}
-        className="select"
-      >
-        {FontSizeOptions.map(o => <option key={o} value={o}>{o}</option>)}
-      </select>
+      <div className="toolbar-group">
+        <span className="group-label">文本</span>
+        <select value={fontFamily} onChange={e => { setFontFamily(e.target.value); applyStyle('font-family', e.target.value); }} className="select">
+          {FontOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+        <select value={fontSize} onChange={e => { setFontSize(e.target.value); applyStyle('font-size', e.target.value); }} className="select">
+          {FontSizeOptions.map(o => <option key={o} value={o}>{o}</option>)}
+        </select>
+        <button onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'bold')} className="btn fw-bold">B</button>
+        <button onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'italic')} className="btn fst-italic">I</button>
+        <button onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'underline')} className="btn text-decoration-underline">U</button>
+      </div>
       <span className="divider" />
-      <button onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'bold')} className="btn fw-bold">B</button>
-      <button onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'italic')} className="btn fst-italic">I</button>
-      <button onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'underline')} className="btn text-decoration-underline">U</button>
+      <div className="toolbar-group">
+        <span className="group-label">对齐</span>
+        <button onClick={() => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'left')} className="btn">Left</button>
+        <button onClick={() => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'center')} className="btn">Center</button>
+        <button onClick={() => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'right')} className="btn">Right</button>
+      </div>
       <span className="divider" />
-      <button onClick={() => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'left')} className="btn">Left</button>
-      <button onClick={() => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'center')} className="btn">Center</button>
-      <button onClick={() => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'right')} className="btn">Right</button>
-      <span className="divider" />
-      <button onClick={insertTable} className="btn">插入表格</button>
-      <span className="divider" />
-      <div style={{ position: 'relative' }}>
+      <div className="toolbar-group" style={{ position: 'relative' }}>
+        <span className="group-label">表格</span>
+        <button onClick={insertTable} className="btn">插入表格</button>
         <button onClick={() => setPickerOpen(v => !v)} className="btn">尺寸选择</button>
         {pickerOpen && (
-          <div style={{ position: 'absolute', top: '110%', left: 0, background: '#fff', border: '1px solid #ddd', padding: 8, zIndex: 20 }}>
-            {sizes.map((row, ri) => (
-              <div key={ri} style={{ display: 'flex' }}>
-                {row.map((it, ci) => (
-                  <div key={ci} onMouseEnter={() => {}} onClick={() => { editor.dispatchCommand(INSERT_TABLE_COMMAND, { columns: String(it.c), rows: String(it.r) }); setPickerOpen(false) }} style={{ width: 18, height: 18, margin: 2, background: '#f3f4f6' }} />
-                ))}
-              </div>
-            ))}
-          </div>
+          <TableSizePicker onPick={(r,c)=>{ editor.dispatchCommand(INSERT_TABLE_COMMAND, { columns: String(c), rows: String(r) }); setPickerOpen(false) }} />
         )}
+        <button onClick={toggleSelectionMode} className="btn" style={{ background: selectionMode ? 'rgba(126,91,239,0.2)' : undefined }}>选择模式</button>
+        <button onClick={() => addRow('after')} className="btn">添加行</button>
+        <button onClick={delRow} className="btn">删除行</button>
+        <button onClick={addCol} className="btn">添加列</button>
+        <button onClick={delCol} className="btn">删除列</button>
       </div>
-      <button onClick={toggleSelectionMode} className="btn" style={{ background: selectionMode ? 'rgba(126,91,239,0.2)' : undefined }}>选择模式</button>
-      <button onClick={() => addRow('after')} className="btn">添加行</button>
-      <button onClick={delRow} className="btn">删除行</button>
-      <button onClick={addCol} className="btn">添加列</button>
-      <button onClick={delCol} className="btn">删除列</button>
-      
       <span className="divider" />
-      <label className="btn">
-        图片
-        <input type="file" accept="image/*" multiple style={{display:'none'}} onChange={handleImage} />
-      </label>
-      <label className="btn">
-        视频
-        <input type="file" accept="video/*" style={{display:'none'}} onChange={handleVideo} />
-      </label>
-      <label className="btn">
-        Excel
-        <input type="file" accept=".xlsx, .xls" style={{display:'none'}} onChange={handleExcel} />
-      </label>
-      {isUploading && <span style={{marginLeft: 10, fontSize: 12}}>上传/处理中...</span>}
+      <div className="toolbar-group">
+        <span className="group-label">插入</span>
+        <label className="btn">图片<input type="file" accept="image/*" multiple style={{display:'none'}} onChange={handleImage} /></label>
+        <label className="btn">视频<input type="file" accept="video/*" style={{display:'none'}} onChange={handleVideo} /></label>
+        <label className="btn">Excel<input type="file" accept=".xlsx, .xls" style={{display:'none'}} onChange={handleExcel} /></label>
+        {isUploading && <span style={{marginLeft: 10, fontSize: 12}}>上传/处理中...</span>}
+      </div>
     </div>
   );
+}
+
+function TableSizePicker({ onPick }) {
+  const [dragging, setDragging] = useState(false)
+  const [start, setStart] = useState(null)
+  const [end, setEnd] = useState(null)
+  const ref = React.useRef(null)
+  const dim = { rows: 10, cols: 10 }
+  const rect = React.useMemo(() => {
+    if (!start || !end) return null
+    const r1 = Math.min(start.r, end.r), r2 = Math.max(start.r, end.r)
+    const c1 = Math.min(start.c, end.c), c2 = Math.max(start.c, end.c)
+    return { r1, c1, r2, c2 }
+  }, [start, end])
+
+  const setByEvent = (e) => {
+    const box = ref.current
+    if (!box) return null
+    const rect = box.getBoundingClientRect()
+    const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left
+    const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top
+    const cellW = rect.width / dim.cols
+    const cellH = rect.height / dim.rows
+    const c = Math.min(dim.cols, Math.max(1, Math.ceil(x / cellW)))
+    const r = Math.min(dim.rows, Math.max(1, Math.ceil(y / cellH)))
+    return { r, c }
+  }
+
+  const onDown = (e) => { const p = setByEvent(e); if (!p) return; setStart(p); setEnd(p); setDragging(true) }
+  const onMove = (e) => { if (!dragging) return; const p = setByEvent(e); if (!p) return; setEnd(p) }
+  const onUp = () => { if (rect) onPick(rect.r2 - rect.r1 + 1, rect.c2 - rect.c1 + 1); setDragging(false); setStart(null); setEnd(null) }
+  const onClickCell = (r,c) => { onPick(r,c) }
+
+  const overlayStyle = (() => {
+    if (!rect || !ref.current) return { display:'none' }
+    const host = ref.current.getBoundingClientRect()
+    const cellW = host.width / dim.cols
+    const cellH = host.height / dim.rows
+    const x = (rect.c1 - 1) * cellW
+    const y = (rect.r1 - 1) * cellH
+    const w = (rect.c2 - rect.c1 + 1) * cellW
+    const h = (rect.r2 - rect.r1 + 1) * cellH
+    return { left: x, top: y, width: w, height: h }
+  })()
+
+  return (
+    <div className="size-picker" ref={ref}
+      onMouseDown={onDown}
+      onMouseMove={onMove}
+      onMouseUp={onUp}
+      onTouchStart={onDown}
+      onTouchMove={onMove}
+      onTouchEnd={onUp}
+    >
+      <div className="size-overlay" style={overlayStyle} />
+      {Array.from({length: dim.rows}).map((_, ri) => (
+        <div key={ri} className="size-row">
+          {Array.from({length: dim.cols}).map((_, ci) => {
+            const r = ri+1, c = ci+1
+            const active = rect && r>=rect.r1 && r<=rect.r2 && c>=rect.c1 && c<=rect.c2
+            return <span key={ci} className={active? 'size-cell active':'size-cell'} onClick={()=>onClickCell(r,c)} />
+          })}
+        </div>
+      ))}
+      <div className="size-label">{rect? `${rect.r2-rect.r1+1}×${rect.c2-rect.c1+1}`: '选择尺寸'}</div>
+    </div>
+  )
 }
