@@ -1,0 +1,227 @@
+package service
+
+import (
+    "context"
+    "database/sql"
+    "fmt"
+    "bytes"
+    "io"
+    "os"
+    "path/filepath"
+    "strings"
+    "time"
+    "github.com/google/uuid"
+    "notepad-server/internal/model"
+    "golang.org/x/text/encoding/japanese"
+    "golang.org/x/text/encoding/simplifiedchinese"
+    "golang.org/x/text/transform"
+    "github.com/saintfish/chardet"
+    "golang.org/x/text/encoding/traditionalchinese"
+)
+
+// 文件服务：封装文件的创建、读取、更新、删除
+type FileService struct {
+    DB *sql.DB
+}
+
+// 创建文件
+func (s *FileService) Create(ctx context.Context, title, content string) (*model.File, error) {
+    now := time.Now().Unix()
+    id := uuid.New().String()
+    _, err := s.DB.ExecContext(ctx, `INSERT INTO files (id, title, content, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`, id, title, content, now, now)
+    if err != nil {
+        return nil, fmt.Errorf("创建文件失败: %w", err)
+    }
+    return &model.File{ID: id, Title: title, Content: content, CreatedAt: now, UpdatedAt: now}, nil
+}
+
+// 获取文件
+func (s *FileService) Get(ctx context.Context, id string) (*model.File, error) {
+    var f model.File
+    row := s.DB.QueryRowContext(ctx, `SELECT id, title, content, created_at, updated_at FROM files WHERE id = ?`, id)
+    if err := row.Scan(&f.ID, &f.Title, &f.Content, &f.CreatedAt, &f.UpdatedAt); err != nil {
+        if err == sql.ErrNoRows {
+            return nil, fmt.Errorf("文件不存在: %w", err)
+        }
+        return nil, fmt.Errorf("读取文件失败: %w", err)
+    }
+    return &f, nil
+}
+
+// 更新文件
+func (s *FileService) Update(ctx context.Context, id string, title, content *string) (*model.File, error) {
+    f, err := s.Get(ctx, id)
+    if err != nil { return nil, err }
+    if title != nil { f.Title = *title }
+    if content != nil { f.Content = *content }
+    f.UpdatedAt = time.Now().Unix()
+    _, err = s.DB.ExecContext(ctx, `UPDATE files SET title = ?, content = ?, updated_at = ? WHERE id = ?`, f.Title, f.Content, f.UpdatedAt, id)
+    if err != nil { return nil, fmt.Errorf("更新文件失败: %w", err) }
+    return f, nil
+}
+
+// 删除文件
+func (s *FileService) Delete(ctx context.Context, id string) error {
+    _, err := s.DB.ExecContext(ctx, `DELETE FROM files WHERE id = ?`, id)
+    if err != nil { return fmt.Errorf("删除文件失败: %w", err) }
+    return nil
+}
+
+// 列出文件（简化：按更新时间倒序）
+func (s *FileService) List(ctx context.Context, q string, page, size int) ([]*model.File, error) {
+    if page <= 0 { page = 1 }
+    if size <= 0 { size = 20 }
+    offset := (page - 1) * size
+    query := `SELECT id, title, content, created_at, updated_at FROM files WHERE title LIKE ? OR content LIKE ? ORDER BY updated_at DESC LIMIT ? OFFSET ?`
+    rows, err := s.DB.QueryContext(ctx, query, "%"+q+"%", "%"+q+"%", size, offset)
+    if err != nil { return nil, fmt.Errorf("查询文件失败: %w", err) }
+    defer rows.Close()
+    var out []*model.File
+    for rows.Next() {
+        var f model.File
+        if err := rows.Scan(&f.ID, &f.Title, &f.Content, &f.CreatedAt, &f.UpdatedAt); err != nil { return nil, fmt.Errorf("解析文件失败: %w", err) }
+        out = append(out, &f)
+    }
+    return out, nil
+}
+
+// 另存为：将指定文件内容写入到给定路径，支持编码（当前仅utf-8）
+func (s *FileService) SaveAs(ctx context.Context, id string, path string, encoding string) error {
+    f, err := s.Get(ctx, id)
+    if err != nil { return err }
+    abs, err := filepath.Abs(path)
+    if err != nil { return fmt.Errorf("路径解析失败: %w", err) }
+    data := []byte(f.Content)
+    enc := strings.ToLower(strings.TrimSpace(encoding))
+    switch enc {
+    case "", "utf-8", "utf8":
+        // 无需转码
+    case "gbk":
+        w := &bytes.Buffer{}
+        tw := transform.NewWriter(w, simplifiedchinese.GBK.NewEncoder())
+        if _, err := tw.Write(data); err != nil { return fmt.Errorf("GBK 转码失败: %w", err) }
+        if err := tw.Close(); err != nil { return fmt.Errorf("GBK writer 关闭失败: %w", err) }
+        data = w.Bytes()
+    case "shift-jis", "shift_jis":
+        w := &bytes.Buffer{}
+        tw := transform.NewWriter(w, japanese.ShiftJIS.NewEncoder())
+        if _, err := tw.Write(data); err != nil { return fmt.Errorf("Shift-JIS 转码失败: %w", err) }
+        if err := tw.Close(); err != nil { return fmt.Errorf("Shift-JIS writer 关闭失败: %w", err) }
+        data = w.Bytes()
+    case "gb18030":
+        w := &bytes.Buffer{}
+        tw := transform.NewWriter(w, simplifiedchinese.GB18030.NewEncoder())
+        if _, err := tw.Write(data); err != nil { return fmt.Errorf("GB18030 转码失败: %w", err) }
+        if err := tw.Close(); err != nil { return fmt.Errorf("GB18030 writer 关闭失败: %w", err) }
+        data = w.Bytes()
+    case "big5", "big5-hkscs":
+        w := &bytes.Buffer{}
+        tw := transform.NewWriter(w, traditionalchinese.Big5.NewEncoder())
+        if _, err := tw.Write(data); err != nil { return fmt.Errorf("Big5 转码失败: %w", err) }
+        if err := tw.Close(); err != nil { return fmt.Errorf("Big5 writer 关闭失败: %w", err) }
+        data = w.Bytes()
+    case "euc-cn":
+        // 使用 GB18030 编码近似支持 EUC-CN
+        w := &bytes.Buffer{}
+        tw := transform.NewWriter(w, simplifiedchinese.GB18030.NewEncoder())
+        if _, err := tw.Write(data); err != nil { return fmt.Errorf("EUC-CN 转码失败: %w", err) }
+        if err := tw.Close(); err != nil { return fmt.Errorf("EUC-CN writer 关闭失败: %w", err) }
+        data = w.Bytes()
+    case "iso-2022-cn":
+        // 使用 GB18030 近似支持 ISO-2022-CN
+        w := &bytes.Buffer{}
+        tw := transform.NewWriter(w, simplifiedchinese.GB18030.NewEncoder())
+        if _, err := tw.Write(data); err != nil { return fmt.Errorf("ISO-2022-CN 转码失败: %w", err) }
+        if err := tw.Close(); err != nil { return fmt.Errorf("ISO-2022-CN writer 关闭失败: %w", err) }
+        data = w.Bytes()
+    
+    default:
+        return fmt.Errorf("不支持的编码: %s", encoding)
+    }
+    if err := os.WriteFile(abs, data, 0o644); err != nil {
+        return fmt.Errorf("写入文件失败: %w", err)
+    }
+    return nil
+}
+
+// 导入：从本地路径读取文本并创建新文件，支持编码（当前仅utf-8）
+func (s *FileService) ImportPath(ctx context.Context, path string, encoding string) (*model.File, error) {
+    abs, err := filepath.Abs(path)
+    if err != nil { return nil, fmt.Errorf("路径解析失败: %w", err) }
+    b, err := os.ReadFile(abs)
+    if err != nil { return nil, fmt.Errorf("读取文件失败: %w", err) }
+    enc := strings.ToLower(strings.TrimSpace(encoding))
+    if enc == "" {
+        det := chardet.NewTextDetector()
+        if r, derr := det.DetectBest(b); derr == nil && r != nil {
+            charset := strings.ToLower(r.Charset)
+            switch charset {
+            case "utf-8", "utf8": enc = "utf-8"
+            case "gbk", "gb2312": enc = "gbk"
+            case "gb18030": enc = "gb18030"
+            case "shift_jis", "shift-jis": enc = "shift-jis"
+            case "big5", "big5-hkscs": enc = "big5"
+            case "euc-jp": enc = "euc-jp"
+            case "euc-cn": enc = "euc-cn"
+            case "iso-2022-cn": enc = "iso-2022-cn"
+            default: enc = "utf-8"
+            }
+        } else {
+            enc = "utf-8"
+        }
+    }
+    switch enc {
+    case "", "utf-8", "utf8":
+        // 原样读取
+    case "gbk":
+        r := transform.NewReader(bytes.NewReader(b), simplifiedchinese.GBK.NewDecoder())
+        decoded, err := io.ReadAll(r)
+        if err != nil { return nil, fmt.Errorf("GBK 解码失败: %w", err) }
+        b = decoded
+    case "gb18030":
+        r := transform.NewReader(bytes.NewReader(b), simplifiedchinese.GB18030.NewDecoder())
+        decoded, err := io.ReadAll(r)
+        if err != nil { return nil, fmt.Errorf("GB18030 解码失败: %w", err) }
+        b = decoded
+    case "shift-jis", "shift_jis":
+        r := transform.NewReader(bytes.NewReader(b), japanese.ShiftJIS.NewDecoder())
+        decoded, err := io.ReadAll(r)
+        if err != nil { return nil, fmt.Errorf("Shift-JIS 解码失败: %w", err) }
+        b = decoded
+    case "big5":
+        r := transform.NewReader(bytes.NewReader(b), traditionalchinese.Big5.NewDecoder())
+        decoded, err := io.ReadAll(r)
+        if err != nil { return nil, fmt.Errorf("Big5 解码失败: %w", err) }
+        b = decoded
+    case "euc-jp":
+        r := transform.NewReader(bytes.NewReader(b), japanese.EUCJP.NewDecoder())
+        decoded, err := io.ReadAll(r)
+        if err != nil { return nil, fmt.Errorf("EUC-JP 解码失败: %w", err) }
+        b = decoded
+    case "iso-2022-cn":
+        r := transform.NewReader(bytes.NewReader(b), simplifiedchinese.GB18030.NewDecoder())
+        decoded, err := io.ReadAll(r)
+        if err != nil { return nil, fmt.Errorf("ISO-2022-CN 解码失败: %w", err) }
+        b = decoded
+    case "hz-gb-2312":
+        r := transform.NewReader(bytes.NewReader(b), simplifiedchinese.HZGB2312.NewDecoder())
+        decoded, err := io.ReadAll(r)
+        if err != nil { return nil, fmt.Errorf("HZ-GB2312 解码失败: %w", err) }
+        b = decoded
+    case "iso-2022-jp":
+        r := transform.NewReader(bytes.NewReader(b), japanese.ISO2022JP.NewDecoder())
+        decoded, err := io.ReadAll(r)
+        if err != nil { return nil, fmt.Errorf("ISO-2022-JP 解码失败: %w", err) }
+        b = decoded
+    case "euc-cn":
+        r := transform.NewReader(bytes.NewReader(b), simplifiedchinese.GB18030.NewDecoder())
+        decoded, err := io.ReadAll(r)
+        if err != nil { return nil, fmt.Errorf("EUC-CN 解码失败: %w", err) }
+        b = decoded
+    default:
+        return nil, fmt.Errorf("不支持的编码: %s", encoding)
+    }
+    base := filepath.Base(abs)
+    title := strings.TrimSuffix(base, filepath.Ext(base))
+    return s.Create(ctx, title, string(b))
+}

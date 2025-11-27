@@ -1,0 +1,210 @@
+:root {
+  --bg: #faf9f7;
+  --fg: #1f2d3d;
+  --accent: #7e5bef;
+  --muted: #6b7280;
+  --accent2: #f59e0b;
+  --panel: #fffdf9;
+  --sb-thumb: rgba(0,0,0,0.25);
+  --sb-thumb-hover: rgba(0,0,0,0.35);
+  --sb-track: transparent;
+}
+[data-theme="dark"] {
+  --bg: #0f1419;
+  --fg: #e5e7eb;
+  --accent: #93c5fd;
+  --muted: #9ca3af;
+  --accent2: #fbbf24;
+  --panel: #0c1117;
+  --sb-thumb: rgba(255,255,255,0.25);
+  --sb-thumb-hover: rgba(255,255,255,0.35);
+  --sb-track: transparent;
+}
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; }
+body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--fg); overflow: hidden; }
+.app { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+.app-header { flex: 0 0 56px; display: flex; align-items: center; padding: 0 16px; border-bottom: 1px solid rgba(0,0,0,0.06); background: linear-gradient(90deg, var(--accent) 0%, var(--accent2) 100%); color: #fff; }
+.app-header h1 { font-size: 18px; letter-spacing: 0.5px; color: #fff; }
+.app-header .spacer { flex: 1 1 auto; }
+.app-main { flex: 1 1 0; overflow: hidden; padding: 0; position: relative; }
+.app-main.flex { display: flex; align-items: stretch; gap: 0; height: 100%; }
+.sidebar { flex: 0 0 var(--sidebar-w, 280px); min-width: 200px; max-width: 480px; border-right: 1px solid rgba(0,0,0,0.06); background: var(--panel); display: flex; flex-direction: column; height: 100%; overflow: hidden; transition: flex-basis .2s ease; }
+.resizer { flex: 0 0 6px; cursor: col-resize; background: linear-gradient(to right, rgba(0,0,0,0.06), rgba(0,0,0,0.06)); z-index: 10; }
+.resizer:hover { background: linear-gradient(to right, var(--accent), var(--accent)); opacity: .3; }
+.content { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+.placeholder { color: var(--muted); transition: opacity .2s ease; display: flex; align-items: center; justify-content: center; height: 100%; }
+.file-list { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+.file-list .toolbar { flex: 0 0 auto; z-index: 2; border-bottom: 1px solid rgba(0,0,0,0.06); }
+.file-list .list { list-style: none; margin: 0; padding: 0; flex: 1 1 0; overflow-y: auto; }
+.editor-textarea { flex: 1 1 0; height: 100%; min-height: 0; padding: 12px; border: none; border-radius: 0; outline: none; background: var(--panel); color: var(--fg); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 14px; line-height: 1.6; resize: none; overflow-y: auto; }
+.status-bar { display: none; }
+.status-right { display: flex; align-items: center; gap: 8px; }
+@media (max-width: 640px) {
+  .app-header { padding: 0 8px; }
+  .app-main { padding: 0; }
+  .app-main.flex { flex-direction: column; }
+  .sidebar { display: none; }
+  .resizer { display: none; }
+  .content { order: 1; }
+}
+/* 模态对话框 */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.25); display: flex; align-items: center; justify-content: center; z-index: 100; }
+.modal { width: 360px; max-width: 92vw; background: var(--panel); border: 1px solid rgba(0,0,0,0.1); border-radius: 12px; padding: 16px; box-shadow: 0 6px 24px rgba(0,0,0,.15); }
+.modal-title { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+.modal-message { font-size: 14px; color: var(--fg); margin-bottom: 12px; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.btn.danger { border-color: #ef4444; color: #ef4444; }
+.btn.danger:hover { background: rgba(239,68,68,.12); }
+.modal-input-row { margin-bottom: 8px; }
+.modal-error { color: #ef4444; font-size: 12px; margin-bottom: 8px; }
+
+/* 基础组件 */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  height: 32px; padding: 0 12px;
+  font-size: 13px; font-weight: 500;
+  border: 1px solid rgba(0,0,0,0.12); border-radius: 6px;
+  background: var(--panel); color: var(--fg);
+  cursor: pointer; user-select: none;
+  transition: all .15s ease;
+  white-space: nowrap;
+}
+.btn:hover { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.2); }
+.btn:active { background: rgba(0,0,0,0.08); transform: translateY(1px); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn.primary { background: var(--accent); color: #fff; border-color: transparent; }
+.btn.primary:hover { opacity: 0.9; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+.btn.danger { border-color: #ef4444; color: #ef4444; }
+.btn.danger:hover { background: #fef2f2; border-color: #ef4444; }
+
+.input {
+  height: 32px; padding: 0 10px;
+  font-size: 13px;
+  border: 1px solid rgba(0,0,0,0.12); border-radius: 6px;
+  background: var(--panel); color: var(--fg);
+  outline: none; transition: border-color .15s ease;
+}
+.input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(126, 91, 239, 0.1); }
+
+/* 工具栏 */
+.toolbar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px;
+  background: var(--panel);
+}
+.toolbar.colored { background: #faf9f7; border-bottom: 1px solid rgba(0,0,0,0.06); }
+[data-theme="dark"] .toolbar.colored { background: #161b22; }
+
+.toolbar-group { display: flex; align-items: center; gap: 8px; }
+.divider { width: 1px; height: 20px; background: rgba(0,0,0,0.1); margin: 0 4px; }
+
+/* 编辑器状态 */
+.status-line {
+  position: absolute; bottom: 12px; right: 24px;
+  font-size: 12px; color: var(--muted);
+  background: var(--panel); padding: 2px 8px; border-radius: 4px;
+  border: 1px solid rgba(0,0,0,0.05);
+  pointer-events: none; opacity: 0.8;
+}
+.content.switching { opacity: 0.6; pointer-events: none; transition: opacity .15s; }
+
+/* 文件列表特定样式 */
+.file-list .toolbar {
+  flex-wrap: wrap;
+  height: auto;
+  row-gap: 8px;
+}
+.file-list .search-box {
+  display: flex;
+  align-items: center;
+  flex: 1 1 100%; /* 强制占满一行，确保不与上方按钮并排挤压 */
+  gap: 4px;
+  min-width: 0;
+  margin-top: 4px; /* 增加一点间距 */
+}
+.file-list .search-box .input {
+  flex: 1;
+  min-width: 0;
+}
+.file-list .toolbar .btn {
+  white-space: nowrap;
+}
+
+.list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(0,0,0,0.04);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+.list-item:hover {
+  background-color: rgba(0,0,0,0.02);
+}
+.list-item.active {
+  background-color: rgba(126, 91, 239, 0.08);
+  border-right: 3px solid var(--accent);
+}
+[data-theme="dark"] .list-item.active {
+  background-color: rgba(147, 197, 253, 0.12);
+}
+
+.list-item .info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.list-item .title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.list-item.active .title {
+  color: var(--accent);
+}
+.list-item .meta {
+  font-size: 12px;
+  color: var(--muted);
+}
+.list-item .actions {
+  display: flex;
+  gap: 4px;
+  margin-left: 8px;
+  opacity: 0;
+  transform: translateX(10px);
+  transition: all 0.2s ease;
+}
+.list-item:hover .actions,
+.list-item.active .actions {
+  opacity: 1;
+  transform: translateX(0);
+}
+.list-item .actions .btn {
+  height: 24px;
+  padding: 0 8px;
+  font-size: 12px;
+  background: transparent;
+  border-color: rgba(0,0,0,0.1);
+}
+.list-item .actions .btn:hover {
+  background: var(--panel);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Global thin scrollbar (macOS-like) */
+* { scrollbar-width: thin; scrollbar-color: var(--sb-thumb) var(--sb-track); }
+::-webkit-scrollbar { width: 8px; height: 8px; border-radius: 999px; }
+::-webkit-scrollbar-track { background: var(--sb-track); border-radius: 999px; }
+::-webkit-scrollbar-thumb { background-color: var(--sb-thumb); border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background-color: var(--sb-thumb-hover); }
+::-webkit-scrollbar-button { display: none; }
+::-webkit-scrollbar-corner { background: transparent; }
