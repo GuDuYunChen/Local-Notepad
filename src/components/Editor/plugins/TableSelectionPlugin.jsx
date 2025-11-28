@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
-import { $getRoot, $createParagraphNode } from 'lexical'
+import { $getRoot, $createParagraphNode, FORMAT_ELEMENT_COMMAND, $getSelection } from 'lexical'
 import { TableNode, TableRowNode, TableCellNode, $createTableCellNode, $createTableRowNode } from '@lexical/table'
 
 export default function TableSelectionPlugin() {
@@ -20,6 +20,25 @@ export default function TableSelectionPlugin() {
     window.addEventListener('tableSelection:mode', onMode)
     return () => window.removeEventListener('tableSelection:mode', onMode)
   }, [])
+
+  useEffect(() => {
+    const onAction = (e) => {
+      const { type, payload } = e.detail || {}
+      if (type === 'mergeCells') { if (!rects[0]) { alert('请先框选多个单元格再合并'); return } doMerge() }
+      else if (type === 'splitCells') doSplit()
+      else if (type === 'alignVertical') applyAlign(payload)
+      else if (type === 'alignHorizontal') applyHorizontal(payload)
+      else if (type === 'borderPreset') applyBorder(payload)
+      else if (type === 'background') applyBackground(payload)
+      else if (type === 'autoFitWindow') autoSize('fitWindow')
+      else if (type === 'autoFitContent') autoSize('fitContent')
+      
+      // 恢复编辑器焦点，防止操作后失焦无法输入
+      setTimeout(() => editor.focus(), 0)
+    }
+    window.addEventListener('tableAction', onAction)
+    return () => window.removeEventListener('tableAction', onAction)
+  }, [editor, rects])
 
   useEffect(() => {
     if (!active) return
@@ -45,7 +64,7 @@ export default function TableSelectionPlugin() {
       if (!cell) return
       draggingRef.current = true
       startRef.current = cell
-      e.preventDefault()
+      // e.preventDefault() // Removed to allow focus/input
     }
     let lastKey = ''
     const onMove = (e) => {
@@ -54,7 +73,7 @@ export default function TableSelectionPlugin() {
       const b = getCell(e.target) || a
       const ai = indexOf(a), bi = indexOf(b)
       if (!ai.table || ai.table !== bi.table) return
-      const r1 = Math.min(ai.r, bi.r), r2 = Math.max(ai.r, bi.r)
+      const r1 = Math.min(ai.c, bi.r), r2 = Math.max(ai.r, bi.r)
       const c1 = Math.min(ai.c, bi.c), c2 = Math.max(ai.c, bi.c)
       const key = `${ai.tableIndex}-${r1}-${c1}-${r2}-${c2}`
       if (key === lastKey) return
@@ -165,7 +184,7 @@ export default function TableSelectionPlugin() {
     if (!r) return
     editor.update(() => {
       const tables = []
-      const walk = (node) => { const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
+      const walk = (node) => { if (!node.getChildren) return; const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
       walk($getRoot())
       const table = tables[r.tableIndex]
       if (!table) return
@@ -191,12 +210,70 @@ export default function TableSelectionPlugin() {
     if (menuRef.current) menuRef.current.style.display = 'none'
   }
 
+  const doSplit = () => {
+    const r = rects[0]
+    editor.update(() => {
+      const tables = []
+      const walk = (node) => { if (!node.getChildren) return; const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
+      walk($getRoot())
+      if (r) {
+        const table = tables[r.tableIndex]
+        if (!table) return
+        const rows = table.getChildren()
+        const target = rows[r.r1]?.getChildren()?.[r.c1]
+        if (!(target instanceof TableCellNode)) return
+        const rs = target.getRowSpan?.() || 1
+        const cs = target.getColSpan?.() || 1
+        if (rs === 1 && cs === 1) return
+        target.setRowSpan?.(1)
+        target.setColSpan?.(1)
+        for (let rr = r.r1; rr < r.r1 + rs; rr++) {
+          const row = rows[rr]
+          const cells = row.getChildren()
+          for (let cc = r.c1; cc < r.c1 + cs; cc++) {
+            if (rr === r.r1 && cc === r.c1) continue
+            const cell = $createTableCellNode()
+            cell.append($createParagraphNode())
+            row.insertAt(Math.min(cc, cells.length), cell)
+          }
+        }
+      } else {
+        const sel = $getSelection()
+        const node = sel?.getNodes?.()[0]
+        let cell = node
+        while (cell && !(cell instanceof TableCellNode)) { cell = cell.getParent?.() }
+        if (!(cell instanceof TableCellNode)) return
+        const row = cell.getParent()
+        const table = row?.getParent?.()
+        const rs = cell.getRowSpan?.() || 1
+        const cs = cell.getColSpan?.() || 1
+        if (rs === 1 && cs === 1) return
+        cell.setRowSpan?.(1)
+        cell.setColSpan?.(1)
+        const rowIndex = row.getIndexWithinParent?.() ?? 0
+        const colIndex = cell.getIndexWithinParent?.() ?? 0
+        const rows = table.getChildren()
+        for (let rr = rowIndex; rr < rowIndex + rs; rr++) {
+          const rNode = rows[rr]
+          const cells = rNode.getChildren()
+          for (let cc = colIndex; cc < colIndex + cs; cc++) {
+            if (rr === rowIndex && cc === colIndex) continue
+            const nc = $createTableCellNode()
+            nc.append($createParagraphNode())
+            rNode.insertAt(Math.min(cc, cells.length), nc)
+          }
+        }
+      }
+    })
+    setRects([])
+  }
+
   const doClear = () => {
     const r = rects[0]
     if (!r) return
     editor.update(() => {
       const tables = []
-      const walk = (node) => { const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
+      const walk = (node) => { if (!node.getChildren) return; const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
       walk($getRoot())
       const table = tables[r.tableIndex]
       if (!table) return
@@ -220,7 +297,7 @@ export default function TableSelectionPlugin() {
     const { tIndex, ri } = readInfo()
     editor.update(() => {
       const tables = []
-      const walk = (node) => { const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
+      const walk = (node) => { if (!node.getChildren) return; const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
       walk($getRoot())
       const table = tables[tIndex]
       if (!table) return
@@ -237,7 +314,7 @@ export default function TableSelectionPlugin() {
     const { tIndex, ri } = readInfo()
     editor.update(() => {
       const tables = []
-      const walk = (node) => { const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
+      const walk = (node) => { if (!node.getChildren) return; const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
       walk($getRoot())
       const table = tables[tIndex]
       if (!table) return
@@ -252,7 +329,7 @@ export default function TableSelectionPlugin() {
     const { tIndex, ci } = readInfo()
     editor.update(() => {
       const tables = []
-      const walk = (node) => { const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
+      const walk = (node) => { if (!node.getChildren) return; const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
       walk($getRoot())
       const table = tables[tIndex]
       if (!table) return
@@ -265,7 +342,7 @@ export default function TableSelectionPlugin() {
   const addColForTable = (tIndex) => {
     editor.update(() => {
       const tables = []
-      const walk = (node) => { const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
+      const walk = (node) => { if (!node.getChildren) return; const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
       walk($getRoot())
       const table = tables[tIndex]
       if (!table) return
@@ -279,7 +356,7 @@ export default function TableSelectionPlugin() {
     const { tIndex, ci } = readInfo()
     editor.update(() => {
       const tables = []
-      const walk = (node) => { const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
+      const walk = (node) => { if (!node.getChildren) return; const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
       walk($getRoot())
       const table = tables[tIndex]
       if (!table) return
@@ -290,6 +367,7 @@ export default function TableSelectionPlugin() {
   }
 
   const outlines = (() => {
+    if (typeof document === 'undefined') return []
     const container = document.querySelector('.editor-container')
     if (!container) return []
     const tables = Array.from(container.querySelectorAll('table'))
@@ -309,6 +387,169 @@ export default function TableSelectionPlugin() {
       return { x, y, w, h }
     }).filter(Boolean)
   })()
+
+  const applyAlign = (v) => {
+    const r = rects[0]
+    editor.update(() => {
+      const tables = []
+      const walk = (node) => { if (!node.getChildren) return; const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
+      walk($getRoot())
+      if (r) {
+        const table = tables[r.tableIndex]
+        if (!table) return
+        const targetRows = table.getChildren()
+        for (let rr = r.r1; rr <= r.r2; rr++) {
+          const row = targetRows[rr]
+          const cells = row.getChildren()
+          for (let cc = r.c1; cc <= r.c2 && cc < cells.length; cc++) { cells[cc].setVerticalAlign?.(v) }
+        }
+      } else {
+        const sel = $getSelection()
+        const node = sel?.getNodes?.()[0]
+        let cell = node
+        while (cell && !(cell instanceof TableCellNode)) { cell = cell.getParent?.() }
+        if (cell) cell.setVerticalAlign?.(v)
+      }
+    })
+    setRects([])
+  }
+
+  const applyHorizontal = (v) => {
+    const r = rects[0]
+    const patch = `text-align: ${v};`
+    editor.update(() => {
+      const tables = []
+      const walk = (node) => { if (!node.getChildren) return; const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
+      walk($getRoot())
+      const applyCell = (cell) => { const prev = cell.getStyle?.() || ''; cell.setStyle?.(mergeStyle(prev, patch)) }
+      if (r) {
+        const table = tables[r.tableIndex]
+        if (!table) return
+        const targetRows = table.getChildren()
+        for (let rr = r.r1; rr <= r.r2; rr++) {
+          const row = targetRows[rr]
+          const cells = row.getChildren()
+          for (let cc = r.c1; cc <= r.c2 && cc < cells.length; cc++) { applyCell(cells[cc]) }
+        }
+      } else {
+        const sel = $getSelection()
+        const node = sel?.getNodes?.()[0]
+        let cell = node
+        while (cell && !(cell instanceof TableCellNode)) { cell = cell.getParent?.() }
+        if (cell) applyCell(cell)
+      }
+    })
+    setRects([])
+  }
+
+  const applyBorder = (preset) => {
+    const r = rects[0]
+    const style = (() => {
+      if (preset === 'none') return 'border: 0;'
+      if (preset === 'thin') return 'border: 1px solid #999;'
+      if (preset === 'bold') return 'border: 2px solid #333;'
+      if (preset === 'dashed') return 'border: 2px dashed #666;'
+      return ''
+    })()
+    editor.update(() => {
+      const tables = []
+      const walk = (node) => { if (!node.getChildren) return; const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
+      walk($getRoot())
+      const applyCell = (cell) => { const prev = cell.getStyle?.() || ''; cell.setStyle?.(mergeStyle(prev, style)) }
+      if (r) {
+        const table = tables[r.tableIndex]
+        if (!table) return
+        const targetRows = table.getChildren()
+        for (let rr = r.r1; rr <= r.r2; rr++) {
+          const row = targetRows[rr]
+          const cells = row.getChildren()
+          for (let cc = r.c1; cc <= r.c2 && cc < cells.length; cc++) { applyCell(cells[cc]) }
+        }
+      } else {
+        const sel = $getSelection()
+        const node = sel?.getNodes?.()[0]
+        let cell = node
+        while (cell && !(cell instanceof TableCellNode)) { cell = cell.getParent?.() }
+        if (cell) applyCell(cell)
+      }
+    })
+    setRects([])
+  }
+
+  const applyBackground = (color) => {
+    const r = rects[0]
+    editor.update(() => {
+      const tables = []
+      const walk = (node) => { if (!node.getChildren) return; const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
+      walk($getRoot())
+      if (r) {
+        const table = tables[r.tableIndex]
+        if (!table) return
+        const targetRows = table.getChildren()
+        for (let rr = r.r1; rr <= r.r2; rr++) {
+          const row = targetRows[rr]
+          const cells = row.getChildren()
+          for (let cc = r.c1; cc <= r.c2 && cc < cells.length; cc++) { cells[cc].setBackgroundColor?.(color) }
+        }
+      } else {
+        const sel = $getSelection()
+        const node = sel?.getNodes?.()[0]
+        let cell = node
+        while (cell && !(cell instanceof TableCellNode)) { cell = cell.getParent?.() }
+        if (cell) cell.setBackgroundColor?.(color)
+      }
+    })
+    setRects([])
+  }
+
+  const mergeStyle = (prev, patch) => {
+    const map = {}
+    const put = (s) => { s.split(';').map(x=>x.trim()).filter(Boolean).forEach((kv)=>{ const i=kv.indexOf(':'); if(i>0){ const k=kv.slice(0,i).trim(); const v=kv.slice(i+1).trim(); map[k]=v } }) }
+    put(prev || '')
+    put(patch || '')
+    return Object.entries(map).map(([k,v])=>`${k}: ${v};`).join(' ')
+  }
+
+  const autoSize = (mode) => {
+    editor.update(() => {
+      const tables = []
+      const walk = (node) => { if (!node.getChildren) return; const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
+      walk($getRoot())
+      const container = document.querySelector('.editor-container')
+      const tableEls = container ? Array.from(container.querySelectorAll('table')) : []
+      let tableIndex = hoverTable
+      if (tableIndex === null || tableIndex === undefined) {
+        const sel = $getSelection()
+        const node = sel?.getNodes?.()[0]
+        let tableNode = node
+        while (tableNode && !(tableNode instanceof TableNode)) { tableNode = tableNode.getParent?.() }
+        if (tableNode) {
+          const list = []
+          const walk2 = (n) => { if (!n.getChildren) return; const kids = n.getChildren(); for (const k of kids) { if (k instanceof TableNode) list.push(k); walk2(k) } }
+          walk2($getRoot())
+          tableIndex = list.indexOf(tableNode)
+        } else {
+          tableIndex = 0
+        }
+      }
+      const table = tables[tableIndex]
+      const tableEl = tableEls[tableIndex]
+      if (!table || !tableEl) return
+      const rows = table.getChildren()
+      const colsCount = rows[0]?.getChildren()?.length || 1
+      if (mode === 'fitWindow') {
+        const hostW = container.getBoundingClientRect().width - 20
+        const colW = Math.max(60, Math.floor(hostW / colsCount))
+        rows.forEach((row) => { const cells = row.getChildren(); cells.forEach((cell)=>cell.setWidth?.(colW)) })
+      } else if (mode === 'fitContent') {
+        const measures = new Array(colsCount).fill(60)
+        Array.from(tableEl.rows).forEach((r) => {
+          Array.from(r.cells).forEach((c, ci) => { const w = Math.ceil(c.scrollWidth) + 24; measures[ci] = Math.max(measures[ci], w) })
+        })
+        rows.forEach((row) => { const cells = row.getChildren(); cells.forEach((cell, ci)=>cell.setWidth?.(measures[ci])) })
+      }
+    })
+  }
 
   return (
     <div ref={overlayRef} className="table-selection-overlay" style={{ pointerEvents: 'none' }}>

@@ -20,6 +20,7 @@ import { $getSelection, $isRangeSelection } from 'lexical';
 import { mergeRegister } from '@lexical/utils';
 import { compressImage, generateVideoMetadata, loadXLSX, uploadFile } from '../utils/fileUpload';
 import { TableNode, TableRowNode } from '@lexical/table'
+import TableMenu from './TableMenu'
 
 const FontOptions = [
   { label: 'Arial', value: 'Arial' },
@@ -66,92 +67,10 @@ export default function ToolbarPlugin() {
   };
 
   const [pickerOpen, setPickerOpen] = useState(false)
-  const [selectionMode, setSelectionMode] = useState(false)
-  const sizes = Array.from({ length: 10 }, (_, r) => Array.from({ length: 10 }, (_, c) => ({ r: r + 1, c: c + 1 })))
 
-  const toggleSelectionMode = () => {
-    const next = !selectionMode
-    setSelectionMode(next)
-    window.dispatchEvent(new CustomEvent('tableSelection:mode', { detail: next }))
-    if (!next) window.dispatchEvent(new CustomEvent('tableSelection:clear', {}))
-  }
+  const toggleSelectionMode = () => {}
 
-  const addRow = (dir = 'after') => {
-    editor.update(() => {
-      const sel = $getSelection()
-      if (!$isRangeSelection(sel)) return
-      const node = sel.getNodes()[0]
-      let table = node
-      while (table && !(table instanceof TableNode)) { table = table.getParent() }
-      if (!table) return
-      const rows = table.getChildren()
-      const sample = rows[0]
-      const cols = sample ? sample.getChildren().length : 1
-      const row = $createTableRowNode()
-      for (let i = 0; i < cols; i++) {
-        const cell = $createTableCellNode()
-        const p = $createParagraphNode()
-        cell.append(p)
-        row.append(cell)
-      }
-      table.append(row)
-    })
-  }
-
-  const delRow = () => {
-    editor.update(() => {
-      const sel = $getSelection()
-      if (!$isRangeSelection(sel)) return
-      const node = sel.getNodes()[0]
-      let row = node
-      while (row && !(row instanceof TableRowNode)) { row = row.getParent() }
-      if (!row) return
-      row.remove()
-    })
-  }
-
-  const addCol = () => {
-    editor.update(() => {
-      const sel = $getSelection()
-      if (!$isRangeSelection(sel)) return
-      const node = sel.getNodes()[0]
-      let table = node
-      while (table && !(table instanceof TableNode)) { table = table.getParent() }
-      if (!table) return
-      const rows = table.getChildren()
-      const sampleHeader = (() => {
-        const firstCell = rows[0]?.getChildren()?.[0]
-        try { return typeof firstCell?.getHeaderState === 'function' ? firstCell.getHeaderState() : 0 } catch { return 0 }
-      })()
-      rows.forEach((row, ri) => {
-        const cell = $createTableCellNode()
-        const p = $createParagraphNode()
-        cell.append(p)
-        try { if (ri === 0 && typeof cell.setHeaderState === 'function') cell.setHeaderState(sampleHeader) } catch {}
-        row.append(cell)
-      })
-    })
-  }
-
-  const delCol = () => {
-    editor.update(() => {
-      const sel = $getSelection()
-      if (!$isRangeSelection(sel)) return
-      const node = sel.getNodes()[0]
-      let row = node
-      while (row && !(row instanceof TableRowNode)) { row = row.getParent() }
-      if (!row) return
-      const cells = row.getChildren()
-      const idx = Math.max(0, cells.length - 1)
-      let table = row.getParent()
-      const rows = table.getChildren()
-      for (const r of rows) {
-        const cs = r.getChildren()
-        const target = cs[idx]
-        if (target) target.remove()
-      }
-    })
-  }
+  
 
   const uploadFileSafe = async (file) => {
     try {
@@ -319,16 +238,7 @@ export default function ToolbarPlugin() {
       <span className="divider" />
       <div className="toolbar-group" style={{ position: 'relative' }}>
         <span className="group-label">表格</span>
-        <button onClick={insertTable} className="btn">插入表格</button>
-        <button onClick={() => setPickerOpen(v => !v)} className="btn">尺寸选择</button>
-        {pickerOpen && (
-          <TableSizePicker onPick={(r,c)=>{ editor.dispatchCommand(INSERT_TABLE_COMMAND, { columns: String(c), rows: String(r) }); setPickerOpen(false) }} />
-        )}
-        <button onClick={toggleSelectionMode} className="btn" style={{ background: selectionMode ? 'rgba(126,91,239,0.2)' : undefined }}>选择模式</button>
-        <button onClick={() => addRow('after')} className="btn">添加行</button>
-        <button onClick={delRow} className="btn">删除行</button>
-        <button onClick={addCol} className="btn">添加列</button>
-        <button onClick={delCol} className="btn">删除列</button>
+        <TableMenu />
       </div>
       <span className="divider" />
       <div className="toolbar-group">
@@ -342,69 +252,4 @@ export default function ToolbarPlugin() {
   );
 }
 
-function TableSizePicker({ onPick }) {
-  const [dragging, setDragging] = useState(false)
-  const [start, setStart] = useState(null)
-  const [end, setEnd] = useState(null)
-  const ref = React.useRef(null)
-  const dim = { rows: 10, cols: 10 }
-  const rect = React.useMemo(() => {
-    if (!start || !end) return null
-    const r1 = Math.min(start.r, end.r), r2 = Math.max(start.r, end.r)
-    const c1 = Math.min(start.c, end.c), c2 = Math.max(start.c, end.c)
-    return { r1, c1, r2, c2 }
-  }, [start, end])
-
-  const setByEvent = (e) => {
-    const box = ref.current
-    if (!box) return null
-    const rect = box.getBoundingClientRect()
-    const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left
-    const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top
-    const cellW = rect.width / dim.cols
-    const cellH = rect.height / dim.rows
-    const c = Math.min(dim.cols, Math.max(1, Math.ceil(x / cellW)))
-    const r = Math.min(dim.rows, Math.max(1, Math.ceil(y / cellH)))
-    return { r, c }
-  }
-
-  const onDown = (e) => { const p = setByEvent(e); if (!p) return; setStart(p); setEnd(p); setDragging(true) }
-  const onMove = (e) => { if (!dragging) return; const p = setByEvent(e); if (!p) return; setEnd(p) }
-  const onUp = () => { if (rect) onPick(rect.r2 - rect.r1 + 1, rect.c2 - rect.c1 + 1); setDragging(false); setStart(null); setEnd(null) }
-  const onClickCell = (r,c) => { onPick(r,c) }
-
-  const overlayStyle = (() => {
-    if (!rect || !ref.current) return { display:'none' }
-    const host = ref.current.getBoundingClientRect()
-    const cellW = host.width / dim.cols
-    const cellH = host.height / dim.rows
-    const x = (rect.c1 - 1) * cellW
-    const y = (rect.r1 - 1) * cellH
-    const w = (rect.c2 - rect.c1 + 1) * cellW
-    const h = (rect.r2 - rect.r1 + 1) * cellH
-    return { left: x, top: y, width: w, height: h }
-  })()
-
-  return (
-    <div className="size-picker" ref={ref}
-      onMouseDown={onDown}
-      onMouseMove={onMove}
-      onMouseUp={onUp}
-      onTouchStart={onDown}
-      onTouchMove={onMove}
-      onTouchEnd={onUp}
-    >
-      <div className="size-overlay" style={overlayStyle} />
-      {Array.from({length: dim.rows}).map((_, ri) => (
-        <div key={ri} className="size-row">
-          {Array.from({length: dim.cols}).map((_, ci) => {
-            const r = ri+1, c = ci+1
-            const active = rect && r>=rect.r1 && r<=rect.r2 && c>=rect.c1 && c<=rect.c2
-            return <span key={ci} className={active? 'size-cell active':'size-cell'} onClick={()=>onClickCell(r,c)} />
-          })}
-        </div>
-      ))}
-      <div className="size-label">{rect? `${rect.r2-rect.r1+1}×${rect.c2-rect.c1+1}`: '选择尺寸'}</div>
-    </div>
-  )
-}
+// 尺寸选择已整合到 TableMenu 中

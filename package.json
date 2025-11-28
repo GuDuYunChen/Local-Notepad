@@ -14,8 +14,8 @@
     "test:e2e": "vitest run tests/e2e/backend.spec.ts"
   },
   "dependencies": {
-    "@lexical/link": "^0.15.0",
     "@lexical/code": "^0.15.0",
+    "@lexical/link": "^0.15.0",
     "@lexical/list": "^0.15.0",
     "@lexical/react": "^0.15.0",
     "@lexical/rich-text": "^0.15.0",
@@ -23,9 +23,9 @@
     "@lexical/table": "^0.15.0",
     "@lexical/utils": "^0.15.0",
     "lexical": "^0.15.0",
-    "xlsx": "^0.18.5",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.0",
@@ -33,6 +33,7 @@
     "electron": "^31.0.0",
     "electron-builder": "^24.9.3",
     "esbuild": "^0.21.5",
+    "jsdom": "^27.2.0",
     "vite": "^5.0.0",
     "vitest": "^1.6.0",
     "wait-on": "^7.2.0"
@@ -52,11 +53,22 @@
       }
     ],
     "protocols": [
-      { "name": "Notepad Protocol", "schemes": ["notepad"] }
+      {
+        "name": "Notepad Protocol",
+        "schemes": [
+          "notepad"
+        ]
+      }
     ],
     "fileAssociations": [
-      { "ext": "md", "name": "Markdown Document" },
-      { "ext": "txt", "name": "Text Document" }
+      {
+        "ext": "md",
+        "name": "Markdown Document"
+      },
+      {
+        "ext": "txt",
+        "name": "Text Document"
+      }
     ],
     "nsis": {
       "oneClick": false,
@@ -74,3 +86,5 @@
     }
   }
 }
+
+
