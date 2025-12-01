@@ -1,6 +1,6 @@
 {
   "name": "notepad-desktop",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "main": "out/electron/main.cjs",
@@ -78,7 +78,7 @@
       "allowElevation": true,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "shortcutName": "Notepad",
+      "shortcutName": "记事本",
       "artifactName": "Notepad-${version}-Setup.exe"
     },
     "win": {

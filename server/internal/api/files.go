@@ -98,13 +98,9 @@ func (a *FileAPI) Import(r *ghttp.Request) {
         }
     }
     if len(in.Paths) > 0 {
-        var out []interface{}
-        for _, p := range in.Paths {
-            if strings.TrimSpace(p) == "" { continue }
-            f, err := a.Svc.ImportPath(r.GetCtx(), p, in.Encoding)
-            if err != nil { writeErr(r, 1013, "导入失败", err); return }
-            out = append(out, f)
-        }
+        // 使用批量事务导入
+        out, err := a.Svc.BatchImport(r.GetCtx(), in.Paths, in.Encoding)
+        if err != nil { writeErr(r, 1013, "批量导入失败", err); return }
         writeOK(r, out)
         return
     }
