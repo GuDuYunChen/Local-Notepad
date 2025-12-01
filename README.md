@@ -13,21 +13,40 @@
 - 构建 Electron 主/预加载脚本：`npm run build:main`
 - 构建渲染进程：`npm run build:renderer`
 
-## 一键打包（生成 Windows 安装包 exe）
-- 前置要求：
-  - Windows 环境
-  - Node.js ≥ 18 与 npm
-  - Go ≥ 1.20（用于构建后端服务）
-- 方式一：双击脚本（推荐）
-  1. 在项目根目录双击 `pack-win.ps1`。
-  2. 脚本会自动安装依赖并执行打包，完成后自动打开产物所在文件夹。
-  3. 安装包文件名：`dist/Notepad-<version>-Setup.exe`。
-  - 若遇到 PowerShell 执行策略限制，可在终端执行：
-    - `powershell -ExecutionPolicy Bypass -File ./pack-win.ps1`
-- 方式二：命令行打包
-  1. `npm install`
-  2. `npm run build`
-     - 包含：构建后端（Go）、构建 Electron 主进程与渲染进程、执行 `electron-builder` 生成安装包。
+## 打包与构建（生成本地安装包）
+
+本项目支持生成 Windows 本地安装包（.exe），生成的安装包为**完全离线版本**，包含前端、Electron 容器及 Go 后端服务，用户可直接在本地安装使用，无需额外部署。
+
+### 方式一：使用自动化脚本（推荐）
+双击项目根目录下的 `pack-win.ps1` 脚本。
+- 脚本会自动检查环境（Node.js, Go）、安装依赖、构建前后端并生成安装包。
+- **产物位置**：`dist/Notepad-<version>-Setup.exe`
+- **使用方式**：直接双击生成的 `.exe` 文件进行安装，安装后即可在桌面启动应用。
+
+### 方式二：命令行手动打包
+如果需要手动控制构建过程，可在终端依次执行：
+
+1. **安装依赖**
+   ```bash
+   npm install
+   ```
+
+2. **执行构建**
+   ```bash
+   npm run build
+   ```
+   该命令会依次执行：
+   - `npm run ci:build-backend-win`：编译 Go 后端服务
+   - `npm run build:main`：编译 Electron 主进程
+   - `npm run build:renderer`：编译 React 前端
+   - `electron-builder`：打包生成 Windows 安装程序
+
+3. **获取产物**
+   构建完成后，安装包将生成在 `dist/` 目录下，文件名为 `Notepad-<version>-Setup.exe`。
+
+### 注意事项
+- **环境要求**：打包需在 Windows 环境下进行，且需预先安装 Go (≥1.20) 和 Node.js。
+- **后端集成**：打包过程会自动将编译好的 `notepad-server.exe` 复制到安装包中，用户安装后应用会自动管理后端服务的启动与关闭。
 
 ## 部署
 - 打包生成的 `Notepad-<version>-Setup.exe` 直接分发给用户安装。
