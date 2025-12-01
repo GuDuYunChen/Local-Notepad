@@ -14,7 +14,7 @@ function createWindow() {
     minHeight: 600,
     title: 'Notepad',
     webPreferences: {
-      preload: path.join(__dirname, 'preload.cjs'),
+      preload: path.join(app.getAppPath(), 'out/electron/preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true
@@ -30,7 +30,8 @@ function createWindow() {
     }
   } else {
     process.env.API_BASE = 'http://127.0.0.1:27121'
-    const indexPath = path.resolve(process.cwd(), 'dist', 'index.html')
+    // 使用 app.getAppPath() 获取应用根目录 (asar 内部根目录)，确保路径解析正确
+    const indexPath = path.join(app.getAppPath(), 'dist/index.html')
     startBackend()
     mainWindow.loadFile(indexPath)
   }

@@ -35,7 +35,7 @@ function createWindow() {
     minHeight: 600,
     title: "Notepad",
     webPreferences: {
-      preload: import_node_path.default.join(__dirname, "preload.cjs"),
+      preload: import_node_path.default.join(import_electron.app.getAppPath(), "out/electron/preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true
@@ -50,7 +50,7 @@ function createWindow() {
     }
   } else {
     process.env.API_BASE = "http://127.0.0.1:27121";
-    const indexPath = import_node_path.default.resolve(process.cwd(), "dist", "index.html");
+    const indexPath = import_node_path.default.join(import_electron.app.getAppPath(), "dist/index.html");
     startBackend();
     mainWindow.loadFile(indexPath);
   }

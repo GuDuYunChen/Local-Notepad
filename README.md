@@ -18,9 +18,10 @@
 本项目支持生成 Windows 本地安装包（.exe），生成的安装包为**完全离线版本**，包含前端、Electron 容器及 Go 后端服务，用户可直接在本地安装使用，无需额外部署。
 
 ### 方式一：使用自动化脚本（推荐）
-双击项目根目录下的 `pack-win.ps1` 脚本。
+双击项目根目录下的 `pack-win.bat` 脚本（或者右键 `pack-win.ps1` 选择“使用 PowerShell 运行”）。
+- **注意**：Windows 默认会将 `.ps1` 文件关联到记事本打开，直接双击可能无法运行。请使用新提供的 `pack-win.bat` 批处理文件，或者右键点击 `.ps1` 文件选择运行。
 - 脚本会自动检查环境（Node.js, Go）、安装依赖、构建前后端并生成安装包。
-- **产物位置**：`dist/Notepad-<version>-Setup.exe`
+- **产物位置**：`release/Notepad-<version>-Setup.exe`
 - **使用方式**：直接双击生成的 `.exe` 文件进行安装，安装后即可在桌面启动应用。
 
 ### 方式二：命令行手动打包
@@ -42,7 +43,7 @@
    - `electron-builder`：打包生成 Windows 安装程序
 
 3. **获取产物**
-   构建完成后，安装包将生成在 `dist/` 目录下，文件名为 `Notepad-<version>-Setup.exe`。
+   构建完成后，安装包将生成在 `release/` 目录下，文件名为 `Notepad-<version>-Setup.exe`。
 
 ### 注意事项
 - **环境要求**：打包需在 Windows 环境下进行，且需预先安装 Go (≥1.20) 和 Node.js。

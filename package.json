@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "main": "electron/main.js",
+  "main": "out/electron/main.cjs",
   "scripts": {
     "dev": "concurrently \"vite\" \"wait-on http://localhost:5000 && npx -y electron@31 out/electron/main.cjs\" \"npm:build:main:watch\"",
     "build:renderer": "vite build",
@@ -39,6 +39,9 @@
     "wait-on": "^7.2.0"
   },
   "build": {
+    "directories": {
+      "output": "release"
+    },
     "appId": "com.example.notepaddesktop",
     "productName": "Notepad",
     "files": [
