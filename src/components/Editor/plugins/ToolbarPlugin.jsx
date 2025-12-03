@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import { INSERT_TABLE_COMMAND, $createTableNode, $createTableRowNode, $createTableCellNode } from '@lexical/table';
 import { $createImageNode } from '../nodes/ImageNode';
@@ -24,6 +24,13 @@ import TableMenu from './TableMenu'
 
 const FontOptions = [
   { label: 'Arial', value: 'Arial' },
+  { label: '阿里妈妈灵动体', value: 'AlimamaAgileVF' },
+  { label: '阿里妈妈刀隶体', value: 'AlimamaDaoLiTi' },
+  { label: '阿里妈妈东方大楷', value: 'AlimamaDongFangDaKai' },
+  { label: '阿里妈妈方圆体', value: 'AlimamaFangYuanTiVF' },
+  { label: '阿里妈妈数黑体', value: 'AlimamaShuHeiTi' },
+  { label: '钉钉进步体', value: 'DingTalkJinBuTi' },
+  { label: '淘宝买菜体', value: 'TaoBaoMaiCaiTi' },
   { label: '宋体', value: 'SimSun' },
   { label: '黑体', value: 'SimHei' },
   { label: '微软雅黑', value: 'Microsoft YaHei' },
@@ -37,12 +44,31 @@ export default function ToolbarPlugin() {
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [fontSize, setFontSize] = useState('14px');
-  const [fontFamily, setFontFamily] = useState('Arial');
+  const [fontFamily, setFontFamily] = useState(() => localStorage.getItem('editor-font-family') || 'Arial');
   const [isUploading, setIsUploading] = useState(false);
   const [isBold, setIsBold] = useState(false);
   const [isItalic, setIsItalic] = useState(false);
   const [isUnderline, setIsUnderline] = useState(false);
   const [elementFormat, setElementFormat] = useState('left');
+  const fontSelectRef = useRef(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        fontSelectRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const handleFontChange = (e) => {
+    const value = e.target.value;
+    setFontFamily(value);
+    localStorage.setItem('editor-font-family', value);
+    applyStyle('font-family', value);
+  };
 
   const updateToolbar = useCallback(() => {
     const selection = $getSelection();
@@ -241,7 +267,7 @@ export default function ToolbarPlugin() {
       <span className="divider" />
       <div className="toolbar-group">
         <span className="group-label">文本</span>
-        <select value={fontFamily} onChange={e => { setFontFamily(e.target.value); applyStyle('font-family', e.target.value); }} className="select">
+        <select ref={fontSelectRef} value={fontFamily} onChange={handleFontChange} className="select" style={{width: 140}}>
           {FontOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
         <select value={fontSize} onChange={e => { setFontSize(e.target.value); applyStyle('font-size', e.target.value); }} className="select">

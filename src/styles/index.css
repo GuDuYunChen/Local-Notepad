@@ -1,3 +1,70 @@
+@font-face {
+  font-family: 'TaoBaoMaiCaiTi';
+  src: url('../assets/fonts/TaoBaoMaiCaiTi-Regular/TaoBaoMaiCaiTi-Regular.woff2') format('woff2'),
+       url('../assets/fonts/TaoBaoMaiCaiTi-Regular/TaoBaoMaiCaiTi-Regular.woff') format('woff'),
+       url('../assets/fonts/TaoBaoMaiCaiTi-Regular/TaoBaoMaiCaiTi-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'AlimamaAgileVF';
+  src: url('../assets/fonts/AlimamaAgileVF/AlimamaAgileVF/AlimamaAgileVF-Thin.woff2') format('woff2'),
+       url('../assets/fonts/AlimamaAgileVF/AlimamaAgileVF/AlimamaAgileVF-Thin.woff') format('woff'),
+       url('../assets/fonts/AlimamaAgileVF/AlimamaAgileVF/AlimamaAgileVF-Thin.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'AlimamaDaoLiTi';
+  src: url('../assets/fonts/AlimamaDaoLiTi/AlimamaDaoLiTi/AlimamaDaoLiTi.woff2') format('woff2'),
+       url('../assets/fonts/AlimamaDaoLiTi/AlimamaDaoLiTi/AlimamaDaoLiTi.woff') format('woff'),
+       url('../assets/fonts/AlimamaDaoLiTi/AlimamaDaoLiTi/AlimamaDaoLiTi.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'AlimamaDongFangDaKai';
+  src: url('../assets/fonts/AlimamaDongFangDaKai/AlimamaDongFangDaKai-Regular/AlimamaDongFangDaKai-Regular.woff2') format('woff2'),
+       url('../assets/fonts/AlimamaDongFangDaKai/AlimamaDongFangDaKai-Regular/AlimamaDongFangDaKai-Regular.woff') format('woff'),
+       url('../assets/fonts/AlimamaDongFangDaKai/AlimamaDongFangDaKai-Regular/AlimamaDongFangDaKai-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'AlimamaFangYuanTiVF';
+  src: url('../assets/fonts/AlimamaFangYuanTiVF/AlimamaFangYuanTiVF/AlimamaFangYuanTiVF-Thin.woff2') format('woff2'),
+       url('../assets/fonts/AlimamaFangYuanTiVF/AlimamaFangYuanTiVF/AlimamaFangYuanTiVF-Thin.woff') format('woff');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'AlimamaShuHeiTi';
+  src: url('../assets/fonts/AlimamaShuHeiTi/AlimamaShuHeiTi/AlimamaShuHeiTi-Bold/AlimamaShuHeiTi-Bold.woff2') format('woff2'),
+       url('../assets/fonts/AlimamaShuHeiTi/AlimamaShuHeiTi/AlimamaShuHeiTi-Bold/AlimamaShuHeiTi-Bold.woff') format('woff'),
+       url('../assets/fonts/AlimamaShuHeiTi/AlimamaShuHeiTi/AlimamaShuHeiTi-Bold/AlimamaShuHeiTi-Bold.ttf') format('truetype');
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'DingTalkJinBuTi';
+  src: url('../assets/fonts/DingTalkJinBuTi/DingTalkJinBuTi/DingTalkJinBuTi-Regular/DingTalkJinBuTi-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --bg: #faf9f7;
   --fg: #1f2d3d;
