@@ -71,7 +71,8 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, "PingFang SC",
   white-space: nowrap;
 }
 .btn:hover { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.2); }
-.btn:active { background: rgba(0,0,0,0.08); transform: translateY(1px); }
+.btn:active,
+.btn.active { background: rgba(0,0,0,0.08); transform: translateY(1px); border-color: rgba(0,0,0,0.2); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn.primary { background: var(--accent); color: #fff; border-color: transparent; }
 .btn.primary:hover { opacity: 0.9; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
@@ -175,18 +176,16 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, "PingFang SC",
   color: var(--muted);
 }
 .list-item .actions {
-  display: flex;
+  display: none;
   gap: 4px;
   margin-left: 8px;
-  opacity: 0;
-  transform: translateX(10px);
-  transition: all 0.2s ease;
 }
 .list-item:hover .actions,
 .list-item.active .actions {
-  opacity: 1;
-  transform: translateX(0);
+  display: flex;
+  animation: fadeIn 0.2s ease;
 }
+@keyframes fadeIn { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: translateX(0); } }
 .list-item .actions .btn {
   height: 24px;
   padding: 0 8px;

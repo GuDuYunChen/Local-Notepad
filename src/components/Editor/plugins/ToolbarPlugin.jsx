@@ -17,7 +17,7 @@ import {
 } from 'lexical';
 import { $patchStyleText } from '@lexical/selection';
 import { $getSelection, $isRangeSelection } from 'lexical';
-import { mergeRegister } from '@lexical/utils';
+import { mergeRegister, $getNearestBlockElementAncestorOrThrow } from '@lexical/utils';
 import { compressImage, generateVideoMetadata, loadXLSX, uploadFile } from '../utils/fileUpload';
 import { TableNode, TableRowNode } from '@lexical/table'
 import TableMenu from './TableMenu'
@@ -39,9 +39,32 @@ export default function ToolbarPlugin() {
   const [fontSize, setFontSize] = useState('14px');
   const [fontFamily, setFontFamily] = useState('Arial');
   const [isUploading, setIsUploading] = useState(false);
+  const [isBold, setIsBold] = useState(false);
+  const [isItalic, setIsItalic] = useState(false);
+  const [isUnderline, setIsUnderline] = useState(false);
+  const [elementFormat, setElementFormat] = useState('left');
+
+  const updateToolbar = useCallback(() => {
+    const selection = $getSelection();
+    if ($isRangeSelection(selection)) {
+      setIsBold(selection.hasFormat('bold'));
+      setIsItalic(selection.hasFormat('italic'));
+      setIsUnderline(selection.hasFormat('underline'));
+      const anchorNode = selection.anchor.getNode();
+      const element = anchorNode.getKey() === 'root'
+        ? anchorNode
+        : $getNearestBlockElementAncestorOrThrow(anchorNode);
+      setElementFormat(element.getFormatType() || 'left');
+    }
+  }, [editor]);
 
   useEffect(() => {
     return mergeRegister(
+      editor.registerUpdateListener(({ editorState }) => {
+        editorState.read(() => {
+          updateToolbar();
+        });
+      }),
       editor.registerCommand(CAN_UNDO_COMMAND, (payload) => {
         setCanUndo(payload);
         return false;
@@ -51,7 +74,7 @@ export default function ToolbarPlugin() {
         return false;
       }, 1)
     );
-  }, [editor]);
+  }, [editor, updateToolbar]);
 
   const applyStyle = (style, value) => {
     editor.update(() => {
@@ -224,16 +247,16 @@ export default function ToolbarPlugin() {
         <select value={fontSize} onChange={e => { setFontSize(e.target.value); applyStyle('font-size', e.target.value); }} className="select">
           {FontSizeOptions.map(o => <option key={o} value={o}>{o}</option>)}
         </select>
-        <button onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'bold')} className="btn fw-bold">B</button>
-        <button onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'italic')} className="btn fst-italic">I</button>
-        <button onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'underline')} className="btn text-decoration-underline">U</button>
+        <button onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'bold')} className={`btn fw-bold${isBold ? ' active' : ''}`}>B</button>
+        <button onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'italic')} className={`btn fst-italic${isItalic ? ' active' : ''}`}>I</button>
+        <button onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'underline')} className={`btn text-decoration-underline${isUnderline ? ' active' : ''}`}>U</button>
       </div>
       <span className="divider" />
       <div className="toolbar-group">
         <span className="group-label">对齐</span>
-        <button onClick={() => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'left')} className="btn">Left</button>
-        <button onClick={() => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'center')} className="btn">Center</button>
-        <button onClick={() => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'right')} className="btn">Right</button>
+        <button onClick={() => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'left')} className={`btn${elementFormat === 'left' ? ' active' : ''}`}>Left</button>
+        <button onClick={() => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'center')} className={`btn${elementFormat === 'center' ? ' active' : ''}`}>Center</button>
+        <button onClick={() => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'right')} className={`btn${elementFormat === 'right' ? ' active' : ''}`}>Right</button>
       </div>
       <span className="divider" />
       <div className="toolbar-group" style={{ position: 'relative' }}>
