@@ -1,0 +1,34 @@
+directories:
+  output: release
+  buildResources: build
+appId: com.example.notepaddesktop
+productName: Notepad
+files:
+  - filter:
+      - dist/**
+      - out/electron/**
+      - package.json
+extraResources:
+  - from: server/bin/notepad-server.exe
+    to: bin/notepad-server.exe
+protocols:
+  - name: Notepad Protocol
+    schemes:
+      - notepad
+fileAssociations:
+  - ext: md
+    name: Markdown Document
+  - ext: txt
+    name: Text Document
+nsis:
+  oneClick: false
+  allowElevation: true
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  shortcutName: 记事本
+  artifactName: Notepad-${version}-Setup.exe
+win:
+  target:
+    - nsis
+  artifactName: Notepad-${version}-Setup.exe
+electronVersion: 31.7.7

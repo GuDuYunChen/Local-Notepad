@@ -25,4 +25,3 @@ pnpm-lock.yaml
 .env.*.local
 npminstall-debug.log
 qodana.yaml
-*.yaml

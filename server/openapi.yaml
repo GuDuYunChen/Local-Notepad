@@ -1,0 +1,131 @@
+openapi: 3.0.3
+info:
+  title: Notepad Server API
+  version: 0.1.0
+servers:
+  - url: http://127.0.0.1:27121
+paths:
+  /api/health:
+    get:
+      summary: 健康检查
+      responses:
+        '200': { description: OK }
+  /api/files:
+    get:
+      summary: 列出文件
+      parameters:
+        - in: query
+          name: q
+          schema: { type: string }
+        - in: query
+          name: page
+          schema: { type: integer }
+        - in: query
+          name: size
+          schema: { type: integer }
+      responses:
+        '200': { description: OK }
+    post:
+      summary: 新建文件
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string }
+                content: { type: string }
+      responses:
+        '200': { description: OK }
+  /api/files/{id}:
+    get:
+      summary: 读取文件
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
+  /api/files/{id}/save-as:
+    post:
+      summary: 另存为到本地路径
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                path: { type: string }
+                encoding: { type: string, default: utf-8 }
+      responses:
+        '200': { description: OK }
+  /api/files/import:
+    post:
+      summary: 从本地路径导入
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                path: { type: string }
+                paths: { type: array, items: { type: string } }
+                encoding: { type: string, default: utf-8 }
+      responses:
+        '200': { description: OK }
+    put:
+      summary: 更新文件
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string }
+                content: { type: string }
+      responses:
+        '200': { description: OK }
+    delete:
+      summary: 删除文件
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
+  /api/settings:
+    get:
+      summary: 获取设置
+      responses:
+        '200': { description: OK }
+    put:
+      summary: 更新设置
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                theme: { type: string, enum: [light, dark] }
+                editor_opts: { type: object }
+                sync_enabled: { type: boolean }
+                sync_endpoint: { type: string }
+      responses:
+        '200': { description: OK }
