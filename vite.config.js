@@ -8,7 +8,7 @@ export default defineConfig(({ mode }) => ({
   plugins: [react()],
   server: { port: 5000, strictPort: true },
   build: { 
-    outDir: '../dist', // 避免 dist 目录占用问题，改用 dist-renderer
+    outDir: '../dist', // 避免 dist 目录占用问题，
     emptyOutDir: true 
   },
   resolve: { alias: { '~': path.resolve(process.cwd(), 'src') } }

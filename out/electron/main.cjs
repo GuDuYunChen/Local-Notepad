@@ -28,20 +28,23 @@ var import_node_path = __toESM(require("node:path"), 1);
 var mainWindow = null;
 var backend = null;
 function createWindow() {
+  const isDev = !import_electron.app.isPackaged;
+  const iconPath = isDev ? import_node_path.default.join(__dirname, "../../build/icon.ico") : import_node_path.default.join(import_electron.app.getAppPath(), "build/icon.ico");
   mainWindow = new import_electron.BrowserWindow({
     width: 1100,
     height: 720,
     minWidth: 900,
     minHeight: 600,
     title: "Notepad",
+    icon: iconPath,
+    // Windows 上传字符串路径兼容性通常更好
     webPreferences: {
-      preload: import_node_path.default.join(import_electron.app.getAppPath(), "out/electron/preload.cjs"),
+      preload: import_node_path.default.join(__dirname, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true
     }
   });
-  const isDev = !import_electron.app.isPackaged;
   if (isDev) {
     process.env.API_BASE = "http://127.0.0.1:27121";
     mainWindow.loadURL("http://localhost:5000");

@@ -8,6 +8,7 @@ files:
       - dist/**
       - out/electron/**
       - package.json
+      - build/icon.ico
 extraResources:
   - from: server/bin/notepad-server.exe
     to: bin/notepad-server.exe
@@ -30,5 +31,6 @@ nsis:
 win:
   target:
     - nsis
+  icon: build/icon.ico
   artifactName: Notepad-${version}-Setup.exe
 electronVersion: 31.7.7

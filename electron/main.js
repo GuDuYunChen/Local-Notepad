@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage } from 'electron'
 import { spawn } from 'node:child_process'
 import path from 'node:path'
 
@@ -7,21 +7,29 @@ let mainWindow = null
 let backend = null
 
 function createWindow() {
+  const isDev = !app.isPackaged
+  // 确保开发和生产环境都能正确找到图标
+  // 在开发环境，使用 __dirname 向上查找 build 目录
+  // 在生产环境，build/icon.ico 已被打包到 resources 目录或 app.asar 中
+  const iconPath = isDev 
+    ? path.join(__dirname, '../../build/icon.ico')
+    : path.join(app.getAppPath(), 'build/icon.ico')
+
   mainWindow = new BrowserWindow({
     width: 1100,
     height: 720,
     minWidth: 900,
     minHeight: 600,
     title: 'Notepad',
+    icon: iconPath, // Windows 上传字符串路径兼容性通常更好
     webPreferences: {
-      preload: path.join(app.getAppPath(), 'out/electron/preload.cjs'),
+      preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true
     }
   })
 
-  const isDev = !app.isPackaged
   if (isDev) {
     process.env.API_BASE = 'http://127.0.0.1:27121'
     mainWindow.loadURL('http://localhost:5000')
