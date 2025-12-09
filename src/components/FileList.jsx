@@ -23,14 +23,15 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
 
   // Sync selectedId (prop) with selectedIds
   useEffect(() => {
+      // Always sync internal selection with prop, ensuring UI reflects Active Editor state.
       if (selectedId) {
-          // If prop selectedId changes, ensure it's in selectedIds
-          // If we want standard behavior: click -> select only one. Ctrl+Click -> toggle.
-          // Since selectedId comes from parent (Editor), it represents the *Active* file.
-          // We can keep selectedIds as {selectedId} initially.
-          if (!selectedIds.has(selectedId)) {
-              setSelectedIds(new Set([selectedId]))
-          }
+          // Force sync: if prop exists, it must be the only selection (unless multi-select mode? logic simplified for now)
+          // To fix "two items selected on cancel": we enforce that if we are not in a multi-select operation (which we can't easily know here),
+          // we sync to prop.
+          // Since we decided `handleSelect` won't update `selectedIds` for single click, this Effect does the job.
+          setSelectedIds(new Set([selectedId]))
+      } else {
+          setSelectedIds(new Set())
       }
   }, [selectedId])
 
@@ -42,30 +43,49 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       }
       
       // If ctrl key, toggle
-      if (e.ctrlKey || e.metaKey) {
+      if (e && (e.ctrlKey || e.metaKey)) {
           const next = new Set(selectedIds)
           if (next.has(item.id)) {
               next.delete(item.id)
-              // If we deselect the active one, what happens? 
-              // We probably shouldn't deselect the active one unless we switch active.
-              // But for bulk operations, we can have active file NOT in selection? 
-              // Usually Active is part of Selection.
           } else {
               next.add(item.id)
           }
           setSelectedIds(next)
-          // Don't switch active file if just toggling others?
-          // Usually clicking sets active.
           onSelect(item) 
-      } else if (e.shiftKey) {
-          // Range select (simplified: just add for now, implementing range in tree is complex)
+      } else if (e && e.shiftKey) {
+          // Range select
           const next = new Set(selectedIds)
           next.add(item.id)
           setSelectedIds(next)
           onSelect(item)
       } else {
           // Single select
-          setSelectedIds(new Set([item.id]))
+          // We do NOT update selectedIds immediately here if we want to wait for parent confirmation?
+          // But UI needs feedback.
+          // Strategy: Optimistically select. If parent denies (prop doesn't change), 
+          // the useEffect [selectedId] will revert it (if we enforce it).
+          
+          // Let's enforce sync in useEffect.
+          // Here we just notify parent.
+          // BUT, to avoid "flash" or double selection, we can wait?
+          // No, usually we select immediately.
+          // If parent cancels, selectedId prop won't change, so we revert.
+          
+          // ISSUE: `selectedIds` update is batched.
+          // If we set it here, render happens.
+          // Then parent decides to NOT change selectedId.
+          // Then useEffect runs? No, if prop doesn't change, useEffect [selectedId] might NOT run if dependency didn't change.
+          // But we need it to run to revert.
+          
+          // Solution: Don't set `selectedIds` here for single select. 
+          // Let the prop drive the selection state for the Active File.
+          // But for multi-select (Ctrl), we manage local state.
+          
+          // REFACTOR:
+          // For single click (activation): Call onSelect. Don't touch selectedIds.
+          // Let useEffect update selectedIds when prop changes.
+          // This ensures if switch is cancelled, UI doesn't change.
+          
           onSelect(item)
       }
   }
@@ -468,14 +488,35 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
           count = countRecursive(targetItem.id)
           setDeleteConfirm({ id: targetId, count, isFolder: true, title: targetItem.title })
       } else {
-          void onDelete(targetId)
+          // Check if deleting the currently selected file
+          if (targetId === selectedId) {
+               setDeleteConfirm({ id: targetId, count: 0, isFolder: false, title: targetItem.title })
+          } else {
+               // Use onBeforeDelete (App level confirmation) for non-selected files if needed?
+               // The requirement says: 
+               // 1. Deleting selected file -> Show "Delete Confirmation" (Confirm/Cancel) -> NO Save Dialog.
+               // 2. Switching file -> If unsaved -> Show "Save Confirmation" (Save/Don't Save/Cancel).
+               
+               // If we delete a non-selected file, we can just delete it or ask confirmation.
+               // Existing logic used onBeforeDelete which triggered App's dialog.
+               // We should probably unify this.
+               // Let's use local confirmation for consistency if that's acceptable, 
+               // OR delegate to App.
+               
+               // Requirement 1 specifically mentions "When deleting CURRENTLY SELECTED file".
+               // But usually delete always needs confirmation.
+               // Let's use local deleteConfirm for everything to keep it independent from App's "Unsaved" logic.
+               setDeleteConfirm({ id: targetId, count: 0, isFolder: false, title: targetItem.title })
+          }
       }
       setContextMenu(null)
   }
 
   async function onDelete(targetId) {
     try {
-      // 1. 判断是否需要确认 (This logic was for unsaved changes, we keep it)
+      // 1. No onBeforeDelete call here anymore to avoid "Unsaved Changes" dialog from App.
+      // We handle delete confirmation locally.
+      
       const targetItem = items.find(i => i.id === targetId)
       if (!targetItem) return
 
@@ -490,13 +531,6 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
               }
               curr = items.find(i => i.id === curr.parent_id)
           }
-      }
-
-      if (isDeletingSelected || isDeletingParentOfSelected) {
-          // Skip onBeforeDelete check
-      } else {
-          const ok = await (onBeforeDelete?.(targetId) ?? true)
-          if (!ok) return
       }
 
       setLoading(true) // Show loading state (simple progress)
@@ -529,24 +563,39 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
           }
 
           if (nextSelection) {
+              // Call onSelect. App.jsx will check unsaved logic.
+              // But wait, if we just deleted the file (and set deletedIds via onItemsChanged later),
+              // App logic: "if current file deleted, skip save".
+              // So we need to ensure App knows it's deleted BEFORE we switch.
+              // BUT onItemsChanged is called AFTER we update items state.
+              // Here we haven't updated items state yet.
+              // So App still thinks current file is valid.
+              // If we switch now, App sees unsaved changes on a valid file -> prompts save.
+              
+              // We want to SKIP save prompt if we are deleting the active file.
+              // Strategy:
+              // 1. Update items locally first (remove deleted).
+              // 2. Call onItemsChanged (App detects deletion and updates deletedIds).
+              // 3. Call onSelect (App sees deletedIds and skips save).
+              
+              // Let's reorder:
+              setItems(prev => prev.filter(i => i.id !== targetId))
+              // onItemsChanged is triggered by effect? No, FileList doesn't have effect for onItemsChanged.
+              // It calls it in load() or specific actions.
+              // We should call it here.
+              onItemsChanged?.(nextItems)
+              
+              // NOW call onSelect
               onSelect(nextSelection)
           } else {
+              setItems(prev => prev.filter(i => i.id !== targetId))
+              onItemsChanged?.(nextItems)
               onSelect(null)
           }
+      } else {
+          setItems(prev => prev.filter(i => i.id !== targetId))
+          onItemsChanged?.(nextItems)
       }
-
-      setItems(prev => prev.filter(i => i.id !== targetId)) // Should filter recursively in frontend to be safe?
-      // Actually backend does recursive delete. Frontend state sync:
-      // We need to remove targetId AND all descendants from state to avoid ghosts.
-      // Or just reload. Reload is safer.
-      
-      // Stop saving process if deleting active file
-      // If we are deleting the active file, we should have already unselected it above.
-      // However, the Editor component might still be mounted or saving.
-      // Changing selection to null or another file unmounts the old Editor.
-      // But if there was a pending save, we want to ensure it doesn't resurrect the file.
-      // The backend should ideally reject updates to deleted files.
-      // But frontend can also clear caches.
       
       void load() 
       pushHistory({ type: 'delete', data: { id: targetId } })

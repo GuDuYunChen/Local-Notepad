@@ -22,8 +22,14 @@ export default function App() {
   const [current, setCurrent] = useState(null)
   const [content, setContent] = useState('')
   const [switching, setSwitching] = useState(false)
+  const [deletedIds, setDeletedIds] = useState(new Set()) // Track deleted files to skip save
   const [dialog, setDialog] = useState(null)
+  // Check unsaved changes: compare current content with original content from database
+  // Note: current.content holds the original content loaded from DB.
+  // content holds the current editor content.
+  // If current is null, no file selected.
   const unsaved = !!(current && content !== (current.content || ''))
+  
   const select = (f) => {
     setSwitching(true)
     setCurrent(f)
@@ -56,7 +62,7 @@ export default function App() {
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [current]) // Removed content dependency as saveCurrent doesn't use it directly
+  }, [current])
 
   useEffect(() => {
     function onMove(e) {
@@ -91,8 +97,26 @@ export default function App() {
                 selectedId={current?.id}
                 updatedItem={current}
                 onSelect={(f) => {
-                  if (!current || f.id === current.id || !unsaved) { select(f); return }
-                  setDialog({ type: 'unsaved', next: () => select(f) })
+                  // If switching to the same file, do nothing
+                  if (current && f && f.id === current.id) return
+                  
+                  // Check if current file was deleted
+                  if (current && deletedIds.has(current.id)) {
+                      select(f)
+                      return
+                  }
+                  
+                  // Check for unsaved changes
+                  if (!current || !unsaved) { 
+                      select(f)
+                      return 
+                  }
+                  
+                  // Show Unsaved Dialog
+                  setDialog({ 
+                      type: 'unsaved', 
+                      next: () => select(f) 
+                  })
                 }}
                 onBeforeNew={async () => {
                   if (!unsaved) return true
@@ -101,11 +125,26 @@ export default function App() {
                   })
                 }}
                 onBeforeDelete={async (id) => {
-                  return new Promise((resolve) => {
-                    setDialog({ type: 'delete', id, resolve })
-                  })
+                  // This callback is now deprecated/unused by FileList for delete confirmation,
+                  // but might still be called? No, FileList handles delete internally now.
+                  // However, we can use this to notify App about deletion start?
+                  // Or better, FileList should notify us about deletion.
+                  // Since FileList handles delete, we need a way to track deleted IDs here.
+                  // But FileList doesn't emit "onDeleted" prop.
+                  // We can infer it from onItemsChanged or we can add onDeleted prop.
+                  // For now, let's rely on FileList calling onItemsChanged.
+                  return true 
                 }}
-                onItemsChanged={(list) => { if (!current && list.length) select(list[0]) }}
+                onItemsChanged={(list) => { 
+                    // Detect if current file is gone
+                    if (current && !list.find(i => i.id === current.id)) {
+                        // Current file deleted. Add to deletedIds to prevent save.
+                        setDeletedIds(prev => new Set([...prev, current.id]))
+                        // If FileList didn't select new one yet (it should have), we might need to handle it.
+                        // But FileList logic says it calls onSelect.
+                    }
+                    if (!current && list.length) select(list[0]) 
+                }}
               />
             </aside>
             <div className="resizer" onMouseDown={() => setDragging(true)} />
@@ -149,22 +188,13 @@ export default function App() {
               } 
             }},
             { label: '不保存', onClick: () => { dialog.next(); setDialog(null) } },
-            { label: '取消', onClick: () => { setDialog(null) } },
+            { label: '取消', onClick: () => { if (dialog.cancel) dialog.cancel(); setDialog(null) } },
           ]}
-          onClose={() => setDialog(null)}
+          onClose={() => { if (dialog.cancel) dialog.cancel(); setDialog(null) }}
         />
       )}
-      {dialog?.type === 'delete' && (
-        <ConfirmDialog
-          title="确认删除"
-          message="删除后不可恢复，是否继续？"
-          actions={[
-            { label: '删除', kind: 'danger', onClick: () => { dialog.resolve(true); setDialog(null) } },
-            { label: '取消', onClick: () => { dialog.resolve(false); setDialog(null) } },
-          ]}
-          onClose={() => { dialog.resolve(false); setDialog(null) }}
-        />
-      )}
+      {/* Delete dialog is handled in FileList now, so we can remove 'delete' type here if unused, 
+          but we keep 'unsaved' logic. */}
     </div>
   )
 }
