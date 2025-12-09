@@ -270,18 +270,79 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
     })
   }, [updatedItem])
 
+  // Helper to build tree from flat items (for internal logic usage)
+  function buildTree(flatItems) {
+      const map = {}
+      const roots = []
+      flatItems.forEach(i => {
+          map[i.id] = { ...i, children: [] }
+      })
+      flatItems.forEach(i => {
+          if (i.parent_id && map[i.parent_id]) {
+              map[i.parent_id].children.push(map[i.id])
+          } else {
+              roots.push(map[i.id])
+          }
+      })
+      
+      const sortFn = (a, b) => {
+          if (a.is_folder !== b.is_folder) return b.is_folder ? 1 : -1
+          return (b.sort_order ?? 0) - (a.sort_order ?? 0)
+      }
+      
+      const sortRecursive = (nodes) => {
+          nodes.sort(sortFn)
+          nodes.forEach(n => sortRecursive(n.children))
+      }
+      sortRecursive(roots)
+      return roots
+  }
+
+  // Helper to find the first file (DFS)
+  function findFirstFileInTree(nodes) {
+      for (const node of nodes) {
+          if (!node.is_folder) return node
+          const found = findFirstFileInTree(node.children)
+          if (found) return found
+      }
+      return null
+  }
+  
+  // Helper to find first file in a specific folder (by ID)
+  function findFirstFileInFolder(tree, folderId) {
+      // Find the folder node first
+      let targetFolder = null
+      const findFolder = (nodes) => {
+          for (const node of nodes) {
+              if (node.id === folderId) {
+                  targetFolder = node
+                  return
+              }
+              if (node.children) findFolder(node.children)
+              if (targetFolder) return
+          }
+      }
+      findFolder(tree)
+      
+      if (targetFolder && targetFolder.children.length > 0) {
+          return findFirstFileInTree(targetFolder.children)
+      }
+      return null
+  }
+
   async function load() {
     setLoading(true)
     try {
       const qs = q ? `?q=${encodeURIComponent(q)}` : ''
       const list = await api(`/api/files${qs}`)
-      // 后端按 is_folder DESC, sort_order DESC 排序
       setItems(list)
       onItemsChanged?.(list)
-      // 如果没有选中项且有文件，选中第一个（非文件夹）
+      
+      // Ensure selection
       if (!selectedId && list.length > 0) {
-        const firstFile = list.find(i => !i.is_folder)
-        if (firstFile) onSelect(firstFile)
+          const tree = buildTree(list)
+          const first = findFirstFileInTree(tree)
+          if (first) onSelect(first)
       }
     } catch (e) {
       console.error(e)
@@ -290,7 +351,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
     }
   }
 
-  // 构建树形结构
+  // 构建树形结构 (Memoized for rendering)
   const tree = useMemo(() => {
     const map = {}
     const roots = []
@@ -443,9 +504,35 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       
       const nextItems = items.filter(i => i.id !== targetId && i.parent_id !== targetId) // Simple filter
       
+      // Determine next selection
       if (isDeletingSelected || isDeletingParentOfSelected) {
-          const firstFile = nextItems.find(i => !i.is_folder)
-          onSelect(firstFile || null)
+          const nextTree = buildTree(nextItems)
+          let nextSelection = null
+
+          // If deleted file was in a folder, try to find next in that folder
+          if (targetItem.parent_id) {
+              // Note: targetItem.parent_id is still valid in nextItems (folder itself wasn't deleted unless recursive)
+              // But if we deleted a folder (recursive), targetItem is that folder.
+              // If we deleted a file inside a folder...
+              
+              // Case 1: Deleted a FILE inside a folder
+              if (!targetItem.is_folder) {
+                  // Try to find first file in the same folder
+                   nextSelection = findFirstFileInFolder(nextTree, targetItem.parent_id)
+                   // If found, ensure folder expanded (it should be already if we were selecting a file inside it)
+              }
+          }
+          
+          // Fallback (Logic A): Select first file in entire tree
+          if (!nextSelection) {
+              nextSelection = findFirstFileInTree(nextTree)
+          }
+
+          if (nextSelection) {
+              onSelect(nextSelection)
+          } else {
+              onSelect(null)
+          }
       }
 
       setItems(prev => prev.filter(i => i.id !== targetId)) // Should filter recursively in frontend to be safe?
