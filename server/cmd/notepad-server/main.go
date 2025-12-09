@@ -68,6 +68,23 @@ func main() {
 	// 执行自动备份
 	performBackup(ctx, db, dbPath)
 
+	go func() {
+		ticker := time.NewTicker(24 * time.Hour)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				if err := (&service.FileService{DB: db}).CleanupOldDeleted(ctx); err != nil {
+					g.Log().Error(ctx, "自动清理失败:", err)
+				} else {
+					g.Log().Info(ctx, "自动清理完成")
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
 	s := g.Server()
 	s.SetClientMaxBodySize(100 * 1024 * 1024) // 100MB for video uploads
 	s.SetGraceful(true)
@@ -201,6 +218,20 @@ func migrate(ctx context.Context, db *sql.DB) error {
 			return fmt.Errorf("执行迁移失败: %w", err)
 		}
 	}
+
+	// 增量迁移：添加 is_folder 和 parent_id 字段
+	// 由于 SQLite 不支持 IF NOT EXISTS 的 ADD COLUMN，这里直接执行并忽略错误（主要是重复列错误）
+	alterStmts := []string{
+		"ALTER TABLE files ADD COLUMN is_folder INTEGER DEFAULT 0", // SQLite boolean is integer 0/1
+		"ALTER TABLE files ADD COLUMN parent_id TEXT DEFAULT ''",
+		"ALTER TABLE files ADD COLUMN sort_order INTEGER DEFAULT 0",
+		"ALTER TABLE files ADD COLUMN is_deleted INTEGER DEFAULT 0",
+		"ALTER TABLE files ADD COLUMN deleted_at INTEGER DEFAULT 0",
+	}
+	for _, s := range alterStmts {
+		_, _ = db.ExecContext(ctx, s)
+	}
+
 	return nil
 }
 

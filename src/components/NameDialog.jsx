@@ -15,8 +15,7 @@ export default function NameDialog({ defaultName = '未命名.md', onConfirm, on
       const m = validate(n)
       if (m) { setErr(m); return }
     }
-    const withExt = /\.[a-zA-Z0-9]+$/.test(n) ? n : `${n}.md`
-    onConfirm(withExt)
+    onConfirm(n)
   }
   return (
     <div className="modal-overlay" role="dialog" aria-modal="true">

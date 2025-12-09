@@ -20,7 +20,12 @@ async function call(path: string, init?: RequestInit) {
 let proc: any
 
 beforeAll(async () => {
-  proc = spawn('.\\server\\bin\\notepad-server.exe', { cwd: process.cwd(), stdio: 'ignore' })
+  if (!process.env.SKIP_SPAWN) {
+    proc = spawn('.\\server\\bin\\notepad-server.exe', { 
+        cwd: process.cwd(), 
+        stdio: 'inherit'
+    })
+  }
   for (let i = 0; i < 10; i++) {
     try {
       const res = await fetch(base + '/api/health')
@@ -68,5 +73,31 @@ describe('backend e2e', () => {
     await call(`/api/files/${f.id}/save-as`, { method: 'POST', body: JSON.stringify({ path: out, encoding: 'iso-2022-cn' }) })
     const imported = await call('/api/files/import', { method: 'POST', body: JSON.stringify({ path: out, encoding: 'iso-2022-cn' }) })
     expect(imported.content).toBe(content)
+  })
+
+  it('create folder and nested file', async () => {
+    // 1. Create Folder
+    const folder = await call('/api/files', { 
+        method: 'POST', 
+        body: JSON.stringify({ title: 'e2e-folder', is_folder: true }) 
+    })
+    expect(folder.id).toBeTruthy()
+    expect(folder.is_folder).toBe(true)
+
+    // 2. Create File inside Folder
+    const file = await call('/api/files', { 
+        method: 'POST', 
+        body: JSON.stringify({ title: 'nested-file', content: 'nested', parent_id: folder.id }) 
+    })
+    expect(file.id).toBeTruthy()
+    expect(file.parent_id).toBe(folder.id)
+
+    // 3. List files and check hierarchy (flat list with parent_id)
+    const list = await call('/api/files')
+    const foundFolder = list.find((i: any) => i.id === folder.id)
+    const foundFile = list.find((i: any) => i.id === file.id)
+    expect(foundFolder).toBeTruthy()
+    expect(foundFile).toBeTruthy()
+    expect(foundFile.parent_id).toBe(folder.id)
   })
 })
