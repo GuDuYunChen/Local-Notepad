@@ -96,9 +96,15 @@ export default function App() {
               <FileList
                 selectedId={current?.id}
                 updatedItem={current}
-                onSelect={(f) => {
+                onSelect={(f, options = {}) => {
                   // If switching to the same file, do nothing
                   if (current && f && f.id === current.id) return
+                  
+                  // Force skip save check (e.g. after delete)
+                  if (options?.skipSave) {
+                      select(f)
+                      return
+                  }
                   
                   // Check if current file was deleted
                   if (current && deletedIds.has(current.id)) {

@@ -585,12 +585,12 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
               // We should call it here.
               onItemsChanged?.(nextItems)
               
-              // NOW call onSelect
-              onSelect(nextSelection)
+              // NOW call onSelect with skipSave option
+              onSelect(nextSelection, { skipSave: true })
           } else {
               setItems(prev => prev.filter(i => i.id !== targetId))
               onItemsChanged?.(nextItems)
-              onSelect(null)
+              onSelect(null, { skipSave: true })
           }
       } else {
           setItems(prev => prev.filter(i => i.id !== targetId))
