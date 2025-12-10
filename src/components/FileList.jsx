@@ -1,6 +1,122 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react'
 import { api } from '~/services/api'
 import NameDialog from './NameDialog'
+import { useDrag, useDrop } from 'react-dnd'
+import { NativeTypes } from 'react-dnd-html5-backend'
+import { message } from 'antd'
+
+const ItemType = 'FILE_NODE'
+
+const FileNode = ({ 
+    node, 
+    level, 
+    isSelected, 
+    isExpanded, 
+    folderState, 
+    onSelect, 
+    toggleExpand, 
+    onContextMenu, 
+    onMove,
+    checkHierarchy,
+    removeExtension
+}) => {
+    const ref = useRef(null)
+    const [dropPos, setDropPos] = useState(null)
+
+    const [{ isDragging }, drag] = useDrag({
+        type: ItemType,
+        item: { ...node },
+        collect: (monitor) => ({
+            isDragging: monitor.isDragging(),
+        }),
+    })
+
+    const [{ isOver }, drop] = useDrop({
+        accept: ItemType,
+        hover: (draggedItem, monitor) => {
+            if (!ref.current || !monitor.isOver({ shallow: true })) return
+            
+            if (draggedItem.id === node.id) return
+            
+            // Hierarchy Check
+            if (checkHierarchy(draggedItem.id, node.id)) {
+                return
+            }
+
+            const hoverBoundingRect = ref.current.getBoundingClientRect()
+            const hoverClientY = monitor.getClientOffset().y - hoverBoundingRect.top
+            const height = hoverBoundingRect.height
+            
+            let newPos = ''
+            if (node.is_folder) {
+                if (hoverClientY < height * 0.25) newPos = 'before'
+                else if (hoverClientY > height * 0.75) newPos = 'after'
+                else newPos = 'inside'
+            } else {
+                if (hoverClientY < height * 0.5) newPos = 'before'
+                else newPos = 'after'
+            }
+            
+            setDropPos(newPos)
+        },
+        drop: (draggedItem, monitor) => {
+            if (monitor.didDrop()) return
+            if (draggedItem.id === node.id) return
+            
+            if (checkHierarchy(draggedItem.id, node.id)) {
+                message.error('操作无效：不能将文件夹移动到自身子目录', 3)
+                return
+            }
+            onMove(draggedItem, node, dropPos)
+        },
+        collect: (monitor) => ({
+            isOver: monitor.isOver({ shallow: true }),
+        }),
+    })
+
+    drag(drop(ref))
+
+    // Reset dropPos when not over
+    useEffect(() => {
+        if (!isOver) setDropPos(null)
+    }, [isOver])
+
+    let dragClass = ''
+    if (isOver && dropPos) {
+        if (dropPos === 'inside') dragClass = 'drag-inside'
+        else if (dropPos === 'before') dragClass = 'drag-before'
+        else if (dropPos === 'after') dragClass = 'drag-after'
+    }
+
+    return (
+        <li 
+            ref={ref}
+            className={`list-item level-${level}${isSelected ? ' active' : ''}${node.is_folder ? ' folder' : ''} ${isDragging ? 'dragging' : ''} ${dragClass}`} 
+            onClick={(e) => onSelect(node, e)}
+            onContextMenu={(e) => onContextMenu(e, node)}
+            style={{ paddingLeft: `${12 + level * 16}px`, opacity: isDragging ? 0.5 : 1 }}
+        >
+          <div className="icon">
+              {node.is_folder ? (
+                  isExpanded ? '📂' : '📁'
+              ) : (
+                  '📄'
+              )}
+              {node.is_folder && folderState > 0 && (
+                  <span className="selection-indicator">
+                      {folderState === 2 ? '☑️' : '⊟'}
+                  </span>
+              )}
+          </div>
+          <div className="info">
+            <div className="title" title={node.title}>
+                {node.is_folder ? node.title : removeExtension(node.title)}
+                {node.is_folder && <span className="count"> ({node.fileCount})</span>}
+            </div>
+          </div>
+        </li>
+    )
+}
 
 /**
  * 文件列表组件
@@ -113,10 +229,6 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       if (selectedCount > 0) return 1
       return 0
   }
-  const [draggedItem, setDraggedItem] = useState(null)
-  const [dragOverItem, setDragOverItem] = useState(null)
-  const [dragPosition, setDragPosition] = useState(null) // 'before', 'after', 'inside'
-
   const newMenuRef = useRef(null)
   const contextMenuRef = useRef(null)
 
@@ -727,178 +839,116 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
 
   // --- Drag and Drop Handlers ---
 
-  function handleDragStart(e, item) {
-    e.stopPropagation()
-    setDraggedItem(item)
-    e.dataTransfer.effectAllowed = 'move'
-    // 设置拖拽预览图（可选）
+  function checkHierarchy(sourceId, targetId) {
+      if (sourceId === targetId) return true
+      let curr = items.find(i => i.id === targetId)
+      while (curr && curr.parent_id) {
+          if (curr.parent_id === sourceId) return true
+          curr = items.find(i => i.id === curr.parent_id)
+      }
+      return false
   }
 
-  function handleDragOver(e, item) {
-    e.preventDefault()
-    e.stopPropagation()
-    if (!draggedItem || draggedItem.id === item.id) return
-
-    // 检查是否拖拽到自己的子孙节点中（防止循环）
-    // 简单检查：如果是文件夹，且目标是该文件夹的子节点
-    // 这里不做深度检查，后端会防环，前端主要防直接拖入自己
-
-    const rect = e.currentTarget.getBoundingClientRect()
-    const y = e.clientY - rect.top
-    const height = rect.height
-    
-    // 逻辑：
-    // 上 25% -> before
-    // 下 25% -> after
-    // 中 50% -> inside (如果是文件夹)
-    
-    let pos = ''
-    if (item.is_folder) {
-        if (y < height * 0.25) pos = 'before'
-        else if (y > height * 0.75) pos = 'after'
-        else pos = 'inside'
-    } else {
-        if (y < height * 0.5) pos = 'before'
-        else pos = 'after'
-    }
-
-    setDragOverItem(item)
-    setDragPosition(pos)
-  }
-
-  function handleDragLeave(e) {
-      e.preventDefault()
-      e.stopPropagation()
-      // 只有离开当前 target 时才清除，但 dragleave 会在子元素触发时也冒泡
-      // 简单处理：不清除，drop 时清除
-  }
-
-  async function handleDrop(e, targetItem) {
-    e.preventDefault()
-    e.stopPropagation()
-    
-    const dragged = draggedItem
-    const target = targetItem
-    const pos = dragPosition
-
-    setDraggedItem(null)
-    setDragOverItem(null)
-    setDragPosition(null)
-
-    if (!dragged || dragged.id === target.id) return
-
-    // 计算新的 parent_id 和 sort_order
+  async function handleMove(dragged, target, pos) {
     let newParentId = dragged.parent_id
     let newSortOrder = dragged.sort_order
 
-    // 简单策略：
-    // inside: parent_id = target.id, sort_order = max + 1 (top)
-    // before: parent_id = target.parent_id, sort_order = target.sort_order + 1
-    // after: parent_id = target.parent_id, sort_order = target.sort_order - 1
-    // 注意：sort_order 需要足够间隙，或者我们重新生成。
-    // 为了简化，我们使用 time.Now().Unix() 作为基准，但这只适合置顶。
-    // 插入中间需要浮点数或者重新排序。我们目前用 int64，可能不够插入。
-    // 改进：取前后两个元素的 sort_order 平均值？
-    // 或者简单点：
-    // inside -> 置顶
-    // before/after -> 交换位置？不，插入。
-    
-    // 由于后端只支持 sort_order 排序，我们需要获取目标位置的前后元素来计算新的 sort_order。
-    // 这里简化实现：
-    // inside: 变为 target 的子元素，sort_order = current_timestamp (置顶)
-    // before/after: 变为 target 的兄弟，sort_order = target.sort_order +/- 1000
-    // 如果冲突，可能需要重排。
+    if (pos === 'inside') {
+        newParentId = target.id
+        newSortOrder = Date.now() / 1000 + 1000
+        setExpanded(prev => new Set([...prev, target.id]))
+    } else {
+        newParentId = target.parent_id
+        const baseOrder = target.sort_order || 0
+        newSortOrder = pos === 'before' ? baseOrder + 1 : baseOrder - 1
+    }
 
     try {
-        let updates = {}
-        if (pos === 'inside') {
-            updates.parent_id = target.id
-            updates.sort_order = Date.now() / 1000 + 1000 // 确保在上面
-            // 自动展开目标文件夹
-            setExpanded(prev => new Set([...prev, target.id]))
-        } else {
-            updates.parent_id = target.parent_id
-            // 获取 target 的 sort_order
-            const baseOrder = target.sort_order || 0
-            updates.sort_order = pos === 'before' ? baseOrder + 1 : baseOrder - 1
-            // 潜在问题：冲突。
-            // 理想做法是重新分配该层级的所有 sort_order，或者使用 float。
-            // 我们暂且这样，如果顺序不对，再次拖拽即可。
-        }
-
         await api(`/api/files/${dragged.id}`, {
             method: 'PUT',
-            body: JSON.stringify(updates)
+            body: JSON.stringify({ parent_id: newParentId, sort_order: newSortOrder })
         })
+        
         pushHistory({ 
             type: 'move', 
             data: { 
                 id: dragged.id, 
                 oldParentId: dragged.parent_id, 
                 oldSortOrder: dragged.sort_order,
-                newParentId: updates.parent_id,
-                newSortOrder: updates.sort_order
+                newParentId: newParentId,
+                newSortOrder: newSortOrder
             } 
         })
         void load()
     } catch (e) {
         console.error(e)
+        message.error('移动失败，已还原')
+        void load() // Reload to revert UI
     }
   }
-  
-  // Drag and Drop Handlers
-  function handleContainerDragOver(e) {
-      e.preventDefault()
-      e.dataTransfer.dropEffect = 'copy'
-  }
-  
-  async function handleContainerDrop(e) {
-      e.preventDefault()
-      // 如果是在内部拖拽，且 drop 在空白处 -> 移到根目录
-      if (draggedItem) {
-          // Move to root
-          try {
-              if (draggedItem.parent_id === '') return // already root
-              
-              const updates = { parent_id: '', sort_order: Date.now() / 1000 + 1000 }
-              await api(`/api/files/${draggedItem.id}`, {
-                  method: 'PUT',
-                  body: JSON.stringify(updates)
-              })
-              pushHistory({ 
-                  type: 'move', 
-                  data: { 
-                      id: draggedItem.id, 
-                      oldParentId: draggedItem.parent_id, 
-                      oldSortOrder: draggedItem.sort_order,
-                      newParentId: '',
-                      newSortOrder: updates.sort_order
-                  } 
-              })
-              void load()
-          } catch(e) { console.error(e) }
-          setDraggedItem(null)
-          return
-      }
 
-      const files = e.dataTransfer.files
-      if (files && files.length > 0) {
-          const paths = []
-          for (let i = 0; i < files.length; i++) {
-              if (files[i].path) paths.push(files[i].path) // Electron 环境下有 path
-          }
-          if (paths.length > 0) {
-              // 导入到哪里？如果有 dragOverItem 且是 inside，则导入到那里
-              // 但 container drop 通常是空白处。
-              // 这里简化：导入到根目录
+  async function handleMoveToRoot(dragged) {
+      if (dragged.parent_id === '') return
+      
+      const newSortOrder = Date.now() / 1000 + 1000
+      
+      try {
+          await api(`/api/files/${dragged.id}`, {
+              method: 'PUT',
+              body: JSON.stringify({ parent_id: '', sort_order: newSortOrder })
+          })
+           pushHistory({ 
+              type: 'move', 
+              data: { 
+                  id: dragged.id, 
+                  oldParentId: dragged.parent_id, 
+                  oldSortOrder: dragged.sort_order,
+                  newParentId: '',
+                  newSortOrder: newSortOrder
+              } 
+          })
+          void load()
+      } catch (e) {
+          console.error(e)
+          message.error('移动失败，已还原')
+          void load()
+      }
+  }
+
+  async function handleNativeFileDrop(files) {
+       if (!files || files.length === 0) return
+       
+       const paths = []
+       for (let i = 0; i < files.length; i++) {
+           if (files[i].path) paths.push(files[i].path)
+       }
+       
+       if (paths.length > 0) {
+           try {
                await api('/api/files/import', {
                   method: 'POST',
                   body: JSON.stringify({ paths, encoding: 'utf-8' }),
                 })
                 void load()
-          }
-      }
-  }
+           } catch (e) { console.error(e) }
+       }
+   }
+
+   const [, dropContainer] = useDrop({
+       accept: [ItemType, NativeTypes.FILE],
+       drop: (item, monitor) => {
+           if (monitor.didDrop()) return
+           
+           const itemType = monitor.getItemType()
+           if (itemType === ItemType) {
+               handleMoveToRoot(item)
+           } else if (itemType === NativeTypes.FILE) {
+               const dropped = monitor.getItem()
+               handleNativeFileDrop(dropped.files)
+           }
+       }
+   })
+
 
   function handleContextMenuEvent(e, item) {
     e.preventDefault()
@@ -924,49 +974,21 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
         folderState = getFolderSelectionState(node)
     }
     
-    // Drag visual state
-    const isDragging = draggedItem?.id === node.id
-    const isOver = dragOverItem?.id === node.id
-    let dragClass = ''
-    if (isOver) {
-        if (dragPosition === 'inside') dragClass = 'drag-inside'
-        else if (dragPosition === 'before') dragClass = 'drag-before'
-        else if (dragPosition === 'after') dragClass = 'drag-after'
-    }
-
     return (
       <React.Fragment key={node.id}>
-        <li 
-            className={`list-item level-${level}${isSelected ? ' active' : ''}${isFolder ? ' folder' : ''} ${isDragging ? 'dragging' : ''} ${dragClass}`} 
-            onClick={(e) => handleSelect(node, e)}
-            onContextMenu={(e) => handleContextMenuEvent(e, node)}
-            draggable="true"
-            onDragStart={(e) => handleDragStart(e, node)}
-            onDragOver={(e) => handleDragOver(e, node)}
-            onDragLeave={handleDragLeave}
-            onDrop={(e) => handleDrop(e, node)}
-            style={{ paddingLeft: `${12 + level * 16}px` }}
-        >
-          <div className="icon">
-              {isFolder ? (
-                  isExpanded ? '📂' : '📁'
-              ) : (
-                  // File Icon
-                  '📄'
-              )}
-              {isFolder && folderState > 0 && (
-                  <span className="selection-indicator">
-                      {folderState === 2 ? '☑️' : '⊟'}
-                  </span>
-              )}
-          </div>
-          <div className="info">
-            <div className="title" title={node.title}>
-                {isFolder ? node.title : removeExtension(node.title)}
-                {isFolder && <span className="count"> ({node.fileCount})</span>}
-            </div>
-          </div>
-        </li>
+        <FileNode 
+            node={node}
+            level={level}
+            isSelected={isSelected}
+            isExpanded={isExpanded}
+            folderState={folderState}
+            onSelect={handleSelect}
+            toggleExpand={toggleExpand}
+            onContextMenu={handleContextMenuEvent}
+            onMove={handleMove}
+            checkHierarchy={checkHierarchy}
+            removeExtension={removeExtension}
+        />
         {isFolder && isExpanded && node.children.length > 0 && (
             node.children.map(child => renderNode(child, level + 1))
         )}
@@ -980,7 +1002,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
   }
 
   return (
-    <div className="file-list" onDragOver={handleContainerDragOver} onDrop={handleContainerDrop}>
+    <div className="file-list" ref={dropContainer}>
       <div className="toolbar colored">
         <div className="btn-group" style={{ position: 'relative' }}>
             <button className="btn primary" onClick={() => setShowNewMenu(!showNewMenu)}>
