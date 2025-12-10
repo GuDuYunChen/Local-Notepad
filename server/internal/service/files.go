@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"fmt"
 	"io"
+	"log"
 	"notepad-server/internal/model"
 	"os"
 	"path/filepath"
@@ -75,16 +76,32 @@ func (s *FileService) Update(ctx context.Context, id string, title, content, par
 
 	// Prevent updating if file is deleted (unless restoring)
 	if f.IsDeleted && (isDeleted == nil || *isDeleted) {
-		// If it's already deleted, and we are NOT setting isDeleted=false (restoring), then reject.
-		// Wait, if isDeleted is true, and we are updating content...
-		// If request doesn't touch isDeleted, it remains true.
-		// If request sets isDeleted=true, it remains true.
-		// If request sets isDeleted=false, it becomes false (Restore).
-		// So if IsDeleted is true after applying changes, and it was true before...
-		// Actually simpler: if the file is currently deleted, and the update is NOT a restore operation.
-		// A restore operation MUST set isDeleted = false.
 		if isDeleted == nil || *isDeleted == true {
 			return nil, fmt.Errorf("文件已删除，无法更新")
+		}
+	}
+
+	// 检查重名冲突 (如果修改了 Title 或 ParentID)
+	newTitle := f.Title
+	newParentID := f.ParentID
+	checkConflict := false
+	if title != nil {
+		newTitle = *title
+		checkConflict = true
+	}
+	if parentID != nil {
+		newParentID = *parentID
+		checkConflict = true
+	}
+
+	if checkConflict {
+		var count int
+		err := s.DB.QueryRowContext(ctx, "SELECT COUNT(*) FROM files WHERE parent_id = ? AND title = ? AND id != ? AND is_deleted = 0", newParentID, newTitle, id).Scan(&count)
+		if err != nil {
+			return nil, fmt.Errorf("检查重名失败: %w", err)
+		}
+		if count > 0 {
+			return nil, fmt.Errorf("目标位置已存在同名文件或文件夹: %s", newTitle)
 		}
 	}
 
@@ -93,6 +110,12 @@ func (s *FileService) Update(ctx context.Context, id string, title, content, par
 	if err != nil {
 		return nil, fmt.Errorf("更新文件失败: %w", err)
 	}
+
+	// 记录操作日志
+	if parentID != nil || sortOrder != nil {
+		log.Printf("[Move] File %s (%s) moved to Parent: %s, Order: %d", f.Title, f.ID, f.ParentID, f.SortOrder)
+	}
+
 	return f, nil
 }
 
@@ -136,15 +159,9 @@ func (s *FileService) List(ctx context.Context, q string, page, size int) ([]*mo
 	}
 	offset := (page - 1) * size
 	// 注意：SQLite boolean true is 1. ORDER BY is_folder DESC means folders first.
-	// 排序逻辑：
-	// 1. is_folder DESC (文件夹在最前) -> 用户未明确要求，但通常如此。如果用户要求自定义排序，则可能需要统一排序。
-	// 需求 2 提到 "支持将排序第一的文件拖到第四的位置"，这意味着文件夹和文件可能混合排序，或者文件夹之间、文件之间各自排序。
-	// 通常实现：同一层级内，按 sort_order 排序。
-	// 这里我们修改排序逻辑：优先按 is_folder (如果需要)，然后按 sort_order DESC。
-	// 为了支持完全自定义排序（文件夹和文件混排），应该只按 sort_order 排序。
-	// 但通常文件夹置顶。我们暂且保持 is_folder DESC, 然后 sort_order DESC (或者 ASC，看前端习惯，通常新创建的在顶端，所以用 DESC，create时用 now)。
-	// 如果用户拖拽，我们会更新 sort_order。
-	query := `SELECT id, title, content, created_at, updated_at, is_folder, parent_id, sort_order, is_deleted FROM files WHERE is_deleted = 0 AND (title LIKE ? OR content LIKE ?) ORDER BY is_folder DESC, sort_order DESC LIMIT ? OFFSET ?`
+	// 需求调整：支持文件夹和文件混合排序，因此移除 is_folder DESC
+	// 按 sort_order DESC 排序
+	query := `SELECT id, title, content, created_at, updated_at, is_folder, parent_id, sort_order, is_deleted FROM files WHERE is_deleted = 0 AND (title LIKE ? OR content LIKE ?) ORDER BY sort_order DESC LIMIT ? OFFSET ?`
 	rows, err := s.DB.QueryContext(ctx, query, "%"+q+"%", "%"+q+"%", size, offset)
 	if err != nil {
 		return nil, fmt.Errorf("查询文件失败: %w", err)

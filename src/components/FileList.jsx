@@ -418,7 +418,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       })
       
       const sortFn = (a, b) => {
-          if (a.is_folder !== b.is_folder) return b.is_folder ? 1 : -1
+          // if (a.is_folder !== b.is_folder) return b.is_folder ? 1 : -1
           return (b.sort_order ?? 0) - (a.sort_order ?? 0)
       }
       
@@ -502,9 +502,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
 
     // 递归计算文件数和排序
     const sortFn = (a, b) => {
-        // 优先 is_folder (文件夹在前)
-        if (a.is_folder !== b.is_folder) return b.is_folder ? 1 : -1
-        // 然后按 sort_order 倒序 (大的在前)
+        // 需求调整：文件夹和文件混合排序，仅按 sort_order 倒序
         return (b.sort_order ?? 0) - (a.sort_order ?? 0)
     }
 
@@ -882,7 +880,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
         void load()
     } catch (e) {
         console.error(e)
-        message.error('移动失败，已还原')
+        message.error(e.message || '移动失败，已还原')
         void load() // Reload to revert UI
     }
   }
@@ -910,7 +908,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
           void load()
       } catch (e) {
           console.error(e)
-          message.error('移动失败，已还原')
+          message.error(e.message || '移动失败，已还原')
           void load()
       }
   }
