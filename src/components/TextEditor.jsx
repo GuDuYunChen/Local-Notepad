@@ -20,14 +20,23 @@ function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved 
   const onChangeRef = useRef(onChange)
   const onLoadedRef = useRef(onLoaded)
   const onSavedRef = useRef(onSaved)
+  const deletedIdsRef = useRef(deletedIds)
 
   useEffect(() => { onChangeRef.current = onChange }, [onChange])
   useEffect(() => { onLoadedRef.current = onLoaded }, [onLoaded])
   useEffect(() => { onSavedRef.current = onSaved }, [onSaved])
+  useEffect(() => { deletedIdsRef.current = deletedIds }, [deletedIds])
 
   const saveNow = React.useCallback(async (reason, specificId = null) => {
     const id = specificId || currentIdRef.current
     if (!id) return
+    
+    // Check if deleted
+    if (deletedIdsRef.current && deletedIdsRef.current.has(id)) {
+        console.debug('Skip save for deleted file:', id)
+        return
+    }
+
     const text = contentRef.current
     try {
       setSaving(true)
@@ -50,6 +59,18 @@ function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved 
       return updated
     } catch (e) {
       if (e.name === 'AbortError') return
+      
+      // If error is 1006 (Update failed) and likely due to file deleted, suppress or warn gently
+      // But we don't have the code here easily, just the message.
+      // If message contains "更新失败", it might be deleted.
+      if (e.message && e.message.includes('更新失败')) {
+          // Check if it might be deleted
+          if (deletedIdsRef.current && deletedIdsRef.current.has(id)) {
+              console.warn('Suppressing save error for deleted file:', id)
+              return
+          }
+      }
+
       console.error('保存失败', reason, e)
       throw e
     } finally {

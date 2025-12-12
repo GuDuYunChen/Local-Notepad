@@ -34,6 +34,16 @@ export default function App() {
     setSwitching(true)
     setCurrent(f)
     setContent(f ? (f.content || '') : '')
+    
+    // Clear from deletedIds if we are selecting it (e.g. Undo delete)
+    if (f && deletedIds.has(f.id)) {
+        setDeletedIds(prev => {
+            const next = new Set(prev)
+            next.delete(f.id)
+            return next
+        })
+    }
+
     setTimeout(() => setSwitching(false), 180)
   }
   async function saveCurrent() {

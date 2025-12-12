@@ -651,6 +651,12 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
               // However, load() is async.
               // We should explicitly clear selection if we know it's deleted.
               
+              // Notify App that the current file is removed from the list
+              // This triggers App to add it to deletedIds, preventing auto-save
+              if (selectedId) {
+                  onItemsChanged?.(items.filter(i => i.id !== selectedId))
+              }
+
               if (nextSelectionId) {
                   const nextItem = items.find(i => i.id === nextSelectionId)
                   onSelect(nextItem, { skipSave: true })
