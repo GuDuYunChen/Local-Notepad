@@ -23,6 +23,8 @@ func (a *FileAPI) Register(group *ghttp.RouterGroup) {
 	group.DELETE("/files/{id}", a.Delete)
 	group.POST("/files/{id}/save-as", a.SaveAs)
 	group.POST("/files/import", a.Import)
+	group.POST("/files/export", a.BatchExport)
+	group.POST("/files/batch-delete", a.BatchDelete)
 }
 
 // 列表
@@ -169,6 +171,52 @@ func (a *FileAPI) Import(r *ghttp.Request) {
 		return
 	}
 	writeOK(r, f)
+}
+
+// 批量导出
+func (a *FileAPI) BatchExport(r *ghttp.Request) {
+	var in struct {
+		IDs       []string `json:"ids"`
+		TargetDir string   `json:"targetDir"`
+	}
+	if err := r.Parse(&in); err != nil {
+		writeErr(r, 1014, "参数错误", err)
+		return
+	}
+	if len(in.IDs) == 0 {
+		writeErr(r, 1015, "未选择文件", gerror.New("ids empty"))
+		return
+	}
+	if in.TargetDir == "" {
+		writeErr(r, 1016, "导出路径不能为空", gerror.New("targetDir empty"))
+		return
+	}
+
+	if err := a.Svc.BatchExport(r.GetCtx(), in.IDs, in.TargetDir); err != nil {
+		writeErr(r, 1017, "导出失败", err)
+		return
+	}
+	writeOK(r, g.Map{"ok": true})
+}
+
+// 批量删除
+func (a *FileAPI) BatchDelete(r *ghttp.Request) {
+	var in struct {
+		IDs []string `json:"ids"`
+	}
+	if err := r.Parse(&in); err != nil {
+		writeErr(r, 1018, "参数错误", err)
+		return
+	}
+	if len(in.IDs) == 0 {
+		writeErr(r, 1019, "未选择删除项", gerror.New("ids empty"))
+		return
+	}
+	if err := a.Svc.BatchDelete(r.GetCtx(), in.IDs); err != nil {
+		writeErr(r, 1020, "批量删除失败", err)
+		return
+	}
+	writeOK(r, g.Map{"ok": true})
 }
 
 func toInt(s string, def int) int {

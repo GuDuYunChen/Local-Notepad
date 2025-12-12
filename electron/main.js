@@ -2,6 +2,9 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage } from 'electron
 import { spawn } from 'node:child_process'
 import path from 'node:path'
 
+import { processExport } from './export.js'
+import { selectAndParseFiles } from './import.js'
+
 // 应用主进程：负责创建窗口、设置安全选项
 let mainWindow = null
 let backend = null
@@ -139,4 +142,29 @@ ipcMain.handle('dialog:saveFile', async () => {
     { name: 'Markdown', extensions: ['md'] }
   ] })
   return res.canceled ? '' : (res.filePath || '')
+})
+
+ipcMain.handle('dialog:openDirectory', async () => {
+  const res = await dialog.showOpenDialog({ properties: ['openDirectory'] })
+  return res.canceled ? '' : (res.filePaths[0] || '')
+})
+
+ipcMain.handle('export:docx', async (event, { ids, targetDir }) => {
+  try {
+    const errors = await processExport(ids, targetDir)
+    return { success: true, errors }
+  } catch (e) {
+    console.error(e)
+    return { success: false, message: e.message }
+  }
+})
+
+ipcMain.handle('import:files', async () => {
+    try {
+        const results = await selectAndParseFiles()
+        return { success: true, results }
+    } catch (e) {
+        console.error(e)
+        return { success: false, message: e.message }
+    }
 })

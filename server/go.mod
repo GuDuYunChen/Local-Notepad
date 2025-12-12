@@ -1,11 +1,15 @@
 module notepad-server
 
-go 1.21
+go 1.22
+
+toolchain go1.24.11
 
 require (
+	github.com/gingfrederik/docx v0.0.1
 	github.com/gogf/gf/v2 v2.7.4
 	github.com/google/uuid v1.6.0
 	github.com/saintfish/chardet v0.0.0-20230101081208-5e3ef4b5456d
+	github.com/yuin/goldmark v1.7.13
 	golang.org/x/text v0.14.0
 	modernc.org/sqlite v1.29.4
 )

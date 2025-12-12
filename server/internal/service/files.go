@@ -139,6 +139,42 @@ func (s *FileService) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
+// BatchDelete deletes multiple files/folders recursively
+func (s *FileService) BatchDelete(ctx context.Context, ids []string) error {
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin tx failed: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Recursive Delete Query
+	query := `
+	WITH RECURSIVE sub(id) AS (
+		SELECT id FROM files WHERE id = ?
+		UNION ALL
+		SELECT f.id FROM files f JOIN sub ON f.parent_id = sub.id
+	)
+	UPDATE files SET is_deleted = 1, deleted_at = ?, updated_at = ? WHERE id IN sub;
+	`
+	now := time.Now().Unix()
+	stmt, err := tx.PrepareContext(ctx, query)
+	if err != nil {
+		return fmt.Errorf("prepare stmt failed: %w", err)
+	}
+	defer stmt.Close()
+
+	for _, id := range ids {
+		if _, err := stmt.ExecContext(ctx, id, now, now); err != nil {
+			return fmt.Errorf("delete id %s failed: %w", id, err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit failed: %w", err)
+	}
+	return nil
+}
+
 // CleanupOldDeleted 清理超过 30 天的已删除文件
 func (s *FileService) CleanupOldDeleted(ctx context.Context) error {
 	threshold := time.Now().Add(-30 * 24 * time.Hour).Unix()
@@ -446,4 +482,84 @@ func (s *FileService) ImportPath(ctx context.Context, path string, encoding stri
 	base := filepath.Base(abs)
 	title := strings.TrimSuffix(base, filepath.Ext(base))
 	return s.Create(ctx, title, content, false, "")
+}
+
+// GetChildren gets immediate children of a folder
+func (s *FileService) GetChildren(ctx context.Context, parentID string) ([]*model.File, error) {
+	rows, err := s.DB.QueryContext(ctx, `SELECT id, title, content, created_at, updated_at, is_folder, parent_id, sort_order, is_deleted FROM files WHERE parent_id = ? AND is_deleted = 0`, parentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []*model.File
+	for rows.Next() {
+		var f model.File
+		if err := rows.Scan(&f.ID, &f.Title, &f.Content, &f.CreatedAt, &f.UpdatedAt, &f.IsFolder, &f.ParentID, &f.SortOrder, &f.IsDeleted); err != nil {
+			return nil, err
+		}
+		out = append(out, &f)
+	}
+	return out, nil
+}
+
+// BatchExport exports files/folders to a target directory with docx conversion
+func (s *FileService) BatchExport(ctx context.Context, ids []string, targetDir string) error {
+	for _, id := range ids {
+		if err := s.exportItemRecursive(ctx, id, targetDir); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *FileService) exportItemRecursive(ctx context.Context, id string, currentDir string) error {
+	f, err := s.Get(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	name := sanitizeName(f.Title)
+	if name == "" {
+		name = "Untitled"
+	}
+
+	if f.IsFolder {
+		newDir := filepath.Join(currentDir, name)
+		if err := os.MkdirAll(newDir, 0755); err != nil {
+			return fmt.Errorf("create dir %s failed: %w", newDir, err)
+		}
+
+		children, err := s.GetChildren(ctx, id)
+		if err != nil {
+			return err
+		}
+
+		for _, child := range children {
+			if err := s.exportItemRecursive(ctx, child.ID, newDir); err != nil {
+				return err
+			}
+		}
+	} else {
+		ext := filepath.Ext(name)
+		if ext != "" {
+			name = strings.TrimSuffix(name, ext)
+		}
+		name = name + ".docx"
+
+		outPath := filepath.Join(currentDir, name)
+
+		if err := ConvertToDocx(f.Content, outPath); err != nil {
+			return fmt.Errorf("convert file %s failed: %w", name, err)
+		}
+	}
+	return nil
+}
+
+func sanitizeName(name string) string {
+	invalid := []string{"<", ">", ":", "\"", "/", "\\", "|", "?", "*"}
+	for _, char := range invalid {
+		name = strings.ReplaceAll(name, char, "_")
+	}
+	return strings.TrimSpace(name)
 }

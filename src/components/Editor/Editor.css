@@ -252,9 +252,10 @@
 
 .table-selection-overlay { position: absolute; inset: 0; }
 .table-selection-outline { background: rgba(126,91,239,0.08); outline: 2px solid rgba(126,91,239,0.9); border-radius: 4px; }
-.table-context-menu { position: fixed; z-index: 1000; background: #fff; border: 1px solid #ddd; box-shadow: 0 6px 24px rgba(0,0,0,.12); border-radius: 8px; padding: 6px; display: none; }
-.table-context-menu .item { padding: 6px 10px; font-size: 13px; cursor: pointer; border-radius: 6px; }
+.table-context-menu { position: fixed; z-index: 1000; background: #fff; border: 1px solid #ddd; box-shadow: 0 6px 24px rgba(0,0,0,.12); border-radius: 8px; padding: 6px; display: none; min-width: 140px; }
+.table-context-menu .item { padding: 6px 10px; font-size: 13px; cursor: pointer; border-radius: 6px; color: var(--text-color); }
 .table-context-menu .item:hover { background: rgba(0,0,0,0.06); }
+.table-context-menu .divider { height: 1px; background: #eee; margin: 4px 0; }
 .table-add-col-btn { background: var(--panel); border: 1px solid var(--toolbar-border); border-radius: 999px; height: 24px; padding: 0 10px; font-size: 12px; color: var(--fg); box-shadow: 0 2px 6px rgba(0,0,0,.12); }
 .table-add-col-btn:hover { background: rgba(0,0,0,0.04); }
 

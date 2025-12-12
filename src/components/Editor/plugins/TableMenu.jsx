@@ -104,6 +104,13 @@ export default function TableMenu() {
             <div className="tm-item" onClick={()=>dispatch('autoFitWindow')}>适应窗口</div>
             <div className="tm-item" onClick={()=>dispatch('autoFitContent')}>适应内容</div>
           </div>
+          <div className="tm-divider" />
+          <div className="tm-group">
+            <div className="tm-item" onClick={()=>dispatch('sortAsc')}>按首列升序排序</div>
+            <div className="tm-item" onClick={()=>dispatch('sortDesc')}>按首列降序排序</div>
+            <div className="tm-item" onClick={()=>{ const q = window.prompt('筛选包含文本：'); if (q) dispatch('filterContains', q) }}>筛选包含文本…</div>
+            <div className="tm-item" onClick={()=>dispatch('paginate', 10)}>分页（每10行）</div>
+          </div>
         </div>
       )}
     </div>

@@ -33,7 +33,7 @@ export default function App() {
   const select = (f) => {
     setSwitching(true)
     setCurrent(f)
-    setContent(f.content || '')
+    setContent(f ? (f.content || '') : '')
     setTimeout(() => setSwitching(false), 180)
   }
   async function saveCurrent() {
@@ -158,6 +158,7 @@ export default function App() {
               <TextEditor
                 ref={editorRef}
                 activeId={current?.id || null}
+                deletedIds={deletedIds}
                 onChange={setContent}
                 onLoaded={(text) => {
                   if (current) {

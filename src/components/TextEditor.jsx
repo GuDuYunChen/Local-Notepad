@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState, useImperativeHandle } from
 import { api } from '~/services/api'
 import Editor from './Editor/Editor'
 
-function TextEditorInternal({ activeId, onChange, onLoaded, onSaved }, ref) {
+function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved }, ref) {
   // taRef, query, rep, wrapOn removed as they are specific to textarea
   const contentRef = useRef('')
   const saveTimerRef = useRef(null)
@@ -69,9 +69,12 @@ function TextEditorInternal({ activeId, onChange, onLoaded, onSaved }, ref) {
     
     // Save previous file if it was loaded and has content
     if (currentIdRef.current && contentRef.current !== undefined) {
-      cacheWrite(currentIdRef.current, contentRef.current)
-      // Don't await this save - let it happen in background or via abortable controller
-      void saveNow('manual', currentIdRef.current) 
+      const isDeleted = deletedIds?.has(currentIdRef.current)
+      if (!isDeleted) {
+        cacheWrite(currentIdRef.current, contentRef.current)
+        // Don't await this save - let it happen in background or via abortable controller
+        void saveNow('manual', currentIdRef.current) 
+      }
     }
 
     currentIdRef.current = activeId || null

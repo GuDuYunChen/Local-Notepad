@@ -82,6 +82,33 @@ paths:
                 encoding: { type: string, default: utf-8 }
       responses:
         '200': { description: OK }
+  /api/files/batch-delete:
+    post:
+      summary: 批量删除文件
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ids: { type: array, items: { type: string } }
+      responses:
+        '200': { description: OK }
+  /api/files/export:
+    post:
+      summary: 批量导出文件
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ids: { type: array, items: { type: string } }
+                targetDir: { type: string }
+      responses:
+        '200': { description: OK }
     put:
       summary: 更新文件
       parameters:

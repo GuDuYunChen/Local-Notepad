@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react'
 import { api } from '~/services/api'
 import NameDialog from './NameDialog'
+import FileSelectorDialog from './FileSelectorDialog'
 import { useDrag, useDrop } from 'react-dnd'
 import { NativeTypes } from 'react-dnd-html5-backend'
 import { message } from 'antd'
@@ -130,6 +131,8 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
   const [naming, setNaming] = useState(false) // 新建文件对话框
   const [folderNaming, setFolderNaming] = useState(false) // 新建文件夹对话框
   const [renaming, setRenaming] = useState(null)
+  const [showExport, setShowExport] = useState(false)
+  const [showBatchDelete, setShowBatchDelete] = useState(false)
   const [expanded, setExpanded] = useState(new Set()) // 展开的文件夹ID集合
   const [showNewMenu, setShowNewMenu] = useState(false) // 新建菜单显隐
   const [contextMenu, setContextMenu] = useState(null) // 右键菜单 { x, y, item }
@@ -462,7 +465,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       return null
   }
 
-  async function load() {
+  async function load(retryCount = 0) {
     setLoading(true)
     try {
       const qs = q ? `?q=${encodeURIComponent(q)}` : ''
@@ -478,6 +481,12 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       }
     } catch (e) {
       console.error(e)
+      if (retryCount < 3) {
+          console.log(`Load failed, retrying (${retryCount + 1}/3)...`)
+          setTimeout(() => load(retryCount + 1), 1000)
+      } else {
+          message.error('加载文件列表失败，请手动刷新')
+      }
     } finally {
       setLoading(false)
     }
@@ -543,27 +552,186 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
     } catch (e) { console.error(e) }
   }
 
+  async function onExportConfirm(ids, roots) {
+    try {
+        const targetDir = await window.electronAPI.openDirectoryDialog()
+        if (!targetDir) return
+        
+        // Use Electron main process export logic (Node.js)
+        const res = await window.electronAPI.exportToDocx(roots, targetDir)
+        
+        if (res && res.success) {
+             message.success('导出成功')
+             if (res.errors && res.errors.length > 0) {
+                 message.warning(`部分文件导出失败: ${res.errors.length} 个`)
+             }
+        } else {
+             message.error('导出失败: ' + (res?.message || '未知错误'))
+        }
+    } catch (e) {
+        console.error(e)
+        message.error('导出失败: ' + (e.message || '未知错误'))
+    }
+  }
+
+  async function onBatchDeleteConfirm(ids, roots) {
+      // Logic:
+      // 1. If active file is deleted, find adjacent file FIRST.
+      // 2. Execute Delete.
+      // 3. Update selection.
+      
+      let nextSelectionId = null
+      let shouldReselect = false
+      
+      if (selectedId) {
+          // Check if selectedId or its parent is in roots
+          let isDeleted = false
+          if (roots.includes(selectedId)) {
+              isDeleted = true
+          } else {
+               let curr = items.find(i => i.id === selectedId)
+               while (curr && curr.parent_id) {
+                  if (roots.includes(curr.parent_id)) {
+                      isDeleted = true
+                      break
+                  }
+                  curr = items.find(i => i.id === curr.parent_id)
+               }
+          }
+          
+          if (isDeleted) {
+              shouldReselect = true
+              // Find adjacent
+              const visibleList = []
+              const traverse = (nodes) => {
+                  for (const node of nodes) {
+                      visibleList.push(node)
+                      if (node.is_folder && expanded.has(node.id)) {
+                          traverse(node.children)
+                      }
+                  }
+              }
+              traverse(tree)
+              
+              const idx = visibleList.findIndex(i => i.id === selectedId)
+              if (idx !== -1) {
+                  // Strategy: Find the nearest neighbor that is NOT in the delete set.
+                  // Backward search
+                  for (let i = idx - 1; i >= 0; i--) {
+                      const candidate = visibleList[i]
+                      if (!isItemDeleted(candidate, roots)) {
+                          nextSelectionId = candidate.id
+                          break
+                      }
+                  }
+                  // If no prev, Forward search
+                  if (!nextSelectionId) {
+                      for (let i = idx + 1; i < visibleList.length; i++) {
+                          const candidate = visibleList[i]
+                          if (!isItemDeleted(candidate, roots)) {
+                              nextSelectionId = candidate.id
+                              break
+                          }
+                      }
+                  }
+              }
+          }
+      }
+
+      try {
+          await api('/api/files/batch-delete', {
+              method: 'POST',
+              body: JSON.stringify({ ids: roots })
+          })
+          
+          if (shouldReselect) {
+              // Immediately unselect current file to close preview/prevent save
+              // This is critical: We must ensure App.jsx knows this file is gone.
+              // But App.jsx relies on onItemsChanged to detect deletion.
+              // However, load() is async.
+              // We should explicitly clear selection if we know it's deleted.
+              
+              if (nextSelectionId) {
+                  const nextItem = items.find(i => i.id === nextSelectionId)
+                  onSelect(nextItem, { skipSave: true })
+              } else {
+                  // Fallback: select nothing or first available after reload
+                  onSelect(null, { skipSave: true })
+              }
+          }
+
+          message.success(`成功删除 ${ids.length} 个项目`)
+          void load()
+      } catch (e) {
+          console.error(e)
+          message.error('批量删除失败: ' + (e.message || '未知错误'))
+          throw e // Re-throw to let dialog know it failed
+      }
+  }
+  
+  function isItemDeleted(item, roots) {
+      if (roots.includes(item.id)) return true
+      let curr = item
+      while (curr && curr.parent_id) {
+          if (roots.includes(curr.parent_id)) return true
+          // We need to look up parent in `items` list because `item` might be from `tree` which has parent ref? 
+          // `items` is flat. `tree` nodes usually don't have parent ref, but we have `parent_id`.
+          // We need to find the parent object.
+          // `items` is available in scope.
+          curr = items.find(i => i.id === curr.parent_id)
+      }
+      return false
+  }
+
   async function onImport() {
     try {
-      const paths = await window.electronAPI.openFileDialog()
-      if (!paths || paths.length === 0) return
-      if (paths.length === 1) {
-        const created = await api('/api/files/import', {
-          method: 'POST',
-          body: JSON.stringify({ path: paths[0], encoding: 'utf-8' }),
-        })
-        const next = [created, ...items] 
-        setItems(next)
-        onItemsChanged?.(next)
-        void load() 
-      } else {
-        await api('/api/files/import', {
-          method: 'POST',
-          body: JSON.stringify({ paths, encoding: 'utf-8' }),
-        })
-        void load()
+      const res = await window.electronAPI.importFiles()
+      if (!res || !res.success || !res.results || res.results.length === 0) return
+      
+      const results = res.results
+      const loadingMsg = message.loading(`正在导入 ${results.length} 个文件...`, 0)
+      
+      let successCount = 0
+      let failCount = 0
+      
+      for (const item of results) {
+          if (item.error) {
+              failCount++
+              continue
+          }
+          try {
+              // Use default title if empty
+              const title = item.title || '未命名'
+              
+              await api('/api/files', {
+                  method: 'POST',
+                  body: JSON.stringify({
+                      title: title,
+                      content: item.content || '',
+                      is_folder: false,
+                      parent_id: '' // Import to root by default
+                  })
+              })
+              successCount++
+          } catch (e) {
+              console.error(`Import create failed for ${item.title}`, e)
+              failCount++
+          }
       }
-    } catch (e) { console.error(e) }
+      
+      loadingMsg() // Close loading
+      
+      if (successCount > 0) {
+          message.success(`成功导入 ${successCount} 个文件`)
+          void load()
+      }
+      if (failCount > 0) {
+          message.warning(`${failCount} 个文件导入失败`)
+      }
+    } catch (e) { 
+        console.error(e)
+        message.error('导入出错')
+    }
   }
 
   async function onSaveAs(id) {
@@ -579,6 +747,12 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
 
   // 优化的删除逻辑
   async function onDeleteCheck(targetId) {
+      // Check if we are deleting a selection
+      if (selectedIds.has(targetId) && selectedIds.size > 1) {
+          void onBatchDeleteCheck()
+          return
+      }
+
       const targetItem = items.find(i => i.id === targetId)
       if (!targetItem) return
       
@@ -598,31 +772,19 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
           count = countRecursive(targetItem.id)
           setDeleteConfirm({ id: targetId, count, isFolder: true, title: targetItem.title })
       } else {
-          // Check if deleting the currently selected file
-          if (targetId === selectedId) {
-               setDeleteConfirm({ id: targetId, count: 0, isFolder: false, title: targetItem.title })
-          } else {
-               // Use onBeforeDelete (App level confirmation) for non-selected files if needed?
-               // The requirement says: 
-               // 1. Deleting selected file -> Show "Delete Confirmation" (Confirm/Cancel) -> NO Save Dialog.
-               // 2. Switching file -> If unsaved -> Show "Save Confirmation" (Save/Don't Save/Cancel).
-               
-               // If we delete a non-selected file, we can just delete it or ask confirmation.
-               // Existing logic used onBeforeDelete which triggered App's dialog.
-               // We should probably unify this.
-               // Let's use local confirmation for consistency if that's acceptable, 
-               // OR delegate to App.
-               
-               // Requirement 1 specifically mentions "When deleting CURRENTLY SELECTED file".
-               // But usually delete always needs confirmation.
-               // Let's use local deleteConfirm for everything to keep it independent from App's "Unsaved" logic.
-               setDeleteConfirm({ id: targetId, count: 0, isFolder: false, title: targetItem.title })
-          }
+          setDeleteConfirm({ id: targetId, count: 0, isFolder: false, title: targetItem.title })
       }
       setContextMenu(null)
   }
 
   async function onDelete(targetId) {
+    // Handle Batch Delete
+    if (deleteConfirm && deleteConfirm.isBatch) {
+        await onBatchDeleteConfirm(deleteConfirm.ids, deleteConfirm.ids)
+        setDeleteConfirm(null)
+        return
+    }
+
     try {
       // 1. No onBeforeDelete call here anymore to avoid "Unsaved Changes" dialog from App.
       // We handle delete confirmation locally.
@@ -951,8 +1113,30 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
   function handleContextMenuEvent(e, item) {
     e.preventDefault()
     e.stopPropagation()
+    
+    // If the item is not in the current selection, select it (single select)
+    // unless Ctrl/Shift is pressed? Context menu usually selects the item if not selected.
+    // If item IS in selection, keep selection (to allow operation on batch).
+    if (!selectedIds.has(item.id)) {
+        onSelect(item) // This triggers single selection logic
+        // But wait, onSelect might be async or dependent on prop update.
+        // For context menu, we might want to force update selectedIds locally?
+        // Actually, let's just use the item passed to context menu if it's not selected.
+        // But if we want to support "Right click on one of selected -> Delete All",
+        // we need to know if it was selected.
+    }
+    
     setContextMenu({ x: e.clientX, y: e.clientY, item })
   }
+
+  // Unified Batch Delete Check
+  async function onBatchDeleteCheck() {
+      setShowBatchDelete(true)
+  }
+
+  // Update Delete Confirm Dialog to handle batch
+  // ...
+
 
   function format(ts) {
     const d = new Date(ts * 1000)
@@ -1014,6 +1198,8 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
             )}
         </div>
         <button className="btn" onClick={onImport}>导入</button>
+        <button className="btn" onClick={() => setShowExport(true)}>导出</button>
+        <button className="btn danger" onClick={() => void onBatchDeleteCheck()}>批量删除</button>
         <div className="search-box">
           <input className="input" placeholder="搜索..." value={q} onChange={e => setQ(e.target.value)} />
           <button className="btn" onClick={() => void load()}>🔍</button>
@@ -1053,13 +1239,24 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       {deleteConfirm && (
           <div className="modal-overlay">
               <div className="modal">
-                  <div className="modal-title">删除确认</div>
+                  <div className="modal-title">{deleteConfirm.isBatch ? '批量删除确认' : '删除确认'}</div>
                   <div className="modal-message">
-                      确定要删除 {deleteConfirm.isFolder ? '文件夹' : '文件'} "{deleteConfirm.title}" 吗？
-                      {deleteConfirm.isFolder && (
-                          <div style={{ marginTop: 8, color: '#ef4444' }}>
-                              ⚠️ 将同时删除其中包含的 {deleteConfirm.count} 个项目！
-                          </div>
+                      {deleteConfirm.isBatch ? (
+                          <>
+                              确定要删除选中的 {deleteConfirm.count} 个项目吗？
+                              <div style={{ marginTop: 8, color: '#ef4444' }}>
+                                  ⚠️ 此操作不可恢复！
+                              </div>
+                          </>
+                      ) : (
+                          <>
+                              确定要删除 {deleteConfirm.isFolder ? '文件夹' : '文件'} "{deleteConfirm.title}" 吗？
+                              {deleteConfirm.isFolder && (
+                                  <div style={{ marginTop: 8, color: '#ef4444' }}>
+                                      ⚠️ 将同时删除其中包含的 {deleteConfirm.count} 个项目！
+                                  </div>
+                              )}
+                          </>
                       )}
                   </div>
                   <div className="modal-actions">
@@ -1078,6 +1275,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
           validate={validateName}
           onConfirm={onNewFileConfirm}
           onCancel={() => setNaming(false)}
+          showFormatSelect={true}
         />
       )}
       {folderNaming && (
@@ -1090,6 +1288,8 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
           onCancel={() => setFolderNaming(false)}
         />
       )}
+      {showExport && <FileSelectorDialog open={showExport} onClose={() => setShowExport(false)} items={items} onConfirm={onExportConfirm} title="导出文件" confirmText="开始导出" />}
+      {showBatchDelete && <FileSelectorDialog open={showBatchDelete} onClose={() => setShowBatchDelete(false)} items={items} onConfirm={onBatchDeleteConfirm} title="批量删除" confirmText="删除" processingText="删除中..." showDeleteWarning={true} selectedFileId={selectedId} initialSelectedIds={Array.from(selectedIds)} />}
       {renaming && (
         <NameDialog
           defaultName={renaming.title}

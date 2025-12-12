@@ -32,6 +32,10 @@ export default function TableSelectionPlugin() {
       else if (type === 'background') applyBackground(payload)
       else if (type === 'autoFitWindow') autoSize('fitWindow')
       else if (type === 'autoFitContent') autoSize('fitContent')
+      else if (type === 'sortAsc') sortByFirstCol('asc')
+      else if (type === 'sortDesc') sortByFirstCol('desc')
+      else if (type === 'filterContains') filterRowsContains(payload)
+      else if (type === 'paginate') paginateRows(Number(payload) || 10)
       
       // 恢复编辑器焦点，防止操作后失焦无法输入
       setTimeout(() => editor.focus(), 0)
@@ -59,6 +63,11 @@ export default function TableSelectionPlugin() {
     }
 
     const onKey = (e) => { ctrlRef.current = e.ctrlKey || e.metaKey }
+    const onShortcut = (e) => {
+      if (!(e.ctrlKey || e.metaKey) || !e.altKey) return
+      if (e.key.toLowerCase() === 'm') { e.preventDefault(); doMerge() }
+      if (e.key.toLowerCase() === 's') { e.preventDefault(); doSplit() }
+    }
     const onDown = (e) => {
       const cell = getCell(e.target)
       if (!cell) return
@@ -99,6 +108,7 @@ export default function TableSelectionPlugin() {
     container.addEventListener('mouseleave', onLeave)
     container.addEventListener('mouseover', onOver)
     window.addEventListener('keydown', onKey)
+    window.addEventListener('keydown', onShortcut)
     window.addEventListener('keyup', onKey)
     return () => {
       container.removeEventListener('mousedown', onDown)
@@ -106,6 +116,7 @@ export default function TableSelectionPlugin() {
       container.removeEventListener('mouseup', onUp)
       container.removeEventListener('mouseleave', onLeave)
       window.removeEventListener('keydown', onKey)
+      window.removeEventListener('keydown', onShortcut)
       window.removeEventListener('keyup', onKey)
       container.removeEventListener('mouseover', onOver)
     }
@@ -152,6 +163,14 @@ export default function TableSelectionPlugin() {
       m.appendChild(make('删除行', () => doDelRow()))
       m.appendChild(make('添加列', () => doAddCol()))
       m.appendChild(make('删除列', () => doDelCol()))
+      
+      const div = document.createElement('div'); div.className = 'divider'; m.appendChild(div)
+      
+      m.appendChild(make('按首列升序', () => sortByFirstCol('asc')))
+      m.appendChild(make('按首列降序', () => sortByFirstCol('desc')))
+      m.appendChild(make('筛选文本...', () => { const q = window.prompt('筛选包含文本：'); if (q) filterRowsContains(q) }))
+      m.appendChild(make('分页(10行)', () => paginateRows(10)))
+
       document.body.appendChild(m)
       menuRef.current = m
     }
@@ -364,6 +383,82 @@ export default function TableSelectionPlugin() {
       for (const r of rows) { const cells = r.getChildren(); const target = cells[ci]; if (target) target.remove() }
     })
     if (menuRef.current) menuRef.current.style.display = 'none'
+  }
+
+  const sortByFirstCol = (dir) => {
+    editor.update(() => {
+      const tables = []
+      const walk = (node) => { if (!node.getChildren) return; const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
+      walk($getRoot())
+      const container = document.querySelector('.editor-container')
+      const tableEls = container ? Array.from(container.querySelectorAll('table')) : []
+      const tIndex = hoverTable ?? 0
+      const table = tables[tIndex]
+      const tableEl = tableEls[tIndex]
+      if (!table || !tableEl) return
+      const rows = table.getChildren()
+      const bodyRows = rows.slice(1)
+      const sorted = bodyRows.slice().sort((a, b) => {
+        const ta = a.getChildren?.()[0]
+        const tb = b.getChildren?.()[0]
+        const va = String(ta?.getTextContent?.() || '')
+        const vb = String(tb?.getTextContent?.() || '')
+        return dir === 'asc' ? va.localeCompare(vb, 'zh-CN') : vb.localeCompare(va, 'zh-CN')
+      })
+      bodyRows.forEach(r => r.remove())
+      sorted.forEach(r => table.append(r))
+    })
+  }
+
+  const filterRowsContains = (q) => {
+    if (!q) return
+    editor.update(() => {
+      const tables = []
+      const walk = (node) => { if (!node.getChildren) return; const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
+      walk($getRoot())
+      const tIndex = hoverTable ?? 0
+      const table = tables[tIndex]
+      if (!table) return
+      const rows = table.getChildren()
+      const header = rows[0]
+      const remain = [header]
+      rows.slice(1).forEach(r => {
+        const text = r.getTextContent?.() || ''
+        if (text.includes(q)) remain.push(r)
+        else r.remove()
+      })
+    })
+  }
+
+  const paginateRows = (pageSize) => {
+    editor.update(() => {
+      const tables = []
+      const walk = (node) => { if (!node.getChildren) return; const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
+      walk($getRoot())
+      const tIndex = hoverTable ?? 0
+      const table = tables[tIndex]
+      if (!table) return
+      const rows = table.getChildren()
+      const header = rows[0]
+      let group = []
+      let remaining = rows.slice(1)
+      const parent = table.getParent?.()
+      if (!parent) return
+      const makeTable = (rowsGroup) => {
+        const nt = new TableNode()
+        const newRows = [header.clone?.() || header]
+        rowsGroup.forEach(r => newRows.push(r))
+        newRows.forEach(r => nt.append(r))
+        parent.insertAfter(nt, table)
+        return nt
+      }
+      while (remaining.length > 0) {
+        group = remaining.splice(0, pageSize)
+        makeTable(group)
+      }
+      // Original table will keep only header
+      rows.slice(1).forEach(r => r.remove())
+    })
   }
 
   const outlines = (() => {
