@@ -9,7 +9,7 @@ import { LinkPlugin } from '@lexical/react/LexicalLinkPlugin';
 import { ListPlugin } from '@lexical/react/LexicalListPlugin';
 import { MarkdownShortcutPlugin } from '@lexical/react/LexicalMarkdownShortcutPlugin';
 import { TRANSFORMERS } from '@lexical/markdown';
-import LexicalErrorBoundary from '@lexical/react/LexicalErrorBoundary';
+import {LexicalErrorBoundary} from '@lexical/react/LexicalErrorBoundary';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import { $getRoot, $createParagraphNode, $createTextNode } from 'lexical';
 

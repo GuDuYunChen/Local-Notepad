@@ -5,7 +5,7 @@ import { ContentEditable } from '@lexical/react/LexicalContentEditable'
 import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin'
 import { HeadingNode, $createHeadingNode, QuoteNode, $createQuoteNode } from '@lexical/rich-text'
 import { CodeNode, CodeHighlightNode, $createCodeNode } from '@lexical/code'
-import LexicalErrorBoundary from '@lexical/react/LexicalErrorBoundary'
+import {LexicalErrorBoundary} from '@lexical/react/LexicalErrorBoundary'
 import {
   FORMAT_TEXT_COMMAND,
   $getRoot,
