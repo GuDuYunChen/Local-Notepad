@@ -19,7 +19,9 @@ const FileNode = ({
     onContextMenu, 
     onMove,
     checkHierarchy,
-    removeExtension
+    removeExtension,
+    onRename,
+    onDelete
 }) => {
     const ref = useRef(null)
     const [dropPos, setDropPos] = useState(null)
@@ -114,6 +116,10 @@ const FileNode = ({
                 {node.is_folder ? node.title : removeExtension(node.title)}
                 {node.is_folder && <span className="count"> ({node.fileCount})</span>}
             </div>
+          </div>
+          <div className="actions">
+            <button className="action-btn" onClick={(e) => { e.stopPropagation(); onRename(node); }} title="重命名">✏️</button>
+            <button className="action-btn danger" onClick={(e) => { e.stopPropagation(); onDelete(node); }} title="删除">🗑️</button>
           </div>
         </li>
     )
@@ -1176,6 +1182,8 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
             onMove={handleMove}
             checkHierarchy={checkHierarchy}
             removeExtension={removeExtension}
+            onRename={(n) => setRenaming(n)}
+            onDelete={(n) => onDeleteCheck(n.id)}
         />
         {isFolder && isExpanded && node.children.length > 0 && (
             node.children.map(child => renderNode(child, level + 1))
@@ -1323,6 +1331,12 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
           .tree-list .list-item .count { color: var(--muted); font-size: 12px; }
           .tree-list .empty-folder { font-size: 12px; color: var(--muted); padding: 8px 12px; font-style: italic; }
           
+          .tree-list .list-item .actions { display: none; gap: 4px; margin-left: 8px; }
+          .tree-list .list-item:hover .actions { display: flex; }
+          .tree-list .action-btn { background: none; border: none; cursor: pointer; font-size: 12px; padding: 2px 4px; border-radius: 4px; opacity: 0.7; transition: all 0.2s; }
+          .tree-list .action-btn:hover { background: rgba(0,0,0,0.1); opacity: 1; transform: scale(1.1); }
+          .tree-list .action-btn.danger:hover { background: rgba(255,0,0,0.1); }
+
           /* Drag Styles */
           .tree-list .list-item.dragging { opacity: 0.5; background: #f0f0f0; }
           .tree-list .list-item.drag-inside { background: rgba(126, 91, 239, 0.2); border: 1px dashed var(--accent); }

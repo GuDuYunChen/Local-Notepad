@@ -22,6 +22,7 @@ import { AutoLinkNode, LinkNode } from "@lexical/link";
 import ToolbarPlugin from "./plugins/ToolbarPlugin";
 import PasteImagePlugin from "./plugins/PasteImagePlugin";
 import TableSelectionPlugin from "./plugins/TableSelectionPlugin";
+import TableActionMenuPlugin from "./plugins/TableActionMenuPlugin";
 import { ImageNode } from "./nodes/ImageNode";
 import { VideoNode } from "./nodes/VideoNode";
 import { ImageGridNode } from "./nodes/ImageGridNode";
@@ -39,6 +40,7 @@ const theme = {
   table: 'editor-table',
   tableCell: 'editor-table-cell',
   tableCellHeader: 'editor-table-cell-header',
+  tableRowStriping: 'editor-table-row-striping',
   image: 'editor-image',
   imageGrid: 'editor-image-grid',
   video: 'editor-video',
@@ -127,6 +129,7 @@ export default function Editor({ initialContent, onChange, readOnly }) {
           <OnChangePlugin onChange={onChange} />
           <LoadContentPlugin content={initialContent} />
           <TableSelectionPlugin />
+          <TableActionMenuPlugin />
         </div>
       </div>
     </LexicalComposer>

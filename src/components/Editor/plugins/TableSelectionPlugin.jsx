@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { $getRoot, $createParagraphNode, FORMAT_ELEMENT_COMMAND, $getSelection } from 'lexical'
-import { TableNode, TableRowNode, TableCellNode, $createTableCellNode, $createTableRowNode } from '@lexical/table'
+import { TableNode, TableRowNode, TableCellNode, $createTableCellNode, $createTableRowNode, TableCellHeaderStates } from '@lexical/table'
+import { $getNodeByKey } from 'lexical'
 
 export default function TableSelectionPlugin() {
   const [editor] = useLexicalComposerContext()
@@ -36,6 +37,17 @@ export default function TableSelectionPlugin() {
       else if (type === 'sortDesc') sortByFirstCol('desc')
       else if (type === 'filterContains') filterRowsContains(payload)
       else if (type === 'paginate') paginateRows(Number(payload) || 10)
+      else if (type === 'insertRow' || type === 'insertRowAbove' || type === 'insertRowBelow') doAddRow(payload)
+      else if (type === 'deleteRow') doDelRow(payload)
+      else if (type === 'insertCol' || type === 'insertColLeft' || type === 'insertColRight') doAddCol(payload)
+      else if (type === 'deleteCol') doDelCol(payload)
+      else if (type === 'deleteTable') doDelTable(payload)
+      else if (type === 'clear') doClear()
+      else if (type === 'toggleRowStriping') toggleRowStriping(payload)
+      else if (type === 'toggleFrozenRow') toggleFrozenRow(payload)
+      else if (type === 'toggleFrozenColumn') toggleFrozenColumn(payload)
+      else if (type === 'toggleRowHeader') toggleRowHeader(payload)
+      else if (type === 'toggleColumnHeader') toggleColumnHeader(payload)
       
       // 恢复编辑器焦点，防止操作后失焦无法输入
       setTimeout(() => editor.focus(), 0)
@@ -229,6 +241,71 @@ export default function TableSelectionPlugin() {
     if (menuRef.current) menuRef.current.style.display = 'none'
   }
 
+  const doDelTable = (payload) => {
+    editor.update(() => {
+      const table = getTable(payload)
+      if (table) table.remove()
+    })
+    if (menuRef.current) menuRef.current.style.display = 'none'
+  }
+
+  const toggleRowStriping = (payload) => {
+    editor.update(() => {
+      const table = getTable(payload)
+      if (table) {
+        table.setRowStriping(!table.getRowStriping())
+      }
+    })
+  }
+
+  const toggleFrozenRow = (payload) => {
+    editor.update(() => {
+      const table = getTable(payload)
+      if (table) {
+        table.setFrozenRows(table.getFrozenRows() === 0 ? 1 : 0)
+      }
+    })
+  }
+
+  const toggleFrozenColumn = (payload) => {
+    editor.update(() => {
+      const table = getTable(payload)
+      if (table) {
+        table.setFrozenColumns(table.getFrozenColumns() === 0 ? 1 : 0)
+      }
+    })
+  }
+
+  const toggleRowHeader = (payload) => {
+    editor.update(() => {
+      const table = getTable(payload)
+      if (!table) return
+      const rows = table.getChildren()
+      const row = rows[0]
+      if (!row) return
+      const cells = row.getChildren()
+      cells.forEach(cell => {
+        if (cell.toggleHeaderStyle) {
+          cell.toggleHeaderStyle(TableCellHeaderStates.ROW)
+        }
+      })
+    })
+  }
+
+  const toggleColumnHeader = (payload) => {
+    editor.update(() => {
+      const table = getTable(payload)
+      if (!table) return
+      const rows = table.getChildren()
+      rows.forEach(row => {
+        const cell = row.getChildren()[0]
+        if (cell && cell.toggleHeaderStyle) {
+          cell.toggleHeaderStyle(TableCellHeaderStates.COLUMN)
+        }
+      })
+    })
+  }
+
   const doSplit = () => {
     const r = rects[0]
     editor.update(() => {
@@ -312,30 +389,71 @@ export default function TableSelectionPlugin() {
     if (menuRef.current) menuRef.current.style.display = 'none'
   }
 
-  const doAddRow = () => {
-    const { tIndex, ri } = readInfo()
+  const getTable = (payload) => {
+    if (payload?.tableKey) return $getNodeByKey(payload.tableKey)
+    const info = payload?.tIndex !== undefined ? payload : readInfo()
+    const tIndex = info.tIndex
+    const tables = []
+    const walk = (node) => { if (!node.getChildren) return; const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
+    walk($getRoot())
+    return tables[tIndex]
+  }
+
+  const doAddRow = (payload) => {
+    let ri, mode
+    if (payload) { ri = payload.ri; mode = payload.mode }
+    else { const info = readInfo(); ri = info.ri; mode = 'below' }
+
     editor.update(() => {
-      const tables = []
-      const walk = (node) => { if (!node.getChildren) return; const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
-      walk($getRoot())
-      const table = tables[tIndex]
+      const table = getTable(payload)
       if (!table) return
       const rows = table.getChildren()
       const cols = rows[0]?.getChildren().length || 1
       const row = $createTableRowNode()
-      for (let i = 0; i < cols; i++) { const cell = $createTableCellNode(); cell.append($createParagraphNode()); row.append(cell) }
-      table.insertAt(ri + 1, row)
+      
+      // Get reference row to copy styles
+      const refRow = rows[ri]
+      const refCells = refRow ? refRow.getChildren() : null
+
+      for (let i = 0; i < cols; i++) { 
+        const cell = $createTableCellNode(); 
+        cell.append($createParagraphNode()); 
+        
+        // Copy styles from reference cell
+        if (refCells && refCells[i]) {
+          const refCell = refCells[i]
+          if (refCell.getBackgroundColor()) cell.setBackgroundColor(refCell.getBackgroundColor())
+          if (refCell.getVerticalAlign()) cell.setVerticalAlign(refCell.getVerticalAlign())
+          if (refCell.getWidth()) cell.setWidth(refCell.getWidth())
+          if (refCell.getStyle && cell.setStyle) {
+             cell.setStyle(refCell.getStyle())
+          }
+        }
+        
+        row.append(cell) 
+      }
+      
+      const targetRow = rows[ri]
+      if (targetRow) {
+        if (mode === 'above') {
+          targetRow.insertBefore(row)
+        } else {
+          targetRow.insertAfter(row)
+        }
+      } else {
+        table.append(row)
+      }
     })
     if (menuRef.current) menuRef.current.style.display = 'none'
   }
 
-  const doDelRow = () => {
-    const { tIndex, ri } = readInfo()
+  const doDelRow = (payload) => {
+    let ri
+    if (payload) { ri = payload.ri }
+    else { const info = readInfo(); ri = info.ri }
+
     editor.update(() => {
-      const tables = []
-      const walk = (node) => { if (!node.getChildren) return; const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
-      walk($getRoot())
-      const table = tables[tIndex]
+      const table = getTable(payload)
       if (!table) return
       const rows = table.getChildren()
       const row = rows[ri]
@@ -344,16 +462,45 @@ export default function TableSelectionPlugin() {
     if (menuRef.current) menuRef.current.style.display = 'none'
   }
 
-  const doAddCol = () => {
-    const { tIndex, ci } = readInfo()
+  const doAddCol = (payload) => {
+    let ci, mode
+    if (payload) { ci = payload.ci; mode = payload.mode }
+    else { const info = readInfo(); ci = info.ci; mode = 'right' }
+
     editor.update(() => {
-      const tables = []
-      const walk = (node) => { if (!node.getChildren) return; const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
-      walk($getRoot())
-      const table = tables[tIndex]
+      const table = getTable(payload)
       if (!table) return
       const rows = table.getChildren()
-      for (const r of rows) { const cell = $createTableCellNode(); cell.append($createParagraphNode()); r.insertAt(ci + 1, cell) }
+      for (const r of rows) { 
+        const cell = $createTableCellNode(); 
+        cell.append($createParagraphNode()); 
+        
+        // Copy styles from reference cell in the same row
+        const cells = r.getChildren()
+        const refCell = cells[ci]
+        if (refCell) {
+           if (refCell.getBackgroundColor()) cell.setBackgroundColor(refCell.getBackgroundColor())
+           if (refCell.getVerticalAlign()) cell.setVerticalAlign(refCell.getVerticalAlign())
+           if (refCell.getWidth()) cell.setWidth(refCell.getWidth())
+           
+           if (refCell.getStyle && cell.setStyle) {
+              cell.setStyle(refCell.getStyle())
+           }
+           if (refCell.getHeaderStyles) {
+             cell.setHeaderStyles(refCell.getHeaderStyles())
+           }
+        }
+
+        if (refCell) {
+          if (mode === 'left') {
+            refCell.insertBefore(cell)
+          } else {
+            refCell.insertAfter(cell)
+          }
+        } else {
+          r.append(cell)
+        }
+      }
     })
     if (menuRef.current) menuRef.current.style.display = 'none'
   }
@@ -371,13 +518,13 @@ export default function TableSelectionPlugin() {
     })
   }
 
-  const doDelCol = () => {
-    const { tIndex, ci } = readInfo()
+  const doDelCol = (payload) => {
+    let ci
+    if (payload) { ci = payload.ci }
+    else { const info = readInfo(); ci = info.ci }
+
     editor.update(() => {
-      const tables = []
-      const walk = (node) => { if (!node.getChildren) return; const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
-      walk($getRoot())
-      const table = tables[tIndex]
+      const table = getTable(payload)
       if (!table) return
       const rows = table.getChildren()
       for (const r of rows) { const cells = r.getChildren(); const target = cells[ci]; if (target) target.remove() }
@@ -410,7 +557,8 @@ export default function TableSelectionPlugin() {
     })
   }
 
-  const filterRowsContains = (q) => {
+  const filterRowsContains = (payload) => {
+    const q = payload?.value ?? payload
     if (!q) return
     editor.update(() => {
       const tables = []
@@ -430,7 +578,8 @@ export default function TableSelectionPlugin() {
     })
   }
 
-  const paginateRows = (pageSize) => {
+  const paginateRows = (payload) => {
+    const pageSize = Number(payload?.value ?? payload)
     editor.update(() => {
       const tables = []
       const walk = (node) => { if (!node.getChildren) return; const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
@@ -483,7 +632,8 @@ export default function TableSelectionPlugin() {
     }).filter(Boolean)
   })()
 
-  const applyAlign = (v) => {
+  const applyAlign = (payload) => {
+    const v = payload?.value ?? payload
     const r = rects[0]
     editor.update(() => {
       const tables = []
@@ -498,6 +648,9 @@ export default function TableSelectionPlugin() {
           const cells = row.getChildren()
           for (let cc = r.c1; cc <= r.c2 && cc < cells.length; cc++) { cells[cc].setVerticalAlign?.(v) }
         }
+      } else if (payload?.cellKey) {
+        const cell = $getNodeByKey(payload.cellKey)
+        if (cell && cell.setVerticalAlign) cell.setVerticalAlign(v)
       } else {
         const sel = $getSelection()
         const node = sel?.getNodes?.()[0]
@@ -509,7 +662,8 @@ export default function TableSelectionPlugin() {
     setRects([])
   }
 
-  const applyHorizontal = (v) => {
+  const applyHorizontal = (payload) => {
+    const v = payload?.value ?? payload
     const r = rects[0]
     const patch = `text-align: ${v};`
     editor.update(() => {
@@ -526,6 +680,9 @@ export default function TableSelectionPlugin() {
           const cells = row.getChildren()
           for (let cc = r.c1; cc <= r.c2 && cc < cells.length; cc++) { applyCell(cells[cc]) }
         }
+      } else if (payload?.cellKey) {
+        const cell = $getNodeByKey(payload.cellKey)
+        if (cell) applyCell(cell)
       } else {
         const sel = $getSelection()
         const node = sel?.getNodes?.()[0]
@@ -537,7 +694,8 @@ export default function TableSelectionPlugin() {
     setRects([])
   }
 
-  const applyBorder = (preset) => {
+  const applyBorder = (payload) => {
+    const preset = payload?.value ?? payload
     const r = rects[0]
     const style = (() => {
       if (preset === 'none') return 'border: 0;'
@@ -560,6 +718,9 @@ export default function TableSelectionPlugin() {
           const cells = row.getChildren()
           for (let cc = r.c1; cc <= r.c2 && cc < cells.length; cc++) { applyCell(cells[cc]) }
         }
+      } else if (payload?.cellKey) {
+        const cell = $getNodeByKey(payload.cellKey)
+        if (cell) applyCell(cell)
       } else {
         const sel = $getSelection()
         const node = sel?.getNodes?.()[0]
@@ -571,7 +732,8 @@ export default function TableSelectionPlugin() {
     setRects([])
   }
 
-  const applyBackground = (color) => {
+  const applyBackground = (payload) => {
+    const color = payload?.value ?? payload
     const r = rects[0]
     editor.update(() => {
       const tables = []
@@ -586,6 +748,9 @@ export default function TableSelectionPlugin() {
           const cells = row.getChildren()
           for (let cc = r.c1; cc <= r.c2 && cc < cells.length; cc++) { cells[cc].setBackgroundColor?.(color) }
         }
+      } else if (payload?.cellKey) {
+        const cell = $getNodeByKey(payload.cellKey)
+        if (cell && cell.setBackgroundColor) cell.setBackgroundColor(color)
       } else {
         const sel = $getSelection()
         const node = sel?.getNodes?.()[0]
