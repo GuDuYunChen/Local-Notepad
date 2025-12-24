@@ -29,20 +29,6 @@ export default function FileSelectorDialog({ open, onClose, items, onConfirm, ti
 
     // ... tree and useEffect ...
 
-    // Check if active file is in selection
-    const isActiveFileSelected = useMemo(() => {
-        if (!showDeleteWarning || !selectedFileId) return false;
-        
-        // Helper to check if id is in selection or if any ancestor is in selection
-        const check = (id) => {
-             if (selectedIds.has(id)) return true;
-             const item = items.find(i => i.id === id);
-             if (item && item.parent_id) return check(item.parent_id);
-             return false;
-        };
-        return check(selectedFileId);
-    }, [selectedIds, selectedFileId, items, showDeleteWarning]);
-
     // Build tree from items
     const tree = useMemo(() => {
         const map = {};
@@ -86,12 +72,17 @@ export default function FileSelectorDialog({ open, onClose, items, onConfirm, ti
 
     useEffect(() => {
         if (open) {
-            setSelectedIds(new Set(initialSelectedIds));
+            // Filter out selectedFileId from initial selection if it exists
+            const initialSet = new Set(initialSelectedIds);
+            if (selectedFileId && initialSet.has(selectedFileId)) {
+                initialSet.delete(selectedFileId);
+            }
+            setSelectedIds(initialSet);
             setExpandedIds(new Set());
             setProcessing(false);
             setLastClickedId(null);
         }
-    }, [open, initialSelectedIds]);
+    }, [open, initialSelectedIds, selectedFileId]);
 
     if (!open) return null;
 
@@ -125,6 +116,9 @@ export default function FileSelectorDialog({ open, onClose, items, onConfirm, ti
      * @param {Object} e - Event object
      */
     const handleSelect = (node, checked, e) => {
+        // Prevent selection if it's the current file
+        if (node.id === selectedFileId) return;
+
         const next = new Set(selectedIds);
         const ids = descendantsMap[node.id] || [node.id];
         
@@ -138,17 +132,15 @@ export default function FileSelectorDialog({ open, onClose, items, onConfirm, ti
                 const end = Math.max(lastIdx, currIdx);
                 const range = visibleFlatList.slice(start, end + 1);
                 
-                // If checking, add all in range
-                // If unchecking, remove all in range (usually Shift+Click means select range)
-                // Standard behavior: Set all in range to 'checked'
-                
                 range.forEach(n => {
-                    // Also include descendants if it's a folder? 
-                    // Usually list selection selects the item itself. 
-                    // But here we have recursive selection logic.
-                    // Let's apply recursive selection to each item in range.
+                    // Skip current file in range selection
+                    if (n.id === selectedFileId) return;
+
                     const subIds = descendantsMap[n.id] || [n.id];
                     subIds.forEach(id => {
+                        // Also check subIds for selectedFileId
+                        if (id === selectedFileId) return;
+
                         if (checked) next.add(id);
                         else next.delete(id);
                     });
@@ -157,7 +149,9 @@ export default function FileSelectorDialog({ open, onClose, items, onConfirm, ti
         } else {
             // Normal Selection
             if (checked) {
-                ids.forEach(id => next.add(id));
+                ids.forEach(id => {
+                    if (id !== selectedFileId) next.add(id);
+                });
             } else {
                 ids.forEach(id => next.delete(id));
             }
@@ -168,10 +162,16 @@ export default function FileSelectorDialog({ open, onClose, items, onConfirm, ti
     };
 
     const handleSelectAll = () => {
-        if (selectedIds.size === items.length) {
+        // Exclude selectedFileId from total count for comparison
+        const selectableItems = items.filter(i => i.id !== selectedFileId);
+        
+        // Check if all *selectable* items are selected
+        const allSelectableSelected = selectableItems.every(i => selectedIds.has(i.id));
+
+        if (allSelectableSelected) {
             setSelectedIds(new Set());
         } else {
-            setSelectedIds(new Set(items.map(i => i.id)));
+            setSelectedIds(new Set(selectableItems.map(i => i.id)));
         }
     };
 
@@ -218,6 +218,7 @@ export default function FileSelectorDialog({ open, onClose, items, onConfirm, ti
     const renderNode = (node, level = 0) => {
         const isExpanded = expandedIds.has(node.id);
         const isChecked = selectedIds.has(node.id);
+        const isCurrent = node.id === selectedFileId;
         
         let allChildrenSelected = true;
         let someChildrenSelected = false;
@@ -242,7 +243,15 @@ export default function FileSelectorDialog({ open, onClose, items, onConfirm, ti
 
         return (
             <div key={node.id}>
-                <div className="tree-item" style={{ paddingLeft: level * 20 + 10 }}>
+                <div 
+                    className={`tree-item ${isCurrent ? 'disabled' : ''}`} 
+                    style={{ 
+                        paddingLeft: level * 20 + 10,
+                        color: isCurrent ? '#CCCCCC' : 'inherit',
+                        cursor: isCurrent ? 'not-allowed' : 'default'
+                    }}
+                    title={isCurrent ? "当前正在浏览的菜单项不可删除" : node.title}
+                >
                     <span 
                         className="toggle" 
                         onClick={(e) => node.is_folder && handleExpand(node.id, e)}
@@ -253,6 +262,7 @@ export default function FileSelectorDialog({ open, onClose, items, onConfirm, ti
                     <input 
                         type="checkbox" 
                         checked={allChildrenSelected}
+                        disabled={isCurrent}
                         ref={el => el && (el.indeterminate = someChildrenSelected && !allChildrenSelected)}
                         onChange={(e) => handleSelect(node, e.target.checked, e.nativeEvent)}
                     />
@@ -278,26 +288,23 @@ export default function FileSelectorDialog({ open, onClose, items, onConfirm, ti
                 <div className="modal-body">
                     <div className="toolbar">
                         <button className="btn small" onClick={handleSelectAll}>
-                            {selectedIds.size === items.length && items.length > 0 ? '取消全选' : '全选'}
+                            {selectedIds.size > 0 && selectedIds.size === items.filter(i => i.id !== selectedFileId).length ? '取消全选' : '全选'}
                         </button>
                         <span className="counter">已选择 {selectedIds.size} 项</span>
                     </div>
                     <div className="tree-container">
                         {tree.map(node => renderNode(node))}
                     </div>
-                    {showDeleteWarning && isActiveFileSelected && (
-                        <div className="warning-box" style={{ marginTop: 8, padding: 8, background: '#fff2f0', border: '1px solid #ffccc7', borderRadius: 4, color: '#cf1322', fontSize: 13 }}>
-                            ⚠️ 注意：当前正在浏览的文件包含在删除列表中，删除后将自动关闭。
-                        </div>
-                    )}
                 </div>
                 <div className="modal-footer">
                     {processing && <span className="loading-text">{processingText}</span>}
-                    <button className="btn" onClick={onClose}>取消</button>
-                    <button className="btn primary" onClick={handleConfirmAction} disabled={processing || selectedIds.size === 0}>
-                        {processing && <span className="spinner"></span>}
-                        {confirmText}
-                    </button>
+                    <div className="btn-group">
+                        <button className="btn" onClick={onClose}>取消</button>
+                        <button className="btn primary" onClick={handleConfirmAction} disabled={processing || selectedIds.size === 0}>
+                            {processing && <span className="spinner"></span>}
+                            {confirmText}
+                        </button>
+                    </div>
                 </div>
             </div>
             <style>{`
@@ -308,10 +315,27 @@ export default function FileSelectorDialog({ open, onClose, items, onConfirm, ti
                 .tree-container { max-height: 400px; overflow-y: auto; border: 1px solid #eee; border-radius: 4px; }
                 .tree-item { display: flex; align-items: center; padding: 4px 0; gap: 6px; cursor: default; }
                 .tree-item:hover { background: #f5f5f5; }
+                .tree-item.disabled:hover { background: transparent; }
                 .tree-item .toggle { cursor: pointer; width: 16px; text-align: center; font-size: 10px; color: #666; }
                 .tree-item input { cursor: pointer; }
+                .tree-item input:disabled { cursor: not-allowed; opacity: 0.5; }
                 .loading-text { margin-right: 12px; color: #666; }
                 .btn.small { height: 28px; padding: 0 8px; font-size: 12px; }
+                .modal-footer { 
+                    display: flex; 
+                    align-items: center; 
+                    margin-top: 16px; 
+                    position: relative;
+                }
+                .modal-footer .btn-group {
+                    display: flex;
+                    gap: 12px;
+                    padding: 0 16px;
+                }
+                .modal-footer .loading-text {
+                    position: absolute;
+                    left: 0;
+                }
                 .spinner {
                     display: inline-block;
                     width: 12px;
