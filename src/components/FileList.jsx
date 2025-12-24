@@ -5,7 +5,7 @@ import FileSelectorDialog from './FileSelectorDialog'
 import { useDrag, useDrop } from 'react-dnd'
 import { NativeTypes } from 'react-dnd-html5-backend'
 import { message } from 'antd'
-
+import { Input } from 'antd';
 const ItemType = 'FILE_NODE'
 
 const FileNode = ({ 
@@ -1215,7 +1215,8 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
         <button className="btn" onClick={() => setShowExport(true)}>导出</button>
         <button className="btn danger" onClick={() => void onBatchDeleteCheck()}>批量删除</button>
         <div className="search-box">
-          <input className="input" placeholder="搜索..." value={q} onChange={e => setQ(e.target.value)} />
+          {/*<input className="input" placeholder="搜索..." value={q} onChange={e => setQ(e.target.value)} />*/}
+          <Input placeholder="搜索..." allowClear value={q} onChange={e => setQ(e.target.value)} onPressEnter={() => void load()} />
           <button className="btn" onClick={() => void load()}>🔍</button>
         </div>
       </div>
