@@ -4,6 +4,7 @@ import TextEditor from './components/TextEditor'
 import FileList from './components/FileList'
 import { api } from '~/services/api'
 import ConfirmDialog from './components/ConfirmDialog'
+import { message } from 'antd'
 
 // 应用根组件：后续接入路由、主题与编辑器
 /**
@@ -169,6 +170,7 @@ export default function App() {
                 ref={editorRef}
                 activeId={current?.id || null}
                 deletedIds={deletedIds}
+                autoSaveOnSwitch={false}
                 onChange={setContent}
                 onLoaded={(text) => {
                   if (current) {
@@ -195,19 +197,44 @@ export default function App() {
           title="当前文件未保存"
           message="是否保存更改？"
           actions={[
-            { label: '保存', kind: 'primary', onClick: async () => { 
-              const ok = await saveCurrent()
-              if (ok) {
-                dialog.next() 
-                setDialog(null) 
-              } else { 
-                alert('保存失败，请重试') 
+            { 
+              label: '保存', 
+              kind: 'primary', 
+              loading: dialog.saving,
+              onClick: async () => { 
+                setDialog(prev => ({ ...prev, saving: true }))
+                const ok = await saveCurrent()
+                if (ok) {
+                  setDialog(null)
+                  dialog.next() 
+                } else { 
+                  message.error('保存失败，请重试') 
+                  setDialog(prev => ({ ...prev, saving: false }))
+                } 
+              }
+            },
+            { 
+              label: '不保存', 
+              disabled: dialog.saving,
+              onClick: () => { 
+                  setDialog(null)
+                  dialog.next() 
               } 
-            }},
-            { label: '不保存', onClick: () => { dialog.next(); setDialog(null) } },
-            { label: '取消', onClick: () => { if (dialog.cancel) dialog.cancel(); setDialog(null) } },
+            },
+            { 
+              label: '取消', 
+              disabled: dialog.saving,
+              onClick: () => { 
+                  if (dialog.cancel) dialog.cancel()
+                  setDialog(null) 
+              } 
+            },
           ]}
-          onClose={() => { if (dialog.cancel) dialog.cancel(); setDialog(null) }}
+          onClose={() => { 
+              if (dialog.saving) return
+              if (dialog.cancel) dialog.cancel()
+              setDialog(null) 
+          }}
         />
       )}
       {/* Delete dialog is handled in FileList now, so we can remove 'delete' type here if unused, 

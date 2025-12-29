@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState, useImperativeHandle } from
 import { api } from '~/services/api'
 import Editor from './Editor/Editor'
 
-function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved }, ref) {
+function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved, autoSaveOnSwitch = true }, ref) {
   // taRef, query, rep, wrapOn removed as they are specific to textarea
   const contentRef = useRef('')
   const saveTimerRef = useRef(null)
@@ -91,7 +91,7 @@ function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved 
     // Save previous file if it was loaded and has content
     if (currentIdRef.current && contentRef.current !== undefined) {
       const isDeleted = deletedIds?.has(currentIdRef.current)
-      if (!isDeleted) {
+      if (!isDeleted && autoSaveOnSwitch) {
         cacheWrite(currentIdRef.current, contentRef.current)
         // Don't await this save - let it happen in background or via abortable controller
         void saveNow('manual', currentIdRef.current) 
@@ -135,7 +135,7 @@ function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved 
     return () => {
       // Cleanup if needed
     }
-  }, [activeId, saveNow])
+  }, [activeId, saveNow, autoSaveOnSwitch])
 
   useEffect(() => {
     if (intervalRef.current) { window.clearInterval(intervalRef.current) }
