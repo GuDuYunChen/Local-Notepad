@@ -217,6 +217,9 @@ export default function App() {
               label: '不保存', 
               disabled: dialog.saving,
               onClick: () => { 
+                  if (editorRef.current) {
+                      editorRef.current.clearCache()
+                  }
                   setDialog(null)
                   dialog.next() 
               } 

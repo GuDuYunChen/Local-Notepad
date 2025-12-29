@@ -79,7 +79,12 @@ function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved,
   }, [])
 
   useImperativeHandle(ref, () => ({
-    save: () => saveNow('external')
+    save: () => saveNow('external'),
+    clearCache: () => {
+        if (currentIdRef.current) {
+            cacheRemove(currentIdRef.current)
+        }
+    }
   }))
 
   useEffect(() => {
@@ -224,6 +229,12 @@ const cacheWrite = (id, content, savedAt) => {
   if (!supportsLocalStorage()) return
   if (content.length > 1024 * 1024 * 1) return
   try { localStorage.setItem(`editor:cache:${id}`, JSON.stringify(payload)) } catch {}
+}
+
+const cacheRemove = (id) => {
+  memoryCache.delete(id)
+  if (!supportsLocalStorage()) return
+  try { localStorage.removeItem(`editor:cache:${id}`) } catch {}
 }
 
 const TextEditor = React.forwardRef(TextEditorInternal)
