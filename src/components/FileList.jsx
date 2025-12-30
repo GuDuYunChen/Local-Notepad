@@ -1036,7 +1036,10 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       setItems(prev => prev.map(i => i.id === id ? { ...i, title: updated.title } : i))
       onItemsChanged?.(items)
       setRenaming(null)
-    } catch (e) { console.error(e) }
+    } catch (e) { 
+        console.error(e)
+        throw e // Rethrow to let NameDialog handle it
+    }
   }
 
   async function onNewFileConfirm(name, format) {
@@ -1069,7 +1072,10 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
           setExpanded(prev => new Set([...prev, targetParentId]))
       }
       void load()
-    } catch (e) { console.error(e) }
+    } catch (e) { 
+        console.error(e)
+        throw e
+    }
     setNaming(false)
   }
 
@@ -1091,7 +1097,10 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
           setExpanded(prev => new Set([...prev, targetParentId]))
       }
       void load()
-    } catch (e) { console.error(e) }
+    } catch (e) { 
+        console.error(e)
+        throw e
+    }
     setFolderNaming(false)
   }
 
@@ -1372,7 +1381,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
                   </div>
                   <div className="modal-actions">
                       <button className="btn" onClick={() => setDeleteConfirm(null)}>取消</button>
-                      <button className="btn danger" onClick={() => void onDelete(deleteConfirm.id)}>删除</button>
+                      <button className="btn danger" onClick={() => onDelete(deleteConfirm.id)}>删除</button>
                   </div>
               </div>
           </div>
@@ -1427,7 +1436,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
           title={renaming.is_folder ? '重命名文件夹' : '重命名文件'}
           message={`当前名称：${renaming.title}`}
           validate={renaming.is_folder ? validateFolderInput : validateName}
-          onConfirm={(name) => void onRenameConfirm(renaming.id, name)}
+          onConfirm={(name) => onRenameConfirm(renaming.id, name)}
           onCancel={() => setRenaming(null)}
           isRename={!renaming.is_folder}
         />

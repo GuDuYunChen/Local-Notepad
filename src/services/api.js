@@ -7,11 +7,17 @@ function getBaseURL() {
 
 export async function api(path, init) {
   const url = `${getBaseURL()}${path}`
-  const res = await fetch(url, {
-    headers: { 'Content-Type': 'application/json' },
-    ...(init || {}),
-  })
-  if (!res.ok) throw new Error(`网络错误: ${res.status}`)
+  let res;
+  try {
+      res = await fetch(url, {
+        headers: { 'Content-Type': 'application/json' },
+        ...(init || {}),
+      })
+  } catch (e) {
+      throw new Error('网络连接失败，请检查网络后重试')
+  }
+  
+  if (!res.ok) throw new Error(`网络连接失败，请检查网络后重试`)
   const body = await res.json()
   if (body.code !== 0) throw new Error(body.message || '请求失败')
   return body.data

@@ -52,7 +52,7 @@ export default function NameDialog({
     return () => document.removeEventListener('keydown', onKey)
   }, [onCancel, showFormatSelect, defaultName, isRename])
 
-  const ok = () => {
+  const ok = async () => {
     const n = name.trim()
     if (!n) { setErr('文件名不能为空'); return }
     if (validate) {
@@ -63,14 +63,21 @@ export default function NameDialog({
     // Parent expects onConfirm(name, format) or just name.
     // If showFormatSelect is true, we should probably pass both or combined.
     // Let's pass both.
-    if (showFormatSelect || isRename) {
-        // If isRename, we might need to append format here or let parent handle it.
-        // FileList's onRenameConfirm expects (id, name, format) but logic there appends it.
-        // Actually FileList logic: "if we have a fixed format (from isRename mode), append it if missing"
-        // But here we stripped it. So we pass `n` (name part) and `format` (extension).
-        onConfirm(n, format)
-    } else {
-        onConfirm(n)
+    
+    setErr('') // Clear previous errors
+    
+    try {
+        if (showFormatSelect || isRename) {
+            // If isRename, we might need to append format here or let parent handle it.
+            // FileList's onRenameConfirm expects (id, name, format) but logic there appends it.
+            // Actually FileList logic: "if we have a fixed format (from isRename mode), append it if missing"
+            // But here we stripped it. So we pass `n` (name part) and `format` (extension).
+            await onConfirm(n, format)
+        } else {
+            await onConfirm(n)
+        }
+    } catch (e) {
+        setErr(e.message || '操作失败')
     }
   }
 
@@ -150,6 +157,11 @@ export default function NameDialog({
             padding: 0 8px;
             font-size: 12px;
             margin-left: 8px;
+        }
+        .modal-error {
+            color: #ff4d4f;
+            font-size: 13px;
+            margin-top: 8px;
         }
       `}</style>
     </div>

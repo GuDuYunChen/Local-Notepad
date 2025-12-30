@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"notepad-server/internal/service"
 	"strconv"
 	"strings"
@@ -89,9 +90,31 @@ func (a *FileAPI) Update(r *ghttp.Request) {
 		writeErr(r, 1005, "参数错误", err)
 		return
 	}
+
+	// 校验文件名包含特殊字符
+	if in.Title != nil {
+		invalid := []string{"/", "\\", ":", "*", "?", "\"", "<", ">", "|"}
+		for _, char := range invalid {
+			if strings.Contains(*in.Title, char) {
+				writeErr(r, 1006, "文件名不能包含特殊字符：/ \\ : * ? \" < > |", fmt.Errorf("invalid char: %s", char))
+				return
+			}
+		}
+	}
+
 	f, err := a.Svc.Update(r.GetCtx(), id, in.Title, in.Content, in.ParentID, in.SortOrder, in.IsDeleted)
 	if err != nil {
-		writeErr(r, 1006, "更新失败", err)
+		msg := "更新失败"
+		errStr := err.Error()
+		if strings.Contains(errStr, "目标位置已存在同名文件") {
+			msg = "文件名已存在，请使用其他名称"
+		} else if strings.Contains(errStr, "文件已删除") {
+			msg = errStr
+		} else {
+			// 其他数据库错误等
+			msg = "服务器异常，请稍后重试"
+		}
+		writeErr(r, 1006, msg, err)
 		return
 	}
 	writeOK(r, f)
