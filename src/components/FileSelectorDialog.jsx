@@ -94,7 +94,7 @@ export default function FileSelectorDialog({
         if (open) {
             if (mode === 'single-folder') {
                 setSingleSelectedId(initialSelectedIds[0] || '');
-                setExpandedIds(new Set()); // Maybe auto-expand to target?
+                setExpandedIds(new Set()); 
             } else {
                 // Filter out selectedFileId from initial selection if it exists
                 const initialSet = new Set(initialSelectedIds);
@@ -107,7 +107,9 @@ export default function FileSelectorDialog({
             setProcessing(false);
             setLastClickedId(null);
         }
-    }, [open, initialSelectedIds, selectedFileId, mode]);
+        // Remove initialSelectedIds from dependency to avoid loop if parent passes new array reference
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open, mode, selectedFileId]);
 
     if (!open) return null;
 
@@ -135,6 +137,18 @@ export default function FileSelectorDialog({
         return map;
     }, [tree, mode]);
 
+    // Check if node contains selectedFileId (for disabling parent folders)
+    const containsSelectedFile = useMemo(() => {
+        if (!selectedFileId || mode === 'single-folder') return new Set();
+        const set = new Set();
+        Object.entries(descendantsMap).forEach(([id, descendants]) => {
+            if (descendants.includes(selectedFileId)) {
+                set.add(id);
+            }
+        });
+        return set;
+    }, [descendantsMap, selectedFileId, mode]);
+
     /**
      * Handle item selection
      * @param {Object} node - The file/folder node
@@ -147,8 +161,8 @@ export default function FileSelectorDialog({
             return;
         }
 
-        // Prevent selection if it's the current file
-        if (node.id === selectedFileId) return;
+        // Prevent selection if it's the current file or contains it
+        if (node.id === selectedFileId || containsSelectedFile.has(node.id)) return;
 
         const next = new Set(selectedIds);
         const ids = descendantsMap[node.id] || [node.id];
@@ -164,13 +178,13 @@ export default function FileSelectorDialog({
                 const range = visibleFlatList.slice(start, end + 1);
                 
                 range.forEach(n => {
-                    // Skip current file in range selection
-                    if (n.id === selectedFileId) return;
+                    // Skip disabled items
+                    if (n.id === selectedFileId || containsSelectedFile.has(n.id)) return;
 
                     const subIds = descendantsMap[n.id] || [n.id];
                     subIds.forEach(id => {
-                        // Also check subIds for selectedFileId
-                        if (id === selectedFileId) return;
+                        // Also check subIds for disabled state
+                        if (id === selectedFileId || containsSelectedFile.has(id)) return;
 
                         if (checked) next.add(id);
                         else next.delete(id);
@@ -181,7 +195,7 @@ export default function FileSelectorDialog({
             // Normal Selection
             if (checked) {
                 ids.forEach(id => {
-                    if (id !== selectedFileId) next.add(id);
+                    if (id !== selectedFileId && !containsSelectedFile.has(id)) next.add(id);
                 });
             } else {
                 ids.forEach(id => next.delete(id));
@@ -193,11 +207,11 @@ export default function FileSelectorDialog({
     };
 
     const handleSelectAll = () => {
-        // Exclude selectedFileId from total count for comparison
-        const selectableItems = items.filter(i => i.id !== selectedFileId);
+        // Exclude selectedFileId and its parents from total count
+        const selectableItems = items.filter(i => i.id !== selectedFileId && !containsSelectedFile.has(i.id));
         
         // Check if all *selectable* items are selected
-        const allSelectableSelected = selectableItems.every(i => selectedIds.has(i.id));
+        const allSelectableSelected = selectableItems.length > 0 && selectableItems.every(i => selectedIds.has(i.id));
 
         if (allSelectableSelected) {
             setSelectedIds(new Set());
@@ -205,6 +219,11 @@ export default function FileSelectorDialog({
             setSelectedIds(new Set(selectableItems.map(i => i.id)));
         }
     };
+    
+    // Check state for button text
+    const selectableCount = items.filter(i => i.id !== selectedFileId && !containsSelectedFile.has(i.id)).length;
+    const isAllSelected = selectableCount > 0 && selectedIds.size === selectableCount;
+
 
 
     const handleConfirmAction = async () => {
@@ -225,7 +244,9 @@ export default function FileSelectorDialog({
             // ... (roots logic) ...
             
             const roots = [];
-            const allSelected = new Set(selectedIds);
+            // Filter out any accidentally selected disabled items
+            const finalIds = Array.from(selectedIds).filter(id => id !== selectedFileId && !containsSelectedFile.has(id));
+            const allSelected = new Set(finalIds);
             const itemMap = {};
             items.forEach(i => itemMap[i.id] = i);
             
@@ -245,7 +266,7 @@ export default function FileSelectorDialog({
             });
             
             // We pass both: array of all selected IDs, and optimized roots
-            await onConfirm(Array.from(selectedIds), roots);
+            await onConfirm(finalIds, roots);
             onClose();
         } catch (e) {
             console.error(e);
@@ -289,21 +310,27 @@ export default function FileSelectorDialog({
 
         const isChecked = selectedIds.has(node.id);
         const isCurrent = node.id === selectedFileId;
+        const isDisabled = isCurrent || containsSelectedFile.has(node.id);
         
         let allChildrenSelected = true;
         let someChildrenSelected = false;
         
         if (node.is_folder) {
              const childIds = descendantsMap[node.id].filter(id => id !== node.id);
-             if (childIds.length === 0) {
-                 allChildrenSelected = selectedIds.has(node.id);
-                 someChildrenSelected = selectedIds.has(node.id);
+             // For checkbox logic, we only care about selectable children
+             const selectableChildIds = childIds.filter(id => id !== selectedFileId && !containsSelectedFile.has(id));
+             
+             if (selectableChildIds.length === 0) {
+                 // If no selectable children, check self if not disabled
+                 // If disabled, it's effectively unchecked for UI purposes (or irrelevant)
+                 allChildrenSelected = isDisabled ? false : selectedIds.has(node.id);
+                 someChildrenSelected = isDisabled ? false : selectedIds.has(node.id);
              } else {
                  let count = 0;
-                 childIds.forEach(id => {
+                 selectableChildIds.forEach(id => {
                      if (selectedIds.has(id)) count++;
                  });
-                 allChildrenSelected = count === childIds.length;
+                 allChildrenSelected = count === selectableChildIds.length;
                  someChildrenSelected = count > 0;
              }
         } else {
@@ -311,16 +338,23 @@ export default function FileSelectorDialog({
             someChildrenSelected = selectedIds.has(node.id);
         }
 
+        let tooltip = node.title;
+        if (isCurrent) {
+            tooltip = "当前文件正在阅读中，无法删除";
+        } else if (isDisabled) {
+            tooltip = "该文件夹包含正在阅读的文件，无法删除";
+        }
+
         return (
             <div key={node.id}>
                 <div 
-                    className={`tree-item ${isCurrent ? 'disabled' : ''}`} 
+                    className={`tree-item ${isDisabled ? 'disabled' : ''}`} 
                     style={{ 
                         paddingLeft: level * 20 + 10,
-                        color: isCurrent ? '#CCCCCC' : 'inherit',
-                        cursor: isCurrent ? 'not-allowed' : 'default'
+                        color: isDisabled ? '#CCCCCC' : 'inherit',
+                        cursor: isDisabled ? 'not-allowed' : 'default'
                     }}
-                    title={isCurrent ? "当前正在浏览的菜单项不可删除" : node.title}
+                    title={tooltip}
                 >
                     <span 
                         className="toggle" 
@@ -332,7 +366,7 @@ export default function FileSelectorDialog({
                     <input 
                         type="checkbox" 
                         checked={allChildrenSelected}
-                        disabled={isCurrent}
+                        disabled={isDisabled}
                         ref={el => el && (el.indeterminate = someChildrenSelected && !allChildrenSelected)}
                         onChange={(e) => handleSelect(node, e.target.checked, e.nativeEvent)}
                     />
@@ -358,7 +392,7 @@ export default function FileSelectorDialog({
                 <div className="modal-body">
                     <div className="toolbar">
                         <button className="btn small" onClick={handleSelectAll}>
-                            {selectedIds.size > 0 && selectedIds.size === items.filter(i => i.id !== selectedFileId).length ? '取消全选' : '全选'}
+                            {isAllSelected ? '取消全选' : '全选'}
                         </button>
                         <span className="counter">已选择 {selectedIds.size} 项</span>
                     </div>
@@ -393,7 +427,7 @@ export default function FileSelectorDialog({
                 .modal-header h3 { margin: 0; }
                 .close-btn { background: none; border: none; font-size: 20px; cursor: pointer; }
                 .modal-body .toolbar { display: flex; justify-content: space-between; align-items: center; padding-bottom: 8px; border-bottom: 1px solid #eee; margin-bottom: 8px; }
-                .tree-container { max-height: 400px; overflow-y: auto; border: 1px solid #eee; border-radius: 4px; }
+                .tree-container { max-height: 60vh; overflow-y: auto; border: 1px solid #eee; border-radius: 4px; }
                 .tree-item { display: flex; align-items: center; padding: 4px 0; gap: 6px; cursor: default; }
                 .tree-item:hover { background: rgba(0,0,0,0.04); }
                 .tree-item.disabled:hover { background: transparent; }
@@ -408,11 +442,11 @@ export default function FileSelectorDialog({
                     align-items: center; 
                     margin-top: 16px; 
                     position: relative;
+                    justify-content: end;
                 }
                 .modal-footer .btn-group {
                     display: flex;
-                    gap: 12px;
-                    padding: 0 16px;
+                    gap: 12px; 
                 }
                 .modal-footer .loading-text {
                     position: absolute;

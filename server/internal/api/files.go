@@ -55,11 +55,29 @@ func (a *FileAPI) Create(r *ghttp.Request) {
 	}
 	in.Title = strings.TrimSpace(in.Title)
 	if in.Title == "" {
-		in.Title = "未命名"
+		writeErr(r, 1002, "文件名不能为空", nil)
+		return
 	}
+
+	// 校验文件名包含特殊字符
+	invalid := []string{"/", "\\", ":", "*", "?", "\"", "<", ">", "|"}
+	for _, char := range invalid {
+		if strings.Contains(in.Title, char) {
+			writeErr(r, 1006, "文件名不能包含特殊字符：/ \\ : * ? \" < > |", fmt.Errorf("invalid char: %s", char))
+			return
+		}
+	}
+
 	f, err := a.Svc.Create(r.GetCtx(), in.Title, in.Content, in.IsFolder, in.ParentID)
 	if err != nil {
-		writeErr(r, 1003, "创建失败", err)
+		msg := "创建失败"
+		errStr := err.Error()
+		if strings.Contains(errStr, "目标位置已存在同名文件") {
+			msg = "文件名已存在，请使用其他名称"
+		} else {
+			msg = "服务器异常，请稍后重试"
+		}
+		writeErr(r, 1003, msg, err)
 		return
 	}
 	writeOK(r, f)
@@ -93,6 +111,13 @@ func (a *FileAPI) Update(r *ghttp.Request) {
 
 	// 校验文件名包含特殊字符
 	if in.Title != nil {
+		t := strings.TrimSpace(*in.Title)
+		if t == "" {
+			writeErr(r, 1002, "文件名不能为空", nil)
+			return
+		}
+		*in.Title = t
+
 		invalid := []string{"/", "\\", ":", "*", "?", "\"", "<", ">", "|"}
 		for _, char := range invalid {
 			if strings.Contains(*in.Title, char) {

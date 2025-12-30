@@ -28,11 +28,21 @@ type FileService struct {
 
 // 创建文件或文件夹
 func (s *FileService) Create(ctx context.Context, title, content string, isFolder bool, parentID string) (*model.File, error) {
+	// 检查重名冲突
+	var count int
+	err := s.DB.QueryRowContext(ctx, "SELECT COUNT(*) FROM files WHERE parent_id = ? AND title = ? AND is_deleted = 0", parentID, title).Scan(&count)
+	if err != nil {
+		return nil, fmt.Errorf("检查重名失败: %w", err)
+	}
+	if count > 0 {
+		return nil, fmt.Errorf("目标位置已存在同名文件或文件夹: %s", title)
+	}
+
 	now := time.Now().Unix()
 	id := uuid.New().String()
 	// 新建项默认排序在最前（假设 SortOrder 越大越靠前，或者使用 updated_at）
 	// 这里我们初始化 SortOrder 为 now，方便排序
-	_, err := s.DB.ExecContext(ctx, `INSERT INTO files (id, title, content, created_at, updated_at, is_folder, parent_id, sort_order, is_deleted) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`, id, title, content, now, now, isFolder, parentID, now)
+	_, err = s.DB.ExecContext(ctx, `INSERT INTO files (id, title, content, created_at, updated_at, is_folder, parent_id, sort_order, is_deleted) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`, id, title, content, now, now, isFolder, parentID, now)
 	if err != nil {
 		return nil, fmt.Errorf("创建文件失败: %w", err)
 	}
