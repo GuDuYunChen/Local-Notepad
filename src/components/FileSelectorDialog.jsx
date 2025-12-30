@@ -206,23 +206,80 @@ export default function FileSelectorDialog({
         setLastClickedId(node.id);
     };
 
+    // Flatten all items that are actually present in the tree structure (visible in UI context)
+    // This handles the case where items might contain orphans or deleted items not in the tree.
+    const treeItemIds = useMemo(() => {
+        const ids = new Set();
+        const traverse = (nodes) => {
+            nodes.forEach(node => {
+                ids.add(node.id);
+                if (node.children) traverse(node.children);
+            });
+        };
+        traverse(tree);
+        return ids;
+    }, [tree]);
+
     const handleSelectAll = () => {
         // Exclude selectedFileId and its parents from total count
-        const selectableItems = items.filter(i => i.id !== selectedFileId && !containsSelectedFile.has(i.id));
+        // AND ensure we only select items that are actually in the tree
+        const selectableItems = items.filter(i => 
+            i.id !== selectedFileId && 
+            !containsSelectedFile.has(i.id) && 
+            treeItemIds.has(i.id)
+        );
         
-        // Check if all *selectable* items are selected
+        // Calculate valid selected count properly (excluding children if parent is selected)
+        const validSelectedIdsCount = Array.from(selectedIds).filter(id => {
+            const item = items.find(i => i.id === id);
+            // Must be a valid item, not disabled, AND present in the tree
+            if (!item || id === selectedFileId || containsSelectedFile.has(id) || !treeItemIds.has(id)) return false;
+            
+            // If parent is also selected, don't count this child
+            if (item.parent_id && selectedIds.has(item.parent_id)) return false;
+            
+            return true;
+        }).length;
+
+        // Check if all *selectable roots* are selected. 
         const allSelectableSelected = selectableItems.length > 0 && selectableItems.every(i => selectedIds.has(i.id));
 
         if (allSelectableSelected) {
             setSelectedIds(new Set());
         } else {
+            // Select all selectable items
             setSelectedIds(new Set(selectableItems.map(i => i.id)));
         }
     };
     
-    // Check state for button text
-    const selectableCount = items.filter(i => i.id !== selectedFileId && !containsSelectedFile.has(i.id)).length;
-    const isAllSelected = selectableCount > 0 && selectedIds.size === selectableCount;
+    // Check state for button text and counter
+    // Filter out invalid IDs from selectedIds (in case some were selected before being disabled or removed)
+    // AND filter out children if parent is already selected to avoid double counting in UI
+    const validSelectedIdsCount = Array.from(selectedIds).filter(id => {
+        const item = items.find(i => i.id === id);
+        if (!item || id === selectedFileId || containsSelectedFile.has(id) || !treeItemIds.has(id)) return false;
+        
+        // Check if any ancestor is also selected
+        let curr = item;
+        while (curr && curr.parent_id) {
+             if (selectedIds.has(curr.parent_id)) return false;
+             curr = items.find(i => i.id === curr.parent_id);
+        }
+        return true;
+    }).length;
+
+    const selectableCount = items.filter(i => 
+        i.id !== selectedFileId && 
+        !containsSelectedFile.has(i.id) &&
+        treeItemIds.has(i.id)
+    ).length;
+    // For "All Selected" state, we can stick to checking if all selectable items are in the set
+    // because handleSelectAll adds everything.
+    const isAllSelected = selectableCount > 0 && items.filter(i => 
+        i.id !== selectedFileId && 
+        !containsSelectedFile.has(i.id) &&
+        treeItemIds.has(i.id)
+    ).every(i => selectedIds.has(i.id));
 
 
 
@@ -320,11 +377,16 @@ export default function FileSelectorDialog({
              // For checkbox logic, we only care about selectable children
              const selectableChildIds = childIds.filter(id => id !== selectedFileId && !containsSelectedFile.has(id));
              
-             if (selectableChildIds.length === 0) {
+             if (isDisabled) {
+                 // If the folder itself is disabled (because it contains the current file), 
+                 // it should NEVER appear selected or indeterminate, regardless of children.
+                 allChildrenSelected = false;
+                 someChildrenSelected = false;
+             } else if (selectableChildIds.length === 0) {
                  // If no selectable children, check self if not disabled
                  // If disabled, it's effectively unchecked for UI purposes (or irrelevant)
-                 allChildrenSelected = isDisabled ? false : selectedIds.has(node.id);
-                 someChildrenSelected = isDisabled ? false : selectedIds.has(node.id);
+                 allChildrenSelected = selectedIds.has(node.id);
+                 someChildrenSelected = selectedIds.has(node.id);
              } else {
                  let count = 0;
                  selectableChildIds.forEach(id => {
@@ -394,7 +456,7 @@ export default function FileSelectorDialog({
                         <button className="btn small" onClick={handleSelectAll}>
                             {isAllSelected ? '取消全选' : '全选'}
                         </button>
-                        <span className="counter">已选择 {selectedIds.size} 项</span>
+                        <span className="counter">已选择 {validSelectedIdsCount} 项</span>
                     </div>
                     <div className="tree-container">
                         {mode === 'single-folder' && (
@@ -434,7 +496,9 @@ export default function FileSelectorDialog({
                 .tree-item.selected { background: rgba(126, 91, 239, 0.1); color: var(--accent); }
                 .tree-item .toggle { cursor: pointer; width: 16px; text-align: center; font-size: 10px; color: var(--muted, #666); }
                 .tree-item input { cursor: pointer; }
-                .tree-item input:disabled { cursor: not-allowed; opacity: 0.5; }
+                .tree-item input:disabled { cursor: not-allowed; opacity: 0.5; filter: grayscale(100%); }
+                .tree-item.disabled input { opacity: 0.3; }
+                .tree-item.disabled { color: #aaa !important; }
                 .loading-text { margin-right: 12px; color: #666; }
                 .btn.small { height: 28px; padding: 0 8px; font-size: 12px; }
                 .modal-footer { 

@@ -75,6 +75,9 @@ func (s *FileService) Update(ctx context.Context, id string, title, content, par
 		f.Content = *content
 	}
 	if parentID != nil {
+		if *parentID == id {
+			return nil, fmt.Errorf("不能将文件夹移动到其自身内部")
+		}
 		f.ParentID = *parentID
 	}
 	if sortOrder != nil {
