@@ -143,6 +143,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
   const [showNewMenu, setShowNewMenu] = useState(false) // 新建菜单显隐
   const [contextMenu, setContextMenu] = useState(null) // 右键菜单 { x, y, item }
   const [targetParentId, setTargetParentId] = useState('') // 新建时的目标父目录ID
+  const [showFolderSelector, setShowFolderSelector] = useState(false) // 路径选择器
   
   const [selectedIds, setSelectedIds] = useState(new Set()) // Multi-select state
 
@@ -498,6 +499,18 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
     }
   }
 
+  // Helper to get path label
+  const getPathLabel = (folderId) => {
+      if (!folderId) return '根目录'
+      const parts = []
+      let curr = items.find(i => i.id === folderId)
+      while (curr) {
+          parts.unshift(curr.title)
+          curr = items.find(i => i.id === curr.parent_id)
+      }
+      return parts.join(' / ') || '根目录'
+  }
+
   // 构建树形结构 (Memoized for rendering)
   const tree = useMemo(() => {
     const map = {}
@@ -538,20 +551,65 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
     return roots
   }, [items])
 
-  async function onNewFileCheck(parentId = '') {
+  async function onNewFileCheck(parentId) {
     try {
       const ok = await (onBeforeNew?.() ?? true)
       if (!ok) return
-      setTargetParentId(parentId)
+
+      let target = parentId;
+      // If parentId is not provided (e.g. toolbar/shortcut), infer from selection
+      if (target === undefined || target === null || target === '') {
+          // Note: toolbar passes '', shortcut passes nothing.
+          // But if explicit '' is passed (e.g. explicit root), we might want to respect it?
+          // Existing code: toolbar calls onNewFileCheck('')
+          // Shortcut calls onNewFileCheck()
+          
+          // Let's refine: if argument is NOT provided (undefined), try to infer.
+          // If '' is provided, it means root.
+          // However, user wants "smart" creation.
+          // If I click "New" in toolbar, I usually expect it to be in current context if I have one.
+          
+          // Let's change toolbar to call onNewFileCheck() without args if we want inference.
+          // But wait, the existing code for toolbar was: onClick={() => onNewFileCheck('')}
+          // I should change that call site if I want inference there.
+          // OR I can change logic here: if parentId is '' AND we have selection, maybe we should infer?
+          // But maybe user WANTS root.
+          
+          // To be safe and support "Explicit Root", we should treat '' as Root.
+          // And change Toolbar/Shortcut to pass `undefined` or `null` to signal "Infer".
+          
+          if (target === undefined || target === null) {
+              if (selectedId) {
+                  const item = items.find(i => i.id === selectedId)
+                  if (item) {
+                      target = item.is_folder ? item.id : item.parent_id
+                  }
+              }
+              if (!target) target = ''
+          }
+      }
+
+      setTargetParentId(target)
       setNaming(true)
       setShowNewMenu(false)
       setContextMenu(null)
     } catch (e) { console.error(e) }
   }
 
-  async function onNewFolderCheck(parentId = '') {
+  async function onNewFolderCheck(parentId) {
     try {
-      setTargetParentId(parentId)
+      let target = parentId;
+      if (target === undefined || target === null) {
+          if (selectedId) {
+              const item = items.find(i => i.id === selectedId)
+              if (item) {
+                  target = item.is_folder ? item.id : item.parent_id
+              }
+          }
+          if (!target) target = ''
+      }
+
+      setTargetParentId(target)
       setFolderNaming(true)
       setShowNewMenu(false)
       setContextMenu(null)
@@ -938,9 +996,39 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       return ''
   }
 
-  async function onRenameConfirm(id, name) {
+  async function onRenameConfirm(id, name, format) {
     try {
-      const updated = await api(`/api/files/${id}`, { method: 'PUT', body: JSON.stringify({ title: name }) })
+      let finalName = name;
+      // If we have a fixed format (from isRename mode), append it if missing
+      // (Though NameDialog should handle returning clean name, we might need to reconstruct full name)
+      // Actually, if isRename is true, NameDialog returns the name part.
+      // We need to know the original extension if format is passed?
+      // Wait, NameDialog passes `format` if showFormatSelect is true.
+      // If showFormatSelect is false (which it is for rename currently, or we will change it?), 
+      // we need to handle extension preservation.
+      
+      // Update: We are adding `isRename` prop to NameDialog.
+      // If `isRename` is true, NameDialog will display extension as static text.
+      // It should return the name part.
+      // We need to append the extension back.
+      
+      // Let's see how we call NameDialog for rename.
+      // We need to pass the extension to NameDialog so it can display it.
+      // And NameDialog returns the new name part.
+      // So here we need to reconstruct.
+      
+      // But `onRenameConfirm` signature in `NameDialog` is `(name, format)`.
+      // If `isRename` is true, `format` argument might be the extension we passed in?
+      // Or we can rely on `renaming` state to get the original extension.
+      
+      if (renaming && !renaming.is_folder) {
+          const originalExt = renaming.title.substring(renaming.title.lastIndexOf('.'));
+          if (originalExt && !finalName.endsWith(originalExt)) {
+              finalName += originalExt;
+          }
+      }
+
+      const updated = await api(`/api/files/${id}`, { method: 'PUT', body: JSON.stringify({ title: finalName }) })
       // Push history
       const oldTitle = items.find(i => i.id === id)?.title
       pushHistory({ type: 'rename', data: { id, oldTitle, newTitle: name } })
@@ -951,10 +1039,18 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
     } catch (e) { console.error(e) }
   }
 
-  async function onNewFileConfirm(name) {
+  async function onNewFileConfirm(name, format) {
     try {
-      // Add default extension if missing (since NameDialog no longer auto-appends)
-      const title = /\.[a-zA-Z0-9]+$/.test(name) ? name : `${name}.md`
+      // Add extension if not present (NameDialog now handles extension stripping/appending, 
+      // but to be safe we check format).
+      // If NameDialog passes clean name + format, we combine them.
+      let title = name;
+      if (format && !title.endsWith(format)) {
+          title = title + format;
+      } else if (!format && !/\.[a-zA-Z0-9]+$/.test(title)) {
+          // Fallback if no format passed (shouldn't happen with updated NameDialog)
+          title = `${title}.md`
+      }
 
       const item = await api('/api/files', { 
           method: 'POST', 
@@ -1206,8 +1302,8 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
             </button>
             {showNewMenu && (
                 <div className="dropdown-menu" ref={newMenuRef} style={{ position: 'absolute', top: '100%', left: 0, zIndex: 100 }}>
-                    <div className="menu-item" onClick={() => onNewFileCheck('')}>新建文件 (Ctrl+N)</div>
-                    <div className="menu-item" onClick={() => onNewFolderCheck('')}>新建文件夹 (Ctrl+Shift+N)</div>
+                    <div className="menu-item" onClick={() => onNewFileCheck()}>新建文件 (Ctrl+N)</div>
+                    <div className="menu-item" onClick={() => onNewFolderCheck()}>新建文件夹 (Ctrl+Shift+N)</div>
                 </div>
             )}
         </div>
@@ -1284,13 +1380,15 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
 
       {naming && (
         <NameDialog
-          defaultName={'未命名.md'}
+          defaultName={'未命名'}
           title={'新建文件'}
-          message={'请输入文件名（可包含扩展名）：'}
+          message={'请输入文件名（不包含扩展名）：'}
           validate={validateName}
           onConfirm={onNewFileConfirm}
           onCancel={() => setNaming(false)}
           showFormatSelect={true}
+          currentPathLabel={getPathLabel(targetParentId)}
+          onPathSelect={() => setShowFolderSelector(true)}
         />
       )}
       {folderNaming && (
@@ -1301,10 +1399,28 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
           validate={validateFolderInput}
           onConfirm={onNewFolderConfirm}
           onCancel={() => setFolderNaming(false)}
+          currentPathLabel={getPathLabel(targetParentId)}
+          onPathSelect={() => setShowFolderSelector(true)}
         />
       )}
       {showExport && <FileSelectorDialog open={showExport} onClose={() => setShowExport(false)} items={items} onConfirm={onExportConfirm} title="导出文件" confirmText="开始导出" />}
       {showBatchDelete && <FileSelectorDialog open={showBatchDelete} onClose={() => setShowBatchDelete(false)} items={items} onConfirm={onBatchDeleteConfirm} title="批量删除" confirmText="删除" processingText="删除中..." showDeleteWarning={true} selectedFileId={selectedId} initialSelectedIds={Array.from(selectedIds)} />}
+      {showFolderSelector && (
+          <FileSelectorDialog 
+              open={showFolderSelector}
+              onClose={() => setShowFolderSelector(false)}
+              items={items}
+              title="选择目标文件夹"
+              confirmText="确定"
+              mode="single-folder"
+              initialSelectedIds={targetParentId ? [targetParentId] : []}
+              onConfirm={(ids) => {
+                  setTargetParentId(ids[0] || '')
+                  // No need to close explicitly here as FileSelectorDialog closes itself? 
+                  // But we need to ensure local state updates.
+              }}
+          />
+      )}
       {renaming && (
         <NameDialog
           defaultName={renaming.title}
@@ -1313,6 +1429,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
           validate={renaming.is_folder ? validateFolderInput : validateName}
           onConfirm={(name) => void onRenameConfirm(renaming.id, name)}
           onCancel={() => setRenaming(null)}
+          isRename={!renaming.is_folder}
         />
       )}
       <style>{`

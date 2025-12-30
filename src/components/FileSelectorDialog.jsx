@@ -21,11 +21,24 @@ const FileIcon = () => '📄';
  * @param {boolean} [props.showDeleteWarning] - Whether to show warning if active file is selected
  * @param {string} [props.selectedFileId] - ID of the currently active file (for warning)
  */
-export default function FileSelectorDialog({ open, onClose, items, onConfirm, title = '选择内容', confirmText = '确定', processingText = '处理中...', showDeleteWarning = false, selectedFileId = null, initialSelectedIds = [] }) {
+export default function FileSelectorDialog({ 
+    open, 
+    onClose, 
+    items, 
+    onConfirm, 
+    title = '选择内容', 
+    confirmText = '确定', 
+    processingText = '处理中...', 
+    showDeleteWarning = false, 
+    selectedFileId = null, 
+    initialSelectedIds = [],
+    mode = 'multi' // 'multi' | 'single-folder'
+}) {
     const [selectedIds, setSelectedIds] = useState(new Set(initialSelectedIds));
     const [expandedIds, setExpandedIds] = useState(new Set());
     const [processing, setProcessing] = useState(false);
     const [lastClickedId, setLastClickedId] = useState(null);
+    const [singleSelectedId, setSingleSelectedId] = useState(initialSelectedIds[0] || null);
 
     // ... tree and useEffect ...
 
@@ -33,8 +46,15 @@ export default function FileSelectorDialog({ open, onClose, items, onConfirm, ti
     const tree = useMemo(() => {
         const map = {};
         const roots = [];
+        
+        // Filter items based on mode
+        let nodes = items;
+        if (mode === 'single-folder') {
+            nodes = items.filter(i => i.is_folder);
+        }
+        
         // Deep copy items to avoid mutation issues
-        const nodes = items.map(i => ({ ...i, children: [] }));
+        nodes = nodes.map(i => ({ ...i, children: [] }));
         
         nodes.forEach(i => map[i.id] = i);
         
@@ -72,17 +92,22 @@ export default function FileSelectorDialog({ open, onClose, items, onConfirm, ti
 
     useEffect(() => {
         if (open) {
-            // Filter out selectedFileId from initial selection if it exists
-            const initialSet = new Set(initialSelectedIds);
-            if (selectedFileId && initialSet.has(selectedFileId)) {
-                initialSet.delete(selectedFileId);
+            if (mode === 'single-folder') {
+                setSingleSelectedId(initialSelectedIds[0] || '');
+                setExpandedIds(new Set()); // Maybe auto-expand to target?
+            } else {
+                // Filter out selectedFileId from initial selection if it exists
+                const initialSet = new Set(initialSelectedIds);
+                if (selectedFileId && initialSet.has(selectedFileId)) {
+                    initialSet.delete(selectedFileId);
+                }
+                setSelectedIds(initialSet);
+                setExpandedIds(new Set());
             }
-            setSelectedIds(initialSet);
-            setExpandedIds(new Set());
             setProcessing(false);
             setLastClickedId(null);
         }
-    }, [open, initialSelectedIds, selectedFileId]);
+    }, [open, initialSelectedIds, selectedFileId, mode]);
 
     if (!open) return null;
 
@@ -96,6 +121,7 @@ export default function FileSelectorDialog({ open, onClose, items, onConfirm, ti
     
     // Efficient descendant lookup
     const descendantsMap = useMemo(() => {
+        if (mode === 'single-folder') return {}; // Not needed
         const map = {};
         const compute = (node) => {
             let ids = [node.id];
@@ -107,7 +133,7 @@ export default function FileSelectorDialog({ open, onClose, items, onConfirm, ti
         };
         tree.forEach(compute);
         return map;
-    }, [tree]);
+    }, [tree, mode]);
 
     /**
      * Handle item selection
@@ -116,6 +142,11 @@ export default function FileSelectorDialog({ open, onClose, items, onConfirm, ti
      * @param {Object} e - Event object
      */
     const handleSelect = (node, checked, e) => {
+        if (mode === 'single-folder') {
+            setSingleSelectedId(node.id);
+            return;
+        }
+
         // Prevent selection if it's the current file
         if (node.id === selectedFileId) return;
 
@@ -177,6 +208,16 @@ export default function FileSelectorDialog({ open, onClose, items, onConfirm, ti
 
 
     const handleConfirmAction = async () => {
+        if (mode === 'single-folder') {
+             setProcessing(true);
+             try {
+                 await onConfirm([singleSelectedId], [singleSelectedId]);
+                 onClose();
+             } catch (e) { console.error(e) } 
+             finally { setProcessing(false) }
+             return;
+        }
+
         if (selectedIds.size === 0) return;
         setProcessing(true);
         try {
@@ -217,6 +258,35 @@ export default function FileSelectorDialog({ open, onClose, items, onConfirm, ti
     // Recursive render
     const renderNode = (node, level = 0) => {
         const isExpanded = expandedIds.has(node.id);
+        
+        if (mode === 'single-folder') {
+             const isChecked = singleSelectedId === node.id;
+             return (
+                 <div key={node.id}>
+                    <div 
+                        className={`tree-item ${isChecked ? 'selected' : ''}`}
+                        style={{ paddingLeft: level * 20 + 10 }}
+                        onClick={(e) => handleSelect(node, true, e)}
+                    >
+                        <span 
+                            className="toggle" 
+                            onClick={(e) => { e.stopPropagation(); node.is_folder && handleExpand(node.id, e); }}
+                            style={{ visibility: node.is_folder ? 'visible' : 'hidden' }}
+                        >
+                            {isExpanded ? '▼' : '▶'}
+                        </span>
+                        <span className="icon"><FolderIcon expanded={isExpanded} /></span>
+                        <span className="title">{node.title}</span>
+                    </div>
+                    {node.is_folder && isExpanded && (
+                        <div>
+                            {node.children.map(child => renderNode(child, level + 1))}
+                        </div>
+                    )}
+                 </div>
+             )
+        }
+
         const isChecked = selectedIds.has(node.id);
         const isCurrent = node.id === selectedFileId;
         
@@ -293,6 +363,17 @@ export default function FileSelectorDialog({ open, onClose, items, onConfirm, ti
                         <span className="counter">已选择 {selectedIds.size} 项</span>
                     </div>
                     <div className="tree-container">
+                        {mode === 'single-folder' && (
+                            <div 
+                                className={`tree-item ${singleSelectedId === '' ? 'selected' : ''}`}
+                                style={{ paddingLeft: 10 }}
+                                onClick={() => setSingleSelectedId('')}
+                            >
+                                <span className="toggle" style={{ visibility: 'hidden' }}></span>
+                                <span className="icon">🏠</span>
+                                <span className="title">根目录</span>
+                            </div>
+                        )}
                         {tree.map(node => renderNode(node))}
                     </div>
                 </div>
@@ -300,7 +381,7 @@ export default function FileSelectorDialog({ open, onClose, items, onConfirm, ti
                     {processing && <span className="loading-text">{processingText}</span>}
                     <div className="btn-group">
                         <button className="btn" onClick={onClose}>取消</button>
-                        <button className="btn primary" onClick={handleConfirmAction} disabled={processing || selectedIds.size === 0}>
+                        <button className="btn primary" onClick={handleConfirmAction} disabled={processing || (mode !== 'single-folder' && selectedIds.size === 0)}>
                             {processing && <span className="spinner"></span>}
                             {confirmText}
                         </button>
@@ -314,9 +395,10 @@ export default function FileSelectorDialog({ open, onClose, items, onConfirm, ti
                 .modal-body .toolbar { display: flex; justify-content: space-between; align-items: center; padding-bottom: 8px; border-bottom: 1px solid #eee; margin-bottom: 8px; }
                 .tree-container { max-height: 400px; overflow-y: auto; border: 1px solid #eee; border-radius: 4px; }
                 .tree-item { display: flex; align-items: center; padding: 4px 0; gap: 6px; cursor: default; }
-                .tree-item:hover { background: #f5f5f5; }
+                .tree-item:hover { background: rgba(0,0,0,0.04); }
                 .tree-item.disabled:hover { background: transparent; }
-                .tree-item .toggle { cursor: pointer; width: 16px; text-align: center; font-size: 10px; color: #666; }
+                .tree-item.selected { background: rgba(126, 91, 239, 0.1); color: var(--accent); }
+                .tree-item .toggle { cursor: pointer; width: 16px; text-align: center; font-size: 10px; color: var(--muted, #666); }
                 .tree-item input { cursor: pointer; }
                 .tree-item input:disabled { cursor: not-allowed; opacity: 0.5; }
                 .loading-text { margin-right: 12px; color: #666; }
