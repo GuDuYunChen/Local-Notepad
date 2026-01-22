@@ -23,9 +23,11 @@ import ToolbarPlugin from "./plugins/ToolbarPlugin";
 import PasteImagePlugin from "./plugins/PasteImagePlugin";
 import TableSelectionPlugin from "./plugins/TableSelectionPlugin";
 import TableActionMenuPlugin from "./plugins/TableActionMenuPlugin";
+import CodeBlockPlugin from "./plugins/CodeBlockPlugin";
 import { ImageNode } from "./nodes/ImageNode";
 import { VideoNode } from "./nodes/VideoNode";
 import { ImageGridNode } from "./nodes/ImageGridNode";
+import { CodeBlockNode } from "./nodes/CodeBlockNode";
 import './Editor.css';
 
 const theme = {
@@ -44,6 +46,7 @@ const theme = {
   image: 'editor-image',
   imageGrid: 'editor-image-grid',
   video: 'editor-video',
+  codeBlock: 'code-block-wrapper',
 };
 
 function Placeholder() {
@@ -104,7 +107,8 @@ export default function Editor({ initialContent, onChange, readOnly }) {
       HeadingNode, QuoteNode, ListItemNode, ListNode, CodeHighlightNode, CodeNode,
       TableNode, TableCellNode, TableRowNode,
       AutoLinkNode, LinkNode,
-      ImageNode, VideoNode, ImageGridNode
+      ImageNode, VideoNode, ImageGridNode,
+      CodeBlockNode
     ],
     editable: !readOnly,
   };
@@ -126,6 +130,7 @@ export default function Editor({ initialContent, onChange, readOnly }) {
           <ListPlugin />
           <LinkPlugin />
           <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
+          <CodeBlockPlugin />
           <OnChangePlugin onChange={onChange} />
           <LoadContentPlugin content={initialContent} />
           <TableSelectionPlugin />

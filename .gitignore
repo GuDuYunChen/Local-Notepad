@@ -13,6 +13,7 @@ tmp*
 temp*
 coverage
 test-report.html
+test-results.json
 .idea/
 yarn-error.log
 *.zip
@@ -28,3 +29,5 @@ qodana.yaml
 
 release
 bin
+test-results
+*.kiro

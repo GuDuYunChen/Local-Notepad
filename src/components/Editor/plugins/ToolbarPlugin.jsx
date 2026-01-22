@@ -1,6 +1,7 @@
 import React, { useCallback, useState, useEffect, useRef } from 'react';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import { INSERT_TABLE_COMMAND, $createTableNode, $createTableRowNode, $createTableCellNode } from '@lexical/table';
+import { INSERT_CODE_BLOCK_COMMAND } from './CodeBlockPlugin';
 import { $createImageNode } from '../nodes/ImageNode';
 import { $createImageGridNode } from '../nodes/ImageGridNode';
 import { $createVideoNode } from '../nodes/VideoNode';
@@ -295,6 +296,7 @@ export default function ToolbarPlugin() {
         <label className="btn">图片<input type="file" accept="image/*" multiple style={{display:'none'}} onChange={handleImage} /></label>
         <label className="btn">视频<input type="file" accept="video/*" style={{display:'none'}} onChange={handleVideo} /></label>
         <label className="btn">Excel<input type="file" accept=".xlsx, .xls" style={{display:'none'}} onChange={handleExcel} /></label>
+        <button className="btn" onClick={() => editor.dispatchCommand(INSERT_CODE_BLOCK_COMMAND)}>代码块</button>
         {isUploading && <span style={{marginLeft: 10, fontSize: 12}}>上传/处理中...</span>}
       </div>
     </div>
