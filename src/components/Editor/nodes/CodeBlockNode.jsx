@@ -429,7 +429,7 @@ const CodeBlockComponent = React.memo(function CodeBlockComponent({ code, langua
               wordWrap: 'normal',
               overflowWrap: 'normal',
               tabSize: 4,
-              zIndex: 2,
+              zIndex: 3,
             }}
           />
           <pre
@@ -453,7 +453,7 @@ const CodeBlockComponent = React.memo(function CodeBlockComponent({ code, langua
               overflowWrap: 'normal',
               tabSize: 4,
               overflow: 'auto',
-              zIndex: 1,
+              zIndex: 2,
               pointerEvents: 'none',
             }}
           >
