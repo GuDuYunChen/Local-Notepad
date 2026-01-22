@@ -44,6 +44,9 @@ export default function CodeBlockPlugin() {
             const paragraph = $createParagraphNode();
             $insertNodes([paragraph]);
             
+            // Focus the code block
+            codeBlock.selectStart();
+            
             return true;
           }
 
@@ -86,16 +89,8 @@ export default function CodeBlockPlugin() {
             const paragraph = $createParagraphNode();
             $insertNodes([paragraph]);
             
-            // Keep the code block selected
-            const codeBlockKey = codeBlock.getKey();
-            setTimeout(() => {
-              editor.update(() => {
-                const node = $getNodeByKey(codeBlockKey);
-                if (node) {
-                  node.selectNext();
-                }
-              });
-            }, 0);
+            // Focus the code block
+            codeBlock.selectStart();
           } else {
             // No text selected, insert empty code block
             const codeBlock = $createCodeBlockNode('', 'plaintext');
@@ -104,6 +99,9 @@ export default function CodeBlockPlugin() {
             // Add a paragraph after the code block
             const paragraph = $createParagraphNode();
             $insertNodes([paragraph]);
+            
+            // Focus the code block
+            codeBlock.selectStart();
           }
         });
         
