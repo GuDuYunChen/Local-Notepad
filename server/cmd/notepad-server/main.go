@@ -68,12 +68,22 @@ func main() {
 	// 执行自动备份
 	performBackup(ctx, db, dbPath)
 
+	// 启动定时任务
 	go func() {
-		ticker := time.NewTicker(24 * time.Hour)
-		defer ticker.Stop()
+		// 备份定时器：每8小时执行一次
+		backupTicker := time.NewTicker(8 * time.Hour)
+		defer backupTicker.Stop()
+		
+		// 清理定时器：每24小时执行一次
+		cleanupTicker := time.NewTicker(24 * time.Hour)
+		defer cleanupTicker.Stop()
+		
 		for {
 			select {
-			case <-ticker.C:
+			case <-backupTicker.C:
+				g.Log().Info(ctx, "开始执行定时备份...")
+				performBackup(ctx, db, dbPath)
+			case <-cleanupTicker.C:
 				if err := (&service.FileService{DB: db}).CleanupOldDeleted(ctx); err != nil {
 					g.Log().Error(ctx, "自动清理失败:", err)
 				} else {
@@ -264,9 +274,10 @@ func performBackup(ctx context.Context, db *sql.DB, dbPath string) {
 		// 解析文件名中的时间戳 backup-20060102-150405.db
 		tsStr := strings.TrimSuffix(strings.TrimPrefix(lastBackup, "backup-"), ".db")
 		if lastTime, err := time.Parse("20060102-150405", tsStr); err == nil {
-			// 如果距离上次备份不足 3 天，则跳过
-			if time.Since(lastTime) < 1*24*time.Hour {
+			// 如果距离上次备份不足 8 小时，则跳过
+			if time.Since(lastTime) < 8*time.Hour {
 				shouldBackup = false
+				g.Log().Debug(ctx, "距离上次备份不足8小时，跳过本次备份")
 			}
 		}
 	}
@@ -293,9 +304,11 @@ func performBackup(ctx context.Context, db *sql.DB, dbPath string) {
 		}
 	}
 
-	// 保留最近 3 个备份
-	if len(backups) > 3 {
-		toDelete := len(backups) - 3
+	// 保留最近 100 个备份
+	if len(backups) > 100 {
+		toDelete := len(backups) - 100
+		g.Log().Info(ctx, fmt.Sprintf("当前备份数量: %d，需要删除 %d 个旧备份", len(backups), toDelete))
+		
 		for i := 0; i < toDelete; i++ {
 			path := filepath.Join(backupDir, backups[i])
 			if err := os.Remove(path); err != nil {
