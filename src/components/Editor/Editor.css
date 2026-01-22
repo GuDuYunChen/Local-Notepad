@@ -455,24 +455,18 @@
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
 }
 
-.code-block-content pre {
+.code-editor-container {
+  position: relative;
   flex: 1;
-  margin: 0;
-  padding: 0;
-  background-color: #f5f5f5;
-  overflow: visible;
+  min-height: 100px;
 }
 
-.code-block-content code {
-  display: block;
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-  font-size: 13px;
-  line-height: 1.5;
-  color: #333;
-  white-space: pre;
-  word-wrap: normal;
-  overflow-wrap: normal;
-  tab-size: 4;
+.code-textarea {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace !important;
+}
+
+.code-preview {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace !important;
 }
 
 /* Scrollbar styling for code blocks */

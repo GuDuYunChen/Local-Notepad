@@ -261,12 +261,11 @@ function highlightCode(code, language) {
 
 const CodeBlockComponent = React.memo(function CodeBlockComponent({ code, language, nodeKey }) {
   const [editor] = useLexicalComposerContext();
-  const codeRef = useRef(null);
-  const [highlightedCode, setHighlightedCode] = useState('');
+  const textareaRef = useRef(null);
+  const preRef = useRef(null);
   const [autoHighlight, setAutoHighlight] = useState(true);
   const [showEnableButton, setShowEnableButton] = useState(false);
-  const inputTimeoutRef = useRef(null);
-  const isUpdatingRef = useRef(false);
+  const highlightTimeoutRef = useRef(null);
 
   // Performance optimization: detect large files
   const MAX_LINES_FOR_AUTO_HIGHLIGHT = 1000;
@@ -285,27 +284,29 @@ const CodeBlockComponent = React.memo(function CodeBlockComponent({ code, langua
     }
   }, [isLargeFile, autoHighlight]);
 
-  // Apply syntax highlighting when code or language changes (with debounce for performance)
+  // Apply syntax highlighting to the preview element
   useEffect(() => {
+    if (!preRef.current) return;
+
     // Clear previous timeout
-    if (inputTimeoutRef.current) {
-      clearTimeout(inputTimeoutRef.current);
+    if (highlightTimeoutRef.current) {
+      clearTimeout(highlightTimeoutRef.current);
     }
 
     // Debounce highlighting for better performance
-    inputTimeoutRef.current = setTimeout(() => {
+    highlightTimeoutRef.current = setTimeout(() => {
       if (autoHighlight || !isLargeFile) {
         const highlighted = highlightCode(code, language);
-        setHighlightedCode(highlighted);
+        preRef.current.innerHTML = highlighted;
       } else {
         // For large files with auto-highlight disabled, show plain text
-        setHighlightedCode(escapeHtml(code));
+        preRef.current.textContent = code;
       }
-    }, 100); // 100ms debounce
+    }, 200);
 
     return () => {
-      if (inputTimeoutRef.current) {
-        clearTimeout(inputTimeoutRef.current);
+      if (highlightTimeoutRef.current) {
+        clearTimeout(highlightTimeoutRef.current);
       }
     };
   }, [code, language, autoHighlight, isLargeFile]);
@@ -314,15 +315,11 @@ const CodeBlockComponent = React.memo(function CodeBlockComponent({ code, langua
   const handleEnableHighlight = () => {
     setAutoHighlight(true);
     setShowEnableButton(false);
-    const highlighted = highlightCode(code, language);
-    setHighlightedCode(highlighted);
   };
 
-  // Handle code content changes
-  const handleInput = (event) => {
-    if (isUpdatingRef.current) return;
-    
-    const newCode = event.currentTarget.textContent || '';
+  // Handle textarea input changes
+  const handleTextareaChange = (event) => {
+    const newCode = event.target.value;
     editor.update(() => {
       const node = $getNodeByKey(nodeKey);
       if (node && $isCodeBlockNode(node)) {
@@ -331,38 +328,18 @@ const CodeBlockComponent = React.memo(function CodeBlockComponent({ code, langua
     });
   };
 
-  // Handle paste events to preserve formatting (indentation, newlines, whitespace)
+  // Handle paste events
   const handlePaste = (event) => {
-    event.preventDefault();
-    
-    // Get pasted text using textContent to preserve formatting
-    const pastedText = event.clipboardData?.getData('text/plain') || '';
-    
-    // Insert the text at cursor position
-    const selection = window.getSelection();
-    if (selection && selection.rangeCount > 0) {
-      const range = selection.getRangeAt(0);
-      range.deleteContents();
-      
-      // Create text node with pasted content
-      const textNode = document.createTextNode(pastedText);
-      range.insertNode(textNode);
-      
-      // Move cursor to end of pasted content
-      range.setStartAfter(textNode);
-      range.collapse(true);
-      selection.removeAllRanges();
-      selection.addRange(range);
-      
-      // Update the code block node with new content
-      const newCode = codeRef.current?.textContent || '';
+    // Let the default paste behavior work
+    setTimeout(() => {
+      const newCode = textareaRef.current?.value || '';
       editor.update(() => {
         const node = $getNodeByKey(nodeKey);
         if (node && $isCodeBlockNode(node)) {
           node.setCode(newCode);
         }
       });
-    }
+    }, 0);
   };
 
   // Handle language selection changes
@@ -375,67 +352,13 @@ const CodeBlockComponent = React.memo(function CodeBlockComponent({ code, langua
     });
   };
 
-  // Update the DOM when highlighted code changes
-  useEffect(() => {
-    if (!codeRef.current) return;
-    
-    isUpdatingRef.current = true;
-    
-    // Get current cursor position
-    const selection = window.getSelection();
-    let cursorOffset = 0;
-    let cursorNode = null;
-    
-    if (selection && selection.rangeCount > 0) {
-      const range = selection.getRangeAt(0);
-      if (codeRef.current.contains(range.commonAncestorContainer)) {
-        cursorNode = range.commonAncestorContainer;
-        cursorOffset = range.startOffset;
-      }
+  // Sync textarea scroll with preview
+  const handleScroll = (event) => {
+    if (preRef.current && textareaRef.current) {
+      preRef.current.scrollTop = event.target.scrollTop;
+      preRef.current.scrollLeft = event.target.scrollLeft;
     }
-    
-    // Clear and rebuild the content
-    codeRef.current.innerHTML = '';
-    
-    // Create a temporary container to parse the highlighted HTML
-    const temp = document.createElement('div');
-    temp.innerHTML = highlightedCode;
-    
-    // Copy all child nodes
-    while (temp.firstChild) {
-      codeRef.current.appendChild(temp.firstChild);
-    }
-    
-    // Restore cursor position if possible
-    if (cursorNode && selection) {
-      try {
-        const newRange = document.createRange();
-        let targetNode = cursorNode;
-        let targetOffset = cursorOffset;
-        
-        // If the original node was removed, try to find a suitable replacement
-        if (!codeRef.current.contains(targetNode)) {
-          targetNode = codeRef.current.firstChild || codeRef.current;
-          targetOffset = 0;
-        }
-        
-        if (targetNode.nodeType === Node.TEXT_NODE) {
-          targetOffset = Math.min(targetOffset, targetNode.textContent?.length || 0);
-          newRange.setStart(targetNode, targetOffset);
-        } else {
-          newRange.setStart(targetNode, 0);
-        }
-        
-        newRange.collapse(true);
-        selection.removeAllRanges();
-        selection.addRange(newRange);
-      } catch (e) {
-        // Cursor restoration failed, ignore
-      }
-    }
-    
-    isUpdatingRef.current = false;
-  }, [highlightedCode]);
+  };
 
   return (
     <div className="code-block-wrapper">
@@ -473,28 +396,70 @@ const CodeBlockComponent = React.memo(function CodeBlockComponent({ code, langua
             </div>
           ))}
         </div>
-        <pre className={`language-${language}`}>
-          <code
-            ref={codeRef}
-            contentEditable={true}
-            onInput={handleInput}
+        <div className="code-editor-container">
+          <textarea
+            ref={textareaRef}
+            value={code}
+            onChange={handleTextareaChange}
             onPaste={handlePaste}
-            suppressContentEditableWarning={true}
+            onScroll={handleScroll}
+            className="code-textarea"
             spellCheck={false}
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
             style={{
-              fontFamily: 'monospace',
-              backgroundColor: '#f5f5f5',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
               padding: '12px',
+              margin: 0,
+              border: 'none',
               outline: 'none',
-              display: 'block',
+              resize: 'none',
+              fontFamily: 'Consolas, Monaco, "Courier New", monospace',
+              fontSize: '13px',
+              lineHeight: '1.5',
+              color: 'transparent',
+              backgroundColor: 'transparent',
+              caretColor: '#333',
               whiteSpace: 'pre',
               wordWrap: 'normal',
-              overflowX: 'auto',
+              overflowWrap: 'normal',
+              tabSize: 4,
+              zIndex: 2,
+            }}
+          />
+          <pre
+            ref={preRef}
+            className={`language-${language} code-preview`}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              padding: '12px',
+              margin: 0,
+              fontFamily: 'Consolas, Monaco, "Courier New", monospace',
+              fontSize: '13px',
+              lineHeight: '1.5',
+              color: '#333',
+              backgroundColor: '#f5f5f5',
+              whiteSpace: 'pre',
+              wordWrap: 'normal',
+              overflowWrap: 'normal',
+              tabSize: 4,
+              overflow: 'auto',
+              zIndex: 1,
+              pointerEvents: 'none',
             }}
           >
             {code}
-          </code>
-        </pre>
+          </pre>
+        </div>
       </div>
     </div>
   );
