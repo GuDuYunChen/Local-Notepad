@@ -1,6 +1,6 @@
 {
   "name": "notepad-desktop",
-  "version": "2.6.0",
+  "version": "2.7.0",
   "private": true,
   "type": "module",
   "main": "out/electron/main.cjs",
@@ -68,7 +68,7 @@
       "output": "release"
     },
     "appId": "com.example.notepaddesktop",
-    "productName": "Notepad",
+    "productName": "记事本",
     "files": [
       "dist/**",
       "out/electron/**",

@@ -2,7 +2,7 @@ directories:
   output: release
   buildResources: build
 appId: com.example.notepaddesktop
-productName: Notepad
+productName: 记事本
 files:
   - filter:
       - dist/**
