@@ -7,10 +7,60 @@
 
 ## 开发运行
 
-- 安装依赖：`npm install`
-- 启动开发：`npm run dev`
-  - 将同时启动 Vite、Electron（开发模式）与主进程构建监视。
-  - cd/server    go run ./cmd/notepad-server/main.go
+### 环境要求
+
+- Node.js ≥ 18
+- Go ≥ 1.20
+- npm 或 pnpm
+
+### 安装依赖
+
+```bash
+npm install
+```
+
+### 启动前端（Electron + Vite 开发模式）
+
+```bash
+npm run dev
+```
+
+该命令将同时启动 Vite 开发服务器和 Electron 应用。
+
+### 启动后端（Go HTTP 服务）
+
+打开新的终端窗口，进入 `server` 目录执行：
+
+```bash
+cd server
+go run ./cmd/notepad-server/main.go
+```
+
+后端服务默认监听端口 **27121**，可通过环境变量 `PORT` 修改：
+
+```bash
+# Windows
+set PORT=8080 && go run ./cmd/notepad-server/main.go
+
+# Linux/macOS
+PORT=8080 go run ./cmd/notepad-server/main.go
+```
+
+### 自定义数据目录（可选）
+
+默认数据库存储在用户数据目录下，可通过 `NOTEPAD_DATA` 环境变量指定：
+
+```bash
+# Windows
+set NOTEPAD_DATA=D:\my-notepad-data && go run ./cmd/notepad-server/main.go
+
+# Linux/macOS
+NOTEPAD_DATA=/path/to/data go run ./cmd/notepad-server/main.go
+```
+
+### 验证服务是否正常运行
+
+访问 http://127.0.0.1:27121/api/health ，返回 `{"code":0,"message":"OK"}` 表示后端服务正常。
 
 ## 构建
 

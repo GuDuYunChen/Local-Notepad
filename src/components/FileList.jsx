@@ -357,6 +357,10 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
   useEffect(() => {
       function handleUndoRedo(e) {
           if (e.ctrlKey && e.key === 'z') {
+              // 如果焦点在可编辑元素内（编辑器、输入框等），不拦截，让编辑器自行处理
+              const el = document.activeElement
+              const tag = el?.tagName?.toLowerCase()
+              if (tag === 'input' || tag === 'textarea' || el?.isContentEditable) return
               e.preventDefault()
               if (e.shiftKey) {
                   void performRedo()
