@@ -1334,7 +1334,21 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       ) : (
         <ul className="list tree-list">
           {tree.map(node => renderNode(node))}
-          {tree.length === 0 && <div className="placeholder">暂无文件</div>}
+          {tree.length === 0 && (
+            <div className="empty-state">
+              <div className="empty-icon">📝</div>
+              <div className="empty-title">暂无文件</div>
+              <div className="empty-desc">开始创建你的第一篇笔记吧</div>
+              <div className="empty-actions">
+                <button className="btn primary" onClick={() => onNewFileCheck()}>新建文件</button>
+                <button className="btn" onClick={() => onNewFolderCheck()}>新建文件夹</button>
+              </div>
+              <div className="empty-tips">
+                <div>快捷键：Ctrl+N 新建文件 · Ctrl+Shift+N 新建文件夹</div>
+                <div>支持拖拽导入本地文件</div>
+              </div>
+            </div>
+          )}
         </ul>
       )}
 

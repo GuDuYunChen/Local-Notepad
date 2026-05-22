@@ -262,8 +262,8 @@ export default function ToolbarPlugin() {
     <div className="editor-toolbar">
       <div className="toolbar-group">
         <span className="group-label">历史</span>
-        <button disabled={!canUndo} onClick={() => editor.dispatchCommand(UNDO_COMMAND)} className="btn">Undo</button>
-        <button disabled={!canRedo} onClick={() => editor.dispatchCommand(REDO_COMMAND)} className="btn">Redo</button>
+        <button disabled={!canUndo} onClick={() => editor.dispatchCommand(UNDO_COMMAND)} className="btn" aria-label="撤销" title="撤销 (Ctrl+Z)">↶ 撤销</button>
+        <button disabled={!canRedo} onClick={() => editor.dispatchCommand(REDO_COMMAND)} className="btn" aria-label="重做" title="重做 (Ctrl+Y)">↷ 重做</button>
       </div>
       <span className="divider" />
       <div className="toolbar-group">
@@ -281,9 +281,9 @@ export default function ToolbarPlugin() {
       <span className="divider" />
       <div className="toolbar-group">
         <span className="group-label">对齐</span>
-        <button onClick={() => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'left')} className={`btn${elementFormat === 'left' ? ' active' : ''}`}>Left</button>
-        <button onClick={() => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'center')} className={`btn${elementFormat === 'center' ? ' active' : ''}`}>Center</button>
-        <button onClick={() => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'right')} className={`btn${elementFormat === 'right' ? ' active' : ''}`}>Right</button>
+        <button onClick={() => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'left')} className={`btn${elementFormat === 'left' ? ' active' : ''}`} aria-label="左对齐" title="左对齐">≡ 左</button>
+        <button onClick={() => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'center')} className={`btn${elementFormat === 'center' ? ' active' : ''}`} aria-label="居中对齐" title="居中对齐">≡ 中</button>
+        <button onClick={() => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'right')} className={`btn${elementFormat === 'right' ? ' active' : ''}`} aria-label="右对齐" title="右对齐">≡ 右</button>
       </div>
       <span className="divider" />
       <div className="toolbar-group" style={{ position: 'relative' }}>

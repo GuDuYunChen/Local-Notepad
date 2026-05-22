@@ -14,6 +14,7 @@ function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved,
   const [lastSavedAt, setLastSavedAt] = useState(null)
   const [saving, setSaving] = useState(false)
   const [selMode, setSelMode] = useState(false)
+  const [wordCount, setWordCount] = useState(0)
   const statusRef = useRef(null)
   const [editorContent, setEditorContent] = useState('')
 
@@ -178,6 +179,20 @@ function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved,
     contentRef.current = newContent
     scheduleCache()
     onChangeRef.current?.(newContent)
+    try {
+      const state = JSON.parse(newContent)
+      let text = ''
+      const extract = (node) => {
+        if (node.type === 'text') text += node.text || ''
+        if (node.children) node.children.forEach(extract)
+      }
+      if (state.root && state.root.children) {
+        state.root.children.forEach(extract)
+      }
+      setWordCount(text.length)
+    } catch {
+      setWordCount(0)
+    }
   }
 
   return (
@@ -192,10 +207,13 @@ function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved,
              initialContent={editorContent} 
              onChange={handleEditorChange} 
           />
-           <div ref={statusRef} className="editor-status-bar" style={{ position: 'sticky', bottom: 0, borderTop: '1px solid #ddd', padding: '6px 10px', fontSize: 12, color: '#666', background: '#f5f5f5', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+           <div ref={statusRef} className="editor-status-bar">
              <span>{saving ? '保存中…' : (lastSavedAt ? `已保存 ${formatFull(lastSavedAt)}` : '未保存')}</span>
-             <span style={{ marginLeft: 10 }}>选择模式：{selMode ? '开' : '关'}</span>
-             <button style={{marginLeft: 10}} onClick={() => saveNow('manual')} disabled={saving}>{saving ? '...' : '立即保存'}</button>
+             <span className="status-right">
+               <span>字数：{wordCount}</span>
+               <span style={{ marginLeft: 10 }}>选择模式：{selMode ? '开' : '关'}</span>
+               <button style={{marginLeft: 10}} onClick={() => saveNow('manual')} disabled={saving}>{saving ? '...' : '立即保存'}</button>
+             </span>
            </div>
         </>
       )}
