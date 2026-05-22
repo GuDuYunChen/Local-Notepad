@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState, useImperativeHandle } from 'react'
 import { api } from '~/services/api'
+import { tagApi } from '~/services/tagApi'
 import Editor from './Editor/Editor'
+import TagSelector from './TagSelector'
 
 function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved, autoSaveOnSwitch = true }, ref) {
   // taRef, query, rep, wrapOn removed as they are specific to textarea
@@ -15,6 +17,7 @@ function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved,
   const [saving, setSaving] = useState(false)
   const [selMode, setSelMode] = useState(false)
   const [wordCount, setWordCount] = useState(0)
+  const [fileTags, setFileTags] = useState([])
   const statusRef = useRef(null)
   const [editorContent, setEditorContent] = useState('')
 
@@ -110,6 +113,7 @@ function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved,
       setSwitching(false)
       setLoading(false)
       setLastSavedAt(null)
+      setFileTags([])
       contentRef.current = ''
       setEditorContent('')
       return
@@ -128,6 +132,13 @@ function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved,
         setEditorContent(text || '')
         onChangeRef.current?.(contentRef.current)
         onLoadedRef.current?.(contentRef.current)
+        
+        try {
+          const tags = await tagApi.getFileTags(id)
+          setFileTags(tags || [])
+        } catch (e) {
+          console.error('加载标签失败', e)
+        }
       } catch (e) {
         console.error('加载内容失败', e)
       } finally {
@@ -210,6 +221,7 @@ function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved,
            <div ref={statusRef} className="editor-status-bar">
              <span>{saving ? '保存中…' : (lastSavedAt ? `已保存 ${formatFull(lastSavedAt)}` : '未保存')}</span>
              <span className="status-right">
+               {activeId && <TagSelector fileId={activeId} tags={fileTags} onChange={setFileTags} />}
                <span>字数：{wordCount}</span>
                <span style={{ marginLeft: 10 }}>选择模式：{selMode ? '开' : '关'}</span>
                <button style={{marginLeft: 10}} onClick={() => saveNow('manual')} disabled={saving}>{saving ? '...' : '立即保存'}</button>

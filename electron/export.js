@@ -222,7 +222,7 @@ export async function exportToDocx(files, targetDir) {
     // Let's accept IDs.
 }
 
-export async function processExport(ids, targetDir) {
+export async function processExport(ids, targetDir, format = 'docx') {
     const errors = []
     
     async function processItem(id, currentDir) {
@@ -234,59 +234,41 @@ export async function processExport(ids, targetDir) {
                 const newDir = path.join(currentDir, safeTitle)
                 if (!fs.existsSync(newDir)) fs.mkdirSync(newDir)
                 
-                // Fetch children
-                // We need an API for children or just fetch all and filter?
-                // Go has GetChildren internally.
-                // Let's fetch children via Go API? 
-                // We don't have a public API for GetChildren.
-                // But we have `List` with query? No.
-                // We can assume `List` returns all (it has pagination).
-                // Or we can rely on `fetchFileContent` to return children? No it returns single file.
-                
-                // Hack: We need `GetChildren` API exposed or logic.
-                // Or, we can use the `List` API to find children.
-                // Or, better: Modify Go to expose `GET /files?parent_id=xxx`.
-                // Actually, Go's `List` API doesn't support parent_id filtering exposed to HTTP.
-                
-                // Let's fix Go API to support parent_id filtering.
-                // Or use `GET /files` to get ALL and filter in memory (inefficient but works for small app).
-                
-                // Alternative: The Go `BatchExport` was recursive.
-                // Now we are moving logic to Node.
-                // We need to traverse the tree.
-                
-                // Let's use `GET /files?size=10000` to get all files and build tree locally?
                 const base = process.env.API_BASE || 'http://127.0.0.1:27121'
                 const res = await fetch(`${base}/api/files?size=10000`)
                 const allFiles = (await res.json()).data
                 
                 const children = allFiles.filter(f => f.parent_id === id)
                 for (const child of children) {
-                    await processItem(child.id, newDir)
+                    await processItem(child.id, newDir, format)
                 }
                 
             } else {
-                const docChildren = []
-                const lexicalNodes = parseLexicalState(file.content)
-                
-                // Convert nodes
-                for (const node of lexicalNodes) {
-                    const converted = await convertNode(node)
-                    if (converted) {
-                        if (Array.isArray(converted)) docChildren.push(...converted)
-                        else docChildren.push(converted)
+                if (format === 'markdown' || format === 'md') {
+                    const mdContent = convertToMarkdown(file.content)
+                    fs.writeFileSync(path.join(currentDir, `${safeTitle}.md`), mdContent)
+                } else {
+                    const docChildren = []
+                    const lexicalNodes = parseLexicalState(file.content)
+                    
+                    for (const node of lexicalNodes) {
+                        const converted = await convertNode(node)
+                        if (converted) {
+                            if (Array.isArray(converted)) docChildren.push(...converted)
+                            else docChildren.push(converted)
+                        }
                     }
+                    
+                    const doc = new Document({
+                        sections: [{
+                            properties: {},
+                            children: docChildren
+                        }]
+                    })
+                    
+                    const buffer = await Packer.toBuffer(doc)
+                    fs.writeFileSync(path.join(currentDir, `${safeTitle}.docx`), buffer)
                 }
-                
-                const doc = new Document({
-                    sections: [{
-                        properties: {},
-                        children: docChildren
-                    }]
-                })
-                
-                const buffer = await Packer.toBuffer(doc)
-                fs.writeFileSync(path.join(currentDir, `${safeTitle}.docx`), buffer)
             }
         } catch (e) {
             console.error(`Export ${id} failed`, e)
@@ -294,11 +276,151 @@ export async function processExport(ids, targetDir) {
         }
     }
 
-    // First fetch all IDs
-    // But we need to handle the root IDs provided.
     for (const id of ids) {
-        await processItem(id, targetDir)
+        await processItem(id, targetDir, format)
     }
     
     return errors
+}
+
+function convertToMarkdown(lexicalJSON) {
+    try {
+        const state = JSON.parse(lexicalJSON)
+        const root = state.root || { children: [] }
+        return processLexicalRoot(root)
+    } catch (e) {
+        return lexicalJSON
+    }
+}
+
+function processLexicalRoot(root) {
+    const lines = []
+    for (const node of root.children || []) {
+        processNodeToMarkdown(node, lines, 0)
+    }
+    return lines.join('\n')
+}
+
+function processNodeToMarkdown(node, lines, depth) {
+    if (!node || !node.type) return
+    
+    switch (node.type) {
+        case 'paragraph':
+            const text = processInlineNodes(node.children || [])
+            if (text) {
+                lines.push(text)
+                lines.push('')
+            }
+            break
+            
+        case 'heading':
+            const level = node.level || 1
+            const headingText = processInlineNodes(node.children || [])
+            lines.push(`${'#'.repeat(level)} ${headingText}`)
+            lines.push('')
+            break
+            
+        case 'list':
+            const listType = node.listType === 'number' ? 'number' : 'bullet'
+            processListItems(node.children || [], lines, listType, 0)
+            break
+            
+        case 'quote':
+            const quoteText = processInlineNodes(node.children || [])
+            lines.push(`> ${quoteText}`)
+            lines.push('')
+            break
+            
+        case 'code':
+            const codeText = processInlineNodes(node.children || [])
+            lines.push('```')
+            lines.push(codeText)
+            lines.push('```')
+            lines.push('')
+            break
+            
+        case 'code-block':
+            const lang = node.language || ''
+            const blockText = processInlineNodes(node.children || [])
+            lines.push(`\`\`\`${lang}`)
+            lines.push(blockText)
+            lines.push('```')
+            lines.push('')
+            break
+            
+        case 'table':
+            processTableToMarkdown(node, lines)
+            break
+            
+        default:
+            if (node.children) {
+                for (const child of node.children) {
+                    processNodeToMarkdown(child, lines, depth + 1)
+                }
+            }
+    }
+}
+
+function processInlineNodes(children) {
+    if (!children || children.length === 0) return ''
+    
+    let result = ''
+    for (const child of children) {
+        if (child.type === 'text') {
+            let text = child.text || ''
+            const format = child.format || 0
+            
+            if (format & 16) text = `\`${text}\``
+            else {
+                if (format & 8) text = `~~${text}~~`
+                if (format & 2) text = `*${text}*`
+                if (format & 1) text = `**${text}**`
+            }
+            result += text
+        } else if (child.type === 'linebreak') {
+            result += '\n'
+        } else if (child.type === 'link') {
+            const linkText = processInlineNodes(child.children || [])
+            result += `[${linkText}](${child.url || ''})`
+        }
+    }
+    return result
+}
+
+function processListItems(items, lines, listType, indent) {
+    let counter = 1
+    const prefix = '  '.repeat(indent)
+    
+    for (const item of items) {
+        if (item.type === 'listitem') {
+            const text = processInlineNodes(item.children || [])
+            const bullet = listType === 'number' ? `${counter}.` : '-'
+            lines.push(`${prefix}${bullet} ${text}`)
+            counter++
+            
+            for (const child of item.children || []) {
+                if (child.type === 'list') {
+                    const nestedType = child.listType === 'number' ? 'number' : 'bullet'
+                    processListItems(child.children || [], lines, nestedType, indent + 1)
+                }
+            }
+        }
+    }
+}
+
+function processTableToMarkdown(node, lines) {
+    const rows = node.children || []
+    if (rows.length === 0) return
+    
+    for (let i = 0; i < rows.length; i++) {
+        const row = rows[i]
+        const cells = row.children || []
+        const cellTexts = cells.map(cell => processInlineNodes(cell.children || []))
+        lines.push(`| ${cellTexts.join(' | ')} |`)
+        
+        if (i === 0) {
+            lines.push(`| ${cells.map(() => '---').join(' | ')} |`)
+        }
+    }
+    lines.push('')
 }

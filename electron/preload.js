@@ -7,6 +7,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openFileDialog: () => ipcRenderer.invoke('dialog:openFile'),
   saveFileDialog: () => ipcRenderer.invoke('dialog:saveFile'),
   openDirectoryDialog: () => ipcRenderer.invoke('dialog:openDirectory'),
-  exportToDocx: (ids, targetDir) => ipcRenderer.invoke('export:docx', { ids, targetDir }),
+  exportToDocx: (ids, targetDir, format) => ipcRenderer.invoke('export:docx', { ids, targetDir, format }),
   importFiles: () => ipcRenderer.invoke('import:files'),
+  backupCreate: (targetDir) => ipcRenderer.invoke('backup:create', { targetDir }),
+  backupRestore: (backupFile) => ipcRenderer.invoke('backup:restore', { backupFile }),
+  backupList: (backupDir) => ipcRenderer.invoke('backup:list', { backupDir }),
 })

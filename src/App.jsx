@@ -4,6 +4,8 @@ import TextEditor from './components/TextEditor'
 import FileList from './components/FileList'
 import { api } from '~/services/api'
 import ConfirmDialog from './components/ConfirmDialog'
+import ShortcutsModal from './components/ShortcutsModal'
+import BackupPanel from './components/BackupPanel'
 import { message } from 'antd'
 
 // 应用根组件：后续接入路由、主题与编辑器
@@ -19,12 +21,17 @@ export default function App() {
     const n = v ? parseInt(v, 10) : 280
     return Math.min(480, Math.max(200, isNaN(n) ? 280 : n))
   })
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    return localStorage.getItem('sidebarCollapsed') === 'true'
+  })
   const [dragging, setDragging] = useState(false)
   const [current, setCurrent] = useState(null)
   const [content, setContent] = useState('')
   const [switching, setSwitching] = useState(false)
   const [deletedIds, setDeletedIds] = useState(new Set()) // Track deleted files to skip save
   const [dialog, setDialog] = useState(null)
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  const [backupOpen, setBackupOpen] = useState(false)
   // Check unsaved changes: compare current content with original content from database
   // Note: current.content holds the original content loaded from DB.
   // content holds the current editor content.
@@ -70,6 +77,14 @@ export default function App() {
         e.preventDefault()
         void saveCurrent()
       }
+      if (k === '/' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault()
+        setShortcutsOpen(prev => !prev)
+      }
+      if (k === 'f1') {
+        e.preventDefault()
+        setShortcutsOpen(true)
+      }
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
@@ -98,15 +113,18 @@ export default function App() {
       <header className="app-header">
         <h1>记事本</h1>
         <div className="spacer" />
+        <button className="btn header-btn" onClick={() => setBackupOpen(true)} title="备份与恢复">💾 备份</button>
+        <button className="btn header-btn" onClick={() => setShortcutsOpen(true)} title="快捷键 (Ctrl+/)">⌨️ 快捷键</button>
         <ThemeToggle />
       </header>
       <main className="app-main flex" style={{ '--sidebar-w': `${sidebarW}px` }}>
         {ready ? (
           <>
-            <aside className="sidebar">
-              <FileList
-                selectedId={current?.id}
-                updatedItem={current}
+            <aside className={`sidebar${sidebarCollapsed ? ' collapsed' : ''}`} style={{ '--sidebar-w': `${sidebarW}px` }}>
+              {!sidebarCollapsed && (
+                <FileList
+                  selectedId={current?.id}
+                  updatedItem={current}
                 onSelect={(f, options = {}) => {
                   // If switching to the same file, do nothing
                   if (current && f && f.id === current.id) return
@@ -163,6 +181,16 @@ export default function App() {
                     if (!current && list.length) select(list[0]) 
                 }}
               />
+              )}
+              <button className="sidebar-toggle-btn" onClick={() => {
+                setSidebarCollapsed(prev => {
+                  const next = !prev
+                  localStorage.setItem('sidebarCollapsed', String(next))
+                  return next
+                })
+              }} title={sidebarCollapsed ? '展开侧边栏' : '折叠侧边栏'}>
+                {sidebarCollapsed ? '▶' : '◀'}
+              </button>
             </aside>
             <div className="resizer" onMouseDown={() => setDragging(true)} />
             <section className={`content${switching ? ' switching' : ''}`}>
@@ -240,6 +268,8 @@ export default function App() {
           }}
         />
       )}
+      <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+      <BackupPanel open={backupOpen} onClose={() => setBackupOpen(false)} />
       {/* Delete dialog is handled in FileList now, so we can remove 'delete' type here if unused, 
           but we keep 'unsaved' logic. */}
     </div>

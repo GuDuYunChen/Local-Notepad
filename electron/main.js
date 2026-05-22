@@ -4,6 +4,7 @@ import path from 'node:path'
 
 import { processExport } from './export.js'
 import { selectAndParseFiles } from './import.js'
+import { handleBackup, handleRestore, listBackups } from './backup.js'
 
 // 应用主进程：负责创建窗口、设置安全选项
 let mainWindow = null
@@ -149,9 +150,9 @@ ipcMain.handle('dialog:openDirectory', async () => {
   return res.canceled ? '' : (res.filePaths[0] || '')
 })
 
-ipcMain.handle('export:docx', async (event, { ids, targetDir }) => {
+ipcMain.handle('export:docx', async (event, { ids, targetDir, format = 'docx' }) => {
   try {
-    const errors = await processExport(ids, targetDir)
+    const errors = await processExport(ids, targetDir, format)
     return { success: true, errors }
   } catch (e) {
     console.error(e)
@@ -167,4 +168,34 @@ ipcMain.handle('import:files', async () => {
         console.error(e)
         return { success: false, message: e.message }
     }
+})
+
+ipcMain.handle('backup:create', async (event, { targetDir }) => {
+  try {
+    const result = await handleBackup(targetDir)
+    return result
+  } catch (e) {
+    console.error(e)
+    return { success: false, message: e.message }
+  }
+})
+
+ipcMain.handle('backup:restore', async (event, { backupFile }) => {
+  try {
+    const result = await handleRestore(backupFile)
+    return result
+  } catch (e) {
+    console.error(e)
+    return { success: false, message: e.message }
+  }
+})
+
+ipcMain.handle('backup:list', async (event, { backupDir }) => {
+  try {
+    const backups = await listBackups(backupDir)
+    return { success: true, backups }
+  } catch (e) {
+    console.error(e)
+    return { success: false, message: e.message }
+  }
 })

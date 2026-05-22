@@ -113,6 +113,7 @@ const FileNode = ({
           </div>
           <div className="info">
             <div className="title" title={node.title}>
+                {node.is_pinned && <span className="pin-icon" title="已置顶">⭐</span>}
                 {node.is_folder ? node.title : removeExtension(node.title)}
                 {node.is_folder && <span className="count"> ({node.fileCount})</span>}
             </div>
@@ -622,11 +623,15 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
 
   async function onExportConfirm(ids, roots) {
     try {
+        const format = await new Promise((resolve) => {
+            const choice = window.confirm('导出为 Markdown 格式？\n\n点击"确定"导出为 Markdown\n点击"取消"导出为 DOCX')
+            resolve(choice ? 'markdown' : 'docx')
+        })
+        
         const targetDir = await window.electronAPI.openDirectoryDialog()
         if (!targetDir) return
         
-        // Use Electron main process export logic (Node.js)
-        const res = await window.electronAPI.exportToDocx(roots, targetDir)
+        const res = await window.electronAPI.exportToDocx(roots, targetDir, format)
         
         if (res && res.success) {
              message.success('导出成功')
@@ -817,6 +822,16 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
         body: JSON.stringify({ path }),
       })
     } catch (e) { console.error(e) }
+  }
+
+  async function togglePin(id, isPinned) {
+    try {
+      await api.updateFile(id, { is_pinned: isPinned })
+      await loadList()
+    } catch (e) {
+      console.error(e)
+      message.error('置顶操作失败')
+    }
   }
 
   // 优化的删除逻辑
@@ -1366,6 +1381,9 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
                     <div className="divider"></div>
                   </>
               )}
+              <div className="menu-item" onClick={() => { togglePin(contextMenu.item.id, !contextMenu.item.is_pinned); setContextMenu(null) }}>
+                  {contextMenu.item.is_pinned ? '取消置顶' : '置顶'}
+              </div>
               <div className="menu-item" onClick={() => { setRenaming(contextMenu.item); setContextMenu(null) }}>重命名</div>
               {!contextMenu.item.is_folder && (
                   <div className="menu-item" onClick={() => { void onSaveAs(contextMenu.item.id); setContextMenu(null) }}>另存为</div>

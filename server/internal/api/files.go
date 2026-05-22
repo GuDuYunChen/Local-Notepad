@@ -103,6 +103,7 @@ func (a *FileAPI) Update(r *ghttp.Request) {
 		ParentID  *string `json:"parent_id"`
 		SortOrder *int64  `json:"sort_order"`
 		IsDeleted *bool   `json:"is_deleted"`
+		IsPinned  *bool   `json:"is_pinned"`
 	}
 	if err := r.Parse(&in); err != nil {
 		writeErr(r, 1005, "参数错误", err)
@@ -127,7 +128,7 @@ func (a *FileAPI) Update(r *ghttp.Request) {
 		}
 	}
 
-	f, err := a.Svc.Update(r.GetCtx(), id, in.Title, in.Content, in.ParentID, in.SortOrder, in.IsDeleted)
+	f, err := a.Svc.Update(r.GetCtx(), id, in.Title, in.Content, in.ParentID, in.SortOrder, in.IsDeleted, in.IsPinned)
 	if err != nil {
 		msg := "更新失败"
 		errStr := err.Error()
@@ -226,6 +227,7 @@ func (a *FileAPI) BatchExport(r *ghttp.Request) {
 	var in struct {
 		IDs       []string `json:"ids"`
 		TargetDir string   `json:"targetDir"`
+		Format    string   `json:"format"` // docx, markdown, pdf
 	}
 	if err := r.Parse(&in); err != nil {
 		writeErr(r, 1014, "参数错误", err)
@@ -239,8 +241,11 @@ func (a *FileAPI) BatchExport(r *ghttp.Request) {
 		writeErr(r, 1016, "导出路径不能为空", gerror.New("targetDir empty"))
 		return
 	}
+	if in.Format == "" {
+		in.Format = "docx"
+	}
 
-	if err := a.Svc.BatchExport(r.GetCtx(), in.IDs, in.TargetDir); err != nil {
+	if err := a.Svc.BatchExport(r.GetCtx(), in.IDs, in.TargetDir, in.Format); err != nil {
 		writeErr(r, 1017, "导出失败", err)
 		return
 	}

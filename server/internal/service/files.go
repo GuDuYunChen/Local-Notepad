@@ -42,18 +42,18 @@ func (s *FileService) Create(ctx context.Context, title, content string, isFolde
 	id := uuid.New().String()
 	// 新建项默认排序在最前（假设 SortOrder 越大越靠前，或者使用 updated_at）
 	// 这里我们初始化 SortOrder 为 now，方便排序
-	_, err = s.DB.ExecContext(ctx, `INSERT INTO files (id, title, content, created_at, updated_at, is_folder, parent_id, sort_order, is_deleted) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`, id, title, content, now, now, isFolder, parentID, now)
+	_, err = s.DB.ExecContext(ctx, `INSERT INTO files (id, title, content, created_at, updated_at, is_folder, parent_id, sort_order, is_deleted, is_pinned) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0)`, id, title, content, now, now, isFolder, parentID, now)
 	if err != nil {
 		return nil, fmt.Errorf("创建文件失败: %w", err)
 	}
-	return &model.File{ID: id, Title: title, Content: content, CreatedAt: now, UpdatedAt: now, IsFolder: isFolder, ParentID: parentID, SortOrder: now, IsDeleted: false}, nil
+	return &model.File{ID: id, Title: title, Content: content, CreatedAt: now, UpdatedAt: now, IsFolder: isFolder, ParentID: parentID, SortOrder: now, IsDeleted: false, IsPinned: false}, nil
 }
 
 // 获取文件
 func (s *FileService) Get(ctx context.Context, id string) (*model.File, error) {
 	var f model.File
-	row := s.DB.QueryRowContext(ctx, `SELECT id, title, content, created_at, updated_at, is_folder, parent_id, sort_order, is_deleted FROM files WHERE id = ? AND is_deleted = 0`, id)
-	if err := row.Scan(&f.ID, &f.Title, &f.Content, &f.CreatedAt, &f.UpdatedAt, &f.IsFolder, &f.ParentID, &f.SortOrder, &f.IsDeleted); err != nil {
+	row := s.DB.QueryRowContext(ctx, `SELECT id, title, content, created_at, updated_at, is_folder, parent_id, sort_order, is_deleted, deleted_at, is_pinned FROM files WHERE id = ? AND is_deleted = 0`, id)
+	if err := row.Scan(&f.ID, &f.Title, &f.Content, &f.CreatedAt, &f.UpdatedAt, &f.IsFolder, &f.ParentID, &f.SortOrder, &f.IsDeleted, &f.DeletedAt, &f.IsPinned); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("文件不存在: %w", err)
 		}
@@ -63,7 +63,7 @@ func (s *FileService) Get(ctx context.Context, id string) (*model.File, error) {
 }
 
 // 更新文件
-func (s *FileService) Update(ctx context.Context, id string, title, content, parentID *string, sortOrder *int64, isDeleted *bool) (*model.File, error) {
+func (s *FileService) Update(ctx context.Context, id string, title, content, parentID *string, sortOrder *int64, isDeleted *bool, isPinned *bool) (*model.File, error) {
 	f, err := s.Get(ctx, id)
 	if err != nil {
 		return nil, err
@@ -85,6 +85,9 @@ func (s *FileService) Update(ctx context.Context, id string, title, content, par
 	}
 	if isDeleted != nil {
 		f.IsDeleted = *isDeleted
+	}
+	if isPinned != nil {
+		f.IsPinned = *isPinned
 	}
 
 	// Prevent updating if file is deleted (unless restoring)
@@ -119,7 +122,7 @@ func (s *FileService) Update(ctx context.Context, id string, title, content, par
 	}
 
 	f.UpdatedAt = time.Now().Unix()
-	_, err = s.DB.ExecContext(ctx, `UPDATE files SET title = ?, content = ?, parent_id = ?, sort_order = ?, is_deleted = ?, updated_at = ? WHERE id = ?`, f.Title, f.Content, f.ParentID, f.SortOrder, f.IsDeleted, f.UpdatedAt, id)
+	_, err = s.DB.ExecContext(ctx, `UPDATE files SET title = ?, content = ?, parent_id = ?, sort_order = ?, is_deleted = ?, is_pinned = ?, updated_at = ? WHERE id = ?`, f.Title, f.Content, f.ParentID, f.SortOrder, f.IsDeleted, f.IsPinned, f.UpdatedAt, id)
 	if err != nil {
 		return nil, fmt.Errorf("更新文件失败: %w", err)
 	}
@@ -209,8 +212,8 @@ func (s *FileService) List(ctx context.Context, q string, page, size int) ([]*mo
 	offset := (page - 1) * size
 	// 注意：SQLite boolean true is 1. ORDER BY is_folder DESC means folders first.
 	// 需求调整：支持文件夹和文件混合排序，因此移除 is_folder DESC
-	// 按 sort_order DESC 排序
-	query := `SELECT id, title, content, created_at, updated_at, is_folder, parent_id, sort_order, is_deleted FROM files WHERE is_deleted = 0 AND (title LIKE ? OR content LIKE ?) ORDER BY sort_order DESC LIMIT ? OFFSET ?`
+	// 按 is_pinned DESC, sort_order DESC 排序
+	query := `SELECT id, title, content, created_at, updated_at, is_folder, parent_id, sort_order, is_deleted, deleted_at, is_pinned FROM files WHERE is_deleted = 0 AND (title LIKE ? OR content LIKE ?) ORDER BY is_pinned DESC, sort_order DESC LIMIT ? OFFSET ?`
 	rows, err := s.DB.QueryContext(ctx, query, "%"+q+"%", "%"+q+"%", size, offset)
 	if err != nil {
 		return nil, fmt.Errorf("查询文件失败: %w", err)
@@ -219,7 +222,7 @@ func (s *FileService) List(ctx context.Context, q string, page, size int) ([]*mo
 	var out []*model.File
 	for rows.Next() {
 		var f model.File
-		if err := rows.Scan(&f.ID, &f.Title, &f.Content, &f.CreatedAt, &f.UpdatedAt, &f.IsFolder, &f.ParentID, &f.SortOrder, &f.IsDeleted); err != nil {
+		if err := rows.Scan(&f.ID, &f.Title, &f.Content, &f.CreatedAt, &f.UpdatedAt, &f.IsFolder, &f.ParentID, &f.SortOrder, &f.IsDeleted, &f.DeletedAt, &f.IsPinned); err != nil {
 			return nil, fmt.Errorf("解析文件失败: %w", err)
 		}
 		out = append(out, &f)
@@ -499,7 +502,7 @@ func (s *FileService) ImportPath(ctx context.Context, path string, encoding stri
 
 // GetChildren gets immediate children of a folder
 func (s *FileService) GetChildren(ctx context.Context, parentID string) ([]*model.File, error) {
-	rows, err := s.DB.QueryContext(ctx, `SELECT id, title, content, created_at, updated_at, is_folder, parent_id, sort_order, is_deleted FROM files WHERE parent_id = ? AND is_deleted = 0`, parentID)
+	rows, err := s.DB.QueryContext(ctx, `SELECT id, title, content, created_at, updated_at, is_folder, parent_id, sort_order, is_deleted, deleted_at, is_pinned FROM files WHERE parent_id = ? AND is_deleted = 0`, parentID)
 	if err != nil {
 		return nil, err
 	}
@@ -508,7 +511,7 @@ func (s *FileService) GetChildren(ctx context.Context, parentID string) ([]*mode
 	var out []*model.File
 	for rows.Next() {
 		var f model.File
-		if err := rows.Scan(&f.ID, &f.Title, &f.Content, &f.CreatedAt, &f.UpdatedAt, &f.IsFolder, &f.ParentID, &f.SortOrder, &f.IsDeleted); err != nil {
+		if err := rows.Scan(&f.ID, &f.Title, &f.Content, &f.CreatedAt, &f.UpdatedAt, &f.IsFolder, &f.ParentID, &f.SortOrder, &f.IsDeleted, &f.DeletedAt, &f.IsPinned); err != nil {
 			return nil, err
 		}
 		out = append(out, &f)
@@ -516,17 +519,17 @@ func (s *FileService) GetChildren(ctx context.Context, parentID string) ([]*mode
 	return out, nil
 }
 
-// BatchExport exports files/folders to a target directory with docx conversion
-func (s *FileService) BatchExport(ctx context.Context, ids []string, targetDir string) error {
+// BatchExport exports files/folders to a target directory with format conversion
+func (s *FileService) BatchExport(ctx context.Context, ids []string, targetDir string, format string) error {
 	for _, id := range ids {
-		if err := s.exportItemRecursive(ctx, id, targetDir); err != nil {
+		if err := s.exportItemRecursive(ctx, id, targetDir, format); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (s *FileService) exportItemRecursive(ctx context.Context, id string, currentDir string) error {
+func (s *FileService) exportItemRecursive(ctx context.Context, id string, currentDir string, format string) error {
 	f, err := s.Get(ctx, id)
 	if err != nil {
 		return err
@@ -549,7 +552,7 @@ func (s *FileService) exportItemRecursive(ctx context.Context, id string, curren
 		}
 
 		for _, child := range children {
-			if err := s.exportItemRecursive(ctx, child.ID, newDir); err != nil {
+			if err := s.exportItemRecursive(ctx, child.ID, newDir, format); err != nil {
 				return err
 			}
 		}
@@ -558,11 +561,22 @@ func (s *FileService) exportItemRecursive(ctx context.Context, id string, curren
 		if ext != "" {
 			name = strings.TrimSuffix(name, ext)
 		}
-		name = name + ".docx"
-
-		outPath := filepath.Join(currentDir, name)
-
-		if err := ConvertToDocx(f.Content, outPath); err != nil {
+		
+		var outPath string
+		var err error
+		
+		switch format {
+		case "markdown", "md":
+			name = name + ".md"
+			outPath = filepath.Join(currentDir, name)
+			err = ExportToMarkdown(f.Content, outPath)
+		default:
+			name = name + ".docx"
+			outPath = filepath.Join(currentDir, name)
+			err = ConvertToDocx(f.Content, outPath)
+		}
+		
+		if err != nil {
 			return fmt.Errorf("convert file %s failed: %w", name, err)
 		}
 	}

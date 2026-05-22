@@ -884,8 +884,8 @@ var init_tap = __esm({
 });
 
 // node_modules/underscore/modules/toPath.js
-function toPath(path4) {
-  return isArray_default(path4) ? path4 : [path4];
+function toPath(path5) {
+  return isArray_default(path5) ? path5 : [path5];
 }
 var init_toPath = __esm({
   "node_modules/underscore/modules/toPath.js"() {
@@ -896,8 +896,8 @@ var init_toPath = __esm({
 });
 
 // node_modules/underscore/modules/_toPath.js
-function toPath2(path4) {
-  return _.toPath(path4);
+function toPath2(path5) {
+  return _.toPath(path5);
 }
 var init_toPath2 = __esm({
   "node_modules/underscore/modules/_toPath.js"() {
@@ -907,11 +907,11 @@ var init_toPath2 = __esm({
 });
 
 // node_modules/underscore/modules/_deepGet.js
-function deepGet(obj2, path4) {
-  var length = path4.length;
+function deepGet(obj2, path5) {
+  var length = path5.length;
   for (var i = 0; i < length; i++) {
     if (obj2 == null) return void 0;
-    obj2 = obj2[path4[i]];
+    obj2 = obj2[path5[i]];
   }
   return length ? obj2 : void 0;
 }
@@ -921,8 +921,8 @@ var init_deepGet = __esm({
 });
 
 // node_modules/underscore/modules/get.js
-function get2(object2, path4, defaultValue) {
-  var value = deepGet(object2, toPath2(path4));
+function get2(object2, path5, defaultValue) {
+  var value = deepGet(object2, toPath2(path5));
   return isUndefined(value) ? defaultValue : value;
 }
 var init_get = __esm({
@@ -934,11 +934,11 @@ var init_get = __esm({
 });
 
 // node_modules/underscore/modules/has.js
-function has2(obj2, path4) {
-  path4 = toPath2(path4);
-  var length = path4.length;
+function has2(obj2, path5) {
+  path5 = toPath2(path5);
+  var length = path5.length;
   for (var i = 0; i < length; i++) {
-    var key = path4[i];
+    var key = path5[i];
     if (!has(obj2, key)) return false;
     obj2 = obj2[key];
   }
@@ -975,10 +975,10 @@ var init_matcher = __esm({
 });
 
 // node_modules/underscore/modules/property.js
-function property(path4) {
-  path4 = toPath2(path4);
+function property(path5) {
+  path5 = toPath2(path5);
   return function(obj2) {
-    return deepGet(obj2, path4);
+    return deepGet(obj2, path5);
   };
 }
 var init_property = __esm({
@@ -1086,8 +1086,8 @@ var init_noop = __esm({
 // node_modules/underscore/modules/propertyOf.js
 function propertyOf(obj2) {
   if (obj2 == null) return noop2;
-  return function(path4) {
-    return get2(obj2, path4);
+  return function(path5) {
+    return get2(obj2, path5);
   };
 }
 var init_propertyOf = __esm({
@@ -1281,14 +1281,14 @@ var init_template = __esm({
 });
 
 // node_modules/underscore/modules/result.js
-function result(obj2, path4, fallback) {
-  path4 = toPath2(path4);
-  var length = path4.length;
+function result(obj2, path5, fallback) {
+  path5 = toPath2(path5);
+  var length = path5.length;
   if (!length) {
     return isFunction_default(fallback) ? fallback.call(obj2) : fallback;
   }
   for (var i = 0; i < length; i++) {
-    var prop = obj2 == null ? void 0 : obj2[path4[i]];
+    var prop = obj2 == null ? void 0 : obj2[path5[i]];
     if (prop === void 0) {
       prop = fallback;
       i = length;
@@ -1969,14 +1969,14 @@ var init_invoke = __esm({
     init_map();
     init_deepGet();
     init_toPath2();
-    invoke_default = restArguments(function(obj2, path4, args) {
+    invoke_default = restArguments(function(obj2, path5, args) {
       var contextPath, func;
-      if (isFunction_default(path4)) {
-        func = path4;
+      if (isFunction_default(path5)) {
+        func = path5;
       } else {
-        path4 = toPath2(path4);
-        contextPath = path4.slice(0, -1);
-        path4 = path4[path4.length - 1];
+        path5 = toPath2(path5);
+        contextPath = path5.slice(0, -1);
+        path5 = path5[path5.length - 1];
       }
       return map(obj2, function(context) {
         var method = func;
@@ -1985,7 +1985,7 @@ var init_invoke = __esm({
             context = deepGet(context, contextPath);
           }
           if (context == null) return void 0;
-          method = context[path4];
+          method = context[path5];
         }
         return method == null ? method : method.apply(context, args);
       });
@@ -11451,8 +11451,8 @@ var require_utils = __commonJS({
       var result2 = transform[inputType][outputType](input);
       return result2;
     };
-    exports2.resolve = function(path4) {
-      var parts = path4.split("/");
+    exports2.resolve = function(path5) {
+      var parts = path5.split("/");
       var result2 = [];
       for (var index = 0; index < parts.length; index++) {
         var part = parts[index];
@@ -17282,18 +17282,18 @@ var require_object = __commonJS({
       var object2 = new ZipObject(name, zipObjectContent, o);
       this.files[name] = object2;
     };
-    var parentFolder = function(path4) {
-      if (path4.slice(-1) === "/") {
-        path4 = path4.substring(0, path4.length - 1);
+    var parentFolder = function(path5) {
+      if (path5.slice(-1) === "/") {
+        path5 = path5.substring(0, path5.length - 1);
       }
-      var lastSlash = path4.lastIndexOf("/");
-      return lastSlash > 0 ? path4.substring(0, lastSlash) : "";
+      var lastSlash = path5.lastIndexOf("/");
+      return lastSlash > 0 ? path5.substring(0, lastSlash) : "";
     };
-    var forceTrailingSlash = function(path4) {
-      if (path4.slice(-1) !== "/") {
-        path4 += "/";
+    var forceTrailingSlash = function(path5) {
+      if (path5.slice(-1) !== "/") {
+        path5 += "/";
       }
-      return path4;
+      return path5;
     };
     var folderAdd = function(name, createFolders) {
       createFolders = typeof createFolders !== "undefined" ? createFolders : defaults.createFolders;
@@ -18331,27 +18331,27 @@ var require_zipfile = __commonJS({
         };
       });
     }
-    function splitPath(path4) {
-      var lastIndex = path4.lastIndexOf("/");
+    function splitPath(path5) {
+      var lastIndex = path5.lastIndexOf("/");
       if (lastIndex === -1) {
-        return { dirname: "", basename: path4 };
+        return { dirname: "", basename: path5 };
       } else {
         return {
-          dirname: path4.substring(0, lastIndex),
-          basename: path4.substring(lastIndex + 1)
+          dirname: path5.substring(0, lastIndex),
+          basename: path5.substring(lastIndex + 1)
         };
       }
     }
     function joinPath() {
-      var nonEmptyPaths = Array.prototype.filter.call(arguments, function(path4) {
-        return path4;
+      var nonEmptyPaths = Array.prototype.filter.call(arguments, function(path5) {
+        return path5;
       });
       var relevantPaths = [];
-      nonEmptyPaths.forEach(function(path4) {
-        if (/^\//.test(path4)) {
-          relevantPaths = [path4];
+      nonEmptyPaths.forEach(function(path5) {
+        if (/^\//.test(path5)) {
+          relevantPaths = [path5];
         } else {
-          relevantPaths.push(path4);
+          relevantPaths.push(path5);
         }
       });
       return relevantPaths.join("/");
@@ -25612,9 +25612,9 @@ var require_office_xml_reader = __commonJS({
         return collapseAlternateContent(document2)[0];
       });
     }
-    function readXmlFromZipFile(docxFile, path4) {
-      if (docxFile.exists(path4)) {
-        return docxFile.read(path4, "utf-8").then(stripUtf8Bom).then(read);
+    function readXmlFromZipFile(docxFile, path5) {
+      if (docxFile.exists(path5)) {
+        return docxFile.read(path5, "utf-8").then(stripUtf8Bom).then(read);
       } else {
         return promises.resolve(null);
       }
@@ -27371,10 +27371,10 @@ var require_body_reader = __commonJS({
         }
       }
       function findEmbeddedImageFile(relationshipId) {
-        var path4 = uris.uriToZipEntryName("word", relationships.findTargetByRelationshipId(relationshipId));
+        var path5 = uris.uriToZipEntryName("word", relationships.findTargetByRelationshipId(relationshipId));
         return {
-          path: path4,
-          read: docxFile.read.bind(docxFile, path4)
+          path: path5,
+          read: docxFile.read.bind(docxFile, path5)
         };
       }
       function readImage(imageFile, altText) {
@@ -27611,12 +27611,12 @@ var require_content_types_reader = __commonJS({
     }
     function contentTypes(overrides, extensionDefaults) {
       return {
-        findContentType: function(path4) {
-          var overrideContentType = overrides[path4];
+        findContentType: function(path5) {
+          var overrideContentType = overrides[path5];
           if (overrideContentType) {
             return overrideContentType;
           } else {
-            var pathParts = path4.split(".");
+            var pathParts = path5.split(".");
             var extension = pathParts[pathParts.length - 1];
             if (extensionDefaults.hasOwnProperty(extension)) {
               return extensionDefaults[extension];
@@ -27859,12 +27859,12 @@ var require_comments_reader = __commonJS({
 var require_path_is_absolute = __commonJS({
   "node_modules/path-is-absolute/index.js"(exports2, module2) {
     "use strict";
-    function posix(path4) {
-      return path4.charAt(0) === "/";
+    function posix(path5) {
+      return path5.charAt(0) === "/";
     }
-    function win32(path4) {
+    function win32(path5) {
       var splitDeviceRe = /^([a-zA-Z]:|[\\\/]{2}[^\\\/]+[\\\/]+[^\\\/]+)?([\\\/])?([\s\S]*?)$/;
-      var result2 = splitDeviceRe.exec(path4);
+      var result2 = splitDeviceRe.exec(path5);
       var device = result2[1] || "";
       var isUnc = Boolean(device && device.charAt(1) !== ":");
       return Boolean(result2[2] || isUnc);
@@ -27878,7 +27878,7 @@ var require_path_is_absolute = __commonJS({
 // node_modules/mammoth/lib/docx/files.js
 var require_files = __commonJS({
   "node_modules/mammoth/lib/docx/files.js"(exports2) {
-    var fs3 = require("fs");
+    var fs4 = require("fs");
     var url = require("url");
     var os = require("os");
     var dirname = require("path").dirname;
@@ -27898,19 +27898,19 @@ var require_files = __commonJS({
       }
       var base = options.relativeToFile ? dirname(options.relativeToFile) : null;
       function read(uri2, encoding) {
-        return resolveUri(uri2).then(function(path4) {
-          return readFile2(path4, encoding).caught(function(error) {
+        return resolveUri(uri2).then(function(path5) {
+          return readFile2(path5, encoding).caught(function(error) {
             var message = "could not open external image: '" + uri2 + "' (document directory: '" + base + "')\n" + error.message;
             return promises.reject(new Error(message));
           });
         });
       }
       function resolveUri(uri2) {
-        var path4 = uriToPath(uri2);
-        if (isAbsolutePath(path4)) {
-          return promises.resolve(path4);
+        var path5 = uriToPath(uri2);
+        if (isAbsolutePath(path5)) {
+          return promises.resolve(path5);
         } else if (base) {
-          return promises.resolve(resolvePath(base, path4));
+          return promises.resolve(resolvePath(base, path5));
         } else {
           return promises.reject(new Error("could not find external image '" + uri2 + "', path of input document is unknown"));
         }
@@ -27919,18 +27919,18 @@ var require_files = __commonJS({
         read
       };
     }
-    var readFile2 = promises.promisify(fs3.readFile.bind(fs3));
+    var readFile2 = promises.promisify(fs4.readFile.bind(fs4));
     function uriToPath(uriString, platform) {
       if (!platform) {
         platform = os.platform();
       }
       var uri2 = url.parse(uriString);
       if (isLocalFileUri(uri2) || isRelativeUri(uri2)) {
-        var path4 = decodeURIComponent(uri2.path);
-        if (platform === "win32" && /^\/[a-z]:/i.test(path4)) {
-          return path4.slice(1);
+        var path5 = decodeURIComponent(uri2.path);
+        if (platform === "win32" && /^\/[a-z]:/i.test(path5)) {
+          return path5.slice(1);
         } else {
-          return path4;
+          return path5;
         }
       } else {
         throw new Error("Could not convert URI to path: " + uriString);
@@ -28130,18 +28130,18 @@ var require_docx_reader = __commonJS({
       readElement: contentTypesReader.readContentTypesFromXml,
       defaultValue: contentTypesReader.defaultContentTypes
     });
-    function readNumberingFromZipFile(zipFile, path4, styles) {
+    function readNumberingFromZipFile(zipFile, path5, styles) {
       return xmlFileReader({
-        filename: path4,
+        filename: path5,
         readElement: function(element) {
           return numberingXml.readNumberingXml(element, { styles });
         },
         defaultValue: numberingXml.defaultNumbering
       })(zipFile);
     }
-    function readStylesFromZipFile(zipFile, path4) {
+    function readStylesFromZipFile(zipFile, path5) {
       return xmlFileReader({
-        filename: path4,
+        filename: path5,
         readElement: stylesReader.readStylesXml,
         defaultValue: stylesReader.defaultStyles
       })(zipFile);
@@ -28172,10 +28172,10 @@ var require_style_map = __commonJS({
       });
     }
     function updateRelationships(docxFile) {
-      var path4 = "word/_rels/document.xml.rels";
+      var path5 = "word/_rels/document.xml.rels";
       var relationshipsUri = "http://schemas.openxmlformats.org/package/2006/relationships";
       var relationshipElementName = "{" + relationshipsUri + "}Relationship";
-      return docxFile.read(path4, "utf8").then(xml2.readString).then(function(relationshipsContainer) {
+      return docxFile.read(path5, "utf8").then(xml2.readString).then(function(relationshipsContainer) {
         var relationships = relationshipsContainer.children;
         addOrUpdateElement(relationships, relationshipElementName, "Id", {
           "Id": "rMammothStyleMap",
@@ -28183,21 +28183,21 @@ var require_style_map = __commonJS({
           "Target": styleMapAbsolutePath
         });
         var namespaces = { "": relationshipsUri };
-        return docxFile.write(path4, xml2.writeString(relationshipsContainer, namespaces));
+        return docxFile.write(path5, xml2.writeString(relationshipsContainer, namespaces));
       });
     }
     function updateContentTypes(docxFile) {
-      var path4 = "[Content_Types].xml";
+      var path5 = "[Content_Types].xml";
       var contentTypesUri = "http://schemas.openxmlformats.org/package/2006/content-types";
       var overrideName = "{" + contentTypesUri + "}Override";
-      return docxFile.read(path4, "utf8").then(xml2.readString).then(function(typesElement) {
+      return docxFile.read(path5, "utf8").then(xml2.readString).then(function(typesElement) {
         var children = typesElement.children;
         addOrUpdateElement(children, overrideName, "PartName", {
           "PartName": styleMapAbsolutePath,
           "ContentType": "text/prs.mammoth.style-map"
         });
         var namespaces = { "": contentTypesUri };
-        return docxFile.write(path4, xml2.writeString(typesElement, namespaces));
+        return docxFile.write(path5, xml2.writeString(typesElement, namespaces));
       });
     }
     function addOrUpdateElement(elements, name, identifyingAttribute, attributes) {
@@ -28885,9 +28885,9 @@ var require_document_to_html = __commonJS({
         };
         var paths = [];
         if (run.highlight !== null) {
-          var path4 = findHtmlPath({ type: "highlight", color: run.highlight });
-          if (path4) {
-            paths.push(path4);
+          var path5 = findHtmlPath({ type: "highlight", color: run.highlight });
+          if (path5) {
+            paths.push(path5);
           }
         }
         if (run.isSmallCaps) {
@@ -28922,15 +28922,15 @@ var require_document_to_html = __commonJS({
           messages.push(unrecognisedStyleWarning("run", run));
         }
         paths.push(stylePath);
-        paths.forEach(function(path5) {
-          nodes = path5.wrap.bind(path5, nodes);
+        paths.forEach(function(path6) {
+          nodes = path6.wrap.bind(path6, nodes);
         });
         return nodes();
       }
       function findHtmlPathForRunProperty(elementType, defaultTagName) {
-        var path4 = findHtmlPath({ type: elementType });
-        if (path4) {
-          return path4;
+        var path5 = findHtmlPath({ type: elementType });
+        if (path5) {
+          return path5;
         } else if (defaultTagName) {
           return htmlPaths.element(defaultTagName, {}, { fresh: false });
         } else {
@@ -30632,11 +30632,11 @@ var require_options_reader = __commonJS({
 // node_modules/mammoth/lib/unzip.js
 var require_unzip = __commonJS({
   "node_modules/mammoth/lib/unzip.js"(exports2) {
-    var fs3 = require("fs");
+    var fs4 = require("fs");
     var promises = require_promises();
     var zipfile = require_zipfile();
     exports2.openZip = openZip;
-    var readFile2 = promises.promisify(fs3.readFile);
+    var readFile2 = promises.promisify(fs4.readFile);
     function openZip(options) {
       if (options.path) {
         return readFile2(options.path).then(zipfile.openArrayBuffer);
@@ -30678,7 +30678,7 @@ var require_lib6 = __commonJS({
     var unzip2 = require_unzip();
     var Result = require_results().Result;
     exports2.convertToHtml = convertToHtml;
-    exports2.convertToMarkdown = convertToMarkdown;
+    exports2.convertToMarkdown = convertToMarkdown2;
     exports2.convert = convert;
     exports2.extractRawText = extractRawText;
     exports2.images = require_images();
@@ -30689,7 +30689,7 @@ var require_lib6 = __commonJS({
     function convertToHtml(input, options) {
       return convert(input, options);
     }
-    function convertToMarkdown(input, options) {
+    function convertToMarkdown2(input, options) {
       var markdownOptions = Object.create(options || {});
       markdownOptions.outputFormat = "markdown";
       return convert(input, markdownOptions);
@@ -35875,9 +35875,9 @@ var require_xlsx = __commonJS({
           }
           return o;
         }
-        var fs3;
+        var fs4;
         function get_fs() {
-          return fs3 || (fs3 = require("fs"));
+          return fs4 || (fs4 = require("fs"));
         }
         function parse(file, options) {
           if (file[0] == 80 && file[1] == 75) return parse_zip2(file, options);
@@ -36152,7 +36152,7 @@ var require_xlsx = __commonJS({
         }
         function read_file(filename2, options) {
           get_fs();
-          return parse(fs3.readFileSync(filename2), options);
+          return parse(fs4.readFileSync(filename2), options);
         }
         function read(blob, options) {
           var type2 = options && options.type;
@@ -36429,7 +36429,7 @@ var require_xlsx = __commonJS({
           }
           return o;
         }
-        function find2(cfb, path4) {
+        function find2(cfb, path5) {
           var UCFullPaths = cfb.FullPaths.map(function(x) {
             return x.toUpperCase();
           });
@@ -36438,11 +36438,11 @@ var require_xlsx = __commonJS({
             return y[y.length - (x.slice(-1) == "/" ? 2 : 1)];
           });
           var k = false;
-          if (path4.charCodeAt(0) === 47) {
+          if (path5.charCodeAt(0) === 47) {
             k = true;
-            path4 = UCFullPaths[0].slice(0, -1) + path4;
-          } else k = path4.indexOf("/") !== -1;
-          var UCPath = path4.toUpperCase();
+            path5 = UCFullPaths[0].slice(0, -1) + path5;
+          } else k = path5.indexOf("/") !== -1;
+          var UCPath = path5.toUpperCase();
           var w = k === true ? UCFullPaths.indexOf(UCPath) : UCPaths.indexOf(UCPath);
           if (w !== -1) return cfb.FileIndex[w];
           var m = !UCPath.match(chr1);
@@ -36478,7 +36478,7 @@ var require_xlsx = __commonJS({
         function write_file(cfb, filename2, options) {
           get_fs();
           var o = _write(cfb, options);
-          fs3.writeFileSync(filename2, o);
+          fs4.writeFileSync(filename2, o);
         }
         function a2s2(o) {
           var out = new Array(o.length);
@@ -36490,7 +36490,7 @@ var require_xlsx = __commonJS({
           switch (options && options.type || "buffer") {
             case "file":
               get_fs();
-              fs3.writeFileSync(options.filename, o);
+              fs4.writeFileSync(options.filename, o);
               return o;
             case "binary":
               return typeof o == "string" ? o : a2s2(o);
@@ -37420,11 +37420,11 @@ var require_xlsx = __commonJS({
         }
         throw new Error("cannot save file " + fname);
       }
-      function read_binary(path4) {
-        if (typeof _fs !== "undefined") return _fs.readFileSync(path4);
-        if (typeof Deno !== "undefined") return Deno.readFileSync(path4);
+      function read_binary(path5) {
+        if (typeof _fs !== "undefined") return _fs.readFileSync(path5);
+        if (typeof Deno !== "undefined") return Deno.readFileSync(path5);
         if (typeof $ !== "undefined" && typeof File !== "undefined" && typeof Folder !== "undefined") try {
-          var infile = File(path4);
+          var infile = File(path5);
           infile.open("r");
           infile.encoding = "binary";
           var data = infile.read();
@@ -37433,7 +37433,7 @@ var require_xlsx = __commonJS({
         } catch (e) {
           if (!e.message || !e.message.match(/onstruct/)) throw e;
         }
-        throw new Error("Cannot access file " + path4);
+        throw new Error("Cannot access file " + path5);
       }
       function keys2(o) {
         var ks = Object.keys(o), o2 = [];
@@ -37707,16 +37707,16 @@ var require_xlsx = __commonJS({
         for (var i = 0; i < k.length; ++i) if (k[i].slice(-1) != "/") o.push(k[i].replace(/^Root Entry[\/]/, ""));
         return o.sort();
       }
-      function zip_add_file(zip, path4, content) {
+      function zip_add_file(zip, path5, content) {
         if (zip.FullPaths) {
           if (typeof content == "string") {
             var res;
             if (has_buf) res = Buffer_from(content);
             else res = utf8decode(content);
-            return CFB.utils.cfb_add(zip, path4, res);
+            return CFB.utils.cfb_add(zip, path5, res);
           }
-          CFB.utils.cfb_add(zip, path4, content);
-        } else zip.file(path4, content);
+          CFB.utils.cfb_add(zip, path5, content);
+        } else zip.file(path5, content);
       }
       function zip_new() {
         return CFB.utils.cfb_new();
@@ -37733,11 +37733,11 @@ var require_xlsx = __commonJS({
         }
         throw new Error("Unrecognized type " + o.type);
       }
-      function resolve_path(path4, base) {
-        if (path4.charAt(0) == "/") return path4.slice(1);
+      function resolve_path(path5, base) {
+        if (path5.charAt(0) == "/") return path5.slice(1);
         var result2 = base.split("/");
         if (base.slice(-1) != "/") result2.pop();
-        var target = path4.split("/");
+        var target = path5.split("/");
         while (target.length !== 0) {
           var step = target.shift();
           if (step === "..") result2.pop();
@@ -61805,19 +61805,19 @@ var require_xlsx = __commonJS({
         }
         return !wbrels || wbrels.length === 0 ? null : wbrels;
       }
-      function safe_parse_sheet(zip, path4, relsPath, sheet, idx, sheetRels, sheets, stype, opts, wb, themes, styles) {
+      function safe_parse_sheet(zip, path5, relsPath, sheet, idx, sheetRels, sheets, stype, opts, wb, themes, styles) {
         try {
-          sheetRels[sheet] = parse_rels(getzipstr(zip, relsPath, true), path4);
-          var data = getzipdata(zip, path4);
+          sheetRels[sheet] = parse_rels(getzipstr(zip, relsPath, true), path5);
+          var data = getzipdata(zip, path5);
           var _ws;
           switch (stype) {
             case "sheet":
-              _ws = parse_ws(data, path4, idx, opts, sheetRels[sheet], wb, themes, styles);
+              _ws = parse_ws(data, path5, idx, opts, sheetRels[sheet], wb, themes, styles);
               break;
             case "chart":
-              _ws = parse_cs(data, path4, idx, opts, sheetRels[sheet], wb, themes, styles);
+              _ws = parse_cs(data, path5, idx, opts, sheetRels[sheet], wb, themes, styles);
               if (!_ws || !_ws["!drawel"]) break;
-              var dfile = resolve_path(_ws["!drawel"].Target, path4);
+              var dfile = resolve_path(_ws["!drawel"].Target, path5);
               var drelsp = get_rels_path(dfile);
               var draw = parse_drawing(getzipstr(zip, dfile, true), parse_rels(getzipstr(zip, drelsp, true), dfile));
               var chartp = resolve_path(draw, dfile);
@@ -61825,10 +61825,10 @@ var require_xlsx = __commonJS({
               _ws = parse_chart(getzipstr(zip, chartp, true), chartp, opts, parse_rels(getzipstr(zip, crelsp, true), chartp), wb, _ws);
               break;
             case "macro":
-              _ws = parse_ms(data, path4, idx, opts, sheetRels[sheet], wb, themes, styles);
+              _ws = parse_ms(data, path5, idx, opts, sheetRels[sheet], wb, themes, styles);
               break;
             case "dialog":
-              _ws = parse_ds(data, path4, idx, opts, sheetRels[sheet], wb, themes, styles);
+              _ws = parse_ds(data, path5, idx, opts, sheetRels[sheet], wb, themes, styles);
               break;
             default:
               throw new Error("Unrecognized sheet type " + stype);
@@ -61838,13 +61838,13 @@ var require_xlsx = __commonJS({
           if (sheetRels && sheetRels[sheet]) keys2(sheetRels[sheet]).forEach(function(n) {
             var dfile2 = "";
             if (sheetRels[sheet][n].Type == RELS.CMNT) {
-              dfile2 = resolve_path(sheetRels[sheet][n].Target, path4);
+              dfile2 = resolve_path(sheetRels[sheet][n].Target, path5);
               var comments = parse_cmnt(getzipdata(zip, dfile2, true), dfile2, opts);
               if (!comments || !comments.length) return;
               sheet_insert_comments(_ws, comments, false);
             }
             if (sheetRels[sheet][n].Type == RELS.TCMNT) {
-              dfile2 = resolve_path(sheetRels[sheet][n].Target, path4);
+              dfile2 = resolve_path(sheetRels[sheet][n].Target, path5);
               tcomments = tcomments.concat(parse_tcmnt_xml(getzipdata(zip, dfile2, true), opts));
             }
           });
@@ -61948,7 +61948,7 @@ var require_xlsx = __commonJS({
         if (opts.bookDeps && dir.calcchain) deps = parse_cc(getzipdata(zip, strip_front_slash(dir.calcchain)), dir.calcchain, opts);
         var i = 0;
         var sheetRels = {};
-        var path4, relsPath;
+        var path5, relsPath;
         {
           var wbsheets = wb.Sheets;
           props.Worksheets = wbsheets.length;
@@ -61973,15 +61973,15 @@ var require_xlsx = __commonJS({
         wsloop: for (i = 0; i != props.Worksheets; ++i) {
           var stype = "sheet";
           if (wbrels && wbrels[i]) {
-            path4 = "xl/" + wbrels[i][1].replace(/[\/]?xl\//, "");
-            if (!safegetzipfile(zip, path4)) path4 = wbrels[i][1];
-            if (!safegetzipfile(zip, path4)) path4 = wbrelsfile.replace(/_rels\/.*$/, "") + wbrels[i][1];
+            path5 = "xl/" + wbrels[i][1].replace(/[\/]?xl\//, "");
+            if (!safegetzipfile(zip, path5)) path5 = wbrels[i][1];
+            if (!safegetzipfile(zip, path5)) path5 = wbrelsfile.replace(/_rels\/.*$/, "") + wbrels[i][1];
             stype = wbrels[i][2];
           } else {
-            path4 = "xl/worksheets/sheet" + (i + 1 - nmode) + "." + wbext;
-            path4 = path4.replace(/sheet0\./, "sheet.");
+            path5 = "xl/worksheets/sheet" + (i + 1 - nmode) + "." + wbext;
+            path5 = path5.replace(/sheet0\./, "sheet.");
           }
-          relsPath = path4.replace(/^(.*)(\/)([^\/]*)$/, "$1/_rels/$3.rels");
+          relsPath = path5.replace(/^(.*)(\/)([^\/]*)$/, "$1/_rels/$3.rels");
           if (opts && opts.sheets != null) switch (typeof opts.sheets) {
             case "number":
               if (i != opts.sheets) continue wsloop;
@@ -61999,7 +61999,7 @@ var require_xlsx = __commonJS({
                 if (!snjseen) continue wsloop;
               }
           }
-          safe_parse_sheet(zip, path4, relsPath, props.SheetNames[i], i, sheetRels, sheets, stype, opts, wb, themes, styles);
+          safe_parse_sheet(zip, path5, relsPath, props.SheetNames[i], i, sheetRels, sheets, stype, opts, wb, themes, styles);
         }
         out = {
           Directory: dir,
@@ -62882,7 +62882,7 @@ var require_xlsx = __commonJS({
         return out;
       }
       var qreg = /"/g;
-      function make_csv_row(sheet, r, R, cols, fs3, rs, FS, o) {
+      function make_csv_row(sheet, r, R, cols, fs4, rs, FS, o) {
         var isempty = true;
         var row = [], txt = "", rr = encode_row(R);
         for (var C = r.s.c; C <= r.e.c; ++C) {
@@ -62892,7 +62892,7 @@ var require_xlsx = __commonJS({
           else if (val.v != null) {
             isempty = false;
             txt = "" + (o.rawNumbers && val.t == "n" ? val.v : format_cell(val, null, o));
-            for (var i = 0, cc = 0; i !== txt.length; ++i) if ((cc = txt.charCodeAt(i)) === fs3 || cc === rs || cc === 34 || o.forceQuotes) {
+            for (var i = 0, cc = 0; i !== txt.length; ++i) if ((cc = txt.charCodeAt(i)) === fs4 || cc === rs || cc === 34 || o.forceQuotes) {
               txt = '"' + txt.replace(qreg, '""') + '"';
               break;
             }
@@ -62912,7 +62912,7 @@ var require_xlsx = __commonJS({
         var o = opts == null ? {} : opts;
         if (sheet == null || sheet["!ref"] == null) return "";
         var r = safe_decode_range(sheet["!ref"]);
-        var FS = o.FS !== void 0 ? o.FS : ",", fs3 = FS.charCodeAt(0);
+        var FS = o.FS !== void 0 ? o.FS : ",", fs4 = FS.charCodeAt(0);
         var RS = o.RS !== void 0 ? o.RS : "\n", rs = RS.charCodeAt(0);
         var endregex = new RegExp((FS == "|" ? "\\|" : FS) + "+$");
         var row = "", cols = [];
@@ -62923,7 +62923,7 @@ var require_xlsx = __commonJS({
         var w = 0;
         for (var R = r.s.r; R <= r.e.r; ++R) {
           if ((rowinfo[R] || {}).hidden) continue;
-          row = make_csv_row(sheet, r, R, cols, fs3, rs, FS, o);
+          row = make_csv_row(sheet, r, R, cols, fs4, rs, FS, o);
           if (row == null) {
             continue;
           }
@@ -63195,7 +63195,7 @@ var require_xlsx = __commonJS({
           return stream;
         }
         var r = safe_decode_range(sheet["!ref"]);
-        var FS = o.FS !== void 0 ? o.FS : ",", fs3 = FS.charCodeAt(0);
+        var FS = o.FS !== void 0 ? o.FS : ",", fs4 = FS.charCodeAt(0);
         var RS = o.RS !== void 0 ? o.RS : "\n", rs = RS.charCodeAt(0);
         var endregex = new RegExp((FS == "|" ? "\\|" : FS) + "+$");
         var row = "", cols = [];
@@ -63213,7 +63213,7 @@ var require_xlsx = __commonJS({
           while (R <= r.e.r) {
             ++R;
             if ((rowinfo[R - 1] || {}).hidden) continue;
-            row = make_csv_row(sheet, r, R - 1, cols, fs3, rs, FS, o);
+            row = make_csv_row(sheet, r, R - 1, cols, fs4, rs, FS, o);
             if (row != null) {
               if (o.strip) row = row.replace(endregex, "");
               if (row || o.blankrows !== false) return stream.push((w++ ? RS : "") + row);
@@ -66346,7 +66346,7 @@ var require_pend = __commonJS({
 // node_modules/fd-slicer/index.js
 var require_fd_slicer = __commonJS({
   "node_modules/fd-slicer/index.js"(exports2) {
-    var fs3 = require("fs");
+    var fs4 = require("fs");
     var util2 = require("util");
     var stream = require("stream");
     var Readable = stream.Readable;
@@ -66371,7 +66371,7 @@ var require_fd_slicer = __commonJS({
     FdSlicer.prototype.read = function(buffer2, offset, length, position, callback) {
       var self2 = this;
       self2.pend.go(function(cb2) {
-        fs3.read(self2.fd, buffer2, offset, length, position, function(err, bytesRead, buffer3) {
+        fs4.read(self2.fd, buffer2, offset, length, position, function(err, bytesRead, buffer3) {
           cb2();
           callback(err, bytesRead, buffer3);
         });
@@ -66380,7 +66380,7 @@ var require_fd_slicer = __commonJS({
     FdSlicer.prototype.write = function(buffer2, offset, length, position, callback) {
       var self2 = this;
       self2.pend.go(function(cb2) {
-        fs3.write(self2.fd, buffer2, offset, length, position, function(err, written, buffer3) {
+        fs4.write(self2.fd, buffer2, offset, length, position, function(err, written, buffer3) {
           cb2();
           callback(err, written, buffer3);
         });
@@ -66401,7 +66401,7 @@ var require_fd_slicer = __commonJS({
       if (self2.refCount > 0) return;
       if (self2.refCount < 0) throw new Error("invalid unref");
       if (self2.autoClose) {
-        fs3.close(self2.fd, onCloseDone);
+        fs4.close(self2.fd, onCloseDone);
       }
       function onCloseDone(err) {
         if (err) {
@@ -66438,7 +66438,7 @@ var require_fd_slicer = __commonJS({
       self2.context.pend.go(function(cb2) {
         if (self2.destroyed) return cb2();
         var buffer2 = new Buffer(toRead);
-        fs3.read(self2.context.fd, buffer2, 0, toRead, self2.pos, function(err, bytesRead) {
+        fs4.read(self2.context.fd, buffer2, 0, toRead, self2.pos, function(err, bytesRead) {
           if (err) {
             self2.destroy(err);
           } else if (bytesRead === 0) {
@@ -66485,7 +66485,7 @@ var require_fd_slicer = __commonJS({
       }
       self2.context.pend.go(function(cb2) {
         if (self2.destroyed) return cb2();
-        fs3.write(self2.context.fd, buffer2, 0, buffer2.length, self2.pos, function(err2, bytes) {
+        fs4.write(self2.context.fd, buffer2, 0, buffer2.length, self2.pos, function(err2, bytes) {
           if (err2) {
             self2.destroy();
             cb2();
@@ -66912,7 +66912,7 @@ var require_buffer_crc32 = __commonJS({
 // node_modules/yauzl/index.js
 var require_yauzl = __commonJS({
   "node_modules/yauzl/index.js"(exports2) {
-    var fs3 = require("fs");
+    var fs4 = require("fs");
     var zlib = require("zlib");
     var fd_slicer = require_fd_slicer();
     var crc32 = require_buffer_crc32();
@@ -66930,7 +66930,7 @@ var require_yauzl = __commonJS({
     exports2.ZipFile = ZipFile;
     exports2.Entry = Entry;
     exports2.RandomAccessReader = RandomAccessReader;
-    function open(path4, options, callback) {
+    function open(path5, options, callback) {
       if (typeof options === "function") {
         callback = options;
         options = null;
@@ -66942,10 +66942,10 @@ var require_yauzl = __commonJS({
       if (options.validateEntrySizes == null) options.validateEntrySizes = true;
       if (options.strictFileNames == null) options.strictFileNames = false;
       if (callback == null) callback = defaultCallback;
-      fs3.open(path4, "r", function(err, fd) {
+      fs4.open(path5, "r", function(err, fd) {
         if (err) return callback(err);
         fromFd(fd, options, function(err2, zipfile) {
-          if (err2) fs3.close(fd, defaultCallback);
+          if (err2) fs4.close(fd, defaultCallback);
           callback(err2, zipfile);
         });
       });
@@ -66962,7 +66962,7 @@ var require_yauzl = __commonJS({
       if (options.validateEntrySizes == null) options.validateEntrySizes = true;
       if (options.strictFileNames == null) options.strictFileNames = false;
       if (callback == null) callback = defaultCallback;
-      fs3.fstat(fd, function(err, stats) {
+      fs4.fstat(fd, function(err, stats) {
         if (err) return callback(err);
         var reader = fd_slicer.createFromFd(fd, { autoClose: true });
         fromRandomAccessReader(reader, stats.size, options, callback);
@@ -67569,7 +67569,7 @@ var require_buffer_reader = __commonJS({
 // node_modules/word-extractor/lib/file-reader.js
 var require_file_reader = __commonJS({
   "node_modules/word-extractor/lib/file-reader.js"(exports2, module2) {
-    var fs3 = require("fs");
+    var fs4 = require("fs");
     var FileReader2 = class _FileReader {
       /**
        * Creates a new file reader instance, using the given filename.
@@ -67586,7 +67586,7 @@ var require_file_reader = __commonJS({
        */
       open() {
         return new Promise((resolve, reject2) => {
-          fs3.open(this._filename, "r", 438, (err, fd) => {
+          fs4.open(this._filename, "r", 438, (err, fd) => {
             if (err) {
               return reject2(err);
             }
@@ -67603,7 +67603,7 @@ var require_file_reader = __commonJS({
       close() {
         return new Promise((resolve, reject2) => {
           if (this._fd) {
-            fs3.close(this._fd, (err) => {
+            fs4.close(this._fd, (err) => {
               if (err) {
                 return reject2(err);
               }
@@ -67630,7 +67630,7 @@ var require_file_reader = __commonJS({
           if (!this._fd) {
             return reject2(new Error("file not open"));
           }
-          fs3.read(this._fd, buffer2, offset, length, position, (err, bytesRead, buffer3) => {
+          fs4.read(this._fd, buffer2, offset, length, position, (err, bytesRead, buffer3) => {
             if (err) {
               return reject2(err);
             }
@@ -67661,7 +67661,7 @@ var require_file_reader = __commonJS({
 // node_modules/word-extractor/lib/open-office-extractor.js
 var require_open_office_extractor = __commonJS({
   "node_modules/word-extractor/lib/open-office-extractor.js"(exports2, module2) {
-    var path4 = require("path");
+    var path5 = require("path");
     var SAXES = require_saxes();
     var yauzl = require_yauzl();
     var BufferReader = require_buffer_reader();
@@ -67697,7 +67697,7 @@ var require_open_office_extractor = __commonJS({
         if (this._actions[filename]) {
           return true;
         }
-        const extension = path4.posix.extname(filename).replace(/^\./, "");
+        const extension = path5.posix.extname(filename).replace(/^\./, "");
         if (!extension) {
           return false;
         }
@@ -73028,32 +73028,32 @@ var require_URL = __commonJS({
           else
             return basepath.substring(0, lastslash + 1) + refpath;
         }
-        function remove_dot_segments(path4) {
-          if (!path4) return path4;
+        function remove_dot_segments(path5) {
+          if (!path5) return path5;
           var output = "";
-          while (path4.length > 0) {
-            if (path4 === "." || path4 === "..") {
-              path4 = "";
+          while (path5.length > 0) {
+            if (path5 === "." || path5 === "..") {
+              path5 = "";
               break;
             }
-            var twochars = path4.substring(0, 2);
-            var threechars = path4.substring(0, 3);
-            var fourchars = path4.substring(0, 4);
+            var twochars = path5.substring(0, 2);
+            var threechars = path5.substring(0, 3);
+            var fourchars = path5.substring(0, 4);
             if (threechars === "../") {
-              path4 = path4.substring(3);
+              path5 = path5.substring(3);
             } else if (twochars === "./") {
-              path4 = path4.substring(2);
+              path5 = path5.substring(2);
             } else if (threechars === "/./") {
-              path4 = "/" + path4.substring(3);
-            } else if (twochars === "/." && path4.length === 2) {
-              path4 = "/";
-            } else if (fourchars === "/../" || threechars === "/.." && path4.length === 3) {
-              path4 = "/" + path4.substring(4);
+              path5 = "/" + path5.substring(3);
+            } else if (twochars === "/." && path5.length === 2) {
+              path5 = "/";
+            } else if (fourchars === "/../" || threechars === "/.." && path5.length === 3) {
+              path5 = "/" + path5.substring(4);
               output = output.replace(/\/?[^\/]*$/, "");
             } else {
-              var segment = path4.match(/(\/?([^\/]*))/)[0];
+              var segment = path5.match(/(\/?([^\/]*))/)[0];
               output += segment;
-              path4 = path4.substring(segment.length);
+              path5 = path5.substring(segment.length);
             }
           }
           return output;
@@ -101813,8 +101813,8 @@ var File2 = class {
   }
 };
 var streamBrowserifyExports = requireStreamBrowserify();
-function commonjsRequire(path4) {
-  throw new Error('Could not dynamically require "' + path4 + '". Please configure the dynamicRequireTargets or/and ignoreDynamicRequires option of @rollup/plugin-commonjs appropriately for this require call to work.');
+function commonjsRequire(path5) {
+  throw new Error('Could not dynamically require "' + path5 + '". Please configure the dynamicRequireTargets or/and ignoreDynamicRequires option of @rollup/plugin-commonjs appropriately for this require call to work.');
 }
 var jszip_min = { exports: {} };
 var hasRequiredJszip_min;
@@ -105131,7 +105131,7 @@ async function convertImage(node) {
   }
   return new Paragraph({ text: "[\u56FE\u7247\u52A0\u8F7D\u5931\u8D25]" });
 }
-async function processExport(ids, targetDir) {
+async function processExport(ids, targetDir, format = "docx") {
   const errors = [];
   async function processItem(id, currentDir) {
     try {
@@ -105145,26 +105145,31 @@ async function processExport(ids, targetDir) {
         const allFiles = (await res.json()).data;
         const children = allFiles.filter((f) => f.parent_id === id);
         for (const child of children) {
-          await processItem(child.id, newDir);
+          await processItem(child.id, newDir, format);
         }
       } else {
-        const docChildren = [];
-        const lexicalNodes = parseLexicalState(file.content);
-        for (const node of lexicalNodes) {
-          const converted = await convertNode(node);
-          if (converted) {
-            if (Array.isArray(converted)) docChildren.push(...converted);
-            else docChildren.push(converted);
+        if (format === "markdown" || format === "md") {
+          const mdContent = convertToMarkdown(file.content);
+          import_fs.default.writeFileSync(import_path.default.join(currentDir, `${safeTitle}.md`), mdContent);
+        } else {
+          const docChildren = [];
+          const lexicalNodes = parseLexicalState(file.content);
+          for (const node of lexicalNodes) {
+            const converted = await convertNode(node);
+            if (converted) {
+              if (Array.isArray(converted)) docChildren.push(...converted);
+              else docChildren.push(converted);
+            }
           }
+          const doc = new File2({
+            sections: [{
+              properties: {},
+              children: docChildren
+            }]
+          });
+          const buffer2 = await Packer.toBuffer(doc);
+          import_fs.default.writeFileSync(import_path.default.join(currentDir, `${safeTitle}.docx`), buffer2);
         }
-        const doc = new File2({
-          sections: [{
-            properties: {},
-            children: docChildren
-          }]
-        });
-        const buffer2 = await Packer.toBuffer(doc);
-        import_fs.default.writeFileSync(import_path.default.join(currentDir, `${safeTitle}.docx`), buffer2);
       }
     } catch (e) {
       console.error(`Export ${id} failed`, e);
@@ -105172,9 +105177,131 @@ async function processExport(ids, targetDir) {
     }
   }
   for (const id of ids) {
-    await processItem(id, targetDir);
+    await processItem(id, targetDir, format);
   }
   return errors;
+}
+function convertToMarkdown(lexicalJSON) {
+  try {
+    const state2 = JSON.parse(lexicalJSON);
+    const root2 = state2.root || { children: [] };
+    return processLexicalRoot(root2);
+  } catch (e) {
+    return lexicalJSON;
+  }
+}
+function processLexicalRoot(root2) {
+  const lines = [];
+  for (const node of root2.children || []) {
+    processNodeToMarkdown(node, lines, 0);
+  }
+  return lines.join("\n");
+}
+function processNodeToMarkdown(node, lines, depth) {
+  if (!node || !node.type) return;
+  switch (node.type) {
+    case "paragraph":
+      const text = processInlineNodes(node.children || []);
+      if (text) {
+        lines.push(text);
+        lines.push("");
+      }
+      break;
+    case "heading":
+      const level = node.level || 1;
+      const headingText = processInlineNodes(node.children || []);
+      lines.push(`${"#".repeat(level)} ${headingText}`);
+      lines.push("");
+      break;
+    case "list":
+      const listType = node.listType === "number" ? "number" : "bullet";
+      processListItems(node.children || [], lines, listType, 0);
+      break;
+    case "quote":
+      const quoteText = processInlineNodes(node.children || []);
+      lines.push(`> ${quoteText}`);
+      lines.push("");
+      break;
+    case "code":
+      const codeText = processInlineNodes(node.children || []);
+      lines.push("```");
+      lines.push(codeText);
+      lines.push("```");
+      lines.push("");
+      break;
+    case "code-block":
+      const lang = node.language || "";
+      const blockText = processInlineNodes(node.children || []);
+      lines.push(`\`\`\`${lang}`);
+      lines.push(blockText);
+      lines.push("```");
+      lines.push("");
+      break;
+    case "table":
+      processTableToMarkdown(node, lines);
+      break;
+    default:
+      if (node.children) {
+        for (const child of node.children) {
+          processNodeToMarkdown(child, lines, depth + 1);
+        }
+      }
+  }
+}
+function processInlineNodes(children) {
+  if (!children || children.length === 0) return "";
+  let result2 = "";
+  for (const child of children) {
+    if (child.type === "text") {
+      let text = child.text || "";
+      const format = child.format || 0;
+      if (format & 16) text = `\`${text}\``;
+      else {
+        if (format & 8) text = `~~${text}~~`;
+        if (format & 2) text = `*${text}*`;
+        if (format & 1) text = `**${text}**`;
+      }
+      result2 += text;
+    } else if (child.type === "linebreak") {
+      result2 += "\n";
+    } else if (child.type === "link") {
+      const linkText = processInlineNodes(child.children || []);
+      result2 += `[${linkText}](${child.url || ""})`;
+    }
+  }
+  return result2;
+}
+function processListItems(items, lines, listType, indent) {
+  let counter = 1;
+  const prefix = "  ".repeat(indent);
+  for (const item of items) {
+    if (item.type === "listitem") {
+      const text = processInlineNodes(item.children || []);
+      const bullet = listType === "number" ? `${counter}.` : "-";
+      lines.push(`${prefix}${bullet} ${text}`);
+      counter++;
+      for (const child of item.children || []) {
+        if (child.type === "list") {
+          const nestedType = child.listType === "number" ? "number" : "bullet";
+          processListItems(child.children || [], lines, nestedType, indent + 1);
+        }
+      }
+    }
+  }
+}
+function processTableToMarkdown(node, lines) {
+  const rows = node.children || [];
+  if (rows.length === 0) return;
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const cells = row.children || [];
+    const cellTexts = cells.map((cell) => processInlineNodes(cell.children || []));
+    lines.push(`| ${cellTexts.join(" | ")} |`);
+    if (i === 0) {
+      lines.push(`| ${cells.map(() => "---").join(" | ")} |`);
+    }
+  }
+  lines.push("");
 }
 
 // electron/import.js
@@ -105266,6 +105393,54 @@ async function selectAndParseFiles() {
     }
   }
   return results;
+}
+
+// electron/backup.js
+var import_fs3 = __toESM(require("fs"), 1);
+var import_path3 = __toESM(require("path"), 1);
+async function handleBackup(backupDir) {
+  const dbPath = process.env.NOTEPAD_DB_PATH || getDefaultDBPath();
+  if (!import_fs3.default.existsSync(dbPath)) {
+    throw new Error("\u6570\u636E\u5E93\u6587\u4EF6\u4E0D\u5B58\u5728");
+  }
+  const timestamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-").slice(0, 19);
+  const backupPath = import_path3.default.join(backupDir, `backup-${timestamp}.db`);
+  import_fs3.default.copyFileSync(dbPath, backupPath);
+  return { success: true, path: backupPath };
+}
+async function handleRestore(backupFile) {
+  if (!import_fs3.default.existsSync(backupFile)) {
+    throw new Error("\u5907\u4EFD\u6587\u4EF6\u4E0D\u5B58\u5728");
+  }
+  const dbPath = process.env.NOTEPAD_DB_PATH || getDefaultDBPath();
+  const dbDir = import_path3.default.dirname(dbPath);
+  if (!import_fs3.default.existsSync(dbDir)) {
+    import_fs3.default.mkdirSync(dbDir, { recursive: true });
+  }
+  import_fs3.default.copyFileSync(backupFile, dbPath);
+  return { success: true };
+}
+async function listBackups(backupDir) {
+  if (!import_fs3.default.existsSync(backupDir)) {
+    return [];
+  }
+  const files = import_fs3.default.readdirSync(backupDir);
+  return files.filter((f) => f.startsWith("backup-") && f.endsWith(".db")).sort().reverse().map((f) => ({
+    name: f,
+    path: import_path3.default.join(backupDir, f),
+    size: import_fs3.default.statSync(import_path3.default.join(backupDir, f)).size,
+    date: new Date(f.replace("backup-", "").replace(".db", "").replace(/-/g, ":").replace(/T/, " ")).toISOString()
+  }));
+}
+function getDefaultDBPath() {
+  const home = process.env.HOME || process.env.USERPROFILE;
+  if (process.platform === "win32") {
+    return import_path3.default.join(home, "AppData", "Roaming", "Notepad", "notepad.db");
+  } else if (process.platform === "darwin") {
+    return import_path3.default.join(home, "Library", "Application Support", "Notepad", "notepad.db");
+  } else {
+    return import_path3.default.join(home, ".notepad", "notepad.db");
+  }
 }
 
 // electron/main.js
@@ -105394,9 +105569,9 @@ import_electron2.ipcMain.handle("dialog:openDirectory", async () => {
   const res = await import_electron2.dialog.showOpenDialog({ properties: ["openDirectory"] });
   return res.canceled ? "" : res.filePaths[0] || "";
 });
-import_electron2.ipcMain.handle("export:docx", async (event, { ids, targetDir }) => {
+import_electron2.ipcMain.handle("export:docx", async (event, { ids, targetDir, format = "docx" }) => {
   try {
-    const errors = await processExport(ids, targetDir);
+    const errors = await processExport(ids, targetDir, format);
     return { success: true, errors };
   } catch (e) {
     console.error(e);
@@ -105407,6 +105582,33 @@ import_electron2.ipcMain.handle("import:files", async () => {
   try {
     const results = await selectAndParseFiles();
     return { success: true, results };
+  } catch (e) {
+    console.error(e);
+    return { success: false, message: e.message };
+  }
+});
+import_electron2.ipcMain.handle("backup:create", async (event, { targetDir }) => {
+  try {
+    const result2 = await handleBackup(targetDir);
+    return result2;
+  } catch (e) {
+    console.error(e);
+    return { success: false, message: e.message };
+  }
+});
+import_electron2.ipcMain.handle("backup:restore", async (event, { backupFile }) => {
+  try {
+    const result2 = await handleRestore(backupFile);
+    return result2;
+  } catch (e) {
+    console.error(e);
+    return { success: false, message: e.message };
+  }
+});
+import_electron2.ipcMain.handle("backup:list", async (event, { backupDir }) => {
+  try {
+    const backups = await listBackups(backupDir);
+    return { success: true, backups };
   } catch (e) {
     console.error(e);
     return { success: false, message: e.message };

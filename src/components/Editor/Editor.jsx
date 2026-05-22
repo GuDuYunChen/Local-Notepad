@@ -24,6 +24,7 @@ import PasteImagePlugin from "./plugins/PasteImagePlugin";
 import TableSelectionPlugin from "./plugins/TableSelectionPlugin";
 import TableActionMenuPlugin from "./plugins/TableActionMenuPlugin";
 import CodeBlockPlugin from "./plugins/CodeBlockPlugin";
+import SearchPlugin from "./plugins/SearchPlugin";
 import { ImageNode } from "./nodes/ImageNode";
 import { VideoNode } from "./nodes/VideoNode";
 import { ImageGridNode } from "./nodes/ImageGridNode";
@@ -117,6 +118,7 @@ export default function Editor({ initialContent, onChange, readOnly }) {
     <LexicalComposer initialConfig={initialConfig}>
       <div className="editor-shell">
         <ToolbarPlugin />
+        <SearchPlugin />
         <PasteImagePlugin />
         <div className="editor-container">
           <RichTextPlugin

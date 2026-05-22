@@ -101,7 +101,45 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, "PingFang SC",
 .app-header .spacer { flex: 1 1 auto; }
 .app-main { flex: 1 1 0; overflow: hidden; padding: 0; position: relative; }
 .app-main.flex { display: flex; align-items: stretch; gap: 0; height: 100%; }
-.sidebar { flex: 0 0 var(--sidebar-w, 280px); min-width: 200px; max-width: 480px; border-right: 1px solid rgba(0,0,0,0.06); background: var(--panel); display: flex; flex-direction: column; height: 100%; overflow: hidden; transition: flex-basis .2s ease; }
+.sidebar {
+  flex: 0 0 var(--sidebar-w, 280px);
+  min-width: 40px;
+  max-width: 480px;
+  border-right: 1px solid rgba(0,0,0,0.06);
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  transition: flex-basis .2s ease, width .2s ease;
+  position: relative;
+}
+.sidebar.collapsed {
+  flex-basis: 40px;
+  min-width: 40px;
+}
+.sidebar-toggle-btn {
+  position: absolute;
+  bottom: 12px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--border-color);
+  background: var(--panel);
+  color: var(--muted);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  z-index: 10;
+}
+.sidebar-toggle-btn:hover {
+  background: var(--toolbar-btn-hover);
+  color: var(--fg);
+}
 .resizer { flex: 0 0 6px; cursor: col-resize; background: linear-gradient(to right, rgba(0,0,0,0.06), rgba(0,0,0,0.06)); z-index: 10; }
 .resizer:hover { background: linear-gradient(to right, var(--accent), var(--accent)); opacity: .3; }
 .content { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; height: 100%; overflow: hidden; }
@@ -122,6 +160,248 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, "PingFang SC",
 .empty-desc { font-size: 14px; margin-bottom: 24px; }
 .empty-actions { display: flex; gap: 12px; margin-bottom: 32px; }
 .empty-tips { font-size: 12px; line-height: 1.8; opacity: 0.7; }
+
+/* 快捷键面板 */
+.shortcuts-modal {
+  width: 520px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.modal-header .modal-title {
+  margin-bottom: 0;
+}
+.close-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  font-size: 20px;
+  cursor: pointer;
+  color: var(--muted);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.close-btn:hover {
+  background: var(--toolbar-btn-hover);
+}
+.shortcut-group {
+  margin-bottom: 20px;
+}
+.shortcut-category {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+.shortcut-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.shortcut-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+}
+.shortcut-key {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-family: monospace;
+  background: var(--toolbar-btn-hover);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--fg);
+}
+.shortcut-desc {
+  font-size: 13px;
+  color: var(--fg);
+  margin-left: 12px;
+}
+
+/* 头部按钮 */
+.header-btn {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+/* 标签选择器 */
+.tag-selector {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-right: 12px;
+}
+.tag-list {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.tag-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  font-size: 11px;
+  color: #fff;
+  border-radius: 3px;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.tag-badge:hover {
+  opacity: 0.8;
+}
+.tag-add-btn {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--muted);
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tag-add-btn:hover {
+  background: var(--toolbar-btn-hover);
+}
+.tag-dropdown {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  background: var(--panel);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  padding: 8px;
+  min-width: 180px;
+  z-index: 100;
+}
+.tag-options {
+  max-height: 200px;
+  overflow-y: auto;
+  margin-bottom: 8px;
+}
+.tag-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 13px;
+}
+.tag-option:hover {
+  background: var(--toolbar-btn-hover);
+}
+.tag-option.attached {
+  background: rgba(126,91,239,0.1);
+}
+.tag-color-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.tag-option-name {
+  flex: 1;
+}
+.tag-check {
+  color: var(--accent);
+  font-weight: 600;
+}
+.tag-create-btn {
+  width: 100%;
+  padding: 6px;
+  border: 1px dashed var(--border-color);
+  background: transparent;
+  color: var(--muted);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.tag-create-btn:hover {
+  background: var(--toolbar-btn-hover);
+  color: var(--fg);
+}
+.tag-create-form {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.tag-input {
+  flex: 1;
+  height: 28px;
+  padding: 0 8px;
+  font-size: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--fg);
+  outline: none;
+}
+.tag-input:focus {
+  border-color: var(--accent);
+}
+
+/* 备份面板 */
+.backup-modal {
+  width: 560px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+.backup-actions {
+  margin-bottom: 16px;
+}
+.backup-list {
+  margin-top: 16px;
+}
+.backup-items {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.backup-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  margin-bottom: 8px;
+  background: var(--bg);
+}
+.backup-item:hover {
+  background: var(--toolbar-btn-hover);
+}
+.backup-info {
+  flex: 1;
+  min-width: 0;
+}
+.backup-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fg);
+  margin-bottom: 4px;
+}
+.backup-meta {
+  font-size: 12px;
+  color: var(--muted);
+}
 .file-list { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
 .file-list .toolbar { flex: 0 0 auto; z-index: 2; border-bottom: 1px solid rgba(0,0,0,0.06); }
 .file-list .list { list-style: none; margin: 0; padding: 0; flex: 1 1 0; overflow-y: auto; }
@@ -253,7 +533,10 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, "PingFang SC",
   position: relative;
 }
 .list-item:hover {
-  background-color: rgba(0,0,0,0.02);
+  background-color: rgba(0,0,0,0.05);
+}
+[data-theme="dark"] .list-item:hover {
+  background-color: rgba(255,255,255,0.05);
 }
 .list-item.active {
   background-color: rgba(126, 91, 239, 0.08);
@@ -277,6 +560,13 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, "PingFang SC",
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.pin-icon {
+  font-size: 12px;
+  flex-shrink: 0;
 }
 .list-item.active .title {
   color: var(--accent);

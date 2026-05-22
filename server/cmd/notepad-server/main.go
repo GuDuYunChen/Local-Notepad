@@ -159,9 +159,11 @@ func main() {
 	fileAPI := &api.FileAPI{Svc: &service.FileService{DB: db}}
 	settingsAPI := &api.SettingsAPI{Svc: &service.SettingsService{DB: db}}
 	uploadAPI := &api.UploadAPI{}
+	tagAPI := &api.TagAPI{Svc: &service.TagService{DB: db}}
 	fileAPI.Register(group)
 	settingsAPI.Register(group)
 	uploadAPI.Register(group)
+	tagAPI.Register(group)
 
 	// 优雅退出：监听系统信号
 	quit := make(chan os.Signal, 1)
@@ -232,14 +234,26 @@ func migrate(ctx context.Context, db *sql.DB) error {
 	// 增量迁移：添加 is_folder 和 parent_id 字段
 	// 由于 SQLite 不支持 IF NOT EXISTS 的 ADD COLUMN，这里直接执行并忽略错误（主要是重复列错误）
 	alterStmts := []string{
-		"ALTER TABLE files ADD COLUMN is_folder INTEGER DEFAULT 0", // SQLite boolean is integer 0/1
+		"ALTER TABLE files ADD COLUMN is_folder INTEGER DEFAULT 0",
 		"ALTER TABLE files ADD COLUMN parent_id TEXT DEFAULT ''",
 		"ALTER TABLE files ADD COLUMN sort_order INTEGER DEFAULT 0",
 		"ALTER TABLE files ADD COLUMN is_deleted INTEGER DEFAULT 0",
 		"ALTER TABLE files ADD COLUMN deleted_at INTEGER DEFAULT 0",
+		"ALTER TABLE files ADD COLUMN is_pinned INTEGER DEFAULT 0",
 	}
 	for _, s := range alterStmts {
 		_, _ = db.ExecContext(ctx, s)
+	}
+
+	// 创建标签表
+	tagTables := []string{
+		`CREATE TABLE IF NOT EXISTS tags (id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, color TEXT DEFAULT '#7e5bef')`,
+		`CREATE TABLE IF NOT EXISTS file_tags (file_id TEXT NOT NULL, tag_id TEXT NOT NULL, PRIMARY KEY (file_id, tag_id), FOREIGN KEY (file_id) REFERENCES files(id), FOREIGN KEY (tag_id) REFERENCES tags(id))`,
+	}
+	for _, s := range tagTables {
+		if _, err := db.ExecContext(ctx, s); err != nil {
+			g.Log().Warning(ctx, "创建标签表失败:", err)
+		}
 	}
 
 	return nil
