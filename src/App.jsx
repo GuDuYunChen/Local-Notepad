@@ -32,6 +32,9 @@ export default function App() {
   const [dialog, setDialog] = useState(null)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [backupOpen, setBackupOpen] = useState(false)
+  const [focusMode, setFocusMode] = useState(() => {
+    return localStorage.getItem('focusMode') === 'true'
+  })
   // Check unsaved changes: compare current content with original content from database
   // Note: current.content holds the original content loaded from DB.
   // content holds the current editor content.
@@ -85,6 +88,14 @@ export default function App() {
         e.preventDefault()
         setShortcutsOpen(true)
       }
+      if (k === 'f11') {
+        e.preventDefault()
+        setFocusMode(prev => {
+          const next = !prev
+          localStorage.setItem('focusMode', String(next))
+          return next
+        })
+      }
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
@@ -109,10 +120,17 @@ export default function App() {
   }, [dragging])
 
   return (
-    <div className="app">
+    <div className={`app${focusMode ? ' focus-mode' : ''}`}>
       <header className="app-header">
         <h1>记事本</h1>
         <div className="spacer" />
+        <button className="btn header-btn" onClick={() => setFocusMode(prev => {
+          const next = !prev
+          localStorage.setItem('focusMode', String(next))
+          return next
+        })} title="专注模式 (F11)">
+          {focusMode ? '◧ 退出专注' : '◧ 专注模式'}
+        </button>
         <button className="btn header-btn" onClick={() => setBackupOpen(true)} title="备份与恢复">💾 备份</button>
         <button className="btn header-btn" onClick={() => setShortcutsOpen(true)} title="快捷键 (Ctrl+/)">⌨️ 快捷键</button>
         <ThemeToggle />
@@ -120,11 +138,13 @@ export default function App() {
       <main className="app-main flex" style={{ '--sidebar-w': `${sidebarW}px` }}>
         {ready ? (
           <>
-            <aside className={`sidebar${sidebarCollapsed ? ' collapsed' : ''}`} style={{ '--sidebar-w': `${sidebarW}px` }}>
-              {!sidebarCollapsed && (
-                <FileList
-                  selectedId={current?.id}
-                  updatedItem={current}
+            {!focusMode && (
+              <>
+                <aside className={`sidebar${sidebarCollapsed ? ' collapsed' : ''}`} style={{ '--sidebar-w': `${sidebarW}px` }}>
+                  {!sidebarCollapsed && (
+                    <FileList
+                      selectedId={current?.id}
+                      updatedItem={current}
                 onSelect={(f, options = {}) => {
                   // If switching to the same file, do nothing
                   if (current && f && f.id === current.id) return
@@ -192,7 +212,9 @@ export default function App() {
                 {sidebarCollapsed ? '▶' : '◀'}
               </button>
             </aside>
-            <div className="resizer" onMouseDown={() => setDragging(true)} />
+                <div className="resizer" onMouseDown={() => setDragging(true)} />
+              </>
+            )}
             <section className={`content${switching ? ' switching' : ''}`}>
               <TextEditor
                 ref={editorRef}
