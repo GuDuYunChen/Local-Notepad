@@ -25,6 +25,8 @@ import TableSelectionPlugin from "./plugins/TableSelectionPlugin";
 import TableActionMenuPlugin from "./plugins/TableActionMenuPlugin";
 import CodeBlockPlugin from "./plugins/CodeBlockPlugin";
 import SearchPlugin from "./plugins/SearchPlugin";
+import SlashMenuPlugin from "./plugins/SlashMenuPlugin";
+import BlockHandlePlugin from "./plugins/BlockHandlePlugin";
 import { ImageNode } from "./nodes/ImageNode";
 import { VideoNode } from "./nodes/VideoNode";
 import { ImageGridNode } from "./nodes/ImageGridNode";
@@ -133,6 +135,8 @@ export default function Editor({ initialContent, onChange, readOnly }) {
           <LinkPlugin />
           <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
           <CodeBlockPlugin />
+          <SlashMenuPlugin />
+          <BlockHandlePlugin />
           <OnChangePlugin onChange={onChange} />
           <LoadContentPlugin content={initialContent} />
           <TableSelectionPlugin />

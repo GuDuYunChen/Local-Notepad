@@ -201,6 +201,12 @@
   outline: none;
 }
 
+/* 块手柄容器 */
+.editor-container .block-handle {
+  position: absolute;
+  left: 8px;
+}
+
 .editor-placeholder {
   color: var(--muted);
   overflow: hidden;
