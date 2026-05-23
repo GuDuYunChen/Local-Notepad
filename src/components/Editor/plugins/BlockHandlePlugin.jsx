@@ -118,15 +118,6 @@ export default function BlockHandlePlugin() {
     }
   }, [editor, updatePosition])
 
-  const handleDragStart = (e) => {
-    e.dataTransfer.effectAllowed = 'move'
-    e.target.style.opacity = '0.5'
-  }
-
-  const handleDragEnd = (e) => {
-    e.target.style.opacity = '1'
-  }
-
   const convertBlock = (newType) => {
     editor.update(() => {
       const selection = $getSelection()
@@ -173,9 +164,7 @@ export default function BlockHandlePlugin() {
         className="block-handle"
         ref={handleRef}
         style={{ top: `${position.top}px`, left: `${position.left}px` }}
-        draggable
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
+        draggable="true"
         onClick={() => setShowMenu(!showMenu)}
         aria-label="块操作手柄"
       >

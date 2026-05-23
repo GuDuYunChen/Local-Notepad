@@ -22,6 +22,7 @@ import { mergeRegister, $getNearestBlockElementAncestorOrThrow } from '@lexical/
 import { compressImage, generateVideoMetadata, loadXLSX, uploadFile } from '../utils/fileUpload';
 import { TableNode, TableRowNode } from '@lexical/table'
 import TableMenu from './TableMenu'
+import './TextColorPlugin.css'
 
 const FontOptions = [
   { label: 'Arial', value: 'Arial' },
@@ -51,7 +52,32 @@ export default function ToolbarPlugin() {
   const [isItalic, setIsItalic] = useState(false);
   const [isUnderline, setIsUnderline] = useState(false);
   const [elementFormat, setElementFormat] = useState('left');
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [showHighlightPicker, setShowHighlightPicker] = useState(false);
   const fontSelectRef = useRef(null);
+  const colorPickerRef = useRef(null);
+
+  const TEXT_COLORS = [
+    { label: '默认', value: '' },
+    { label: '红色', value: '#ef4444' },
+    { label: '橙色', value: '#f97316' },
+    { label: '黄色', value: '#eab308' },
+    { label: '绿色', value: '#22c55e' },
+    { label: '蓝色', value: '#3b82f6' },
+    { label: '紫色', value: '#8b5cf6' },
+    { label: '粉色', value: '#ec4899' },
+  ];
+
+  const HIGHLIGHT_COLORS = [
+    { label: '无', value: '' },
+    { label: '红色', value: '#fee2e2' },
+    { label: '橙色', value: '#ffedd5' },
+    { label: '黄色', value: '#fef9c3' },
+    { label: '绿色', value: '#dcfce7' },
+    { label: '蓝色', value: '#dbeafe' },
+    { label: '紫色', value: '#f3e8ff' },
+    { label: '粉色', value: '#fce7f3' },
+  ];
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -63,6 +89,37 @@ export default function ToolbarPlugin() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (colorPickerRef.current && !colorPickerRef.current.contains(e.target)) {
+        setShowColorPicker(false);
+        setShowHighlightPicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const applyTextColor = (color) => {
+    editor.update(() => {
+      const selection = $getSelection();
+      if (!$isRangeSelection(selection)) return;
+      $patchStyleText(selection, { color });
+    });
+    setShowColorPicker(false);
+    editor.focus();
+  };
+
+  const applyHighlight = (color) => {
+    editor.update(() => {
+      const selection = $getSelection();
+      if (!$isRangeSelection(selection)) return;
+      $patchStyleText(selection, { 'background-color': color });
+    });
+    setShowHighlightPicker(false);
+    editor.focus();
+  };
 
   const handleFontChange = (e) => {
     const value = e.target.value;
@@ -277,6 +334,68 @@ export default function ToolbarPlugin() {
         <button onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'bold')} className={`btn fw-bold${isBold ? ' active' : ''}`}>B</button>
         <button onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'italic')} className={`btn fst-italic${isItalic ? ' active' : ''}`}>I</button>
         <button onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'underline')} className={`btn text-decoration-underline${isUnderline ? ' active' : ''}`}>U</button>
+        <div className="text-color-group" ref={colorPickerRef}>
+          <button
+            className="text-color-btn"
+            onClick={() => {
+              setShowColorPicker(!showColorPicker);
+              setShowHighlightPicker(false);
+            }}
+            title="文本颜色"
+            aria-label="文本颜色"
+          >
+            <span className="text-color-icon">A</span>
+          </button>
+          {showColorPicker && (
+            <div className="color-picker-dropdown" role="listbox" aria-label="文本颜色选择">
+              {TEXT_COLORS.map((color) => (
+                <button
+                  key={color.value || 'default'}
+                  className="color-option"
+                  onClick={() => applyTextColor(color.value)}
+                  title={color.label}
+                  aria-label={color.label}
+                >
+                  <span
+                    className="color-swatch"
+                    style={{ backgroundColor: color.value || 'transparent', border: !color.value ? '1px dashed var(--muted)' : 'none' }}
+                  />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="text-color-group">
+          <button
+            className="text-color-btn"
+            onClick={() => {
+              setShowHighlightPicker(!showHighlightPicker);
+              setShowColorPicker(false);
+            }}
+            title="文本高亮"
+            aria-label="文本高亮"
+          >
+            <span className="highlight-icon">🖍</span>
+          </button>
+          {showHighlightPicker && (
+            <div className="color-picker-dropdown" role="listbox" aria-label="高亮颜色选择">
+              {HIGHLIGHT_COLORS.map((color) => (
+                <button
+                  key={color.value || 'default'}
+                  className="color-option"
+                  onClick={() => applyHighlight(color.value)}
+                  title={color.label}
+                  aria-label={color.label}
+                >
+                  <span
+                    className="color-swatch"
+                    style={{ backgroundColor: color.value || 'transparent', border: !color.value ? '1px dashed var(--muted)' : 'none' }}
+                  />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
       <span className="divider" />
       <div className="toolbar-group">

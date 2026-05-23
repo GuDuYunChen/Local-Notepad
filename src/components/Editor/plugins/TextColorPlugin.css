@@ -1,0 +1,94 @@
+.text-color-toolbar {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.text-color-group {
+  position: relative;
+}
+
+.text-color-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.text-color-btn:hover {
+  background-color: var(--toolbar-btn-hover, rgba(0,0,0,0.04));
+  border-color: var(--border-color, rgba(0,0,0,0.12));
+}
+
+.text-color-icon {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--accent, #7e5bef);
+}
+
+.highlight-icon {
+  font-size: 16px;
+}
+
+.color-picker-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 100;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  padding: 10px;
+  background: var(--panel, #fff);
+  border: 1px solid var(--border-color, rgba(0,0,0,0.12));
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  animation: colorPickerFadeIn 0.15s ease;
+}
+
+@keyframes colorPickerFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.color-option {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: 1px solid var(--border-color, rgba(0,0,0,0.08));
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+
+.color-option:hover {
+  background-color: var(--toolbar-btn-hover, rgba(0,0,0,0.04));
+  transform: scale(1.1);
+}
+
+.color-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .color-picker-dropdown {
+    animation-duration: 0.01ms !important;
+  }
+}

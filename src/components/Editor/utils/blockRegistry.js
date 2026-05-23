@@ -7,6 +7,8 @@ import { $createImageNode } from '../nodes/ImageNode'
 import { $createTodoNode } from '../nodes/TodoNode'
 import { $createDividerNode } from '../nodes/DividerNode'
 import { $createCalloutNode } from '../nodes/CalloutNode'
+import { $createToggleNode } from '../nodes/ToggleNode'
+import { $createEmbedNode } from '../nodes/EmbedNode'
 
 export const INSERT_IMAGE_BLOCK_COMMAND = createCommand('insertImageBlockCommand')
 
@@ -24,6 +26,8 @@ export const BlockType = {
   DIVIDER: 'divider',
   CALLOUT: 'callout',
   TODO: 'todo',
+  TOGGLE: 'toggle',
+  EMBED: 'embed',
 }
 
 export const blockRegistry = [
@@ -201,6 +205,44 @@ export const blockRegistry = [
         const todoNode = $createTodoNode()
         const paragraph = $createParagraphNode()
         paragraph.append(todoNode)
+        const selection = editor.getSelection()
+        if (selection) {
+          selection.insertNodes([paragraph])
+        }
+      })
+    },
+  },
+  {
+    type: BlockType.TOGGLE,
+    label: '折叠块',
+    description: '可展开/折叠的内容块',
+    icon: '▶',
+    keywords: ['toggle', '折叠', 'collapse', 'expand'],
+    shortcut: '',
+    createNode: (editor) => {
+      editor.update(() => {
+        const toggleNode = $createToggleNode()
+        const paragraph = $createParagraphNode()
+        paragraph.append(toggleNode)
+        const selection = editor.getSelection()
+        if (selection) {
+          selection.insertNodes([paragraph])
+        }
+      })
+    },
+  },
+  {
+    type: BlockType.EMBED,
+    label: '嵌入内容',
+    description: '嵌入视频或外部内容',
+    icon: '📺',
+    keywords: ['embed', '嵌入', 'video', '视频', 'youtube', 'bilibili'],
+    shortcut: '',
+    createNode: (editor) => {
+      editor.update(() => {
+        const embedNode = $createEmbedNode()
+        const paragraph = $createParagraphNode()
+        paragraph.append(embedNode)
         const selection = editor.getSelection()
         if (selection) {
           selection.insertNodes([paragraph])

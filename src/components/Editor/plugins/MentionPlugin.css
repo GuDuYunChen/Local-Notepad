@@ -1,0 +1,73 @@
+.mention-menu {
+  position: fixed;
+  z-index: 1000;
+  background: var(--panel, #fff);
+  border: 1px solid var(--border-color, rgba(0,0,0,0.12));
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  padding: 8px 0;
+  min-width: 200px;
+  max-width: 280px;
+  max-height: 280px;
+  overflow-y: auto;
+  animation: mentionMenuFadeIn 0.15s ease;
+}
+
+@keyframes mentionMenuFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.mention-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.mention-menu-item:hover,
+.mention-menu-item.selected {
+  background-color: var(--toolbar-btn-hover, rgba(0,0,0,0.04));
+}
+
+.mention-menu-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: var(--accent, #7e5bef);
+  color: #fff;
+  border-radius: 50%;
+  font-size: 13px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.mention-menu-name {
+  font-size: 14px;
+  color: var(--fg, #1f2d3d);
+}
+
+.mention-node {
+  background: var(--toolbar-btn-hover, rgba(126,91,239,0.1));
+  color: var(--accent, #7e5bef);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mention-menu {
+    animation-duration: 0.01ms !important;
+  }
+}

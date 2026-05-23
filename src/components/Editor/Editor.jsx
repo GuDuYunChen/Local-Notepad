@@ -27,6 +27,8 @@ import CodeBlockPlugin from "./plugins/CodeBlockPlugin";
 import SearchPlugin from "./plugins/SearchPlugin";
 import SlashMenuPlugin from "./plugins/SlashMenuPlugin";
 import BlockHandlePlugin from "./plugins/BlockHandlePlugin";
+import MentionPlugin from "./plugins/MentionPlugin";
+import DragDropPlugin from "./plugins/DragDropPlugin";
 import { ImageNode } from "./nodes/ImageNode";
 import { VideoNode } from "./nodes/VideoNode";
 import { ImageGridNode } from "./nodes/ImageGridNode";
@@ -34,6 +36,10 @@ import { CodeBlockNode } from "./nodes/CodeBlockNode";
 import { TodoNode } from "./nodes/TodoNode";
 import { DividerNode } from "./nodes/DividerNode";
 import { CalloutNode } from "./nodes/CalloutNode";
+import { ToggleNode } from "./nodes/ToggleNode";
+import { EmbedNode } from "./nodes/EmbedNode";
+import { InlineCodeNode } from "./nodes/InlineCodeNode";
+import { MentionNode } from "./nodes/MentionNode";
 import './Editor.css';
 import './nodes/BlockNodes.css';
 
@@ -116,7 +122,9 @@ export default function Editor({ initialContent, onChange, readOnly }) {
       AutoLinkNode, LinkNode,
       ImageNode, VideoNode, ImageGridNode,
       CodeBlockNode,
-      TodoNode, DividerNode, CalloutNode
+      TodoNode, DividerNode, CalloutNode,
+      ToggleNode, EmbedNode,
+      InlineCodeNode, MentionNode
     ],
     editable: !readOnly,
   };
@@ -142,6 +150,8 @@ export default function Editor({ initialContent, onChange, readOnly }) {
           <CodeBlockPlugin />
           <SlashMenuPlugin />
           <BlockHandlePlugin />
+          <MentionPlugin />
+          <DragDropPlugin />
           <OnChangePlugin onChange={onChange} />
           <LoadContentPlugin content={initialContent} />
           <TableSelectionPlugin />
