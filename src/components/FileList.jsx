@@ -405,9 +405,6 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
         if (contextMenu) {
           setContextMenu(null)
         }
-        if (dropdownMenu) {
-          setDropdownMenu(null)
-        }
         if (showNewMenu) {
           setShowNewMenu(false)
         }
@@ -415,7 +412,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [items, contextMenu, dropdownMenu, showNewMenu]) // 依赖 items 只是为了确保最新状态，虽然这里主要是触发弹窗
+  }, [items, contextMenu, showNewMenu]) // 依赖 items 只是为了确保最新状态，虽然这里主要是触发弹窗
 
   useEffect(() => {
     if (!updatedItem) return
