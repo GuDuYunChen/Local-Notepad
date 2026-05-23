@@ -4,6 +4,9 @@ import { $createListNode, $createListItemNode } from '@lexical/list'
 import { $createCodeNode } from '@lexical/code'
 import { INSERT_TABLE_COMMAND } from '@lexical/table'
 import { $createImageNode } from '../nodes/ImageNode'
+import { $createTodoNode } from '../nodes/TodoNode'
+import { $createDividerNode } from '../nodes/DividerNode'
+import { $createCalloutNode } from '../nodes/CalloutNode'
 
 export const INSERT_IMAGE_BLOCK_COMMAND = createCommand('insertImageBlockCommand')
 
@@ -155,7 +158,17 @@ export const blockRegistry = [
     icon: '—',
     keywords: ['divider', '分割线', 'hr', 'horizontal'],
     shortcut: '---',
-    createNode: () => null,
+    createNode: (editor) => {
+      editor.update(() => {
+        const dividerNode = $createDividerNode()
+        const paragraph = $createParagraphNode()
+        paragraph.append(dividerNode)
+        const selection = editor.getSelection()
+        if (selection) {
+          selection.insertNodes([paragraph])
+        }
+      })
+    },
   },
   {
     type: BlockType.CALLOUT,
@@ -164,7 +177,17 @@ export const blockRegistry = [
     icon: '💡',
     keywords: ['callout', '提示', 'note', 'info'],
     shortcut: '',
-    createNode: () => null,
+    createNode: (editor) => {
+      editor.update(() => {
+        const calloutNode = $createCalloutNode()
+        const paragraph = $createParagraphNode()
+        paragraph.append(calloutNode)
+        const selection = editor.getSelection()
+        if (selection) {
+          selection.insertNodes([paragraph])
+        }
+      })
+    },
   },
   {
     type: BlockType.TODO,
@@ -173,7 +196,17 @@ export const blockRegistry = [
     icon: '☐',
     keywords: ['todo', 'checkbox', '待办', '任务'],
     shortcut: '- [ ]',
-    createNode: () => $createListItemNode(),
+    createNode: (editor) => {
+      editor.update(() => {
+        const todoNode = $createTodoNode()
+        const paragraph = $createParagraphNode()
+        paragraph.append(todoNode)
+        const selection = editor.getSelection()
+        if (selection) {
+          selection.insertNodes([paragraph])
+        }
+      })
+    },
   },
 ]
 

@@ -31,7 +31,11 @@ import { ImageNode } from "./nodes/ImageNode";
 import { VideoNode } from "./nodes/VideoNode";
 import { ImageGridNode } from "./nodes/ImageGridNode";
 import { CodeBlockNode } from "./nodes/CodeBlockNode";
+import { TodoNode } from "./nodes/TodoNode";
+import { DividerNode } from "./nodes/DividerNode";
+import { CalloutNode } from "./nodes/CalloutNode";
 import './Editor.css';
+import './nodes/BlockNodes.css';
 
 const theme = {
   paragraph: 'editor-paragraph',
@@ -111,7 +115,8 @@ export default function Editor({ initialContent, onChange, readOnly }) {
       TableNode, TableCellNode, TableRowNode,
       AutoLinkNode, LinkNode,
       ImageNode, VideoNode, ImageGridNode,
-      CodeBlockNode
+      CodeBlockNode,
+      TodoNode, DividerNode, CalloutNode
     ],
     editable: !readOnly,
   };

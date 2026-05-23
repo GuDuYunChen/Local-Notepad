@@ -32,9 +32,7 @@ export default function App() {
   const [dialog, setDialog] = useState(null)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [backupOpen, setBackupOpen] = useState(false)
-  const [focusMode, setFocusMode] = useState(() => {
-    return localStorage.getItem('focusMode') === 'true'
-  })
+  const [focusMode, setFocusMode] = useState(false)
   // Check unsaved changes: compare current content with original content from database
   // Note: current.content holds the original content loaded from DB.
   // content holds the current editor content.
@@ -90,11 +88,7 @@ export default function App() {
       }
       if (k === 'f11') {
         e.preventDefault()
-        setFocusMode(prev => {
-          const next = !prev
-          localStorage.setItem('focusMode', String(next))
-          return next
-        })
+        setFocusMode(prev => !prev)
       }
     }
     document.addEventListener('keydown', onKey)
