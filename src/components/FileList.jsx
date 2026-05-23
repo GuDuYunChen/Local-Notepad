@@ -99,7 +99,7 @@ const FileNode = ({
             onContextMenu={(e) => onContextMenu(e, node)}
             style={{ paddingLeft: `${12 + level * 16}px`, opacity: isDragging ? 0.5 : 1 }}
         >
-          <div className="icon">
+          <div className="icon" aria-hidden="true">
               {node.is_folder ? (
                   isExpanded ? '📂' : '📁'
               ) : (
@@ -119,8 +119,8 @@ const FileNode = ({
             </div>
           </div>
           <div className="actions">
-            <button className="action-btn" onClick={(e) => { e.stopPropagation(); onRename(node); }} title="重命名">✏️</button>
-            <button className="action-btn danger" onClick={(e) => { e.stopPropagation(); onDelete(node); }} title="删除">🗑️</button>
+            <button className="action-btn" onClick={(e) => { e.stopPropagation(); onRename(node); }} title="重命名" aria-label={`重命名 ${node.title}`}>✏️</button>
+            <button className="action-btn danger" onClick={(e) => { e.stopPropagation(); onDelete(node); }} title="删除" aria-label={`删除 ${node.title}`}>🗑️</button>
           </div>
         </li>
     )
@@ -1284,8 +1284,11 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
 
   function format(ts) {
     const d = new Date(ts * 1000)
-    const pad = (n) => String(n).padStart(2, '0')
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+    return new Intl.DateTimeFormat('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(d)
   }
 
   // 递归渲染树节点
@@ -1348,7 +1351,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
         <button className="btn danger" onClick={() => void onBatchDeleteCheck()}>批量删除</button>
         <div className="search-box">
           {/*<input className="input" placeholder="搜索..." value={q} onChange={e => setQ(e.target.value)} />*/}
-          <Input placeholder="搜索..." allowClear value={q} onChange={e => setQ(e.target.value)} onPressEnter={() => void load()} />
+          <Input placeholder="搜索…" allowClear value={q} onChange={e => setQ(e.target.value)} onPressEnter={() => void load()} aria-label="搜索文件" />
           <button className="btn" onClick={() => void load()}>🔍</button>
         </div>
       </div>
@@ -1512,7 +1515,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
           
           .tree-list .list-item .actions { display: none; gap: 4px; margin-left: 8px; }
           .tree-list .list-item:hover .actions { display: flex; }
-          .tree-list .action-btn { background: none; border: none; cursor: pointer; font-size: 12px; padding: 2px 4px; border-radius: 4px; opacity: 0.7; transition: all 0.2s; }
+          .tree-list .action-btn { background: none; border: none; cursor: pointer; font-size: 12px; padding: 2px 4px; border-radius: 4px; opacity: 0.7; transition: opacity 0.2s, background-color 0.2s, transform 0.2s; }
           .tree-list .action-btn:hover { background: rgba(0,0,0,0.1); opacity: 1; transform: scale(1.1); }
           .tree-list .action-btn.danger:hover { background: rgba(255,0,0,0.1); }
 

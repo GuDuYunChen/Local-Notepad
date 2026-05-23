@@ -190,7 +190,7 @@ function LanguageSelector({ value, onChange }) {
           <input
             type="text"
             className="language-selector-search"
-            placeholder="Search languages..."
+            placeholder="Search languages…"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             autoFocus

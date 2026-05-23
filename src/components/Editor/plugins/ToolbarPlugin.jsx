@@ -297,7 +297,7 @@ export default function ToolbarPlugin() {
         <label className="btn">视频<input type="file" accept="video/*" style={{display:'none'}} onChange={handleVideo} /></label>
         <label className="btn">Excel<input type="file" accept=".xlsx, .xls" style={{display:'none'}} onChange={handleExcel} /></label>
         <button className="btn" onClick={() => editor.dispatchCommand(INSERT_CODE_BLOCK_COMMAND)}>代码块</button>
-        {isUploading && <span style={{marginLeft: 10, fontSize: 12}}>上传/处理中...</span>}
+        {isUploading && <span style={{marginLeft: 10, fontSize: 12}}>上传/处理中…</span>}
       </div>
     </div>
   );

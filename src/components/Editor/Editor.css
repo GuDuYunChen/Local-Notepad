@@ -36,7 +36,7 @@
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
   margin-bottom: 8px;
   align-items: center;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .editor-toolbar .btn,
@@ -47,7 +47,7 @@
   height: 36px;
   min-width: 36px;
   padding: 0 12px;
-  gap: 4px; /* Space between potential icon and text */
+  gap: 4px;
   background-color: var(--toolbar-btn-bg);
   border: 1px solid transparent;
   border-radius: 4px;
@@ -55,7 +55,7 @@
   font-size: 0.9rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
   user-select: none;
   text-decoration: none;
   line-height: 1.5;
@@ -195,6 +195,10 @@
   caret-color: var(--text-color);
   max-width: 800px;
   margin: 0 auto;
+}
+
+.editor-input:focus-visible {
+  outline: none;
 }
 
 .editor-placeholder {
@@ -524,7 +528,7 @@
   text-transform: uppercase;
   letter-spacing: 0.5px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
 .language-selector-button:hover {
@@ -682,7 +686,7 @@
   background: var(--panel);
   color: var(--fg);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 .search-btn:hover:not(:disabled) {
   background: var(--toolbar-btn-hover);

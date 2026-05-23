@@ -140,7 +140,7 @@ export default function SearchPlugin() {
         <input
           ref={inputRef}
           className="search-input"
-          placeholder="搜索..."
+          placeholder="搜索…"
           value={searchText}
           onChange={e => setSearchText(e.target.value)}
         />
@@ -154,7 +154,7 @@ export default function SearchPlugin() {
       <div className="search-row">
         <input
           className="search-input"
-          placeholder="替换..."
+          placeholder="替换…"
           value={replaceText}
           onChange={e => setReplaceText(e.target.value)}
         />

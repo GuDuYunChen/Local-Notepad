@@ -125,16 +125,16 @@ export default function App() {
         <h1>记事本</h1>
         <div className="spacer" />
         {!focusMode && (
-          <button className="btn header-btn" onClick={() => setFocusMode(true)} title="专注模式 (F11)">
+          <button className="btn header-btn" onClick={() => setFocusMode(true)} title="专注模式 (F11)" aria-label="进入专注模式">
             ◧ 专注模式
           </button>
         )}
-        <button className="btn header-btn" onClick={() => setBackupOpen(true)} title="备份与恢复">💾 备份</button>
-        <button className="btn header-btn" onClick={() => setShortcutsOpen(true)} title="快捷键 (Ctrl+/)">⌨️ 快捷键</button>
+        <button className="btn header-btn" onClick={() => setBackupOpen(true)} title="备份与恢复" aria-label="备份与恢复">💾 备份</button>
+        <button className="btn header-btn" onClick={() => setShortcutsOpen(true)} title="快捷键 (Ctrl+/)" aria-label="快捷键面板">⌨️ 快捷键</button>
         <ThemeToggle />
       </header>
       {focusMode && (
-        <button className="focus-exit-floating" onClick={() => setFocusMode(false)} title="退出专注模式 (F11)">
+        <button className="focus-exit-floating" onClick={() => setFocusMode(false)} title="退出专注模式 (F11)" aria-label="退出专注模式">
           ✕ 退出专注
         </button>
       )}
@@ -211,7 +211,7 @@ export default function App() {
                   localStorage.setItem('sidebarCollapsed', String(next))
                   return next
                 })
-              }} title={sidebarCollapsed ? '展开侧边栏' : '折叠侧边栏'}>
+              }} title={sidebarCollapsed ? '展开侧边栏' : '折叠侧边栏'} aria-label={sidebarCollapsed ? '展开侧边栏' : '折叠侧边栏'}>
                 {sidebarCollapsed ? '▶' : '◀'}
               </button>
             </aside>

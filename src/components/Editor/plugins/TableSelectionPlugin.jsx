@@ -180,7 +180,7 @@ export default function TableSelectionPlugin() {
       
       m.appendChild(make('按首列升序', () => sortByFirstCol('asc')))
       m.appendChild(make('按首列降序', () => sortByFirstCol('desc')))
-      m.appendChild(make('筛选文本...', () => { const q = window.prompt('筛选包含文本：'); if (q) filterRowsContains(q) }))
+      m.appendChild(make('筛选文本…', () => { const q = window.prompt('筛选包含文本：'); if (q) filterRowsContains(q) }))
       m.appendChild(make('分页(10行)', () => paginateRows(10)))
 
       document.body.appendChild(m)

@@ -86,16 +86,27 @@
   --sb-thumb: rgba(255,255,255,0.25);
   --sb-thumb-hover: rgba(255,255,255,0.35);
   --sb-track: transparent;
+  color-scheme: dark;
 }
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; }
-body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--fg); overflow: hidden; }
+body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif; background: var(--bg); color: var(--fg); overflow: hidden; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 
 /* 主题切换全局过渡 */
 *, *::before, *::after {
   transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
 }
-.app { display: flex; flex-direction: column; height: 100%; }
+
+/* 减少动画偏好设置 */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+.app { display: flex; flex-direction: column; height: 100%; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
 .app-header { height: 48px; flex: 0 0 48px; display: flex; align-items: center; padding: 0 16px; background: linear-gradient(90deg, var(--accent) 0%, var(--accent2) 100%); color: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
 .app-header h1 { font-size: 18px; font-weight: 600; margin: 0; }
 .app-header .spacer { flex: 1; }
@@ -130,7 +141,7 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, "PingFang SC",
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, transform 0.2s ease;
   backdrop-filter: blur(4px);
 }
 .focus-exit-floating:hover {
@@ -205,7 +216,7 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, "PingFang SC",
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.15s ease;
+  transition: background-color 0.15s ease, color 0.15s ease;
   z-index: 10;
 }
 .sidebar-toggle-btn:hover {
@@ -543,7 +554,7 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, "PingFang SC",
   border: 1px solid rgba(0,0,0,0.12); border-radius: 6px;
   background: var(--panel); color: var(--fg);
   cursor: pointer; user-select: none;
-  transition: all .15s ease;
+  transition: background-color .15s ease, border-color .15s ease, transform .15s ease, box-shadow .15s ease;
   white-space: nowrap;
 }
 .btn:hover { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.2); }
@@ -625,7 +636,7 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, "PingFang SC",
   padding: 12px 16px;
   border-bottom: 1px solid rgba(0,0,0,0.04);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
   position: relative;
 }
 .list-item:hover {

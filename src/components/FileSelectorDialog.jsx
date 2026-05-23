@@ -28,7 +28,7 @@ export default function FileSelectorDialog({
     onConfirm, 
     title = '选择内容', 
     confirmText = '确定', 
-    processingText = '处理中...', 
+    processingText = '处理中…', 
     showDeleteWarning = false, 
     selectedFileId = null, 
     initialSelectedIds = [],

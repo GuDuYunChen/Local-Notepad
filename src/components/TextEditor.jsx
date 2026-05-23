@@ -176,8 +176,15 @@ function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved,
   const formatFull = (ts) => {
     if (!ts) return ''
     const d = new Date(ts)
-    const pad = (n) => String(n).padStart(2, '0')
-    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+    return new Intl.DateTimeFormat('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    }).format(d)
   }
 
   const scheduleCache = () => {

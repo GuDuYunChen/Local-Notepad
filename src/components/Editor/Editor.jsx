@@ -51,7 +51,7 @@ const theme = {
 };
 
 function Placeholder() {
-  return <div className="editor-placeholder">开始输入...</div>;
+  return <div className="editor-placeholder">开始输入…</div>;
 }
 
 function OnChangePlugin({ onChange }) {

@@ -87,7 +87,7 @@ export default function BackupPanel({ open, onClose }) {
           </div>
           <div className="backup-list">
             {loading ? (
-              <div className="placeholder">加载中...</div>
+              <div className="placeholder">加载中…</div>
             ) : backups.length === 0 ? (
               <div className="empty-state">
                 <div className="empty-icon">💾</div>

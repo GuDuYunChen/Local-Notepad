@@ -14,9 +14,9 @@ export default function ConfirmDialog({ title, message, actions, onClose }) {
   const isAnyLoading = actions.some(a => a.loading);
 
   return (
-    <div className="modal-overlay" role="dialog" aria-modal="true">
+    <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-title">
       <div className="modal">
-        <div className="modal-title">{title}</div>
+        <div className="modal-title" id="modal-title">{title}</div>
         <div className="modal-message">{message}</div>
         <div className="modal-actions">
           {actions.map((a, idx) => (
