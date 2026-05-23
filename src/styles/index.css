@@ -119,6 +119,40 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, "PingFang SC",
   margin: 0 auto;
   width: 100%;
 }
+
+/* 拖拽覆盖层 */
+.drag-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(126, 91, 239, 0.1);
+  backdrop-filter: blur(2px);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  animation: fadeIn 0.2s ease;
+}
+.drag-overlay-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 32px 48px;
+  background: var(--panel);
+  border: 2px dashed var(--accent);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(126, 91, 239, 0.2);
+}
+.drag-icon {
+  font-size: 48px;
+  opacity: 0.8;
+}
+.drag-text {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--accent);
+}
 .app-main { flex: 1 1 0; overflow: hidden; padding: 0; position: relative; }
 .app-main.flex { display: flex; align-items: stretch; gap: 0; height: 100%; }
 .sidebar {
@@ -376,6 +410,30 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, "PingFang SC",
 }
 .tag-input:focus {
   border-color: var(--accent);
+}
+
+/* 保存按钮 */
+.save-btn {
+  margin-left: 10px;
+}
+.save-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* Spinner */
+.spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  margin-right: 4px;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 /* 备份面板 */

@@ -18,6 +18,7 @@ function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved,
   const [selMode, setSelMode] = useState(false)
   const [wordCount, setWordCount] = useState(0)
   const [fileTags, setFileTags] = useState([])
+  const [dragOver, setDragOver] = useState(false)
   const statusRef = useRef(null)
   const [editorContent, setEditorContent] = useState('')
 
@@ -207,7 +208,24 @@ function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved,
   }
 
   return (
-    <div className={switching ? 'content switching' : 'content'} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div 
+      className={switching ? 'content switching' : 'content'} 
+      style={{ display: 'flex', flexDirection: 'column', height: '100%' }}
+      onDragOver={(e) => {
+        e.preventDefault()
+        setDragOver(true)
+      }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={() => setDragOver(false)}
+    >
+      {dragOver && (
+        <div className="drag-overlay">
+          <div className="drag-overlay-content">
+            <div className="drag-icon">📄</div>
+            <div className="drag-text">释放以导入文件</div>
+          </div>
+        </div>
+      )}
       {!activeId ? (
         <div className="placeholder">请选择文件以开始编辑</div>
       ) : loading ? (
@@ -224,7 +242,13 @@ function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved,
                {activeId && <TagSelector fileId={activeId} tags={fileTags} onChange={setFileTags} />}
                <span>字数：{wordCount}</span>
                <span style={{ marginLeft: 10 }}>选择模式：{selMode ? '开' : '关'}</span>
-               <button style={{marginLeft: 10}} onClick={() => saveNow('manual')} disabled={saving}>{saving ? '...' : '立即保存'}</button>
+               <button className="btn small save-btn" onClick={() => saveNow('manual')} disabled={saving}>
+                 {saving ? (
+                   <>
+                     <span className="spinner" /> 保存中…
+                   </>
+                 ) : '立即保存'}
+               </button>
              </span>
            </div>
         </>

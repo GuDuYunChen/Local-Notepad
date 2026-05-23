@@ -401,10 +401,21 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
            onNewFileCheck()
         }
       }
+      if (e.key === 'Escape') {
+        if (contextMenu) {
+          setContextMenu(null)
+        }
+        if (dropdownMenu) {
+          setDropdownMenu(null)
+        }
+        if (showNewMenu) {
+          setShowNewMenu(false)
+        }
+      }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [items]) // 依赖 items 只是为了确保最新状态，虽然这里主要是触发弹窗
+  }, [items, contextMenu, dropdownMenu, showNewMenu]) // 依赖 items 只是为了确保最新状态，虽然这里主要是触发弹窗
 
   useEffect(() => {
     if (!updatedItem) return
@@ -1509,10 +1520,22 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
           .tree-list .action-btn.danger:hover { background: rgba(255,0,0,0.1); }
 
           /* Drag Styles */
-          .tree-list .list-item.dragging { opacity: 0.5; background: #f0f0f0; }
-          .tree-list .list-item.drag-inside { background: rgba(126, 91, 239, 0.2); border: 1px dashed var(--accent); }
-          .tree-list .list-item.drag-before { border-top: 2px solid var(--accent); }
-          .tree-list .list-item.drag-after { border-bottom: 2px solid var(--accent); }
+          .tree-list .list-item.dragging { opacity: 0.4; background: rgba(126, 91, 239, 0.05); }
+          .tree-list .list-item.drag-inside { background: rgba(126, 91, 239, 0.15); border: 2px dashed var(--accent); border-radius: 4px; }
+          .tree-list .list-item.drag-before { border-top: 3px solid var(--accent); margin-top: -1px; }
+          .tree-list .list-item.drag-after { border-bottom: 3px solid var(--accent); margin-bottom: -1px; }
+          .tree-list .list-item.drag-before::before,
+          .tree-list .list-item.drag-after::after {
+              content: '';
+              position: absolute;
+              left: 0;
+              right: 0;
+              height: 3px;
+              background: var(--accent);
+              box-shadow: 0 0 8px rgba(126, 91, 239, 0.4);
+          }
+          .tree-list .list-item.drag-before::before { top: -3px; }
+          .tree-list .list-item.drag-after::after { bottom: -3px; }
 
           .dropdown-menu, .context-menu {
               background: var(--panel);

@@ -193,6 +193,8 @@
   outline: 0;
   padding: 10px;
   caret-color: var(--text-color);
+  max-width: 800px;
+  margin: 0 auto;
 }
 
 .editor-placeholder {
