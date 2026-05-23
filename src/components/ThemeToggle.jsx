@@ -34,7 +34,7 @@ export default function ThemeToggle() {
   }
 
   return (
-    <button className="btn" onClick={toggle} aria-label="切换主题">
+    <button className="btn theme-toggle" onClick={toggle} aria-label="切换主题">
       {theme === 'light' ? '夜间模式' : '日间模式'}
     </button>
   )

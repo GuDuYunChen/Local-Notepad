@@ -124,17 +124,20 @@ export default function App() {
       <header className="app-header">
         <h1>记事本</h1>
         <div className="spacer" />
-        <button className="btn header-btn" onClick={() => setFocusMode(prev => {
-          const next = !prev
-          localStorage.setItem('focusMode', String(next))
-          return next
-        })} title="专注模式 (F11)">
-          {focusMode ? '◧ 退出专注' : '◧ 专注模式'}
-        </button>
+        {!focusMode && (
+          <button className="btn header-btn" onClick={() => setFocusMode(true)} title="专注模式 (F11)">
+            ◧ 专注模式
+          </button>
+        )}
         <button className="btn header-btn" onClick={() => setBackupOpen(true)} title="备份与恢复">💾 备份</button>
         <button className="btn header-btn" onClick={() => setShortcutsOpen(true)} title="快捷键 (Ctrl+/)">⌨️ 快捷键</button>
         <ThemeToggle />
       </header>
+      {focusMode && (
+        <button className="focus-exit-floating" onClick={() => setFocusMode(false)} title="退出专注模式 (F11)">
+          ✕ 退出专注
+        </button>
+      )}
       <main className="app-main flex" style={{ '--sidebar-w': `${sidebarW}px` }}>
         {ready ? (
           <>
