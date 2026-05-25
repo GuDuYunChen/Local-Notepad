@@ -105435,11 +105435,11 @@ async function listBackups(backupDir) {
 function getDefaultDBPath() {
   const home = process.env.HOME || process.env.USERPROFILE;
   if (process.platform === "win32") {
-    return import_path3.default.join(home, "AppData", "Roaming", "Notepad", "notepad.db");
+    return import_path3.default.join(home, "AppData", "Roaming", "Notepad", "data.db");
   } else if (process.platform === "darwin") {
-    return import_path3.default.join(home, "Library", "Application Support", "Notepad", "notepad.db");
+    return import_path3.default.join(home, "Library", "Application Support", "Notepad", "data.db");
   } else {
-    return import_path3.default.join(home, ".notepad", "notepad.db");
+    return import_path3.default.join(home, ".notepad", "data.db");
   }
 }
 

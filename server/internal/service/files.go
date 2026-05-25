@@ -210,10 +210,7 @@ func (s *FileService) List(ctx context.Context, q string, page, size int) ([]*mo
 		size = 20
 	}
 	offset := (page - 1) * size
-	// 注意：SQLite boolean true is 1. ORDER BY is_folder DESC means folders first.
-	// 需求调整：支持文件夹和文件混合排序，因此移除 is_folder DESC
-	// 按 is_pinned DESC, sort_order DESC 排序
-	query := `SELECT id, title, content, created_at, updated_at, is_folder, parent_id, sort_order, is_deleted, deleted_at, is_pinned FROM files WHERE is_deleted = 0 AND (title LIKE ? OR content LIKE ?) ORDER BY is_pinned DESC, sort_order DESC LIMIT ? OFFSET ?`
+	query := `SELECT id, title, created_at, updated_at, is_folder, parent_id, sort_order, is_deleted, deleted_at, is_pinned FROM files WHERE is_deleted = 0 AND (title LIKE ? OR content LIKE ?) ORDER BY is_pinned DESC, sort_order DESC LIMIT ? OFFSET ?`
 	rows, err := s.DB.QueryContext(ctx, query, "%"+q+"%", "%"+q+"%", size, offset)
 	if err != nil {
 		return nil, fmt.Errorf("查询文件失败: %w", err)
@@ -222,7 +219,7 @@ func (s *FileService) List(ctx context.Context, q string, page, size int) ([]*mo
 	var out []*model.File
 	for rows.Next() {
 		var f model.File
-		if err := rows.Scan(&f.ID, &f.Title, &f.Content, &f.CreatedAt, &f.UpdatedAt, &f.IsFolder, &f.ParentID, &f.SortOrder, &f.IsDeleted, &f.DeletedAt, &f.IsPinned); err != nil {
+		if err := rows.Scan(&f.ID, &f.Title, &f.CreatedAt, &f.UpdatedAt, &f.IsFolder, &f.ParentID, &f.SortOrder, &f.IsDeleted, &f.DeletedAt, &f.IsPinned); err != nil {
 			return nil, fmt.Errorf("解析文件失败: %w", err)
 		}
 		out = append(out, &f)
@@ -502,7 +499,7 @@ func (s *FileService) ImportPath(ctx context.Context, path string, encoding stri
 
 // GetChildren gets immediate children of a folder
 func (s *FileService) GetChildren(ctx context.Context, parentID string) ([]*model.File, error) {
-	rows, err := s.DB.QueryContext(ctx, `SELECT id, title, content, created_at, updated_at, is_folder, parent_id, sort_order, is_deleted, deleted_at, is_pinned FROM files WHERE parent_id = ? AND is_deleted = 0`, parentID)
+	rows, err := s.DB.QueryContext(ctx, `SELECT id, title, created_at, updated_at, is_folder, parent_id, sort_order, is_deleted, deleted_at, is_pinned FROM files WHERE parent_id = ? AND is_deleted = 0`, parentID)
 	if err != nil {
 		return nil, err
 	}
@@ -511,7 +508,7 @@ func (s *FileService) GetChildren(ctx context.Context, parentID string) ([]*mode
 	var out []*model.File
 	for rows.Next() {
 		var f model.File
-		if err := rows.Scan(&f.ID, &f.Title, &f.Content, &f.CreatedAt, &f.UpdatedAt, &f.IsFolder, &f.ParentID, &f.SortOrder, &f.IsDeleted, &f.DeletedAt, &f.IsPinned); err != nil {
+		if err := rows.Scan(&f.ID, &f.Title, &f.CreatedAt, &f.UpdatedAt, &f.IsFolder, &f.ParentID, &f.SortOrder, &f.IsDeleted, &f.DeletedAt, &f.IsPinned); err != nil {
 			return nil, err
 		}
 		out = append(out, &f)

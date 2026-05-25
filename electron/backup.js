@@ -52,10 +52,10 @@ export async function listBackups(backupDir) {
 function getDefaultDBPath() {
   const home = process.env.HOME || process.env.USERPROFILE
   if (process.platform === 'win32') {
-    return path.join(home, 'AppData', 'Roaming', 'Notepad', 'notepad.db')
+    return path.join(home, 'AppData', 'Roaming', 'Notepad', 'data.db')
   } else if (process.platform === 'darwin') {
-    return path.join(home, 'Library', 'Application Support', 'Notepad', 'notepad.db')
+    return path.join(home, 'Library', 'Application Support', 'Notepad', 'data.db')
   } else {
-    return path.join(home, '.notepad', 'notepad.db')
+    return path.join(home, '.notepad', 'data.db')
   }
 }

@@ -1159,12 +1159,24 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
 
     if (pos === 'inside') {
         newParentId = target.id
-        newSortOrder = Date.now() / 1000 + 1000
+        const siblings = items.filter(i => i.parent_id === target.id)
+        newSortOrder = siblings.length > 0 
+          ? Math.max(...siblings.map(s => s.sort_order || 0)) + 1000 
+          : Date.now() / 1000
         setExpanded(prev => new Set([...prev, target.id]))
     } else {
         newParentId = target.parent_id
-        const baseOrder = target.sort_order || 0
-        newSortOrder = pos === 'before' ? baseOrder + 1 : baseOrder - 1
+        const siblings = items.filter(i => i.parent_id === target.parent_id)
+        const targetIndex = siblings.findIndex(s => s.id === target.id)
+        if (pos === 'before' && targetIndex > 0) {
+          const prevSibling = siblings[targetIndex - 1]
+          newSortOrder = (prevSibling.sort_order + target.sort_order) / 2
+        } else if (pos === 'after' && targetIndex < siblings.length - 1) {
+          const nextSibling = siblings[targetIndex + 1]
+          newSortOrder = (target.sort_order + nextSibling.sort_order) / 2
+        } else {
+          newSortOrder = pos === 'before' ? target.sort_order + 1000 : target.sort_order - 1000
+        }
     }
 
     try {
@@ -1194,7 +1206,10 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
   async function handleMoveToRoot(dragged) {
       if (dragged.parent_id === '') return
       
-      const newSortOrder = Date.now() / 1000 + 1000
+      const siblings = items.filter(i => i.parent_id === '')
+      const newSortOrder = siblings.length > 0 
+        ? Math.max(...siblings.map(s => s.sort_order || 0)) + 1000 
+        : Date.now() / 1000
       
       try {
           await api(`/api/files/${dragged.id}`, {

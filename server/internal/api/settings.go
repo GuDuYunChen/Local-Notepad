@@ -17,15 +17,14 @@ func (a *SettingsAPI) Register(group *ghttp.RouterGroup) {
 // 获取设置
 func (a *SettingsAPI) Get(r *ghttp.Request) {
     s, err := a.Svc.Get(r.GetCtx())
-    if err != nil { writeErr(r, 2001, "读取设置失败", err); return }
+    if err != nil { writeErr(r, 3001, "读取设置失败", err); return }
     writeOK(r, s)
 }
 
-// 更新设置
 func (a *SettingsAPI) Update(r *ghttp.Request) {
     var in model.Settings
-    if err := r.Parse(&in); err != nil { writeErr(r, 2002, "参数错误", err); return }
+    if err := r.Parse(&in); err != nil { writeErr(r, 3002, "参数错误", err); return }
     s, err := a.Svc.Update(r.GetCtx(), &in)
-    if err != nil { writeErr(r, 2003, "更新设置失败", err); return }
+    if err != nil { writeErr(r, 3003, "更新设置失败", err); return }
     writeOK(r, s)
 }

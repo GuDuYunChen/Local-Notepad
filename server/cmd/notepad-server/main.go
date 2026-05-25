@@ -14,9 +14,10 @@ import (
 	"syscall"
 	"time"
 
-	"notepad-server/internal/api"
+	"notepad-server/internal/controller"
+	"notepad-server/internal/dao"
+	"notepad-server/internal/logic"
 	"notepad-server/internal/middleware"
-	"notepad-server/internal/service"
 
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
@@ -70,13 +71,13 @@ func main() {
 
 	// 启动定时任务
 	go func() {
-		// 备份定时器：每8小时执行一次
 		backupTicker := time.NewTicker(8 * time.Hour)
 		defer backupTicker.Stop()
 		
-		// 清理定时器：每24小时执行一次
 		cleanupTicker := time.NewTicker(24 * time.Hour)
 		defer cleanupTicker.Stop()
+		
+		fileLogic := &logic.FileLogic{FileDAO: &dao.FileDAO{DB: db}}
 		
 		for {
 			select {
@@ -84,7 +85,7 @@ func main() {
 				g.Log().Info(ctx, "开始执行定时备份...")
 				performBackup(ctx, db, dbPath)
 			case <-cleanupTicker.C:
-				if err := (&service.FileService{DB: db}).CleanupOldDeleted(ctx); err != nil {
+				if err := fileLogic.CleanupOldDeleted(ctx); err != nil {
 					g.Log().Error(ctx, "自动清理失败:", err)
 				} else {
 					g.Log().Info(ctx, "自动清理完成")
@@ -156,14 +157,25 @@ func main() {
 
 	// 注册业务路由
 	group := s.Group("/api")
-	fileAPI := &api.FileAPI{Svc: &service.FileService{DB: db}}
-	settingsAPI := &api.SettingsAPI{Svc: &service.SettingsService{DB: db}}
-	uploadAPI := &api.UploadAPI{}
-	tagAPI := &api.TagAPI{Svc: &service.TagService{DB: db}}
-	fileAPI.Register(group)
-	settingsAPI.Register(group)
-	uploadAPI.Register(group)
-	tagAPI.Register(group)
+	
+	fileDAO := &dao.FileDAO{DB: db}
+	fileLogic := &logic.FileLogic{FileDAO: fileDAO}
+	fileController := &controller.FileController{FileLogic: fileLogic}
+	
+	settingsDAO := &dao.SettingsDAO{DB: db}
+	settingsLogic := &logic.SettingsLogic{SettingsDAO: settingsDAO}
+	settingsController := &controller.SettingsController{SettingsLogic: settingsLogic}
+	
+	tagDAO := &dao.TagDAO{DB: db}
+	tagLogic := &logic.TagLogic{TagDAO: tagDAO}
+	tagController := &controller.TagController{TagLogic: tagLogic}
+	
+	uploadController := &controller.UploadController{}
+	
+	fileController.Register(group)
+	settingsController.Register(group)
+	uploadController.Register(group)
+	tagController.Register(group)
 
 	// 优雅退出：监听系统信号
 	quit := make(chan os.Signal, 1)
@@ -206,53 +218,101 @@ func runtimeOS() string {
 
 // 迁移初始化表结构
 func migrate(ctx context.Context, db *sql.DB) error {
-	stmts := []string{
-		`CREATE TABLE IF NOT EXISTS files (
-            id TEXT PRIMARY KEY,
-            title TEXT NOT NULL,
-            content TEXT NOT NULL,
-            created_at INTEGER NOT NULL,
-            updated_at INTEGER NOT NULL,
-            tags TEXT
-        );`,
-		`CREATE TABLE IF NOT EXISTS settings (
-            id INTEGER PRIMARY KEY,
-            theme TEXT NOT NULL,
-            editor_opts TEXT,
-            sync_enabled INTEGER,
-            sync_endpoint TEXT
-        );`,
-		`CREATE INDEX IF NOT EXISTS idx_files_updated_at ON files(updated_at DESC);`,
-		`INSERT OR IGNORE INTO settings (id, theme) VALUES (1, 'light');`,
+	if _, err := db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, applied_at INTEGER NOT NULL)`); err != nil {
+		return fmt.Errorf("创建迁移表失败: %w", err)
 	}
-	for _, s := range stmts {
-		if _, err := db.ExecContext(ctx, s); err != nil {
-			return fmt.Errorf("执行迁移失败: %w", err)
+
+	migrations := []struct {
+		version int
+		stmts   []string
+	}{
+		{
+			version: 1,
+			stmts: []string{
+				`CREATE TABLE IF NOT EXISTS files (
+					id TEXT PRIMARY KEY,
+					title TEXT NOT NULL,
+					content TEXT NOT NULL,
+					created_at INTEGER NOT NULL,
+					updated_at INTEGER NOT NULL,
+					tags TEXT
+				)`,
+				`CREATE TABLE IF NOT EXISTS settings (
+					id INTEGER PRIMARY KEY,
+					theme TEXT NOT NULL,
+					editor_opts TEXT,
+					sync_enabled INTEGER,
+					sync_endpoint TEXT
+				)`,
+				`CREATE INDEX IF NOT EXISTS idx_files_updated_at ON files(updated_at DESC)`,
+				`INSERT OR IGNORE INTO settings (id, theme) VALUES (1, 'light')`,
+			},
+		},
+		{
+			version: 2,
+			stmts: []string{
+				"ALTER TABLE files ADD COLUMN is_folder INTEGER DEFAULT 0",
+				"ALTER TABLE files ADD COLUMN parent_id TEXT DEFAULT ''",
+				"ALTER TABLE files ADD COLUMN sort_order INTEGER DEFAULT 0",
+			},
+		},
+		{
+			version: 3,
+			stmts: []string{
+				"ALTER TABLE files ADD COLUMN is_deleted INTEGER DEFAULT 0",
+				"ALTER TABLE files ADD COLUMN deleted_at INTEGER DEFAULT 0",
+				"ALTER TABLE files ADD COLUMN is_pinned INTEGER DEFAULT 0",
+			},
+		},
+		{
+			version: 4,
+			stmts: []string{
+				`CREATE TABLE IF NOT EXISTS tags (id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, color TEXT DEFAULT '#7e5bef')`,
+				`CREATE TABLE IF NOT EXISTS file_tags (file_id TEXT NOT NULL, tag_id TEXT NOT NULL, PRIMARY KEY (file_id, tag_id), FOREIGN KEY (file_id) REFERENCES files(id), FOREIGN KEY (tag_id) REFERENCES tags(id))`,
+			},
+		},
+	}
+
+	var currentVersion int
+	err := db.QueryRowContext(ctx, `SELECT COALESCE(MAX(version), 0) FROM schema_migrations`).Scan(&currentVersion)
+	if err != nil {
+		return fmt.Errorf("查询当前版本失败: %w", err)
+	}
+
+	for _, m := range migrations {
+		if m.version <= currentVersion {
+			continue
 		}
-	}
 
-	// 增量迁移：添加 is_folder 和 parent_id 字段
-	// 由于 SQLite 不支持 IF NOT EXISTS 的 ADD COLUMN，这里直接执行并忽略错误（主要是重复列错误）
-	alterStmts := []string{
-		"ALTER TABLE files ADD COLUMN is_folder INTEGER DEFAULT 0",
-		"ALTER TABLE files ADD COLUMN parent_id TEXT DEFAULT ''",
-		"ALTER TABLE files ADD COLUMN sort_order INTEGER DEFAULT 0",
-		"ALTER TABLE files ADD COLUMN is_deleted INTEGER DEFAULT 0",
-		"ALTER TABLE files ADD COLUMN deleted_at INTEGER DEFAULT 0",
-		"ALTER TABLE files ADD COLUMN is_pinned INTEGER DEFAULT 0",
-	}
-	for _, s := range alterStmts {
-		_, _ = db.ExecContext(ctx, s)
-	}
+		tx, err := db.BeginTx(ctx, nil)
+		if err != nil {
+			return fmt.Errorf("开始迁移 %d 失败: %w", m.version, err)
+		}
 
-	// 创建标签表
-	tagTables := []string{
-		`CREATE TABLE IF NOT EXISTS tags (id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, color TEXT DEFAULT '#7e5bef')`,
-		`CREATE TABLE IF NOT EXISTS file_tags (file_id TEXT NOT NULL, tag_id TEXT NOT NULL, PRIMARY KEY (file_id, tag_id), FOREIGN KEY (file_id) REFERENCES files(id), FOREIGN KEY (tag_id) REFERENCES tags(id))`,
-	}
-	for _, s := range tagTables {
-		if _, err := db.ExecContext(ctx, s); err != nil {
-			g.Log().Warning(ctx, "创建标签表失败:", err)
+		allSuccess := true
+		for _, stmt := range m.stmts {
+			if _, err := tx.ExecContext(ctx, stmt); err != nil {
+				allSuccess = false
+				if strings.Contains(err.Error(), "duplicate column name") || strings.Contains(err.Error(), "table already exists") {
+					g.Log().Debug(ctx, fmt.Sprintf("迁移 %d 跳过(已存在): %s", m.version, stmt))
+				} else {
+					g.Log().Warning(ctx, fmt.Sprintf("迁移 %d 语句失败: %s, 错误: %v", m.version, stmt, err))
+				}
+			}
+		}
+
+		if allSuccess {
+			if _, err := tx.ExecContext(ctx, `INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)`, m.version, time.Now().Unix()); err != nil {
+				tx.Rollback()
+				return fmt.Errorf("记录迁移版本 %d 失败: %w", m.version, err)
+			}
+			if err := tx.Commit(); err != nil {
+				return fmt.Errorf("提交迁移 %d 失败: %w", m.version, err)
+			}
+			g.Log().Info(ctx, fmt.Sprintf("数据库迁移已应用: 版本 %d", m.version))
+		} else {
+			tx.Rollback()
+			g.Log().Info(ctx, fmt.Sprintf("迁移 %d 部分语句已存在，跳过版本记录", m.version))
 		}
 	}
 
