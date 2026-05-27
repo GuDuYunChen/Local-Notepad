@@ -1,5 +1,6 @@
 import fs from 'fs'
 import path from 'path'
+import { ipcMain } from 'electron'
 
 export async function handleBackup(backupDir) {
   const dbPath = process.env.NOTEPAD_DB_PATH || getDefaultDBPath()
@@ -35,6 +36,10 @@ export async function handleRestore(backupFile) {
   const shmPath = dbPath + '-shm'
   if (fs.existsSync(walPath)) fs.unlinkSync(walPath)
   if (fs.existsSync(shmPath)) fs.unlinkSync(shmPath)
+  
+  if (ipcMain) {
+    ipcMain.emit('db:restored')
+  }
   
   return { success: true }
 }

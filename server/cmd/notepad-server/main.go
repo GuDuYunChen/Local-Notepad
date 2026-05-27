@@ -277,8 +277,8 @@ func migrate(ctx context.Context, db *sql.DB) error {
 			version: 5,
 			stmts: []string{
 				`CREATE VIRTUAL TABLE IF NOT EXISTS files_fts USING fts5(title, content, content='files', content_rowid='rowid')`,
-				`CREATE TRIGGER IF NOT EXISTS files_fts_insert AFTER INSERT ON files BEGIN INSERT INTO files_fts(rowid, title, content) VALUES (new.rowid, new.title, new.content); END`,
-				`CREATE TRIGGER IF NOT EXISTS files_fts_update AFTER UPDATE ON files BEGIN UPDATE files_fts SET title=new.title, content=new.content WHERE rowid=new.rowid; END`,
+				`CREATE TRIGGER IF NOT EXISTS files_fts_insert AFTER INSERT ON files BEGIN INSERT INTO files_fts(rowid, title, content) VALUES (new.rowid, COALESCE(new.title, ''), COALESCE(new.content, '')); END`,
+				`CREATE TRIGGER IF NOT EXISTS files_fts_update AFTER UPDATE ON files BEGIN UPDATE files_fts SET title=COALESCE(new.title, ''), content=COALESCE(new.content, '') WHERE rowid=new.rowid; END`,
 				`CREATE TRIGGER IF NOT EXISTS files_fts_delete AFTER DELETE ON files BEGIN DELETE FROM files_fts WHERE rowid=old.rowid; END`,
 			},
 		},

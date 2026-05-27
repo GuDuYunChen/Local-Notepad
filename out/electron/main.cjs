@@ -85322,7 +85322,7 @@ var require_turndown_plugin_gfm_cjs = __commonJS({
 });
 
 // electron/main.js
-var import_electron3 = require("electron");
+var import_electron4 = require("electron");
 var import_node_child_process = require("node:child_process");
 var import_node_path = __toESM(require("node:path"), 1);
 
@@ -105304,6 +105304,241 @@ function processTableToMarkdown(node, lines) {
   }
   lines.push("");
 }
+async function exportToPDF(file, outputPath) {
+  const win = new import_electron.BrowserWindow({
+    show: false,
+    width: 800,
+    height: 600,
+    webPreferences: { nodeIntegration: false }
+  });
+  const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <style>
+                body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; line-height: 1.6; }
+                h1, h2, h3, h4 { margin-top: 24px; margin-bottom: 12px; }
+                p { margin-bottom: 12px; }
+                blockquote { border-left: 4px solid #ddd; padding-left: 16px; color: #666; margin: 16px 0; }
+                code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-family: 'Courier New', monospace; }
+                pre { background: #f5f5f5; padding: 16px; border-radius: 4px; overflow-x: auto; }
+                table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                th { background: #f5f5f5; font-weight: 600; }
+                img { max-width: 100%; height: auto; }
+                ul, ol { padding-left: 24px; }
+                li { margin-bottom: 4px; }
+            </style>
+        </head>
+        <body>
+            <h1>${file.title}</h1>
+            <div id="content"></div>
+        </body>
+        </html>
+    `;
+  await win.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(htmlContent));
+  const contentDiv = await win.webContents.executeJavaScript(`
+        (function() {
+            const content = ${JSON.stringify(file.content || "")}
+            const container = document.getElementById('content')
+            try {
+                const state = JSON.parse(content)
+                const html = convertLexicalToHTML(state)
+                container.innerHTML = html
+            } catch(e) {
+                container.innerHTML = '<p>' + content.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</p>'
+            }
+            return container.innerHTML
+        })()
+    `);
+  await win.webContents.executeJavaScript(`
+        function convertLexicalToHTML(state) {
+            if (!state.root || !state.root.children) return ''
+            return state.root.children.map(node => convertNode(node)).join('')
+        }
+        function convertNode(node) {
+            if (!node.type) return ''
+            switch(node.type) {
+                case 'heading':
+                    const tag = node.tag || 'h1'
+                    return '<' + tag + '>' + convertChildren(node.children) + '</' + tag + '>'
+                case 'paragraph':
+                    return '<p>' + convertChildren(node.children) + '</p>'
+                case 'quote':
+                    return '<blockquote>' + convertChildren(node.children) + '</blockquote>'
+                case 'list':
+                    const listTag = node.listType === 'number' ? 'ol' : 'ul'
+                    return '<' + listTag + '>' + node.children.map(item => '<li>' + convertChildren(item.children) + '</li>').join('') + '</' + listTag + '>'
+                case 'code':
+                case 'code-block':
+                    return '<pre><code>' + convertChildren(node.children) + '</code></pre>'
+                case 'image':
+                    return '<img src="' + (node.src || '') + '" alt="' + (node.alt || '') + '">'
+                case 'table':
+                    return convertTable(node)
+                default:
+                    if (node.children) return convertChildren(node.children)
+                    return ''
+            }
+        }
+        function convertChildren(children) {
+            if (!children) return ''
+            return children.map(child => {
+                if (child.type === 'text') {
+                    let text = (child.text || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                    const f = child.format || 0
+                    if (f & 16) return '<code>' + text + '</code>'
+                    if (f & 8) text = '<s>' + text + '</s>'
+                    if (f & 2) text = '<em>' + text + '</em>'
+                    if (f & 1) text = '<strong>' + text + '</strong>'
+                    return text
+                }
+                if (child.type === 'link') return '<a href="' + (child.url || '') + '">' + convertChildren(child.children) + '</a>'
+                if (child.type === 'linebreak') return '<br>'
+                return ''
+            }).join('')
+        }
+        function convertTable(node) {
+            if (!node.children) return ''
+            let html = '<table>'
+            node.children.forEach((row, i) => {
+                html += '<tr>'
+                row.children.forEach(cell => {
+                    const tag = i === 0 ? 'th' : 'td'
+                    html += '<' + tag + '>' + convertChildren(cell.children) + '</' + tag + '>'
+                })
+                html += '</tr>'
+            })
+            html += '</table>'
+            return html
+        }
+    `);
+  const pdfBuffer = await win.webContents.printToPDF({
+    pageSize: "A4",
+    margins: { top: 20, bottom: 20, left: 20, right: 20 }
+  });
+  win.close();
+  import_fs.default.writeFileSync(outputPath, pdfBuffer);
+  return outputPath;
+}
+async function exportToHTML(file, outputPath) {
+  const htmlContent = convertLexicalToFullHTML(file);
+  import_fs.default.writeFileSync(outputPath, htmlContent, "utf-8");
+  return outputPath;
+}
+function convertLexicalToFullHTML(file) {
+  let bodyHTML = "";
+  try {
+    const state2 = JSON.parse(file.content || "");
+    bodyHTML = state2.root ? convertLexicalRootToHTML(state2.root) : `<p>${escapeHTML(file.content)}</p>`;
+  } catch {
+    bodyHTML = `<p>${escapeHTML(file.content || "")}</p>`;
+  }
+  return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${escapeHTML(file.title)}</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; line-height: 1.6; color: #333; }
+        h1 { border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        h1, h2, h3, h4 { margin-top: 24px; margin-bottom: 12px; }
+        p { margin-bottom: 12px; }
+        blockquote { border-left: 4px solid #ddd; padding-left: 16px; color: #666; margin: 16px 0; }
+        code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-family: 'Courier New', Consolas, monospace; font-size: 0.9em; }
+        pre { background: #f5f5f5; padding: 16px; border-radius: 4px; overflow-x: auto; }
+        pre code { background: none; padding: 0; }
+        table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #f5f5f5; font-weight: 600; }
+        img { max-width: 100%; height: auto; border-radius: 4px; }
+        ul, ol { padding-left: 24px; }
+        li { margin-bottom: 4px; }
+        a { color: #0366d6; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        hr { border: none; border-top: 1px solid #eee; margin: 24px 0; }
+    </style>
+</head>
+<body>
+    <h1>${escapeHTML(file.title)}</h1>
+    ${bodyHTML}
+</body>
+</html>`;
+}
+function convertLexicalRootToHTML(root2) {
+  if (!root2.children) return "";
+  return root2.children.map((node) => convertNodeToHTML(node)).join("");
+}
+function convertNodeToHTML(node) {
+  if (!node || !node.type) return "";
+  switch (node.type) {
+    case "heading":
+      const tag = node.tag || "h1";
+      return `<${tag}>${convertChildrenToHTML(node.children)}</${tag}>`;
+    case "paragraph":
+      return `<p>${convertChildrenToHTML(node.children)}</p>`;
+    case "quote":
+      return `<blockquote>${convertChildrenToHTML(node.children)}</blockquote>`;
+    case "list":
+      const listTag = node.listType === "number" ? "ol" : "ul";
+      return `<${listTag}>${node.children.map((item) => `<li>${convertChildrenToHTML(item.children)}</li>`).join("")}</${listTag}>`;
+    case "code":
+    case "code-block":
+      const lang = node.language ? ` class="language-${node.language}"` : "";
+      return `<pre><code${lang}>${escapeHTML(convertChildrenToHTML(node.children))}</code></pre>`;
+    case "image":
+      return `<img src="${node.src || ""}" alt="${escapeHTML(node.alt || "")}">`;
+    case "image-grid":
+      return `<div class="image-grid">${node.children.map((img) => `<img src="${img.src || ""}" alt="${escapeHTML(img.alt || "")}">`).join("")}</div>`;
+    case "table":
+      return convertTableToHTML(node);
+    case "divider":
+      return "<hr>";
+    case "todo":
+      const checked = node.checked ? "checked" : "";
+      return `<p><input type="checkbox" disabled ${checked}> ${convertChildrenToHTML(node.children)}</p>`;
+    default:
+      if (node.children) return convertChildrenToHTML(node.children);
+      return "";
+  }
+}
+function convertChildrenToHTML(children) {
+  if (!children) return "";
+  return children.map((child) => {
+    if (child.type === "text") {
+      let text = escapeHTML(child.text || "");
+      const f = child.format || 0;
+      if (f & 16) return `<code>${text}</code>`;
+      if (f & 8) text = `<s>${text}</s>`;
+      if (f & 2) text = `<em>${text}</em>`;
+      if (f & 1) text = `<strong>${text}</strong>`;
+      return text;
+    }
+    if (child.type === "link") return `<a href="${child.url || ""}">${convertChildrenToHTML(child.children)}</a>`;
+    if (child.type === "linebreak") return "<br>";
+    return "";
+  }).join("");
+}
+function convertTableToHTML(node) {
+  if (!node.children) return "";
+  let html = "<table>";
+  node.children.forEach((row, i) => {
+    html += "<tr>";
+    row.children.forEach((cell) => {
+      const tag = i === 0 ? "th" : "td";
+      html += `<${tag}>${convertChildrenToHTML(cell.children)}</${tag}>`;
+    });
+    html += "</tr>";
+  });
+  html += "</table>";
+  return html;
+}
+function escapeHTML(str) {
+  if (!str) return "";
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
 
 // electron/import.js
 var import_mammoth = __toESM(require_lib6(), 1);
@@ -105399,6 +105634,7 @@ async function selectAndParseFiles() {
 // electron/backup.js
 var import_fs3 = __toESM(require("fs"), 1);
 var import_path3 = __toESM(require("path"), 1);
+var import_electron3 = require("electron");
 async function handleBackup(backupDir) {
   const dbPath = process.env.NOTEPAD_DB_PATH || getDefaultDBPath();
   if (!import_fs3.default.existsSync(dbPath)) {
@@ -105425,6 +105661,9 @@ async function handleRestore(backupFile) {
   const shmPath = dbPath + "-shm";
   if (import_fs3.default.existsSync(walPath)) import_fs3.default.unlinkSync(walPath);
   if (import_fs3.default.existsSync(shmPath)) import_fs3.default.unlinkSync(shmPath);
+  if (import_electron3.ipcMain) {
+    import_electron3.ipcMain.emit("db:restored");
+  }
   return { success: true };
 }
 async function listBackups(backupDir) {
@@ -105454,9 +105693,9 @@ function getDefaultDBPath() {
 var mainWindow = null;
 var backend = null;
 function createWindow() {
-  const isDev = !import_electron3.app.isPackaged;
-  const iconPath = isDev ? import_node_path.default.join(__dirname, "../../build/icon.ico") : import_node_path.default.join(import_electron3.app.getAppPath(), "build/icon.ico");
-  mainWindow = new import_electron3.BrowserWindow({
+  const isDev = !import_electron4.app.isPackaged;
+  const iconPath = isDev ? import_node_path.default.join(__dirname, "../../build/icon.ico") : import_node_path.default.join(import_electron4.app.getAppPath(), "build/icon.ico");
+  mainWindow = new import_electron4.BrowserWindow({
     width: 1100,
     height: 720,
     minWidth: 900,
@@ -105479,7 +105718,7 @@ function createWindow() {
     }
   } else {
     process.env.API_BASE = "http://127.0.0.1:27121";
-    const indexPath = import_node_path.default.join(import_electron3.app.getAppPath(), "dist/index.html");
+    const indexPath = import_node_path.default.join(import_electron4.app.getAppPath(), "dist/index.html");
     startBackend();
     mainWindow.loadFile(indexPath);
   }
@@ -105487,10 +105726,10 @@ function createWindow() {
     mainWindow = null;
   });
 }
-import_electron3.app.commandLine.appendSwitch("disable-features", "Autofill");
-import_electron3.app.whenReady().then(async () => {
-  import_electron3.app.commandLine.appendSwitch("lang", "zh-CN");
-  const menu = import_electron3.Menu.buildFromTemplate([
+import_electron4.app.commandLine.appendSwitch("disable-features", "Autofill");
+import_electron4.app.whenReady().then(async () => {
+  import_electron4.app.commandLine.appendSwitch("lang", "zh-CN");
+  const menu = import_electron4.Menu.buildFromTemplate([
     {
       label: "\u6587\u4EF6",
       submenu: [{ role: "quit", label: "\u9000\u51FA" }]
@@ -105518,32 +105757,32 @@ import_electron3.app.whenReady().then(async () => {
       submenu: [{ role: "about", label: "\u5173\u4E8E" }]
     }
   ]);
-  import_electron3.Menu.setApplicationMenu(menu);
-  if (import_electron3.app.isPackaged) {
-    import_electron3.app.setAsDefaultProtocolClient("notepad");
+  import_electron4.Menu.setApplicationMenu(menu);
+  if (import_electron4.app.isPackaged) {
+    import_electron4.app.setAsDefaultProtocolClient("notepad");
   }
-  const gotLock = import_electron3.app.requestSingleInstanceLock();
+  const gotLock = import_electron4.app.requestSingleInstanceLock();
   if (!gotLock) {
-    import_electron3.app.quit();
+    import_electron4.app.quit();
     return;
   }
-  import_electron3.app.on("second-instance", () => {
+  import_electron4.app.on("second-instance", () => {
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.focus();
     }
   });
   createWindow();
-  import_electron3.app.on("activate", () => {
-    if (import_electron3.BrowserWindow.getAllWindows().length === 0) {
+  import_electron4.app.on("activate", () => {
+    if (import_electron4.BrowserWindow.getAllWindows().length === 0) {
       createWindow();
     }
   });
 });
-import_electron3.app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") import_electron3.app.quit();
+import_electron4.app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") import_electron4.app.quit();
 });
-import_electron3.app.on("before-quit", () => {
+import_electron4.app.on("before-quit", () => {
   if (backend) {
     backend.kill();
     backend = null;
@@ -105555,28 +105794,28 @@ function startBackend() {
     const exe = import_node_path.default.join(process.resourcesPath, "bin", "notepad-server.exe");
     backend = (0, import_node_child_process.spawn)(exe, { stdio: "ignore" });
   } catch (e) {
-    import_electron3.dialog.showErrorBox("\u540E\u7AEF\u542F\u52A8\u5931\u8D25", String(e));
+    import_electron4.dialog.showErrorBox("\u540E\u7AEF\u542F\u52A8\u5931\u8D25", String(e));
   }
 }
-import_electron3.ipcMain.handle("dialog:openFile", async () => {
-  const res = await import_electron3.dialog.showOpenDialog({ properties: ["openFile"], filters: [
+import_electron4.ipcMain.handle("dialog:openFile", async () => {
+  const res = await import_electron4.dialog.showOpenDialog({ properties: ["openFile"], filters: [
     { name: "Text/Markdown", extensions: ["txt", "md"] },
     { name: "All Files", extensions: ["*"] }
   ] });
   return res.canceled ? [] : res.filePaths;
 });
-import_electron3.ipcMain.handle("dialog:saveFile", async () => {
-  const res = await import_electron3.dialog.showSaveDialog({ filters: [
+import_electron4.ipcMain.handle("dialog:saveFile", async () => {
+  const res = await import_electron4.dialog.showSaveDialog({ filters: [
     { name: "Text", extensions: ["txt"] },
     { name: "Markdown", extensions: ["md"] }
   ] });
   return res.canceled ? "" : res.filePath || "";
 });
-import_electron3.ipcMain.handle("dialog:openDirectory", async () => {
-  const res = await import_electron3.dialog.showOpenDialog({ properties: ["openDirectory"] });
+import_electron4.ipcMain.handle("dialog:openDirectory", async () => {
+  const res = await import_electron4.dialog.showOpenDialog({ properties: ["openDirectory"] });
   return res.canceled ? "" : res.filePaths[0] || "";
 });
-import_electron3.ipcMain.handle("export:docx", async (event, { ids, targetDir, format = "docx" }) => {
+import_electron4.ipcMain.handle("export:docx", async (event, { ids, targetDir, format = "docx" }) => {
   try {
     const errors = await processExport(ids, targetDir, format);
     return { success: true, errors };
@@ -105585,7 +105824,25 @@ import_electron3.ipcMain.handle("export:docx", async (event, { ids, targetDir, f
     return { success: false, message: e.message };
   }
 });
-import_electron3.ipcMain.handle("import:files", async () => {
+import_electron4.ipcMain.handle("export:pdf", async (event, { file, outputPath }) => {
+  try {
+    const path5 = await exportToPDF(file, outputPath);
+    return { success: true, path: path5 };
+  } catch (e) {
+    console.error(e);
+    return { success: false, message: e.message };
+  }
+});
+import_electron4.ipcMain.handle("export:html", async (event, { file, outputPath }) => {
+  try {
+    const path5 = await exportToHTML(file, outputPath);
+    return { success: true, path: path5 };
+  } catch (e) {
+    console.error(e);
+    return { success: false, message: e.message };
+  }
+});
+import_electron4.ipcMain.handle("import:files", async () => {
   try {
     const results = await selectAndParseFiles();
     return { success: true, results };
@@ -105594,7 +105851,7 @@ import_electron3.ipcMain.handle("import:files", async () => {
     return { success: false, message: e.message };
   }
 });
-import_electron3.ipcMain.handle("backup:create", async (event, { targetDir }) => {
+import_electron4.ipcMain.handle("backup:create", async (event, { targetDir }) => {
   try {
     const result2 = await handleBackup(targetDir);
     return result2;
@@ -105603,16 +105860,19 @@ import_electron3.ipcMain.handle("backup:create", async (event, { targetDir }) =>
     return { success: false, message: e.message };
   }
 });
-import_electron3.ipcMain.handle("backup:restore", async (event, { backupFile }) => {
+import_electron4.ipcMain.handle("backup:restore", async (event, { backupFile }) => {
   try {
     const result2 = await handleRestore(backupFile);
+    if (result2.success && mainWindow) {
+      mainWindow.webContents.send("app:reload");
+    }
     return result2;
   } catch (e) {
     console.error(e);
     return { success: false, message: e.message };
   }
 });
-import_electron3.ipcMain.handle("backup:list", async (event, { backupDir }) => {
+import_electron4.ipcMain.handle("backup:list", async (event, { backupDir }) => {
   try {
     const backups = await listBackups(backupDir);
     return { success: true, backups };

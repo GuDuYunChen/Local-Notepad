@@ -2,7 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage } from 'electron
 import { spawn } from 'node:child_process'
 import path from 'node:path'
 
-import { processExport } from './export.js'
+import { processExport, exportToPDF, exportToHTML } from './export.js'
 import { selectAndParseFiles } from './import.js'
 import { handleBackup, handleRestore, listBackups } from './backup.js'
 
@@ -160,6 +160,26 @@ ipcMain.handle('export:docx', async (event, { ids, targetDir, format = 'docx' })
   }
 })
 
+ipcMain.handle('export:pdf', async (event, { file, outputPath }) => {
+  try {
+    const path = await exportToPDF(file, outputPath)
+    return { success: true, path }
+  } catch (e) {
+    console.error(e)
+    return { success: false, message: e.message }
+  }
+})
+
+ipcMain.handle('export:html', async (event, { file, outputPath }) => {
+  try {
+    const path = await exportToHTML(file, outputPath)
+    return { success: true, path }
+  } catch (e) {
+    console.error(e)
+    return { success: false, message: e.message }
+  }
+})
+
 ipcMain.handle('import:files', async () => {
     try {
         const results = await selectAndParseFiles()
@@ -183,6 +203,9 @@ ipcMain.handle('backup:create', async (event, { targetDir }) => {
 ipcMain.handle('backup:restore', async (event, { backupFile }) => {
   try {
     const result = await handleRestore(backupFile)
+    if (result.success && mainWindow) {
+      mainWindow.webContents.send('app:reload')
+    }
     return result
   } catch (e) {
     console.error(e)

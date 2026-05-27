@@ -76,6 +76,14 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    if (window.electronAPI) {
+      window.electronAPI.onReload(() => {
+        window.location.reload()
+      })
+    }
+  }, [])
+
+  useEffect(() => {
     const onKey = (e) => {
       const k = e.key.toLowerCase()
       if (e.ctrlKey && k === 's') {
@@ -97,7 +105,7 @@ export default function App() {
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [current])
+  }, [])
 
   useEffect(() => {
     function onMove(e) {

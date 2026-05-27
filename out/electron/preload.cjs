@@ -7,8 +7,11 @@ import_electron.contextBridge.exposeInMainWorld("electronAPI", {
   saveFileDialog: () => import_electron.ipcRenderer.invoke("dialog:saveFile"),
   openDirectoryDialog: () => import_electron.ipcRenderer.invoke("dialog:openDirectory"),
   exportToDocx: (ids, targetDir, format) => import_electron.ipcRenderer.invoke("export:docx", { ids, targetDir, format }),
+  exportToPDF: (file, outputPath) => import_electron.ipcRenderer.invoke("export:pdf", { file, outputPath }),
+  exportToHTML: (file, outputPath) => import_electron.ipcRenderer.invoke("export:html", { file, outputPath }),
   importFiles: () => import_electron.ipcRenderer.invoke("import:files"),
   backupCreate: (targetDir) => import_electron.ipcRenderer.invoke("backup:create", { targetDir }),
   backupRestore: (backupFile) => import_electron.ipcRenderer.invoke("backup:restore", { backupFile }),
-  backupList: (backupDir) => import_electron.ipcRenderer.invoke("backup:list", { backupDir })
+  backupList: (backupDir) => import_electron.ipcRenderer.invoke("backup:list", { backupDir }),
+  onReload: (callback) => import_electron.ipcRenderer.on("app:reload", callback)
 });
