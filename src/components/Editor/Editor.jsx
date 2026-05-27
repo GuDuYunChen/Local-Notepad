@@ -12,8 +12,6 @@ import { TRANSFORMERS } from '@lexical/markdown';
 import {LexicalErrorBoundary} from '@lexical/react/LexicalErrorBoundary';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import { $getRoot, $createParagraphNode, $createTextNode } from 'lexical';
-import { $convertEditorStateToJSON } from '@lexical/clipboard';
-import { $clearHistoryState } from '@lexical/history';
 
 import { HeadingNode, QuoteNode } from "@lexical/rich-text";
 import { TableNode, TableCellNode, TableRowNode } from "@lexical/table";
@@ -78,8 +76,7 @@ function OnChangePlugin({ onChange }) {
 
   useEffect(() => {
     return editor.registerUpdateListener(({ editorState }) => {
-      const json = editor.getEditorState().read($convertEditorStateToJSON);
-      onChangeRef.current?.(json);
+      onChangeRef.current?.(JSON.stringify(editorState));
     });
   }, [editor]);
   return null;
@@ -108,7 +105,6 @@ function LoadContentPlugin({ content }) {
             root.append(p);
           }
         }
-        $clearHistoryState();
       });
     };
     Promise.resolve().then(run);
