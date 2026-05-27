@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { api, getBacklinks } from '../services/api'
 import './BacklinksPanel.css'
 
 export default function BacklinksPanel({ fileId, onSelectFile }) {
   const [backlinks, setBacklinks] = useState([])
   const [loading, setLoading] = useState(false)
+  const abortRef = useRef(null)
 
   useEffect(() => {
     if (!fileId) {
@@ -12,29 +13,48 @@ export default function BacklinksPanel({ fileId, onSelectFile }) {
       return
     }
 
+    if (abortRef.current) {
+      abortRef.current.abort()
+    }
+
+    const controller = new AbortController()
+    abortRef.current = controller
+
     const load = async () => {
       setLoading(true)
       try {
         const links = await getBacklinks(fileId)
+        if (controller.signal.aborted) return
+
         const enriched = await Promise.all(
           links.map(async (link) => {
             try {
               const file = await api(`/api/files/${link.source_id}`)
+              if (controller.signal.aborted) return { ...link, source_title: '未知文件' }
               return { ...link, source_title: file.title }
             } catch {
               return { ...link, source_title: '未知文件' }
             }
           })
         )
+        if (controller.signal.aborted) return
         setBacklinks(enriched)
       } catch (e) {
-        console.error('加载反向链接失败', e)
+        if (e.name !== 'AbortError') {
+          console.error('加载反向链接失败', e)
+        }
       } finally {
-        setLoading(false)
+        if (!controller.signal.aborted) {
+          setLoading(false)
+        }
       }
     }
 
     load()
+
+    return () => {
+      controller.abort()
+    }
   }, [fileId])
 
   if (!fileId) return null

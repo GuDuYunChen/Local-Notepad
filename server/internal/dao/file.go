@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"notepad-server/internal/model"
+	"strings"
 	"time"
 )
 
@@ -114,7 +115,7 @@ func (d *FileDAO) List(ctx context.Context, q string, page, size int) ([]*model.
 			INNER JOIN files_fts ft ON f.rowid = ft.rowid
 			WHERE f.is_deleted = 0 AND files_fts MATCH ?
 			ORDER BY f.is_pinned DESC, f.sort_order DESC LIMIT ? OFFSET ?`
-		args = []interface{}{q, size, offset}
+		args = []interface{}{escapeFTS5Query(q), size, offset}
 	} else {
 		query = `SELECT id, title, created_at, updated_at, is_folder, parent_id, sort_order, is_deleted, deleted_at, is_pinned 
 			FROM files WHERE is_deleted = 0 
@@ -176,4 +177,13 @@ func (d *FileDAO) GetChildren(ctx context.Context, parentID string) ([]*model.Fi
 func (d *FileDAO) CleanupOldDeleted(ctx context.Context, threshold int64) error {
 	_, err := d.DB.ExecContext(ctx, `DELETE FROM files WHERE is_deleted = 1 AND deleted_at < ?`, threshold)
 	return err
+}
+
+func escapeFTS5Query(q string) string {
+	escaped := strings.ReplaceAll(q, `"`, `""`)
+	escaped = strings.ReplaceAll(escaped, `*`, ``)
+	escaped = strings.ReplaceAll(escaped, `(`, ``)
+	escaped = strings.ReplaceAll(escaped, `)`, ``)
+	escaped = strings.ReplaceAll(escaped, `?`, ``)
+	return `"` + escaped + `"`
 }

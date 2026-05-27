@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { api } from '../services/api'
 import './VersionHistory.css'
 
@@ -6,6 +6,7 @@ export default function VersionHistory({ fileId, onRestore }) {
   const [versions, setVersions] = useState([])
   const [loading, setLoading] = useState(false)
   const [selectedVersion, setSelectedVersion] = useState(null)
+  const abortRef = useRef(null)
 
   useEffect(() => {
     if (!fileId) {
@@ -13,19 +14,35 @@ export default function VersionHistory({ fileId, onRestore }) {
       return
     }
 
+    if (abortRef.current) {
+      abortRef.current.abort()
+    }
+
+    const controller = new AbortController()
+    abortRef.current = controller
+
     const load = async () => {
       setLoading(true)
       try {
         const list = await api(`/api/files/${fileId}/versions`)
+        if (controller.signal.aborted) return
         setVersions(list || [])
       } catch (e) {
-        console.error('加载版本历史失败', e)
+        if (e.name !== 'AbortError') {
+          console.error('加载版本历史失败', e)
+        }
       } finally {
-        setLoading(false)
+        if (!controller.signal.aborted) {
+          setLoading(false)
+        }
       }
     }
 
     load()
+
+    return () => {
+      controller.abort()
+    }
   }, [fileId])
 
   const handleRestore = async (versionId) => {

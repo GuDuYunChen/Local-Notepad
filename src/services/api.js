@@ -53,6 +53,6 @@ export async function getBacklinks(fileId) {
 }
 
 export async function searchFiles(query) {
-  const res = await api(`/api/files/search?q=${encodeURIComponent(query)}`)
+  const res = await api(`/api/files?q=${encodeURIComponent(query)}`)
   return res
 }
