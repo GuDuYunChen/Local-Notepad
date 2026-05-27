@@ -8,6 +8,7 @@ import { api } from '~/services/api'
 import ConfirmDialog from './components/ConfirmDialog'
 import ShortcutsModal from './components/ShortcutsModal'
 import BackupPanel from './components/BackupPanel'
+import ErrorBoundary from './components/ErrorBoundary'
 import { message } from 'antd'
 
 // 应用根组件：后续接入路由、主题与编辑器
@@ -43,7 +44,7 @@ export default function App() {
   // If current is null, no file selected.
   const unsaved = !!(current && content !== (current.content || ''))
   
-  const select = (f) => {
+  const select = React.useCallback((f) => {
     setSwitching(true)
     setCurrent(f)
     setContent(f ? (f.content || '') : '')
@@ -58,7 +59,7 @@ export default function App() {
     }
 
     setTimeout(() => setSwitching(false), 180)
-  }
+  }, [deletedIds])
   async function saveCurrent() {
     if (!current || !editorRef.current) return false
     try {
@@ -77,9 +78,12 @@ export default function App() {
 
   useEffect(() => {
     if (window.electronAPI) {
-      window.electronAPI.onReload(() => {
+      const cleanup = window.electronAPI.onReload(() => {
         window.location.reload()
       })
+      return () => {
+        if (typeof cleanup === 'function') cleanup()
+      }
     }
   }, [])
 
@@ -159,9 +163,10 @@ export default function App() {
               <>
                 <aside className={`sidebar${sidebarCollapsed ? ' collapsed' : ''}`} style={{ '--sidebar-w': `${sidebarW}px` }}>
                   {!sidebarCollapsed && (
-                    <FileList
-                      selectedId={current?.id}
-                      updatedItem={current}
+                    <ErrorBoundary label="文件列表">
+                      <FileList
+                        selectedId={current?.id}
+                        updatedItem={current}
                 onSelect={(f, options = {}) => {
                   // If switching to the same file, do nothing
                   if (current && f && f.id === current.id) return
@@ -218,6 +223,7 @@ export default function App() {
                     if (!current && list.length) select(list[0]) 
                 }}
               />
+                    </ErrorBoundary>
               )}
               <button className="sidebar-toggle-btn" onClick={() => {
                 setSidebarCollapsed(prev => {
@@ -233,26 +239,28 @@ export default function App() {
               </>
             )}
             <section className={`content${switching ? ' switching' : ''}`}>
-              <TextEditor
-                ref={editorRef}
-                activeId={current?.id || null}
-                deletedIds={deletedIds}
-                autoSaveOnSwitch={false}
-                onChange={setContent}
-                onLoaded={(text) => {
-                  if (current) {
-                    setCurrent(prev => ({ ...prev, content: text }))
-                    setContent(text)
-                  }
-                }}
-                onSaved={(updated) => {
-                  if (current) {
-                    const finalContent = updated.content !== undefined ? updated.content : content
-                    const merged = { ...current, ...updated, content: finalContent }
-                    setCurrent(merged)
-                  }
-                }}
-              />
+              <ErrorBoundary label="编辑器">
+                <TextEditor
+                  ref={editorRef}
+                  activeId={current?.id || null}
+                  deletedIds={deletedIds}
+                  autoSaveOnSwitch={false}
+                  onChange={setContent}
+                  onLoaded={(text) => {
+                    if (current) {
+                      setCurrent(prev => ({ ...prev, content: text }))
+                      setContent(text)
+                    }
+                  }}
+                  onSaved={(updated) => {
+                    if (current) {
+                      const finalContent = updated.content !== undefined ? updated.content : content
+                      const merged = { ...current, ...updated, content: finalContent }
+                      setCurrent(merged)
+                    }
+                  }}
+                />
+              </ErrorBoundary>
               {showBacklinks && current && (
                 <BacklinksPanel
                   fileId={current.id}

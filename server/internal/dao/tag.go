@@ -27,6 +27,9 @@ func (d *TagDAO) List(ctx context.Context) ([]*model.Tag, error) {
 		}
 		out = append(out, &t)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
@@ -66,6 +69,9 @@ func (d *TagDAO) GetFileTags(ctx context.Context, fileID string) ([]*model.Tag, 
 		}
 		out = append(out, &t)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
@@ -81,7 +87,7 @@ func (d *TagDAO) RemoveFileTag(ctx context.Context, fileID, tagID string) error 
 
 func (d *TagDAO) GetFilesByTag(ctx context.Context, tagID string) ([]*model.File, error) {
 	rows, err := d.DB.QueryContext(ctx,
-		`SELECT f.id, f.title, f.created_at, f.updated_at, f.is_folder, f.parent_id, f.sort_order, f.is_deleted, f.deleted_at, f.is_pinned 
+		`SELECT f.id, f.title, f.content, f.created_at, f.updated_at, f.is_folder, f.parent_id, f.sort_order, f.is_deleted, f.deleted_at, f.is_pinned 
 		 FROM files f JOIN file_tags ft ON f.id = ft.file_id WHERE ft.tag_id = ? AND f.is_deleted = 0`, tagID)
 	if err != nil {
 		return nil, err
@@ -91,10 +97,13 @@ func (d *TagDAO) GetFilesByTag(ctx context.Context, tagID string) ([]*model.File
 	var out []*model.File
 	for rows.Next() {
 		var f model.File
-		if err := rows.Scan(&f.ID, &f.Title, &f.CreatedAt, &f.UpdatedAt, &f.IsFolder, &f.ParentID, &f.SortOrder, &f.IsDeleted, &f.DeletedAt, &f.IsPinned); err != nil {
+		if err := rows.Scan(&f.ID, &f.Title, &f.Content, &f.CreatedAt, &f.UpdatedAt, &f.IsFolder, &f.ParentID, &f.SortOrder, &f.IsDeleted, &f.DeletedAt, &f.IsPinned); err != nil {
 			return nil, err
 		}
 		out = append(out, &f)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return out, nil
 }

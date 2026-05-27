@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useDrag, useDrop } from 'react-dnd'
 import { Input, message } from 'antd'
 import {
@@ -23,6 +23,10 @@ export function FileTreeItem({
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(item.title)
   const inputRef = useRef(null)
+
+  useEffect(() => {
+    setName(item.title)
+  }, [item.title])
 
   const [{ isDragging }, drag] = useDrag({
     type: 'FILE',
@@ -73,6 +77,18 @@ export function FileTreeItem({
       style={{ paddingLeft: `${depth * 16 + 8}px` }}
       onClick={() => !item.is_folder && onSelect(item)}
       onDoubleClick={() => item.is_folder && onToggle(item.id)}
+      role="treeitem"
+      aria-expanded={item.is_folder ? isExpanded : undefined}
+      aria-selected={isSelected}
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && !item.is_folder) {
+          onSelect(item)
+        }
+        if (e.key === 'Enter' && item.is_folder) {
+          onToggle(item.id)
+        }
+      }}
     >
       <span className="file-icon">{icon}</span>
       {item.is_pinned && <PushpinOutlined className="pin-icon" />}
@@ -93,11 +109,30 @@ export function FileTreeItem({
       <div className="file-actions">
         {!editing && (
           <>
-            <span onClick={() => setEditing(true)}>重命名</span>
-            <span onClick={() => onPin(item.id, !item.is_pinned)}>
+            <button
+              type="button"
+              className="file-action-btn"
+              onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+              aria-label={`重命名 ${item.title}`}
+            >
+              重命名
+            </button>
+            <button
+              type="button"
+              className="file-action-btn"
+              onClick={(e) => { e.stopPropagation(); onPin(item.id, !item.is_pinned); }}
+              aria-label={item.is_pinned ? `取消置顶 ${item.title}` : `置顶 ${item.title}`}
+            >
               {item.is_pinned ? '取消置顶' : '置顶'}
-            </span>
-            <span onClick={() => onDelete(item.id)}>删除</span>
+            </button>
+            <button
+              type="button"
+              className="file-action-btn file-action-btn--danger"
+              onClick={(e) => { e.stopPropagation(); onDelete(item.id); }}
+              aria-label={`删除 ${item.title}`}
+            >
+              删除
+            </button>
           </>
         )}
       </div>

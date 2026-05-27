@@ -110,10 +110,14 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
 
-app.on('before-quit', () => {
+app.on('before-quit', (event) => {
   if (backend) {
-    backend.kill()
-    backend = null
+    event.preventDefault()
+    backend.on('exit', () => {
+      backend = null
+      app.quit()
+    })
+    backend.kill('SIGTERM')
   }
 })
 
@@ -121,8 +125,12 @@ app.on('before-quit', () => {
 function startBackend() {
   if (backend) return
   try {
-    const exe = path.join(process.resourcesPath, 'bin', 'notepad-server.exe')
+    const backendBin = process.platform === 'win32' ? 'notepad-server.exe' : 'notepad-server'
+    const exe = path.join(process.resourcesPath, 'bin', backendBin)
     backend = spawn(exe, { stdio: 'ignore' })
+    backend.on('error', (err) => {
+      dialog.showErrorBox('后端启动失败', `无法启动后端服务: ${err.message}`)
+    })
   } catch (e) {
     dialog.showErrorBox('后端启动失败', String(e))
   }

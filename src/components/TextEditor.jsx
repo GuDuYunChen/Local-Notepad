@@ -177,7 +177,10 @@ function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved,
     window.addEventListener('resize', apply)
     const onMode = (e) => { setSelMode(!!e.detail) }
     window.addEventListener('tableSelection:mode', onMode)
-    return () => window.removeEventListener('resize', apply)
+    return () => {
+      window.removeEventListener('resize', apply)
+      window.removeEventListener('tableSelection:mode', onMode)
+    }
   }, [])
 
   const formatFull = (ts) => {
@@ -201,7 +204,7 @@ function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved,
     }, 250)
   }
 
-  const handleEditorChange = (newContent) => {
+  const handleEditorChange = React.useCallback((newContent) => {
     contentRef.current = newContent
     scheduleCache()
     onChangeRef.current?.(newContent)
@@ -219,18 +222,23 @@ function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved,
     } catch {
       setWordCount(0)
     }
-  }
+  }, [])
+
+  const handleDragOver = React.useCallback((e) => {
+    e.preventDefault()
+    setDragOver(true)
+  }, [])
+
+  const handleDragLeave = React.useCallback(() => setDragOver(false), [])
+  const handleDrop = React.useCallback(() => setDragOver(false), [])
 
   return (
     <div 
       className={switching ? 'content switching' : 'content'} 
       style={{ display: 'flex', flexDirection: 'column', height: '100%' }}
-      onDragOver={(e) => {
-        e.preventDefault()
-        setDragOver(true)
-      }}
-      onDragLeave={() => setDragOver(false)}
-      onDrop={() => setDragOver(false)}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
     >
       {dragOver && (
         <div className="drag-overlay">

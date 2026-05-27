@@ -55,6 +55,9 @@ func (d *LinkDAO) GetBacklinks(ctx context.Context, targetID string) ([]*model.L
 		}
 		links = append(links, &l)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	return links, nil
 }
 
@@ -74,6 +77,9 @@ func (d *LinkDAO) GetOutgoingLinks(ctx context.Context, sourceID string) ([]*mod
 			return nil, err
 		}
 		links = append(links, &l)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return links, nil
 }

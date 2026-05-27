@@ -269,6 +269,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
   // We only support undo for now to keep it simple, or full stack.
   // Due to state complexity, we'll implement a basic history stack ref.
   const historyRef = useRef({ undo: [], redo: [] })
+  const retryTimerRef = useRef(null)
   
   function pushHistory(action) {
       historyRef.current.undo.push(action)
@@ -381,7 +382,13 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current)
+        retryTimerRef.current = null
+      }
+    }
   }, [])
 
   useEffect(() => {
@@ -420,64 +427,68 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
   }, [updatedItem])
 
   // Helper to build tree from flat items (for internal logic usage)
-  function buildTree(flatItems) {
-      const map = {}
-      const roots = []
-      flatItems.forEach(i => {
-          map[i.id] = { ...i, children: [] }
-      })
-      flatItems.forEach(i => {
-          if (i.parent_id && map[i.parent_id]) {
-              map[i.parent_id].children.push(map[i.id])
-          } else {
-              roots.push(map[i.id])
-          }
-      })
-      
-      const sortFn = (a, b) => {
-          // if (a.is_folder !== b.is_folder) return b.is_folder ? 1 : -1
-          return (b.sort_order ?? 0) - (a.sort_order ?? 0)
-      }
-      
-      const sortRecursive = (nodes) => {
-          nodes.sort(sortFn)
-          nodes.forEach(n => sortRecursive(n.children))
-      }
-      sortRecursive(roots)
-      return roots
-  }
+  const buildTree = React.useMemo(() => {
+    return (flatItems) => {
+        const map = {}
+        const roots = []
+        flatItems.forEach(i => {
+            map[i.id] = { ...i, children: [] }
+        })
+        flatItems.forEach(i => {
+            if (i.parent_id && map[i.parent_id]) {
+                map[i.parent_id].children.push(map[i.id])
+            } else {
+                roots.push(map[i.id])
+            }
+        })
+        
+        const sortFn = (a, b) => {
+            return (b.sort_order ?? 0) - (a.sort_order ?? 0)
+        }
+        
+        const sortRecursive = (nodes) => {
+            nodes.sort(sortFn)
+            nodes.forEach(n => sortRecursive(n.children))
+        }
+        sortRecursive(roots)
+        return roots
+    }
+  }, [])
 
   // Helper to find the first file (DFS)
-  function findFirstFileInTree(nodes) {
-      for (const node of nodes) {
-          if (!node.is_folder) return node
-          const found = findFirstFileInTree(node.children)
-          if (found) return found
+  const findFirstFileInTree = React.useMemo(() => {
+      return (nodes) => {
+          for (const node of nodes) {
+              if (!node.is_folder) return node
+              const found = findFirstFileInTree(node.children)
+              if (found) return found
+          }
+          return null
       }
-      return null
-  }
+  }, [])
   
   // Helper to find first file in a specific folder (by ID)
-  function findFirstFileInFolder(tree, folderId) {
-      // Find the folder node first
-      let targetFolder = null
-      const findFolder = (nodes) => {
-          for (const node of nodes) {
-              if (node.id === folderId) {
-                  targetFolder = node
-                  return
+  const findFirstFileInFolder = React.useMemo(() => {
+      return (tree, folderId) => {
+          let targetFolder = null
+          const findFolder = (nodes) => {
+              for (const node of nodes) {
+                  if (node.id === folderId) {
+                      targetFolder = node
+                      return
+                  }
+                  if (node.children) findFolder(node.children)
+                  if (targetFolder) return
               }
-              if (node.children) findFolder(node.children)
-              if (targetFolder) return
           }
+          findFolder(tree)
+          
+          if (targetFolder && targetFolder.children.length > 0) {
+              return findFirstFileInTree(targetFolder.children)
+          }
+          return null
       }
-      findFolder(tree)
-      
-      if (targetFolder && targetFolder.children.length > 0) {
-          return findFirstFileInTree(targetFolder.children)
-      }
-      return null
-  }
+  }, [findFirstFileInTree])
 
   async function load(retryCount = 0) {
     setLoading(true)
@@ -497,7 +508,8 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       console.error(e)
       if (retryCount < 3) {
           console.log(`Load failed, retrying (${retryCount + 1}/3)...`)
-          setTimeout(() => load(retryCount + 1), 1000)
+          if (retryTimerRef.current) clearTimeout(retryTimerRef.current)
+          retryTimerRef.current = setTimeout(() => load(retryCount + 1), 1000)
       } else {
           message.error('加载文件列表失败，请手动刷新')
       }

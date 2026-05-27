@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { LexicalComposer } from '@lexical/react/LexicalComposer';
 import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin';
 import { ContentEditable } from '@lexical/react/LexicalContentEditable';
@@ -12,6 +12,8 @@ import { TRANSFORMERS } from '@lexical/markdown';
 import {LexicalErrorBoundary} from '@lexical/react/LexicalErrorBoundary';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import { $getRoot, $createParagraphNode, $createTextNode } from 'lexical';
+import { $convertEditorStateToJSON } from '@lexical/clipboard';
+import { $clearHistoryState } from '@lexical/history';
 
 import { HeadingNode, QuoteNode } from "@lexical/rich-text";
 import { TableNode, TableCellNode, TableRowNode } from "@lexical/table";
@@ -68,11 +70,18 @@ function Placeholder() {
 
 function OnChangePlugin({ onChange }) {
   const [editor] = useLexicalComposerContext();
+  const onChangeRef = useRef(onChange);
+  
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
   useEffect(() => {
     return editor.registerUpdateListener(({ editorState }) => {
-      onChange(JSON.stringify(editorState));
+      const json = editor.getEditorState().read($convertEditorStateToJSON);
+      onChangeRef.current?.(json);
     });
-  }, [editor, onChange]);
+  }, [editor]);
   return null;
 }
 
@@ -82,26 +91,25 @@ function LoadContentPlugin({ content }) {
     let cancelled = false;
     const run = () => {
       if (cancelled) return;
-      if (!content) {
-        editor.update(() => {
+      editor.update(() => {
+        if (!content) {
           const root = $getRoot();
           root.clear();
           root.append($createParagraphNode());
-        });
-        return;
-      }
-      try {
-        const state = editor.parseEditorState(content);
-        editor.setEditorState(state);
-      } catch (e) {
-        editor.update(() => {
-          const root = $getRoot();
-          root.clear();
-          const p = $createParagraphNode();
-          p.append($createTextNode(content));
-          root.append(p);
-        });
-      }
+        } else {
+          try {
+            const state = editor.parseEditorState(content);
+            editor.setEditorState(state);
+          } catch (e) {
+            const root = $getRoot();
+            root.clear();
+            const p = $createParagraphNode();
+            p.append($createTextNode(content));
+            root.append(p);
+          }
+        }
+        $clearHistoryState();
+      });
     };
     Promise.resolve().then(run);
     return () => { cancelled = true };

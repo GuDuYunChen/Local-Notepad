@@ -80,11 +80,28 @@ export class ImageNode extends DecoratorNode {
   }
 }
 
+function isValidImageUrl(url) {
+    if (!url) return false;
+    if (url.startsWith('data:')) return true;
+    if (url.startsWith('blob:')) return true;
+    try {
+        const parsed = new URL(url);
+        return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+    } catch {
+        return false;
+    }
+}
+
 function ImageComponent({ src, alt, width, height, originalSrc, caption }) {
+  const safeSrc = isValidImageUrl(src) ? src : '';
+  const safeOriginalSrc = isValidImageUrl(originalSrc) ? originalSrc : '';
+
   const handleDownload = (e) => {
     e.preventDefault();
+    const downloadSrc = safeOriginalSrc || safeSrc;
+    if (!downloadSrc) return;
     const a = document.createElement('a');
-    a.href = originalSrc || src;
+    a.href = downloadSrc;
     a.download = alt || 'image';
     document.body.appendChild(a);
     a.click();
@@ -93,32 +110,41 @@ function ImageComponent({ src, alt, width, height, originalSrc, caption }) {
 
   return (
     <span className="editor-image-wrapper" style={{ display: 'inline-block', position: 'relative' }}>
-      <img
-        src={src}
-        alt={alt}
-        loading="lazy"
-        title={alt || caption}
-        style={{ maxWidth: '100%', height: 'auto', display: 'block' }}
-      />
-      <button
-        onClick={handleDownload}
-        className="image-download-btn"
-        style={{
-          position: 'absolute',
-          top: 5,
-          right: 5,
-          background: 'rgba(0,0,0,0.5)',
-          color: 'white',
-          border: 'none',
-          padding: '2px 5px',
-          cursor: 'pointer',
-          fontSize: '10px',
-          borderRadius: '3px',
-        }}
-        title="下载原图"
-      >
-        ⬇
-      </button>
+      {safeSrc ? (
+        <img
+          src={safeSrc}
+          alt={alt}
+          loading="lazy"
+          title={alt || caption}
+          style={{ maxWidth: '100%', height: 'auto', display: 'block' }}
+        />
+      ) : (
+        <div className="image-placeholder" style={{ padding: 20, background: '#f5f5f5', borderRadius: 4, textAlign: 'center', color: '#999' }}>
+          无效的图片链接
+        </div>
+      )}
+      {safeSrc && (
+        <button
+          onClick={handleDownload}
+          className="image-download-btn"
+          style={{
+            position: 'absolute',
+            top: 5,
+            right: 5,
+            background: 'rgba(0,0,0,0.5)',
+            color: 'white',
+            border: 'none',
+            padding: '2px 5px',
+            cursor: 'pointer',
+            fontSize: '10px',
+            borderRadius: '3px',
+          }}
+          title="下载原图"
+          aria-label="下载原图"
+        >
+          ⬇
+        </button>
+      )}
       <div className="editor-image-caption" style={{ fontSize: 12, color: '#666', marginTop: 4, textAlign: 'center' }}>{caption}</div>
     </span>
   );

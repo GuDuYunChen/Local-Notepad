@@ -79,17 +79,38 @@ function EmbedComponent({ nodeKey, url, title }) {
     }
   }
 
+  const ALLOWED_EMBED_DOMAINS = [
+    'www.youtube.com',
+    'player.bilibili.com',
+    'player.vimeo.com',
+    'open.spotify.com',
+    'www.slideshare.net',
+    'docs.google.com',
+    'drive.google.com',
+  ]
+
   const getEmbedUrl = (inputUrl) => {
     if (!inputUrl) return ''
-    const youtubeMatch = inputUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/)
-    if (youtubeMatch) {
-      return `https://www.youtube.com/embed/${youtubeMatch[1]}`
+    try {
+      const parsed = new URL(inputUrl.startsWith('//') ? 'https:' + inputUrl : inputUrl)
+      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+        return ''
+      }
+      const youtubeMatch = inputUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/)
+      if (youtubeMatch) {
+        return `https://www.youtube.com/embed/${youtubeMatch[1]}`
+      }
+      const bilibiliMatch = inputUrl.match(/bilibili\.com\/video\/([a-zA-Z0-9]+)/)
+      if (bilibiliMatch) {
+        return `//player.bilibili.com/player.html?bvid=${bilibiliMatch[1]}`
+      }
+      if (ALLOWED_EMBED_DOMAINS.includes(parsed.hostname)) {
+        return inputUrl
+      }
+      return ''
+    } catch {
+      return ''
     }
-    const bilibiliMatch = inputUrl.match(/bilibili\.com\/video\/([a-zA-Z0-9]+)/)
-    if (bilibiliMatch) {
-      return `//player.bilibili.com/player.html?bvid=${bilibiliMatch[1]}`
-    }
-    return inputUrl
   }
 
   const embedUrl = getEmbedUrl(editUrl)
@@ -101,7 +122,7 @@ function EmbedComponent({ nodeKey, url, title }) {
           type="url"
           value={editUrl}
           onChange={(e) => setEditUrl(e.target.value)}
-          placeholder="输入嵌入链接 (YouTube, Bilibili, 或其他 iframe 链接)..."
+          placeholder="输入嵌入链接 (YouTube, Bilibili, 或其他支持的 iframe 链接)..."
           className="embed-input"
         />
         <input
@@ -129,9 +150,10 @@ function EmbedComponent({ nodeKey, url, title }) {
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           allowFullScreen
           title={editTitle || '嵌入内容'}
+          sandbox="allow-scripts allow-same-origin allow-popups allow-presentation"
         />
       ) : (
-        <div className="embed-placeholder">无效的嵌入链接</div>
+        <div className="embed-placeholder">不支持的链接格式或无效的嵌入链接</div>
       )}
       <button onClick={() => setIsEditing(true)} className="embed-edit-btn" aria-label="编辑嵌入内容">
         ✏️ 编辑

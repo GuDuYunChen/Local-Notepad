@@ -18,7 +18,7 @@ func (d *FileDAO) Create(ctx context.Context, f *model.File) error {
 	_, err := d.DB.ExecContext(ctx,
 		`INSERT INTO files (id, title, content, created_at, updated_at, is_folder, parent_id, sort_order, is_deleted, is_pinned) 
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0)`,
-		f.ID, f.Title, f.Content, now, now, f.IsFolder, f.ParentID, now)
+		f.ID, f.Title, f.Content, now, now, f.IsFolder, f.ParentID, f.SortOrder)
 	return err
 }
 
@@ -110,14 +110,14 @@ func (d *FileDAO) List(ctx context.Context, q string, page, size int) ([]*model.
 	var args []interface{}
 
 	if q != "" {
-		query = `SELECT f.id, f.title, f.created_at, f.updated_at, f.is_folder, f.parent_id, f.sort_order, f.is_deleted, f.deleted_at, f.is_pinned 
+		query = `SELECT f.id, f.title, f.content, f.created_at, f.updated_at, f.is_folder, f.parent_id, f.sort_order, f.is_deleted, f.deleted_at, f.is_pinned 
 			FROM files f
 			INNER JOIN files_fts ft ON f.rowid = ft.rowid
 			WHERE f.is_deleted = 0 AND files_fts MATCH ?
 			ORDER BY f.is_pinned DESC, f.sort_order DESC LIMIT ? OFFSET ?`
 		args = []interface{}{escapeFTS5Query(q), size, offset}
 	} else {
-		query = `SELECT id, title, created_at, updated_at, is_folder, parent_id, sort_order, is_deleted, deleted_at, is_pinned 
+		query = `SELECT id, title, content, created_at, updated_at, is_folder, parent_id, sort_order, is_deleted, deleted_at, is_pinned 
 			FROM files WHERE is_deleted = 0 
 			ORDER BY is_pinned DESC, sort_order DESC LIMIT ? OFFSET ?`
 		args = []interface{}{size, offset}
@@ -132,10 +132,13 @@ func (d *FileDAO) List(ctx context.Context, q string, page, size int) ([]*model.
 	var out []*model.File
 	for rows.Next() {
 		var f model.File
-		if err := rows.Scan(&f.ID, &f.Title, &f.CreatedAt, &f.UpdatedAt, &f.IsFolder, &f.ParentID, &f.SortOrder, &f.IsDeleted, &f.DeletedAt, &f.IsPinned); err != nil {
+		if err := rows.Scan(&f.ID, &f.Title, &f.Content, &f.CreatedAt, &f.UpdatedAt, &f.IsFolder, &f.ParentID, &f.SortOrder, &f.IsDeleted, &f.DeletedAt, &f.IsPinned); err != nil {
 			return nil, err
 		}
 		out = append(out, &f)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return out, nil
 }
@@ -156,7 +159,7 @@ func (d *FileDAO) CheckDuplicate(ctx context.Context, parentID, title, excludeID
 
 func (d *FileDAO) GetChildren(ctx context.Context, parentID string) ([]*model.File, error) {
 	rows, err := d.DB.QueryContext(ctx,
-		`SELECT id, title, created_at, updated_at, is_folder, parent_id, sort_order, is_deleted, deleted_at, is_pinned 
+		`SELECT id, title, content, created_at, updated_at, is_folder, parent_id, sort_order, is_deleted, deleted_at, is_pinned 
 		 FROM files WHERE parent_id = ? AND is_deleted = 0`, parentID)
 	if err != nil {
 		return nil, err
@@ -166,10 +169,13 @@ func (d *FileDAO) GetChildren(ctx context.Context, parentID string) ([]*model.Fi
 	var out []*model.File
 	for rows.Next() {
 		var f model.File
-		if err := rows.Scan(&f.ID, &f.Title, &f.CreatedAt, &f.UpdatedAt, &f.IsFolder, &f.ParentID, &f.SortOrder, &f.IsDeleted, &f.DeletedAt, &f.IsPinned); err != nil {
+		if err := rows.Scan(&f.ID, &f.Title, &f.Content, &f.CreatedAt, &f.UpdatedAt, &f.IsFolder, &f.ParentID, &f.SortOrder, &f.IsDeleted, &f.DeletedAt, &f.IsPinned); err != nil {
 			return nil, err
 		}
 		out = append(out, &f)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return out, nil
 }

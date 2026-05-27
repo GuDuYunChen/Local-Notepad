@@ -61,26 +61,44 @@ export class VideoNode extends DecoratorNode {
   }
 }
 
+function formatDuration(seconds) {
+    if (!seconds) return '';
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+}
+
+function isValidVideoUrl(url) {
+    if (!url) return false;
+    if (url.startsWith('data:')) return true;
+    if (url.startsWith('blob:')) return true;
+    try {
+        const parsed = new URL(url);
+        return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+    } catch {
+        return false;
+    }
+}
+
 function VideoComponent({ src, width, height, poster, duration }) {
-  const formatDuration = (seconds) => {
-      if (!seconds) return '';
-      const m = Math.floor(seconds / 60);
-      const s = Math.floor(seconds % 60);
-      return `${m}:${s < 10 ? '0' : ''}${s}`;
-  };
+  const safeSrc = isValidVideoUrl(src) ? src : '';
 
   return (
     <div className="editor-video-wrapper" style={{ position: 'relative', display: 'inline-block' }}>
-      <video
-        src={src}
-        controls
-        poster={poster}
-        style={{ maxWidth: '100%', maxHeight: 400, display: 'block' }}
-      />
-      {duration && (
+      {safeSrc ? (
+        <video
+          src={safeSrc}
+          controls
+          poster={poster}
+          style={{ maxWidth: '100%', maxHeight: 400, display: 'block' }}
+        />
+      ) : (
+        <div className="video-placeholder">无效的视频链接</div>
+      )}
+      {duration && safeSrc && (
           <div style={{
               position: 'absolute',
-              bottom: 40, // above controls roughly
+              bottom: 40,
               right: 10,
               background: 'rgba(0,0,0,0.7)',
               color: 'white',

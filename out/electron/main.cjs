@@ -105309,118 +105309,128 @@ async function exportToPDF(file, outputPath) {
     show: false,
     width: 800,
     height: 600,
-    webPreferences: { nodeIntegration: false }
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true
+    }
   });
-  const htmlContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <style>
-                body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; line-height: 1.6; }
-                h1, h2, h3, h4 { margin-top: 24px; margin-bottom: 12px; }
-                p { margin-bottom: 12px; }
-                blockquote { border-left: 4px solid #ddd; padding-left: 16px; color: #666; margin: 16px 0; }
-                code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-family: 'Courier New', monospace; }
-                pre { background: #f5f5f5; padding: 16px; border-radius: 4px; overflow-x: auto; }
-                table { border-collapse: collapse; width: 100%; margin: 16px 0; }
-                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                th { background: #f5f5f5; font-weight: 600; }
-                img { max-width: 100%; height: auto; }
-                ul, ol { padding-left: 24px; }
-                li { margin-bottom: 4px; }
-            </style>
-        </head>
-        <body>
-            <h1>${file.title}</h1>
-            <div id="content"></div>
-        </body>
-        </html>
-    `;
-  await win.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(htmlContent));
-  const contentDiv = await win.webContents.executeJavaScript(`
-        (function() {
-            const content = ${JSON.stringify(file.content || "")}
-            const container = document.getElementById('content')
-            try {
-                const state = JSON.parse(content)
-                const html = convertLexicalToHTML(state)
-                container.innerHTML = html
-            } catch(e) {
-                container.innerHTML = '<p>' + content.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</p>'
-            }
-            return container.innerHTML
-        })()
-    `);
-  await win.webContents.executeJavaScript(`
-        function convertLexicalToHTML(state) {
-            if (!state.root || !state.root.children) return ''
-            return state.root.children.map(node => convertNode(node)).join('')
-        }
-        function convertNode(node) {
-            if (!node.type) return ''
-            switch(node.type) {
-                case 'heading':
-                    const tag = node.tag || 'h1'
-                    return '<' + tag + '>' + convertChildren(node.children) + '</' + tag + '>'
-                case 'paragraph':
-                    return '<p>' + convertChildren(node.children) + '</p>'
-                case 'quote':
-                    return '<blockquote>' + convertChildren(node.children) + '</blockquote>'
-                case 'list':
-                    const listTag = node.listType === 'number' ? 'ol' : 'ul'
-                    return '<' + listTag + '>' + node.children.map(item => '<li>' + convertChildren(item.children) + '</li>').join('') + '</' + listTag + '>'
-                case 'code':
-                case 'code-block':
-                    return '<pre><code>' + convertChildren(node.children) + '</code></pre>'
-                case 'image':
-                    return '<img src="' + (node.src || '') + '" alt="' + (node.alt || '') + '">'
-                case 'table':
-                    return convertTable(node)
-                default:
-                    if (node.children) return convertChildren(node.children)
-                    return ''
-            }
-        }
-        function convertChildren(children) {
-            if (!children) return ''
-            return children.map(child => {
-                if (child.type === 'text') {
-                    let text = (child.text || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-                    const f = child.format || 0
-                    if (f & 16) return '<code>' + text + '</code>'
-                    if (f & 8) text = '<s>' + text + '</s>'
-                    if (f & 2) text = '<em>' + text + '</em>'
-                    if (f & 1) text = '<strong>' + text + '</strong>'
-                    return text
+  try {
+    const htmlContent = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <style>
+                    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; line-height: 1.6; }
+                    h1, h2, h3, h4 { margin-top: 24px; margin-bottom: 12px; }
+                    p { margin-bottom: 12px; }
+                    blockquote { border-left: 4px solid #ddd; padding-left: 16px; color: #666; margin: 16px 0; }
+                    code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-family: 'Courier New', monospace; }
+                    pre { background: #f5f5f5; padding: 16px; border-radius: 4px; overflow-x: auto; }
+                    table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+                    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                    th { background: #f5f5f5; font-weight: 600; }
+                    img { max-width: 100%; height: auto; }
+                    ul, ol { padding-left: 24px; }
+                    li { margin-bottom: 4px; }
+                </style>
+            </head>
+            <body>
+                <h1>${escapeHTML(file.title)}</h1>
+                <div id="content"></div>
+            </body>
+            </html>
+        `;
+    await win.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(htmlContent));
+    const safeContent = JSON.stringify(file.content || "");
+    const contentDiv = await win.webContents.executeJavaScript(`
+            (function() {
+                const content = ${safeContent}
+                const container = document.getElementById('content')
+                try {
+                    const state = JSON.parse(content)
+                    const html = convertLexicalToHTML(state)
+                    container.innerHTML = html
+                } catch(e) {
+                    container.innerHTML = '<p>' + content.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</p>'
                 }
-                if (child.type === 'link') return '<a href="' + (child.url || '') + '">' + convertChildren(child.children) + '</a>'
-                if (child.type === 'linebreak') return '<br>'
-                return ''
-            }).join('')
-        }
-        function convertTable(node) {
-            if (!node.children) return ''
-            let html = '<table>'
-            node.children.forEach((row, i) => {
-                html += '<tr>'
-                row.children.forEach(cell => {
-                    const tag = i === 0 ? 'th' : 'td'
-                    html += '<' + tag + '>' + convertChildren(cell.children) + '</' + tag + '>'
+                return container.innerHTML
+            })()
+        `);
+    await win.webContents.executeJavaScript(`
+            function convertLexicalToHTML(state) {
+                if (!state.root || !state.root.children) return ''
+                return state.root.children.map(node => convertNode(node)).join('')
+            }
+            function convertNode(node) {
+                if (!node.type) return ''
+                switch(node.type) {
+                    case 'heading':
+                        const tag = node.tag || 'h1'
+                        return '<' + tag + '>' + convertChildren(node.children) + '</' + tag + '>'
+                    case 'paragraph':
+                        return '<p>' + convertChildren(node.children) + '</p>'
+                    case 'quote':
+                        return '<blockquote>' + convertChildren(node.children) + '</blockquote>'
+                    case 'list':
+                        const listTag = node.listType === 'number' ? 'ol' : 'ul'
+                        return '<' + listTag + '>' + node.children.map(item => '<li>' + convertChildren(item.children) + '</li>').join('') + '</' + listTag + '>'
+                    case 'code':
+                    case 'code-block':
+                        return '<pre><code>' + convertChildren(node.children) + '</code></pre>'
+                    case 'image':
+                        return '<img src="' + (node.src || '').replace(/"/g, '&quot;') + '" alt="' + (node.alt || '').replace(/"/g, '&quot;') + '">'
+                    case 'table':
+                        return convertTable(node)
+                    default:
+                        if (node.children) return convertChildren(node.children)
+                        return ''
+                }
+            }
+            function convertChildren(children) {
+                if (!children) return ''
+                return children.map(child => {
+                    if (child.type === 'text') {
+                        let text = (child.text || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                        const f = child.format || 0
+                        if (f & 16) return '<code>' + text + '</code>'
+                        if (f & 8) text = '<s>' + text + '</s>'
+                        if (f & 2) text = '<em>' + text + '</em>'
+                        if (f & 1) text = '<strong>' + text + '</strong>'
+                        return text
+                    }
+                    if (child.type === 'link') return '<a href="' + (child.url || '').replace(/"/g, '&quot;') + '">' + convertChildren(child.children) + '</a>'
+                    if (child.type === 'linebreak') return '<br>'
+                    return ''
+                }).join('')
+            }
+            function convertTable(node) {
+                if (!node.children) return ''
+                let html = '<table>'
+                node.children.forEach((row, i) => {
+                    html += '<tr>'
+                    row.children.forEach(cell => {
+                        const tag = i === 0 ? 'th' : 'td'
+                        html += '<' + tag + '>' + convertChildren(cell.children) + '</' + tag + '>'
+                    })
+                    html += '</tr>'
                 })
-                html += '</tr>'
-            })
-            html += '</table>'
-            return html
-        }
-    `);
-  const pdfBuffer = await win.webContents.printToPDF({
-    pageSize: "A4",
-    margins: { top: 20, bottom: 20, left: 20, right: 20 }
-  });
-  win.close();
-  import_fs.default.writeFileSync(outputPath, pdfBuffer);
-  return outputPath;
+                html += '</table>'
+                return html
+            }
+        `);
+    const pdfBuffer = await win.webContents.printToPDF({
+      pageSize: "A4",
+      margins: { top: 20, bottom: 20, left: 20, right: 20 }
+    });
+    import_fs.default.writeFileSync(outputPath, pdfBuffer);
+    return outputPath;
+  } finally {
+    if (!win.isDestroyed()) {
+      win.close();
+    }
+  }
 }
 async function exportToHTML(file, outputPath) {
   const htmlContent = convertLexicalToFullHTML(file);
@@ -105782,17 +105792,25 @@ import_electron4.app.whenReady().then(async () => {
 import_electron4.app.on("window-all-closed", () => {
   if (process.platform !== "darwin") import_electron4.app.quit();
 });
-import_electron4.app.on("before-quit", () => {
+import_electron4.app.on("before-quit", (event) => {
   if (backend) {
-    backend.kill();
-    backend = null;
+    event.preventDefault();
+    backend.on("exit", () => {
+      backend = null;
+      import_electron4.app.quit();
+    });
+    backend.kill("SIGTERM");
   }
 });
 function startBackend() {
   if (backend) return;
   try {
-    const exe = import_node_path.default.join(process.resourcesPath, "bin", "notepad-server.exe");
+    const backendBin = process.platform === "win32" ? "notepad-server.exe" : "notepad-server";
+    const exe = import_node_path.default.join(process.resourcesPath, "bin", backendBin);
     backend = (0, import_node_child_process.spawn)(exe, { stdio: "ignore" });
+    backend.on("error", (err) => {
+      import_electron4.dialog.showErrorBox("\u540E\u7AEF\u542F\u52A8\u5931\u8D25", `\u65E0\u6CD5\u542F\u52A8\u540E\u7AEF\u670D\u52A1: ${err.message}`);
+    });
   } catch (e) {
     import_electron4.dialog.showErrorBox("\u540E\u7AEF\u542F\u52A8\u5931\u8D25", String(e));
   }

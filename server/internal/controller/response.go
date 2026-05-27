@@ -12,3 +12,11 @@ func writeOK(r *ghttp.Request, data interface{}) {
 func writeErr(r *ghttp.Request, code int, msg string, err error) {
 	r.Response.WriteJson(g.Map{"code": code, "message": msg, "data": nil})
 }
+
+func writeErrWithDetail(r *ghttp.Request, code int, msg string, err error) {
+	detail := ""
+	if err != nil {
+		detail = err.Error()
+	}
+	r.Response.WriteJson(g.Map{"code": code, "message": msg, "detail": detail, "data": nil})
+}

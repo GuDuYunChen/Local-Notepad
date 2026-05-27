@@ -36,6 +36,9 @@ func (d *VersionDAO) GetVersions(ctx context.Context, fileID string) ([]*model.F
 		}
 		versions = append(versions, &v)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	return versions, nil
 }
 

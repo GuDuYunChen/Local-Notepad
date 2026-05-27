@@ -1,8 +1,6 @@
 package middleware
 
 import (
-    "strings"
-
     "github.com/gogf/gf/v2/net/ghttp"
 )
 
@@ -19,9 +17,6 @@ func isAllowedOrigin(origin string) bool {
             return true
         }
     }
-    if strings.HasPrefix(origin, "http://localhost:") || strings.HasPrefix(origin, "http://127.0.0.1:") {
-        return true
-    }
     return false
 }
 
@@ -29,7 +24,8 @@ func CORS(r *ghttp.Request) {
     h := r.Response.Header()
     origin := r.Header.Get("Origin")
     if origin == "" || !isAllowedOrigin(origin) {
-        origin = "*"
+        r.Middleware.Next()
+        return
     }
     h.Set("Access-Control-Allow-Origin", origin)
     h.Set("Vary", "Origin")
