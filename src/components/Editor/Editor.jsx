@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { LexicalComposer } from '@lexical/react/LexicalComposer';
 import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin';
 import { ContentEditable } from '@lexical/react/LexicalContentEditable';
@@ -109,25 +109,27 @@ function LoadContentPlugin({ content }) {
   return null;
 }
 
+const EDITOR_NODES = [
+  HeadingNode, QuoteNode, ListItemNode, ListNode, CodeHighlightNode, CodeNode,
+  TableNode, TableCellNode, TableRowNode,
+  AutoLinkNode, LinkNode,
+  ImageNode, VideoNode, ImageGridNode,
+  CodeBlockNode,
+  TodoNode, DividerNode, CalloutNode,
+  ToggleNode, EmbedNode,
+  InlineCodeNode, MentionNode
+];
+
 export default function Editor({ initialContent, onChange, readOnly }) {
-  const initialConfig = {
+  const initialConfig = useMemo(() => ({
     namespace: 'MyEditor',
     theme,
     onError(error) {
       console.error(error);
     },
-    nodes: [
-      HeadingNode, QuoteNode, ListItemNode, ListNode, CodeHighlightNode, CodeNode,
-      TableNode, TableCellNode, TableRowNode,
-      AutoLinkNode, LinkNode,
-      ImageNode, VideoNode, ImageGridNode,
-      CodeBlockNode,
-      TodoNode, DividerNode, CalloutNode,
-      ToggleNode, EmbedNode,
-      InlineCodeNode, MentionNode
-    ],
+    nodes: EDITOR_NODES,
     editable: !readOnly,
-  };
+  }), [readOnly]);
 
   return (
     <LexicalComposer initialConfig={initialConfig}>

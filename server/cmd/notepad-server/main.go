@@ -159,8 +159,10 @@ func main() {
 	group := s.Group("/api")
 	
 	fileDAO := &dao.FileDAO{DB: db}
-	fileLogic := &logic.FileLogic{FileDAO: fileDAO}
-	fileController := &controller.FileController{FileLogic: fileLogic}
+	linkDAO := &dao.LinkDAO{DB: db}
+	versionDAO := &dao.VersionDAO{DB: db}
+	fileLogic := &logic.FileLogic{FileDAO: fileDAO, LinkDAO: linkDAO, VersionDAO: versionDAO}
+	fileController := &controller.FileController{FileLogic: fileLogic, LinkDAO: linkDAO}
 	
 	settingsDAO := &dao.SettingsDAO{DB: db}
 	settingsLogic := &logic.SettingsLogic{SettingsDAO: settingsDAO}
@@ -269,6 +271,44 @@ func migrate(ctx context.Context, db *sql.DB) error {
 			stmts: []string{
 				`CREATE TABLE IF NOT EXISTS tags (id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, color TEXT DEFAULT '#7e5bef')`,
 				`CREATE TABLE IF NOT EXISTS file_tags (file_id TEXT NOT NULL, tag_id TEXT NOT NULL, PRIMARY KEY (file_id, tag_id), FOREIGN KEY (file_id) REFERENCES files(id), FOREIGN KEY (tag_id) REFERENCES tags(id))`,
+			},
+		},
+		{
+			version: 5,
+			stmts: []string{
+				`CREATE VIRTUAL TABLE IF NOT EXISTS files_fts USING fts5(title, content, content='files', content_rowid='rowid')`,
+				`CREATE TRIGGER IF NOT EXISTS files_fts_insert AFTER INSERT ON files BEGIN INSERT INTO files_fts(rowid, title, content) VALUES (new.rowid, new.title, new.content); END`,
+				`CREATE TRIGGER IF NOT EXISTS files_fts_update AFTER UPDATE ON files BEGIN UPDATE files_fts SET title=new.title, content=new.content WHERE rowid=new.rowid; END`,
+				`CREATE TRIGGER IF NOT EXISTS files_fts_delete AFTER DELETE ON files BEGIN DELETE FROM files_fts WHERE rowid=old.rowid; END`,
+			},
+		},
+		{
+			version: 6,
+			stmts: []string{
+				`CREATE TABLE IF NOT EXISTS links (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					source_id TEXT NOT NULL,
+					target_id TEXT NOT NULL,
+					created_at INTEGER NOT NULL,
+					UNIQUE(source_id, target_id)
+				)`,
+				`CREATE INDEX IF NOT EXISTS idx_links_source ON links(source_id)`,
+				`CREATE INDEX IF NOT EXISTS idx_links_target ON links(target_id)`,
+			},
+		},
+		{
+			version: 7,
+			stmts: []string{
+				`CREATE TABLE IF NOT EXISTS file_versions (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					file_id TEXT NOT NULL,
+					content TEXT NOT NULL,
+					title TEXT NOT NULL,
+					created_at INTEGER NOT NULL,
+					FOREIGN KEY (file_id) REFERENCES files(id)
+				)`,
+				`CREATE INDEX IF NOT EXISTS idx_file_versions_file_id ON file_versions(file_id)`,
+				`CREATE INDEX IF NOT EXISTS idx_file_versions_created_at ON file_versions(created_at DESC)`,
 			},
 		},
 	}

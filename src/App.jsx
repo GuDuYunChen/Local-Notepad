@@ -2,6 +2,8 @@ import React, { useEffect, useState, useRef } from 'react'
 import ThemeToggle from './components/ThemeToggle'
 import TextEditor from './components/TextEditor'
 import FileList from './components/FileList'
+import BacklinksPanel from './components/BacklinksPanel'
+import VersionHistory from './components/VersionHistory'
 import { api } from '~/services/api'
 import ConfirmDialog from './components/ConfirmDialog'
 import ShortcutsModal from './components/ShortcutsModal'
@@ -33,6 +35,8 @@ export default function App() {
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [backupOpen, setBackupOpen] = useState(false)
   const [focusMode, setFocusMode] = useState(false)
+  const [showBacklinks, setShowBacklinks] = useState(false)
+  const [showVersions, setShowVersions] = useState(false)
   // Check unsaved changes: compare current content with original content from database
   // Note: current.content holds the original content loaded from DB.
   // content holds the current editor content.
@@ -119,9 +123,17 @@ export default function App() {
         <h1>记事本</h1>
         <div className="spacer" />
         {!focusMode && (
-          <button className="btn header-btn" onClick={() => setFocusMode(true)} title="专注模式 (F11)" aria-label="进入专注模式">
-            ◧ 专注模式
-          </button>
+          <>
+            <button className="btn header-btn" onClick={() => setShowBacklinks(!showBacklinks)} title="反向链接" aria-label="反向链接">
+              🔗 反向链接
+            </button>
+            <button className="btn header-btn" onClick={() => setShowVersions(!showVersions)} title="版本历史" aria-label="版本历史">
+              📜 版本历史
+            </button>
+            <button className="btn header-btn" onClick={() => setFocusMode(true)} title="专注模式 (F11)" aria-label="进入专注模式">
+              ◧ 专注模式
+            </button>
+          </>
         )}
         <button className="btn header-btn" onClick={() => setBackupOpen(true)} title="备份与恢复" aria-label="备份与恢复">💾 备份</button>
         <button className="btn header-btn" onClick={() => setShortcutsOpen(true)} title="快捷键 (Ctrl+/)" aria-label="快捷键面板">⌨️ 快捷键</button>
@@ -233,6 +245,30 @@ export default function App() {
                   }
                 }}
               />
+              {showBacklinks && current && (
+                <BacklinksPanel
+                  fileId={current.id}
+                  onSelectFile={(id) => {
+                    api(`/api/files/${id}`).then(f => {
+                      setCurrent(f)
+                      setContent(f.content || '')
+                    })
+                  }}
+                />
+              )}
+              {showVersions && current && (
+                <VersionHistory
+                  fileId={current.id}
+                  onRestore={() => {
+                    if (current) {
+                      api(`/api/files/${current.id}`).then(f => {
+                        setCurrent(f)
+                        setContent(f.content || '')
+                      })
+                    }
+                  }}
+                />
+              )}
             </section>
           </>
         ) : (

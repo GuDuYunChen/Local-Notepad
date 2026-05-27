@@ -27,7 +27,15 @@ export async function handleRestore(backupFile) {
     fs.mkdirSync(dbDir, { recursive: true })
   }
   
-  fs.copyFileSync(backupFile, dbPath)
+  const tempPath = dbPath + '.tmp.restore'
+  fs.copyFileSync(backupFile, tempPath)
+  fs.renameSync(tempPath, dbPath)
+  
+  const walPath = dbPath + '-wal'
+  const shmPath = dbPath + '-shm'
+  if (fs.existsSync(walPath)) fs.unlinkSync(walPath)
+  if (fs.existsSync(shmPath)) fs.unlinkSync(shmPath)
+  
   return { success: true }
 }
 

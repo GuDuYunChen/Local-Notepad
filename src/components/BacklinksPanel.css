@@ -1,0 +1,49 @@
+.backlinks-panel {
+  border-top: 1px solid var(--border-color, #e5e7eb);
+  padding: 12px;
+  background: var(--bg-secondary, #f9fafb);
+}
+
+.backlinks-header h3 {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #374151);
+}
+
+.backlinks-list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.backlinks-loading,
+.backlinks-empty {
+  padding: 12px;
+  text-align: center;
+  color: var(--text-secondary, #6b7280);
+  font-size: 12px;
+}
+
+.backlink-item {
+  padding: 8px;
+  margin-bottom: 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.backlink-item:hover {
+  background: var(--hover-bg, #f3f4f6);
+}
+
+.backlink-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary, #374151);
+  margin-bottom: 2px;
+}
+
+.backlink-time {
+  font-size: 11px;
+  color: var(--text-secondary, #9ca3af);
+}

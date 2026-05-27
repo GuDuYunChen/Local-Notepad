@@ -1,6 +1,7 @@
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, BorderStyle, WidthType, ImageRun } from 'docx'
 import fs from 'fs'
 import path from 'path'
+import { BrowserWindow } from 'electron'
 
 // 辅助：获取文件内容（从 Go 后端）
 async function fetchFileContent(id) {
@@ -423,4 +424,254 @@ function processTableToMarkdown(node, lines) {
         }
     }
     lines.push('')
+}
+
+export async function exportToPDF(file, outputPath) {
+    const win = new BrowserWindow({
+        show: false,
+        width: 800,
+        height: 600,
+        webPreferences: { nodeIntegration: false }
+    })
+
+    const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <style>
+                body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; line-height: 1.6; }
+                h1, h2, h3, h4 { margin-top: 24px; margin-bottom: 12px; }
+                p { margin-bottom: 12px; }
+                blockquote { border-left: 4px solid #ddd; padding-left: 16px; color: #666; margin: 16px 0; }
+                code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-family: 'Courier New', monospace; }
+                pre { background: #f5f5f5; padding: 16px; border-radius: 4px; overflow-x: auto; }
+                table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                th { background: #f5f5f5; font-weight: 600; }
+                img { max-width: 100%; height: auto; }
+                ul, ol { padding-left: 24px; }
+                li { margin-bottom: 4px; }
+            </style>
+        </head>
+        <body>
+            <h1>${file.title}</h1>
+            <div id="content"></div>
+        </body>
+        </html>
+    `
+
+    await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(htmlContent))
+    
+    const contentDiv = await win.webContents.executeJavaScript(`
+        (function() {
+            const content = ${JSON.stringify(file.content || '')}
+            const container = document.getElementById('content')
+            try {
+                const state = JSON.parse(content)
+                const html = convertLexicalToHTML(state)
+                container.innerHTML = html
+            } catch(e) {
+                container.innerHTML = '<p>' + content.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</p>'
+            }
+            return container.innerHTML
+        })()
+    `)
+
+    await win.webContents.executeJavaScript(`
+        function convertLexicalToHTML(state) {
+            if (!state.root || !state.root.children) return ''
+            return state.root.children.map(node => convertNode(node)).join('')
+        }
+        function convertNode(node) {
+            if (!node.type) return ''
+            switch(node.type) {
+                case 'heading':
+                    const tag = node.tag || 'h1'
+                    return '<' + tag + '>' + convertChildren(node.children) + '</' + tag + '>'
+                case 'paragraph':
+                    return '<p>' + convertChildren(node.children) + '</p>'
+                case 'quote':
+                    return '<blockquote>' + convertChildren(node.children) + '</blockquote>'
+                case 'list':
+                    const listTag = node.listType === 'number' ? 'ol' : 'ul'
+                    return '<' + listTag + '>' + node.children.map(item => '<li>' + convertChildren(item.children) + '</li>').join('') + '</' + listTag + '>'
+                case 'code':
+                case 'code-block':
+                    return '<pre><code>' + convertChildren(node.children) + '</code></pre>'
+                case 'image':
+                    return '<img src="' + (node.src || '') + '" alt="' + (node.alt || '') + '">'
+                case 'table':
+                    return convertTable(node)
+                default:
+                    if (node.children) return convertChildren(node.children)
+                    return ''
+            }
+        }
+        function convertChildren(children) {
+            if (!children) return ''
+            return children.map(child => {
+                if (child.type === 'text') {
+                    let text = (child.text || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                    const f = child.format || 0
+                    if (f & 16) return '<code>' + text + '</code>'
+                    if (f & 8) text = '<s>' + text + '</s>'
+                    if (f & 2) text = '<em>' + text + '</em>'
+                    if (f & 1) text = '<strong>' + text + '</strong>'
+                    return text
+                }
+                if (child.type === 'link') return '<a href="' + (child.url || '') + '">' + convertChildren(child.children) + '</a>'
+                if (child.type === 'linebreak') return '<br>'
+                return ''
+            }).join('')
+        }
+        function convertTable(node) {
+            if (!node.children) return ''
+            let html = '<table>'
+            node.children.forEach((row, i) => {
+                html += '<tr>'
+                row.children.forEach(cell => {
+                    const tag = i === 0 ? 'th' : 'td'
+                    html += '<' + tag + '>' + convertChildren(cell.children) + '</' + tag + '>'
+                })
+                html += '</tr>'
+            })
+            html += '</table>'
+            return html
+        }
+    `)
+
+    const pdfBuffer = await win.webContents.printToPDF({
+        pageSize: 'A4',
+        margins: { top: 20, bottom: 20, left: 20, right: 20 }
+    })
+
+    win.close()
+    fs.writeFileSync(outputPath, pdfBuffer)
+    return outputPath
+}
+
+export async function exportToHTML(file, outputPath) {
+    const htmlContent = convertLexicalToFullHTML(file)
+    fs.writeFileSync(outputPath, htmlContent, 'utf-8')
+    return outputPath
+}
+
+function convertLexicalToFullHTML(file) {
+    let bodyHTML = ''
+    try {
+        const state = JSON.parse(file.content || '')
+        bodyHTML = state.root ? convertLexicalRootToHTML(state.root) : `<p>${escapeHTML(file.content)}</p>`
+    } catch {
+        bodyHTML = `<p>${escapeHTML(file.content || '')}</p>`
+    }
+
+    return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${escapeHTML(file.title)}</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; line-height: 1.6; color: #333; }
+        h1 { border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        h1, h2, h3, h4 { margin-top: 24px; margin-bottom: 12px; }
+        p { margin-bottom: 12px; }
+        blockquote { border-left: 4px solid #ddd; padding-left: 16px; color: #666; margin: 16px 0; }
+        code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-family: 'Courier New', Consolas, monospace; font-size: 0.9em; }
+        pre { background: #f5f5f5; padding: 16px; border-radius: 4px; overflow-x: auto; }
+        pre code { background: none; padding: 0; }
+        table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #f5f5f5; font-weight: 600; }
+        img { max-width: 100%; height: auto; border-radius: 4px; }
+        ul, ol { padding-left: 24px; }
+        li { margin-bottom: 4px; }
+        a { color: #0366d6; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        hr { border: none; border-top: 1px solid #eee; margin: 24px 0; }
+    </style>
+</head>
+<body>
+    <h1>${escapeHTML(file.title)}</h1>
+    ${bodyHTML}
+</body>
+</html>`
+}
+
+function convertLexicalRootToHTML(root) {
+    if (!root.children) return ''
+    return root.children.map(node => convertNodeToHTML(node)).join('')
+}
+
+function convertNodeToHTML(node) {
+    if (!node || !node.type) return ''
+    switch (node.type) {
+        case 'heading':
+            const tag = node.tag || 'h1'
+            return `<${tag}>${convertChildrenToHTML(node.children)}</${tag}>`
+        case 'paragraph':
+            return `<p>${convertChildrenToHTML(node.children)}</p>`
+        case 'quote':
+            return `<blockquote>${convertChildrenToHTML(node.children)}</blockquote>`
+        case 'list':
+            const listTag = node.listType === 'number' ? 'ol' : 'ul'
+            return `<${listTag}>${node.children.map(item => `<li>${convertChildrenToHTML(item.children)}</li>`).join('')}</${listTag}>`
+        case 'code':
+        case 'code-block':
+            const lang = node.language ? ` class="language-${node.language}"` : ''
+            return `<pre><code${lang}>${escapeHTML(convertChildrenToHTML(node.children))}</code></pre>`
+        case 'image':
+            return `<img src="${node.src || ''}" alt="${escapeHTML(node.alt || '')}">`
+        case 'image-grid':
+            return `<div class="image-grid">${node.children.map(img => `<img src="${img.src || ''}" alt="${escapeHTML(img.alt || '')}">`).join('')}</div>`
+        case 'table':
+            return convertTableToHTML(node)
+        case 'divider':
+            return '<hr>'
+        case 'todo':
+            const checked = node.checked ? 'checked' : ''
+            return `<p><input type="checkbox" disabled ${checked}> ${convertChildrenToHTML(node.children)}</p>`
+        default:
+            if (node.children) return convertChildrenToHTML(node.children)
+            return ''
+    }
+}
+
+function convertChildrenToHTML(children) {
+    if (!children) return ''
+    return children.map(child => {
+        if (child.type === 'text') {
+            let text = escapeHTML(child.text || '')
+            const f = child.format || 0
+            if (f & 16) return `<code>${text}</code>`
+            if (f & 8) text = `<s>${text}</s>`
+            if (f & 2) text = `<em>${text}</em>`
+            if (f & 1) text = `<strong>${text}</strong>`
+            return text
+        }
+        if (child.type === 'link') return `<a href="${child.url || ''}">${convertChildrenToHTML(child.children)}</a>`
+        if (child.type === 'linebreak') return '<br>'
+        return ''
+    }).join('')
+}
+
+function convertTableToHTML(node) {
+    if (!node.children) return ''
+    let html = '<table>'
+    node.children.forEach((row, i) => {
+        html += '<tr>'
+        row.children.forEach(cell => {
+            const tag = i === 0 ? 'th' : 'td'
+            html += `<${tag}>${convertChildrenToHTML(cell.children)}</${tag}>`
+        })
+        html += '</tr>'
+    })
+    html += '</table>'
+    return html
+}
+
+function escapeHTML(str) {
+    if (!str) return ''
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }

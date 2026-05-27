@@ -85322,7 +85322,7 @@ var require_turndown_plugin_gfm_cjs = __commonJS({
 });
 
 // electron/main.js
-var import_electron2 = require("electron");
+var import_electron3 = require("electron");
 var import_node_child_process = require("node:child_process");
 var import_node_path = __toESM(require("node:path"), 1);
 
@@ -104977,6 +104977,7 @@ var UTF16BE = new Uint8Array([254, 255]);
 // electron/export.js
 var import_fs = __toESM(require("fs"), 1);
 var import_path = __toESM(require("path"), 1);
+var import_electron = require("electron");
 async function fetchFileContent(id) {
   const base = process.env.API_BASE || "http://127.0.0.1:27121";
   const res = await fetch(`${base}/api/files/${id}`);
@@ -105310,7 +105311,7 @@ var XLSX = __toESM(require_xlsx(), 1);
 var import_word_extractor = __toESM(require_word(), 1);
 var import_fs2 = __toESM(require("fs"), 1);
 var import_path2 = __toESM(require("path"), 1);
-var import_electron = require("electron");
+var import_electron2 = require("electron");
 var import_turndown = __toESM(require_turndown_cjs(), 1);
 var import_turndown_plugin_gfm = __toESM(require_turndown_plugin_gfm_cjs(), 1);
 var turndownService = new import_turndown.default({
@@ -105329,7 +105330,7 @@ turndownService.addRule("complexTable", {
   }
 });
 async function selectAndParseFiles() {
-  const { filePaths } = await import_electron.dialog.showOpenDialog({
+  const { filePaths } = await import_electron2.dialog.showOpenDialog({
     properties: ["openFile", "multiSelections"],
     filters: [
       { name: "\u6240\u6709\u652F\u6301\u683C\u5F0F", extensions: ["docx", "doc", "xlsx", "xls", "md", "txt"] },
@@ -105417,7 +105418,13 @@ async function handleRestore(backupFile) {
   if (!import_fs3.default.existsSync(dbDir)) {
     import_fs3.default.mkdirSync(dbDir, { recursive: true });
   }
-  import_fs3.default.copyFileSync(backupFile, dbPath);
+  const tempPath = dbPath + ".tmp.restore";
+  import_fs3.default.copyFileSync(backupFile, tempPath);
+  import_fs3.default.renameSync(tempPath, dbPath);
+  const walPath = dbPath + "-wal";
+  const shmPath = dbPath + "-shm";
+  if (import_fs3.default.existsSync(walPath)) import_fs3.default.unlinkSync(walPath);
+  if (import_fs3.default.existsSync(shmPath)) import_fs3.default.unlinkSync(shmPath);
   return { success: true };
 }
 async function listBackups(backupDir) {
@@ -105447,9 +105454,9 @@ function getDefaultDBPath() {
 var mainWindow = null;
 var backend = null;
 function createWindow() {
-  const isDev = !import_electron2.app.isPackaged;
-  const iconPath = isDev ? import_node_path.default.join(__dirname, "../../build/icon.ico") : import_node_path.default.join(import_electron2.app.getAppPath(), "build/icon.ico");
-  mainWindow = new import_electron2.BrowserWindow({
+  const isDev = !import_electron3.app.isPackaged;
+  const iconPath = isDev ? import_node_path.default.join(__dirname, "../../build/icon.ico") : import_node_path.default.join(import_electron3.app.getAppPath(), "build/icon.ico");
+  mainWindow = new import_electron3.BrowserWindow({
     width: 1100,
     height: 720,
     minWidth: 900,
@@ -105472,7 +105479,7 @@ function createWindow() {
     }
   } else {
     process.env.API_BASE = "http://127.0.0.1:27121";
-    const indexPath = import_node_path.default.join(import_electron2.app.getAppPath(), "dist/index.html");
+    const indexPath = import_node_path.default.join(import_electron3.app.getAppPath(), "dist/index.html");
     startBackend();
     mainWindow.loadFile(indexPath);
   }
@@ -105480,10 +105487,10 @@ function createWindow() {
     mainWindow = null;
   });
 }
-import_electron2.app.commandLine.appendSwitch("disable-features", "Autofill");
-import_electron2.app.whenReady().then(async () => {
-  import_electron2.app.commandLine.appendSwitch("lang", "zh-CN");
-  const menu = import_electron2.Menu.buildFromTemplate([
+import_electron3.app.commandLine.appendSwitch("disable-features", "Autofill");
+import_electron3.app.whenReady().then(async () => {
+  import_electron3.app.commandLine.appendSwitch("lang", "zh-CN");
+  const menu = import_electron3.Menu.buildFromTemplate([
     {
       label: "\u6587\u4EF6",
       submenu: [{ role: "quit", label: "\u9000\u51FA" }]
@@ -105511,32 +105518,32 @@ import_electron2.app.whenReady().then(async () => {
       submenu: [{ role: "about", label: "\u5173\u4E8E" }]
     }
   ]);
-  import_electron2.Menu.setApplicationMenu(menu);
-  if (import_electron2.app.isPackaged) {
-    import_electron2.app.setAsDefaultProtocolClient("notepad");
+  import_electron3.Menu.setApplicationMenu(menu);
+  if (import_electron3.app.isPackaged) {
+    import_electron3.app.setAsDefaultProtocolClient("notepad");
   }
-  const gotLock = import_electron2.app.requestSingleInstanceLock();
+  const gotLock = import_electron3.app.requestSingleInstanceLock();
   if (!gotLock) {
-    import_electron2.app.quit();
+    import_electron3.app.quit();
     return;
   }
-  import_electron2.app.on("second-instance", () => {
+  import_electron3.app.on("second-instance", () => {
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.focus();
     }
   });
   createWindow();
-  import_electron2.app.on("activate", () => {
-    if (import_electron2.BrowserWindow.getAllWindows().length === 0) {
+  import_electron3.app.on("activate", () => {
+    if (import_electron3.BrowserWindow.getAllWindows().length === 0) {
       createWindow();
     }
   });
 });
-import_electron2.app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") import_electron2.app.quit();
+import_electron3.app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") import_electron3.app.quit();
 });
-import_electron2.app.on("before-quit", () => {
+import_electron3.app.on("before-quit", () => {
   if (backend) {
     backend.kill();
     backend = null;
@@ -105548,28 +105555,28 @@ function startBackend() {
     const exe = import_node_path.default.join(process.resourcesPath, "bin", "notepad-server.exe");
     backend = (0, import_node_child_process.spawn)(exe, { stdio: "ignore" });
   } catch (e) {
-    import_electron2.dialog.showErrorBox("\u540E\u7AEF\u542F\u52A8\u5931\u8D25", String(e));
+    import_electron3.dialog.showErrorBox("\u540E\u7AEF\u542F\u52A8\u5931\u8D25", String(e));
   }
 }
-import_electron2.ipcMain.handle("dialog:openFile", async () => {
-  const res = await import_electron2.dialog.showOpenDialog({ properties: ["openFile"], filters: [
+import_electron3.ipcMain.handle("dialog:openFile", async () => {
+  const res = await import_electron3.dialog.showOpenDialog({ properties: ["openFile"], filters: [
     { name: "Text/Markdown", extensions: ["txt", "md"] },
     { name: "All Files", extensions: ["*"] }
   ] });
   return res.canceled ? [] : res.filePaths;
 });
-import_electron2.ipcMain.handle("dialog:saveFile", async () => {
-  const res = await import_electron2.dialog.showSaveDialog({ filters: [
+import_electron3.ipcMain.handle("dialog:saveFile", async () => {
+  const res = await import_electron3.dialog.showSaveDialog({ filters: [
     { name: "Text", extensions: ["txt"] },
     { name: "Markdown", extensions: ["md"] }
   ] });
   return res.canceled ? "" : res.filePath || "";
 });
-import_electron2.ipcMain.handle("dialog:openDirectory", async () => {
-  const res = await import_electron2.dialog.showOpenDialog({ properties: ["openDirectory"] });
+import_electron3.ipcMain.handle("dialog:openDirectory", async () => {
+  const res = await import_electron3.dialog.showOpenDialog({ properties: ["openDirectory"] });
   return res.canceled ? "" : res.filePaths[0] || "";
 });
-import_electron2.ipcMain.handle("export:docx", async (event, { ids, targetDir, format = "docx" }) => {
+import_electron3.ipcMain.handle("export:docx", async (event, { ids, targetDir, format = "docx" }) => {
   try {
     const errors = await processExport(ids, targetDir, format);
     return { success: true, errors };
@@ -105578,7 +105585,7 @@ import_electron2.ipcMain.handle("export:docx", async (event, { ids, targetDir, f
     return { success: false, message: e.message };
   }
 });
-import_electron2.ipcMain.handle("import:files", async () => {
+import_electron3.ipcMain.handle("import:files", async () => {
   try {
     const results = await selectAndParseFiles();
     return { success: true, results };
@@ -105587,7 +105594,7 @@ import_electron2.ipcMain.handle("import:files", async () => {
     return { success: false, message: e.message };
   }
 });
-import_electron2.ipcMain.handle("backup:create", async (event, { targetDir }) => {
+import_electron3.ipcMain.handle("backup:create", async (event, { targetDir }) => {
   try {
     const result2 = await handleBackup(targetDir);
     return result2;
@@ -105596,7 +105603,7 @@ import_electron2.ipcMain.handle("backup:create", async (event, { targetDir }) =>
     return { success: false, message: e.message };
   }
 });
-import_electron2.ipcMain.handle("backup:restore", async (event, { backupFile }) => {
+import_electron3.ipcMain.handle("backup:restore", async (event, { backupFile }) => {
   try {
     const result2 = await handleRestore(backupFile);
     return result2;
@@ -105605,7 +105612,7 @@ import_electron2.ipcMain.handle("backup:restore", async (event, { backupFile }) 
     return { success: false, message: e.message };
   }
 });
-import_electron2.ipcMain.handle("backup:list", async (event, { backupDir }) => {
+import_electron3.ipcMain.handle("backup:list", async (event, { backupDir }) => {
   try {
     const backups = await listBackups(backupDir);
     return { success: true, backups };

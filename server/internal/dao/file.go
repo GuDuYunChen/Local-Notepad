@@ -46,10 +46,22 @@ func (d *FileDAO) DeleteRecursive(ctx context.Context, id string) error {
 	WITH RECURSIVE sub(id) AS (
 		SELECT id FROM files WHERE id = ?
 		UNION ALL
-		SELECT f.id FROM files f JOIN sub ON f.parent_id = sub.id
+		SELECT f.id FROM files f JOIN sub ON f.parent_id = sub.id WHERE f.parent_id != f.id
 	)
 	UPDATE files SET is_deleted = 1, deleted_at = ?, updated_at = ? WHERE id IN sub;`
 	_, err := d.DB.ExecContext(ctx, query, id, now, now)
+	return err
+}
+
+func (d *FileDAO) RestoreRecursive(ctx context.Context, id string) error {
+	query := `
+	WITH RECURSIVE sub(id) AS (
+		SELECT id FROM files WHERE id = ?
+		UNION ALL
+		SELECT f.id FROM files f JOIN sub ON f.parent_id = sub.id WHERE f.parent_id != f.id
+	)
+	UPDATE files SET is_deleted = 0, deleted_at = 0, updated_at = ? WHERE id IN sub;`
+	_, err := d.DB.ExecContext(ctx, query, id, time.Now().Unix())
 	return err
 }
 
@@ -64,7 +76,7 @@ func (d *FileDAO) BatchDeleteRecursive(ctx context.Context, ids []string) error 
 	WITH RECURSIVE sub(id) AS (
 		SELECT id FROM files WHERE id = ?
 		UNION ALL
-		SELECT f.id FROM files f JOIN sub ON f.parent_id = sub.id
+		SELECT f.id FROM files f JOIN sub ON f.parent_id = sub.id WHERE f.parent_id != f.id
 	)
 	UPDATE files SET is_deleted = 1, deleted_at = ?, updated_at = ? WHERE id IN sub;`
 
@@ -93,11 +105,24 @@ func (d *FileDAO) List(ctx context.Context, q string, page, size int) ([]*model.
 	}
 	offset := (page - 1) * size
 
-	query := `SELECT id, title, created_at, updated_at, is_folder, parent_id, sort_order, is_deleted, deleted_at, is_pinned 
-		FROM files WHERE is_deleted = 0 AND (title LIKE ? OR content LIKE ?) 
-		ORDER BY is_pinned DESC, sort_order DESC LIMIT ? OFFSET ?`
+	var query string
+	var args []interface{}
 
-	rows, err := d.DB.QueryContext(ctx, query, "%"+q+"%", "%"+q+"%", size, offset)
+	if q != "" {
+		query = `SELECT f.id, f.title, f.created_at, f.updated_at, f.is_folder, f.parent_id, f.sort_order, f.is_deleted, f.deleted_at, f.is_pinned 
+			FROM files f
+			INNER JOIN files_fts ft ON f.rowid = ft.rowid
+			WHERE f.is_deleted = 0 AND files_fts MATCH ?
+			ORDER BY f.is_pinned DESC, f.sort_order DESC LIMIT ? OFFSET ?`
+		args = []interface{}{q, size, offset}
+	} else {
+		query = `SELECT id, title, created_at, updated_at, is_folder, parent_id, sort_order, is_deleted, deleted_at, is_pinned 
+			FROM files WHERE is_deleted = 0 
+			ORDER BY is_pinned DESC, sort_order DESC LIMIT ? OFFSET ?`
+		args = []interface{}{size, offset}
+	}
+
+	rows, err := d.DB.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}

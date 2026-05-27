@@ -282,14 +282,8 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       try {
           switch (action.type) {
               case 'delete':
-                  // Restore: Create again with same ID/Content (backend support needed? or just create new)
-                  // Ideally we use "restore" API if soft delete is used.
-                  // Since we implemented soft delete, we can "undelete".
-                  // But our delete API is soft delete now. We need a restore API.
-                  // For now, let's implement a 'restore' endpoint or just update is_deleted=0
-                   await api(`/api/files/${action.data.id}`, {
-                      method: 'PUT',
-                      body: JSON.stringify({ is_deleted: false })
+                   await api(`/api/files/${action.data.id}/restore`, {
+                      method: 'POST'
                   })
                   break
               case 'create':
@@ -606,7 +600,10 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       setNaming(true)
       setShowNewMenu(false)
       setContextMenu(null)
-    } catch (e) { console.error(e) }
+    } catch (e) {
+      console.error(e)
+      message.error('操作失败: ' + (e.message || '未知错误'))
+    }
   }
 
   async function onNewFolderCheck(parentId) {
@@ -626,7 +623,10 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       setFolderNaming(true)
       setShowNewMenu(false)
       setContextMenu(null)
-    } catch (e) { console.error(e) }
+    } catch (e) {
+      console.error(e)
+      message.error('操作失败: ' + (e.message || '未知错误'))
+    }
   }
 
   async function onExportConfirm(ids, roots) {
@@ -817,7 +817,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       }
     } catch (e) { 
         console.error(e)
-        message.error('导入出错')
+        message.error('导入出错: ' + (e.message || '未知错误'))
     }
   }
 
@@ -829,7 +829,11 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
         method: 'POST',
         body: JSON.stringify({ path }),
       })
-    } catch (e) { console.error(e) }
+      message.success('另存为成功')
+    } catch (e) {
+      console.error(e)
+      message.error('另存为失败: ' + (e.message || '未知错误'))
+    }
   }
 
   async function togglePin(id, isPinned) {
@@ -838,7 +842,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       await loadList()
     } catch (e) {
       console.error(e)
-      message.error('置顶操作失败')
+      message.error('置顶操作失败: ' + (e.message || '未知错误'))
     }
   }
 
@@ -970,6 +974,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       pushHistory({ type: 'delete', data: { id: targetId } })
     } catch (e) {
       console.error(e)
+      message.error('删除失败: ' + (e.message || '未知错误'))
     } finally {
         setLoading(false)
         setDeleteConfirm(null)
@@ -1101,6 +1106,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       void load()
     } catch (e) { 
         console.error(e)
+        message.error('重命名失败: ' + (e.message || '未知错误'))
         throw e
     }
     setNaming(false)
@@ -1162,7 +1168,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
         const siblings = items.filter(i => i.parent_id === target.id)
         newSortOrder = siblings.length > 0 
           ? Math.max(...siblings.map(s => s.sort_order || 0)) + 1000 
-          : Date.now() / 1000
+          : Math.floor(Date.now() / 1000)
         setExpanded(prev => new Set([...prev, target.id]))
     } else {
         newParentId = target.parent_id
@@ -1170,10 +1176,10 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
         const targetIndex = siblings.findIndex(s => s.id === target.id)
         if (pos === 'before' && targetIndex > 0) {
           const prevSibling = siblings[targetIndex - 1]
-          newSortOrder = (prevSibling.sort_order + target.sort_order) / 2
+          newSortOrder = Math.floor((prevSibling.sort_order + target.sort_order) / 2)
         } else if (pos === 'after' && targetIndex < siblings.length - 1) {
           const nextSibling = siblings[targetIndex + 1]
-          newSortOrder = (target.sort_order + nextSibling.sort_order) / 2
+          newSortOrder = Math.floor((target.sort_order + nextSibling.sort_order) / 2)
         } else {
           newSortOrder = pos === 'before' ? target.sort_order + 1000 : target.sort_order - 1000
         }
@@ -1365,9 +1371,16 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
         <button className="btn" onClick={() => setShowExport(true)}>导出</button>
         <button className="btn danger" onClick={() => void onBatchDeleteCheck()}>批量删除</button>
         <div className="search-box">
-          {/*<input className="input" placeholder="搜索..." value={q} onChange={e => setQ(e.target.value)} />*/}
-          <Input placeholder="搜索…" allowClear value={q} onChange={e => setQ(e.target.value)} onPressEnter={() => void load()} aria-label="搜索文件" />
+          <Input 
+            placeholder="搜索文件标题和内容..." 
+            allowClear 
+            value={q} 
+            onChange={e => setQ(e.target.value)} 
+            onPressEnter={() => void load()} 
+            aria-label="搜索文件"
+          />
           <button className="btn" onClick={() => void load()}>🔍</button>
+          {q && <span className="search-hint">按回车搜索</span>}
         </div>
       </div>
       {loading ? (

@@ -93,20 +93,22 @@ function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved,
   }))
 
   useEffect(() => {
-    // Prevent recursive saves or re-entries if activeId is stable
     if (activeId === currentIdRef.current) return
 
     setSwitching(true)
     
-    // Save previous file if it was loaded and has content
-    if (currentIdRef.current && contentRef.current !== undefined) {
-      const isDeleted = deletedIds?.has(currentIdRef.current)
+    const prevId = currentIdRef.current
+    if (prevId && contentRef.current !== undefined) {
+      const isDeleted = deletedIds?.has(prevId)
       if (!isDeleted && autoSaveOnSwitch) {
-        cacheWrite(currentIdRef.current, contentRef.current)
-        // Don't await this save - let it happen in background or via abortable controller
-        void saveNow('manual', currentIdRef.current) 
+        cacheWrite(prevId, contentRef.current)
+        void saveNow('manual', prevId) 
       }
     }
+
+    if (abortRef.current) { abortRef.current.abort() }
+    const loadCtl = new AbortController()
+    abortRef.current = loadCtl
 
     currentIdRef.current = activeId || null
 
@@ -124,8 +126,11 @@ function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved,
       setLoading(true)
       try {
         const f = await api(`/api/files/${id}`)
+        if (id !== currentIdRef.current) return
         const cached = cacheRead(id)
-        const useCache = cached && cached.editedAt && (!f.updated_at || cached.editedAt > f.updated_at * 1000)
+        const cacheMaxAge = 5 * 60 * 1000
+        const isCacheFresh = cached && cached.editedAt && (Date.now() - cached.editedAt) < cacheMaxAge
+        const useCache = isCacheFresh && cached.editedAt && (!f.updated_at || cached.editedAt > f.updated_at * 1000)
         const text = useCache ? cached.content : f.content
         
         setLastSavedAt(f.updated_at ? f.updated_at * 1000 : null)
@@ -136,24 +141,26 @@ function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved,
         
         try {
           const tags = await tagApi.getFileTags(id)
-          setFileTags(tags || [])
+          if (id === currentIdRef.current) setFileTags(tags || [])
         } catch (e) {
           console.error('加载标签失败', e)
         }
       } catch (e) {
-        console.error('加载内容失败', e)
+        if (e.name !== 'AbortError') console.error('加载内容失败', e)
       } finally {
-        setLoading(false)
-        setSwitching(false)
+        if (id === currentIdRef.current) {
+          setLoading(false)
+          setSwitching(false)
+        }
       }
     }
 
     load(activeId)
     
     return () => {
-      // Cleanup if needed
+      loadCtl.abort()
     }
-  }, [activeId, saveNow, autoSaveOnSwitch])
+  }, [activeId, autoSaveOnSwitch])
 
   useEffect(() => {
     if (intervalRef.current) { window.clearInterval(intervalRef.current) }

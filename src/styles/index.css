@@ -607,6 +607,14 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, "PingFang SC",
 }
 .content.switching { opacity: 0.6; pointer-events: none; transition: opacity .15s; }
 
+.backlinks-panel,
+.version-history {
+  border-top: 1px solid var(--border-color, #e5e7eb);
+  background: var(--panel, #fffdf9);
+  max-height: 300px;
+  overflow-y: auto;
+}
+
 /* 文件列表特定样式 */
 .file-list .toolbar {
   flex-wrap: wrap;
@@ -620,6 +628,38 @@ body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, "PingFang SC",
   gap: 4px;
   min-width: 0;
   margin-top: 4px; /* 增加一点间距 */
+}
+
+.search-hint {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.wiki-link {
+  color: var(--accent);
+  background: rgba(126, 91, 239, 0.1);
+  padding: 2px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.wiki-link:hover {
+  background: rgba(126, 91, 239, 0.2);
+  text-decoration: underline;
+}
+
+.search-result-highlight {
+  background: #fef08a;
+  padding: 1px 2px;
+  border-radius: 2px;
+}
+
+[data-theme="dark"] .search-result-highlight {
+  background: #854d0e;
+  color: #fef08a;
 }
 .file-list .search-box .input {
   flex: 1;

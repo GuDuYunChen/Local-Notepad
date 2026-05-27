@@ -46,3 +46,13 @@ export async function api(path, init) {
   }
   return body.data
 }
+
+export async function getBacklinks(fileId) {
+  const res = await api(`/api/files/${fileId}/backlinks`)
+  return res
+}
+
+export async function searchFiles(query) {
+  const res = await api(`/api/files/search?q=${encodeURIComponent(query)}`)
+  return res
+}
