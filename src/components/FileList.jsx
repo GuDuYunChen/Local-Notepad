@@ -1592,7 +1592,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
               right: 0;
               height: 3px;
               background: var(--clay);
-              box-shadow: 0 0 8px rgba(200, 122, 106, 0.4);
+              box-shadow: 0 0 10px var(--clay-medium);
           }
           .tree-list .list-item.drag-before::before { top: -3px; }
           .tree-list .list-item.drag-after::after { bottom: -3px; }
