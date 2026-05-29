@@ -41,10 +41,7 @@ export default function BackupPanel({ open, onClose }) {
 
   async function handleBackup() {
     try {
-      const targetDir = await window.electronAPI.openDirectoryDialog()
-      if (!targetDir) return
-      
-      const res = await window.electronAPI.backupCreate(targetDir)
+      const res = await window.electronAPI.backupCreate('')
       if (res.success) {
         message.success('备份成功')
         await loadBackups()
@@ -83,7 +80,10 @@ export default function BackupPanel({ open, onClose }) {
         </div>
         <div className="modal-body">
           <div className="backup-actions">
-            <button className="btn primary" onClick={handleBackup}>创建备份</button>
+            <button className="btn primary" onClick={handleBackup}>查看恢复说明</button>
+          </div>
+          <div className="empty-desc" style={{ marginBottom: 12 }}>
+            手工备份与恢复已停用。当前版本使用自动热备份，请从系统备份目录选择备份文件，并在完全退出应用后再恢复。
           </div>
           <div className="backup-list">
             {loading ? (
@@ -92,7 +92,7 @@ export default function BackupPanel({ open, onClose }) {
               <div className="empty-state">
                 <div className="empty-icon">💾</div>
                 <div className="empty-title">暂无备份</div>
-                <div className="empty-desc">点击"创建备份"开始备份数据库</div>
+                <div className="empty-desc">应用会在启动时和每 8 小时自动生成数据库备份</div>
               </div>
             ) : (
               <ul className="backup-items">

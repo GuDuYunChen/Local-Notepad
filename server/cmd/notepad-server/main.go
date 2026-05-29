@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -40,7 +41,36 @@ func main() {
 		g.Log().Fatal(ctx, fmt.Errorf("打开数据库失败: %w", err))
 		return
 	}
-	defer db.Close()
+	defer func() {
+		if db != nil {
+			_ = db.Close()
+		}
+	}()
+	
+	// 检测数据库是否损坏
+	if err := checkDatabaseIntegrity(db); err != nil {
+		g.Log().Warning(ctx, fmt.Errorf("数据库完整性检查失败: %w", err))
+		if closeErr := db.Close(); closeErr != nil {
+			g.Log().Warning(ctx, fmt.Errorf("恢复前关闭数据库失败: %w", closeErr))
+		}
+		db = nil
+		if recovered := tryRecoverDatabase(dbPath); recovered {
+			g.Log().Info(ctx, "数据库已从备份恢复")
+			db, err = sql.Open("sqlite", dbPath)
+			if err != nil {
+				g.Log().Fatal(ctx, fmt.Errorf("恢复后打开数据库失败: %w", err))
+				return
+			}
+			if err := checkDatabaseIntegrity(db); err != nil {
+				g.Log().Fatal(ctx, fmt.Errorf("恢复后的数据库仍然损坏: %w", err))
+				return
+			}
+		} else {
+			g.Log().Fatal(ctx, "数据库损坏且无法恢复，请手动从备份恢复")
+			return
+		}
+	}
+	
 	if _, err := db.Exec("PRAGMA journal_mode=WAL;"); err != nil {
 		g.Log().Warning(ctx, fmt.Errorf("设置 WAL 失败: %w", err))
 	}
@@ -63,6 +93,10 @@ func main() {
 
 	if err := migrate(ctx, db); err != nil {
 		g.Log().Fatal(ctx, fmt.Errorf("数据库迁移失败: %w", err))
+		return
+	}
+	if err := ensureCompatibleSchema(ctx, db); err != nil {
+		g.Log().Fatal(ctx, fmt.Errorf("数据库兼容修复失败: %w", err))
 		return
 	}
 
@@ -359,6 +393,67 @@ func migrate(ctx context.Context, db *sql.DB) error {
 	return nil
 }
 
+func ensureCompatibleSchema(ctx context.Context, db *sql.DB) error {
+	requiredColumns := []struct {
+		table      string
+		column     string
+		definition string
+	}{
+		{table: "files", column: "is_folder", definition: "INTEGER DEFAULT 0"},
+		{table: "files", column: "parent_id", definition: "TEXT DEFAULT ''"},
+		{table: "files", column: "sort_order", definition: "INTEGER DEFAULT 0"},
+		{table: "files", column: "is_deleted", definition: "INTEGER DEFAULT 0"},
+		{table: "files", column: "deleted_at", definition: "INTEGER DEFAULT 0"},
+		{table: "files", column: "is_pinned", definition: "INTEGER DEFAULT 0"},
+	}
+
+	for _, item := range requiredColumns {
+		exists, err := sqliteColumnExists(ctx, db, item.table, item.column)
+		if err != nil {
+			return fmt.Errorf("检查字段 %s.%s 失败: %w", item.table, item.column, err)
+		}
+		if exists {
+			continue
+		}
+		stmt := fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", item.table, item.column, item.definition)
+		if _, err := db.ExecContext(ctx, stmt); err != nil {
+			return fmt.Errorf("补齐字段 %s.%s 失败: %w", item.table, item.column, err)
+		}
+		g.Log().Info(ctx, fmt.Sprintf("已补齐数据库字段: %s.%s", item.table, item.column))
+	}
+
+	return nil
+}
+
+func sqliteColumnExists(ctx context.Context, db *sql.DB, tableName string, columnName string) (bool, error) {
+	rows, err := db.QueryContext(ctx, fmt.Sprintf("PRAGMA table_info(%s)", tableName))
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var cid int
+		var name string
+		var dataType string
+		var notNull int
+		var defaultValue sql.NullString
+		var pk int
+		if err := rows.Scan(&cid, &name, &dataType, &notNull, &defaultValue, &pk); err != nil {
+			return false, err
+		}
+		if name == columnName {
+			return true, nil
+		}
+	}
+
+	if err := rows.Err(); err != nil {
+		return false, err
+	}
+
+	return false, nil
+}
+
 // 自动备份逻辑
 func performBackup(ctx context.Context, db *sql.DB, dbPath string) {
 	backupDir := filepath.Join(filepath.Dir(dbPath), "backups")
@@ -432,6 +527,75 @@ func performBackup(ctx context.Context, db *sql.DB, dbPath string) {
 			}
 		}
 	}
+}
+
+// 检查数据库完整性
+func checkDatabaseIntegrity(db *sql.DB) error {
+	var result string
+	err := db.QueryRow("PRAGMA integrity_check").Scan(&result)
+	if err != nil {
+		return fmt.Errorf("完整性检查执行失败: %w", err)
+	}
+	if result != "ok" {
+		return fmt.Errorf("数据库损坏: %s", result)
+	}
+	return nil
+}
+
+// 尝试从备份恢复数据库
+func tryRecoverDatabase(dbPath string) bool {
+	backupDir := filepath.Join(filepath.Dir(dbPath), "backups")
+	
+	// 查找最新备份
+	entries, err := os.ReadDir(backupDir)
+	if err != nil {
+		return false
+	}
+	
+	var latestBackup string
+	var latestTime time.Time
+	
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasPrefix(e.Name(), "backup-") || !strings.HasSuffix(e.Name(), ".db") {
+			continue
+		}
+		
+		tsStr := strings.TrimSuffix(strings.TrimPrefix(e.Name(), "backup-"), ".db")
+		if t, err := time.Parse("20060102-150405", tsStr); err == nil {
+			if t.After(latestTime) {
+				latestTime = t
+				latestBackup = e.Name()
+			}
+		}
+	}
+	
+	if latestBackup == "" {
+		return false
+	}
+	
+	// 关闭并删除损坏的数据库及相关文件
+	os.Remove(dbPath)
+	os.Remove(dbPath + "-shm")
+	os.Remove(dbPath + "-wal")
+	
+	// 复制备份
+	src := filepath.Join(backupDir, latestBackup)
+	dst := dbPath
+	
+	srcFile, err := os.Open(src)
+	if err != nil {
+		return false
+	}
+	defer srcFile.Close()
+	
+	dstFile, err := os.Create(dst)
+	if err != nil {
+		return false
+	}
+	defer dstFile.Close()
+	
+	_, err = io.Copy(dstFile, srcFile)
+	return err == nil
 }
 
 // 删除占位路由函数

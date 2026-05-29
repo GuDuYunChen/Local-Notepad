@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo, useRef } from 'react'
 import { api } from '~/services/api'
 import NameDialog from './NameDialog'
 import FileSelectorDialog from './FileSelectorDialog'
+import TemplateSelector from './TemplateSelector'
 import { useDrag, useDrop } from 'react-dnd'
 import { NativeTypes } from 'react-dnd-html5-backend'
 import { message } from 'antd'
@@ -101,13 +102,21 @@ const FileNode = ({
         >
           <div className="icon" aria-hidden="true">
               {node.is_folder ? (
-                  isExpanded ? '📂' : '📁'
+                  isExpanded ? (
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
+                  ) : (
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                  )
               ) : (
-                  '📄'
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
               )}
               {node.is_folder && folderState > 0 && (
                   <span className="selection-indicator">
-                      {folderState === 2 ? '☑️' : '⊟'}
+                      {folderState === 2 ? (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                      ) : (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                      )}
                   </span>
               )}
           </div>
@@ -119,8 +128,12 @@ const FileNode = ({
             </div>
           </div>
           <div className="actions">
-            <button className="action-btn" onClick={(e) => { e.stopPropagation(); onRename(node); }} title="重命名" aria-label={`重命名 ${node.title}`}>✏️</button>
-            <button className="action-btn danger" onClick={(e) => { e.stopPropagation(); onDelete(node); }} title="删除" aria-label={`删除 ${node.title}`}>🗑️</button>
+            <button className="action-btn" onClick={(e) => { e.stopPropagation(); onRename(node); }} title="重命名" aria-label={`重命名 ${node.title}`}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </button>
+            <button className="action-btn danger" onClick={(e) => { e.stopPropagation(); onDelete(node); }} title="删除" aria-label={`删除 ${node.title}`}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            </button>
           </div>
         </li>
     )
@@ -145,6 +158,8 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
   const [contextMenu, setContextMenu] = useState(null) // 右键菜单 { x, y, item }
   const [targetParentId, setTargetParentId] = useState('') // 新建时的目标父目录ID
   const [showFolderSelector, setShowFolderSelector] = useState(false) // 路径选择器
+  const [showTemplate, setShowTemplate] = useState(false) // 模板选择器
+  const [pendingNewFile, setPendingNewFile] = useState(null) // 待新建文件信息
   
   const [selectedIds, setSelectedIds] = useState(new Set()) // Multi-select state
 
@@ -495,12 +510,13 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
     try {
       const qs = q ? `?q=${encodeURIComponent(q)}` : ''
       const list = await api(`/api/files${qs}`)
-      setItems(list)
-      onItemsChanged?.(list)
+      const normalizedList = Array.isArray(list) ? list : []
+      setItems(normalizedList)
+      onItemsChanged?.(normalizedList)
       
       // Ensure selection
-      if (!selectedId && list.length > 0) {
-          const tree = buildTree(list)
+      if (!selectedId && normalizedList.length > 0) {
+          const tree = buildTree(normalizedList)
           const first = findFirstFileInTree(tree)
           if (first) onSelect(first)
       }
@@ -609,7 +625,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       }
 
       setTargetParentId(target)
-      setNaming(true)
+      setShowTemplate(true)
       setShowNewMenu(false)
       setContextMenu(null)
     } catch (e) {
@@ -1088,22 +1104,19 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
 
   async function onNewFileConfirm(name, format) {
     try {
-      // Add extension if not present (NameDialog now handles extension stripping/appending, 
-      // but to be safe we check format).
-      // If NameDialog passes clean name + format, we combine them.
       let title = name;
       if (format && !title.endsWith(format)) {
           title = title + format;
       } else if (!format && !/\.[a-zA-Z0-9]+$/.test(title)) {
-          // Fallback if no format passed (shouldn't happen with updated NameDialog)
           title = `${title}.md`
       }
 
+      const content = pendingNewFile ? (pendingNewFile.content || '') : ''
       const item = await api('/api/files', { 
           method: 'POST', 
           body: JSON.stringify({ 
               title: title, 
-              content: '', 
+              content: content, 
               is_folder: false, 
               parent_id: targetParentId 
           }) 
@@ -1118,10 +1131,21 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       void load()
     } catch (e) { 
         console.error(e)
-        message.error('重命名失败: ' + (e.message || '未知错误'))
+        message.error('新建失败: ' + (e.message || '未知错误'))
         throw e
     }
     setNaming(false)
+    setPendingNewFile(null)
+  }
+
+  function handleTemplateSelect(template) {
+    setShowTemplate(false)
+    if (!template) {
+      setNaming(true)
+      return
+    }
+    setPendingNewFile(template)
+    setNaming(true)
   }
 
   async function onNewFolderConfirm(name) {
@@ -1370,18 +1394,37 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       <div className="toolbar colored">
         <div className="btn-group" style={{ position: 'relative' }}>
             <button className="btn primary" onClick={() => setShowNewMenu(!showNewMenu)}>
-                新建 ▾
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              新建
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
             </button>
             {showNewMenu && (
                 <div className="dropdown-menu" ref={newMenuRef} style={{ position: 'absolute', top: '100%', left: 0, zIndex: 100 }}>
-                    <div className="menu-item" onClick={() => onNewFileCheck()}>新建文件 (Ctrl+N)</div>
-                    <div className="menu-item" onClick={() => onNewFolderCheck()}>新建文件夹 (Ctrl+Shift+N)</div>
+                    <div className="menu-item" onClick={() => onNewFileCheck()}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+                      新建文件
+                      <span style={{marginLeft: 'auto', opacity: 0.6, fontSize: '11px'}}>Ctrl+N</span>
+                    </div>
+                    <div className="menu-item" onClick={() => onNewFolderCheck()}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/></svg>
+                      新建文件夹
+                      <span style={{marginLeft: 'auto', opacity: 0.6, fontSize: '11px'}}>Ctrl+Shift+N</span>
+                    </div>
                 </div>
             )}
         </div>
-        <button className="btn" onClick={onImport}>导入</button>
-        <button className="btn" onClick={() => setShowExport(true)}>导出</button>
-        <button className="btn danger" onClick={() => void onBatchDeleteCheck()}>批量删除</button>
+        <button className="btn" onClick={onImport}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          导入
+        </button>
+        <button className="btn" onClick={() => setShowExport(true)}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          导出
+        </button>
+        <button className="btn danger" onClick={() => void onBatchDeleteCheck()}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          批量删除
+        </button>
         <div className="search-box">
           <Input 
             placeholder="搜索文件标题和内容..." 
@@ -1509,6 +1552,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       )}
       {showExport && <FileSelectorDialog open={showExport} onClose={() => setShowExport(false)} items={items} onConfirm={onExportConfirm} title="导出文件" confirmText="开始导出" />}
       {showBatchDelete && <FileSelectorDialog open={showBatchDelete} onClose={() => setShowBatchDelete(false)} items={items} onConfirm={onBatchDeleteConfirm} title="批量删除" confirmText="删除" processingText="删除中..." showDeleteWarning={true} selectedFileId={selectedId} initialSelectedIds={Array.from(selectedIds)} />}
+      <TemplateSelector open={showTemplate} onClose={() => setShowTemplate(false)} onSelect={handleTemplateSelect} />
       {showFolderSelector && (
           <FileSelectorDialog 
               open={showFolderSelector}
@@ -1537,33 +1581,9 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
         />
       )}
       <style>{`
-          .tree-list .list-item {
-              display: flex; align-items: center; gap: 8px;
-              padding: 8px 12px; cursor: pointer;
-              user-select: none;
-              border-bottom: 1px solid rgba(0,0,0,0.03);
-              border-top: 2px solid transparent; /* for drag-before */
-              border-bottom: 2px solid transparent; /* for drag-after */
-          }
-          .tree-list .list-item:hover { background: rgba(0,0,0,0.03); }
-          .tree-list .list-item.active { background: rgba(126, 91, 239, 0.1); color: var(--accent); }
-          .tree-list .list-item .icon { font-size: 16px; min-width: 20px; text-align: center; }
-          .tree-list .list-item .info { flex: 1; min-width: 0; }
-          .tree-list .list-item .title { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-          .tree-list .list-item .count { color: var(--muted); font-size: 12px; }
-          .tree-list .empty-folder { font-size: 12px; color: var(--muted); padding: 8px 12px; font-style: italic; }
-          
-          .tree-list .list-item .actions { display: none; gap: 4px; margin-left: 8px; }
-          .tree-list .list-item:hover .actions { display: flex; }
-          .tree-list .action-btn { background: none; border: none; cursor: pointer; font-size: 12px; padding: 2px 4px; border-radius: 4px; opacity: 0.7; transition: opacity 0.2s, background-color 0.2s, transform 0.2s; }
-          .tree-list .action-btn:hover { background: rgba(0,0,0,0.1); opacity: 1; transform: scale(1.1); }
-          .tree-list .action-btn.danger:hover { background: rgba(255,0,0,0.1); }
-
-          /* Drag Styles */
-          .tree-list .list-item.dragging { opacity: 0.4; background: rgba(126, 91, 239, 0.05); }
-          .tree-list .list-item.drag-inside { background: rgba(126, 91, 239, 0.15); border: 2px dashed var(--accent); border-radius: 4px; }
-          .tree-list .list-item.drag-before { border-top: 3px solid var(--accent); margin-top: -1px; }
-          .tree-list .list-item.drag-after { border-bottom: 3px solid var(--accent); margin-bottom: -1px; }
+          .tree-list .list-item.drag-inside { background: var(--clay-light); border: 2px dashed var(--clay); border-radius: 4px; }
+          .tree-list .list-item.drag-before { border-top: 3px solid var(--clay); margin-top: -1px; position: relative; }
+          .tree-list .list-item.drag-after { border-bottom: 3px solid var(--clay); margin-bottom: -1px; position: relative; }
           .tree-list .list-item.drag-before::before,
           .tree-list .list-item.drag-after::after {
               content: '';
@@ -1571,30 +1591,11 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
               left: 0;
               right: 0;
               height: 3px;
-              background: var(--accent);
-              box-shadow: 0 0 8px rgba(126, 91, 239, 0.4);
+              background: var(--clay);
+              box-shadow: 0 0 8px rgba(200, 122, 106, 0.4);
           }
           .tree-list .list-item.drag-before::before { top: -3px; }
           .tree-list .list-item.drag-after::after { bottom: -3px; }
-
-          .dropdown-menu, .context-menu {
-              background: var(--panel);
-              border: 1px solid rgba(0,0,0,0.1);
-              box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-              border-radius: 6px;
-              padding: 4px 0;
-              min-width: 140px;
-          }
-          .menu-item {
-              padding: 6px 16px;
-              font-size: 13px;
-              cursor: pointer;
-              color: var(--fg);
-          }
-          .menu-item:hover { background: var(--accent); color: #fff; }
-          .menu-item.danger { color: #ef4444; }
-          .menu-item.danger:hover { background: #ef4444; color: #fff; }
-          .divider { height: 1px; background: rgba(0,0,0,0.1); margin: 4px 0; }
       `}</style>
     </div>
   )

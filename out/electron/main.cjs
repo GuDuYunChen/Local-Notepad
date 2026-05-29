@@ -105646,35 +105646,10 @@ var import_fs3 = __toESM(require("fs"), 1);
 var import_path3 = __toESM(require("path"), 1);
 var import_electron3 = require("electron");
 async function handleBackup(backupDir) {
-  const dbPath = process.env.NOTEPAD_DB_PATH || getDefaultDBPath();
-  if (!import_fs3.default.existsSync(dbPath)) {
-    throw new Error("\u6570\u636E\u5E93\u6587\u4EF6\u4E0D\u5B58\u5728");
-  }
-  const timestamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-").slice(0, 19);
-  const backupPath = import_path3.default.join(backupDir, `backup-${timestamp}.db`);
-  import_fs3.default.copyFileSync(dbPath, backupPath);
-  return { success: true, path: backupPath };
+  throw new Error("\u5F53\u524D\u7248\u672C\u5DF2\u7981\u7528\u684C\u9762\u7AEF\u624B\u5DE5\u5907\u4EFD\u3002\u5E94\u7528\u4F7F\u7528 SQLite WAL \u6A21\u5F0F\uFF0C\u76F4\u63A5\u590D\u5236\u5728\u7EBF\u6570\u636E\u5E93\u53EF\u80FD\u751F\u6210\u635F\u574F\u5907\u4EFD\uFF0C\u8BF7\u4F7F\u7528\u5E94\u7528\u81EA\u52A8\u5907\u4EFD\u76EE\u5F55\u4E2D\u7684\u5907\u4EFD\u6587\u4EF6\u3002");
 }
 async function handleRestore(backupFile) {
-  if (!import_fs3.default.existsSync(backupFile)) {
-    throw new Error("\u5907\u4EFD\u6587\u4EF6\u4E0D\u5B58\u5728");
-  }
-  const dbPath = process.env.NOTEPAD_DB_PATH || getDefaultDBPath();
-  const dbDir = import_path3.default.dirname(dbPath);
-  if (!import_fs3.default.existsSync(dbDir)) {
-    import_fs3.default.mkdirSync(dbDir, { recursive: true });
-  }
-  const tempPath = dbPath + ".tmp.restore";
-  import_fs3.default.copyFileSync(backupFile, tempPath);
-  import_fs3.default.renameSync(tempPath, dbPath);
-  const walPath = dbPath + "-wal";
-  const shmPath = dbPath + "-shm";
-  if (import_fs3.default.existsSync(walPath)) import_fs3.default.unlinkSync(walPath);
-  if (import_fs3.default.existsSync(shmPath)) import_fs3.default.unlinkSync(shmPath);
-  if (import_electron3.ipcMain) {
-    import_electron3.ipcMain.emit("db:restored");
-  }
-  return { success: true };
+  throw new Error("\u5F53\u524D\u7248\u672C\u5DF2\u7981\u7528\u684C\u9762\u7AEF\u624B\u5DE5\u6062\u590D\u3002\u8BF7\u5148\u5B8C\u5168\u9000\u51FA\u5E94\u7528\uFF0C\u518D\u4F7F\u7528\u81EA\u52A8\u5907\u4EFD\u76EE\u5F55\u4E2D\u7684\u5907\u4EFD\u6587\u4EF6\u6216\u6062\u590D\u811A\u672C\u8FDB\u884C\u79BB\u7EBF\u6062\u590D\u3002");
 }
 async function listBackups(backupDir) {
   if (!import_fs3.default.existsSync(backupDir)) {
@@ -105687,16 +105662,6 @@ async function listBackups(backupDir) {
     size: import_fs3.default.statSync(import_path3.default.join(backupDir, f)).size,
     date: new Date(f.replace("backup-", "").replace(".db", "").replace(/-/g, ":").replace(/T/, " ")).toISOString()
   }));
-}
-function getDefaultDBPath() {
-  const home = process.env.HOME || process.env.USERPROFILE;
-  if (process.platform === "win32") {
-    return import_path3.default.join(home, "AppData", "Roaming", "Notepad", "data.db");
-  } else if (process.platform === "darwin") {
-    return import_path3.default.join(home, "Library", "Application Support", "Notepad", "data.db");
-  } else {
-    return import_path3.default.join(home, ".notepad", "data.db");
-  }
 }
 
 // electron/main.js

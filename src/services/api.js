@@ -41,7 +41,7 @@ export async function api(path, init) {
   }
   const body = await res.json()
   if (body.code !== 0) {
-    const msg = ERROR_MESSAGES[body.code] || body.message || '请求失败'
+    const msg = body.message || ERROR_MESSAGES[body.code] || '请求失败'
     throw new Error(msg)
   }
   return body.data

@@ -83,3 +83,25 @@ func (d *LinkDAO) GetOutgoingLinks(ctx context.Context, sourceID string) ([]*mod
 	}
 	return links, nil
 }
+
+func (d *LinkDAO) GetAllLinks(ctx context.Context) ([]*model.Link, error) {
+	rows, err := d.DB.QueryContext(ctx,
+		`SELECT id, source_id, target_id, created_at FROM links ORDER BY created_at DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var links []*model.Link
+	for rows.Next() {
+		var l model.Link
+		if err := rows.Scan(&l.ID, &l.SourceID, &l.TargetID, &l.CreatedAt); err != nil {
+			return nil, err
+		}
+		links = append(links, &l)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return links, nil
+}

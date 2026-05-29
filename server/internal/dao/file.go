@@ -15,6 +15,8 @@ type FileDAO struct {
 
 func (d *FileDAO) Create(ctx context.Context, f *model.File) error {
 	now := time.Now().Unix()
+	f.CreatedAt = now
+	f.UpdatedAt = now
 	_, err := d.DB.ExecContext(ctx,
 		`INSERT INTO files (id, title, content, created_at, updated_at, is_folder, parent_id, sort_order, is_deleted, is_pinned) 
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0)`,
@@ -129,7 +131,7 @@ func (d *FileDAO) List(ctx context.Context, q string, page, size int) ([]*model.
 	}
 	defer rows.Close()
 
-	var out []*model.File
+	out := make([]*model.File, 0)
 	for rows.Next() {
 		var f model.File
 		if err := rows.Scan(&f.ID, &f.Title, &f.Content, &f.CreatedAt, &f.UpdatedAt, &f.IsFolder, &f.ParentID, &f.SortOrder, &f.IsDeleted, &f.DeletedAt, &f.IsPinned); err != nil {

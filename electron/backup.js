@@ -3,45 +3,14 @@ import path from 'path'
 import { ipcMain } from 'electron'
 
 export async function handleBackup(backupDir) {
-  const dbPath = process.env.NOTEPAD_DB_PATH || getDefaultDBPath()
-  
-  if (!fs.existsSync(dbPath)) {
-    throw new Error('数据库文件不存在')
-  }
-  
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
-  const backupPath = path.join(backupDir, `backup-${timestamp}.db`)
-  
-  fs.copyFileSync(dbPath, backupPath)
-  return { success: true, path: backupPath }
+  void backupDir
+  throw new Error('当前版本已禁用桌面端手工备份。应用使用 SQLite WAL 模式，直接复制在线数据库可能生成损坏备份，请使用应用自动备份目录中的备份文件。')
 }
 
 export async function handleRestore(backupFile) {
-  if (!fs.existsSync(backupFile)) {
-    throw new Error('备份文件不存在')
-  }
-  
-  const dbPath = process.env.NOTEPAD_DB_PATH || getDefaultDBPath()
-  const dbDir = path.dirname(dbPath)
-  
-  if (!fs.existsSync(dbDir)) {
-    fs.mkdirSync(dbDir, { recursive: true })
-  }
-  
-  const tempPath = dbPath + '.tmp.restore'
-  fs.copyFileSync(backupFile, tempPath)
-  fs.renameSync(tempPath, dbPath)
-  
-  const walPath = dbPath + '-wal'
-  const shmPath = dbPath + '-shm'
-  if (fs.existsSync(walPath)) fs.unlinkSync(walPath)
-  if (fs.existsSync(shmPath)) fs.unlinkSync(shmPath)
-  
-  if (ipcMain) {
-    ipcMain.emit('db:restored')
-  }
-  
-  return { success: true }
+  void backupFile
+  void ipcMain
+  throw new Error('当前版本已禁用桌面端手工恢复。请先完全退出应用，再使用自动备份目录中的备份文件或恢复脚本进行离线恢复。')
 }
 
 export async function listBackups(backupDir) {

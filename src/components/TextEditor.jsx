@@ -9,7 +9,9 @@ function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved,
   const contentRef = useRef('')
   const saveTimerRef = useRef(null)
   const intervalRef = useRef(null)
-  const abortRef = useRef(null)
+  const saveAbortRef = useRef(null)
+  const loadAbortRef = useRef(null)
+  const inFlightSaveRef = useRef(null)
   const currentIdRef = useRef(null)
   const [loading, setLoading] = useState(false)
   const [switching, setSwitching] = useState(false)
@@ -43,44 +45,58 @@ function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved,
     }
 
     const text = contentRef.current
-    try {
-      setSaving(true)
-      if (abortRef.current) { abortRef.current.abort() }
-      const ctl = new AbortController()
-      abortRef.current = ctl
-      const updated = await api(`/api/files/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify({ content: text }),
-        signal: ctl.signal,
-      })
-      const now = Date.now()
-      // Only update UI state if we are still on the same file
-      if (id === currentIdRef.current) {
-        setLastSavedAt(now)
-        cacheWrite(id, text, now)
-        onSavedRef.current?.(updated)
-      }
-      console.debug('自动保存完成', reason, id, now)
-      return updated
-    } catch (e) {
-      if (e.name === 'AbortError') return
-      
-      // If error is 1006 (Update failed) and likely due to file deleted, suppress or warn gently
-      // But we don't have the code here easily, just the message.
-      // If message contains "更新失败", it might be deleted.
-      if (e.message && e.message.includes('更新失败')) {
+    if (inFlightSaveRef.current?.id === id) {
+      return inFlightSaveRef.current.promise
+    }
+
+    const ctl = new AbortController()
+    const savePromise = (async () => {
+      try {
+        setSaving(true)
+        saveAbortRef.current = ctl
+        const updated = await api(`/api/files/${id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ content: text }),
+          signal: ctl.signal,
+        })
+        const now = Date.now()
+        // Only update UI state if we are still on the same file
+        if (id === currentIdRef.current) {
+          setLastSavedAt(now)
+          cacheWrite(id, text, now)
+          onSavedRef.current?.(updated)
+        }
+        console.debug('自动保存完成', reason, id, now)
+        return updated
+      } catch (e) {
+        if (e.name === 'AbortError') return
+        
+        // If error is 1006 (Update failed) and likely due to file deleted, suppress or warn gently
+        // But we don't have the code here easily, just the message.
+        // If message contains "更新失败", it might be deleted.
+        if (e.message && e.message.includes('更新失败')) {
           // Check if it might be deleted
           if (deletedIdsRef.current && deletedIdsRef.current.has(id)) {
               console.warn('Suppressing save error for deleted file:', id)
               return
           }
-      }
+        }
 
-      console.error('保存失败', reason, e)
-      throw e
-    } finally {
-      setSaving(false)
-    }
+        console.error('保存失败', reason, e)
+        throw e
+      } finally {
+        if (saveAbortRef.current === ctl) {
+          saveAbortRef.current = null
+        }
+        if (inFlightSaveRef.current?.promise === savePromise) {
+          inFlightSaveRef.current = null
+        }
+        setSaving(false)
+      }
+    })()
+
+    inFlightSaveRef.current = { id, promise: savePromise }
+    return savePromise
   }, [])
 
   useImperativeHandle(ref, () => ({
@@ -106,9 +122,9 @@ function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved,
       }
     }
 
-    if (abortRef.current) { abortRef.current.abort() }
+    if (loadAbortRef.current) { loadAbortRef.current.abort() }
     const loadCtl = new AbortController()
-    abortRef.current = loadCtl
+    loadAbortRef.current = loadCtl
 
     currentIdRef.current = activeId || null
 
@@ -159,6 +175,9 @@ function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved,
     
     return () => {
       loadCtl.abort()
+      if (loadAbortRef.current === loadCtl) {
+        loadAbortRef.current = null
+      }
     }
   }, [activeId, autoSaveOnSwitch])
 

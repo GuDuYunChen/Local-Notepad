@@ -135,7 +135,7 @@ NOTEPAD_DATA=/path/to/data go run ./cmd/notepad-server/main.go
 - **macOS**: `~/Library/Application Support/Notepad/data.db`
 - **Linux**: `~/.notepad/data.db`
 
-**备份建议**：定期复制备份 `data.db` 文件即可保存所有文字资料。系统已内置自动备份机制，详情见下文“数据备份与恢复”。
+**备份建议**：不要在应用运行时直接复制 `data.db`。当前版本使用 SQLite WAL 模式，在线复制主库文件可能得到不完整备份。请优先使用系统自动生成的备份文件，详情见下文“数据备份与恢复”。
 
 ### 2. 附件数据（图片、视频）
 
@@ -169,7 +169,7 @@ NOTEPAD_DATA=/path/to/data go run ./cmd/notepad-server/main.go
 3.  找到当前的数据库文件 `data.db`，将其重命名为 `data.db.old`（作为保险）。
 4.  进入 `backups` 文件夹，选择一个你需要恢复的备份文件（例如 `backup-20231001-120000.db`）。
 5.  将该备份文件**复制**到上一级目录（即 `Notepad` 根目录）。
-6.  将复制过来的文件重命名为 `data.db`。
+6.  将复制过来的文件重命名为 `data.db`，并确保旧的 `data.db-wal`、`data.db-shm` 已一并删除。
 7.  重新启动应用，数据即恢复完成。
 
 ## 版本与产物

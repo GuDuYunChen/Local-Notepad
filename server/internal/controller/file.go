@@ -1,10 +1,13 @@
 package controller
 
 import (
+	"log"
 	"notepad-server/internal/dao"
 	"notepad-server/internal/logic"
 	"notepad-server/internal/model"
+	"time"
 
+	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
 )
 
@@ -28,6 +31,11 @@ func (c *FileController) Register(group *ghttp.RouterGroup) {
 	group.POST("/files/batch-import", c.BatchImport)
 	group.POST("/files/{id}/export", c.Export)
 	group.POST("/files/{id}/save-as", c.SaveAs)
+	group.GET("/graph", c.Graph)
+	group.GET("/files/daily/{date}", c.DailyNote)
+	group.GET("/templates", c.ListTemplates)
+	group.POST("/templates", c.CreateTemplate)
+	group.DELETE("/templates/{id}", c.DeleteTemplate)
 }
 
 func (c *FileController) Create(r *ghttp.Request) {
@@ -77,7 +85,8 @@ func (c *FileController) Update(r *ghttp.Request) {
 
 	f, err := c.FileLogic.Update(r.GetCtx(), id, in.Title, in.Content, in.ParentID, in.SortOrder, in.IsDeleted, in.IsPinned)
 	if err != nil {
-		writeErr(r, 1006, "保存失败", err)
+		log.Printf("保存文件失败 id=%s: %v", id, err)
+		writeErrWithDetail(r, 1006, "保存失败", err)
 		return
 	}
 	writeOK(r, f)
@@ -171,7 +180,7 @@ func (c *FileController) List(r *ghttp.Request) {
 
 	files, err := c.FileLogic.List(r.GetCtx(), q, page, size)
 	if err != nil {
-		writeErr(r, 1001, "查询失败", err)
+		writeErrWithDetail(r, 1001, "查询失败", err)
 		return
 	}
 	writeOK(r, files)
@@ -254,4 +263,145 @@ func (c *FileController) SaveAs(r *ghttp.Request) {
 	writeOK(r, nil)
 }
 
+func (c *FileController) Graph(r *ghttp.Request) {
+	if c.LinkDAO == nil {
+		writeOK(r, g.Map{"nodes": []interface{}{}, "edges": []interface{}{}})
+		return
+	}
+
+	links, err := c.LinkDAO.GetAllLinks(r.GetCtx())
+	if err != nil {
+		writeErr(r, 1001, "查询知识图谱失败", err)
+		return
+	}
+
+	files, err := c.FileLogic.List(r.GetCtx(), "", 1, 10000)
+	if err != nil {
+		writeErr(r, 1001, "查询文件列表失败", err)
+		return
+	}
+
+	fileMap := make(map[string]*model.File)
+	for _, f := range files {
+		fileMap[f.ID] = f
+	}
+
+	type Node struct {
+		ID    string `json:"id"`
+		Label string `json:"label"`
+		Links int    `json:"links"`
+	}
+
+	type Edge struct {
+		Source string `json:"source"`
+		Target string `json:"target"`
+	}
+
+	nodeMap := make(map[string]*Node)
+	var edges []Edge
+
+	for _, f := range files {
+		nodeMap[f.ID] = &Node{ID: f.ID, Label: f.Title, Links: 0}
+	}
+
+	for _, l := range links {
+		if _, ok := nodeMap[l.SourceID]; !ok {
+			continue
+		}
+		if _, ok := nodeMap[l.TargetID]; !ok {
+			continue
+		}
+		nodeMap[l.SourceID].Links++
+		nodeMap[l.TargetID].Links++
+		edges = append(edges, Edge{Source: l.SourceID, Target: l.TargetID})
+	}
+
+	var nodes []Node
+	for _, n := range nodeMap {
+		if n.Links > 0 {
+			nodes = append(nodes, *n)
+		}
+	}
+
+	writeOK(r, g.Map{"nodes": nodes, "edges": edges})
+}
+
+func (c *FileController) DailyNote(r *ghttp.Request) {
+	date := r.Get("date").String()
+	if date == "" {
+		date = time.Now().Format("2006-01-02")
+	}
+
+	title := date
+
+	files, err := c.FileLogic.List(r.GetCtx(), "", 1, 10000)
+	if err != nil {
+		writeErr(r, 1001, "查询文件列表失败", err)
+		return
+	}
+
+	for _, f := range files {
+		if f.Title == title && !f.IsFolder {
+			writeOK(r, g.Map{"file": f, "created": false})
+			return
+		}
+	}
+
+	f, err := c.FileLogic.Create(r.GetCtx(), title, "", false, "")
+	if err != nil {
+		writeErr(r, 1006, "创建每日笔记失败", err)
+		return
+	}
+
+	writeOK(r, g.Map{"file": f, "created": true})
+}
+
+func (c *FileController) ListTemplates(r *ghttp.Request) {
+	files, err := c.FileLogic.List(r.GetCtx(), "", 1, 10000)
+	if err != nil {
+		writeErr(r, 1001, "查询模板列表失败", err)
+		return
+	}
+
+	templates := make([]g.Map, 0)
+	for _, f := range files {
+		if !f.IsFolder && len(f.Title) > 9 && f.Title[:9] == "__tpl__" {
+			templates = append(templates, g.Map{
+				"id":      f.ID,
+				"title":   f.Title[9:],
+				"content": f.Content,
+			})
+		}
+	}
+
+	writeOK(r, templates)
+}
+
+func (c *FileController) CreateTemplate(r *ghttp.Request) {
+	var in struct {
+		Title   string `json:"title" v:"required#模板名称不能为空"`
+		Content string `json:"content"`
+	}
+	if err := r.Parse(&in); err != nil {
+		writeErr(r, 1005, "参数错误", err)
+		return
+	}
+
+	f, err := c.FileLogic.Create(r.GetCtx(), "__tpl__"+in.Title, in.Content, false, "")
+	if err != nil {
+		writeErr(r, 1006, "创建模板失败", err)
+		return
+	}
+
+	writeOK(r, g.Map{"id": f.ID, "title": in.Title})
+}
+
+func (c *FileController) DeleteTemplate(r *ghttp.Request) {
+	id := r.Get("id").String()
+	if err := c.FileLogic.Delete(r.GetCtx(), id); err != nil {
+		writeErr(r, 1007, "删除模板失败", err)
+		return
+	}
+	writeOK(r, nil)
+}
 
