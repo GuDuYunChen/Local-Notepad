@@ -2394,3 +2394,91 @@ body {
     display: none;
   }
 }
+
+
+/* Inspector quick actions + document summary */
+.inspector-quick-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.inspector-action-btn {
+  min-width: 0;
+  min-height: 34px;
+  padding: 6px 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.inspector-action-btn:hover:not(:disabled) {
+  border-color: var(--line-strong);
+  background: var(--surface-hover);
+  color: var(--ink);
+}
+
+.inspector-action-btn.active {
+  border-color: var(--clay-medium);
+  background: var(--clay-light);
+  color: var(--clay);
+}
+
+.inspector-action-btn:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.property-summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  margin-bottom: 14px;
+}
+
+.property-summary-card {
+  min-width: 0;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--paper-deep);
+}
+
+.property-summary-card span {
+  color: var(--ink-muted);
+  font-size: 9px;
+}
+
+.property-summary-card strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.property-summary-card.save-未保存 strong {
+  color: var(--amber);
+}
+
+.property-summary-card.save-保存失败 strong {
+  color: var(--red);
+}
+
+.property-summary-card.save-保存中… strong {
+  color: var(--clay);
+}
