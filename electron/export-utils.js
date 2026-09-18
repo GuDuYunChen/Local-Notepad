@@ -75,3 +75,13 @@ export function plainTextFromNode(node) {
   if (!Array.isArray(node.children)) return ''
   return node.children.map(plainTextFromNode).join('')
 }
+
+
+export function listItemText(item) {
+  if (!item || !Array.isArray(item.children)) return ''
+  return item.children
+    .filter(child => child?.type !== 'list')
+    .map(child => plainTextFromNode(child))
+    .filter(Boolean)
+    .join(' ')
+}
