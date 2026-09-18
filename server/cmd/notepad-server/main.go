@@ -442,6 +442,29 @@ func migrate(ctx context.Context, db *sql.DB) error {
 				`CREATE INDEX IF NOT EXISTS idx_file_versions_created_at ON file_versions(created_at DESC)`,
 			},
 		},
+		{
+			version: 8,
+			stmts: []string{
+				`DROP TRIGGER IF EXISTS files_fts_insert`,
+				`DROP TRIGGER IF EXISTS files_fts_update`,
+				`DROP TRIGGER IF EXISTS files_fts_delete`,
+				`CREATE TRIGGER files_fts_insert AFTER INSERT ON files BEGIN
+					INSERT INTO files_fts(rowid, title, content)
+					VALUES (new.rowid, COALESCE(new.title, ''), COALESCE(new.content, ''));
+				END`,
+				`CREATE TRIGGER files_fts_update AFTER UPDATE OF title, content ON files BEGIN
+					INSERT INTO files_fts(files_fts, rowid, title, content)
+					VALUES ('delete', old.rowid, COALESCE(old.title, ''), COALESCE(old.content, ''));
+					INSERT INTO files_fts(rowid, title, content)
+					VALUES (new.rowid, COALESCE(new.title, ''), COALESCE(new.content, ''));
+				END`,
+				`CREATE TRIGGER files_fts_delete AFTER DELETE ON files BEGIN
+					INSERT INTO files_fts(files_fts, rowid, title, content)
+					VALUES ('delete', old.rowid, COALESCE(old.title, ''), COALESCE(old.content, ''));
+				END`,
+				`INSERT INTO files_fts(files_fts) VALUES('rebuild')`,
+			},
+		},
 	}
 
 	var currentVersion int
