@@ -2,7 +2,14 @@ import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, Ta
 import fs from 'fs'
 import path from 'path'
 import { BrowserWindow } from 'electron'
-import { codeBlockText, fetchAllFileMetadata, indexChildrenByParent, safeExportStem } from './export-utils.js'
+import {
+    codeBlockText,
+    fetchAllFileMetadata,
+    headingLevel,
+    indexChildrenByParent,
+    plainTextFromNode,
+    safeExportStem
+} from './export-utils.js'
 
 // 辅助：获取文件内容（从 Go 后端）
 async function fetchFileContent(id) {
@@ -354,7 +361,7 @@ function processNodeToMarkdown(node, lines, depth) {
             break
             
         case 'heading':
-            const level = node.level || 1
+            const level = headingLevel(node)
             const headingText = processInlineNodes(node.children || [])
             lines.push(`${'#'.repeat(level)} ${headingText}`)
             lines.push('')
@@ -464,7 +471,14 @@ function processListItems(items, lines, listType, indent) {
     
     for (const item of items) {
         if (item.type === 'listitem') {
-            const text = processInlineNodes(item.children || [])
+            const text = (item.children || [])
+                .filter(child => child.type !== 'list')
+                .map(child => child.type === 'paragraph'
+                    ? processInlineNodes(child.children || [])
+                    : plainTextFromNode(child)
+                )
+                .filter(Boolean)
+                .join(' ')
             const bullet = listType === 'number' ? `${counter}.` : '-'
             lines.push(`${prefix}${bullet} ${text}`)
             counter++
@@ -486,7 +500,10 @@ function processTableToMarkdown(node, lines) {
     for (let i = 0; i < rows.length; i++) {
         const row = rows[i]
         const cells = row.children || []
-        const cellTexts = cells.map(cell => processInlineNodes(cell.children || []))
+        const cellTexts = cells.map(cell => plainTextFromNode(cell)
+            .replace(/\|/g, '\\|')
+            .replace(/\r?\n/g, ' ')
+        )
         lines.push(`| ${cellTexts.join(' | ')} |`)
         
         if (i === 0) {
@@ -696,7 +713,7 @@ function convertNodeToHTML(node) {
             return `<blockquote>${convertChildrenToHTML(node.children)}</blockquote>`
         case 'list':
             const listTag = node.listType === 'number' ? 'ol' : 'ul'
-            return `<${listTag}>${node.children.map(item => `<li>${convertChildrenToHTML(item.children)}</li>`).join('')}</${listTag}>`
+            return `<${listTag}>${(node.children || []).map(convertListItemToHTML).join('')}</${listTag}>`
         case 'code':
             return `<pre><code>${escapeHTML(convertChildrenToHTML(node.children))}</code></pre>`
         case 'code-block':
@@ -721,6 +738,23 @@ function convertNodeToHTML(node) {
             if (node.children) return convertChildrenToHTML(node.children)
             return ''
     }
+}
+
+function convertListItemToHTML(item) {
+    const content = (item?.children || [])
+        .filter(child => child.type !== 'list')
+        .map(child => child.type === 'paragraph'
+            ? convertChildrenToHTML(child.children)
+            : convertNodeToHTML(child)
+        )
+        .join('')
+
+    const nested = (item?.children || [])
+        .filter(child => child.type === 'list')
+        .map(convertNodeToHTML)
+        .join('')
+
+    return `<li>${content}${nested}</li>`
 }
 
 function convertChildrenToHTML(children) {
@@ -748,7 +782,12 @@ function convertTableToHTML(node) {
         html += '<tr>'
         row.children.forEach(cell => {
             const tag = i === 0 ? 'th' : 'td'
-            html += `<${tag}>${convertChildrenToHTML(cell.children)}</${tag}>`
+            const cellHTML = (cell.children || []).map(child =>
+                child.type === 'paragraph'
+                    ? convertChildrenToHTML(child.children)
+                    : convertNodeToHTML(child)
+            ).join('')
+            html += `<${tag}>${cellHTML}</${tag}>`
         })
         html += '</tr>'
     })
