@@ -154,6 +154,23 @@ export default function App() {
     api(`/api/files/${id}`).then(select)
   }, [select])
 
+  const updateCurrentFile = React.useCallback(async (patch) => {
+    const id = current?.id
+    if (!id) return null
+
+    const updated = await api(`/api/files/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(patch),
+    })
+
+    setCurrent(prev => (
+      prev?.id === id
+        ? { ...prev, ...updated, content: prev.content }
+        : prev
+    ))
+    return updated
+  }, [current?.id])
+
   const restoreCurrent = React.useCallback(() => {
     if (!current) return
     api(`/api/files/${current.id}`).then(select)
@@ -479,6 +496,9 @@ export default function App() {
                     onClose={() => setInspectorOpen(false)}
                     onSelectFile={loadAndSelect}
                     onRestore={restoreCurrent}
+                    editorStatus={editorStatus}
+                    unsaved={unsaved}
+                    onUpdateFile={updateCurrentFile}
                   />
                 </React.Suspense>
               )}
