@@ -4,7 +4,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 
 import { processExport, exportToPDF, exportToHTML } from './export.js'
-import { selectAndParseFiles } from './import.js'
+import { parseImportPaths, selectAndParseFiles } from './import.js'
 import { ensureBackupDir, getDefaultBackupDir, listBackups } from './backup.js'
 
 // 应用主进程：负责创建窗口、设置安全选项
@@ -219,6 +219,16 @@ ipcMain.handle('import:files', async () => {
         console.error(e)
         return { success: false, message: e.message }
     }
+})
+
+ipcMain.handle('import:paths', async (event, { paths = [] } = {}) => {
+  try {
+    const results = await parseImportPaths(paths)
+    return { success: true, results }
+  } catch (e) {
+    console.error(e)
+    return { success: false, message: e.message }
+  }
 })
 
 ipcMain.handle('backup:list', async () => {
