@@ -162,6 +162,7 @@ func (d *FileDAO) List(ctx context.Context, q string, page, size int) ([]*model.
 			query = `SELECT id, title, content, created_at, updated_at, is_folder, parent_id, sort_order, is_deleted, deleted_at, is_pinned
 				FROM files
 				WHERE is_deleted = 0
+				  AND NOT (is_folder = 0 AND substr(title, 1, 7) = '__tpl__')
 				  AND (title LIKE ? ESCAPE '\' OR content LIKE ? ESCAPE '\')
 				ORDER BY is_pinned DESC,
 				  CASE
@@ -177,6 +178,7 @@ func (d *FileDAO) List(ctx context.Context, q string, page, size int) ([]*model.
 			query = `SELECT f.id, f.title, f.content, f.created_at, f.updated_at, f.is_folder, f.parent_id, f.sort_order, f.is_deleted, f.deleted_at, f.is_pinned
 				FROM files f
 				WHERE f.is_deleted = 0
+				  AND NOT (f.is_folder = 0 AND substr(f.title, 1, 7) = '__tpl__')
 				  AND (
 					f.title LIKE ? ESCAPE '\'
 					OR f.content LIKE ? ESCAPE '\'
@@ -197,7 +199,9 @@ func (d *FileDAO) List(ctx context.Context, q string, page, size int) ([]*model.
 		}
 	} else {
 		query = `SELECT id, title, content, created_at, updated_at, is_folder, parent_id, sort_order, is_deleted, deleted_at, is_pinned 
-			FROM files WHERE is_deleted = 0 
+			FROM files
+			WHERE is_deleted = 0
+			  AND NOT (is_folder = 0 AND substr(title, 1, 7) = '__tpl__')
 			ORDER BY is_pinned DESC, sort_order DESC LIMIT ? OFFSET ?`
 		args = []interface{}{size, offset}
 	}
@@ -227,6 +231,7 @@ func (d *FileDAO) ListAllMetadata(ctx context.Context) ([]*model.File, error) {
 		`SELECT id, title, '', created_at, updated_at, is_folder, parent_id, sort_order, is_deleted, deleted_at, is_pinned
 		 FROM files
 		 WHERE is_deleted = 0
+		   AND NOT (is_folder = 0 AND substr(title, 1, 7) = '__tpl__')
 		 ORDER BY is_pinned DESC, sort_order DESC`)
 	if err != nil {
 		return nil, err
