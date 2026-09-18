@@ -225,17 +225,26 @@ export default function App() {
                           }}
                           onBeforeDelete={async () => true}
                           onItemsChanged={(list) => {
-                            if (current && !list.find(i => i.id === current.id)) {
-                              setDeletedIds(prev => new Set([...prev, current.id]))
-                              const nextFile = list.find(i => !i.is_folder) || list[0] || null
-                              if (nextFile) select(nextFile)
-                              else {
-                                setCurrent(null)
-                                setContent('')
+                            if (current) {
+                              const matched = list.find(i => i.id === current.id)
+                              if (!matched) {
+                                setDeletedIds(prev => new Set([...prev, current.id]))
+                                const nextFile = list.find(i => !i.is_folder) || list[0] || null
+                                if (nextFile) select(nextFile)
+                                else {
+                                  setCurrent(null)
+                                  setContent('')
+                                }
+                                return
                               }
-                              return
+
+                              setCurrent(prev => prev
+                                ? { ...prev, ...matched, content: prev.content }
+                                : prev
+                              )
+                            } else if (list.length) {
+                              select(list[0])
                             }
-                            if (!current && list.length) select(list[0])
                           }}
                         />
                       </ErrorBoundary>
