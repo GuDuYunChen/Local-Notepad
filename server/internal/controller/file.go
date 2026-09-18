@@ -19,10 +19,13 @@ type FileController struct {
 }
 
 func (c *FileController) Register(group *ghttp.RouterGroup) {
+	group.GET("/files/trash", c.ListTrash)
+	group.DELETE("/files/trash", c.EmptyTrash)
 	group.POST("/files", c.Create)
 	group.GET("/files/{id}", c.Get)
 	group.PUT("/files/{id}", c.Update)
 	group.DELETE("/files/{id}", c.Delete)
+	group.DELETE("/files/{id}/permanent", c.PermanentDelete)
 	group.POST("/files/{id}/restore", c.Restore)
 	group.GET("/files/{id}/backlinks", c.Backlinks)
 	group.GET("/files/{id}/versions", c.Versions)
@@ -92,6 +95,32 @@ func (c *FileController) Update(r *ghttp.Request) {
 		return
 	}
 	writeOK(r, f)
+}
+
+func (c *FileController) ListTrash(r *ghttp.Request) {
+	files, err := c.FileLogic.ListTrash(r.GetCtx())
+	if err != nil {
+		writeErrWithDetail(r, 1001, "查询回收站失败", err)
+		return
+	}
+	writeOK(r, files)
+}
+
+func (c *FileController) PermanentDelete(r *ghttp.Request) {
+	id := r.Get("id").String()
+	if err := c.FileLogic.PermanentDelete(r.GetCtx(), id); err != nil {
+		writeErrWithDetail(r, 1007, "永久删除失败", err)
+		return
+	}
+	writeOK(r, nil)
+}
+
+func (c *FileController) EmptyTrash(r *ghttp.Request) {
+	if err := c.FileLogic.EmptyTrash(r.GetCtx()); err != nil {
+		writeErrWithDetail(r, 1007, "清空回收站失败", err)
+		return
+	}
+	writeOK(r, nil)
 }
 
 func (c *FileController) Delete(r *ghttp.Request) {
