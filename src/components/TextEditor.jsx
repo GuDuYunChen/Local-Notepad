@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useImperativeHandle } from 'react'
 import { api } from '~/services/api'
 import Editor from './Editor/Editor'
+import { countLexicalCharacters } from '~/utils/lexicalText'
 
 function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved, autoSaveOnSwitch = true }, ref) {
   const contentRef = useRef('')
@@ -212,18 +213,7 @@ function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved,
     scheduleCache()
     onChangeRef.current?.(newContent)
 
-    try {
-      const state = JSON.parse(newContent)
-      let text = ''
-      const extract = (node) => {
-        if (node.type === 'text') text += node.text || ''
-        node.children?.forEach(extract)
-      }
-      state.root?.children?.forEach(extract)
-      setWordCount(text.length)
-    } catch {
-      setWordCount(0)
-    }
+    setWordCount(countLexicalCharacters(newContent))
   }, [])
 
   return (
