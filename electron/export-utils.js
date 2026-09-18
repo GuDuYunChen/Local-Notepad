@@ -1,3 +1,4 @@
+import fs from 'node:fs'
 import path from 'node:path'
 
 export function safeExportStem(title) {
@@ -156,6 +157,86 @@ export async function embedLocalImagesInLexical(content, fetchImpl = globalThis.
       }
     } else if (node.type === 'video' && node.poster) {
       node.poster = await rewrite(node.poster)
+    }
+
+    for (const child of node.children || []) {
+      await walk(child)
+    }
+  }
+
+  await walk(state.root)
+  return JSON.stringify(state)
+}
+
+
+function safeAssetFilename(src, index = 0) {
+  try {
+    const url = new URL(src)
+    const raw = decodeURIComponent(path.basename(url.pathname))
+    const safe = raw.replace(/[\\/:*?"<>|]/g, '_')
+    return safe || `asset-${index + 1}`
+  } catch {
+    return `asset-${index + 1}`
+  }
+}
+
+export async function materializeLocalAssetsInLexical(
+  content,
+  outputDir,
+  assetDirName,
+  fetchImpl = globalThis.fetch
+) {
+  let state
+  try {
+    state = JSON.parse(content || '')
+  } catch {
+    return content
+  }
+
+  const assetDir = path.join(outputDir, assetDirName)
+  const written = new Map()
+  let assetIndex = 0
+
+  const rewrite = async (src) => {
+    if (!isLocalUploadUrl(src)) return src
+    if (written.has(src)) return written.get(src)
+
+    try {
+      const response = await fetchImpl(src)
+      if (!response?.ok) return src
+
+      fs.mkdirSync(assetDir, { recursive: true })
+      let filename = safeAssetFilename(src, assetIndex++)
+      let target = path.join(assetDir, filename)
+      let suffix = 1
+      const ext = path.extname(filename)
+      const stem = ext ? filename.slice(0, -ext.length) : filename
+
+      while (fs.existsSync(target)) {
+        filename = `${stem}-${suffix++}${ext}`
+        target = path.join(assetDir, filename)
+      }
+
+      fs.writeFileSync(target, Buffer.from(await response.arrayBuffer()))
+      const relative = `./${assetDirName}/${filename}`.replace(/\\/g, '/')
+      written.set(src, relative)
+      return relative
+    } catch {
+      return src
+    }
+  }
+
+  const walk = async (node) => {
+    if (!node) return
+    if (node.type === 'image') {
+      node.src = await rewrite(node.src)
+    } else if (node.type === 'image-grid') {
+      for (const item of node.items || []) {
+        item.src = await rewrite(item.src)
+      }
+    } else if (node.type === 'video') {
+      node.src = await rewrite(node.src)
+      if (node.poster) node.poster = await rewrite(node.poster)
     }
 
     for (const child of node.children || []) {
