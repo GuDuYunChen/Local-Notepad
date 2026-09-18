@@ -261,6 +261,62 @@ func TestParseWikiLinksIgnoresDuplicateWikiNodes(t *testing.T) {
 	}
 }
 
+func TestCreateSyncsSerializedWikiLinksImmediately(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	db.SetMaxOpenConns(1)
+	defer db.Close()
+
+	schema := []string{
+		`CREATE TABLE files (
+			id TEXT PRIMARY KEY,
+			title TEXT NOT NULL,
+			content TEXT NOT NULL,
+			created_at INTEGER NOT NULL,
+			updated_at INTEGER NOT NULL,
+			is_folder INTEGER DEFAULT 0,
+			parent_id TEXT DEFAULT '',
+			sort_order INTEGER DEFAULT 0,
+			is_deleted INTEGER DEFAULT 0,
+			deleted_at INTEGER DEFAULT 0,
+			is_pinned INTEGER DEFAULT 0
+		)`,
+		`CREATE TABLE links (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			source_id TEXT NOT NULL,
+			target_id TEXT NOT NULL,
+			created_at INTEGER NOT NULL,
+			UNIQUE(source_id, target_id)
+		)`,
+	}
+	for _, stmt := range schema {
+		if _, err := db.Exec(stmt); err != nil {
+			t.Fatalf("create schema: %v", err)
+		}
+	}
+
+	fileLogic := &FileLogic{
+		FileDAO: &dao.FileDAO{DB: db},
+		LinkDAO: &dao.LinkDAO{DB: db},
+	}
+	content := `{"root":{"children":[{"type":"wiki-link","id":"target-id","title":"Target"}]}}`
+
+	file, err := fileLogic.Create(context.Background(), "Source.md", content, false, "")
+	if err != nil {
+		t.Fatalf("Create with WikiLink: %v", err)
+	}
+
+	links, err := fileLogic.LinkDAO.GetOutgoingLinks(context.Background(), file.ID)
+	if err != nil {
+		t.Fatalf("GetOutgoingLinks: %v", err)
+	}
+	if len(links) != 1 || links[0].TargetID != "target-id" {
+		t.Fatalf("unexpected links after create: %#v", links)
+	}
+}
+
 func TestNormalizeTitleSanitizesAndLimitsLength(t *testing.T) {
 	title, err := normalizeTitle("  bad/name?.md  ")
 	if err != nil {
