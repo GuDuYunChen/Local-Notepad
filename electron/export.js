@@ -7,6 +7,7 @@ import {
     fetchAllFileMetadata,
     headingLevel,
     indexChildrenByParent,
+    listItemText,
     plainTextFromNode,
     safeExportStem
 } from './export-utils.js'
@@ -156,26 +157,37 @@ async function convertChildren(children) {
     return runs
 }
 
-async function convertList(node) {
-    // node.listType: 'bullet' | 'number'
-    // node.children: [ { type: 'listitem', children: [...] } ]
-    // We return an array of Paragraphs
+async function convertList(node, level = 0) {
     const paras = []
-    const isNum = node.listType === 'number'
-    
-    for (const item of node.children) {
-        if (item.type === 'listitem') {
-            const children = await convertChildren(item.children)
+    const isNumbered = node.listType === 'number'
+    let counter = Number(node.start) || 1
+
+    for (const item of node.children || []) {
+        if (item.type !== 'listitem') continue
+
+        const text = listItemText(item)
+        if (isNumbered) {
             paras.push(new Paragraph({
-                children: children,
-                bullet: {
-                    level: 0 // nested lists handling needed for robust support
-                }
+                indent: { left: 360 * level },
+                children: [new TextRun({ text: `${counter}. ${text}` })]
+            }))
+            counter++
+        } else {
+            paras.push(new Paragraph({
+                indent: { left: 360 * level },
+                children: [new TextRun({ text })],
+                bullet: { level: Math.min(level, 8) }
             }))
         }
+
+        for (const child of item.children || []) {
+            if (child.type === 'list') {
+                paras.push(...await convertList(child, level + 1))
+            }
+        }
     }
-    return paras // Wait, convertNode returns ONE object usually.
-    // If we return array, the caller needs to handle it.
+
+    return paras
 }
 
 async function convertTable(node) {
