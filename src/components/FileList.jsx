@@ -95,9 +95,14 @@ const FileNode = ({
     }
 
     return (
-        <li 
+        <div
             ref={ref}
+            id={`file-tree-item-${node.id}`}
             data-file-id={node.id}
+            role="treeitem"
+            aria-level={level + 1}
+            aria-selected={isSelected}
+            aria-expanded={node.is_folder ? isExpanded : undefined}
             className={`list-item level-${level}${isSelected ? ' active' : ''}${isKeyboardFocused ? ' keyboard-focus' : ''}${node.is_folder ? ' folder' : ''} ${isDragging ? 'dragging' : ''} ${dragClass}`}
             onClick={(e) => onSelect(node, e)}
             onContextMenu={(e) => onContextMenu(e, node)}
@@ -131,14 +136,14 @@ const FileNode = ({
             </div>
           </div>
           <div className="actions">
-            <button className="action-btn" onClick={(e) => { e.stopPropagation(); onRename(node); }} title="重命名" aria-label={`重命名 ${node.title}`}>
+            <button tabIndex={-1} className="action-btn" onClick={(e) => { e.stopPropagation(); onRename(node); }} title="重命名" aria-label={`重命名 ${node.title}`}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
             </button>
-            <button className="action-btn danger" onClick={(e) => { e.stopPropagation(); onDelete(node); }} title="删除" aria-label={`删除 ${node.title}`}>
+            <button tabIndex={-1} className="action-btn danger" onClick={(e) => { e.stopPropagation(); onDelete(node); }} title="删除" aria-label={`删除 ${node.title}`}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
             </button>
           </div>
-        </li>
+        </div>
     )
 }
 
@@ -1486,9 +1491,9 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
             node.children.map(child => renderNode(child, level + 1))
         )}
         {isFolder && isExpanded && node.children.length === 0 && (
-            <li className="empty-folder" style={{ paddingLeft: `${12 + (level + 1) * 16}px` }}>
+            <div role="presentation" className="empty-folder" style={{ paddingLeft: `${12 + (level + 1) * 16}px` }}>
                 (空)
-            </li>
+            </div>
         )}
       </React.Fragment>
     )
@@ -1595,11 +1600,19 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       {loading ? (
         <div className="placeholder">加载中…</div>
       ) : (
-        <ul
+        <div
           ref={treeListRef}
           className="list tree-list"
+          role="tree"
           tabIndex={0}
           aria-label="文件树"
+          aria-multiselectable="true"
+          aria-activedescendant={keyboardFocusId ? `file-tree-item-${keyboardFocusId}` : undefined}
+          onFocus={() => {
+            if (!keyboardFocusId && visibleNodes.length) {
+              focusTreeItem(selectedId || visibleNodes[0].id)
+            }
+          }}
           onKeyDown={handleTreeKeyDown}
           onMouseDown={() => treeListRef.current?.focus({ preventScroll: true })}
         >
@@ -1627,7 +1640,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
               </div>
             )
           )}
-        </ul>
+        </div>
       )}
 
       {/* 右键菜单 */}
