@@ -11,8 +11,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   exportToPDF: (file, outputPath) => ipcRenderer.invoke('export:pdf', { file, outputPath }),
   exportToHTML: (file, outputPath) => ipcRenderer.invoke('export:html', { file, outputPath }),
   importFiles: () => ipcRenderer.invoke('import:files'),
-  backupCreate: (targetDir) => ipcRenderer.invoke('backup:create', { targetDir }),
-  backupRestore: (backupFile) => ipcRenderer.invoke('backup:restore', { backupFile }),
-  backupList: (backupDir) => ipcRenderer.invoke('backup:list', { backupDir }),
+  backupList: () => ipcRenderer.invoke('backup:list'),
+  backupOpenFolder: () => ipcRenderer.invoke('backup:openFolder'),
   onReload: (callback) => ipcRenderer.on('app:reload', callback),
 })
