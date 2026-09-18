@@ -118,9 +118,9 @@ func (d *FileDAO) List(ctx context.Context, q string, page, size int) ([]*model.
 			FROM files f
 			INNER JOIN files_fts ft ON f.rowid = ft.rowid
 			WHERE f.is_deleted = 0
-			  AND (f.title LIKE ? ESCAPE '\\' OR files_fts MATCH ?)
+			  AND (f.title LIKE ? ESCAPE '\' OR files_fts MATCH ?)
 			ORDER BY f.is_pinned DESC,
-			  CASE WHEN f.title LIKE ? ESCAPE '\\' THEN 0 ELSE 1 END,
+			  CASE WHEN f.title LIKE ? ESCAPE '\' THEN 0 ELSE 1 END,
 			  f.updated_at DESC,
 			  f.sort_order DESC
 			LIMIT ? OFFSET ?`
