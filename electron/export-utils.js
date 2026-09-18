@@ -85,3 +85,84 @@ export function listItemText(item) {
     .filter(Boolean)
     .join(' ')
 }
+
+
+function isLocalHost(hostname) {
+  return hostname === '127.0.0.1' || hostname === 'localhost' || hostname === '::1'
+}
+
+export function isLocalUploadUrl(value) {
+  try {
+    const url = new URL(value)
+    return ['http:', 'https:'].includes(url.protocol) &&
+      isLocalHost(url.hostname) &&
+      url.pathname.startsWith('/uploads/')
+  } catch {
+    return false
+  }
+}
+
+function mimeFromSource(src) {
+  const pathname = (() => {
+    try { return new URL(src).pathname } catch { return src }
+  })().toLowerCase()
+
+  if (pathname.endsWith('.png')) return 'image/png'
+  if (pathname.endsWith('.gif')) return 'image/gif'
+  if (pathname.endsWith('.webp')) return 'image/webp'
+  if (pathname.endsWith('.svg')) return 'image/svg+xml'
+  if (pathname.endsWith('.bmp')) return 'image/bmp'
+  if (pathname.endsWith('.ico')) return 'image/x-icon'
+  return 'image/jpeg'
+}
+
+export async function localUploadToDataUri(src, fetchImpl = globalThis.fetch) {
+  if (!isLocalUploadUrl(src)) return src
+
+  try {
+    const response = await fetchImpl(src)
+    if (!response?.ok) return src
+
+    const bytes = Buffer.from(await response.arrayBuffer())
+    const contentType = response.headers?.get?.('content-type')?.split(';')[0]?.trim()
+    const mime = contentType || mimeFromSource(src)
+    return `data:${mime};base64,${bytes.toString('base64')}`
+  } catch {
+    return src
+  }
+}
+
+export async function embedLocalImagesInLexical(content, fetchImpl = globalThis.fetch) {
+  let state
+  try {
+    state = JSON.parse(content || '')
+  } catch {
+    return content
+  }
+
+  const rewrite = async (src) => {
+    if (!src || String(src).startsWith('data:')) return src
+    return localUploadToDataUri(src, fetchImpl)
+  }
+
+  const walk = async (node) => {
+    if (!node) return
+
+    if (node.type === 'image') {
+      node.src = await rewrite(node.src)
+    } else if (node.type === 'image-grid') {
+      for (const item of node.items || []) {
+        item.src = await rewrite(item.src)
+      }
+    } else if (node.type === 'video' && node.poster) {
+      node.poster = await rewrite(node.poster)
+    }
+
+    for (const child of node.children || []) {
+      await walk(child)
+    }
+  }
+
+  await walk(state.root)
+  return JSON.stringify(state)
+}
