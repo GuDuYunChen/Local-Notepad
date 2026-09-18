@@ -4,6 +4,7 @@ import Editor from './Editor/Editor'
 
 function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved, autoSaveOnSwitch = true }, ref) {
   const contentRef = useRef('')
+  const lastSavedContentRef = useRef('')
   const saveTimerRef = useRef(null)
   const intervalRef = useRef(null)
   const saveAbortRef = useRef(null)
@@ -31,14 +32,25 @@ function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved,
   useEffect(() => { onSavedRef.current = onSaved }, [onSaved])
   useEffect(() => { deletedIdsRef.current = deletedIds }, [deletedIds])
 
-  const saveNow = React.useCallback(async (reason, specificId = null) => {
+  const saveNow = React.useCallback(async (reason, specificId = null, contentOverride = null) => {
     const id = specificId || currentIdRef.current
     if (!id) return
 
     if (deletedIdsRef.current?.has(id)) return
 
-    const text = contentRef.current
-    if (inFlightSaveRef.current?.id === id) return inFlightSaveRef.current.promise
+    const text = contentOverride ?? contentRef.current
+    if (id === currentIdRef.current && text === lastSavedContentRef.current) {
+      setSaveError(false)
+      return { id, content: text, skipped: true }
+    }
+
+    if (inFlightSaveRef.current?.id === id) {
+      if (inFlightSaveRef.current.content === text) {
+        return inFlightSaveRef.current.promise
+      }
+      const queuedText = text
+      return inFlightSaveRef.current.promise.then(() => saveNow(reason, id, queuedText))
+    }
 
     const ctl = new AbortController()
     const savePromise = (async () => {
@@ -55,6 +67,7 @@ function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved,
 
         const now = Date.now()
         if (id === currentIdRef.current) {
+          lastSavedContentRef.current = text
           setLastSavedAt(now)
           cacheWrite(id, text, now)
           onSavedRef.current?.(updated)
@@ -73,7 +86,7 @@ function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved,
       }
     })()
 
-    inFlightSaveRef.current = { id, promise: savePromise }
+    inFlightSaveRef.current = { id, content: text, promise: savePromise }
     return savePromise
   }, [])
 
@@ -108,6 +121,7 @@ function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved,
       setSwitching(false)
       setLoading(false)
       setLastSavedAt(null)
+      lastSavedContentRef.current = ''
       contentRef.current = ''
       setEditorContent('')
       return
@@ -123,8 +137,10 @@ function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved,
         const cacheMaxAge = 5 * 60 * 1000
         const isCacheFresh = cached && cached.editedAt && (Date.now() - cached.editedAt) < cacheMaxAge
         const useCache = isCacheFresh && cached.editedAt && (!f.updated_at || cached.editedAt > f.updated_at * 1000)
-        const text = useCache ? cached.content : f.content
+        const serverText = f.content || ''
+        const text = useCache ? cached.content : serverText
 
+        lastSavedContentRef.current = serverText
         setLastSavedAt(f.updated_at ? f.updated_at * 1000 : null)
         contentRef.current = text || ''
         setEditorContent(text || '')
