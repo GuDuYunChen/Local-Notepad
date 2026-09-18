@@ -21,6 +21,23 @@ describe('lexicalText', () => {
     expect(text).toContain('图片标题')
   })
 
+  it('projects WikiLink labels into readable text', () => {
+    const content = JSON.stringify({
+      root: {
+        children: [
+          {
+            type: 'paragraph',
+            children: [
+              { type: 'text', text: '参见 ' },
+              { type: 'wiki-link', id: 'target-id', title: '目标笔记' },
+            ],
+          },
+        ],
+      },
+    })
+    expect(extractLexicalText(content)).toBe('参见 [[目标笔记]]')
+  })
+
   it('falls back to plain text and counts Unicode code points', () => {
     expect(extractLexicalText('plain text')).toBe('plain text')
     expect(countLexicalCharacters(JSON.stringify({
