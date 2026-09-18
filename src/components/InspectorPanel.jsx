@@ -82,13 +82,23 @@ export default function InspectorPanel({
               <TagSelector fileId={file.id} tags={tags} onChange={setTags} />
             </div>
             <div className="property-row">
-              <span>最后更新</span>
-              <strong>{formatUpdated(file.updated_at)}</strong>
-            </div>
-            <div className="property-row">
               <span>类型</span>
               <strong>{file.is_folder ? '文件夹' : '笔记'}</strong>
             </div>
+            <div className="property-row">
+              <span>创建时间</span>
+              <strong>{formatUpdated(file.created_at)}</strong>
+            </div>
+            <div className="property-row">
+              <span>最后更新</span>
+              <strong>{formatUpdated(file.updated_at)}</strong>
+            </div>
+            {file.is_pinned !== undefined && (
+              <div className="property-row">
+                <span>置顶</span>
+                <strong>{file.is_pinned ? '是' : '否'}</strong>
+              </div>
+            )}
           </div>
         )}
 
