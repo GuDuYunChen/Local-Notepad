@@ -80,6 +80,50 @@ assert body["data"]["title"] == "Smoke Note.md", body
 assert body["data"]["content"] == "updated smoke body", body
 '
 
+curl --connect-timeout 1 --max-time 3 -fsS -X DELETE -H 'Origin: null' "$BASE/api/files/$FILE_ID" |
+python3 -c '
+import json, sys
+body=json.load(sys.stdin)
+assert body["code"] == 0, body
+'
+
+TRASH_RESPONSE="$(
+  curl --connect-timeout 1 --max-time 3 -fsS -H 'Origin: null' "$BASE/api/files/trash"
+)"
+FILE_ID_FOR_PY="$FILE_ID" printf '%s' "$TRASH_RESPONSE" | FILE_ID_FOR_PY="$FILE_ID" python3 -c '
+import json, os, sys
+body=json.load(sys.stdin)
+assert body["code"] == 0, body
+items=body["data"]
+assert len(items) == 1, items
+assert items[0]["id"] == os.environ["FILE_ID_FOR_PY"], items
+assert items[0].get("content", "") == "", items
+'
+
+curl --connect-timeout 1 --max-time 3 -fsS -X POST -H 'Origin: null' "$BASE/api/files/$FILE_ID/restore" |
+python3 -c '
+import json, sys
+body=json.load(sys.stdin)
+assert body["code"] == 0, body
+'
+
+curl --connect-timeout 1 --max-time 3 -fsS -X DELETE -H 'Origin: null' "$BASE/api/files/$FILE_ID" >/dev/null
+
+curl --connect-timeout 1 --max-time 3 -fsS -X DELETE -H 'Origin: null' "$BASE/api/files/$FILE_ID/permanent" |
+python3 -c '
+import json, sys
+body=json.load(sys.stdin)
+assert body["code"] == 0, body
+'
+
+curl --connect-timeout 1 --max-time 3 -fsS -H 'Origin: null' "$BASE/api/files/trash" |
+python3 -c '
+import json, sys
+body=json.load(sys.stdin)
+assert body["code"] == 0, body
+assert body["data"] == [], body
+'
+
 CORS_HEADERS="$(
   curl --connect-timeout 1 --max-time 3 -sS -D - -o /dev/null     -H 'Origin: null'     "$BASE/api/health"
 )"
