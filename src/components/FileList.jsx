@@ -652,6 +652,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       }
       if (event.key === 'F2') {
           event.preventDefault()
+          event.stopPropagation()
           setRenaming(currentNode)
           return
       }
