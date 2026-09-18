@@ -45,9 +45,10 @@ describe('listAllFiles', () => {
     const files = await listAllFiles()
 
     expect(files).toHaveLength(202)
+    expect(fetchMock.mock.calls[0][0]).toContain('compact=1')
     expect(fetchMock).toHaveBeenCalledTimes(2)
-    expect(fetchMock.mock.calls[0][0]).toContain('/api/files?page=1&size=200')
-    expect(fetchMock.mock.calls[1][0]).toContain('/api/files?page=2&size=200')
+    expect(fetchMock.mock.calls[0][0]).toContain('/api/files?page=1&size=200&compact=1')
+    expect(fetchMock.mock.calls[1][0]).toContain('/api/files?page=2&size=200&compact=1')
   })
 
   it('keeps the search query across pages and de-duplicates ids', async () => {
