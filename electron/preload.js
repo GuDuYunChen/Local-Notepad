@@ -16,5 +16,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getPathForFile: (file) => webUtils?.getPathForFile ? webUtils.getPathForFile(file) : (file?.path || ''),
   backupList: () => ipcRenderer.invoke('backup:list'),
   backupOpenFolder: () => ipcRenderer.invoke('backup:openFolder'),
+  appDiagnostics: () => ipcRenderer.invoke('app:diagnostics'),
+  openAppFolder: (kind) => ipcRenderer.invoke('app:openFolder', { kind }),
   onReload: (callback) => ipcRenderer.on('app:reload', callback),
 })
