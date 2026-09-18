@@ -454,10 +454,6 @@ function escapeMarkdownText(text) {
     return String(text || '').replace(/[\\[\]_*]/g, '\\$&')
 }
 
-function processInlineNodes(children) {')
-}')
-}
-
 function processInlineNodes(children) {
     if (!children || children.length === 0) return ''
     
