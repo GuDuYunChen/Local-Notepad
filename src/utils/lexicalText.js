@@ -15,6 +15,7 @@ export function extractLexicalText(content) {
     if (node.type === 'code-block') return node.code || ''
     if (node.type === 'todo') return node.text || ''
     if (node.type === 'image') return node.caption || node.alt || ''
+    if (node.type === 'wiki-link') return node.title ? `[[${node.title}]]` : ''
 
     if (!Array.isArray(node.children)) return ''
     return node.children.map(collect).join('')
