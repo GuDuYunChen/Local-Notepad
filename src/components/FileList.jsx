@@ -13,7 +13,8 @@ const ItemType = 'FILE_NODE'
 const FileNode = ({ 
     node, 
     level, 
-    isSelected, 
+    isSelected,
+    isKeyboardFocused,
     isExpanded, 
     folderState, 
     onSelect, 
@@ -96,7 +97,8 @@ const FileNode = ({
     return (
         <li 
             ref={ref}
-            className={`list-item level-${level}${isSelected ? ' active' : ''}${node.is_folder ? ' folder' : ''} ${isDragging ? 'dragging' : ''} ${dragClass}`} 
+            data-file-id={node.id}
+            className={`list-item level-${level}${isSelected ? ' active' : ''}${isKeyboardFocused ? ' keyboard-focus' : ''}${node.is_folder ? ' folder' : ''} ${isDragging ? 'dragging' : ''} ${dragClass}`}
             onClick={(e) => onSelect(node, e)}
             onContextMenu={(e) => onContextMenu(e, node)}
             style={{ paddingLeft: `${12 + level * 16}px`, opacity: isDragging ? 0.5 : 1 }}
@@ -164,11 +166,14 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
   const [pendingNewFile, setPendingNewFile] = useState(null) // 待新建文件信息
   
   const [selectedIds, setSelectedIds] = useState(new Set()) // Multi-select state
+  const [keyboardFocusId, setKeyboardFocusId] = useState(selectedId || '')
+  const treeListRef = useRef(null)
 
   // Sync selectedId (prop) with selectedIds
   useEffect(() => {
       // Always sync internal selection with prop, ensuring UI reflects Active Editor state.
       if (selectedId) {
+          setKeyboardFocusId(selectedId)
           // Force sync: if prop exists, it must be the only selection (unless multi-select mode? logic simplified for now)
           // To fix "two items selected on cancel": we enforce that if we are not in a multi-select operation (which we can't easily know here),
           // we sync to prop.
@@ -181,6 +186,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
 
   // Multi-select Logic
   function handleSelect(item, e) {
+      setKeyboardFocusId(item.id)
       if (item.is_folder) {
           toggleExpand(item.id, e)
           return
@@ -561,6 +567,99 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
     processRecursive(roots)
     return roots
   }, [items])
+
+  const visibleNodes = useMemo(() => {
+      const out = []
+      const walk = (nodes) => {
+          for (const node of nodes) {
+              out.push(node)
+              if (node.is_folder && expanded.has(node.id)) {
+                  walk(node.children || [])
+              }
+          }
+      }
+      walk(tree)
+      return out
+  }, [tree, expanded])
+
+  const focusTreeItem = React.useCallback((id) => {
+      if (!id) return
+      setKeyboardFocusId(id)
+      window.requestAnimationFrame(() => {
+          document.querySelector(`[data-file-id="${CSS.escape(id)}"]`)?.scrollIntoView({
+              block: 'nearest',
+          })
+      })
+  }, [])
+
+  function handleTreeKeyDown(event) {
+      if (visibleNodes.length === 0) return
+
+      const currentIndex = Math.max(
+          0,
+          visibleNodes.findIndex(node => node.id === (keyboardFocusId || selectedId))
+      )
+      const currentNode = visibleNodes[currentIndex] || visibleNodes[0]
+
+      if (event.key === 'ArrowDown') {
+          event.preventDefault()
+          const next = visibleNodes[Math.min(visibleNodes.length - 1, currentIndex + 1)]
+          focusTreeItem(next.id)
+          return
+      }
+      if (event.key === 'ArrowUp') {
+          event.preventDefault()
+          const prev = visibleNodes[Math.max(0, currentIndex - 1)]
+          focusTreeItem(prev.id)
+          return
+      }
+      if (event.key === 'Home') {
+          event.preventDefault()
+          focusTreeItem(visibleNodes[0].id)
+          return
+      }
+      if (event.key === 'End') {
+          event.preventDefault()
+          focusTreeItem(visibleNodes[visibleNodes.length - 1].id)
+          return
+      }
+      if (event.key === 'ArrowRight' && currentNode.is_folder) {
+          event.preventDefault()
+          if (!expanded.has(currentNode.id)) {
+              toggleExpand(currentNode.id)
+          } else if (currentNode.children?.length) {
+              focusTreeItem(currentNode.children[0].id)
+          }
+          return
+      }
+      if (event.key === 'ArrowLeft') {
+          event.preventDefault()
+          if (currentNode.is_folder && expanded.has(currentNode.id)) {
+              toggleExpand(currentNode.id)
+          } else if (currentNode.parent_id) {
+              focusTreeItem(currentNode.parent_id)
+          }
+          return
+      }
+      if (event.key === 'Enter') {
+          event.preventDefault()
+          if (currentNode.is_folder) {
+              toggleExpand(currentNode.id)
+          } else {
+              onSelect(currentNode)
+          }
+          return
+      }
+      if (event.key === 'F2') {
+          event.preventDefault()
+          setRenaming(currentNode)
+          return
+      }
+      if (event.key === 'Delete') {
+          event.preventDefault()
+          void onDeleteCheck(currentNode.id)
+      }
+  }
 
   async function onNewFileCheck(parentId) {
     try {
@@ -1348,6 +1447,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
     const isFolder = node.is_folder
     const isExpanded = expanded.has(node.id)
     const isSelected = selectedId === node.id || selectedIds.has(node.id)
+    const isKeyboardFocused = keyboardFocusId === node.id
     
     // Selection State for Folder
     let folderState = 0
@@ -1361,6 +1461,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
             node={node}
             level={level}
             isSelected={isSelected}
+            isKeyboardFocused={isKeyboardFocused}
             isExpanded={isExpanded}
             folderState={folderState}
             onSelect={handleSelect}
@@ -1485,7 +1586,14 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       {loading ? (
         <div className="placeholder">加载中…</div>
       ) : (
-        <ul className="list tree-list">
+        <ul
+          ref={treeListRef}
+          className="list tree-list"
+          tabIndex={0}
+          aria-label="文件树"
+          onKeyDown={handleTreeKeyDown}
+          onMouseDown={() => treeListRef.current?.focus({ preventScroll: true })}
+        >
           {tree.map(node => renderNode(node))}
           {tree.length === 0 && (
             q ? (
