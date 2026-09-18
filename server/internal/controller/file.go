@@ -52,7 +52,7 @@ func (c *FileController) Create(r *ghttp.Request) {
 
 	f, err := c.FileLogic.Create(r.GetCtx(), in.Title, in.Content, in.IsFolder, in.ParentID)
 	if err != nil {
-		writeErr(r, 1006, "创建失败", err)
+		writeErrWithDetail(r, 1006, "创建失败", err)
 		return
 	}
 	writeOK(r, f)
