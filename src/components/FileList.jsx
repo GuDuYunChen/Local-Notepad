@@ -4,6 +4,7 @@ import { NativeTypes } from 'react-dnd-html5-backend'
 import { api, listAllFiles } from '~/services/api'
 import { toast } from '~/services/toast'
 import { executeFileHistoryAction } from '~/services/fileHistory'
+import { normalizeImportedContent } from '~/services/importContent'
 
 const NameDialog = React.lazy(() => import('./NameDialog'))
 const FileSelectorDialog = React.lazy(() => import('./FileSelectorDialog'))
@@ -774,54 +775,63 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       return false
   }
 
+  async function importParsedResults(results) {
+    if (!Array.isArray(results) || results.length === 0) return
+
+    const loadingMsg = toast.loading(`正在导入 ${results.length} 个文件...`, 0)
+    let successCount = 0
+    let failCount = 0
+
+    try {
+      for (const item of results) {
+        if (item.error) {
+          failCount++
+          continue
+        }
+
+        try {
+          const title = item.title || '未命名'
+          const content = normalizeImportedContent(item)
+
+          await api('/api/files', {
+            method: 'POST',
+            body: JSON.stringify({
+              title,
+              content,
+              is_folder: false,
+              parent_id: ''
+            })
+          })
+          successCount++
+        } catch (e) {
+          console.error(`Import create failed for ${item.title}`, e)
+          failCount++
+        }
+      }
+    } finally {
+      loadingMsg()
+    }
+
+    if (successCount > 0) {
+      toast.success(`成功导入 ${successCount} 个文件`)
+      void load()
+    }
+    if (failCount > 0) {
+      toast.warning(`${failCount} 个文件导入失败`)
+    }
+  }
+
   async function onImport() {
     try {
       const res = await window.electronAPI.importFiles()
-      if (!res || !res.success || !res.results || res.results.length === 0) return
-      
-      const results = res.results
-      const loadingMsg = toast.loading(`正在导入 ${results.length} 个文件...`, 0)
-      
-      let successCount = 0
-      let failCount = 0
-      
-      for (const item of results) {
-          if (item.error) {
-              failCount++
-              continue
-          }
-          try {
-              // Use default title if empty
-              const title = item.title || '未命名'
-              
-              await api('/api/files', {
-                  method: 'POST',
-                  body: JSON.stringify({
-                      title: title,
-                      content: item.content || '',
-                      is_folder: false,
-                      parent_id: '' // Import to root by default
-                  })
-              })
-              successCount++
-          } catch (e) {
-              console.error(`Import create failed for ${item.title}`, e)
-              failCount++
-          }
+      if (!res?.success) {
+        if (res?.message) toast.error('导入出错: ' + res.message)
+        return
       }
-      
-      loadingMsg() // Close loading
-      
-      if (successCount > 0) {
-          toast.success(`成功导入 ${successCount} 个文件`)
-          void load()
-      }
-      if (failCount > 0) {
-          toast.warning(`${failCount} 个文件导入失败`)
-      }
-    } catch (e) { 
-        console.error(e)
-        toast.error('导入出错: ' + (e.message || '未知错误'))
+      await importParsedResults(res.results)
+    } catch (e) {
+      console.error(e)
+      toast.error('导入出错: ' + (e.message || '未知错误'))
     }
   }
 
@@ -1256,23 +1266,28 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
   }
 
   async function handleNativeFileDrop(files) {
-       if (!files || files.length === 0) return
-       
-       const paths = []
-       for (let i = 0; i < files.length; i++) {
-           if (files[i].path) paths.push(files[i].path)
-       }
-       
-       if (paths.length > 0) {
-           try {
-               await api('/api/files/import', {
-                  method: 'POST',
-                  body: JSON.stringify({ paths, encoding: 'utf-8' }),
-                })
-                void load()
-           } catch (e) { console.error(e) }
-       }
-   }
+    if (!files || files.length === 0) return
+
+    try {
+      const paths = Array.from(files)
+        .map(file => window.electronAPI?.getPathForFile?.(file) || file?.path || '')
+        .filter(Boolean)
+
+      if (paths.length === 0) {
+        toast.warning('无法读取拖入文件路径，请使用“导入文件”')
+        return
+      }
+
+      const res = await window.electronAPI?.importPaths?.(paths)
+      if (!res?.success) {
+        throw new Error(res?.message || '解析拖入文件失败')
+      }
+      await importParsedResults(res.results)
+    } catch (e) {
+      console.error(e)
+      toast.error('拖放导入失败: ' + (e.message || '未知错误'))
+    }
+  }
 
    const [, dropContainer] = useDrop({
        accept: [ItemType, NativeTypes.FILE],
