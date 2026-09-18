@@ -1,8 +1,6 @@
 @font-face {
   font-family: 'AlimamaAgileVF';
-  src: url('../assets/fonts/AlimamaAgileVF/AlimamaAgileVF/AlimamaAgileVF-Thin.woff2') format('woff2'),
-       url('../assets/fonts/AlimamaAgileVF/AlimamaAgileVF/AlimamaAgileVF-Thin.woff') format('woff'),
-       url('../assets/fonts/AlimamaAgileVF/AlimamaAgileVF/AlimamaAgileVF-Thin.ttf') format('truetype');
+  src: url('../assets/fonts/AlimamaAgileVF/AlimamaAgileVF/AlimamaAgileVF-Thin.woff2') format('woff2');
   font-weight: 100 900;
   font-style: normal;
   font-display: swap;
