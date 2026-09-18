@@ -183,6 +183,13 @@ func (c *FileController) List(r *ghttp.Request) {
 		writeErrWithDetail(r, 1001, "查询失败", err)
 		return
 	}
+
+	if r.Get("compact").Bool() {
+		for _, file := range files {
+			file.Content = ""
+		}
+	}
+
 	writeOK(r, files)
 }
 
