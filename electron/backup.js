@@ -1,43 +1,69 @@
-import fs from 'fs'
-import path from 'path'
-import { ipcMain } from 'electron'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 
-export async function handleBackup(backupDir) {
-  void backupDir
-  throw new Error('当前版本已禁用桌面端手工备份。应用使用 SQLite WAL 模式，直接复制在线数据库可能生成损坏备份，请使用应用自动备份目录中的备份文件。')
-}
+export function getDefaultDataDir() {
+  const configured = process.env.NOTEPAD_DATA?.trim()
+  if (configured) return configured
 
-export async function handleRestore(backupFile) {
-  void backupFile
-  void ipcMain
-  throw new Error('当前版本已禁用桌面端手工恢复。请先完全退出应用，再使用自动备份目录中的备份文件或恢复脚本进行离线恢复。')
-}
-
-export async function listBackups(backupDir) {
-  if (!fs.existsSync(backupDir)) {
-    return []
+  const home = os.homedir()
+  if (process.platform === 'win32') {
+    return path.join(home, 'AppData', 'Roaming', 'Notepad')
   }
-  
-  const files = fs.readdirSync(backupDir)
+  if (process.platform === 'darwin') {
+    return path.join(home, 'Library', 'Application Support', 'Notepad')
+  }
+  return path.join(home, '.notepad')
+}
+
+export function getDefaultBackupDir() {
+  return path.join(getDefaultDataDir(), 'backups')
+}
+
+export function ensureBackupDir() {
+  const backupDir = getDefaultBackupDir()
+  fs.mkdirSync(backupDir, { recursive: true })
+  return backupDir
+}
+
+export function parseBackupTimestamp(filename, fallbackDate = null) {
+  const match = /^backup-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})\.db$/.exec(filename)
+  if (match) {
+    const [, year, month, day, hour, minute, second] = match
+    const date = new Date(
+      Number(year),
+      Number(month) - 1,
+      Number(day),
+      Number(hour),
+      Number(minute),
+      Number(second)
+    )
+    if (!Number.isNaN(date.getTime())) return date.toISOString()
+  }
+
+  if (fallbackDate instanceof Date && !Number.isNaN(fallbackDate.getTime())) {
+    return fallbackDate.toISOString()
+  }
+  return ''
+}
+
+export async function listBackups(backupDir = '') {
+  const resolvedDir = backupDir || getDefaultBackupDir()
+  if (!fs.existsSync(resolvedDir)) return []
+
+  const files = fs.readdirSync(resolvedDir)
   return files
-    .filter(f => f.startsWith('backup-') && f.endsWith('.db'))
+    .filter(file => file.startsWith('backup-') && file.endsWith('.db'))
     .sort()
     .reverse()
-    .map(f => ({
-      name: f,
-      path: path.join(backupDir, f),
-      size: fs.statSync(path.join(backupDir, f)).size,
-      date: new Date(f.replace('backup-', '').replace('.db', '').replace(/-/g, ':').replace(/T/, ' ')).toISOString()
-    }))
-}
-
-function getDefaultDBPath() {
-  const home = process.env.HOME || process.env.USERPROFILE
-  if (process.platform === 'win32') {
-    return path.join(home, 'AppData', 'Roaming', 'Notepad', 'data.db')
-  } else if (process.platform === 'darwin') {
-    return path.join(home, 'Library', 'Application Support', 'Notepad', 'data.db')
-  } else {
-    return path.join(home, '.notepad', 'data.db')
-  }
+    .map(file => {
+      const filePath = path.join(resolvedDir, file)
+      const stat = fs.statSync(filePath)
+      return {
+        name: file,
+        path: filePath,
+        size: stat.size,
+        date: parseBackupTimestamp(file, stat.mtime),
+      }
+    })
 }
