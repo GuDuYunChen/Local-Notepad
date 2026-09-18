@@ -1,10 +1,126 @@
 package main
 
 import (
+	"context"
+	"database/sql"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"notepad-server/internal/dao"
+	"notepad-server/internal/model"
+
+	_ "modernc.org/sqlite"
 )
+
+func openMigrationTestDB(t *testing.T) *sql.DB {
+	t.Helper()
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	db.SetMaxOpenConns(1)
+	t.Cleanup(func() { _ = db.Close() })
+	return db
+}
+
+func TestFTSMigrationKeepsIndexInSyncOnUpdateAndPermanentDelete(t *testing.T) {
+	db := openMigrationTestDB(t)
+	ctx := context.Background()
+	if err := migrate(ctx, db); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+
+	fileDAO := &dao.FileDAO{DB: db}
+	file := &model.File{ID: "fts-file", Title: "Search note", Content: "alpha content"}
+	if err := fileDAO.Create(ctx, file); err != nil {
+		t.Fatalf("create indexed file: %v", err)
+	}
+
+	alpha, err := fileDAO.List(ctx, "alpha", 1, 20)
+	if err != nil || len(alpha) != 1 {
+		t.Fatalf("initial FTS search failed: %#v, %v", alpha, err)
+	}
+
+	file.Content = "beta content"
+	if err := fileDAO.Update(ctx, file); err != nil {
+		t.Fatalf("update indexed file: %v", err)
+	}
+
+	alpha, err = fileDAO.List(ctx, "alpha", 1, 20)
+	if err != nil {
+		t.Fatalf("search old term: %v", err)
+	}
+	if len(alpha) != 0 {
+		t.Fatalf("old FTS term still matched after update: %#v", alpha)
+	}
+	beta, err := fileDAO.List(ctx, "beta", 1, 20)
+	if err != nil || len(beta) != 1 || beta[0].ID != file.ID {
+		t.Fatalf("updated FTS term missing: %#v, %v", beta, err)
+	}
+
+	if err := fileDAO.DeleteRecursive(ctx, file.ID); err != nil {
+		t.Fatalf("soft delete file: %v", err)
+	}
+	if _, err := db.Exec(`UPDATE files SET deleted_at = 1 WHERE id = ?`, file.ID); err != nil {
+		t.Fatalf("age deleted file: %v", err)
+	}
+	if err := fileDAO.CleanupOldDeleted(ctx, 2); err != nil {
+		t.Fatalf("permanent cleanup: %v", err)
+	}
+
+	var ftsCount int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM files_fts WHERE files_fts MATCH '"beta"*'`).Scan(&ftsCount); err != nil {
+		t.Fatalf("query FTS after delete: %v", err)
+	}
+	if ftsCount != 0 {
+		t.Fatalf("deleted file remained in FTS index: %d", ftsCount)
+	}
+}
+
+func TestFTSMigrationRebuildsExistingRowsWhenUpgradingFromV4(t *testing.T) {
+	db := openMigrationTestDB(t)
+	ctx := context.Background()
+
+	setup := []string{
+		`CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at INTEGER NOT NULL)`,
+		`INSERT INTO schema_migrations (version, applied_at) VALUES (4, 1)`,
+		`CREATE TABLE files (
+			id TEXT PRIMARY KEY,
+			title TEXT NOT NULL,
+			content TEXT NOT NULL,
+			created_at INTEGER NOT NULL,
+			updated_at INTEGER NOT NULL,
+			is_folder INTEGER DEFAULT 0,
+			parent_id TEXT DEFAULT '',
+			sort_order INTEGER DEFAULT 0,
+			is_deleted INTEGER DEFAULT 0,
+			deleted_at INTEGER DEFAULT 0,
+			is_pinned INTEGER DEFAULT 0
+		)`,
+		`INSERT INTO files
+			(id, title, content, created_at, updated_at, is_folder, parent_id, sort_order, is_deleted, deleted_at, is_pinned)
+		 VALUES ('legacy-file', 'Legacy note', 'historical searchable content', 1, 1, 0, '', 0, 0, 0, 0)`,
+	}
+	for _, stmt := range setup {
+		if _, err := db.Exec(stmt); err != nil {
+			t.Fatalf("prepare v4 database: %v", err)
+		}
+	}
+
+	if err := migrate(ctx, db); err != nil {
+		t.Fatalf("upgrade migrate: %v", err)
+	}
+
+	fileDAO := &dao.FileDAO{DB: db}
+	files, err := fileDAO.List(ctx, "historical", 1, 20)
+	if err != nil {
+		t.Fatalf("search rebuilt index: %v", err)
+	}
+	if len(files) != 1 || files[0].ID != "legacy-file" {
+		t.Fatalf("legacy row missing from rebuilt FTS index: %#v", files)
+	}
+}
 
 func TestResolveUploadPathUsesDatabaseDirectory(t *testing.T) {
 	root := t.TempDir()
