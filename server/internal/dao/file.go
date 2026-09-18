@@ -112,12 +112,19 @@ func (d *FileDAO) List(ctx context.Context, q string, page, size int) ([]*model.
 	var args []interface{}
 
 	if q != "" {
-		query = `SELECT f.id, f.title, f.content, f.created_at, f.updated_at, f.is_folder, f.parent_id, f.sort_order, f.is_deleted, f.deleted_at, f.is_pinned 
+		likePattern := escapeLikePattern(q)
+		ftsQuery := escapeFTS5Query(q)
+		query = `SELECT f.id, f.title, f.content, f.created_at, f.updated_at, f.is_folder, f.parent_id, f.sort_order, f.is_deleted, f.deleted_at, f.is_pinned
 			FROM files f
 			INNER JOIN files_fts ft ON f.rowid = ft.rowid
-			WHERE f.is_deleted = 0 AND files_fts MATCH ?
-			ORDER BY f.is_pinned DESC, f.sort_order DESC LIMIT ? OFFSET ?`
-		args = []interface{}{escapeFTS5Query(q), size, offset}
+			WHERE f.is_deleted = 0
+			  AND (f.title LIKE ? ESCAPE '\\' OR files_fts MATCH ?)
+			ORDER BY f.is_pinned DESC,
+			  CASE WHEN f.title LIKE ? ESCAPE '\\' THEN 0 ELSE 1 END,
+			  f.updated_at DESC,
+			  f.sort_order DESC
+			LIMIT ? OFFSET ?`
+		args = []interface{}{likePattern, ftsQuery, likePattern, size, offset}
 	} else {
 		query = `SELECT id, title, content, created_at, updated_at, is_folder, parent_id, sort_order, is_deleted, deleted_at, is_pinned 
 			FROM files WHERE is_deleted = 0 
@@ -188,10 +195,32 @@ func (d *FileDAO) CleanupOldDeleted(ctx context.Context, threshold int64) error 
 }
 
 func escapeFTS5Query(q string) string {
-	escaped := strings.ReplaceAll(q, `"`, `""`)
-	escaped = strings.ReplaceAll(escaped, `*`, ``)
-	escaped = strings.ReplaceAll(escaped, `(`, ``)
-	escaped = strings.ReplaceAll(escaped, `)`, ``)
-	escaped = strings.ReplaceAll(escaped, `?`, ``)
-	return `"` + escaped + `"`
+	normalized := strings.TrimSpace(q)
+	replacer := strings.NewReplacer(
+		`"`, `""`,
+		`*`, ``,
+		`(`, ``,
+		`)`, ``,
+		`?`, ``,
+	)
+	normalized = strings.TrimSpace(replacer.Replace(normalized))
+	terms := strings.Fields(normalized)
+	if len(terms) == 0 {
+		return `""`
+	}
+
+	parts := make([]string, 0, len(terms))
+	for _, term := range terms {
+		parts = append(parts, `"`+term+`"*`)
+	}
+	return strings.Join(parts, " AND ")
+}
+
+func escapeLikePattern(q string) string {
+	replacer := strings.NewReplacer(
+		`\\`, `\\\\`,
+		`%`, `\\%`,
+		`_`, `\\_`,
+	)
+	return "%" + replacer.Replace(strings.TrimSpace(q)) + "%"
 }
