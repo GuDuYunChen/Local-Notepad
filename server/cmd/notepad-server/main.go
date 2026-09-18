@@ -25,6 +25,31 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+func configureDatabasePool(db *sql.DB) {
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
+}
+
+func applySQLitePragmas(ctx context.Context, db *sql.DB) {
+	pragmas := []struct {
+		name string
+		sql  string
+	}{
+		{name: "WAL", sql: "PRAGMA journal_mode=WAL;"},
+		{name: "synchronous", sql: "PRAGMA synchronous=NORMAL;"},
+		{name: "busy_timeout", sql: "PRAGMA busy_timeout=5000;"},
+		{name: "foreign_keys", sql: "PRAGMA foreign_keys=ON;"},
+		{name: "cache_size", sql: "PRAGMA cache_size=-64000;"},
+		{name: "temp_store", sql: "PRAGMA temp_store=MEMORY;"},
+		{name: "mmap_size", sql: "PRAGMA mmap_size=268435456;"},
+	}
+	for _, pragma := range pragmas {
+		if _, err := db.Exec(pragma.sql); err != nil {
+			g.Log().Warning(ctx, fmt.Errorf("设置 %s 失败: %w", pragma.name, err))
+		}
+	}
+}
+
 // 程序入口：启动 HTTP 服务并初始化数据库
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -41,6 +66,7 @@ func main() {
 		g.Log().Fatal(ctx, fmt.Errorf("打开数据库失败: %w", err))
 		return
 	}
+	configureDatabasePool(db)
 	defer func() {
 		if db != nil {
 			_ = db.Close()
@@ -61,6 +87,7 @@ func main() {
 				g.Log().Fatal(ctx, fmt.Errorf("恢复后打开数据库失败: %w", err))
 				return
 			}
+			configureDatabasePool(db)
 			if err := checkDatabaseIntegrity(db); err != nil {
 				g.Log().Fatal(ctx, fmt.Errorf("恢复后的数据库仍然损坏: %w", err))
 				return
@@ -71,25 +98,7 @@ func main() {
 		}
 	}
 	
-	if _, err := db.Exec("PRAGMA journal_mode=WAL;"); err != nil {
-		g.Log().Warning(ctx, fmt.Errorf("设置 WAL 失败: %w", err))
-	}
-	// 优化：设置同步模式为 NORMAL，平衡安全性与性能
-	if _, err := db.Exec("PRAGMA synchronous=NORMAL;"); err != nil {
-		g.Log().Warning(ctx, fmt.Errorf("设置 synchronous 失败: %w", err))
-	}
-	// 优化：增加缓存大小 (默认 2000 页 -> -64000 即 64MB)
-	if _, err := db.Exec("PRAGMA cache_size=-64000;"); err != nil {
-		g.Log().Warning(ctx, fmt.Errorf("设置 cache_size 失败: %w", err))
-	}
-	// 优化：存储临时表在内存中
-	if _, err := db.Exec("PRAGMA temp_store=MEMORY;"); err != nil {
-		g.Log().Warning(ctx, fmt.Errorf("设置 temp_store 失败: %w", err))
-	}
-	// 优化：启用 mmap，减少 I/O (256MB)
-	if _, err := db.Exec("PRAGMA mmap_size=268435456;"); err != nil {
-		g.Log().Warning(ctx, fmt.Errorf("设置 mmap_size 失败: %w", err))
-	}
+	applySQLitePragmas(ctx, db)
 
 	if err := migrate(ctx, db); err != nil {
 		g.Log().Fatal(ctx, fmt.Errorf("数据库迁移失败: %w", err))
@@ -463,6 +472,18 @@ func migrate(ctx context.Context, db *sql.DB) error {
 					VALUES ('delete', old.rowid, COALESCE(old.title, ''), COALESCE(old.content, ''));
 				END`,
 				`INSERT INTO files_fts(files_fts) VALUES('rebuild')`,
+			},
+		},
+		{
+			version: 9,
+			stmts: []string{
+				`DELETE FROM file_tags
+				 WHERE NOT EXISTS (SELECT 1 FROM files WHERE files.id = file_tags.file_id)
+				    OR NOT EXISTS (SELECT 1 FROM tags WHERE tags.id = file_tags.tag_id)`,
+				`DELETE FROM file_versions
+				 WHERE NOT EXISTS (SELECT 1 FROM files WHERE files.id = file_versions.file_id)`,
+				`DELETE FROM links
+				 WHERE NOT EXISTS (SELECT 1 FROM files WHERE files.id = links.source_id)`,
 			},
 		},
 	}
