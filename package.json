@@ -12,7 +12,8 @@
     "build:main": "esbuild electron/main.js --bundle --platform=node --format=cjs --external:electron --outfile=out/electron/main.cjs && esbuild electron/preload.js --bundle --platform=node --format=cjs --external:electron --outfile=out/electron/preload.cjs",
     "build:main:watch": "concurrently \"esbuild electron/main.js --bundle --platform=node --format=cjs --external:electron --outfile=out/electron/main.cjs --watch\" \"esbuild electron/preload.js --bundle --platform=node --format=cjs --external:electron --outfile=out/electron/preload.cjs --watch\"",
     "test:e2e": "vitest run --root=. tests/e2e/backend.spec.ts",
-    "test:ui": "vitest run --root=. src/components/"
+    "test:ui": "vitest run --root=. src/components/TextEditor.test.jsx src/components/UIRedesign.test.jsx",
+    "test:editor": "vitest run --root=. src/components/Editor/"
   },
   "dependencies": {
     "@lexical/code": "^0.39.0",
