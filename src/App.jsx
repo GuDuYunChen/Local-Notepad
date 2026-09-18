@@ -1,11 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react'
-import ThemeToggle from './components/ThemeToggle'
 import TextEditor from './components/TextEditor'
 import FileList from './components/FileList'
-import BacklinksPanel from './components/BacklinksPanel'
-import VersionHistory from './components/VersionHistory'
 import GraphPanel from './components/GraphPanel'
 import DailyNotesPanel from './components/DailyNotesPanel'
+import NavigationRail from './components/NavigationRail'
+import InspectorPanel from './components/InspectorPanel'
 import { api } from '~/services/api'
 import ConfirmDialog from './components/ConfirmDialog'
 import ShortcutsModal from './components/ShortcutsModal'
@@ -13,57 +12,47 @@ import BackupPanel from './components/BackupPanel'
 import ErrorBoundary from './components/ErrorBoundary'
 import { message } from 'antd'
 
-// 应用根组件：后续接入路由、主题与编辑器
-/**
- * 应用根组件
- * 功能：提供基础布局与主题切换入口，后续承载文件列表与编辑器区域
- */
 export default function App() {
   const editorRef = useRef(null)
   const [ready, setReady] = useState(false)
+  const [workspace, setWorkspace] = useState('notes')
+  const [inspectorOpen, setInspectorOpen] = useState(false)
+  const [inspectorTab, setInspectorTab] = useState('properties')
   const [sidebarW, setSidebarW] = useState(() => {
     const v = localStorage.getItem('sidebarWidth')
     const n = v ? parseInt(v, 10) : 280
-    return Math.min(480, Math.max(200, isNaN(n) ? 280 : n))
+    return Math.min(420, Math.max(220, isNaN(n) ? 280 : n))
   })
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    return localStorage.getItem('sidebarCollapsed') === 'true'
-  })
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('sidebarCollapsed') === 'true')
   const [dragging, setDragging] = useState(false)
   const [current, setCurrent] = useState(null)
   const [content, setContent] = useState('')
   const [switching, setSwitching] = useState(false)
-  const [deletedIds, setDeletedIds] = useState(new Set()) // Track deleted files to skip save
+  const [deletedIds, setDeletedIds] = useState(new Set())
   const [dialog, setDialog] = useState(null)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [backupOpen, setBackupOpen] = useState(false)
   const [focusMode, setFocusMode] = useState(false)
-  const [showBacklinks, setShowBacklinks] = useState(false)
-  const [showVersions, setShowVersions] = useState(false)
-  const [showGraph, setShowGraph] = useState(false)
-  const [showDailyNotes, setShowDailyNotes] = useState(false)
-  // Check unsaved changes: compare current content with original content from database
-  // Note: current.content holds the original content loaded from DB.
-  // content holds the current editor content.
-  // If current is null, no file selected.
+
   const unsaved = !!(current && content !== (current.content || ''))
-  
+
   const select = React.useCallback((f) => {
     setSwitching(true)
     setCurrent(f)
     setContent(f ? (f.content || '') : '')
-    
-    // Clear from deletedIds if we are selecting it (e.g. Undo delete)
+    setWorkspace('notes')
+
     if (f && deletedIds.has(f.id)) {
-        setDeletedIds(prev => {
-            const next = new Set(prev)
-            next.delete(f.id)
-            return next
-        })
+      setDeletedIds(prev => {
+        const next = new Set(prev)
+        next.delete(f.id)
+        return next
+      })
     }
 
     setTimeout(() => setSwitching(false), 180)
   }, [deletedIds])
+
   async function saveCurrent() {
     if (!current || !editorRef.current) return false
     try {
@@ -75,19 +64,25 @@ export default function App() {
     }
   }
 
+  const loadAndSelect = React.useCallback((id) => {
+    api(`/api/files/${id}`).then(select)
+  }, [select])
+
+  const restoreCurrent = React.useCallback(() => {
+    if (!current) return
+    api(`/api/files/${current.id}`).then(select)
+  }, [current, select])
+
   useEffect(() => {
     const t = setTimeout(() => setReady(true), 100)
     return () => clearTimeout(t)
   }, [])
 
   useEffect(() => {
-    if (window.electronAPI) {
-      const cleanup = window.electronAPI.onReload(() => {
-        window.location.reload()
-      })
-      return () => {
-        if (typeof cleanup === 'function') cleanup()
-      }
+    if (!window.electronAPI) return undefined
+    const cleanup = window.electronAPI.onReload(() => window.location.reload())
+    return () => {
+      if (typeof cleanup === 'function') cleanup()
     }
   }, [])
 
@@ -118,7 +113,8 @@ export default function App() {
   useEffect(() => {
     function onMove(e) {
       if (!dragging) return
-      const w = Math.min(480, Math.max(200, e.clientX))
+      const rail = 52
+      const w = Math.min(420, Math.max(220, e.clientX - rail))
       setSidebarW(w)
       localStorage.setItem('sidebarWidth', String(w))
     }
@@ -133,264 +129,233 @@ export default function App() {
     }
   }, [dragging])
 
+  const handleSelectFile = (f, options = {}) => {
+    if (current && f && f.id === current.id) {
+      setWorkspace('notes')
+      return
+    }
+    if (options?.skipSave || (current && deletedIds.has(current.id)) || !current || !unsaved) {
+      select(f)
+      return
+    }
+    setDialog({ type: 'unsaved', next: () => select(f) })
+  }
+
+  const workspaceTitle = workspace === 'daily' ? '每日笔记' : workspace === 'graph' ? '知识图谱' : (current?.title || '笔记')
+
   return (
-    <div className={`app${focusMode ? ' focus-mode' : ''}`}>
-      <header className="app-header">
-        <h1>记事本</h1>
-        <div className="spacer" />
-        {!focusMode && (
-          <>
-            <button className={`btn header-btn${showDailyNotes ? ' active' : ''}`} onClick={() => setShowDailyNotes(!showDailyNotes)} title="每日笔记" aria-label="每日笔记">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-              每日笔记
-            </button>
-            <button className={`btn header-btn${showGraph ? ' active' : ''}`} onClick={() => setShowGraph(!showGraph)} title="知识图谱" aria-label="知识图谱">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v6m11-7h-6m-6 0H1m16.66-5.66l-4.24 4.24M6.34 17.66l4.24-4.24m0-2.84l4.24-4.24M6.34 6.34l4.24 4.24"/></svg>
-              知识图谱
-            </button>
-            <button className={`btn header-btn${showBacklinks ? ' active' : ''}`} onClick={() => setShowBacklinks(!showBacklinks)} title="反向链接" aria-label="反向链接">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-              反向链接
-            </button>
-            <button className={`btn header-btn${showVersions ? ' active' : ''}`} onClick={() => setShowVersions(!showVersions)} title="版本历史" aria-label="版本历史">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-              版本历史
-            </button>
-            <button className="btn header-btn" onClick={() => setFocusMode(true)} title="专注模式 (F11)" aria-label="进入专注模式">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
-              专注模式
-            </button>
-          </>
-        )}
-        <button className="btn header-btn" onClick={() => setBackupOpen(true)} title="备份与恢复" aria-label="备份与恢复">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-          备份
-        </button>
-        <button className="btn header-btn" onClick={() => setShortcutsOpen(true)} title="快捷键 (Ctrl+/)" aria-label="快捷键面板">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2" ry="2"/><path d="M6 8h.001M10 8h.001M14 8h.001M18 8h.001M8 12h.001M12 12h.001M16 12h.001M7 16h10"/></svg>
-          快捷键
-        </button>
-        <ThemeToggle />
-      </header>
-      {focusMode && (
-        <button className="focus-exit-floating" onClick={() => setFocusMode(false)} title="退出专注模式 (F11)" aria-label="退出专注模式">
-          ✕ 退出专注
-        </button>
+    <div className={`app-shell${focusMode ? ' focus-mode' : ''}`}>
+      {!focusMode && (
+        <NavigationRail
+          activeWorkspace={workspace}
+          onChangeWorkspace={setWorkspace}
+          onOpenBackup={() => setBackupOpen(true)}
+          onOpenShortcuts={() => setShortcutsOpen(true)}
+        />
       )}
-      <main className="app-main flex" style={{ '--sidebar-w': `${sidebarW}px` }}>
-        {ready ? (
-          <>
-            {!focusMode && (
-              <>
-                <aside className={`sidebar${sidebarCollapsed ? ' collapsed' : ''}`} style={{ '--sidebar-w': `${sidebarW}px` }}>
-                  {!sidebarCollapsed && (
-                    <ErrorBoundary label="文件列表">
-                      <FileList
-                        selectedId={current?.id}
-                        updatedItem={current}
-                onSelect={(f, options = {}) => {
-                  // If switching to the same file, do nothing
-                  if (current && f && f.id === current.id) return
-                  
-                  // Force skip save check (e.g. after delete)
-                  if (options?.skipSave) {
-                      select(f)
-                      return
-                  }
-                  
-                  // Check if current file was deleted
-                  if (current && deletedIds.has(current.id)) {
-                      select(f)
-                      return
-                  }
-                  
-                  // Check for unsaved changes
-                  if (!current || !unsaved) { 
-                      select(f)
-                      return 
-                  }
-                  
-                  // Show Unsaved Dialog
-                  setDialog({ 
-                      type: 'unsaved', 
-                      next: () => select(f) 
-                  })
-                }}
-                onBeforeNew={async () => {
-                  if (!unsaved) return true
-                  return new Promise((resolve) => {
-                    setDialog({ type: 'unsaved', next: () => resolve(true), cancel: () => resolve(false) })
-                  })
-                }}
-                onBeforeDelete={async (id) => {
-                  // This callback is now deprecated/unused by FileList for delete confirmation,
-                  // but might still be called? No, FileList handles delete internally now.
-                  // However, we can use this to notify App about deletion start?
-                  // Or better, FileList should notify us about deletion.
-                  // Since FileList handles delete, we need a way to track deleted IDs here.
-                  // But FileList doesn't emit "onDeleted" prop.
-                  // We can infer it from onItemsChanged or we can add onDeleted prop.
-                  // For now, let's rely on FileList calling onItemsChanged.
-                  return true 
-                }}
-                onItemsChanged={(list) => { 
-                    // Detect if current file is gone
-                    if (current && !list.find(i => i.id === current.id)) {
-                        // Current selection no longer exists in the restored dataset.
-                        // Mark it as missing to suppress save prompts and switch away.
-                        setDeletedIds(prev => new Set([...prev, current.id]))
-                        const nextFile = list.find(i => !i.is_folder) || list[0] || null
-                        if (nextFile) {
-                          select(nextFile)
-                        } else {
-                          setCurrent(null)
-                          setContent('')
-                        }
-                        return
-                    }
-                    if (!current && list.length) select(list[0]) 
-                }}
-              />
-                    </ErrorBoundary>
+
+      <div className="app-surface">
+        {!focusMode && (
+          <header className="workspace-header">
+            <div className="workspace-heading">
+              <div className="workspace-kicker">{workspace === 'notes' ? 'Local Notepad' : '工作区'}</div>
+              <div className="workspace-title" title={workspaceTitle}>{workspaceTitle}</div>
+            </div>
+            <div className="workspace-header-actions">
+              {workspace === 'notes' && current && (
+                <button
+                  className={`icon-btn${inspectorOpen ? ' active' : ''}`}
+                  onClick={() => setInspectorOpen(prev => !prev)}
+                  title="文档信息"
+                  aria-label="文档信息"
+                  aria-pressed={inspectorOpen}
+                >
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M12 11v5M12 8h.01" />
+                  </svg>
+                </button>
               )}
-              <button className="sidebar-toggle-btn" onClick={() => {
-                setSidebarCollapsed(prev => {
-                  const next = !prev
-                  localStorage.setItem('sidebarCollapsed', String(next))
-                  return next
-                })
-              }} title={sidebarCollapsed ? '展开侧边栏' : '折叠侧边栏'} aria-label={sidebarCollapsed ? '展开侧边栏' : '折叠侧边栏'}>
-                {sidebarCollapsed ? '▶' : '◀'}
-              </button>
-            </aside>
-                <div className="resizer" onMouseDown={() => setDragging(true)} />
-              </>
-            )}
-            <section className={`content${switching ? ' switching' : ''}`}>
-              <ErrorBoundary label="编辑器">
-                <TextEditor
-                  ref={editorRef}
-                  activeId={current?.id || null}
-                  deletedIds={deletedIds}
-                  autoSaveOnSwitch={false}
-                  onChange={setContent}
-                  onLoaded={(text) => {
-                    if (current) {
-                      setCurrent(prev => ({ ...prev, content: text }))
-                      setContent(text)
-                    }
-                  }}
-                  onSaved={(updated) => {
-                    if (current) {
-                      const finalContent = updated.content !== undefined ? updated.content : content
-                      const merged = { ...current, ...updated, content: finalContent }
-                      setCurrent(merged)
-                    }
-                  }}
-                />
-              </ErrorBoundary>
-              {showDailyNotes && (
-                <DailyNotesPanel
-                  onClose={() => setShowDailyNotes(false)}
-                  onSelectFile={(f) => {
-                    if (typeof f === 'string') {
-                      api(`/api/files/${f}`).then(file => select(file))
-                    } else {
-                      select(f)
-                    }
-                  }}
-                />
+              {workspace === 'notes' && (
+                <button className="icon-btn" onClick={() => setFocusMode(true)} title="专注模式 (F11)" aria-label="进入专注模式">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3" />
+                  </svg>
+                </button>
               )}
-              {showGraph && (
-                <GraphPanel
-                  onClose={() => setShowGraph(false)}
-                  onSelectFile={(id) => {
-                    api(`/api/files/${id}`).then(f => select(f))
-                  }}
-                />
-              )}
-              {showBacklinks && current && (
-                <BacklinksPanel
-                  fileId={current.id}
-                  onSelectFile={(id) => {
-                    api(`/api/files/${id}`).then(f => {
-                      setCurrent(f)
-                      setContent(f.content || '')
-                    })
-                  }}
-                />
-              )}
-              {showVersions && current && (
-                <VersionHistory
-                  fileId={current.id}
-                  onRestore={() => {
-                    if (current) {
-                      api(`/api/files/${current.id}`).then(f => {
-                        setCurrent(f)
-                        setContent(f.content || '')
-                      })
-                    }
-                  }}
-                />
-              )}
-            </section>
-          </>
-        ) : (
-          <div className="placeholder">正在加载…</div>
+            </div>
+          </header>
         )}
-      </main>
+
+        {focusMode && (
+          <button className="focus-exit-floating" onClick={() => setFocusMode(false)} title="退出专注模式 (F11)" aria-label="退出专注模式">
+            ✕ 退出专注
+          </button>
+        )}
+
+        <main className="workspace-frame" style={{ '--sidebar-w': `${sidebarW}px` }}>
+          {ready ? (
+            <>
+              {!focusMode && workspace === 'notes' && (
+                <>
+                  <aside className={`file-sidebar${sidebarCollapsed ? ' collapsed' : ''}`} style={{ '--sidebar-w': `${sidebarW}px` }}>
+                    {!sidebarCollapsed && (
+                      <ErrorBoundary label="文件列表">
+                        <FileList
+                          selectedId={current?.id}
+                          updatedItem={current}
+                          onSelect={handleSelectFile}
+                          onBeforeNew={async () => {
+                            if (!unsaved) return true
+                            return new Promise((resolve) => {
+                              setDialog({ type: 'unsaved', next: () => resolve(true), cancel: () => resolve(false) })
+                            })
+                          }}
+                          onBeforeDelete={async () => true}
+                          onItemsChanged={(list) => {
+                            if (current && !list.find(i => i.id === current.id)) {
+                              setDeletedIds(prev => new Set([...prev, current.id]))
+                              const nextFile = list.find(i => !i.is_folder) || list[0] || null
+                              if (nextFile) select(nextFile)
+                              else {
+                                setCurrent(null)
+                                setContent('')
+                              }
+                              return
+                            }
+                            if (!current && list.length) select(list[0])
+                          }}
+                        />
+                      </ErrorBoundary>
+                    )}
+                    <button
+                      className="sidebar-toggle-btn"
+                      onClick={() => {
+                        setSidebarCollapsed(prev => {
+                          const next = !prev
+                          localStorage.setItem('sidebarCollapsed', String(next))
+                          return next
+                        })
+                      }}
+                      title={sidebarCollapsed ? '展开侧边栏' : '折叠侧边栏'}
+                      aria-label={sidebarCollapsed ? '展开侧边栏' : '折叠侧边栏'}
+                    >
+                      {sidebarCollapsed ? '›' : '‹'}
+                    </button>
+                  </aside>
+                  {!sidebarCollapsed && <div className="resizer" onMouseDown={() => setDragging(true)} />}
+                </>
+              )}
+
+              <section className={`workspace-content${switching ? ' switching' : ''}`}>
+                {workspace === 'notes' && (
+                  <ErrorBoundary label="编辑器">
+                    <TextEditor
+                      ref={editorRef}
+                      activeId={current?.id || null}
+                      deletedIds={deletedIds}
+                      autoSaveOnSwitch={false}
+                      onChange={setContent}
+                      onLoaded={(text) => {
+                        if (current) {
+                          setCurrent(prev => ({ ...prev, content: text }))
+                          setContent(text)
+                        }
+                      }}
+                      onSaved={(updated) => {
+                        if (current) {
+                          const finalContent = updated.content !== undefined ? updated.content : content
+                          setCurrent({ ...current, ...updated, content: finalContent })
+                        }
+                      }}
+                    />
+                  </ErrorBoundary>
+                )}
+
+                {workspace === 'daily' && (
+                  <DailyNotesPanel
+                    onClose={() => setWorkspace('notes')}
+                    onSelectFile={(f) => {
+                      if (typeof f === 'string') api(`/api/files/${f}`).then(select)
+                      else select(f)
+                    }}
+                  />
+                )}
+
+                {workspace === 'graph' && (
+                  <GraphPanel
+                    onClose={() => setWorkspace('notes')}
+                    onSelectFile={loadAndSelect}
+                  />
+                )}
+              </section>
+
+              {!focusMode && workspace === 'notes' && inspectorOpen && current && (
+                <InspectorPanel
+                  file={current}
+                  activeTab={inspectorTab}
+                  onTabChange={setInspectorTab}
+                  onClose={() => setInspectorOpen(false)}
+                  onSelectFile={loadAndSelect}
+                  onRestore={restoreCurrent}
+                />
+              )}
+            </>
+          ) : (
+            <div className="placeholder">正在加载…</div>
+          )}
+        </main>
+      </div>
+
       {dialog?.type === 'unsaved' && (
         <ConfirmDialog
           title="当前文件未保存"
           message="是否保存更改？"
           actions={[
-            { 
-              label: '保存', 
-              kind: 'primary', 
+            {
+              label: '保存',
+              kind: 'primary',
               loading: dialog.saving,
-              onClick: async () => { 
+              onClick: async () => {
                 setDialog(prev => ({ ...prev, saving: true }))
                 const ok = await saveCurrent()
                 if (ok) {
                   setDialog(null)
-                  dialog.next() 
-                } else { 
-                  message.error('保存失败，请重试') 
+                  dialog.next()
+                } else {
+                  message.error('保存失败，请重试')
                   setDialog(prev => ({ ...prev, saving: false }))
-                } 
+                }
               }
             },
-            { 
-              label: '不保存', 
+            {
+              label: '不保存',
               disabled: dialog.saving,
-              onClick: () => { 
-                  if (editorRef.current) {
-                      editorRef.current.clearCache()
-                  }
-                  setDialog(null)
-                  dialog.next() 
-              } 
+              onClick: () => {
+                editorRef.current?.clearCache()
+                setDialog(null)
+                dialog.next()
+              }
             },
-            { 
-              label: '取消', 
+            {
+              label: '取消',
               disabled: dialog.saving,
-              onClick: () => { 
-                  if (dialog.cancel) dialog.cancel()
-                  setDialog(null) 
-              } 
+              onClick: () => {
+                dialog.cancel?.()
+                setDialog(null)
+              }
             },
           ]}
-          onClose={() => { 
-              if (dialog.saving) return
-              if (dialog.cancel) dialog.cancel()
-              setDialog(null) 
+          onClose={() => {
+            if (dialog.saving) return
+            dialog.cancel?.()
+            setDialog(null)
           }}
         />
       )}
+
       <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
       <BackupPanel open={backupOpen} onClose={() => setBackupOpen(false)} />
-      {/* Delete dialog is handled in FileList now, so we can remove 'delete' type here if unused, 
-          but we keep 'unsaved' logic. */}
     </div>
   )
 }
