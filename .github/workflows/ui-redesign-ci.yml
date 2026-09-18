@@ -30,6 +30,9 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
+      - name: Build Electron main/preload
+        run: npm run build:main
+
       - name: Build renderer
         run: npm run build:renderer
 
@@ -39,6 +42,9 @@ jobs:
       - name: Run backend tests
         working-directory: server
         run: go test ./...
+
+      - name: Run Electron tests
+        run: npm run test:electron
 
       - name: Run editor tests
         run: npm run test:editor
