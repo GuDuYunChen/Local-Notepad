@@ -14,7 +14,9 @@
     "test:e2e": "vitest run --root=. tests/e2e/backend.spec.ts",
     "test:ui": "vitest run --root=. src/components/TextEditor.test.jsx src/components/UIRedesign.test.jsx src/services/api.test.js src/services/fileHistory.test.js src/services/importContent.test.js src/utils/lexicalText.test.js",
     "test:editor": "vitest run --root=. src/components/Editor/",
-    "test:electron": "vitest run --root=. electron/*.test.js"
+    "test:electron": "vitest run --root=. electron/*.test.js",
+    "dev:backend": "go -C server run ./cmd/notepad-server",
+    "dev:all": "concurrently -k -n backend,main,vite,electron \"npm:dev:backend\" \"npm:build:main:watch\" \"vite\" \"wait-on http://localhost:5000 http://127.0.0.1:27121/api/health && npx -y electron@31 out/electron/main.cjs\""
   },
   "dependencies": {
     "@lexical/code": "^0.39.0",
