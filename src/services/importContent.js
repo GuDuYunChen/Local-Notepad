@@ -60,8 +60,9 @@ export function normalizeImportedContent(item) {
   const title = String(item?.title || '')
   const ext = title.toLowerCase().match(/(\.[^.]+)$/)?.[1] || ''
   const content = String(item?.content || '')
+  const contentType = item?.contentType || (ext === '.txt' || ext === '.doc' ? 'text' : 'markdown')
 
-  if (ext === '.txt') {
+  if (contentType === 'text') {
     return plainTextToLexical(content)
   }
 
