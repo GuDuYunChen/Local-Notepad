@@ -143,16 +143,13 @@ async function convertChildren(children) {
              // Usually TextRun can contain break.
              runs.push(new TextRun({ text: '\n' })) // or break: 1
         } else if (child.type === 'link') {
-             // Link handling
              const linkRuns = await convertChildren(child.children)
-             // docx lib handles ExternalHyperlink
-             // For simplicity, just add text runs with color blue
-             linkRuns.forEach(r => {
-                 // r is TextRun. We can't modify it easily if it's already created?
-                 // TextRun is immutable-ish in construction?
-                 // Let's just append them. Ideally we wrap in ExternalHyperlink.
-                 runs.push(r)
-             })
+             linkRuns.forEach(r => runs.push(r))
+        } else if (child.type === 'wiki-link') {
+             runs.push(new TextRun({
+                 text: `[[${child.title || '未命名'}]]`,
+                 color: '7057D9'
+             }))
         }
     }
     return runs
@@ -454,7 +451,9 @@ function processNodeToMarkdown(node, lines, depth) {
 }
 
 function escapeMarkdownText(text) {
+    return String(text || '').replace(/[\\[\]_*]/g, '\\function escapeMarkdownText(text) {
     return String(text || '').replace(/[\\[\]_*]/g, '\\function processInlineNodes(children) {')
+}')
 }
 
 function processInlineNodes(children) {
@@ -478,6 +477,8 @@ function processInlineNodes(children) {
         } else if (child.type === 'link') {
             const linkText = processInlineNodes(child.children || [])
             result += `[${linkText}](${child.url || ''})`
+        } else if (child.type === 'wiki-link') {
+            result += `[[${child.title || '未命名'}]]`
         }
     }
     return result
@@ -699,7 +700,8 @@ function convertChildrenToHTML(children) {
             if (f & 1) text = `<strong>${text}</strong>`
             return text
         }
-        if (child.type === 'link') return `<a href="${child.url || ''}">${convertChildrenToHTML(child.children)}</a>`
+        if (child.type === 'link') return `<a href="${escapeHTML(child.url || '')}">${convertChildrenToHTML(child.children)}</a>`
+        if (child.type === 'wiki-link') return `<span class="wiki-link">[[${escapeHTML(child.title || '未命名')}]]</span>`
         if (child.type === 'linebreak') return '<br>'
         return ''
     }).join('')
