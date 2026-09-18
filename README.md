@@ -19,13 +19,21 @@
 npm install
 ```
 
-### 启动前端（Electron + Vite 开发模式）
+### 一键启动完整开发环境（推荐）
+
+```bash
+npm run dev:all
+```
+
+该命令会同时启动 Go 后端、Electron main/preload watch、Vite 和 Electron，并等待前端与本地 API 健康检查通过后再打开窗口。
+
+### 分开启动前端（Electron + Vite 开发模式）
 
 ```bash
 npm run dev
 ```
 
-该命令将同时启动 Vite 开发服务器和 Electron 应用。
+该命令只启动 Vite、Electron 和 main/preload watch，不启动 Go 后端；适合需要单独调试后端的场景。
 
 ### 启动后端（Go HTTP 服务）
 
