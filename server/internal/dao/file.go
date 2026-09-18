@@ -100,6 +100,7 @@ func (d *FileDAO) BatchDeleteRecursive(ctx context.Context, ids []string) error 
 }
 
 func (d *FileDAO) List(ctx context.Context, q string, page, size int) ([]*model.File, error) {
+	q = strings.TrimSpace(q)
 	if page <= 0 {
 		page = 1
 	}
@@ -117,26 +118,39 @@ func (d *FileDAO) List(ctx context.Context, q string, page, size int) ([]*model.
 		if ftsQuery == "" {
 			query = `SELECT id, title, content, created_at, updated_at, is_folder, parent_id, sort_order, is_deleted, deleted_at, is_pinned
 				FROM files
-				WHERE is_deleted = 0 AND title LIKE ? ESCAPE '\'
-				ORDER BY is_pinned DESC, updated_at DESC, sort_order DESC
+				WHERE is_deleted = 0
+				  AND (title LIKE ? ESCAPE '\' OR content LIKE ? ESCAPE '\')
+				ORDER BY is_pinned DESC,
+				  CASE
+					WHEN title LIKE ? ESCAPE '\' THEN 0
+					WHEN content LIKE ? ESCAPE '\' THEN 1
+					ELSE 2
+				  END,
+				  updated_at DESC,
+				  sort_order DESC
 				LIMIT ? OFFSET ?`
-			args = []interface{}{likePattern, size, offset}
+			args = []interface{}{likePattern, likePattern, likePattern, likePattern, size, offset}
 		} else {
 			query = `SELECT f.id, f.title, f.content, f.created_at, f.updated_at, f.is_folder, f.parent_id, f.sort_order, f.is_deleted, f.deleted_at, f.is_pinned
 				FROM files f
 				WHERE f.is_deleted = 0
 				  AND (
 					f.title LIKE ? ESCAPE '\'
+					OR f.content LIKE ? ESCAPE '\'
 					OR f.rowid IN (
 						SELECT rowid FROM files_fts WHERE files_fts MATCH ?
 					)
 				  )
 				ORDER BY f.is_pinned DESC,
-				  CASE WHEN f.title LIKE ? ESCAPE '\' THEN 0 ELSE 1 END,
+				  CASE
+					WHEN f.title LIKE ? ESCAPE '\' THEN 0
+					WHEN f.content LIKE ? ESCAPE '\' THEN 1
+					ELSE 2
+				  END,
 				  f.updated_at DESC,
 				  f.sort_order DESC
 				LIMIT ? OFFSET ?`
-			args = []interface{}{likePattern, ftsQuery, likePattern, size, offset}
+			args = []interface{}{likePattern, likePattern, ftsQuery, likePattern, likePattern, size, offset}
 		}
 	} else {
 		query = `SELECT id, title, content, created_at, updated_at, is_folder, parent_id, sort_order, is_deleted, deleted_at, is_pinned 
