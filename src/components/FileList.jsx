@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react'
 import { api } from '~/services/api'
-import NameDialog from './NameDialog'
-import FileSelectorDialog from './FileSelectorDialog'
-import TemplateSelector from './TemplateSelector'
+const NameDialog = React.lazy(() => import('./NameDialog'))
+const FileSelectorDialog = React.lazy(() => import('./FileSelectorDialog'))
+const TemplateSelector = React.lazy(() => import('./TemplateSelector'))
 import { useDrag, useDrop } from 'react-dnd'
 import { NativeTypes } from 'react-dnd-html5-backend'
 import { toast } from '~/services/toast'
@@ -1593,6 +1593,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
           </div>
       )}
 
+      <React.Suspense fallback={null}>
       {naming && (
         <NameDialog
           defaultName={'未命名'}
@@ -1620,7 +1621,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       )}
       {showExport && <FileSelectorDialog open={showExport} onClose={() => setShowExport(false)} items={items} onConfirm={onExportConfirm} title="导出文件" confirmText="开始导出" />}
       {showBatchDelete && <FileSelectorDialog open={showBatchDelete} onClose={() => setShowBatchDelete(false)} items={items} onConfirm={onBatchDeleteConfirm} title="批量删除" confirmText="删除" processingText="删除中..." showDeleteWarning={true} selectedFileId={selectedId} initialSelectedIds={Array.from(selectedIds)} />}
-      <TemplateSelector open={showTemplate} onClose={() => setShowTemplate(false)} onSelect={handleTemplateSelect} />
+      {showTemplate && <TemplateSelector open={showTemplate} onClose={() => setShowTemplate(false)} onSelect={handleTemplateSelect} />}
       {showFolderSelector && (
           <FileSelectorDialog 
               open={showFolderSelector}
@@ -1648,6 +1649,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
           isRename={!renaming.is_folder}
         />
       )}
+      </React.Suspense>
       <style>{`
           .tree-list .list-item.drag-inside { background: var(--clay-light); border: 2px dashed var(--clay); border-radius: 4px; }
           .tree-list .list-item.drag-before { border-top: 3px solid var(--clay); margin-top: -1px; position: relative; }
