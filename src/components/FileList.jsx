@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react'
 import { useDrag, useDrop } from 'react-dnd'
 import { NativeTypes } from 'react-dnd-html5-backend'
-import { api } from '~/services/api'
+import { api, listAllFiles } from '~/services/api'
 import { toast } from '~/services/toast'
 
 const NameDialog = React.lazy(() => import('./NameDialog'))
@@ -528,9 +528,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
   async function load(retryCount = 0) {
     setLoading(true)
     try {
-      const qs = q ? `?q=${encodeURIComponent(q)}` : ''
-      const list = await api(`/api/files${qs}`)
-      const normalizedList = Array.isArray(list) ? list : []
+      const normalizedList = await listAllFiles(q)
       setItems(normalizedList)
       onItemsChanged?.(normalizedList)
       
