@@ -14,6 +14,7 @@ type SettingsController struct {
 func (c *SettingsController) Register(group *ghttp.RouterGroup) {
 	group.GET("/settings", c.Get)
 	group.PUT("/settings", c.Update)
+	group.GET("/diagnostics", c.Diagnostics)
 }
 
 func (c *SettingsController) Get(r *ghttp.Request) {
@@ -37,4 +38,14 @@ func (c *SettingsController) Update(r *ghttp.Request) {
 		return
 	}
 	writeOK(r, s)
+}
+
+
+func (c *SettingsController) Diagnostics(r *ghttp.Request) {
+	diag, err := c.SettingsLogic.Diagnostics(r.GetCtx())
+	if err != nil {
+		writeErrWithDetail(r, 3004, "读取诊断信息失败", err)
+		return
+	}
+	writeOK(r, diag)
 }
