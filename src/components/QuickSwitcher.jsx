@@ -2,6 +2,48 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { api, searchFiles } from '~/services/api'
 import { extractLexicalText } from '~/utils/lexicalText'
 
+export function buildHighlightSegments(text, query) {
+  const source = String(text || '')
+  const normalizedQuery = String(query || '').trim()
+  if (!normalizedQuery) return [{ text: source, match: false }]
+
+  const lowerSource = source.toLowerCase()
+  const lowerQuery = normalizedQuery.toLowerCase()
+  const index = lowerSource.indexOf(lowerQuery)
+  if (index < 0) return [{ text: source, match: false }]
+
+  const before = source.slice(0, index)
+  const matched = source.slice(index, index + normalizedQuery.length)
+  const after = source.slice(index + normalizedQuery.length)
+
+  return [
+    ...(before ? [{ text: before, match: false }] : []),
+    { text: matched, match: true },
+    ...(after ? [{ text: after, match: false }] : []),
+  ]
+}
+
+export function getSearchMatchScope(file, query) {
+  const normalizedQuery = String(query || '').trim().toLowerCase()
+  if (!normalizedQuery) return file?.is_pinned ? 'pinned' : 'recent'
+
+  const title = String(file?.title || '').toLowerCase()
+  if (title.includes(normalizedQuery)) return 'title'
+
+  const body = extractLexicalText(file?.content || '').toLowerCase()
+  if (body.includes(normalizedQuery)) return 'content'
+
+  return 'other'
+}
+
+function HighlightMatch({ text, query }) {
+  return buildHighlightSegments(text, query).map((segment, index) => (
+    segment.match
+      ? <mark key={`m-${index}`} className="search-match">{segment.text}</mark>
+      : <React.Fragment key={`t-${index}`}>{segment.text}</React.Fragment>
+  ))
+}
+
 function buildPreview(content, query) {
   const text = extractLexicalText(content).replace(/\s+/g, ' ').trim()
   if (!text) return '空白笔记'
@@ -54,6 +96,7 @@ export default function QuickSwitcher({ open, onClose, onSelectFile }) {
   const [loading, setLoading] = useState(false)
   const [activeIndex, setActiveIndex] = useState(0)
   const inputRef = useRef(null)
+  const resultsRef = useRef(null)
   const requestRef = useRef(0)
 
   useEffect(() => {
@@ -117,6 +160,13 @@ export default function QuickSwitcher({ open, onClose, onSelectFile }) {
     }
   }, [activeIndex, visibleResults.length])
 
+  useEffect(() => {
+    const active = resultsRef.current?.querySelector(
+      `[data-result-index="${activeIndex}"]`
+    )
+    active?.scrollIntoView?.({ block: 'nearest' })
+  }, [activeIndex, visibleResults.length])
+
   if (!open) return null
 
   const choose = (file) => {
@@ -174,42 +224,68 @@ export default function QuickSwitcher({ open, onClose, onSelectFile }) {
             onKeyDown={handleKeyDown}
             placeholder="搜索标题或正文…"
             aria-label="搜索标题或正文"
+            aria-controls="quick-switcher-results"
+            aria-activedescendant={visibleResults[activeIndex] ? `quick-result-${visibleResults[activeIndex].id}` : undefined}
+            aria-autocomplete="list"
           />
           <kbd>Ctrl K</kbd>
         </div>
 
-        <div className="quick-switcher-meta">
+        <div className="quick-switcher-meta" role="status" aria-live="polite">
           <span>{query.trim() ? '搜索结果' : '最近笔记'}</span>
           <span>{loading ? '搜索中…' : `${visibleResults.length} 项`}</span>
         </div>
 
-        <div className="quick-switcher-results" role="listbox" aria-label="搜索结果">
+        <div
+          id="quick-switcher-results"
+          ref={resultsRef}
+          className="quick-switcher-results"
+          role="listbox"
+          aria-label="搜索结果"
+        >
           {!loading && visibleResults.length === 0 ? (
             <div className="quick-switcher-empty">
               <strong>{query.trim() ? '没有找到匹配的笔记' : '还没有可打开的笔记'}</strong>
               <span>{query.trim() ? '换一个关键词试试。' : '先创建一篇笔记，然后就能在这里快速打开。'}</span>
             </div>
           ) : (
-            visibleResults.map((file, index) => (
-              <button
-                type="button"
-                key={file.id}
-                className={`quick-switcher-result${index === activeIndex ? ' active' : ''}`}
-                onMouseEnter={() => setActiveIndex(index)}
-                onClick={() => choose(file)}
-                role="option"
-                aria-selected={index === activeIndex}
-              >
-                <span className="quick-switcher-result-main">
-                  <span className="quick-switcher-result-title">
-                    {file.is_pinned && <span aria-label="已置顶">★</span>}
-                    {file.title}
+            visibleResults.map((file, index) => {
+              const scope = getSearchMatchScope(file, query)
+              const scopeLabel = {
+                title: '标题命中',
+                content: '正文命中',
+                pinned: '已置顶',
+                recent: '最近',
+              }[scope]
+
+              return (
+                <button
+                  type="button"
+                  id={`quick-result-${file.id}`}
+                  data-result-index={index}
+                  key={file.id}
+                  className={`quick-switcher-result${index === activeIndex ? ' active' : ''}`}
+                  onMouseEnter={() => setActiveIndex(index)}
+                  onClick={() => choose(file)}
+                  role="option"
+                  aria-selected={index === activeIndex}
+                >
+                  <span className="quick-switcher-result-main">
+                    <span className="quick-switcher-result-title-row">
+                      <span className="quick-switcher-result-title">
+                        {file.is_pinned && <span aria-label="已置顶">★</span>}
+                        <HighlightMatch text={file.title} query={query} />
+                      </span>
+                      {scopeLabel && <span className={`quick-switcher-match-badge ${scope}`}>{scopeLabel}</span>}
+                    </span>
+                    <span className="quick-switcher-result-preview">
+                      <HighlightMatch text={buildPreview(file.content, query)} query={query} />
+                    </span>
                   </span>
-                  <span className="quick-switcher-result-preview">{buildPreview(file.content, query)}</span>
-                </span>
-                <span className="quick-switcher-result-time">{formatRelativeTime(file.updated_at)}</span>
-              </button>
-            ))
+                  <span className="quick-switcher-result-time">{formatRelativeTime(file.updated_at)}</span>
+                </button>
+              )
+            })
           )}
         </div>
 
