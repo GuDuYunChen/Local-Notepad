@@ -305,7 +305,12 @@ export async function processExport(ids, targetDir, format = 'docx') {
             } else {
                 const stem = safeExportStem(file.title)
                 if (format === 'markdown' || format === 'md') {
-                    const mdContent = convertToMarkdown(file.content)
+                    const portableContent = await materializeLocalAssetsInLexical(
+                        file.content,
+                        currentDir,
+                        `${stem}_assets`
+                    )
+                    const mdContent = convertToMarkdown(portableContent)
                     fs.writeFileSync(path.join(currentDir, `${stem}.md`), mdContent)
                 } else {
                     const docChildren = []
