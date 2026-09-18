@@ -1,14 +1,15 @@
 import React, { useEffect, useState, useRef } from 'react'
 import TextEditor from './components/TextEditor'
 import FileList from './components/FileList'
-import GraphPanel from './components/GraphPanel'
-import DailyNotesPanel from './components/DailyNotesPanel'
 import NavigationRail from './components/NavigationRail'
-import InspectorPanel from './components/InspectorPanel'
 import { api } from '~/services/api'
 import ConfirmDialog from './components/ConfirmDialog'
-import ShortcutsModal from './components/ShortcutsModal'
-import BackupPanel from './components/BackupPanel'
+
+const GraphPanel = React.lazy(() => import('./components/GraphPanel'))
+const DailyNotesPanel = React.lazy(() => import('./components/DailyNotesPanel'))
+const InspectorPanel = React.lazy(() => import('./components/InspectorPanel'))
+const ShortcutsModal = React.lazy(() => import('./components/ShortcutsModal'))
+const BackupPanel = React.lazy(() => import('./components/BackupPanel'))
 import ErrorBoundary from './components/ErrorBoundary'
 import { message } from 'antd'
 
@@ -273,32 +274,38 @@ export default function App() {
                 )}
 
                 {workspace === 'daily' && (
-                  <DailyNotesPanel
-                    onClose={() => setWorkspace('notes')}
-                    onSelectFile={(f) => {
-                      if (typeof f === 'string') api(`/api/files/${f}`).then(select)
-                      else select(f)
-                    }}
-                  />
+                  <React.Suspense fallback={<div className="workspace-loading">正在打开每日笔记…</div>}>
+                    <DailyNotesPanel
+                      onClose={() => setWorkspace('notes')}
+                      onSelectFile={(f) => {
+                        if (typeof f === 'string') api(`/api/files/${f}`).then(select)
+                        else select(f)
+                      }}
+                    />
+                  </React.Suspense>
                 )}
 
                 {workspace === 'graph' && (
-                  <GraphPanel
-                    onClose={() => setWorkspace('notes')}
-                    onSelectFile={loadAndSelect}
-                  />
+                  <React.Suspense fallback={<div className="workspace-loading">正在加载知识图谱…</div>}>
+                    <GraphPanel
+                      onClose={() => setWorkspace('notes')}
+                      onSelectFile={loadAndSelect}
+                    />
+                  </React.Suspense>
                 )}
               </section>
 
               {!focusMode && workspace === 'notes' && inspectorOpen && current && (
-                <InspectorPanel
-                  file={current}
-                  activeTab={inspectorTab}
-                  onTabChange={setInspectorTab}
-                  onClose={() => setInspectorOpen(false)}
-                  onSelectFile={loadAndSelect}
-                  onRestore={restoreCurrent}
-                />
+                <React.Suspense fallback={<aside className="inspector-panel inspector-loading">正在加载…</aside>}>
+                  <InspectorPanel
+                    file={current}
+                    activeTab={inspectorTab}
+                    onTabChange={setInspectorTab}
+                    onClose={() => setInspectorOpen(false)}
+                    onSelectFile={loadAndSelect}
+                    onRestore={restoreCurrent}
+                  />
+                </React.Suspense>
               )}
             </>
           ) : (
@@ -354,8 +361,12 @@ export default function App() {
         />
       )}
 
-      <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
-      <BackupPanel open={backupOpen} onClose={() => setBackupOpen(false)} />
+      {(shortcutsOpen || backupOpen) && (
+        <React.Suspense fallback={null}>
+          <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+          <BackupPanel open={backupOpen} onClose={() => setBackupOpen(false)} />
+        </React.Suspense>
+      )}
     </div>
   )
 }
