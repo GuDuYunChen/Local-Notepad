@@ -335,9 +335,6 @@ func flattenUploadEntries(uploadPath string) {
 		}
 		src := filepath.Join(srcDir, files[0].Name())
 		dst := filepath.Join(uploadPath, name)
-		if _, err := os.Stat(dst); err == nil {
-			continue
-		}
 		tmp := filepath.Join(uploadPath, name+".tmp")
 		if err := os.Rename(src, tmp); err != nil {
 			continue
