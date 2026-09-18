@@ -4,7 +4,7 @@ import { countLexicalCharacters } from '~/utils/lexicalText'
 
 const Editor = React.lazy(() => import('./Editor/Editor'))
 
-function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved, autoSaveOnSwitch = true }, ref) {
+function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved, onStatusChange, autoSaveOnSwitch = true }, ref) {
   const contentRef = useRef('')
   const lastSavedContentRef = useRef('')
   const saveTimerRef = useRef(null)
@@ -27,11 +27,13 @@ function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved,
   const onChangeRef = useRef(onChange)
   const onLoadedRef = useRef(onLoaded)
   const onSavedRef = useRef(onSaved)
+  const onStatusChangeRef = useRef(onStatusChange)
   const deletedIdsRef = useRef(deletedIds)
 
   useEffect(() => { onChangeRef.current = onChange }, [onChange])
   useEffect(() => { onLoadedRef.current = onLoaded }, [onLoaded])
   useEffect(() => { onSavedRef.current = onSaved }, [onSaved])
+  useEffect(() => { onStatusChangeRef.current = onStatusChange }, [onStatusChange])
   useEffect(() => { deletedIdsRef.current = deletedIds }, [deletedIds])
 
   const saveNow = React.useCallback(async (reason, specificId = null, contentOverride = null) => {
@@ -145,6 +147,7 @@ function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved,
         lastSavedContentRef.current = serverText
         setLastSavedAt(f.updated_at ? f.updated_at * 1000 : null)
         contentRef.current = text || ''
+        setWordCount(countLexicalCharacters(text || ''))
         setEditorContent(text || '')
         onChangeRef.current?.(contentRef.current)
         onLoadedRef.current?.(contentRef.current)
@@ -176,6 +179,17 @@ function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved,
       }
     }
   }, [saveNow])
+
+  useEffect(() => {
+    onStatusChangeRef.current?.({
+      activeId,
+      saving,
+      saveError,
+      lastSavedAt,
+      dirty: Boolean(activeId && contentRef.current !== lastSavedContentRef.current),
+      wordCount,
+    })
+  }, [activeId, saving, saveError, lastSavedAt, wordCount])
 
   useEffect(() => {
     const apply = () => {
