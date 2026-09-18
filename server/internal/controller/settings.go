@@ -27,7 +27,7 @@ func (c *SettingsController) Get(r *ghttp.Request) {
 }
 
 func (c *SettingsController) Update(r *ghttp.Request) {
-	var in model.Settings
+	var in model.SettingsPatch
 	if err := r.Parse(&in); err != nil {
 		writeErr(r, 3002, "参数错误", err)
 		return
