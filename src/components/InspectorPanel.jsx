@@ -3,6 +3,7 @@ import BacklinksPanel from './BacklinksPanel'
 import VersionHistory from './VersionHistory'
 import TagSelector from './TagSelector'
 import { tagApi } from '~/services/tagApi'
+import { toast } from '~/services/toast'
 
 function formatUpdated(ts) {
   if (!ts) return '—'
@@ -16,6 +17,35 @@ function formatUpdated(ts) {
   })
 }
 
+function copyTextFallback(text) {
+  const textarea = document.createElement('textarea')
+  textarea.value = text
+  textarea.setAttribute('readonly', '')
+  textarea.style.position = 'fixed'
+  textarea.style.opacity = '0'
+  document.body.appendChild(textarea)
+  textarea.select()
+  const copied = document.execCommand?.('copy')
+  textarea.remove()
+  return copied !== false
+}
+
+async function copyText(text) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text)
+    return true
+  }
+  return copyTextFallback(text)
+}
+
+function statusLabel(editorStatus, unsaved) {
+  if (editorStatus?.saveError) return '保存失败'
+  if (editorStatus?.saving) return '保存中…'
+  if (unsaved || editorStatus?.dirty) return '未保存'
+  if (editorStatus?.lastSavedAt) return '已保存'
+  return '尚未保存'
+}
+
 export default function InspectorPanel({
   file,
   activeTab,
@@ -23,8 +53,12 @@ export default function InspectorPanel({
   onClose,
   onSelectFile,
   onRestore,
+  editorStatus,
+  unsaved,
+  onUpdateFile,
 }) {
   const [tags, setTags] = useState([])
+  const [pinBusy, setPinBusy] = useState(false)
 
   useEffect(() => {
     let alive = true
@@ -46,6 +80,32 @@ export default function InspectorPanel({
 
   if (!file) return null
 
+  const togglePinned = async () => {
+    if (!onUpdateFile || pinBusy) return
+    setPinBusy(true)
+    try {
+      await onUpdateFile({ is_pinned: !file.is_pinned })
+      toast.success(file.is_pinned ? '已取消置顶' : '已置顶')
+    } catch (error) {
+      console.error('置顶操作失败', error)
+      toast.error(error.message || '置顶操作失败')
+    } finally {
+      setPinBusy(false)
+    }
+  }
+
+  const copyWikiReference = async () => {
+    try {
+      await copyText(`[[${file.title || '未命名'}]]`)
+      toast.success('Wiki 引用已复制')
+    } catch (error) {
+      console.error('复制 Wiki 引用失败', error)
+      toast.error('复制失败')
+    }
+  }
+
+  const saveState = statusLabel(editorStatus, unsaved)
+
   return (
     <aside className="inspector-panel" aria-label="文档检查器">
       <div className="inspector-header">
@@ -54,6 +114,26 @@ export default function InspectorPanel({
           <div className="inspector-title" title={file.title}>{file.title || '未命名'}</div>
         </div>
         <button className="icon-btn" onClick={onClose} title="关闭检查器" aria-label="关闭检查器">×</button>
+      </div>
+
+      <div className="inspector-quick-actions">
+        <button
+          type="button"
+          className={`inspector-action-btn${file.is_pinned ? ' active' : ''}`}
+          onClick={() => void togglePinned()}
+          disabled={pinBusy}
+        >
+          <span aria-hidden="true">{file.is_pinned ? '★' : '☆'}</span>
+          {pinBusy ? '处理中…' : file.is_pinned ? '取消置顶' : '置顶'}
+        </button>
+        <button
+          type="button"
+          className="inspector-action-btn"
+          onClick={() => void copyWikiReference()}
+        >
+          <span aria-hidden="true">[[]]</span>
+          复制 Wiki 引用
+        </button>
       </div>
 
       <div className="inspector-tabs" role="tablist" aria-label="文档信息">
@@ -77,10 +157,22 @@ export default function InspectorPanel({
       <div className="inspector-body">
         {activeTab === 'properties' && (
           <div className="inspector-properties">
+            <div className="property-summary-grid">
+              <div className="property-summary-card">
+                <span>字数</span>
+                <strong>{(editorStatus?.wordCount || 0).toLocaleString()}</strong>
+              </div>
+              <div className={`property-summary-card save-${saveState}`}>
+                <span>保存状态</span>
+                <strong>{saveState}</strong>
+              </div>
+            </div>
+
             <div className="property-group">
               <div className="property-label">标签</div>
               <TagSelector fileId={file.id} tags={tags} onChange={setTags} />
             </div>
+
             <div className="property-row">
               <span>类型</span>
               <strong>{file.is_folder ? '文件夹' : '笔记'}</strong>
@@ -93,12 +185,10 @@ export default function InspectorPanel({
               <span>最后更新</span>
               <strong>{formatUpdated(file.updated_at)}</strong>
             </div>
-            {file.is_pinned !== undefined && (
-              <div className="property-row">
-                <span>置顶</span>
-                <strong>{file.is_pinned ? '是' : '否'}</strong>
-              </div>
-            )}
+            <div className="property-row">
+              <span>置顶</span>
+              <strong>{file.is_pinned ? '是' : '否'}</strong>
+            </div>
           </div>
         )}
 
@@ -113,3 +203,5 @@ export default function InspectorPanel({
     </aside>
   )
 }
+
+export { statusLabel }
