@@ -17,6 +17,7 @@ import ErrorBoundary from './components/ErrorBoundary'
 
 export default function App() {
   const editorRef = useRef(null)
+  const titleInputRef = useRef(null)
   const [ready, setReady] = useState(false)
   const [workspace, setWorkspace] = useState('notes')
   const [inspectorOpen, setInspectorOpen] = useState(false)
@@ -37,6 +38,16 @@ export default function App() {
   const [backupOpen, setBackupOpen] = useState(false)
   const [quickSearchOpen, setQuickSearchOpen] = useState(false)
   const [focusMode, setFocusMode] = useState(false)
+  const [editorStatus, setEditorStatus] = useState({
+    saving: false,
+    saveError: false,
+    lastSavedAt: null,
+    dirty: false,
+    wordCount: 0,
+  })
+  const [titleEditing, setTitleEditing] = useState(false)
+  const [titleDraft, setTitleDraft] = useState('')
+  const [titleSaving, setTitleSaving] = useState(false)
 
   const unsaved = !!(current && content !== (current.content || ''))
 
@@ -44,6 +55,15 @@ export default function App() {
     setSwitching(true)
     setCurrent(f)
     setContent(f ? (f.content || '') : '')
+    setTitleEditing(false)
+    setTitleDraft(f?.title || '')
+    setEditorStatus({
+      saving: false,
+      saveError: false,
+      lastSavedAt: f?.updated_at ? f.updated_at * 1000 : null,
+      dirty: false,
+      wordCount: 0,
+    })
     setWorkspace('notes')
     if (typeof window !== 'undefined' && window.innerWidth <= 720) {
       setSidebarCollapsed(true)
@@ -70,6 +90,58 @@ export default function App() {
       return false
     }
   }, [current])
+
+  const beginTitleEdit = React.useCallback(() => {
+    if (workspace !== 'notes' || !current || current.is_folder || titleSaving) return
+    setTitleDraft(current.title || '')
+    setTitleEditing(true)
+    window.requestAnimationFrame(() => {
+      titleInputRef.current?.focus()
+      titleInputRef.current?.select()
+    })
+  }, [workspace, current, titleSaving])
+
+  const cancelTitleEdit = React.useCallback(() => {
+    setTitleDraft(current?.title || '')
+    setTitleEditing(false)
+  }, [current?.title])
+
+  const commitTitleEdit = React.useCallback(async () => {
+    if (!titleEditing || !current?.id || titleSaving) return
+
+    const nextTitle = titleDraft.trim()
+    if (!nextTitle) {
+      toast.error('标题不能为空')
+      window.requestAnimationFrame(() => titleInputRef.current?.focus())
+      return
+    }
+    if (nextTitle === current.title) {
+      setTitleEditing(false)
+      return
+    }
+
+    setTitleSaving(true)
+    try {
+      const updated = await api(`/api/files/${current.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ title: nextTitle }),
+      })
+      setCurrent(prev => (
+        prev?.id === current.id
+          ? { ...prev, ...updated, content: prev.content }
+          : prev
+      ))
+      setTitleDraft(updated.title || nextTitle)
+      setTitleEditing(false)
+      toast.success('标题已更新')
+    } catch (error) {
+      console.error('重命名失败', error)
+      toast.error(error.message || '重命名失败')
+      window.requestAnimationFrame(() => titleInputRef.current?.focus())
+    } finally {
+      setTitleSaving(false)
+    }
+  }, [titleEditing, current, titleDraft, titleSaving])
 
   const loadAndSelect = React.useCallback((id) => {
     api(`/api/files/${id}`).then(select)
@@ -116,10 +188,18 @@ export default function App() {
         e.preventDefault()
         setFocusMode(prev => !prev)
       }
+      if (k === 'f2' && workspace === 'notes' && current && !current.is_folder) {
+        const el = document.activeElement
+        const tag = el?.tagName?.toLowerCase()
+        if (tag !== 'input' && tag !== 'textarea' && !el?.isContentEditable) {
+          e.preventDefault()
+          beginTitleEdit()
+        }
+      }
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [saveCurrent])
+  }, [saveCurrent, beginTitleEdit, workspace, current])
 
   useEffect(() => {
     function onMove(e) {
@@ -188,7 +268,56 @@ export default function App() {
           <header className="workspace-header">
             <div className="workspace-heading">
               <div className="workspace-kicker">{workspace === 'notes' ? 'Local Notepad' : '工作区'}</div>
-              <div className="workspace-title" title={workspaceTitle}>{workspaceTitle}</div>
+              {workspace === 'notes' && current && !current.is_folder ? (
+                <div className="workspace-document-title">
+                  {titleEditing ? (
+                    <input
+                      ref={titleInputRef}
+                      className="workspace-title-input"
+                      value={titleDraft}
+                      disabled={titleSaving}
+                      onChange={event => setTitleDraft(event.target.value)}
+                      onBlur={() => void commitTitleEdit()}
+                      onKeyDown={event => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault()
+                          void commitTitleEdit()
+                        } else if (event.key === 'Escape') {
+                          event.preventDefault()
+                          cancelTitleEdit()
+                        }
+                      }}
+                      aria-label="当前笔记标题"
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      className="workspace-title-button"
+                      onClick={beginTitleEdit}
+                      title="点击重命名（F2）"
+                      aria-label={`重命名 ${current.title || '未命名'}`}
+                    >
+                      {current.title || '未命名'}
+                    </button>
+                  )}
+                  <span
+                    className={`workspace-save-chip${editorStatus.saveError ? ' error' : editorStatus.saving ? ' saving' : (unsaved || editorStatus.dirty) ? ' dirty' : ''}`}
+                    title={editorStatus.lastSavedAt ? new Date(editorStatus.lastSavedAt).toLocaleString('zh-CN') : ''}
+                  >
+                    {editorStatus.saveError
+                      ? '保存失败'
+                      : editorStatus.saving
+                        ? '保存中…'
+                        : (unsaved || editorStatus.dirty)
+                          ? '未保存'
+                          : editorStatus.lastSavedAt
+                            ? '已保存'
+                            : '尚未保存'}
+                  </span>
+                </div>
+              ) : (
+                <div className="workspace-title" title={workspaceTitle}>{workspaceTitle}</div>
+              )}
             </div>
             <div className="workspace-header-actions">
               {workspace === 'notes' && current && (
@@ -300,6 +429,7 @@ export default function App() {
                           setContent(text)
                         }
                       }}
+                      onStatusChange={setEditorStatus}
                       onSaved={(updated) => {
                         if (current) {
                           const finalContent = updated.content !== undefined ? updated.content : content
