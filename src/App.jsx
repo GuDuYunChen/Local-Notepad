@@ -152,6 +152,23 @@ export default function App() {
     setDialog({ type: 'unsaved', next: () => select(f) })
   }
 
+  useEffect(() => {
+    const openWikiLink = (event) => {
+      const id = event.detail?.id
+      if (!id) return
+
+      api(`/api/files/${id}`)
+        .then(file => handleSelectFile(file))
+        .catch(error => {
+          console.error('打开 WikiLink 失败', error)
+          toast.error('目标笔记不存在或已删除')
+        })
+    }
+
+    window.addEventListener('wikiLink:open', openWikiLink)
+    return () => window.removeEventListener('wikiLink:open', openWikiLink)
+  }, [current, deletedIds, unsaved, select])
+
   const workspaceTitle = workspace === 'daily' ? '每日笔记' : workspace === 'graph' ? '知识图谱' : (current?.title || '笔记')
 
   return (
