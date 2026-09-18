@@ -827,12 +827,15 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
 
   async function onSaveAs(id) {
     try {
-      const path = await window.electronAPI.saveFileDialog()
-      if (!path) return
-      await api(`/api/files/${id}/save-as`, {
-        method: 'POST',
-        body: JSON.stringify({ path }),
+      const file = await api(`/api/files/${id}`)
+      const res = await window.electronAPI?.saveContentAs?.({
+        suggestedName: file?.title || 'note.md',
+        content: file?.content || '',
       })
+      if (res?.canceled) return
+      if (!res?.success) {
+        throw new Error(res?.message || '写入文件失败')
+      }
       toast.success('另存为成功')
     } catch (e) {
       console.error(e)
