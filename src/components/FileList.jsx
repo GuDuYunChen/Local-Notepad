@@ -1196,8 +1196,9 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       const oldTitle = items.find(i => i.id === id)?.title
       pushHistory({ type: 'rename', data: { id, oldTitle, newTitle: finalName } })
 
-      setItems(prev => prev.map(i => i.id === id ? { ...i, title: updated.title } : i))
-      onItemsChanged?.(items)
+      const nextItems = items.map(i => i.id === id ? { ...i, title: updated.title } : i)
+      setItems(nextItems)
+      onItemsChanged?.(nextItems)
       setRenaming(null)
     } catch (e) { 
         console.error(e)
@@ -1603,9 +1604,9 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
         <div
           ref={treeListRef}
           className="list tree-list"
-          role="tree"
+          role={tree.length ? 'tree' : 'region'}
           tabIndex={0}
-          aria-label="文件树"
+          aria-label={tree.length ? '文件树' : '空资料库'}
           aria-multiselectable="true"
           aria-activedescendant={keyboardFocusId ? `file-tree-item-${keyboardFocusId}` : undefined}
           onFocus={() => {
