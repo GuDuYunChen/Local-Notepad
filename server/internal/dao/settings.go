@@ -3,7 +3,9 @@ package dao
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
+
 	"notepad-server/internal/model"
 )
 
@@ -13,17 +15,40 @@ type SettingsDAO struct {
 
 func (d *SettingsDAO) Get(ctx context.Context) (*model.Settings, error) {
 	var s model.Settings
-	row := d.DB.QueryRowContext(ctx, `SELECT theme, editor_opts, sync_enabled, sync_endpoint FROM settings WHERE id = 1`)
-	if err := row.Scan(&s.Theme, &s.EditorOpts, &s.SyncEnabled, &s.SyncEndpoint); err != nil {
+	var editorOpts sql.NullString
+	var syncEndpoint sql.NullString
+	var syncEnabled int
+
+	row := d.DB.QueryRowContext(ctx,
+		`SELECT theme, editor_opts, sync_enabled, sync_endpoint FROM settings WHERE id = 1`)
+	if err := row.Scan(&s.Theme, &editorOpts, &syncEnabled, &syncEndpoint); err != nil {
 		return nil, err
 	}
+
+	s.SyncEnabled = syncEnabled != 0
+	s.SyncEndpoint = syncEndpoint.String
+	s.EditorOpts = map[string]interface{}{}
+
+	if editorOpts.Valid && editorOpts.String != "" {
+		if err := json.Unmarshal([]byte(editorOpts.String), &s.EditorOpts); err != nil {
+			return nil, fmt.Errorf("解析 editor_opts 失败: %w", err)
+		}
+	}
+
 	return &s, nil
 }
 
 func (d *SettingsDAO) Update(ctx context.Context, s *model.Settings) error {
-	_, err := d.DB.ExecContext(ctx,
-		`UPDATE settings SET theme = ?, editor_opts = ?, sync_enabled = ?, sync_endpoint = ? WHERE id = 1`,
-		s.Theme, s.EditorOpts, s.SyncEnabled, s.SyncEndpoint)
+	editorJSON, err := json.Marshal(s.EditorOpts)
+	if err != nil {
+		return fmt.Errorf("序列化 editor_opts 失败: %w", err)
+	}
+
+	_, err = d.DB.ExecContext(ctx,
+		`UPDATE settings
+		 SET theme = ?, editor_opts = ?, sync_enabled = ?, sync_endpoint = ?
+		 WHERE id = 1`,
+		s.Theme, string(editorJSON), s.SyncEnabled, s.SyncEndpoint)
 	return err
 }
 
