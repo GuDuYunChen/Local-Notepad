@@ -5,6 +5,8 @@ import { createRoot } from 'react-dom/client'
 import NavigationRail from './NavigationRail'
 import TemplateSelector from './TemplateSelector'
 import QuickSwitcher from './QuickSwitcher'
+import ToastViewport from './ToastViewport'
+import { toast } from '~/services/toast'
 import { api, searchFiles } from '~/services/api'
 
 vi.mock('./ThemeToggle', () => ({
@@ -153,6 +155,27 @@ describe('UI redesign smoke tests', () => {
 
     expect(onSelectFile).toHaveBeenCalledWith(expect.objectContaining({ id: 'file-2' }))
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows and closes lightweight loading toasts', async () => {
+    await act(async () => {
+      root.render(<ToastViewport />)
+    })
+
+    let closeToast
+    await act(async () => {
+      closeToast = toast.loading('正在处理', 0)
+      await Promise.resolve()
+    })
+
+    expect(container.textContent).toContain('正在处理')
+
+    await act(async () => {
+      closeToast()
+      await Promise.resolve()
+    })
+
+    expect(container.textContent).not.toContain('正在处理')
   })
 
   it('creates a blank note from the template selector', async () => {
