@@ -6,10 +6,12 @@ import path from 'node:path'
 import { processExport, exportToPDF, exportToHTML } from './export.js'
 import { parseImportPaths, selectAndParseFiles } from './import.js'
 import { ensureBackupDir, getDefaultBackupDir, listBackups } from './backup.js'
+import { stopChildProcess } from './backend-process.js'
 
 // 应用主进程：负责创建窗口、设置安全选项
 let mainWindow = null
 let backend = null
+let allowQuit = false
 
 function createWindow() {
   const isDev = !app.isPackaged
@@ -112,14 +114,16 @@ app.on('window-all-closed', () => {
 })
 
 app.on('before-quit', (event) => {
-  if (backend) {
-    event.preventDefault()
-    backend.on('exit', () => {
-      backend = null
-      app.quit()
-    })
-    backend.kill('SIGTERM')
-  }
+  if (allowQuit || !backend) return
+
+  event.preventDefault()
+  const child = backend
+  backend = null
+
+  void stopChildProcess(child, 2500).finally(() => {
+    allowQuit = true
+    app.quit()
+  })
 })
 
 // 启动后端进程（生产模式）
