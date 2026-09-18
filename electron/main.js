@@ -1,5 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, shell } from 'electron'
 import { spawn } from 'node:child_process'
+import fs from 'node:fs/promises'
 import path from 'node:path'
 
 import { processExport, exportToPDF, exportToHTML } from './export.js'
@@ -151,6 +152,28 @@ ipcMain.handle('dialog:saveFile', async () => {
     { name: 'Markdown', extensions: ['md'] }
   ] })
   return res.canceled ? '' : (res.filePath || '')
+})
+
+ipcMain.handle('file:saveContentAs', async (event, { suggestedName = 'note.md', content = '' } = {}) => {
+  try {
+    const result = await dialog.showSaveDialog({
+      defaultPath: suggestedName,
+      filters: [
+        { name: 'Markdown', extensions: ['md'] },
+        { name: 'Text', extensions: ['txt'] },
+        { name: 'All Files', extensions: ['*'] },
+      ],
+    })
+    if (result.canceled || !result.filePath) {
+      return { success: false, canceled: true }
+    }
+
+    await fs.writeFile(result.filePath, String(content ?? ''), 'utf8')
+    return { success: true, path: result.filePath }
+  } catch (error) {
+    console.error(error)
+    return { success: false, canceled: false, message: error.message }
+  }
 })
 
 ipcMain.handle('dialog:openDirectory', async () => {
