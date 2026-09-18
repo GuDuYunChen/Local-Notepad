@@ -4,7 +4,6 @@ import { NativeTypes } from 'react-dnd-html5-backend'
 import { api, listAllFiles } from '~/services/api'
 import { toast } from '~/services/toast'
 import { executeFileHistoryAction } from '~/services/fileHistory'
-import { normalizeImportedContent } from '~/services/importContent'
 
 const NameDialog = React.lazy(() => import('./NameDialog'))
 const FileSelectorDialog = React.lazy(() => import('./FileSelectorDialog'))
@@ -783,6 +782,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
     let failCount = 0
 
     try {
+      const { normalizeImportedContent } = await import('~/services/importContent')
       for (const item of results) {
         if (item.error) {
           failCount++
