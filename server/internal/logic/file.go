@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/saintfish/chardet"
@@ -29,24 +30,22 @@ type FileLogic struct {
 }
 
 func (l *FileLogic) Create(ctx context.Context, title string, content string, isFolder bool, parentID string) (*model.File, error) {
-	title = sanitizeName(title)
-	if title == "" {
-		return nil, fmt.Errorf("标题不能为空")
+	normalizedTitle, err := normalizeTitle(title)
+	if err != nil {
+		return nil, err
 	}
 
-	if parentID != "" {
-		duplicate, err := l.FileDAO.CheckDuplicate(ctx, parentID, title, "")
-		if err != nil {
-			return nil, err
-		}
-		if duplicate {
-			return nil, fmt.Errorf("已存在同名文件或文件夹: %s", title)
-		}
+	duplicate, err := l.FileDAO.CheckDuplicate(ctx, parentID, normalizedTitle, "")
+	if err != nil {
+		return nil, err
+	}
+	if duplicate {
+		return nil, fmt.Errorf("已存在同名文件或文件夹: %s", normalizedTitle)
 	}
 
 	f := &model.File{
 		ID:       uuid.New().String(),
-		Title:    title,
+		Title:    normalizedTitle,
 		Content:  content,
 		IsFolder: isFolder,
 		ParentID: parentID,
@@ -74,14 +73,34 @@ func (l *FileLogic) Update(ctx context.Context, id string, title, content, paren
 		return nil, fmt.Errorf("文件已删除，无法更新")
 	}
 
-	if title != nil {
-		f.Title = *title
+	targetParentID := f.ParentID
+	if parentID != nil {
+		targetParentID = *parentID
+	}
+
+	if title != nil || parentID != nil {
+		targetTitle := f.Title
+		if title != nil {
+			normalizedTitle, err := normalizeTitle(*title)
+			if err != nil {
+				return nil, err
+			}
+			targetTitle = normalizedTitle
+		}
+
+		duplicate, err := l.FileDAO.CheckDuplicate(ctx, targetParentID, targetTitle, id)
+		if err != nil {
+			return nil, err
+		}
+		if duplicate {
+			return nil, fmt.Errorf("已存在同名文件或文件夹: %s", targetTitle)
+		}
+
+		f.Title = targetTitle
+		f.ParentID = targetParentID
 	}
 	if content != nil {
 		f.Content = *content
-	}
-	if parentID != nil {
-		f.ParentID = *parentID
 	}
 	if sortOrder != nil {
 		f.SortOrder = *sortOrder
@@ -249,6 +268,17 @@ func (l *FileLogic) BatchExport(ctx context.Context, ids []string, format string
 		buf.WriteString(f.Content)
 	}
 	return buf.Bytes(), "export." + format, nil
+}
+
+func normalizeTitle(title string) (string, error) {
+	title = sanitizeName(title)
+	if title == "" {
+		return "", fmt.Errorf("标题不能为空")
+	}
+	if utf8.RuneCountInString(title) > 255 {
+		return "", fmt.Errorf("标题长度不能超过 255 个字符")
+	}
+	return title, nil
 }
 
 func sanitizeName(name string) string {
