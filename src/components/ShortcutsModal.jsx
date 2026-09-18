@@ -20,8 +20,11 @@ const shortcuts = [
     { key: 'Ctrl + U', desc: '下划线' },
   ]},
   { category: '导航操作', items: [
-    { key: '↑ / ↓', desc: '在列表或快速搜索中移动' },
-    { key: 'Enter', desc: '打开选中笔记' },
+    { key: '↑ / ↓', desc: '在文件树或快速搜索中移动' },
+    { key: '← / →', desc: '折叠 / 展开文件夹' },
+    { key: 'Enter', desc: '打开笔记 / 展开文件夹' },
+    { key: 'F2', desc: '重命名当前笔记或文件树项目' },
+    { key: 'Delete', desc: '删除文件树当前项目' },
     { key: 'Escape', desc: '关闭对话框 / 面板' },
   ]},
 ]
