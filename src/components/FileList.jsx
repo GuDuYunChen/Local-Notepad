@@ -305,6 +305,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
           void load()
       } catch (e) {
           console.error("Undo failed", e)
+          toast.error('撤销失败: ' + (e.message || '未知错误'))
           historyRef.current.undo.push(action) // put back
       }
   }
@@ -319,6 +320,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
           void load()
       } catch (e) {
           console.error("Redo failed", e)
+          toast.error('重做失败: ' + (e.message || '未知错误'))
           historyRef.current.redo.push(action)
       }
   }
