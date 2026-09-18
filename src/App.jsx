@@ -13,6 +13,7 @@ const InspectorPanel = React.lazy(() => import('./components/InspectorPanel'))
 const ShortcutsModal = React.lazy(() => import('./components/ShortcutsModal'))
 const BackupPanel = React.lazy(() => import('./components/BackupPanel'))
 const QuickSwitcher = React.lazy(() => import('./components/QuickSwitcher'))
+const TrashPanel = React.lazy(() => import('./components/TrashPanel'))
 import ErrorBoundary from './components/ErrorBoundary'
 
 export default function App() {
@@ -273,7 +274,13 @@ export default function App() {
     return () => window.removeEventListener('wikiLink:open', openWikiLink)
   }, [current, deletedIds, unsaved, select])
 
-  const workspaceTitle = workspace === 'daily' ? '每日笔记' : workspace === 'graph' ? '知识图谱' : (current?.title || '笔记')
+  const workspaceTitle = workspace === 'daily'
+    ? '每日笔记'
+    : workspace === 'graph'
+      ? '知识图谱'
+      : workspace === 'trash'
+        ? '回收站'
+        : (current?.title || '笔记')
 
   return (
     <div className={`app-shell${focusMode ? ' focus-mode' : ''}`}>
@@ -485,6 +492,21 @@ export default function App() {
                     <GraphPanel
                       onClose={() => setWorkspace('notes')}
                       onSelectFile={loadAndSelect}
+                    />
+                  </React.Suspense>
+                )}
+
+                {workspace === 'trash' && (
+                  <React.Suspense fallback={<div className="workspace-loading">正在打开回收站…</div>}>
+                    <TrashPanel
+                      onClose={() => setWorkspace('notes')}
+                      onRestored={(ids) => {
+                        setDeletedIds(prev => {
+                          const next = new Set(prev)
+                          ids.forEach(id => next.delete(id))
+                          return next
+                        })
+                      }}
                     />
                   </React.Suspense>
                 )}
