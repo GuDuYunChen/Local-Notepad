@@ -154,6 +154,19 @@ func TestFileDAOListSearch(t *testing.T) {
 		}
 	})
 
+	t.Run("internal templates stay hidden from ordinary search", func(t *testing.T) {
+		seedSearchFile(t, dao, "internal-template", "__tpl__Secret", "secret searchable template")
+		files, err := dao.List(ctx, "secret", 1, 20)
+		if err != nil {
+			t.Fatalf("List template search: %v", err)
+		}
+		for _, file := range files {
+			if file.ID == "internal-template" {
+				t.Fatalf("internal template leaked into ordinary search: %#v", files)
+			}
+		}
+	})
+
 	t.Run("operator-only input stays safe", func(t *testing.T) {
 		files, err := dao.List(ctx, "***???", 1, 20)
 		if err != nil {
@@ -174,13 +187,19 @@ func TestFileDAOSpecialQueriesDoNotPageInternalViews(t *testing.T) {
 		id := fmt.Sprintf("note-%03d", i)
 		seedSearchFile(t, dao, id, fmt.Sprintf("Note %03d", i), "large content payload")
 	}
+	seedSearchFile(t, dao, "hidden-template", "__tpl__Internal", "template body")
 
 	files, err := dao.ListAllMetadata(ctx)
 	if err != nil {
 		t.Fatalf("ListAllMetadata: %v", err)
 	}
 	if len(files) != 205 {
-		t.Fatalf("ListAllMetadata returned %d files, want 205", len(files))
+		t.Fatalf("ListAllMetadata returned %d files, want 205 non-template files", len(files))
+	}
+	for _, file := range files {
+		if file.ID == "hidden-template" {
+			t.Fatal("internal template leaked into metadata view")
+		}
 	}
 	for _, file := range files {
 		if file.Content != "" {
