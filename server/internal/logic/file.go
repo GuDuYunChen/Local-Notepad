@@ -34,6 +34,9 @@ func (l *FileLogic) Create(ctx context.Context, title string, content string, is
 	if err != nil {
 		return nil, err
 	}
+	if err := l.validateParent(ctx, "", isFolder, parentID); err != nil {
+		return nil, err
+	}
 
 	duplicate, err := l.FileDAO.CheckDuplicate(ctx, parentID, normalizedTitle, "")
 	if err != nil {
@@ -76,6 +79,9 @@ func (l *FileLogic) Update(ctx context.Context, id string, title, content, paren
 	targetParentID := f.ParentID
 	if parentID != nil {
 		targetParentID = *parentID
+		if err := l.validateParent(ctx, id, f.IsFolder, targetParentID); err != nil {
+			return nil, err
+		}
 	}
 
 	if title != nil || parentID != nil {
@@ -268,6 +274,35 @@ func (l *FileLogic) BatchExport(ctx context.Context, ids []string, format string
 		buf.WriteString(f.Content)
 	}
 	return buf.Bytes(), "export." + format, nil
+}
+
+func (l *FileLogic) validateParent(ctx context.Context, itemID string, isFolder bool, parentID string) error {
+	if parentID == "" {
+		return nil
+	}
+	if itemID != "" && parentID == itemID {
+		return fmt.Errorf("不能将文件夹移动到其自身内部")
+	}
+
+	parent, err := l.FileDAO.GetByID(ctx, parentID)
+	if err != nil {
+		return fmt.Errorf("目标文件夹不存在")
+	}
+	if !parent.IsFolder {
+		return fmt.Errorf("目标位置不是文件夹")
+	}
+
+	if itemID != "" && isFolder {
+		inside, err := l.FileDAO.IsDescendant(ctx, itemID, parentID)
+		if err != nil {
+			return err
+		}
+		if inside {
+			return fmt.Errorf("不能将文件夹移动到其自身内部")
+		}
+	}
+
+	return nil
 }
 
 func normalizeTitle(title string) (string, error) {
