@@ -105,6 +105,69 @@ describe('TextEditor save coordination', () => {
     expect(api).toHaveBeenCalledTimes(1)
   })
 
+  it('reports dirty and saved status to the workspace header', async () => {
+    const changed = '{"root":{"children":[{"type":"paragraph","children":[{"type":"text","text":"changed"}]}]}}'
+    const statuses = []
+
+    api.mockImplementation((path, init) => {
+      if (!init?.method) {
+        return Promise.resolve({
+          id: 'file-1',
+          content: '{"root":{"children":[]}}',
+          updated_at: 1,
+        })
+      }
+      if (init.method === 'PUT') {
+        return Promise.resolve({
+          id: 'file-1',
+          content: changed,
+          updated_at: 2,
+        })
+      }
+      return Promise.reject(new Error(`Unexpected request: ${path}`))
+    })
+
+    const editorRef = React.createRef()
+    await act(async () => {
+      root.render(
+        <TextEditor
+          ref={editorRef}
+          activeId="file-1"
+          deletedIds={new Set()}
+          autoSaveOnSwitch={false}
+          onChange={() => {}}
+          onLoaded={() => {}}
+          onSaved={() => {}}
+          onStatusChange={(status) => statuses.push(status)}
+        />
+      )
+    })
+    await flushPromises()
+
+    expect(statuses.at(-1)).toMatchObject({
+      dirty: false,
+      saveError: false,
+    })
+
+    await act(async () => {
+      globalThis.__textEditorMockOnChange(changed)
+      await Promise.resolve()
+    })
+
+    expect(statuses.some(status => status.dirty === true)).toBe(true)
+
+    await act(async () => {
+      await editorRef.current.save()
+    })
+    await flushPromises()
+
+    expect(statuses.at(-1)).toMatchObject({
+      dirty: false,
+      saveError: false,
+    })
+    expect(statuses.at(-1).lastSavedAt).toBeTruthy()
+  })
+
   it('reuses the in-flight save when interval save overlaps manual save', async () => {
     const putRequests = []
 
