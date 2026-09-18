@@ -2,6 +2,7 @@ import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, Ta
 import fs from 'fs'
 import path from 'path'
 import { BrowserWindow } from 'electron'
+import { codeBlockText, fetchAllFileMetadata, indexChildrenByParent, safeExportStem } from './export-utils.js'
 
 // 辅助：获取文件内容（从 Go 后端）
 async function fetchFileContent(id) {
@@ -60,6 +61,16 @@ async function convertNode(node) {
 
         case 'table':
             return await convertTable(node)
+
+        case 'code-block':
+            return new Paragraph({
+                children: [
+                    new TextRun({
+                        text: codeBlockText(node),
+                        font: 'Courier New'
+                    })
+                ]
+            })
             
         case 'image':
         case 'image-grid': // Custom node?
@@ -225,29 +236,28 @@ export async function exportToDocx(files, targetDir) {
 
 export async function processExport(ids, targetDir, format = 'docx') {
     const errors = []
+    const allFiles = await fetchAllFileMetadata()
+    const childrenByParent = indexChildrenByParent(allFiles)
     
     async function processItem(id, currentDir) {
         try {
             const file = await fetchFileContent(id)
-            const safeTitle = file.title.replace(/[\\/:*?"<>|]/g, '_')
+            const safeTitle = String(file.title || 'Untitled').replace(/[\\/:*?"<>|]/g, '_')
             
             if (file.is_folder) {
                 const newDir = path.join(currentDir, safeTitle)
-                if (!fs.existsSync(newDir)) fs.mkdirSync(newDir)
+                if (!fs.existsSync(newDir)) fs.mkdirSync(newDir, { recursive: true })
                 
-                const base = process.env.API_BASE || 'http://127.0.0.1:27121'
-                const res = await fetch(`${base}/api/files?size=10000`)
-                const allFiles = (await res.json()).data
-                
-                const children = allFiles.filter(f => f.parent_id === id)
+                const children = childrenByParent.get(id) || []
                 for (const child of children) {
-                    await processItem(child.id, newDir, format)
+                    await processItem(child.id, newDir)
                 }
                 
             } else {
+                const stem = safeExportStem(file.title)
                 if (format === 'markdown' || format === 'md') {
                     const mdContent = convertToMarkdown(file.content)
-                    fs.writeFileSync(path.join(currentDir, `${safeTitle}.md`), mdContent)
+                    fs.writeFileSync(path.join(currentDir, `${stem}.md`), mdContent)
                 } else {
                     const docChildren = []
                     const lexicalNodes = parseLexicalState(file.content)
@@ -268,7 +278,7 @@ export async function processExport(ids, targetDir, format = 'docx') {
                     })
                     
                     const buffer = await Packer.toBuffer(doc)
-                    fs.writeFileSync(path.join(currentDir, `${safeTitle}.docx`), buffer)
+                    fs.writeFileSync(path.join(currentDir, `${stem}.docx`), buffer)
                 }
             }
         } catch (e) {
@@ -278,7 +288,7 @@ export async function processExport(ids, targetDir, format = 'docx') {
     }
 
     for (const id of ids) {
-        await processItem(id, targetDir, format)
+        await processItem(id, targetDir)
     }
     
     return errors
@@ -342,7 +352,7 @@ function processNodeToMarkdown(node, lines, depth) {
             
         case 'code-block':
             const lang = node.language || ''
-            const blockText = processInlineNodes(node.children || [])
+            const blockText = codeBlockText(node)
             lines.push(`\`\`\`${lang}`)
             lines.push(blockText)
             lines.push('```')
@@ -628,9 +638,10 @@ function convertNodeToHTML(node) {
             const listTag = node.listType === 'number' ? 'ol' : 'ul'
             return `<${listTag}>${node.children.map(item => `<li>${convertChildrenToHTML(item.children)}</li>`).join('')}</${listTag}>`
         case 'code':
+            return `<pre><code>${escapeHTML(convertChildrenToHTML(node.children))}</code></pre>`
         case 'code-block':
             const lang = node.language ? ` class="language-${node.language}"` : ''
-            return `<pre><code${lang}>${escapeHTML(convertChildrenToHTML(node.children))}</code></pre>`
+            return `<pre><code${lang}>${escapeHTML(codeBlockText(node))}</code></pre>`
         case 'image':
             return `<img src="${node.src || ''}" alt="${escapeHTML(node.alt || '')}">`
         case 'image-grid':
