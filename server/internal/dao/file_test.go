@@ -12,7 +12,8 @@ func TestEscapeFTS5Query(t *testing.T) {
 		{name: "multiple terms", in: "project plan", want: `"project"* AND "plan"*`},
 		{name: "strip operators", in: "hello*(world)?", want: `"helloworld"*`},
 		{name: "trim spaces", in: "  hello  world  ", want: `"hello"* AND "world"*`},
-		{name: "empty", in: "   ", want: `""`},
+		{name: "empty", in: "   ", want: ""},
+		{name: "operators only", in: "***???", want: ""},
 	}
 
 	for _, tt := range tests {
