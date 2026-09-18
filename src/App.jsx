@@ -14,6 +14,7 @@ const ShortcutsModal = React.lazy(() => import('./components/ShortcutsModal'))
 const BackupPanel = React.lazy(() => import('./components/BackupPanel'))
 const QuickSwitcher = React.lazy(() => import('./components/QuickSwitcher'))
 const TrashPanel = React.lazy(() => import('./components/TrashPanel'))
+const SettingsPanel = React.lazy(() => import('./components/SettingsPanel'))
 import ErrorBoundary from './components/ErrorBoundary'
 
 export default function App() {
@@ -245,6 +246,26 @@ export default function App() {
     }
   }, [dragging])
 
+  const changeWorkspace = React.useCallback((nextWorkspace) => {
+    if (!nextWorkspace || nextWorkspace === workspace) return
+
+    if (
+      workspace === 'notes' &&
+      nextWorkspace !== 'notes' &&
+      current &&
+      !deletedIds.has(current.id) &&
+      unsaved
+    ) {
+      setDialog({
+        type: 'unsaved',
+        next: () => setWorkspace(nextWorkspace),
+      })
+      return
+    }
+
+    setWorkspace(nextWorkspace)
+  }, [workspace, current, deletedIds, unsaved])
+
   const handleSelectFile = (f, options = {}) => {
     if (current && f && f.id === current.id) {
       setWorkspace('notes')
@@ -280,14 +301,16 @@ export default function App() {
       ? '知识图谱'
       : workspace === 'trash'
         ? '回收站'
-        : (current?.title || '笔记')
+        : workspace === 'settings'
+          ? '设置与诊断'
+          : (current?.title || '笔记')
 
   return (
     <div className={`app-shell${focusMode ? ' focus-mode' : ''}`}>
       {!focusMode && (
         <NavigationRail
           activeWorkspace={workspace}
-          onChangeWorkspace={setWorkspace}
+          onChangeWorkspace={changeWorkspace}
           onOpenSearch={() => setQuickSearchOpen(true)}
           onOpenBackup={() => setBackupOpen(true)}
           onOpenShortcuts={() => setShortcutsOpen(true)}
@@ -456,7 +479,7 @@ export default function App() {
                       autoSaveOnSwitch={false}
                       onCreateNote={() => window.dispatchEvent(new Event('library:create-note'))}
                       onOpenSearch={() => setQuickSearchOpen(true)}
-                      onOpenDaily={() => setWorkspace('daily')}
+                      onOpenDaily={() => changeWorkspace('daily')}
                       onChange={setContent}
                       onLoaded={(text) => {
                         if (current) {
@@ -507,6 +530,16 @@ export default function App() {
                           return next
                         })
                       }}
+                    />
+                  </React.Suspense>
+                )}
+
+                {workspace === 'settings' && (
+                  <React.Suspense fallback={<div className="workspace-loading">正在读取诊断信息…</div>}>
+                    <SettingsPanel
+                      onClose={() => setWorkspace('notes')}
+                      onOpenBackup={() => setBackupOpen(true)}
+                      onOpenShortcuts={() => setShortcutsOpen(true)}
                     />
                   </React.Suspense>
                 )}
