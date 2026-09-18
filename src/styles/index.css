@@ -905,13 +905,13 @@ body {
 
 .tag-selector { position: relative; display: inline-flex; align-items: center; margin-right: 10px; }
 .tag-list { display: flex; align-items: center; gap: 3px; }
-.tag-badge { display: inline-block; padding: 2px 6px; font-size: 10px; color: #fff; border-radius: 4px; cursor: pointer; user-select: none; white-space: nowrap; }
+.tag-badge { display: inline-flex; align-items: center; padding: 2px 6px; border: 0; font: inherit; font-size: 10px; color: #fff; border-radius: 4px; cursor: pointer; user-select: none; white-space: nowrap; }
 .tag-badge:hover { opacity: 0.85; }
 .tag-add-btn { width: 20px; height: 20px; border: 1px solid var(--line); background: transparent; color: var(--ink-muted); border-radius: 4px; cursor: pointer; font-size: 13px; display: flex; align-items: center; justify-content: center; }
 .tag-add-btn:hover { background: var(--hover-bg); color: var(--ink); }
 .tag-dropdown { position: absolute; bottom: calc(100% + 6px); right: 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); box-shadow: var(--shadow-pop); padding: 6px; min-width: 180px; z-index: 100; }
 .tag-options { max-height: 180px; overflow-y: auto; margin-bottom: 6px; }
-.tag-option { display: flex; align-items: center; gap: 6px; padding: 6px 8px; cursor: pointer; border-radius: 4px; font-size: 12px; }
+.tag-option { width: 100%; display: flex; align-items: center; gap: 6px; padding: 6px 8px; border: 0; background: transparent; color: var(--ink); cursor: pointer; border-radius: 4px; font: inherit; font-size: 12px; text-align: left; }
 .tag-option:hover { background: var(--hover-bg); }
 .tag-option.attached { background: var(--clay-light); }
 .tag-color-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
@@ -941,4 +941,13 @@ body {
   .app-main.flex { flex-direction: column; }
   .sidebar, .resizer { display: none; }
   .content { order: 1; }
+}
+
+
+.tag-badge:focus-visible,
+.tag-add-btn:focus-visible,
+.tag-option:focus-visible,
+.tag-create-btn:focus-visible {
+  outline: 2px solid var(--clay);
+  outline-offset: 2px;
 }
