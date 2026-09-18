@@ -128,9 +128,6 @@ app.whenReady().then(async () => {
     },
   ])
   Menu.setApplicationMenu(menu)
-  if (app.isPackaged) {
-    app.setAsDefaultProtocolClient('notepad')
-  }
   const gotLock = app.requestSingleInstanceLock()
   if (!gotLock) {
     app.quit()
