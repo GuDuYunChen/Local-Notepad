@@ -134,41 +134,18 @@ func main() {
 	s.SetClientMaxBodySize(100 * 1024 * 1024) // 100MB for video uploads
 	s.SetGraceful(true)
 
-	uploadPath := "uploads"
-	if info, err := os.Stat("server"); err == nil && info.IsDir() {
-		uploadPath = filepath.Join("server", "uploads")
-	}
+	uploadPath := resolveUploadPath(dbPath)
 	if err := os.MkdirAll(uploadPath, 0755); err != nil {
 		g.Log().Warning(ctx, fmt.Errorf("创建上传目录失败: %w", err))
 	}
-	func() {
-		entries, err := os.ReadDir(uploadPath)
-		if err != nil {
-			return
+	for _, legacyPath := range []string{"uploads", filepath.Join("server", "uploads")} {
+		if copied, err := migrateLegacyUploads(legacyPath, uploadPath); err != nil {
+			g.Log().Warning(ctx, fmt.Errorf("迁移旧上传目录失败 (%s): %w", legacyPath, err))
+		} else if copied > 0 {
+			g.Log().Info(ctx, fmt.Sprintf("已迁移 %d 个旧上传资源: %s", copied, legacyPath))
 		}
-		for _, e := range entries {
-			if e.IsDir() {
-				name := e.Name()
-				srcDir := filepath.Join(uploadPath, name)
-				files, err := os.ReadDir(srcDir)
-				if err != nil || len(files) != 1 {
-					continue
-				}
-				f := files[0]
-				if f.IsDir() {
-					continue
-				}
-				src := filepath.Join(srcDir, f.Name())
-				dst := filepath.Join(uploadPath, name)
-				tmp := filepath.Join(uploadPath, name+".tmp")
-				if err := os.Rename(src, tmp); err != nil {
-					continue
-				}
-				_ = os.RemoveAll(srcDir)
-				_ = os.Rename(tmp, dst)
-			}
-		}
-	}()
+	}
+	flattenUploadEntries(uploadPath)
 
 	s.AddStaticPath("/uploads", uploadPath)
 	s.SetReadTimeout(10 * time.Second)
@@ -206,7 +183,7 @@ func main() {
 	tagLogic := &logic.TagLogic{TagDAO: tagDAO}
 	tagController := &controller.TagController{TagLogic: tagLogic}
 	
-	uploadController := &controller.UploadController{}
+	uploadController := &controller.UploadController{UploadDir: uploadPath}
 	
 	fileController.Register(group)
 	settingsController.Register(group)
@@ -245,6 +222,129 @@ func resolveDBPath() string {
 		}
 	}
 	return filepath.Join(base, "data.db")
+}
+
+func resolveUploadPath(dbPath string) string {
+	return filepath.Join(filepath.Dir(dbPath), "uploads")
+}
+
+func copyFileIfMissing(src string, dst string) (bool, error) {
+	if _, err := os.Stat(dst); err == nil {
+		return false, nil
+	} else if !os.IsNotExist(err) {
+		return false, err
+	}
+
+	in, err := os.Open(src)
+	if err != nil {
+		return false, err
+	}
+	defer in.Close()
+
+	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_EXCL, 0644)
+	if err != nil {
+		if os.IsExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	_, copyErr := io.Copy(out, in)
+	closeErr := out.Close()
+	if copyErr != nil {
+		_ = os.Remove(dst)
+		return false, copyErr
+	}
+	if closeErr != nil {
+		_ = os.Remove(dst)
+		return false, closeErr
+	}
+	return true, nil
+}
+
+func migrateLegacyUploads(legacyPath string, targetPath string) (int, error) {
+	legacyAbs, err := filepath.Abs(legacyPath)
+	if err != nil {
+		return 0, err
+	}
+	targetAbs, err := filepath.Abs(targetPath)
+	if err != nil {
+		return 0, err
+	}
+	if legacyAbs == targetAbs {
+		return 0, nil
+	}
+
+	entries, err := os.ReadDir(legacyAbs)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return 0, nil
+		}
+		return 0, err
+	}
+	if err := os.MkdirAll(targetAbs, 0755); err != nil {
+		return 0, err
+	}
+
+	copied := 0
+	for _, entry := range entries {
+		if entry.IsDir() {
+			files, err := os.ReadDir(filepath.Join(legacyAbs, entry.Name()))
+			if err != nil || len(files) != 1 || files[0].IsDir() {
+				continue
+			}
+			src := filepath.Join(legacyAbs, entry.Name(), files[0].Name())
+			dst := filepath.Join(targetAbs, entry.Name())
+			ok, err := copyFileIfMissing(src, dst)
+			if err != nil {
+				return copied, err
+			}
+			if ok {
+				copied++
+			}
+			continue
+		}
+
+		src := filepath.Join(legacyAbs, entry.Name())
+		dst := filepath.Join(targetAbs, entry.Name())
+		ok, err := copyFileIfMissing(src, dst)
+		if err != nil {
+			return copied, err
+		}
+		if ok {
+			copied++
+		}
+	}
+	return copied, nil
+}
+
+func flattenUploadEntries(uploadPath string) {
+	entries, err := os.ReadDir(uploadPath)
+	if err != nil {
+		return
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		srcDir := filepath.Join(uploadPath, name)
+		files, err := os.ReadDir(srcDir)
+		if err != nil || len(files) != 1 || files[0].IsDir() {
+			continue
+		}
+		src := filepath.Join(srcDir, files[0].Name())
+		dst := filepath.Join(uploadPath, name)
+		if _, err := os.Stat(dst); err == nil {
+			continue
+		}
+		tmp := filepath.Join(uploadPath, name+".tmp")
+		if err := os.Rename(src, tmp); err != nil {
+			continue
+		}
+		_ = os.RemoveAll(srcDir)
+		_ = os.Rename(tmp, dst)
+	}
 }
 
 // 获取运行时系统名称
