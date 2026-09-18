@@ -104,7 +104,7 @@ func (c *FileController) Delete(r *ghttp.Request) {
 func (c *FileController) Restore(r *ghttp.Request) {
 	id := r.Get("id").String()
 	if err := c.FileLogic.Restore(r.GetCtx(), id); err != nil {
-		writeErr(r, 1007, "恢复失败", err)
+		writeErrWithDetail(r, 1007, "恢复失败", err)
 		return
 	}
 	writeOK(r, nil)
