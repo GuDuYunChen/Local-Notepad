@@ -1,3 +1,6 @@
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import {
   codeBlockText,
@@ -8,6 +11,7 @@ import {
   isLocalUploadUrl,
   listItemText,
   localUploadToDataUri,
+  materializeLocalAssetsInLexical,
   plainTextFromNode,
   safeExportStem,
 } from './export-utils.js'
@@ -125,6 +129,41 @@ describe('export helpers', () => {
     expect(rewritten.root.children[1].items[0].src).toMatch(/^data:image\/jpeg;base64,/)
     expect(rewritten.root.children[1].items[1].src).toBe('https://example.com/c.jpg')
     expect(fetchImpl).toHaveBeenCalledTimes(2)
+  })
+
+  it('copies local Markdown assets and rewrites them to relative paths', async () => {
+    const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-md-export-'))
+    try {
+      const fetchImpl = vi.fn().mockResolvedValue({
+        ok: true,
+        arrayBuffer: async () => Uint8Array.from([7, 8, 9]).buffer,
+      })
+      const content = JSON.stringify({
+        root: {
+          children: [
+            { type: 'image', src: 'http://127.0.0.1:27121/uploads/photo.png' },
+            { type: 'video', src: 'http://127.0.0.1:27121/uploads/movie.mp4' },
+            { type: 'image', src: 'https://example.com/external.png' },
+          ],
+        },
+      })
+
+      const rewritten = JSON.parse(await materializeLocalAssetsInLexical(
+        content,
+        outputDir,
+        'Note_assets',
+        fetchImpl
+      ))
+
+      expect(rewritten.root.children[0].src).toBe('./Note_assets/photo.png')
+      expect(rewritten.root.children[1].src).toBe('./Note_assets/movie.mp4')
+      expect(rewritten.root.children[2].src).toBe('https://example.com/external.png')
+      expect(fs.readFileSync(path.join(outputDir, 'Note_assets', 'photo.png'))).toEqual(Buffer.from([7, 8, 9]))
+      expect(fs.readFileSync(path.join(outputDir, 'Note_assets', 'movie.mp4'))).toEqual(Buffer.from([7, 8, 9]))
+      expect(fetchImpl).toHaveBeenCalledTimes(2)
+    } finally {
+      fs.rmSync(outputDir, { recursive: true, force: true })
+    }
   })
 
   it('loads every metadata page once with compact responses', async () => {
