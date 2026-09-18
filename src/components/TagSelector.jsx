@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { tagApi } from '~/services/tagApi'
-import { message } from 'antd'
+import { toast } from '~/services/toast'
 
 export default function TagSelector({ fileId, tags, onChange }) {
   const [allTags, setAllTags] = useState([])
@@ -43,7 +43,7 @@ export default function TagSelector({ fileId, tags, onChange }) {
       const updated = await tagApi.getFileTags(fileId)
       onChange(updated || [])
     } catch (e) {
-      message.error('标签操作失败')
+      toast.error('标签操作失败')
     }
   }
 
@@ -55,7 +55,7 @@ export default function TagSelector({ fileId, tags, onChange }) {
       setShowCreate(false)
       await loadTags()
     } catch (e) {
-      message.error('创建标签失败')
+      toast.error('创建标签失败')
     }
   }
 
