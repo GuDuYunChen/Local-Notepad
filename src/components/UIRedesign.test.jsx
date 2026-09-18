@@ -144,6 +144,9 @@ describe('UI redesign smoke tests', () => {
     await act(async () => {
       input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
       await Promise.resolve()
+    })
+
+    await act(async () => {
       input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
       await Promise.resolve()
     })
