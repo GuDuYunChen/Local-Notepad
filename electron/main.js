@@ -6,14 +6,14 @@ import path from 'node:path'
 import { processExport, exportToPDF, exportToHTML } from './export.js'
 import { parseImportPaths, selectAndParseFiles } from './import.js'
 import { ensureBackupDir, getDefaultBackupDir, listBackups } from './backup.js'
-import { stopChildProcess } from './backend-process.js'
+import { stopChildProcess, waitForHttpService } from './backend-process.js'
 
 // 应用主进程：负责创建窗口、设置安全选项
 let mainWindow = null
 let backend = null
 let allowQuit = false
 
-function createWindow() {
+async function createWindow() {
   const isDev = !app.isPackaged
   // 确保开发和生产环境都能正确找到图标
   // 在开发环境，使用 __dirname 向上查找 build 目录
@@ -39,7 +39,7 @@ function createWindow() {
 
   if (isDev) {
     process.env.API_BASE = 'http://127.0.0.1:27121'
-    mainWindow.loadURL('http://localhost:5000')
+    await mainWindow.loadURL('http://localhost:5000')
     if (process.env.OPEN_DEVTOOLS === '1') {
       mainWindow.webContents.openDevTools({ mode: 'detach' })
     }
@@ -48,7 +48,21 @@ function createWindow() {
     // 使用 app.getAppPath() 获取应用根目录 (asar 内部根目录)，确保路径解析正确
     const indexPath = path.join(app.getAppPath(), 'dist/index.html')
     startBackend()
-    mainWindow.loadFile(indexPath)
+
+    const backendReady = await waitForHttpService(`${process.env.API_BASE}/api/health`, {
+      timeoutMs: 8000,
+      intervalMs: 120,
+    })
+    if (!backendReady) {
+      dialog.showErrorBox(
+        '后端服务未就绪',
+        '本地数据服务未能在 8 秒内启动。应用仍会打开，但文件功能可能暂时不可用。'
+      )
+    }
+
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      await mainWindow.loadFile(indexPath)
+    }
   }
 
   mainWindow.on('closed', () => { mainWindow = null })
@@ -100,11 +114,11 @@ app.whenReady().then(async () => {
       mainWindow.focus()
     }
   })
-  createWindow()
+  await createWindow()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow()
+      void createWindow()
     }
   })
 })
