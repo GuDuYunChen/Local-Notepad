@@ -155,6 +155,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
   const [showBatchDelete, setShowBatchDelete] = useState(false)
   const [expanded, setExpanded] = useState(new Set()) // 展开的文件夹ID集合
   const [showNewMenu, setShowNewMenu] = useState(false) // 新建菜单显隐
+  const [showLibraryMenu, setShowLibraryMenu] = useState(false)
   const [contextMenu, setContextMenu] = useState(null) // 右键菜单 { x, y, item }
   const [targetParentId, setTargetParentId] = useState('') // 新建时的目标父目录ID
   const [showFolderSelector, setShowFolderSelector] = useState(false) // 路径选择器
@@ -256,6 +257,8 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       return 0
   }
   const newMenuRef = useRef(null)
+  const libraryMenuRef = useRef(null)
+  const searchMountedRef = useRef(false)
   const contextMenuRef = useRef(null)
 
   const [deleteConfirm, setDeleteConfirm] = useState(null) // { id, count, isFolder }
@@ -392,6 +395,9 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       if (newMenuRef.current && !newMenuRef.current.contains(e.target)) {
         setShowNewMenu(false)
       }
+      if (libraryMenuRef.current && !libraryMenuRef.current.contains(e.target)) {
+        setShowLibraryMenu(false)
+      }
       if (contextMenuRef.current && !contextMenuRef.current.contains(e.target)) {
         setContextMenu(null)
       }
@@ -405,6 +411,17 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       }
     }
   }, [])
+
+  useEffect(() => {
+    if (!searchMountedRef.current) {
+      searchMountedRef.current = true
+      return undefined
+    }
+    const timer = window.setTimeout(() => {
+      void load()
+    }, 280)
+    return () => window.clearTimeout(timer)
+  }, [q])
 
   useEffect(() => {
     // 快捷键支持
@@ -1391,51 +1408,88 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
 
   return (
     <div className="file-list" ref={dropContainer}>
-      <div className="toolbar colored">
-        <div className="btn-group" style={{ position: 'relative' }}>
-            <button className="btn primary" onClick={() => setShowNewMenu(!showNewMenu)}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              新建
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-            </button>
-            {showNewMenu && (
-                <div className="dropdown-menu" ref={newMenuRef} style={{ position: 'absolute', top: '100%', left: 0, zIndex: 100 }}>
-                    <div className="menu-item" onClick={() => onNewFileCheck()}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
-                      新建文件
-                      <span style={{marginLeft: 'auto', opacity: 0.6, fontSize: '11px'}}>Ctrl+N</span>
-                    </div>
-                    <div className="menu-item" onClick={() => onNewFolderCheck()}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/></svg>
-                      新建文件夹
-                      <span style={{marginLeft: 'auto', opacity: 0.6, fontSize: '11px'}}>Ctrl+Shift+N</span>
-                    </div>
+      <div className="file-library-header">
+        <div className="file-library-title-row">
+          <div>
+            <div className="file-library-eyebrow">资料库</div>
+            <div className="file-library-title">我的笔记</div>
+          </div>
+
+          <div className="file-library-actions">
+            <div className="btn-group file-new-wrap" style={{ position: 'relative' }}>
+              <button
+                className="btn primary file-new-btn"
+                onClick={() => setShowNewMenu(!showNewMenu)}
+                title="新建"
+                aria-label="新建"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19"/>
+                  <line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                新建
+              </button>
+              {showNewMenu && (
+                <div className="dropdown-menu file-action-menu" ref={newMenuRef}>
+                  <div className="menu-item" onClick={() => onNewFileCheck()}>
+                    <span>新建文件</span>
+                    <kbd>Ctrl+N</kbd>
+                  </div>
+                  <div className="menu-item" onClick={() => onNewFolderCheck()}>
+                    <span>新建文件夹</span>
+                    <kbd>Ctrl+Shift+N</kbd>
+                  </div>
                 </div>
-            )}
+              )}
+            </div>
+
+            <div className="file-more-wrap" ref={libraryMenuRef}>
+              <button
+                className={`icon-btn file-more-btn${showLibraryMenu ? ' active' : ''}`}
+                onClick={() => setShowLibraryMenu(prev => !prev)}
+                title="更多资料库操作"
+                aria-label="更多资料库操作"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <circle cx="5" cy="12" r="1.8"/>
+                  <circle cx="12" cy="12" r="1.8"/>
+                  <circle cx="19" cy="12" r="1.8"/>
+                </svg>
+              </button>
+              {showLibraryMenu && (
+                <div className="dropdown-menu file-action-menu file-more-menu">
+                  <div className="menu-item" onClick={() => { setShowLibraryMenu(false); void onImport() }}>
+                    导入文件
+                  </div>
+                  <div className="menu-item" onClick={() => { setShowLibraryMenu(false); setShowExport(true) }}>
+                    导出…
+                  </div>
+                  <div className="divider" />
+                  <div className="menu-item danger" onClick={() => { setShowLibraryMenu(false); void onBatchDeleteCheck() }}>
+                    批量删除{selectedIds.size > 1 ? `（${selectedIds.size}）` : ''}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
-        <button className="btn" onClick={onImport}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          导入
-        </button>
-        <button className="btn" onClick={() => setShowExport(true)}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          导出
-        </button>
-        <button className="btn danger" onClick={() => void onBatchDeleteCheck()}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-          批量删除
-        </button>
-        <div className="search-box">
-          <Input 
-            placeholder="搜索文件标题和内容..." 
-            allowClear 
-            value={q} 
-            onChange={e => setQ(e.target.value)} 
-            onPressEnter={() => void load()} 
+
+        <div className="file-search-row">
+          <div className="file-search-icon" aria-hidden="true">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="7"/>
+              <path d="m20 20-4-4"/>
+            </svg>
+          </div>
+          <Input
+            className="file-search-input"
+            placeholder="搜索标题或正文"
+            allowClear
+            value={q}
+            onChange={e => setQ(e.target.value)}
+            onPressEnter={() => void load()}
             aria-label="搜索文件"
           />
-          <button className="btn" onClick={() => void load()}>🔍</button>
-          {q && <span className="search-hint">按回车搜索</span>}
         </div>
       </div>
       {loading ? (
