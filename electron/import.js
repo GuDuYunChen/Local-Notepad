@@ -66,6 +66,7 @@ export async function parseImportPaths(filePaths) {
             const ext = path.extname(filePath).toLowerCase()
             const filename = path.basename(filePath)
             let content = ''
+            let contentType = 'markdown'
             
             if (ext === '.docx') {
                 const result = await mammoth.convertToHtml({ path: filePath })
@@ -74,6 +75,7 @@ export async function parseImportPaths(filePaths) {
                 // and convert simple tables to Markdown.
                 content = turndownService.turndown(result.value)
             } else if (ext === '.doc') {
+                contentType = 'text'
                 const extractor = new WordExtractor()
                 const extracted = await extractor.extract(filePath)
                 content = extracted.getBody()
@@ -85,12 +87,14 @@ export async function parseImportPaths(filePaths) {
                 content = turndownService.turndown(html)
             } else {
                 // md, txt
+                contentType = ext === '.txt' ? 'text' : 'markdown'
                 content = fs.readFileSync(filePath, 'utf-8')
             }
             
             results.push({
                 title: filename,
-                content: content,
+                content,
+                contentType,
                 originalPath: filePath,
                 success: true
             })
