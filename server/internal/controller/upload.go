@@ -10,10 +10,11 @@ import (
 
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
-	"github.com/gogf/gf/v2/os/gfile"
 )
 
-type UploadController struct{}
+type UploadController struct {
+	UploadDir string
+}
 
 var allowedExtensions = map[string]bool{
 	".png": true, ".jpg": true, ".jpeg": true, ".gif": true, ".webp": true, ".svg": true, ".bmp": true, ".ico": true,
@@ -73,15 +74,13 @@ func (c *UploadController) Upload(r *ghttp.Request) {
 		}
 	}
 
-	uploadDir := "uploads"
-	if info, err := os.Stat("server"); err == nil && info.IsDir() {
-		uploadDir = filepath.Join("server", "uploads")
+	uploadDir := c.UploadDir
+	if uploadDir == "" {
+		uploadDir = "uploads"
 	}
-	if !gfile.Exists(uploadDir) {
-		if err := gfile.Mkdir(uploadDir); err != nil {
-			writeErr(r, 1010, "服务端错误: 无法创建上传目录", err)
-			return
-		}
+	if err := os.MkdirAll(uploadDir, 0755); err != nil {
+		writeErr(r, 1010, "服务端错误: 无法创建上传目录", err)
+		return
 	}
 
 	name := fmt.Sprintf("%d%s", time.Now().UnixNano(), ext)
