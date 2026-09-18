@@ -73,6 +73,7 @@ export function plainTextFromNode(node) {
   if (node.type === 'linebreak') return '\n'
   if (node.type === 'code-block') return codeBlockText(node)
   if (node.type === 'todo') return node.text || ''
+  if (node.type === 'wiki-link') return node.title ? `[[${node.title}]]` : ''
   if (!Array.isArray(node.children)) return ''
   return node.children.map(plainTextFromNode).join('')
 }
