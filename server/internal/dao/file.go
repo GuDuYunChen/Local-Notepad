@@ -284,8 +284,44 @@ func (d *FileDAO) GetChildren(ctx context.Context, parentID string) ([]*model.Fi
 }
 
 func (d *FileDAO) CleanupOldDeleted(ctx context.Context, threshold int64) error {
-	_, err := d.DB.ExecContext(ctx, `DELETE FROM files WHERE is_deleted = 1 AND deleted_at < ?`, threshold)
-	return err
+	tx, err := d.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin cleanup tx failed: %w", err)
+	}
+	defer tx.Rollback()
+
+	deletedIDs := `SELECT id FROM files WHERE is_deleted = 1 AND deleted_at < ?`
+	statements := []struct {
+		query string
+		args  []interface{}
+	}{
+		{
+			query: `DELETE FROM file_tags WHERE file_id IN (` + deletedIDs + `)`,
+			args:  []interface{}{threshold},
+		},
+		{
+			query: `DELETE FROM file_versions WHERE file_id IN (` + deletedIDs + `)`,
+			args:  []interface{}{threshold},
+		},
+		{
+			query: `DELETE FROM links
+				WHERE source_id IN (` + deletedIDs + `)
+				   OR target_id IN (` + deletedIDs + `)`,
+			args: []interface{}{threshold, threshold},
+		},
+		{
+			query: `DELETE FROM files WHERE is_deleted = 1 AND deleted_at < ?`,
+			args:  []interface{}{threshold},
+		},
+	}
+
+	for _, statement := range statements {
+		if _, err := tx.ExecContext(ctx, statement.query, statement.args...); err != nil {
+			return fmt.Errorf("cleanup deleted file data failed: %w", err)
+		}
+	}
+
+	return tx.Commit()
 }
 
 func escapeFTS5Query(q string) string {
