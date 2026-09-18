@@ -40,6 +40,5 @@ jobs:
         working-directory: server
         run: go test ./...
 
-      - name: Run legacy editor tests
-        continue-on-error: true
+      - name: Run editor tests
         run: npm run test:editor
