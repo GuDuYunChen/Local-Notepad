@@ -3,6 +3,7 @@ import { useDrag, useDrop } from 'react-dnd'
 import { NativeTypes } from 'react-dnd-html5-backend'
 import { api, listAllFiles } from '~/services/api'
 import { toast } from '~/services/toast'
+import { executeFileHistoryAction } from '~/services/fileHistory'
 
 const NameDialog = React.lazy(() => import('./NameDialog'))
 const FileSelectorDialog = React.lazy(() => import('./FileSelectorDialog'))
@@ -299,29 +300,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       if (!action) return
       
       try {
-          switch (action.type) {
-              case 'delete':
-                   await api(`/api/files/${action.data.id}/restore`, {
-                      method: 'POST'
-                  })
-                  break
-              case 'create':
-                  // Undo create -> delete
-                   await api(`/api/files/${action.data.id}`, { method: 'DELETE' })
-                  break
-              case 'rename':
-                   await api(`/api/files/${action.data.id}`, {
-                      method: 'PUT',
-                      body: JSON.stringify({ title: action.data.oldTitle })
-                  })
-                  break
-              case 'move':
-                   await api(`/api/files/${action.data.id}`, {
-                      method: 'PUT',
-                      body: JSON.stringify({ parent_id: action.data.oldParentId, sort_order: action.data.oldSortOrder })
-                  })
-                  break
-          }
+          await executeFileHistoryAction(action, 'undo')
           historyRef.current.redo.push(action)
           void load()
       } catch (e) {
@@ -335,30 +314,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       if (!action) return
 
       try {
-           switch (action.type) {
-              case 'delete':
-                  await api(`/api/files/${action.data.id}`, { method: 'DELETE' })
-                  break
-              case 'create':
-                  // Redo create: we deleted it in undo. We need to restore it.
-                  await api(`/api/files/${action.data.id}`, {
-                      method: 'PUT',
-                      body: JSON.stringify({ is_deleted: false })
-                  })
-                  break
-              case 'rename':
-                   await api(`/api/files/${action.data.id}`, {
-                      method: 'PUT',
-                      body: JSON.stringify({ title: action.data.newTitle })
-                  })
-                  break
-              case 'move':
-                   await api(`/api/files/${action.data.id}`, {
-                      method: 'PUT',
-                      body: JSON.stringify({ parent_id: action.data.newParentId, sort_order: action.data.newSortOrder })
-                  })
-                  break
-          }
+          await executeFileHistoryAction(action, 'redo')
           historyRef.current.undo.push(action)
           void load()
       } catch (e) {
