@@ -1,34 +1,7 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react'
 import { api } from '../services/api'
+import { extractLexicalText } from '~/utils/lexicalText'
 import './VersionHistory.css'
-
-function extractReadableText(content) {
-  if (!content) return '（空内容）'
-
-  try {
-    const state = JSON.parse(content)
-
-    const collectText = (node) => {
-      if (!node) return ''
-      if (node.type === 'text') return node.text || ''
-      if (!Array.isArray(node.children)) return ''
-      return node.children.map(collectText).join('')
-    }
-
-    if (state?.root?.children) {
-      const text = state.root.children
-        .map(collectText)
-        .filter(line => line.trim())
-        .join('\n')
-        .trim()
-      return text || '（空内容）'
-    }
-  } catch {
-    // Older versions may contain plain text rather than Lexical JSON.
-  }
-
-  return String(content)
-}
 
 function formatVersionTime(ts) {
   if (!ts) return '时间未知'
@@ -80,7 +53,7 @@ export default function VersionHistory({ fileId, onRestore }) {
   }, [fileId])
 
   const preview = useMemo(
-    () => extractReadableText(selectedVersion?.content).slice(0, 1800),
+    () => (extractLexicalText(selectedVersion?.content) || '（空内容）').slice(0, 1800),
     [selectedVersion]
   )
 
