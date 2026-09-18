@@ -105,6 +105,28 @@ export default function InspectorPanel({
   }
 
   const saveState = statusLabel(editorStatus, unsaved)
+  const tabs = [
+    ['properties', '属性'],
+    ['backlinks', '反向链接'],
+    ['history', '历史'],
+  ]
+
+  const handleTabKeyDown = (event, index) => {
+    let nextIndex = null
+    if (event.key === 'ArrowRight') nextIndex = (index + 1) % tabs.length
+    else if (event.key === 'ArrowLeft') nextIndex = (index - 1 + tabs.length) % tabs.length
+    else if (event.key === 'Home') nextIndex = 0
+    else if (event.key === 'End') nextIndex = tabs.length - 1
+
+    if (nextIndex === null) return
+
+    event.preventDefault()
+    const nextTab = tabs[nextIndex][0]
+    onTabChange(nextTab)
+    window.requestAnimationFrame(() => {
+      document.getElementById(`inspector-tab-${nextTab}`)?.focus()
+    })
+  }
 
   return (
     <aside className="inspector-panel" aria-label="文档检查器">
@@ -137,24 +159,30 @@ export default function InspectorPanel({
       </div>
 
       <div className="inspector-tabs" role="tablist" aria-label="文档信息">
-        {[
-          ['properties', '属性'],
-          ['backlinks', '反向链接'],
-          ['history', '历史'],
-        ].map(([id, label]) => (
+        {tabs.map(([id, label], index) => (
           <button
             key={id}
+            id={`inspector-tab-${id}`}
             className={`inspector-tab${activeTab === id ? ' active' : ''}`}
             onClick={() => onTabChange(id)}
+            onKeyDown={(event) => handleTabKeyDown(event, index)}
             role="tab"
             aria-selected={activeTab === id}
+            aria-controls={`inspector-panel-${id}`}
+            tabIndex={activeTab === id ? 0 : -1}
           >
             {label}
           </button>
         ))}
       </div>
 
-      <div className="inspector-body">
+      <div
+        id={`inspector-panel-${activeTab}`}
+        className="inspector-body"
+        role="tabpanel"
+        aria-labelledby={`inspector-tab-${activeTab}`}
+        tabIndex={0}
+      >
         {activeTab === 'properties' && (
           <div className="inspector-properties">
             <div className="property-summary-grid">
