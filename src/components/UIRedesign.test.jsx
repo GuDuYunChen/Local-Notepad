@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import NavigationRail from './NavigationRail'
+import TrashPanel, { trashDaysRemaining } from './TrashPanel'
 import TemplateSelector from './TemplateSelector'
 import QuickSwitcher, { buildHighlightSegments, getSearchMatchScope } from './QuickSwitcher'
 import ToastViewport from './ToastViewport'
@@ -80,6 +81,7 @@ describe('UI redesign smoke tests', () => {
     const notesButton = container.querySelector('button[aria-label="笔记"]')
     const dailyButton = container.querySelector('button[aria-label="每日笔记"]')
     const graphButton = container.querySelector('button[aria-label="知识图谱"]')
+    const trashButton = container.querySelector('button[aria-label="回收站"]')
     const backupButton = container.querySelector('button[aria-label="备份与恢复"]')
     const shortcutsButton = container.querySelector('button[aria-label="快捷键"]')
 
@@ -88,6 +90,7 @@ describe('UI redesign smoke tests', () => {
     expect(notesButton.classList.contains('active')).toBe(true)
     expect(dailyButton).toBeTruthy()
     expect(graphButton).toBeTruthy()
+    expect(trashButton).toBeTruthy()
     expect(backupButton).toBeTruthy()
     expect(shortcutsButton).toBeTruthy()
 
@@ -99,6 +102,9 @@ describe('UI redesign smoke tests', () => {
 
     await click(graphButton)
     expect(onChangeWorkspace).toHaveBeenCalledWith('graph')
+
+    await click(trashButton)
+    expect(onChangeWorkspace).toHaveBeenCalledWith('trash')
 
     await click(backupButton)
     expect(onOpenBackup).toHaveBeenCalledTimes(1)
@@ -184,6 +190,51 @@ describe('UI redesign smoke tests', () => {
 
     expect(onSelectFile).toHaveBeenCalledWith(expect.objectContaining({ id: 'file-1' }))
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('calculates recycle-bin retention without going below zero', () => {
+    const now = new Date('2026-09-18T12:00:00Z').getTime()
+    expect(trashDaysRemaining(Math.floor(now / 1000), now)).toBe(30)
+    expect(trashDaysRemaining(Math.floor((now - 5 * 24 * 60 * 60 * 1000) / 1000), now)).toBe(25)
+    expect(trashDaysRemaining(Math.floor((now - 40 * 24 * 60 * 60 * 1000) / 1000), now)).toBe(0)
+  })
+
+  it('restores a recycle-bin item through the restore endpoint', async () => {
+    const onRestored = vi.fn()
+    api.mockImplementation((path, init) => {
+      if (path === '/api/files/trash' && !init?.method) {
+        return Promise.resolve([
+          {
+            id: 'deleted-1',
+            title: 'Deleted.md',
+            is_folder: false,
+            is_deleted: true,
+            deleted_at: Math.floor(Date.now() / 1000),
+          },
+        ])
+      }
+      if (path === '/api/files/deleted-1/restore' && init?.method === 'POST') {
+        return Promise.resolve(null)
+      }
+      return Promise.reject(new Error(`Unexpected request: ${path}`))
+    })
+
+    await act(async () => {
+      root.render(<TrashPanel onClose={() => {}} onRestored={onRestored} />)
+    })
+    await flushPromises()
+
+    const restoreButton = Array.from(container.querySelectorAll('button'))
+      .find(button => button.textContent === '恢复')
+
+    expect(restoreButton).toBeTruthy()
+
+    await click(restoreButton)
+    await flushPromises()
+
+    expect(api).toHaveBeenCalledWith('/api/files/deleted-1/restore', { method: 'POST' })
+    expect(onRestored).toHaveBeenCalledWith(['deleted-1'])
+    expect(container.textContent).toContain('回收站是空的')
   })
 
   it('maps editor save state consistently for the inspector', () => {
