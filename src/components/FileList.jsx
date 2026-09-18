@@ -5,8 +5,7 @@ import FileSelectorDialog from './FileSelectorDialog'
 import TemplateSelector from './TemplateSelector'
 import { useDrag, useDrop } from 'react-dnd'
 import { NativeTypes } from 'react-dnd-html5-backend'
-import { message } from 'antd'
-import { Input } from 'antd';
+import { toast } from '~/services/toast'
 const ItemType = 'FILE_NODE'
 
 const FileNode = ({ 
@@ -68,7 +67,7 @@ const FileNode = ({
             if (draggedItem.id === node.id) return
             
             if (checkHierarchy(draggedItem.id, node.id)) {
-                message.error('操作无效：不能将文件夹移动到自身子目录', 3)
+                toast.error('操作无效：不能将文件夹移动到自身子目录', 3)
                 return
             }
             onMove(draggedItem, node, dropPos)
@@ -547,7 +546,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
           if (retryTimerRef.current) clearTimeout(retryTimerRef.current)
           retryTimerRef.current = setTimeout(() => load(retryCount + 1), 1000)
       } else {
-          message.error('加载文件列表失败，请手动刷新')
+          toast.error('加载文件列表失败，请手动刷新')
       }
     } finally {
       setLoading(false)
@@ -650,7 +649,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       setContextMenu(null)
     } catch (e) {
       console.error(e)
-      message.error('操作失败: ' + (e.message || '未知错误'))
+      toast.error('操作失败: ' + (e.message || '未知错误'))
     }
   }
 
@@ -673,7 +672,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       setContextMenu(null)
     } catch (e) {
       console.error(e)
-      message.error('操作失败: ' + (e.message || '未知错误'))
+      toast.error('操作失败: ' + (e.message || '未知错误'))
     }
   }
 
@@ -690,16 +689,16 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
         const res = await window.electronAPI.exportToDocx(roots, targetDir, format)
         
         if (res && res.success) {
-             message.success('导出成功')
+             toast.success('导出成功')
              if (res.errors && res.errors.length > 0) {
-                 message.warning(`部分文件导出失败: ${res.errors.length} 个`)
+                 toast.warning(`部分文件导出失败: ${res.errors.length} 个`)
              }
         } else {
-             message.error('导出失败: ' + (res?.message || '未知错误'))
+             toast.error('导出失败: ' + (res?.message || '未知错误'))
         }
     } catch (e) {
         console.error(e)
-        message.error('导出失败: ' + (e.message || '未知错误'))
+        toast.error('导出失败: ' + (e.message || '未知错误'))
     }
   }
 
@@ -795,11 +794,11 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
               }
           }
 
-          message.success(`成功删除 ${ids.length} 个项目`)
+          toast.success(`成功删除 ${ids.length} 个项目`)
           void load()
       } catch (e) {
           console.error(e)
-          message.error('批量删除失败: ' + (e.message || '未知错误'))
+          toast.error('批量删除失败: ' + (e.message || '未知错误'))
           throw e // Re-throw to let dialog know it failed
       }
   }
@@ -824,7 +823,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       if (!res || !res.success || !res.results || res.results.length === 0) return
       
       const results = res.results
-      const loadingMsg = message.loading(`正在导入 ${results.length} 个文件...`, 0)
+      const loadingMsg = toast.loading(`正在导入 ${results.length} 个文件...`, 0)
       
       let successCount = 0
       let failCount = 0
@@ -857,15 +856,15 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       loadingMsg() // Close loading
       
       if (successCount > 0) {
-          message.success(`成功导入 ${successCount} 个文件`)
+          toast.success(`成功导入 ${successCount} 个文件`)
           void load()
       }
       if (failCount > 0) {
-          message.warning(`${failCount} 个文件导入失败`)
+          toast.warning(`${failCount} 个文件导入失败`)
       }
     } catch (e) { 
         console.error(e)
-        message.error('导入出错: ' + (e.message || '未知错误'))
+        toast.error('导入出错: ' + (e.message || '未知错误'))
     }
   }
 
@@ -877,10 +876,10 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
         method: 'POST',
         body: JSON.stringify({ path }),
       })
-      message.success('另存为成功')
+      toast.success('另存为成功')
     } catch (e) {
       console.error(e)
-      message.error('另存为失败: ' + (e.message || '未知错误'))
+      toast.error('另存为失败: ' + (e.message || '未知错误'))
     }
   }
 
@@ -890,7 +889,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       await loadList()
     } catch (e) {
       console.error(e)
-      message.error('置顶操作失败: ' + (e.message || '未知错误'))
+      toast.error('置顶操作失败: ' + (e.message || '未知错误'))
     }
   }
 
@@ -1022,7 +1021,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       pushHistory({ type: 'delete', data: { id: targetId } })
     } catch (e) {
       console.error(e)
-      message.error('删除失败: ' + (e.message || '未知错误'))
+      toast.error('删除失败: ' + (e.message || '未知错误'))
     } finally {
         setLoading(false)
         setDeleteConfirm(null)
@@ -1151,7 +1150,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       void load()
     } catch (e) { 
         console.error(e)
-        message.error('新建失败: ' + (e.message || '未知错误'))
+        toast.error('新建失败: ' + (e.message || '未知错误'))
         throw e
     }
     setNaming(false)
@@ -1260,7 +1259,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
         void load()
     } catch (e) {
         console.error(e)
-        message.error(e.message || '移动失败，已还原')
+        toast.error(e.message || '移动失败，已还原')
         void load() // Reload to revert UI
     }
   }
@@ -1291,7 +1290,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
           void load()
       } catch (e) {
           console.error(e)
-          message.error(e.message || '移动失败，已还原')
+          toast.error(e.message || '移动失败，已还原')
           void load()
       }
   }
@@ -1484,15 +1483,27 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
               <path d="m20 20-4-4"/>
             </svg>
           </div>
-          <Input
+          <input
             className="file-search-input"
             placeholder="搜索标题或正文"
-            allowClear
             value={q}
             onChange={e => setQ(e.target.value)}
-            onPressEnter={() => void load()}
+            onKeyDown={e => {
+              if (e.key === 'Enter') void load()
+            }}
             aria-label="搜索文件"
           />
+          {q && (
+            <button
+              type="button"
+              className="file-search-clear"
+              onClick={() => setQ('')}
+              aria-label="清除搜索"
+              title="清除搜索"
+            >
+              ×
+            </button>
+          )}
         </div>
       </div>
       {loading ? (
