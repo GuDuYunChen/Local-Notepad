@@ -227,9 +227,9 @@ func escapeFTS5Query(q string) string {
 
 func escapeLikePattern(q string) string {
 	replacer := strings.NewReplacer(
-		`\\`, `\\\\`,
-		`%`, `\\%`,
-		`_`, `\\_`,
+		`\`, `\\`,
+		`%`, `\%`,
+		`_`, `\_`,
 	)
 	return "%" + replacer.Replace(strings.TrimSpace(q)) + "%"
 }
