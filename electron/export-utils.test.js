@@ -1,10 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   codeBlockText,
+  embedLocalImagesInLexical,
   fetchAllFileMetadata,
   headingLevel,
   indexChildrenByParent,
+  isLocalUploadUrl,
   listItemText,
+  localUploadToDataUri,
   plainTextFromNode,
   safeExportStem,
 } from './export-utils.js'
@@ -69,6 +72,59 @@ describe('export helpers', () => {
       ],
     }
     expect(listItemText(item)).toBe('Parent item')
+  })
+
+  it('identifies only local app upload URLs as embeddable assets', () => {
+    expect(isLocalUploadUrl('http://127.0.0.1:27121/uploads/a.png')).toBe(true)
+    expect(isLocalUploadUrl('http://localhost:27121/uploads/a.png')).toBe(true)
+    expect(isLocalUploadUrl('https://example.com/uploads/a.png')).toBe(false)
+    expect(isLocalUploadUrl('data:image/png;base64,AA==')).toBe(false)
+  })
+
+  it('embeds local images as data URIs without fetching external images', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      headers: { get: () => 'image/png' },
+      arrayBuffer: async () => Uint8Array.from([1, 2, 3]).buffer,
+    })
+
+    const dataUri = await localUploadToDataUri(
+      'http://127.0.0.1:27121/uploads/a.png',
+      fetchImpl
+    )
+    expect(dataUri).toBe('data:image/png;base64,AQID')
+
+    const external = await localUploadToDataUri('https://example.com/a.png', fetchImpl)
+    expect(external).toBe('https://example.com/a.png')
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+  })
+
+  it('rewrites image and image-grid sources inside Lexical content', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      headers: { get: () => 'image/jpeg' },
+      arrayBuffer: async () => Uint8Array.from([255, 216, 255]).buffer,
+    })
+    const content = JSON.stringify({
+      root: {
+        children: [
+          { type: 'image', src: 'http://127.0.0.1:27121/uploads/a.jpg' },
+          {
+            type: 'image-grid',
+            items: [
+              { src: 'http://127.0.0.1:27121/uploads/b.jpg' },
+              { src: 'https://example.com/c.jpg' },
+            ],
+          },
+        ],
+      },
+    })
+
+    const rewritten = JSON.parse(await embedLocalImagesInLexical(content, fetchImpl))
+    expect(rewritten.root.children[0].src).toMatch(/^data:image\/jpeg;base64,/)
+    expect(rewritten.root.children[1].items[0].src).toMatch(/^data:image\/jpeg;base64,/)
+    expect(rewritten.root.children[1].items[1].src).toBe('https://example.com/c.jpg')
+    expect(fetchImpl).toHaveBeenCalledTimes(2)
   })
 
   it('loads every metadata page once with compact responses', async () => {
