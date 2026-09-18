@@ -78,8 +78,10 @@ export default function TrashPanel({ onClose, onRestored }) {
     try {
       await api(`/api/files/${item.id}/restore`, { method: 'POST' })
       removeItems([item.id])
-      onRestored?.([item.id])
-      if (!silent) toast.success(`已恢复：${item.title}`)
+      if (!silent) {
+        onRestored?.([item.id])
+        toast.success(`已恢复：${item.title}`)
+      }
       return { ok: true, id: item.id }
     } catch (error) {
       console.error('恢复失败', item.id, error)
