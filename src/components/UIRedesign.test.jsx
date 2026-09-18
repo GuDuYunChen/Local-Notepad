@@ -4,6 +4,7 @@ import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import NavigationRail from './NavigationRail'
 import TrashPanel, { trashDaysRemaining } from './TrashPanel'
+import { diagnosticsToText, formatDiagnosticBytes } from './SettingsPanel'
 import TemplateSelector from './TemplateSelector'
 import QuickSwitcher, { buildHighlightSegments, getSearchMatchScope } from './QuickSwitcher'
 import ToastViewport from './ToastViewport'
@@ -82,6 +83,7 @@ describe('UI redesign smoke tests', () => {
     const dailyButton = container.querySelector('button[aria-label="每日笔记"]')
     const graphButton = container.querySelector('button[aria-label="知识图谱"]')
     const trashButton = container.querySelector('button[aria-label="回收站"]')
+    const settingsButton = container.querySelector('button[aria-label="设置与诊断"]')
     const backupButton = container.querySelector('button[aria-label="备份与恢复"]')
     const shortcutsButton = container.querySelector('button[aria-label="快捷键"]')
 
@@ -91,6 +93,7 @@ describe('UI redesign smoke tests', () => {
     expect(dailyButton).toBeTruthy()
     expect(graphButton).toBeTruthy()
     expect(trashButton).toBeTruthy()
+    expect(settingsButton).toBeTruthy()
     expect(backupButton).toBeTruthy()
     expect(shortcutsButton).toBeTruthy()
 
@@ -105,6 +108,9 @@ describe('UI redesign smoke tests', () => {
 
     await click(trashButton)
     expect(onChangeWorkspace).toHaveBeenCalledWith('trash')
+
+    await click(settingsButton)
+    expect(onChangeWorkspace).toHaveBeenCalledWith('settings')
 
     await click(backupButton)
     expect(onOpenBackup).toHaveBeenCalledTimes(1)
@@ -235,6 +241,45 @@ describe('UI redesign smoke tests', () => {
     expect(api).toHaveBeenCalledWith('/api/files/deleted-1/restore', { method: 'POST' })
     expect(onRestored).toHaveBeenCalledWith(['deleted-1'])
     expect(container.textContent).toContain('回收站是空的')
+  })
+
+  it('formats diagnostics for display and copy', () => {
+    expect(formatDiagnosticBytes(0)).toBe('0 B')
+    expect(formatDiagnosticBytes(2048)).toBe('2.0 KB')
+    expect(formatDiagnosticBytes(5 * 1024 * 1024)).toBe('5.0 MB')
+
+    const text = diagnosticsToText(
+      {
+        integrity: 'ok',
+        journal_mode: 'wal',
+        foreign_keys: true,
+        busy_timeout: 5000,
+        database_size: 2048,
+        active_notes: 3,
+        active_folders: 1,
+        trash_items: 2,
+        backup_count: 4,
+        data_dir: '/data',
+        database_path: '/data/data.db',
+        backup_dir: '/data/backups',
+        upload_dir: '/data/uploads',
+      },
+      {
+        version: '4.0.0',
+        platform: 'win32',
+        arch: 'x64',
+        electron: '31.0.0',
+        chrome: '126',
+        node: '20',
+        packaged: true,
+      },
+      12.4
+    )
+
+    expect(text).toContain('应用版本: 4.0.0')
+    expect(text).toContain('数据库完整性: ok')
+    expect(text).toContain('后端响应: 12 ms')
+    expect(text).toContain('数据目录: /data')
   })
 
   it('maps editor save state consistently for the inspector', () => {
