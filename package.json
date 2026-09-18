@@ -8,7 +8,7 @@
     "dev": "concurrently \"vite\" \"wait-on http://localhost:5000 && npx -y electron@31 out/electron/main.cjs\" \"npm:build:main:watch\"",
     "build:renderer": "vite build",
     "ci:build-backend-win": "go -C server build -o bin/notepad-server.exe ./cmd/notepad-server",
-    "build": "npm run ci:build-backend-win && npm run build:main && vite build && electron-builder",
+    "build": "npm run ci:build-backend-win && npm run build:main && vite build && electron-builder --publish never",
     "build:main": "esbuild electron/main.js --bundle --platform=node --format=cjs --external:electron --outfile=out/electron/main.cjs && esbuild electron/preload.js --bundle --platform=node --format=cjs --external:electron --outfile=out/electron/preload.cjs",
     "build:main:watch": "concurrently \"esbuild electron/main.js --bundle --platform=node --format=cjs --external:electron --outfile=out/electron/main.cjs --watch\" \"esbuild electron/preload.js --bundle --platform=node --format=cjs --external:electron --outfile=out/electron/preload.cjs --watch\"",
     "test:ui": "vitest run --root=. src/components/TextEditor.test.jsx src/components/UIRedesign.test.jsx src/services/api.test.js src/services/fileHistory.test.js src/services/importContent.test.js src/utils/lexicalText.test.js",
