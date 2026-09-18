@@ -99,6 +99,125 @@ func (d *FileDAO) DeleteRecursive(ctx context.Context, id string) error {
 	return err
 }
 
+func (d *FileDAO) ListTrashRoots(ctx context.Context) ([]*model.File, error) {
+	rows, err := d.DB.QueryContext(ctx, `
+		SELECT f.id, f.title, '', f.created_at, f.updated_at, f.is_folder, f.parent_id, f.sort_order, f.is_deleted, f.deleted_at, f.is_pinned
+		FROM files f
+		WHERE f.is_deleted = 1
+		  AND NOT (f.is_folder = 0 AND substr(f.title, 1, 7) = '__tpl__')
+		  AND (
+			f.parent_id = ''
+			OR NOT EXISTS (
+				SELECT 1 FROM files parent
+				WHERE parent.id = f.parent_id AND parent.is_deleted = 1
+			)
+		  )
+		ORDER BY f.deleted_at DESC, f.updated_at DESC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]*model.File, 0)
+	for rows.Next() {
+		var f model.File
+		if err := rows.Scan(
+			&f.ID,
+			&f.Title,
+			&f.Content,
+			&f.CreatedAt,
+			&f.UpdatedAt,
+			&f.IsFolder,
+			&f.ParentID,
+			&f.SortOrder,
+			&f.IsDeleted,
+			&f.DeletedAt,
+			&f.IsPinned,
+		); err != nil {
+			return nil, err
+		}
+		out = append(out, &f)
+	}
+	return out, rows.Err()
+}
+
+func (d *FileDAO) PermanentDeleteRecursive(ctx context.Context, id string) error {
+	tx, err := d.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin permanent delete tx failed: %w", err)
+	}
+	defer tx.Rollback()
+
+	subtree := `
+		WITH RECURSIVE sub(id) AS (
+			SELECT id FROM files WHERE id = ? AND is_deleted = 1
+			UNION
+			SELECT f.id
+			FROM files f
+			JOIN sub ON f.parent_id = sub.id
+			WHERE f.is_deleted = 1 AND f.parent_id != f.id
+		)
+	`
+
+	statements := []struct {
+		query string
+		args  []interface{}
+	}{
+		{
+			query: subtree + ` DELETE FROM file_tags WHERE file_id IN (SELECT id FROM sub)`,
+			args:  []interface{}{id},
+		},
+		{
+			query: subtree + ` DELETE FROM file_versions WHERE file_id IN (SELECT id FROM sub)`,
+			args:  []interface{}{id},
+		},
+		{
+			query: subtree + ` DELETE FROM links
+				WHERE source_id IN (SELECT id FROM sub)
+				   OR target_id IN (SELECT id FROM sub)`,
+			args: []interface{}{id},
+		},
+		{
+			query: subtree + ` DELETE FROM files WHERE id IN (SELECT id FROM sub)`,
+			args:  []interface{}{id},
+		},
+	}
+
+	for _, statement := range statements {
+		if _, err := tx.ExecContext(ctx, statement.query, statement.args...); err != nil {
+			return fmt.Errorf("permanent delete failed: %w", err)
+		}
+	}
+
+	return tx.Commit()
+}
+
+func (d *FileDAO) EmptyTrash(ctx context.Context) error {
+	tx, err := d.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin empty trash tx failed: %w", err)
+	}
+	defer tx.Rollback()
+
+	statements := []string{
+		`DELETE FROM file_tags WHERE file_id IN (SELECT id FROM files WHERE is_deleted = 1)`,
+		`DELETE FROM file_versions WHERE file_id IN (SELECT id FROM files WHERE is_deleted = 1)`,
+		`DELETE FROM links
+		  WHERE source_id IN (SELECT id FROM files WHERE is_deleted = 1)
+		     OR target_id IN (SELECT id FROM files WHERE is_deleted = 1)`,
+		`DELETE FROM files WHERE is_deleted = 1`,
+	}
+
+	for _, statement := range statements {
+		if _, err := tx.ExecContext(ctx, statement); err != nil {
+			return fmt.Errorf("empty trash failed: %w", err)
+		}
+	}
+
+	return tx.Commit()
+}
+
 func (d *FileDAO) RestoreRecursive(ctx context.Context, id string) error {
 	query := `
 	WITH RECURSIVE sub(id) AS (
