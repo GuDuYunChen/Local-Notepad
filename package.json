@@ -11,7 +11,6 @@
     "build": "npm run ci:build-backend-win && npm run build:main && vite build && electron-builder",
     "build:main": "esbuild electron/main.js --bundle --platform=node --format=cjs --external:electron --outfile=out/electron/main.cjs && esbuild electron/preload.js --bundle --platform=node --format=cjs --external:electron --outfile=out/electron/preload.cjs",
     "build:main:watch": "concurrently \"esbuild electron/main.js --bundle --platform=node --format=cjs --external:electron --outfile=out/electron/main.cjs --watch\" \"esbuild electron/preload.js --bundle --platform=node --format=cjs --external:electron --outfile=out/electron/preload.cjs --watch\"",
-    "test:e2e": "vitest run --root=. tests/e2e/backend.spec.ts",
     "test:ui": "vitest run --root=. src/components/TextEditor.test.jsx src/components/UIRedesign.test.jsx src/services/api.test.js src/services/fileHistory.test.js src/services/importContent.test.js src/utils/lexicalText.test.js",
     "test:editor": "vitest run --root=. src/components/Editor/",
     "test:electron": "vitest run --root=. electron/*.test.js",
