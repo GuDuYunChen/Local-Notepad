@@ -174,6 +174,7 @@ export default function ToolbarPlugin() {
   };
 
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(false)
 
   const toggleSelectionMode = () => {}
 
@@ -316,107 +317,189 @@ export default function ToolbarPlugin() {
   };
 
   return (
-    <div className="editor-toolbar">
-      <div className="toolbar-group">
-        <span className="group-label">历史</span>
-        <button disabled={!canUndo} onClick={() => editor.dispatchCommand(UNDO_COMMAND)} className="btn" aria-label="撤销" title="撤销 (Ctrl+Z)">↶ 撤销</button>
-        <button disabled={!canRedo} onClick={() => editor.dispatchCommand(REDO_COMMAND)} className="btn" aria-label="重做" title="重做 (Ctrl+Y)">↷ 重做</button>
+    <div className="editor-toolbar compact-toolbar">
+      <div className="toolbar-group compact-history">
+        <button
+          disabled={!canUndo}
+          onClick={() => editor.dispatchCommand(UNDO_COMMAND)}
+          className="btn icon-only"
+          aria-label="撤销"
+          title="撤销 (Ctrl+Z)"
+        >↶</button>
+        <button
+          disabled={!canRedo}
+          onClick={() => editor.dispatchCommand(REDO_COMMAND)}
+          className="btn icon-only"
+          aria-label="重做"
+          title="重做 (Ctrl+Y)"
+        >↷</button>
       </div>
+
       <span className="divider" />
-      <div className="toolbar-group">
-        <span className="group-label">文本</span>
-        <select ref={fontSelectRef} value={fontFamily} onChange={handleFontChange} className="select" style={{width: 140}}>
-          {FontOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
-        <select value={fontSize} onChange={e => { setFontSize(e.target.value); applyStyle('font-size', e.target.value); }} className="select">
-          {FontSizeOptions.map(o => <option key={o} value={o}>{o}</option>)}
-        </select>
-        <button onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'bold')} className={`btn fw-bold${isBold ? ' active' : ''}`}>B</button>
-        <button onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'italic')} className={`btn fst-italic${isItalic ? ' active' : ''}`}>I</button>
-        <button onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'underline')} className={`btn text-decoration-underline${isUnderline ? ' active' : ''}`}>U</button>
-        <div className="text-color-group" ref={colorPickerRef}>
-          <button
-            className="text-color-btn"
-            onClick={() => {
-              setShowColorPicker(!showColorPicker);
-              setShowHighlightPicker(false);
-            }}
-            title="文本颜色"
-            aria-label="文本颜色"
-          >
-            <span className="text-color-icon">A</span>
-          </button>
-          {showColorPicker && (
-            <div className="color-picker-dropdown" role="listbox" aria-label="文本颜色选择">
-              {TEXT_COLORS.map((color) => (
-                <button
-                  key={color.value || 'default'}
-                  className="color-option"
-                  onClick={() => applyTextColor(color.value)}
-                  title={color.label}
-                  aria-label={color.label}
+
+      <div className="toolbar-group compact-format">
+        <button
+          onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'bold')}
+          className={`btn fw-bold${isBold ? ' active' : ''}`}
+          aria-label="加粗"
+          title="加粗"
+        >B</button>
+        <button
+          onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'italic')}
+          className={`btn fst-italic${isItalic ? ' active' : ''}`}
+          aria-label="斜体"
+          title="斜体"
+        >I</button>
+        <button
+          onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'underline')}
+          className={`btn text-decoration-underline${isUnderline ? ' active' : ''}`}
+          aria-label="下划线"
+          title="下划线"
+        >U</button>
+      </div>
+
+      <div className="toolbar-spacer" />
+
+      {isUploading && <span className="toolbar-progress">处理中…</span>}
+
+      <div className="toolbar-more-wrap">
+        <button
+          className={`btn toolbar-more-trigger${moreOpen ? ' active' : ''}`}
+          onClick={() => setMoreOpen(prev => !prev)}
+          aria-label="更多插入与格式"
+          title="更多插入与格式"
+        >
+          <span className="toolbar-plus">＋</span>
+          <span>更多</span>
+        </button>
+
+        {moreOpen && (
+          <div className="toolbar-more-menu">
+            <div className="toolbar-menu-section">
+              <div className="toolbar-menu-label">文字</div>
+              <div className="toolbar-menu-row">
+                <select
+                  ref={fontSelectRef}
+                  value={fontFamily}
+                  onChange={handleFontChange}
+                  className="select toolbar-wide-select"
+                  aria-label="字体"
                 >
-                  <span
-                    className="color-swatch"
-                    style={{ backgroundColor: color.value || 'transparent', border: !color.value ? '1px dashed var(--muted)' : 'none' }}
-                  />
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-        <div className="text-color-group">
-          <button
-            className="text-color-btn"
-            onClick={() => {
-              setShowHighlightPicker(!showHighlightPicker);
-              setShowColorPicker(false);
-            }}
-            title="文本高亮"
-            aria-label="文本高亮"
-          >
-            <span className="highlight-icon">🖍</span>
-          </button>
-          {showHighlightPicker && (
-            <div className="color-picker-dropdown" role="listbox" aria-label="高亮颜色选择">
-              {HIGHLIGHT_COLORS.map((color) => (
-                <button
-                  key={color.value || 'default'}
-                  className="color-option"
-                  onClick={() => applyHighlight(color.value)}
-                  title={color.label}
-                  aria-label={color.label}
+                  {FontOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+                <select
+                  value={fontSize}
+                  onChange={e => { setFontSize(e.target.value); applyStyle('font-size', e.target.value); }}
+                  className="select"
+                  aria-label="字号"
                 >
-                  <span
-                    className="color-swatch"
-                    style={{ backgroundColor: color.value || 'transparent', border: !color.value ? '1px dashed var(--muted)' : 'none' }}
-                  />
-                </button>
-              ))}
+                  {FontSizeOptions.map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
+              </div>
+
+              <div className="toolbar-menu-row">
+                <div className="text-color-group" ref={colorPickerRef}>
+                  <button
+                    className="btn"
+                    onClick={() => {
+                      setShowColorPicker(!showColorPicker);
+                      setShowHighlightPicker(false);
+                    }}
+                  >
+                    文字颜色
+                  </button>
+                  {showColorPicker && (
+                    <div className="color-picker-dropdown" role="listbox" aria-label="文本颜色选择">
+                      {TEXT_COLORS.map((color) => (
+                        <button
+                          key={color.value || 'default'}
+                          className="color-option"
+                          onClick={() => applyTextColor(color.value)}
+                          title={color.label}
+                          aria-label={color.label}
+                        >
+                          <span
+                            className="color-swatch"
+                            style={{ backgroundColor: color.value || 'transparent', border: !color.value ? '1px dashed var(--muted)' : 'none' }}
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="text-color-group">
+                  <button
+                    className="btn"
+                    onClick={() => {
+                      setShowHighlightPicker(!showHighlightPicker);
+                      setShowColorPicker(false);
+                    }}
+                  >
+                    高亮
+                  </button>
+                  {showHighlightPicker && (
+                    <div className="color-picker-dropdown" role="listbox" aria-label="高亮颜色选择">
+                      {HIGHLIGHT_COLORS.map((color) => (
+                        <button
+                          key={color.value || 'default'}
+                          className="color-option"
+                          onClick={() => applyHighlight(color.value)}
+                          title={color.label}
+                          aria-label={color.label}
+                        >
+                          <span
+                            className="color-swatch"
+                            style={{ backgroundColor: color.value || 'transparent', border: !color.value ? '1px dashed var(--muted)' : 'none' }}
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
-          )}
-        </div>
-      </div>
-      <span className="divider" />
-      <div className="toolbar-group">
-        <span className="group-label">对齐</span>
-        <button onClick={() => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'left')} className={`btn${elementFormat === 'left' ? ' active' : ''}`} aria-label="左对齐" title="左对齐">≡ 左</button>
-        <button onClick={() => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'center')} className={`btn${elementFormat === 'center' ? ' active' : ''}`} aria-label="居中对齐" title="居中对齐">≡ 中</button>
-        <button onClick={() => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'right')} className={`btn${elementFormat === 'right' ? ' active' : ''}`} aria-label="右对齐" title="右对齐">≡ 右</button>
-      </div>
-      <span className="divider" />
-      <div className="toolbar-group" style={{ position: 'relative' }}>
-        <span className="group-label">表格</span>
-        <TableMenu />
-      </div>
-      <span className="divider" />
-      <div className="toolbar-group">
-        <span className="group-label">插入</span>
-        <label className="btn">图片<input type="file" accept="image/*" multiple style={{display:'none'}} onChange={handleImage} /></label>
-        <label className="btn">视频<input type="file" accept="video/*" style={{display:'none'}} onChange={handleVideo} /></label>
-        <label className="btn">Excel<input type="file" accept=".xlsx, .xls" style={{display:'none'}} onChange={handleExcel} /></label>
-        <button className="btn" onClick={() => editor.dispatchCommand(INSERT_CODE_BLOCK_COMMAND)}>代码块</button>
-        {isUploading && <span style={{marginLeft: 10, fontSize: 12}}>上传/处理中…</span>}
+
+            <div className="toolbar-menu-section">
+              <div className="toolbar-menu-label">对齐</div>
+              <div className="toolbar-menu-row">
+                <button onClick={() => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'left')} className={`btn${elementFormat === 'left' ? ' active' : ''}`}>左对齐</button>
+                <button onClick={() => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'center')} className={`btn${elementFormat === 'center' ? ' active' : ''}`}>居中</button>
+                <button onClick={() => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'right')} className={`btn${elementFormat === 'right' ? ' active' : ''}`}>右对齐</button>
+              </div>
+            </div>
+
+            <div className="toolbar-menu-section">
+              <div className="toolbar-menu-label">插入</div>
+              <div className="toolbar-menu-grid">
+                <label className="btn toolbar-menu-action">
+                  图片
+                  <input type="file" accept="image/*" multiple style={{display:'none'}} onChange={handleImage} />
+                </label>
+                <label className="btn toolbar-menu-action">
+                  视频
+                  <input type="file" accept="video/*" style={{display:'none'}} onChange={handleVideo} />
+                </label>
+                <label className="btn toolbar-menu-action">
+                  Excel
+                  <input type="file" accept=".xlsx, .xls" style={{display:'none'}} onChange={handleExcel} />
+                </label>
+                <button
+                  className="btn toolbar-menu-action"
+                  onClick={() => {
+                    editor.dispatchCommand(INSERT_CODE_BLOCK_COMMAND)
+                    setMoreOpen(false)
+                  }}
+                >
+                  代码块
+                </button>
+              </div>
+              <div className="toolbar-table-section">
+                <TableMenu />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
