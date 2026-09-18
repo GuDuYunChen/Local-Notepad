@@ -96,7 +96,8 @@ func TestFileDAOListSearch(t *testing.T) {
 	ctx := context.Background()
 
 	seedSearchFile(t, dao, "project", "项目计划", "milestone schedule")
-	seedSearchFile(t, dao, "industrial", "行业观察", "industrial platform roadmap")
+	seedSearchFile(t, dao, "industrial", "行业观察", "研究工业富联走势并记录 industrial platform roadmap")
+	seedSearchFile(t, dao, "title-match", "富联笔记", "标题直接命中测试")
 	seedSearchFile(t, dao, "other", "其他笔记", "unrelated")
 
 	t.Run("partial title match", func(t *testing.T) {
@@ -116,6 +117,39 @@ func TestFileDAOListSearch(t *testing.T) {
 		}
 		if len(files) != 1 || files[0].ID != "industrial" {
 			t.Fatalf("expected industrial note, got %#v", files)
+		}
+	})
+
+	t.Run("chinese content substring match", func(t *testing.T) {
+		files, err := dao.List(ctx, "富联", 1, 20)
+		if err != nil {
+			t.Fatalf("List chinese content substring: %v", err)
+		}
+		if len(files) < 2 {
+			t.Fatalf("expected title and content matches, got %#v", files)
+		}
+		if files[0].ID != "title-match" {
+			t.Fatalf("expected title match first, got %#v", files)
+		}
+		foundContent := false
+		for _, file := range files {
+			if file.ID == "industrial" {
+				foundContent = true
+				break
+			}
+		}
+		if !foundContent {
+			t.Fatalf("expected chinese body substring match, got %#v", files)
+		}
+	})
+
+	t.Run("whitespace query behaves like unfiltered list", func(t *testing.T) {
+		files, err := dao.List(ctx, "   ", 1, 20)
+		if err != nil {
+			t.Fatalf("List whitespace query: %v", err)
+		}
+		if len(files) != 4 {
+			t.Fatalf("expected all files for whitespace query, got %d", len(files))
 		}
 	})
 
