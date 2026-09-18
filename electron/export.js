@@ -73,10 +73,39 @@ async function convertNode(node) {
             })
             
         case 'image':
-        case 'image-grid': // Custom node?
-            // Handle image logic
-            // node.src might be base64 or url
             return await convertImage(node)
+
+        case 'image-grid': {
+            const paragraphs = []
+            for (const item of node.items || []) {
+                const paragraph = await convertImage(item)
+                if (paragraph) paragraphs.push(paragraph)
+            }
+            return paragraphs
+        }
+
+        case 'todo':
+            return new Paragraph({
+                children: [
+                    new TextRun({
+                        text: `${node.checked ? '☑' : '☐'} ${node.text || ''}`
+                    })
+                ]
+            })
+
+        case 'video':
+            return new Paragraph({
+                children: [
+                    new TextRun({
+                        text: node.src ? `视频: ${node.src}` : '[视频]'
+                    })
+                ]
+            })
+
+        case 'divider':
+            return new Paragraph({
+                children: [new TextRun({ text: '────────────────' })]
+            })
 
         default:
             // Fallback for unknown nodes
@@ -362,6 +391,33 @@ function processNodeToMarkdown(node, lines, depth) {
         case 'table':
             processTableToMarkdown(node, lines)
             break
+
+        case 'image':
+            lines.push(`![${escapeMarkdownText(node.alt || node.caption || '图片')}](${node.src || ''})`)
+            lines.push('')
+            break
+
+        case 'image-grid':
+            for (const item of node.items || []) {
+                lines.push(`![${escapeMarkdownText(item.alt || '图片')}](${item.src || ''})`)
+            }
+            lines.push('')
+            break
+
+        case 'video':
+            lines.push(node.src ? `[视频](${node.src})` : '[视频]')
+            lines.push('')
+            break
+
+        case 'todo':
+            lines.push(`- [${node.checked ? 'x' : ' '}] ${node.text || ''}`)
+            lines.push('')
+            break
+
+        case 'divider':
+            lines.push('---')
+            lines.push('')
+            break
             
         default:
             if (node.children) {
@@ -370,6 +426,10 @@ function processNodeToMarkdown(node, lines, depth) {
                 }
             }
     }
+}
+
+function escapeMarkdownText(text) {
+    return String(text || '').replace(/[\\[\]_*]/g, '\\function processInlineNodes(children) {')
 }
 
 function processInlineNodes(children) {
@@ -645,14 +705,18 @@ function convertNodeToHTML(node) {
         case 'image':
             return `<img src="${node.src || ''}" alt="${escapeHTML(node.alt || '')}">`
         case 'image-grid':
-            return `<div class="image-grid">${node.children.map(img => `<img src="${img.src || ''}" alt="${escapeHTML(img.alt || '')}">`).join('')}</div>`
+            return `<div class="image-grid">${(node.items || []).map(img => `<img src="${escapeHTML(img.src || '')}" alt="${escapeHTML(img.alt || '')}">`).join('')}</div>`
+        case 'video':
+            return node.src
+                ? `<p><a href="${escapeHTML(node.src)}">视频</a></p>`
+                : '<p>[视频]</p>'
         case 'table':
             return convertTableToHTML(node)
         case 'divider':
             return '<hr>'
         case 'todo':
             const checked = node.checked ? 'checked' : ''
-            return `<p><input type="checkbox" disabled ${checked}> ${convertChildrenToHTML(node.children)}</p>`
+            return `<p><input type="checkbox" disabled ${checked}> ${escapeHTML(node.text || '')}</p>`
         default:
             if (node.children) return convertChildrenToHTML(node.children)
             return ''
