@@ -122,6 +122,87 @@ func TestFTSMigrationRebuildsExistingRowsWhenUpgradingFromV4(t *testing.T) {
 	}
 }
 
+func TestSQLitePragmasEnableBusyTimeoutAndForeignKeys(t *testing.T) {
+	db := openMigrationTestDB(t)
+	ctx := context.Background()
+	configureDatabasePool(db)
+	applySQLitePragmas(ctx, db)
+
+	var busyTimeout int
+	if err := db.QueryRow(`PRAGMA busy_timeout`).Scan(&busyTimeout); err != nil {
+		t.Fatalf("read busy_timeout: %v", err)
+	}
+	if busyTimeout != 5000 {
+		t.Fatalf("busy_timeout = %d, want 5000", busyTimeout)
+	}
+
+	var foreignKeys int
+	if err := db.QueryRow(`PRAGMA foreign_keys`).Scan(&foreignKeys); err != nil {
+		t.Fatalf("read foreign_keys: %v", err)
+	}
+	if foreignKeys != 1 {
+		t.Fatalf("foreign_keys = %d, want 1", foreignKeys)
+	}
+}
+
+func TestMigrationV9CleansHistoricalOrphansWithoutDroppingUnresolvedTargets(t *testing.T) {
+	db := openMigrationTestDB(t)
+	ctx := context.Background()
+	if err := migrate(ctx, db); err != nil {
+		t.Fatalf("initial migrate: %v", err)
+	}
+
+	if _, err := db.Exec(`DELETE FROM schema_migrations WHERE version = 9`); err != nil {
+		t.Fatalf("rewind migration version: %v", err)
+	}
+	if _, err := db.Exec(`INSERT INTO files
+		(id, title, content, created_at, updated_at, is_folder, parent_id, sort_order, is_deleted, deleted_at, is_pinned)
+	 VALUES ('active-file', 'Active', '', 1, 1, 0, '', 0, 0, 0, 0)`); err != nil {
+		t.Fatalf("insert active file: %v", err)
+	}
+	if _, err := db.Exec(`INSERT INTO tags (id, name, color) VALUES ('active-tag', 'Active', '#000')`); err != nil {
+		t.Fatalf("insert active tag: %v", err)
+	}
+
+	statements := []string{
+		`INSERT INTO file_tags (file_id, tag_id) VALUES ('active-file', 'active-tag')`,
+		`INSERT INTO file_tags (file_id, tag_id) VALUES ('missing-file', 'active-tag')`,
+		`INSERT INTO file_versions (file_id, content, title, created_at) VALUES ('missing-file', '', 'orphan', 1)`,
+		`INSERT INTO links (source_id, target_id, created_at) VALUES ('missing-file', 'active-file', 1)`,
+		`INSERT INTO links (source_id, target_id, created_at) VALUES ('active-file', 'future-target', 1)`,
+	}
+	for _, stmt := range statements {
+		if _, err := db.Exec(stmt); err != nil {
+			t.Fatalf("seed v9 orphan data: %v", err)
+		}
+	}
+
+	if err := migrate(ctx, db); err != nil {
+		t.Fatalf("apply v9 migration: %v", err)
+	}
+
+	checks := []struct {
+		query string
+		want  int
+		label string
+	}{
+		{`SELECT COUNT(*) FROM file_tags WHERE file_id = 'missing-file'`, 0, "orphan file_tags"},
+		{`SELECT COUNT(*) FROM file_tags WHERE file_id = 'active-file' AND tag_id = 'active-tag'`, 1, "valid file_tags"},
+		{`SELECT COUNT(*) FROM file_versions WHERE file_id = 'missing-file'`, 0, "orphan versions"},
+		{`SELECT COUNT(*) FROM links WHERE source_id = 'missing-file'`, 0, "orphan source links"},
+		{`SELECT COUNT(*) FROM links WHERE source_id = 'active-file' AND target_id = 'future-target'`, 1, "unresolved target link"},
+	}
+	for _, check := range checks {
+		var got int
+		if err := db.QueryRow(check.query).Scan(&got); err != nil {
+			t.Fatalf("%s query failed: %v", check.label, err)
+		}
+		if got != check.want {
+			t.Fatalf("%s count = %d, want %d", check.label, got, check.want)
+		}
+	}
+}
+
 func TestResolveUploadPathUsesDatabaseDirectory(t *testing.T) {
 	root := t.TempDir()
 	dbPath := filepath.Join(root, "data.db")
