@@ -4,6 +4,7 @@ import path from 'path'
 import { BrowserWindow } from 'electron'
 import {
     codeBlockText,
+    embedLocalImagesInLexical,
     fetchAllFileMetadata,
     headingLevel,
     indexChildrenByParent,
@@ -538,7 +539,8 @@ export async function exportToPDF(file, outputPath) {
     })
 
     try {
-        const htmlContent = convertLexicalToFullHTML(file)
+        const portableContent = await embedLocalImagesInLexical(file.content)
+        const htmlContent = convertLexicalToFullHTML({ ...file, content: portableContent })
         await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(htmlContent))
 
         // Wait for images referenced by the note before printing.
@@ -571,7 +573,8 @@ export async function exportToPDF(file, outputPath) {
 }
 
 export async function exportToHTML(file, outputPath) {
-    const htmlContent = convertLexicalToFullHTML(file)
+    const portableContent = await embedLocalImagesInLexical(file.content)
+    const htmlContent = convertLexicalToFullHTML({ ...file, content: portableContent })
     fs.writeFileSync(outputPath, htmlContent, 'utf-8')
     return outputPath
 }
