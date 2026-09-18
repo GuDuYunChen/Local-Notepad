@@ -28,6 +28,15 @@ describe('import content normalization', () => {
     expect(state.root.children.some(node => node.type === 'quote')).toBe(true)
   })
 
+  it('honors parser content type for legacy Word plain text', () => {
+    const serialized = JSON.parse(normalizeImportedContent({
+      title: 'legacy.doc',
+      content: '# literal legacy heading',
+      contentType: 'text',
+    }))
+    expect(serialized.root.children[0].type).toBe('paragraph')
+  })
+
   it('uses plain text conversion only for txt imports', () => {
     const txt = JSON.parse(normalizeImportedContent({ title: 'notes.txt', content: '# literal' }))
     const md = JSON.parse(normalizeImportedContent({ title: 'notes.md', content: '# heading' }))
