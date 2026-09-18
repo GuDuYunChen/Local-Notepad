@@ -38,7 +38,11 @@ export async function selectAndParseFiles() {
         ]
     })
 
-    if (!filePaths || filePaths.length === 0) return []
+    return parseImportPaths(filePaths)
+}
+
+export async function parseImportPaths(filePaths) {
+    if (!Array.isArray(filePaths) || filePaths.length === 0) return []
     if (filePaths.length > 100) {
         throw new Error('批量导入不能超过100个文件')
     }
