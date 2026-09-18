@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('__API_BASE__', base)
 contextBridge.exposeInMainWorld('electronAPI', {
   openFileDialog: () => ipcRenderer.invoke('dialog:openFile'),
   saveFileDialog: () => ipcRenderer.invoke('dialog:saveFile'),
+  saveContentAs: (payload) => ipcRenderer.invoke('file:saveContentAs', payload),
   openDirectoryDialog: () => ipcRenderer.invoke('dialog:openDirectory'),
   exportToDocx: (ids, targetDir, format) => ipcRenderer.invoke('export:docx', { ids, targetDir, format }),
   exportToPDF: (file, outputPath) => ipcRenderer.invoke('export:pdf', { file, outputPath }),
