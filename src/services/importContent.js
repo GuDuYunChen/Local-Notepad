@@ -31,17 +31,19 @@ export function plainTextToLexical(text) {
   editor.update(() => {
     const root = $getRoot()
     root.clear()
-    const lines = String(text || '').replace(/
-/g, '
-').split('
-')
+
+    const lines = String(text || '').replace(/\r\n/g, '\n').split('\n')
     for (const line of lines) {
       const paragraph = $createParagraphNode()
       if (line) paragraph.append($createTextNode(line))
       root.append(paragraph)
     }
-    if (lines.length === 0) root.append($createParagraphNode())
+
+    if (lines.length === 0) {
+      root.append($createParagraphNode())
+    }
   }, { discrete: true })
+
   return JSON.stringify(editor.getEditorState().toJSON())
 }
 
@@ -50,12 +52,13 @@ export function markdownToLexical(markdown) {
   editor.update(() => {
     $convertFromMarkdownString(String(markdown || ''), TRANSFORMERS)
   }, { discrete: true })
+
   return JSON.stringify(editor.getEditorState().toJSON())
 }
 
 export function normalizeImportedContent(item) {
   const title = String(item?.title || '')
-  const ext = title.toLowerCase().match(/(.[^.]+)$/)?.[1] || ''
+  const ext = title.toLowerCase().match(/(\.[^.]+)$/)?.[1] || ''
   const content = String(item?.content || '')
 
   if (ext === '.txt') {
