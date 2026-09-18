@@ -31,6 +31,29 @@ function normalizeResults(list) {
     .slice(0, MAX_RESULTS)
 }
 
+export function $insertWikiLinkAtSelection(file) {
+  if (!file?.id) return false
+
+  const selection = $getSelection()
+  if (!$isRangeSelection(selection) || !selection.isCollapsed()) return false
+
+  const anchorNode = selection.anchor.getNode()
+  if (!$isTextNode(anchorNode)) return false
+
+  const match = matchWikiQuery(anchorNode.getTextContent(), selection.anchor.offset)
+  if (!match) return false
+
+  anchorNode.spliceText(match.start, match.raw.length, '', true)
+  const currentSelection = $getSelection()
+  if (!$isRangeSelection(currentSelection)) return false
+
+  $insertNodes([
+    $createWikiLinkNode(file.id, file.title || '未命名'),
+    $createTextNode(' '),
+  ])
+  return true
+}
+
 export default function WikiLinkPlugin() {
   const [editor] = useLexicalComposerContext()
   const [isOpen, setIsOpen] = useState(false)
@@ -50,30 +73,15 @@ export default function WikiLinkPlugin() {
   }, [])
 
   const insertLink = useCallback((file) => {
-    if (!file?.id) return
-
+    let inserted = false
     editor.update(() => {
-      const selection = $getSelection()
-      if (!$isRangeSelection(selection) || !selection.isCollapsed()) return
-
-      const anchorNode = selection.anchor.getNode()
-      if (!$isTextNode(anchorNode)) return
-
-      const match = matchWikiQuery(anchorNode.getTextContent(), selection.anchor.offset)
-      if (!match) return
-
-      anchorNode.spliceText(match.start, match.raw.length, '', true)
-      const currentSelection = $getSelection()
-      if (!$isRangeSelection(currentSelection)) return
-
-      $insertNodes([
-        $createWikiLinkNode(file.id, file.title || '未命名'),
-        $createTextNode(' '),
-      ])
+      inserted = $insertWikiLinkAtSelection(file)
     })
 
-    close()
-    editor.focus()
+    if (inserted) {
+      close()
+      editor.focus()
+    }
   }, [editor, close])
 
   useEffect(() => {
