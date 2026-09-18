@@ -70,7 +70,7 @@
     "directories": {
       "output": "release"
     },
-    "appId": "com.example.notepaddesktop",
+    "appId": "com.guduyunchen.localnotepad",
     "productName": "记事本",
     "files": [
       "dist/**",
@@ -99,5 +99,7 @@
       "icon": "build/icon.ico",
       "artifactName": "Notepad-${version}-Setup.exe"
     }
-  }
+  },
+  "description": "Local-first desktop notes and personal knowledge workspace",
+  "author": "GuDuYunChen"
 }
