@@ -1,25 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { api, searchFiles } from '~/services/api'
-
-function extractPlainText(content) {
-  if (!content) return ''
-
-  try {
-    const state = JSON.parse(content)
-    const collect = (node) => {
-      if (!node) return ''
-      if (node.type === 'text') return node.text || ''
-      if (!Array.isArray(node.children)) return ''
-      return node.children.map(collect).join(' ')
-    }
-    return collect(state?.root).replace(/\s+/g, ' ').trim()
-  } catch {
-    return String(content).replace(/\s+/g, ' ').trim()
-  }
-}
+import { extractLexicalText } from '~/utils/lexicalText'
 
 function buildPreview(content, query) {
-  const text = extractPlainText(content)
+  const text = extractLexicalText(content).replace(/\s+/g, ' ').trim()
   if (!text) return '空白笔记'
 
   const normalizedQuery = query.trim().toLowerCase()
