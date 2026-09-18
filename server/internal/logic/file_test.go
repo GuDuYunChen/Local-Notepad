@@ -170,6 +170,63 @@ func TestUpdateRejectsMoveUnderFile(t *testing.T) {
 	}
 }
 
+func TestRestoreRejectsNameCollision(t *testing.T) {
+	logic := newFileLogicTestDB(t)
+	ctx := context.Background()
+
+	original, err := logic.Create(ctx, "Notes.md", "old", false, "")
+	if err != nil {
+		t.Fatalf("create original: %v", err)
+	}
+	if err := logic.Delete(ctx, original.ID); err != nil {
+		t.Fatalf("delete original: %v", err)
+	}
+	if _, err := logic.Create(ctx, "notes.md", "new", false, ""); err != nil {
+		t.Fatalf("create replacement: %v", err)
+	}
+
+	if err := logic.Restore(ctx, original.ID); err == nil {
+		t.Fatal("expected restore collision to fail")
+	} else if !strings.Contains(err.Error(), "目标位置已存在同名文件或文件夹") {
+		t.Fatalf("unexpected restore error: %v", err)
+	}
+
+	deleted, err := logic.FileDAO.GetByIDIncludingDeleted(ctx, original.ID)
+	if err != nil {
+		t.Fatalf("read deleted original: %v", err)
+	}
+	if !deleted.IsDeleted {
+		t.Fatal("conflicting original should remain deleted")
+	}
+}
+
+func TestRestoreRecursiveSucceedsWithoutConflict(t *testing.T) {
+	logic := newFileLogicTestDB(t)
+	ctx := context.Background()
+
+	folder, err := logic.Create(ctx, "Folder", "", true, "")
+	if err != nil {
+		t.Fatalf("create folder: %v", err)
+	}
+	child, err := logic.Create(ctx, "Child.md", "content", false, folder.ID)
+	if err != nil {
+		t.Fatalf("create child: %v", err)
+	}
+	if err := logic.Delete(ctx, folder.ID); err != nil {
+		t.Fatalf("delete subtree: %v", err)
+	}
+	if err := logic.Restore(ctx, folder.ID); err != nil {
+		t.Fatalf("restore subtree: %v", err)
+	}
+
+	if _, err := logic.Get(ctx, folder.ID); err != nil {
+		t.Fatalf("restored folder missing: %v", err)
+	}
+	if _, err := logic.Get(ctx, child.ID); err != nil {
+		t.Fatalf("restored child missing: %v", err)
+	}
+}
+
 func TestNormalizeTitleSanitizesAndLimitsLength(t *testing.T) {
 	title, err := normalizeTitle("  bad/name?.md  ")
 	if err != nil {
