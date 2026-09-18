@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
-import { api } from '~/services/api'
+import { api, listAllFiles } from '~/services/api'
 import './DailyNotesPanel.css'
 
 function localDateKey(date = new Date()) {
@@ -23,7 +23,7 @@ export default function DailyNotesPanel({ onSelectFile, onClose }) {
   const loadNotes = useCallback(async () => {
     setLoading(true)
     try {
-      const list = await api('/api/files')
+      const list = await listAllFiles()
       const dailyNotes = (Array.isArray(list) ? list : [])
         .filter(f => !f.is_folder && /^\d{4}-\d{2}-\d{2}$/.test(f.title))
         .sort((a, b) => b.title.localeCompare(a.title))
