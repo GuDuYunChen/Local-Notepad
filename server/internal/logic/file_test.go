@@ -227,6 +227,40 @@ func TestRestoreRecursiveSucceedsWithoutConflict(t *testing.T) {
 	}
 }
 
+func TestParseWikiLinksPrefersSerializedWikiNodeIDsAndKeepsLegacySyntax(t *testing.T) {
+	content := `{"root":{"children":[
+		{"type":"paragraph","children":[
+			{"type":"wiki-link","id":"target-id","title":"Target title"},
+			{"type":"text","text":" legacy [[legacy-id]] duplicate [[legacy-id]]"}
+		]}
+	]}}`
+
+	links := parseWikiLinks(content)
+	if len(links) != 2 {
+		t.Fatalf("parseWikiLinks() = %#v, want 2 unique links", links)
+	}
+
+	got := map[string]bool{}
+	for _, id := range links {
+		got[id] = true
+	}
+	if !got["target-id"] || !got["legacy-id"] {
+		t.Fatalf("missing parsed link IDs: %#v", links)
+	}
+}
+
+func TestParseWikiLinksIgnoresDuplicateWikiNodes(t *testing.T) {
+	content := `{"root":{"children":[
+		{"type":"wiki-link","id":"same-id","title":"One"},
+		{"type":"wiki-link","id":"same-id","title":"Two"}
+	]}}`
+
+	links := parseWikiLinks(content)
+	if len(links) != 1 || links[0] != "same-id" {
+		t.Fatalf("unexpected duplicate link result: %#v", links)
+	}
+}
+
 func TestNormalizeTitleSanitizesAndLimitsLength(t *testing.T) {
 	title, err := normalizeTitle("  bad/name?.md  ")
 	if err != nil {
