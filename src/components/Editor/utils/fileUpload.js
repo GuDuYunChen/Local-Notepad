@@ -73,20 +73,18 @@ export const generateVideoMetadata = (file) => {
     });
 };
 
+let xlsxPromise = null;
+
 export const loadXLSX = () => {
-  return new Promise((resolve, reject) => {
-    if (window.XLSX) {
-      resolve(window.XLSX);
-      return;
-    }
-    const s = document.createElement('script');
-    s.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
-    s.onload = () => {
-      if (window.XLSX) resolve(window.XLSX); else reject(new Error('XLSX load failed'));
-    };
-    s.onerror = () => reject(new Error('XLSX load error'));
-    document.head.appendChild(s);
-  });
+  if (!xlsxPromise) {
+    xlsxPromise = import('xlsx')
+      .then((module) => module.default || module)
+      .catch((error) => {
+        xlsxPromise = null;
+        throw error;
+      });
+  }
+  return xlsxPromise;
 };
 
 export const uploadFile = async (file) => {
