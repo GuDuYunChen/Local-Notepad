@@ -4,6 +4,7 @@ import {
   fetchAllFileMetadata,
   headingLevel,
   indexChildrenByParent,
+  listItemText,
   plainTextFromNode,
   safeExportStem,
 } from './export-utils.js'
@@ -52,6 +53,22 @@ describe('export helpers', () => {
       ],
     }
     expect(plainTextFromNode(node)).toBe('Cell value')
+  })
+
+  it('extracts list item text without duplicating nested lists', () => {
+    const item = {
+      type: 'listitem',
+      children: [
+        { type: 'paragraph', children: [{ type: 'text', text: 'Parent item' }] },
+        {
+          type: 'list',
+          children: [
+            { type: 'listitem', children: [{ type: 'paragraph', children: [{ type: 'text', text: 'Nested' }] }] },
+          ],
+        },
+      ],
+    }
+    expect(listItemText(item)).toBe('Parent item')
   })
 
   it('loads every metadata page once with compact responses', async () => {
