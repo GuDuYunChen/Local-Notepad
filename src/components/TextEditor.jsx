@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState, useImperativeHandle } from 'react'
 import { api } from '~/services/api'
-import Editor from './Editor/Editor'
 import { countLexicalCharacters } from '~/utils/lexicalText'
+
+const Editor = React.lazy(() => import('./Editor/Editor'))
 
 function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved, autoSaveOnSwitch = true }, ref) {
   const contentRef = useRef('')
@@ -243,7 +244,9 @@ function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved,
         <div className="placeholder">加载中…</div>
       ) : (
         <>
-          <Editor initialContent={editorContent} onChange={handleEditorChange} />
+          <React.Suspense fallback={<div className="placeholder">正在加载编辑器…</div>}>
+            <Editor initialContent={editorContent} onChange={handleEditorChange} />
+          </React.Suspense>
           <div ref={statusRef} className="editor-status-bar">
             <span className={`save-state${saveError ? ' error' : ''}`}>
               {saveError ? '保存失败' : saving ? '保存中…' : lastSavedAt ? `已保存 ${formatSavedTime(lastSavedAt)}` : '尚未保存'}
