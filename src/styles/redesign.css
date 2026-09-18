@@ -937,3 +937,536 @@ body {
     width: auto;
   }
 }
+
+
+/* Library header */
+.file-library-header {
+  padding: 13px 10px 10px;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper-deep);
+}
+
+.file-library-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+}
+
+.file-library-title-row > div:first-child {
+  min-width: 0;
+}
+
+.file-library-eyebrow,
+.daily-workspace-eyebrow,
+.graph-workspace-eyebrow {
+  margin-bottom: 2px;
+  color: var(--ink-muted);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.file-library-title {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.file-library-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.file-new-btn {
+  height: 30px !important;
+  padding: 0 9px !important;
+  gap: 5px !important;
+  border-radius: 7px !important;
+  font-size: 11px !important;
+}
+
+.file-more-wrap,
+.file-new-wrap {
+  position: relative;
+}
+
+.file-more-btn {
+  width: 30px;
+  height: 30px;
+}
+
+.file-action-menu {
+  position: absolute !important;
+  top: calc(100% + 6px) !important;
+  left: 0 !important;
+  z-index: 120 !important;
+  min-width: 190px;
+  padding: 5px !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 10px !important;
+  background: var(--surface) !important;
+  box-shadow: var(--shadow-pop) !important;
+}
+
+.file-more-menu {
+  left: auto !important;
+  right: 0 !important;
+}
+
+.file-action-menu .menu-item {
+  min-height: 32px;
+  padding: 6px 8px !important;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-soft);
+  font-size: 11px;
+}
+
+.file-action-menu .menu-item:hover {
+  color: var(--ink);
+  background: var(--surface-hover);
+}
+
+.file-action-menu .menu-item.danger {
+  color: var(--red);
+}
+
+.file-action-menu kbd {
+  margin-left: auto;
+  padding: 2px 5px;
+  border: 1px solid var(--line);
+  border-bottom-color: var(--line-strong);
+  border-radius: 4px;
+  background: var(--paper);
+  color: var(--ink-muted);
+  font: inherit;
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.file-search-row {
+  position: relative;
+  margin-top: 10px;
+}
+
+.file-search-icon {
+  position: absolute;
+  left: 9px;
+  top: 50%;
+  z-index: 3;
+  transform: translateY(-50%);
+  color: var(--ink-muted);
+  pointer-events: none;
+}
+
+.file-search-input.ant-input-affix-wrapper {
+  height: 32px;
+  padding: 0 8px 0 29px;
+  border: 1px solid var(--line) !important;
+  border-radius: 8px !important;
+  background: var(--surface) !important;
+  box-shadow: none !important;
+}
+
+.file-search-input.ant-input-affix-wrapper:hover,
+.file-search-input.ant-input-affix-wrapper-focused {
+  border-color: var(--line-strong) !important;
+  box-shadow: 0 0 0 2px var(--clay-light) !important;
+}
+
+.file-search-input input {
+  background: transparent !important;
+  color: var(--ink) !important;
+  font-size: 11px !important;
+}
+
+.file-search-input input::placeholder {
+  color: var(--ink-muted) !important;
+}
+
+.file-sidebar .tree-list {
+  padding: 6px 0 16px;
+}
+
+.file-sidebar .list-item {
+  min-height: 32px;
+  gap: 7px;
+}
+
+.file-sidebar .list-item .icon {
+  color: var(--ink-muted);
+}
+
+.file-sidebar .list-item.active .icon {
+  color: var(--clay);
+}
+
+.file-sidebar .list-item .title {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.file-sidebar .list-item .count {
+  color: var(--ink-muted);
+  font-size: 10px;
+  font-weight: 400;
+}
+
+.file-sidebar .list-item .pin-icon {
+  font-size: 10px;
+  filter: grayscale(1);
+  opacity: 0.7;
+}
+
+/* Daily notes workspace */
+.daily-workspace-toolbar,
+.graph-workspace-toolbar {
+  min-height: 54px !important;
+}
+
+.daily-workspace-toolbar > div:first-child,
+.graph-workspace-toolbar > div:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.daily-workspace-toolbar strong,
+.graph-workspace-toolbar strong {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.daily-today-btn {
+  min-width: 46px;
+}
+
+.daily-workspace-body {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  padding: 24px;
+  background: var(--paper);
+}
+
+.calendar-card,
+.daily-recent-card {
+  width: min(760px, 100%);
+  margin: 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.calendar-card .calendar-grid {
+  width: auto !important;
+  margin: 0 !important;
+  padding: 18px 20px 10px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.calendar-card .calendar-weekday {
+  padding: 7px 0;
+  color: var(--ink-muted);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.calendar-card .calendar-day {
+  position: relative;
+  min-height: 46px !important;
+  display: grid !important;
+  place-items: center;
+  border-radius: 10px !important;
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.calendar-card .calendar-day:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--ink);
+}
+
+.calendar-card .calendar-day.today {
+  background: transparent !important;
+  color: var(--clay) !important;
+  box-shadow: inset 0 0 0 1px var(--clay-medium) !important;
+}
+
+.calendar-card .calendar-day.selected {
+  background: var(--clay) !important;
+  color: #fff !important;
+  box-shadow: none !important;
+}
+
+.calendar-card .calendar-day.selected.today {
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.35) !important;
+}
+
+.calendar-card .calendar-day.has-note::after {
+  display: none !important;
+}
+
+.calendar-note-dot {
+  position: absolute;
+  bottom: 6px;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.7;
+}
+
+.calendar-hint {
+  padding: 10px 20px 16px;
+  color: var(--ink-muted);
+  font-size: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.daily-recent-card {
+  margin-top: 14px;
+  padding: 14px;
+}
+
+.daily-recent-card .daily-notes-list-header {
+  margin: 0 0 10px;
+}
+
+.daily-recent-card .daily-notes-list-header > div {
+  display: flex;
+  flex-direction: column;
+}
+
+.daily-recent-list {
+  margin: 0;
+  padding: 0;
+}
+
+.daily-recent-list li {
+  list-style: none;
+}
+
+.daily-recent-card .daily-note-item {
+  width: 100%;
+  min-height: 48px !important;
+  display: grid !important;
+  grid-template-columns: 62px minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 7px 8px !important;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0 !important;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.daily-recent-card .daily-note-item:hover {
+  background: var(--surface-hover);
+}
+
+.daily-note-date {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.daily-note-date strong {
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.daily-note-date small,
+.daily-recent-card .daily-note-time {
+  color: var(--ink-muted);
+  font-size: 9px;
+}
+
+.daily-recent-card .daily-note-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.daily-empty-state {
+  padding: 34px 18px !important;
+}
+
+/* Graph workspace */
+.graph-workspace-toolbar {
+  gap: 14px;
+}
+
+.graph-workspace-toolbar .graph-header-actions {
+  margin-left: auto;
+}
+
+.graph-search-wrap {
+  width: 210px;
+  height: 32px;
+  padding: 0 7px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink-muted);
+}
+
+.graph-search-wrap:focus-within {
+  border-color: var(--line-strong);
+  box-shadow: 0 0 0 2px var(--clay-light);
+}
+
+.graph-search-wrap input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 11px;
+}
+
+.graph-search-wrap input::placeholder {
+  color: var(--ink-muted);
+}
+
+.graph-search-wrap button {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+
+.graph-canvas {
+  min-height: 0;
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 1px 1px, var(--line) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.graph-canvas .graph-svg {
+  width: 100%;
+  height: 100%;
+  background: transparent !important;
+}
+
+.graph-node {
+  transition: opacity 0.15s ease;
+}
+
+.graph-node.dimmed {
+  opacity: 0.65;
+}
+
+.graph-node:hover circle {
+  stroke: var(--accent) !important;
+  stroke-width: 3px !important;
+}
+
+.graph-stats {
+  min-height: 34px;
+  justify-content: flex-start !important;
+  padding: 0 14px !important;
+  align-items: center;
+  gap: 14px !important;
+  background: var(--surface);
+}
+
+.graph-stats-hint {
+  margin-left: auto;
+  color: var(--ink-muted);
+}
+
+.graph-empty-state {
+  height: 100%;
+}
+
+.graph-empty-mark {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  color: var(--clay);
+  font-size: 22px;
+  background: var(--surface);
+}
+
+@media (max-width: 900px) {
+  .graph-search-wrap {
+    width: 160px;
+  }
+
+  .graph-stats-hint {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .file-library-title {
+    font-size: 12px;
+  }
+
+  .file-library-eyebrow {
+    display: none;
+  }
+
+  .daily-workspace-body {
+    padding: 12px;
+  }
+
+  .calendar-card .calendar-grid {
+    padding: 10px !important;
+    gap: 2px !important;
+  }
+
+  .calendar-card .calendar-day {
+    min-height: 38px !important;
+  }
+
+  .graph-workspace-toolbar {
+    align-items: flex-start !important;
+    flex-direction: column;
+    padding: 8px 10px !important;
+  }
+
+  .graph-workspace-toolbar .graph-header-actions {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .graph-search-wrap {
+    flex: 1;
+    width: auto;
+  }
+
+  .graph-workspace-toolbar .btn.small {
+    display: none;
+  }
+}
