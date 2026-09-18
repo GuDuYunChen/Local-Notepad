@@ -26,3 +26,6 @@ jobs:
 
       - name: Build renderer
         run: npm run build:renderer
+
+      - name: Run UI tests
+        run: npm run test:ui
