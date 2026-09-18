@@ -222,6 +222,68 @@ func (d *FileDAO) List(ctx context.Context, q string, page, size int) ([]*model.
 	return out, nil
 }
 
+func (d *FileDAO) ListAllMetadata(ctx context.Context) ([]*model.File, error) {
+	rows, err := d.DB.QueryContext(ctx,
+		`SELECT id, title, '', created_at, updated_at, is_folder, parent_id, sort_order, is_deleted, deleted_at, is_pinned
+		 FROM files
+		 WHERE is_deleted = 0
+		 ORDER BY is_pinned DESC, sort_order DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]*model.File, 0)
+	for rows.Next() {
+		var f model.File
+		if err := rows.Scan(&f.ID, &f.Title, &f.Content, &f.CreatedAt, &f.UpdatedAt, &f.IsFolder, &f.ParentID, &f.SortOrder, &f.IsDeleted, &f.DeletedAt, &f.IsPinned); err != nil {
+			return nil, err
+		}
+		out = append(out, &f)
+	}
+	return out, rows.Err()
+}
+
+func (d *FileDAO) FindActiveByTitle(ctx context.Context, parentID, title string) (*model.File, error) {
+	var f model.File
+	row := d.DB.QueryRowContext(ctx,
+		`SELECT id, title, content, created_at, updated_at, is_folder, parent_id, sort_order, is_deleted, deleted_at, is_pinned
+		 FROM files
+		 WHERE is_deleted = 0 AND parent_id = ? AND title = ? COLLATE NOCASE
+		 ORDER BY updated_at DESC
+		 LIMIT 1`,
+		parentID, title,
+	)
+	if err := row.Scan(&f.ID, &f.Title, &f.Content, &f.CreatedAt, &f.UpdatedAt, &f.IsFolder, &f.ParentID, &f.SortOrder, &f.IsDeleted, &f.DeletedAt, &f.IsPinned); err != nil {
+		return nil, err
+	}
+	return &f, nil
+}
+
+func (d *FileDAO) ListTemplates(ctx context.Context) ([]*model.File, error) {
+	rows, err := d.DB.QueryContext(ctx,
+		`SELECT id, title, content, created_at, updated_at, is_folder, parent_id, sort_order, is_deleted, deleted_at, is_pinned
+		 FROM files
+		 WHERE is_deleted = 0
+		   AND is_folder = 0
+		   AND substr(title, 1, 7) = '__tpl__'
+		 ORDER BY updated_at DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]*model.File, 0)
+	for rows.Next() {
+		var f model.File
+		if err := rows.Scan(&f.ID, &f.Title, &f.Content, &f.CreatedAt, &f.UpdatedAt, &f.IsFolder, &f.ParentID, &f.SortOrder, &f.IsDeleted, &f.DeletedAt, &f.IsPinned); err != nil {
+			return nil, err
+		}
+		out = append(out, &f)
+	}
+	return out, rows.Err()
+}
+
 func (d *FileDAO) IsDescendant(ctx context.Context, ancestorID, candidateID string) (bool, error) {
 	if ancestorID == "" || candidateID == "" {
 		return false, nil
