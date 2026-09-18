@@ -140,6 +140,10 @@ export class CodeBlockNode extends DecoratorNode {
     );
   }
 
+  getTextContent() {
+    return this.__code;
+  }
+
   // Accessor methods
   getCode() {
     return this.__code;
