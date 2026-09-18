@@ -214,6 +214,18 @@ func (l *FileLogic) List(ctx context.Context, q string, page, size int) ([]*mode
 	return l.FileDAO.List(ctx, q, page, size)
 }
 
+func (l *FileLogic) ListAllMetadata(ctx context.Context) ([]*model.File, error) {
+	return l.FileDAO.ListAllMetadata(ctx)
+}
+
+func (l *FileLogic) FindByTitle(ctx context.Context, parentID, title string) (*model.File, error) {
+	return l.FileDAO.FindActiveByTitle(ctx, parentID, title)
+}
+
+func (l *FileLogic) ListTemplates(ctx context.Context) ([]*model.File, error) {
+	return l.FileDAO.ListTemplates(ctx)
+}
+
 func (l *FileLogic) GetChildren(ctx context.Context, parentID string) ([]*model.File, error) {
 	return l.FileDAO.GetChildren(ctx, parentID)
 }
