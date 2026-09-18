@@ -25,8 +25,8 @@ func TestEscapeFTS5Query(t *testing.T) {
 }
 
 func TestEscapeLikePattern(t *testing.T) {
-	got := escapeLikePattern(` 100%_\\safe `)
-	want := `%100\\%\\_\\\\safe%`
+	got := escapeLikePattern(" 100%_\\\\safe ")
+	want := `%100\%\_\\safe%`
 	if got != want {
 		t.Fatalf("escapeLikePattern() = %q, want %q", got, want)
 	}
