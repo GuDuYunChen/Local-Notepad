@@ -451,8 +451,10 @@ function processNodeToMarkdown(node, lines, depth) {
 }
 
 function escapeMarkdownText(text) {
-    return String(text || '').replace(/[\\[\]_*]/g, '\\function escapeMarkdownText(text) {
-    return String(text || '').replace(/[\\[\]_*]/g, '\\function processInlineNodes(children) {')
+    return String(text || '').replace(/[\\[\]_*]/g, '\\$&')
+}
+
+function processInlineNodes(children) {')
 }')
 }
 
