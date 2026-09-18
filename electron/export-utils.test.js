@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   codeBlockText,
   fetchAllFileMetadata,
+  headingLevel,
   indexChildrenByParent,
+  plainTextFromNode,
   safeExportStem,
 } from './export-utils.js'
 
@@ -28,6 +30,28 @@ describe('export helpers', () => {
       type: 'code-block',
       children: [{ type: 'text', text: 'legacy' }],
     })).toBe('legacy')
+  })
+
+  it('derives heading levels from Lexical heading tags', () => {
+    expect(headingLevel({ tag: 'h1' })).toBe(1)
+    expect(headingLevel({ tag: 'h4' })).toBe(4)
+    expect(headingLevel({ level: 3 })).toBe(3)
+  })
+
+  it('extracts text recursively from table and list containers', () => {
+    const node = {
+      type: 'tablecell',
+      children: [
+        {
+          type: 'paragraph',
+          children: [
+            { type: 'text', text: 'Cell ' },
+            { type: 'text', text: 'value' },
+          ],
+        },
+      ],
+    }
+    expect(plainTextFromNode(node)).toBe('Cell value')
   })
 
   it('loads every metadata page once with compact responses', async () => {
