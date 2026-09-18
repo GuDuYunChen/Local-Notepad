@@ -43,8 +43,19 @@ func (d *TagDAO) Create(ctx context.Context, name, color string) (*model.Tag, er
 }
 
 func (d *TagDAO) Delete(ctx context.Context, id string) error {
-	_, err := d.DB.ExecContext(ctx, `DELETE FROM tags WHERE id = ?`, id)
-	return err
+	tx, err := d.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.ExecContext(ctx, `DELETE FROM file_tags WHERE tag_id = ?`, id); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM tags WHERE id = ?`, id); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (d *TagDAO) DeleteFileTags(ctx context.Context, fileID string) error {
