@@ -59,38 +59,67 @@ export default function TagSelector({ fileId, tags, onChange }) {
     }
   }
 
+  const closeDropdown = () => {
+    setDropdownOpen(false)
+    setShowCreate(false)
+    setNewTagName('')
+  }
+
   return (
-    <div className="tag-selector" ref={dropdownRef}>
+    <div
+      className="tag-selector"
+      ref={dropdownRef}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape' && dropdownOpen) {
+          event.stopPropagation()
+          closeDropdown()
+        }
+      }}
+    >
       <div className="tag-list">
         {tags.map(tag => (
-          <span
+          <button
             key={tag.id}
+            type="button"
             className="tag-badge"
             style={{ backgroundColor: tag.color }}
             onClick={() => toggleTag(tag)}
+            aria-label={`移除标签 ${tag.name}`}
+            title={`移除标签：${tag.name}`}
           >
             {tag.name} ×
-          </span>
+          </button>
         ))}
-        <button className="tag-add-btn" onClick={() => setDropdownOpen(!dropdownOpen)} title="管理标签">
+        <button
+          type="button"
+          className="tag-add-btn"
+          onClick={() => setDropdownOpen(prev => !prev)}
+          title="管理标签"
+          aria-label="管理标签"
+          aria-haspopup="dialog"
+          aria-expanded={dropdownOpen}
+        >
           +
         </button>
       </div>
       {dropdownOpen && (
-        <div className="tag-dropdown">
-          <div className="tag-options">
+        <div className="tag-dropdown" role="dialog" aria-label="管理标签">
+          <div className="tag-options" role="listbox" aria-label="可用标签" aria-multiselectable="true">
             {allTags.map(tag => {
               const isAttached = tags.some(t => t.id === tag.id)
               return (
-                <div
+                <button
+                  type="button"
                   key={tag.id}
                   className={`tag-option ${isAttached ? 'attached' : ''}`}
                   onClick={() => toggleTag(tag)}
+                  role="option"
+                  aria-selected={isAttached}
                 >
-                  <span className="tag-color-dot" style={{ backgroundColor: tag.color }} />
+                  <span className="tag-color-dot" style={{ backgroundColor: tag.color }} aria-hidden="true" />
                   <span className="tag-option-name">{tag.name}</span>
-                  {isAttached && <span className="tag-check">✓</span>}
-                </div>
+                  {isAttached && <span className="tag-check" aria-hidden="true">✓</span>}
+                </button>
               )
             })}
           </div>
@@ -99,16 +128,26 @@ export default function TagSelector({ fileId, tags, onChange }) {
               <input
                 className="tag-input"
                 placeholder="标签名称"
+                aria-label="标签名称"
                 value={newTagName}
                 onChange={e => setNewTagName(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && createTag()}
                 autoFocus
               />
-              <button className="btn small" onClick={createTag}>创建</button>
-              <button className="btn small" onClick={() => setShowCreate(false)}>取消</button>
+              <button type="button" className="btn small" onClick={createTag}>创建</button>
+              <button
+                type="button"
+                className="btn small"
+                onClick={() => {
+                  setShowCreate(false)
+                  setNewTagName('')
+                }}
+              >
+                取消
+              </button>
             </div>
           ) : (
-            <button className="tag-create-btn" onClick={() => setShowCreate(true)}>
+            <button type="button" className="tag-create-btn" onClick={() => setShowCreate(true)}>
               + 新建标签
             </button>
           )}
