@@ -4,7 +4,7 @@ import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import NavigationRail from './NavigationRail'
 import TemplateSelector from './TemplateSelector'
-import QuickSwitcher from './QuickSwitcher'
+import QuickSwitcher, { buildHighlightSegments, getSearchMatchScope } from './QuickSwitcher'
 import ToastViewport from './ToastViewport'
 import { statusLabel } from './InspectorPanel'
 import { toast } from '~/services/toast'
@@ -105,6 +105,31 @@ describe('UI redesign smoke tests', () => {
 
     await click(shortcutsButton)
     expect(onOpenShortcuts).toHaveBeenCalledTimes(1)
+  })
+
+  it('highlights the first search match without regex side effects', () => {
+    expect(buildHighlightSegments('Alpha [Beta] Gamma', '[beta]')).toEqual([
+      { text: 'Alpha ', match: false },
+      { text: '[Beta]', match: true },
+      { text: ' Gamma', match: false },
+    ])
+  })
+
+  it('distinguishes title and body matches in quick search', () => {
+    const file = {
+      title: 'Project Notes',
+      content: JSON.stringify({
+        root: {
+          children: [
+            { type: 'paragraph', children: [{ type: 'text', text: 'contains roadmap details' }] },
+          ],
+        },
+      }),
+    }
+
+    expect(getSearchMatchScope(file, 'project')).toBe('title')
+    expect(getSearchMatchScope(file, 'roadmap')).toBe('content')
+    expect(getSearchMatchScope({ ...file, is_pinned: true }, '')).toBe('pinned')
   })
 
   it('opens recent notes and supports keyboard selection in quick search', async () => {
