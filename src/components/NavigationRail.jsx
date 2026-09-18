@@ -10,6 +10,7 @@ const Icon = ({ children }) => (
 export default function NavigationRail({
   activeWorkspace,
   onChangeWorkspace,
+  onOpenSearch,
   onOpenBackup,
   onOpenShortcuts,
 }) {
@@ -36,6 +37,10 @@ export default function NavigationRail({
       <div className="navigation-brand" title="Local Notepad" aria-label="Local Notepad">N</div>
 
       <div className="navigation-primary">
+        <button className="rail-btn" onClick={onOpenSearch} title="快速搜索 (Ctrl+K)" aria-label="快速搜索">
+          <Icon><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></Icon>
+        </button>
+        <div className="navigation-divider" />
         {items.map(item => (
           <button
             key={item.id}
