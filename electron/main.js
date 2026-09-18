@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from 'electron'
 import { spawn } from 'node:child_process'
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -27,6 +27,8 @@ async function createWindow() {
     height: 720,
     minWidth: 900,
     minHeight: 600,
+    show: false,
+    backgroundColor: '#f6f6f8',
     title: 'Notepad',
     icon: iconPath, // Windows 上传字符串路径兼容性通常更好
     webPreferences: {
@@ -34,6 +36,15 @@ async function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true
+    }
+  })
+
+  mainWindow.on('closed', () => {
+    mainWindow = null
+  })
+  mainWindow.once('ready-to-show', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.show()
     }
   })
 
@@ -65,12 +76,11 @@ async function createWindow() {
     }
   }
 
-  mainWindow.on('closed', () => { mainWindow = null })
 }
 app.commandLine.appendSwitch('disable-features', 'Autofill')
+app.commandLine.appendSwitch('lang', 'zh-CN')
 
 app.whenReady().then(async () => {
-  app.commandLine.appendSwitch('lang', 'zh-CN')
   const menu = Menu.buildFromTemplate([
     {
       label: '文件',
