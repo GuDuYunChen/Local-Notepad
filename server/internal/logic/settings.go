@@ -2,6 +2,7 @@ package logic
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -20,11 +21,36 @@ func (l *SettingsLogic) Get(ctx context.Context) (*model.Settings, error) {
 	return l.SettingsDAO.Get(ctx)
 }
 
-func (l *SettingsLogic) Update(ctx context.Context, s *model.Settings) (*model.Settings, error) {
-	if err := l.SettingsDAO.Update(ctx, s); err != nil {
+func (l *SettingsLogic) Update(ctx context.Context, patch *model.SettingsPatch) (*model.Settings, error) {
+	current, err := l.SettingsDAO.Get(ctx)
+	if err != nil {
 		return nil, err
 	}
-	return s, nil
+
+	if patch.Theme != nil {
+		if *patch.Theme != "light" && *patch.Theme != "dark" {
+			return nil, fmt.Errorf("不支持的主题: %s", *patch.Theme)
+		}
+		current.Theme = *patch.Theme
+	}
+	if patch.EditorOpts != nil {
+		current.EditorOpts = *patch.EditorOpts
+	}
+	if patch.SyncEnabled != nil {
+		current.SyncEnabled = *patch.SyncEnabled
+	}
+	if patch.SyncEndpoint != nil {
+		current.SyncEndpoint = *patch.SyncEndpoint
+	}
+
+	if current.EditorOpts == nil {
+		current.EditorOpts = map[string]interface{}{}
+	}
+
+	if err := l.SettingsDAO.Update(ctx, current); err != nil {
+		return nil, err
+	}
+	return current, nil
 }
 
 
