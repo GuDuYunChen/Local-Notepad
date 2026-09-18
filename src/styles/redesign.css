@@ -2580,3 +2580,16 @@ body {
 [data-theme="dark"] .search-match {
   background: rgba(196, 154, 90, 0.25);
 }
+
+
+/* Respect reduced-motion system preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
