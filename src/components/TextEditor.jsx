@@ -4,7 +4,18 @@ import { countLexicalCharacters } from '~/utils/lexicalText'
 
 const Editor = React.lazy(() => import('./Editor/Editor'))
 
-function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved, onStatusChange, autoSaveOnSwitch = true }, ref) {
+function TextEditorInternal({
+  activeId,
+  deletedIds,
+  onChange,
+  onLoaded,
+  onSaved,
+  onStatusChange,
+  onCreateNote,
+  onOpenSearch,
+  onOpenDaily,
+  autoSaveOnSwitch = true,
+}, ref) {
   const contentRef = useRef('')
   const lastSavedContentRef = useRef('')
   const saveTimerRef = useRef(null)
@@ -251,8 +262,17 @@ function TextEditorInternal({ activeId, deletedIds, onChange, onLoaded, onSaved,
       {!activeId ? (
         <div className="empty-editor-state">
           <div className="empty-editor-mark">N</div>
-          <div className="empty-editor-title">选择一篇笔记开始写作</div>
-          <div className="empty-editor-desc">你的内容保存在本地，随时可以继续。</div>
+          <div className="empty-editor-title">从这里开始</div>
+          <div className="empty-editor-desc">创建一篇新笔记，或快速回到已有内容。数据始终保存在本地。</div>
+          <div className="empty-editor-actions">
+            <button className="btn primary" onClick={onCreateNote}>新建笔记</button>
+            <button className="btn" onClick={onOpenSearch}>快速搜索</button>
+            <button className="btn" onClick={onOpenDaily}>每日笔记</button>
+          </div>
+          <div className="empty-editor-shortcuts">
+            <span><kbd>Ctrl N</kbd> 新建</span>
+            <span><kbd>Ctrl K</kbd> 搜索</span>
+          </div>
         </div>
       ) : loading ? (
         <div className="placeholder">加载中…</div>
