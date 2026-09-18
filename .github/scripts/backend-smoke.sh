@@ -28,20 +28,20 @@ cleanup() {
 trap cleanup EXIT
 
 for _ in $(seq 1 80); do
-  if curl -fsS "$BASE/api/health" >/dev/null 2>&1; then
+  if curl --connect-timeout 1 --max-time 3 -fsS "$BASE/api/health" >/dev/null 2>&1; then
     break
   fi
   sleep 0.1
 done
 
-curl -fsS "$BASE/api/health" | python3 -c '
+curl --connect-timeout 1 --max-time 3 -fsS "$BASE/api/health" | python3 -c '
 import json, sys
 body=json.load(sys.stdin)
 assert body["code"] == 0, body
 '
 
 CREATE_RESPONSE="$(
-  curl -fsS     -H 'Origin: null'     -H 'Content-Type: application/json'     -d '{"title":"Smoke Note.md","content":"smoke body","is_folder":false,"parent_id":""}'     "$BASE/api/files"
+  curl --connect-timeout 1 --max-time 3 -fsS     -H 'Origin: null'     -H 'Content-Type: application/json'     -d '{"title":"Smoke Note.md","content":"smoke body","is_folder":false,"parent_id":""}'     "$BASE/api/files"
 )"
 
 FILE_ID="$(
@@ -53,7 +53,7 @@ print(body["data"]["id"])
 '
 )"
 
-curl -fsS   -H 'Origin: null'   "$BASE/api/files?page=1&size=200&compact=1" |
+curl --connect-timeout 1 --max-time 3 -fsS   -H 'Origin: null'   "$BASE/api/files?page=1&size=200&compact=1" |
 python3 -c '
 import json, sys
 body=json.load(sys.stdin)
@@ -63,7 +63,7 @@ assert any(item["title"] == "Smoke Note.md" for item in items), items
 assert all(item.get("content", "") == "" for item in items), items
 '
 
-curl -fsS   -X PUT   -H 'Origin: null'   -H 'Content-Type: application/json'   -d '{"content":"updated smoke body"}'   "$BASE/api/files/$FILE_ID" |
+curl --connect-timeout 1 --max-time 3 -fsS   -X PUT   -H 'Origin: null'   -H 'Content-Type: application/json'   -d '{"content":"updated smoke body"}'   "$BASE/api/files/$FILE_ID" |
 python3 -c '
 import json, sys
 body=json.load(sys.stdin)
@@ -71,7 +71,7 @@ assert body["code"] == 0, body
 assert body["data"]["content"] == "updated smoke body", body
 '
 
-curl -fsS   -H 'Origin: null'   "$BASE/api/files/$FILE_ID" |
+curl --connect-timeout 1 --max-time 3 -fsS   -H 'Origin: null'   "$BASE/api/files/$FILE_ID" |
 python3 -c '
 import json, sys
 body=json.load(sys.stdin)
@@ -81,7 +81,7 @@ assert body["data"]["content"] == "updated smoke body", body
 '
 
 CORS_HEADERS="$(
-  curl -sS -D - -o /dev/null     -H 'Origin: null'     "$BASE/api/health"
+  curl --connect-timeout 1 --max-time 3 -sS -D - -o /dev/null     -H 'Origin: null'     "$BASE/api/health"
 )"
 printf '%s' "$CORS_HEADERS" | grep -qi '^Access-Control-Allow-Origin: null'
 
