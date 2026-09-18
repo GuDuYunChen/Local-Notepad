@@ -55,3 +55,23 @@ export function indexChildrenByParent(files) {
   }
   return map
 }
+
+
+export function headingLevel(node) {
+  const tag = String(node?.tag || '')
+  const fromTag = /^h([1-6])$/.exec(tag)
+  if (fromTag) return Number(fromTag[1])
+
+  const level = Number(node?.level)
+  return Number.isInteger(level) && level >= 1 && level <= 6 ? level : 1
+}
+
+export function plainTextFromNode(node) {
+  if (!node) return ''
+  if (node.type === 'text') return node.text || ''
+  if (node.type === 'linebreak') return '\n'
+  if (node.type === 'code-block') return codeBlockText(node)
+  if (node.type === 'todo') return node.text || ''
+  if (!Array.isArray(node.children)) return ''
+  return node.children.map(plainTextFromNode).join('')
+}
