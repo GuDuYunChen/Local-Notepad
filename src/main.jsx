@@ -4,6 +4,7 @@ import { DndProvider } from 'react-dnd'
 import { HTML5Backend } from 'react-dnd-html5-backend'
 import App from './App'
 import './styles/index.css'
+import './styles/redesign.css'
 
 const el = document.getElementById('root')
 if (el) {
