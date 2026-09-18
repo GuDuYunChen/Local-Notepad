@@ -57,6 +57,13 @@ func (l *FileLogic) Create(ctx context.Context, title string, content string, is
 	if err := l.FileDAO.Create(ctx, f); err != nil {
 		return nil, err
 	}
+
+	if content != "" && l.LinkDAO != nil {
+		if err := l.LinkDAO.SyncLinks(ctx, f.ID, parseWikiLinks(content)); err != nil {
+			return nil, fmt.Errorf("同步 WikiLink 失败: %w", err)
+		}
+	}
+
 	return f, nil
 }
 
