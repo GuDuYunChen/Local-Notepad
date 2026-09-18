@@ -7,26 +7,20 @@ function extractReadableText(content) {
 
   try {
     const state = JSON.parse(content)
-    const lines = []
 
-    const walk = (node, current = []) => {
-      if (!node) return
-      if (node.type === 'text') {
-        current.push(node.text || '')
-        return
-      }
-
-      if (Array.isArray(node.children)) {
-        const local = []
-        node.children.forEach(child => walk(child, local))
-        const text = local.join('')
-        if (text.trim()) lines.push(text)
-      }
+    const collectText = (node) => {
+      if (!node) return ''
+      if (node.type === 'text') return node.text || ''
+      if (!Array.isArray(node.children)) return ''
+      return node.children.map(collectText).join('')
     }
 
     if (state?.root?.children) {
-      state.root.children.forEach(node => walk(node))
-      const text = lines.join('\n').trim()
+      const text = state.root.children
+        .map(collectText)
+        .filter(line => line.trim())
+        .join('\n')
+        .trim()
       return text || '（空内容）'
     }
   } catch {
@@ -128,37 +122,31 @@ export default function VersionHistory({ fileId, onRestore }) {
           <div className="version-empty">暂无版本历史</div>
         ) : (
           versions.map((version, index) => (
-            <button
-              type="button"
+            <div
               key={version.id}
               className={`version-item ${selectedVersion?.id === version.id ? 'selected' : ''}`}
-              onClick={() => setSelectedVersion(version)}
             >
-              <span className="version-item-main">
-                <strong>{index === 0 ? '当前版本' : `历史版本 ${versions.length - index}`}</strong>
-                <small>{formatVersionTime(version.created_at)}</small>
-              </span>
+              <button
+                type="button"
+                className="version-select-action"
+                onClick={() => setSelectedVersion(version)}
+              >
+                <span className="version-item-main">
+                  <strong>{index === 0 ? '当前版本' : `历史版本 ${versions.length - index}`}</strong>
+                  <small>{formatVersionTime(version.created_at)}</small>
+                </span>
+              </button>
               {index > 0 && (
-                <span
-                  role="button"
-                  tabIndex={0}
+                <button
+                  type="button"
                   className="version-restore-action"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    void handleRestore(version)
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault()
-                      e.stopPropagation()
-                      void handleRestore(version)
-                    }
-                  }}
+                  onClick={() => void handleRestore(version)}
+                  disabled={restoringId === version.id}
                 >
                   {restoringId === version.id ? '恢复中…' : '恢复'}
-                </span>
+                </button>
               )}
-            </button>
+            </div>
           ))
         )}
       </div>
