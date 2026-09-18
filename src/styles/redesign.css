@@ -1794,3 +1794,22 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* Lazy workspace loading states */
+.workspace-loading {
+  min-height: 0;
+  flex: 1;
+  display: grid;
+  place-items: center;
+  background: var(--surface);
+  color: var(--ink-muted);
+  font-size: 11px;
+}
+
+.inspector-loading {
+  display: grid !important;
+  place-items: center;
+  color: var(--ink-muted);
+  font-size: 11px;
+}
