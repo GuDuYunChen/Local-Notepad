@@ -67,6 +67,7 @@ export async function listAllFiles(query = '') {
     const params = new URLSearchParams({
       page: String(page),
       size: String(pageSize),
+      compact: '1',
     })
     if (normalizedQuery) params.set('q', normalizedQuery)
 
