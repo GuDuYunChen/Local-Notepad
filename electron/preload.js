@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 
 const base = process.env.API_BASE || 'http://127.0.0.1:27121'
 contextBridge.exposeInMainWorld('__API_BASE__', base)
@@ -12,6 +12,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   exportToPDF: (file, outputPath) => ipcRenderer.invoke('export:pdf', { file, outputPath }),
   exportToHTML: (file, outputPath) => ipcRenderer.invoke('export:html', { file, outputPath }),
   importFiles: () => ipcRenderer.invoke('import:files'),
+  importPaths: (paths) => ipcRenderer.invoke('import:paths', { paths }),
+  getPathForFile: (file) => webUtils?.getPathForFile ? webUtils.getPathForFile(file) : (file?.path || ''),
   backupList: () => ipcRenderer.invoke('backup:list'),
   backupOpenFolder: () => ipcRenderer.invoke('backup:openFolder'),
   onReload: (callback) => ipcRenderer.on('app:reload', callback),
