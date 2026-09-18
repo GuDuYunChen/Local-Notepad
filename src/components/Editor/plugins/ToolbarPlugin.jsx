@@ -54,8 +54,10 @@ export default function ToolbarPlugin() {
   const [elementFormat, setElementFormat] = useState('left');
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showHighlightPicker, setShowHighlightPicker] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const fontSelectRef = useRef(null);
   const colorPickerRef = useRef(null);
+  const moreMenuRef = useRef(null);
 
   const TEXT_COLORS = [
     { label: '默认', value: '' },
@@ -95,6 +97,9 @@ export default function ToolbarPlugin() {
       if (colorPickerRef.current && !colorPickerRef.current.contains(e.target)) {
         setShowColorPicker(false);
         setShowHighlightPicker(false);
+      }
+      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target)) {
+        setMoreOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -168,17 +173,6 @@ export default function ToolbarPlugin() {
       }
     });
   };
-
-  const insertTable = () => {
-    editor.dispatchCommand(INSERT_TABLE_COMMAND, { columns: '3', rows: '3' });
-  };
-
-  const [pickerOpen, setPickerOpen] = useState(false)
-  const [moreOpen, setMoreOpen] = useState(false)
-
-  const toggleSelectionMode = () => {}
-
-  
 
   const uploadFileSafe = async (file) => {
     try {
@@ -362,7 +356,7 @@ export default function ToolbarPlugin() {
 
       {isUploading && <span className="toolbar-progress">处理中…</span>}
 
-      <div className="toolbar-more-wrap">
+      <div className="toolbar-more-wrap" ref={moreMenuRef}>
         <button
           className={`btn toolbar-more-trigger${moreOpen ? ' active' : ''}`}
           onClick={() => setMoreOpen(prev => !prev)}
