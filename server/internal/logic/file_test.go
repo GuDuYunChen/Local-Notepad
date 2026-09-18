@@ -105,6 +105,71 @@ func TestUpdateRejectsMoveCollision(t *testing.T) {
 	}
 }
 
+func TestCreateRejectsNonFolderParent(t *testing.T) {
+	logic := newFileLogicTestDB(t)
+	ctx := context.Background()
+
+	file, err := logic.Create(ctx, "parent.md", "", false, "")
+	if err != nil {
+		t.Fatalf("create file parent: %v", err)
+	}
+
+	if _, err := logic.Create(ctx, "child.md", "", false, file.ID); err == nil {
+		t.Fatal("expected non-folder parent to be rejected")
+	} else if !strings.Contains(err.Error(), "目标位置不是文件夹") {
+		t.Fatalf("unexpected parent error: %v", err)
+	}
+}
+
+func TestUpdateRejectsFolderCycle(t *testing.T) {
+	logic := newFileLogicTestDB(t)
+	ctx := context.Background()
+
+	root, err := logic.Create(ctx, "Root", "", true, "")
+	if err != nil {
+		t.Fatalf("create root folder: %v", err)
+	}
+	child, err := logic.Create(ctx, "Child", "", true, root.ID)
+	if err != nil {
+		t.Fatalf("create child folder: %v", err)
+	}
+	grandchild, err := logic.Create(ctx, "Grandchild", "", true, child.ID)
+	if err != nil {
+		t.Fatalf("create grandchild folder: %v", err)
+	}
+
+	self := root.ID
+	if _, err := logic.Update(ctx, root.ID, nil, nil, &self, nil, nil, nil); err == nil {
+		t.Fatal("expected moving folder into itself to fail")
+	}
+
+	target := grandchild.ID
+	if _, err := logic.Update(ctx, root.ID, nil, nil, &target, nil, nil, nil); err == nil {
+		t.Fatal("expected moving folder into descendant to fail")
+	} else if !strings.Contains(err.Error(), "不能将文件夹移动到其自身内部") {
+		t.Fatalf("unexpected cycle error: %v", err)
+	}
+}
+
+func TestUpdateRejectsMoveUnderFile(t *testing.T) {
+	logic := newFileLogicTestDB(t)
+	ctx := context.Background()
+
+	folder, err := logic.Create(ctx, "Folder", "", true, "")
+	if err != nil {
+		t.Fatalf("create folder: %v", err)
+	}
+	file, err := logic.Create(ctx, "File.md", "", false, "")
+	if err != nil {
+		t.Fatalf("create file: %v", err)
+	}
+
+	target := file.ID
+	if _, err := logic.Update(ctx, folder.ID, nil, nil, &target, nil, nil, nil); err == nil {
+		t.Fatal("expected move under ordinary file to fail")
+	}
+}
+
 func TestNormalizeTitleSanitizesAndLimitsLength(t *testing.T) {
 	title, err := normalizeTitle("  bad/name?.md  ")
 	if err != nil {
