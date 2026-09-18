@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { message } from 'antd'
+import { toast } from '~/services/toast'
 
 export default function BackupPanel({ open, onClose }) {
   const [backups, setBackups] = useState([])
@@ -19,10 +19,10 @@ export default function BackupPanel({ open, onClose }) {
       if (res.success) {
         setBackups(res.backups || [])
       } else {
-        message.error('加载备份列表失败')
+        toast.error('加载备份列表失败')
       }
     } catch (e) {
-      message.error('加载备份列表失败')
+      toast.error('加载备份列表失败')
     } finally {
       setLoading(false)
     }
@@ -43,13 +43,13 @@ export default function BackupPanel({ open, onClose }) {
     try {
       const res = await window.electronAPI.backupCreate('')
       if (res.success) {
-        message.success('备份成功')
+        toast.success('备份成功')
         await loadBackups()
       } else {
-        message.error('备份失败: ' + (res.message || '未知错误'))
+        toast.error('备份失败: ' + (res.message || '未知错误'))
       }
     } catch (e) {
-      message.error('备份失败')
+      toast.error('备份失败')
     }
   }
 
@@ -59,13 +59,13 @@ export default function BackupPanel({ open, onClose }) {
     try {
       const res = await window.electronAPI.backupRestore(backupPath)
       if (res.success) {
-        message.success('恢复成功，应用将重启')
+        toast.success('恢复成功，应用将重启')
         setTimeout(() => window.location.reload(), 1000)
       } else {
-        message.error('恢复失败: ' + (res.message || '未知错误'))
+        toast.error('恢复失败: ' + (res.message || '未知错误'))
       }
     } catch (e) {
-      message.error('恢复失败')
+      toast.error('恢复失败')
     }
   }
 
