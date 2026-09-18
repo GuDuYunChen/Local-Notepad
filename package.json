@@ -37,7 +37,6 @@
     "@lexical/text": "^0.39.0",
     "@lexical/utils": "^0.39.0",
     "@lexical/yjs": "0.39.0",
-    "antd": "^6.1.0",
     "d3": "^7.9.0",
     "docx": "^9.5.1",
     "highlight.js": "^11.11.1",
