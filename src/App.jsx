@@ -4,6 +4,8 @@ import FileList from './components/FileList'
 import NavigationRail from './components/NavigationRail'
 import { api } from '~/services/api'
 import ConfirmDialog from './components/ConfirmDialog'
+import ToastViewport from './components/ToastViewport'
+import { toast } from '~/services/toast'
 
 const GraphPanel = React.lazy(() => import('./components/GraphPanel'))
 const DailyNotesPanel = React.lazy(() => import('./components/DailyNotesPanel'))
@@ -12,7 +14,6 @@ const ShortcutsModal = React.lazy(() => import('./components/ShortcutsModal'))
 const BackupPanel = React.lazy(() => import('./components/BackupPanel'))
 const QuickSwitcher = React.lazy(() => import('./components/QuickSwitcher'))
 import ErrorBoundary from './components/ErrorBoundary'
-import { message } from 'antd'
 
 export default function App() {
   const editorRef = useRef(null)
@@ -324,6 +325,8 @@ export default function App() {
         </main>
       </div>
 
+      <ToastViewport />
+
       {dialog?.type === 'unsaved' && (
         <ConfirmDialog
           title="当前文件未保存"
@@ -340,7 +343,7 @@ export default function App() {
                   setDialog(null)
                   dialog.next()
                 } else {
-                  message.error('保存失败，请重试')
+                  toast.error('保存失败，请重试')
                   setDialog(prev => ({ ...prev, saving: false }))
                 }
               }
