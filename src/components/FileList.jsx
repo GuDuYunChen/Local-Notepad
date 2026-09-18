@@ -353,6 +353,14 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
 
 
   useEffect(() => {
+    const handleCreateNoteRequest = () => {
+      void onNewFileCheck()
+    }
+    window.addEventListener('library:create-note', handleCreateNoteRequest)
+    return () => window.removeEventListener('library:create-note', handleCreateNoteRequest)
+  }, [selectedId, items])
+
+  useEffect(() => {
     void load()
     
     function handleClickOutside(e) {
