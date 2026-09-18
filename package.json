@@ -84,24 +84,6 @@
         "to": "bin/notepad-server.exe"
       }
     ],
-    "protocols": [
-      {
-        "name": "Notepad Protocol",
-        "schemes": [
-          "notepad"
-        ]
-      }
-    ],
-    "fileAssociations": [
-      {
-        "ext": "md",
-        "name": "Markdown Document"
-      },
-      {
-        "ext": "txt",
-        "name": "Text Document"
-      }
-    ],
     "nsis": {
       "oneClick": false,
       "allowElevation": true,
