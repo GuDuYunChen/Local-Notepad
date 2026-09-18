@@ -441,11 +441,14 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
         if (showNewMenu) {
           setShowNewMenu(false)
         }
+        if (showLibraryMenu) {
+          setShowLibraryMenu(false)
+        }
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [items, contextMenu, showNewMenu]) // 依赖 items 只是为了确保最新状态，虽然这里主要是触发弹窗
+  }, [items, contextMenu, showNewMenu, showLibraryMenu]) // 保持快捷键读取最新菜单状态
 
   useEffect(() => {
     if (!updatedItem) return
