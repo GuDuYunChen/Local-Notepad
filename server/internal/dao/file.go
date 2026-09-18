@@ -114,17 +114,26 @@ func (d *FileDAO) List(ctx context.Context, q string, page, size int) ([]*model.
 	if q != "" {
 		likePattern := escapeLikePattern(q)
 		ftsQuery := escapeFTS5Query(q)
-		query = `SELECT f.id, f.title, f.content, f.created_at, f.updated_at, f.is_folder, f.parent_id, f.sort_order, f.is_deleted, f.deleted_at, f.is_pinned
-			FROM files f
-			INNER JOIN files_fts ft ON f.rowid = ft.rowid
-			WHERE f.is_deleted = 0
-			  AND (f.title LIKE ? ESCAPE '\' OR files_fts MATCH ?)
-			ORDER BY f.is_pinned DESC,
-			  CASE WHEN f.title LIKE ? ESCAPE '\' THEN 0 ELSE 1 END,
-			  f.updated_at DESC,
-			  f.sort_order DESC
-			LIMIT ? OFFSET ?`
-		args = []interface{}{likePattern, ftsQuery, likePattern, size, offset}
+		if ftsQuery == "" {
+			query = `SELECT id, title, content, created_at, updated_at, is_folder, parent_id, sort_order, is_deleted, deleted_at, is_pinned
+				FROM files
+				WHERE is_deleted = 0 AND title LIKE ? ESCAPE '\'
+				ORDER BY is_pinned DESC, updated_at DESC, sort_order DESC
+				LIMIT ? OFFSET ?`
+			args = []interface{}{likePattern, size, offset}
+		} else {
+			query = `SELECT f.id, f.title, f.content, f.created_at, f.updated_at, f.is_folder, f.parent_id, f.sort_order, f.is_deleted, f.deleted_at, f.is_pinned
+				FROM files f
+				INNER JOIN files_fts ft ON f.rowid = ft.rowid
+				WHERE f.is_deleted = 0
+				  AND (f.title LIKE ? ESCAPE '\' OR files_fts MATCH ?)
+				ORDER BY f.is_pinned DESC,
+				  CASE WHEN f.title LIKE ? ESCAPE '\' THEN 0 ELSE 1 END,
+				  f.updated_at DESC,
+				  f.sort_order DESC
+				LIMIT ? OFFSET ?`
+			args = []interface{}{likePattern, ftsQuery, likePattern, size, offset}
+		}
 	} else {
 		query = `SELECT id, title, content, created_at, updated_at, is_folder, parent_id, sort_order, is_deleted, deleted_at, is_pinned 
 			FROM files WHERE is_deleted = 0 
@@ -206,7 +215,7 @@ func escapeFTS5Query(q string) string {
 	normalized = strings.TrimSpace(replacer.Replace(normalized))
 	terms := strings.Fields(normalized)
 	if len(terms) == 0 {
-		return `""`
+		return ""
 	}
 
 	parts := make([]string, 0, len(terms))
