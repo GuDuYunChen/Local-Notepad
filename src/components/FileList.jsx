@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react'
+import { useDrag, useDrop } from 'react-dnd'
+import { NativeTypes } from 'react-dnd-html5-backend'
 import { api } from '~/services/api'
+import { toast } from '~/services/toast'
+
 const NameDialog = React.lazy(() => import('./NameDialog'))
 const FileSelectorDialog = React.lazy(() => import('./FileSelectorDialog'))
 const TemplateSelector = React.lazy(() => import('./TemplateSelector'))
-import { useDrag, useDrop } from 'react-dnd'
-import { NativeTypes } from 'react-dnd-html5-backend'
-import { toast } from '~/services/toast'
 const ItemType = 'FILE_NODE'
 
 const FileNode = ({ 
