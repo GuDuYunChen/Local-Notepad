@@ -1,10 +1,10 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, shell } from 'electron'
 import { spawn } from 'node:child_process'
 import path from 'node:path'
 
 import { processExport, exportToPDF, exportToHTML } from './export.js'
 import { selectAndParseFiles } from './import.js'
-import { handleBackup, handleRestore, listBackups } from './backup.js'
+import { ensureBackupDir, getDefaultBackupDir, listBackups } from './backup.js'
 
 // 应用主进程：负责创建窗口、设置安全选项
 let mainWindow = null
@@ -198,33 +198,23 @@ ipcMain.handle('import:files', async () => {
     }
 })
 
-ipcMain.handle('backup:create', async (event, { targetDir }) => {
+ipcMain.handle('backup:list', async () => {
   try {
-    const result = await handleBackup(targetDir)
-    return result
-  } catch (e) {
-    console.error(e)
-    return { success: false, message: e.message }
-  }
-})
-
-ipcMain.handle('backup:restore', async (event, { backupFile }) => {
-  try {
-    const result = await handleRestore(backupFile)
-    if (result.success && mainWindow) {
-      mainWindow.webContents.send('app:reload')
-    }
-    return result
-  } catch (e) {
-    console.error(e)
-    return { success: false, message: e.message }
-  }
-})
-
-ipcMain.handle('backup:list', async (event, { backupDir }) => {
-  try {
+    const backupDir = getDefaultBackupDir()
     const backups = await listBackups(backupDir)
-    return { success: true, backups }
+    return { success: true, backups, directory: backupDir }
+  } catch (e) {
+    console.error(e)
+    return { success: false, message: e.message }
+  }
+})
+
+ipcMain.handle('backup:openFolder', async () => {
+  try {
+    const backupDir = ensureBackupDir()
+    const error = await shell.openPath(backupDir)
+    if (error) return { success: false, message: error }
+    return { success: true, directory: backupDir }
   } catch (e) {
     console.error(e)
     return { success: false, message: e.message }
