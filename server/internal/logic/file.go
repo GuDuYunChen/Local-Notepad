@@ -154,6 +154,25 @@ func (l *FileLogic) Delete(ctx context.Context, id string) error {
 	return l.FileDAO.DeleteRecursive(ctx, id)
 }
 
+func (l *FileLogic) ListTrash(ctx context.Context) ([]*model.File, error) {
+	return l.FileDAO.ListTrashRoots(ctx)
+}
+
+func (l *FileLogic) PermanentDelete(ctx context.Context, id string) error {
+	item, err := l.FileDAO.GetByIDIncludingDeleted(ctx, id)
+	if err != nil {
+		return fmt.Errorf("文件不存在: %w", err)
+	}
+	if !item.IsDeleted {
+		return fmt.Errorf("只能永久删除回收站中的文件")
+	}
+	return l.FileDAO.PermanentDeleteRecursive(ctx, id)
+}
+
+func (l *FileLogic) EmptyTrash(ctx context.Context) error {
+	return l.FileDAO.EmptyTrash(ctx)
+}
+
 func (l *FileLogic) Restore(ctx context.Context, id string) error {
 	items, err := l.FileDAO.GetSubtreeIncludingDeleted(ctx, id)
 	if err != nil {
