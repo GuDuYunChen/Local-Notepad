@@ -1,71 +1,42 @@
-import React, { useState, useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { toast } from '~/services/toast'
 
 export default function BackupPanel({ open, onClose }) {
   const [backups, setBackups] = useState([])
+  const [backupDir, setBackupDir] = useState('')
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    if (open) {
-      loadBackups()
-    }
+    if (open) void loadBackups()
   }, [open])
 
   async function loadBackups() {
     setLoading(true)
     try {
-      const backupDir = await getBackupDir()
-      const res = await window.electronAPI.backupList(backupDir)
-      if (res.success) {
+      const res = await window.electronAPI?.backupList?.()
+      if (res?.success) {
         setBackups(res.backups || [])
+        setBackupDir(res.directory || '')
       } else {
-        toast.error('加载备份列表失败')
+        toast.error('加载备份列表失败: ' + (res?.message || '未知错误'))
       }
-    } catch (e) {
+    } catch (error) {
+      console.error(error)
       toast.error('加载备份列表失败')
     } finally {
       setLoading(false)
     }
   }
 
-  async function getBackupDir() {
-    const home = process.env.HOME || process.env.USERPROFILE
-    if (process.platform === 'win32') {
-      return `${home}\\AppData\\Roaming\\Notepad\\backups`
-    } else if (process.platform === 'darwin') {
-      return `${home}/Library/Application Support/Notepad/backups`
-    } else {
-      return `${home}/.notepad/backups`
-    }
-  }
-
-  async function handleBackup() {
+  async function openBackupFolder() {
     try {
-      const res = await window.electronAPI.backupCreate('')
-      if (res.success) {
-        toast.success('备份成功')
-        await loadBackups()
-      } else {
-        toast.error('备份失败: ' + (res.message || '未知错误'))
+      const res = await window.electronAPI?.backupOpenFolder?.()
+      if (!res?.success) {
+        toast.error('打开备份目录失败: ' + (res?.message || '未知错误'))
       }
-    } catch (e) {
-      toast.error('备份失败')
-    }
-  }
-
-  async function handleRestore(backupPath) {
-    if (!window.confirm('确定要恢复此备份吗？当前数据将被覆盖。')) return
-    
-    try {
-      const res = await window.electronAPI.backupRestore(backupPath)
-      if (res.success) {
-        toast.success('恢复成功，应用将重启')
-        setTimeout(() => window.location.reload(), 1000)
-      } else {
-        toast.error('恢复失败: ' + (res.message || '未知错误'))
-      }
-    } catch (e) {
-      toast.error('恢复失败')
+    } catch (error) {
+      console.error(error)
+      toast.error('打开备份目录失败')
     }
   }
 
@@ -73,38 +44,55 @@ export default function BackupPanel({ open, onClose }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal backup-modal" onClick={e => e.stopPropagation()}>
+      <div className="modal backup-modal" onClick={event => event.stopPropagation()}>
         <div className="modal-header">
-          <h2 className="modal-title">备份与恢复</h2>
-          <button className="close-btn" onClick={onClose}>×</button>
+          <div>
+            <div className="template-eyebrow">Safety & Recovery</div>
+            <h2 className="modal-title">自动备份</h2>
+          </div>
+          <button className="close-btn" onClick={onClose} aria-label="关闭">×</button>
         </div>
+
         <div className="modal-body">
           <div className="backup-actions">
-            <button className="btn primary" onClick={handleBackup}>查看恢复说明</button>
+            <button className="btn primary" onClick={openBackupFolder}>打开备份目录</button>
+            <button className="btn" onClick={loadBackups} disabled={loading}>刷新</button>
           </div>
-          <div className="empty-desc" style={{ marginBottom: 12 }}>
-            手工备份与恢复已停用。当前版本使用自动热备份，请从系统备份目录选择备份文件，并在完全退出应用后再恢复。
+
+          <div className="backup-guidance">
+            应用启动时会检查备份，并每 8 小时使用 SQLite 热备份生成一次数据库副本，最多保留最近 100 份。
+            为避免 WAL 数据不一致，当前界面不执行在线恢复；需要恢复时请先完全退出应用，再使用备份文件进行离线恢复。
           </div>
+
+          {backupDir && (
+            <div className="backup-directory" title={backupDir}>
+              <span>备份目录</span>
+              <code>{backupDir}</code>
+            </div>
+          )}
+
           <div className="backup-list">
             {loading ? (
               <div className="placeholder">加载中…</div>
             ) : backups.length === 0 ? (
               <div className="empty-state">
                 <div className="empty-icon">💾</div>
-                <div className="empty-title">暂无备份</div>
-                <div className="empty-desc">应用会在启动时和每 8 小时自动生成数据库备份</div>
+                <div className="empty-title">暂无自动备份</div>
+                <div className="empty-desc">首次启动或距离上次备份满 8 小时后会自动生成</div>
               </div>
             ) : (
               <ul className="backup-items">
-                {backups.map(backup => (
+                {backups.map((backup, index) => (
                   <li key={backup.path} className="backup-item">
                     <div className="backup-info">
-                      <div className="backup-name">{backup.name}</div>
+                      <div className="backup-name">
+                        {backup.name}
+                        {index === 0 && <span className="backup-latest">最新</span>}
+                      </div>
                       <div className="backup-meta">
                         {formatSize(backup.size)} · {formatDate(backup.date)}
                       </div>
                     </div>
-                    <button className="btn small" onClick={() => handleRestore(backup.path)}>恢复</button>
                   </li>
                 ))}
               </ul>
@@ -123,10 +111,7 @@ function formatSize(bytes) {
 }
 
 function formatDate(dateStr) {
-  try {
-    const date = new Date(dateStr)
-    return date.toLocaleString('zh-CN')
-  } catch {
-    return dateStr
-  }
+  const date = new Date(dateStr)
+  if (Number.isNaN(date.getTime())) return dateStr || '时间未知'
+  return date.toLocaleString('zh-CN')
 }
