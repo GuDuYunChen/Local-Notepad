@@ -142,6 +142,7 @@ describe('UI redesign smoke tests', () => {
 
     expect(input).toBeTruthy()
     expect(results).toHaveLength(2)
+    expect(api).toHaveBeenCalledTimes(1)
     expect(results[0].textContent).toContain('第二篇笔记')
     expect(results[1].textContent).toContain('第一篇笔记')
 
