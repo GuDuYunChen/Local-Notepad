@@ -61,6 +61,15 @@ export default function NavigationRail({
       </div>
 
       <div className="navigation-secondary">
+        <button
+          className={`rail-btn${activeWorkspace === 'settings' ? ' active' : ''}`}
+          onClick={() => onChangeWorkspace('settings')}
+          title="设置与诊断"
+          aria-label="设置与诊断"
+          aria-pressed={activeWorkspace === 'settings'}
+        >
+          <Icon><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21h-4v-.09A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3v-4h.09A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3h4v.09A1.7 1.7 0 0 0 15.4 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 .6 1 1.7 1.7 0 0 0 1.1.4H21v4h-.09a1.7 1.7 0 0 0-1.51.6z" /></Icon>
+        </button>
         <button className="rail-btn" onClick={onOpenBackup} title="备份与恢复" aria-label="备份与恢复">
           <Icon><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><path d="M7 3v6h8V4M7 21v-8h10v8" /></Icon>
         </button>
