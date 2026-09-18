@@ -183,9 +183,9 @@ func (d *FileDAO) CheckDuplicate(ctx context.Context, parentID, title, excludeID
 	var count int
 	var err error
 	if excludeID != "" {
-		err = d.DB.QueryRowContext(ctx, "SELECT COUNT(*) FROM files WHERE parent_id = ? AND title = ? AND id != ? AND is_deleted = 0", parentID, title, excludeID).Scan(&count)
+		err = d.DB.QueryRowContext(ctx, "SELECT COUNT(*) FROM files WHERE parent_id = ? AND title = ? COLLATE NOCASE AND id != ? AND is_deleted = 0", parentID, title, excludeID).Scan(&count)
 	} else {
-		err = d.DB.QueryRowContext(ctx, "SELECT COUNT(*) FROM files WHERE parent_id = ? AND title = ? AND is_deleted = 0", parentID, title).Scan(&count)
+		err = d.DB.QueryRowContext(ctx, "SELECT COUNT(*) FROM files WHERE parent_id = ? AND title = ? COLLATE NOCASE AND is_deleted = 0", parentID, title).Scan(&count)
 	}
 	if err != nil {
 		return false, err
