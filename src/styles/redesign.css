@@ -2482,3 +2482,55 @@ body {
 .property-summary-card.save-保存中… strong {
   color: var(--clay);
 }
+
+
+/* Editor first-use empty state */
+.empty-editor-actions {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.empty-editor-actions .btn {
+  min-height: 32px;
+}
+
+.empty-editor-shortcuts {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--ink-muted);
+  font-size: 9px;
+}
+
+.empty-editor-shortcuts span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.empty-editor-shortcuts kbd {
+  padding: 2px 5px;
+  border: 1px solid var(--line);
+  border-bottom-color: var(--line-strong);
+  border-radius: 5px;
+  background: var(--paper);
+  color: var(--ink-muted);
+  font: inherit;
+  font-size: 8px;
+}
+
+@media (max-width: 620px) {
+  .empty-editor-actions {
+    flex-direction: column;
+  }
+
+  .empty-editor-actions .btn {
+    width: min(220px, 100%);
+  }
+}
