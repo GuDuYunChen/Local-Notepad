@@ -147,6 +147,43 @@ func (l *FileLogic) Delete(ctx context.Context, id string) error {
 }
 
 func (l *FileLogic) Restore(ctx context.Context, id string) error {
+	items, err := l.FileDAO.GetSubtreeIncludingDeleted(ctx, id)
+	if err != nil {
+		return err
+	}
+	if len(items) == 0 {
+		return fmt.Errorf("文件不存在")
+	}
+
+	subtree := make(map[string]bool, len(items))
+	for _, item := range items {
+		subtree[item.ID] = true
+	}
+
+	for _, item := range items {
+		if !item.IsDeleted {
+			continue
+		}
+
+		if item.ParentID != "" && !subtree[item.ParentID] {
+			parent, err := l.FileDAO.GetByID(ctx, item.ParentID)
+			if err != nil {
+				return fmt.Errorf("无法恢复 %s：父文件夹不存在或已删除", item.Title)
+			}
+			if !parent.IsFolder {
+				return fmt.Errorf("无法恢复 %s：父级不是文件夹", item.Title)
+			}
+		}
+
+		duplicate, err := l.FileDAO.CheckDuplicate(ctx, item.ParentID, item.Title, item.ID)
+		if err != nil {
+			return err
+		}
+		if duplicate {
+			return fmt.Errorf("无法恢复 %s：目标位置已存在同名文件或文件夹", item.Title)
+		}
+	}
+
 	return l.FileDAO.RestoreRecursive(ctx, id)
 }
 
