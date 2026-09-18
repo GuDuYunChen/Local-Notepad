@@ -7,6 +7,7 @@ import { processExport, exportToPDF, exportToHTML } from './export.js'
 import { parseImportPaths, selectAndParseFiles } from './import.js'
 import { ensureBackupDir, getDefaultBackupDir, listBackups } from './backup.js'
 import { stopChildProcess, waitForHttpService } from './backend-process.js'
+import { classifyNavigation } from './navigation.js'
 
 // 应用主进程：负责创建窗口、设置安全选项
 let mainWindow = null
@@ -25,8 +26,8 @@ async function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1100,
     height: 720,
-    minWidth: 900,
-    minHeight: 600,
+    minWidth: 720,
+    minHeight: 520,
     show: false,
     backgroundColor: '#f6f6f8',
     title: 'Notepad',
@@ -45,6 +46,23 @@ async function createWindow() {
   mainWindow.once('ready-to-show', () => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.show()
+    }
+  })
+
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (classifyNavigation(url, isDev) === 'external') {
+      void shell.openExternal(url)
+    }
+    return { action: 'deny' }
+  })
+
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    const classification = classifyNavigation(url, isDev)
+    if (classification === 'internal') return
+
+    event.preventDefault()
+    if (classification === 'external') {
+      void shell.openExternal(url)
     }
   })
 
