@@ -56,3 +56,29 @@ export async function searchFiles(query) {
   const res = await api(`/api/files?q=${encodeURIComponent(query)}`)
   return res
 }
+
+
+export async function listAllFiles(query = '') {
+  const pageSize = 200
+  const normalizedQuery = String(query || '').trim()
+  const byId = new Map()
+
+  for (let page = 1; ; page += 1) {
+    const params = new URLSearchParams({
+      page: String(page),
+      size: String(pageSize),
+    })
+    if (normalizedQuery) params.set('q', normalizedQuery)
+
+    const batch = await api(`/api/files?${params.toString()}`)
+    const items = Array.isArray(batch) ? batch : []
+
+    for (const item of items) {
+      if (item?.id) byId.set(item.id, item)
+    }
+
+    if (items.length < pageSize) break
+  }
+
+  return Array.from(byId.values())
+}
