@@ -56,6 +56,14 @@ function normalizeFiles(list) {
     .filter(file => !file.is_folder && !file.is_deleted && !file.title?.startsWith('__tpl__'))
 }
 
+function normalizeRecentFiles(list) {
+  return normalizeFiles(list).sort((a, b) => {
+    const pinnedDiff = Number(Boolean(b.is_pinned)) - Number(Boolean(a.is_pinned))
+    if (pinnedDiff !== 0) return pinnedDiff
+    return (b.updated_at || 0) - (a.updated_at || 0)
+  })
+}
+
 export default function QuickSwitcher({ open, onClose, onSelectFile }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
@@ -73,10 +81,10 @@ export default function QuickSwitcher({ open, onClose, onSelectFile }) {
     const requestId = requestRef.current
     setLoading(true)
 
-    api('/api/files?size=20')
+    api('/api/files?size=200')
       .then(list => {
         if (requestRef.current !== requestId) return
-        setResults(normalizeFiles(list))
+        setResults(normalizeRecentFiles(list))
       })
       .catch(() => {
         if (requestRef.current === requestId) setResults([])
@@ -97,12 +105,13 @@ export default function QuickSwitcher({ open, onClose, onSelectFile }) {
       setLoading(true)
 
       try {
-        const list = query.trim()
+        const hasQuery = Boolean(query.trim())
+        const list = hasQuery
           ? await searchFiles(query.trim())
-          : await api('/api/files?size=20')
+          : await api('/api/files?size=200')
 
         if (requestRef.current !== requestId) return
-        setResults(normalizeFiles(list))
+        setResults(hasQuery ? normalizeFiles(list) : normalizeRecentFiles(list))
         setActiveIndex(0)
       } catch (error) {
         if (requestRef.current === requestId) {
