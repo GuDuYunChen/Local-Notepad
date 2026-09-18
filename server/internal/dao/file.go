@@ -35,6 +35,49 @@ func (d *FileDAO) GetByID(ctx context.Context, id string) (*model.File, error) {
 	return &f, nil
 }
 
+func (d *FileDAO) GetByIDIncludingDeleted(ctx context.Context, id string) (*model.File, error) {
+	var f model.File
+	row := d.DB.QueryRowContext(ctx,
+		`SELECT id, title, content, created_at, updated_at, is_folder, parent_id, sort_order, is_deleted, deleted_at, is_pinned
+		 FROM files WHERE id = ?`, id)
+	if err := row.Scan(&f.ID, &f.Title, &f.Content, &f.CreatedAt, &f.UpdatedAt, &f.IsFolder, &f.ParentID, &f.SortOrder, &f.IsDeleted, &f.DeletedAt, &f.IsPinned); err != nil {
+		return nil, err
+	}
+	return &f, nil
+}
+
+func (d *FileDAO) GetSubtreeIncludingDeleted(ctx context.Context, id string) ([]*model.File, error) {
+	rows, err := d.DB.QueryContext(ctx, `
+		WITH RECURSIVE sub(id) AS (
+			SELECT id FROM files WHERE id = ?
+			UNION
+			SELECT f.id
+			FROM files f
+			JOIN sub ON f.parent_id = sub.id
+			WHERE f.parent_id != f.id
+		)
+		SELECT id, title, content, created_at, updated_at, is_folder, parent_id, sort_order, is_deleted, deleted_at, is_pinned
+		FROM files
+		WHERE id IN sub`, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]*model.File, 0)
+	for rows.Next() {
+		var f model.File
+		if err := rows.Scan(&f.ID, &f.Title, &f.Content, &f.CreatedAt, &f.UpdatedAt, &f.IsFolder, &f.ParentID, &f.SortOrder, &f.IsDeleted, &f.DeletedAt, &f.IsPinned); err != nil {
+			return nil, err
+		}
+		out = append(out, &f)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (d *FileDAO) Update(ctx context.Context, f *model.File) error {
 	f.UpdatedAt = time.Now().Unix()
 	_, err := d.DB.ExecContext(ctx,
