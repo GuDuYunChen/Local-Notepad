@@ -15,14 +15,46 @@ import {
   KEY_BACKSPACE_COMMAND,
   DELETE_CHARACTER_COMMAND,
   $getNodeByKey,
-  $insertNodes,
-  $isTextNode,
+  $getRoot,
 } from 'lexical';
 import { $createCodeBlockNode, $isCodeBlockNode } from '../nodes/CodeBlockNode';
 import { mergeRegister } from '@lexical/utils';
 
 // Define custom command for inserting code blocks
 export const INSERT_CODE_BLOCK_COMMAND = createCommand('INSERT_CODE_BLOCK_COMMAND');
+
+export function $insertCodeBlockAtSelection(codeOverride) {
+  const selection = $getSelection();
+  const code = codeOverride !== undefined
+    ? codeOverride
+    : ($isRangeSelection(selection) ? selection.getTextContent() : '');
+
+  if ($isRangeSelection(selection) && !selection.isCollapsed()) {
+    selection.removeText();
+  }
+
+  const codeBlock = $createCodeBlockNode(code || '', 'plaintext');
+  const trailingParagraph = $createParagraphNode();
+  const currentSelection = $getSelection();
+
+  if ($isRangeSelection(currentSelection)) {
+    const anchorNode = currentSelection.anchor.getNode();
+    const topLevel = anchorNode.getTopLevelElementOrThrow();
+
+    if (topLevel.getType() === 'paragraph' && topLevel.getTextContent().length === 0) {
+      topLevel.replace(codeBlock);
+    } else {
+      topLevel.insertAfter(codeBlock);
+    }
+  } else {
+    $getRoot().append(codeBlock);
+  }
+
+  codeBlock.insertAfter(trailingParagraph);
+  trailingParagraph.select();
+
+  return codeBlock;
+}
 
 export default function CodeBlockPlugin() {
   const [editor] = useLexicalComposerContext();
@@ -33,78 +65,9 @@ export default function CodeBlockPlugin() {
       INSERT_CODE_BLOCK_COMMAND,
       () => {
         editor.update(() => {
-          const selection = $getSelection();
-          
-          if (!$isRangeSelection(selection)) {
-            // No selection, insert empty code block at cursor
-            const codeBlock = $createCodeBlockNode('', 'plaintext');
-            $insertNodes([codeBlock]);
-            
-            // Add a paragraph after the code block for easier navigation
-            const paragraph = $createParagraphNode();
-            $insertNodes([paragraph]);
-            
-            // Focus the code block
-            codeBlock.selectStart();
-            
-            return true;
-          }
-
-          // Get selected text content
-          const selectedText = selection.getTextContent();
-          
-          if (selectedText) {
-            // Handle multi-paragraph selection by merging content
-            const nodes = selection.getNodes();
-            let fullText = '';
-            
-            // Collect text from all selected nodes
-            for (let i = 0; i < nodes.length; i++) {
-              const node = nodes[i];
-              if ($isTextNode(node)) {
-                const text = node.getTextContent();
-                fullText += text;
-                
-                // Add newline between different parent nodes (paragraphs)
-                if (i < nodes.length - 1) {
-                  const nextNode = nodes[i + 1];
-                  const currentParent = node.getParent();
-                  const nextParent = nextNode.getParent();
-                  
-                  if (currentParent !== nextParent) {
-                    fullText += '\n';
-                  }
-                }
-              }
-            }
-            
-            // Create code block with selected text
-            const codeBlock = $createCodeBlockNode(fullText || selectedText, 'plaintext');
-            
-            // Remove selected content and insert code block
-            selection.removeText();
-            $insertNodes([codeBlock]);
-            
-            // Add a paragraph after the code block
-            const paragraph = $createParagraphNode();
-            $insertNodes([paragraph]);
-            
-            // Focus the code block
-            codeBlock.selectStart();
-          } else {
-            // No text selected, insert empty code block
-            const codeBlock = $createCodeBlockNode('', 'plaintext');
-            $insertNodes([codeBlock]);
-            
-            // Add a paragraph after the code block
-            const paragraph = $createParagraphNode();
-            $insertNodes([paragraph]);
-            
-            // Focus the code block
-            codeBlock.selectStart();
-          }
+          $insertCodeBlockAtSelection();
         });
-        
+
         return true;
       },
       COMMAND_PRIORITY_EDITOR
@@ -125,16 +88,8 @@ export default function CodeBlockPlugin() {
         // Check if the current line starts with ```
         if (text.trim() === '```') {
           editor.update(() => {
-            // Remove the ``` text
             anchorNode.remove();
-            
-            // Insert code block
-            const codeBlock = $createCodeBlockNode('', 'plaintext');
-            $insertNodes([codeBlock]);
-            
-            // Add a paragraph after the code block
-            const paragraph = $createParagraphNode();
-            $insertNodes([paragraph]);
+            $insertCodeBlockAtSelection('');
           });
         }
       });
