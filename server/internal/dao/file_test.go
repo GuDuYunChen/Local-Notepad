@@ -2,6 +2,7 @@ package dao
 
 import (
 	"context"
+	"fmt"
 	"database/sql"
 	"testing"
 
@@ -162,4 +163,62 @@ func TestFileDAOListSearch(t *testing.T) {
 			t.Fatalf("expected no matches, got %#v", files)
 		}
 	})
+}
+
+
+func TestFileDAOSpecialQueriesDoNotPageInternalViews(t *testing.T) {
+	dao := newSearchTestDAO(t)
+	ctx := context.Background()
+
+	for i := 0; i < 205; i++ {
+		id := fmt.Sprintf("note-%03d", i)
+		seedSearchFile(t, dao, id, fmt.Sprintf("Note %03d", i), "large content payload")
+	}
+
+	files, err := dao.ListAllMetadata(ctx)
+	if err != nil {
+		t.Fatalf("ListAllMetadata: %v", err)
+	}
+	if len(files) != 205 {
+		t.Fatalf("ListAllMetadata returned %d files, want 205", len(files))
+	}
+	for _, file := range files {
+		if file.Content != "" {
+			t.Fatalf("metadata query should omit content for %s", file.ID)
+		}
+	}
+}
+
+func TestFileDAOFindActiveByTitleAndTemplates(t *testing.T) {
+	dao := newSearchTestDAO(t)
+	ctx := context.Background()
+
+	seedSearchFile(t, dao, "daily", "2026-09-18", "daily content")
+	seedSearchFile(t, dao, "tpl-short", "__tpl__A", "template A")
+	seedSearchFile(t, dao, "tpl-long", "__tpl__Meeting", "template Meeting")
+	seedSearchFile(t, dao, "normal", "Ordinary note", "ordinary")
+
+	daily, err := dao.FindActiveByTitle(ctx, "", "2026-09-18")
+	if err != nil {
+		t.Fatalf("FindActiveByTitle: %v", err)
+	}
+	if daily.ID != "daily" || daily.Content != "daily content" {
+		t.Fatalf("unexpected daily note: %#v", daily)
+	}
+
+	templates, err := dao.ListTemplates(ctx)
+	if err != nil {
+		t.Fatalf("ListTemplates: %v", err)
+	}
+	if len(templates) != 2 {
+		t.Fatalf("ListTemplates returned %d templates, want 2: %#v", len(templates), templates)
+	}
+
+	got := map[string]string{}
+	for _, template := range templates {
+		got[template.ID] = template.Title
+	}
+	if got["tpl-short"] != "__tpl__A" || got["tpl-long"] != "__tpl__Meeting" {
+		t.Fatalf("unexpected template titles: %#v", got)
+	}
 }
