@@ -8,6 +8,10 @@ on:
     branches:
       - master
 
+concurrency:
+  group: ui-redesign-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   renderer-build:
     runs-on: ubuntu-latest
