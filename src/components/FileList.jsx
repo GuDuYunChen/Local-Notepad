@@ -1071,16 +1071,17 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       // Or we can rely on `renaming` state to get the original extension.
       
       if (renaming && !renaming.is_folder) {
-          const originalExt = renaming.title.substring(renaming.title.lastIndexOf('.'));
+          const dotIndex = renaming.title.lastIndexOf('.')
+          const originalExt = dotIndex > 0 ? renaming.title.slice(dotIndex) : ''
           if (originalExt && !finalName.endsWith(originalExt)) {
-              finalName += originalExt;
+              finalName += originalExt
           }
       }
 
       const updated = await api(`/api/files/${id}`, { method: 'PUT', body: JSON.stringify({ title: finalName }) })
       // Push history
       const oldTitle = items.find(i => i.id === id)?.title
-      pushHistory({ type: 'rename', data: { id, oldTitle, newTitle: name } })
+      pushHistory({ type: 'rename', data: { id, oldTitle, newTitle: finalName } })
 
       setItems(prev => prev.map(i => i.id === id ? { ...i, title: updated.title } : i))
       onItemsChanged?.(items)
@@ -1240,7 +1241,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       const siblings = items.filter(i => i.parent_id === '')
       const newSortOrder = siblings.length > 0 
         ? Math.max(...siblings.map(s => s.sort_order || 0)) + 1000 
-        : Date.now() / 1000
+        : Math.floor(Date.now() / 1000)
       
       try {
           await api(`/api/files/${dragged.id}`, {
