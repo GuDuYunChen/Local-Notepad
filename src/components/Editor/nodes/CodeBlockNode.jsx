@@ -3,8 +3,6 @@ import React, { useRef, useEffect, useState } from 'react';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import { $getNodeByKey } from 'lexical';
 
-// Import highlight.js - simple and reliable
-import hljs from 'highlight.js';
 import 'highlight.js/styles/atom-one-dark.css';
 
 // Supported languages list
@@ -165,15 +163,6 @@ export class CodeBlockNode extends DecoratorNode {
 }
 
 /**
- * Escape HTML special characters to prevent XSS
- */
-function escapeHtml(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
-
-/**
  * LanguageSelector component for selecting programming language
  */
 function LanguageSelector({ value, onChange }) {
@@ -257,50 +246,6 @@ function LanguageSelector({ value, onChange }) {
   );
 }
 
-/**
- * Highlight code using highlight.js
- * Falls back to plain text if highlighting fails
- */
-function highlightCode(code, language) {
-  try {
-    // Handle plaintext - no highlighting needed
-    if (language === 'plaintext' || language === 'text') {
-      return escapeHtml(code);
-    }
-
-    // Map language aliases
-    const languageMap = {
-      'js': 'javascript',
-      'ts': 'typescript',
-      'py': 'python',
-      'rb': 'ruby',
-      'sh': 'bash',
-      'html': 'xml',
-      'markup': 'xml',
-      'xml': 'xml',
-      'shell': 'bash',
-      'assembly': 'x86asm',
-      'yml': 'yaml',
-    };
-
-    const hlLanguage = languageMap[language] || language;
-
-    // Try to highlight with the specified language
-    try {
-      const result = hljs.highlight(code, { language: hlLanguage, ignoreIllegals: true });
-      return result.value;
-    } catch (err) {
-      // If language not found, try auto-detection
-      const result = hljs.highlightAuto(code);
-      return result.value;
-    }
-  } catch (error) {
-    // Highlighting failed, fall back to plain text
-    console.error('Syntax highlighting failed:', error);
-    return escapeHtml(code);
-  }
-}
-
 const CodeBlockComponent = React.memo(function CodeBlockComponent({ code, language, nodeKey }) {
   const [editor] = useLexicalComposerContext();
   const textareaRef = useRef(null);
@@ -308,6 +253,7 @@ const CodeBlockComponent = React.memo(function CodeBlockComponent({ code, langua
   const [autoHighlight, setAutoHighlight] = useState(true);
   const [showEnableButton, setShowEnableButton] = useState(false);
   const highlightTimeoutRef = useRef(null);
+  const highlightRequestRef = useRef(0);
 
   // Performance optimization: detect large files
   const MAX_LINES_FOR_AUTO_HIGHLIGHT = 1000;
@@ -326,27 +272,42 @@ const CodeBlockComponent = React.memo(function CodeBlockComponent({ code, langua
     }
   }, [isLargeFile, autoHighlight]);
 
-  // Apply syntax highlighting to the preview element
+  // Load syntax highlighting only when a non-plaintext code block is actually rendered.
   useEffect(() => {
-    if (!preRef.current) return;
+    if (!preRef.current) return undefined;
 
-    // Clear previous timeout
     if (highlightTimeoutRef.current) {
       clearTimeout(highlightTimeoutRef.current);
     }
 
-    // Debounce highlighting for better performance
-    highlightTimeoutRef.current = setTimeout(() => {
-      if (autoHighlight || !isLargeFile) {
-        const highlighted = highlightCode(code, language);
-        preRef.current.innerHTML = highlighted;
-      } else {
-        // For large files with auto-highlight disabled, show plain text
+    const requestId = ++highlightRequestRef.current;
+    let cancelled = false;
+
+    highlightTimeoutRef.current = setTimeout(async () => {
+      if (cancelled || requestId !== highlightRequestRef.current || !preRef.current) return;
+
+      if ((!autoHighlight && isLargeFile) || language === 'plaintext' || language === 'text') {
         preRef.current.textContent = code;
+        return;
+      }
+
+      try {
+        const { highlightCode } = await import('../utils/syntaxHighlight');
+        const highlighted = await highlightCode(code, language);
+
+        if (!cancelled && requestId === highlightRequestRef.current && preRef.current) {
+          preRef.current.innerHTML = highlighted;
+        }
+      } catch (error) {
+        console.error('Syntax highlighting failed:', error);
+        if (!cancelled && requestId === highlightRequestRef.current && preRef.current) {
+          preRef.current.textContent = code;
+        }
       }
     }, 200);
 
     return () => {
+      cancelled = true;
       if (highlightTimeoutRef.current) {
         clearTimeout(highlightTimeoutRef.current);
       }
