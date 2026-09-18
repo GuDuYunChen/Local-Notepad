@@ -124,6 +124,22 @@ assert body["code"] == 0, body
 assert body["data"] == [], body
 '
 
+curl --connect-timeout 1 --max-time 3 -fsS -H 'Origin: null' "$BASE/api/diagnostics" |
+python3 -c '
+import json, sys
+body=json.load(sys.stdin)
+assert body["code"] == 0, body
+data=body["data"]
+assert data["integrity"] == "ok", data
+assert data["status"] == "ok", data
+assert data["foreign_keys"] is True, data
+assert data["busy_timeout"] == 5000, data
+assert data["database_path"], data
+assert data["data_dir"], data
+assert data["backup_dir"], data
+assert data["upload_dir"], data
+'
+
 CORS_HEADERS="$(
   curl --connect-timeout 1 --max-time 3 -sS -D - -o /dev/null     -H 'Origin: null'     "$BASE/api/health"
 )"
