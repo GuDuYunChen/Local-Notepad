@@ -51,6 +51,11 @@ jobs:
           CGO_ENABLED: '0'
         run: go build -o bin/notepad-server.exe ./cmd/notepad-server
 
+      - name: Run backend HTTP smoke
+        env:
+          NOTEPAD_SMOKE_PORT: '27129'
+        run: bash .github/scripts/backend-smoke.sh
+
       - name: Run Electron tests
         run: npm run test:electron
 
