@@ -1662,3 +1662,135 @@ body {
   line-height: 1.65;
   white-space: pre-wrap;
 }
+
+
+/* Template selector */
+.template-overlay {
+  background: rgba(20, 18, 26, 0.34) !important;
+  backdrop-filter: blur(5px);
+}
+
+.template-selector {
+  width: min(680px, calc(100vw - 32px));
+  max-height: min(620px, calc(100vh - 40px));
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow-pop);
+}
+
+.template-selector-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+  padding: 20px 20px 15px;
+  border-bottom: 1px solid var(--line);
+}
+
+.template-selector-header > div:first-child {
+  min-width: 0;
+  flex: 1;
+}
+
+.template-eyebrow {
+  margin-bottom: 4px;
+  color: var(--ink-muted);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.template-selector-header h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 18px;
+  font-weight: 680;
+}
+
+.template-selector-header p {
+  margin: 5px 0 0;
+  color: var(--ink-muted);
+  font-size: 11px;
+}
+
+.template-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  padding: 14px;
+}
+
+.template-card {
+  min-height: 112px;
+  position: relative;
+  padding: 13px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--surface);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.template-card:hover {
+  transform: translateY(-1px);
+  border-color: var(--line-strong);
+  background: var(--surface-hover);
+  box-shadow: var(--shadow-soft);
+}
+
+.template-card.primary-template {
+  background: var(--paper-deep);
+}
+
+.template-card-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.template-card-top strong {
+  min-width: 0;
+  flex: 1;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.template-card-top small {
+  color: var(--ink-muted);
+  font-size: 8px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.template-card-description {
+  padding-right: 24px;
+  color: var(--ink-soft);
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.template-card-arrow {
+  position: absolute;
+  right: 12px;
+  bottom: 11px;
+  color: var(--ink-muted);
+  font-size: 14px;
+}
+
+.template-card:hover .template-card-arrow {
+  color: var(--clay);
+  transform: translateX(2px);
+}
+
+@media (max-width: 620px) {
+  .template-grid {
+    grid-template-columns: 1fr;
+  }
+}
