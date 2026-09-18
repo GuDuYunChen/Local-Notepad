@@ -166,6 +166,16 @@ describe('export helpers', () => {
     }
   })
 
+  it('keeps WikiLink labels in recursive text extraction', () => {
+    expect(plainTextFromNode({
+      type: 'paragraph',
+      children: [
+        { type: 'text', text: 'See ' },
+        { type: 'wiki-link', id: 'target', title: 'Target note' },
+      ],
+    })).toBe('See [[Target note]]')
+  })
+
   it('loads every metadata page once with compact responses', async () => {
     const first = Array.from({ length: 200 }, (_, index) => ({
       id: `file-${index}`,
