@@ -447,6 +447,9 @@ export default function App() {
                       activeId={current?.id || null}
                       deletedIds={deletedIds}
                       autoSaveOnSwitch={false}
+                      onCreateNote={() => window.dispatchEvent(new Event('library:create-note'))}
+                      onOpenSearch={() => setQuickSearchOpen(true)}
+                      onOpenDaily={() => setWorkspace('daily')}
                       onChange={setContent}
                       onLoaded={(text) => {
                         if (current) {
