@@ -6,6 +6,7 @@ import NavigationRail from './NavigationRail'
 import TemplateSelector from './TemplateSelector'
 import QuickSwitcher from './QuickSwitcher'
 import ToastViewport from './ToastViewport'
+import { statusLabel } from './InspectorPanel'
 import { toast } from '~/services/toast'
 import { api, searchFiles } from '~/services/api'
 
@@ -158,6 +159,14 @@ describe('UI redesign smoke tests', () => {
 
     expect(onSelectFile).toHaveBeenCalledWith(expect.objectContaining({ id: 'file-1' }))
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('maps editor save state consistently for the inspector', () => {
+    expect(statusLabel({ saveError: true }, false)).toBe('保存失败')
+    expect(statusLabel({ saving: true }, false)).toBe('保存中…')
+    expect(statusLabel({ dirty: true }, false)).toBe('未保存')
+    expect(statusLabel({ dirty: false, lastSavedAt: Date.now() }, false)).toBe('已保存')
+    expect(statusLabel({}, false)).toBe('尚未保存')
   })
 
   it('shows and closes lightweight loading toasts', async () => {
