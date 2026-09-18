@@ -3,6 +3,7 @@ package logic
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -374,17 +375,47 @@ func sanitizeName(name string) string {
 }
 
 func parseWikiLinks(content string) []string {
-	re := regexp.MustCompile(`\[\[([^\]]+)\]\]`)
-	matches := re.FindAllStringSubmatch(content, -1)
 	seen := make(map[string]bool)
-	var ids []string
-	for _, m := range matches {
-		id := m[1]
-		if !seen[id] {
-			seen[id] = true
-			ids = append(ids, id)
+	ids := make([]string, 0)
+
+	add := func(id string) {
+		id = strings.TrimSpace(id)
+		if id == "" || seen[id] {
+			return
 		}
+		seen[id] = true
+		ids = append(ids, id)
 	}
+
+	var state interface{}
+	if err := json.Unmarshal([]byte(content), &state); err == nil {
+		var walk func(interface{})
+		walk = func(value interface{}) {
+			switch node := value.(type) {
+			case map[string]interface{}:
+				if nodeType, _ := node["type"].(string); nodeType == "wiki-link" {
+					if id, _ := node["id"].(string); id != "" {
+						add(id)
+					}
+				}
+				for _, child := range node {
+					walk(child)
+				}
+			case []interface{}:
+				for _, child := range node {
+					walk(child)
+				}
+			}
+		}
+		walk(state)
+	}
+
+	// Compatibility for older notes that stored literal [[target-id]] text.
+	re := regexp.MustCompile(`\[\[([^\]]+)\]\]`)
+	for _, match := range re.FindAllStringSubmatch(content, -1) {
+		add(match[1])
+	}
+
 	return ids
 }
 
