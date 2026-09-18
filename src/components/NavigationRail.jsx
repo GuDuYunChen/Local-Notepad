@@ -30,6 +30,11 @@ export default function NavigationRail({
       label: '知识图谱',
       icon: <Icon><circle cx="12" cy="12" r="2.5" /><circle cx="5" cy="6" r="2" /><circle cx="19" cy="6" r="2" /><circle cx="5" cy="18" r="2" /><circle cx="19" cy="18" r="2" /><path d="m7 7.5 3 3M17 7.5l-3 3M7 16.5l3-3M17 16.5l-3-3" /></Icon>,
     },
+    {
+      id: 'trash',
+      label: '回收站',
+      icon: <Icon><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5" /></Icon>,
+    },
   ]
 
   return (
