@@ -14,6 +14,20 @@ afterEach(() => {
 })
 
 describe('listAllFiles', () => {
+  it('surfaces server detail messages for actionable errors', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        code: 1006,
+        message: '保存失败',
+        detail: '已存在同名文件或文件夹: Notes.md',
+        data: null,
+      }),
+    })
+
+    await expect(listAllFiles('Notes')).rejects.toThrow('已存在同名文件或文件夹: Notes.md')
+  })
+
   it('loads every page using the backend maximum page size', async () => {
     const firstPage = Array.from({ length: 200 }, (_, index) => ({
       id: `file-${index}`,
