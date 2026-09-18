@@ -63,6 +63,48 @@ describe('TextEditor save coordination', () => {
     vi.useRealTimers()
   })
 
+  it('exposes create search and daily actions when no note is open', async () => {
+    const onCreateNote = vi.fn()
+    const onOpenSearch = vi.fn()
+    const onOpenDaily = vi.fn()
+
+    await act(async () => {
+      root.render(
+        <TextEditor
+          activeId={null}
+          deletedIds={new Set()}
+          autoSaveOnSwitch={false}
+          onChange={() => {}}
+          onLoaded={() => {}}
+          onSaved={() => {}}
+          onCreateNote={onCreateNote}
+          onOpenSearch={onOpenSearch}
+          onOpenDaily={onOpenDaily}
+        />
+      )
+    })
+
+    const buttons = Array.from(container.querySelectorAll('button'))
+    const createButton = buttons.find(button => button.textContent === '新建笔记')
+    const searchButton = buttons.find(button => button.textContent === '快速搜索')
+    const dailyButton = buttons.find(button => button.textContent === '每日笔记')
+
+    expect(createButton).toBeTruthy()
+    expect(searchButton).toBeTruthy()
+    expect(dailyButton).toBeTruthy()
+
+    await act(async () => {
+      createButton.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      searchButton.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      dailyButton.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    expect(onCreateNote).toHaveBeenCalledTimes(1)
+    expect(onOpenSearch).toHaveBeenCalledTimes(1)
+    expect(onOpenDaily).toHaveBeenCalledTimes(1)
+  })
+
   it('does not write unchanged content on interval or explicit save', async () => {
     api.mockImplementation((path, init) => {
       if (!init?.method) {
