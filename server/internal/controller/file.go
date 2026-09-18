@@ -1,10 +1,12 @@
 package controller
 
 import (
+	"database/sql"
 	"log"
 	"notepad-server/internal/dao"
 	"notepad-server/internal/logic"
 	"notepad-server/internal/model"
+	"strings"
 	"time"
 
 	"github.com/gogf/gf/v2/frame/g"
@@ -282,7 +284,7 @@ func (c *FileController) Graph(r *ghttp.Request) {
 		return
 	}
 
-	files, err := c.FileLogic.List(r.GetCtx(), "", 1, 10000)
+	files, err := c.FileLogic.ListAllMetadata(r.GetCtx())
 	if err != nil {
 		writeErr(r, 1001, "查询文件列表失败", err)
 		return
@@ -341,17 +343,14 @@ func (c *FileController) DailyNote(r *ghttp.Request) {
 
 	title := date
 
-	files, err := c.FileLogic.List(r.GetCtx(), "", 1, 10000)
-	if err != nil {
-		writeErr(r, 1001, "查询文件列表失败", err)
-		return
-	}
-
-	for _, f := range files {
-		if f.Title == title && !f.IsFolder {
-			writeOK(r, g.Map{"file": f, "created": false})
+	if existing, err := c.FileLogic.FindByTitle(r.GetCtx(), "", title); err == nil {
+		if !existing.IsFolder {
+			writeOK(r, g.Map{"file": existing, "created": false})
 			return
 		}
+	} else if err != sql.ErrNoRows {
+		writeErrWithDetail(r, 1001, "查询每日笔记失败", err)
+		return
 	}
 
 	f, err := c.FileLogic.Create(r.GetCtx(), title, "", false, "")
@@ -364,21 +363,21 @@ func (c *FileController) DailyNote(r *ghttp.Request) {
 }
 
 func (c *FileController) ListTemplates(r *ghttp.Request) {
-	files, err := c.FileLogic.List(r.GetCtx(), "", 1, 10000)
+	const templatePrefix = "__tpl__"
+
+	files, err := c.FileLogic.ListTemplates(r.GetCtx())
 	if err != nil {
-		writeErr(r, 1001, "查询模板列表失败", err)
+		writeErrWithDetail(r, 1001, "查询模板列表失败", err)
 		return
 	}
 
-	templates := make([]g.Map, 0)
+	templates := make([]g.Map, 0, len(files))
 	for _, f := range files {
-		if !f.IsFolder && len(f.Title) > 9 && f.Title[:9] == "__tpl__" {
-			templates = append(templates, g.Map{
-				"id":      f.ID,
-				"title":   f.Title[9:],
-				"content": f.Content,
-			})
-		}
+		templates = append(templates, g.Map{
+			"id":      f.ID,
+			"title":   strings.TrimPrefix(f.Title, templatePrefix),
+			"content": f.Content,
+		})
 	}
 
 	writeOK(r, templates)
