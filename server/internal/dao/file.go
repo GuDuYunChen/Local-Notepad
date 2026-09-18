@@ -179,6 +179,30 @@ func (d *FileDAO) List(ctx context.Context, q string, page, size int) ([]*model.
 	return out, nil
 }
 
+func (d *FileDAO) IsDescendant(ctx context.Context, ancestorID, candidateID string) (bool, error) {
+	if ancestorID == "" || candidateID == "" {
+		return false, nil
+	}
+
+	var exists int
+	err := d.DB.QueryRowContext(ctx, `
+		WITH RECURSIVE descendants(id) AS (
+			SELECT id FROM files WHERE parent_id = ? AND is_deleted = 0
+			UNION
+			SELECT f.id
+			FROM files f
+			JOIN descendants dsc ON f.parent_id = dsc.id
+			WHERE f.is_deleted = 0
+		)
+		SELECT EXISTS(SELECT 1 FROM descendants WHERE id = ?)`,
+		ancestorID, candidateID,
+	).Scan(&exists)
+	if err != nil {
+		return false, err
+	}
+	return exists == 1, nil
+}
+
 func (d *FileDAO) CheckDuplicate(ctx context.Context, parentID, title, excludeID string) (bool, error) {
 	var count int
 	var err error
