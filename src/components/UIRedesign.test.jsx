@@ -142,6 +142,8 @@ describe('UI redesign smoke tests', () => {
 
     expect(input).toBeTruthy()
     expect(results).toHaveLength(2)
+    expect(results[0].textContent).toContain('第二篇笔记')
+    expect(results[1].textContent).toContain('第一篇笔记')
 
     await act(async () => {
       input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
@@ -153,7 +155,7 @@ describe('UI redesign smoke tests', () => {
       await Promise.resolve()
     })
 
-    expect(onSelectFile).toHaveBeenCalledWith(expect.objectContaining({ id: 'file-2' }))
+    expect(onSelectFile).toHaveBeenCalledWith(expect.objectContaining({ id: 'file-1' }))
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
