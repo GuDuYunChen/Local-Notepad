@@ -5,7 +5,7 @@ import path from 'node:path'
 
 import { processExport, exportToPDF, exportToHTML } from './export.js'
 import { parseImportPaths, selectAndParseFiles } from './import.js'
-import { ensureBackupDir, getDefaultBackupDir, listBackups } from './backup.js'
+import { ensureBackupDir, getDefaultBackupDir, getDefaultDataDir, listBackups } from './backup.js'
 import { stopChildProcess, waitForHttpService } from './backend-process.js'
 import { classifyNavigation } from './navigation.js'
 
@@ -271,6 +271,40 @@ ipcMain.handle('import:paths', async (event, { paths = [] } = {}) => {
   } catch (e) {
     console.error(e)
     return { success: false, message: e.message }
+  }
+})
+
+ipcMain.handle('app:diagnostics', async () => ({
+  success: true,
+  version: app.getVersion(),
+  electron: process.versions.electron || '',
+  chrome: process.versions.chrome || '',
+  node: process.versions.node || '',
+  platform: process.platform,
+  arch: process.arch,
+  packaged: app.isPackaged,
+}))
+
+ipcMain.handle('app:openFolder', async (event, { kind } = {}) => {
+  try {
+    const dataDir = getDefaultDataDir()
+    const allowed = {
+      data: dataDir,
+      backups: path.join(dataDir, 'backups'),
+      uploads: path.join(dataDir, 'uploads'),
+    }
+    const target = allowed[kind]
+    if (!target) {
+      return { success: false, message: '不支持的目录类型' }
+    }
+
+    await fs.mkdir(target, { recursive: true })
+    const error = await shell.openPath(target)
+    if (error) return { success: false, message: error }
+    return { success: true, path: target }
+  } catch (error) {
+    console.error(error)
+    return { success: false, message: error.message }
   }
 })
 
