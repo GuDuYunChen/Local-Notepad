@@ -76,36 +76,26 @@ export default function QuickSwitcher({ open, onClose, onSelectFile }) {
     if (!open) return undefined
 
     setQuery('')
+    setResults([])
     setActiveIndex(0)
-    requestRef.current += 1
-    const requestId = requestRef.current
     setLoading(true)
-
-    api('/api/files?size=200')
-      .then(list => {
-        if (requestRef.current !== requestId) return
-        setResults(normalizeRecentFiles(list))
-      })
-      .catch(() => {
-        if (requestRef.current === requestId) setResults([])
-      })
-      .finally(() => {
-        if (requestRef.current === requestId) setLoading(false)
-      })
 
     const focusTimer = window.setTimeout(() => inputRef.current?.focus(), 0)
     return () => window.clearTimeout(focusTimer)
   }, [open])
 
   useEffect(() => {
-    if (!open) return undefined
+    if (!open) {
+      requestRef.current += 1
+      return undefined
+    }
 
-    const timer = window.setTimeout(async () => {
-      const requestId = ++requestRef.current
-      setLoading(true)
+    const hasQuery = Boolean(query.trim())
+    const requestId = ++requestRef.current
+    setLoading(true)
 
+    const runSearch = async () => {
       try {
-        const hasQuery = Boolean(query.trim())
         const list = hasQuery
           ? await searchFiles(query.trim())
           : await api('/api/files?size=200')
@@ -121,6 +111,15 @@ export default function QuickSwitcher({ open, onClose, onSelectFile }) {
       } finally {
         if (requestRef.current === requestId) setLoading(false)
       }
+    }
+
+    if (!hasQuery) {
+      void runSearch()
+      return undefined
+    }
+
+    const timer = window.setTimeout(() => {
+      void runSearch()
     }, 180)
 
     return () => window.clearTimeout(timer)
