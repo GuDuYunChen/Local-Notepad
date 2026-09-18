@@ -23,10 +23,10 @@ func (l *TagLogic) Create(ctx context.Context, name, color string) (*model.Tag, 
 }
 
 func (l *TagLogic) Delete(ctx context.Context, id string) error {
-	if err := l.TagDAO.DeleteFileTags(ctx, id); err != nil {
-		return fmt.Errorf("清理文件标签关联失败: %w", err)
+	if err := l.TagDAO.Delete(ctx, id); err != nil {
+		return fmt.Errorf("删除标签失败: %w", err)
 	}
-	return l.TagDAO.Delete(ctx, id)
+	return nil
 }
 
 func (l *TagLogic) GetFileTags(ctx context.Context, fileID string) ([]*model.Tag, error) {
