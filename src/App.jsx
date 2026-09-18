@@ -10,6 +10,7 @@ const DailyNotesPanel = React.lazy(() => import('./components/DailyNotesPanel'))
 const InspectorPanel = React.lazy(() => import('./components/InspectorPanel'))
 const ShortcutsModal = React.lazy(() => import('./components/ShortcutsModal'))
 const BackupPanel = React.lazy(() => import('./components/BackupPanel'))
+const QuickSwitcher = React.lazy(() => import('./components/QuickSwitcher'))
 import ErrorBoundary from './components/ErrorBoundary'
 import { message } from 'antd'
 
@@ -33,6 +34,7 @@ export default function App() {
   const [dialog, setDialog] = useState(null)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [backupOpen, setBackupOpen] = useState(false)
+  const [quickSearchOpen, setQuickSearchOpen] = useState(false)
   const [focusMode, setFocusMode] = useState(false)
 
   const unsaved = !!(current && content !== (current.content || ''))
@@ -42,6 +44,9 @@ export default function App() {
     setCurrent(f)
     setContent(f ? (f.content || '') : '')
     setWorkspace('notes')
+    if (typeof window !== 'undefined' && window.innerWidth <= 720) {
+      setSidebarCollapsed(true)
+    }
 
     if (f && deletedIds.has(f.id)) {
       setDeletedIds(prev => {
@@ -54,7 +59,7 @@ export default function App() {
     setTimeout(() => setSwitching(false), 180)
   }, [deletedIds])
 
-  async function saveCurrent() {
+  const saveCurrent = React.useCallback(async () => {
     if (!current || !editorRef.current) return false
     try {
       const updated = await editorRef.current.save()
@@ -63,7 +68,7 @@ export default function App() {
       console.error(e)
       return false
     }
-  }
+  }, [current])
 
   const loadAndSelect = React.useCallback((id) => {
     api(`/api/files/${id}`).then(select)
@@ -90,9 +95,13 @@ export default function App() {
   useEffect(() => {
     const onKey = (e) => {
       const k = e.key.toLowerCase()
-      if (e.ctrlKey && k === 's') {
+      if ((e.ctrlKey || e.metaKey) && k === 's') {
         e.preventDefault()
         void saveCurrent()
+      }
+      if ((e.ctrlKey || e.metaKey) && k === 'k') {
+        e.preventDefault()
+        setQuickSearchOpen(true)
       }
       if (k === '/' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault()
@@ -109,7 +118,7 @@ export default function App() {
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [])
+  }, [saveCurrent])
 
   useEffect(() => {
     function onMove(e) {
@@ -150,6 +159,7 @@ export default function App() {
         <NavigationRail
           activeWorkspace={workspace}
           onChangeWorkspace={setWorkspace}
+          onOpenSearch={() => setQuickSearchOpen(true)}
           onOpenBackup={() => setBackupOpen(true)}
           onOpenShortcuts={() => setShortcutsOpen(true)}
         />
@@ -361,10 +371,15 @@ export default function App() {
         />
       )}
 
-      {(shortcutsOpen || backupOpen) && (
+      {(shortcutsOpen || backupOpen || quickSearchOpen) && (
         <React.Suspense fallback={null}>
           <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
           <BackupPanel open={backupOpen} onClose={() => setBackupOpen(false)} />
+          <QuickSwitcher
+            open={quickSearchOpen}
+            onClose={() => setQuickSearchOpen(false)}
+            onSelectFile={handleSelectFile}
+          />
         </React.Suspense>
       )}
     </div>
