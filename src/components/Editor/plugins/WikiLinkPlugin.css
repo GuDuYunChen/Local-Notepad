@@ -1,0 +1,106 @@
+.wiki-link {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--clay-light, rgba(112, 87, 217, 0.1));
+  color: var(--clay, #7057d9);
+  font-weight: 600;
+  cursor: pointer;
+  vertical-align: baseline;
+}
+
+.wiki-link:hover,
+.wiki-link:focus-visible {
+  background: var(--clay-medium, rgba(112, 87, 217, 0.18));
+  outline: none;
+}
+
+.wiki-link-menu {
+  position: fixed;
+  z-index: 1100;
+  width: min(320px, calc(100vw - 24px));
+  max-height: 330px;
+  overflow: auto;
+  padding: 6px;
+  border: 1px solid var(--line, #e8e6eb);
+  border-radius: 10px;
+  background: var(--surface, #fff);
+  box-shadow: var(--shadow-pop, 0 20px 46px rgba(26,22,34,0.12));
+}
+
+.wiki-link-menu-header {
+  padding: 7px 8px 8px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid var(--line, #e8e6eb);
+  color: var(--ink, #24222a);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.wiki-link-menu-header small {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink-muted, #9a96a3);
+  font-size: 9px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wiki-link-menu-item {
+  width: 100%;
+  min-height: 34px;
+  margin-top: 3px;
+  padding: 6px 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink, #24222a);
+  text-align: left;
+  cursor: pointer;
+}
+
+.wiki-link-menu-item:hover,
+.wiki-link-menu-item.selected {
+  background: var(--surface-hover, #f7f6fa);
+}
+
+.wiki-link-menu-icon {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+  background: var(--clay-light, rgba(112,87,217,0.1));
+  color: var(--clay, #7057d9);
+  font-size: 10px;
+}
+
+.wiki-link-menu-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 550;
+}
+
+.wiki-link-menu-empty,
+.wiki-link-menu-footer {
+  padding: 9px 8px;
+  color: var(--ink-muted, #9a96a3);
+  font-size: 9px;
+}
+
+.wiki-link-menu-footer {
+  margin-top: 4px;
+  border-top: 1px solid var(--line, #e8e6eb);
+}
