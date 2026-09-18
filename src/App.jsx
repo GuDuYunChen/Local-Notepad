@@ -18,6 +18,7 @@ import ErrorBoundary from './components/ErrorBoundary'
 export default function App() {
   const editorRef = useRef(null)
   const titleInputRef = useRef(null)
+  const skipTitleCommitRef = useRef(false)
   const [ready, setReady] = useState(false)
   const [workspace, setWorkspace] = useState('notes')
   const [inspectorOpen, setInspectorOpen] = useState(false)
@@ -93,6 +94,7 @@ export default function App() {
 
   const beginTitleEdit = React.useCallback(() => {
     if (workspace !== 'notes' || !current || current.is_folder || titleSaving) return
+    skipTitleCommitRef.current = false
     setTitleDraft(current.title || '')
     setTitleEditing(true)
     window.requestAnimationFrame(() => {
@@ -102,11 +104,16 @@ export default function App() {
   }, [workspace, current, titleSaving])
 
   const cancelTitleEdit = React.useCallback(() => {
+    skipTitleCommitRef.current = true
     setTitleDraft(current?.title || '')
     setTitleEditing(false)
   }, [current?.title])
 
   const commitTitleEdit = React.useCallback(async () => {
+    if (skipTitleCommitRef.current) {
+      skipTitleCommitRef.current = false
+      return
+    }
     if (!titleEditing || !current?.id || titleSaving) return
 
     const nextTitle = titleDraft.trim()
@@ -281,10 +288,11 @@ export default function App() {
                       onKeyDown={event => {
                         if (event.key === 'Enter') {
                           event.preventDefault()
-                          void commitTitleEdit()
+                          event.currentTarget.blur()
                         } else if (event.key === 'Escape') {
                           event.preventDefault()
                           cancelTitleEdit()
+                          event.currentTarget.blur()
                         }
                       }}
                       aria-label="当前笔记标题"
