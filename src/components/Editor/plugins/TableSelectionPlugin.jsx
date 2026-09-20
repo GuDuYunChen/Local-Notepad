@@ -3,6 +3,7 @@ import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext
 import { $getRoot, $createParagraphNode, FORMAT_ELEMENT_COMMAND, $getSelection } from 'lexical'
 import { TableNode, TableRowNode, TableCellNode, $createTableCellNode, $createTableRowNode, TableCellHeaderStates } from '@lexical/table'
 import { $getNodeByKey } from 'lexical'
+import { toast } from '~/services/toast'
 
 export default function TableSelectionPlugin() {
   const [editor] = useLexicalComposerContext()
@@ -17,7 +18,7 @@ export default function TableSelectionPlugin() {
   const [addBtnPos, setAddBtnPos] = useState(null)
 
   useEffect(() => {
-    const onMode = (e) => { setActive(!!e.detail); if (!e.detail) setBoxes([]) }
+    const onMode = (e) => { setActive(!!e.detail); if (!e.detail) setRects([]) }
     window.addEventListener('tableSelection:mode', onMode)
     return () => window.removeEventListener('tableSelection:mode', onMode)
   }, [])
@@ -25,7 +26,7 @@ export default function TableSelectionPlugin() {
   useEffect(() => {
     const onAction = (e) => {
       const { type, payload } = e.detail || {}
-      if (type === 'mergeCells') { if (!rects[0]) { alert('请先框选多个单元格再合并'); return } doMerge() }
+      if (type === 'mergeCells') { if (!rects[0]) { toast.warning('请先框选多个单元格'); return } doMerge() }
       else if (type === 'splitCells') doSplit()
       else if (type === 'alignVertical') applyAlign(payload)
       else if (type === 'alignHorizontal') applyHorizontal(payload)
@@ -94,7 +95,7 @@ export default function TableSelectionPlugin() {
       const b = getCell(e.target) || a
       const ai = indexOf(a), bi = indexOf(b)
       if (!ai.table || ai.table !== bi.table) return
-      const r1 = Math.min(ai.c, bi.r), r2 = Math.max(ai.r, bi.r)
+      const r1 = Math.min(ai.r, bi.r), r2 = Math.max(ai.r, bi.r)
       const c1 = Math.min(ai.c, bi.c), c2 = Math.max(ai.c, bi.c)
       const key = `${ai.tableIndex}-${r1}-${c1}-${r2}-${c2}`
       if (key === lastKey) return
@@ -180,7 +181,6 @@ export default function TableSelectionPlugin() {
       
       m.appendChild(make('按首列升序', () => sortByFirstCol('asc')))
       m.appendChild(make('按首列降序', () => sortByFirstCol('desc')))
-      m.appendChild(make('筛选文本…', () => { const q = window.prompt('筛选包含文本：'); if (q) filterRowsContains(q) }))
       m.appendChild(make('分页(10行)', () => paginateRows(10)))
 
       document.body.appendChild(m)
