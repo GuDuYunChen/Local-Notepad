@@ -2,7 +2,17 @@ import React from 'react'
 import ThemeToggle from './ThemeToggle'
 
 const Icon = ({ children }) => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <svg
+    width="19"
+    height="19"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
     {children}
   </svg>
 )
@@ -11,44 +21,52 @@ export default function NavigationRail({
   activeWorkspace,
   onChangeWorkspace,
   onOpenSearch,
-  onOpenBackup,
-  onOpenShortcuts,
 }) {
-  const items = [
+  const primaryItems = [
     {
       id: 'notes',
-      label: '笔记',
-      icon: <Icon><path d="M4 4h16v16H4z" /><path d="M8 8h8M8 12h8M8 16h5" /></Icon>,
+      label: '笔记列表',
+      icon: <Icon><path d="M5 4h14v16H5z" /><path d="M8 8h8M8 12h8M8 16h5" /></Icon>,
     },
     {
       id: 'daily',
       label: '每日笔记',
-      icon: <Icon><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 10h18" /><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01" /></Icon>,
+      icon: <Icon><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 10h18" /></Icon>,
     },
     {
       id: 'graph',
       label: '知识图谱',
-      icon: <Icon><circle cx="12" cy="12" r="2.5" /><circle cx="5" cy="6" r="2" /><circle cx="19" cy="6" r="2" /><circle cx="5" cy="18" r="2" /><circle cx="19" cy="18" r="2" /><path d="m7 7.5 3 3M17 7.5l-3 3M7 16.5l3-3M17 16.5l-3-3" /></Icon>,
-    },
-    {
-      id: 'trash',
-      label: '回收站',
-      icon: <Icon><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5" /></Icon>,
+      icon: <Icon><circle cx="12" cy="12" r="2.5" /><circle cx="5" cy="7" r="2" /><circle cx="19" cy="7" r="2" /><path d="m7 8 3 2M17 8l-3 2M12 14v5" /></Icon>,
     },
   ]
 
   return (
-    <nav className="navigation-rail" aria-label="主导航">
-      <div className="navigation-brand" title="Local Notepad" aria-label="Local Notepad">N</div>
+    <nav className="navigation-rail minimal-navigation-rail" aria-label="主导航">
+      <button
+        type="button"
+        className="navigation-brand minimal-navigation-brand"
+        onClick={() => onChangeWorkspace('notes')}
+        title="我的笔记"
+        aria-label="我的笔记"
+      >
+        N
+      </button>
 
       <div className="navigation-primary">
-        <button className="rail-btn" onClick={onOpenSearch} title="快速搜索 (Ctrl+K)" aria-label="快速搜索">
+        <button
+          type="button"
+          className="rail-btn rail-search"
+          onClick={onOpenSearch}
+          title="搜索 (Ctrl+K)"
+          aria-label="搜索笔记"
+        >
           <Icon><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></Icon>
         </button>
-        <div className="navigation-divider" />
-        {items.map(item => (
+
+        {primaryItems.map(item => (
           <button
             key={item.id}
+            type="button"
             className={`rail-btn${activeWorkspace === item.id ? ' active' : ''}`}
             onClick={() => onChangeWorkspace(item.id)}
             title={item.label}
@@ -62,19 +80,24 @@ export default function NavigationRail({
 
       <div className="navigation-secondary">
         <button
+          type="button"
+          className={`rail-btn${activeWorkspace === 'trash' ? ' active' : ''}`}
+          onClick={() => onChangeWorkspace('trash')}
+          title="回收站"
+          aria-label="回收站"
+          aria-pressed={activeWorkspace === 'trash'}
+        >
+          <Icon><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13" /></Icon>
+        </button>
+        <button
+          type="button"
           className={`rail-btn${activeWorkspace === 'settings' ? ' active' : ''}`}
           onClick={() => onChangeWorkspace('settings')}
-          title="设置与诊断"
-          aria-label="设置与诊断"
+          title="设置"
+          aria-label="设置"
           aria-pressed={activeWorkspace === 'settings'}
         >
-          <Icon><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21h-4v-.09A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3v-4h.09A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3h4v.09A1.7 1.7 0 0 0 15.4 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 .6 1 1.7 1.7 0 0 0 1.1.4H21v4h-.09a1.7 1.7 0 0 0-1.51.6z" /></Icon>
-        </button>
-        <button className="rail-btn" onClick={onOpenBackup} title="备份与恢复" aria-label="备份与恢复">
-          <Icon><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><path d="M7 3v6h8V4M7 21v-8h10v8" /></Icon>
-        </button>
-        <button className="rail-btn" onClick={onOpenShortcuts} title="快捷键" aria-label="快捷键">
-          <Icon><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M7 13h10M9 16h6" /></Icon>
+          <Icon><circle cx="12" cy="12" r="3" /><path d="M19 12a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z" /></Icon>
         </button>
         <div className="rail-theme">
           <ThemeToggle />
