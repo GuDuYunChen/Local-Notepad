@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react'
+import React, { useEffect, useId, useMemo, useState } from 'react'
 
-export default function NameDialog({ 
-  defaultName = '未命名.md', 
-  onConfirm, 
-  onCancel, 
-  title = '新建文件', 
-  message = '请输入文件名（可包含扩展名）：', 
+export default function NameDialog({
+  defaultName = '未命名.md',
+  onConfirm,
+  onCancel,
+  title = '新建笔记',
+  message = '给这篇笔记起个名字：',
   validate,
   showFormatSelect = false,
   currentPathLabel = '',
@@ -15,155 +15,182 @@ export default function NameDialog({
   const [name, setName] = useState(defaultName)
   const [format, setFormat] = useState('.md')
   const [err, setErr] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [showOptions, setShowOptions] = useState(false)
+  const inputId = useId()
+  const descriptionId = useId()
 
   useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') onCancel() }
+    const onKey = (event) => {
+      if (event.key === 'Escape' && !submitting) onCancel?.()
+    }
     document.addEventListener('keydown', onKey)
-    
-    // Initialize format from defaultName
+
     if (showFormatSelect) {
-        const match = defaultName.match(/\.[^.]+$/);
-        if (match) {
-            const ext = match[0];
-            if (['.md', '.txt', '.docx'].includes(ext)) {
-                setFormat(ext);
-                // Strip extension from name
-                setName(defaultName.substring(0, defaultName.lastIndexOf('.')));
-            } else {
-                setName(defaultName);
-            }
-        } else {
-            setName(defaultName);
-        }
+      const match = defaultName.match(/\.[^.]+$/)
+      if (match && ['.md', '.txt', '.docx'].includes(match[0])) {
+        setFormat(match[0])
+        setName(defaultName.substring(0, defaultName.lastIndexOf('.')))
+      } else {
+        setName(defaultName)
+      }
     } else if (isRename) {
-        // In Rename mode, strip extension and store it in format
-        const lastDot = defaultName.lastIndexOf('.');
-        if (lastDot > 0) {
-            setFormat(defaultName.substring(lastDot));
-            setName(defaultName.substring(0, lastDot));
-        } else {
-            setName(defaultName);
-            setFormat('');
-        }
+      const lastDot = defaultName.lastIndexOf('.')
+      if (lastDot > 0) {
+        setFormat(defaultName.substring(lastDot))
+        setName(defaultName.substring(0, lastDot))
+      } else {
+        setName(defaultName)
+        setFormat('')
+      }
     } else {
-        setName(defaultName);
+      setName(defaultName)
     }
-    
+
     return () => document.removeEventListener('keydown', onKey)
-  }, [onCancel, showFormatSelect, defaultName, isRename])
+  }, [onCancel, showFormatSelect, defaultName, isRename, submitting])
 
-  const ok = async () => {
-    const n = name.trim()
-    if (!n) { setErr('文件名不能为空'); return }
+  const formatLabel = useMemo(() => ({
+    '.md': '标准笔记',
+    '.txt': '纯文本',
+    '.docx': 'Word 文档',
+  }[format] || format), [format])
+
+  const submit = async (event) => {
+    event?.preventDefault()
+    if (submitting) return
+
+    const nextName = name.trim()
+    if (!nextName) {
+      setErr('请输入名称')
+      return
+    }
+
     if (validate) {
-      const m = validate(n)
-      if (m) { setErr(m); return }
+      const validationMessage = validate(nextName)
+      if (validationMessage) {
+        setErr(validationMessage)
+        return
+      }
     }
-    // Pass format separately or combine?
-    // Parent expects onConfirm(name, format) or just name.
-    // If showFormatSelect is true, we should probably pass both or combined.
-    // Let's pass both.
-    
-    setErr('') // Clear previous errors
-    
+
+    setErr('')
+    setSubmitting(true)
     try {
-        if (showFormatSelect || isRename) {
-            // If isRename, we might need to append format here or let parent handle it.
-            // FileList's onRenameConfirm expects (id, name, format) but logic there appends it.
-            // Actually FileList logic: "if we have a fixed format (from isRename mode), append it if missing"
-            // But here we stripped it. So we pass `n` (name part) and `format` (extension).
-            await onConfirm(n, format)
-        } else {
-            await onConfirm(n)
-        }
-    } catch (e) {
-        setErr(e.message || '操作失败')
+      if (showFormatSelect || isRename) {
+        await onConfirm(nextName, format)
+      } else {
+        await onConfirm(nextName)
+      }
+    } catch (error) {
+      setErr(error.message || '操作失败，请重试')
+      setSubmitting(false)
     }
   }
 
-  const handleFormatChange = (e) => {
-    const newFormat = e.target.value
-    setFormat(newFormat)
-    // No longer update name
-  }
-
-  const handleNameChange = (e) => {
-      setName(e.target.value)
-      // No longer sync format from name input, as name input shouldn't have extension
-  }
+  const hasSecondaryOptions = showFormatSelect || Boolean(currentPathLabel)
 
   return (
-    <div className="modal-overlay" role="dialog" aria-modal="true">
-      <div className="modal">
-        <div className="modal-title">{title}</div>
-        <div className="modal-message">{message}</div>
-        <div className="modal-input-row" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <input className="input" autoFocus value={name} onChange={handleNameChange} style={{ flex: 1 }} />
-            {showFormatSelect && (
-                <select className="select" value={format} onChange={handleFormatChange} style={{ width: 120 }}>
-                    <option value=".md">Markdown (.md)</option>
-                    <option value=".txt">纯文本 (.txt)</option>
-                    <option value=".docx">Word (.docx)</option>
-                </select>
-            )}
-            {isRename && format && (
-                <div className="static-ext" style={{ color: '#666', fontSize: 13 }}>{format}</div>
-            )}
+    <div
+      className="modal-overlay consumer-modal-overlay"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !submitting) onCancel?.()
+      }}
+    >
+      <form
+        className="modal consumer-modal name-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="name-dialog-title"
+        aria-describedby={descriptionId}
+        onSubmit={submit}
+      >
+        <div className="consumer-modal-heading">
+          <div className="modal-title" id="name-dialog-title">{title}</div>
+          <div className="modal-message" id={descriptionId}>{message}</div>
         </div>
-        {currentPathLabel && (
-            <div className="path-row">
-                <span className="path-text" title={currentPathLabel}>
-                    位置: {currentPathLabel}
-                </span>
-                {onPathSelect && (
-                    <button className="btn small" onClick={onPathSelect}>更改</button>
+
+        <div className="name-dialog-field">
+          <label htmlFor={inputId}>名称</label>
+          <div className="name-dialog-input-wrap">
+            <input
+              id={inputId}
+              className="input name-dialog-input"
+              autoFocus
+              value={name}
+              disabled={submitting}
+              onChange={(event) => {
+                setName(event.target.value)
+                if (err) setErr('')
+              }}
+              placeholder="例如：旅行计划"
+              aria-invalid={Boolean(err)}
+            />
+            {isRename && format && <span className="static-ext">{format}</span>}
+          </div>
+        </div>
+
+        {hasSecondaryOptions && (
+          <div className="name-dialog-secondary">
+            <button
+              type="button"
+              className="name-dialog-options-toggle"
+              aria-expanded={showOptions}
+              onClick={() => setShowOptions(prev => !prev)}
+            >
+              <span>更多选项</span>
+              <span aria-hidden="true">{showOptions ? '⌃' : '⌄'}</span>
+            </button>
+
+            {showOptions && (
+              <div className="name-dialog-options">
+                {showFormatSelect && (
+                  <label className="name-dialog-option-row">
+                    <span>
+                      <strong>保存格式</strong>
+                      <small>{formatLabel}</small>
+                    </span>
+                    <select
+                      className="select"
+                      value={format}
+                      disabled={submitting}
+                      onChange={(event) => setFormat(event.target.value)}
+                    >
+                      <option value=".md">标准笔记 (.md)</option>
+                      <option value=".txt">纯文本 (.txt)</option>
+                      <option value=".docx">Word (.docx)</option>
+                    </select>
+                  </label>
                 )}
-            </div>
+
+                {currentPathLabel && (
+                  <div className="name-dialog-option-row">
+                    <span>
+                      <strong>保存位置</strong>
+                      <small className="path-text" title={currentPathLabel}>{currentPathLabel}</small>
+                    </span>
+                    {onPathSelect && (
+                      <button type="button" className="btn small" onClick={onPathSelect} disabled={submitting}>
+                        更改
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         )}
-        {err && <div className="modal-error">{err}</div>}
-        <div className="modal-actions">
-          <button className="btn" onClick={onCancel}>取消</button>
-          <button className="btn primary" onClick={ok}>确定</button>
+
+        {err && <div className="modal-error" role="alert">{err}</div>}
+
+        <div className="modal-actions consumer-modal-actions">
+          <button type="button" className="btn" onClick={onCancel} disabled={submitting}>取消</button>
+          <button type="submit" className="btn primary" disabled={submitting}>
+            {submitting ? '正在处理…' : '确定'}
+          </button>
         </div>
-      </div>
-      <style>{`
-        .select {
-            padding: 4px 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            background: var(--bg);
-            color: var(--fg);
-        }
-        .path-row {
-            font-size: 12px;
-            color: #666;
-            margin-top: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background: rgba(128,128,128,0.08);
-            padding: 6px 10px;
-            border-radius: 6px;
-        }
-        .path-text {
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            max-width: 220px;
-            font-family: monospace;
-        }
-        .btn.small {
-            height: 24px;
-            padding: 0 8px;
-            font-size: 12px;
-            margin-left: 8px;
-        }
-        .modal-error {
-            color: #ff4d4f;
-            font-size: 13px;
-            margin-top: 8px;
-        }
-      `}</style>
+      </form>
     </div>
   )
 }
