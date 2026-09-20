@@ -610,6 +610,16 @@ export default function ToolbarPlugin() {
 
       <div className="toolbar-spacer" />
 
+      <button
+        type="button"
+        className="btn toolbar-text-btn toolbar-find-btn"
+        onClick={() => window.dispatchEvent(new Event('editor:open-search'))}
+        aria-label="文内查找与替换"
+        title="文内查找与替换 (Ctrl+F)"
+      >
+        查找
+      </button>
+
       <span className="toolbar-slash-hint">输入 / 快速插入</span>
       {isUploading && <span className="toolbar-progress">处理中…</span>}
 
