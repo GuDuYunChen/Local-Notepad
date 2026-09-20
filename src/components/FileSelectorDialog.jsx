@@ -111,6 +111,15 @@ export default function FileSelectorDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, mode, selectedFileId]);
 
+    useEffect(() => {
+        if (!open) return undefined;
+        const onKeyDown = (event) => {
+            if (event.key === 'Escape' && !processing) onClose?.();
+        };
+        document.addEventListener('keydown', onKeyDown);
+        return () => document.removeEventListener('keydown', onKeyDown);
+    }, [open, processing, onClose]);
+
     if (!open) return null;
 
     const handleExpand = (id, e) => {
