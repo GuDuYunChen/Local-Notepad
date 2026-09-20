@@ -1526,7 +1526,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
               {showNewMenu && (
                 <div className="dropdown-menu file-action-menu" ref={newMenuRef}>
                   <div className="menu-item" onClick={() => onNewFileCheck()}>
-                    <span>新建文件</span>
+                    <span>新建笔记</span>
                     <kbd>Ctrl+N</kbd>
                   </div>
                   <div className="menu-item" onClick={() => onNewFolderCheck()}>
@@ -1628,14 +1628,14 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
             ) : (
               <div className="empty-state">
                 <div className="empty-icon">📝</div>
-                <div className="empty-title">暂无文件</div>
-                <div className="empty-desc">开始创建你的第一篇笔记吧</div>
+                <div className="empty-title">还没有笔记</div>
+                <div className="empty-desc">写下第一条想法，之后都可以在这里继续整理。</div>
                 <div className="empty-actions">
-                  <button className="btn primary" onClick={() => onNewFileCheck()}>新建文件</button>
+                  <button className="btn primary" onClick={() => onNewFileCheck()}>新建笔记</button>
                   <button className="btn" onClick={() => onNewFolderCheck()}>新建文件夹</button>
                 </div>
                 <div className="empty-tips">
-                  <div>快捷键：Ctrl+N 新建文件 · Ctrl+Shift+N 新建文件夹</div>
+                  <div>快捷键：Ctrl+N 新建笔记 · Ctrl+Shift+N 新建文件夹</div>
                   <div>支持拖拽导入本地文件</div>
                 </div>
               </div>
@@ -1653,7 +1653,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
           >
               {contextMenu.item.is_folder && (
                   <>
-                    <div className="menu-item" onClick={() => onNewFileCheck(contextMenu.item.id)}>在此新建文件</div>
+                    <div className="menu-item" onClick={() => onNewFileCheck(contextMenu.item.id)}>在此新建笔记</div>
                     <div className="menu-item" onClick={() => onNewFolderCheck(contextMenu.item.id)}>在此新建文件夹</div>
                     <div className="divider"></div>
                   </>
@@ -1704,8 +1704,8 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       {naming && (
         <NameDialog
           defaultName={'未命名'}
-          title={'新建文件'}
-          message={'请输入文件名（不包含扩展名）：'}
+          title={'新建笔记'}
+          message={'给这篇笔记起个名字：'}
           validate={validateName}
           onConfirm={onNewFileConfirm}
           onCancel={() => setNaming(false)}
