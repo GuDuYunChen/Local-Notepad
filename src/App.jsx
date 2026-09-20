@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react'
 import TextEditor from './components/TextEditor'
 import FileList from './components/FileList'
-import NavigationRail from './components/NavigationRail'
+import ConsumerHeader from './components/ConsumerHeader'
 import { api } from '~/services/api'
 import ConfirmDialog from './components/ConfirmDialog'
 import ToastViewport from './components/ToastViewport'
@@ -230,8 +230,7 @@ export default function App() {
   useEffect(() => {
     function onMove(e) {
       if (!dragging) return
-      const rail = 52
-      const w = Math.min(420, Math.max(220, e.clientX - rail))
+      const w = Math.min(420, Math.max(220, e.clientX))
       setSidebarW(w)
       localStorage.setItem('sidebarWidth', String(w))
     }
@@ -308,7 +307,7 @@ export default function App() {
   return (
     <div className={`app-shell${focusMode ? ' focus-mode' : ''}`}>
       {!focusMode && (
-        <NavigationRail
+        <ConsumerHeader
           activeWorkspace={workspace}
           onChangeWorkspace={changeWorkspace}
           onOpenSearch={() => setQuickSearchOpen(true)}
@@ -318,11 +317,10 @@ export default function App() {
       )}
 
       <div className="app-surface">
-        {!focusMode && (
-          <header className="workspace-header">
+        {!focusMode && workspace === 'notes' && (
+          <header className="workspace-header consumer-document-header">
             <div className="workspace-heading">
-              <div className="workspace-kicker">{workspace === 'notes' ? 'Local Notepad' : '工作区'}</div>
-              {workspace === 'notes' && current && !current.is_folder ? (
+              {current && !current.is_folder ? (
                 <div className="workspace-document-title">
                   {titleEditing ? (
                     <input
@@ -371,7 +369,7 @@ export default function App() {
                   </span>
                 </div>
               ) : (
-                <div className="workspace-title" title={workspaceTitle}>{workspaceTitle}</div>
+                <div className="workspace-title" title="笔记">笔记</div>
               )}
             </div>
             <div className="workspace-header-actions">
