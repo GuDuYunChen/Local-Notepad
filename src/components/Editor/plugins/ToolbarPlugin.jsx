@@ -46,6 +46,7 @@ import { $createCalloutNode } from '../nodes/CalloutNode'
 import { $createDividerNode } from '../nodes/DividerNode'
 import { $createToggleNode } from '../nodes/ToggleNode'
 import { $createEmbedNode } from '../nodes/EmbedNode'
+import { $createAttachmentNode } from '../nodes/AttachmentNode'
 import { compressImage, generateVideoMetadata, loadXLSX, uploadFile } from '../utils/fileUpload'
 import { toast } from '~/services/toast'
 import TableMenu from './TableMenu'
@@ -320,6 +321,38 @@ export default function ToolbarPlugin() {
     } catch (error) {
       toast.error(error.message || '上传失败')
       return null
+    }
+  }
+
+  const handleAttachment = async (event) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    if (file.size > 100 * 1024 * 1024) {
+      toast.warning('单个附件不能超过 100 MB')
+      event.target.value = ''
+      return
+    }
+
+    setIsUploading(true)
+    try {
+      const result = await uploadFileSafe(file)
+      if (!result) return
+
+      editor.update(() => {
+        $insertNodes([
+          $createAttachmentNode({
+            src: result.url,
+            name: file.name,
+            size: file.size,
+            mime: file.type || '',
+          }),
+        ])
+      })
+      setInsertOpen(false)
+    } finally {
+      setIsUploading(false)
+      event.target.value = ''
     }
   }
 
@@ -664,6 +697,10 @@ export default function ToolbarPlugin() {
             <div className="toolbar-menu-section">
               <div className="toolbar-menu-label">内容块</div>
               <div className="toolbar-menu-grid toolbar-insert-grid">
+                <label className="btn toolbar-menu-action">
+                  附件
+                  <input type="file" hidden onChange={handleAttachment} />
+                </label>
                 <label className="btn toolbar-menu-action">
                   图片
                   <input type="file" accept="image/*" multiple hidden onChange={handleImage} />
