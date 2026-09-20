@@ -44,6 +44,7 @@ import { EmbedNode } from "./nodes/EmbedNode";
 import { InlineCodeNode } from "./nodes/InlineCodeNode";
 import { MentionNode } from "./nodes/MentionNode";
 import { WikiLinkNode } from "./nodes/WikiLinkNode";
+import { AttachmentNode } from "./nodes/AttachmentNode";
 import './Editor.css';
 import './nodes/BlockNodes.css';
 
@@ -143,7 +144,8 @@ const EDITOR_NODES = [
   CodeBlockNode,
   TodoNode, DividerNode, CalloutNode,
   ToggleNode, EmbedNode,
-  InlineCodeNode, MentionNode, WikiLinkNode
+  InlineCodeNode, MentionNode, WikiLinkNode,
+  AttachmentNode
 ];
 
 export default function Editor({ initialContent, onChange, readOnly }) {
