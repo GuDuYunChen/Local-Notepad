@@ -1,5 +1,6 @@
-import { DecoratorNode } from 'lexical'
-import React, { useState } from 'react'
+import { $getNodeByKey, DecoratorNode } from 'lexical'
+import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
+import React, { useEffect, useState } from 'react'
 
 const CALLOUT_ICONS = ['💡', '⚠️', 'ℹ️', '✅', '❌', '📌', '🔔', '💬']
 
@@ -17,7 +18,7 @@ export class CalloutNode extends DecoratorNode {
 
   static importJSON(serializedNode) {
     const { icon, text } = serializedNode
-    return new CalloutNode(icon, text)
+    return new CalloutNode(icon || '💡', text || '')
   }
 
   exportJSON() {
@@ -71,46 +72,71 @@ export class CalloutNode extends DecoratorNode {
 }
 
 function CalloutComponent({ nodeKey, icon, text }) {
-  const [currentIcon, setCurrentIcon] = useState(icon)
-  const [editText, setEditText] = useState(text || '提示内容')
+  const [editor] = useLexicalComposerContext()
+  const [currentIcon, setCurrentIcon] = useState(icon || '💡')
+  const [editText, setEditText] = useState(text || '')
   const [showIconPicker, setShowIconPicker] = useState(false)
 
-  const handleIconSelect = (newIcon) => {
-    setCurrentIcon(newIcon)
+  useEffect(() => setCurrentIcon(icon || '💡'), [icon])
+  useEffect(() => setEditText(text || ''), [text])
+
+  const persist = (patch) => {
+    editor.update(() => {
+      const node = $getNodeByKey(nodeKey)
+      if (!$isCalloutNode(node)) return
+      if (patch.icon !== undefined) node.setIcon(patch.icon)
+      if (patch.text !== undefined) node.setText(patch.text)
+    })
+  }
+
+  const handleIconSelect = (nextIcon) => {
+    setCurrentIcon(nextIcon)
     setShowIconPicker(false)
+    persist({ icon: nextIcon })
+  }
+
+  const handleTextChange = (event) => {
+    const next = event.target.value
+    setEditText(next)
+    persist({ text: next })
   }
 
   return (
     <div className="callout-block">
       <div className="callout-header">
         <button
+          type="button"
           className="callout-icon-btn"
-          onClick={() => setShowIconPicker(!showIconPicker)}
-          aria-label="选择图标"
+          onClick={() => setShowIconPicker(prev => !prev)}
+          aria-label="选择提示图标"
+          aria-expanded={showIconPicker}
         >
           {currentIcon}
         </button>
+
         {showIconPicker && (
           <div className="callout-icon-picker">
-            {CALLOUT_ICONS.map((ic) => (
+            {CALLOUT_ICONS.map(item => (
               <button
-                key={ic}
+                type="button"
+                key={item}
                 className="callout-icon-option"
-                onClick={() => handleIconSelect(ic)}
-                aria-label={`选择图标 ${ic}`}
+                onClick={() => handleIconSelect(item)}
+                aria-label={`选择图标 ${item}`}
               >
-                {ic}
+                {item}
               </button>
             ))}
           </div>
         )}
       </div>
+
       <div className="callout-content">
         <textarea
           value={editText}
-          onChange={(e) => setEditText(e.target.value)}
+          onChange={handleTextChange}
           className="callout-textarea"
-          placeholder="输入提示内容..."
+          placeholder="输入提示、结论或注意事项…"
           rows={3}
         />
       </div>
