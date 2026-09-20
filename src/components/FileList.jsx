@@ -1549,8 +1549,8 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
               <button
                 className={`icon-btn file-more-btn${showLibraryMenu ? ' active' : ''}`}
                 onClick={() => setShowLibraryMenu(prev => !prev)}
-                title="更多资料库操作"
-                aria-label="更多资料库操作"
+                title="更多笔记操作"
+                aria-label="更多笔记操作"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                   <circle cx="5" cy="12" r="1.8"/>
@@ -1630,7 +1630,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
             q ? (
               <div className="empty-state search-empty">
                 <div className="empty-icon">🔍</div>
-                <div className="empty-title">未找到匹配的文件</div>
+                <div className="empty-title">没有找到匹配的笔记</div>
                 <div className="empty-desc">尝试使用其他关键词搜索</div>
               </div>
             ) : (
