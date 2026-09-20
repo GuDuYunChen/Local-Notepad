@@ -72,6 +72,7 @@ const theme = {
     bold: 'editor-text-bold',
     italic: 'editor-text-italic',
     underline: 'editor-text-underline',
+    code: 'inline-code',
     strikethrough: 'editor-text-strikethrough',
     underlineStrikethrough: 'editor-text-underlineStrikethrough',
   },
