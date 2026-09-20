@@ -5,7 +5,7 @@
   justify-content: center;
   width: 24px;
   height: 24px;
-  cursor: pointer;
+  cursor: grab;
   border-radius: 4px;
   background: transparent;
   transition: background-color 0.15s ease;
@@ -124,4 +124,9 @@
   font-size: 9px;
   text-transform: none;
   letter-spacing: 0;
+}
+
+
+.block-handle:active {
+  cursor: grabbing;
 }
