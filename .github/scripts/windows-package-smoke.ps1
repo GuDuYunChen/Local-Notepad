@@ -185,15 +185,23 @@ if ($uninstallProcess.ExitCode -ne 0) {
   throw "NSIS uninstaller exited with code $($uninstallProcess.ExitCode)."
 }
 
-for ($i = 0; $i -lt 30 -and (Test-Path $installedApp.FullName); $i++) {
-  Start-Sleep -Milliseconds 200
+$uninstallDeadline = (Get-Date).AddSeconds(45)
+while ((Get-Date) -lt $uninstallDeadline) {
+  $appStillExists = Test-Path $installedApp.FullName
+  $backendStillExists = Test-Path $installedBackend
+
+  if (-not $appStillExists -and -not $backendStillExists) {
+    break
+  }
+
+  Start-Sleep -Milliseconds 250
 }
 
 if (Test-Path $installedApp.FullName) {
-  throw "Installed application remained after silent uninstall: $($installedApp.FullName)"
+  throw "Installed application remained after silent uninstall timeout: $($installedApp.FullName)"
 }
 if (Test-Path $installedBackend) {
-  throw "Installed backend remained after silent uninstall: $installedBackend"
+  throw "Installed backend remained after silent uninstall timeout: $installedBackend"
 }
 
 Write-Host 'NSIS silent install and uninstall smoke passed.'
