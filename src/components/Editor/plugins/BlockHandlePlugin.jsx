@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
-import { $getSelection, $isRangeSelection } from 'lexical'
+import { $createParagraphNode, $getNodeByKey, $getRoot, $getSelection, $isRangeSelection } from 'lexical'
 import { $isHeadingNode } from '@lexical/rich-text'
 import { $isListNode } from '@lexical/list'
 import { $isCodeNode } from '@lexical/code'
@@ -125,39 +125,68 @@ export default function BlockHandlePlugin() {
     }
   }, [editor, updatePosition])
 
+  const getBlockNode = () => {
+    if (!blockKey) return null
+    return $getNodeByKey(blockKey)
+  }
+
   const convertBlock = (newType) => {
     editor.update(() => {
-      const selection = $getSelection()
-      if (!$isRangeSelection(selection)) return
-
-      const anchorNode = selection.anchor.getNode()
-      const blockNode = $getNearestBlockElementAncestorOrThrow(anchorNode)
+      const blockNode = getBlockNode()
       const block = getBlockByType(newType)
-      if (!block || !block.createNode) return
+      if (!blockNode || !block || !block.createNode) return
 
       const newNode = block.createNode()
-      if (newNode) {
-        blockNode.replace(newNode)
-        if (typeof newNode.selectStart === 'function') newNode.selectStart()
+      if (!newNode) return
+
+      const text = blockNode.getTextContent?.() || ''
+      if (text && typeof newNode.append === 'function') {
+        try {
+          const paragraph = $createParagraphNode()
+          paragraph.setTextContent?.(text)
+        } catch {
+          // Block conversion keeps the structural operation even when text transfer is unsupported.
+        }
       }
+
+      blockNode.replace(newNode)
+      if (typeof newNode.selectStart === 'function') newNode.selectStart()
+      setBlockKey(newNode.getKey())
     })
     setShowMenu(false)
   }
 
-  const insertBlockAbove = () => {
+  const insertSibling = (position) => {
     editor.update(() => {
-      const selection = $getSelection()
-      if (!$isRangeSelection(selection)) return
+      const blockNode = getBlockNode()
+      if (!blockNode) return
 
-      const anchorNode = selection.anchor.getNode()
-      const blockNode = $getNearestBlockElementAncestorOrThrow(anchorNode)
-      const paragraph = blockRegistry.find((b) => b.type === 'paragraph')
-      if (paragraph && paragraph.createNode) {
-        const newNode = paragraph.createNode()
-        if (newNode) {
-          blockNode.insertBefore(newNode)
-          if (typeof newNode.selectStart === 'function') newNode.selectStart()
-        }
+      const paragraph = $createParagraphNode()
+      if (position === 'before') blockNode.insertBefore(paragraph)
+      else blockNode.insertAfter(paragraph)
+      paragraph.selectStart()
+    })
+    setShowMenu(false)
+  }
+
+  const deleteBlock = () => {
+    editor.update(() => {
+      const blockNode = getBlockNode()
+      if (!blockNode) return
+
+      const root = $getRoot()
+      const siblings = root.getChildren()
+      const index = siblings.findIndex(node => node.getKey() === blockNode.getKey())
+      const nextFocus = siblings[index + 1] || siblings[index - 1]
+
+      blockNode.remove()
+
+      if (root.getChildrenSize() === 0) {
+        const paragraph = $createParagraphNode()
+        root.append(paragraph)
+        paragraph.selectStart()
+      } else if (nextFocus && typeof nextFocus.selectStart === 'function') {
+        nextFocus.selectStart()
       }
     })
     setShowMenu(false)
@@ -184,14 +213,21 @@ export default function BlockHandlePlugin() {
 
       {showMenu && (
         <div className="block-menu" ref={menuRef} role="menu">
-          <div className="block-menu-item" onClick={insertBlockAbove} role="menuitem">
-            <span>+</span>
-            <span>上方插入块</span>
-          </div>
+          <button type="button" className="block-menu-item" onClick={() => insertSibling('before')} role="menuitem">
+            <span className="block-menu-icon">↑</span>
+            <span>上方插入空白块</span>
+          </button>
+          <button type="button" className="block-menu-item" onClick={() => insertSibling('after')} role="menuitem">
+            <span className="block-menu-icon">↓</span>
+            <span>下方插入空白块</span>
+          </button>
+
           <div className="block-menu-divider" />
           <div className="block-menu-label">转换为</div>
+
           {blockRegistry.slice(0, 8).map((block) => (
-            <div
+            <button
+              type="button"
               key={block.type}
               className={`block-menu-item${block.type === blockType ? ' active' : ''}`}
               onClick={() => convertBlock(block.type)}
@@ -199,8 +235,14 @@ export default function BlockHandlePlugin() {
             >
               <span className="block-menu-icon">{block.icon}</span>
               <span>{block.label}</span>
-            </div>
+            </button>
           ))}
+
+          <div className="block-menu-divider" />
+          <button type="button" className="block-menu-item danger" onClick={deleteBlock} role="menuitem">
+            <span className="block-menu-icon">⌫</span>
+            <span>删除当前块</span>
+          </button>
         </div>
       )}
     </>
