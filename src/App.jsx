@@ -71,9 +71,8 @@ export default function App() {
       wordCount: 0,
     })
     setWorkspace('notes')
-    if (typeof window !== 'undefined' && window.innerWidth <= 720) {
-      setSidebarCollapsed(true)
-    }
+    setSidebarCollapsed(true)
+    localStorage.setItem('sidebarCollapsedV3', 'true')
 
     if (f && deletedIds.has(f.id)) {
       setDeletedIds(prev => {
