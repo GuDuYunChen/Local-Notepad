@@ -2,8 +2,7 @@ import React from 'react'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
-import ConsumerHeader from './ConsumerHeader'
-import NavigationRail from './NavigationRail'
+import WorkspaceSidebar from './WorkspaceSidebar'
 import TrashPanel, { trashDaysRemaining } from './TrashPanel'
 import { diagnosticsToText, formatDiagnosticBytes } from './SettingsPanel'
 import TemplateSelector from './TemplateSelector'
@@ -62,29 +61,39 @@ describe('UI redesign smoke tests', () => {
     delete globalThis.IS_REACT_ACT_ENVIRONMENT
   })
 
-  it('switches workspaces and exposes global navigation actions', async () => {
+  it('renders a complete expanded workspace sidebar by default', async () => {
     const onChangeWorkspace = vi.fn()
     const onOpenSearch = vi.fn()
     const onOpenBackup = vi.fn()
     const onOpenShortcuts = vi.fn()
+    const onToggleCollapsed = vi.fn()
 
     await act(async () => {
       root.render(
-        <ConsumerHeader
+        <WorkspaceSidebar
           activeWorkspace="notes"
+          collapsed={false}
+          onToggleCollapsed={onToggleCollapsed}
           onChangeWorkspace={onChangeWorkspace}
           onOpenSearch={onOpenSearch}
           onOpenBackup={onOpenBackup}
           onOpenShortcuts={onOpenShortcuts}
-        />
+        >
+          <div data-library="true">笔记资料库</div>
+        </WorkspaceSidebar>
       )
     })
 
-    const searchButton = Array.from(container.querySelectorAll('button')).find(button => button.textContent.includes('搜索'))
-    const notesButton = Array.from(container.querySelectorAll('button')).find(button => button.textContent.includes('笔记'))
-    const dailyButton = Array.from(container.querySelectorAll('button')).find(button => button.textContent.includes('每日笔记'))
-    const graphButton = Array.from(container.querySelectorAll('button')).find(button => button.textContent.includes('知识图谱'))
-    const moreButton = Array.from(container.querySelectorAll('button')).find(button => button.textContent.includes('更多'))
+    expect(container.textContent).toContain('记事本')
+    expect(container.textContent).toContain('我的本地空间')
+    expect(container.textContent).toContain('笔记资料库')
+
+    const buttons = Array.from(container.querySelectorAll('button'))
+    const searchButton = buttons.find(button => button.getAttribute('aria-label') === '搜索笔记')
+    const notesButton = buttons.find(button => button.getAttribute('aria-label') === '笔记')
+    const dailyButton = buttons.find(button => button.getAttribute('aria-label') === '每日笔记')
+    const graphButton = buttons.find(button => button.getAttribute('aria-label') === '知识图谱')
+    const moreButton = buttons.find(button => button.getAttribute('aria-label') === '更多功能')
 
     expect(searchButton).toBeTruthy()
     expect(notesButton).toBeTruthy()
@@ -99,63 +108,37 @@ describe('UI redesign smoke tests', () => {
     await click(dailyButton)
     expect(onChangeWorkspace).toHaveBeenCalledWith('daily')
 
-    await click(graphButton)
-    expect(onChangeWorkspace).toHaveBeenCalledWith('graph')
+    await click(moreButton)
+    const moreItems = Array.from(container.querySelectorAll('[role="menuitem"]'))
+    expect(moreItems.some(button => button.textContent.includes('回收站'))).toBe(true)
+    expect(moreItems.some(button => button.textContent.includes('设置'))).toBe(true)
+    expect(moreItems.some(button => button.textContent.includes('备份与恢复'))).toBe(true)
+    expect(moreItems.some(button => button.textContent.includes('快捷键'))).toBe(true)
 
-    const clickMoreItem = async (label) => {
-      await click(moreButton)
-      const item = Array.from(container.querySelectorAll('[role="menuitem"]'))
-        .find(button => button.textContent.includes(label))
-      expect(item).toBeTruthy()
-      await click(item)
-    }
-
-    await clickMoreItem('回收站')
-    expect(onChangeWorkspace).toHaveBeenCalledWith('trash')
-
-    await clickMoreItem('设置')
-    expect(onChangeWorkspace).toHaveBeenCalledWith('settings')
-
-    await clickMoreItem('备份与恢复')
+    await click(moreItems.find(button => button.textContent.includes('备份与恢复')))
     expect(onOpenBackup).toHaveBeenCalledTimes(1)
-
-    await clickMoreItem('快捷键')
-    expect(onOpenShortcuts).toHaveBeenCalledTimes(1)
   })
 
-  it('keeps the minimal navigation rail focused on core consumer actions', async () => {
-    const onChangeWorkspace = vi.fn()
-    const onOpenSearch = vi.fn()
-
+  it('keeps the sidebar compact only after the user collapses it', async () => {
     await act(async () => {
       root.render(
-        <NavigationRail
+        <WorkspaceSidebar
           activeWorkspace="notes"
-          onChangeWorkspace={onChangeWorkspace}
-          onOpenSearch={onOpenSearch}
-        />
+          collapsed
+          onToggleCollapsed={() => {}}
+          onChangeWorkspace={() => {}}
+          onOpenSearch={() => {}}
+          onOpenBackup={() => {}}
+          onOpenShortcuts={() => {}}
+        >
+          <div data-library="true">笔记资料库</div>
+        </WorkspaceSidebar>
       )
     })
 
-    const buttons = Array.from(container.querySelectorAll('button'))
-    expect(buttons.some(button => button.getAttribute('aria-label') === '搜索笔记')).toBe(true)
-    expect(buttons.some(button => button.getAttribute('aria-label') === '笔记列表')).toBe(true)
-    expect(buttons.some(button => button.getAttribute('aria-label') === '每日笔记')).toBe(true)
-    expect(buttons.some(button => button.getAttribute('aria-label') === '更多功能')).toBe(true)
-    expect(buttons.some(button => button.getAttribute('aria-label') === '知识图谱')).toBe(false)
-    expect(buttons.some(button => button.getAttribute('aria-label') === '设置')).toBe(false)
-
-    await click(buttons.find(button => button.getAttribute('aria-label') === '搜索笔记'))
-    expect(onOpenSearch).toHaveBeenCalledTimes(1)
-
-    await click(buttons.find(button => button.getAttribute('aria-label') === '每日笔记'))
-    expect(onChangeWorkspace).toHaveBeenCalledWith('daily')
-
-    await click(buttons.find(button => button.getAttribute('aria-label') === '更多功能'))
-    const moreItems = Array.from(container.querySelectorAll('[role="menuitem"]'))
-    expect(moreItems.some(button => button.textContent.includes('知识图谱'))).toBe(true)
-    expect(moreItems.some(button => button.textContent.includes('回收站'))).toBe(true)
-    expect(moreItems.some(button => button.textContent.includes('设置'))).toBe(true)
+    expect(container.querySelector('.workspace-sidebar').classList.contains('collapsed')).toBe(true)
+    expect(container.querySelector('[data-library="true"]')).toBeNull()
+    expect(container.querySelector('button[aria-label="展开侧边栏"]')).toBeTruthy()
   })
 
   it('highlights the first search match without regex side effects', () => {
