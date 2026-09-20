@@ -402,9 +402,9 @@ export default function FileSelectorDialog({
 
         let tooltip = node.title;
         if (isCurrent) {
-            tooltip = "当前文件正在阅读中，无法删除";
+            tooltip = "当前正在编辑，先切换到其他笔记再操作";
         } else if (isDisabled) {
-            tooltip = "该文件夹包含正在阅读的文件，无法删除";
+            tooltip = "这个文件夹包含当前正在编辑的笔记，暂时不能删除";
         }
 
         return (
@@ -445,89 +445,94 @@ export default function FileSelectorDialog({
     };
 
     return (
-        <div className="modal-overlay">
-            <div className="modal" style={{ width: 500, maxWidth: '90vw' }}>
-                <div className="modal-header">
-                    <h3>{title}</h3>
-                    <button className="close-btn" onClick={onClose}>×</button>
-                </div>
-                <div className="modal-body">
-                    <div className="toolbar">
-                        <button className="btn small" onClick={handleSelectAll}>
+        <div
+            className="modal-overlay consumer-modal-overlay"
+            role="presentation"
+            onMouseDown={(event) => {
+                if (event.target === event.currentTarget && !processing) onClose();
+            }}
+        >
+            <section
+                className="modal consumer-modal selector-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="selector-dialog-title"
+            >
+                <header className="selector-modal-header">
+                    <div>
+                        <div className="modal-title" id="selector-dialog-title">{title}</div>
+                        <div className="modal-message">
+                            {mode === 'single-folder'
+                                ? '选择一个位置，之后新内容会保存在这里。'
+                                : showDeleteWarning
+                                    ? '选择要移到回收站的内容。30 天内仍然可以恢复。'
+                                    : '选择需要处理的内容。'}
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        className="icon-btn selector-close-btn"
+                        onClick={onClose}
+                        disabled={processing}
+                        aria-label="关闭"
+                        title="关闭"
+                    >
+                        ×
+                    </button>
+                </header>
+
+                {showDeleteWarning && (
+                    <div className="selector-info-banner">
+                        当前正在编辑的笔记会自动保留，避免误删正在使用的内容。
+                    </div>
+                )}
+
+                <div className="selector-toolbar">
+                    {mode !== 'single-folder' ? (
+                        <button type="button" className="btn small" onClick={handleSelectAll} disabled={processing}>
                             {isAllSelected ? '取消全选' : '全选'}
                         </button>
-                        <span className="counter">已选择 {validSelectedIdsCount} 项</span>
-                    </div>
-                    <div className="tree-container">
-                        {mode === 'single-folder' && (
-                            <div 
-                                className={`tree-item ${singleSelectedId === '' ? 'selected' : ''}`}
-                                style={{ paddingLeft: 10 }}
-                                onClick={() => setSingleSelectedId('')}
-                            >
-                                <span className="toggle" style={{ visibility: 'hidden' }}></span>
-                                <span className="icon">🏠</span>
-                                <span className="title">根目录</span>
-                            </div>
-                        )}
-                        {tree.map(node => renderNode(node))}
-                    </div>
+                    ) : (
+                        <span>保存位置</span>
+                    )}
+                    <span className="selector-counter">
+                        {mode === 'single-folder'
+                            ? (singleSelectedId ? '已选择文件夹' : '顶层位置')
+                            : `已选择 ${validSelectedIdsCount} 项`}
+                    </span>
                 </div>
-                <div className="modal-footer">
-                    {processing && <span className="loading-text">{processingText}</span>}
+
+                <div className="selector-tree" aria-label={mode === 'single-folder' ? '选择文件夹' : '选择内容'}>
+                    {mode === 'single-folder' && (
+                        <div
+                            className={`tree-item selector-root-item ${singleSelectedId === '' ? 'selected' : ''}`}
+                            onClick={() => setSingleSelectedId('')}
+                        >
+                            <span className="toggle" aria-hidden="true" />
+                            <span className="icon" aria-hidden="true">⌂</span>
+                            <span className="title">我的笔记（顶层）</span>
+                        </div>
+                    )}
+                    {tree.map(node => renderNode(node))}
+                </div>
+
+                <footer className="selector-modal-footer">
+                    <span className="selector-processing" aria-live="polite">
+                        {processing ? processingText : ''}
+                    </span>
                     <div className="btn-group">
-                        <button className="btn" onClick={onClose}>取消</button>
-                        <button className="btn primary" onClick={handleConfirmAction} disabled={processing || (mode !== 'single-folder' && selectedIds.size === 0)}>
-                            {processing && <span className="spinner"></span>}
-                            {confirmText}
+                        <button type="button" className="btn" onClick={onClose} disabled={processing}>取消</button>
+                        <button
+                            type="button"
+                            className="btn primary"
+                            onClick={handleConfirmAction}
+                            disabled={processing || (mode !== 'single-folder' && selectedIds.size === 0)}
+                        >
+                            {processing ? processingText : confirmText}
                         </button>
                     </div>
-                </div>
-            </div>
-            <style>{`
-                .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-                .modal-header h3 { margin: 0; }
-                .close-btn { background: none; border: none; font-size: 20px; cursor: pointer; }
-                .modal-body .toolbar { display: flex; justify-content: space-between; align-items: center; padding-bottom: 8px; border-bottom: 1px solid #eee; margin-bottom: 8px; }
-                .tree-container { max-height: 60vh; overflow-y: auto; border: 1px solid #eee; border-radius: 4px; }
-                .tree-item { display: flex; align-items: center; padding: 4px 0; gap: 6px; cursor: default; }
-                .tree-item:hover { background: rgba(0,0,0,0.04); }
-                .tree-item.disabled:hover { background: transparent; }
-                .tree-item.selected { background: rgba(126, 91, 239, 0.1); color: var(--accent); }
-                .tree-item .toggle { cursor: pointer; width: 16px; text-align: center; font-size: 10px; color: var(--muted, #666); }
-                .tree-item input { cursor: pointer; }
-                .tree-item input:disabled { cursor: not-allowed; opacity: 0.5; filter: grayscale(100%); }
-                .tree-item.disabled input { opacity: 0.3; }
-                .tree-item.disabled { color: #aaa !important; }
-                .loading-text { margin-right: 12px; color: #666; }
-                .btn.small { height: 28px; padding: 0 8px; font-size: 12px; }
-                .modal-footer { 
-                    display: flex; 
-                    align-items: center; 
-                    margin-top: 16px; 
-                    position: relative;
-                    justify-content: end;
-                }
-                .modal-footer .btn-group {
-                    display: flex;
-                    gap: 12px; 
-                }
-                .modal-footer .loading-text {
-                    position: absolute;
-                    left: 0;
-                }
-                .spinner {
-                    display: inline-block;
-                    width: 12px;
-                    height: 12px;
-                    border: 2px solid rgba(255,255,255,0.3);
-                    border-radius: 50%;
-                    border-top-color: #fff;
-                    animation: spin 1s ease-in-out infinite;
-                    margin-right: 8px;
-                }
-                @keyframes spin { to { transform: rotate(360deg); } }
-            `}</style>
+                </footer>
+            </section>
         </div>
     );
 }
