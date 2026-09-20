@@ -141,15 +141,21 @@ describe('UI redesign smoke tests', () => {
     expect(buttons.some(button => button.getAttribute('aria-label') === '搜索笔记')).toBe(true)
     expect(buttons.some(button => button.getAttribute('aria-label') === '笔记列表')).toBe(true)
     expect(buttons.some(button => button.getAttribute('aria-label') === '每日笔记')).toBe(true)
-    expect(buttons.some(button => button.getAttribute('aria-label') === '知识图谱')).toBe(true)
-    expect(buttons.some(button => button.getAttribute('aria-label') === '设置')).toBe(true)
-    expect(buttons.some(button => button.textContent.includes('备份与恢复'))).toBe(false)
+    expect(buttons.some(button => button.getAttribute('aria-label') === '更多功能')).toBe(true)
+    expect(buttons.some(button => button.getAttribute('aria-label') === '知识图谱')).toBe(false)
+    expect(buttons.some(button => button.getAttribute('aria-label') === '设置')).toBe(false)
 
     await click(buttons.find(button => button.getAttribute('aria-label') === '搜索笔记'))
     expect(onOpenSearch).toHaveBeenCalledTimes(1)
 
     await click(buttons.find(button => button.getAttribute('aria-label') === '每日笔记'))
     expect(onChangeWorkspace).toHaveBeenCalledWith('daily')
+
+    await click(buttons.find(button => button.getAttribute('aria-label') === '更多功能'))
+    const moreItems = Array.from(container.querySelectorAll('[role="menuitem"]'))
+    expect(moreItems.some(button => button.textContent.includes('知识图谱'))).toBe(true)
+    expect(moreItems.some(button => button.textContent.includes('回收站'))).toBe(true)
+    expect(moreItems.some(button => button.textContent.includes('设置'))).toBe(true)
   })
 
   it('highlights the first search match without regex side effects', () => {
