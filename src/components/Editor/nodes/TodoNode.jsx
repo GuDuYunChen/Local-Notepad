@@ -1,5 +1,6 @@
-import { DecoratorNode } from 'lexical'
-import React, { useState } from 'react'
+import { $getNodeByKey, DecoratorNode } from 'lexical'
+import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
+import React, { useEffect, useState } from 'react'
 
 export class TodoNode extends DecoratorNode {
   __checked
@@ -15,7 +16,7 @@ export class TodoNode extends DecoratorNode {
 
   static importJSON(serializedNode) {
     const { checked, text } = serializedNode
-    return new TodoNode(checked, text)
+    return new TodoNode(Boolean(checked), text || '')
   }
 
   exportJSON() {
@@ -69,29 +70,43 @@ export class TodoNode extends DecoratorNode {
 }
 
 function TodoComponent({ nodeKey, checked, text }) {
-  const [isChecked, setIsChecked] = useState(checked)
-  const [editText, setEditText] = useState(text || '待办事项')
-  const [isEditing, setIsEditing] = useState(false)
+  const [editor] = useLexicalComposerContext()
+  const [isChecked, setIsChecked] = useState(Boolean(checked))
+  const [editText, setEditText] = useState(text || '')
+  const [isEditing, setIsEditing] = useState(!text)
+
+  useEffect(() => {
+    setIsChecked(Boolean(checked))
+  }, [checked])
+
+  useEffect(() => {
+    setEditText(text || '')
+  }, [text])
+
+  const persist = (patch) => {
+    editor.update(() => {
+      const node = $getNodeByKey(nodeKey)
+      if (!$isTodoNode(node)) return
+      if (patch.checked !== undefined) node.setChecked(patch.checked)
+      if (patch.text !== undefined) node.setText(patch.text)
+    })
+  }
 
   const handleToggle = () => {
-    setIsChecked(!isChecked)
+    const next = !isChecked
+    setIsChecked(next)
+    persist({ checked: next })
   }
 
-  const handleDoubleClick = () => {
-    setIsEditing(true)
+  const handleTextChange = (event) => {
+    const next = event.target.value
+    setEditText(next)
+    persist({ text: next })
   }
 
-  const handleBlur = () => {
+  const finishEditing = () => {
     setIsEditing(false)
-  }
-
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter') {
-      setIsEditing(false)
-    }
-    if (e.key === 'Escape') {
-      setIsEditing(false)
-    }
+    persist({ text: editText.trim() })
   }
 
   return (
@@ -103,20 +118,37 @@ function TodoComponent({ nodeKey, checked, text }) {
         className="todo-checkbox"
         aria-label="切换待办状态"
       />
+
       {isEditing ? (
         <input
           type="text"
           value={editText}
-          onChange={(e) => setEditText(e.target.value)}
-          onBlur={handleBlur}
-          onKeyDown={handleKeyDown}
+          onChange={handleTextChange}
+          onBlur={finishEditing}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault()
+              event.currentTarget.blur()
+            }
+            if (event.key === 'Escape') {
+              event.preventDefault()
+              setEditText(text || '')
+              event.currentTarget.blur()
+            }
+          }}
           className="todo-input"
+          placeholder="待办事项"
           autoFocus
         />
       ) : (
-        <span className="todo-text" onDoubleClick={handleDoubleClick}>
+        <button
+          type="button"
+          className="todo-text todo-text-button"
+          onClick={() => setIsEditing(true)}
+          title="点击编辑"
+        >
           {editText || '待办事项'}
-        </span>
+        </button>
       )}
     </div>
   )
