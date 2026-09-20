@@ -90,12 +90,31 @@ function normalizeItems(items) {
   }))
 }
 
+export function reorderImageGridItems(items, fromIndex, toIndex) {
+  const list = Array.isArray(items) ? [...items] : []
+  if (
+    fromIndex < 0 ||
+    toIndex < 0 ||
+    fromIndex >= list.length ||
+    toIndex >= list.length ||
+    fromIndex === toIndex
+  ) {
+    return list
+  }
+
+  const [moved] = list.splice(fromIndex, 1)
+  list.splice(toIndex, 0, moved)
+  return list
+}
+
 function ImageGridComponent({ nodeKey, items, columns, gap }) {
   const [editor] = useLexicalComposerContext()
   const [selected, setSelected] = useState(false)
   const [currentColumns, setCurrentColumns] = useState(columns || 3)
   const [currentGap, setCurrentGap] = useState(gap || 8)
   const [currentItems, setCurrentItems] = useState(() => normalizeItems(items))
+  const [dragIndex, setDragIndex] = useState(-1)
+  const [dragOverIndex, setDragOverIndex] = useState(-1)
   const wrapperRef = useRef(null)
 
   useEffect(() => setCurrentColumns(columns || 3), [columns])
@@ -142,6 +161,42 @@ function ImageGridComponent({ nodeKey, items, columns, gap }) {
     ))
     setCurrentItems(nextItems)
     updateNode({ items: nextItems })
+  }
+
+  const reorderItems = (fromIndex, toIndex) => {
+    const nextItems = reorderImageGridItems(currentItems, fromIndex, toIndex)
+    if (nextItems === currentItems) return
+    setCurrentItems(nextItems)
+    updateNode({ items: nextItems })
+  }
+
+  const handleDragStart = (event, index) => {
+    event.stopPropagation()
+    setSelected(true)
+    setDragIndex(index)
+    setDragOverIndex(index)
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', String(index))
+  }
+
+  const handleDragOver = (event, index) => {
+    if (dragIndex < 0 || index === dragOverIndex) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'move'
+    setDragOverIndex(index)
+  }
+
+  const handleDrop = (event, index) => {
+    event.preventDefault()
+    event.stopPropagation()
+    if (dragIndex >= 0) reorderItems(dragIndex, index)
+    setDragIndex(-1)
+    setDragOverIndex(-1)
+  }
+
+  const handleDragEnd = () => {
+    setDragIndex(-1)
+    setDragOverIndex(-1)
   }
 
   const removeItem = index => {
@@ -233,8 +288,27 @@ function ImageGridComponent({ nodeKey, items, columns, gap }) {
         }}
       >
         {currentItems.map((item, index) => (
-          <div key={`${item.src || item.alt || 'image'}-${index}`} className="editor-image-grid-card">
+          <div
+            key={`${item.src || item.alt || 'image'}-${index}`}
+            className={`editor-image-grid-card${dragIndex === index ? ' dragging' : ''}${dragOverIndex === index && dragIndex !== index ? ' drag-over' : ''}`}
+            onDragOver={event => handleDragOver(event, index)}
+            onDrop={event => handleDrop(event, index)}
+          >
             <div className="editor-image-grid-media">
+              {selected && (
+                <button
+                  type="button"
+                  className="editor-image-grid-drag"
+                  draggable
+                  onDragStart={event => handleDragStart(event, index)}
+                  onDragEnd={handleDragEnd}
+                  onClick={event => event.stopPropagation()}
+                  aria-label={`拖动图片 ${index + 1} 排序`}
+                  title="拖动排序"
+                >
+                  ⋮⋮
+                </button>
+              )}
               <img
                 src={item.src}
                 alt={item.alt || item.caption || ''}
