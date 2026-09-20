@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { api } from '~/services/api'
 import { toast } from '~/services/toast'
+import ConfirmDialog from './ConfirmDialog'
 
 const RETENTION_DAYS = 30
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -29,6 +30,8 @@ export default function TrashPanel({ onClose, onRestored }) {
   const [loading, setLoading] = useState(false)
   const [busyIds, setBusyIds] = useState(new Set())
   const [bulkBusy, setBulkBusy] = useState(false)
+  const [confirmAction, setConfirmAction] = useState(null)
+  const [confirmBusy, setConfirmBusy] = useState(false)
 
   const loadTrash = useCallback(async () => {
     setLoading(true)
@@ -127,13 +130,11 @@ export default function TrashPanel({ onClose, onRestored }) {
     }
   }
 
-  const deleteSelected = async () => {
-    if (selectedItems.length === 0 || bulkBusy) return
-    if (!window.confirm(`永久删除选中的 ${selectedItems.length} 项？此操作无法撤销。`)) return
-
+  const permanentlyDeleteSelected = async (targets) => {
+    if (targets.length === 0 || bulkBusy) return
     setBulkBusy(true)
     try {
-      const results = await Promise.all(selectedItems.map(item => permanentDeleteOne(item, true)))
+      const results = await Promise.all(targets.map(item => permanentDeleteOne(item, true)))
       const deleted = results.filter(result => result.ok).length
       const failed = results.length - deleted
       if (deleted) toast.success(`已永久删除 ${deleted} 项`)
@@ -145,8 +146,6 @@ export default function TrashPanel({ onClose, onRestored }) {
 
   const emptyTrash = async () => {
     if (items.length === 0 || bulkBusy) return
-    if (!window.confirm(`清空回收站中的 ${items.length} 项？所有内容将永久删除，无法恢复。`)) return
-
     setBulkBusy(true)
     try {
       await api('/api/files/trash', { method: 'DELETE' })
@@ -156,8 +155,53 @@ export default function TrashPanel({ onClose, onRestored }) {
     } catch (error) {
       console.error('清空回收站失败', error)
       toast.error(error.message || '清空回收站失败')
+      throw error
     } finally {
       setBulkBusy(false)
+    }
+  }
+
+  const requestDeleteSelected = () => {
+    const targets = [...selectedItems]
+    if (targets.length === 0 || bulkBusy) return
+    setConfirmAction({
+      title: `永久删除 ${targets.length} 项？`,
+      message: '删除后无法恢复。只有确定不再需要这些内容时才继续。',
+      confirmLabel: '永久删除',
+      run: () => permanentlyDeleteSelected(targets),
+    })
+  }
+
+  const requestEmptyTrash = () => {
+    const count = items.length
+    if (count === 0 || bulkBusy) return
+    setConfirmAction({
+      title: '清空回收站？',
+      message: `回收站中的 ${count} 项内容都会被永久删除，并且无法恢复。`,
+      confirmLabel: '清空回收站',
+      run: emptyTrash,
+    })
+  }
+
+  const requestDeleteOne = (item) => {
+    setConfirmAction({
+      title: '永久删除这项内容？',
+      message: `“${item.title || '未命名'}”删除后无法恢复。`,
+      confirmLabel: '永久删除',
+      run: () => permanentDeleteOne(item),
+    })
+  }
+
+  const runConfirmedAction = async () => {
+    if (!confirmAction?.run || confirmBusy) return
+    setConfirmBusy(true)
+    try {
+      await confirmAction.run()
+      setConfirmAction(null)
+    } catch {
+      // The action already surfaces its own error toast.
+    } finally {
+      setConfirmBusy(false)
     }
   }
 
@@ -202,14 +246,14 @@ export default function TrashPanel({ onClose, onRestored }) {
             <button
               className="btn small danger"
               disabled={selectedIds.size === 0 || bulkBusy}
-              onClick={() => void deleteSelected()}
+              onClick={requestDeleteSelected}
             >
               永久删除所选
             </button>
             <button
               className="btn small danger subtle"
               disabled={bulkBusy}
-              onClick={() => void emptyTrash()}
+              onClick={requestEmptyTrash}
             >
               清空回收站
             </button>
@@ -282,11 +326,7 @@ export default function TrashPanel({ onClose, onRestored }) {
                     <button
                       className="btn small danger subtle"
                       disabled={busy || bulkBusy}
-                      onClick={() => {
-                        if (window.confirm(`永久删除“${item.title}”？此操作无法撤销。`)) {
-                          void permanentDeleteOne(item)
-                        }
-                      }}
+                      onClick={() => requestDeleteOne(item)}
                     >
                       永久删除
                     </button>
@@ -297,6 +337,29 @@ export default function TrashPanel({ onClose, onRestored }) {
           </div>
         )}
       </div>
+
+      {confirmAction && (
+        <ConfirmDialog
+          title={confirmAction.title}
+          message={confirmAction.message}
+          onClose={() => {
+            if (!confirmBusy) setConfirmAction(null)
+          }}
+          actions={[
+            {
+              label: '取消',
+              disabled: confirmBusy,
+              onClick: () => setConfirmAction(null),
+            },
+            {
+              label: confirmAction.confirmLabel,
+              kind: 'danger',
+              loading: confirmBusy,
+              onClick: () => void runConfirmedAction(),
+            },
+          ]}
+        />
+      )}
     </div>
   )
 }
