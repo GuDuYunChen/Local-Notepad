@@ -1,8 +1,21 @@
-import { createEditor, $createParagraphNode, $createTextNode, $getRoot } from 'lexical'
+import {
+  createEditor,
+  $createParagraphNode,
+  $createTextNode,
+  $getRoot,
+} from 'lexical'
 import { HeadingNode, QuoteNode } from '@lexical/rich-text'
 import { ListItemNode, ListNode } from '@lexical/list'
 import { CodeHighlightNode, CodeNode } from '@lexical/code'
 import { AutoLinkNode, LinkNode } from '@lexical/link'
+import {
+  TableCellNode,
+  TableNode,
+  TableRowNode,
+  $createTableCellNode,
+  $createTableNode,
+  $createTableRowNode,
+} from '@lexical/table'
 import { $convertFromMarkdownString, TRANSFORMERS } from '@lexical/markdown'
 
 const IMPORT_NODES = [
@@ -14,6 +27,9 @@ const IMPORT_NODES = [
   CodeNode,
   AutoLinkNode,
   LinkNode,
+  TableNode,
+  TableRowNode,
+  TableCellNode,
 ]
 
 function createImportEditor() {
@@ -23,6 +39,119 @@ function createImportEditor() {
     onError(error) {
       throw error
     },
+  })
+}
+
+function parseTableRow(line) {
+  let source = String(line || '').trim()
+  if (!source.includes('|')) return null
+  if (source.startsWith('|')) source = source.slice(1)
+  if (source.endsWith('|')) source = source.slice(0, -1)
+
+  const cells = []
+  let current = ''
+  let escaped = false
+
+  for (const char of source) {
+    if (escaped) {
+      current += char
+      escaped = false
+      continue
+    }
+    if (char === '\\') {
+      escaped = true
+      continue
+    }
+    if (char === '|') {
+      cells.push(current.trim())
+      current = ''
+      continue
+    }
+    current += char
+  }
+  cells.push(current.trim())
+  return cells
+}
+
+function isTableSeparator(line) {
+  const cells = parseTableRow(line)
+  return Boolean(
+    cells?.length &&
+    cells.every(cell => /^:?-{3,}:?$/.test(cell.replace(/\s+/g, '')))
+  )
+}
+
+function extractMarkdownTables(markdown) {
+  const lines = String(markdown || '').replace(/\r\n/g, '\n').split('\n')
+  const tables = []
+  const output = []
+
+  for (let index = 0; index < lines.length;) {
+    const header = parseTableRow(lines[index])
+    const hasTableStart = (
+      header?.length &&
+      index + 1 < lines.length &&
+      isTableSeparator(lines[index + 1])
+    )
+
+    if (!hasTableStart) {
+      output.push(lines[index])
+      index += 1
+      continue
+    }
+
+    const rows = [header]
+    index += 2
+
+    while (index < lines.length) {
+      const row = parseTableRow(lines[index])
+      if (!row?.length || !lines[index].includes('|')) break
+      rows.push(row)
+      index += 1
+    }
+
+    const marker = `LOCAL_NOTEPAD_TABLE_${tables.length}_PLACEHOLDER`
+    tables.push({ marker, rows })
+    output.push('')
+    output.push(marker)
+    output.push('')
+  }
+
+  return {
+    markdown: output.join('\n'),
+    tables,
+  }
+}
+
+function createTableFromRows(rows) {
+  const table = $createTableNode()
+
+  rows.forEach((row) => {
+    const rowNode = $createTableRowNode()
+    row.forEach((value) => {
+      const cellNode = $createTableCellNode()
+      const paragraph = $createParagraphNode()
+      if (value) paragraph.append($createTextNode(value))
+      cellNode.append(paragraph)
+      rowNode.append(cellNode)
+    })
+    table.append(rowNode)
+  })
+
+  return table
+}
+
+function restoreMarkdownTables(tables) {
+  if (!tables.length) return
+
+  const tableByMarker = new Map(tables.map(table => [table.marker, table]))
+  const children = $getRoot().getChildren()
+
+  children.forEach((node) => {
+    const marker = node.getTextContent().trim()
+    const table = tableByMarker.get(marker)
+    if (!table) return
+    node.replace(createTableFromRows(table.rows))
   })
 }
 
@@ -49,8 +178,11 @@ export function plainTextToLexical(text) {
 
 export function markdownToLexical(markdown) {
   const editor = createImportEditor()
+  const extracted = extractMarkdownTables(markdown)
+
   editor.update(() => {
-    $convertFromMarkdownString(String(markdown || ''), TRANSFORMERS)
+    $convertFromMarkdownString(extracted.markdown, TRANSFORMERS)
+    restoreMarkdownTables(extracted.tables)
   }, { discrete: true })
 
   return JSON.stringify(editor.getEditorState().toJSON())
