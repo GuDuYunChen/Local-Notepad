@@ -13,7 +13,6 @@ export default function TableSelectionPlugin() {
   const overlayRef = useRef(null)
   const ctrlRef = useRef(false)
   const draggingRef = useRef(false)
-  const menuRef = useRef(null)
   const [hoverTable, setHoverTable] = useState(null)
   const [addBtnPos, setAddBtnPos] = useState(null)
 
@@ -43,7 +42,7 @@ export default function TableSelectionPlugin() {
       else if (type === 'insertCol' || type === 'insertColLeft' || type === 'insertColRight') doAddCol(payload)
       else if (type === 'deleteCol') doDelCol(payload)
       else if (type === 'deleteTable') doDelTable(payload)
-      else if (type === 'clear') doClear()
+      else if (type === 'clear') doClear(payload)
       else if (type === 'toggleRowStriping') toggleRowStriping(payload)
       else if (type === 'toggleFrozenRow') toggleFrozenRow(payload)
       else if (type === 'toggleFrozenColumn') toggleFrozenColumn(payload)
@@ -135,80 +134,31 @@ export default function TableSelectionPlugin() {
     }
   }, [active])
 
-  useEffect(() => {
-    const container = document.querySelector('.editor-container')
-    if (!container) return
-    const onContext = (e) => {
-      const cell = e.target.closest('td')
-      const table = e.target.closest('table')
-      if (!cell || !table) return
-      e.preventDefault()
-      const ri = Array.from(cell.parentElement.parentElement.children).indexOf(cell.parentElement)
-      const ci = Array.from(cell.parentElement.children).indexOf(cell)
-      const tIndex = Array.from(container.querySelectorAll('table')).indexOf(table)
-      const menu = getMenu()
-      menu.style.left = `${e.clientX}px`
-      menu.style.top = `${e.clientY}px`
-      menu.style.display = 'block'
-      menu.dataset.info = JSON.stringify({ tIndex, ri, ci })
-    }
-    const onClickDoc = (e) => {
-      const m = menuRef.current
-      if (!m) return
-      if (!m.contains(e.target)) m.style.display = 'none'
-    }
-    container.addEventListener('contextmenu', onContext)
-    document.addEventListener('click', onClickDoc)
-    return () => { container.removeEventListener('contextmenu', onContext); document.removeEventListener('click', onClickDoc) }
-  }, [])
 
-  const getMenu = () => {
-    let m = menuRef.current
-    if (!m) {
-      m = document.createElement('div')
-      m.className = 'table-context-menu'
-      const make = (text, handler) => { const btn = document.createElement('div'); btn.className='item'; btn.textContent=text; btn.onclick=handler; return btn }
-      m.appendChild(make('选择整行', () => doRowColSelect('row')))
-      m.appendChild(make('选择整列', () => doRowColSelect('col')))
-      m.appendChild(make('合并单元格', () => doMerge()))
-      m.appendChild(make('清除内容', () => doClear()))
-      m.appendChild(make('添加行', () => doAddRow()))
-      m.appendChild(make('删除行', () => doDelRow()))
-      m.appendChild(make('添加列', () => doAddCol()))
-      m.appendChild(make('删除列', () => doDelCol()))
-      
-      const div = document.createElement('div'); div.className = 'divider'; m.appendChild(div)
-      
-      m.appendChild(make('按首列升序', () => sortByFirstCol('asc')))
-      m.appendChild(make('按首列降序', () => sortByFirstCol('desc')))
-      m.appendChild(make('分页(10行)', () => paginateRows(10)))
+  const getCurrentCellInfo = () => {
+    const selection = $getSelection()
+    const node = selection?.getNodes?.()[0]
+    let cell = node
 
-      document.body.appendChild(m)
-      menuRef.current = m
+    while (cell && !(cell instanceof TableCellNode)) {
+      cell = cell.getParent?.()
     }
-    return m
+
+    if (!(cell instanceof TableCellNode)) return null
+
+    const row = cell.getParent?.()
+    const table = row?.getParent?.()
+    if (!(row instanceof TableRowNode) || !(table instanceof TableNode)) return null
+
+    return {
+      cell,
+      row,
+      table,
+      ri: row.getIndexWithinParent?.() ?? 0,
+      ci: cell.getIndexWithinParent?.() ?? 0,
+    }
   }
 
-  const readInfo = () => {
-    const m = getMenu()
-    try { return JSON.parse(m.dataset.info || '{}') } catch { return {} }
-  }
-
-  const doRowColSelect = (type) => {
-    const { tIndex, ri, ci } = readInfo()
-    const container = document.querySelector('.editor-container')
-    const tables = container ? Array.from(container.querySelectorAll('table')) : []
-    const table = tables[tIndex]
-    if (!table) return
-    if (type === 'row') {
-      const cols = table.rows[ri]?.children?.length || 1
-      setRects([{ tableIndex: tIndex, r1: ri, c1: 0, r2: ri, c2: cols - 1 }])
-    } else {
-      const rows = table.rows.length
-      setRects([{ tableIndex: tIndex, r1: 0, c1: ci, r2: rows - 1, c2: ci }])
-    }
-    menuRef.current.style.display = 'none'
-  }
 
   const doMerge = () => {
     const r = rects[0]
@@ -238,7 +188,6 @@ export default function TableSelectionPlugin() {
       }
     })
     setRects([])
-    if (menuRef.current) menuRef.current.style.display = 'none'
   }
 
   const doDelTable = (payload) => {
@@ -246,7 +195,6 @@ export default function TableSelectionPlugin() {
       const table = getTable(payload)
       if (table) table.remove()
     })
-    if (menuRef.current) menuRef.current.style.display = 'none'
   }
 
   const toggleRowStriping = (payload) => {
@@ -364,48 +312,71 @@ export default function TableSelectionPlugin() {
     setRects([])
   }
 
-  const doClear = () => {
+  const doClear = (payload) => {
     const r = rects[0]
-    if (!r) return
+
     editor.update(() => {
-      const tables = []
-      const walk = (node) => { if (!node.getChildren) return; const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
-      walk($getRoot())
-      const table = tables[r.tableIndex]
-      if (!table) return
-      const rows = table.getChildren()
-      for (let rr = r.r1; rr <= r.r2; rr++) {
-        const row = rows[rr]
-        const cells = row.getChildren()
-        for (let cc = r.c1; cc <= r.c2 && cc < cells.length; cc++) {
-          const cell = cells[cc]
-          const kids = cell.getChildren()
-          for (const k of kids) { k.remove() }
-          const p = $createParagraphNode()
-          cell.append(p)
-        }
+      const clearCell = (cell) => {
+        if (!(cell instanceof TableCellNode)) return
+        for (const child of cell.getChildren()) child.remove()
+        cell.append($createParagraphNode())
       }
+
+      if (r) {
+        const tables = []
+        const walk = (node) => {
+          if (!node.getChildren) return
+          for (const child of node.getChildren()) {
+            if (child instanceof TableNode) tables.push(child)
+            walk(child)
+          }
+        }
+        walk($getRoot())
+
+        const table = tables[r.tableIndex]
+        if (!table) return
+
+        const rows = table.getChildren()
+        for (let rr = r.r1; rr <= r.r2; rr++) {
+          const row = rows[rr]
+          const cells = row.getChildren()
+          for (let cc = r.c1; cc <= r.c2 && cc < cells.length; cc++) {
+            clearCell(cells[cc])
+          }
+        }
+        return
+      }
+
+      const target = payload?.cellKey ? $getNodeByKey(payload.cellKey) : getCurrentCellInfo()?.cell
+      clearCell(target)
     })
-    if (menuRef.current) menuRef.current.style.display = 'none'
   }
 
   const getTable = (payload) => {
     if (payload?.tableKey) return $getNodeByKey(payload.tableKey)
-    const info = payload?.tIndex !== undefined ? payload : readInfo()
-    const tIndex = info.tIndex
-    const tables = []
-    const walk = (node) => { if (!node.getChildren) return; const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
-    walk($getRoot())
-    return tables[tIndex]
+
+    if (payload?.tIndex !== undefined) {
+      const tables = []
+      const walk = (node) => {
+        if (!node.getChildren) return
+        for (const child of node.getChildren()) {
+          if (child instanceof TableNode) tables.push(child)
+          walk(child)
+        }
+      }
+      walk($getRoot())
+      return tables[payload.tIndex]
+    }
+
+    return getCurrentCellInfo()?.table || null
   }
 
   const doAddRow = (payload) => {
-    let ri, mode
-    if (payload) { ri = payload.ri; mode = payload.mode }
-    else { const info = readInfo(); ri = info.ri; mode = 'below' }
-
     editor.update(() => {
-      const table = getTable(payload)
+      const current = getCurrentCellInfo()
+      const ri = payload?.ri ?? current?.ri ?? 0
+      const mode = payload?.mode || 'below'
+      const table = getTable(payload) || current?.table
       if (!table) return
       const rows = table.getChildren()
       const cols = rows[0]?.getChildren().length || 1
@@ -444,31 +415,26 @@ export default function TableSelectionPlugin() {
         table.append(row)
       }
     })
-    if (menuRef.current) menuRef.current.style.display = 'none'
   }
 
   const doDelRow = (payload) => {
-    let ri
-    if (payload) { ri = payload.ri }
-    else { const info = readInfo(); ri = info.ri }
-
     editor.update(() => {
-      const table = getTable(payload)
+      const current = getCurrentCellInfo()
+      const ri = payload?.ri ?? current?.ri ?? 0
+      const table = getTable(payload) || current?.table
       if (!table) return
       const rows = table.getChildren()
       const row = rows[ri]
       if (row) row.remove()
     })
-    if (menuRef.current) menuRef.current.style.display = 'none'
   }
 
   const doAddCol = (payload) => {
-    let ci, mode
-    if (payload) { ci = payload.ci; mode = payload.mode }
-    else { const info = readInfo(); ci = info.ci; mode = 'right' }
-
     editor.update(() => {
-      const table = getTable(payload)
+      const current = getCurrentCellInfo()
+      const ci = payload?.ci ?? current?.ci ?? 0
+      const mode = payload?.mode || 'right'
+      const table = getTable(payload) || current?.table
       if (!table) return
       const rows = table.getChildren()
       for (const r of rows) { 
@@ -502,7 +468,6 @@ export default function TableSelectionPlugin() {
         }
       }
     })
-    if (menuRef.current) menuRef.current.style.display = 'none'
   }
 
   const addColForTable = (tIndex) => {
@@ -519,17 +484,14 @@ export default function TableSelectionPlugin() {
   }
 
   const doDelCol = (payload) => {
-    let ci
-    if (payload) { ci = payload.ci }
-    else { const info = readInfo(); ci = info.ci }
-
     editor.update(() => {
-      const table = getTable(payload)
+      const current = getCurrentCellInfo()
+      const ci = payload?.ci ?? current?.ci ?? 0
+      const table = getTable(payload) || current?.table
       if (!table) return
       const rows = table.getChildren()
       for (const r of rows) { const cells = r.getChildren(); const target = cells[ci]; if (target) target.remove() }
     })
-    if (menuRef.current) menuRef.current.style.display = 'none'
   }
 
   const sortByFirstCol = (dir) => {
