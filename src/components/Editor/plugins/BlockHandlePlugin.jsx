@@ -71,7 +71,8 @@ export default function BlockHandlePlugin() {
       if (!$isRangeSelection(selection)) return
 
       const anchorNode = selection.anchor.getNode()
-      const type = getBlockTypeFromNode(anchorNode)
+      const blockNode = $getNearestBlockElementAncestorOrThrow(anchorNode)
+      const type = getBlockTypeFromNode(blockNode)
       setBlockType(type || 'paragraph')
     })
 
