@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { LexicalComposer } from '@lexical/react/LexicalComposer';
 import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin';
 import { ContentEditable } from '@lexical/react/LexicalContentEditable';
@@ -145,8 +145,6 @@ const EDITOR_NODES = [
 ];
 
 export default function Editor({ initialContent, onChange, readOnly }) {
-  const [toolbarOpen, setToolbarOpen] = useState(false)
-
   const initialConfig = useMemo(() => ({
     namespace: 'MyEditor',
     theme,
@@ -159,20 +157,8 @@ export default function Editor({ initialContent, onChange, readOnly }) {
 
   return (
     <LexicalComposer initialConfig={initialConfig}>
-      <div className={`editor-shell${toolbarOpen ? ' toolbar-open' : ''}`}>
-        {!readOnly && (
-          <button
-            type="button"
-            className={`editor-format-toggle${toolbarOpen ? ' active' : ''}`}
-            onClick={() => setToolbarOpen(prev => !prev)}
-            aria-expanded={toolbarOpen}
-            aria-label={toolbarOpen ? '收起格式工具' : '打开格式工具'}
-            title={toolbarOpen ? '收起格式工具' : '格式工具'}
-          >
-            Aa
-          </button>
-        )}
-        {toolbarOpen && <ToolbarPlugin />}
+      <div className="editor-shell">
+        {!readOnly && <ToolbarPlugin />}
         <SearchPlugin />
         <PasteImagePlugin />
         <div className="editor-container">
