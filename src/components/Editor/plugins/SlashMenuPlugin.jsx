@@ -101,7 +101,17 @@ export default function SlashMenuPlugin() {
           return
         }
 
+        const charBeforeSlash = lastSlashIndex > 0 ? textBeforeCursor[lastSlashIndex - 1] : ''
+        if (lastSlashIndex > 0 && !/\s/.test(charBeforeSlash)) {
+          closeMenu()
+          return
+        }
+
         const textAfterSlash = textBeforeCursor.slice(lastSlashIndex + 1)
+        if (textAfterSlash.includes('/') || textAfterSlash.includes('\n')) {
+          closeMenu()
+          return
+        }
 
         const domSelection = window.getSelection()
         if (!domSelection || domSelection.rangeCount === 0) return
@@ -133,12 +143,14 @@ export default function SlashMenuPlugin() {
       }
 
       if (e.key === 'ArrowDown') {
+        if (!filteredBlocks.length) return
         e.preventDefault()
         setSelectedIndex((prev) => (prev + 1) % filteredBlocks.length)
         return
       }
 
       if (e.key === 'ArrowUp') {
+        if (!filteredBlocks.length) return
         e.preventDefault()
         setSelectedIndex((prev) => (prev - 1 + filteredBlocks.length) % filteredBlocks.length)
         return
