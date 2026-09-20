@@ -28,6 +28,28 @@ describe('import content normalization', () => {
     expect(state.root.children.some(node => node.type === 'quote')).toBe(true)
   })
 
+  it('converts Markdown pipe tables into native Lexical tables', () => {
+    const serialized = markdownToLexical([
+      '## 人物设定',
+      '',
+      '| 项目 | 详情 |',
+      '|------|------|',
+      '| 年龄 | 30 岁 |',
+      '| 武器 | 重剑 |',
+      '',
+      '后续正文',
+    ].join('\n'))
+
+    const state = JSON.parse(serialized)
+    const table = state.root.children.find(node => node.type === 'table')
+
+    expect(table).toBeTruthy()
+    expect(table.children).toHaveLength(3)
+    expect(table.children[0].children).toHaveLength(2)
+    expect(textFromState(JSON.stringify({ root: { children: [table] } }))).toContain('项目')
+    expect(textFromState(JSON.stringify({ root: { children: [table] } }))).toContain('重剑')
+  })
+
   it('honors parser content type for legacy Word plain text', () => {
     const serialized = JSON.parse(normalizeImportedContent({
       title: 'legacy.doc',
