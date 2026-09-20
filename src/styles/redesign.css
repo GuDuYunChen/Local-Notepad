@@ -4000,3 +4000,341 @@ body {
     padding: 38px 28px 72px !important;
   }
 }
+
+
+/* -------------------------------------------------------------------------- */
+/* Consumer UX v2 - dialogs and secondary workspaces                           */
+/* -------------------------------------------------------------------------- */
+.consumer-modal-overlay {
+  padding: 24px;
+  background: rgba(20, 18, 25, 0.36) !important;
+  backdrop-filter: blur(6px);
+}
+
+.consumer-modal {
+  width: min(440px, calc(100vw - 32px));
+  padding: 22px !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 18px !important;
+  background: var(--surface) !important;
+}
+
+.consumer-modal-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.consumer-modal .modal-title {
+  margin: 0 !important;
+  color: var(--ink) !important;
+  font-size: 18px !important;
+  font-weight: 740 !important;
+  letter-spacing: -0.02em;
+}
+
+.consumer-modal .modal-message {
+  margin: 0 !important;
+  color: var(--ink-soft) !important;
+  font-size: 13px !important;
+  line-height: 1.65;
+}
+
+.consumer-modal-actions {
+  margin-top: 22px !important;
+  display: flex !important;
+  justify-content: flex-end;
+  gap: 8px !important;
+}
+
+.consumer-modal-actions .btn {
+  min-height: 38px;
+  padding-inline: 16px;
+  border-radius: 10px;
+  font-size: 12px;
+}
+
+.consumer-button-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.consumer-button-loading .spinner {
+  width: 14px;
+  height: 14px;
+  animation: consumer-spin .8s linear infinite;
+}
+
+@keyframes consumer-spin {
+  to { transform: rotate(360deg); }
+}
+
+.name-dialog-field {
+  margin-top: 20px;
+}
+
+.name-dialog-field > label {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.name-dialog-input-wrap {
+  display: flex;
+  align-items: center;
+  min-height: 42px;
+  border: 1px solid var(--line-strong);
+  border-radius: 11px;
+  background: var(--surface);
+  transition: border-color .12s ease, box-shadow .12s ease;
+}
+
+.name-dialog-input-wrap:focus-within {
+  border-color: var(--clay);
+  box-shadow: 0 0 0 3px var(--clay-light);
+}
+
+.name-dialog-input {
+  min-width: 0;
+  flex: 1;
+  height: 40px !important;
+  padding: 0 12px !important;
+  border: 0 !important;
+  outline: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  font-size: 14px !important;
+}
+
+.name-dialog .static-ext {
+  flex: 0 0 auto;
+  margin-right: 11px;
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+
+.name-dialog-secondary {
+  margin-top: 12px;
+}
+
+.name-dialog-options-toggle {
+  width: 100%;
+  min-height: 36px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 0;
+  background: transparent;
+  color: var(--ink-muted);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.name-dialog-options-toggle:hover {
+  color: var(--ink);
+}
+
+.name-dialog-options {
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--paper);
+}
+
+.name-dialog-option-row {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.name-dialog-option-row + .name-dialog-option-row {
+  border-top: 1px solid var(--line);
+}
+
+.name-dialog-option-row > span:first-child {
+  min-width: 0;
+  flex: 1;
+}
+
+.name-dialog-option-row strong,
+.name-dialog-option-row small {
+  display: block;
+}
+
+.name-dialog-option-row strong {
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.name-dialog-option-row small {
+  margin-top: 2px;
+  overflow: hidden;
+  color: var(--ink-muted);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.name-dialog-option-row .select {
+  max-width: 164px;
+  min-height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 11px;
+}
+
+.consumer-modal .modal-error {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: var(--red-light);
+  color: var(--red);
+  font-size: 11px;
+}
+
+.settings-status-pill.neutral {
+  background: var(--paper-deep);
+  color: var(--ink-muted);
+}
+
+.daily-workspace-heading {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.daily-workspace-heading strong {
+  font-size: 15px !important;
+  font-weight: 720 !important;
+}
+
+.daily-workspace-heading span {
+  color: var(--ink-muted);
+  font-size: 11px;
+}
+
+.daily-section-heading {
+  padding: 18px 20px 2px;
+}
+
+.daily-section-heading strong,
+.daily-notes-list-header strong {
+  display: block;
+  color: var(--ink);
+  font-size: 14px !important;
+  font-weight: 700 !important;
+}
+
+.daily-section-heading span,
+.daily-notes-list-header span {
+  display: block;
+  margin-top: 3px;
+  color: var(--ink-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.daily-recent-card {
+  padding: 16px !important;
+}
+
+.daily-recent-card .daily-notes-list-header {
+  min-height: 44px;
+  display: flex !important;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.trash-toolbar,
+.settings-toolbar,
+.daily-notes-header {
+  padding-left: 20px !important;
+  padding-right: 20px !important;
+}
+
+.trash-content,
+.settings-content,
+.daily-workspace-body {
+  padding: 24px !important;
+}
+
+.trash-list,
+.consumer-settings-section,
+.calendar-card,
+.daily-recent-card {
+  max-width: 820px;
+}
+
+.trash-item {
+  min-height: 82px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  box-shadow: none;
+}
+
+.trash-item:hover {
+  border-color: var(--line-strong);
+}
+
+.trash-retention {
+  min-width: 64px;
+}
+
+@media (max-width: 760px) {
+  .consumer-modal-overlay {
+    padding: 12px;
+    align-items: flex-end !important;
+  }
+
+  .consumer-modal {
+    width: 100%;
+    max-height: calc(100vh - 24px);
+    overflow: auto;
+    padding: 20px !important;
+    border-radius: 18px !important;
+  }
+
+  .consumer-modal-actions {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .consumer-modal-actions .btn {
+    width: 100%;
+  }
+
+  .name-dialog-option-row {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 10px 0;
+  }
+
+  .name-dialog-option-row .select {
+    width: 100%;
+    max-width: none;
+  }
+
+  .trash-content,
+  .settings-content,
+  .daily-workspace-body {
+    padding: 12px !important;
+  }
+
+  .daily-workspace-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 1px;
+  }
+}
