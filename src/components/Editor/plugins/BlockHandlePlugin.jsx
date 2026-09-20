@@ -6,6 +6,7 @@ import { $isListNode } from '@lexical/list'
 import { $isCodeNode } from '@lexical/code'
 import { $isTableNode } from '@lexical/table'
 import { blockRegistry, getBlockByType } from '../utils/blockRegistry'
+import { $getNearestBlockElementAncestorOrThrow } from '@lexical/utils'
 import './BlockHandlePlugin.css'
 
 function getBlockTypeFromNode(node) {
@@ -124,13 +125,14 @@ export default function BlockHandlePlugin() {
       if (!$isRangeSelection(selection)) return
 
       const anchorNode = selection.anchor.getNode()
+      const blockNode = $getNearestBlockElementAncestorOrThrow(anchorNode)
       const block = getBlockByType(newType)
       if (!block || !block.createNode) return
 
-      const newNode = block.createNode(editor)
+      const newNode = block.createNode()
       if (newNode) {
-        anchorNode.replace(newNode)
-        newNode.selectStart()
+        blockNode.replace(newNode)
+        if (typeof newNode.selectStart === 'function') newNode.selectStart()
       }
     })
     setShowMenu(false)
@@ -142,12 +144,13 @@ export default function BlockHandlePlugin() {
       if (!$isRangeSelection(selection)) return
 
       const anchorNode = selection.anchor.getNode()
+      const blockNode = $getNearestBlockElementAncestorOrThrow(anchorNode)
       const paragraph = blockRegistry.find((b) => b.type === 'paragraph')
       if (paragraph && paragraph.createNode) {
-        const newNode = paragraph.createNode(editor)
+        const newNode = paragraph.createNode()
         if (newNode) {
-          anchorNode.insertBefore(newNode)
-          newNode.selectStart()
+          blockNode.insertBefore(newNode)
+          if (typeof newNode.selectStart === 'function') newNode.selectStart()
         }
       }
     })
@@ -164,9 +167,9 @@ export default function BlockHandlePlugin() {
         className="block-handle"
         ref={handleRef}
         style={{ top: `${position.top}px`, left: `${position.left}px` }}
-        draggable="true"
         onClick={() => setShowMenu(!showMenu)}
-        aria-label="块操作手柄"
+        aria-label="块操作菜单"
+        title="块操作"
       >
         <span className="block-handle-icon">⋮⋮</span>
       </div>
