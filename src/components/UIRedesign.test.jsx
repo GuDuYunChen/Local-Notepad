@@ -100,31 +100,24 @@ describe('UI redesign smoke tests', () => {
     await click(graphButton)
     expect(onChangeWorkspace).toHaveBeenCalledWith('graph')
 
-    await click(moreButton)
+    const clickMoreItem = async (label) => {
+      await click(moreButton)
+      const item = Array.from(container.querySelectorAll('[role="menuitem"]'))
+        .find(button => button.textContent.includes(label))
+      expect(item).toBeTruthy()
+      await click(item)
+    }
 
-    const trashButton = Array.from(container.querySelectorAll('[role="menuitem"]')).find(button => button.textContent.includes('回收站'))
-    const backupButton = Array.from(container.querySelectorAll('[role="menuitem"]')).find(button => button.textContent.includes('备份与恢复'))
-    const shortcutsButton = Array.from(container.querySelectorAll('[role="menuitem"]')).find(button => button.textContent.includes('快捷键'))
-    const settingsButton = Array.from(container.querySelectorAll('[role="menuitem"]')).find(button => button.textContent.includes('设置'))
-
-    expect(trashButton).toBeTruthy()
-    expect(backupButton).toBeTruthy()
-    expect(shortcutsButton).toBeTruthy()
-    expect(settingsButton).toBeTruthy()
-
-    await click(trashButton)
+    await clickMoreItem('回收站')
     expect(onChangeWorkspace).toHaveBeenCalledWith('trash')
 
-    await click(moreButton)
-    await click(settingsButton)
+    await clickMoreItem('设置')
     expect(onChangeWorkspace).toHaveBeenCalledWith('settings')
 
-    await click(moreButton)
-    await click(backupButton)
+    await clickMoreItem('备份与恢复')
     expect(onOpenBackup).toHaveBeenCalledTimes(1)
 
-    await click(moreButton)
-    await click(shortcutsButton)
+    await clickMoreItem('快捷键')
     expect(onOpenShortcuts).toHaveBeenCalledTimes(1)
   })
 
