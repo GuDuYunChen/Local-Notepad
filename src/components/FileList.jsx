@@ -161,6 +161,8 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
   const [folderNaming, setFolderNaming] = useState(false) // 新建文件夹对话框
   const [renaming, setRenaming] = useState(null)
   const [showExport, setShowExport] = useState(false)
+  const [pendingExport, setPendingExport] = useState(null)
+  const [exportBusy, setExportBusy] = useState(false)
   const [showBatchDelete, setShowBatchDelete] = useState(false)
   const [expanded, setExpanded] = useState(new Set()) // 展开的文件夹ID集合
   const [showNewMenu, setShowNewMenu] = useState(false) // 新建菜单显隐
@@ -748,28 +750,33 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
   }
 
   async function onExportConfirm(ids, roots) {
+    setPendingExport({ ids, roots })
+  }
+
+  async function performExport(format) {
+    if (!pendingExport || exportBusy) return
+
+    setExportBusy(true)
     try {
-        const format = await new Promise((resolve) => {
-            const choice = window.confirm('导出为 Markdown 格式？\n\n点击"确定"导出为 Markdown\n点击"取消"导出为 DOCX')
-            resolve(choice ? 'markdown' : 'docx')
-        })
-        
         const targetDir = await window.electronAPI.openDirectoryDialog()
         if (!targetDir) return
-        
-        const res = await window.electronAPI.exportToDocx(roots, targetDir, format)
-        
+
+        const res = await window.electronAPI.exportToDocx(pendingExport.roots, targetDir, format)
+
         if (res && res.success) {
              toast.success('导出成功')
              if (res.errors && res.errors.length > 0) {
-                 toast.warning(`部分文件导出失败: ${res.errors.length} 个`)
+                 toast.warning(`部分笔记导出失败：${res.errors.length} 项`)
              }
         } else {
-             toast.error('导出失败: ' + (res?.message || '未知错误'))
+             toast.error('导出失败：' + (res?.message || '未知错误'))
         }
     } catch (e) {
         console.error(e)
-        toast.error('导出失败: ' + (e.message || '未知错误'))
+        toast.error('导出失败：' + (e.message || '未知错误'))
+    } finally {
+        setExportBusy(false)
+        setPendingExport(null)
     }
   }
 
@@ -1584,7 +1591,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
             onKeyDown={e => {
               if (e.key === 'Enter') void load()
             }}
-            aria-label="搜索文件"
+            aria-label="搜索笔记"
           />
           {q && (
             <button
@@ -1607,7 +1614,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
           className="list tree-list"
           role={tree.length ? 'tree' : 'region'}
           tabIndex={0}
-          aria-label={tree.length ? '文件树' : '空资料库'}
+          aria-label={tree.length ? '笔记列表' : '空笔记列表'}
           aria-multiselectable="true"
           aria-activedescendant={keyboardFocusId ? `file-tree-item-${keyboardFocusId}` : undefined}
           onFocus={() => {
@@ -1720,15 +1727,42 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
           onPathSelect={() => setShowFolderSelector(true)}
         />
       )}
-      {showExport && <FileSelectorDialog open={showExport} onClose={() => setShowExport(false)} items={items} onConfirm={onExportConfirm} title="导出文件" confirmText="开始导出" />}
-      {showBatchDelete && <FileSelectorDialog open={showBatchDelete} onClose={() => setShowBatchDelete(false)} items={items} onConfirm={onBatchDeleteConfirm} title="批量删除" confirmText="删除" processingText="删除中..." showDeleteWarning={true} selectedFileId={selectedId} initialSelectedIds={Array.from(selectedIds)} />}
+      {showExport && <FileSelectorDialog open={showExport} onClose={() => setShowExport(false)} items={items} onConfirm={onExportConfirm} title="导出笔记" confirmText="下一步" />}
+      {showBatchDelete && <FileSelectorDialog open={showBatchDelete} onClose={() => setShowBatchDelete(false)} items={items} onConfirm={onBatchDeleteConfirm} title="移到回收站" confirmText="移到回收站" processingText="处理中…" showDeleteWarning={true} selectedFileId={selectedId} initialSelectedIds={Array.from(selectedIds)} />}
       {showTemplate && <TemplateSelector open={showTemplate} onClose={() => setShowTemplate(false)} onSelect={handleTemplateSelect} />}
+      {pendingExport && (
+        <ConfirmDialog
+          title="选择导出格式"
+          message="导出的内容会保存到你接下来选择的文件夹。"
+          onClose={() => {
+            if (!exportBusy) setPendingExport(null)
+          }}
+          actions={[
+            {
+              label: '取消',
+              disabled: exportBusy,
+              onClick: () => setPendingExport(null),
+            },
+            {
+              label: 'Markdown',
+              loading: exportBusy,
+              onClick: () => void performExport('markdown'),
+            },
+            {
+              label: 'Word 文档',
+              kind: 'primary',
+              loading: exportBusy,
+              onClick: () => void performExport('docx'),
+            },
+          ]}
+        />
+      )}
       {showFolderSelector && (
           <FileSelectorDialog 
               open={showFolderSelector}
               onClose={() => setShowFolderSelector(false)}
               items={items}
-              title="选择目标文件夹"
+              title="选择保存位置"
               confirmText="确定"
               mode="single-folder"
               initialSelectedIds={targetParentId ? [targetParentId] : []}
