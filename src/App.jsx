@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react'
 import TextEditor from './components/TextEditor'
 import FileList from './components/FileList'
-import ConsumerHeader from './components/ConsumerHeader'
+import NavigationRail from './components/NavigationRail'
 import { api } from '~/services/api'
 import ConfirmDialog from './components/ConfirmDialog'
 import ToastViewport from './components/ToastViewport'
@@ -30,7 +30,10 @@ export default function App() {
     const n = v ? parseInt(v, 10) : 280
     return Math.min(420, Math.max(220, isNaN(n) ? 280 : n))
   })
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('sidebarCollapsed') === 'true')
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    const saved = localStorage.getItem('sidebarCollapsed')
+    return saved === null ? true : saved === 'true'
+  })
   const [dragging, setDragging] = useState(false)
   const [current, setCurrent] = useState(null)
   const [content, setContent] = useState('')
@@ -265,6 +268,22 @@ export default function App() {
     setWorkspace(nextWorkspace)
   }, [workspace, current, deletedIds, unsaved])
 
+  const handleNavigation = React.useCallback((nextWorkspace) => {
+    if (nextWorkspace === 'notes') {
+      if (workspace === 'notes') {
+        setSidebarCollapsed(prev => {
+          const next = !prev
+          localStorage.setItem('sidebarCollapsed', String(next))
+          return next
+        })
+        return
+      }
+      setSidebarCollapsed(false)
+      localStorage.setItem('sidebarCollapsed', 'false')
+    }
+    changeWorkspace(nextWorkspace)
+  }, [workspace, changeWorkspace])
+
   const handleSelectFile = (f, options = {}) => {
     if (current && f && f.id === current.id) {
       setWorkspace('notes')
@@ -307,9 +326,9 @@ export default function App() {
   return (
     <div className={`app-shell${focusMode ? ' focus-mode' : ''}`}>
       {!focusMode && (
-        <ConsumerHeader
+        <NavigationRail
           activeWorkspace={workspace}
-          onChangeWorkspace={changeWorkspace}
+          onChangeWorkspace={handleNavigation}
           onOpenSearch={() => setQuickSearchOpen(true)}
           onOpenBackup={() => setBackupOpen(true)}
           onOpenShortcuts={() => setShortcutsOpen(true)}
@@ -317,7 +336,7 @@ export default function App() {
       )}
 
       <div className="app-surface">
-        {!focusMode && workspace === 'notes' && (
+        {!focusMode && workspace === 'notes' && current && !current.is_folder && (
           <header className="workspace-header consumer-document-header">
             <div className="workspace-heading">
               {current && !current.is_folder ? (
@@ -353,20 +372,17 @@ export default function App() {
                       {current.title || '未命名'}
                     </button>
                   )}
-                  <span
-                    className={`workspace-save-chip${editorStatus.saveError ? ' error' : editorStatus.saving ? ' saving' : (unsaved || editorStatus.dirty) ? ' dirty' : ''}`}
-                    title={editorStatus.lastSavedAt ? new Date(editorStatus.lastSavedAt).toLocaleString('zh-CN') : ''}
-                  >
-                    {editorStatus.saveError
-                      ? '保存失败'
-                      : editorStatus.saving
-                        ? '保存中…'
-                        : (unsaved || editorStatus.dirty)
-                          ? '未保存'
-                          : editorStatus.lastSavedAt
-                            ? '已保存'
-                            : '尚未保存'}
-                  </span>
+                  {(editorStatus.saveError || editorStatus.saving || unsaved || editorStatus.dirty) && (
+                    <span
+                      className={`workspace-save-chip${editorStatus.saveError ? ' error' : editorStatus.saving ? ' saving' : ' dirty'}`}
+                    >
+                      {editorStatus.saveError
+                        ? '保存失败'
+                        : editorStatus.saving
+                          ? '保存中…'
+                          : '未保存'}
+                    </span>
+                  )}
                 </div>
               ) : (
                 <div className="workspace-title" title="笔记">笔记</div>
