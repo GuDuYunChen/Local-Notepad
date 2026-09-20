@@ -31,7 +31,7 @@ export default function App() {
     return Math.min(420, Math.max(220, isNaN(n) ? 280 : n))
   })
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    const saved = localStorage.getItem('sidebarCollapsed')
+    const saved = localStorage.getItem('sidebarCollapsedV3')
     return saved === null ? true : saved === 'true'
   })
   const [dragging, setDragging] = useState(false)
@@ -273,13 +273,13 @@ export default function App() {
       if (workspace === 'notes') {
         setSidebarCollapsed(prev => {
           const next = !prev
-          localStorage.setItem('sidebarCollapsed', String(next))
+          localStorage.setItem('sidebarCollapsedV3', String(next))
           return next
         })
         return
       }
       setSidebarCollapsed(false)
-      localStorage.setItem('sidebarCollapsed', 'false')
+      localStorage.setItem('sidebarCollapsedV3', 'false')
     }
     changeWorkspace(nextWorkspace)
   }, [workspace, changeWorkspace])
@@ -469,7 +469,7 @@ export default function App() {
                       onClick={() => {
                         setSidebarCollapsed(prev => {
                           const next = !prev
-                          localStorage.setItem('sidebarCollapsed', String(next))
+                          localStorage.setItem('sidebarCollapsedV3', String(next))
                           return next
                         })
                       }}
