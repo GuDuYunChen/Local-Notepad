@@ -5,7 +5,7 @@
   justify-content: center;
   width: 24px;
   height: 24px;
-  cursor: grab;
+  cursor: pointer;
   border-radius: 4px;
   background: transparent;
   transition: background-color 0.15s ease;
@@ -14,10 +14,6 @@
 
 .block-handle:hover {
   background-color: var(--toolbar-btn-hover, rgba(0,0,0,0.06));
-}
-
-.block-handle:active {
-  cursor: grabbing;
 }
 
 .block-handle-icon {
@@ -96,4 +92,36 @@
   .block-menu {
     animation-duration: 0.01ms !important;
   }
+}
+
+
+.block-handle {
+  border: 1px solid transparent;
+  color: var(--ink-muted, #6b7280);
+}
+
+.block-handle:hover {
+  border-color: var(--border-color, rgba(0,0,0,.1));
+  background: var(--panel, #fff);
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0,0,0,.06));
+}
+
+.block-menu {
+  padding: 6px !important;
+  border-radius: 11px !important;
+  min-width: 210px;
+}
+
+.block-menu-item {
+  min-height: 34px;
+  padding: 6px 9px;
+  border-radius: 7px;
+  font-size: 11px;
+}
+
+.block-menu-label {
+  padding: 7px 9px 4px;
+  font-size: 9px;
+  text-transform: none;
+  letter-spacing: 0;
 }
