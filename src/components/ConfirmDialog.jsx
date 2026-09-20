@@ -1,55 +1,72 @@
 import React from 'react'
 
 export default function ConfirmDialog({ title, message, actions, onClose }) {
+  const isAnyLoading = actions.some(action => action.loading)
+  const primaryRef = React.useRef(null)
+
   React.useEffect(() => {
-    // Only allow Escape if NOT loading
-    const isAnyLoading = actions.some(a => a.loading);
-    const onKey = (e) => { 
-        if (e.key === 'Escape' && !isAnyLoading) onClose() 
+    const onKey = (event) => {
+      if (event.key === 'Escape' && !isAnyLoading) onClose?.()
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [onClose, actions])
+  }, [onClose, isAnyLoading])
 
-  const isAnyLoading = actions.some(a => a.loading);
+  React.useEffect(() => {
+    const timer = window.setTimeout(() => primaryRef.current?.focus(), 0)
+    return () => window.clearTimeout(timer)
+  }, [])
+
+  const descriptionId = 'consumer-confirm-description'
 
   return (
-    <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-      <div className="modal">
-        <div className="modal-title" id="modal-title">{title}</div>
-        <div className="modal-message">{message}</div>
-        <div className="modal-actions">
-          {actions.map((a, idx) => (
-            <button 
-                key={idx} 
-                className={`btn${a.kind === 'primary' ? ' primary' : ''}${a.kind === 'danger' ? ' danger' : ''}`} 
-                onClick={a.onClick}
-                disabled={a.disabled || isAnyLoading}
-                style={{ 
-                    opacity: (a.disabled || (isAnyLoading && !a.loading)) ? 0.5 : 1, 
-                    cursor: (a.disabled || isAnyLoading) ? 'not-allowed' : 'pointer',
-                    position: 'relative'
-                }}
-            >
-                {a.loading ? (
-                    <>
-                        <span style={{ opacity: 0 }}>{a.label}</span>
-                        <span style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }}>
-                            <svg className="spinner" viewBox="0 0 50 50" style={{ width: '1em', height: '1em', animation: 'spin 1s linear infinite' }}>
-                                <circle cx="25" cy="25" r="20" fill="none" stroke="currentColor" strokeWidth="5"></circle>
-                            </svg>
-                        </span>
-                    </>
-                ) : a.label}
-            </button>
-          ))}
+    <div
+      className="modal-overlay consumer-modal-overlay"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !isAnyLoading) onClose?.()
+      }}
+    >
+      <section
+        className="modal consumer-modal consumer-confirm-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="consumer-confirm-title"
+        aria-describedby={descriptionId}
+      >
+        <div className="consumer-modal-heading">
+          <div className="modal-title" id="consumer-confirm-title">{title}</div>
+          <div className="modal-message" id={descriptionId}>{message}</div>
         </div>
-        <style>{`
-            @keyframes spin {
-                100% { transform: rotate(360deg); }
-            }
-        `}</style>
-      </div>
+
+        <div className="modal-actions consumer-modal-actions">
+          {actions.map((action, index) => {
+            const isPrimary = action.kind === 'primary' || action.kind === 'danger'
+            const disabled = action.disabled || isAnyLoading
+
+            return (
+              <button
+                key={`${action.label}-${index}`}
+                ref={isPrimary ? primaryRef : undefined}
+                type="button"
+                className={`btn${action.kind === 'primary' ? ' primary' : ''}${action.kind === 'danger' ? ' danger' : ''}`}
+                onClick={action.onClick}
+                disabled={disabled}
+                aria-busy={Boolean(action.loading)}
+              >
+                {action.loading ? (
+                  <span className="consumer-button-loading">
+                    <svg className="spinner" viewBox="0 0 50 50" aria-hidden="true">
+                      <circle cx="25" cy="25" r="20" fill="none" stroke="currentColor" strokeWidth="5" />
+                    </svg>
+                    <span>处理中…</span>
+                  </span>
+                ) : action.label}
+              </button>
+            )
+          })}
+        </div>
+      </section>
     </div>
   )
 }
