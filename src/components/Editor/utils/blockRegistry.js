@@ -16,6 +16,7 @@ export const BlockType = {
   H1: 'heading-1',
   H2: 'heading-2',
   H3: 'heading-3',
+  H4: 'heading-4',
   QUOTE: 'quote',
   BULLET_LIST: 'bullet-list',
   NUMBERED_LIST: 'numbered-list',
@@ -104,6 +105,15 @@ export const blockRegistry = [
     keywords: ['h3', '标题', 'heading', '三级'],
     shortcut: '### ',
     createNode: () => $createHeadingNode('h3'),
+  },
+  {
+    type: BlockType.H4,
+    label: '四级标题',
+    description: '更细的内容层级',
+    icon: 'H4',
+    keywords: ['h4', '标题', 'heading', '四级'],
+    shortcut: '#### ',
+    createNode: () => $createHeadingNode('h4'),
   },
   {
     type: BlockType.QUOTE,
