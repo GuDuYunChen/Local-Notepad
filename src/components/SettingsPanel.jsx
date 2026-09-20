@@ -67,8 +67,8 @@ async function copyText(text) {
   textarea.remove()
 }
 
-function StatusPill({ ok, children }) {
-  return <span className={`settings-status-pill${ok ? ' ok' : ' warn'}`}>{children}</span>
+function StatusPill({ tone = 'neutral', children }) {
+  return <span className={`settings-status-pill ${tone}`}>{children}</span>
 }
 
 export default function SettingsPanel({
@@ -133,6 +133,8 @@ export default function SettingsPanel({
   }
 
   const healthOK = server?.status === 'ok' && server?.integrity === 'ok'
+  const dataStatusTone = !server ? 'neutral' : (healthOK ? 'ok' : 'warn')
+  const dataStatusLabel = !server ? '正在检查' : (healthOK ? '本地数据正常' : '需要检查')
 
   return (
     <div className="settings-panel">
@@ -163,7 +165,7 @@ export default function SettingsPanel({
         <section className="settings-card consumer-settings-section">
           <div className="settings-card-header">
             <h3>数据与备份</h3>
-            <StatusPill ok={healthOK}>{healthOK ? '本地数据正常' : '需要检查'}</StatusPill>
+            <StatusPill tone={dataStatusTone}>{dataStatusLabel}</StatusPill>
           </div>
 
           <div className="consumer-data-summary">
@@ -210,7 +212,7 @@ export default function SettingsPanel({
               <strong>版本</strong>
               <span>{appInfo?.version ? `记事本 ${appInfo.version}` : '正在读取版本信息…'}</span>
             </div>
-            <StatusPill ok={Boolean(appInfo)}>{appInfo?.packaged ? '桌面版' : '开发模式'}</StatusPill>
+            <StatusPill tone={appInfo ? 'neutral' : 'neutral'}>{appInfo ? (appInfo.packaged ? '桌面版' : '开发模式') : '读取中'}</StatusPill>
           </div>
 
           <div className="settings-row">
