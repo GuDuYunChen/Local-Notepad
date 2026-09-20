@@ -1658,3 +1658,51 @@
     grid-template-columns: 1fr 1fr !important;
   }
 }
+
+
+/* Image grid drag sorting */
+.editor-image-grid-card {
+  position: relative;
+  transition: transform .12s ease, opacity .12s ease, outline-color .12s ease;
+}
+
+.editor-image-grid-card.dragging {
+  opacity: .35;
+  transform: scale(.98);
+}
+
+.editor-image-grid-card.drag-over {
+  outline: 2px solid color-mix(in srgb, var(--clay) 58%, transparent);
+  outline-offset: 3px;
+  border-radius: 10px;
+}
+
+.editor-image-grid-drag {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 3;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255,255,255,.22);
+  border-radius: 7px;
+  background: rgba(24,22,28,.72);
+  color: rgba(255,255,255,.88);
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: -1px;
+  cursor: grab;
+  opacity: .72;
+}
+
+.editor-image-grid-drag:hover {
+  opacity: 1;
+  background: rgba(24,22,28,.88);
+}
+
+.editor-image-grid-drag:active {
+  cursor: grabbing;
+}
