@@ -50,6 +50,21 @@ describe('import content normalization', () => {
     expect(textFromState(JSON.stringify({ root: { children: [table] } }))).toContain('重剑')
   })
 
+  it('preserves standalone Markdown dividers as native divider blocks', () => {
+    const serialized = markdownToLexical([
+      '# 标题',
+      '',
+      '正文',
+      '',
+      '---',
+      '',
+      '下一段',
+    ].join('\n'))
+
+    const state = JSON.parse(serialized)
+    expect(state.root.children.some(node => node.type === 'divider')).toBe(true)
+  })
+
   it('honors parser content type for legacy Word plain text', () => {
     const serialized = JSON.parse(normalizeImportedContent({
       title: 'legacy.doc',
