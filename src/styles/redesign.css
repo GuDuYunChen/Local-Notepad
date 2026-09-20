@@ -3372,3 +3372,265 @@ body {
     margin-left: 0;
   }
 }
+
+
+/* C-end readability and simplified settings */
+.consumer-header {
+  height: 56px;
+  min-height: 56px;
+}
+
+.consumer-brand strong {
+  font-size: 15px;
+}
+
+.consumer-nav-btn,
+.consumer-action-btn {
+  min-height: 36px;
+  font-size: 12px;
+}
+
+.consumer-more-menu button {
+  min-height: 38px;
+  font-size: 12px;
+}
+
+.consumer-document-header {
+  height: 44px;
+  min-height: 44px;
+}
+
+.file-sidebar .list-item {
+  min-height: 38px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.file-sidebar .list-item .title {
+  font-size: 13px;
+}
+
+.file-sidebar .list-item .count {
+  font-size: 11px;
+}
+
+.quick-switcher-result-title {
+  font-size: 13px !important;
+}
+
+.quick-switcher-result-preview,
+.quick-switcher-result-time,
+.quick-switcher-meta {
+  font-size: 11px !important;
+}
+
+.quick-switcher-match-badge {
+  font-size: 10px;
+  padding: 3px 6px;
+}
+
+.inspector-header {
+  min-height: 66px;
+}
+
+.inspector-eyebrow,
+.property-label,
+.property-row,
+.inspector-action-btn {
+  font-size: 11px;
+}
+
+.inspector-title,
+.property-row strong {
+  font-size: 13px;
+}
+
+.property-summary-card span {
+  font-size: 11px;
+}
+
+.property-summary-card strong {
+  font-size: 14px;
+}
+
+.trash-toolbar strong,
+.settings-toolbar strong {
+  font-size: 16px;
+}
+
+.trash-toolbar p,
+.settings-toolbar p {
+  font-size: 11px;
+}
+
+.trash-item {
+  min-height: 76px;
+  padding: 11px 12px;
+}
+
+.trash-item-title {
+  font-size: 13px;
+}
+
+.trash-item-meta {
+  font-size: 11px;
+}
+
+.trash-item-actions .btn,
+.trash-bulk-actions .btn {
+  min-height: 34px;
+  font-size: 11px;
+}
+
+.consumer-settings-content {
+  padding-top: 22px;
+}
+
+.consumer-settings-section {
+  max-width: 760px;
+  padding: 18px;
+  border-radius: 14px;
+}
+
+.consumer-settings-section .settings-card-header {
+  min-height: 34px;
+  margin-bottom: 6px;
+}
+
+.consumer-settings-section .settings-card-header h3 {
+  font-size: 14px;
+}
+
+.consumer-settings-section .settings-row,
+.consumer-settings-section .settings-path-row {
+  min-height: 58px;
+}
+
+.consumer-settings-section .settings-row strong,
+.consumer-settings-section .settings-path-row strong {
+  font-size: 13px;
+}
+
+.consumer-settings-section .settings-row span,
+.consumer-settings-section .settings-path-row code {
+  margin-top: 4px;
+  font-size: 11px;
+}
+
+.consumer-data-summary {
+  margin: 6px 0 10px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.consumer-data-summary > div {
+  min-height: 72px;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 3px;
+  border-radius: 10px;
+  background: var(--paper);
+}
+
+.consumer-data-summary strong {
+  color: var(--ink);
+  font-size: 18px;
+  font-weight: 720;
+}
+
+.consumer-data-summary span {
+  color: var(--ink-muted);
+  font-size: 11px;
+}
+
+.consumer-settings-actions {
+  border-top: 0;
+  padding-top: 10px;
+}
+
+.settings-advanced-toggle {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 8px;
+  padding: 0 2px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.settings-advanced-toggle:hover {
+  color: var(--ink);
+}
+
+.settings-advanced-panel {
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.settings-advanced-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.settings-advanced-header > div:first-child {
+  min-width: 0;
+  flex: 1;
+}
+
+.settings-advanced-header strong {
+  display: block;
+  font-size: 12px;
+  color: var(--ink);
+}
+
+.settings-advanced-header span {
+  display: block;
+  margin-top: 2px;
+  font-size: 10px;
+  color: var(--ink-muted);
+}
+
+.settings-metric-grid.advanced .settings-metric {
+  background: var(--paper);
+}
+
+.settings-metric-grid.advanced .settings-metric span {
+  font-size: 10px;
+}
+
+.settings-metric-grid.advanced .settings-metric strong {
+  font-size: 12px;
+}
+
+.settings-path-row.advanced {
+  margin-top: 8px;
+}
+
+@media (max-width: 760px) {
+  .consumer-data-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .consumer-data-summary > div {
+    min-height: 54px;
+    grid-auto-flow: column;
+    justify-content: space-between;
+    padding: 0 12px;
+  }
+
+  .settings-advanced-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
