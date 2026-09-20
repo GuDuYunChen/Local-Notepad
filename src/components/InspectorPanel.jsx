@@ -97,9 +97,9 @@ export default function InspectorPanel({
   const copyWikiReference = async () => {
     try {
       await copyText(`[[${file.title || '未命名'}]]`)
-      toast.success('Wiki 引用已复制')
+      toast.success('笔记引用已复制')
     } catch (error) {
-      console.error('复制 Wiki 引用失败', error)
+      console.error('复制笔记引用失败', error)
       toast.error('复制失败')
     }
   }
@@ -129,13 +129,13 @@ export default function InspectorPanel({
   }
 
   return (
-    <aside className="inspector-panel" aria-label="文档检查器">
+    <aside className="inspector-panel" aria-label="笔记详情">
       <div className="inspector-header">
         <div>
-          <div className="inspector-eyebrow">当前文档</div>
+          <div className="inspector-eyebrow">笔记详情</div>
           <div className="inspector-title" title={file.title}>{file.title || '未命名'}</div>
         </div>
-        <button className="icon-btn" onClick={onClose} title="关闭检查器" aria-label="关闭检查器">×</button>
+        <button className="icon-btn" onClick={onClose} title="关闭详情" aria-label="关闭详情">×</button>
       </div>
 
       <div className="inspector-quick-actions">
@@ -158,7 +158,7 @@ export default function InspectorPanel({
         </button>
       </div>
 
-      <div className="inspector-tabs" role="tablist" aria-label="文档信息">
+      <div className="inspector-tabs" role="tablist" aria-label="笔记信息">
         {tabs.map(([id, label], index) => (
           <button
             key={id}
