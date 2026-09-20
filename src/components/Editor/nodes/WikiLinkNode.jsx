@@ -1,5 +1,9 @@
 import { DecoratorNode } from 'lexical'
-import React from 'react'
+import React, { useEffect, useRef, useState } from 'react'
+import { api } from '~/services/api'
+import { extractLexicalText } from '~/utils/lexicalText'
+
+const previewCache = new Map()
 
 export class WikiLinkNode extends DecoratorNode {
   __id
@@ -62,13 +66,71 @@ export class WikiLinkNode extends DecoratorNode {
 }
 
 function WikiLinkView({ id, title }) {
-  const openTarget = (event) => {
+  const cached = previewCache.get(id)
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const [preview, setPreview] = useState(cached || null)
+  const [loading, setLoading] = useState(false)
+  const timerRef = useRef(null)
+
+  useEffect(() => () => {
+    if (timerRef.current) window.clearTimeout(timerRef.current)
+  }, [])
+
+  const loadPreview = async () => {
+    if (!id || preview || loading) return
+
+    setLoading(true)
+    try {
+      const file = await api(`/api/files/${id}`)
+      const text = extractLexicalText(file?.content || '')
+        .replace(/\s+/g, ' ')
+        .trim()
+
+      const next = {
+        title: file?.title || title || '未命名',
+        excerpt: text.slice(0, 180) || '这篇笔记还没有正文内容。',
+        updatedAt: file?.updated_at || 0,
+      }
+
+      previewCache.set(id, next)
+      setPreview(next)
+    } catch (error) {
+      console.error('加载 Wiki 链接预览失败', error)
+      setPreview({
+        title: title || '笔记',
+        excerpt: '暂时无法读取这篇笔记的预览。',
+        unavailable: true,
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const showPreview = () => {
+    if (timerRef.current) window.clearTimeout(timerRef.current)
+    timerRef.current = window.setTimeout(() => {
+      setPreviewOpen(true)
+      void loadPreview()
+    }, 220)
+  }
+
+  const hidePreview = () => {
+    if (timerRef.current) window.clearTimeout(timerRef.current)
+    timerRef.current = window.setTimeout(() => setPreviewOpen(false), 100)
+  }
+
+  const openTarget = event => {
     event.preventDefault()
     event.stopPropagation()
+    setPreviewOpen(false)
     window.dispatchEvent(new CustomEvent('wikiLink:open', {
       detail: { id, title },
     }))
   }
+
+  const updatedLabel = preview?.updatedAt
+    ? new Date(preview.updatedAt * 1000).toLocaleDateString('zh-CN')
+    : ''
 
   return (
     <span
@@ -76,9 +138,13 @@ function WikiLinkView({ id, title }) {
       role="link"
       tabIndex={0}
       title={`打开笔记：${title}`}
-      onMouseDown={(event) => event.preventDefault()}
+      onMouseEnter={showPreview}
+      onMouseLeave={hidePreview}
+      onFocus={showPreview}
+      onBlur={hidePreview}
+      onMouseDown={event => event.preventDefault()}
       onClick={openTarget}
-      onKeyDown={(event) => {
+      onKeyDown={event => {
         if (event.key === 'Enter' || event.key === ' ') openTarget(event)
       }}
     >
@@ -87,6 +153,27 @@ function WikiLinkView({ id, title }) {
         <path d="M9 9h6M9 13h6M9 17h4" />
       </svg>
       <span>{title}</span>
+
+      {previewOpen && (
+        <span
+          className="wiki-link-preview"
+          role="tooltip"
+          onMouseEnter={() => {
+            if (timerRef.current) window.clearTimeout(timerRef.current)
+          }}
+          onMouseLeave={hidePreview}
+        >
+          <span className="wiki-link-preview-kicker">关联笔记</span>
+          <strong>{preview?.title || title}</strong>
+          <span className={`wiki-link-preview-excerpt${preview?.unavailable ? ' unavailable' : ''}`}>
+            {loading && !preview ? '正在读取预览…' : (preview?.excerpt || '正在读取预览…')}
+          </span>
+          <span className="wiki-link-preview-footer">
+            <span>{updatedLabel ? `更新于 ${updatedLabel}` : '点击打开完整笔记'}</span>
+            <span aria-hidden="true">↗</span>
+          </span>
+        </span>
+      )}
     </span>
   )
 }
