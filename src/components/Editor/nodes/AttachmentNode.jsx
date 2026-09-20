@@ -1,5 +1,5 @@
 import { DecoratorNode } from 'lexical'
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 
 export class AttachmentNode extends DecoratorNode {
   __src
@@ -74,16 +74,50 @@ function formatSize(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+function fileExtension(name) {
+  const raw = String(name || '')
+  const index = raw.lastIndexOf('.')
+  return index >= 0 ? raw.slice(index + 1).toLowerCase() : ''
+}
+
 function fileTypeLabel(name, mime) {
-  const ext = String(name || '').split('.').pop()?.toUpperCase()
+  const ext = fileExtension(name).toUpperCase()
   if (ext && ext.length <= 5) return ext
   if (mime?.includes('pdf')) return 'PDF'
   if (mime?.includes('zip')) return 'ZIP'
   return 'FILE'
 }
 
+export function getAttachmentPreviewType(name, mime) {
+  const ext = fileExtension(name)
+  const normalizedMime = String(mime || '').toLowerCase()
+
+  if (normalizedMime.startsWith('image/') || ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'].includes(ext)) {
+    return 'image'
+  }
+
+  if (normalizedMime.includes('pdf') || ext === 'pdf') {
+    return 'pdf'
+  }
+
+  return null
+}
+
 function AttachmentComponent({ src, name, size, mime }) {
   const [downloading, setDownloading] = useState(false)
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const previewType = getAttachmentPreviewType(name, mime)
+
+  useEffect(() => {
+    if (!previewOpen) return undefined
+
+    const onKeyDown = event => {
+      if (event.key === 'Escape') setPreviewOpen(false)
+    }
+
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [previewOpen])
 
   const download = async () => {
     if (!src || downloading) return
@@ -109,21 +143,89 @@ function AttachmentComponent({ src, name, size, mime }) {
   }
 
   return (
-    <div className="attachment-block">
-      <div className="attachment-type" aria-hidden="true">{fileTypeLabel(name, mime)}</div>
-      <div className="attachment-info">
-        <strong title={name}>{name || '附件'}</strong>
-        <span>{[formatSize(size), mime].filter(Boolean).join(' · ') || '本地附件'}</span>
+    <>
+      <div className="attachment-block">
+        <div className="attachment-type" aria-hidden="true">{fileTypeLabel(name, mime)}</div>
+
+        <div className="attachment-info">
+          <strong title={name}>{name || '附件'}</strong>
+          <span>{[formatSize(size), mime].filter(Boolean).join(' · ') || '本地附件'}</span>
+        </div>
+
+        <div className="attachment-actions">
+          {previewType && (
+            <button
+              type="button"
+              className="attachment-preview-button"
+              onClick={() => setPreviewOpen(true)}
+              disabled={!src}
+            >
+              预览
+            </button>
+          )}
+
+          <button
+            type="button"
+            className="attachment-download"
+            onClick={download}
+            disabled={!src || downloading}
+          >
+            {downloading ? '下载中…' : '下载'}
+          </button>
+        </div>
       </div>
-      <button
-        type="button"
-        className="attachment-download"
-        onClick={download}
-        disabled={!src || downloading}
-      >
-        {downloading ? '下载中…' : '下载'}
-      </button>
-    </div>
+
+      {previewOpen && previewType && (
+        <div
+          className="attachment-preview-overlay"
+          role="presentation"
+          onMouseDown={event => {
+            if (event.target === event.currentTarget) setPreviewOpen(false)
+          }}
+        >
+          <section
+            className="attachment-preview-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`预览 ${name || '附件'}`}
+          >
+            <header className="attachment-preview-header">
+              <div>
+                <strong>{name || '附件'}</strong>
+                <span>{[formatSize(size), mime].filter(Boolean).join(' · ')}</span>
+              </div>
+
+              <div className="attachment-preview-header-actions">
+                <button type="button" onClick={download} disabled={downloading}>
+                  {downloading ? '下载中…' : '下载'}
+                </button>
+                <button
+                  type="button"
+                  className="attachment-preview-close"
+                  onClick={() => setPreviewOpen(false)}
+                  aria-label="关闭预览"
+                  title="关闭"
+                >
+                  ×
+                </button>
+              </div>
+            </header>
+
+            <div className={`attachment-preview-body ${previewType}`}>
+              {previewType === 'image' ? (
+                <img src={src} alt={name || '附件预览'} />
+              ) : (
+                <iframe
+                  src={src}
+                  title={name || 'PDF 预览'}
+                  className="attachment-pdf-preview"
+                />
+              )}
+            </div>
+          </section>
+        </div>
+      )}
+    </>
   )
 }
 
