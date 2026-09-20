@@ -129,6 +129,16 @@ export default function ToolbarPlugin() {
   }, [])
 
   useEffect(() => {
+    const openLink = () => {
+      setLinkOpen(true)
+      setMoreOpen(false)
+    }
+
+    window.addEventListener('editor:open-link', openLink)
+    return () => window.removeEventListener('editor:open-link', openLink)
+  }, [])
+
+  useEffect(() => {
     const handleClickOutside = (event) => {
       if (colorPickerRef.current && !colorPickerRef.current.contains(event.target)) {
         setShowColorPicker(false)
