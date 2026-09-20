@@ -10,6 +10,7 @@ import { CalloutNode, $createCalloutNode } from '../nodes/CalloutNode'
 import { ToggleNode, $createToggleNode } from '../nodes/ToggleNode'
 import { DividerNode } from '../nodes/DividerNode'
 import { EmbedNode, $createEmbedNode } from '../nodes/EmbedNode'
+import { AttachmentNode, $createAttachmentNode } from '../nodes/AttachmentNode'
 
 function createTestEditor() {
   return createEditor({
@@ -25,6 +26,7 @@ function createTestEditor() {
       ToggleNode,
       DividerNode,
       EmbedNode,
+      AttachmentNode,
     ],
     onError(error) {
       throw error
@@ -44,6 +46,7 @@ describe('editor block registry', () => {
         BlockType.H1,
         BlockType.H2,
         BlockType.H3,
+        BlockType.H4,
         BlockType.QUOTE,
         BlockType.BULLET_LIST,
         BlockType.NUMBERED_LIST,
@@ -75,6 +78,30 @@ describe('editor block registry', () => {
     expect(nodeTypes).toContain('toggle')
     expect(nodeTypes).toContain('divider')
     expect(nodeTypes).toContain('embed')
+  })
+
+  it('serializes generic file attachments', () => {
+    const editor = createTestEditor()
+
+    editor.update(() => {
+      const root = $getRoot()
+      root.clear()
+      root.append($createAttachmentNode({
+        src: 'http://127.0.0.1:27121/uploads/report.pdf',
+        name: 'report.pdf',
+        size: 2048,
+        mime: 'application/pdf',
+      }))
+    }, { discrete: true })
+
+    const attachment = editor.getEditorState().toJSON().root.children[0]
+    expect(attachment).toMatchObject({
+      type: 'attachment',
+      src: 'http://127.0.0.1:27121/uploads/report.pdf',
+      name: 'report.pdf',
+      size: 2048,
+      mime: 'application/pdf',
+    })
   })
 
   it('serializes interactive block edits instead of keeping them only in React state', () => {
