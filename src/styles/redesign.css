@@ -5634,3 +5634,34 @@ body {
     pointer-events: none;
   }
 }
+
+
+/* Mobile collapsed sidebar remains recoverable after removing the old rail */
+@media (max-width: 820px) {
+  .workspace-sidebar.collapsed {
+    position: relative !important;
+    inset: auto !important;
+    width: 46px !important;
+    min-width: 46px !important;
+    max-width: 46px !important;
+    flex: 0 0 46px !important;
+    overflow: visible !important;
+    border-right: 1px solid var(--line) !important;
+    box-shadow: none !important;
+    pointer-events: auto;
+  }
+
+  .workspace-sidebar.collapsed .workspace-sidebar-top {
+    padding-inline: 4px;
+  }
+
+  .workspace-sidebar.collapsed .workspace-brand-mark,
+  .workspace-sidebar.collapsed .workspace-sidebar-nav-item,
+  .workspace-sidebar.collapsed .workspace-sidebar-more,
+  .workspace-sidebar.collapsed .workspace-sidebar-icon-btn,
+  .workspace-sidebar.collapsed .workspace-sidebar-expand {
+    width: 36px !important;
+    min-width: 36px !important;
+    height: 36px !important;
+  }
+}
