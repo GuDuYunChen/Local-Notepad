@@ -8,6 +8,7 @@ import { diagnosticsToText, formatDiagnosticBytes } from './SettingsPanel'
 import TemplateSelector from './TemplateSelector'
 import QuickSwitcher, { buildHighlightSegments, getSearchMatchScope } from './QuickSwitcher'
 import ToastViewport from './ToastViewport'
+import NameDialog from './NameDialog'
 import { statusLabel } from './InspectorPanel'
 import { toast } from '~/services/toast'
 import { api, searchFiles } from '~/services/api'
@@ -243,6 +244,83 @@ describe('UI redesign smoke tests', () => {
     expect(api).toHaveBeenCalledWith('/api/files/deleted-1/restore', { method: 'POST' })
     expect(onRestored).toHaveBeenCalledWith(['deleted-1'])
     expect(container.textContent).toContain('回收站是空的')
+  })
+
+  it('uses an in-app confirmation before permanently deleting from trash', async () => {
+    api.mockImplementation((path, init) => {
+      if (path === '/api/files/trash' && !init?.method) {
+        return Promise.resolve([
+          {
+            id: 'deleted-2',
+            title: '旧笔记.md',
+            is_folder: false,
+            is_deleted: true,
+            deleted_at: Math.floor(Date.now() / 1000),
+          },
+        ])
+      }
+      if (path === '/api/files/deleted-2/permanent' && init?.method === 'DELETE') {
+        return Promise.resolve(null)
+      }
+      return Promise.reject(new Error(`Unexpected request: ${path}`))
+    })
+
+    await act(async () => {
+      root.render(<TrashPanel onClose={() => {}} onRestored={() => {}} />)
+    })
+    await flushPromises()
+
+    const rowDeleteButton = Array.from(container.querySelectorAll('.trash-item-actions button'))
+      .find(button => button.textContent === '永久删除')
+
+    expect(rowDeleteButton).toBeTruthy()
+    await click(rowDeleteButton)
+
+    const dialog = container.querySelector('.consumer-confirm-modal')
+    expect(dialog).toBeTruthy()
+    expect(dialog.textContent).toContain('永久删除这项内容？')
+    expect(dialog.textContent).toContain('旧笔记.md')
+
+    const confirmButton = Array.from(dialog.querySelectorAll('button'))
+      .find(button => button.textContent === '永久删除')
+    await click(confirmButton)
+    await flushPromises()
+
+    expect(api).toHaveBeenCalledWith('/api/files/deleted-2/permanent', { method: 'DELETE' })
+    expect(container.textContent).toContain('回收站是空的')
+  })
+
+  it('keeps file format and location behind secondary options when naming a note', async () => {
+    const onConfirm = vi.fn().mockResolvedValue(null)
+    const onCancel = vi.fn()
+
+    await act(async () => {
+      root.render(
+        <NameDialog
+          defaultName="未命名"
+          title="新建笔记"
+          message="给这篇笔记起个名字："
+          showFormatSelect
+          currentPathLabel="我的笔记 / 项目"
+          onConfirm={onConfirm}
+          onCancel={onCancel}
+        />
+      )
+    })
+
+    expect(container.textContent).toContain('新建笔记')
+    expect(container.querySelector('select')).toBeNull()
+    expect(container.textContent).not.toContain('我的笔记 / 项目')
+
+    const optionsButton = Array.from(container.querySelectorAll('button'))
+      .find(button => button.textContent.includes('更多选项'))
+    expect(optionsButton).toBeTruthy()
+
+    await click(optionsButton)
+
+    expect(container.querySelector('select')).toBeTruthy()
+    expect(container.textContent).toContain('保存格式')
+    expect(container.textContent).toContain('我的笔记 / 项目')
   })
 
   it('formats diagnostics for display and copy', () => {
