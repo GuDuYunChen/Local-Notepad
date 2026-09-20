@@ -7,6 +7,46 @@ $resourcesDir = Join-Path $unpackedDir 'resources'
 $backend = Join-Path $resourcesDir 'bin\notepad-server.exe'
 $appAsar = Join-Path $resourcesDir 'app.asar'
 
+function Invoke-NsisSilentInstall {
+  param(
+    [Parameter(Mandatory = $true)][string]$InstallerPath,
+    [Parameter(Mandatory = $true)][string]$InstallDirBase,
+    [int]$MaxAttempts = 2
+  )
+
+  for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+    $targetDir = if ($attempt -eq 1) { $InstallDirBase } else { "$InstallDirBase-$attempt" }
+
+    if (Test-Path $targetDir) {
+      Remove-Item -Path $targetDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    Write-Host "Installing NSIS package (attempt $attempt/$MaxAttempts) to: $targetDir"
+
+    $process = Start-Process `
+      -FilePath $InstallerPath `
+      -ArgumentList @('/S', "/D=$targetDir") `
+      -PassThru `
+      -Wait
+
+    if ($process.ExitCode -eq 0) {
+      return $targetDir
+    }
+
+    Write-Warning "NSIS installer attempt $attempt exited with code $($process.ExitCode)."
+
+    if (Test-Path $targetDir) {
+      Remove-Item -Path $targetDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    if ($attempt -lt $MaxAttempts) {
+      Start-Sleep -Seconds 2
+    }
+  }
+
+  throw "NSIS installer failed after $MaxAttempts attempts."
+}
+
 function Test-NotepadBackend {
   param(
     [Parameter(Mandatory = $true)][string]$BackendPath,
@@ -96,21 +136,11 @@ Test-NotepadBackend `
   -Port 27139 `
   -Label 'win-unpacked'
 
-$installDir = Join-Path $env:RUNNER_TEMP 'local-notepad-installed'
-if (Test-Path $installDir) {
-  Remove-Item -Path $installDir -Recurse -Force
-}
-
-Write-Host "Installing NSIS package to: $installDir"
-$installProcess = Start-Process `
-  -FilePath $installer.FullName `
-  -ArgumentList @('/S', "/D=$installDir") `
-  -PassThru `
-  -Wait
-
-if ($installProcess.ExitCode -ne 0) {
-  throw "NSIS installer exited with code $($installProcess.ExitCode)."
-}
+$installDirBase = Join-Path $env:RUNNER_TEMP 'local-notepad-installed'
+$installDir = Invoke-NsisSilentInstall `
+  -InstallerPath $installer.FullName `
+  -InstallDirBase $installDirBase `
+  -MaxAttempts 2
 
 $installedResources = Join-Path $installDir 'resources'
 $installedBackend = Join-Path $installedResources 'bin\notepad-server.exe'
