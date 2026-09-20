@@ -13,7 +13,10 @@ function getBlockTypeFromNode(node) {
   if (!node) return null
   if ($isHeadingNode(node)) {
     const tag = node.getTag()
-    return tag === 'h1' ? 'heading-1' : tag === 'h2' ? 'heading-2' : 'heading-3'
+    if (tag === 'h1') return 'heading-1'
+    if (tag === 'h2') return 'heading-2'
+    if (tag === 'h3') return 'heading-3'
+    return 'heading-4'
   }
   if ($isListNode(node)) return node.getListType() === 'bullet' ? 'bullet-list' : 'numbered-list'
   if ($isCodeNode(node)) return 'code-block'
