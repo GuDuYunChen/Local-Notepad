@@ -97,9 +97,9 @@ export default function DailyNotesPanel({ onSelectFile, onClose }) {
   return (
     <div className="daily-notes-panel">
       <div className="daily-notes-header daily-workspace-toolbar">
-        <div>
-          <div className="daily-workspace-eyebrow">Calendar</div>
-          <strong>{monthLabel}</strong>
+        <div className="daily-workspace-heading">
+          <strong>每日笔记</strong>
+          <span>{monthLabel}</span>
         </div>
         <div className="daily-notes-header-actions">
           <button className="btn small" onClick={() => moveMonth(-1)} aria-label="上个月">‹</button>
@@ -111,6 +111,12 @@ export default function DailyNotesPanel({ onSelectFile, onClose }) {
 
       <div className="daily-workspace-body">
         <section className="calendar-card">
+          <div className="daily-section-heading">
+            <div>
+              <strong>选择日期</strong>
+              <span>点一下日期即可打开；还没有内容时会自动创建。</span>
+            </div>
+          </div>
           <div className="calendar-grid">
             {weekDays.map(d => (
               <div key={d} className="calendar-weekday">{d}</div>
@@ -137,16 +143,13 @@ export default function DailyNotesPanel({ onSelectFile, onClose }) {
             ))}
           </div>
 
-          <div className="calendar-hint">
-            点击日期即可打开每日笔记；没有笔记的日期会自动创建。
-          </div>
         </section>
 
         <section className="daily-recent-card">
           <div className="daily-notes-list-header">
             <div>
-              <div className="daily-workspace-eyebrow">Recent</div>
-              <strong>最近的每日笔记</strong>
+              <strong>最近记录</strong>
+              <span>快速回到最近写过的每日笔记。</span>
             </div>
             <button className="icon-btn" onClick={loadNotes} title="刷新" aria-label="刷新">↻</button>
           </div>
@@ -156,7 +159,7 @@ export default function DailyNotesPanel({ onSelectFile, onClose }) {
           ) : recentNotes.length === 0 ? (
             <div className="empty-state daily-empty-state">
               <div className="empty-title">还没有每日笔记</div>
-              <div className="empty-desc">从上面的日历选择一个日期开始记录。</div>
+              <div className="empty-desc">从上面的日历选一天，开始记录今天发生的事。</div>
             </div>
           ) : (
             <ul className="daily-recent-list">
