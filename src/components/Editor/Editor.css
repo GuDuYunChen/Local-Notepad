@@ -669,8 +669,8 @@
 }
 
 .editor-input {
-  max-width: 900px;
-  padding: 64px 72px 120px;
+  max-width: 860px;
+  padding: 64px 64px 120px;
   font-size: 16px;
   line-height: 1.85;
   letter-spacing: .005em;
@@ -818,6 +818,14 @@
 
 .editor-table tr:nth-child(even):not(:first-child) .editor-table-cell {
   background: color-mix(in srgb, var(--paper) 68%, transparent);
+}
+
+@media (min-width: 1120px) {
+  .editor-table {
+    width: calc(100% + 120px);
+    margin-left: -60px;
+    margin-right: -60px;
+  }
 }
 
 @media (max-width: 900px) {
