@@ -11,6 +11,7 @@ import { ToggleNode, $createToggleNode } from '../nodes/ToggleNode'
 import { DividerNode } from '../nodes/DividerNode'
 import { EmbedNode, $createEmbedNode } from '../nodes/EmbedNode'
 import { AttachmentNode, $createAttachmentNode } from '../nodes/AttachmentNode'
+import { ImageNode, $createImageNode } from '../nodes/ImageNode'
 
 function createTestEditor() {
   return createEditor({
@@ -27,6 +28,7 @@ function createTestEditor() {
       DividerNode,
       EmbedNode,
       AttachmentNode,
+      ImageNode,
     ],
     onError(error) {
       throw error
@@ -78,6 +80,38 @@ describe('editor block registry', () => {
     expect(nodeTypes).toContain('toggle')
     expect(nodeTypes).toContain('divider')
     expect(nodeTypes).toContain('embed')
+  })
+
+  it('serializes editable image layout metadata', () => {
+    const editor = createTestEditor()
+
+    editor.update(() => {
+      const root = $getRoot()
+      root.clear()
+
+      const image = $createImageNode({
+        src: 'http://127.0.0.1:27121/uploads/image.jpg',
+        originalSrc: 'http://127.0.0.1:27121/uploads/image-original.jpg',
+        alt: '风景',
+        width: 520,
+        caption: '旧说明',
+        align: 'left',
+      })
+
+      image.setWidth('100%')
+      image.setCaption('新的图片说明')
+      image.setAlign('right')
+      root.append(image)
+    }, { discrete: true })
+
+    const image = editor.getEditorState().toJSON().root.children[0]
+    expect(image).toMatchObject({
+      type: 'image',
+      version: 2,
+      width: '100%',
+      caption: '新的图片说明',
+      align: 'right',
+    })
   })
 
   it('serializes generic file attachments', () => {
