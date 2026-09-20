@@ -1211,3 +1211,35 @@
   border-radius: 99px;
   background: var(--clay);
 }
+
+
+/* Block drag sorting feedback */
+.editor-input > .block-being-dragged {
+  opacity: .34;
+}
+
+.editor-input > .block-drop-before,
+.editor-input > .block-drop-after {
+  position: relative;
+}
+
+.editor-input > .block-drop-before::before,
+.editor-input > .block-drop-after::after {
+  content: '';
+  position: absolute;
+  left: -10px;
+  right: -10px;
+  height: 2px;
+  border-radius: 99px;
+  background: var(--clay);
+  box-shadow: 0 0 0 2px var(--clay-light);
+  pointer-events: none;
+}
+
+.editor-input > .block-drop-before::before {
+  top: -6px;
+}
+
+.editor-input > .block-drop-after::after {
+  bottom: -6px;
+}
