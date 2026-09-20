@@ -82,7 +82,11 @@ function WikiLinkView({ id, title }) {
         if (event.key === 'Enter' || event.key === ' ') openTarget(event)
       }}
     >
-      [[{title}]]
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M6 4h10l2 2v14H6z" />
+        <path d="M9 9h6M9 13h6M9 17h4" />
+      </svg>
+      <span>{title}</span>
     </span>
   )
 }
