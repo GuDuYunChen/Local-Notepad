@@ -165,9 +165,8 @@ export default function TrashPanel({ onClose, onRestored }) {
     <div className="trash-panel">
       <header className="trash-toolbar">
         <div>
-          <div className="trash-eyebrow">Recycle Bin</div>
           <strong>回收站</strong>
-          <p>删除的内容保留 30 天，到期后自动永久清理。</p>
+          <p>最近删除的内容会保留 30 天，你可以随时恢复。</p>
         </div>
 
         <div className="trash-toolbar-actions">
