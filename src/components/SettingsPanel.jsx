@@ -137,9 +137,8 @@ export default function SettingsPanel({
     <div className="settings-panel">
       <header className="settings-toolbar">
         <div>
-          <div className="settings-eyebrow">Settings & Diagnostics</div>
-          <strong>设置与诊断</strong>
-          <p>查看本地运行状态和数据位置；不会上传任何诊断信息。</p>
+          <strong>设置</strong>
+          <p>调整常用选项，并查看这台电脑上的本地数据状态。</p>
         </div>
         <div className="settings-toolbar-actions">
           <button className="btn small" onClick={() => void refresh()} disabled={loading}>
@@ -153,8 +152,7 @@ export default function SettingsPanel({
         <section className="settings-card">
           <div className="settings-card-header">
             <div>
-              <div className="settings-section-eyebrow">Appearance</div>
-              <h3>外观与常用入口</h3>
+              <h3>外观与常用功能</h3>
             </div>
           </div>
           <div className="settings-row">
@@ -174,8 +172,7 @@ export default function SettingsPanel({
         <section className="settings-card">
           <div className="settings-card-header">
             <div>
-              <div className="settings-section-eyebrow">Application</div>
-              <h3>应用与运行环境</h3>
+              <h3>关于记事本</h3>
             </div>
             <StatusPill ok={Boolean(appInfo)}>桌面运行时</StatusPill>
           </div>
@@ -192,8 +189,7 @@ export default function SettingsPanel({
         <section className="settings-card">
           <div className="settings-card-header">
             <div>
-              <div className="settings-section-eyebrow">Data Health</div>
-              <h3>本地数据健康</h3>
+              <h3>数据状态</h3>
             </div>
             <StatusPill ok={healthOK}>{healthOK ? '正常' : '需要检查'}</StatusPill>
           </div>
@@ -223,8 +219,7 @@ export default function SettingsPanel({
         <section className="settings-card">
           <div className="settings-card-header">
             <div>
-              <div className="settings-section-eyebrow">Storage</div>
-              <h3>本地存储位置</h3>
+              <h3>存储位置</h3>
             </div>
           </div>
 
