@@ -1,108 +1,103 @@
 import { useEffect, useRef } from 'react'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
-import { $getSelection, $isRangeSelection, $getRoot, $isElementNode } from 'lexical'
+import { $getRoot } from 'lexical'
 
 export default function DragDropPlugin() {
   const [editor] = useLexicalComposerContext()
-  const dragItemRef = useRef(null)
-  const dragOverItemRef = useRef(null)
+  const dragKeyRef = useRef('')
+  const dragElementRef = useRef(null)
+  const dropTargetRef = useRef(null)
+  const dropPositionRef = useRef('before')
 
   useEffect(() => {
-    const editorContainer = document.querySelector('.editor-container')
-    if (!editorContainer) return
+    const editorContainer = editor.getRootElement()?.closest('.editor-container')
+    if (!editorContainer) return undefined
 
-    let dragHandle = null
+    const clearIndicators = () => {
+      editorContainer.querySelectorAll('.editor-input > *').forEach(element => {
+        element.classList.remove('block-drop-before', 'block-drop-after', 'block-being-dragged')
+      })
+    }
 
-    const handleDragStart = (e) => {
-      const handle = e.target.closest('.block-handle')
+    const cleanup = () => {
+      clearIndicators()
+      dragKeyRef.current = ''
+      dragElementRef.current = null
+      dropTargetRef.current = null
+      dropPositionRef.current = 'before'
+    }
+
+    const handleDragStart = (event) => {
+      const handle = event.target.closest('.block-handle')
       if (!handle) return
 
-      dragHandle = handle
-      const blockElement = handle.closest('.editor-input > *')
-      if (!blockElement) return
-
-      dragItemRef.current = blockElement
-      e.dataTransfer.effectAllowed = 'move'
-      e.dataTransfer.setData('text/plain', '')
-
-      setTimeout(() => {
-        blockElement.style.opacity = '0.4'
-      }, 0)
-    }
-
-    const handleDragOver = (e) => {
-      e.preventDefault()
-      e.dataTransfer.dropEffect = 'move'
-
-      const target = e.target.closest('.editor-input > *')
-      if (target && target !== dragItemRef.current) {
-        dragOverItemRef.current = target
-
-        document.querySelectorAll('.editor-input > *').forEach((el) => {
-          el.style.borderTop = 'none'
-        })
-
-        target.style.borderTop = '2px solid var(--accent, #7e5bef)'
+      const blockKey = handle.dataset.blockKey
+      const blockElement = blockKey ? editor.getElementByKey(blockKey) : null
+      if (!blockKey || !blockElement) {
+        event.preventDefault()
+        return
       }
+
+      dragKeyRef.current = blockKey
+      dragElementRef.current = blockElement
+      blockElement.classList.add('block-being-dragged')
+
+      event.dataTransfer.effectAllowed = 'move'
+      event.dataTransfer.setData('application/x-local-notepad-block', blockKey)
+      event.dataTransfer.setData('text/plain', '')
     }
 
-    const handleDrop = (e) => {
-      e.preventDefault()
+    const handleDragOver = (event) => {
+      if (!dragKeyRef.current) return
 
-      const dragItem = dragItemRef.current
-      const dropTarget = dragOverItemRef.current
+      const target = event.target.closest('.editor-input > *')
+      if (!target || target === dragElementRef.current) return
 
-      if (!dragItem || !dropTarget || dragItem === dropTarget) {
+      event.preventDefault()
+      event.dataTransfer.dropEffect = 'move'
+
+      clearIndicators()
+      dragElementRef.current?.classList.add('block-being-dragged')
+
+      const rect = target.getBoundingClientRect()
+      const position = event.clientY < rect.top + rect.height / 2 ? 'before' : 'after'
+
+      dropTargetRef.current = target
+      dropPositionRef.current = position
+      target.classList.add(position === 'before' ? 'block-drop-before' : 'block-drop-after')
+    }
+
+    const handleDrop = (event) => {
+      if (!dragKeyRef.current) return
+
+      event.preventDefault()
+
+      const dragKey = dragKeyRef.current
+      const targetElement = dropTargetRef.current
+      const position = dropPositionRef.current
+
+      if (!targetElement || targetElement === dragElementRef.current) {
         cleanup()
         return
       }
 
       editor.update(() => {
-        const root = $getRoot()
-        const children = root.getChildren()
+        const children = $getRoot().getChildren()
+        const dragNode = children.find(child => child.getKey() === dragKey)
+        const targetNode = children.find(child => editor.getElementByKey(child.getKey()) === targetElement)
 
-        const dragIndex = children.findIndex((child) => {
-          const dom = editor.getElementByKey(child.getKey())
-          return dom === dragItem
-        })
+        if (!dragNode || !targetNode || dragNode === targetNode) return
 
-        const dropIndex = children.findIndex((child) => {
-          const dom = editor.getElementByKey(child.getKey())
-          return dom === dropTarget
-        })
+        if (position === 'after') targetNode.insertAfter(dragNode)
+        else targetNode.insertBefore(dragNode)
 
-        if (dragIndex === -1 || dropIndex === -1) return
-
-        const dragNode = children[dragIndex]
-        const dropNode = children[dropIndex]
-
-        if (dragIndex < dropIndex) {
-          dropNode.insertAfter(dragNode)
-        } else {
-          dropNode.insertBefore(dragNode)
-        }
-
-        dragNode.selectEnd()
+        if (typeof dragNode.selectEnd === 'function') dragNode.selectEnd()
       })
 
       cleanup()
     }
 
-    const handleDragEnd = () => {
-      cleanup()
-    }
-
-    const cleanup = () => {
-      if (dragItemRef.current) {
-        dragItemRef.current.style.opacity = '1'
-      }
-      document.querySelectorAll('.editor-input > *').forEach((el) => {
-        el.style.borderTop = 'none'
-      })
-      dragItemRef.current = null
-      dragOverItemRef.current = null
-      dragHandle = null
-    }
+    const handleDragEnd = () => cleanup()
 
     editorContainer.addEventListener('dragstart', handleDragStart, true)
     editorContainer.addEventListener('dragover', handleDragOver, true)
@@ -110,6 +105,7 @@ export default function DragDropPlugin() {
     editorContainer.addEventListener('dragend', handleDragEnd, true)
 
     return () => {
+      cleanup()
       editorContainer.removeEventListener('dragstart', handleDragStart, true)
       editorContainer.removeEventListener('dragover', handleDragOver, true)
       editorContainer.removeEventListener('drop', handleDrop, true)
