@@ -312,86 +312,88 @@ export default function App() {
           ? '设置与诊断'
           : (current?.title || '笔记')
 
+  const documentHeader = !focusMode && workspace === 'notes' && current && !current.is_folder ? (
+  <header className="workspace-header consumer-document-header">
+    <div className="workspace-heading">
+      {current && !current.is_folder ? (
+        <div className="workspace-document-title">
+          {titleEditing ? (
+            <input
+              ref={titleInputRef}
+              className="workspace-title-input"
+              value={titleDraft}
+              disabled={titleSaving}
+              onChange={event => setTitleDraft(event.target.value)}
+              onBlur={() => void commitTitleEdit()}
+              onKeyDown={event => {
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  event.currentTarget.blur()
+                } else if (event.key === 'Escape') {
+                  event.preventDefault()
+                  cancelTitleEdit()
+                  event.currentTarget.blur()
+                }
+              }}
+              aria-label="当前笔记标题"
+            />
+          ) : (
+            <button
+              type="button"
+              className="workspace-title-button"
+              onClick={beginTitleEdit}
+              title="点击重命名（F2）"
+              aria-label={`重命名 ${current.title || '未命名'}`}
+            >
+              {current.title || '未命名'}
+            </button>
+          )}
+          {(editorStatus.saveError || editorStatus.saving || unsaved || editorStatus.dirty) && (
+            <span
+              className={`workspace-save-chip${editorStatus.saveError ? ' error' : editorStatus.saving ? ' saving' : ' dirty'}`}
+            >
+              {editorStatus.saveError
+                ? '保存失败'
+                : editorStatus.saving
+                  ? '保存中…'
+                  : '未保存'}
+            </span>
+          )}
+        </div>
+      ) : (
+        <div className="workspace-title" title="笔记">笔记</div>
+      )}
+    </div>
+    <div className="workspace-header-actions">
+      {workspace === 'notes' && current && (
+        <button
+          className={`icon-btn${inspectorOpen ? ' active' : ''}`}
+          onClick={() => setInspectorOpen(prev => !prev)}
+          title="笔记详情"
+          aria-label="笔记详情"
+          aria-pressed={inspectorOpen}
+        >
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 11v5M12 8h.01" />
+          </svg>
+        </button>
+      )}
+      {workspace === 'notes' && (
+        <button className="icon-btn" onClick={() => setFocusMode(true)} title="专注模式 (F11)" aria-label="进入专注模式">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3" />
+          </svg>
+        </button>
+      )}
+    </div>
+  </header>
+  ) : null
+
   return (
     <div className={`app-shell${focusMode ? ' focus-mode' : ''}`}>
       <div className="app-surface">
-        {!focusMode && workspace === 'notes' && current && !current.is_folder && (
-          <header className="workspace-header consumer-document-header">
-            <div className="workspace-heading">
-              {current && !current.is_folder ? (
-                <div className="workspace-document-title">
-                  {titleEditing ? (
-                    <input
-                      ref={titleInputRef}
-                      className="workspace-title-input"
-                      value={titleDraft}
-                      disabled={titleSaving}
-                      onChange={event => setTitleDraft(event.target.value)}
-                      onBlur={() => void commitTitleEdit()}
-                      onKeyDown={event => {
-                        if (event.key === 'Enter') {
-                          event.preventDefault()
-                          event.currentTarget.blur()
-                        } else if (event.key === 'Escape') {
-                          event.preventDefault()
-                          cancelTitleEdit()
-                          event.currentTarget.blur()
-                        }
-                      }}
-                      aria-label="当前笔记标题"
-                    />
-                  ) : (
-                    <button
-                      type="button"
-                      className="workspace-title-button"
-                      onClick={beginTitleEdit}
-                      title="点击重命名（F2）"
-                      aria-label={`重命名 ${current.title || '未命名'}`}
-                    >
-                      {current.title || '未命名'}
-                    </button>
-                  )}
-                  {(editorStatus.saveError || editorStatus.saving || unsaved || editorStatus.dirty) && (
-                    <span
-                      className={`workspace-save-chip${editorStatus.saveError ? ' error' : editorStatus.saving ? ' saving' : ' dirty'}`}
-                    >
-                      {editorStatus.saveError
-                        ? '保存失败'
-                        : editorStatus.saving
-                          ? '保存中…'
-                          : '未保存'}
-                    </span>
-                  )}
-                </div>
-              ) : (
-                <div className="workspace-title" title="笔记">笔记</div>
-              )}
-            </div>
-            <div className="workspace-header-actions">
-              {workspace === 'notes' && current && (
-                <button
-                  className={`icon-btn${inspectorOpen ? ' active' : ''}`}
-                  onClick={() => setInspectorOpen(prev => !prev)}
-                  title="笔记详情"
-                  aria-label="笔记详情"
-                  aria-pressed={inspectorOpen}
-                >
-                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <circle cx="12" cy="12" r="9" />
-                    <path d="M12 11v5M12 8h.01" />
-                  </svg>
-                </button>
-              )}
-              {workspace === 'notes' && (
-                <button className="icon-btn" onClick={() => setFocusMode(true)} title="专注模式 (F11)" aria-label="进入专注模式">
-                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3" />
-                  </svg>
-                </button>
-              )}
-            </div>
-          </header>
-        )}
+
 
         {focusMode && (
           <button className="focus-exit-floating" onClick={() => setFocusMode(false)} title="退出专注模式 (F11)" aria-label="退出专注模式">
@@ -461,6 +463,7 @@ export default function App() {
               )}
 
               <section className={`workspace-content${switching ? ' switching' : ''}`}>
+                {documentHeader}
                 {workspace === 'notes' && (
                   <ErrorBoundary label="编辑器">
                     <TextEditor
