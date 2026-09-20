@@ -25,28 +25,47 @@ export default function SlashMenuPlugin() {
 
   const selectBlock = useCallback(
     (block) => {
+      let runAfterUpdate = false
+
       editor.update(() => {
         const selection = $getSelection()
         if (!$isRangeSelection(selection)) return
 
         const anchor = selection.anchor
         const anchorNode = anchor.getNode()
+        if (!$isParagraphNode(anchorNode)) return
 
-        if ($isParagraphNode(anchorNode)) {
-          const textContent = anchorNode.getTextContent()
-          const slashIndex = textContent.lastIndexOf(SLASH_TRIGGER)
-          if (slashIndex !== -1) {
-            const textBeforeSlash = textContent.slice(0, slashIndex)
-            anchorNode.setTextContent(textBeforeSlash)
-          } else {
-            anchorNode.clear()
-          }
-        }
+        const textContent = anchorNode.getTextContent()
+        const cursorOffset = anchor.offset
+        const beforeCursor = textContent.slice(0, cursorOffset)
+        const slashIndex = beforeCursor.lastIndexOf(SLASH_TRIGGER)
+        const beforeSlash = slashIndex >= 0 ? textContent.slice(0, slashIndex) : ''
+        const afterQuery = slashIndex >= 0 ? textContent.slice(cursorOffset) : ''
+        const remainingText = beforeSlash + afterQuery
 
         if (block.createNode) {
-          block.createNode(editor)
+          const nextNode = block.createNode()
+          if (!nextNode) return
+
+          if (!remainingText.trim()) {
+            anchorNode.replace(nextNode)
+          } else {
+            anchorNode.setTextContent(remainingText)
+            anchorNode.insertAfter(nextNode)
+          }
+
+          if (typeof nextNode.selectEnd === 'function') {
+            nextNode.selectEnd()
+          }
+        } else {
+          anchorNode.setTextContent(remainingText)
+          runAfterUpdate = Boolean(block.run)
         }
       })
+
+      if (runAfterUpdate) {
+        Promise.resolve().then(() => block.run?.(editor))
+      }
 
       closeMenu()
       editor.focus()
