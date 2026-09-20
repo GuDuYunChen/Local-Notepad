@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import {
-  INSERT_TABLE_COMMAND,
   $createTableCellNode,
   $createTableNode,
   $createTableRowNode,
@@ -105,6 +104,7 @@ export default function ToolbarPlugin() {
   const [isBold, setIsBold] = useState(false)
   const [isItalic, setIsItalic] = useState(false)
   const [isUnderline, setIsUnderline] = useState(false)
+  const [isCode, setIsCode] = useState(false)
   const [isStrikethrough, setIsStrikethrough] = useState(false)
   const [blockType, setBlockType] = useState('paragraph')
   const [isBulletList, setIsBulletList] = useState(false)
@@ -201,6 +201,7 @@ export default function ToolbarPlugin() {
     setIsBold(selection.hasFormat('bold'))
     setIsItalic(selection.hasFormat('italic'))
     setIsUnderline(selection.hasFormat('underline'))
+    setIsCode(selection.hasFormat('code'))
     setIsStrikethrough(selection.hasFormat('strikethrough'))
     setHasSelection(!selection.isCollapsed())
 
@@ -586,6 +587,15 @@ export default function ToolbarPlugin() {
         >
           U
         </button>
+        <button
+          type="button"
+          onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'code')}
+          className={`btn toolbar-inline-code${isCode ? ' active' : ''}`}
+          aria-label="行内代码"
+          title="行内代码"
+        >
+          &lt;/&gt;
+        </button>
       </div>
 
       <span className="divider" />
@@ -709,16 +719,6 @@ export default function ToolbarPlugin() {
                   视频
                   <input type="file" accept="video/*" hidden onChange={handleVideo} />
                 </label>
-                <button
-                  type="button"
-                  className="btn toolbar-menu-action"
-                  onClick={() => {
-                    editor.dispatchCommand(INSERT_TABLE_COMMAND, { columns: 3, rows: 3 })
-                    setInsertOpen(false)
-                  }}
-                >
-                  表格
-                </button>
                 <button
                   type="button"
                   className="btn toolbar-menu-action"
