@@ -112,7 +112,7 @@ export default function TemplateSelector({ open, onClose, onSelect }) {
       <section className="template-selector" role="dialog" aria-modal="true" aria-labelledby="template-title">
         <header className="template-selector-header">
           <div>
-            <div className="template-eyebrow">New note</div>
+            <div className="template-eyebrow">新建笔记</div>
             <h2 id="template-title">选择模板</h2>
             <p>先选择一个结构，也可以直接创建空白笔记。</p>
           </div>
