@@ -188,7 +188,10 @@ export default function TrashPanel({ onClose, onRestored }) {
       title: '永久删除这项内容？',
       message: `“${item.title || '未命名'}”删除后无法恢复。`,
       confirmLabel: '永久删除',
-      run: () => permanentDeleteOne(item),
+      run: async () => {
+        const result = await permanentDeleteOne(item)
+        if (!result.ok) throw result.error || new Error('永久删除失败')
+      },
     })
   }
 
