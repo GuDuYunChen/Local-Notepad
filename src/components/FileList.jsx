@@ -1532,15 +1532,27 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
                 新建
               </button>
               {showNewMenu && (
-                <div className="dropdown-menu file-action-menu" ref={newMenuRef}>
-                  <div className="menu-item" onClick={() => onNewFileCheck()}>
-                    <span>新建笔记</span>
+                <div className="dropdown-menu file-action-menu" ref={newMenuRef} role="menu" aria-label="新建">
+                  <button type="button" className="menu-item" role="menuitem" onClick={() => onNewFileCheck()}>
+                    <span className="menu-item-icon" aria-hidden="true">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M6 3h9l3 3v15H6z" />
+                        <path d="M15 3v4h4M9 12h6M12 9v6" />
+                      </svg>
+                    </span>
+                    <span className="menu-item-label">新建笔记</span>
                     <kbd>Ctrl+N</kbd>
-                  </div>
-                  <div className="menu-item" onClick={() => onNewFolderCheck()}>
-                    <span>新建文件夹</span>
+                  </button>
+                  <button type="button" className="menu-item" role="menuitem" onClick={() => onNewFolderCheck()}>
+                    <span className="menu-item-icon" aria-hidden="true">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M3 6h7l2 2h9v11H3z" />
+                        <path d="M12 11v5M9.5 13.5h5" />
+                      </svg>
+                    </span>
+                    <span className="menu-item-label">新建文件夹</span>
                     <kbd>Ctrl+Shift+N</kbd>
-                  </div>
+                  </button>
                 </div>
               )}
             </div>
@@ -1559,17 +1571,41 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
                 </svg>
               </button>
               {showLibraryMenu && (
-                <div className="dropdown-menu file-action-menu file-more-menu">
-                  <div className="menu-item" onClick={() => { setShowLibraryMenu(false); void onImport() }}>
-                    导入文件
-                  </div>
-                  <div className="menu-item" onClick={() => { setShowLibraryMenu(false); setShowExport(true) }}>
-                    导出…
-                  </div>
+                <div className="dropdown-menu file-action-menu file-more-menu" role="menu" aria-label="更多笔记操作">
+                  <button type="button" className="menu-item" role="menuitem" onClick={() => { setShowLibraryMenu(false); void onImport() }}>
+                    <span className="menu-item-icon" aria-hidden="true">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 3v12M7 8l5-5 5 5" /><path d="M5 14v6h14v-6" />
+                      </svg>
+                    </span>
+                    <span className="menu-item-label">
+                      <strong>导入</strong>
+                      <small>Markdown、文本、Word 等</small>
+                    </span>
+                  </button>
+                  <button type="button" className="menu-item" role="menuitem" onClick={() => { setShowLibraryMenu(false); setShowExport(true) }}>
+                    <span className="menu-item-icon" aria-hidden="true">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 21V9M7 16l5 5 5-5" /><path d="M5 10V4h14v6" />
+                      </svg>
+                    </span>
+                    <span className="menu-item-label">
+                      <strong>导出</strong>
+                      <small>保存为 Markdown 或 Word</small>
+                    </span>
+                  </button>
                   <div className="divider" />
-                  <div className="menu-item danger" onClick={() => { setShowLibraryMenu(false); void onBatchDeleteCheck() }}>
-                    批量删除{selectedIds.size > 1 ? `（${selectedIds.size}）` : ''}
-                  </div>
+                  <button type="button" className="menu-item danger" role="menuitem" onClick={() => { setShowLibraryMenu(false); void onBatchDeleteCheck() }}>
+                    <span className="menu-item-icon" aria-hidden="true">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13" />
+                      </svg>
+                    </span>
+                    <span className="menu-item-label">
+                      <strong>{selectedIds.size > 1 ? `移到回收站（${selectedIds.size}）` : '批量整理'}</strong>
+                      <small>{selectedIds.size > 1 ? '所选内容可在 30 天内恢复' : '选择多个项目后可批量操作'}</small>
+                    </span>
+                  </button>
                 </div>
               )}
             </div>
@@ -1654,27 +1690,48 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
 
       {/* 右键菜单 */}
       {contextMenu && (
-          <div 
-            className="context-menu" 
-            ref={contextMenuRef}
-            style={{ top: contextMenu.y, left: contextMenu.x, position: 'fixed', zIndex: 200 }}
-          >
-              {contextMenu.item.is_folder && (
-                  <>
-                    <div className="menu-item" onClick={() => onNewFileCheck(contextMenu.item.id)}>在此新建笔记</div>
-                    <div className="menu-item" onClick={() => onNewFolderCheck(contextMenu.item.id)}>在此新建文件夹</div>
-                    <div className="divider"></div>
-                  </>
-              )}
-              <div className="menu-item" onClick={() => { togglePin(contextMenu.item.id, !contextMenu.item.is_pinned); setContextMenu(null) }}>
-                  {contextMenu.item.is_pinned ? '取消置顶' : '置顶'}
-              </div>
-              <div className="menu-item" onClick={() => { setRenaming(contextMenu.item); setContextMenu(null) }}>重命名</div>
-              {!contextMenu.item.is_folder && (
-                  <div className="menu-item" onClick={() => { void onSaveAs(contextMenu.item.id); setContextMenu(null) }}>另存为</div>
-              )}
-              <div className="menu-item danger" onClick={() => onDeleteCheck(contextMenu.item.id)}>删除</div>
-          </div>
+        <div
+          className="context-menu file-context-menu"
+          ref={contextMenuRef}
+          role="menu"
+          aria-label={`${contextMenu.item.title} 操作`}
+          style={{ top: contextMenu.y, left: contextMenu.x, position: 'fixed', zIndex: 200 }}
+        >
+          {contextMenu.item.is_folder && (
+            <>
+              <button type="button" className="menu-item" role="menuitem" onClick={() => { setContextMenu(null); onNewFileCheck(contextMenu.item.id) }}>
+                <span className="menu-item-icon" aria-hidden="true">＋</span>
+                <span className="menu-item-label">在此新建笔记</span>
+              </button>
+              <button type="button" className="menu-item" role="menuitem" onClick={() => { setContextMenu(null); onNewFolderCheck(contextMenu.item.id) }}>
+                <span className="menu-item-icon" aria-hidden="true">▢</span>
+                <span className="menu-item-label">在此新建文件夹</span>
+              </button>
+              <div className="divider" />
+            </>
+          )}
+          <button type="button" className="menu-item" role="menuitem" onClick={() => { togglePin(contextMenu.item.id, !contextMenu.item.is_pinned); setContextMenu(null) }}>
+            <span className="menu-item-icon" aria-hidden="true">⌖</span>
+            <span className="menu-item-label">{contextMenu.item.is_pinned ? '取消置顶' : '置顶'}</span>
+          </button>
+          <button type="button" className="menu-item" role="menuitem" onClick={() => { setRenaming(contextMenu.item); setContextMenu(null) }}>
+            <span className="menu-item-icon" aria-hidden="true">✎</span>
+            <span className="menu-item-label">重命名</span>
+            <kbd>F2</kbd>
+          </button>
+          {!contextMenu.item.is_folder && (
+            <button type="button" className="menu-item" role="menuitem" onClick={() => { void onSaveAs(contextMenu.item.id); setContextMenu(null) }}>
+              <span className="menu-item-icon" aria-hidden="true">⇩</span>
+              <span className="menu-item-label">另存为</span>
+            </button>
+          )}
+          <div className="divider" />
+          <button type="button" className="menu-item danger" role="menuitem" onClick={() => { setContextMenu(null); onDeleteCheck(contextMenu.item.id) }}>
+            <span className="menu-item-icon" aria-hidden="true">⌫</span>
+            <span className="menu-item-label">移到回收站</span>
+            <kbd>Del</kbd>
+          </button>
+        </div>
       )}
 
       {deleteConfirm && (
