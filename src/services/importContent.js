@@ -110,7 +110,7 @@ function extractMarkdownTables(markdown) {
       index += 1
     }
 
-    const marker = `LOCAL_NOTEPAD_TABLE_${tables.length}_PLACEHOLDER`
+    const marker = `LOCALNOTEPADTABLE${tables.length}PLACEHOLDER`
     tables.push({ marker, rows })
     output.push('')
     output.push(marker)
