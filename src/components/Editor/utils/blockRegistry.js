@@ -9,6 +9,7 @@ import { $createDividerNode } from '../nodes/DividerNode'
 import { $createCalloutNode } from '../nodes/CalloutNode'
 import { $createToggleNode } from '../nodes/ToggleNode'
 import { $createEmbedNode } from '../nodes/EmbedNode'
+import { $createAttachmentNode } from '../nodes/AttachmentNode'
 import { uploadFile } from './fileUpload'
 
 export const BlockType = {
@@ -28,6 +29,7 @@ export const BlockType = {
   TODO: 'todo',
   TOGGLE: 'toggle',
   EMBED: 'embed',
+  ATTACHMENT: 'attachment',
 }
 
 function createListNode(listType) {
@@ -36,6 +38,36 @@ function createListNode(listType) {
   item.append($createTextNode(''))
   list.append(item)
   return list
+}
+
+async function insertUploadedAttachment(editor) {
+  const input = document.createElement('input')
+  input.type = 'file'
+
+  input.onchange = async (event) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    try {
+      const result = await uploadFile(file)
+      if (!result?.url) return
+
+      editor.update(() => {
+        $insertNodes([
+          $createAttachmentNode({
+            src: result.url,
+            name: file.name,
+            size: file.size,
+            mime: file.type || '',
+          }),
+        ])
+      })
+    } catch (error) {
+      console.error('附件上传失败', error)
+    }
+  }
+
+  input.click()
 }
 
 async function insertUploadedImage(editor) {
@@ -168,6 +200,15 @@ export const blockRegistry = [
     keywords: ['table', '表格'],
     shortcut: '',
     run: (editor) => editor.dispatchCommand(INSERT_TABLE_COMMAND, { columns: 3, rows: 3 }),
+  },
+  {
+    type: BlockType.ATTACHMENT,
+    label: '附件',
+    description: '上传 PDF、Word、压缩包或其他文件',
+    icon: '📎',
+    keywords: ['attachment', 'file', '附件', '文件', 'pdf', 'word'],
+    shortcut: '',
+    run: insertUploadedAttachment,
   },
   {
     type: BlockType.IMAGE,
