@@ -177,8 +177,8 @@ export default function GraphPanel({ onSelectFile, onClose }) {
     <div className="graph-panel">
       <div className="graph-header graph-workspace-toolbar">
         <div>
-          <div className="graph-workspace-eyebrow">Connections</div>
-          <strong>知识关系</strong>
+          <strong>知识图谱</strong>
+          <span className="graph-workspace-subtitle">看看笔记之间已经建立了哪些联系。</span>
         </div>
 
         <div className="graph-header-actions">
