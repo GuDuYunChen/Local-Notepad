@@ -212,7 +212,7 @@ export default function SettingsPanel({
               <strong>版本</strong>
               <span>{appInfo?.version ? `记事本 ${appInfo.version}` : '正在读取版本信息…'}</span>
             </div>
-            <StatusPill tone={appInfo ? 'neutral' : 'neutral'}>{appInfo ? (appInfo.packaged ? '桌面版' : '开发模式') : '读取中'}</StatusPill>
+            <StatusPill tone="neutral">{appInfo ? (appInfo.packaged ? '桌面版' : '开发模式') : '读取中'}</StatusPill>
           </div>
 
           <div className="settings-row">
