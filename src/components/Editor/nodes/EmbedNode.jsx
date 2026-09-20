@@ -1,5 +1,6 @@
-import { DecoratorNode } from 'lexical'
-import React, { useState } from 'react'
+import { $getNodeByKey, DecoratorNode } from 'lexical'
+import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
+import React, { useEffect, useState } from 'react'
 
 export class EmbedNode extends DecoratorNode {
   __url
@@ -15,7 +16,7 @@ export class EmbedNode extends DecoratorNode {
 
   static importJSON(serializedNode) {
     const { url, title } = serializedNode
-    return new EmbedNode(url, title)
+    return new EmbedNode(url || '', title || '')
   }
 
   exportJSON() {
@@ -69,19 +70,36 @@ export class EmbedNode extends DecoratorNode {
 }
 
 function EmbedComponent({ nodeKey, url, title }) {
+  const [editor] = useLexicalComposerContext()
   const [editUrl, setEditUrl] = useState(url || '')
   const [editTitle, setEditTitle] = useState(title || '')
   const [isEditing, setIsEditing] = useState(!url)
 
+  useEffect(() => setEditUrl(url || ''), [url])
+  useEffect(() => setEditTitle(title || ''), [title])
+
+  const persist = () => {
+    editor.update(() => {
+      const node = $getNodeByKey(nodeKey)
+      if (!$isEmbedNode(node)) return
+      node.setUrl(editUrl.trim())
+      node.setTitle(editTitle.trim())
+    })
+  }
+
   const handleSave = () => {
-    if (editUrl.trim()) {
-      setIsEditing(false)
-    }
+    if (!editUrl.trim()) return
+    persist()
+    setIsEditing(false)
   }
 
   const ALLOWED_EMBED_DOMAINS = [
     'www.youtube.com',
+    'youtube.com',
+    'youtu.be',
     'player.bilibili.com',
+    'www.bilibili.com',
+    'bilibili.com',
     'player.vimeo.com',
     'open.spotify.com',
     'www.slideshare.net',
@@ -92,21 +110,19 @@ function EmbedComponent({ nodeKey, url, title }) {
   const getEmbedUrl = (inputUrl) => {
     if (!inputUrl) return ''
     try {
-      const parsed = new URL(inputUrl.startsWith('//') ? 'https:' + inputUrl : inputUrl)
-      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
-        return ''
-      }
-      const youtubeMatch = inputUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/)
-      if (youtubeMatch) {
-        return `https://www.youtube.com/embed/${youtubeMatch[1]}`
-      }
-      const bilibiliMatch = inputUrl.match(/bilibili\.com\/video\/([a-zA-Z0-9]+)/)
+      const normalized = inputUrl.startsWith('//') ? 'https:' + inputUrl : inputUrl
+      const parsed = new URL(normalized)
+      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return ''
+
+      const youtubeMatch = normalized.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/)
+      if (youtubeMatch) return `https://www.youtube.com/embed/${youtubeMatch[1]}`
+
+      const bilibiliMatch = normalized.match(/bilibili\.com\/video\/([a-zA-Z0-9]+)/)
       if (bilibiliMatch) {
-        return `//player.bilibili.com/player.html?bvid=${bilibiliMatch[1]}`
+        return `https://player.bilibili.com/player.html?bvid=${bilibiliMatch[1]}`
       }
-      if (ALLOWED_EMBED_DOMAINS.includes(parsed.hostname)) {
-        return inputUrl
-      }
+
+      if (ALLOWED_EMBED_DOMAINS.includes(parsed.hostname)) return normalized
       return ''
     } catch {
       return ''
@@ -121,20 +137,31 @@ function EmbedComponent({ nodeKey, url, title }) {
         <input
           type="url"
           value={editUrl}
-          onChange={(e) => setEditUrl(e.target.value)}
-          placeholder="输入嵌入链接 (YouTube, Bilibili, 或其他支持的 iframe 链接)..."
+          onChange={(event) => setEditUrl(event.target.value)}
+          placeholder="粘贴 YouTube、Bilibili 或其他支持的链接"
           className="embed-input"
         />
         <input
           type="text"
           value={editTitle}
-          onChange={(e) => setEditTitle(e.target.value)}
-          placeholder="标题（可选）..."
+          onChange={(event) => setEditTitle(event.target.value)}
+          placeholder="标题（可选）"
           className="embed-input"
         />
-        <button onClick={handleSave} className="embed-save-btn" disabled={!editUrl.trim()}>
-          保存
-        </button>
+        <div className="embed-edit-actions">
+          {url && (
+            <button type="button" className="btn" onClick={() => {
+              setEditUrl(url || '')
+              setEditTitle(title || '')
+              setIsEditing(false)
+            }}>
+              取消
+            </button>
+          )}
+          <button type="button" onClick={handleSave} className="embed-save-btn" disabled={!editUrl.trim()}>
+            保存
+          </button>
+        </div>
       </div>
     )
   }
@@ -153,10 +180,10 @@ function EmbedComponent({ nodeKey, url, title }) {
           sandbox="allow-scripts allow-same-origin allow-popups allow-presentation"
         />
       ) : (
-        <div className="embed-placeholder">不支持的链接格式或无效的嵌入链接</div>
+        <div className="embed-placeholder">这个链接暂不支持嵌入显示</div>
       )}
-      <button onClick={() => setIsEditing(true)} className="embed-edit-btn" aria-label="编辑嵌入内容">
-        ✏️ 编辑
+      <button type="button" onClick={() => setIsEditing(true)} className="embed-edit-btn" aria-label="编辑嵌入内容">
+        编辑嵌入
       </button>
     </div>
   )
