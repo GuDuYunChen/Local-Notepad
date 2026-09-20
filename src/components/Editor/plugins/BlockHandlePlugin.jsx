@@ -29,6 +29,7 @@ export default function BlockHandlePlugin() {
   const [isVisible, setIsVisible] = useState(false)
   const [position, setPosition] = useState({ top: 0, left: 0 })
   const [blockType, setBlockType] = useState('paragraph')
+  const [blockKey, setBlockKey] = useState('')
   const [showMenu, setShowMenu] = useState(false)
   const menuRef = useRef(null)
   const handleRef = useRef(null)
@@ -66,14 +67,15 @@ export default function BlockHandlePlugin() {
       return
     }
 
-    editor.update(() => {
-      const selection = $getSelection()
-      if (!$isRangeSelection(selection)) return
+    editor.getEditorState().read(() => {
+      const lexicalSelection = $getSelection()
+      if (!$isRangeSelection(lexicalSelection)) return
 
-      const anchorNode = selection.anchor.getNode()
+      const anchorNode = lexicalSelection.anchor.getNode()
       const blockNode = $getNearestBlockElementAncestorOrThrow(anchorNode)
       const type = getBlockTypeFromNode(blockNode)
       setBlockType(type || 'paragraph')
+      setBlockKey(blockNode.getKey())
     })
 
     setPosition({
@@ -171,9 +173,11 @@ export default function BlockHandlePlugin() {
         className="block-handle"
         ref={handleRef}
         style={{ top: `${position.top}px`, left: `${position.left}px` }}
+        draggable={Boolean(blockKey)}
+        data-block-key={blockKey}
         onClick={() => setShowMenu(!showMenu)}
-        aria-label="块操作菜单"
-        title="块操作"
+        aria-label="块操作与拖动排序"
+        title="拖动排序 · 点击打开块操作"
       >
         <span className="block-handle-icon">⋮⋮</span>
       </div>
