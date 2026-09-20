@@ -17,6 +17,7 @@ import {
   $createTableRowNode,
 } from '@lexical/table'
 import { $convertFromMarkdownString, TRANSFORMERS } from '@lexical/markdown'
+import { DividerNode, $createDividerNode } from '~/components/Editor/nodes/DividerNode'
 
 const IMPORT_NODES = [
   HeadingNode,
@@ -30,6 +31,7 @@ const IMPORT_NODES = [
   TableNode,
   TableRowNode,
   TableCellNode,
+  DividerNode,
 ]
 
 function createImportEditor() {
@@ -123,6 +125,28 @@ function extractMarkdownTables(markdown) {
   }
 }
 
+function extractMarkdownDividers(markdown) {
+  const lines = String(markdown || '').split('\n')
+  const dividers = []
+  const output = lines.map((line, index) => {
+    const trimmed = line.trim()
+    const isDivider = trimmed === '---' || trimmed === '***' || trimmed === '___'
+    const previousBlank = index === 0 || lines[index - 1].trim() === ''
+    const nextBlank = index === lines.length - 1 || lines[index + 1].trim() === ''
+
+    if (!isDivider || !previousBlank || !nextBlank) return line
+
+    const marker = `LOCALNOTEPADDIVIDER${dividers.length}PLACEHOLDER`
+    dividers.push(marker)
+    return marker
+  })
+
+  return {
+    markdown: output.join('\n'),
+    dividers,
+  }
+}
+
 function createTableFromRows(rows) {
   const table = $createTableNode()
 
@@ -139,6 +163,18 @@ function createTableFromRows(rows) {
   })
 
   return table
+}
+
+function restoreMarkdownDividers(dividers) {
+  if (!dividers.length) return
+
+  const markers = new Set(dividers)
+  const children = $getRoot().getChildren()
+
+  children.forEach((node) => {
+    if (!markers.has(node.getTextContent().trim())) return
+    node.replace($createDividerNode())
+  })
 }
 
 function restoreMarkdownTables(tables) {
@@ -178,11 +214,13 @@ export function plainTextToLexical(text) {
 
 export function markdownToLexical(markdown) {
   const editor = createImportEditor()
-  const extracted = extractMarkdownTables(markdown)
+  const extractedTables = extractMarkdownTables(markdown)
+  const extractedDividers = extractMarkdownDividers(extractedTables.markdown)
 
   editor.update(() => {
-    $convertFromMarkdownString(extracted.markdown, TRANSFORMERS)
-    restoreMarkdownTables(extracted.tables)
+    $convertFromMarkdownString(extractedDividers.markdown, TRANSFORMERS)
+    restoreMarkdownTables(extractedTables.tables)
+    restoreMarkdownDividers(extractedDividers.dividers)
   }, { discrete: true })
 
   return JSON.stringify(editor.getEditorState().toJSON())
