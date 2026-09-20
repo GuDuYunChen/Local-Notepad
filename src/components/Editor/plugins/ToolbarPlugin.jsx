@@ -29,6 +29,8 @@ import {
   CAN_UNDO_COMMAND,
   FORMAT_ELEMENT_COMMAND,
   FORMAT_TEXT_COMMAND,
+  INDENT_CONTENT_COMMAND,
+  OUTDENT_CONTENT_COMMAND,
   REDO_COMMAND,
   UNDO_COMMAND,
 } from 'lexical'
@@ -86,6 +88,7 @@ const BLOCK_OPTIONS = [
   ['h1', '标题 1'],
   ['h2', '标题 2'],
   ['h3', '标题 3'],
+  ['h4', '标题 4'],
   ['quote', '引用'],
 ]
 
@@ -101,6 +104,7 @@ export default function ToolbarPlugin() {
   const [isBold, setIsBold] = useState(false)
   const [isItalic, setIsItalic] = useState(false)
   const [isUnderline, setIsUnderline] = useState(false)
+  const [isStrikethrough, setIsStrikethrough] = useState(false)
   const [blockType, setBlockType] = useState('paragraph')
   const [isBulletList, setIsBulletList] = useState(false)
   const [isNumberList, setIsNumberList] = useState(false)
@@ -108,12 +112,14 @@ export default function ToolbarPlugin() {
   const [elementFormat, setElementFormat] = useState('left')
   const [showColorPicker, setShowColorPicker] = useState(false)
   const [showHighlightPicker, setShowHighlightPicker] = useState(false)
+  const [insertOpen, setInsertOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
   const [linkOpen, setLinkOpen] = useState(false)
   const [linkUrl, setLinkUrl] = useState('')
 
   const fontSelectRef = useRef(null)
   const colorPickerRef = useRef(null)
+  const insertMenuRef = useRef(null)
   const moreMenuRef = useRef(null)
   const linkRef = useRef(null)
 
@@ -131,6 +137,7 @@ export default function ToolbarPlugin() {
   useEffect(() => {
     const openLink = () => {
       setLinkOpen(true)
+      setInsertOpen(false)
       setMoreOpen(false)
     }
 
@@ -143,6 +150,9 @@ export default function ToolbarPlugin() {
       if (colorPickerRef.current && !colorPickerRef.current.contains(event.target)) {
         setShowColorPicker(false)
         setShowHighlightPicker(false)
+      }
+      if (insertMenuRef.current && !insertMenuRef.current.contains(event.target)) {
+        setInsertOpen(false)
       }
       if (moreMenuRef.current && !moreMenuRef.current.contains(event.target)) {
         setMoreOpen(false)
@@ -190,6 +200,7 @@ export default function ToolbarPlugin() {
     setIsBold(selection.hasFormat('bold'))
     setIsItalic(selection.hasFormat('italic'))
     setIsUnderline(selection.hasFormat('underline'))
+    setIsStrikethrough(selection.hasFormat('strikethrough'))
     setHasSelection(!selection.isCollapsed())
 
     const anchorNode = selection.anchor.getNode()
@@ -279,7 +290,7 @@ export default function ToolbarPlugin() {
     editor.update(() => {
       $insertNodes([node])
     })
-    setMoreOpen(false)
+    setInsertOpen(false)
     editor.focus()
   }
 
@@ -633,11 +644,14 @@ export default function ToolbarPlugin() {
       <span className="toolbar-slash-hint">输入 / 快速插入</span>
       {isUploading && <span className="toolbar-progress">处理中…</span>}
 
-      <div className="toolbar-more-wrap" ref={moreMenuRef}>
+      <div className="toolbar-more-wrap" ref={insertMenuRef}>
         <button
           type="button"
-          className={`btn toolbar-more-trigger${moreOpen ? ' active' : ''}`}
-          onClick={() => setMoreOpen(prev => !prev)}
+          className={`btn toolbar-more-trigger${insertOpen ? ' active' : ''}`}
+          onClick={() => {
+            setInsertOpen(prev => !prev)
+            setMoreOpen(false)
+          }}
           aria-label="插入内容"
           title="插入内容"
         >
@@ -645,8 +659,8 @@ export default function ToolbarPlugin() {
           <span>插入</span>
         </button>
 
-        {moreOpen && (
-          <div className="toolbar-more-menu">
+        {insertOpen && (
+          <div className="toolbar-more-menu toolbar-insert-menu">
             <div className="toolbar-menu-section">
               <div className="toolbar-menu-label">内容块</div>
               <div className="toolbar-menu-grid toolbar-insert-grid">
@@ -663,7 +677,7 @@ export default function ToolbarPlugin() {
                   className="btn toolbar-menu-action"
                   onClick={() => {
                     editor.dispatchCommand(INSERT_TABLE_COMMAND, { columns: 3, rows: 3 })
-                    setMoreOpen(false)
+                    setInsertOpen(false)
                   }}
                 >
                   表格
@@ -673,7 +687,7 @@ export default function ToolbarPlugin() {
                   className="btn toolbar-menu-action"
                   onClick={() => {
                     editor.dispatchCommand(INSERT_CODE_BLOCK_COMMAND)
-                    setMoreOpen(false)
+                    setInsertOpen(false)
                   }}
                 >
                   代码块
@@ -700,7 +714,26 @@ export default function ToolbarPlugin() {
                 <TableMenu />
               </div>
             </div>
+          </div>
+        )}
+      </div>
 
+      <div className="toolbar-more-wrap" ref={moreMenuRef}>
+        <button
+          type="button"
+          className={`btn toolbar-format-more${moreOpen ? ' active' : ''}`}
+          onClick={() => {
+            setMoreOpen(prev => !prev)
+            setInsertOpen(false)
+          }}
+          aria-label="更多格式"
+          title="更多格式"
+        >
+          •••
+        </button>
+
+        {moreOpen && (
+          <div className="toolbar-more-menu toolbar-format-menu">
             <div className="toolbar-menu-section">
               <div className="toolbar-menu-label">文字样式</div>
               <div className="toolbar-menu-row">
@@ -729,6 +762,13 @@ export default function ToolbarPlugin() {
               </div>
 
               <div className="toolbar-menu-row">
+                <button
+                  type="button"
+                  className={`btn${isStrikethrough ? ' active' : ''}`}
+                  onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'strikethrough')}
+                >
+                  删除线
+                </button>
                 <div className="text-color-group" ref={colorPickerRef}>
                   <button
                     type="button"
@@ -763,7 +803,6 @@ export default function ToolbarPlugin() {
                     </div>
                   )}
                 </div>
-
                 <div className="text-color-group">
                   <button
                     type="button"
@@ -802,7 +841,7 @@ export default function ToolbarPlugin() {
             </div>
 
             <div className="toolbar-menu-section">
-              <div className="toolbar-menu-label">段落对齐</div>
+              <div className="toolbar-menu-label">段落</div>
               <div className="toolbar-menu-row">
                 <button
                   type="button"
@@ -826,9 +865,18 @@ export default function ToolbarPlugin() {
                   右对齐
                 </button>
               </div>
+              <div className="toolbar-menu-row">
+                <button type="button" className="btn" onClick={() => editor.dispatchCommand(OUTDENT_CONTENT_COMMAND)}>
+                  减少缩进
+                </button>
+                <button type="button" className="btn" onClick={() => editor.dispatchCommand(INDENT_CONTENT_COMMAND)}>
+                  增加缩进
+                </button>
+              </div>
             </div>
           </div>
         )}
+      </div>
       </div>
     </div>
   )
