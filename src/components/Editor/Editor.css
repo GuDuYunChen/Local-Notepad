@@ -871,3 +871,198 @@
     padding: 8px 9px;
   }
 }
+
+
+/* -------------------------------------------------------------------------- */
+/* Mature editor overlays                                                      */
+/* -------------------------------------------------------------------------- */
+.floating-text-toolbar {
+  position: fixed;
+  z-index: 1200;
+  height: 36px;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  box-shadow: 0 12px 34px rgba(20, 16, 34, .18);
+  backdrop-filter: blur(14px);
+  animation: floatingToolbarIn .1s ease-out;
+}
+
+@keyframes floatingToolbarIn {
+  from { opacity: 0; transform: translateY(3px) scale(.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.floating-text-toolbar button {
+  width: 30px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.floating-text-toolbar button:hover,
+.floating-text-toolbar button.active {
+  background: var(--surface-hover);
+  color: var(--ink);
+}
+
+.floating-text-toolbar button.active {
+  background: var(--clay-light);
+  color: var(--clay);
+}
+
+.floating-toolbar-divider {
+  width: 1px;
+  height: 18px;
+  margin-inline: 2px;
+  background: var(--line);
+}
+
+.floating-underline {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.floating-strike {
+  text-decoration: line-through;
+}
+
+.floating-highlight {
+  padding: 0 2px;
+  border-radius: 3px;
+  background: #fff0a6;
+  color: #433d25;
+  font-weight: 700;
+}
+
+.document-outline {
+  position: absolute;
+  top: 60px;
+  right: 13px;
+  z-index: 55;
+}
+
+.document-outline-toggle {
+  min-width: 42px;
+  height: 30px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  color: var(--ink-muted);
+  font: inherit;
+  font-size: 9px;
+  cursor: pointer;
+  opacity: .45;
+  backdrop-filter: blur(10px);
+}
+
+.document-outline:hover .document-outline-toggle,
+.document-outline.open .document-outline-toggle {
+  opacity: 1;
+  color: var(--ink);
+  background: var(--surface);
+}
+
+.document-outline-panel {
+  position: absolute;
+  top: 38px;
+  right: 0;
+  width: 248px;
+  max-height: min(62vh, 520px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 18px 46px rgba(20, 16, 34, .16);
+}
+
+.document-outline-header {
+  padding: 11px 12px 9px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.document-outline-header strong {
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 680;
+}
+
+.document-outline-header span {
+  color: var(--ink-muted);
+  font-size: 9px;
+}
+
+.document-outline-list {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.document-outline-item {
+  width: 100%;
+  min-height: 31px;
+  padding: 6px 8px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 10px;
+  line-height: 1.45;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.document-outline-item:hover {
+  background: var(--surface-hover);
+  color: var(--ink);
+}
+
+.document-outline-item.level-2 { padding-left: 18px; }
+.document-outline-item.level-3 { padding-left: 28px; color: var(--ink-muted); }
+.document-outline-item.level-4 { padding-left: 38px; color: var(--ink-muted); }
+
+.outline-target-flash {
+  animation: outlineTargetFlash .9s ease-out;
+}
+
+@keyframes outlineTargetFlash {
+  0%, 35% { background: var(--clay-light); border-radius: 5px; }
+  100% { background: transparent; }
+}
+
+@media (max-width: 840px) {
+  .document-outline {
+    right: 8px;
+  }
+
+  .document-outline-panel {
+    width: min(250px, calc(100vw - 76px));
+  }
+}
