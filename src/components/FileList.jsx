@@ -4,6 +4,7 @@ import { NativeTypes } from 'react-dnd-html5-backend'
 import { api, listAllFiles } from '~/services/api'
 import { toast } from '~/services/toast'
 import { executeFileHistoryAction } from '~/services/fileHistory'
+import ConfirmDialog from './ConfirmDialog'
 
 const NameDialog = React.lazy(() => import('./NameDialog'))
 const FileSelectorDialog = React.lazy(() => import('./FileSelectorDialog'))
@@ -1670,34 +1671,27 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       )}
 
       {deleteConfirm && (
-          <div className="modal-overlay">
-              <div className="modal">
-                  <div className="modal-title">{deleteConfirm.isBatch ? '批量删除确认' : '删除确认'}</div>
-                  <div className="modal-message">
-                      {deleteConfirm.isBatch ? (
-                          <>
-                              确定要删除选中的 {deleteConfirm.count} 个项目吗？
-                              <div style={{ marginTop: 8, color: '#ef4444' }}>
-                                  ⚠️ 此操作不可恢复！
-                              </div>
-                          </>
-                      ) : (
-                          <>
-                              确定要删除 {deleteConfirm.isFolder ? '文件夹' : '文件'} "{deleteConfirm.title}" 吗？
-                              {deleteConfirm.isFolder && (
-                                  <div style={{ marginTop: 8, color: '#ef4444' }}>
-                                      ⚠️ 将同时删除其中包含的 {deleteConfirm.count} 个项目！
-                                  </div>
-                              )}
-                          </>
-                      )}
-                  </div>
-                  <div className="modal-actions">
-                      <button className="btn" onClick={() => setDeleteConfirm(null)}>取消</button>
-                      <button className="btn danger" onClick={() => onDelete(deleteConfirm.id)}>删除</button>
-                  </div>
-              </div>
-          </div>
+        <ConfirmDialog
+          title="移到回收站？"
+          message={
+            deleteConfirm.isFolder && deleteConfirm.count > 0
+              ? `“${deleteConfirm.title}”以及其中 ${deleteConfirm.count} 项内容会移到回收站，30 天内可以恢复。`
+              : `“${deleteConfirm.title}”会移到回收站，30 天内可以恢复。`
+          }
+          onClose={() => setDeleteConfirm(null)}
+          actions={[
+            {
+              label: '取消',
+              onClick: () => setDeleteConfirm(null),
+            },
+            {
+              label: '移到回收站',
+              kind: 'primary',
+              loading,
+              onClick: () => void onDelete(deleteConfirm.id),
+            },
+          ]}
+        />
       )}
 
       <React.Suspense fallback={null}>
@@ -1748,8 +1742,8 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       {renaming && (
         <NameDialog
           defaultName={renaming.title}
-          title={renaming.is_folder ? '重命名文件夹' : '重命名文件'}
-          message={`当前名称：${renaming.title}`}
+          title={renaming.is_folder ? '重命名文件夹' : '重命名笔记'}
+          message={renaming.is_folder ? `当前名称：${renaming.title}` : '输入新的笔记名称。'}
           validate={renaming.is_folder ? validateFolderInput : validateName}
           onConfirm={(name) => onRenameConfirm(renaming.id, name)}
           onCancel={() => setRenaming(null)}
