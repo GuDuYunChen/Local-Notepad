@@ -104,3 +104,25 @@
   margin-top: 4px;
   border-top: 1px solid var(--line, #e8e6eb);
 }
+
+
+.wiki-link {
+  gap: 4px;
+  padding: 1px 6px 1px 4px;
+  border: 1px solid color-mix(in srgb, var(--clay, #7057d9) 16%, transparent);
+  background: color-mix(in srgb, var(--clay-light, rgba(112,87,217,.1)) 68%, transparent);
+  font-size: .94em;
+  font-weight: 560;
+  text-decoration: none;
+}
+
+.wiki-link svg {
+  flex: 0 0 auto;
+  opacity: .72;
+}
+
+.wiki-link > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
