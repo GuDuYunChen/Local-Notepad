@@ -49,11 +49,6 @@ export default function DocumentOutlinePlugin() {
       block: 'center',
     })
 
-    editor.update(() => {
-      const node = editor.getEditorState().read(() => null)
-      void node
-    })
-
     window.setTimeout(() => {
       element.classList.add('outline-target-flash')
       window.setTimeout(() => element.classList.remove('outline-target-flash'), 900)
