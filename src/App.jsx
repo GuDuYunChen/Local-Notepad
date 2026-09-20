@@ -565,7 +565,7 @@ export default function App() {
 
       {dialog?.type === 'unsaved' && (
         <ConfirmDialog
-          title="当前文件未保存"
+          title="当前笔记未保存"
           message="是否保存更改？"
           actions={[
             {
