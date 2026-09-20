@@ -119,18 +119,28 @@ export default function SearchPlugin() {
 
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.ctrlKey && e.key.toLowerCase() === 'f') {
-        e.preventDefault();
-        setIsOpen(prev => !prev);
+      const modifier = e.ctrlKey || e.metaKey
+      if (modifier && e.key.toLowerCase() === 'f') {
+        e.preventDefault()
+        setIsOpen(prev => !prev)
       }
-      if (e.ctrlKey && e.key.toLowerCase() === 'h') {
-        e.preventDefault();
-        setIsOpen(true);
+      if (modifier && e.key.toLowerCase() === 'h') {
+        e.preventDefault()
+        setIsOpen(true)
       }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+    }
+
+    const handleOpenSearch = () => {
+      setIsOpen(true)
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('editor:open-search', handleOpenSearch)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('editor:open-search', handleOpenSearch)
+    }
+  }, [])
 
   if (!isOpen) return null;
 
