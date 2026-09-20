@@ -377,8 +377,8 @@ export default function App() {
                 <button
                   className={`icon-btn${inspectorOpen ? ' active' : ''}`}
                   onClick={() => setInspectorOpen(prev => !prev)}
-                  title="文档信息"
-                  aria-label="文档信息"
+                  title="笔记详情"
+                  aria-label="笔记详情"
                   aria-pressed={inspectorOpen}
                 >
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -411,7 +411,7 @@ export default function App() {
                 <>
                   <aside className={`file-sidebar${sidebarCollapsed ? ' collapsed' : ''}`} style={{ '--sidebar-w': `${sidebarW}px` }}>
                     {!sidebarCollapsed && (
-                      <ErrorBoundary label="文件列表">
+                      <ErrorBoundary label="笔记列表">
                         <FileList
                           selectedId={current?.id}
                           updatedItem={current}
