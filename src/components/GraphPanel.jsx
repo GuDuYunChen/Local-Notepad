@@ -190,8 +190,8 @@ export default function GraphPanel({ onSelectFile, onClose }) {
             <input
               value={query}
               onChange={e => setQuery(e.target.value)}
-              placeholder="查找节点"
-              aria-label="查找图谱节点"
+              placeholder="搜索笔记"
+              aria-label="搜索知识图谱中的笔记"
             />
             {query && <button onClick={() => setQuery('')} aria-label="清除搜索">×</button>}
           </div>
@@ -216,9 +216,9 @@ export default function GraphPanel({ onSelectFile, onClose }) {
       </div>
 
       <div className="graph-stats">
-        <span>{graphData.nodes.length} 个节点</span>
-        <span>{graphData.edges.length} 条链接</span>
-        {query.trim() && <span>{matchCount} 个匹配</span>}
+        <span>{graphData.nodes.length} 篇笔记</span>
+        <span>{graphData.edges.length} 条关联</span>
+        {query.trim() && <span>{matchCount} 个匹配结果</span>}
         <span className="graph-stats-hint">拖拽节点 · 滚轮缩放 · 点击打开笔记</span>
       </div>
     </div>
