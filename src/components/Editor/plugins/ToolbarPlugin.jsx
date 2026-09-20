@@ -877,7 +877,6 @@ export default function ToolbarPlugin() {
           </div>
         )}
       </div>
-      </div>
     </div>
   )
 }
