@@ -162,7 +162,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
   const [renaming, setRenaming] = useState(null)
   const [showExport, setShowExport] = useState(false)
   const [pendingExport, setPendingExport] = useState(null)
-  const [exportBusy, setExportBusy] = useState(false)
+  const [exportBusy, setExportBusy] = useState(null)
   const [showBatchDelete, setShowBatchDelete] = useState(false)
   const [expanded, setExpanded] = useState(new Set()) // 展开的文件夹ID集合
   const [showNewMenu, setShowNewMenu] = useState(false) // 新建菜单显隐
@@ -756,7 +756,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
   async function performExport(format) {
     if (!pendingExport || exportBusy) return
 
-    setExportBusy(true)
+    setExportBusy(format)
     try {
         const targetDir = await window.electronAPI.openDirectoryDialog()
         if (!targetDir) return
@@ -775,7 +775,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
         console.error(e)
         toast.error('导出失败：' + (e.message || '未知错误'))
     } finally {
-        setExportBusy(false)
+        setExportBusy(null)
         setPendingExport(null)
     }
   }
@@ -1740,18 +1740,20 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
           actions={[
             {
               label: '取消',
-              disabled: exportBusy,
+              disabled: Boolean(exportBusy),
               onClick: () => setPendingExport(null),
             },
             {
               label: 'Markdown',
-              loading: exportBusy,
+              loading: exportBusy === 'markdown',
+              disabled: Boolean(exportBusy),
               onClick: () => void performExport('markdown'),
             },
             {
               label: 'Word 文档',
               kind: 'primary',
-              loading: exportBusy,
+              loading: exportBusy === 'docx',
+              disabled: Boolean(exportBusy),
               onClick: () => void performExport('docx'),
             },
           ]}
