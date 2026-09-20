@@ -1,4 +1,4 @@
-import { $createParagraphNode, $createTextNode, COMMAND_PRIORITY_LOW, createCommand } from 'lexical'
+import { $createParagraphNode, $createTextNode, $insertNodes } from 'lexical'
 import { $createHeadingNode, $createQuoteNode } from '@lexical/rich-text'
 import { $createListNode, $createListItemNode } from '@lexical/list'
 import { $createCodeNode } from '@lexical/code'
@@ -9,8 +9,7 @@ import { $createDividerNode } from '../nodes/DividerNode'
 import { $createCalloutNode } from '../nodes/CalloutNode'
 import { $createToggleNode } from '../nodes/ToggleNode'
 import { $createEmbedNode } from '../nodes/EmbedNode'
-
-export const INSERT_IMAGE_BLOCK_COMMAND = createCommand('insertImageBlockCommand')
+import { uploadFile } from './fileUpload'
 
 export const BlockType = {
   PARAGRAPH: 'paragraph',
@@ -30,53 +29,86 @@ export const BlockType = {
   EMBED: 'embed',
 }
 
+function createListNode(listType) {
+  const list = $createListNode(listType)
+  const item = $createListItemNode()
+  item.append($createTextNode(''))
+  list.append(item)
+  return list
+}
+
+async function insertUploadedImage(editor) {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = 'image/*'
+
+  input.onchange = async (event) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    try {
+      const result = await uploadFile(file)
+      if (!result?.url) return
+
+      editor.update(() => {
+        $insertNodes([
+          $createImageNode({
+            src: result.url,
+            originalSrc: result.url,
+            alt: file.name,
+            caption: file.name,
+          }),
+        ])
+      })
+    } catch (error) {
+      console.error('图片上传失败', error)
+    }
+  }
+
+  input.click()
+}
+
 export const blockRegistry = [
   {
     type: BlockType.PARAGRAPH,
-    label: '文本',
+    label: '正文',
     description: '普通文本段落',
     icon: '¶',
-    keywords: ['text', '文本', 'paragraph'],
+    keywords: ['text', '文本', '正文', 'paragraph'],
     shortcut: '',
-    createNode: (editor) => {
-      editor.update(() => {
-        const p = $createParagraphNode()
-        p.append($createTextNode(''))
-        return p
-      })
-    },
+    createNode: () => $createParagraphNode(),
   },
   {
     type: BlockType.H1,
     label: '一级标题',
-    description: '大标题',
+    description: '章节或页面主标题',
     icon: 'H1',
-    keywords: ['h1', '标题', 'heading'],
+    keywords: ['h1', '标题', 'heading', '一级'],
     shortcut: '# ',
     createNode: () => $createHeadingNode('h1'),
   },
   {
     type: BlockType.H2,
     label: '二级标题',
-    description: '中等标题',
+    description: '主要章节标题',
     icon: 'H2',
-    keywords: ['h2', '标题', 'heading'],
+    keywords: ['h2', '标题', 'heading', '二级'],
     shortcut: '## ',
     createNode: () => $createHeadingNode('h2'),
   },
   {
     type: BlockType.H3,
     label: '三级标题',
-    description: '小标题',
+    description: '小节标题',
     icon: 'H3',
-    keywords: ['h3', '标题', 'heading'],
+    keywords: ['h3', '标题', 'heading', '三级'],
     shortcut: '### ',
     createNode: () => $createHeadingNode('h3'),
   },
   {
     type: BlockType.QUOTE,
     label: '引用',
-    description: '引用文本',
+    description: '引用或强调一段内容',
     icon: '❝',
     keywords: ['quote', '引用', 'blockquote'],
     shortcut: '> ',
@@ -89,7 +121,7 @@ export const blockRegistry = [
     icon: '•',
     keywords: ['bullet', 'list', '列表', '无序'],
     shortcut: '- ',
-    createNode: () => $createListNode('bullet'),
+    createNode: () => createListNode('bullet'),
   },
   {
     type: BlockType.NUMBERED_LIST,
@@ -98,12 +130,21 @@ export const blockRegistry = [
     icon: '1.',
     keywords: ['number', 'list', '列表', '有序', 'numbered'],
     shortcut: '1. ',
-    createNode: () => $createListNode('number'),
+    createNode: () => createListNode('number'),
+  },
+  {
+    type: BlockType.TODO,
+    label: '待办事项',
+    description: '可勾选并保存状态的任务',
+    icon: '☐',
+    keywords: ['todo', 'checkbox', '待办', '任务'],
+    shortcut: '- [ ]',
+    createNode: () => $createTodoNode(),
   },
   {
     type: BlockType.CODE_BLOCK,
     label: '代码块',
-    description: '带语法高亮的代码块',
+    description: '多行代码内容',
     icon: '</>',
     keywords: ['code', '代码', 'block'],
     shortcut: '```',
@@ -112,160 +153,72 @@ export const blockRegistry = [
   {
     type: BlockType.TABLE,
     label: '表格',
-    description: '插入表格',
+    description: '插入 3×3 表格',
     icon: '▦',
     keywords: ['table', '表格'],
     shortcut: '',
-    createNode: (editor) => {
-      editor.dispatchCommand(INSERT_TABLE_COMMAND, { columns: 3, rows: 3 })
-    },
+    run: (editor) => editor.dispatchCommand(INSERT_TABLE_COMMAND, { columns: 3, rows: 3 }),
   },
   {
     type: BlockType.IMAGE,
     label: '图片',
-    description: '上传图片',
+    description: '上传并插入图片',
     icon: '🖼',
     keywords: ['image', '图片', 'photo'],
     shortcut: '',
-    createNode: (editor) => {
-      const input = document.createElement('input')
-      input.type = 'file'
-      input.accept = 'image/*'
-      input.onchange = async (e) => {
-        const file = e.target.files[0]
-        if (file) {
-          const reader = new FileReader()
-          reader.onload = () => {
-            editor.update(() => {
-              const imageNode = $createImageNode({
-                src: reader.result,
-                alt: file.name,
-              })
-              const paragraph = $createParagraphNode()
-              paragraph.append(imageNode)
-              const selection = editor.getSelection()
-              if (selection) {
-                selection.insertNodes([paragraph])
-              }
-            })
-          }
-          reader.readAsDataURL(file)
-        }
-      }
-      input.click()
-    },
+    run: insertUploadedImage,
   },
   {
     type: BlockType.DIVIDER,
     label: '分割线',
-    description: '水平分割线',
+    description: '分隔不同内容章节',
     icon: '—',
     keywords: ['divider', '分割线', 'hr', 'horizontal'],
     shortcut: '---',
-    createNode: (editor) => {
-      editor.update(() => {
-        const dividerNode = $createDividerNode()
-        const paragraph = $createParagraphNode()
-        paragraph.append(dividerNode)
-        const selection = editor.getSelection()
-        if (selection) {
-          selection.insertNodes([paragraph])
-        }
-      })
-    },
+    createNode: () => $createDividerNode(),
   },
   {
     type: BlockType.CALLOUT,
-    label: '提示框',
-    description: '带图标的提示块',
+    label: '提示块',
+    description: '突出提示、结论或注意事项',
     icon: '💡',
     keywords: ['callout', '提示', 'note', 'info'],
     shortcut: '',
-    createNode: (editor) => {
-      editor.update(() => {
-        const calloutNode = $createCalloutNode()
-        const paragraph = $createParagraphNode()
-        paragraph.append(calloutNode)
-        const selection = editor.getSelection()
-        if (selection) {
-          selection.insertNodes([paragraph])
-        }
-      })
-    },
-  },
-  {
-    type: BlockType.TODO,
-    label: '待办事项',
-    description: '可勾选的待办列表',
-    icon: '☐',
-    keywords: ['todo', 'checkbox', '待办', '任务'],
-    shortcut: '- [ ]',
-    createNode: (editor) => {
-      editor.update(() => {
-        const todoNode = $createTodoNode()
-        const paragraph = $createParagraphNode()
-        paragraph.append(todoNode)
-        const selection = editor.getSelection()
-        if (selection) {
-          selection.insertNodes([paragraph])
-        }
-      })
-    },
+    createNode: () => $createCalloutNode(),
   },
   {
     type: BlockType.TOGGLE,
     label: '折叠块',
-    description: '可展开/折叠的内容块',
+    description: '收起暂时不需要看的内容',
     icon: '▶',
     keywords: ['toggle', '折叠', 'collapse', 'expand'],
     shortcut: '',
-    createNode: (editor) => {
-      editor.update(() => {
-        const toggleNode = $createToggleNode()
-        const paragraph = $createParagraphNode()
-        paragraph.append(toggleNode)
-        const selection = editor.getSelection()
-        if (selection) {
-          selection.insertNodes([paragraph])
-        }
-      })
-    },
+    createNode: () => $createToggleNode(),
   },
   {
     type: BlockType.EMBED,
     label: '嵌入内容',
-    description: '嵌入视频或外部内容',
-    icon: '📺',
+    description: '嵌入支持的网站内容',
+    icon: '◫',
     keywords: ['embed', '嵌入', 'video', '视频', 'youtube', 'bilibili'],
     shortcut: '',
-    createNode: (editor) => {
-      editor.update(() => {
-        const embedNode = $createEmbedNode()
-        const paragraph = $createParagraphNode()
-        paragraph.append(embedNode)
-        const selection = editor.getSelection()
-        if (selection) {
-          selection.insertNodes([paragraph])
-        }
-      })
-    },
+    createNode: () => $createEmbedNode(),
   },
 ]
 
 export function getBlockByType(type) {
-  return blockRegistry.find((b) => b.type === type)
+  return blockRegistry.find(block => block.type === type)
 }
 
 export function searchBlocks(query) {
   if (!query) return blockRegistry
-  const lowerQuery = query.toLowerCase()
-  return blockRegistry.filter((block) =>
-    block.keywords.some(
-      (keyword) => keyword.toLowerCase().includes(lowerQuery) || block.label.toLowerCase().includes(lowerQuery)
-    )
+  const normalizedQuery = query.toLowerCase()
+  return blockRegistry.filter(block =>
+    block.keywords.some(keyword => keyword.toLowerCase().includes(normalizedQuery)) ||
+    block.label.toLowerCase().includes(normalizedQuery)
   )
 }
 
 export function getBlockByShortcut(shortcut) {
-  return blockRegistry.find((b) => b.shortcut === shortcut)
+  return blockRegistry.find(block => block.shortcut === shortcut)
 }
