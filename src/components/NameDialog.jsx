@@ -21,11 +21,6 @@ export default function NameDialog({
   const descriptionId = useId()
 
   useEffect(() => {
-    const onKey = (event) => {
-      if (event.key === 'Escape' && !submitting) onCancel?.()
-    }
-    document.addEventListener('keydown', onKey)
-
     if (showFormatSelect) {
       const match = defaultName.match(/\.[^.]+$/)
       if (match && ['.md', '.txt', '.docx'].includes(match[0])) {
@@ -46,9 +41,15 @@ export default function NameDialog({
     } else {
       setName(defaultName)
     }
+  }, [showFormatSelect, defaultName, isRename])
 
+  useEffect(() => {
+    const onKey = (event) => {
+      if (event.key === 'Escape' && !submitting) onCancel?.()
+    }
+    document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [onCancel, showFormatSelect, defaultName, isRename, submitting])
+  }, [onCancel, submitting])
 
   const formatLabel = useMemo(() => ({
     '.md': '标准笔记',
