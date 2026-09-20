@@ -338,3 +338,74 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+
+/* Persistent interactive blocks */
+.todo-text-button {
+  min-width: 0;
+  flex: 1;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: var(--fg, #1f2d3d);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.55;
+  text-align: left;
+  cursor: text;
+}
+
+.todo-block.checked .todo-text-button {
+  text-decoration: line-through;
+  color: var(--muted, #6b7280);
+}
+
+.toggle-header {
+  cursor: default;
+}
+
+.toggle-arrow-button {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted, #6b7280);
+  cursor: pointer;
+}
+
+.toggle-arrow-button:hover {
+  background: var(--toolbar-btn-hover, rgba(0,0,0,0.06));
+}
+
+.toggle-title-input {
+  min-width: 0;
+  flex: 1;
+  padding: 3px 2px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--fg, #1f2d3d);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.toggle-content {
+  padding-top: 8px;
+}
+
+.embed-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.embed-edit-actions .btn,
+.embed-save-btn {
+  min-height: 34px;
+  border-radius: 8px;
+}
