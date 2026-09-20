@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
-import { $createParagraphNode, $getNodeByKey, $getRoot, $getSelection, $isRangeSelection } from 'lexical'
+import { $createParagraphNode, $createTextNode, $getNodeByKey, $getRoot, $getSelection, $isRangeSelection } from 'lexical'
 import { $isHeadingNode } from '@lexical/rich-text'
 import { $isListNode } from '@lexical/list'
 import { $isCodeNode } from '@lexical/code'
@@ -140,12 +140,15 @@ export default function BlockHandlePlugin() {
       if (!newNode) return
 
       const text = blockNode.getTextContent?.() || ''
-      if (text && typeof newNode.append === 'function') {
-        try {
-          const paragraph = $createParagraphNode()
-          paragraph.setTextContent?.(text)
-        } catch {
-          // Block conversion keeps the structural operation even when text transfer is unsupported.
+      if (text) {
+        if (newNode.getType?.() === 'list') {
+          const firstItem = newNode.getFirstChild?.()
+          if (firstItem?.clear && firstItem?.append) {
+            firstItem.clear()
+            firstItem.append($createTextNode(text))
+          }
+        } else if (typeof newNode.append === 'function') {
+          newNode.append($createTextNode(text))
         }
       }
 
