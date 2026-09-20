@@ -72,7 +72,7 @@ export default function WorkspaceSidebar({
   ]
 
   return (
-    <aside className={`workspace-sidebar${collapsed ? ' collapsed' : ''}`}>
+    <aside className={`workspace-sidebar file-sidebar${collapsed ? ' collapsed' : ''}`}>
       <div className="workspace-sidebar-top">
         <div className="workspace-sidebar-brand">
           <button
