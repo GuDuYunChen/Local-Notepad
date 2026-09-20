@@ -31,8 +31,8 @@ export default function App() {
     return Math.min(420, Math.max(220, isNaN(n) ? 280 : n))
   })
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    const saved = localStorage.getItem('sidebarCollapsedV3')
-    return saved === null ? true : saved === 'true'
+    const saved = localStorage.getItem('sidebarCollapsedV4')
+    return saved === null ? false : saved === 'true'
   })
   const [dragging, setDragging] = useState(false)
   const [current, setCurrent] = useState(null)
@@ -71,8 +71,10 @@ export default function App() {
       wordCount: 0,
     })
     setWorkspace('notes')
-    setSidebarCollapsed(true)
-    localStorage.setItem('sidebarCollapsedV3', 'true')
+    if (typeof window !== 'undefined' && window.innerWidth <= 720) {
+      setSidebarCollapsed(true)
+      localStorage.setItem('sidebarCollapsedV4', 'true')
+    }
 
     if (f && deletedIds.has(f.id)) {
       setDeletedIds(prev => {
@@ -272,13 +274,13 @@ export default function App() {
       if (workspace === 'notes') {
         setSidebarCollapsed(prev => {
           const next = !prev
-          localStorage.setItem('sidebarCollapsedV3', String(next))
+          localStorage.setItem('sidebarCollapsedV4', String(next))
           return next
         })
         return
       }
       setSidebarCollapsed(false)
-      localStorage.setItem('sidebarCollapsedV3', 'false')
+      localStorage.setItem('sidebarCollapsedV4', 'false')
     }
     changeWorkspace(nextWorkspace)
   }, [workspace, changeWorkspace])
@@ -468,7 +470,7 @@ export default function App() {
                       onClick={() => {
                         setSidebarCollapsed(prev => {
                           const next = !prev
-                          localStorage.setItem('sidebarCollapsedV3', String(next))
+                          localStorage.setItem('sidebarCollapsedV4', String(next))
                           return next
                         })
                       }}
