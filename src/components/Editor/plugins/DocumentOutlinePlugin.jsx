@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { $getRoot } from 'lexical'
 import { $isHeadingNode } from '@lexical/rich-text'
@@ -12,32 +12,109 @@ const levelLabel = {
   h6: 6,
 }
 
+export function getCollapsedOutlineKeys(nodes, collapsedKeys) {
+  const collapsed = collapsedKeys instanceof Set
+    ? collapsedKeys
+    : new Set(collapsedKeys || [])
+
+  const hidden = new Set()
+
+  for (let index = 0; index < nodes.length; index++) {
+    const node = nodes[index]
+    if (!node?.isHeading || !collapsed.has(node.key)) continue
+
+    for (let nextIndex = index + 1; nextIndex < nodes.length; nextIndex++) {
+      const next = nodes[nextIndex]
+      if (next?.isHeading && next.level <= node.level) break
+      hidden.add(next.key)
+    }
+  }
+
+  return hidden
+}
+
+function hasCollapsibleContent(nodes, headingKey) {
+  const index = nodes.findIndex(node => node.key === headingKey)
+  const heading = nodes[index]
+  if (index < 0 || !heading?.isHeading) return false
+
+  const next = nodes[index + 1]
+  if (!next) return false
+  return !(next.isHeading && next.level <= heading.level)
+}
+
 export default function DocumentOutlinePlugin() {
   const [editor] = useLexicalComposerContext()
   const [headings, setHeadings] = useState([])
+  const [outlineNodes, setOutlineNodes] = useState([])
+  const [collapsedKeys, setCollapsedKeys] = useState(() => new Set())
   const [activeKey, setActiveKey] = useState('')
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
-    const collect = (editorState) => {
-      editorState.read(() => {
-        const next = $getRoot()
-          .getChildren()
-          .filter($isHeadingNode)
-          .map(node => ({
-            key: node.getKey(),
-            level: levelLabel[node.getTag()] || 1,
-            text: node.getTextContent().trim() || '未命名标题',
-          }))
+    const collect = editorState => {
+      let nextHeadings = []
+      let nextNodes = []
 
-        setHeadings(next)
-        if (next.length < 2) setOpen(false)
+      editorState.read(() => {
+        nextNodes = $getRoot().getChildren().map(node => {
+          const isHeading = $isHeadingNode(node)
+          const level = isHeading ? (levelLabel[node.getTag()] || 1) : null
+          return {
+            key: node.getKey(),
+            isHeading,
+            level,
+            text: isHeading ? (node.getTextContent().trim() || '未命名标题') : '',
+          }
+        })
+
+        nextHeadings = nextNodes.filter(node => node.isHeading)
       })
+
+      setOutlineNodes(nextNodes)
+      setHeadings(nextHeadings)
+
+      const validHeadingKeys = new Set(nextHeadings.map(item => item.key))
+      setCollapsedKeys(previous => {
+        const next = new Set([...previous].filter(key => validHeadingKeys.has(key)))
+        if (next.size === previous.size && [...next].every(key => previous.has(key))) return previous
+        return next
+      })
+
+      if (nextHeadings.length < 2) setOpen(false)
     }
 
     collect(editor.getEditorState())
     return editor.registerUpdateListener(({ editorState }) => collect(editorState))
   }, [editor])
+
+  const hiddenKeys = useMemo(
+    () => getCollapsedOutlineKeys(outlineNodes, collapsedKeys),
+    [outlineNodes, collapsedKeys]
+  )
+
+  useEffect(() => {
+    if (!outlineNodes.length) return undefined
+
+    for (const node of outlineNodes) {
+      const element = editor.getElementByKey(node.key)
+      if (!element) continue
+      element.style.display = hiddenKeys.has(node.key) ? 'none' : ''
+      element.classList.toggle(
+        'outline-section-collapsed',
+        Boolean(node.isHeading && collapsedKeys.has(node.key))
+      )
+    }
+
+    return () => {
+      for (const node of outlineNodes) {
+        const element = editor.getElementByKey(node.key)
+        if (!element) continue
+        element.style.display = ''
+        element.classList.remove('outline-section-collapsed')
+      }
+    }
+  }, [editor, outlineNodes, hiddenKeys, collapsedKeys])
 
   useEffect(() => {
     if (!headings.length) {
@@ -56,9 +133,10 @@ export default function DocumentOutlinePlugin() {
       frame = window.requestAnimationFrame(() => {
         const scrollerRect = scroller.getBoundingClientRect()
         const anchorY = scrollerRect.top + Math.min(150, scrollerRect.height * 0.22)
-        let nextKey = headings[0]?.key || ''
+        let nextKey = headings.find(heading => !hiddenKeys.has(heading.key))?.key || ''
 
         for (const heading of headings) {
+          if (hiddenKeys.has(heading.key)) continue
           const element = editor.getElementByKey(heading.key)
           if (!element) continue
           const rect = element.getBoundingClientRect()
@@ -79,11 +157,13 @@ export default function DocumentOutlinePlugin() {
       scroller.removeEventListener('scroll', updateActiveHeading)
       window.removeEventListener('resize', updateActiveHeading)
     }
-  }, [editor, headings])
+  }, [editor, headings, hiddenKeys])
 
   if (headings.length < 2) return null
 
-  const goToHeading = (key) => {
+  const visibleHeadings = headings.filter(heading => !hiddenKeys.has(heading.key))
+
+  const goToHeading = key => {
     const element = editor.getElementByKey(key)
     if (!element) return
 
@@ -97,6 +177,15 @@ export default function DocumentOutlinePlugin() {
       element.classList.add('outline-target-flash')
       window.setTimeout(() => element.classList.remove('outline-target-flash'), 900)
     }, 180)
+  }
+
+  const toggleCollapsed = key => {
+    setCollapsedKeys(previous => {
+      const next = new Set(previous)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
   }
 
   return (
@@ -116,23 +205,46 @@ export default function DocumentOutlinePlugin() {
       {open && (
         <div className="document-outline-panel">
           <div className="document-outline-header">
-            <strong>文档目录</strong>
+            <div>
+              <strong>文档目录</strong>
+              <small>点击跳转 · 箭头折叠章节</small>
+            </div>
             <span>{headings.length} 个标题</span>
           </div>
 
           <div className="document-outline-list">
-            {headings.map(heading => (
-              <button
-                type="button"
-                key={heading.key}
-                className={`document-outline-item level-${Math.min(heading.level, 4)}${activeKey === heading.key ? ' active' : ''}`}
-                onClick={() => goToHeading(heading.key)}
-                title={heading.text}
-                aria-current={activeKey === heading.key ? 'location' : undefined}
-              >
-                {heading.text}
-              </button>
-            ))}
+            {visibleHeadings.map(heading => {
+              const collapsible = hasCollapsibleContent(outlineNodes, heading.key)
+              const collapsed = collapsedKeys.has(heading.key)
+
+              return (
+                <div
+                  key={heading.key}
+                  className={`document-outline-row level-${Math.min(heading.level, 4)}${activeKey === heading.key ? ' active' : ''}`}
+                >
+                  <button
+                    type="button"
+                    className="document-outline-collapse"
+                    onClick={() => collapsible && toggleCollapsed(heading.key)}
+                    disabled={!collapsible}
+                    aria-label={collapsed ? '展开章节' : '折叠章节'}
+                    title={collapsible ? (collapsed ? '展开章节' : '折叠章节') : ''}
+                  >
+                    <span className={collapsed ? '' : 'open'}>›</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="document-outline-item"
+                    onClick={() => goToHeading(heading.key)}
+                    title={heading.text}
+                    aria-current={activeKey === heading.key ? 'location' : undefined}
+                  >
+                    {heading.text}
+                  </button>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}
