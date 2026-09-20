@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { LexicalComposer } from '@lexical/react/LexicalComposer';
 import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin';
 import { ContentEditable } from '@lexical/react/LexicalContentEditable';
@@ -47,6 +47,24 @@ import './nodes/BlockNodes.css';
 
 const theme = {
   paragraph: 'editor-paragraph',
+  heading: {
+    h1: 'editor-heading-h1',
+    h2: 'editor-heading-h2',
+    h3: 'editor-heading-h3',
+    h4: 'editor-heading-h4',
+    h5: 'editor-heading-h5',
+    h6: 'editor-heading-h6',
+  },
+  quote: 'editor-quote',
+  list: {
+    ol: 'editor-list-ol',
+    ul: 'editor-list-ul',
+    listitem: 'editor-list-item',
+    nested: {
+      listitem: 'editor-nested-list-item',
+    },
+  },
+  link: 'editor-link',
   text: {
     bold: 'editor-text-bold',
     italic: 'editor-text-italic',
@@ -127,6 +145,8 @@ const EDITOR_NODES = [
 ];
 
 export default function Editor({ initialContent, onChange, readOnly }) {
+  const [toolbarOpen, setToolbarOpen] = useState(false)
+
   const initialConfig = useMemo(() => ({
     namespace: 'MyEditor',
     theme,
@@ -139,8 +159,20 @@ export default function Editor({ initialContent, onChange, readOnly }) {
 
   return (
     <LexicalComposer initialConfig={initialConfig}>
-      <div className="editor-shell">
-        <ToolbarPlugin />
+      <div className={`editor-shell${toolbarOpen ? ' toolbar-open' : ''}`}>
+        {!readOnly && (
+          <button
+            type="button"
+            className={`editor-format-toggle${toolbarOpen ? ' active' : ''}`}
+            onClick={() => setToolbarOpen(prev => !prev)}
+            aria-expanded={toolbarOpen}
+            aria-label={toolbarOpen ? '收起格式工具' : '打开格式工具'}
+            title={toolbarOpen ? '收起格式工具' : '格式工具'}
+          >
+            Aa
+          </button>
+        )}
+        {toolbarOpen && <ToolbarPlugin />}
         <SearchPlugin />
         <PasteImagePlugin />
         <div className="editor-container">
