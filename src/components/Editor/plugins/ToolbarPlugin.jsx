@@ -1,376 +1,688 @@
-import React, { useCallback, useState, useEffect, useRef } from 'react';
-import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
-import { INSERT_TABLE_COMMAND, $createTableNode, $createTableRowNode, $createTableCellNode } from '@lexical/table';
-import { INSERT_CODE_BLOCK_COMMAND } from './CodeBlockPlugin';
-import { $createImageNode } from '../nodes/ImageNode';
-import { $createImageGridNode } from '../nodes/ImageGridNode';
-import { $createVideoNode } from '../nodes/VideoNode';
-import { 
-  $insertNodes, 
-  $createParagraphNode, 
-  $createTextNode, 
-  FORMAT_TEXT_COMMAND, 
-  FORMAT_ELEMENT_COMMAND,
-  UNDO_COMMAND,
-  REDO_COMMAND,
-  CAN_UNDO_COMMAND,
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
+import {
+  INSERT_TABLE_COMMAND,
+  $createTableCellNode,
+  $createTableNode,
+  $createTableRowNode,
+} from '@lexical/table'
+import {
+  INSERT_ORDERED_LIST_COMMAND,
+  INSERT_UNORDERED_LIST_COMMAND,
+  REMOVE_LIST_COMMAND,
+  $isListNode,
+} from '@lexical/list'
+import { TOGGLE_LINK_COMMAND } from '@lexical/link'
+import {
+  $createHeadingNode,
+  $createQuoteNode,
+  $isHeadingNode,
+  $isQuoteNode,
+} from '@lexical/rich-text'
+import {
+  $createParagraphNode,
+  $createTextNode,
+  $getSelection,
+  $insertNodes,
+  $isRangeSelection,
   CAN_REDO_COMMAND,
-} from 'lexical';
-import { $patchStyleText } from '@lexical/selection';
-import { $getSelection, $isRangeSelection } from 'lexical';
-import { mergeRegister, $getNearestBlockElementAncestorOrThrow } from '@lexical/utils';
-import { compressImage, generateVideoMetadata, loadXLSX, uploadFile } from '../utils/fileUpload';
-import { TableNode, TableRowNode } from '@lexical/table'
+  CAN_UNDO_COMMAND,
+  FORMAT_ELEMENT_COMMAND,
+  FORMAT_TEXT_COMMAND,
+  REDO_COMMAND,
+  UNDO_COMMAND,
+} from 'lexical'
+import { $patchStyleText, $setBlocksType } from '@lexical/selection'
+import { mergeRegister, $getNearestBlockElementAncestorOrThrow } from '@lexical/utils'
+
+import { INSERT_CODE_BLOCK_COMMAND } from './CodeBlockPlugin'
+import { $createImageNode } from '../nodes/ImageNode'
+import { $createImageGridNode } from '../nodes/ImageGridNode'
+import { $createVideoNode } from '../nodes/VideoNode'
+import { $createTodoNode } from '../nodes/TodoNode'
+import { $createCalloutNode } from '../nodes/CalloutNode'
+import { $createDividerNode } from '../nodes/DividerNode'
+import { $createToggleNode } from '../nodes/ToggleNode'
+import { $createEmbedNode } from '../nodes/EmbedNode'
+import { compressImage, generateVideoMetadata, loadXLSX, uploadFile } from '../utils/fileUpload'
+import { toast } from '~/services/toast'
 import TableMenu from './TableMenu'
 import './TextColorPlugin.css'
 
 const FontOptions = [
-  { label: 'Arial', value: 'Arial' },
-  { label: '阿里妈妈灵动体', value: 'AlimamaAgileVF' },
-  { label: '阿里妈妈刀隶体', value: 'AlimamaDaoLiTi' },
-  { label: '阿里妈妈东方大楷', value: 'AlimamaDongFangDaKai' },
-  { label: '阿里妈妈方圆体', value: 'AlimamaFangYuanTiVF' },
-  { label: '阿里妈妈数黑体', value: 'AlimamaShuHeiTi' },
-  { label: '钉钉进步体', value: 'DingTalkJinBuTi' },
-  { label: '淘宝买菜体', value: 'TaoBaoMaiCaiTi' },
+  { label: '系统默认', value: '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif' },
+  { label: '微软雅黑', value: 'Microsoft YaHei' },
   { label: '宋体', value: 'SimSun' },
   { label: '黑体', value: 'SimHei' },
-  { label: '微软雅黑', value: 'Microsoft YaHei' },
+  { label: 'Arial', value: 'Arial' },
   { label: 'Times New Roman', value: 'Times New Roman' },
-];
+  { label: '阿里妈妈灵动体', value: 'AlimamaAgileVF' },
+]
 
-const FontSizeOptions = ['10px', '12px', '14px', '16px', '18px', '20px', '24px', '30px', '36px'];
+const FontSizeOptions = ['12px', '14px', '16px', '18px', '20px', '24px', '30px', '36px']
+
+const TEXT_COLORS = [
+  { label: '默认', value: '' },
+  { label: '红色', value: '#ef4444' },
+  { label: '橙色', value: '#f97316' },
+  { label: '黄色', value: '#eab308' },
+  { label: '绿色', value: '#22c55e' },
+  { label: '蓝色', value: '#3b82f6' },
+  { label: '紫色', value: '#8b5cf6' },
+]
+
+const HIGHLIGHT_COLORS = [
+  { label: '无', value: '' },
+  { label: '红色', value: '#fee2e2' },
+  { label: '橙色', value: '#ffedd5' },
+  { label: '黄色', value: '#fef9c3' },
+  { label: '绿色', value: '#dcfce7' },
+  { label: '蓝色', value: '#dbeafe' },
+  { label: '紫色', value: '#f3e8ff' },
+]
+
+const BLOCK_OPTIONS = [
+  ['paragraph', '正文'],
+  ['h1', '标题 1'],
+  ['h2', '标题 2'],
+  ['h3', '标题 3'],
+  ['quote', '引用'],
+]
 
 export default function ToolbarPlugin() {
-  const [editor] = useLexicalComposerContext();
-  const [canUndo, setCanUndo] = useState(false);
-  const [canRedo, setCanRedo] = useState(false);
-  const [fontSize, setFontSize] = useState('14px');
-  const [fontFamily, setFontFamily] = useState(() => localStorage.getItem('editor-font-family') || 'Arial');
-  const [isUploading, setIsUploading] = useState(false);
-  const [isBold, setIsBold] = useState(false);
-  const [isItalic, setIsItalic] = useState(false);
-  const [isUnderline, setIsUnderline] = useState(false);
-  const [elementFormat, setElementFormat] = useState('left');
-  const [showColorPicker, setShowColorPicker] = useState(false);
-  const [showHighlightPicker, setShowHighlightPicker] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
-  const fontSelectRef = useRef(null);
-  const colorPickerRef = useRef(null);
-  const moreMenuRef = useRef(null);
+  const [editor] = useLexicalComposerContext()
+  const [canUndo, setCanUndo] = useState(false)
+  const [canRedo, setCanRedo] = useState(false)
+  const [fontSize, setFontSize] = useState('16px')
+  const [fontFamily, setFontFamily] = useState(() => (
+    localStorage.getItem('editor-font-family') || FontOptions[0].value
+  ))
+  const [isUploading, setIsUploading] = useState(false)
+  const [isBold, setIsBold] = useState(false)
+  const [isItalic, setIsItalic] = useState(false)
+  const [isUnderline, setIsUnderline] = useState(false)
+  const [blockType, setBlockType] = useState('paragraph')
+  const [isBulletList, setIsBulletList] = useState(false)
+  const [isNumberList, setIsNumberList] = useState(false)
+  const [hasSelection, setHasSelection] = useState(false)
+  const [elementFormat, setElementFormat] = useState('left')
+  const [showColorPicker, setShowColorPicker] = useState(false)
+  const [showHighlightPicker, setShowHighlightPicker] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(false)
+  const [linkOpen, setLinkOpen] = useState(false)
+  const [linkUrl, setLinkUrl] = useState('')
 
-  const TEXT_COLORS = [
-    { label: '默认', value: '' },
-    { label: '红色', value: '#ef4444' },
-    { label: '橙色', value: '#f97316' },
-    { label: '黄色', value: '#eab308' },
-    { label: '绿色', value: '#22c55e' },
-    { label: '蓝色', value: '#3b82f6' },
-    { label: '紫色', value: '#8b5cf6' },
-    { label: '粉色', value: '#ec4899' },
-  ];
-
-  const HIGHLIGHT_COLORS = [
-    { label: '无', value: '' },
-    { label: '红色', value: '#fee2e2' },
-    { label: '橙色', value: '#ffedd5' },
-    { label: '黄色', value: '#fef9c3' },
-    { label: '绿色', value: '#dcfce7' },
-    { label: '蓝色', value: '#dbeafe' },
-    { label: '紫色', value: '#f3e8ff' },
-    { label: '粉色', value: '#fce7f3' },
-  ];
+  const fontSelectRef = useRef(null)
+  const colorPickerRef = useRef(null)
+  const moreMenuRef = useRef(null)
+  const linkRef = useRef(null)
 
   useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'f') {
-        e.preventDefault();
-        fontSelectRef.current?.focus();
+    const handleKeyDown = (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'f') {
+        event.preventDefault()
+        fontSelectRef.current?.focus()
       }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (colorPickerRef.current && !colorPickerRef.current.contains(e.target)) {
-        setShowColorPicker(false);
-        setShowHighlightPicker(false);
-      }
-      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target)) {
-        setMoreOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const applyTextColor = (color) => {
-    editor.update(() => {
-      const selection = $getSelection();
-      if (!$isRangeSelection(selection)) return;
-      $patchStyleText(selection, { color });
-    });
-    setShowColorPicker(false);
-    editor.focus();
-  };
-
-  const applyHighlight = (color) => {
-    editor.update(() => {
-      const selection = $getSelection();
-      if (!$isRangeSelection(selection)) return;
-      $patchStyleText(selection, { 'background-color': color });
-    });
-    setShowHighlightPicker(false);
-    editor.focus();
-  };
-
-  const handleFontChange = (e) => {
-    const value = e.target.value;
-    setFontFamily(value);
-    localStorage.setItem('editor-font-family', value);
-    applyStyle('font-family', value);
-  };
-
-  const updateToolbar = useCallback(() => {
-    const selection = $getSelection();
-    if ($isRangeSelection(selection)) {
-      setIsBold(selection.hasFormat('bold'));
-      setIsItalic(selection.hasFormat('italic'));
-      setIsUnderline(selection.hasFormat('underline'));
-      const anchorNode = selection.anchor.getNode();
-      const element = anchorNode.getKey() === 'root'
-        ? anchorNode
-        : $getNearestBlockElementAncestorOrThrow(anchorNode);
-      setElementFormat(element.getFormatType() || 'left');
     }
-  }, [editor]);
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   useEffect(() => {
-    return mergeRegister(
-      editor.registerUpdateListener(({ editorState }) => {
-        editorState.read(() => {
-          updateToolbar();
-        });
-      }),
-      editor.registerCommand(CAN_UNDO_COMMAND, (payload) => {
-        setCanUndo(payload);
-        return false;
-      }, 1),
-      editor.registerCommand(CAN_REDO_COMMAND, (payload) => {
-        setCanRedo(payload);
-        return false;
-      }, 1)
-    );
-  }, [editor, updateToolbar]);
+    const handleClickOutside = (event) => {
+      if (colorPickerRef.current && !colorPickerRef.current.contains(event.target)) {
+        setShowColorPicker(false)
+        setShowHighlightPicker(false)
+      }
+      if (moreMenuRef.current && !moreMenuRef.current.contains(event.target)) {
+        setMoreOpen(false)
+      }
+      if (linkRef.current && !linkRef.current.contains(event.target)) {
+        setLinkOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   const applyStyle = (style, value) => {
     editor.update(() => {
-      const selection = $getSelection();
+      const selection = $getSelection()
       if ($isRangeSelection(selection)) {
-        $patchStyleText(selection, { [style]: value });
+        $patchStyleText(selection, { [style]: value })
       }
-    });
-  };
+    })
+  }
+
+  const applyTextColor = (color) => {
+    applyStyle('color', color)
+    setShowColorPicker(false)
+    editor.focus()
+  }
+
+  const applyHighlight = (color) => {
+    applyStyle('background-color', color)
+    setShowHighlightPicker(false)
+    editor.focus()
+  }
+
+  const handleFontChange = (event) => {
+    const value = event.target.value
+    setFontFamily(value)
+    localStorage.setItem('editor-font-family', value)
+    applyStyle('font-family', value)
+  }
+
+  const updateToolbar = useCallback(() => {
+    const selection = $getSelection()
+    if (!$isRangeSelection(selection)) return
+
+    setIsBold(selection.hasFormat('bold'))
+    setIsItalic(selection.hasFormat('italic'))
+    setIsUnderline(selection.hasFormat('underline'))
+    setHasSelection(!selection.isCollapsed())
+
+    const anchorNode = selection.anchor.getNode()
+    let element = anchorNode.getKey() === 'root'
+      ? anchorNode
+      : $getNearestBlockElementAncestorOrThrow(anchorNode)
+
+    if (element.getType?.() === 'listitem' && element.getParent()) {
+      element = element.getParent()
+    }
+
+    setElementFormat(element.getFormatType?.() || 'left')
+
+    if ($isHeadingNode(element)) {
+      setBlockType(element.getTag())
+      setIsBulletList(false)
+      setIsNumberList(false)
+      return
+    }
+
+    if ($isQuoteNode(element)) {
+      setBlockType('quote')
+      setIsBulletList(false)
+      setIsNumberList(false)
+      return
+    }
+
+    if ($isListNode(element)) {
+      const listType = element.getListType()
+      setBlockType('paragraph')
+      setIsBulletList(listType === 'bullet')
+      setIsNumberList(listType === 'number')
+      return
+    }
+
+    setBlockType('paragraph')
+    setIsBulletList(false)
+    setIsNumberList(false)
+  }, [])
+
+  useEffect(() => mergeRegister(
+    editor.registerUpdateListener(({ editorState }) => {
+      editorState.read(updateToolbar)
+    }),
+    editor.registerCommand(CAN_UNDO_COMMAND, payload => {
+      setCanUndo(payload)
+      return false
+    }, 1),
+    editor.registerCommand(CAN_REDO_COMMAND, payload => {
+      setCanRedo(payload)
+      return false
+    }, 1),
+  ), [editor, updateToolbar])
+
+  const formatBlock = (nextType) => {
+    editor.dispatchCommand(REMOVE_LIST_COMMAND)
+
+    editor.update(() => {
+      const selection = $getSelection()
+      if (!$isRangeSelection(selection)) return
+
+      if (nextType === 'paragraph') {
+        $setBlocksType(selection, () => $createParagraphNode())
+      } else if (nextType === 'quote') {
+        $setBlocksType(selection, () => $createQuoteNode())
+      } else {
+        $setBlocksType(selection, () => $createHeadingNode(nextType))
+      }
+    })
+
+    editor.focus()
+  }
+
+  const toggleList = (type) => {
+    const active = type === 'bullet' ? isBulletList : isNumberList
+    editor.dispatchCommand(
+      active
+        ? REMOVE_LIST_COMMAND
+        : type === 'bullet'
+          ? INSERT_UNORDERED_LIST_COMMAND
+          : INSERT_ORDERED_LIST_COMMAND
+    )
+    editor.focus()
+  }
+
+  const insertNode = (node) => {
+    editor.update(() => {
+      $insertNodes([node])
+    })
+    setMoreOpen(false)
+    editor.focus()
+  }
+
+  const insertTodo = () => {
+    insertNode($createTodoNode())
+  }
+
+  const applyLink = () => {
+    const url = linkUrl.trim()
+    if (!url || !hasSelection) return
+    editor.dispatchCommand(TOGGLE_LINK_COMMAND, url)
+    setLinkOpen(false)
+    setLinkUrl('')
+    editor.focus()
+  }
+
+  const removeLink = () => {
+    editor.dispatchCommand(TOGGLE_LINK_COMMAND, null)
+    setLinkOpen(false)
+    setLinkUrl('')
+    editor.focus()
+  }
 
   const uploadFileSafe = async (file) => {
     try {
-      return await uploadFile(file);
-    } catch (e) {
-      alert('上传失败: ' + e.message);
-      return null;
+      return await uploadFile(file)
+    } catch (error) {
+      toast.error(error.message || '上传失败')
+      return null
     }
-  };
+  }
 
-  const handleImage = async (e) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
-    for (const f of files) { if (f.size > 10 * 1024 * 1024) { alert('图片最大10MB'); e.target.value=''; return; } }
-    setIsUploading(true);
-    const uploads = await Promise.all(files.map(async (file) => {
-      const type = file.type || '';
-      const skipCompress = type.includes('gif') || type.includes('png');
-      if (!skipCompress && file.size > 2 * 1024 * 1024) {
-        try {
-          const compressedFile = await compressImage(file);
-          const [resCompressed, resOriginal] = await Promise.all([
-            uploadFileSafe(compressedFile),
-            uploadFileSafe(file)
-          ]);
-          if (resCompressed && resOriginal) {
-            return { src: resCompressed.url, originalSrc: resOriginal.url, alt: file.name };
-          }
-        } catch {
-          const res = await uploadFileSafe(file);
-          if (res) return { src: res.url, originalSrc: res.url, alt: file.name };
-          return null;
-        }
-      } else {
-        const res = await uploadFileSafe(file);
-        if (res) return { src: res.url, originalSrc: res.url, alt: file.name };
-        return null;
-      }
-    }));
-    setIsUploading(false);
-    const items = uploads.filter(Boolean);
-    if (items.length === 0) { e.target.value=''; return; }
-    editor.update(() => {
-      if (items.length === 1) {
-        const i = items[0];
-        const node = $createImageNode({ src: i.src, originalSrc: i.originalSrc, alt: i.alt, caption: i.alt, width: 500 });
-        $insertNodes([node]);
-      } else {
-        const grid = $createImageGridNode({ items, columns: 3, gap: 8 });
-        $insertNodes([grid]);
-      }
-    });
-    e.target.value = '';
-  };
+  const handleImage = async (event) => {
+    const files = Array.from(event.target.files || [])
+    if (!files.length) return
 
-  const handleVideo = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    if (file.size > 100 * 1024 * 1024) { alert('视频最大100MB'); return; }
-    
-    setIsUploading(true);
-    
+    if (files.some(file => file.size > 10 * 1024 * 1024)) {
+      toast.warning('单张图片不能超过 10 MB')
+      event.target.value = ''
+      return
+    }
+
+    setIsUploading(true)
     try {
-        const metadata = await generateVideoMetadata(file);
-        const resVideo = await uploadFileSafe(file);
-        
-        let coverUrl = null;
-        if (metadata.coverFile) {
-            const resCover = await uploadFileSafe(metadata.coverFile);
-            if (resCover) coverUrl = resCover.url;
-        }
-        
-        if (resVideo) {
-            editor.update(() => {
-                const node = $createVideoNode({ 
-                    src: resVideo.url, 
-                    width: 600,
-                    poster: coverUrl,
-                    duration: metadata.duration
-                });
-                $insertNodes([node]);
-            });
-        }
-    } catch (e) {
-        console.error('Video upload failed', e);
-        alert('视频上传失败: ' + e.message);
-    }
-    
-    setIsUploading(false);
-    e.target.value = '';
-  };
+      const uploads = await Promise.all(files.map(async file => {
+        const type = file.type || ''
+        const skipCompress = type.includes('gif') || type.includes('png')
 
-  const handleExcel = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { alert('Excel最大5MB'); return; }
-    
-    setIsUploading(true);
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        try {
-            const data = new Uint8Array(e.target.result);
-            loadXLSX().then((XLSX) => {
-              const workbook = XLSX.read(data, { type: 'array' });
-              const sheetName = workbook.SheetNames[0];
-              const sheet = workbook.Sheets[sheetName];
-              const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
-            
-              editor.update(() => {
-                  const table = $createTableNode();
-                  for (const rowData of rows) {
-                      const tableRow = $createTableRowNode();
-                      for (const cellData of rowData) {
-                          const tableCell = $createTableCellNode();
-                          const paragraph = $createParagraphNode();
-                          paragraph.append($createTextNode(String(cellData)));
-                          tableCell.append(paragraph);
-                          tableRow.append(tableCell);
-                      }
-                      table.append(tableRow);
-                  }
-                  $insertNodes([table]);
-              });
-              setIsUploading(false);
-            }).catch(() => {
-              alert('XLSX加载失败');
-              setIsUploading(false);
-            });
-        } catch (err) {
-            alert('解析失败');
-            setIsUploading(false);
+        if (!skipCompress && file.size > 2 * 1024 * 1024) {
+          try {
+            const compressedFile = await compressImage(file)
+            const [compressed, original] = await Promise.all([
+              uploadFileSafe(compressedFile),
+              uploadFileSafe(file),
+            ])
+            if (compressed && original) {
+              return {
+                src: compressed.url,
+                originalSrc: original.url,
+                alt: file.name,
+              }
+            }
+          } catch {
+            // Fall back to the original file below.
+          }
         }
-    };
-    reader.readAsArrayBuffer(file);
-    e.target.value = '';
-  };
+
+        const result = await uploadFileSafe(file)
+        return result
+          ? { src: result.url, originalSrc: result.url, alt: file.name }
+          : null
+      }))
+
+      const items = uploads.filter(Boolean)
+      if (!items.length) return
+
+      editor.update(() => {
+        if (items.length === 1) {
+          const item = items[0]
+          $insertNodes([
+            $createImageNode({
+              src: item.src,
+              originalSrc: item.originalSrc,
+              alt: item.alt,
+              caption: item.alt,
+              width: 640,
+            }),
+          ])
+        } else {
+          $insertNodes([$createImageGridNode({ items, columns: 3, gap: 8 })])
+        }
+      })
+    } finally {
+      setIsUploading(false)
+      event.target.value = ''
+    }
+  }
+
+  const handleVideo = async (event) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    if (file.size > 100 * 1024 * 1024) {
+      toast.warning('视频不能超过 100 MB')
+      event.target.value = ''
+      return
+    }
+
+    setIsUploading(true)
+    try {
+      const metadata = await generateVideoMetadata(file)
+      const videoResult = await uploadFileSafe(file)
+      if (!videoResult) return
+
+      let coverUrl = null
+      if (metadata.coverFile) {
+        const coverResult = await uploadFileSafe(metadata.coverFile)
+        if (coverResult) coverUrl = coverResult.url
+      }
+
+      editor.update(() => {
+        $insertNodes([
+          $createVideoNode({
+            src: videoResult.url,
+            width: 720,
+            poster: coverUrl,
+            duration: metadata.duration,
+          }),
+        ])
+      })
+    } catch (error) {
+      console.error('视频上传失败', error)
+      toast.error(error.message || '视频上传失败')
+    } finally {
+      setIsUploading(false)
+      event.target.value = ''
+    }
+  }
+
+  const handleExcel = async (event) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.warning('Excel 文件不能超过 5 MB')
+      event.target.value = ''
+      return
+    }
+
+    setIsUploading(true)
+    const reader = new FileReader()
+
+    reader.onload = async (loadEvent) => {
+      try {
+        const XLSX = await loadXLSX()
+        const data = new Uint8Array(loadEvent.target.result)
+        const workbook = XLSX.read(data, { type: 'array' })
+        const sheet = workbook.Sheets[workbook.SheetNames[0]]
+        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
+
+        editor.update(() => {
+          const table = $createTableNode()
+          for (const rowData of rows) {
+            const tableRow = $createTableRowNode()
+            for (const cellData of rowData) {
+              const tableCell = $createTableCellNode()
+              const paragraph = $createParagraphNode()
+              paragraph.append($createTextNode(String(cellData)))
+              tableCell.append(paragraph)
+              tableRow.append(tableCell)
+            }
+            table.append(tableRow)
+          }
+          $insertNodes([table])
+        })
+      } catch (error) {
+        console.error('Excel 解析失败', error)
+        toast.error('Excel 解析失败')
+      } finally {
+        setIsUploading(false)
+        event.target.value = ''
+      }
+    }
+
+    reader.onerror = () => {
+      setIsUploading(false)
+      event.target.value = ''
+      toast.error('读取 Excel 文件失败')
+    }
+
+    reader.readAsArrayBuffer(file)
+  }
 
   return (
-    <div className="editor-toolbar compact-toolbar">
-      <div className="toolbar-group compact-history">
+    <div className="editor-toolbar product-editor-toolbar">
+      <div className="toolbar-group compact-history" aria-label="历史操作">
         <button
+          type="button"
           disabled={!canUndo}
           onClick={() => editor.dispatchCommand(UNDO_COMMAND)}
           className="btn icon-only"
           aria-label="撤销"
           title="撤销 (Ctrl+Z)"
-        >↶</button>
+        >
+          ↶
+        </button>
         <button
+          type="button"
           disabled={!canRedo}
           onClick={() => editor.dispatchCommand(REDO_COMMAND)}
           className="btn icon-only"
           aria-label="重做"
           title="重做 (Ctrl+Y)"
-        >↷</button>
+        >
+          ↷
+        </button>
       </div>
 
       <span className="divider" />
 
-      <div className="toolbar-group compact-format">
+      <select
+        className="select toolbar-block-select"
+        value={blockType}
+        onChange={event => formatBlock(event.target.value)}
+        aria-label="段落类型"
+        title="段落类型"
+      >
+        {BLOCK_OPTIONS.map(([value, label]) => (
+          <option key={value} value={value}>{label}</option>
+        ))}
+      </select>
+
+      <span className="divider" />
+
+      <div className="toolbar-group compact-format" aria-label="文字格式">
         <button
+          type="button"
           onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'bold')}
           className={`btn fw-bold${isBold ? ' active' : ''}`}
           aria-label="加粗"
-          title="加粗"
-        >B</button>
+          title="加粗 (Ctrl+B)"
+        >
+          B
+        </button>
         <button
+          type="button"
           onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'italic')}
           className={`btn fst-italic${isItalic ? ' active' : ''}`}
           aria-label="斜体"
-          title="斜体"
-        >I</button>
+          title="斜体 (Ctrl+I)"
+        >
+          I
+        </button>
         <button
+          type="button"
           onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'underline')}
           className={`btn text-decoration-underline${isUnderline ? ' active' : ''}`}
           aria-label="下划线"
-          title="下划线"
-        >U</button>
+          title="下划线 (Ctrl+U)"
+        >
+          U
+        </button>
+      </div>
+
+      <span className="divider" />
+
+      <div className="toolbar-group toolbar-structure" aria-label="结构">
+        <button
+          type="button"
+          className={`btn toolbar-text-btn${isBulletList ? ' active' : ''}`}
+          onClick={() => toggleList('bullet')}
+          aria-label="无序列表"
+          title="无序列表"
+        >
+          • 列表
+        </button>
+        <button
+          type="button"
+          className={`btn toolbar-text-btn${isNumberList ? ' active' : ''}`}
+          onClick={() => toggleList('number')}
+          aria-label="有序列表"
+          title="有序列表"
+        >
+          1. 列表
+        </button>
+        <button
+          type="button"
+          className="btn toolbar-text-btn"
+          onClick={insertTodo}
+          aria-label="插入待办"
+          title="插入待办"
+        >
+          ☐ 待办
+        </button>
+      </div>
+
+      <div className="toolbar-link-wrap" ref={linkRef}>
+        <button
+          type="button"
+          className={`btn toolbar-text-btn${linkOpen ? ' active' : ''}`}
+          disabled={!hasSelection}
+          onClick={() => setLinkOpen(prev => !prev)}
+          aria-label="添加链接"
+          title={hasSelection ? '添加链接' : '先选中文字'}
+        >
+          链接
+        </button>
+
+        {linkOpen && (
+          <div className="toolbar-link-popover">
+            <input
+              autoFocus
+              className="input"
+              value={linkUrl}
+              onChange={event => setLinkUrl(event.target.value)}
+              onKeyDown={event => {
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  applyLink()
+                }
+                if (event.key === 'Escape') {
+                  event.preventDefault()
+                  setLinkOpen(false)
+                }
+              }}
+              placeholder="https://"
+              aria-label="链接地址"
+            />
+            <button type="button" className="btn primary small" onClick={applyLink} disabled={!linkUrl.trim()}>
+              应用
+            </button>
+            <button type="button" className="btn small" onClick={removeLink}>
+              移除
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="toolbar-spacer" />
 
+      <span className="toolbar-slash-hint">输入 / 快速插入</span>
       {isUploading && <span className="toolbar-progress">处理中…</span>}
 
       <div className="toolbar-more-wrap" ref={moreMenuRef}>
         <button
+          type="button"
           className={`btn toolbar-more-trigger${moreOpen ? ' active' : ''}`}
           onClick={() => setMoreOpen(prev => !prev)}
-          aria-label="更多插入与格式"
-          title="更多插入与格式"
+          aria-label="插入内容"
+          title="插入内容"
         >
           <span className="toolbar-plus">＋</span>
-          <span>更多</span>
+          <span>插入</span>
         </button>
 
         {moreOpen && (
           <div className="toolbar-more-menu">
             <div className="toolbar-menu-section">
-              <div className="toolbar-menu-label">文字</div>
+              <div className="toolbar-menu-label">内容块</div>
+              <div className="toolbar-menu-grid toolbar-insert-grid">
+                <label className="btn toolbar-menu-action">
+                  图片
+                  <input type="file" accept="image/*" multiple hidden onChange={handleImage} />
+                </label>
+                <label className="btn toolbar-menu-action">
+                  视频
+                  <input type="file" accept="video/*" hidden onChange={handleVideo} />
+                </label>
+                <button
+                  type="button"
+                  className="btn toolbar-menu-action"
+                  onClick={() => {
+                    editor.dispatchCommand(INSERT_TABLE_COMMAND, { columns: 3, rows: 3 })
+                    setMoreOpen(false)
+                  }}
+                >
+                  表格
+                </button>
+                <button
+                  type="button"
+                  className="btn toolbar-menu-action"
+                  onClick={() => {
+                    editor.dispatchCommand(INSERT_CODE_BLOCK_COMMAND)
+                    setMoreOpen(false)
+                  }}
+                >
+                  代码块
+                </button>
+                <button type="button" className="btn toolbar-menu-action" onClick={() => insertNode($createCalloutNode())}>
+                  提示块
+                </button>
+                <button type="button" className="btn toolbar-menu-action" onClick={() => insertNode($createToggleNode())}>
+                  折叠块
+                </button>
+                <button type="button" className="btn toolbar-menu-action" onClick={() => insertNode($createDividerNode())}>
+                  分割线
+                </button>
+                <button type="button" className="btn toolbar-menu-action" onClick={() => insertNode($createEmbedNode())}>
+                  嵌入
+                </button>
+                <label className="btn toolbar-menu-action">
+                  Excel
+                  <input type="file" accept=".xlsx,.xls" hidden onChange={handleExcel} />
+                </label>
+              </div>
+
+              <div className="toolbar-table-section">
+                <TableMenu />
+              </div>
+            </div>
+
+            <div className="toolbar-menu-section">
+              <div className="toolbar-menu-label">文字样式</div>
               <div className="toolbar-menu-row">
                 <select
                   ref={fontSelectRef}
@@ -379,33 +691,40 @@ export default function ToolbarPlugin() {
                   className="select toolbar-wide-select"
                   aria-label="字体"
                 >
-                  {FontOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  {FontOptions.map(option => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
                 </select>
                 <select
                   value={fontSize}
-                  onChange={e => { setFontSize(e.target.value); applyStyle('font-size', e.target.value); }}
+                  onChange={event => {
+                    setFontSize(event.target.value)
+                    applyStyle('font-size', event.target.value)
+                  }}
                   className="select"
                   aria-label="字号"
                 >
-                  {FontSizeOptions.map(o => <option key={o} value={o}>{o}</option>)}
+                  {FontSizeOptions.map(option => <option key={option} value={option}>{option}</option>)}
                 </select>
               </div>
 
               <div className="toolbar-menu-row">
                 <div className="text-color-group" ref={colorPickerRef}>
                   <button
+                    type="button"
                     className="btn"
                     onClick={() => {
-                      setShowColorPicker(!showColorPicker);
-                      setShowHighlightPicker(false);
+                      setShowColorPicker(prev => !prev)
+                      setShowHighlightPicker(false)
                     }}
                   >
                     文字颜色
                   </button>
                   {showColorPicker && (
                     <div className="color-picker-dropdown" role="listbox" aria-label="文本颜色选择">
-                      {TEXT_COLORS.map((color) => (
+                      {TEXT_COLORS.map(color => (
                         <button
+                          type="button"
                           key={color.value || 'default'}
                           className="color-option"
                           onClick={() => applyTextColor(color.value)}
@@ -414,7 +733,10 @@ export default function ToolbarPlugin() {
                         >
                           <span
                             className="color-swatch"
-                            style={{ backgroundColor: color.value || 'transparent', border: !color.value ? '1px dashed var(--muted)' : 'none' }}
+                            style={{
+                              backgroundColor: color.value || 'transparent',
+                              border: !color.value ? '1px dashed var(--muted)' : 'none',
+                            }}
                           />
                         </button>
                       ))}
@@ -424,18 +746,20 @@ export default function ToolbarPlugin() {
 
                 <div className="text-color-group">
                   <button
+                    type="button"
                     className="btn"
                     onClick={() => {
-                      setShowHighlightPicker(!showHighlightPicker);
-                      setShowColorPicker(false);
+                      setShowHighlightPicker(prev => !prev)
+                      setShowColorPicker(false)
                     }}
                   >
                     高亮
                   </button>
                   {showHighlightPicker && (
                     <div className="color-picker-dropdown" role="listbox" aria-label="高亮颜色选择">
-                      {HIGHLIGHT_COLORS.map((color) => (
+                      {HIGHLIGHT_COLORS.map(color => (
                         <button
+                          type="button"
                           key={color.value || 'default'}
                           className="color-option"
                           onClick={() => applyHighlight(color.value)}
@@ -444,7 +768,10 @@ export default function ToolbarPlugin() {
                         >
                           <span
                             className="color-swatch"
-                            style={{ backgroundColor: color.value || 'transparent', border: !color.value ? '1px dashed var(--muted)' : 'none' }}
+                            style={{
+                              backgroundColor: color.value || 'transparent',
+                              border: !color.value ? '1px dashed var(--muted)' : 'none',
+                            }}
                           />
                         </button>
                       ))}
@@ -455,48 +782,34 @@ export default function ToolbarPlugin() {
             </div>
 
             <div className="toolbar-menu-section">
-              <div className="toolbar-menu-label">对齐</div>
+              <div className="toolbar-menu-label">段落对齐</div>
               <div className="toolbar-menu-row">
-                <button onClick={() => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'left')} className={`btn${elementFormat === 'left' ? ' active' : ''}`}>左对齐</button>
-                <button onClick={() => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'center')} className={`btn${elementFormat === 'center' ? ' active' : ''}`}>居中</button>
-                <button onClick={() => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'right')} className={`btn${elementFormat === 'right' ? ' active' : ''}`}>右对齐</button>
-              </div>
-            </div>
-
-            <div className="toolbar-menu-section">
-              <div className="toolbar-menu-label">插入</div>
-              <div className="toolbar-menu-grid">
-                <label className="btn toolbar-menu-action">
-                  图片
-                  <input type="file" accept="image/*" multiple style={{display:'none'}} onChange={handleImage} />
-                </label>
-                <label className="btn toolbar-menu-action">
-                  视频
-                  <input type="file" accept="video/*" style={{display:'none'}} onChange={handleVideo} />
-                </label>
-                <label className="btn toolbar-menu-action">
-                  Excel
-                  <input type="file" accept=".xlsx, .xls" style={{display:'none'}} onChange={handleExcel} />
-                </label>
                 <button
-                  className="btn toolbar-menu-action"
-                  onClick={() => {
-                    editor.dispatchCommand(INSERT_CODE_BLOCK_COMMAND)
-                    setMoreOpen(false)
-                  }}
+                  type="button"
+                  onClick={() => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'left')}
+                  className={`btn${elementFormat === 'left' ? ' active' : ''}`}
                 >
-                  代码块
+                  左对齐
                 </button>
-              </div>
-              <div className="toolbar-table-section">
-                <TableMenu />
+                <button
+                  type="button"
+                  onClick={() => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'center')}
+                  className={`btn${elementFormat === 'center' ? ' active' : ''}`}
+                >
+                  居中
+                </button>
+                <button
+                  type="button"
+                  onClick={() => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'right')}
+                  className={`btn${elementFormat === 'right' ? ' active' : ''}`}
+                >
+                  右对齐
+                </button>
               </div>
             </div>
           </div>
         )}
       </div>
     </div>
-  );
+  )
 }
-
-// 尺寸选择已整合到 TableMenu 中
