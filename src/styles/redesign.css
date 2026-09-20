@@ -4973,3 +4973,15 @@ body {
     max-width: 54vw;
   }
 }
+
+
+/* Minimal document chrome: secondary actions stay quiet until needed */
+.consumer-document-header .workspace-header-actions {
+  opacity: .22;
+  transition: opacity .15s ease;
+}
+
+.consumer-document-header:hover .workspace-header-actions,
+.consumer-document-header .workspace-header-actions:focus-within {
+  opacity: 1;
+}
