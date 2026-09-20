@@ -12,11 +12,48 @@ export default function BackupPanel({ open, onClose }) {
 
   useEffect(() => {
     if (!open) return undefined
+
     const onKeyDown = (event) => {
       if (event.key === 'Escape' && !loading) onClose?.()
     }
+
     document.addEventListener('keydown', onKeyDown)
-    return (
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [open, loading, onClose])
+
+  async function loadBackups() {
+    setLoading(true)
+    try {
+      const res = await window.electronAPI?.backupList?.()
+      if (res?.success) {
+        setBackups(res.backups || [])
+        setBackupDir(res.directory || '')
+      } else {
+        toast.error('加载备份列表失败：' + (res?.message || '未知错误'))
+      }
+    } catch (error) {
+      console.error(error)
+      toast.error('加载备份列表失败')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function openBackupFolder() {
+    try {
+      const res = await window.electronAPI?.backupOpenFolder?.()
+      if (!res?.success) {
+        toast.error('打开备份目录失败：' + (res?.message || '未知错误'))
+      }
+    } catch (error) {
+      console.error(error)
+      toast.error('打开备份目录失败')
+    }
+  }
+
+  if (!open) return null
+
+  return (
     <div
       className="modal-overlay consumer-modal-overlay"
       role="presentation"
@@ -35,12 +72,25 @@ export default function BackupPanel({ open, onClose }) {
             <h2 className="modal-title" id="backup-dialog-title">备份与恢复</h2>
             <div className="modal-message">查看本机自动备份，出现问题时更安心。</div>
           </div>
-          <button className="icon-btn" onClick={onClose} disabled={loading} aria-label="关闭" title="关闭">×</button>
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={onClose}
+            disabled={loading}
+            aria-label="关闭"
+            title="关闭"
+          >
+            ×
+          </button>
         </header>
 
         <div className="backup-actions consumer-backup-actions">
-          <button className="btn primary" onClick={openBackupFolder}>打开备份文件夹</button>
-          <button className="btn" onClick={loadBackups} disabled={loading}>{loading ? '刷新中…' : '刷新列表'}</button>
+          <button type="button" className="btn primary" onClick={openBackupFolder}>
+            打开备份文件夹
+          </button>
+          <button type="button" className="btn" onClick={loadBackups} disabled={loading}>
+            {loading ? '刷新中…' : '刷新列表'}
+          </button>
         </div>
 
         <div className="backup-guidance consumer-backup-guidance">
