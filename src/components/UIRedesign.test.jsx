@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import ConsumerHeader from './ConsumerHeader'
+import NavigationRail from './NavigationRail'
 import TrashPanel, { trashDaysRemaining } from './TrashPanel'
 import { diagnosticsToText, formatDiagnosticBytes } from './SettingsPanel'
 import TemplateSelector from './TemplateSelector'
@@ -120,6 +121,35 @@ describe('UI redesign smoke tests', () => {
 
     await clickMoreItem('快捷键')
     expect(onOpenShortcuts).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps the minimal navigation rail focused on core consumer actions', async () => {
+    const onChangeWorkspace = vi.fn()
+    const onOpenSearch = vi.fn()
+
+    await act(async () => {
+      root.render(
+        <NavigationRail
+          activeWorkspace="notes"
+          onChangeWorkspace={onChangeWorkspace}
+          onOpenSearch={onOpenSearch}
+        />
+      )
+    })
+
+    const buttons = Array.from(container.querySelectorAll('button'))
+    expect(buttons.some(button => button.getAttribute('aria-label') === '搜索笔记')).toBe(true)
+    expect(buttons.some(button => button.getAttribute('aria-label') === '笔记列表')).toBe(true)
+    expect(buttons.some(button => button.getAttribute('aria-label') === '每日笔记')).toBe(true)
+    expect(buttons.some(button => button.getAttribute('aria-label') === '知识图谱')).toBe(true)
+    expect(buttons.some(button => button.getAttribute('aria-label') === '设置')).toBe(true)
+    expect(buttons.some(button => button.textContent.includes('备份与恢复'))).toBe(false)
+
+    await click(buttons.find(button => button.getAttribute('aria-label') === '搜索笔记'))
+    expect(onOpenSearch).toHaveBeenCalledTimes(1)
+
+    await click(buttons.find(button => button.getAttribute('aria-label') === '每日笔记'))
+    expect(onChangeWorkspace).toHaveBeenCalledWith('daily')
   })
 
   it('highlights the first search match without regex side effects', () => {
