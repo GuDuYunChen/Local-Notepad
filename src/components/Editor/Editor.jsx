@@ -23,6 +23,7 @@ import ToolbarPlugin from "./plugins/ToolbarPlugin";
 import PasteImagePlugin from "./plugins/PasteImagePlugin";
 import TableSelectionPlugin from "./plugins/TableSelectionPlugin";
 import TableActionMenuPlugin from "./plugins/TableActionMenuPlugin";
+import TableColumnResizePlugin from "./plugins/TableColumnResizePlugin";
 import CodeBlockPlugin from "./plugins/CodeBlockPlugin";
 import SearchPlugin from "./plugins/SearchPlugin";
 import FloatingTextToolbarPlugin from "./plugins/FloatingTextToolbarPlugin";
@@ -190,6 +191,7 @@ export default function Editor({ initialContent, onChange, readOnly }) {
           <LoadContentPlugin content={initialContent} />
           <TableSelectionPlugin />
           <TableActionMenuPlugin />
+          <TableColumnResizePlugin />
         </div>
       </div>
     </LexicalComposer>
