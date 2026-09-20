@@ -2,7 +2,7 @@ import React from 'react'
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
-import NavigationRail from './NavigationRail'
+import ConsumerHeader from './ConsumerHeader'
 import TrashPanel, { trashDaysRemaining } from './TrashPanel'
 import { diagnosticsToText, formatDiagnosticBytes } from './SettingsPanel'
 import TemplateSelector from './TemplateSelector'
@@ -68,7 +68,7 @@ describe('UI redesign smoke tests', () => {
 
     await act(async () => {
       root.render(
-        <NavigationRail
+        <ConsumerHeader
           activeWorkspace="notes"
           onChangeWorkspace={onChangeWorkspace}
           onOpenSearch={onOpenSearch}
@@ -78,24 +78,18 @@ describe('UI redesign smoke tests', () => {
       )
     })
 
-    const searchButton = container.querySelector('button[aria-label="快速搜索"]')
-    const notesButton = container.querySelector('button[aria-label="笔记"]')
-    const dailyButton = container.querySelector('button[aria-label="每日笔记"]')
-    const graphButton = container.querySelector('button[aria-label="知识图谱"]')
-    const trashButton = container.querySelector('button[aria-label="回收站"]')
-    const settingsButton = container.querySelector('button[aria-label="设置与诊断"]')
-    const backupButton = container.querySelector('button[aria-label="备份与恢复"]')
-    const shortcutsButton = container.querySelector('button[aria-label="快捷键"]')
+    const searchButton = Array.from(container.querySelectorAll('button')).find(button => button.textContent.includes('搜索'))
+    const notesButton = Array.from(container.querySelectorAll('button')).find(button => button.textContent.includes('笔记'))
+    const dailyButton = Array.from(container.querySelectorAll('button')).find(button => button.textContent.includes('每日笔记'))
+    const graphButton = Array.from(container.querySelectorAll('button')).find(button => button.textContent.includes('知识图谱'))
+    const moreButton = Array.from(container.querySelectorAll('button')).find(button => button.textContent.includes('更多'))
 
     expect(searchButton).toBeTruthy()
     expect(notesButton).toBeTruthy()
     expect(notesButton.classList.contains('active')).toBe(true)
     expect(dailyButton).toBeTruthy()
     expect(graphButton).toBeTruthy()
-    expect(trashButton).toBeTruthy()
-    expect(settingsButton).toBeTruthy()
-    expect(backupButton).toBeTruthy()
-    expect(shortcutsButton).toBeTruthy()
+    expect(moreButton).toBeTruthy()
 
     await click(searchButton)
     expect(onOpenSearch).toHaveBeenCalledTimes(1)
@@ -106,15 +100,30 @@ describe('UI redesign smoke tests', () => {
     await click(graphButton)
     expect(onChangeWorkspace).toHaveBeenCalledWith('graph')
 
+    await click(moreButton)
+
+    const trashButton = Array.from(container.querySelectorAll('[role="menuitem"]')).find(button => button.textContent.includes('回收站'))
+    const backupButton = Array.from(container.querySelectorAll('[role="menuitem"]')).find(button => button.textContent.includes('备份与恢复'))
+    const shortcutsButton = Array.from(container.querySelectorAll('[role="menuitem"]')).find(button => button.textContent.includes('快捷键'))
+    const settingsButton = Array.from(container.querySelectorAll('[role="menuitem"]')).find(button => button.textContent.includes('设置'))
+
+    expect(trashButton).toBeTruthy()
+    expect(backupButton).toBeTruthy()
+    expect(shortcutsButton).toBeTruthy()
+    expect(settingsButton).toBeTruthy()
+
     await click(trashButton)
     expect(onChangeWorkspace).toHaveBeenCalledWith('trash')
 
+    await click(moreButton)
     await click(settingsButton)
     expect(onChangeWorkspace).toHaveBeenCalledWith('settings')
 
+    await click(moreButton)
     await click(backupButton)
     expect(onOpenBackup).toHaveBeenCalledTimes(1)
 
+    await click(moreButton)
     await click(shortcutsButton)
     expect(onOpenShortcuts).toHaveBeenCalledTimes(1)
   })
