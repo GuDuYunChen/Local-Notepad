@@ -1,7 +1,37 @@
 import React, { useState, useEffect, useMemo } from 'react';
 
-const FolderIcon = ({ expanded }) => expanded ? '📂' : '📁';
-const FileIcon = () => '📄';
+const Icon = ({ children, size = 16 }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        {children}
+    </svg>
+);
+
+const FolderIcon = ({ expanded }) => (
+    <Icon>
+        <path d="M3 6h7l2 2h9v11H3z" />
+        {expanded && <path d="M3 11h18" />}
+    </Icon>
+);
+
+const FileIcon = () => (
+    <Icon>
+        <path d="M6 3h9l3 3v15H6z" />
+        <path d="M15 3v4h4" />
+    </Icon>
+);
+
+const ChevronIcon = ({ expanded }) => (
+    <Icon size={13}>
+        <path d={expanded ? 'm7 9 5 5 5-5' : 'm9 7 5 5-5 5'} />
+    </Icon>
+);
+
+const HomeIcon = () => (
+    <Icon>
+        <path d="m4 11 8-7 8 7" />
+        <path d="M6 10v10h12V10M10 20v-6h4v6" />
+    </Icon>
+);
 
 /**
  * File Selector Dialog Component
@@ -355,13 +385,15 @@ export default function FileSelectorDialog({
                         style={{ paddingLeft: level * 20 + 10 }}
                         onClick={(e) => handleSelect(node, true, e)}
                     >
-                        <span 
-                            className="toggle" 
+                        <button
+                            type="button"
+                            className="toggle selector-tree-toggle"
                             onClick={(e) => { e.stopPropagation(); node.is_folder && handleExpand(node.id, e); }}
                             style={{ visibility: node.is_folder ? 'visible' : 'hidden' }}
+                            aria-label={isExpanded ? '收起文件夹' : '展开文件夹'}
                         >
-                            {isExpanded ? '▼' : '▶'}
-                        </span>
+                            <ChevronIcon expanded={isExpanded} />
+                        </button>
                         <span className="icon"><FolderIcon expanded={isExpanded} /></span>
                         <span className="title">{node.title}</span>
                     </div>
@@ -420,20 +452,18 @@ export default function FileSelectorDialog({
             <div key={node.id}>
                 <div 
                     className={`tree-item ${isDisabled ? 'disabled' : ''}`} 
-                    style={{ 
-                        paddingLeft: level * 20 + 10,
-                        color: isDisabled ? '#CCCCCC' : 'inherit',
-                        cursor: isDisabled ? 'not-allowed' : 'default'
-                    }}
+                    style={{ paddingLeft: level * 20 + 10 }}
                     title={tooltip}
                 >
-                    <span 
-                        className="toggle" 
-                        onClick={(e) => node.is_folder && handleExpand(node.id, e)}
+                    <button
+                        type="button"
+                        className="toggle selector-tree-toggle"
+                        onClick={(e) => { e.stopPropagation(); node.is_folder && handleExpand(node.id, e); }}
                         style={{ visibility: node.is_folder ? 'visible' : 'hidden' }}
+                        aria-label={isExpanded ? '收起文件夹' : '展开文件夹'}
                     >
-                        {isExpanded ? '▼' : '▶'}
-                    </span>
+                        <ChevronIcon expanded={isExpanded} />
+                    </button>
                     <input 
                         type="checkbox" 
                         checked={allChildrenSelected}
@@ -518,7 +548,7 @@ export default function FileSelectorDialog({
                             onClick={() => setSingleSelectedId('')}
                         >
                             <span className="toggle" aria-hidden="true" />
-                            <span className="icon" aria-hidden="true">⌂</span>
+                            <span className="icon" aria-hidden="true"><HomeIcon /></span>
                             <span className="title">我的笔记（顶层）</span>
                         </div>
                     )}
