@@ -25,6 +25,8 @@ import TableSelectionPlugin from "./plugins/TableSelectionPlugin";
 import TableActionMenuPlugin from "./plugins/TableActionMenuPlugin";
 import CodeBlockPlugin from "./plugins/CodeBlockPlugin";
 import SearchPlugin from "./plugins/SearchPlugin";
+import FloatingTextToolbarPlugin from "./plugins/FloatingTextToolbarPlugin";
+import DocumentOutlinePlugin from "./plugins/DocumentOutlinePlugin";
 import SlashMenuPlugin from "./plugins/SlashMenuPlugin";
 import BlockHandlePlugin from "./plugins/BlockHandlePlugin";
 import MentionPlugin from "./plugins/MentionPlugin";
@@ -160,6 +162,8 @@ export default function Editor({ initialContent, onChange, readOnly }) {
       <div className="editor-shell">
         {!readOnly && <ToolbarPlugin />}
         <SearchPlugin />
+        <FloatingTextToolbarPlugin />
+        <DocumentOutlinePlugin />
         <PasteImagePlugin />
         <div className="editor-container">
           <RichTextPlugin
