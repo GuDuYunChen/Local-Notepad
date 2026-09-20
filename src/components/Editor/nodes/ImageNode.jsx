@@ -82,7 +82,7 @@ export class ImageNode extends DecoratorNode {
   }
 
   createDOM(config) {
-    const span = document.createElement('span')
+    const span = document.createElement('div')
     const className = config.theme.image
     if (className !== undefined) span.className = className
     return span
