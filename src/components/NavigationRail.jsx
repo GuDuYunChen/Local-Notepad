@@ -21,6 +21,8 @@ export default function NavigationRail({
   activeWorkspace,
   onChangeWorkspace,
   onOpenSearch,
+  onOpenBackup,
+  onOpenShortcuts,
 }) {
   const [moreOpen, setMoreOpen] = useState(false)
   const moreRef = useRef(null)
@@ -121,6 +123,14 @@ export default function NavigationRail({
               <button type="button" role="menuitem" onClick={() => navigate('settings')}>
                 <Icon><circle cx="12" cy="12" r="3" /><path d="M19 12a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z" /></Icon>
                 <span>设置</span>
+              </button>
+              <button type="button" role="menuitem" onClick={() => { setMoreOpen(false); onOpenBackup?.() }}>
+                <Icon><path d="M5 4h14v16H5z" /><path d="M8 4v6h8V5M8 20v-7h8v7" /></Icon>
+                <span>备份与恢复</span>
+              </button>
+              <button type="button" role="menuitem" onClick={() => { setMoreOpen(false); onOpenShortcuts?.() }}>
+                <Icon><rect x="3" y="6" width="18" height="12" rx="2" /><path d="M7 10h.01M11 10h.01M15 10h.01M8 14h8" /></Icon>
+                <span>快捷键</span>
               </button>
               <div className="rail-more-separator" />
               <div className="rail-more-theme">
