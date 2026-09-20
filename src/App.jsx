@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react'
 import TextEditor from './components/TextEditor'
 import FileList from './components/FileList'
-import NavigationRail from './components/NavigationRail'
+import WorkspaceSidebar from './components/WorkspaceSidebar'
 import { api } from '~/services/api'
 import ConfirmDialog from './components/ConfirmDialog'
 import ToastViewport from './components/ToastViewport'
@@ -270,20 +270,8 @@ export default function App() {
   }, [workspace, current, deletedIds, unsaved])
 
   const handleNavigation = React.useCallback((nextWorkspace) => {
-    if (nextWorkspace === 'notes') {
-      if (workspace === 'notes') {
-        setSidebarCollapsed(prev => {
-          const next = !prev
-          localStorage.setItem('sidebarCollapsedV4', String(next))
-          return next
-        })
-        return
-      }
-      setSidebarCollapsed(false)
-      localStorage.setItem('sidebarCollapsedV4', 'false')
-    }
     changeWorkspace(nextWorkspace)
-  }, [workspace, changeWorkspace])
+  }, [changeWorkspace])
 
   const handleSelectFile = (f, options = {}) => {
     if (current && f && f.id === current.id) {
@@ -326,16 +314,6 @@ export default function App() {
 
   return (
     <div className={`app-shell${focusMode ? ' focus-mode' : ''}`}>
-      {!focusMode && (
-        <NavigationRail
-          activeWorkspace={workspace}
-          onChangeWorkspace={handleNavigation}
-          onOpenSearch={() => setQuickSearchOpen(true)}
-          onOpenBackup={() => setBackupOpen(true)}
-          onOpenShortcuts={() => setShortcutsOpen(true)}
-        />
-      )}
-
       <div className="app-surface">
         {!focusMode && workspace === 'notes' && current && !current.is_folder && (
           <header className="workspace-header consumer-document-header">
@@ -424,62 +402,60 @@ export default function App() {
         <main className="workspace-frame" style={{ '--sidebar-w': `${sidebarW}px` }}>
           {ready ? (
             <>
-              {!focusMode && workspace === 'notes' && (
+              {!focusMode && (
                 <>
-                  <aside className={`file-sidebar${sidebarCollapsed ? ' collapsed' : ''}`} style={{ '--sidebar-w': `${sidebarW}px` }}>
-                    {!sidebarCollapsed && (
-                      <ErrorBoundary label="笔记列表">
-                        <FileList
-                          selectedId={current?.id}
-                          updatedItem={current}
-                          onSelect={handleSelectFile}
-                          onBeforeNew={async () => {
-                            if (!unsaved) return true
-                            return new Promise((resolve) => {
-                              setDialog({ type: 'unsaved', next: () => resolve(true), cancel: () => resolve(false) })
-                            })
-                          }}
-                          onBeforeDelete={async () => true}
-                          onItemsChanged={(list) => {
-                            if (current) {
-                              const matched = list.find(i => i.id === current.id)
-                              if (!matched) {
-                                setDeletedIds(prev => new Set([...prev, current.id]))
-                                const nextFile = list.find(i => !i.is_folder) || list[0] || null
-                                if (nextFile) select(nextFile)
-                                else {
-                                  setCurrent(null)
-                                  setContent('')
-                                }
-                                return
+                  <WorkspaceSidebar
+                    activeWorkspace={workspace}
+                    collapsed={sidebarCollapsed}
+                    onToggleCollapsed={() => {
+                      setSidebarCollapsed(prev => {
+                        const next = !prev
+                        localStorage.setItem('sidebarCollapsedV4', String(next))
+                        return next
+                      })
+                    }}
+                    onChangeWorkspace={handleNavigation}
+                    onOpenSearch={() => setQuickSearchOpen(true)}
+                    onOpenBackup={() => setBackupOpen(true)}
+                    onOpenShortcuts={() => setShortcutsOpen(true)}
+                  >
+                    <ErrorBoundary label="笔记列表">
+                      <FileList
+                        selectedId={current?.id}
+                        updatedItem={current}
+                        onSelect={handleSelectFile}
+                        onBeforeNew={async () => {
+                          if (!unsaved) return true
+                          return new Promise((resolve) => {
+                            setDialog({ type: 'unsaved', next: () => resolve(true), cancel: () => resolve(false) })
+                          })
+                        }}
+                        onBeforeDelete={async () => true}
+                        onItemsChanged={(list) => {
+                          if (current) {
+                            const matched = list.find(i => i.id === current.id)
+                            if (!matched) {
+                              setDeletedIds(prev => new Set([...prev, current.id]))
+                              const nextFile = list.find(i => !i.is_folder) || list[0] || null
+                              if (nextFile) select(nextFile)
+                              else {
+                                setCurrent(null)
+                                setContent('')
                               }
-
-                              setCurrent(prev => prev
-                                ? { ...prev, ...matched, content: prev.content }
-                                : prev
-                              )
-                            } else if (list.length) {
-                              select(list[0])
+                              return
                             }
-                          }}
-                        />
-                      </ErrorBoundary>
-                    )}
-                    <button
-                      className="sidebar-toggle-btn"
-                      onClick={() => {
-                        setSidebarCollapsed(prev => {
-                          const next = !prev
-                          localStorage.setItem('sidebarCollapsedV4', String(next))
-                          return next
-                        })
-                      }}
-                      title={sidebarCollapsed ? '展开侧边栏' : '折叠侧边栏'}
-                      aria-label={sidebarCollapsed ? '展开侧边栏' : '折叠侧边栏'}
-                    >
-                      {sidebarCollapsed ? '›' : '‹'}
-                    </button>
-                  </aside>
+
+                            setCurrent(prev => prev
+                              ? { ...prev, ...matched, content: prev.content }
+                              : prev
+                            )
+                          } else if (list.length) {
+                            select(list[0])
+                          }
+                        }}
+                      />
+                    </ErrorBoundary>
+                  </WorkspaceSidebar>
                   {!sidebarCollapsed && <div className="resizer" onMouseDown={() => setDragging(true)} />}
                 </>
               )}
