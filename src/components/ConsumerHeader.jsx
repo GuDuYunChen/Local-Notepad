@@ -47,8 +47,16 @@ export default function ConsumerHeader({
   return (
     <header className="consumer-header">
       <div className="consumer-brand" aria-label="记事本">
-        <span className="consumer-brand-mark" aria-hidden="true">N</span>
-        <strong>记事本</strong>
+        <span className="consumer-brand-mark" aria-hidden="true">
+          <Icon size={17}>
+            <path d="M7 3.5h8l3 3V20H7z" />
+            <path d="M15 3.5V7h3M10 11h5M10 14.5h5M10 18h3" />
+          </Icon>
+        </span>
+        <span className="consumer-brand-copy">
+          <strong>记事本</strong>
+          <small>我的本地空间</small>
+        </span>
       </div>
 
       <nav className="consumer-nav" aria-label="主要功能">
@@ -81,25 +89,29 @@ export default function ConsumerHeader({
         </button>
       </nav>
 
-      <div className="consumer-header-actions">
+      <div className="consumer-command-area">
         <button
           type="button"
           className="consumer-action-btn search"
           onClick={onOpenSearch}
           title="快速搜索 (Ctrl+K)"
+          aria-label="搜索笔记"
         >
           <Icon><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></Icon>
-          <span>搜索</span>
+          <span>搜索你的笔记…</span>
           <kbd>Ctrl K</kbd>
         </button>
+      </div>
 
+      <div className="consumer-header-actions">
         <div className="consumer-more" ref={moreRef}>
           <button
             type="button"
-            className={`consumer-action-btn${moreActive ? ' active' : ''}`}
+            className={`consumer-action-btn consumer-more-trigger${moreActive ? ' active' : ''}`}
             onClick={() => setMoreOpen(prev => !prev)}
             aria-expanded={moreOpen}
             aria-haspopup="menu"
+            title="更多"
           >
             <Icon><circle cx="5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /></Icon>
             <span>更多</span>
