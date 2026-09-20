@@ -1,6 +1,6 @@
 import { DecoratorNode } from 'lexical'
 import React, { useEffect, useRef, useState } from 'react'
-import { api } from '~/services/api'
+import { api, getBacklinks } from '~/services/api'
 import { extractLexicalText } from '~/utils/lexicalText'
 
 const previewCache = new Map()
@@ -81,7 +81,11 @@ function WikiLinkView({ id, title }) {
 
     setLoading(true)
     try {
-      const file = await api(`/api/files/${id}`)
+      const [file, backlinks] = await Promise.all([
+        api(`/api/files/${id}`),
+        getBacklinks(id).catch(() => []),
+      ])
+
       const text = extractLexicalText(file?.content || '')
         .replace(/\s+/g, ' ')
         .trim()
@@ -90,6 +94,7 @@ function WikiLinkView({ id, title }) {
         title: file?.title || title || '未命名',
         excerpt: text.slice(0, 180) || '这篇笔记还没有正文内容。',
         updatedAt: file?.updated_at || 0,
+        backlinkCount: Array.isArray(backlinks) ? backlinks.length : 0,
       }
 
       previewCache.set(id, next)
@@ -169,7 +174,13 @@ function WikiLinkView({ id, title }) {
             {loading && !preview ? '正在读取预览…' : (preview?.excerpt || '正在读取预览…')}
           </span>
           <span className="wiki-link-preview-footer">
-            <span>{updatedLabel ? `更新于 ${updatedLabel}` : '点击打开完整笔记'}</span>
+            <span>
+              {preview?.backlinkCount
+                ? `${preview.backlinkCount} 个反向链接`
+                : updatedLabel
+                  ? `更新于 ${updatedLabel}`
+                  : '点击打开完整笔记'}
+            </span>
             <span aria-hidden="true">↗</span>
           </span>
         </span>
