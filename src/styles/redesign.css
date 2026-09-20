@@ -5799,3 +5799,57 @@ body {
 .file-more-btn:active {
   transform: translateY(1px);
 }
+
+
+/* Separate insert and formatting menus */
+.toolbar-format-more {
+  width: 34px !important;
+  min-width: 34px !important;
+  padding: 0 !important;
+  border: 1px solid transparent !important;
+  background: transparent !important;
+  color: var(--ink-muted) !important;
+  letter-spacing: 1px;
+}
+
+.toolbar-format-more:hover,
+.toolbar-format-more.active {
+  border-color: var(--line) !important;
+  background: var(--surface-hover) !important;
+  color: var(--ink) !important;
+}
+
+.toolbar-insert-menu {
+  width: 348px !important;
+}
+
+.toolbar-format-menu {
+  width: 356px !important;
+}
+
+.toolbar-format-menu .toolbar-menu-row {
+  flex-wrap: wrap;
+}
+
+.toolbar-format-menu .toolbar-menu-row > .btn {
+  flex: 0 0 auto;
+}
+
+.toolbar-format-menu .text-color-group {
+  flex: 1;
+}
+
+.toolbar-format-menu .text-color-group > .btn {
+  width: 100%;
+}
+
+.product-editor-toolbar .toolbar-more-wrap + .toolbar-more-wrap {
+  margin-left: 2px;
+}
+
+@media (max-width: 720px) {
+  .toolbar-insert-menu,
+  .toolbar-format-menu {
+    width: auto !important;
+  }
+}
