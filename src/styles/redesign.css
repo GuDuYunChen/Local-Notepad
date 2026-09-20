@@ -4985,3 +4985,66 @@ body {
 .consumer-document-header .workspace-header-actions:focus-within {
   opacity: 1;
 }
+
+
+/* Minimal rail overflow menu */
+.rail-more-wrap {
+  position: relative;
+}
+
+.rail-more-menu {
+  position: absolute;
+  left: calc(100% + 8px);
+  bottom: 0;
+  z-index: 160;
+  width: 184px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow-pop);
+}
+
+.rail-more-menu > button {
+  width: 100%;
+  min-height: 38px;
+  padding: 7px 9px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rail-more-menu > button:hover {
+  background: var(--surface-hover);
+  color: var(--ink);
+}
+
+.rail-more-separator {
+  height: 1px;
+  margin: 5px 2px;
+  background: var(--line);
+}
+
+.rail-more-theme {
+  min-height: 40px;
+  padding: 4px 7px 4px 9px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.rail-more-theme .theme-toggle {
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px !important;
+}
