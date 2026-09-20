@@ -163,7 +163,6 @@ export default function TableColumnResizePlugin() {
         resizeState.currentWidth || resizeState.startWidth
       )
       setResizeState(null)
-      setHandle(null)
     }
 
     window.addEventListener('mousemove', onMouseMove)
@@ -205,6 +204,7 @@ export default function TableColumnResizePlugin() {
       onMouseDown={event => {
         event.preventDefault()
         event.stopPropagation()
+        if (event.detail > 1) return
         setResizeState({
           tableKey: handle.tableKey,
           colIndex: handle.colIndex,
