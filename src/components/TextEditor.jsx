@@ -282,14 +282,16 @@ function TextEditorInternal({
             <Editor initialContent={editorContent} onChange={handleEditorChange} />
           </React.Suspense>
           <div ref={statusRef} className="editor-status-bar">
-            <span className={`save-state${saveError ? ' error' : ''}`}>
-              {saveError ? '保存失败' : saving ? '保存中…' : lastSavedAt ? `已保存 ${formatSavedTime(lastSavedAt)}` : '尚未保存'}
-              {saveError && (
-                <button className="status-retry-btn" onClick={() => saveNow('retry')} disabled={saving}>重试</button>
-              )}
-            </span>
+            {(saveError || saving) && (
+              <span className={`save-state${saveError ? ' error' : ''}`}>
+                {saveError ? '保存失败' : '保存中…'}
+                {saveError && (
+                  <button className="status-retry-btn" onClick={() => saveNow('retry')} disabled={saving}>重试</button>
+                )}
+              </span>
+            )}
             <span className="status-right">
-              {selMode && <span className="selection-mode-pill">表格选择模式</span>}
+              {selMode && <span className="selection-mode-pill">表格选择</span>}
               <span>{wordCount.toLocaleString()} 字</span>
             </span>
           </div>
