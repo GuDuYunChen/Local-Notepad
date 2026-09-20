@@ -12,6 +12,7 @@ import { DividerNode } from '../nodes/DividerNode'
 import { EmbedNode, $createEmbedNode } from '../nodes/EmbedNode'
 import { AttachmentNode, $createAttachmentNode } from '../nodes/AttachmentNode'
 import { ImageNode, $createImageNode } from '../nodes/ImageNode'
+import { ImageGridNode, $createImageGridNode } from '../nodes/ImageGridNode'
 
 function createTestEditor() {
   return createEditor({
@@ -29,6 +30,7 @@ function createTestEditor() {
       EmbedNode,
       AttachmentNode,
       ImageNode,
+      ImageGridNode,
     ],
     onError(error) {
       throw error
@@ -112,6 +114,44 @@ describe('editor block registry', () => {
       caption: '新的图片说明',
       align: 'right',
     })
+  })
+
+  it('serializes editable image grid layout and captions', () => {
+    const editor = createTestEditor()
+
+    editor.update(() => {
+      const root = $getRoot()
+      root.clear()
+
+      const grid = $createImageGridNode({
+        items: [
+          { src: 'http://127.0.0.1:27121/uploads/a.jpg', alt: 'A' },
+          { src: 'http://127.0.0.1:27121/uploads/b.jpg', alt: 'B' },
+        ],
+        columns: 2,
+        gap: 8,
+      })
+
+      grid.setColumns(4)
+      grid.setGap(16)
+      grid.setItems([
+        { src: 'http://127.0.0.1:27121/uploads/a.jpg', alt: 'A', caption: '第一张' },
+        { src: 'http://127.0.0.1:27121/uploads/b.jpg', alt: 'B', caption: '第二张' },
+      ])
+
+      root.append(grid)
+    }, { discrete: true })
+
+    const grid = editor.getEditorState().toJSON().root.children[0]
+    expect(grid).toMatchObject({
+      type: 'image-grid',
+      version: 2,
+      columns: 4,
+      gap: 16,
+    })
+    expect(grid.items).toHaveLength(2)
+    expect(grid.items[0].caption).toBe('第一张')
+    expect(grid.items[1].caption).toBe('第二张')
   })
 
   it('serializes generic file attachments', () => {
