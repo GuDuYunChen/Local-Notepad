@@ -1,32 +1,64 @@
-import React, { useState, useCallback, useDeferredValue, useEffect, useRef } from 'react';
-import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
-import { $getRoot, $getSelection, $isRangeSelection, $createRangeSelection } from 'lexical';
-import { mergeRegister } from '@lexical/utils';
+import React, { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react'
+import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
+import { $getRoot } from 'lexical'
 
-function $findAllTextNodes(text) {
-  if (!text) return [];
-  const root = $getRoot();
-  const results = [];
-  const lowerText = text.toLowerCase();
+function isWordChar(char) {
+  return Boolean(char && /[\p{L}\p{N}_]/u.test(char))
+}
 
-  function traverse(node) {
-    if (node.getType() === 'text') {
-      const nodeText = node.getTextContent();
-      const lowerNodeText = nodeText.toLowerCase();
-      let startIndex = 0;
-      while (true) {
-        const idx = lowerNodeText.indexOf(lowerText, startIndex);
-        if (idx === -1) break;
-        results.push({ node, offset: idx, length: text.length });
-        startIndex = idx + 1;
-      }
+export function findTextMatchOffsets(text, query, options = {}) {
+  const source = String(text || '')
+  const needle = String(query || '')
+  if (!needle) return []
+
+  const matchCase = Boolean(options.matchCase)
+  const wholeWord = Boolean(options.wholeWord)
+  const haystack = matchCase ? source : source.toLocaleLowerCase()
+  const target = matchCase ? needle : needle.toLocaleLowerCase()
+  const results = []
+
+  let startIndex = 0
+  while (startIndex <= haystack.length - target.length) {
+    const index = haystack.indexOf(target, startIndex)
+    if (index === -1) break
+
+    let accepted = true
+    if (wholeWord) {
+      const before = source[index - 1] || ''
+      const after = source[index + needle.length] || ''
+      if (isWordChar(needle[0]) && isWordChar(before)) accepted = false
+      if (isWordChar(needle[needle.length - 1]) && isWordChar(after)) accepted = false
     }
-    const children = node.getChildren ? node.getChildren() : [];
-    children.forEach(traverse);
+
+    if (accepted) results.push(index)
+    startIndex = index + Math.max(1, target.length)
   }
 
-  root.getChildren().forEach(traverse);
-  return results;
+  return results
+}
+
+function $findAllTextNodes(text, options) {
+  if (!text) return []
+
+  const results = []
+
+  const traverse = node => {
+    if (node.getType() === 'text') {
+      const nodeText = node.getTextContent()
+      for (const offset of findTextMatchOffsets(nodeText, text, options)) {
+        results.push({
+          node,
+          offset,
+          length: text.length,
+        })
+      }
+    }
+
+    for (const child of node.getChildren?.() || []) traverse(child)
+  }
+
+  for (const child of $getRoot().getChildren()) traverse(child)
+  return results
 }
 
 function topLevelKey(node) {
@@ -40,185 +72,284 @@ function topLevelKey(node) {
 function notifySearchMatch(node) {
   const key = topLevelKey(node)
   if (!key) return
+
   window.dispatchEvent(new CustomEvent('editor:search-match', {
     detail: { topLevelKey: key },
   }))
 }
 
+function OptionChip({ active, label, title, onClick }) {
+  return (
+    <button
+      type="button"
+      className={'search-option-chip' + (active ? ' active' : '')}
+      onMouseDown={event => event.preventDefault()}
+      onClick={onClick}
+      title={title}
+      aria-pressed={active}
+    >
+      {label}
+    </button>
+  )
+}
+
 export default function SearchPlugin() {
-  const [editor] = useLexicalComposerContext();
-  const [isOpen, setIsOpen] = useState(false);
-  const [searchText, setSearchText] = useState('');
-  const [replaceText, setReplaceText] = useState('');
-  const deferredSearchText = useDeferredValue(searchText);
-  const [matchCount, setMatchCount] = useState(0);
-  const [currentIndex, setCurrentIndex] = useState(-1);
-  const inputRef = useRef(null);
+  const [editor] = useLexicalComposerContext()
+  const [isOpen, setIsOpen] = useState(false)
+  const [showReplace, setShowReplace] = useState(false)
+  const [searchText, setSearchText] = useState('')
+  const [replaceText, setReplaceText] = useState('')
+  const [matchCase, setMatchCase] = useState(false)
+  const [wholeWord, setWholeWord] = useState(false)
+  const deferredSearchText = useDeferredValue(searchText)
+  const [matchCount, setMatchCount] = useState(0)
+  const [currentIndex, setCurrentIndex] = useState(-1)
+  const inputRef = useRef(null)
+
+  const options = {
+    matchCase,
+    wholeWord,
+  }
 
   useEffect(() => {
-    if (isOpen && inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.select();
-    }
-  }, [isOpen]);
+    if (!isOpen) return
+
+    requestAnimationFrame(() => {
+      inputRef.current?.focus()
+      inputRef.current?.select()
+    })
+  }, [isOpen, showReplace])
 
   useEffect(() => {
-    if (!isOpen || !searchText) {
-      setMatchCount(0);
-      setCurrentIndex(-1);
-      return;
+    if (!isOpen || !deferredSearchText) {
+      setMatchCount(0)
+      setCurrentIndex(-1)
+      return
     }
 
     editor.update(() => {
-      const results = $findAllTextNodes(deferredSearchText);
-      setMatchCount(results.length);
-      if (results.length > 0) {
-        setCurrentIndex(0);
-        const { node, offset, length } = results[0];
-        node.select(offset, offset + length);
-        notifySearchMatch(node);
+      const results = $findAllTextNodes(deferredSearchText, options)
+      setMatchCount(results.length)
+
+      if (!results.length) {
+        setCurrentIndex(-1)
+        return
       }
-    });
-  }, [isOpen, deferredSearchText, editor]);
+
+      setCurrentIndex(0)
+      const { node, offset, length } = results[0]
+      node.select(offset, offset + length)
+      notifySearchMatch(node)
+    })
+  }, [isOpen, deferredSearchText, editor, matchCase, wholeWord])
 
   const goToMatch = useCallback((index) => {
     editor.update(() => {
-      const results = $findAllTextNodes(deferredSearchText);
-      if (results.length === 0) return;
-      const idx = ((index % results.length) + results.length) % results.length;
-      setCurrentIndex(idx);
-      const { node, offset, length } = results[idx];
-      node.select(offset, offset + length);
-      notifySearchMatch(node);
-    });
-  }, [editor, deferredSearchText]);
+      const results = $findAllTextNodes(deferredSearchText, {
+        matchCase,
+        wholeWord,
+      })
+      if (!results.length) return
+
+      const nextIndex = ((index % results.length) + results.length) % results.length
+      setCurrentIndex(nextIndex)
+
+      const { node, offset, length } = results[nextIndex]
+      node.select(offset, offset + length)
+      notifySearchMatch(node)
+    })
+  }, [deferredSearchText, editor, matchCase, wholeWord])
 
   const handleFindNext = useCallback(() => {
-    goToMatch(currentIndex + 1);
-  }, [goToMatch, currentIndex]);
+    goToMatch(currentIndex + 1)
+  }, [currentIndex, goToMatch])
 
   const handleFindPrev = useCallback(() => {
-    goToMatch(currentIndex - 1);
-  }, [goToMatch, currentIndex]);
+    goToMatch(currentIndex - 1)
+  }, [currentIndex, goToMatch])
 
   const handleReplace = useCallback(() => {
-    if (currentIndex < 0) return;
+    if (currentIndex < 0 || !searchText) return
+
     editor.update(() => {
-      const results = $findAllTextNodes(searchText);
-      if (results.length === 0 || currentIndex >= results.length) return;
-      const { node, offset, length } = results[currentIndex];
-      const textContent = node.getTextContent();
-      const newText = textContent.slice(0, offset) + replaceText + textContent.slice(offset + length);
-      node.setTextContent(newText);
-      const newResults = $findAllTextNodes(searchText);
-      setMatchCount(newResults.length);
-      if (newResults.length > 0) {
-        goToMatch(currentIndex % newResults.length);
-      }
-    });
-  }, [editor, searchText, replaceText, currentIndex, goToMatch]);
+      const results = $findAllTextNodes(searchText, {
+        matchCase,
+        wholeWord,
+      })
+      if (!results.length || currentIndex >= results.length) return
+
+      const { node, offset, length } = results[currentIndex]
+      const value = node.getTextContent()
+      node.setTextContent(
+        value.slice(0, offset) +
+        replaceText +
+        value.slice(offset + length)
+      )
+    })
+  }, [currentIndex, editor, matchCase, replaceText, searchText, wholeWord])
 
   const handleReplaceAll = useCallback(() => {
-    if (!searchText) return;
+    if (!searchText) return
+
     editor.update(() => {
-      let count = 0;
-      while (true) {
-        const results = $findAllTextNodes(searchText);
-        if (results.length === 0) break;
-        const { node, offset, length } = results[0];
-        const textContent = node.getTextContent();
-        const newText = textContent.slice(0, offset) + replaceText + textContent.slice(offset + length);
-        node.setTextContent(newText);
-        count++;
-        if (count > 10000) break;
+      const nodes = []
+
+      const traverse = node => {
+        if (node.getType() === 'text') nodes.push(node)
+        for (const child of node.getChildren?.() || []) traverse(child)
       }
-      setMatchCount(0);
-      setCurrentIndex(-1);
-    });
-  }, [editor, searchText, replaceText]);
+      for (const child of $getRoot().getChildren()) traverse(child)
+
+      for (const node of nodes) {
+        const value = node.getTextContent()
+        const offsets = findTextMatchOffsets(value, searchText, {
+          matchCase,
+          wholeWord,
+        })
+        if (!offsets.length) continue
+
+        let next = value
+        for (const offset of [...offsets].reverse()) {
+          next =
+            next.slice(0, offset) +
+            replaceText +
+            next.slice(offset + searchText.length)
+        }
+        node.setTextContent(next)
+      }
+    })
+  }, [editor, matchCase, replaceText, searchText, wholeWord])
 
   useEffect(() => {
-    const handleKeyDown = (e) => {
-      const modifier = e.ctrlKey || e.metaKey
-      if (modifier && e.key.toLowerCase() === 'f') {
-        e.preventDefault()
-        setIsOpen(true)
-        window.requestAnimationFrame(() => {
-          inputRef.current?.focus()
-          inputRef.current?.select()
-        })
-      }
-      if (modifier && e.key.toLowerCase() === 'h') {
-        e.preventDefault()
-        setIsOpen(true)
+    const focusSearch = replace => {
+      setIsOpen(true)
+      setShowReplace(Boolean(replace))
+      requestAnimationFrame(() => {
+        inputRef.current?.focus()
+        inputRef.current?.select()
+      })
+    }
+
+    const handleKeyDown = event => {
+      const modifier = event.ctrlKey || event.metaKey
+      if (!modifier) return
+
+      const key = event.key.toLowerCase()
+      if (key === 'f') {
+        event.preventDefault()
+        focusSearch(false)
+      } else if (key === 'h') {
+        event.preventDefault()
+        focusSearch(true)
       }
     }
 
-    const handleOpenSearch = () => {
-      setIsOpen(true)
+    const handleOpenSearch = event => {
+      focusSearch(Boolean(event?.detail?.replace))
     }
 
     window.addEventListener('keydown', handleKeyDown)
     window.addEventListener('editor:open-search', handleOpenSearch)
+
     return () => {
       window.removeEventListener('keydown', handleKeyDown)
       window.removeEventListener('editor:open-search', handleOpenSearch)
     }
   }, [])
 
-  if (!isOpen) return null;
+  if (!isOpen) return null
 
   return (
     <div className="search-panel">
+      <div className="search-panel-header">
+        <strong>{showReplace ? '查找与替换' : '查找'}</strong>
+        <button
+          type="button"
+          className="search-btn close-btn"
+          onClick={() => {
+            setIsOpen(false)
+            editor.focus()
+          }}
+          aria-label="关闭"
+        >
+          ×
+        </button>
+      </div>
+
       <div className="search-row">
         <input
           ref={inputRef}
           className="search-input"
           placeholder="搜索…"
           value={searchText}
-          onChange={e => setSearchText(e.target.value)}
-          onKeyDown={e => {
-            if (e.key === 'Enter') {
-              e.preventDefault()
-              if (e.shiftKey) handleFindPrev()
+          onChange={event => setSearchText(event.target.value)}
+          onKeyDown={event => {
+            if (event.key === 'Enter') {
+              event.preventDefault()
+              if (event.shiftKey) handleFindPrev()
               else handleFindNext()
             }
-            if (e.key === 'Escape') {
-              e.preventDefault()
+            if (event.key === 'Escape') {
+              event.preventDefault()
               setIsOpen(false)
               editor.focus()
             }
           }}
         />
         <div className="search-count">
-          {matchCount > 0 ? `${currentIndex + 1}/${matchCount}` : '0/0'}
+          {matchCount > 0 ? String(currentIndex + 1) + '/' + matchCount : '0/0'}
         </div>
-        <button className="search-btn" onClick={handleFindPrev} disabled={matchCount === 0}>↑</button>
-        <button className="search-btn" onClick={handleFindNext} disabled={matchCount === 0}>↓</button>
-        <button className="search-btn close-btn" onClick={() => setIsOpen(false)}>×</button>
+        <button type="button" className="search-btn" onClick={handleFindPrev} disabled={!matchCount}>↑</button>
+        <button type="button" className="search-btn" onClick={handleFindNext} disabled={!matchCount}>↓</button>
       </div>
-      <div className="search-row">
-        <input
-          className="search-input"
-          placeholder="替换…"
-          value={replaceText}
-          onChange={e => setReplaceText(e.target.value)}
-          onKeyDown={e => {
-            if (e.key === 'Enter') {
-              e.preventDefault()
-              if (e.shiftKey) handleReplaceAll()
-              else handleReplace()
-            }
-            if (e.key === 'Escape') {
-              e.preventDefault()
-              setIsOpen(false)
-              editor.focus()
-            }
-          }}
+
+      {showReplace && (
+        <div className="search-row">
+          <input
+            className="search-input"
+            placeholder="替换为…"
+            value={replaceText}
+            onChange={event => setReplaceText(event.target.value)}
+            onKeyDown={event => {
+              if (event.key === 'Enter') {
+                event.preventDefault()
+                if (event.shiftKey) handleReplaceAll()
+                else handleReplace()
+              }
+              if (event.key === 'Escape') {
+                event.preventDefault()
+                setIsOpen(false)
+                editor.focus()
+              }
+            }}
+          />
+          <button type="button" className="search-btn" onClick={handleReplace} disabled={!matchCount || currentIndex < 0}>替换</button>
+          <button type="button" className="search-btn" onClick={handleReplaceAll} disabled={!matchCount}>全部</button>
+        </div>
+      )}
+
+      <div className="search-options">
+        <OptionChip
+          active={matchCase}
+          label="Aa"
+          title="区分大小写"
+          onClick={() => setMatchCase(value => !value)}
         />
-        <button className="search-btn" onClick={handleReplace} disabled={matchCount === 0 || currentIndex < 0}>替换</button>
-        <button className="search-btn" onClick={handleReplaceAll} disabled={matchCount === 0}>全部替换</button>
+        <OptionChip
+          active={wholeWord}
+          label="整词"
+          title="仅匹配完整单词或词组"
+          onClick={() => setWholeWord(value => !value)}
+        />
+        <button
+          type="button"
+          className={'search-option-chip' + (showReplace ? ' active' : '')}
+          onMouseDown={event => event.preventDefault()}
+          onClick={() => setShowReplace(value => !value)}
+        >
+          替换
+        </button>
       </div>
     </div>
-  );
+  )
 }
