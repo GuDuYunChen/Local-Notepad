@@ -1,6 +1,7 @@
 import { $getNodeByKey, DecoratorNode } from 'lexical'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import React, { useEffect, useRef, useState } from 'react'
+import { uploadFile } from '../utils/fileUpload'
 
 export class ImageNode extends DecoratorNode {
   __src
@@ -81,6 +82,13 @@ export class ImageNode extends DecoratorNode {
     writable.__align = align
   }
 
+  setSource({ src, originalSrc, alt }) {
+    const writable = this.getWritable()
+    if (src !== undefined) writable.__src = src
+    if (originalSrc !== undefined) writable.__originalSrc = originalSrc
+    if (alt !== undefined) writable.__alt = alt
+  }
+
   createDOM(config) {
     const span = document.createElement('div')
     const className = config.theme.image
@@ -135,7 +143,9 @@ function ImageComponent({ nodeKey, src, alt, width, height, originalSrc, caption
   const [currentWidth, setCurrentWidth] = useState(width || 640)
   const [currentAlign, setCurrentAlign] = useState(align || 'center')
   const [captionText, setCaptionText] = useState(caption || '')
+  const [replacing, setReplacing] = useState(false)
   const wrapperRef = useRef(null)
+  const replaceInputRef = useRef(null)
 
   const safeSrc = isValidImageUrl(src) ? src : ''
   const safeOriginalSrc = isValidImageUrl(originalSrc) ? originalSrc : ''
@@ -160,6 +170,7 @@ function ImageComponent({ nodeKey, src, alt, width, height, originalSrc, caption
       if (patch.width !== undefined) node.setWidth(patch.width)
       if (patch.caption !== undefined) node.setCaption(patch.caption)
       if (patch.align !== undefined) node.setAlign(patch.align)
+      if (patch.source !== undefined) node.setSource(patch.source)
     })
   }
 
@@ -177,6 +188,30 @@ function ImageComponent({ nodeKey, src, alt, width, height, originalSrc, caption
     const next = event.target.value
     setCaptionText(next)
     updateNode({ caption: next })
+  }
+
+  const handleReplace = async (event) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    setReplacing(true)
+    try {
+      const result = await uploadFile(file)
+      if (!result?.url) return
+
+      updateNode({
+        source: {
+          src: result.url,
+          originalSrc: result.url,
+          alt: file.name,
+        },
+      })
+    } catch (error) {
+      console.error('替换图片失败', error)
+    } finally {
+      setReplacing(false)
+      event.target.value = ''
+    }
   }
 
   const handleDownload = (event) => {
@@ -274,7 +309,24 @@ function ImageComponent({ nodeKey, src, alt, width, height, originalSrc, caption
 
             <span className="editor-image-toolbar-divider" />
 
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation()
+                replaceInputRef.current?.click()
+              }}
+              disabled={replacing}
+            >
+              {replacing ? '替换中…' : '替换'}
+            </button>
             <button type="button" onClick={handleDownload}>下载</button>
+            <input
+              ref={replaceInputRef}
+              type="file"
+              accept="image/*"
+              hidden
+              onChange={handleReplace}
+            />
             <button
               type="button"
               className="danger"
