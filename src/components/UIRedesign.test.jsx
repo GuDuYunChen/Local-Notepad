@@ -331,6 +331,11 @@ describe('UI redesign smoke tests', () => {
     expect(container.textContent).toContain('项目节奏')
     expect(container.textContent).toContain('卷级里程碑')
     expect(container.textContent).toContain('下一章节队列')
+    expect(container.textContent).toContain('创作日历与冲刺')
+    expect(container.textContent).toContain('写作日历')
+    expect(container.textContent).toContain('今日执行')
+    expect(container.textContent).toContain('写作冲刺')
+    expect(container.textContent).toContain('每日复盘')
     expect(container.textContent).toContain('未设目标')
     expect(container.textContent).toContain('一二三')
 
@@ -343,6 +348,26 @@ describe('UI redesign smoke tests', () => {
     const weeklyGoalInput = container.querySelector('input[aria-label="每周写作目标"]')
     expect(dailyGoalInput.value).toBe('2000')
     expect(weeklyGoalInput.value).toBe('12000')
+
+    const sprintButton = Array.from(container.querySelectorAll('button'))
+      .find(button => button.textContent.includes('7 天'))
+    expect(sprintButton).toBeTruthy()
+    await click(sprintButton)
+    expect(container.textContent).toContain('冲刺进度')
+    expect(container.textContent).toContain('结束当前冲刺')
+
+    const reviewInput = container.querySelector('textarea[aria-label="今日写作复盘"]')
+    expect(reviewInput).toBeTruthy()
+    await act(async () => {
+      reviewInput.value = '今天完成第一场冲突，明天处理余波。'
+      reviewInput.dispatchEvent(new Event('input', { bubbles: true }))
+      reviewInput.dispatchEvent(new Event('change', { bubbles: true }))
+      await Promise.resolve()
+    })
+    const saveReviewButton = Array.from(container.querySelectorAll('button'))
+      .find(button => button.textContent === '保存今日复盘')
+    expect(saveReviewButton).toBeTruthy()
+    await click(saveReviewButton)
 
     const statusButton = Array.from(container.querySelectorAll('button'))
       .find(button => button.textContent === '草稿')
