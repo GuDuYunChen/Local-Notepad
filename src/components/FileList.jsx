@@ -11,6 +11,19 @@ const FileSelectorDialog = React.lazy(() => import('./FileSelectorDialog'))
 const TemplateSelector = React.lazy(() => import('./TemplateSelector'))
 const ItemType = 'FILE_NODE'
 
+export function compareLibraryItems(a, b) {
+    const pinnedDelta = Number(Boolean(b?.is_pinned)) - Number(Boolean(a?.is_pinned))
+    if (pinnedDelta !== 0) return pinnedDelta
+
+    const sortDelta = Number(b?.sort_order || 0) - Number(a?.sort_order || 0)
+    if (sortDelta !== 0) return sortDelta
+
+    const createdDelta = Number(b?.created_at || 0) - Number(a?.created_at || 0)
+    if (createdDelta !== 0) return createdDelta
+
+    return String(b?.id || '').localeCompare(String(a?.id || ''))
+}
+
 const FileNode = ({ 
     node, 
     level, 
@@ -457,9 +470,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
             }
         })
         
-        const sortFn = (a, b) => {
-            return (b.sort_order ?? 0) - (a.sort_order ?? 0)
-        }
+        const sortFn = compareLibraryItems
         
         const sortRecursive = (nodes) => {
             nodes.sort(sortFn)
@@ -562,10 +573,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
     })
 
     // 递归计算文件数和排序
-    const sortFn = (a, b) => {
-        // 需求调整：文件夹和文件混合排序，仅按 sort_order 倒序
-        return (b.sort_order ?? 0) - (a.sort_order ?? 0)
-    }
+    const sortFn = compareLibraryItems
 
     const processRecursive = (nodes) => {
         nodes.sort(sortFn)
@@ -1234,8 +1242,11 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
           }) 
       })
       pushHistory({ type: 'create', data: { id: item.id } })
-      setItems(prev => [item, ...prev])
-      onItemsChanged?.([item, ...items])
+      setItems(prev => {
+          const next = [item, ...prev]
+          onItemsChanged?.(next)
+          return next
+      })
       onSelect(item)
       if (targetParentId) {
           setExpanded(prev => new Set([...prev, targetParentId]))
@@ -1272,8 +1283,11 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
           }) 
       })
       pushHistory({ type: 'create', data: { id: item.id } })
-      setItems(prev => [item, ...prev])
-      onItemsChanged?.([item, ...items])
+      setItems(prev => {
+          const next = [item, ...prev]
+          onItemsChanged?.(next)
+          return next
+      })
       if (targetParentId) {
           setExpanded(prev => new Set([...prev, targetParentId]))
       }
