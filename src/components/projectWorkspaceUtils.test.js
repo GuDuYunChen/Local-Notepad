@@ -4,6 +4,11 @@ import {
   calculateProjectCardMove,
   getProjectCandidates,
   getProjectExportIds,
+  getRecentProjectActivity,
+  getProjectTemplate,
+  getProjectProgress,
+  getProjectIndexAliases,
+  getProjectChapterSummary,
   getVolumeExportIds,
   nextProjectStatus,
   readProjectWorkspaceMeta,
@@ -93,9 +98,11 @@ describe('project workspace utilities', () => {
 
     expect(readProjectWorkspaceMeta('project')).toEqual({
       type: 'script',
+      targetWords: 0,
       statuses: {
         'chapter-1': 'review',
       },
+      summaries: {},
     })
     expect(nextProjectStatus('draft')).toBe('review')
     expect(nextProjectStatus('review')).toBe('done')
@@ -163,6 +170,89 @@ describe('project workspace utilities', () => {
       expect.objectContaining({ id: 'c', sort_order: 2000 }),
       expect.objectContaining({ id: 'b', sort_order: 3000 }),
     ])
+  })
+
+  it('tracks word goals chapter progress and recent activity', () => {
+    const workspace = buildProjectWorkspace(files, 'project', {
+      statuses: {
+        'chapter-1': 'done',
+        'chapter-2': 'done',
+      },
+    })
+
+    const progress = getProjectProgress(workspace, {
+      targetWords: 16,
+    })
+
+    expect(progress).toEqual({
+      totalWords: 8,
+      targetWords: 16,
+      wordProgress: 50,
+      completed: 2,
+      totalChapters: 4,
+      chapterProgress: 50,
+    })
+
+    expect(getRecentProjectActivity(workspace, 2).map(item => item.id)).toEqual([
+      'chapter-3',
+      'chapter-2',
+    ])
+  })
+
+  it('uses manual chapter summaries before automatic excerpts', () => {
+    const note = {
+      id: 'chapter-1',
+      content: lexical('这是自动摘要正文'),
+    }
+
+    expect(getProjectChapterSummary(note, {
+      summaries: {
+        'chapter-1': '这是手工摘要',
+      },
+    })).toBe('这是手工摘要')
+
+    expect(getProjectChapterSummary(note, {
+      summaries: {},
+    })).toBe('这是自动摘要正文')
+  })
+
+  it('provides distinct novel and script project templates and index aliases', () => {
+    const novel = getProjectTemplate('novel')
+    const script = getProjectTemplate('script')
+
+    expect(novel.label).toBe('小说项目模板')
+    expect(novel.folders[0].title).toBe('第一卷')
+    expect(novel.notes.some(note => note.title === '世界观.md')).toBe(true)
+
+    expect(script.label).toBe('剧本项目模板')
+    expect(script.folders[0].title).toBe('第一集')
+    expect(script.notes.some(note => note.title === '场景表.md')).toBe(true)
+
+    expect(getProjectIndexAliases()).toMatchObject({
+      characters: expect.arrayContaining(['角色', '人物']),
+      locations: expect.arrayContaining(['地点', '场景']),
+      foreshadows: expect.arrayContaining(['伏笔', '线索']),
+    })
+  })
+
+  it('upgrades old project metadata with new creative-console defaults', () => {
+    localStorage.setItem('localNotepad.projectWorkspace.v1', JSON.stringify({
+      project: {
+        type: 'novel',
+        statuses: {
+          'chapter-1': 'done',
+        },
+      },
+    }))
+
+    expect(readProjectWorkspaceMeta('project')).toEqual({
+      type: 'novel',
+      targetWords: 0,
+      statuses: {
+        'chapter-1': 'done',
+      },
+      summaries: {},
+    })
   })
 
   it('returns export ids in project reading order', () => {
