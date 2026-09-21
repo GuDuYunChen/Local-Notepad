@@ -200,6 +200,49 @@ export default function DocumentOutlinePlugin() {
     }
   }, [editor, headings, outlineNodes, collapsedKeys])
 
+  useEffect(() => {
+    const onSearchMatch = event => {
+      const topLevelKey = event.detail?.topLevelKey
+      if (!topLevelKey || !outlineNodes.length) return
+
+      const targetIndex = outlineNodes.findIndex(node => node.key === topLevelKey)
+      if (targetIndex < 0) return
+
+      let heading = null
+      for (let index = targetIndex; index >= 0; index--) {
+        if (outlineNodes[index]?.isHeading) {
+          heading = outlineNodes[index]
+          break
+        }
+      }
+
+      if (!heading) return
+
+      setCollapsedKeys(previous => {
+        if (!previous.size) return previous
+
+        let changed = false
+        const next = new Set(previous)
+
+        for (const collapsedKey of previous) {
+          const hiddenByHeading = getCollapsedOutlineKeys(outlineNodes, new Set([collapsedKey]))
+          if (hiddenByHeading.has(topLevelKey) || hiddenByHeading.has(heading.key)) {
+            next.delete(collapsedKey)
+            changed = true
+          }
+        }
+
+        return changed ? next : previous
+      })
+
+      setActiveKey(heading.key)
+      if (headings.length >= 2) setOpen(true)
+    }
+
+    window.addEventListener('editor:search-match', onSearchMatch)
+    return () => window.removeEventListener('editor:search-match', onSearchMatch)
+  }, [outlineNodes, headings.length])
+
   if (headings.length === 0) return null
 
   const visibleHeadings = headings.filter(heading => !hiddenKeys.has(heading.key))
