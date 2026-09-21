@@ -136,6 +136,16 @@ paths:
           schema: { type: string }
       responses:
         '200': { description: OK }
+  /api/files/{id}/versions/snapshot:
+    post:
+      summary: 创建文件当前内容的版本快照
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
   /api/settings:
     get:
       summary: 获取设置
