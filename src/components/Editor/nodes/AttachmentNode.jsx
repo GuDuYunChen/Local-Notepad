@@ -100,12 +100,21 @@ export function getAttachmentPreviewType(name, mime) {
     return 'pdf'
   }
 
+  if (
+    normalizedMime.startsWith('text/') ||
+    ['txt', 'md', 'markdown', 'json', 'csv', 'log', 'js', 'ts', 'jsx', 'tsx', 'css', 'html', 'xml', 'yaml', 'yml', 'ini'].includes(ext)
+  ) {
+    return 'text'
+  }
+
   return null
 }
 
 function AttachmentComponent({ src, name, size, mime }) {
   const [downloading, setDownloading] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
+  const [textPreview, setTextPreview] = useState('')
+  const [previewLoading, setPreviewLoading] = useState(false)
   const previewType = getAttachmentPreviewType(name, mime)
 
   useEffect(() => {
@@ -118,6 +127,34 @@ function AttachmentComponent({ src, name, size, mime }) {
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [previewOpen])
+
+  useEffect(() => {
+    if (!previewOpen || previewType !== 'text' || !src || textPreview) return undefined
+
+    let alive = true
+    setPreviewLoading(true)
+
+    fetch(src)
+      .then(response => {
+        if (!response.ok) throw new Error('读取附件失败')
+        return response.text()
+      })
+      .then(text => {
+        if (!alive) return
+        const limit = 300000
+        setTextPreview(text.length > limit ? `${text.slice(0, limit)}\n\n… 内容过长，预览已截断` : text)
+      })
+      .catch(error => {
+        if (!alive) return
+        console.error('读取文本附件预览失败', error)
+        setTextPreview('暂时无法读取这个文本附件。')
+      })
+      .finally(() => {
+        if (alive) setPreviewLoading(false)
+      })
+
+    return () => { alive = false }
+  }, [previewOpen, previewType, src, textPreview])
 
   const download = async () => {
     if (!src || downloading) return
@@ -214,12 +251,16 @@ function AttachmentComponent({ src, name, size, mime }) {
             <div className={`attachment-preview-body ${previewType}`}>
               {previewType === 'image' ? (
                 <img src={src} alt={name || '附件预览'} />
-              ) : (
+              ) : previewType === 'pdf' ? (
                 <iframe
                   src={src}
                   title={name || 'PDF 预览'}
                   className="attachment-pdf-preview"
                 />
+              ) : (
+                <pre className="attachment-text-preview">
+                  {previewLoading && !textPreview ? '正在读取预览…' : textPreview}
+                </pre>
               )}
             </div>
           </section>
