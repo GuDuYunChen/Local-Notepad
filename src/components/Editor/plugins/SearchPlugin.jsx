@@ -1,6 +1,7 @@
 import React, { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { $getRoot } from 'lexical'
+import { $isCodeBlockNode } from '../nodes/CodeBlockNode'
 
 function isWordChar(char) {
   return Boolean(char && /[\p{L}\p{N}_]/u.test(char))
@@ -37,16 +38,30 @@ export function findTextMatchOffsets(text, query, options = {}) {
   return results
 }
 
-function $findAllTextNodes(text, options) {
+export function $findAllSearchMatches(text, options = {}) {
   if (!text) return []
 
   const results = []
 
   const traverse = node => {
-    if (node.getType() === 'text') {
-      const nodeText = node.getTextContent()
-      for (const offset of findTextMatchOffsets(nodeText, text, options)) {
+    if ($isCodeBlockNode(node)) {
+      const value = node.getCode()
+      for (const offset of findTextMatchOffsets(value, text, options)) {
         results.push({
+          kind: 'code-block',
+          node,
+          offset,
+          length: text.length,
+        })
+      }
+      return
+    }
+
+    if (node.getType?.() === 'text') {
+      const value = node.getTextContent()
+      for (const offset of findTextMatchOffsets(value, text, options)) {
+        results.push({
+          kind: 'text',
           node,
           offset,
           length: text.length,
@@ -69,13 +84,48 @@ function topLevelKey(node) {
   return current?.getKey?.() || ''
 }
 
-function notifySearchMatch(node) {
+function notifySearchMatch(editor, node) {
   const key = topLevelKey(node)
   if (!key) return
 
   window.dispatchEvent(new CustomEvent('editor:search-match', {
     detail: { topLevelKey: key },
   }))
+
+  requestAnimationFrame(() => {
+    editor.getElementByKey(key)?.scrollIntoView?.({
+      behavior: 'smooth',
+      block: 'center',
+      inline: 'nearest',
+    })
+  })
+}
+
+function revealSearchMatch(editor, match, { focusCode = false } = {}) {
+  if (!match?.node) return
+
+  if (match.kind === 'code-block') {
+    window.dispatchEvent(new CustomEvent('editor:code-search-match', {
+      detail: {
+        nodeKey: match.node.getKey(),
+        offset: match.offset,
+        length: match.length,
+        focus: focusCode,
+      },
+    }))
+  } else {
+    match.node.select(match.offset, match.offset + match.length)
+  }
+
+  notifySearchMatch(editor, match.node)
+}
+
+function replaceMatchValue(value, offset, length, replacement) {
+  return (
+    value.slice(0, offset) +
+    replacement +
+    value.slice(offset + length)
+  )
 }
 
 function OptionChip({ active, label, title, onClick }) {
@@ -105,12 +155,14 @@ export default function SearchPlugin() {
   const [matchCount, setMatchCount] = useState(0)
   const [currentIndex, setCurrentIndex] = useState(-1)
   const [contentRevision, setContentRevision] = useState(0)
+  const currentIndexRef = useRef(-1)
+  const searchSignatureRef = useRef('')
   const inputRef = useRef(null)
 
-  const options = {
-    matchCase,
-    wholeWord,
-  }
+  const setActiveIndex = useCallback((index) => {
+    currentIndexRef.current = index
+    setCurrentIndex(index)
+  }, [])
 
   useEffect(() => {
     if (!isOpen) return
@@ -137,71 +189,109 @@ export default function SearchPlugin() {
 
   useEffect(() => {
     if (!isOpen || !deferredSearchText) {
+      searchSignatureRef.current = ''
       setMatchCount(0)
-      setCurrentIndex(-1)
+      setActiveIndex(-1)
       return
     }
 
     editor.update(() => {
-      const results = $findAllTextNodes(deferredSearchText, options)
+      const results = $findAllSearchMatches(deferredSearchText, {
+        matchCase,
+        wholeWord,
+      })
       setMatchCount(results.length)
 
       if (!results.length) {
-        setCurrentIndex(-1)
+        setActiveIndex(-1)
         return
       }
 
-      setCurrentIndex(0)
-      const { node, offset, length } = results[0]
-      node.select(offset, offset + length)
-      notifySearchMatch(node)
+      const signature = JSON.stringify([
+        deferredSearchText,
+        matchCase,
+        wholeWord,
+      ])
+      const shouldReset = signature !== searchSignatureRef.current
+      searchSignatureRef.current = signature
+
+      const desiredIndex = shouldReset
+        ? 0
+        : Math.min(
+          Math.max(currentIndexRef.current, 0),
+          results.length - 1
+        )
+
+      setActiveIndex(desiredIndex)
+      revealSearchMatch(editor, results[desiredIndex], { focusCode: false })
     })
-  }, [isOpen, deferredSearchText, editor, matchCase, wholeWord, contentRevision])
+  }, [
+    contentRevision,
+    deferredSearchText,
+    editor,
+    isOpen,
+    matchCase,
+    setActiveIndex,
+    wholeWord,
+  ])
 
   const goToMatch = useCallback((index) => {
     editor.update(() => {
-      const results = $findAllTextNodes(deferredSearchText, {
+      const results = $findAllSearchMatches(deferredSearchText, {
         matchCase,
         wholeWord,
       })
       if (!results.length) return
 
       const nextIndex = ((index % results.length) + results.length) % results.length
-      setCurrentIndex(nextIndex)
-
-      const { node, offset, length } = results[nextIndex]
-      node.select(offset, offset + length)
-      notifySearchMatch(node)
+      setActiveIndex(nextIndex)
+      revealSearchMatch(editor, results[nextIndex], { focusCode: true })
     })
-  }, [deferredSearchText, editor, matchCase, wholeWord])
+  }, [
+    deferredSearchText,
+    editor,
+    matchCase,
+    setActiveIndex,
+    wholeWord,
+  ])
 
   const handleFindNext = useCallback(() => {
-    goToMatch(currentIndex + 1)
-  }, [currentIndex, goToMatch])
+    goToMatch(currentIndexRef.current + 1)
+  }, [goToMatch])
 
   const handleFindPrev = useCallback(() => {
-    goToMatch(currentIndex - 1)
-  }, [currentIndex, goToMatch])
+    goToMatch(currentIndexRef.current - 1)
+  }, [goToMatch])
 
   const handleReplace = useCallback(() => {
-    if (currentIndex < 0 || !searchText) return
+    if (currentIndexRef.current < 0 || !searchText) return
 
     editor.update(() => {
-      const results = $findAllTextNodes(searchText, {
+      const results = $findAllSearchMatches(searchText, {
         matchCase,
         wholeWord,
       })
-      if (!results.length || currentIndex >= results.length) return
+      const index = currentIndexRef.current
+      if (!results.length || index >= results.length) return
 
-      const { node, offset, length } = results[currentIndex]
-      const value = node.getTextContent()
-      node.setTextContent(
-        value.slice(0, offset) +
-        replaceText +
-        value.slice(offset + length)
-      )
+      const { kind, node, offset, length } = results[index]
+      if (kind === 'code-block') {
+        node.setCode(replaceMatchValue(
+          node.getCode(),
+          offset,
+          length,
+          replaceText,
+        ))
+      } else {
+        node.setTextContent(replaceMatchValue(
+          node.getTextContent(),
+          offset,
+          length,
+          replaceText,
+        ))
+      }
     })
-  }, [currentIndex, editor, matchCase, replaceText, searchText, wholeWord])
+  }, [editor, matchCase, replaceText, searchText, wholeWord])
 
   const handleReplaceAll = useCallback(() => {
     if (!searchText) return
@@ -210,13 +300,17 @@ export default function SearchPlugin() {
       const nodes = []
 
       const traverse = node => {
-        if (node.getType() === 'text') nodes.push(node)
+        if ($isCodeBlockNode(node) || node.getType?.() === 'text') {
+          nodes.push(node)
+          if ($isCodeBlockNode(node)) return
+        }
         for (const child of node.getChildren?.() || []) traverse(child)
       }
       for (const child of $getRoot().getChildren()) traverse(child)
 
       for (const node of nodes) {
-        const value = node.getTextContent()
+        const isCodeBlock = $isCodeBlockNode(node)
+        const value = isCodeBlock ? node.getCode() : node.getTextContent()
         const offsets = findTextMatchOffsets(value, searchText, {
           matchCase,
           wholeWord,
@@ -225,12 +319,16 @@ export default function SearchPlugin() {
 
         let next = value
         for (const offset of [...offsets].reverse()) {
-          next =
-            next.slice(0, offset) +
-            replaceText +
-            next.slice(offset + searchText.length)
+          next = replaceMatchValue(
+            next,
+            offset,
+            searchText.length,
+            replaceText,
+          )
         }
-        node.setTextContent(next)
+
+        if (isCodeBlock) node.setCode(next)
+        else node.setTextContent(next)
       }
     })
   }, [editor, matchCase, replaceText, searchText, wholeWord])
@@ -311,7 +409,7 @@ export default function SearchPlugin() {
             }
           }}
         />
-        <div className="search-count">
+        <div className="search-count" aria-live="polite">
           {matchCount > 0 ? String(currentIndex + 1) + '/' + matchCount : '0/0'}
         </div>
         <button type="button" className="search-btn" onClick={handleFindPrev} disabled={!matchCount}>↑</button>
