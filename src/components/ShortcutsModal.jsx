@@ -19,7 +19,10 @@ const shortcuts = [
     { key: 'Ctrl + I', desc: '斜体' },
     { key: 'Ctrl + U', desc: '下划线' },
     { key: 'Ctrl + Alt + E', desc: '插入数学公式' },
+    { key: '$ + 空格', desc: '快速插入独立公式' },
+    { key: '$公式$ + 空格', desc: '快速转换为行内公式' },
     { key: 'Ctrl + Alt + T', desc: '切换 / 插入待办清单' },
+    { key: 'Ctrl + Enter', desc: '勾选 / 取消当前待办' },
   ]},
   { category: '导航操作', items: [
     { key: '↑ / ↓', desc: '在笔记列表或快速搜索中移动' },
