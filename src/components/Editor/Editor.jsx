@@ -174,7 +174,7 @@ const EDITOR_NODES = [
   FormulaNode
 ];
 
-export default function Editor({ documentId, initialContent, onChange, readOnly }) {
+export default function Editor({ documentId, documentTitle, initialContent, onChange, readOnly }) {
   const initialConfig = useMemo(() => ({
     namespace: 'MyEditor',
     theme,
@@ -195,7 +195,7 @@ export default function Editor({ documentId, initialContent, onChange, readOnly 
         <MarkdownSourcePlugin readOnly={readOnly} />
         <ResourceManagerPlugin readOnly={readOnly} />
         {!readOnly && <FloatingTextToolbarPlugin />}
-        <DocumentOutlinePlugin />
+        <DocumentOutlinePlugin documentId={documentId} documentTitle={documentTitle} />
         {!readOnly && <PasteImagePlugin />}
         <div className="editor-container">
           <RichTextPlugin
