@@ -53,7 +53,7 @@ describe('mature editor interactions', () => {
     expect(original.map(item => item.src)).toEqual(['a.jpg', 'b.jpg', 'c.jpg'])
   })
 
-  it('recognizes previewable image PDF and text attachments', () => {
+  it('recognizes previewable attachment types', () => {
     expect(getAttachmentPreviewType('photo.jpg', '')).toBe('image')
     expect(getAttachmentPreviewType('scan.bin', 'image/png')).toBe('image')
     expect(getAttachmentPreviewType('manual.pdf', '')).toBe('pdf')
@@ -103,25 +103,11 @@ describe('mature editor interactions', () => {
   })
 
   it('recognizes safe formula typing shortcuts', () => {
-    expect(matchFormulaShortcut('$')).toMatchObject({
+    expect(matchFormulaShortcut('$$')).toMatchObject({
       type: 'block',
       expression: '',
     })
-    expect(matchFormulaShortcut('前文 $E = mc^2
-    const nodes = [
-      { key: 'h1', isHeading: true, level: 1, text: '第一章' },
-      { key: 'p1', isHeading: false, level: null, text: '' },
-      { key: 'h2', isHeading: true, level: 2, text: '细节' },
-      { key: 'p2', isHeading: false, level: null, text: '' },
-    ]
-
-    expect(findOutlineHeadingForKey(nodes, 'p2')).toMatchObject({ key: 'h2', text: '细节' })
-    expect(findOutlineHeadingForKey(nodes, 'p1')).toMatchObject({ key: 'h1', text: '第一章' })
-    expect(findOutlineHeadingForKey(nodes, 'missing')).toBeNull()
-  })
-
-})
-)).toMatchObject({
+    expect(matchFormulaShortcut('前文 $E = mc^2$')).toMatchObject({
       type: 'inline',
       expression: 'E = mc^2',
       start: 3,
@@ -150,5 +136,4 @@ describe('mature editor interactions', () => {
     expect(findOutlineHeadingForKey(nodes, 'p1')).toMatchObject({ key: 'h1', text: '第一章' })
     expect(findOutlineHeadingForKey(nodes, 'missing')).toBeNull()
   })
-
 })
