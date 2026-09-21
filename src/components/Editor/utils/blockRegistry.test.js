@@ -13,6 +13,7 @@ import { EmbedNode, $createEmbedNode } from '../nodes/EmbedNode'
 import { AttachmentNode, $createAttachmentNode } from '../nodes/AttachmentNode'
 import { ImageNode, $createImageNode } from '../nodes/ImageNode'
 import { ImageGridNode, $createImageGridNode } from '../nodes/ImageGridNode'
+import { FormulaNode, $createFormulaNode } from '../nodes/FormulaNode'
 
 function createTestEditor() {
   return createEditor({
@@ -31,6 +32,7 @@ function createTestEditor() {
       AttachmentNode,
       ImageNode,
       ImageGridNode,
+      FormulaNode,
     ],
     onError(error) {
       throw error
@@ -55,11 +57,11 @@ describe('editor block registry', () => {
         BlockType.BULLET_LIST,
         BlockType.NUMBERED_LIST,
         BlockType.CODE_BLOCK,
-        BlockType.TODO,
         BlockType.CALLOUT,
         BlockType.TOGGLE,
         BlockType.DIVIDER,
         BlockType.EMBED,
+        BlockType.FORMULA,
       ]
 
       for (const type of types) {
@@ -77,11 +79,37 @@ describe('editor block registry', () => {
     expect(nodeTypes).toContain('quote')
     expect(nodeTypes).toContain('list')
     expect(nodeTypes).toContain('code')
-    expect(nodeTypes).toContain('todo')
     expect(nodeTypes).toContain('callout')
     expect(nodeTypes).toContain('toggle')
     expect(nodeTypes).toContain('divider')
     expect(nodeTypes).toContain('embed')
+    expect(nodeTypes).toContain('formula')
+    expect(typeof getBlockByType(BlockType.TODO).run).toBe('function')
+  })
+
+  it('serializes editable formula content and display mode', () => {
+    const editor = createTestEditor()
+
+    editor.update(() => {
+      const root = $getRoot()
+      root.clear()
+
+      const formula = $createFormulaNode({
+        expression: 'E = mc^2',
+        displayMode: true,
+      })
+      formula.setExpression('\\int_0^1 x^2 \\, dx')
+      formula.setDisplayMode(false)
+      root.append(formula)
+    }, { discrete: true })
+
+    const formula = editor.getEditorState().toJSON().root.children[0]
+    expect(formula).toMatchObject({
+      type: 'formula',
+      version: 1,
+      expression: '\\int_0^1 x^2 \\, dx',
+      displayMode: false,
+    })
   })
 
   it('serializes editable image layout metadata', () => {
