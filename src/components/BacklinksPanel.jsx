@@ -30,24 +30,37 @@ export default function BacklinksPanel({ fileId, onSelectFile }) {
         const links = await getBacklinks(fileId)
         if (controller.signal.aborted) return
 
-        const enriched = await Promise.all(
+        const enrichedGroups = await Promise.all(
           links.map(async (link) => {
             try {
               const file = await api(`/api/files/${link.source_id}`)
-              if (controller.signal.aborted) return { ...link, source_title: '未知文件' }
-              const occurrence = findWikiLinkOccurrences(file.content || '', fileId)[0] || null
-              return {
-                ...link,
-                source_title: file.title,
-                source_section_path: occurrence?.sourceSectionPath || [],
+              if (controller.signal.aborted) {
+                return [{ ...link, backlink_key: String(link.id), source_title: '未知文件' }]
               }
+
+              const occurrences = findWikiLinkOccurrences(file.content || '', fileId)
+              if (!occurrences.length) {
+                return [{
+                  ...link,
+                  backlink_key: String(link.id),
+                  source_title: file.title,
+                  source_section_path: [],
+                }]
+              }
+
+              return occurrences.map((occurrence, index) => ({
+                ...link,
+                backlink_key: String(link.id) + ':' + index,
+                source_title: file.title,
+                source_section_path: occurrence.sourceSectionPath || [],
+              }))
             } catch {
-              return { ...link, source_title: '未知文件' }
+              return [{ ...link, backlink_key: String(link.id), source_title: '未知文件' }]
             }
           })
         )
         if (controller.signal.aborted) return
-        setBacklinks(enriched)
+        setBacklinks(enrichedGroups.flat())
       } catch (e) {
         if (e.name !== 'AbortError') {
           console.error('加载反向链接失败', e)
@@ -81,7 +94,7 @@ export default function BacklinksPanel({ fileId, onSelectFile }) {
         ) : (
           backlinks.map((link) => (
             <div
-              key={link.id}
+              key={link.backlink_key || link.id}
               className="backlink-item"
               onClick={() => onSelectFile?.(link.source_id, {
                 headingPath: link.source_section_path || [],
