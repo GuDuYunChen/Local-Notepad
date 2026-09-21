@@ -47,3 +47,18 @@
   font-size: 11px;
   color: var(--text-secondary, #9ca3af);
 }
+
+
+.backlink-section {
+  margin: 2px 0 3px;
+  overflow: hidden;
+  color: var(--clay, #7057d9);
+  font-size: 10px;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.backlink-item:hover .backlink-section {
+  color: color-mix(in srgb, var(--clay, #7057d9) 82%, var(--text-primary, #374151));
+}
