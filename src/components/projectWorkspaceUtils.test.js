@@ -91,18 +91,26 @@ describe('project workspace utilities', () => {
   it('persists project type and per-note status without schema changes', () => {
     writeProjectWorkspaceMeta('project', {
       type: 'script',
+      targetWords: 42000,
       statuses: {
         'chapter-1': 'review',
       },
+      summaries: {
+        'chapter-1': '主角第一次做出关键选择',
+      },
+      supportNoteIds: ['support-1'],
     })
 
     expect(readProjectWorkspaceMeta('project')).toEqual({
       type: 'script',
-      targetWords: 0,
+      targetWords: 42000,
       statuses: {
         'chapter-1': 'review',
       },
-      summaries: {},
+      summaries: {
+        'chapter-1': '主角第一次做出关键选择',
+      },
+      supportNoteIds: ['support-1'],
     })
     expect(nextProjectStatus('draft')).toBe('review')
     expect(nextProjectStatus('review')).toBe('done')
@@ -221,10 +229,12 @@ describe('project workspace utilities', () => {
     const script = getProjectTemplate('script')
 
     expect(novel.label).toBe('小说项目模板')
+    expect(novel.targetWords).toBe(500000)
     expect(novel.folders[0].title).toBe('第一卷')
     expect(novel.notes.some(note => note.title === '世界观.md')).toBe(true)
 
     expect(script.label).toBe('剧本项目模板')
+    expect(script.targetWords).toBe(30000)
     expect(script.folders[0].title).toBe('第一集')
     expect(script.notes.some(note => note.title === '场景表.md')).toBe(true)
 
@@ -252,7 +262,32 @@ describe('project workspace utilities', () => {
         'chapter-1': 'done',
       },
       summaries: {},
+      supportNoteIds: [],
     })
+  })
+
+  it('excludes project support notes from manuscript stats and export order', () => {
+    const withSupport = [
+      ...files,
+      {
+        id: 'support-1',
+        title: '人物设定.md',
+        is_folder: false,
+        parent_id: 'project',
+        sort_order: 25,
+        content: lexical('大量人物设定文本'),
+        updated_at: 40,
+      },
+    ]
+
+    const workspace = buildProjectWorkspace(withSupport, 'project', {
+      supportNoteIds: ['support-1'],
+    })
+
+    expect(workspace.chapterCount).toBe(4)
+    expect(workspace.volumes.flatMap(volume => volume.notes).some(note => note.id === 'support-1'))
+      .toBe(false)
+    expect(getProjectExportIds(workspace)).not.toContain('support-1')
   })
 
   it('returns export ids in project reading order', () => {
