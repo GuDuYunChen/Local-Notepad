@@ -5,6 +5,25 @@ import { TableNode, TableRowNode, TableCellNode, $createTableCellNode, $createTa
 import { $getNodeByKey } from 'lexical'
 import { toast } from '~/services/toast'
 
+export function forEachSelectedTableCell(tables, rects, callback) {
+  for (const rect of Array.isArray(rects) ? rects : []) {
+    const table = tables?.[rect.tableIndex]
+    if (!(table instanceof TableNode)) continue
+
+    const rows = table.getChildren()
+    for (let rr = rect.r1; rr <= rect.r2; rr++) {
+      const row = rows[rr]
+      if (!(row instanceof TableRowNode)) continue
+      const cells = row.getChildren()
+
+      for (let cc = rect.c1; cc <= rect.c2 && cc < cells.length; cc++) {
+        const cell = cells[cc]
+        if (cell instanceof TableCellNode) callback(cell, rect, rr, cc)
+      }
+    }
+  }
+}
+
 export function countSelectedTableCells(rects) {
   return (Array.isArray(rects) ? rects : []).reduce((total, rect) => {
     const rows = rect.r2 - rect.r1 + 1
@@ -463,18 +482,16 @@ export default function TableSelectionPlugin() {
   }
 
   const doClear = (payload) => {
-    const r = rects[0]
-
     editor.update(() => {
-      const clearCell = (cell) => {
+      const clearCell = cell => {
         if (!(cell instanceof TableCellNode)) return
         for (const child of cell.getChildren()) child.remove()
         cell.append($createParagraphNode())
       }
 
-      if (r) {
+      if (rects.length) {
         const tables = []
-        const walk = (node) => {
+        const walk = node => {
           if (!node.getChildren) return
           for (const child of node.getChildren()) {
             if (child instanceof TableNode) tables.push(child)
@@ -482,18 +499,7 @@ export default function TableSelectionPlugin() {
           }
         }
         walk($getRoot())
-
-        const table = tables[r.tableIndex]
-        if (!table) return
-
-        const rows = table.getChildren()
-        for (let rr = r.r1; rr <= r.r2; rr++) {
-          const row = rows[rr]
-          const cells = row.getChildren()
-          for (let cc = r.c1; cc <= r.c2 && cc < cells.length; cc++) {
-            clearCell(cells[cc])
-          }
-        }
+        forEachSelectedTableCell(tables, rects, clearCell)
         return
       }
 
@@ -799,133 +805,155 @@ export default function TableSelectionPlugin() {
     }).filter(Boolean)
   })()
 
-  const applyAlign = (payload) => {
-    const v = payload?.value ?? payload
-    const r = rects[0]
+  const applyAlign = payload => {
+    const value = payload?.value ?? payload
+
     editor.update(() => {
-      const tables = []
-      const walk = (node) => { if (!node.getChildren) return; const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
-      walk($getRoot())
-      if (r) {
-        const table = tables[r.tableIndex]
-        if (!table) return
-        const targetRows = table.getChildren()
-        for (let rr = r.r1; rr <= r.r2; rr++) {
-          const row = targetRows[rr]
-          const cells = row.getChildren()
-          for (let cc = r.c1; cc <= r.c2 && cc < cells.length; cc++) { cells[cc].setVerticalAlign?.(v) }
+      if (rects.length) {
+        const tables = []
+        const walk = node => {
+          if (!node.getChildren) return
+          for (const child of node.getChildren()) {
+            if (child instanceof TableNode) tables.push(child)
+            walk(child)
+          }
         }
-      } else if (payload?.cellKey) {
-        const cell = $getNodeByKey(payload.cellKey)
-        if (cell && cell.setVerticalAlign) cell.setVerticalAlign(v)
-      } else {
-        const sel = $getSelection()
-        const node = sel?.getNodes?.()[0]
-        let cell = node
-        while (cell && !(cell instanceof TableCellNode)) { cell = cell.getParent?.() }
-        if (cell) cell.setVerticalAlign?.(v)
+        walk($getRoot())
+        forEachSelectedTableCell(tables, rects, cell => cell.setVerticalAlign?.(value))
+        return
       }
+
+      if (payload?.cellKey) {
+        const cell = $getNodeByKey(payload.cellKey)
+        if (cell?.setVerticalAlign) cell.setVerticalAlign(value)
+        return
+      }
+
+      const selection = $getSelection()
+      let cell = selection?.getNodes?.()[0]
+      while (cell && !(cell instanceof TableCellNode)) cell = cell.getParent?.()
+      cell?.setVerticalAlign?.(value)
     })
+
     if (!active) setRects([])
   }
 
-  const applyHorizontal = (payload) => {
-    const v = payload?.value ?? payload
-    const r = rects[0]
-    const patch = `text-align: ${v};`
+  const applyHorizontal = payload => {
+    const value = payload?.value ?? payload
+    const patch = `text-align: ${value};`
+
     editor.update(() => {
-      const tables = []
-      const walk = (node) => { if (!node.getChildren) return; const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
-      walk($getRoot())
-      const applyCell = (cell) => { const prev = cell.getStyle?.() || ''; cell.setStyle?.(mergeStyle(prev, patch)) }
-      if (r) {
-        const table = tables[r.tableIndex]
-        if (!table) return
-        const targetRows = table.getChildren()
-        for (let rr = r.r1; rr <= r.r2; rr++) {
-          const row = targetRows[rr]
-          const cells = row.getChildren()
-          for (let cc = r.c1; cc <= r.c2 && cc < cells.length; cc++) { applyCell(cells[cc]) }
+      const applyCell = cell => {
+        const previous = cell.getStyle?.() || ''
+        cell.setStyle?.(mergeStyle(previous, patch))
+      }
+
+      if (rects.length) {
+        const tables = []
+        const walk = node => {
+          if (!node.getChildren) return
+          for (const child of node.getChildren()) {
+            if (child instanceof TableNode) tables.push(child)
+            walk(child)
+          }
         }
-      } else if (payload?.cellKey) {
+        walk($getRoot())
+        forEachSelectedTableCell(tables, rects, applyCell)
+        return
+      }
+
+      if (payload?.cellKey) {
         const cell = $getNodeByKey(payload.cellKey)
         if (cell) applyCell(cell)
-      } else {
-        const sel = $getSelection()
-        const node = sel?.getNodes?.()[0]
-        let cell = node
-        while (cell && !(cell instanceof TableCellNode)) { cell = cell.getParent?.() }
-        if (cell) applyCell(cell)
+        return
       }
+
+      const selection = $getSelection()
+      let cell = selection?.getNodes?.()[0]
+      while (cell && !(cell instanceof TableCellNode)) cell = cell.getParent?.()
+      if (cell) applyCell(cell)
     })
+
     if (!active) setRects([])
   }
 
-  const applyBorder = (payload) => {
+  const applyBorder = payload => {
     const preset = payload?.value ?? payload
-    const r = rects[0]
-    const style = (() => {
-      if (preset === 'none') return 'border: 0;'
-      if (preset === 'thin') return 'border: 1px solid #999;'
-      if (preset === 'bold') return 'border: 2px solid #333;'
-      if (preset === 'dashed') return 'border: 2px dashed #666;'
-      return ''
-    })()
+    const style = preset === 'none'
+      ? 'border: 0;'
+      : preset === 'thin'
+        ? 'border: 1px solid #999;'
+        : preset === 'bold'
+          ? 'border: 2px solid #333;'
+          : preset === 'dashed'
+            ? 'border: 2px dashed #666;'
+            : ''
+
     editor.update(() => {
-      const tables = []
-      const walk = (node) => { if (!node.getChildren) return; const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
-      walk($getRoot())
-      const applyCell = (cell) => { const prev = cell.getStyle?.() || ''; cell.setStyle?.(mergeStyle(prev, style)) }
-      if (r) {
-        const table = tables[r.tableIndex]
-        if (!table) return
-        const targetRows = table.getChildren()
-        for (let rr = r.r1; rr <= r.r2; rr++) {
-          const row = targetRows[rr]
-          const cells = row.getChildren()
-          for (let cc = r.c1; cc <= r.c2 && cc < cells.length; cc++) { applyCell(cells[cc]) }
+      const applyCell = cell => {
+        const previous = cell.getStyle?.() || ''
+        cell.setStyle?.(mergeStyle(previous, style))
+      }
+
+      if (rects.length) {
+        const tables = []
+        const walk = node => {
+          if (!node.getChildren) return
+          for (const child of node.getChildren()) {
+            if (child instanceof TableNode) tables.push(child)
+            walk(child)
+          }
         }
-      } else if (payload?.cellKey) {
+        walk($getRoot())
+        forEachSelectedTableCell(tables, rects, applyCell)
+        return
+      }
+
+      if (payload?.cellKey) {
         const cell = $getNodeByKey(payload.cellKey)
         if (cell) applyCell(cell)
-      } else {
-        const sel = $getSelection()
-        const node = sel?.getNodes?.()[0]
-        let cell = node
-        while (cell && !(cell instanceof TableCellNode)) { cell = cell.getParent?.() }
-        if (cell) applyCell(cell)
+        return
       }
+
+      const selection = $getSelection()
+      let cell = selection?.getNodes?.()[0]
+      while (cell && !(cell instanceof TableCellNode)) cell = cell.getParent?.()
+      if (cell) applyCell(cell)
     })
+
     if (!active) setRects([])
   }
 
-  const applyBackground = (payload) => {
+  const applyBackground = payload => {
     const color = payload?.value ?? payload
-    const r = rects[0]
+
     editor.update(() => {
-      const tables = []
-      const walk = (node) => { if (!node.getChildren) return; const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
-      walk($getRoot())
-      if (r) {
-        const table = tables[r.tableIndex]
-        if (!table) return
-        const targetRows = table.getChildren()
-        for (let rr = r.r1; rr <= r.r2; rr++) {
-          const row = targetRows[rr]
-          const cells = row.getChildren()
-          for (let cc = r.c1; cc <= r.c2 && cc < cells.length; cc++) { cells[cc].setBackgroundColor?.(color) }
+      if (rects.length) {
+        const tables = []
+        const walk = node => {
+          if (!node.getChildren) return
+          for (const child of node.getChildren()) {
+            if (child instanceof TableNode) tables.push(child)
+            walk(child)
+          }
         }
-      } else if (payload?.cellKey) {
-        const cell = $getNodeByKey(payload.cellKey)
-        if (cell && cell.setBackgroundColor) cell.setBackgroundColor(color)
-      } else {
-        const sel = $getSelection()
-        const node = sel?.getNodes?.()[0]
-        let cell = node
-        while (cell && !(cell instanceof TableCellNode)) { cell = cell.getParent?.() }
-        if (cell) cell.setBackgroundColor?.(color)
+        walk($getRoot())
+        forEachSelectedTableCell(tables, rects, cell => cell.setBackgroundColor?.(color))
+        return
       }
+
+      if (payload?.cellKey) {
+        const cell = $getNodeByKey(payload.cellKey)
+        if (cell?.setBackgroundColor) cell.setBackgroundColor(color)
+        return
+      }
+
+      const selection = $getSelection()
+      let cell = selection?.getNodes?.()[0]
+      while (cell && !(cell instanceof TableCellNode)) cell = cell.getParent?.()
+      cell?.setBackgroundColor?.(color)
     })
+
     if (!active) setRects([])
   }
 
