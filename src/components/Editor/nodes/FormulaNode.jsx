@@ -5,6 +5,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import 'katex/dist/katex.min.css'
 
 const FORMULA_HISTORY_KEY = 'localNotepad.formulaHistory.v1'
+const FORMULA_FAVORITES_KEY = 'localNotepad.formulaFavorites.v1'
 const COMMON_FORMULAS = [
   { label: '分数', expression: '\\frac{a}{b}' },
   { label: '平方和', expression: 'a^2 + b^2 = c^2' },
@@ -13,6 +14,18 @@ const COMMON_FORMULAS = [
   { label: '根号', expression: '\\sqrt{x}' },
   { label: '矩阵', expression: '\\begin{bmatrix} a & b \\\\ c & d \\end{bmatrix}' },
 ]
+
+export function toggleFormulaFavorite(favorites, expression, limit = 12) {
+  const value = String(expression || '').trim()
+  const current = Array.isArray(favorites) ? favorites.filter(Boolean) : []
+  if (!value) return current.slice(0, limit)
+
+  if (current.includes(value)) {
+    return current.filter(item => item !== value).slice(0, limit)
+  }
+
+  return [value, ...current.filter(item => item !== value)].slice(0, limit)
+}
 
 export function rememberFormulaExpression(history, expression, limit = 6) {
   const value = String(expression || '').trim()
@@ -40,6 +53,26 @@ function saveFormulaHistory(items) {
     // History is a convenience only; formula editing should still work.
   }
 }
+
+function loadFormulaFavorites() {
+  if (typeof window === 'undefined') return []
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(FORMULA_FAVORITES_KEY) || '[]')
+    return Array.isArray(parsed) ? parsed.filter(Boolean).slice(0, 12) : []
+  } catch {
+    return []
+  }
+}
+
+function saveFormulaFavorites(items) {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(FORMULA_FAVORITES_KEY, JSON.stringify(items))
+  } catch {
+    // Favorites are local convenience state and should never block editing.
+  }
+}
+
 
 export class FormulaNode extends DecoratorNode {
   __expression
@@ -114,6 +147,7 @@ function FormulaComponent({ nodeKey, expression, displayMode }) {
   const [draft, setDraft] = useState(expression || '')
   const [blockMode, setBlockMode] = useState(Boolean(displayMode))
   const [recentFormulas, setRecentFormulas] = useState(() => loadFormulaHistory())
+  const [favoriteFormulas, setFavoriteFormulas] = useState(() => loadFormulaFavorites())
   const editorRef = useRef(null)
 
   useEffect(() => setDraft(expression || ''), [expression])
@@ -154,6 +188,12 @@ function FormulaComponent({ nodeKey, expression, displayMode }) {
 
     setEditing(false)
     editor.focus()
+  }
+
+  const toggleFavorite = () => {
+    const next = toggleFormulaFavorite(favoriteFormulas, draft)
+    setFavoriteFormulas(next)
+    saveFormulaFavorites(next)
   }
 
   const remove = () => {
@@ -210,6 +250,24 @@ function FormulaComponent({ nodeKey, expression, displayMode }) {
             </div>
           </div>
 
+          {favoriteFormulas.length > 0 && (
+            <div className="formula-library-section">
+              <span className="formula-library-label">收藏</span>
+              <div className="formula-library-items favorites">
+                {favoriteFormulas.map(item => (
+                  <button
+                    type="button"
+                    key={item}
+                    onClick={() => setDraft(item)}
+                    title={item}
+                  >
+                    ★ {item}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {recentFormulas.length > 0 && (
             <div className="formula-library-section">
               <span className="formula-library-label">最近</span>
@@ -243,6 +301,14 @@ function FormulaComponent({ nodeKey, expression, displayMode }) {
             onClick={() => setBlockMode(false)}
           >
             行内公式
+          </button>
+          <button
+            type="button"
+            className={favoriteFormulas.includes(draft.trim()) ? 'active' : ''}
+            onClick={toggleFavorite}
+            disabled={!draft.trim()}
+          >
+            {favoriteFormulas.includes(draft.trim()) ? '取消收藏' : '收藏'}
           </button>
           <button type="button" onClick={save}>完成</button>
           <button type="button" className="danger" onClick={remove}>删除</button>
