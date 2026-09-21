@@ -232,7 +232,26 @@ export default function App() {
         ))
       }
 
-      const plan = planDeleteReferenceImpact(files, ids)
+      const expandedTargetIds = new Set(ids)
+      let expanded = true
+      while (expanded) {
+        expanded = false
+        for (const file of files) {
+          if (
+            file?.parent_id &&
+            expandedTargetIds.has(file.parent_id) &&
+            !expandedTargetIds.has(file.id)
+          ) {
+            expandedTargetIds.add(file.id)
+            expanded = true
+          }
+        }
+      }
+
+      const plan = planDeleteReferenceImpact(
+        files,
+        Array.from(expandedTargetIds),
+      )
       const decision = await requestReferenceRefactor({
         mode: 'delete',
         targetTitle: targetTitle || '所选内容',
