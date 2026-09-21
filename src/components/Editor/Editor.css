@@ -392,6 +392,18 @@
   overflow: visible;
   background: var(--paper-deep);
   font-family: 'SF Mono', 'Consolas', 'Monaco', 'Courier New', monospace;
+  transition: border-color .16s ease, box-shadow .16s ease;
+}
+
+.code-block-wrapper.search-target,
+.code-block-wrapper:focus-within {
+  border-color: color-mix(in srgb, var(--clay) 58%, var(--line));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--clay-light) 80%, transparent);
+}
+
+.code-textarea::selection {
+  background: color-mix(in srgb, var(--clay) 34%, transparent);
+  color: transparent;
 }
 
 .code-block-header {
