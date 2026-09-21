@@ -361,3 +361,7 @@ function TextEditorInternal({
     </div>
   )
 }
+
+const TextEditor = React.forwardRef(TextEditorInternal)
+
+export default TextEditor
