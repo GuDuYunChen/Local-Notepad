@@ -37,6 +37,8 @@ import MentionPlugin from "./plugins/MentionPlugin";
 import WikiLinkPlugin from "./plugins/WikiLinkPlugin";
 import DragDropPlugin from "./plugins/DragDropPlugin";
 import EditorShortcutPlugin from "./plugins/EditorShortcutPlugin";
+import FormulaShortcutPlugin from "./plugins/FormulaShortcutPlugin";
+import ChecklistKeyboardPlugin from "./plugins/ChecklistKeyboardPlugin";
 import { ImageNode } from "./nodes/ImageNode";
 import { VideoNode } from "./nodes/VideoNode";
 import { ImageGridNode } from "./nodes/ImageGridNode";
@@ -206,6 +208,8 @@ export default function Editor({ initialContent, onChange, readOnly }) {
           <WikiLinkPlugin />
           <DragDropPlugin />
           <EditorShortcutPlugin />
+          <FormulaShortcutPlugin />
+          <ChecklistKeyboardPlugin />
           <OnChangePlugin onChange={onChange} />
           <LoadContentPlugin content={initialContent} />
           <TableSelectionPlugin />
