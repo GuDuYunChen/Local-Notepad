@@ -7,6 +7,10 @@ import {
   formatSectionPath,
   formatWikiReferenceText,
   getRecentReferences,
+  planTargetReferenceRefactor,
+  planDeleteReferenceImpact,
+  hasHeadingStructureChanged,
+  getHeadingStructureSignature,
   rememberReference,
   repairWikiReferences,
 } from './referenceUtils'
@@ -313,6 +317,164 @@ describe('structured reference utilities', () => {
       }),
     ])
     expect(diagnosis.sources[0].repairContent).toContain('"title":"新标题"')
+  })
+
+  it('detects heading structure changes without treating body edits as structural', () => {
+    const before = JSON.stringify({
+      root: {
+        children: [
+          {
+            type: 'heading',
+            tag: 'h1',
+            children: [{ type: 'text', text: '第一卷' }],
+          },
+          {
+            type: 'paragraph',
+            children: [{ type: 'text', text: '正文 A' }],
+          },
+        ],
+      },
+    })
+    const bodyOnly = JSON.stringify({
+      root: {
+        children: [
+          {
+            type: 'heading',
+            tag: 'h1',
+            children: [{ type: 'text', text: '第一卷' }],
+          },
+          {
+            type: 'paragraph',
+            children: [{ type: 'text', text: '正文 B' }],
+          },
+        ],
+      },
+    })
+    const renamedHeading = JSON.stringify({
+      root: {
+        children: [
+          {
+            type: 'heading',
+            tag: 'h1',
+            children: [{ type: 'text', text: '第二卷' }],
+          },
+          {
+            type: 'paragraph',
+            children: [{ type: 'text', text: '正文 B' }],
+          },
+        ],
+      },
+    })
+
+    expect(getHeadingStructureSignature(before)).toBe(
+      getHeadingStructureSignature(bodyOnly)
+    )
+    expect(hasHeadingStructureChanged(before, bodyOnly)).toBe(false)
+    expect(hasHeadingStructureChanged(before, renamedHeading)).toBe(true)
+  })
+
+  it('plans title propagation and moved-section repairs before a refactor', () => {
+    const sourceContent = JSON.stringify({
+      root: {
+        children: [{
+          type: 'wiki-link',
+          id: 'target',
+          title: '旧标题',
+          sectionPath: ['旧层级', '青莲剑宗'],
+        }],
+      },
+    })
+    const oldTargetContent = JSON.stringify({
+      root: {
+        children: [
+          {
+            type: 'heading',
+            tag: 'h1',
+            children: [{ type: 'text', text: '旧层级' }],
+          },
+          {
+            type: 'heading',
+            tag: 'h2',
+            children: [{ type: 'text', text: '青莲剑宗' }],
+          },
+        ],
+      },
+    })
+    const nextTargetContent = JSON.stringify({
+      root: {
+        children: [
+          {
+            type: 'heading',
+            tag: 'h1',
+            children: [{ type: 'text', text: '世界观' }],
+          },
+          {
+            type: 'heading',
+            tag: 'h2',
+            children: [{ type: 'text', text: '青莲剑宗' }],
+          },
+        ],
+      },
+    })
+
+    const plan = planTargetReferenceRefactor([
+      { id: 'source', title: '正文', content: sourceContent },
+      { id: 'target', title: '旧标题', content: oldTargetContent },
+    ], 'target', {
+      title: '新标题',
+      content: nextTargetContent,
+    })
+
+    expect(plan.summary).toMatchObject({
+      incomingReferences: 1,
+      affectedFiles: 1,
+      repairable: 1,
+      broken: 0,
+      repairableFiles: 1,
+    })
+    expect(plan.sources[0].changes[0]).toMatchObject({
+      before: '[[旧标题#旧层级 › 青莲剑宗]]',
+      after: '[[新标题#世界观 › 青莲剑宗]]',
+      issues: ['title-stale', 'section-moved'],
+    })
+  })
+
+  it('reports incoming references before deleting notes or folders', () => {
+    const source = {
+      id: 'source',
+      title: '正文',
+      content: JSON.stringify({
+        root: {
+          children: [
+            {
+              type: 'wiki-link',
+              id: 'target-a',
+              title: 'A',
+              sectionPath: [],
+            },
+            {
+              type: 'wiki-link',
+              id: 'target-b',
+              title: 'B',
+              sectionPath: ['第一章'],
+            },
+          ],
+        },
+      }),
+    }
+
+    const plan = planDeleteReferenceImpact([
+      source,
+      { id: 'target-a', title: 'A', content: '' },
+      { id: 'target-b', title: 'B', content: '' },
+    ], ['target-a', 'target-b'])
+
+    expect(plan.summary).toEqual({
+      incomingReferences: 2,
+      affectedFiles: 1,
+      targetCount: 2,
+    })
+    expect(plan.sources[0].references).toHaveLength(2)
   })
 
   it('keeps recent references deduplicated and newest first', () => {
