@@ -12,6 +12,7 @@ const Editor = React.lazy(() => import('./Editor/Editor'))
 
 function TextEditorInternal({
   activeId,
+  documentTitle,
   deletedIds,
   onChange,
   onLoaded,
@@ -332,6 +333,7 @@ function TextEditorInternal({
           <React.Suspense fallback={<div className="placeholder">正在加载编辑器…</div>}>
             <Editor
               documentId={activeId}
+              documentTitle={documentTitle}
               initialContent={editorContent}
               onChange={handleEditorChange}
             />
