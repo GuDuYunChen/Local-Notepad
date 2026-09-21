@@ -17,6 +17,7 @@ const shortcuts = [
     { key: 'Ctrl + Shift + P', desc: '打开编辑器命令面板' },
     { key: 'Ctrl + Shift + O', desc: '打开 / 关闭文档目录' },
     { key: 'Ctrl + H', desc: '打开替换面板' },
+    { key: 'Ctrl + 点击链接', desc: '直接打开网页或跳转章节' },
     { key: 'Ctrl + 滚轮', desc: '调整写作视图正文字号' },
     { key: 'Ctrl + B', desc: '加粗' },
     { key: 'Ctrl + I', desc: '斜体' },
