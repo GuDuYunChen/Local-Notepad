@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import BacklinksPanel from './BacklinksPanel'
+import ReferenceHealthPanel from './ReferenceHealthPanel'
 import VersionHistory from './VersionHistory'
 import TagSelector from './TagSelector'
 import { tagApi } from '~/services/tagApi'
@@ -113,6 +114,7 @@ export default function InspectorPanel({
   const saveState = statusLabel(editorStatus, unsaved)
   const tabs = [
     ['properties', '属性'],
+    ['references', '引用'],
     ['backlinks', '反向链接'],
     ['history', '历史'],
   ]
@@ -224,6 +226,15 @@ export default function InspectorPanel({
               <strong>{file.is_pinned ? '是' : '否'}</strong>
             </div>
           </div>
+        )}
+
+        {activeTab === 'references' && (
+          <ReferenceHealthPanel
+            file={file}
+            unsaved={unsaved}
+            onSelectFile={onSelectFile}
+            onRepairContent={(nextContent) => onUpdateFile?.({ content: nextContent })}
+          />
         )}
 
         {activeTab === 'backlinks' && (
