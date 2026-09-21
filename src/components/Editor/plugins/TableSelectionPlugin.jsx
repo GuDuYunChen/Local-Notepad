@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
-import { $getRoot, $createParagraphNode, FORMAT_ELEMENT_COMMAND, $getSelection } from 'lexical'
+import { $getRoot, $createParagraphNode, $createTextNode, FORMAT_ELEMENT_COMMAND, $getSelection } from 'lexical'
 import { TableNode, TableRowNode, TableCellNode, $createTableCellNode, $createTableRowNode, TableCellHeaderStates } from '@lexical/table'
 import { $getNodeByKey } from 'lexical'
 import { toast } from '~/services/toast'
@@ -418,15 +418,8 @@ export default function TableSelectionPlugin() {
             for (const child of cell.getChildren()) child.remove()
             const paragraph = $createParagraphNode()
             const value = matrix[rowOffset][colOffset]
-            if (value) paragraph.append(document.createTextNode ? [] : [])
+            if (value) paragraph.append($createTextNode(value))
             cell.append(paragraph)
-            if (value) {
-              const firstChild = paragraph.getFirstChild?.()
-              if (!firstChild) {
-                const textNode = requireTextNode(value)
-                paragraph.append(textNode)
-              }
-            }
           }
         }
       })
