@@ -258,3 +258,9 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+
+.wiki-link > .wiki-link-preview {
+  overflow: visible;
+  white-space: normal;
+}
