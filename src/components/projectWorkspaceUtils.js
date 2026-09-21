@@ -190,6 +190,12 @@ export function readProjectWorkspaceMeta(projectId) {
       chapterQueue: Array.isArray(value.chapterQueue)
         ? [...new Set(value.chapterQueue.map(normalizeId).filter(Boolean))]
         : [],
+      sprint: value.sprint && typeof value.sprint === 'object'
+        ? { ...value.sprint }
+        : null,
+      dailyReviews: value.dailyReviews && typeof value.dailyReviews === 'object'
+        ? { ...value.dailyReviews }
+        : {},
     }
   } catch {
     return {
@@ -205,6 +211,8 @@ export function readProjectWorkspaceMeta(projectId) {
       foreshadowStates: {},
       volumeMilestones: {},
       chapterQueue: [],
+      sprint: null,
+      dailyReviews: {},
     }
   }
 }
@@ -240,6 +248,12 @@ export function writeProjectWorkspaceMeta(projectId, nextMeta) {
       chapterQueue: Array.isArray(nextMeta?.chapterQueue)
         ? [...new Set(nextMeta.chapterQueue.map(normalizeId).filter(Boolean))]
         : [],
+      sprint: nextMeta?.sprint && typeof nextMeta.sprint === 'object'
+        ? nextMeta.sprint
+        : null,
+      dailyReviews: nextMeta?.dailyReviews && typeof nextMeta.dailyReviews === 'object'
+        ? nextMeta.dailyReviews
+        : {},
     }
     localStorage.setItem(PROJECT_META_KEY, JSON.stringify(all))
   } catch {
