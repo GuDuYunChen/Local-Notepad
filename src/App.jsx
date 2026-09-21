@@ -193,9 +193,23 @@ export default function App() {
       body: JSON.stringify(patch),
     })
 
+    const hasContentPatch = Object.prototype.hasOwnProperty.call(patch || {}, 'content')
+    const finalContent = hasContentPatch
+      ? String(updated?.content ?? patch.content ?? '')
+      : null
+
+    if (hasContentPatch) {
+      editorRef.current?.replaceSavedContent?.(finalContent, updated?.updated_at)
+      setContent(finalContent)
+    }
+
     setCurrent(prev => (
       prev?.id === id
-        ? { ...prev, ...updated, content: prev.content }
+        ? {
+          ...prev,
+          ...updated,
+          content: hasContentPatch ? finalContent : prev.content,
+        }
         : prev
     ))
     return updated
