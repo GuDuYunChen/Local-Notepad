@@ -1,0 +1,214 @@
+.reference-health-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.reference-health-state,
+.reference-health-empty {
+  padding: 18px 12px;
+  color: var(--ink-muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.reference-health-empty strong,
+.reference-health-empty span {
+  display: block;
+}
+
+.reference-health-empty strong {
+  margin-bottom: 3px;
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.reference-health-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.reference-health-summary > div {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--paper);
+}
+
+.reference-health-summary span,
+.reference-health-summary strong {
+  display: block;
+}
+
+.reference-health-summary span {
+  color: var(--ink-muted);
+  font-size: 8px;
+}
+
+.reference-health-summary strong {
+  margin-top: 2px;
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.reference-health-summary .warning strong {
+  color: #a36a17;
+}
+
+.reference-health-summary .danger strong {
+  color: var(--red, #c7433c);
+}
+
+.reference-health-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+}
+
+.reference-health-actions .btn {
+  min-height: 31px;
+  padding-inline: 10px;
+  font-size: 9px;
+}
+
+.reference-health-actions > span {
+  color: var(--ink-muted);
+  font-size: 8px;
+  line-height: 1.45;
+}
+
+.reference-health-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.reference-health-item {
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.reference-health-item.repairable {
+  border-color: color-mix(in srgb, #b97820 34%, var(--line));
+}
+
+.reference-health-item.broken {
+  border-color: color-mix(in srgb, var(--red, #c7433c) 30%, var(--line));
+}
+
+.reference-health-item-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 7px;
+}
+
+.reference-health-target {
+  min-width: 0;
+}
+
+.reference-health-target strong {
+  display: block;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reference-health-target span {
+  display: block;
+  margin-top: 2px;
+  overflow: hidden;
+  color: var(--ink-muted);
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reference-health-badge {
+  flex: 0 0 auto;
+  padding: 2px 5px;
+  border-radius: 99px;
+  background: var(--paper);
+  color: var(--ink-muted);
+  font-size: 7px;
+  font-weight: 650;
+}
+
+.reference-health-badge.healthy {
+  background: color-mix(in srgb, #4f9a67 12%, var(--surface));
+  color: #417e55;
+}
+
+.reference-health-badge.repairable {
+  background: color-mix(in srgb, #b97820 12%, var(--surface));
+  color: #9c661d;
+}
+
+.reference-health-badge.broken {
+  background: var(--red-light, rgba(199, 67, 60, .08));
+  color: var(--red, #c7433c);
+}
+
+.reference-health-source,
+.reference-health-suggestion {
+  margin-top: 6px;
+  color: var(--ink-muted);
+  font-size: 8px;
+  line-height: 1.5;
+}
+
+.reference-health-suggestion {
+  color: var(--ink-soft);
+}
+
+.reference-health-issues {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.reference-health-issues span {
+  padding: 2px 5px;
+  border-radius: 5px;
+  background: var(--paper);
+  color: var(--ink-muted);
+  font-size: 7px;
+}
+
+.reference-health-item-actions {
+  margin-top: 7px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.reference-health-item-actions button {
+  min-height: 27px;
+  padding: 0 7px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 8px;
+  cursor: pointer;
+}
+
+.reference-health-item-actions button:hover {
+  border-color: var(--line-strong);
+  background: var(--surface-hover);
+  color: var(--ink);
+}
+
+@media (max-width: 900px) {
+  .reference-health-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
