@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { $getRoot, $getSelection, $isRangeSelection } from 'lexical'
 import { $isHeadingNode } from '@lexical/rich-text'
+import { buildHeadingAnchor } from '../utils/linkUtils'
 
 const levelLabel = {
   h1: 1,
@@ -44,6 +45,30 @@ export function getOutlineBreadcrumb(nodes, activeKey) {
   }
 
   return path
+}
+
+export function findHeadingByPath(nodes, path) {
+  const targetPath = (Array.isArray(path) ? path : [])
+    .map(value => String(value || '').trim().replace(/\s+/g, ' '))
+    .filter(Boolean)
+
+  if (!targetPath.length) return null
+
+  const headings = (Array.isArray(nodes) ? nodes : []).filter(node => node?.isHeading)
+
+  for (const heading of headings) {
+    const breadcrumb = getOutlineBreadcrumb(headings, heading.key)
+      .map(item => String(item.text || '').trim().replace(/\s+/g, ' '))
+
+    if (
+      breadcrumb.length === targetPath.length &&
+      breadcrumb.every((value, index) => value === targetPath[index])
+    ) {
+      return heading
+    }
+  }
+
+  return null
 }
 
 export function getCollapsedOutlineKeys(nodes, collapsedKeys) {
@@ -99,8 +124,10 @@ export default function DocumentOutlinePlugin() {
   const [bodyToggle, setBodyToggle] = useState(null)
   const [open, setOpen] = useState(false)
   const [canReturn, setCanReturn] = useState(false)
+  const [copiedAnchorKey, setCopiedAnchorKey] = useState('')
   const outlineListRef = useRef(null)
   const navigationOriginRef = useRef(null)
+  const anchorCopyTimerRef = useRef(null)
 
   useEffect(() => {
     const collect = editorState => {
@@ -458,6 +485,74 @@ export default function DocumentOutlinePlugin() {
     })
   }
 
+  const copyHeadingAnchor = async heading => {
+    const breadcrumb = getOutlineBreadcrumb(headings, heading.key)
+    const href = buildHeadingAnchor(breadcrumb.map(item => item.text))
+    if (!href) return
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(href)
+      } else {
+        const textarea = document.createElement('textarea')
+        textarea.value = href
+        textarea.setAttribute('readonly', '')
+        textarea.style.position = 'fixed'
+        textarea.style.opacity = '0'
+        document.body.appendChild(textarea)
+        textarea.select()
+        document.execCommand('copy')
+        textarea.remove()
+      }
+
+      if (anchorCopyTimerRef.current) {
+        window.clearTimeout(anchorCopyTimerRef.current)
+      }
+      setCopiedAnchorKey(heading.key)
+      anchorCopyTimerRef.current = window.setTimeout(() => {
+        setCopiedAnchorKey('')
+        anchorCopyTimerRef.current = null
+      }, 1200)
+    } catch {
+      // Copying an anchor is optional; navigation remains usable.
+    }
+  }
+
+  useEffect(() => {
+    const onOpenHeadingAnchor = event => {
+      const target = findHeadingByPath(headings, event.detail?.path)
+      if (!target) return
+
+      const breadcrumb = getOutlineBreadcrumb(headings, target.key)
+      const ancestorKeys = new Set(breadcrumb.map(item => item.key))
+
+      rememberNavigationOrigin()
+      setOpen(true)
+      setCollapsedKeys(previous => {
+        let changed = false
+        const next = new Set(previous)
+        for (const key of ancestorKeys) {
+          if (next.delete(key)) changed = true
+        }
+        return changed ? next : previous
+      })
+
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => goToHeading(target.key, false))
+      })
+    }
+
+    window.addEventListener('editor:open-heading-anchor', onOpenHeadingAnchor)
+    return () => window.removeEventListener('editor:open-heading-anchor', onOpenHeadingAnchor)
+  }, [headings])
+
+  useEffect(() => () => {
+    if (anchorCopyTimerRef.current) {
+      window.clearTimeout(anchorCopyTimerRef.current)
+      anchorCopyTimerRef.current = null
+    }
+  }, [])
+
   const visibleHeadings = headings.filter(heading => !hiddenKeys.has(heading.key))
 
   return (
@@ -513,7 +608,7 @@ export default function DocumentOutlinePlugin() {
               <div className="document-outline-header">
                 <div>
                   <strong>文档目录</strong>
-                  <small>滚动自动跟随 · Ctrl+Shift+O 开关</small>
+                  <small>滚动自动跟随 · # 可复制章节锚点</small>
                 </div>
                 <div className="document-outline-header-actions">
                   <span>{readingProgress}%</span>
@@ -587,6 +682,16 @@ export default function DocumentOutlinePlugin() {
                         aria-current={activeKey === heading.key ? 'location' : undefined}
                       >
                         {heading.text}
+                      </button>
+
+                      <button
+                        type="button"
+                        className={'document-outline-anchor' + (copiedAnchorKey === heading.key ? ' copied' : '')}
+                        onClick={() => void copyHeadingAnchor(heading)}
+                        aria-label={'复制章节锚点：' + heading.text}
+                        title="复制章节锚点"
+                      >
+                        {copiedAnchorKey === heading.key ? '✓' : '#'}
                       </button>
                     </div>
                   )
