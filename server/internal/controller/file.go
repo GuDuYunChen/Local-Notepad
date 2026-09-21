@@ -29,6 +29,7 @@ func (c *FileController) Register(group *ghttp.RouterGroup) {
 	group.POST("/files/{id}/restore", c.Restore)
 	group.GET("/files/{id}/backlinks", c.Backlinks)
 	group.GET("/files/{id}/versions", c.Versions)
+	group.POST("/files/{id}/versions/snapshot", c.SnapshotVersion)
 	group.POST("/files/{id}/versions/{versionId}/restore", c.RestoreVersion)
 	group.GET("/files", c.List)
 	group.POST("/files/batch-delete", c.BatchDelete)
@@ -153,6 +154,15 @@ func (c *FileController) Backlinks(r *ghttp.Request) {
 		return
 	}
 	writeOK(r, links)
+}
+
+func (c *FileController) SnapshotVersion(r *ghttp.Request) {
+	id := r.Get("id").String()
+	if err := c.FileLogic.CreateVersionSnapshot(r.GetCtx(), id); err != nil {
+		writeErrWithDetail(r, 1006, "创建修复前快照失败", err)
+		return
+	}
+	writeOK(r, nil)
 }
 
 func (c *FileController) Versions(r *ghttp.Request) {
