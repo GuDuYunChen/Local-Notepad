@@ -638,17 +638,25 @@ export function planTargetReferenceRefactor(files, targetId, targetOverride = {}
     .filter(file => file && !file.is_folder && !file.is_deleted && !String(file.title || '').startsWith('__tpl__'))
 
   const currentTarget = notes.find(file => String(file.id || '') === id) || null
+  const explicitMappings = Array.isArray(targetOverride.sectionPathMappings)
+    ? targetOverride.sectionPathMappings
+    : []
+  const inferredMappings = targetOverride.content !== undefined
+    ? inferHeadingRenameMappings(
+      currentTarget?.content || '',
+      targetOverride.content || '',
+    )
+    : []
+
   const nextTarget = currentTarget
     ? {
       ...currentTarget,
       ...targetOverride,
       id,
-      sectionPathMappings: targetOverride.content !== undefined
-        ? inferHeadingRenameMappings(
-          currentTarget.content || '',
-          targetOverride.content || '',
-        )
-        : [],
+      sectionPathMappings: [
+        ...explicitMappings,
+        ...inferredMappings,
+      ],
     }
     : null
 
