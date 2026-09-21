@@ -315,12 +315,20 @@ export default function App() {
       return
     }
 
-    setTitleSaving(true)
     try {
+      const review = await reviewRenameRefactor(current, nextTitle)
+      if (!review?.proceed) {
+        setTitleDraft(current.title || '')
+        setTitleEditing(false)
+        return
+      }
+
+      setTitleSaving(true)
       const updated = await api(`/api/files/${current.id}`, {
         method: 'PUT',
         body: JSON.stringify({ title: nextTitle }),
       })
+
       setCurrent(prev => (
         prev?.id === current.id
           ? { ...prev, ...updated, content: prev.content }
@@ -328,7 +336,25 @@ export default function App() {
       ))
       setTitleDraft(updated.title || nextTitle)
       setTitleEditing(false)
-      toast.success('标题已更新')
+
+      if (review.sync && review.plan) {
+        const result = await applyReferenceRepairPlan(review.plan)
+        if (result.skipped.length) {
+          toast.warning(
+            '标题已更新；' +
+            result.repairedReferences +
+            ' 处引用已同步，' +
+            result.skipped.length +
+            ' 篇来源需稍后体检'
+          )
+        } else if (result.repairedReferences) {
+          toast.success('标题已更新，并同步 ' + result.repairedReferences + ' 处引用')
+        } else {
+          toast.success('标题已更新')
+        }
+      } else {
+        toast.success('标题已更新')
+      }
     } catch (error) {
       console.error('重命名失败', error)
       toast.error(error.message || '重命名失败')
@@ -336,7 +362,14 @@ export default function App() {
     } finally {
       setTitleSaving(false)
     }
-  }, [titleEditing, current, titleDraft, titleSaving])
+  }, [
+    applyReferenceRepairPlan,
+    current,
+    reviewRenameRefactor,
+    titleDraft,
+    titleEditing,
+    titleSaving,
+  ])
 
   const loadAndSelect = React.useCallback((id, options = {}) => {
     api(`/api/files/${id}`).then(file => {
