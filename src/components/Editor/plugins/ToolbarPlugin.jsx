@@ -691,6 +691,16 @@ export default function ToolbarPlugin() {
         查找
       </button>
 
+      <button
+        type="button"
+        className="btn toolbar-text-btn toolbar-command-btn"
+        onClick={() => window.dispatchEvent(new Event('editor:open-command-palette'))}
+        aria-label="编辑器命令"
+        title="编辑器命令 (Ctrl+Shift+P)"
+      >
+        命令
+      </button>
+
       <span className="toolbar-slash-hint">输入 / 快速插入</span>
       {isUploading && <span className="toolbar-progress">处理中…</span>}
 
