@@ -1109,6 +1109,15 @@ export default function App() {
                   </ErrorBoundary>
                 )}
 
+                {workspace === 'projects' && (
+                  <React.Suspense fallback={<div className="workspace-loading">正在整理项目…</div>}>
+                    <ProjectWorkspacePanel
+                      onClose={() => setWorkspace('notes')}
+                      onOpenFile={handleInspectorSelectFile}
+                    />
+                  </React.Suspense>
+                )}
+
                 {workspace === 'daily' && (
                   <React.Suspense fallback={<div className="workspace-loading">正在打开每日笔记…</div>}>
                     <DailyNotesPanel
