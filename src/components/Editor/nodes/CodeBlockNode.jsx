@@ -169,7 +169,7 @@ export class CodeBlockNode extends DecoratorNode {
 /**
  * LanguageSelector component for selecting programming language
  */
-function LanguageSelector({ value, onChange }) {
+function LanguageSelector({ value, onChange, disabled = false }) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const dropdownRef = useRef(null);
@@ -210,14 +210,15 @@ function LanguageSelector({ value, onChange }) {
     <div className="language-selector" ref={dropdownRef}>
       <button
         className="language-selector-button"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
         type="button"
+        disabled={disabled}
       >
         {currentLanguageLabel}
         <span className="language-selector-arrow">{isOpen ? '▲' : '▼'}</span>
       </button>
       
-      {isOpen && (
+      {isOpen && !disabled && (
         <div className="language-selector-dropdown">
           <input
             type="text"
@@ -256,6 +257,8 @@ const CodeBlockComponent = React.memo(function CodeBlockComponent({ code, langua
   const preRef = useRef(null);
   const [autoHighlight, setAutoHighlight] = useState(true);
   const [showEnableButton, setShowEnableButton] = useState(false);
+  const [wrapLines, setWrapLines] = useState(false);
+  const [copied, setCopied] = useState(false);
   const highlightTimeoutRef = useRef(null);
   const highlightRequestRef = useRef(0);
 
@@ -324,6 +327,40 @@ const CodeBlockComponent = React.memo(function CodeBlockComponent({ code, langua
     setShowEnableButton(false);
   };
 
+  const isEditable = editor.isEditable();
+
+  const copyCode = async () => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(code);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = code;
+        textarea.setAttribute('readonly', '');
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        textarea.remove();
+      }
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1200);
+    } catch (error) {
+      console.error('复制代码失败:', error);
+    }
+  };
+
+  const removeCodeBlock = () => {
+    if (!isEditable) return;
+    editor.update(() => {
+      const node = $getNodeByKey(nodeKey);
+      if (node && $isCodeBlockNode(node)) {
+        node.remove();
+      }
+    });
+  };
+
   // Handle textarea input changes
   const handleTextareaChange = (event) => {
     const newCode = event.target.value;
@@ -370,30 +407,30 @@ const CodeBlockComponent = React.memo(function CodeBlockComponent({ code, langua
   return (
     <div className="code-block-wrapper">
       <div className="code-block-header">
-        <LanguageSelector value={language} onChange={handleLanguageChange} />
-        {showEnableButton && (
+        <div className="code-block-header-left">
+          <LanguageSelector value={language} onChange={handleLanguageChange} disabled={!isEditable} />
+          <span className="code-block-meta">{lineCount} 行</span>
+          {isLargeFile && (
+            <span className="code-block-meta emphasis">大代码块</span>
+          )}
+        </div>
+
+        <div className="code-block-toolbar" role="toolbar" aria-label="代码块工具">
+          {showEnableButton && isEditable && (
+            <button type="button" onClick={handleEnableHighlight}>启用高亮</button>
+          )}
           <button
-            className="enable-highlight-button"
-            onClick={handleEnableHighlight}
-            style={{
-              marginLeft: '10px',
-              padding: '4px 12px',
-              fontSize: '12px',
-              backgroundColor: '#007bff',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-            }}
+            type="button"
+            className={wrapLines ? 'active' : ''}
+            onClick={() => setWrapLines(value => !value)}
           >
-            启用高亮 ({lineCount} 行)
+            {wrapLines ? '取消换行' : '自动换行'}
           </button>
-        )}
-        {isLargeFile && !showEnableButton && (
-          <span style={{ marginLeft: '10px', fontSize: '12px', color: '#666' }}>
-            大文件 ({lineCount} 行)
-          </span>
-        )}
+          <button type="button" onClick={copyCode}>{copied ? '已复制' : '复制'}</button>
+          {isEditable && (
+            <button type="button" className="danger" onClick={removeCodeBlock}>删除</button>
+          )}
+        </div>
       </div>
       <div className="code-block-content">
         <div className="line-numbers" aria-hidden="true">
@@ -411,6 +448,7 @@ const CodeBlockComponent = React.memo(function CodeBlockComponent({ code, langua
             onPaste={handlePaste}
             onScroll={handleScroll}
             className="code-textarea"
+            readOnly={!isEditable}
             spellCheck={false}
             autoComplete="off"
             autoCorrect="off"
@@ -432,9 +470,9 @@ const CodeBlockComponent = React.memo(function CodeBlockComponent({ code, langua
               color: 'transparent',
               backgroundColor: 'transparent',
               caretColor: '#333',
-              whiteSpace: 'pre',
-              wordWrap: 'normal',
-              overflowWrap: 'normal',
+              whiteSpace: wrapLines ? 'pre-wrap' : 'pre',
+              wordWrap: wrapLines ? 'break-word' : 'normal',
+              overflowWrap: wrapLines ? 'anywhere' : 'normal',
               tabSize: 4,
               zIndex: 3,
             }}
@@ -455,9 +493,9 @@ const CodeBlockComponent = React.memo(function CodeBlockComponent({ code, langua
               lineHeight: '1.5',
               color: '#333',
               backgroundColor: '#f5f5f5',
-              whiteSpace: 'pre',
-              wordWrap: 'normal',
-              overflowWrap: 'normal',
+              whiteSpace: wrapLines ? 'pre-wrap' : 'pre',
+              wordWrap: wrapLines ? 'break-word' : 'normal',
+              overflowWrap: wrapLines ? 'anywhere' : 'normal',
               tabSize: 4,
               overflow: 'auto',
               zIndex: 2,
