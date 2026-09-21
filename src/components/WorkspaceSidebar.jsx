@@ -60,6 +60,11 @@ export default function WorkspaceSidebar({
       icon: <Icon><path d="M5 4h14v16H5z" /><path d="M8 8h8M8 12h8M8 16h5" /></Icon>,
     },
     {
+      id: 'projects',
+      label: '项目',
+      icon: <Icon><path d="M4 5h6l2 2h8v12H4z" /><path d="M8 11h8M8 15h6" /></Icon>,
+    },
+    {
       id: 'daily',
       label: '每日笔记',
       icon: <Icon><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 10h18" /></Icon>,
