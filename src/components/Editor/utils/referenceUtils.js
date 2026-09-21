@@ -173,6 +173,41 @@ function sameSectionPath(left, right) {
   return a.length === b.length && a.every((value, index) => value === b[index])
 }
 
+export function inferHeadingRenameMappings(beforeContent, afterContent) {
+  const before = extractHeadingReferences(beforeContent)
+  const after = extractHeadingReferences(afterContent)
+
+  if (before.length !== after.length || !before.length) return []
+
+  const sameLevels = before.every((item, index) => (
+    item.level === after[index]?.level
+  ))
+  if (!sameLevels) return []
+
+  const renamedIndices = before
+    .map((item, index) => (
+      item.text !== after[index]?.text ? index : -1
+    ))
+    .filter(index => index >= 0)
+
+  if (renamedIndices.length !== 1) return []
+
+  const mappings = []
+  for (let index = 0; index < before.length; index++) {
+    const beforePath = normalizeSectionPath(before[index].path)
+    const afterPath = normalizeSectionPath(after[index].path)
+
+    if (!sameSectionPath(beforePath, afterPath)) {
+      mappings.push({
+        before: beforePath,
+        after: afterPath,
+      })
+    }
+  }
+
+  return mappings
+}
+
 function sectionRepairForTarget(target, sectionPath) {
   const storedPath = normalizeSectionPath(sectionPath)
   if (!storedPath.length) {
@@ -181,6 +216,17 @@ function sectionRepairForTarget(target, sectionPath) {
       repairable: false,
       nextPath: [],
       candidates: [],
+    }
+  }
+
+  const explicitMapping = (target?.sectionPathMappings || [])
+    .find(mapping => sameSectionPath(mapping.before, storedPath))
+  if (explicitMapping) {
+    return {
+      valid: false,
+      repairable: true,
+      nextPath: normalizeSectionPath(explicitMapping.after),
+      candidates: [normalizeSectionPath(explicitMapping.after)],
     }
   }
 
@@ -593,7 +639,17 @@ export function planTargetReferenceRefactor(files, targetId, targetOverride = {}
 
   const currentTarget = notes.find(file => String(file.id || '') === id) || null
   const nextTarget = currentTarget
-    ? { ...currentTarget, ...targetOverride, id }
+    ? {
+      ...currentTarget,
+      ...targetOverride,
+      id,
+      sectionPathMappings: targetOverride.content !== undefined
+        ? inferHeadingRenameMappings(
+          currentTarget.content || '',
+          targetOverride.content || '',
+        )
+        : [],
+    }
     : null
 
   const effectiveNotes = notes.map(file => (
