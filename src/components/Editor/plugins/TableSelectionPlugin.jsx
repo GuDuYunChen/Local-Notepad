@@ -828,8 +828,35 @@ export default function TableSelectionPlugin() {
     })
   }
 
+  const selectedCellCount = rects.reduce((total, rect) => {
+    const rows = rect.r2 - rect.r1 + 1
+    const cols = rect.c2 - rect.c1 + 1
+    return total + rows * cols
+  }, 0)
+
+  const exitSelectionMode = () => {
+    setRects([])
+    setActive(false)
+    window.dispatchEvent(new CustomEvent('tableSelection:mode', { detail: false }))
+    editor.focus()
+  }
+
   return (
     <div ref={overlayRef} className="table-selection-overlay" style={{ pointerEvents: 'none' }}>
+      {active && (
+        <div className="table-selection-modebar" style={{ pointerEvents: 'auto' }}>
+          <div className="table-selection-modebar-copy">
+            <strong>单元格多选</strong>
+            <span>{selectedCellCount > 0 ? `已选择 ${selectedCellCount} 个单元格` : '拖动鼠标框选连续单元格，按 Ctrl/Cmd 可追加区域'}</span>
+          </div>
+          <div className="table-selection-modebar-actions">
+            <button type="button" onClick={doMerge} disabled={selectedCellCount < 2}>合并</button>
+            <button type="button" onClick={doSplit} disabled={selectedCellCount === 0}>拆分</button>
+            <button type="button" onClick={() => doClear()} disabled={selectedCellCount === 0}>清空</button>
+            <button type="button" className="primary" onClick={exitSelectionMode}>完成</button>
+          </div>
+        </div>
+      )}
       {outlines.map((b, i) => (
         <div key={i} className="table-selection-outline" style={{ position: 'absolute', left: b.x, top: b.y, width: b.w, height: b.h }} />
       ))}
