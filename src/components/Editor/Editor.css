@@ -2753,3 +2753,10 @@
     width: min(360px, calc(100vw - 62px));
   }
 }
+
+
+.formula-library-items.favorites button {
+  border-color: color-mix(in srgb, var(--clay) 28%, var(--line));
+  background: color-mix(in srgb, var(--clay-light) 68%, var(--surface));
+  color: var(--ink);
+}
