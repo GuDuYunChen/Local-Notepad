@@ -11,6 +11,7 @@ export function getEditorShortcut(event) {
   const key = String(event.key || '').toLowerCase()
   if (key === 'e') return 'formula'
   if (key === 't') return 'checklist'
+  if (key === 'r') return 'copy-reference'
   return null
 }
 
@@ -37,6 +38,11 @@ export default function EditorShortcutPlugin() {
 
       if (action === 'checklist') {
         editor.dispatchCommand(INSERT_CHECK_LIST_COMMAND)
+        return
+      }
+
+      if (action === 'copy-reference') {
+        window.dispatchEvent(new Event('editor:copy-current-reference'))
       }
     }
 
