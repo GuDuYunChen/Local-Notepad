@@ -824,7 +824,7 @@ export default function ProjectWorkspacePanel({
                         (isBefore ? ' drop-before' : '') +
                         (isAfter ? ' drop-after' : '')
                       }
-                      draggable={!movingId}
+                      draggable={!movingId && editingSummaryId !== note.id}
                       onDragStart={event => {
                         setDraggedNoteId(note.id)
                         event.dataTransfer.effectAllowed = 'move'
