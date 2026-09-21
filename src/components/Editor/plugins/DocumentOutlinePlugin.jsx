@@ -49,6 +49,7 @@ export default function DocumentOutlinePlugin() {
   const [outlineNodes, setOutlineNodes] = useState([])
   const [collapsedKeys, setCollapsedKeys] = useState(() => new Set())
   const [activeKey, setActiveKey] = useState('')
+  const [bodyToggle, setBodyToggle] = useState(null)
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
@@ -159,7 +160,47 @@ export default function DocumentOutlinePlugin() {
     }
   }, [editor, headings, hiddenKeys])
 
-  if (headings.length < 2) return null
+  useEffect(() => {
+    const rootElement = editor.getRootElement()
+    const scroller = rootElement?.closest('.editor-container')
+    if (!rootElement || !scroller) return undefined
+
+    const onMouseMove = event => {
+      const headingElement = event.target?.closest?.('h1, h2, h3, h4, h5, h6')
+      if (!headingElement || !rootElement.contains(headingElement)) {
+        setBodyToggle(null)
+        return
+      }
+
+      const heading = headings.find(item => editor.getElementByKey(item.key) === headingElement)
+      if (!heading || !hasCollapsibleContent(outlineNodes, heading.key)) {
+        setBodyToggle(null)
+        return
+      }
+
+      const rect = headingElement.getBoundingClientRect()
+      setBodyToggle({
+        key: heading.key,
+        collapsed: collapsedKeys.has(heading.key),
+        top: rect.top + Math.max(0, (rect.height - 24) / 2),
+        left: Math.max(6, rect.left - 32),
+      })
+    }
+
+    const hide = () => setBodyToggle(null)
+
+    rootElement.addEventListener('mousemove', onMouseMove)
+    scroller.addEventListener('scroll', hide, { passive: true })
+    window.addEventListener('resize', hide)
+
+    return () => {
+      rootElement.removeEventListener('mousemove', onMouseMove)
+      scroller.removeEventListener('scroll', hide)
+      window.removeEventListener('resize', hide)
+    }
+  }, [editor, headings, outlineNodes, collapsedKeys])
+
+  if (headings.length === 0) return null
 
   const visibleHeadings = headings.filter(heading => !hiddenKeys.has(heading.key))
 
@@ -189,7 +230,26 @@ export default function DocumentOutlinePlugin() {
   }
 
   return (
-    <div className={`document-outline${open ? ' open' : ''}`}>
+    <>
+      {bodyToggle && (
+        <button
+          type="button"
+          className={`heading-body-collapse${bodyToggle.collapsed ? ' collapsed' : ''}`}
+          style={{ top: bodyToggle.top, left: bodyToggle.left }}
+          onMouseDown={event => event.preventDefault()}
+          onClick={() => {
+            toggleCollapsed(bodyToggle.key)
+            setBodyToggle(previous => previous ? { ...previous, collapsed: !previous.collapsed } : previous)
+          }}
+          aria-label={bodyToggle.collapsed ? '展开当前章节' : '折叠当前章节'}
+          title={bodyToggle.collapsed ? '展开章节' : '折叠章节'}
+        >
+          ›
+        </button>
+      )}
+
+      {headings.length >= 2 && (
+        <div className={`document-outline${open ? ' open' : ''}`}>
       <button
         type="button"
         className="document-outline-toggle"
@@ -248,6 +308,8 @@ export default function DocumentOutlinePlugin() {
           </div>
         </div>
       )}
-    </div>
+        </div>
+      )}
+    </>
   )
 }
