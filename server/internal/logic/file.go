@@ -47,12 +47,18 @@ func (l *FileLogic) Create(ctx context.Context, title string, content string, is
 		return nil, fmt.Errorf("已存在同名文件或文件夹: %s", normalizedTitle)
 	}
 
+	sortOrder, err := l.FileDAO.NextSortOrder(ctx, parentID)
+	if err != nil {
+		return nil, fmt.Errorf("生成排序位置失败: %w", err)
+	}
+
 	f := &model.File{
-		ID:       uuid.New().String(),
-		Title:    normalizedTitle,
-		Content:  content,
-		IsFolder: isFolder,
-		ParentID: parentID,
+		ID:        uuid.New().String(),
+		Title:     normalizedTitle,
+		Content:   content,
+		IsFolder:  isFolder,
+		ParentID:  parentID,
+		SortOrder: sortOrder,
 	}
 	if err := l.FileDAO.Create(ctx, f); err != nil {
 		return nil, err
