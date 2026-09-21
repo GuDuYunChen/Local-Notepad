@@ -1940,3 +1940,81 @@
   transform: rotate(0deg);
   opacity: .62;
 }
+
+
+/* Table row and column drag reordering */
+.table-reorder-handle {
+  position: absolute;
+  z-index: 74;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  color: var(--ink-muted);
+  font: inherit;
+  font-size: 10px;
+  letter-spacing: -1px;
+  cursor: grab;
+  opacity: .5;
+  box-shadow: 0 2px 8px rgba(20,16,34,.06);
+  backdrop-filter: blur(8px);
+}
+
+.table-reorder-handle:hover {
+  opacity: 1;
+  color: var(--ink);
+  background: var(--surface);
+  border-color: var(--line-strong);
+}
+
+.table-reorder-handle:active {
+  cursor: grabbing;
+}
+
+.table-reorder-handle:disabled {
+  opacity: .2;
+  cursor: not-allowed;
+}
+
+.table-row-drop-target {
+  position: relative;
+}
+
+.table-row-drop-target::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 2px;
+  z-index: 8;
+  border-radius: 99px;
+  background: var(--clay);
+  box-shadow: 0 0 0 2px var(--clay-light);
+}
+
+.table-col-drop-target {
+  position: relative;
+}
+
+.table-col-drop-target::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: -2px;
+  bottom: 0;
+  width: 2px;
+  z-index: 8;
+  border-radius: 99px;
+  background: var(--clay);
+  box-shadow: 0 0 0 2px var(--clay-light);
+}
+
+.editor-container:has(.table-reorder-handle:active) {
+  cursor: grabbing;
+  user-select: none;
+}
