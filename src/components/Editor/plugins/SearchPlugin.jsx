@@ -4,6 +4,7 @@ import { $getRoot, $getSelection, $isRangeSelection, $createRangeSelection } fro
 import { mergeRegister } from '@lexical/utils';
 
 function $findAllTextNodes(text) {
+  if (!text) return [];
   const root = $getRoot();
   const results = [];
   const lowerText = text.toLowerCase();
