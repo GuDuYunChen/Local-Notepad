@@ -2190,3 +2190,28 @@
     min-width: 0 !important;
   }
 }
+
+
+/* 4.10 multi-select productivity layout */
+.table-selection-modebar {
+  max-width: min(880px, calc(100% - 32px));
+}
+
+.table-selection-modebar-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.table-selection-modebar-actions button {
+  white-space: nowrap;
+}
+
+@media (max-width: 860px) {
+  .table-selection-modebar {
+    align-items: flex-start;
+  }
+
+  .table-selection-modebar-actions {
+    max-width: 60%;
+  }
+}
