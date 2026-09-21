@@ -95,6 +95,11 @@ export default function TableActionMenuPlugin() {
     return () => document.removeEventListener('mousedown', onPointerDown)
   }, [])
 
+  const enterSelectionMode = () => {
+    window.dispatchEvent(new CustomEvent('tableSelection:mode', { detail: true }))
+    setIsMenuOpen(false)
+  }
+
   const dispatch = (type, payload) => {
     const detailPayload = { ...tableInfo }
 
@@ -188,6 +193,7 @@ function TableActionMenu({ menuRef, pos, dispatch }) {
       </MenuSection>
 
       <MenuSection label="单元格">
+        <MenuItem onClick={enterSelectionMode} label="多选单元格…" />
         <MenuItem onClick={() => dispatch('mergeCells')} label="合并所选单元格" />
         <MenuItem onClick={() => dispatch('splitCells')} label="拆分单元格" />
         <MenuItem onClick={() => dispatch('clear')} label="清空内容" />
