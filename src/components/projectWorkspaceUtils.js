@@ -168,6 +168,7 @@ export function readProjectWorkspaceMeta(projectId) {
     return {
       type: value.type === 'script' ? 'script' : 'novel',
       targetWords: Math.max(0, Number(value.targetWords) || 0),
+      chapterTargetWords: Math.max(0, Number(value.chapterTargetWords) || 0),
       statuses: value.statuses && typeof value.statuses === 'object'
         ? { ...value.statuses }
         : {},
@@ -177,14 +178,19 @@ export function readProjectWorkspaceMeta(projectId) {
       supportNoteIds: Array.isArray(value.supportNoteIds)
         ? [...new Set(value.supportNoteIds.map(normalizeId).filter(Boolean))]
         : [],
+      foreshadowStates: value.foreshadowStates && typeof value.foreshadowStates === 'object'
+        ? { ...value.foreshadowStates }
+        : {},
     }
   } catch {
     return {
       type: 'novel',
       targetWords: 0,
+      chapterTargetWords: 0,
       statuses: {},
       summaries: {},
       supportNoteIds: [],
+      foreshadowStates: {},
     }
   }
 }
@@ -198,6 +204,7 @@ export function writeProjectWorkspaceMeta(projectId, nextMeta) {
     all[id] = {
       type: nextMeta?.type === 'script' ? 'script' : 'novel',
       targetWords: Math.max(0, Number(nextMeta?.targetWords) || 0),
+      chapterTargetWords: Math.max(0, Number(nextMeta?.chapterTargetWords) || 0),
       statuses: nextMeta?.statuses && typeof nextMeta.statuses === 'object'
         ? nextMeta.statuses
         : {},
@@ -207,6 +214,9 @@ export function writeProjectWorkspaceMeta(projectId, nextMeta) {
       supportNoteIds: Array.isArray(nextMeta?.supportNoteIds)
         ? [...new Set(nextMeta.supportNoteIds.map(normalizeId).filter(Boolean))]
         : [],
+      foreshadowStates: nextMeta?.foreshadowStates && typeof nextMeta.foreshadowStates === 'object'
+        ? nextMeta.foreshadowStates
+        : {},
     }
     localStorage.setItem(PROJECT_META_KEY, JSON.stringify(all))
   } catch {
