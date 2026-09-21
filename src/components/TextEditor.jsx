@@ -23,6 +23,7 @@ function TextEditorInternal({
   const saveAbortRef = useRef(null)
   const loadAbortRef = useRef(null)
   const inFlightSaveRef = useRef(null)
+  const savingCountsRef = useRef(new Map())
   const currentIdRef = useRef(null)
   const [loading, setLoading] = useState(false)
   const [switching, setSwitching] = useState(false)
@@ -47,6 +48,30 @@ function TextEditorInternal({
   useEffect(() => { onStatusChangeRef.current = onStatusChange }, [onStatusChange])
   useEffect(() => { deletedIdsRef.current = deletedIds }, [deletedIds])
 
+  const syncCurrentSavingState = React.useCallback((id = currentIdRef.current) => {
+    if (!id) {
+      setSaving(false)
+      return
+    }
+    setSaving((savingCountsRef.current.get(id) || 0) > 0)
+  }, [beginSaving, endSaving])
+
+  const beginSaving = React.useCallback((id) => {
+    const next = (savingCountsRef.current.get(id) || 0) + 1
+    savingCountsRef.current.set(id, next)
+    if (id === currentIdRef.current) setSaving(true)
+  }, [])
+
+  const endSaving = React.useCallback((id) => {
+    const current = savingCountsRef.current.get(id) || 0
+    if (current <= 1) savingCountsRef.current.delete(id)
+    else savingCountsRef.current.set(id, current - 1)
+
+    if (id === currentIdRef.current) {
+      setSaving((savingCountsRef.current.get(id) || 0) > 0)
+    }
+  }, [])
+
   const saveNow = React.useCallback(async (reason, specificId = null, contentOverride = null) => {
     const id = specificId || currentIdRef.current
     if (!id) return
@@ -70,7 +95,7 @@ function TextEditorInternal({
     const ctl = new AbortController()
     const savePromise = (async () => {
       try {
-        setSaving(true)
+        beginSaving(id)
         setSaveError(false)
         saveAbortRef.current = ctl
 
@@ -97,7 +122,7 @@ function TextEditorInternal({
       } finally {
         if (saveAbortRef.current === ctl) saveAbortRef.current = null
         if (inFlightSaveRef.current?.promise === savePromise) inFlightSaveRef.current = null
-        setSaving(false)
+        endSaving(id)
       }
     })()
 
@@ -131,6 +156,7 @@ function TextEditorInternal({
     const loadCtl = new AbortController()
     loadAbortRef.current = loadCtl
     currentIdRef.current = activeId || null
+    syncCurrentSavingState(activeId || null)
 
     if (!activeId) {
       setSwitching(false)
@@ -178,7 +204,7 @@ function TextEditorInternal({
       loadCtl.abort()
       if (loadAbortRef.current === loadCtl) loadAbortRef.current = null
     }
-  }, [activeId, autoSaveOnSwitch])
+  }, [activeId, autoSaveOnSwitch, saveNow, syncCurrentSavingState])
 
   useEffect(() => {
     if (intervalRef.current) window.clearInterval(intervalRef.current)
