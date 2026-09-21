@@ -671,6 +671,13 @@ export default function DocumentOutlinePlugin({ documentId = '', documentTitle =
                   <span>{readingProgress}%</span>
                   <button
                     type="button"
+                    onClick={() => window.dispatchEvent(new Event('editor:open-structure-manager'))}
+                    title="打开长篇结构管理"
+                  >
+                    结构
+                  </button>
+                  <button
+                    type="button"
                     onClick={goToCaret}
                     disabled={!caretTopLevelKey}
                     title="回到最后输入位置"
