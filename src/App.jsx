@@ -12,6 +12,7 @@ import ToastViewport from './components/ToastViewport'
 import ReferenceRefactorDialog from './components/ReferenceRefactorDialog'
 import { toast } from '~/services/toast'
 import {
+  expandRefactorTargetIds,
   planDeleteReferenceImpact,
   planTargetReferenceRefactor,
 } from './components/Editor/utils/referenceUtils'
@@ -232,25 +233,9 @@ export default function App() {
         ))
       }
 
-      const expandedTargetIds = new Set(ids)
-      let expanded = true
-      while (expanded) {
-        expanded = false
-        for (const file of files) {
-          if (
-            file?.parent_id &&
-            expandedTargetIds.has(file.parent_id) &&
-            !expandedTargetIds.has(file.id)
-          ) {
-            expandedTargetIds.add(file.id)
-            expanded = true
-          }
-        }
-      }
-
       const plan = planDeleteReferenceImpact(
         files,
-        Array.from(expandedTargetIds),
+        expandRefactorTargetIds(files, ids),
       )
       const decision = await requestReferenceRefactor({
         mode: 'delete',
