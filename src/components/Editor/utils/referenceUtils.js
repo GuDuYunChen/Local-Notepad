@@ -596,13 +596,19 @@ export function planTargetReferenceRefactor(files, targetId, targetOverride = {}
     ? { ...currentTarget, ...targetOverride, id }
     : null
 
+  const effectiveNotes = notes.map(file => (
+    String(file.id || '') === id && nextTarget
+      ? nextTarget
+      : file
+  ))
+
   const sources = []
   let incomingReferences = 0
   let repairable = 0
   let broken = 0
   let repairableFiles = 0
 
-  for (const source of notes) {
+  for (const source of effectiveNotes) {
     const references = collectWikiReferences(source.content || '')
       .filter(reference => reference.id === id)
 
