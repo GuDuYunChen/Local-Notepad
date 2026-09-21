@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { listAllFiles } from './api'
+import {
+  createFileVersionSnapshot,
+  listAllFiles,
+  listAllFilesWithContent,
+} from './api'
 
 function response(data) {
   return {
@@ -71,5 +75,35 @@ describe('listAllFiles', () => {
     expect(files.find(file => file.id === 'match-199')?.title).toBe('Updated Match 199')
     expect(fetchMock.mock.calls[0][0]).toContain('q=%E5%AF%8C%E8%81%94')
     expect(fetchMock.mock.calls[1][0]).toContain('q=%E5%AF%8C%E8%81%94')
+  })
+})
+
+
+describe('reference health API helpers', () => {
+  it('loads full content for library reference scans without compact mode', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(response([
+        { id: 'file-1', title: 'One', content: 'full-content' },
+      ]))
+
+    const files = await listAllFilesWithContent()
+
+    expect(files).toEqual([
+      { id: 'file-1', title: 'One', content: 'full-content' },
+    ])
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock.mock.calls[0][0]).toContain('/api/files?page=1&size=200')
+    expect(fetchMock.mock.calls[0][0]).not.toContain('compact=1')
+  })
+
+  it('creates an explicit pre-repair version snapshot', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(response(null))
+
+    await createFileVersionSnapshot('file-1')
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock.mock.calls[0][0]).toContain('/api/files/file-1/versions/snapshot')
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({ method: 'POST' })
   })
 })
