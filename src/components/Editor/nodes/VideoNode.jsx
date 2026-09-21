@@ -56,6 +56,10 @@ export class VideoNode extends DecoratorNode {
     return false;
   }
 
+  isInline() {
+    return false;
+  }
+
   decorate() {
     return <VideoComponent src={this.__src} width={this.__width} height={this.__height} poster={this.__poster} duration={this.__duration} />;
   }
