@@ -21,6 +21,7 @@ export default function App() {
   const editorRef = useRef(null)
   const titleInputRef = useRef(null)
   const skipTitleCommitRef = useRef(false)
+  const pendingEditorNavigationRef = useRef(null)
   const [ready, setReady] = useState(false)
   const [workspace, setWorkspace] = useState('notes')
   const [inspectorOpen, setInspectorOpen] = useState(false)
@@ -156,8 +157,21 @@ export default function App() {
     }
   }, [titleEditing, current, titleDraft, titleSaving])
 
-  const loadAndSelect = React.useCallback((id) => {
-    api(`/api/files/${id}`).then(select)
+  const loadAndSelect = React.useCallback((id, options = {}) => {
+    api(`/api/files/${id}`).then(file => {
+      const headingPath = Array.isArray(options?.headingPath)
+        ? options.headingPath.filter(Boolean)
+        : []
+
+      if (headingPath.length) {
+        pendingEditorNavigationRef.current = {
+          id,
+          headingPath,
+        }
+      }
+
+      select(file)
+    })
   }, [select])
 
   const updateCurrentFile = React.useCallback(async (patch) => {
@@ -274,15 +288,25 @@ export default function App() {
   }, [changeWorkspace])
 
   const handleSelectFile = (f, options = {}) => {
+    const performSelect = () => {
+      select(f)
+      options.afterSelect?.(f)
+    }
+
     if (current && f && f.id === current.id) {
       setWorkspace('notes')
+      options.afterSelect?.(f)
       return
     }
     if (options?.skipSave || (current && deletedIds.has(current.id)) || !current || !unsaved) {
-      select(f)
+      performSelect()
       return
     }
-    setDialog({ type: 'unsaved', next: () => select(f) })
+    setDialog({
+      type: 'unsaved',
+      next: performSelect,
+      cancel: () => options.onCancel?.(),
+    })
   }
 
   useEffect(() => {
@@ -290,8 +314,36 @@ export default function App() {
       const id = event.detail?.id
       if (!id) return
 
+      const headingPath = Array.isArray(event.detail?.headingPath)
+        ? event.detail.headingPath.filter(Boolean)
+        : []
+
       api(`/api/files/${id}`)
-        .then(file => handleSelectFile(file))
+        .then(file => handleSelectFile(file, {
+          afterSelect: () => {
+            if (!headingPath.length) return
+
+            pendingEditorNavigationRef.current = {
+              id,
+              headingPath,
+            }
+
+            if (current?.id === id) {
+              const pending = pendingEditorNavigationRef.current
+              pendingEditorNavigationRef.current = null
+              window.requestAnimationFrame(() => {
+                window.dispatchEvent(new CustomEvent('editor:open-heading-anchor', {
+                  detail: { path: pending.headingPath },
+                }))
+              })
+            }
+          },
+          onCancel: () => {
+            if (pendingEditorNavigationRef.current?.id === id) {
+              pendingEditorNavigationRef.current = null
+            }
+          },
+        }))
         .catch(error => {
           console.error('打开 WikiLink 失败', error)
           toast.error('目标笔记不存在或已删除')
@@ -469,6 +521,7 @@ export default function App() {
                     <TextEditor
                       ref={editorRef}
                       activeId={current?.id || null}
+                      documentTitle={current?.title || ''}
                       deletedIds={deletedIds}
                       autoSaveOnSwitch={false}
                       onCreateNote={() => window.dispatchEvent(new Event('library:create-note'))}
@@ -479,6 +532,18 @@ export default function App() {
                         if (current) {
                           setCurrent(prev => ({ ...prev, content: text }))
                           setContent(text)
+
+                          const pending = pendingEditorNavigationRef.current
+                          if (pending?.id === current.id && pending.headingPath?.length) {
+                            pendingEditorNavigationRef.current = null
+                            window.requestAnimationFrame(() => {
+                              window.requestAnimationFrame(() => {
+                                window.dispatchEvent(new CustomEvent('editor:open-heading-anchor', {
+                                  detail: { path: pending.headingPath },
+                                }))
+                              })
+                            })
+                          }
                         }
                       }}
                       onStatusChange={setEditorStatus}
