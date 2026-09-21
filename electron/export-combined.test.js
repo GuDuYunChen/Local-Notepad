@@ -2,6 +2,11 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+
+vi.mock('electron', () => ({
+  BrowserWindow: class MockBrowserWindow {},
+}))
+
 import { exportCombinedManuscript } from './export.js'
 
 function response(data) {
