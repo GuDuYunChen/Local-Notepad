@@ -107,6 +107,79 @@ describe('TextEditor save coordination', () => {
     expect(onOpenDaily).toHaveBeenCalledTimes(1)
   })
 
+  it('preserves explicit structure mappings in transformed drafts', async () => {
+    const original = JSON.stringify({
+      root: {
+        children: [{
+          type: 'heading',
+          tag: 'h1',
+          children: [{ type: 'text', text: '第一章' }],
+        }],
+      },
+    })
+    const transformed = JSON.stringify({
+      root: {
+        children: [{
+          type: 'heading',
+          tag: 'h1',
+          children: [{ type: 'text', text: '合并后的章节' }],
+        }],
+      },
+    })
+
+    api.mockImplementation((path, init) => {
+      if (!init?.method) {
+        return Promise.resolve({
+          id: 'file-1',
+          content: original,
+          updated_at: 1,
+        })
+      }
+      return Promise.resolve({
+        id: 'file-1',
+        content: transformed,
+        updated_at: 2,
+      })
+    })
+
+    const editorRef = React.createRef()
+    await act(async () => {
+      root.render(
+        <TextEditor
+          ref={editorRef}
+          activeId="file-1"
+          deletedIds={new Set()}
+          autoSaveOnSwitch={false}
+          onChange={() => {}}
+          onLoaded={() => {}}
+          onSaved={() => {}}
+        />
+      )
+    })
+    await flushPromises()
+
+    await act(async () => {
+      editorRef.current.replaceDraftContent(transformed, {
+        sectionPathMappings: [{
+          before: ['第一章'],
+          after: ['合并后的章节'],
+        }],
+      })
+      await Promise.resolve()
+    })
+
+    expect(editorRef.current.getReferenceRefactorState()).toMatchObject({
+      currentContent: transformed,
+      savedContent: original,
+      structureChanged: true,
+      sectionPathMappings: [{
+        before: ['第一章'],
+        after: ['合并后的章节'],
+      }],
+    })
+    expect(globalThis.__textEditorMockInitialContent).toBe(transformed)
+  })
+
   it('holds structural edits out of interval autosave until explicit review', async () => {
     const original = JSON.stringify({
       root: {
