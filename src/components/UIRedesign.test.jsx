@@ -11,10 +11,11 @@ import ToastViewport from './ToastViewport'
 import NameDialog from './NameDialog'
 import ReferenceRefactorDialog from './ReferenceRefactorDialog'
 import LongFormStructurePanel from './LongFormStructurePanel'
+import ProjectWorkspacePanel from './ProjectWorkspacePanel'
 import { compareLibraryItems } from './FileList'
 import { statusLabel } from './InspectorPanel'
 import { toast } from '~/services/toast'
-import { api, searchFiles } from '~/services/api'
+import { api, listAllFilesWithContent, searchFiles } from '~/services/api'
 
 vi.mock('./ThemeToggle', () => ({
   default: function MockThemeToggle() {
@@ -24,6 +25,7 @@ vi.mock('./ThemeToggle', () => ({
 
 vi.mock('~/services/api', () => ({
   api: vi.fn(),
+  listAllFilesWithContent: vi.fn(),
   searchFiles: vi.fn(),
 }))
 
@@ -48,6 +50,7 @@ describe('UI redesign smoke tests', () => {
   beforeEach(() => {
     globalThis.IS_REACT_ACT_ENVIRONMENT = true
     api.mockReset()
+    listAllFilesWithContent.mockReset()
     searchFiles.mockReset()
     container = document.createElement('div')
     document.body.appendChild(container)
@@ -94,6 +97,7 @@ describe('UI redesign smoke tests', () => {
     const buttons = Array.from(container.querySelectorAll('button'))
     const searchButton = buttons.find(button => button.getAttribute('aria-label') === '搜索笔记')
     const notesButton = buttons.find(button => button.getAttribute('aria-label') === '笔记')
+    const projectButton = buttons.find(button => button.getAttribute('aria-label') === '项目')
     const dailyButton = buttons.find(button => button.getAttribute('aria-label') === '每日笔记')
     const graphButton = buttons.find(button => button.getAttribute('aria-label') === '知识图谱')
     const moreButton = buttons.find(button => button.getAttribute('aria-label') === '更多功能')
@@ -101,6 +105,7 @@ describe('UI redesign smoke tests', () => {
     expect(searchButton).toBeTruthy()
     expect(notesButton).toBeTruthy()
     expect(notesButton.classList.contains('active')).toBe(true)
+    expect(projectButton).toBeTruthy()
     expect(dailyButton).toBeTruthy()
     expect(graphButton).toBeTruthy()
     expect(moreButton).toBeTruthy()
@@ -239,6 +244,74 @@ describe('UI redesign smoke tests', () => {
 
     expect(onSelectFile).toHaveBeenCalledWith(expect.objectContaining({ id: 'file-1' }))
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('renders a project board with chapter stats and local status', async () => {
+    const onOpenFile = vi.fn()
+    listAllFilesWithContent.mockResolvedValue([
+      {
+        id: 'project',
+        title: '太初宇宙',
+        is_folder: true,
+        parent_id: '',
+        sort_order: 100,
+      },
+      {
+        id: 'volume-1',
+        title: '第一卷',
+        is_folder: true,
+        parent_id: 'project',
+        sort_order: 100,
+      },
+      {
+        id: 'chapter-1',
+        title: '第一章.md',
+        is_folder: false,
+        parent_id: 'volume-1',
+        sort_order: 100,
+        updated_at: 10,
+        content: JSON.stringify({
+          root: {
+            children: [{
+              type: 'paragraph',
+              children: [{ type: 'text', text: '一二三' }],
+            }],
+          },
+        }),
+      },
+    ])
+
+    await act(async () => {
+      root.render(
+        <ProjectWorkspacePanel
+          onOpenFile={onOpenFile}
+          onClose={() => {}}
+        />
+      )
+    })
+    await flushPromises()
+
+    expect(container.textContent).toContain('项目工作台')
+    expect(container.textContent).toContain('太初宇宙')
+    expect(container.textContent).toContain('第一卷')
+    expect(container.textContent).toContain('第一章')
+    expect(container.textContent).toContain('3 字')
+    expect(container.textContent).toContain('草稿')
+
+    const statusButton = Array.from(container.querySelectorAll('button'))
+      .find(button => button.textContent === '草稿')
+    await click(statusButton)
+    expect(container.textContent).toContain('修订')
+
+    const chapterButton = Array.from(container.querySelectorAll('button'))
+      .find(button => button.textContent.includes('第一章') && button.classList.contains('project-chapter-open'))
+    await click(chapterButton)
+    expect(onOpenFile).toHaveBeenCalledWith('chapter-1')
+
+    const scriptButton = Array.from(container.querySelectorAll('button'))
+      .find(button => button.textContent === '剧本')
+    await click(scriptButton)
+    expect(container.textContent).toContain('剧本项目')
   })
 
   it('renders and reorders a long-form volume chapter structure', async () => {
