@@ -163,7 +163,16 @@ const FileNode = ({
  * 职责：展示应用库中的文件列表（树形结构），提供新建/打开/保存/删除基础操作
  * 增强：文件夹文件计数、拖拽排序与移动、删除优化
  */
-export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDelete, onItemsChanged, updatedItem }) {
+export default function FileList({
+  selectedId,
+  onSelect,
+  onBeforeNew,
+  onBeforeDelete,
+  onBeforeRename,
+  onAfterRename,
+  onItemsChanged,
+  updatedItem,
+}) {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(false)
   const [q, setQ] = useState('')
@@ -717,7 +726,38 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
     }
   }
 
+  function collectDeleteTargetIds(roots) {
+      const targetIds = new Set(
+          (Array.isArray(roots) ? roots : [roots]).filter(Boolean)
+      )
+
+      let changed = true
+      while (changed) {
+          changed = false
+          for (const item of items) {
+              if (item.parent_id && targetIds.has(item.parent_id) && !targetIds.has(item.id)) {
+                  targetIds.add(item.id)
+                  changed = true
+              }
+          }
+      }
+
+      return Array.from(targetIds)
+  }
+
   async function onBatchDeleteConfirm(ids, roots) {
+      const targetIds = collectDeleteTargetIds(roots)
+      const rootTitles = (roots || [])
+          .map(id => items.find(item => item.id === id)?.title)
+          .filter(Boolean)
+      const allowed = await (onBeforeDelete?.({
+          targetIds,
+          targetTitle: rootTitles.length === 1
+              ? rootTitles[0]
+              : (rootTitles.length + ' 个所选项目'),
+      }) ?? true)
+      if (!allowed) return
+
       // Logic:
       // 1. If active file is deleted, find adjacent file FIRST.
       // 2. Execute Delete.
@@ -931,6 +971,12 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
 
       const targetItem = items.find(i => i.id === targetId)
       if (!targetItem) return
+
+      const allowed = await (onBeforeDelete?.({
+          targetIds: collectDeleteTargetIds([targetId]),
+          targetTitle: targetItem.title,
+      }) ?? true)
+      if (!allowed) return
       
       // Calculate count for recursive delete
       let count = 0
@@ -1136,6 +1182,24 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
           }
       }
 
+      let referenceReview = {
+          proceed: true,
+          sync: false,
+          plan: null,
+      }
+
+      if (renaming && !renaming.is_folder && onBeforeRename) {
+          referenceReview = await onBeforeRename({
+              item: renaming,
+              nextTitle: finalName,
+          })
+
+          if (!referenceReview?.proceed) {
+              setRenaming(null)
+              return
+          }
+      }
+
       const updated = await api(`/api/files/${id}`, { method: 'PUT', body: JSON.stringify({ title: finalName }) })
       // Push history
       const oldTitle = items.find(i => i.id === id)?.title
@@ -1145,6 +1209,19 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
       setItems(nextItems)
       onItemsChanged?.(nextItems)
       setRenaming(null)
+
+      if (referenceReview?.sync && referenceReview?.plan && onAfterRename) {
+          try {
+              await onAfterRename({
+                  item: renaming,
+                  updated,
+                  review: referenceReview,
+              })
+          } catch (error) {
+              console.error('引用同步失败', error)
+              toast.warning('笔记已改名，但部分引用同步失败，可在“引用体检”中继续修复')
+          }
+      }
     } catch (e) { 
         console.error(e)
         throw e // Rethrow to let NameDialog handle it
