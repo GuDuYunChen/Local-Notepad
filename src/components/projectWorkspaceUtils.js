@@ -74,6 +74,10 @@ export function buildProjectWorkspace(files, projectId, projectMeta = {}) {
   ))
   if (!project) return null
 
+  const supportNoteIds = new Set(
+    (projectMeta.supportNoteIds || []).map(normalizeId)
+  )
+
   const directChildren = items.filter(item => (
     normalizeId(item.parent_id) === normalizeId(project.id)
   ))
@@ -81,7 +85,9 @@ export function buildProjectWorkspace(files, projectId, projectMeta = {}) {
     directChildren.filter(item => item.is_folder)
   )
   const directNotes = sortAscendingByLibraryOrder(
-    directChildren.filter(item => !item.is_folder)
+    directChildren.filter(item => (
+      !item.is_folder && !supportNoteIds.has(normalizeId(item.id))
+    ))
   )
 
   const volumes = []
@@ -99,6 +105,7 @@ export function buildProjectWorkspace(files, projectId, projectMeta = {}) {
   for (const folder of volumeFolders) {
     const notes = items.filter(item => (
       !item.is_folder &&
+      !supportNoteIds.has(normalizeId(item.id)) &&
       normalizeId(item.parent_id) === normalizeId(folder.id)
     ))
 
@@ -167,6 +174,9 @@ export function readProjectWorkspaceMeta(projectId) {
       summaries: value.summaries && typeof value.summaries === 'object'
         ? { ...value.summaries }
         : {},
+      supportNoteIds: Array.isArray(value.supportNoteIds)
+        ? [...new Set(value.supportNoteIds.map(normalizeId).filter(Boolean))]
+        : [],
     }
   } catch {
     return {
@@ -174,6 +184,7 @@ export function readProjectWorkspaceMeta(projectId) {
       targetWords: 0,
       statuses: {},
       summaries: {},
+      supportNoteIds: [],
     }
   }
 }
@@ -193,6 +204,9 @@ export function writeProjectWorkspaceMeta(projectId, nextMeta) {
       summaries: nextMeta?.summaries && typeof nextMeta.summaries === 'object'
         ? nextMeta.summaries
         : {},
+      supportNoteIds: Array.isArray(nextMeta?.supportNoteIds)
+        ? [...new Set(nextMeta.supportNoteIds.map(normalizeId).filter(Boolean))]
+        : [],
     }
     localStorage.setItem(PROJECT_META_KEY, JSON.stringify(all))
   } catch {
@@ -289,6 +303,13 @@ export function calculateProjectCardMove(files, noteId, targetParentId, targetIn
   }
 }
 
+export function getProjectDescendantNoteIds(files, projectId) {
+  return descendantsOf(files, projectId)
+    .filter(item => !item.is_folder)
+    .map(item => item.id)
+    .filter(Boolean)
+}
+
 export function getProjectProgress(workspace, projectMeta = {}) {
   const totalWords = Number(workspace?.totalWords) || 0
   const targetWords = Math.max(0, Number(projectMeta?.targetWords) || 0)
@@ -364,14 +385,15 @@ export function getProjectTemplate(type = 'novel') {
     return {
       id: 'script',
       label: '剧本项目模板',
+      targetWords: 30000,
       folders: [
         { key: 'act-1', title: '第一集' },
       ],
       notes: [
-        { title: '剧集总纲.md', parentKey: '', content: '# 剧集总纲\n\n## 核心冲突\n\n## 主线推进\n\n## 角色弧光\n' },
-        { title: '角色表.md', parentKey: '', content: '# 角色表\n\n## 主要角色\n\n## 关系变化\n' },
-        { title: '场景表.md', parentKey: '', content: '# 场景表\n\n## 常用场景\n\n## 视觉锚点\n' },
-        { title: '伏笔清单.md', parentKey: '', content: '# 伏笔清单\n\n## 已埋\n\n## 待回收\n' },
+        { title: '剧集总纲.md', parentKey: '', role: 'support', content: '# 剧集总纲\n\n## 核心冲突\n\n## 主线推进\n\n## 角色弧光\n' },
+        { title: '角色表.md', parentKey: '', role: 'support', content: '# 角色表\n\n## 主要角色\n\n## 关系变化\n' },
+        { title: '场景表.md', parentKey: '', role: 'support', content: '# 场景表\n\n## 常用场景\n\n## 视觉锚点\n' },
+        { title: '伏笔清单.md', parentKey: '', role: 'support', content: '# 伏笔清单\n\n## 已埋\n\n## 待回收\n' },
         { title: '第一场.md', parentKey: 'act-1', content: '# 第一场\n\n## 场景目标\n\n## 动作与对白\n' },
       ],
     }
@@ -380,14 +402,15 @@ export function getProjectTemplate(type = 'novel') {
   return {
     id: 'novel',
     label: '小说项目模板',
+    targetWords: 500000,
     folders: [
       { key: 'volume-1', title: '第一卷' },
     ],
     notes: [
-      { title: '作品总纲.md', parentKey: '', content: '# 作品总纲\n\n## 核心命题\n\n## 主线\n\n## 终局\n' },
-      { title: '人物设定.md', parentKey: '', content: '# 人物设定\n\n## 主角\n\n## 重要配角\n' },
-      { title: '世界观.md', parentKey: '', content: '# 世界观\n\n## 地域\n\n## 力量体系\n\n## 社会规则\n' },
-      { title: '伏笔清单.md', parentKey: '', content: '# 伏笔清单\n\n## 已埋\n\n## 待回收\n' },
+      { title: '作品总纲.md', parentKey: '', role: 'support', content: '# 作品总纲\n\n## 核心命题\n\n## 主线\n\n## 终局\n' },
+      { title: '人物设定.md', parentKey: '', role: 'support', content: '# 人物设定\n\n## 主角\n\n## 重要配角\n' },
+      { title: '世界观.md', parentKey: '', role: 'support', content: '# 世界观\n\n## 地域\n\n## 力量体系\n\n## 社会规则\n' },
+      { title: '伏笔清单.md', parentKey: '', role: 'support', content: '# 伏笔清单\n\n## 已埋\n\n## 待回收\n' },
       { title: '第一章.md', parentKey: 'volume-1', content: '# 第一章\n\n' },
     ],
   }
