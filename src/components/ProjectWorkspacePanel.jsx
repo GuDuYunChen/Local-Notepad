@@ -69,6 +69,7 @@ export default function ProjectWorkspacePanel({
     targetWords: 0,
     statuses: {},
     summaries: {},
+    supportNoteIds: [],
   })
   const [projectIndexes, setProjectIndexes] = useState({
     characters: [],
@@ -101,7 +102,7 @@ export default function ProjectWorkspacePanel({
     } finally {
       setLoading(false)
     }
-  }, [files])
+  }, [])
 
   useEffect(() => {
     void load()
@@ -128,6 +129,7 @@ export default function ProjectWorkspacePanel({
         targetWords: 0,
         statuses: {},
         summaries: {},
+        supportNoteIds: [],
       })
       return
     }
@@ -201,7 +203,7 @@ export default function ProjectWorkspacePanel({
     } finally {
       setIndexLoading(false)
     }
-  }, [])
+  }, [files])
 
   const workspace = useMemo(
     () => buildProjectWorkspace(files, selectedProjectId, projectMeta),
@@ -211,7 +213,7 @@ export default function ProjectWorkspacePanel({
   useEffect(() => {
     if (!workspace?.project?.id) return
     void loadProjectIndexes(workspace)
-  }, [loadProjectIndexes, workspace?.project?.id, files])
+  }, [loadProjectIndexes, workspace?.project?.id])
 
   const labels = getProjectLabels(workspace?.project?.type || projectMeta.type)
   const progress = getProjectProgress(workspace, projectMeta)
