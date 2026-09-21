@@ -36,6 +36,7 @@ import BlockHandlePlugin from "./plugins/BlockHandlePlugin";
 import MentionPlugin from "./plugins/MentionPlugin";
 import WikiLinkPlugin from "./plugins/WikiLinkPlugin";
 import DragDropPlugin from "./plugins/DragDropPlugin";
+import EditorShortcutPlugin from "./plugins/EditorShortcutPlugin";
 import { ImageNode } from "./nodes/ImageNode";
 import { VideoNode } from "./nodes/VideoNode";
 import { ImageGridNode } from "./nodes/ImageGridNode";
@@ -204,6 +205,7 @@ export default function Editor({ initialContent, onChange, readOnly }) {
           <MentionPlugin />
           <WikiLinkPlugin />
           <DragDropPlugin />
+          <EditorShortcutPlugin />
           <OnChangePlugin onChange={onChange} />
           <LoadContentPlugin content={initialContent} />
           <TableSelectionPlugin />
