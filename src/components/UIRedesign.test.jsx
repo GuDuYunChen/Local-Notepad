@@ -324,6 +324,9 @@ describe('UI redesign smoke tests', () => {
     expect(container.textContent).toContain('创作进度')
     expect(container.textContent).toContain('最近写作')
     expect(container.textContent).toContain('项目索引')
+    expect(container.textContent).toContain('创作分析')
+    expect(container.textContent).toContain('写作节奏')
+    expect(container.textContent).toContain('卷级完成度')
     expect(container.textContent).toContain('未设目标')
     expect(container.textContent).toContain('一二三')
 
@@ -505,6 +508,14 @@ describe('UI redesign smoke tests', () => {
     expect(container.textContent).toContain('关关')
     expect(container.textContent).toContain('青崖镇')
     expect(container.textContent).toContain('剑鞘伏笔')
+    expect(container.textContent).toContain('伏笔回收')
+    expect(container.textContent).toContain('待回收')
+
+    const foreshadowState = Array.from(container.querySelectorAll('button'))
+      .find(button => button.textContent === '待回收')
+    expect(foreshadowState).toBeTruthy()
+    await click(foreshadowState)
+    expect(container.textContent).toContain('已回收')
   })
 
   it('renders and reorders a long-form volume chapter structure', async () => {
