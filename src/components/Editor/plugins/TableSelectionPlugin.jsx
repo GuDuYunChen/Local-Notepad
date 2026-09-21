@@ -5,6 +5,14 @@ import { TableNode, TableRowNode, TableCellNode, $createTableCellNode, $createTa
 import { $getNodeByKey } from 'lexical'
 import { toast } from '~/services/toast'
 
+export function countSelectedTableCells(rects) {
+  return (Array.isArray(rects) ? rects : []).reduce((total, rect) => {
+    const rows = rect.r2 - rect.r1 + 1
+    const cols = rect.c2 - rect.c1 + 1
+    return total + rows * cols
+  }, 0)
+}
+
 export default function TableSelectionPlugin() {
   const [editor] = useLexicalComposerContext()
   const [active, setActive] = useState(false)
@@ -836,11 +844,7 @@ export default function TableSelectionPlugin() {
     })
   }
 
-  const selectedCellCount = rects.reduce((total, rect) => {
-    const rows = rect.r2 - rect.r1 + 1
-    const cols = rect.c2 - rect.c1 + 1
-    return total + rows * cols
-  }, 0)
+  const selectedCellCount = countSelectedTableCells(rects)
 
   const exitSelectionMode = () => {
     setRects([])
