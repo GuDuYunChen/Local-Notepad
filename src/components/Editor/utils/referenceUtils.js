@@ -380,3 +380,91 @@ export function repairWikiReferences(content, targets) {
     unresolvedCount,
   }
 }
+
+
+export function diagnoseLibraryReferences(files) {
+  const notes = (Array.isArray(files) ? files : [])
+    .filter(file => file && !file.is_folder && !file.is_deleted && !String(file.title || '').startsWith('__tpl__'))
+
+  const targets = new Map(notes.map(file => [String(file.id || ''), file]))
+  const sources = []
+  const summary = {
+    scannedNotes: notes.length,
+    linkedNotes: 0,
+    totalReferences: 0,
+    healthy: 0,
+    repairable: 0,
+    broken: 0,
+    affectedFiles: 0,
+    repairableFiles: 0,
+  }
+
+  for (const file of notes) {
+    const health = analyzeWikiReferenceHealth(file.content || '', targets)
+    if (!health.length) continue
+
+    summary.linkedNotes += 1
+    summary.totalReferences += health.length
+
+    const repair = repairWikiReferences(file.content || '', targets)
+    let healthy = 0
+    let repairable = 0
+    let broken = 0
+
+    const changes = health
+      .filter(item => item.repairable)
+      .map(item => {
+        const nextTitle = item.target?.title || item.title
+        const nextSectionPath = item.issues.includes('section-moved')
+          ? item.suggestedSectionPath
+          : item.sectionPath
+
+        return {
+          ordinal: item.ordinal,
+          targetId: item.id,
+          before: formatWikiReferenceText(item.title, item.sectionPath),
+          after: formatWikiReferenceText(nextTitle, nextSectionPath),
+          issues: [...item.issues],
+        }
+      })
+
+    for (const item of health) {
+      if (item.status === 'healthy') healthy += 1
+      if (item.status === 'broken') broken += 1
+      if (item.repairable) repairable += 1
+    }
+
+    summary.healthy += healthy
+    summary.repairable += repairable
+    summary.broken += broken
+
+    if (repairable || broken) summary.affectedFiles += 1
+    if (repair.changed) summary.repairableFiles += 1
+
+    sources.push({
+      id: String(file.id || ''),
+      title: String(file.title || '未命名'),
+      updatedAt: Number(file.updated_at) || 0,
+      totalReferences: health.length,
+      healthy,
+      repairable,
+      broken,
+      health,
+      changes,
+      repairContent: repair.changed ? repair.content : null,
+      repairedCount: repair.repairedCount,
+      unresolvedCount: repair.unresolvedCount,
+    })
+  }
+
+  sources.sort((a, b) => {
+    if (a.broken !== b.broken) return b.broken - a.broken
+    if (a.repairable !== b.repairable) return b.repairable - a.repairable
+    return a.title.localeCompare(b.title, 'zh-CN')
+  })
+
+  return {
+    summary,
+    sources,
+  }
+}
