@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -62,8 +63,21 @@ func processNode(node interface{}, md *strings.Builder, depth int) {
 		md.WriteString("\n\n")
 		
 	case "heading":
-		level, _ := n["level"].(float64)
-		for i := 0; i < int(level); i++ {
+		level := 0
+		if rawLevel, ok := n["level"].(float64); ok {
+			level = int(rawLevel)
+		}
+		if level <= 0 {
+			if tag, ok := n["tag"].(string); ok && len(tag) == 2 && tag[0] == 'h' {
+				if parsed, err := strconv.Atoi(tag[1:]); err == nil {
+					level = parsed
+				}
+			}
+		}
+		if level < 1 || level > 6 {
+			level = 1
+		}
+		for i := 0; i < level; i++ {
 			md.WriteString("#")
 		}
 		md.WriteString(" ")
@@ -108,7 +122,9 @@ func processNode(node interface{}, md *strings.Builder, depth int) {
 		md.WriteString("```")
 		md.WriteString(language)
 		md.WriteString("\n")
-		if children, ok := n["children"].([]interface{}); ok {
+		if code, ok := n["code"].(string); ok {
+			md.WriteString(code)
+		} else if children, ok := n["children"].([]interface{}); ok {
 			for _, child := range children {
 				if cn, ok := child.(map[string]interface{}); ok {
 					if text, ok := cn["text"].(string); ok {
@@ -118,6 +134,9 @@ func processNode(node interface{}, md *strings.Builder, depth int) {
 			}
 		}
 		md.WriteString("\n```\n\n")
+
+	case "divider":
+		md.WriteString("---\n\n")
 		
 	case "table":
 		if children, ok := n["children"].([]interface{}); ok {
@@ -170,6 +189,21 @@ func processInlineNode(node interface{}, md *strings.Builder) {
 		return
 	}
 
+	if nodeType == "link" || nodeType == "autolink" {
+		md.WriteString("[")
+		if children, ok := n["children"].([]interface{}); ok {
+			for _, child := range children {
+				processInlineNode(child, md)
+			}
+		}
+		md.WriteString("](")
+		if url, ok := n["url"].(string); ok {
+			md.WriteString(strings.ReplaceAll(url, ")", "\\)"))
+		}
+		md.WriteString(")")
+		return
+	}
+
 	format, _ := n["format"].(float64)
 	text, hasText := n["text"].(string)
 	
@@ -184,9 +218,13 @@ func processInlineNode(node interface{}, md *strings.Builder) {
 	
 	isBold := int(format)&1 != 0
 	isItalic := int(format)&2 != 0
-	isUnderline := int(format)&4 != 0
-	isStrikethrough := int(format)&8 != 0
+	isStrikethrough := int(format)&4 != 0
+	isUnderline := int(format)&8 != 0
+	isCode := int(format)&16 != 0
 	
+	if isCode {
+		md.WriteString("`")
+	}
 	if isBold {
 		md.WriteString("**")
 	}
@@ -207,6 +245,9 @@ func processInlineNode(node interface{}, md *strings.Builder) {
 	}
 	if isBold {
 		md.WriteString("**")
+	}
+	if isCode {
+		md.WriteString("`")
 	}
 	if isUnderline {
 		md.WriteString("")
