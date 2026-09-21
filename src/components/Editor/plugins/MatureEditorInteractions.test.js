@@ -6,8 +6,10 @@ import { countSelectedTableCells, parseTableTSV, tableMatrixToTSV } from './Tabl
 import { getEditorShortcut } from './EditorShortcutPlugin'
 import { matchFormulaShortcut } from './FormulaShortcutPlugin'
 import { getChecklistEnterAction } from './ChecklistKeyboardPlugin'
-import { reorderImageGridItems } from '../nodes/ImageGridNode'
+import { appendImageGridItems, reorderImageGridItems, replaceImageGridItem } from '../nodes/ImageGridNode'
 import { getAttachmentPreviewType } from '../nodes/AttachmentNode'
+import { rememberFormulaExpression } from '../nodes/FormulaNode'
+import { filterCommandPaletteCommands } from './CommandPalettePlugin'
 
 describe('mature editor interactions', () => {
   it('collapses only the section under the selected heading', () => {
@@ -122,6 +124,55 @@ describe('mature editor interactions', () => {
     expect(getChecklistEnterAction({}, true, '已完成任务')).toBe('continue')
     expect(getChecklistEnterAction({}, false, '未完成任务')).toBeNull()
     expect(getChecklistEnterAction({}, true, '   ')).toBeNull()
+  })
+
+  it('appends and replaces image-grid media without mutating unrelated items', () => {
+    const original = [
+      { src: 'a.jpg', caption: 'A' },
+      { src: 'b.jpg', caption: 'B' },
+    ]
+
+    const appended = appendImageGridItems(original, [{ src: 'c.jpg', caption: 'C' }])
+    expect(appended.map(item => item.src)).toEqual(['a.jpg', 'b.jpg', 'c.jpg'])
+    expect(original).toHaveLength(2)
+
+    const replaced = replaceImageGridItem(appended, 1, {
+      src: 'b2.jpg',
+      alt: 'B2',
+    })
+
+    expect(replaced[1]).toMatchObject({
+      src: 'b2.jpg',
+      alt: 'B2',
+      caption: 'B',
+    })
+    expect(replaced[0]).toEqual(appended[0])
+  })
+
+  it('keeps recent formulas unique and bounded', () => {
+    const history = rememberFormulaExpression(
+      ['a+b', 'E=mc^2', '\\frac{a}{b}'],
+      'E=mc^2',
+      3
+    )
+
+    expect(history).toEqual(['E=mc^2', 'a+b', '\\frac{a}{b}'])
+    expect(rememberFormulaExpression(history, 'x^2', 3)).toEqual([
+      'x^2',
+      'E=mc^2',
+      'a+b',
+    ])
+  })
+
+  it('filters command palette entries by label description and keywords', () => {
+    const commands = [
+      { id: 'formula', label: '数学公式', description: '插入 LaTeX', keywords: ['math'] },
+      { id: 'search', label: '文内查找', description: '搜索当前笔记', keywords: ['find'] },
+    ]
+
+    expect(filterCommandPaletteCommands(commands, '公式').map(item => item.id)).toEqual(['formula'])
+    expect(filterCommandPaletteCommands(commands, 'find').map(item => item.id)).toEqual(['search'])
+    expect(filterCommandPaletteCommands(commands, '')).toHaveLength(2)
   })
 
   it('resolves a search hit to its nearest preceding outline heading', () => {
