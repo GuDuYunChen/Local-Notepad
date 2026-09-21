@@ -105,8 +105,16 @@ function OnChangePlugin({ onChange }) {
   }, [onChange]);
 
   useEffect(() => {
-    return editor.registerUpdateListener(({ editorState }) => {
-      onChangeRef.current?.(JSON.stringify(editorState));
+    let lastSerialized = ''
+
+    return editor.registerUpdateListener(({ editorState, dirtyElements, dirtyLeaves }) => {
+      const hasContentChanges = (dirtyElements?.size || 0) > 0 || (dirtyLeaves?.size || 0) > 0
+      if (!hasContentChanges) return
+
+      const serialized = JSON.stringify(editorState)
+      if (serialized === lastSerialized) return
+      lastSerialized = serialized
+      onChangeRef.current?.(serialized)
     });
   }, [editor]);
   return null;
