@@ -20,7 +20,7 @@ func TestExportToMarkdownPreservesFormulasAndChecklists(t *testing.T) {
 	      },
 	      {
 	        "type":"formula",
-	        "expression":"\\\\int_0^1 x^2 \\\\, dx",
+	        "expression":"\\int_0^1 x^2 \\, dx",
 	        "displayMode":true
 	      },
 	      {
