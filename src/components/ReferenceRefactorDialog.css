@@ -1,0 +1,249 @@
+.reference-refactor-dialog {
+  width: min(720px, calc(100vw - 28px));
+  max-height: min(82vh, 760px);
+  overflow: auto;
+}
+
+.reference-refactor-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.reference-refactor-head > div:first-child {
+  min-width: 0;
+  flex: 1;
+}
+
+.reference-refactor-eyebrow {
+  margin-bottom: 3px;
+  color: var(--clay);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.reference-refactor-head h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 16px;
+}
+
+.reference-refactor-head p {
+  margin: 5px 0 0;
+  color: var(--ink-muted);
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.reference-refactor-target-change {
+  margin-top: 12px;
+  padding: 9px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--paper);
+}
+
+.reference-refactor-target-change code {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink-soft);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reference-refactor-target-change span {
+  flex: 0 0 auto;
+  color: var(--ink-muted);
+}
+
+.reference-refactor-summary {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.reference-refactor-summary > div {
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+}
+
+.reference-refactor-summary span,
+.reference-refactor-summary strong {
+  display: block;
+}
+
+.reference-refactor-summary span {
+  color: var(--ink-muted);
+  font-size: 8px;
+}
+
+.reference-refactor-summary strong {
+  margin-top: 2px;
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.reference-refactor-summary .warning strong {
+  color: #9b651d;
+}
+
+.reference-refactor-summary .danger strong {
+  color: var(--red, #c7433c);
+}
+
+.reference-refactor-source-list {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.reference-refactor-source {
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+}
+
+.reference-refactor-source > header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.reference-refactor-source > header button {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 650;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.reference-refactor-source > header span {
+  flex: 0 0 auto;
+  color: var(--ink-muted);
+  font-size: 8px;
+}
+
+.reference-refactor-change-list,
+.reference-refactor-delete-locations {
+  margin-top: 7px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.reference-refactor-change,
+.reference-refactor-delete-locations > div {
+  padding: 7px;
+  border-radius: 7px;
+  background: var(--paper);
+}
+
+.reference-refactor-change > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.reference-refactor-change > div span {
+  padding: 2px 5px;
+  border-radius: 99px;
+  background: color-mix(in srgb, #b97820 10%, var(--surface));
+  color: #95621c;
+  font-size: 7px;
+}
+
+.reference-refactor-change code {
+  display: block;
+  overflow: hidden;
+  color: var(--ink-soft);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 8px;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reference-refactor-change i {
+  display: block;
+  padding: 1px 0;
+  color: var(--ink-muted);
+  font-size: 8px;
+  font-style: normal;
+}
+
+.reference-refactor-unresolved {
+  margin-top: 7px;
+  color: var(--red, #c7433c);
+  font-size: 8px;
+}
+
+.reference-refactor-delete-locations > div strong,
+.reference-refactor-delete-locations > div span {
+  display: block;
+}
+
+.reference-refactor-delete-locations > div strong {
+  color: var(--ink-soft);
+  font-size: 9px;
+}
+
+.reference-refactor-delete-locations > div span,
+.reference-refactor-delete-locations small {
+  margin-top: 2px;
+  color: var(--ink-muted);
+  font-size: 8px;
+}
+
+.reference-refactor-empty,
+.reference-refactor-guidance {
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--paper);
+  color: var(--ink-muted);
+  font-size: 9px;
+  line-height: 1.55;
+}
+
+.reference-refactor-guidance strong,
+.reference-refactor-guidance span {
+  display: block;
+}
+
+.reference-refactor-guidance strong {
+  color: var(--ink);
+  font-size: 9px;
+}
+
+.reference-refactor-actions {
+  margin-top: 14px;
+}
+
+@media (max-width: 640px) {
+  .reference-refactor-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
