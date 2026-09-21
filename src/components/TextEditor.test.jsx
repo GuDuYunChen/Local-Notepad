@@ -16,7 +16,8 @@ vi.mock('~/services/tagApi', () => ({
 }))
 
 vi.mock('./Editor/Editor', () => ({
-  default: function MockEditor({ onChange }) {
+  default: function MockEditor({ initialContent, onChange }) {
+    globalThis.__textEditorMockInitialContent = initialContent
     globalThis.__textEditorMockOnChange = onChange
     return React.createElement('div', null)
   },
@@ -59,6 +60,7 @@ describe('TextEditor save coordination', () => {
     }
     delete globalThis.IS_REACT_ACT_ENVIRONMENT
     delete globalThis.__textEditorMockOnChange
+    delete globalThis.__textEditorMockInitialContent
     vi.clearAllTimers()
     vi.useRealTimers()
   })
@@ -208,6 +210,231 @@ describe('TextEditor save coordination', () => {
       saveError: false,
     })
     expect(statuses.at(-1).lastSavedAt).toBeTruthy()
+  })
+
+  it('keeps the current note marked as saving when a previous note finishes first', async () => {
+    const pending = new Map()
+    const statuses = []
+
+    api.mockImplementation((path, init) => {
+      if (!init?.method) {
+        const id = path.split('/').pop()
+        return Promise.resolve({
+          id,
+          content: '{"root":{"children":[]}}',
+          updated_at: 1,
+        })
+      }
+
+      if (init.method === 'PUT') {
+        const id = path.split('/').pop()
+        return new Promise((resolve) => {
+          pending.set(id, resolve)
+        })
+      }
+
+      return Promise.reject(new Error(`Unexpected request: ${path}`))
+    })
+
+    const editorRef = React.createRef()
+    await act(async () => {
+      root.render(
+        <TextEditor
+          ref={editorRef}
+          activeId="file-1"
+          deletedIds={new Set()}
+          autoSaveOnSwitch
+          onChange={() => {}}
+          onLoaded={() => {}}
+          onSaved={() => {}}
+          onStatusChange={(status) => statuses.push(status)}
+        />
+      )
+    })
+    await flushPromises()
+
+    await act(async () => {
+      globalThis.__textEditorMockOnChange('{"root":{"children":[{"type":"paragraph","children":[{"type":"text","text":"one"}]}]}}')
+      await Promise.resolve()
+    })
+
+    await act(async () => {
+      root.render(
+        <TextEditor
+          ref={editorRef}
+          activeId="file-2"
+          deletedIds={new Set()}
+          autoSaveOnSwitch
+          onChange={() => {}}
+          onLoaded={() => {}}
+          onSaved={() => {}}
+          onStatusChange={(status) => statuses.push(status)}
+        />
+      )
+      await Promise.resolve()
+    })
+    await flushPromises()
+
+    expect(pending.has('file-1')).toBe(true)
+
+    await act(async () => {
+      globalThis.__textEditorMockOnChange('{"root":{"children":[{"type":"paragraph","children":[{"type":"text","text":"two"}]}]}}')
+      await Promise.resolve()
+    })
+
+    let currentSave
+    await act(async () => {
+      currentSave = editorRef.current.save()
+      await Promise.resolve()
+    })
+
+    expect(pending.has('file-2')).toBe(true)
+    expect(statuses.at(-1)).toMatchObject({ activeId: 'file-2', saving: true })
+
+    await act(async () => {
+      pending.get('file-1')({
+        id: 'file-1',
+        content: 'saved-one',
+        updated_at: 2,
+      })
+      await Promise.resolve()
+    })
+
+    expect(statuses.at(-1)).toMatchObject({ activeId: 'file-2', saving: true })
+
+    await act(async () => {
+      pending.get('file-2')({
+        id: 'file-2',
+        content: 'saved-two',
+        updated_at: 3,
+      })
+      await currentSave
+    })
+    await flushPromises()
+
+    expect(statuses.at(-1)).toMatchObject({
+      activeId: 'file-2',
+      saving: false,
+      saveError: false,
+    })
+  })
+
+  it('recovers a fresher local draft while keeping it dirty against the server version', async () => {
+    const server = '{"root":{"children":[{"type":"paragraph","children":[{"type":"text","text":"server"}]}]}}'
+    const draft = '{"root":{"children":[{"type":"paragraph","children":[{"type":"text","text":"draft newer"}]}]}}'
+    const statuses = []
+
+    localStorage.setItem('editor:cache:file-1', JSON.stringify({
+      content: draft,
+      editedAt: Date.now(),
+      savedAt: null,
+    }))
+
+    api.mockResolvedValue({
+      id: 'file-1',
+      content: server,
+      updated_at: Math.floor((Date.now() - 60_000) / 1000),
+    })
+
+    await act(async () => {
+      root.render(
+        <TextEditor
+          activeId="file-1"
+          deletedIds={new Set()}
+          autoSaveOnSwitch={false}
+          onChange={() => {}}
+          onLoaded={() => {}}
+          onSaved={() => {}}
+          onStatusChange={(status) => statuses.push(status)}
+        />
+      )
+    })
+    await flushPromises()
+
+    expect(globalThis.__textEditorMockInitialContent).toBe(draft)
+    expect(statuses.at(-1)).toMatchObject({
+      activeId: 'file-1',
+      dirty: true,
+      saveError: false,
+    })
+
+    localStorage.removeItem('editor:cache:file-1')
+  })
+
+  it('shows a retry path after save failure and clears the error after retry succeeds', async () => {
+    const changed = '{"root":{"children":[{"type":"paragraph","children":[{"type":"text","text":"retry"}]}]}}'
+    const statuses = []
+    let putCount = 0
+
+    api.mockImplementation((path, init) => {
+      if (!init?.method) {
+        return Promise.resolve({
+          id: 'file-1',
+          content: '{"root":{"children":[]}}',
+          updated_at: 1,
+        })
+      }
+
+      if (init.method === 'PUT') {
+        putCount += 1
+        if (putCount === 1) return Promise.reject(new Error('network down'))
+        return Promise.resolve({
+          id: 'file-1',
+          content: changed,
+          updated_at: 2,
+        })
+      }
+
+      return Promise.reject(new Error(`Unexpected request: ${path}`))
+    })
+
+    const editorRef = React.createRef()
+    await act(async () => {
+      root.render(
+        <TextEditor
+          ref={editorRef}
+          activeId="file-1"
+          deletedIds={new Set()}
+          autoSaveOnSwitch={false}
+          onChange={() => {}}
+          onLoaded={() => {}}
+          onSaved={() => {}}
+          onStatusChange={(status) => statuses.push(status)}
+        />
+      )
+    })
+    await flushPromises()
+
+    await act(async () => {
+      globalThis.__textEditorMockOnChange(changed)
+      await Promise.resolve()
+    })
+
+    await act(async () => {
+      await expect(editorRef.current.save()).rejects.toThrow('network down')
+    })
+    await flushPromises()
+
+    expect(statuses.at(-1)).toMatchObject({
+      saveError: true,
+      dirty: true,
+    })
+
+    const retry = container.querySelector('.status-retry-btn')
+    expect(retry).toBeTruthy()
+
+    await act(async () => {
+      retry.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    await flushPromises()
+
+    expect(putCount).toBe(2)
+    expect(statuses.at(-1)).toMatchObject({
+      saveError: false,
+      dirty: false,
+    })
   })
 
   it('reuses the in-flight save when interval save overlaps manual save', async () => {
