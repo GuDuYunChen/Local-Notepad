@@ -23,6 +23,8 @@ const shortcuts = [
     { key: '$公式$ + 空格', desc: '快速转换为行内公式' },
     { key: 'Ctrl + Alt + T', desc: '切换 / 插入待办清单' },
     { key: 'Ctrl + Enter', desc: '勾选 / 取消当前待办' },
+    { key: 'Ctrl + Alt + M', desc: '合并表格多选单元格' },
+    { key: 'Ctrl + Alt + S', desc: '拆分表格单元格' },
   ]},
   { category: '导航操作', items: [
     { key: '↑ / ↓', desc: '在笔记列表或快速搜索中移动' },
