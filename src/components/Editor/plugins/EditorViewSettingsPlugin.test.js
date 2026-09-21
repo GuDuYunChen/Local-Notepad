@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_EDITOR_VIEW_SETTINGS,
+  getEditorWheelFontStep,
   normalizeEditorViewSettings,
 } from './EditorViewSettingsPlugin'
 
@@ -35,5 +36,12 @@ describe('editor view settings', () => {
       fontFamily: 'serif',
       typewriter: false,
     })
+  })
+
+  it('maps Ctrl/Cmd + wheel to bounded font-size steps', () => {
+    expect(getEditorWheelFontStep({ ctrlKey: true, deltaY: -10 })).toBe(1)
+    expect(getEditorWheelFontStep({ metaKey: true, deltaY: 10 })).toBe(-1)
+    expect(getEditorWheelFontStep({ ctrlKey: false, metaKey: false, deltaY: -10 })).toBe(0)
+    expect(getEditorWheelFontStep({ ctrlKey: true, shiftKey: true, deltaY: -10 })).toBe(0)
   })
 })
