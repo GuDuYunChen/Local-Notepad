@@ -331,10 +331,34 @@ export default function FileList({
   async function performUndo() {
       const action = historyRef.current.undo.pop()
       if (!action) return
-      
+
+      let referenceReview = null
       try {
+          if (action.type === 'rename' && onBeforeRename) {
+              const item = items.find(entry => entry.id === action.data.id)
+              if (item && !item.is_folder) {
+                  referenceReview = await onBeforeRename({
+                      item,
+                      nextTitle: action.data.oldTitle,
+                  })
+                  if (!referenceReview?.proceed) {
+                      historyRef.current.undo.push(action)
+                      return
+                  }
+              }
+          }
+
           await executeFileHistoryAction(action, 'undo')
           historyRef.current.redo.push(action)
+
+          if (referenceReview?.sync && referenceReview?.plan && onAfterRename) {
+              await onAfterRename({
+                  item: items.find(entry => entry.id === action.data.id),
+                  updated: null,
+                  review: referenceReview,
+              })
+          }
+
           void load()
       } catch (e) {
           console.error("Undo failed", e)
@@ -347,9 +371,33 @@ export default function FileList({
       const action = historyRef.current.redo.pop()
       if (!action) return
 
+      let referenceReview = null
       try {
+          if (action.type === 'rename' && onBeforeRename) {
+              const item = items.find(entry => entry.id === action.data.id)
+              if (item && !item.is_folder) {
+                  referenceReview = await onBeforeRename({
+                      item,
+                      nextTitle: action.data.newTitle,
+                  })
+                  if (!referenceReview?.proceed) {
+                      historyRef.current.redo.push(action)
+                      return
+                  }
+              }
+          }
+
           await executeFileHistoryAction(action, 'redo')
           historyRef.current.undo.push(action)
+
+          if (referenceReview?.sync && referenceReview?.plan && onAfterRename) {
+              await onAfterRename({
+                  item: items.find(entry => entry.id === action.data.id),
+                  updated: null,
+                  review: referenceReview,
+              })
+          }
+
           void load()
       } catch (e) {
           console.error("Redo failed", e)
@@ -376,7 +424,7 @@ export default function FileList({
       }
       window.addEventListener('keydown', handleUndoRedo)
       return () => window.removeEventListener('keydown', handleUndoRedo)
-  }, [])
+  }, [items, onAfterRename, onBeforeRename])
 
 
   useEffect(() => {
