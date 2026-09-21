@@ -89,14 +89,16 @@ export function buildProjectWorkspace(files, projectId, projectMeta = {}) {
   }
 
   for (const folder of volumeFolders) {
-    const descendants = descendantsOf(items, folder.id)
-      .filter(item => !item.is_folder)
+    const notes = items.filter(item => (
+      !item.is_folder &&
+      normalizeId(item.parent_id) === normalizeId(folder.id)
+    ))
 
     volumes.push(buildVolume({
       id: folder.id,
       title: folder.title || '未命名卷',
       projectId: project.id,
-      notes: sortAscendingByLibraryOrder(descendants),
+      notes: sortAscendingByLibraryOrder(notes),
       meta: projectMeta,
     }))
   }
@@ -220,12 +222,12 @@ export function calculateProjectCardMove(files, noteId, targetParentId, targetIn
       (Number(previous.sort_order || 0) + Number(next.sort_order || 0)) / 2
     )
     if (sortOrder === Number(previous.sort_order || 0) || sortOrder === Number(next.sort_order || 0)) {
-      sortOrder = Number(previous.sort_order || 0) - 1
+      sortOrder = Number(previous.sort_order || 0) + 1
     }
   } else if (previous) {
-    sortOrder = Number(previous.sort_order || 0) - 1000
+    sortOrder = Number(previous.sort_order || 0) + 1000
   } else if (next) {
-    sortOrder = Number(next.sort_order || 0) + 1000
+    sortOrder = Number(next.sort_order || 0) - 1000
   } else {
     sortOrder = Math.floor(Date.now() / 1000)
   }
