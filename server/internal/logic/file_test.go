@@ -373,3 +373,87 @@ func TestNormalizeTitleSanitizesAndLimitsLength(t *testing.T) {
 		t.Fatal("expected title length limit to fail")
 	}
 }
+
+
+func TestCreateVersionSnapshotCapturesPreRepairContent(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	db.SetMaxOpenConns(1)
+	defer db.Close()
+
+	schema := []string{
+		`CREATE TABLE files (
+			id TEXT PRIMARY KEY,
+			title TEXT NOT NULL,
+			content TEXT NOT NULL,
+			created_at INTEGER NOT NULL,
+			updated_at INTEGER NOT NULL,
+			is_folder INTEGER DEFAULT 0,
+			parent_id TEXT DEFAULT '',
+			sort_order INTEGER DEFAULT 0,
+			is_deleted INTEGER DEFAULT 0,
+			deleted_at INTEGER DEFAULT 0,
+			is_pinned INTEGER DEFAULT 0
+		)`,
+		`CREATE TABLE file_versions (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			file_id TEXT NOT NULL,
+			title TEXT NOT NULL,
+			content TEXT NOT NULL,
+			created_at INTEGER NOT NULL
+		)`,
+	}
+	for _, stmt := range schema {
+		if _, err := db.Exec(stmt); err != nil {
+			t.Fatalf("create schema: %v", err)
+		}
+	}
+
+	fileLogic := &FileLogic{
+		FileDAO:    &dao.FileDAO{DB: db},
+		VersionDAO: &dao.VersionDAO{DB: db},
+	}
+
+	file, err := fileLogic.Create(context.Background(), "Source.md", "before repair", false, "")
+	if err != nil {
+		t.Fatalf("create file: %v", err)
+	}
+
+	if err := fileLogic.CreateVersionSnapshot(context.Background(), file.ID); err != nil {
+		t.Fatalf("create explicit snapshot: %v", err)
+	}
+
+	versions, err := fileLogic.VersionDAO.GetVersions(context.Background(), file.ID)
+	if err != nil {
+		t.Fatalf("get versions after explicit snapshot: %v", err)
+	}
+	if len(versions) != 1 || versions[0].Content != "before repair" {
+		t.Fatalf("snapshot content = %#v, want pre-repair content", versions)
+	}
+
+	after := "after repair"
+	if _, err := fileLogic.Update(context.Background(), file.ID, nil, &after, nil, nil, nil, nil); err != nil {
+		t.Fatalf("apply repair update: %v", err)
+	}
+
+	rows, err := db.Query(`SELECT content FROM file_versions WHERE file_id = ? ORDER BY id ASC`, file.ID)
+	if err != nil {
+		t.Fatalf("query version contents: %v", err)
+	}
+	defer rows.Close()
+
+	var contents []string
+	for rows.Next() {
+		var value string
+		if err := rows.Scan(&value); err != nil {
+			t.Fatalf("scan version content: %v", err)
+		}
+		contents = append(contents, value)
+	}
+
+	if len(contents) != 2 || contents[0] != "before repair" || contents[1] != "after repair" {
+		t.Fatalf("version contents = %#v, want explicit pre-repair then repaired snapshot", contents)
+	}
+}
