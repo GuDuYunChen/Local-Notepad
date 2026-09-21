@@ -56,6 +56,10 @@ describe('mature editor interactions', () => {
     expect(getAttachmentPreviewType('manual.bin', 'application/pdf')).toBe('pdf')
     expect(getAttachmentPreviewType('notes.md', '')).toBe('text')
     expect(getAttachmentPreviewType('trace.bin', 'text/plain')).toBe('text')
+    expect(getAttachmentPreviewType('report.docx', '')).toBe('word')
+    expect(getAttachmentPreviewType('report.bin', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')).toBe('word')
+    expect(getAttachmentPreviewType('budget.xlsx', '')).toBe('sheet')
+    expect(getAttachmentPreviewType('legacy.xls', 'application/vnd.ms-excel')).toBe('sheet')
     expect(getAttachmentPreviewType('archive.zip', 'application/zip')).toBeNull()
   })
 
