@@ -273,6 +273,9 @@ describe('project workspace utilities', () => {
       type: 'novel',
       targetWords: 0,
       chapterTargetWords: 0,
+      dailyGoal: 0,
+      weeklyGoal: 0,
+      deadline: '',
       statuses: {
         'chapter-1': 'done',
       },
