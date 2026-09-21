@@ -17,6 +17,13 @@ function modeCopy(mode) {
       intro: '删除目标后，这些跨笔记引用会变成失效引用。',
     }
   }
+  if (mode === 'extract') {
+    return {
+      title: '拆出章节前检查引用',
+      action: '拆出为独立笔记',
+      intro: '拆出后，指向该章节及其子章节的引用会改为指向新笔记。',
+    }
+  }
   return {
     title: '章节结构变化影响',
     action: '保存结构变化',
@@ -85,7 +92,7 @@ export default function ReferenceRefactorDialog({
           </button>
         </header>
 
-        {mode === 'rename' && (
+        {(mode === 'rename' || mode === 'extract') && (
           <div className="reference-refactor-target-change">
             <code>{targetTitle || '未命名'}</code>
             <span>→</span>
@@ -192,6 +199,11 @@ export default function ReferenceRefactorDialog({
             <>
               <strong>删除不会自动清除来源笔记里的引用。</strong>
               <span>建议先打开受影响来源决定替代内容；如果仍继续删除，4.20/4.21 的引用体检会持续标记这些断链。</span>
+            </>
+          ) : mode === 'extract' ? (
+            <>
+              <strong>新笔记会保留原章节路径。</strong>
+              <span>来源引用在改写前都会创建版本快照；正文发生变化的来源会被跳过，不覆盖较新的内容。</span>
             </>
           ) : (
             <>
