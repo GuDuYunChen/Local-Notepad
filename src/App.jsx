@@ -490,7 +490,8 @@ export default function App() {
         }
 
         toast.success(
-          '已拆出“' + extraction.section.text + '”' +
+          '已拆出“' + extraction.section.text + '”为 ' +
+          (created.title || targetTitle) +
           (rewrittenReferences
             ? '，并迁移 ' + rewrittenReferences + ' 处引用'
             : '')
@@ -503,9 +504,7 @@ export default function App() {
           )
         }
 
-        const finalTarget = await api('/api/files/' + created.id)
         window.dispatchEvent(new Event('library:refresh'))
-        select(finalTarget)
       } catch (error) {
         if (created?.id && !sourceSaved) {
           try {
@@ -524,7 +523,6 @@ export default function App() {
     current,
     requestReferenceRefactor,
     saveCurrent,
-    select,
     unsaved,
   ])
 
