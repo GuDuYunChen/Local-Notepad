@@ -506,7 +506,8 @@
 
 .attachment-replace-button,
 .attachment-preview-button,
-.attachment-download {
+.attachment-download,
+.attachment-delete-button {
   min-width: 58px;
   height: 32px;
   padding: 0 10px;
@@ -870,4 +871,17 @@
   place-items: center;
   color: var(--muted, #8b8791);
   font-size: 11px;
+}
+
+
+.attachment-delete-button,
+.attachment-preview-delete {
+  color: var(--red, #c7433c) !important;
+}
+
+.attachment-delete-button:hover,
+.attachment-preview-delete:hover {
+  border-color: color-mix(in srgb, var(--red, #c7433c) 28%, var(--border-color, rgba(0,0,0,.1))) !important;
+  background: var(--red-light, rgba(199,67,60,.08)) !important;
+  color: var(--red, #c7433c) !important;
 }
