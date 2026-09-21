@@ -142,6 +142,10 @@ export default function SearchPlugin() {
       if (modifier && e.key.toLowerCase() === 'f') {
         e.preventDefault()
         setIsOpen(true)
+        window.requestAnimationFrame(() => {
+          inputRef.current?.focus()
+          inputRef.current?.select()
+        })
       }
       if (modifier && e.key.toLowerCase() === 'h') {
         e.preventDefault()
