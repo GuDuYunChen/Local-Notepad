@@ -50,6 +50,7 @@ import { $createFormulaNode } from '../nodes/FormulaNode'
 import { compressImage, generateVideoMetadata, loadXLSX, uploadFile } from '../utils/fileUpload'
 import { toast } from '~/services/toast'
 import TableMenu from './TableMenu'
+import { normalizeLinkUrl } from '../utils/linkUtils'
 import './TextColorPlugin.css'
 
 const FontOptions = [
@@ -308,8 +309,11 @@ export default function ToolbarPlugin() {
   }
 
   const applyLink = () => {
-    const url = linkUrl.trim()
-    if (!url || !hasSelection) return
+    const url = normalizeLinkUrl(linkUrl)
+    if (!url || !hasSelection) {
+      if (linkUrl.trim()) toast.warning('请输入有效网页链接或章节锚点')
+      return
+    }
     editor.dispatchCommand(TOGGLE_LINK_COMMAND, url)
     setLinkOpen(false)
     setLinkUrl('')
@@ -666,8 +670,8 @@ export default function ToolbarPlugin() {
                   setLinkOpen(false)
                 }
               }}
-              placeholder="https://"
-              aria-label="链接地址"
+              placeholder="https:// 或 #heading/章节"
+              aria-label="链接地址或章节锚点"
             />
             <button type="button" className="btn primary small" onClick={applyLink} disabled={!linkUrl.trim()}>
               应用
