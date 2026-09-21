@@ -144,7 +144,27 @@ function TextEditorInternal({
     save: () => saveNow('external'),
     clearCache: () => {
       if (currentIdRef.current) removeEditorDraft(currentIdRef.current)
-    }
+    },
+    replaceSavedContent: (nextContent, updatedAt) => {
+      const text = String(nextContent ?? '')
+      const rawUpdatedAt = Number(updatedAt) || 0
+      const savedAt = rawUpdatedAt
+        ? (rawUpdatedAt < 1_000_000_000_000 ? rawUpdatedAt * 1000 : rawUpdatedAt)
+        : Date.now()
+
+      contentRef.current = text
+      lastSavedContentRef.current = text
+      setEditorContent(text)
+      setWordCount(countLexicalCharacters(text))
+      setLastSavedAt(savedAt)
+      setSaveError(false)
+
+      if (currentIdRef.current) {
+        writeEditorDraft(currentIdRef.current, text, savedAt)
+      }
+
+      onChangeRef.current?.(text)
+    },
   }))
 
   useEffect(() => {
