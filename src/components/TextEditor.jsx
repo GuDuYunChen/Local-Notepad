@@ -20,7 +20,7 @@ function TextEditorInternal({
   const lastSavedContentRef = useRef('')
   const saveTimerRef = useRef(null)
   const intervalRef = useRef(null)
-  const saveAbortRef = useRef(null)
+  const saveControllersRef = useRef(new Set())
   const loadAbortRef = useRef(null)
   const inFlightSaveRef = useRef(null)
   const savingCountsRef = useRef(new Map())
@@ -96,8 +96,8 @@ function TextEditorInternal({
     const savePromise = (async () => {
       try {
         beginSaving(id)
-        setSaveError(false)
-        saveAbortRef.current = ctl
+        if (id === currentIdRef.current) setSaveError(false)
+        saveControllersRef.current.add(ctl)
 
         const updated = await api(`/api/files/${id}`, {
           method: 'PUT',
@@ -120,7 +120,7 @@ function TextEditorInternal({
         console.error('保存失败', reason, e)
         throw e
       } finally {
-        if (saveAbortRef.current === ctl) saveAbortRef.current = null
+        saveControllersRef.current.delete(ctl)
         if (inFlightSaveRef.current?.promise === savePromise) inFlightSaveRef.current = null
         endSaving(id)
       }
@@ -148,7 +148,7 @@ function TextEditorInternal({
       const isDeleted = deletedIds?.has(prevId)
       if (!isDeleted && autoSaveOnSwitch) {
         cacheWrite(prevId, contentRef.current)
-        void saveNow('manual', prevId)
+        void saveNow('manual', prevId).catch(() => {})
       }
     }
 
@@ -206,9 +206,26 @@ function TextEditorInternal({
     }
   }, [activeId, autoSaveOnSwitch, saveNow, syncCurrentSavingState])
 
+  useEffect(() => () => {
+    if (saveTimerRef.current) {
+      window.clearTimeout(saveTimerRef.current)
+      saveTimerRef.current = null
+    }
+
+    loadAbortRef.current?.abort()
+    loadAbortRef.current = null
+
+    for (const controller of saveControllersRef.current) {
+      controller.abort()
+    }
+    saveControllersRef.current.clear()
+  }, [])
+
   useEffect(() => {
     if (intervalRef.current) window.clearInterval(intervalRef.current)
-    intervalRef.current = window.setInterval(() => { saveNow('interval') }, 30000)
+    intervalRef.current = window.setInterval(() => {
+      void saveNow('interval').catch(() => {})
+    }, 30000)
     return () => {
       if (intervalRef.current) {
         window.clearInterval(intervalRef.current)
@@ -312,7 +329,13 @@ function TextEditorInternal({
               <span className={`save-state${saveError ? ' error' : ''}`}>
                 {saveError ? '保存失败' : '保存中…'}
                 {saveError && (
-                  <button className="status-retry-btn" onClick={() => saveNow('retry')} disabled={saving}>重试</button>
+                  <button
+                    className="status-retry-btn"
+                    onClick={() => { void saveNow('retry').catch(() => {}) }}
+                    disabled={saving}
+                  >
+                    重试
+                  </button>
                 )}
               </span>
             )}
