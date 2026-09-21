@@ -1,6 +1,6 @@
 import { $createParagraphNode, $createTextNode, $insertNodes } from 'lexical'
 import { $createHeadingNode, $createQuoteNode } from '@lexical/rich-text'
-import { $createListNode, $createListItemNode } from '@lexical/list'
+import { $createListNode, $createListItemNode, INSERT_CHECK_LIST_COMMAND } from '@lexical/list'
 import { $createCodeNode } from '@lexical/code'
 import { INSERT_TABLE_COMMAND } from '@lexical/table'
 import { $createImageNode } from '../nodes/ImageNode'
@@ -10,6 +10,7 @@ import { $createCalloutNode } from '../nodes/CalloutNode'
 import { $createToggleNode } from '../nodes/ToggleNode'
 import { $createEmbedNode } from '../nodes/EmbedNode'
 import { $createAttachmentNode } from '../nodes/AttachmentNode'
+import { $createFormulaNode } from '../nodes/FormulaNode'
 import { uploadFile } from './fileUpload'
 
 export const BlockType = {
@@ -30,6 +31,7 @@ export const BlockType = {
   TOGGLE: 'toggle',
   EMBED: 'embed',
   ATTACHMENT: 'attachment',
+  FORMULA: 'formula',
 }
 
 function createListNode(listType) {
@@ -176,12 +178,12 @@ export const blockRegistry = [
   },
   {
     type: BlockType.TODO,
-    label: '待办事项',
-    description: '可勾选并保存状态的任务',
+    label: '待办清单',
+    description: '可嵌套、可缩进的任务清单',
     icon: '☐',
-    keywords: ['todo', 'checkbox', '待办', '任务'],
+    keywords: ['todo', 'checkbox', '待办', '任务', 'checklist'],
     shortcut: '- [ ]',
-    createNode: () => $createTodoNode(),
+    run: editor => editor.dispatchCommand(INSERT_CHECK_LIST_COMMAND),
   },
   {
     type: BlockType.CODE_BLOCK,
@@ -200,6 +202,15 @@ export const blockRegistry = [
     keywords: ['table', '表格'],
     shortcut: '',
     run: (editor) => editor.dispatchCommand(INSERT_TABLE_COMMAND, { columns: 3, rows: 3 }),
+  },
+  {
+    type: BlockType.FORMULA,
+    label: '数学公式',
+    description: '插入 LaTeX 公式',
+    icon: '∑',
+    keywords: ['formula', 'math', 'latex', '公式', '数学'],
+    shortcut: '',
+    createNode: () => $createFormulaNode(),
   },
   {
     type: BlockType.ATTACHMENT,
