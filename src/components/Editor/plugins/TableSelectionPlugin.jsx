@@ -494,6 +494,61 @@ export default function TableSelectionPlugin() {
     })
   }
 
+  const doMoveRow = (payload, direction) => {
+    editor.update(() => {
+      const current = getCurrentCellInfo()
+      const ri = payload?.ri ?? current?.ri ?? 0
+      const table = getTable(payload) || current?.table
+      if (!table) return
+
+      const rows = table.getChildren()
+      const targetIndex = ri + direction
+      if (targetIndex < 0 || targetIndex >= rows.length) return
+
+      const row = rows[ri]
+      const target = rows[targetIndex]
+      if (!row || !target) return
+
+      if (direction < 0) target.insertBefore(row)
+      else target.insertAfter(row)
+    })
+  }
+
+  const doMoveCol = (payload, direction) => {
+    editor.update(() => {
+      const current = getCurrentCellInfo()
+      const ci = payload?.ci ?? current?.ci ?? 0
+      const table = getTable(payload) || current?.table
+      if (!table) return
+
+      const rows = table.getChildren()
+      const targetIndex = ci + direction
+      if (targetIndex < 0) return
+
+      for (const row of rows) {
+        const cells = row.getChildren()
+        if (targetIndex >= cells.length) return
+
+        const cell = cells[ci]
+        const target = cells[targetIndex]
+        if (!(cell instanceof TableCellNode) || !(target instanceof TableCellNode)) return
+
+        if ((cell.getColSpan?.() || 1) !== 1 || (target.getColSpan?.() || 1) !== 1) {
+          toast.warning('合并单元格暂不支持直接移动列')
+          return
+        }
+      }
+
+      for (const row of rows) {
+        const cells = row.getChildren()
+        const cell = cells[ci]
+        const target = cells[targetIndex]
+        if (direction < 0) target.insertBefore(cell)
+        else target.insertAfter(cell)
+      }
+    })
+  }
+
   const sortByFirstCol = (dir) => {
     editor.update(() => {
       const tables = []
