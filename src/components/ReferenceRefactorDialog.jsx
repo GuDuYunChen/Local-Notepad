@@ -46,7 +46,12 @@ export default function ReferenceRefactorDialog({
 
   const copy = modeCopy(mode)
   const summary = plan.summary || {}
-  const sources = plan.sources || []
+  const sources = mode === 'structure'
+    ? (plan.sources || []).filter(source => source.repairable || source.broken)
+    : (plan.sources || [])
+  const affectedReferenceCount = mode === 'structure'
+    ? (Number(summary.repairable) || 0) + (Number(summary.broken) || 0)
+    : (Number(summary.incomingReferences) || 0)
 
   return (
     <div
@@ -91,11 +96,11 @@ export default function ReferenceRefactorDialog({
         <div className="reference-refactor-summary">
           <div>
             <span>受影响引用</span>
-            <strong>{summary.incomingReferences || 0}</strong>
+            <strong>{affectedReferenceCount}</strong>
           </div>
           <div>
             <span>来源笔记</span>
-            <strong>{summary.affectedFiles || 0}</strong>
+            <strong>{mode === 'structure' ? sources.length : (summary.affectedFiles || 0)}</strong>
           </div>
           {mode !== 'delete' && (
             <>
