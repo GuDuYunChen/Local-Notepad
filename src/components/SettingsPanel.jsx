@@ -206,10 +206,7 @@ export default function SettingsPanel({
 
         <section className="settings-card consumer-settings-section">
           <div className="settings-card-header">
-            <div>
-              <h3>知识库引用</h3>
-              <p>检查整个本地知识库的 WikiLink 与章节引用。</p>
-            </div>
+            <h3>知识库引用</h3>
           </div>
           <LibraryReferenceHealthPanel onOpenFile={onOpenFile} />
         </section>
