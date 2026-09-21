@@ -15,7 +15,9 @@ const shortcuts = [
   { category: '编辑操作', items: [
     { key: 'Ctrl + F', desc: '打开编辑器搜索' },
     { key: 'Ctrl + Shift + P', desc: '打开编辑器命令面板' },
+    { key: 'Ctrl + Shift + O', desc: '打开 / 关闭文档目录' },
     { key: 'Ctrl + H', desc: '打开替换面板' },
+    { key: 'Ctrl + 滚轮', desc: '调整写作视图正文字号' },
     { key: 'Ctrl + B', desc: '加粗' },
     { key: 'Ctrl + I', desc: '斜体' },
     { key: 'Ctrl + U', desc: '下划线' },
