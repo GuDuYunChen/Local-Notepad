@@ -13,6 +13,18 @@ export function countSelectedTableCells(rects) {
   }, 0)
 }
 
+export function tableMatrixToTSV(matrix) {
+  return (Array.isArray(matrix) ? matrix : [])
+    .map(row => (Array.isArray(row) ? row : []).map(value => String(value ?? '').replace(/\t/g, ' ')).join('\t'))
+    .join('\n')
+}
+
+export function parseTableTSV(text) {
+  const normalized = String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  if (!normalized) return []
+  return normalized.split('\n').map(row => row.split('\t'))
+}
+
 export default function TableSelectionPlugin() {
   const [editor] = useLexicalComposerContext()
   const [active, setActive] = useState(false)
@@ -326,6 +338,104 @@ export default function TableSelectionPlugin() {
       }
     })
     setRects([])
+  }
+
+  const getRectTable = (rect) => {
+    if (!rect) return null
+    const tables = []
+    const walk = node => {
+      if (!node?.getChildren) return
+      for (const child of node.getChildren()) {
+        if (child instanceof TableNode) tables.push(child)
+        walk(child)
+      }
+    }
+    walk($getRoot())
+    return tables[rect.tableIndex] || null
+  }
+
+  const copySelection = async () => {
+    const rect = rects[0]
+    if (!rect) return
+
+    let text = ''
+    editor.getEditorState().read(() => {
+      const table = getRectTable(rect)
+      if (!table) return
+
+      const rows = table.getChildren()
+      const matrix = []
+      for (let rr = rect.r1; rr <= rect.r2; rr++) {
+        const row = rows[rr]
+        if (!(row instanceof TableRowNode)) continue
+        const cells = row.getChildren()
+        const values = []
+        for (let cc = rect.c1; cc <= rect.c2; cc++) {
+          values.push(cells[cc]?.getTextContent?.() || '')
+        }
+        matrix.push(values)
+      }
+      text = tableMatrixToTSV(matrix)
+    })
+
+    if (!text && selectedCellCount === 0) return
+
+    try {
+      await navigator.clipboard.writeText(text)
+      toast.success('已复制所选单元格')
+    } catch (error) {
+      console.error('复制表格内容失败', error)
+      toast.error('复制失败，请检查剪贴板权限')
+    }
+  }
+
+  const pasteSelection = async () => {
+    const rect = rects[0]
+    if (!rect) return
+
+    try {
+      const text = await navigator.clipboard.readText()
+      const matrix = parseTableTSV(text)
+      if (!matrix.length) {
+        toast.warning('剪贴板里没有可粘贴的表格内容')
+        return
+      }
+
+      editor.update(() => {
+        const table = getRectTable(rect)
+        if (!table) return
+        const rows = table.getChildren()
+
+        for (let rowOffset = 0; rowOffset < matrix.length; rowOffset++) {
+          const row = rows[rect.r1 + rowOffset]
+          if (!(row instanceof TableRowNode)) break
+          const cells = row.getChildren()
+
+          for (let colOffset = 0; colOffset < matrix[rowOffset].length; colOffset++) {
+            const cell = cells[rect.c1 + colOffset]
+            if (!(cell instanceof TableCellNode)) break
+
+            for (const child of cell.getChildren()) child.remove()
+            const paragraph = $createParagraphNode()
+            const value = matrix[rowOffset][colOffset]
+            if (value) paragraph.append(document.createTextNode ? [] : [])
+            cell.append(paragraph)
+            if (value) {
+              const firstChild = paragraph.getFirstChild?.()
+              if (!firstChild) {
+                const textNode = requireTextNode(value)
+                paragraph.append(textNode)
+              }
+            }
+          }
+        }
+      })
+
+      toast.success('已粘贴到所选区域')
+    } catch (error) {
+      console.error('粘贴表格内容失败', error)
+      toast.error('粘贴失败，请检查剪贴板权限')
+    }
   }
 
   const doClear = (payload) => {
@@ -862,6 +972,11 @@ export default function TableSelectionPlugin() {
             <span>{selectedCellCount > 0 ? `已选择 ${selectedCellCount} 个单元格` : '拖动鼠标框选连续单元格，按 Ctrl/Cmd 可追加区域'}</span>
           </div>
           <div className="table-selection-modebar-actions">
+            <button type="button" onClick={copySelection} disabled={selectedCellCount === 0}>复制</button>
+            <button type="button" onClick={pasteSelection} disabled={selectedCellCount === 0}>粘贴</button>
+            <button type="button" onClick={() => applyBackground('#fff3cd')} disabled={selectedCellCount === 0}>浅黄</button>
+            <button type="button" onClick={() => applyBackground('')} disabled={selectedCellCount === 0}>清底色</button>
+            <button type="button" onClick={() => applyHorizontal('left')} disabled={selectedCellCount === 0}>左对齐</button>
             <button type="button" onClick={doMerge} disabled={selectedCellCount < 2}>合并</button>
             <button type="button" onClick={doSplit} disabled={selectedCellCount === 0}>拆分</button>
             <button type="button" onClick={() => doClear()} disabled={selectedCellCount === 0}>清空</button>
