@@ -38,6 +38,24 @@ describe('lexicalText', () => {
     expect(extractLexicalText(content)).toBe('参见 [[目标笔记]]')
   })
 
+  it('projects section-aware WikiLink labels into readable text', () => {
+    const content = JSON.stringify({
+      root: {
+        children: [{
+          type: 'paragraph',
+          children: [{
+            type: 'wiki-link',
+            id: 'target-id',
+            title: '设定集',
+            sectionPath: ['宗门', '青莲剑宗'],
+          }],
+        }],
+      },
+    })
+
+    expect(extractLexicalText(content)).toBe('[[设定集#宗门 › 青莲剑宗]]')
+  })
+
   it('falls back to plain text and counts Unicode code points', () => {
     expect(extractLexicalText('plain text')).toBe('plain text')
     expect(countLexicalCharacters(JSON.stringify({
