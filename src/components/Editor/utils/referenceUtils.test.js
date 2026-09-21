@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   analyzeWikiReferenceHealth,
+  diagnoseLibraryReferences,
   extractHeadingReferences,
   findWikiLinkOccurrences,
   formatSectionPath,
@@ -237,6 +238,81 @@ describe('structured reference utilities', () => {
       title: 'B',
       sectionPath: ['旧层级', '第一场'],
     })
+  })
+
+  it('builds a full-library diagnosis and safe repair preview', () => {
+    const files = [
+      {
+        id: 'source',
+        title: '正文',
+        content: JSON.stringify({
+          root: {
+            children: [
+              {
+                type: 'wiki-link',
+                id: 'target',
+                title: '旧标题',
+                sectionPath: ['旧目录', '青莲剑宗'],
+              },
+              {
+                type: 'wiki-link',
+                id: 'missing',
+                title: '失效目标',
+                sectionPath: [],
+              },
+            ],
+          },
+        }),
+      },
+      {
+        id: 'target',
+        title: '新标题',
+        content: JSON.stringify({
+          root: {
+            children: [
+              {
+                type: 'heading',
+                tag: 'h1',
+                children: [{ type: 'text', text: '世界观' }],
+              },
+              {
+                type: 'heading',
+                tag: 'h2',
+                children: [{ type: 'text', text: '青莲剑宗' }],
+              },
+            ],
+          },
+        }),
+      },
+    ]
+
+    const diagnosis = diagnoseLibraryReferences(files)
+
+    expect(diagnosis.summary).toMatchObject({
+      scannedNotes: 2,
+      linkedNotes: 1,
+      totalReferences: 2,
+      repairable: 1,
+      broken: 1,
+      affectedFiles: 1,
+      repairableFiles: 1,
+    })
+
+    expect(diagnosis.sources).toHaveLength(1)
+    expect(diagnosis.sources[0]).toMatchObject({
+      id: 'source',
+      repairable: 1,
+      broken: 1,
+      repairedCount: 1,
+      unresolvedCount: 1,
+    })
+    expect(diagnosis.sources[0].changes).toEqual([
+      expect.objectContaining({
+        before: '[[旧标题#旧目录 › 青莲剑宗]]',
+        after: '[[新标题#世界观 › 青莲剑宗]]',
+      }),
+    ])
+    expect(diagnosis.sources[0].repairContent).toContain('"title":"新标题"')
   })
 
   it('keeps recent references deduplicated and newest first', () => {
