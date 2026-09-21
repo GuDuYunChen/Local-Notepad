@@ -113,6 +113,7 @@ export default function TableSelectionPlugin() {
         return
       }
       if (modifier && !e.altKey && key === 'v') {
+        if (!navigator.clipboard?.readText) return
         e.preventDefault()
         void pasteSelection()
         return
@@ -395,7 +396,19 @@ export default function TableSelectionPlugin() {
     if (!text && selectedCellCount === 0) return
 
     try {
-      await navigator.clipboard.writeText(text)
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text)
+      } else {
+        const textarea = document.createElement('textarea')
+        textarea.value = text
+        textarea.setAttribute('readonly', '')
+        textarea.style.position = 'fixed'
+        textarea.style.opacity = '0'
+        document.body.appendChild(textarea)
+        textarea.select()
+        document.execCommand('copy')
+        textarea.remove()
+      }
       toast.success(rects.length > 1 ? '已复制第一个连续选区' : '已复制所选单元格')
     } catch (error) {
       console.error('复制表格内容失败', error)
@@ -408,6 +421,10 @@ export default function TableSelectionPlugin() {
     if (!rect) return
 
     try {
+      if (!navigator.clipboard?.readText) {
+        toast.warning('当前环境不支持读取剪贴板')
+        return
+      }
       const text = await navigator.clipboard.readText()
       const matrix = parseTableTSV(text)
       if (!matrix.length) {
