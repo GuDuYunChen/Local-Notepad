@@ -466,6 +466,14 @@ export default function FileList({
 
 
   useEffect(() => {
+    const handleRefresh = () => {
+      void load()
+    }
+    window.addEventListener('library:refresh', handleRefresh)
+    return () => window.removeEventListener('library:refresh', handleRefresh)
+  }, [q])
+
+  useEffect(() => {
     const handleCreateNoteRequest = () => {
       void onNewFileCheck()
     }
