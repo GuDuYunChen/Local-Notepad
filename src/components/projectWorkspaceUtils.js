@@ -56,7 +56,15 @@ export function getProjectCandidates(files) {
 }
 
 function sortAscendingByLibraryOrder(items) {
-  return [...items].sort((a, b) => -compareLibraryItems(a, b))
+  return [...items].sort((a, b) => {
+    const sortDelta = Number(a?.sort_order || 0) - Number(b?.sort_order || 0)
+    if (sortDelta !== 0) return sortDelta
+
+    const createdDelta = Number(a?.created_at || 0) - Number(b?.created_at || 0)
+    if (createdDelta !== 0) return createdDelta
+
+    return String(a?.id || '').localeCompare(String(b?.id || ''))
+  })
 }
 
 export function buildProjectWorkspace(files, projectId, projectMeta = {}) {
@@ -204,15 +212,30 @@ export function calculateProjectCardMove(files, noteId, targetParentId, targetIn
   if (!note) return null
 
   const parentId = normalizeId(targetParentId)
-  const siblings = sortAscendingByLibraryOrder(
+  const originalSiblings = sortAscendingByLibraryOrder(
     items.filter(item => (
       !item.is_folder &&
-      normalizeId(item.parent_id) === parentId &&
-      normalizeId(item.id) !== normalizeId(noteId)
+      normalizeId(item.parent_id) === parentId
     ))
   )
+  const sourceIndex = originalSiblings.findIndex(item => (
+    normalizeId(item.id) === normalizeId(noteId)
+  ))
 
-  const index = Math.max(0, Math.min(Number(targetIndex) || 0, siblings.length))
+  const siblings = originalSiblings.filter(item => (
+    normalizeId(item.id) !== normalizeId(noteId)
+  ))
+
+  let requestedIndex = Number(targetIndex) || 0
+  if (
+    normalizeId(note.parent_id) === parentId &&
+    sourceIndex >= 0 &&
+    sourceIndex < requestedIndex
+  ) {
+    requestedIndex -= 1
+  }
+
+  const index = Math.max(0, Math.min(requestedIndex, siblings.length))
   const previous = index > 0 ? siblings[index - 1] : null
   const next = index < siblings.length ? siblings[index] : null
 
@@ -221,8 +244,22 @@ export function calculateProjectCardMove(files, noteId, targetParentId, targetIn
     sortOrder = Math.floor(
       (Number(previous.sort_order || 0) + Number(next.sort_order || 0)) / 2
     )
-    if (sortOrder === Number(previous.sort_order || 0) || sortOrder === Number(next.sort_order || 0)) {
-      sortOrder = Number(previous.sort_order || 0) + 1
+    if (
+      sortOrder === Number(previous.sort_order || 0) ||
+      sortOrder === Number(next.sort_order || 0)
+    ) {
+      const ordered = [...siblings]
+      ordered.splice(index, 0, note)
+      return {
+        id: note.id,
+        parent_id: parentId,
+        sort_order: (index + 1) * 1000,
+        rebalance: ordered.map((item, orderIndex) => ({
+          id: item.id,
+          parent_id: parentId,
+          sort_order: (orderIndex + 1) * 1000,
+        })),
+      }
     }
   } else if (previous) {
     sortOrder = Number(previous.sort_order || 0) + 1000
