@@ -91,6 +91,24 @@ function normalizeItems(items) {
   }))
 }
 
+export function appendImageGridItems(items, additions) {
+  return [
+    ...(Array.isArray(items) ? items : []),
+    ...(Array.isArray(additions) ? additions : []),
+  ]
+}
+
+export function replaceImageGridItem(items, index, replacement) {
+  const list = Array.isArray(items) ? items : []
+  if (index < 0 || index >= list.length || !replacement) return [...list]
+
+  return list.map((item, itemIndex) => (
+    itemIndex === index
+      ? { ...item, ...replacement }
+      : item
+  ))
+}
+
 export function reorderImageGridItems(items, fromIndex, toIndex) {
   const list = Array.isArray(items) ? [...items] : []
   if (
@@ -236,7 +254,7 @@ function ImageGridComponent({ nodeKey, items, columns, gap }) {
     try {
       const additions = await uploadImageFiles(files)
       if (!additions.length) return
-      const nextItems = [...currentItems, ...additions]
+      const nextItems = appendImageGridItems(currentItems, additions)
       setCurrentItems(nextItems)
       updateNode({ items: nextItems })
     } finally {
@@ -258,16 +276,11 @@ function ImageGridComponent({ nodeKey, items, columns, gap }) {
       const result = await uploadFile(file)
       if (!result?.url) return
 
-      const nextItems = currentItems.map((item, index) => (
-        index === replaceIndex
-          ? {
-              ...item,
-              src: result.url,
-              originalSrc: result.url,
-              alt: file.name,
-            }
-          : item
-      ))
+      const nextItems = replaceImageGridItem(currentItems, replaceIndex, {
+        src: result.url,
+        originalSrc: result.url,
+        alt: file.name,
+      })
       setCurrentItems(nextItems)
       updateNode({ items: nextItems })
     } catch (error) {
