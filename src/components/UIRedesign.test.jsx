@@ -113,6 +113,9 @@ describe('UI redesign smoke tests', () => {
     await click(searchButton)
     expect(onOpenSearch).toHaveBeenCalledTimes(1)
 
+    await click(projectButton)
+    expect(onChangeWorkspace).toHaveBeenCalledWith('projects')
+
     await click(dailyButton)
     expect(onChangeWorkspace).toHaveBeenCalledWith('daily')
 
