@@ -81,7 +81,7 @@ const FILTERS = [
   ['attachment', '附件'],
 ]
 
-export default function ResourceManagerPlugin() {
+export default function ResourceManagerPlugin({ readOnly = false }) {
   const [editor] = useLexicalComposerContext()
   const [resources, setResources] = useState([])
   const [open, setOpen] = useState(false)
@@ -213,7 +213,9 @@ export default function ResourceManagerPlugin() {
 
                 <div className="editor-resource-actions">
                   <button type="button" onClick={() => locate(resource)}>定位</button>
-                  <button type="button" className="danger" onClick={() => remove(resource)}>删除</button>
+                  {!readOnly && (
+                    <button type="button" className="danger" onClick={() => remove(resource)}>删除</button>
+                  )}
                 </div>
               </article>
             )) : (
