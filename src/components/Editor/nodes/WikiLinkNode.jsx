@@ -11,6 +11,7 @@ import {
 } from '../utils/referenceUtils'
 
 const previewCache = new Map()
+const PREVIEW_CACHE_TTL = 30_000
 
 export class WikiLinkNode extends DecoratorNode {
   __id
@@ -92,7 +93,12 @@ export class WikiLinkNode extends DecoratorNode {
 function WikiLinkView({ id, title, sectionPath = [] }) {
   const normalizedSectionPath = normalizeSectionPath(sectionPath)
   const previewCacheKey = [id, ...normalizedSectionPath].join('\u001f')
-  const cached = previewCache.get(previewCacheKey)
+  const cachedEntry = previewCache.get(previewCacheKey)
+  const cached = cachedEntry && Date.now() - Number(cachedEntry.cachedAt || 0) < PREVIEW_CACHE_TTL
+    ? cachedEntry
+    : null
+  if (cachedEntry && !cached) previewCache.delete(previewCacheKey)
+
   const [previewOpen, setPreviewOpen] = useState(false)
   const [preview, setPreview] = useState(cached || null)
   const [loading, setLoading] = useState(false)
@@ -131,6 +137,7 @@ function WikiLinkView({ id, title, sectionPath = [] }) {
         sectionMissing: normalizedSectionPath.length > 0 && !sectionHealth.valid,
         sectionRepairable: Boolean(sectionHealth.repairable),
         suggestedSectionPath: sectionHealth.nextPath || normalizedSectionPath,
+        cachedAt: Date.now(),
       }
 
       previewCache.set(previewCacheKey, next)
@@ -141,6 +148,7 @@ function WikiLinkView({ id, title, sectionPath = [] }) {
         title: title || '笔记',
         excerpt: '目标笔记不存在、已删除或暂时无法读取。',
         unavailable: true,
+        cachedAt: Date.now(),
       })
     } finally {
       setLoading(false)
@@ -206,7 +214,7 @@ function WikiLinkView({ id, title, sectionPath = [] }) {
         <path d="M6 4h10l2 2v14H6z" />
         <path d="M9 9h6M9 13h6M9 17h4" />
       </svg>
-      <span>{title}</span>
+      <span>{preview && !preview.unavailable ? preview.title : title}</span>
       {sectionLabel && (
         <small className="wiki-link-section">› {normalizedSectionPath[normalizedSectionPath.length - 1]}</small>
       )}
