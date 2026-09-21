@@ -281,6 +281,10 @@ export default function App() {
         }
       }
 
+      if (refactorState?.structureChanged) {
+        await createFileVersionSnapshot(current.id)
+      }
+
       const updated = await editorRef.current.save()
       if (!updated) return false
 
