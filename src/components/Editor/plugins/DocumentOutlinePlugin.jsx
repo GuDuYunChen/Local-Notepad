@@ -3,6 +3,11 @@ import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext
 import { $getRoot, $getSelection, $isRangeSelection } from 'lexical'
 import { $isHeadingNode } from '@lexical/rich-text'
 import { buildHeadingAnchor } from '../utils/linkUtils'
+import {
+  formatWikiReferenceText,
+  rememberReference,
+} from '../utils/referenceUtils'
+import { toast } from '~/services/toast'
 
 const levelLabel = {
   h1: 1,
@@ -103,6 +108,23 @@ export function findOutlineHeadingForKey(nodes, topLevelKey) {
   return null
 }
 
+async function copyText(value) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(value)
+    return
+  }
+
+  const textarea = document.createElement('textarea')
+  textarea.value = value
+  textarea.setAttribute('readonly', '')
+  textarea.style.position = 'fixed'
+  textarea.style.opacity = '0'
+  document.body.appendChild(textarea)
+  textarea.select()
+  document.execCommand('copy')
+  textarea.remove()
+}
+
 function hasCollapsibleContent(nodes, headingKey) {
   const index = nodes.findIndex(node => node.key === headingKey)
   const heading = nodes[index]
@@ -113,7 +135,7 @@ function hasCollapsibleContent(nodes, headingKey) {
   return !(next.isHeading && next.level <= heading.level)
 }
 
-export default function DocumentOutlinePlugin() {
+export default function DocumentOutlinePlugin({ documentId = '', documentTitle = '' }) {
   const [editor] = useLexicalComposerContext()
   const [headings, setHeadings] = useState([])
   const [outlineNodes, setOutlineNodes] = useState([])
@@ -197,6 +219,41 @@ export default function DocumentOutlinePlugin() {
     () => getOutlineBreadcrumb(headings, activeKey),
     [headings, activeKey]
   )
+
+  const currentReferenceBreadcrumb = useMemo(() => {
+    const caretHeading = findOutlineHeadingForKey(outlineNodes, caretTopLevelKey)
+    return caretHeading
+      ? getOutlineBreadcrumb(headings, caretHeading.key)
+      : activeBreadcrumb
+  }, [activeBreadcrumb, caretTopLevelKey, headings, outlineNodes])
+
+  useEffect(() => {
+    const onCopyCurrentReference = async () => {
+      if (!documentId || !documentTitle) {
+        toast.warning('当前没有可复制的笔记引用')
+        return
+      }
+
+      const sectionPath = currentReferenceBreadcrumb.map(item => item.text)
+      const referenceText = formatWikiReferenceText(documentTitle, sectionPath)
+
+      try {
+        await copyText(referenceText)
+        rememberReference({
+          id: documentId,
+          title: documentTitle,
+          sectionPath,
+        })
+        toast.success(sectionPath.length ? '当前章节引用已复制' : '当前笔记引用已复制')
+      } catch (error) {
+        console.error('复制当前引用失败', error)
+        toast.error('复制引用失败')
+      }
+    }
+
+    window.addEventListener('editor:copy-current-reference', onCopyCurrentReference)
+    return () => window.removeEventListener('editor:copy-current-reference', onCopyCurrentReference)
+  }, [currentReferenceBreadcrumb, documentId, documentTitle])
 
   useEffect(() => {
     if (!outlineNodes.length) return undefined
