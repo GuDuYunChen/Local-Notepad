@@ -140,7 +140,7 @@ export default function SearchPlugin() {
       const modifier = e.ctrlKey || e.metaKey
       if (modifier && e.key.toLowerCase() === 'f') {
         e.preventDefault()
-        setIsOpen(prev => !prev)
+        setIsOpen(true)
       }
       if (modifier && e.key.toLowerCase() === 'h') {
         e.preventDefault()
@@ -171,6 +171,18 @@ export default function SearchPlugin() {
           placeholder="搜索…"
           value={searchText}
           onChange={e => setSearchText(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              if (e.shiftKey) handleFindPrev()
+              else handleFindNext()
+            }
+            if (e.key === 'Escape') {
+              e.preventDefault()
+              setIsOpen(false)
+              editor.focus()
+            }
+          }}
         />
         <div className="search-count">
           {matchCount > 0 ? `${currentIndex + 1}/${matchCount}` : '0/0'}
@@ -185,6 +197,18 @@ export default function SearchPlugin() {
           placeholder="替换…"
           value={replaceText}
           onChange={e => setReplaceText(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              if (e.shiftKey) handleReplaceAll()
+              else handleReplace()
+            }
+            if (e.key === 'Escape') {
+              e.preventDefault()
+              setIsOpen(false)
+              editor.focus()
+            }
+          }}
         />
         <button className="search-btn" onClick={handleReplace} disabled={matchCount === 0 || currentIndex < 0}>替换</button>
         <button className="search-btn" onClick={handleReplaceAll} disabled={matchCount === 0}>全部替换</button>
