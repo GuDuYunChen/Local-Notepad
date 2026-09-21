@@ -1,5 +1,9 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { api, getBacklinks } from '../services/api'
+import {
+  findWikiLinkOccurrences,
+  formatSectionPath,
+} from './Editor/utils/referenceUtils'
 import './BacklinksPanel.css'
 
 export default function BacklinksPanel({ fileId, onSelectFile }) {
@@ -31,7 +35,12 @@ export default function BacklinksPanel({ fileId, onSelectFile }) {
             try {
               const file = await api(`/api/files/${link.source_id}`)
               if (controller.signal.aborted) return { ...link, source_title: '未知文件' }
-              return { ...link, source_title: file.title }
+              const occurrence = findWikiLinkOccurrences(file.content || '', fileId)[0] || null
+              return {
+                ...link,
+                source_title: file.title,
+                source_section_path: occurrence?.sourceSectionPath || [],
+              }
             } catch {
               return { ...link, source_title: '未知文件' }
             }
@@ -74,9 +83,16 @@ export default function BacklinksPanel({ fileId, onSelectFile }) {
             <div
               key={link.id}
               className="backlink-item"
-              onClick={() => onSelectFile?.(link.source_id)}
+              onClick={() => onSelectFile?.(link.source_id, {
+                headingPath: link.source_section_path || [],
+              })}
             >
               <div className="backlink-title">{link.source_title}</div>
+              {link.source_section_path?.length > 0 && (
+                <div className="backlink-section">
+                  {formatSectionPath(link.source_section_path)}
+                </div>
+              )}
               <div className="backlink-time">
                 {new Date(link.created_at * 1000).toLocaleString('zh-CN')}
               </div>
