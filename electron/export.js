@@ -345,6 +345,92 @@ export async function processExport(ids, targetDir, format = 'docx') {
     return errors
 }
 
+export async function exportCombinedManuscript(
+    ids,
+    targetDir,
+    format = 'docx',
+    title = '合并稿',
+  ) {
+    const orderedIds = (Array.isArray(ids) ? ids : []).filter(Boolean)
+    if (!orderedIds.length) {
+        throw new Error('没有可导出的章节')
+    }
+
+    const safeTitle = safeExportStem(title || '合并稿')
+
+    if (format === 'markdown' || format === 'md') {
+        const sections = []
+
+        for (let index = 0; index < orderedIds.length; index++) {
+            const file = await fetchFileContent(orderedIds[index])
+            if (!file || file.is_folder) continue
+
+            const portableContent = await materializeLocalAssetsInLexical(
+                file.content,
+                targetDir,
+                `${safeTitle}_assets/${String(index + 1).padStart(2, '0')}`
+            )
+            const markdown = convertToMarkdown(portableContent).trim()
+            sections.push(
+                `# ${String(file.title || '未命名').replace(/\.[^.]+$/, '')}\n\n${markdown}`.trim()
+            )
+        }
+
+        const outputPath = path.join(targetDir, `${safeTitle}.md`)
+        fs.writeFileSync(outputPath, sections.join('\n\n---\n\n') + '\n', 'utf8')
+        return outputPath
+    }
+
+    const docChildren = [
+        new Paragraph({
+            children: [
+                new TextRun({
+                    text: String(title || '合并稿'),
+                    bold: true,
+                    size: 36,
+                }),
+            ],
+        }),
+        new Paragraph({}),
+    ]
+
+    for (const id of orderedIds) {
+        const file = await fetchFileContent(id)
+        if (!file || file.is_folder) continue
+
+        docChildren.push(
+            new Paragraph({
+                heading: HeadingLevel.HEADING_1,
+                children: [
+                    new TextRun({
+                        text: String(file.title || '未命名').replace(/\.[^.]+$/, ''),
+                    }),
+                ],
+            })
+        )
+
+        const lexicalNodes = parseLexicalState(file.content)
+        for (const node of lexicalNodes) {
+            const converted = await convertNode(node)
+            if (!converted) continue
+            if (Array.isArray(converted)) docChildren.push(...converted)
+            else docChildren.push(converted)
+        }
+        docChildren.push(new Paragraph({}))
+    }
+
+    const doc = new Document({
+        sections: [{
+            properties: {},
+            children: docChildren,
+        }],
+    })
+    const buffer = await Packer.toBuffer(doc)
+    const outputPath = path.join(targetDir, `${safeTitle}.docx`)
+    fs.writeFileSync(outputPath, buffer)
+    return outputPath
+}
+
 function convertToMarkdown(lexicalJSON) {
     try {
         const state = JSON.parse(lexicalJSON)
