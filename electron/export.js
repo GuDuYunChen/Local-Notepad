@@ -146,8 +146,13 @@ async function convertChildren(children) {
              const linkRuns = await convertChildren(child.children)
              linkRuns.forEach(r => runs.push(r))
         } else if (child.type === 'wiki-link') {
+             const section = Array.isArray(child.sectionPath)
+                 ? child.sectionPath.map(value => String(value || '').trim()).filter(Boolean).join(' › ')
+                 : ''
              runs.push(new TextRun({
-                 text: `[[${child.title || '未命名'}]]`,
+                 text: section
+                     ? `[[${child.title || '未命名'}#${section}]]`
+                     : `[[${child.title || '未命名'}]]`,
                  color: '7057D9'
              }))
         }
@@ -371,8 +376,11 @@ export async function exportCombinedManuscript(
                 `${safeTitle}_assets/${String(index + 1).padStart(2, '0')}`
             )
             const markdown = convertToMarkdown(portableContent).trim()
+            const chapterTitle = escapeMarkdownText(
+                String(file.title || '未命名').replace(/\.[^.]+$/, '')
+            )
             sections.push(
-                `# ${String(file.title || '未命名').replace(/\.[^.]+$/, '')}\n\n${markdown}`.trim()
+                `# ${chapterTitle}\n\n${markdown}`.trim()
             )
         }
 
@@ -562,7 +570,12 @@ function processInlineNodes(children) {
             const linkText = processInlineNodes(child.children || [])
             result += `[${linkText}](${child.url || ''})`
         } else if (child.type === 'wiki-link') {
-            result += `[[${child.title || '未命名'}]]`
+            const section = Array.isArray(child.sectionPath)
+                ? child.sectionPath.map(value => String(value || '').trim()).filter(Boolean).join(' › ')
+                : ''
+            result += section
+                ? `[[${child.title || '未命名'}#${section}]]`
+                : `[[${child.title || '未命名'}]]`
         }
     }
     return result
