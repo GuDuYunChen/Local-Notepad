@@ -1907,3 +1907,36 @@
   border-bottom: 1.7px solid #fff;
   transform: rotate(-45deg);
 }
+
+
+/* Inline heading collapse */
+.heading-body-collapse {
+  position: fixed;
+  z-index: 90;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink-muted);
+  font: inherit;
+  font-size: 16px;
+  cursor: pointer;
+  opacity: .32;
+  transform: rotate(90deg);
+  transition: opacity .1s ease, background-color .1s ease, transform .1s ease;
+}
+
+.heading-body-collapse:hover {
+  opacity: 1;
+  background: var(--surface-hover);
+  color: var(--ink);
+}
+
+.heading-body-collapse.collapsed {
+  transform: rotate(0deg);
+  opacity: .62;
+}
