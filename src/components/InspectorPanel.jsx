@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import BacklinksPanel from './BacklinksPanel'
 import ReferenceHealthPanel from './ReferenceHealthPanel'
+import LongFormStructurePanel from './LongFormStructurePanel'
 import VersionHistory from './VersionHistory'
 import TagSelector from './TagSelector'
 import { tagApi } from '~/services/tagApi'
@@ -58,6 +59,9 @@ export default function InspectorPanel({
   editorStatus,
   unsaved,
   onUpdateFile,
+  draftContent,
+  onApplyDraftContent,
+  onExtractSection,
 }) {
   const [tags, setTags] = useState([])
   const [pinBusy, setPinBusy] = useState(false)
@@ -114,6 +118,7 @@ export default function InspectorPanel({
   const saveState = statusLabel(editorStatus, unsaved)
   const tabs = [
     ['properties', '属性'],
+    ['structure', '结构'],
     ['references', '引用'],
     ['backlinks', '反向链接'],
     ['history', '历史'],
@@ -226,6 +231,15 @@ export default function InspectorPanel({
               <strong>{file.is_pinned ? '是' : '否'}</strong>
             </div>
           </div>
+        )}
+
+        {activeTab === 'structure' && (
+          <LongFormStructurePanel
+            content={draftContent ?? file.content ?? ''}
+            busy={Boolean(editorStatus?.saving)}
+            onApplyDraft={onApplyDraftContent}
+            onExtractSection={onExtractSection}
+          />
         )}
 
         {activeTab === 'references' && (
