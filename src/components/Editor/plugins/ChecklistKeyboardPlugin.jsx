@@ -6,7 +6,7 @@ import {
   COMMAND_PRIORITY_LOW,
   KEY_ENTER_COMMAND,
 } from 'lexical'
-import { $isListItemNode, $isListNode } from '@lexical/list'
+import { $createListItemNode, $isListItemNode, $isListNode } from '@lexical/list'
 
 function getCurrentChecklistItem() {
   const selection = $getSelection()
@@ -21,20 +21,39 @@ function getCurrentChecklistItem() {
   return node
 }
 
+export function getChecklistEnterAction(event, checked, text) {
+  const modifier = Boolean(event?.ctrlKey || event?.metaKey)
+  const alt = Boolean(event?.altKey)
+
+  if (modifier && !alt) return 'toggle'
+  if (!modifier && !alt && checked && String(text || '').trim()) return 'continue'
+  return null
+}
+
 export default function ChecklistKeyboardPlugin() {
   const [editor] = useLexicalComposerContext()
 
   useEffect(() => editor.registerCommand(
     KEY_ENTER_COMMAND,
     event => {
-      if (!(event?.ctrlKey || event?.metaKey) || event?.altKey) return false
-
       const item = getCurrentChecklistItem()
-      if (!item || typeof item.setChecked !== 'function') return false
+      if (!item) return false
+
+      const checked = typeof item.getChecked === 'function' ? Boolean(item.getChecked()) : false
+      const action = getChecklistEnterAction(event, checked, item.getTextContent?.() || '')
+      if (!action) return false
 
       event.preventDefault()
-      const checked = typeof item.getChecked === 'function' ? Boolean(item.getChecked()) : false
-      item.setChecked(!checked)
+
+      if (action === 'toggle') {
+        if (typeof item.setChecked !== 'function') return false
+        item.setChecked(!checked)
+        return true
+      }
+
+      const nextItem = $createListItemNode(false)
+      item.insertAfter(nextItem)
+      nextItem.selectStart()
       return true
     },
     COMMAND_PRIORITY_LOW,
