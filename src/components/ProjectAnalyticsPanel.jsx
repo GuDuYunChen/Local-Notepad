@@ -140,6 +140,7 @@ export default function ProjectAnalyticsPanel({
               <input
                 type="number"
                 min="0"
+                aria-label="单章目标字数"
                 step="100"
                 value={projectMeta?.chapterTargetWords || ''}
                 placeholder={
