@@ -631,7 +631,7 @@ export default function ToolbarPlugin() {
           className={`btn toolbar-text-btn${isCheckList ? ' active' : ''}`}
           onClick={() => toggleList('check')}
           aria-label="待办清单"
-          title="待办清单 · Tab/Shift+Tab 调整层级"
+          title="待办清单 · Ctrl+Alt+T · Tab/Shift+Tab 调整层级"
         >
           ☐ 清单
         </button>
@@ -736,7 +736,7 @@ export default function ToolbarPlugin() {
                 >
                   代码块
                 </button>
-                <button type="button" className="btn toolbar-menu-action" onClick={() => insertNode($createFormulaNode())}>
+                <button type="button" className="btn toolbar-menu-action" onClick={() => insertNode($createFormulaNode())} title="Ctrl+Alt+E">
                   数学公式
                 </button>
                 <button type="button" className="btn toolbar-menu-action" onClick={() => insertNode($createCalloutNode())}>
