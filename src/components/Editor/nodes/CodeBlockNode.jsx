@@ -128,6 +128,10 @@ export class CodeBlockNode extends DecoratorNode {
     return false;
   }
 
+  isInline() {
+    return false;
+  }
+
   decorate() {
     return (
       <CodeBlockComponent
