@@ -117,15 +117,16 @@ export default function EditorViewSettingsPlugin({ readOnly = false }) {
   }, [editor, fontCss, readOnly, settings])
 
   useEffect(() => {
-    const openSettings = () => setOpen(true)
-    window.addEventListener('editor:open-view-settings', openSettings)
-    return () => window.removeEventListener('editor:open-view-settings', openSettings)
+    const toggleSettings = () => setOpen(value => !value)
+    window.addEventListener('editor:toggle-view-settings', toggleSettings)
+    return () => window.removeEventListener('editor:toggle-view-settings', toggleSettings)
   }, [])
 
   useEffect(() => {
     if (!open) return
 
     const onPointerDown = event => {
+      if (event.target?.closest?.('.toolbar-view-btn')) return
       if (panelRef.current && !panelRef.current.contains(event.target)) setOpen(false)
     }
 
