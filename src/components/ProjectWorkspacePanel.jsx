@@ -25,6 +25,7 @@ import {
 } from './projectWorkspaceUtils'
 import ProjectAnalyticsPanel from './ProjectAnalyticsPanel'
 import ProjectPlanningPanel from './ProjectPlanningPanel'
+import ProjectSprintPanel from './ProjectSprintPanel'
 import './ProjectWorkspacePanel.css'
 
 const LAST_PROJECT_KEY = 'localNotepad.projectWorkspace.lastProject'
@@ -79,6 +80,8 @@ export default function ProjectWorkspacePanel({
     foreshadowStates: {},
     volumeMilestones: {},
     chapterQueue: [],
+    sprint: null,
+    dailyReviews: {},
   })
   const [projectIndexes, setProjectIndexes] = useState({
     characters: [],
@@ -146,6 +149,8 @@ export default function ProjectWorkspacePanel({
         foreshadowStates: {},
         volumeMilestones: {},
         chapterQueue: [],
+        sprint: null,
+        dailyReviews: {},
       })
       return
     }
@@ -766,6 +771,13 @@ export default function ProjectWorkspacePanel({
       />
 
       <ProjectPlanningPanel
+        workspace={workspace}
+        projectMeta={projectMeta}
+        onMetaChange={updateMeta}
+        onOpenFile={onOpenFile}
+      />
+
+      <ProjectSprintPanel
         workspace={workspace}
         projectMeta={projectMeta}
         onMetaChange={updateMeta}
