@@ -41,6 +41,49 @@ func newFileLogicTestDB(t *testing.T) *FileLogic {
 	return &FileLogic{FileDAO: &dao.FileDAO{DB: db}}
 }
 
+func TestCreateAssignsNewestFirstSortOrder(t *testing.T) {
+	logic := newFileLogicTestDB(t)
+	ctx := context.Background()
+
+	first, err := logic.Create(ctx, "First.md", "", false, "")
+	if err != nil {
+		t.Fatalf("create first: %v", err)
+	}
+	second, err := logic.Create(ctx, "Second.md", "", false, "")
+	if err != nil {
+		t.Fatalf("create second: %v", err)
+	}
+
+	if second.SortOrder <= first.SortOrder {
+		t.Fatalf("newer root item sort_order = %d, want greater than %d", second.SortOrder, first.SortOrder)
+	}
+
+	files, err := logic.List(ctx, "", 1, 20)
+	if err != nil {
+		t.Fatalf("list root items: %v", err)
+	}
+	if len(files) < 2 || files[0].ID != second.ID {
+		t.Fatalf("newest root item was not first: %#v", files)
+	}
+
+	folder, err := logic.Create(ctx, "Folder", "", true, "")
+	if err != nil {
+		t.Fatalf("create folder: %v", err)
+	}
+	childA, err := logic.Create(ctx, "Child A.md", "", false, folder.ID)
+	if err != nil {
+		t.Fatalf("create first child: %v", err)
+	}
+	childB, err := logic.Create(ctx, "Child B.md", "", false, folder.ID)
+	if err != nil {
+		t.Fatalf("create second child: %v", err)
+	}
+
+	if childB.SortOrder <= childA.SortOrder {
+		t.Fatalf("newer child sort_order = %d, want greater than %d", childB.SortOrder, childA.SortOrder)
+	}
+}
+
 func TestCreateRejectsDuplicateNamesInRoot(t *testing.T) {
 	logic := newFileLogicTestDB(t)
 	ctx := context.Background()
