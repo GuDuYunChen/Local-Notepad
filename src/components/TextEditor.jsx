@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useImperativeHandle } from 'react'
 import { api } from '~/services/api'
 import { countLexicalCharacters } from '~/utils/lexicalText'
+import { hasHeadingStructureChanged } from './Editor/utils/referenceUtils'
 import {
   isFreshEditorDraft,
   readEditorDraft,
@@ -39,6 +40,7 @@ function TextEditorInternal({
   const [saveError, setSaveError] = useState(false)
   const [selMode, setSelMode] = useState(false)
   const [wordCount, setWordCount] = useState(0)
+  const [structureDirty, setStructureDirty] = useState(false)
   const [dragOver, setDragOver] = useState(false)
   const statusRef = useRef(null)
   const [editorContent, setEditorContent] = useState('')
@@ -86,6 +88,21 @@ function TextEditorInternal({
     if (deletedIdsRef.current?.has(id)) return
 
     const text = contentOverride ?? contentRef.current
+    const hasStructuralChanges = id === currentIdRef.current && hasHeadingStructureChanged(
+      lastSavedContentRef.current,
+      text,
+    )
+
+    if (reason === 'interval' && hasStructuralChanges) {
+      setStructureDirty(true)
+      return {
+        id,
+        content: text,
+        skipped: true,
+        structural: true,
+      }
+    }
+
     if (id === currentIdRef.current && text === lastSavedContentRef.current) {
       setSaveError(false)
       return { id, content: text, skipped: true }
@@ -116,6 +133,7 @@ function TextEditorInternal({
         const now = Date.now()
         if (id === currentIdRef.current) {
           lastSavedContentRef.current = text
+          setStructureDirty(false)
           setLastSavedAt(now)
           writeEditorDraft(id, text, now)
           onSavedRef.current?.(updated)
@@ -145,6 +163,14 @@ function TextEditorInternal({
     clearCache: () => {
       if (currentIdRef.current) removeEditorDraft(currentIdRef.current)
     },
+    getReferenceRefactorState: () => ({
+      currentContent: contentRef.current,
+      savedContent: lastSavedContentRef.current,
+      structureChanged: hasHeadingStructureChanged(
+        lastSavedContentRef.current,
+        contentRef.current,
+      ),
+    }),
     replaceSavedContent: (nextContent, updatedAt) => {
       const text = String(nextContent ?? '')
       const rawUpdatedAt = Number(updatedAt) || 0
@@ -158,6 +184,7 @@ function TextEditorInternal({
       setWordCount(countLexicalCharacters(text))
       setLastSavedAt(savedAt)
       setSaveError(false)
+      setStructureDirty(false)
 
       if (currentIdRef.current) {
         writeEditorDraft(currentIdRef.current, text, savedAt)
@@ -195,6 +222,7 @@ function TextEditorInternal({
       lastSavedContentRef.current = ''
       contentRef.current = ''
       setEditorContent('')
+      setStructureDirty(false)
       return
     }
 
@@ -210,6 +238,7 @@ function TextEditorInternal({
         const text = useCache ? cached.content : serverText
 
         lastSavedContentRef.current = serverText
+        setStructureDirty(hasHeadingStructureChanged(serverText, text || ''))
         setLastSavedAt(f.updated_at ? f.updated_at * 1000 : null)
         contentRef.current = text || ''
         setWordCount(countLexicalCharacters(text || ''))
@@ -271,8 +300,9 @@ function TextEditorInternal({
       lastSavedAt,
       dirty: Boolean(activeId && contentRef.current !== lastSavedContentRef.current),
       wordCount,
+      structureDirty,
     })
-  }, [activeId, saving, saveError, lastSavedAt, wordCount])
+  }, [activeId, saving, saveError, lastSavedAt, wordCount, structureDirty])
 
   useEffect(() => {
     const apply = () => {
@@ -312,6 +342,10 @@ function TextEditorInternal({
     onChangeRef.current?.(newContent)
 
     setWordCount(countLexicalCharacters(newContent))
+    setStructureDirty(hasHeadingStructureChanged(
+      lastSavedContentRef.current,
+      newContent,
+    ))
   }, [])
 
   return (
@@ -374,6 +408,14 @@ function TextEditorInternal({
               </span>
             )}
             <span className="status-right">
+              {structureDirty && (
+                <span
+                  className="selection-mode-pill structure-dirty-pill"
+                  title="章节标题或层级已变化，Ctrl+S 时会先检查跨笔记引用影响"
+                >
+                  章节结构待确认
+                </span>
+              )}
               {selMode && <span className="selection-mode-pill">表格选择</span>}
               <span>{wordCount.toLocaleString()} 字</span>
             </span>
