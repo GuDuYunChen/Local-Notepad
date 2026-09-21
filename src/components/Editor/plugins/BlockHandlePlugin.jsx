@@ -20,6 +20,27 @@ export function setInternalBlockClipboard(payload) {
   internalBlockClipboard = payload
 }
 
+export function $serializeBlockClipboard(editor, blockNode) {
+  if (!blockNode) return null
+  const selection = $createNodeSelection()
+  selection.add(blockNode.getKey())
+  const payload = $generateJSONFromSelectedNodes(editor, selection)
+  return payload?.nodes?.length ? payload : null
+}
+
+export function $insertBlockClipboardPayloadAfter(payload, blockNode) {
+  if (!blockNode || !payload?.nodes?.length) return []
+
+  const nodes = $generateNodesFromSerializedNodes(payload.nodes)
+  let cursor = blockNode
+  for (const node of nodes) {
+    cursor.insertAfter(node)
+    cursor = node
+  }
+  return nodes
+}
+
+
 function getBlockTypeFromNode(node) {
   if (!node) return null
   if ($isHeadingNode(node)) {
@@ -170,16 +191,7 @@ export default function BlockHandlePlugin() {
     setShowMenu(false)
   }
 
-  const serializeBlock = () => {
-    const blockNode = getBlockNode()
-    if (!blockNode) return null
-
-    const selection = $createNodeSelection()
-    selection.add(blockNode.getKey())
-    const payload = $generateJSONFromSelectedNodes(editor, selection)
-
-    return payload?.nodes?.length ? payload : null
-  }
+  const serializeBlock = () => $serializeBlockClipboard(editor, getBlockNode())
 
   const copyBlock = () => {
     editor.update(() => {
@@ -197,15 +209,9 @@ export default function BlockHandlePlugin() {
   }
 
   const insertSerializedNodesAfter = payload => {
-    const blockNode = getBlockNode()
-    if (!blockNode || !payload?.nodes?.length) return
-
-    const nodes = $generateNodesFromSerializedNodes(payload.nodes)
-    let cursor = blockNode
-    for (const node of nodes) {
-      cursor.insertAfter(node)
-      cursor = node
-    }
+    const nodes = $insertBlockClipboardPayloadAfter(payload, getBlockNode())
+    const cursor = nodes[nodes.length - 1]
+    if (!cursor) return
 
     if (typeof cursor.selectEnd === 'function') cursor.selectEnd()
     setBlockKey(cursor.getKey())
