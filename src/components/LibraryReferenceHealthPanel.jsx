@@ -133,7 +133,7 @@ export default function LibraryReferenceHealthPanel({ onOpenFile }) {
     if (failed.length) {
       toast.warning(
         '已修复 ' + repairedFiles + ' 篇笔记，' +
-        failed.length + ' 篇因快照或保存失败被跳过'
+        failed.length + ' 篇因快照、保存或修复计划变化被跳过，请重新扫描'
       )
     } else {
       toast.success(
