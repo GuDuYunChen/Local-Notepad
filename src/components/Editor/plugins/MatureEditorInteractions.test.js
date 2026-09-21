@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 
 import { findOutlineHeadingForKey, getCollapsedOutlineKeys } from './DocumentOutlinePlugin'
 import { clampTableColumnWidth } from './TableColumnResizePlugin'
-import { countSelectedTableCells } from './TableSelectionPlugin'
+import { countSelectedTableCells, parseTableTSV, tableMatrixToTSV } from './TableSelectionPlugin'
 import { getEditorShortcut } from './EditorShortcutPlugin'
+import { matchFormulaShortcut } from './FormulaShortcutPlugin'
+import { getChecklistEnterAction } from './ChecklistKeyboardPlugin'
 import { reorderImageGridItems } from '../nodes/ImageGridNode'
 import { getAttachmentPreviewType } from '../nodes/AttachmentNode'
 
@@ -82,6 +84,58 @@ describe('mature editor interactions', () => {
     expect(getEditorShortcut({ ctrlKey: true, metaKey: false, altKey: true, key: 'e' })).toBe('formula')
     expect(getEditorShortcut({ ctrlKey: true, metaKey: false, altKey: true, key: 'T' })).toBe('checklist')
     expect(getEditorShortcut({ ctrlKey: true, metaKey: false, altKey: false, key: 'e' })).toBeNull()
+  })
+
+  it('round-trips table clipboard content through TSV helpers', () => {
+    const matrix = [
+      ['姓名', '备注'],
+      ['关关', '含\t制表符'],
+      ['阿茂', '多\n行内容'],
+    ]
+
+    const tsv = tableMatrixToTSV(matrix)
+    expect(tsv).toBe('姓名\t备注\n关关\t含 制表符\n阿茂\t多 行内容')
+    expect(parseTableTSV(tsv)).toEqual([
+      ['姓名', '备注'],
+      ['关关', '含 制表符'],
+      ['阿茂', '多 行内容'],
+    ])
+  })
+
+  it('recognizes safe formula typing shortcuts', () => {
+    expect(matchFormulaShortcut('$')).toMatchObject({
+      type: 'block',
+      expression: '',
+    })
+    expect(matchFormulaShortcut('前文 $E = mc^2
+    const nodes = [
+      { key: 'h1', isHeading: true, level: 1, text: '第一章' },
+      { key: 'p1', isHeading: false, level: null, text: '' },
+      { key: 'h2', isHeading: true, level: 2, text: '细节' },
+      { key: 'p2', isHeading: false, level: null, text: '' },
+    ]
+
+    expect(findOutlineHeadingForKey(nodes, 'p2')).toMatchObject({ key: 'h2', text: '细节' })
+    expect(findOutlineHeadingForKey(nodes, 'p1')).toMatchObject({ key: 'h1', text: '第一章' })
+    expect(findOutlineHeadingForKey(nodes, 'missing')).toBeNull()
+  })
+
+})
+)).toMatchObject({
+      type: 'inline',
+      expression: 'E = mc^2',
+      start: 3,
+    })
+    expect(matchFormulaShortcut('$12')).toBeNull()
+    expect(matchFormulaShortcut('price $12 and more')).toBeNull()
+  })
+
+  it('maps checklist Enter behavior for productive task entry', () => {
+    expect(getChecklistEnterAction({ ctrlKey: true }, false, '任务')).toBe('toggle')
+    expect(getChecklistEnterAction({ metaKey: true }, true, '任务')).toBe('toggle')
+    expect(getChecklistEnterAction({}, true, '已完成任务')).toBe('continue')
+    expect(getChecklistEnterAction({}, false, '未完成任务')).toBeNull()
+    expect(getChecklistEnterAction({}, true, '   ')).toBeNull()
   })
 
   it('resolves a search hit to its nearest preceding outline heading', () => {
