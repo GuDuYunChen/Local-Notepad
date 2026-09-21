@@ -28,6 +28,22 @@ function $findAllTextNodes(text) {
   return results;
 }
 
+function topLevelKey(node) {
+  let current = node
+  while (current?.getParent && current.getParent()?.getType?.() !== 'root') {
+    current = current.getParent()
+  }
+  return current?.getKey?.() || ''
+}
+
+function notifySearchMatch(node) {
+  const key = topLevelKey(node)
+  if (!key) return
+  window.dispatchEvent(new CustomEvent('editor:search-match', {
+    detail: { topLevelKey: key },
+  }))
+}
+
 export default function SearchPlugin() {
   const [editor] = useLexicalComposerContext();
   const [isOpen, setIsOpen] = useState(false);
@@ -58,6 +74,7 @@ export default function SearchPlugin() {
         setCurrentIndex(0);
         const { node, offset, length } = results[0];
         node.select(offset, offset + length);
+        notifySearchMatch(node);
       }
     });
   }, [isOpen, searchText, editor]);
@@ -70,6 +87,7 @@ export default function SearchPlugin() {
       setCurrentIndex(idx);
       const { node, offset, length } = results[idx];
       node.select(offset, offset + length);
+      notifySearchMatch(node);
     });
   }, [editor, searchText]);
 
