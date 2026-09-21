@@ -12,6 +12,13 @@ const EXTRA_COMMANDS = [
     run: () => window.dispatchEvent(new Event('editor:open-search')),
   },
   {
+    id: 'outline',
+    label: '文档目录',
+    description: '打开或关闭长文目录与章节导航',
+    keywords: ['outline', 'toc', '目录', '大纲', '章节', '导航'],
+    run: () => window.dispatchEvent(new Event('editor:toggle-outline')),
+  },
+  {
     id: 'table-selection',
     label: '表格多选模式',
     description: '框选多个单元格并批量操作',
