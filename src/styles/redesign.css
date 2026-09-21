@@ -617,6 +617,11 @@ body {
   color: var(--clay);
 }
 
+.structure-dirty-pill {
+  background: color-mix(in srgb, #b97820 12%, var(--surface));
+  color: #95621c;
+}
+
 .empty-editor-state {
   flex: 1;
   display: grid;
