@@ -50,6 +50,25 @@ describe('import content normalization', () => {
     expect(textFromState(JSON.stringify({ root: { children: [table] } }))).toContain('重剑')
   })
 
+  it('preserves fenced code blocks as native custom code blocks', () => {
+    const serialized = markdownToLexical([
+      '# Code',
+      '',
+      '```javascript',
+      'const answer = 42;',
+      '```',
+    ].join('\n'))
+
+    const state = JSON.parse(serialized)
+    const code = state.root.children.find(node => node.type === 'code-block')
+
+    expect(code).toMatchObject({
+      type: 'code-block',
+      language: 'javascript',
+      code: 'const answer = 42;',
+    })
+  })
+
   it('preserves standalone Markdown dividers as native divider blocks', () => {
     const serialized = markdownToLexical([
       '# 标题',
