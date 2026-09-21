@@ -54,7 +54,7 @@ function TextEditorInternal({
       return
     }
     setSaving((savingCountsRef.current.get(id) || 0) > 0)
-  }, [beginSaving, endSaving])
+  }, [])
 
   const beginSaving = React.useCallback((id) => {
     const next = (savingCountsRef.current.get(id) || 0) + 1
@@ -128,7 +128,7 @@ function TextEditorInternal({
 
     inFlightSaveRef.current = { id, content: text, promise: savePromise }
     return savePromise
-  }, [])
+  }, [beginSaving, endSaving])
 
   useImperativeHandle(ref, () => ({
     save: () => saveNow('external'),
