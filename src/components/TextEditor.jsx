@@ -1,6 +1,12 @@
 import React, { useEffect, useRef, useState, useImperativeHandle } from 'react'
 import { api } from '~/services/api'
 import { countLexicalCharacters } from '~/utils/lexicalText'
+import {
+  isFreshEditorDraft,
+  readEditorDraft,
+  removeEditorDraft,
+  writeEditorDraft,
+} from '~/services/editorDraftCache'
 
 const Editor = React.lazy(() => import('./Editor/Editor'))
 
@@ -110,7 +116,7 @@ function TextEditorInternal({
         if (id === currentIdRef.current) {
           lastSavedContentRef.current = text
           setLastSavedAt(now)
-          cacheWrite(id, text, now)
+          writeEditorDraft(id, text, now)
           onSavedRef.current?.(updated)
         }
         return updated
@@ -136,7 +142,7 @@ function TextEditorInternal({
   useImperativeHandle(ref, () => ({
     save: () => saveNow('external'),
     clearCache: () => {
-      if (currentIdRef.current) cacheRemove(currentIdRef.current)
+      if (currentIdRef.current) removeEditorDraft(currentIdRef.current)
     }
   }))
 
@@ -150,7 +156,7 @@ function TextEditorInternal({
     if (prevId && contentRef.current !== undefined) {
       const isDeleted = deletedIds?.has(prevId)
       if (!isDeleted && autoSaveOnSwitch) {
-        cacheWrite(prevId, contentRef.current)
+        writeEditorDraft(prevId, contentRef.current)
         void saveNow('manual', prevId).catch(() => {})
       }
     }
@@ -177,10 +183,8 @@ function TextEditorInternal({
         const f = await api(`/api/files/${id}`)
         if (id !== currentIdRef.current) return
 
-        const cached = cacheRead(id)
-        const cacheMaxAge = 5 * 60 * 1000
-        const isCacheFresh = cached && cached.editedAt && (Date.now() - cached.editedAt) < cacheMaxAge
-        const useCache = isCacheFresh && cached.editedAt && (!f.updated_at || cached.editedAt > f.updated_at * 1000)
+        const cached = readEditorDraft(id)
+        const useCache = isFreshEditorDraft(cached) && cached.editedAt && (!f.updated_at || cached.editedAt > f.updated_at * 1000)
         const serverText = f.content || ''
         const text = useCache ? cached.content : serverText
 
@@ -276,7 +280,7 @@ function TextEditorInternal({
   const scheduleCache = () => {
     if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current)
     saveTimerRef.current = window.setTimeout(() => {
-      if (currentIdRef.current) cacheWrite(currentIdRef.current, contentRef.current)
+      if (currentIdRef.current) writeEditorDraft(currentIdRef.current, contentRef.current)
     }, 250)
   }
 
@@ -326,7 +330,11 @@ function TextEditorInternal({
       ) : (
         <>
           <React.Suspense fallback={<div className="placeholder">正在加载编辑器…</div>}>
-            <Editor initialContent={editorContent} onChange={handleEditorChange} />
+            <Editor
+              documentId={activeId}
+              initialContent={editorContent}
+              onChange={handleEditorChange}
+            />
           </React.Suspense>
           <div ref={statusRef} className="editor-status-bar">
             {(saveError || saving) && (
@@ -353,44 +361,3 @@ function TextEditorInternal({
     </div>
   )
 }
-
-const memoryCache = new Map()
-
-function supportsLocalStorage() {
-  try {
-    const k = '__supports_ls__'
-    localStorage.setItem(k, '1')
-    localStorage.removeItem(k)
-    return true
-  } catch {
-    return false
-  }
-}
-
-const cacheRead = (id) => {
-  try {
-    if (!supportsLocalStorage()) return memoryCache.get(id) || null
-    const raw = localStorage.getItem(`editor:cache:${id}`)
-    if (!raw) return memoryCache.get(id) || null
-    return JSON.parse(raw)
-  } catch {
-    return memoryCache.get(id) || null
-  }
-}
-
-const cacheWrite = (id, content, savedAt) => {
-  const payload = { content, editedAt: Date.now(), savedAt }
-  memoryCache.set(id, payload)
-  if (!supportsLocalStorage()) return
-  if (content.length > 1024 * 1024) return
-  try { localStorage.setItem(`editor:cache:${id}`, JSON.stringify(payload)) } catch {}
-}
-
-const cacheRemove = (id) => {
-  memoryCache.delete(id)
-  if (!supportsLocalStorage()) return
-  try { localStorage.removeItem(`editor:cache:${id}`) } catch {}
-}
-
-const TextEditor = React.forwardRef(TextEditorInternal)
-export default TextEditor
