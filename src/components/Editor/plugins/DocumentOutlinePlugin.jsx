@@ -97,7 +97,11 @@ export default function DocumentOutlinePlugin() {
     }
 
     collect(editor.getEditorState())
-    return editor.registerUpdateListener(({ editorState }) => collect(editorState))
+    return editor.registerUpdateListener(({ editorState, dirtyElements, dirtyLeaves }) => {
+      const hasContentChanges = (dirtyElements?.size || 0) > 0 || (dirtyLeaves?.size || 0) > 0
+      if (!hasContentChanges) return
+      collect(editorState)
+    })
   }, [editor])
 
   const hiddenKeys = useMemo(
