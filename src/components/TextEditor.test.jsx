@@ -319,6 +319,75 @@ describe('TextEditor save coordination', () => {
     })
   })
 
+  it('does not leak a previous note autosave failure into the newly opened note', async () => {
+    const statuses = []
+
+    api.mockImplementation((path, init) => {
+      const id = path.split('/').pop()
+
+      if (!init?.method) {
+        return Promise.resolve({
+          id,
+          content: '{"root":{"children":[]}}',
+          updated_at: 1,
+        })
+      }
+
+      if (init.method === 'PUT' && id === 'file-1') {
+        return Promise.reject(new Error('old note save failed'))
+      }
+
+      return Promise.resolve({
+        id,
+        content: '{"root":{"children":[]}}',
+        updated_at: 2,
+      })
+    })
+
+    await act(async () => {
+      root.render(
+        <TextEditor
+          activeId="file-1"
+          deletedIds={new Set()}
+          autoSaveOnSwitch
+          onChange={() => {}}
+          onLoaded={() => {}}
+          onSaved={() => {}}
+          onStatusChange={(status) => statuses.push(status)}
+        />
+      )
+    })
+    await flushPromises()
+
+    await act(async () => {
+      globalThis.__textEditorMockOnChange('{"root":{"children":[{"type":"paragraph","children":[{"type":"text","text":"dirty old note"}]}]}}')
+      await Promise.resolve()
+    })
+
+    await act(async () => {
+      root.render(
+        <TextEditor
+          activeId="file-2"
+          deletedIds={new Set()}
+          autoSaveOnSwitch
+          onChange={() => {}}
+          onLoaded={() => {}}
+          onSaved={() => {}}
+          onStatusChange={(status) => statuses.push(status)}
+        />
+      )
+      await Promise.resolve()
+    })
+
+    await flushPromises()
+    await flushPromises()
+
+    expect(statuses.at(-1)).toMatchObject({
+      activeId: 'file-2',
+      saveError: false,
+    })
+  })
+
   it('recovers a fresher local draft while keeping it dirty against the server version', async () => {
     const server = '{"root":{"children":[{"type":"paragraph","children":[{"type":"text","text":"server"}]}]}}'
     const draft = '{"root":{"children":[{"type":"paragraph","children":[{"type":"text","text":"draft newer"}]}]}}'
