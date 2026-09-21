@@ -52,8 +52,8 @@ export default function DocumentSessionPlugin({ documentId }) {
 
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        if (!cancelled && session?.scrollTop) {
-          scroller.scrollTop = session.scrollTop
+        if (!cancelled) {
+          scroller.scrollTop = session?.scrollTop ?? 0
         }
       })
     })
