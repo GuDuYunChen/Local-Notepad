@@ -704,7 +704,7 @@ export default function ToolbarPlugin() {
       <button
         type="button"
         className="btn toolbar-text-btn toolbar-view-btn"
-        onClick={() => window.dispatchEvent(new Event('editor:open-view-settings'))}
+        onClick={() => window.dispatchEvent(new Event('editor:toggle-view-settings'))}
         aria-label="写作视图设置"
         title="写作视图设置"
       >
