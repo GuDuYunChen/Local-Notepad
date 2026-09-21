@@ -259,8 +259,10 @@ const CodeBlockComponent = React.memo(function CodeBlockComponent({ code, langua
   const [showEnableButton, setShowEnableButton] = useState(false);
   const [wrapLines, setWrapLines] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [searchTarget, setSearchTarget] = useState(false);
   const highlightTimeoutRef = useRef(null);
   const highlightRequestRef = useRef(0);
+  const searchTargetTimeoutRef = useRef(null);
 
   // Performance optimization: detect large files
   const MAX_LINES_FOR_AUTO_HIGHLIGHT = 1000;
@@ -326,6 +328,63 @@ const CodeBlockComponent = React.memo(function CodeBlockComponent({ code, langua
     setAutoHighlight(true);
     setShowEnableButton(false);
   };
+
+  useEffect(() => {
+    const handleSearchMatch = (event) => {
+      const detail = event?.detail || {};
+      if (detail.nodeKey !== nodeKey) return;
+
+      const textarea = textareaRef.current;
+      if (!textarea) return;
+
+      const start = Math.max(0, Math.min(code.length, Number(detail.offset) || 0));
+      const length = Math.max(0, Number(detail.length) || 0);
+      const end = Math.max(start, Math.min(code.length, start + length));
+
+      if (searchTargetTimeoutRef.current) {
+        window.clearTimeout(searchTargetTimeoutRef.current);
+      }
+      setSearchTarget(true);
+      searchTargetTimeoutRef.current = window.setTimeout(() => {
+        setSearchTarget(false);
+        searchTargetTimeoutRef.current = null;
+      }, 1400);
+
+      requestAnimationFrame(() => {
+        try {
+          textarea.setSelectionRange(start, end);
+        } catch {
+          // Search positioning is best-effort only.
+        }
+
+        const before = code.slice(0, start);
+        const lineIndex = before.split('\n').length - 1;
+        const computedLineHeight = Number.parseFloat(
+          window.getComputedStyle(textarea).lineHeight
+        ) || 20;
+        const targetScrollTop = Math.max(
+          0,
+          lineIndex * computedLineHeight - textarea.clientHeight * 0.35
+        );
+
+        textarea.scrollTop = targetScrollTop;
+        if (preRef.current) preRef.current.scrollTop = targetScrollTop;
+
+        if (detail.focus) {
+          textarea.focus({ preventScroll: true });
+        }
+      });
+    };
+
+    window.addEventListener('editor:code-search-match', handleSearchMatch);
+    return () => {
+      window.removeEventListener('editor:code-search-match', handleSearchMatch);
+      if (searchTargetTimeoutRef.current) {
+        window.clearTimeout(searchTargetTimeoutRef.current);
+        searchTargetTimeoutRef.current = null;
+      }
+    };
+  }, [code, nodeKey]);
 
   const isEditable = editor.isEditable();
 
@@ -405,7 +464,7 @@ const CodeBlockComponent = React.memo(function CodeBlockComponent({ code, langua
   };
 
   return (
-    <div className="code-block-wrapper">
+    <div className={'code-block-wrapper' + (searchTarget ? ' search-target' : '')}>
       <div className="code-block-header">
         <div className="code-block-header-left">
           <LanguageSelector value={language} onChange={handleLanguageChange} disabled={!isEditable} />
