@@ -160,12 +160,21 @@ export function readProjectWorkspaceMeta(projectId) {
     const value = all?.[normalizeId(projectId)] || {}
     return {
       type: value.type === 'script' ? 'script' : 'novel',
+      targetWords: Math.max(0, Number(value.targetWords) || 0),
       statuses: value.statuses && typeof value.statuses === 'object'
         ? { ...value.statuses }
         : {},
+      summaries: value.summaries && typeof value.summaries === 'object'
+        ? { ...value.summaries }
+        : {},
     }
   } catch {
-    return { type: 'novel', statuses: {} }
+    return {
+      type: 'novel',
+      targetWords: 0,
+      statuses: {},
+      summaries: {},
+    }
   }
 }
 
@@ -177,8 +186,12 @@ export function writeProjectWorkspaceMeta(projectId, nextMeta) {
     const all = JSON.parse(localStorage.getItem(PROJECT_META_KEY) || '{}')
     all[id] = {
       type: nextMeta?.type === 'script' ? 'script' : 'novel',
+      targetWords: Math.max(0, Number(nextMeta?.targetWords) || 0),
       statuses: nextMeta?.statuses && typeof nextMeta.statuses === 'object'
         ? nextMeta.statuses
+        : {},
+      summaries: nextMeta?.summaries && typeof nextMeta.summaries === 'object'
+        ? nextMeta.summaries
         : {},
     }
     localStorage.setItem(PROJECT_META_KEY, JSON.stringify(all))
@@ -273,6 +286,118 @@ export function calculateProjectCardMove(files, noteId, targetParentId, targetIn
     id: note.id,
     parent_id: parentId,
     sort_order: sortOrder,
+  }
+}
+
+export function getProjectProgress(workspace, projectMeta = {}) {
+  const totalWords = Number(workspace?.totalWords) || 0
+  const targetWords = Math.max(0, Number(projectMeta?.targetWords) || 0)
+  const allNotes = (workspace?.volumes || []).flatMap(volume => volume.notes || [])
+  const completed = allNotes.filter(note => note.status === 'done').length
+  const totalChapters = allNotes.length
+
+  return {
+    totalWords,
+    targetWords,
+    wordProgress: targetWords > 0
+      ? Math.max(0, Math.min(100, Math.round((totalWords / targetWords) * 100)))
+      : 0,
+    completed,
+    totalChapters,
+    chapterProgress: totalChapters > 0
+      ? Math.round((completed / totalChapters) * 100)
+      : 0,
+  }
+}
+
+export function getRecentProjectActivity(workspace, limit = 6) {
+  return (workspace?.volumes || [])
+    .flatMap(volume => (volume.notes || []).map(note => ({
+      ...note,
+      volumeId: volume.id,
+      volumeTitle: volume.title,
+    })))
+    .sort((a, b) => Number(b.updated_at || 0) - Number(a.updated_at || 0))
+    .slice(0, Math.max(1, Number(limit) || 6))
+}
+
+export function getProjectChapterSummary(note, projectMeta = {}, maxLength = 96) {
+  const manual = String(projectMeta?.summaries?.[note?.id] || '').trim()
+  if (manual) return manual
+
+  const fallback = extractLexicalProjectText(note?.content || '')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  if (!fallback) return '还没有摘要。'
+  const limit = Math.max(24, Number(maxLength) || 96)
+  return fallback.length > limit
+    ? fallback.slice(0, limit).trimEnd() + '…'
+    : fallback
+}
+
+function extractLexicalProjectText(content) {
+  let state
+  try {
+    state = typeof content === 'string' ? JSON.parse(content) : content
+  } catch {
+    return String(content || '')
+  }
+
+  const collect = node => {
+    if (!node) return ''
+    if (node.type === 'text') return String(node.text || '')
+    if (node.type === 'code-block') return String(node.code || '')
+    if (node.type === 'todo') return String(node.text || '')
+    if (node.type === 'wiki-link') return String(node.title || '')
+    return (node.children || []).map(collect).join(' ')
+  }
+
+  return (state?.root?.children || [])
+    .map(collect)
+    .filter(Boolean)
+    .join(' ')
+}
+
+export function getProjectTemplate(type = 'novel') {
+  if (type === 'script') {
+    return {
+      id: 'script',
+      label: '剧本项目模板',
+      folders: [
+        { key: 'act-1', title: '第一集' },
+      ],
+      notes: [
+        { title: '剧集总纲.md', parentKey: '', content: '# 剧集总纲\n\n## 核心冲突\n\n## 主线推进\n\n## 角色弧光\n' },
+        { title: '角色表.md', parentKey: '', content: '# 角色表\n\n## 主要角色\n\n## 关系变化\n' },
+        { title: '场景表.md', parentKey: '', content: '# 场景表\n\n## 常用场景\n\n## 视觉锚点\n' },
+        { title: '伏笔清单.md', parentKey: '', content: '# 伏笔清单\n\n## 已埋\n\n## 待回收\n' },
+        { title: '第一场.md', parentKey: 'act-1', content: '# 第一场\n\n## 场景目标\n\n## 动作与对白\n' },
+      ],
+    }
+  }
+
+  return {
+    id: 'novel',
+    label: '小说项目模板',
+    folders: [
+      { key: 'volume-1', title: '第一卷' },
+    ],
+    notes: [
+      { title: '作品总纲.md', parentKey: '', content: '# 作品总纲\n\n## 核心命题\n\n## 主线\n\n## 终局\n' },
+      { title: '人物设定.md', parentKey: '', content: '# 人物设定\n\n## 主角\n\n## 重要配角\n' },
+      { title: '世界观.md', parentKey: '', content: '# 世界观\n\n## 地域\n\n## 力量体系\n\n## 社会规则\n' },
+      { title: '伏笔清单.md', parentKey: '', content: '# 伏笔清单\n\n## 已埋\n\n## 待回收\n' },
+      { title: '第一章.md', parentKey: 'volume-1', content: '# 第一章\n\n' },
+    ],
+  }
+}
+
+export function getProjectIndexAliases() {
+  return {
+    characters: ['角色', '人物', 'character', 'characters'],
+    locations: ['地点', '场景', 'location', 'locations'],
+    foreshadows: ['伏笔', '线索', 'foreshadow', 'foreshadows'],
   }
 }
 
