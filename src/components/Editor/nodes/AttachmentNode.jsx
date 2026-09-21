@@ -273,6 +273,14 @@ function AttachmentComponent({ nodeKey, src, name, size, mime }) {
     }
   }
 
+  const removeAttachment = () => {
+    setPreviewOpen(false)
+    editor.update(() => {
+      const node = $getNodeByKey(nodeKey)
+      if ($isAttachmentNode(node)) node.remove()
+    })
+  }
+
   const download = async () => {
     if (!src || downloading) return
 
@@ -335,6 +343,13 @@ function AttachmentComponent({ nodeKey, src, name, size, mime }) {
           >
             {downloading ? '下载中…' : '下载'}
           </button>
+          <button
+            type="button"
+            className="attachment-delete-button"
+            onClick={removeAttachment}
+          >
+            删除
+          </button>
         </div>
       </div>
 
@@ -361,6 +376,9 @@ function AttachmentComponent({ nodeKey, src, name, size, mime }) {
               <div className="attachment-preview-header-actions">
                 <button type="button" onClick={download} disabled={downloading}>
                   {downloading ? '下载中…' : '下载'}
+                </button>
+                <button type="button" className="attachment-preview-delete" onClick={removeAttachment}>
+                  删除
                 </button>
                 <button
                   type="button"
