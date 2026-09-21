@@ -658,6 +658,7 @@ export default function App() {
                       onClose={() => setWorkspace('notes')}
                       onOpenBackup={() => setBackupOpen(true)}
                       onOpenShortcuts={() => setShortcutsOpen(true)}
+                      onOpenFile={handleInspectorSelectFile}
                     />
                   </React.Suspense>
                 )}
@@ -670,7 +671,7 @@ export default function App() {
                     activeTab={inspectorTab}
                     onTabChange={setInspectorTab}
                     onClose={() => setInspectorOpen(false)}
-                    onSelectFile={loadAndSelect}
+                    onSelectFile={handleInspectorSelectFile}
                     onRestore={restoreCurrent}
                     editorStatus={editorStatus}
                     unsaved={unsaved}
