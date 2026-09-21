@@ -107,6 +107,103 @@ describe('TextEditor save coordination', () => {
     expect(onOpenDaily).toHaveBeenCalledTimes(1)
   })
 
+  it('holds structural edits out of interval autosave until explicit review', async () => {
+    const original = JSON.stringify({
+      root: {
+        children: [{
+          type: 'heading',
+          tag: 'h1',
+          children: [{ type: 'text', text: '第一章' }],
+        }],
+      },
+    })
+    const changed = JSON.stringify({
+      root: {
+        children: [{
+          type: 'heading',
+          tag: 'h1',
+          children: [{ type: 'text', text: '第二章' }],
+        }],
+      },
+    })
+    const statuses = []
+
+    api.mockImplementation((path, init) => {
+      if (!init?.method) {
+        return Promise.resolve({
+          id: 'file-1',
+          content: original,
+          updated_at: 1,
+        })
+      }
+      if (init.method === 'PUT') {
+        return Promise.resolve({
+          id: 'file-1',
+          content: changed,
+          updated_at: 2,
+        })
+      }
+      return Promise.reject(new Error('Unexpected request: ' + path))
+    })
+
+    const editorRef = React.createRef()
+    await act(async () => {
+      root.render(
+        <TextEditor
+          ref={editorRef}
+          activeId="file-1"
+          deletedIds={new Set()}
+          autoSaveOnSwitch={false}
+          onChange={() => {}}
+          onLoaded={() => {}}
+          onSaved={() => {}}
+          onStatusChange={(status) => statuses.push(status)}
+        />
+      )
+    })
+    await flushPromises()
+
+    await act(async () => {
+      globalThis.__textEditorMockOnChange(changed)
+      await Promise.resolve()
+    })
+
+    expect(editorRef.current.getReferenceRefactorState()).toMatchObject({
+      currentContent: changed,
+      savedContent: original,
+      structureChanged: true,
+    })
+    expect(statuses.at(-1)).toMatchObject({
+      dirty: true,
+      structureDirty: true,
+    })
+
+    await act(async () => {
+      vi.advanceTimersByTime(30000)
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(api).toHaveBeenCalledTimes(1)
+    expect(container.textContent).toContain('章节结构待确认')
+
+    let result
+    await act(async () => {
+      result = await editorRef.current.save()
+    })
+    await flushPromises()
+
+    expect(result).toMatchObject({
+      id: 'file-1',
+      content: changed,
+    })
+    expect(api).toHaveBeenCalledTimes(2)
+    expect(statuses.at(-1)).toMatchObject({
+      dirty: false,
+      structureDirty: false,
+    })
+  })
+
   it('does not write unchanged content on interval or explicit save', async () => {
     api.mockImplementation((path, init) => {
       if (!init?.method) {
