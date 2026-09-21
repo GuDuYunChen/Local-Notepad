@@ -131,9 +131,9 @@ func processNode(node interface{}, md *strings.Builder, depth int) {
 		expression, _ := n["expression"].(string)
 		displayMode, _ := n["displayMode"].(bool)
 		if displayMode {
-			md.WriteString("$\n")
+			md.WriteString("$$\n")
 			md.WriteString(expression)
-			md.WriteString("\n$\n\n")
+			md.WriteString("\n$$\n\n")
 		} else {
 			md.WriteString("$")
 			md.WriteString(expression)
@@ -159,9 +159,9 @@ func processInlineNode(node interface{}, md *strings.Builder) {
 	if nodeType == "formula" {
 		expression, _ := n["expression"].(string)
 		if displayMode, _ := n["displayMode"].(bool); displayMode {
-			md.WriteString("$\n")
+			md.WriteString("$$\n")
 			md.WriteString(expression)
-			md.WriteString("\n$")
+			md.WriteString("\n$$")
 		} else {
 			md.WriteString("$")
 			md.WriteString(expression)
