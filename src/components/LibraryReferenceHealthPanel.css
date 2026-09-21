@@ -1,0 +1,315 @@
+.library-reference-health {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.library-reference-health-head,
+.library-reference-repair-header,
+.library-reference-health-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.library-reference-health-head > div,
+.library-reference-repair-header > div,
+.library-reference-health-toolbar > div {
+  min-width: 0;
+}
+
+.library-reference-health-head strong,
+.library-reference-repair-header strong,
+.library-reference-health-toolbar strong {
+  display: block;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.library-reference-health-head span,
+.library-reference-repair-header span,
+.library-reference-health-toolbar span,
+.library-reference-health-intro span,
+.library-reference-repair-note,
+.library-reference-manual-note span {
+  display: block;
+  margin-top: 3px;
+  color: var(--ink-muted);
+  font-size: 9px;
+  line-height: 1.55;
+}
+
+.library-reference-health-intro,
+.library-reference-health-state,
+.library-reference-repair-note,
+.library-reference-manual-note {
+  padding: 10px 11px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--paper);
+}
+
+.library-reference-health-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.library-reference-health-summary > div {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.library-reference-health-summary span,
+.library-reference-health-summary strong {
+  display: block;
+}
+
+.library-reference-health-summary span {
+  color: var(--ink-muted);
+  font-size: 8px;
+}
+
+.library-reference-health-summary strong {
+  margin-top: 3px;
+  color: var(--ink);
+  font-size: 16px;
+}
+
+.library-reference-health-summary .warning strong {
+  color: #a36a17;
+}
+
+.library-reference-health-summary .danger strong {
+  color: var(--red, #c7433c);
+}
+
+.library-reference-repair-preview {
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--clay) 25%, var(--line));
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--clay-light) 32%, var(--surface));
+}
+
+.library-reference-repair-progress {
+  height: 18px;
+  margin-top: 10px;
+  position: relative;
+  overflow: hidden;
+  border-radius: 7px;
+  background: var(--paper);
+}
+
+.library-reference-repair-progress > span {
+  display: block;
+  height: 100%;
+  background: color-mix(in srgb, var(--clay) 28%, transparent);
+  transition: width .14s linear;
+}
+
+.library-reference-repair-progress small {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--ink-soft);
+  font-size: 8px;
+}
+
+.library-reference-repair-files,
+.library-reference-diagnosis-list {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.library-reference-file-card {
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+}
+
+.library-reference-file-card > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 9px;
+}
+
+.library-reference-file-card header strong,
+.library-reference-file-card header span {
+  display: block;
+}
+
+.library-reference-file-card header strong {
+  color: var(--ink);
+  font-size: 10px;
+}
+
+.library-reference-file-card header span {
+  margin-top: 2px;
+  color: var(--ink-muted);
+  font-size: 8px;
+}
+
+.library-reference-file-card header button,
+.library-reference-diagnosis-main {
+  border: 0;
+  background: transparent;
+  color: var(--ink-soft);
+  font: inherit;
+  cursor: pointer;
+}
+
+.library-reference-file-card header button {
+  flex: 0 0 auto;
+  padding: 4px 6px;
+  border-radius: 6px;
+  font-size: 8px;
+}
+
+.library-reference-file-card header button:hover {
+  background: var(--surface-hover);
+  color: var(--ink);
+}
+
+.library-reference-change-list {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.library-reference-change {
+  padding: 8px;
+  border-radius: 8px;
+  background: var(--paper);
+}
+
+.library-reference-change code {
+  display: block;
+  overflow: hidden;
+  color: var(--ink-soft);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 8px;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.library-reference-change-arrow {
+  display: block;
+  padding: 2px 0;
+  color: var(--ink-muted);
+  font-size: 8px;
+}
+
+.library-reference-change-tags {
+  margin-bottom: 5px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.library-reference-change-tags span {
+  padding: 2px 5px;
+  border-radius: 99px;
+  background: color-mix(in srgb, #b97820 10%, var(--surface));
+  color: #95621c;
+  font-size: 7px;
+}
+
+.library-reference-repair-note {
+  margin-top: 10px;
+}
+
+.library-reference-diagnosis-row {
+  min-height: 48px;
+  padding: 6px 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+}
+
+.library-reference-diagnosis-main {
+  min-width: 0;
+  flex: 1;
+  padding: 4px;
+  text-align: left;
+}
+
+.library-reference-diagnosis-main strong,
+.library-reference-diagnosis-main span {
+  display: block;
+}
+
+.library-reference-diagnosis-main strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.library-reference-diagnosis-main span {
+  margin-top: 2px;
+  color: var(--ink-muted);
+  font-size: 8px;
+}
+
+.library-reference-diagnosis-badges {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.library-reference-diagnosis-badges span {
+  padding: 2px 5px;
+  border-radius: 99px;
+  font-size: 7px;
+  font-weight: 650;
+}
+
+.library-reference-diagnosis-badges .repairable {
+  background: color-mix(in srgb, #b97820 12%, var(--surface));
+  color: #95621c;
+}
+
+.library-reference-diagnosis-badges .broken {
+  background: var(--red-light, rgba(199,67,60,.08));
+  color: var(--red, #c7433c);
+}
+
+.library-reference-manual-note {
+  margin-top: 2px;
+}
+
+.library-reference-manual-note strong {
+  display: block;
+  color: var(--ink);
+  font-size: 9px;
+}
+
+@media (max-width: 760px) {
+  .library-reference-health-head,
+  .library-reference-repair-header,
+  .library-reference-health-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .library-reference-health-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
