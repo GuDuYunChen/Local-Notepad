@@ -2,10 +2,19 @@ import React, { useEffect, useState, useRef } from 'react'
 import TextEditor from './components/TextEditor'
 import FileList from './components/FileList'
 import WorkspaceSidebar from './components/WorkspaceSidebar'
-import { api } from '~/services/api'
+import {
+  api,
+  createFileVersionSnapshot,
+  listAllFilesWithContent,
+} from '~/services/api'
 import ConfirmDialog from './components/ConfirmDialog'
 import ToastViewport from './components/ToastViewport'
+import ReferenceRefactorDialog from './components/ReferenceRefactorDialog'
 import { toast } from '~/services/toast'
+import {
+  planDeleteReferenceImpact,
+  planTargetReferenceRefactor,
+} from './components/Editor/utils/referenceUtils'
 
 const GraphPanel = React.lazy(() => import('./components/GraphPanel'))
 const DailyNotesPanel = React.lazy(() => import('./components/DailyNotesPanel'))
@@ -41,6 +50,7 @@ export default function App() {
   const [switching, setSwitching] = useState(false)
   const [deletedIds, setDeletedIds] = useState(new Set())
   const [dialog, setDialog] = useState(null)
+  const [referenceRefactor, setReferenceRefactor] = useState(null)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [backupOpen, setBackupOpen] = useState(false)
   const [quickSearchOpen, setQuickSearchOpen] = useState(false)
@@ -88,16 +98,187 @@ export default function App() {
     setTimeout(() => setSwitching(false), 180)
   }, [deletedIds])
 
+  const requestReferenceRefactor = React.useCallback((config) => {
+    const incoming = Number(config?.plan?.summary?.incomingReferences) || 0
+    if (!incoming) {
+      return Promise.resolve({
+        proceed: true,
+        sync: true,
+        plan: config?.plan || null,
+      })
+    }
+
+    return new Promise(resolve => {
+      setReferenceRefactor({
+        ...config,
+        resolve,
+      })
+    })
+  }, [])
+
+  const closeReferenceRefactor = React.useCallback((decision) => {
+    setReferenceRefactor(currentDialog => {
+      currentDialog?.resolve?.(decision)
+      return null
+    })
+  }, [])
+
+  const applyReferenceRepairPlan = React.useCallback(async (
+    plan,
+    { allowCurrentSource = false } = {},
+  ) => {
+    const sources = (plan?.sources || []).filter(source => source.repairContent)
+    let repairedFiles = 0
+    let repairedReferences = 0
+    const skipped = []
+
+    for (const source of sources) {
+      try {
+        if (
+          source.id === current?.id &&
+          unsaved &&
+          !allowCurrentSource
+        ) {
+          throw new Error('来源笔记有未保存修改')
+        }
+
+        const latest = await api('/api/files/' + source.id)
+        if (String(latest?.content || '') !== String(source.content || '')) {
+          throw new Error('来源正文已变化')
+        }
+
+        await createFileVersionSnapshot(source.id)
+        const updated = await api('/api/files/' + source.id, {
+          method: 'PUT',
+          body: JSON.stringify({ content: source.repairContent }),
+        })
+
+        repairedFiles += 1
+        repairedReferences += source.repairedCount || 0
+
+        if (source.id === current?.id) {
+          const finalContent = String(updated?.content ?? source.repairContent)
+          editorRef.current?.replaceSavedContent?.(finalContent, updated?.updated_at)
+          setContent(finalContent)
+          setCurrent(prev => (
+            prev?.id === source.id
+              ? { ...prev, ...updated, content: finalContent }
+              : prev
+          ))
+        }
+      } catch (error) {
+        console.error('同步引用失败', source.id, error)
+        skipped.push({
+          id: source.id,
+          title: source.title,
+          message: error.message || '同步失败',
+        })
+      }
+    }
+
+    return {
+      repairedFiles,
+      repairedReferences,
+      skipped,
+    }
+  }, [current?.id, unsaved])
+
+  const reviewRenameRefactor = React.useCallback(async (item, nextTitle) => {
+    if (!item?.id || item.is_folder) {
+      return { proceed: true, sync: false, plan: null }
+    }
+
+    const files = await listAllFilesWithContent()
+    const plan = planTargetReferenceRefactor(files, item.id, {
+      title: nextTitle,
+    })
+
+    const decision = await requestReferenceRefactor({
+      mode: 'rename',
+      targetTitle: item.title || '未命名',
+      nextTitle,
+      plan,
+    })
+
+    return {
+      ...decision,
+      plan,
+    }
+  }, [requestReferenceRefactor])
+
+  const reviewDeleteRefactor = React.useCallback(async ({
+    targetIds,
+    targetTitle,
+  }) => {
+    const ids = Array.isArray(targetIds) ? targetIds.filter(Boolean) : []
+    if (!ids.length) return true
+
+    const files = await listAllFilesWithContent()
+    const plan = planDeleteReferenceImpact(files, ids)
+    const decision = await requestReferenceRefactor({
+      mode: 'delete',
+      targetTitle: targetTitle || '所选内容',
+      plan,
+    })
+
+    return Boolean(decision?.proceed)
+  }, [requestReferenceRefactor])
+
   const saveCurrent = React.useCallback(async () => {
     if (!current || !editorRef.current) return false
+
     try {
+      const refactorState = editorRef.current.getReferenceRefactorState?.()
+      let review = null
+
+      if (refactorState?.structureChanged) {
+        const files = await listAllFilesWithContent()
+        const plan = planTargetReferenceRefactor(files, current.id, {
+          title: current.title,
+          content: refactorState.currentContent,
+        })
+
+        review = await requestReferenceRefactor({
+          mode: 'structure',
+          targetTitle: current.title || '当前笔记',
+          plan,
+        })
+
+        if (!review?.proceed) return null
+        review = { ...review, plan }
+      }
+
       const updated = await editorRef.current.save()
-      return !!updated
+      if (!updated) return false
+
+      if (review?.sync && review.plan) {
+        const result = await applyReferenceRepairPlan(review.plan, {
+          allowCurrentSource: true,
+        })
+
+        if (result.skipped.length) {
+          toast.warning(
+            '正文已保存；' +
+            result.repairedReferences +
+            ' 处引用已同步，' +
+            result.skipped.length +
+            ' 篇来源因内容变化被跳过'
+          )
+        } else if (result.repairedReferences) {
+          toast.success('正文已保存，并同步 ' + result.repairedReferences + ' 处引用')
+        }
+      }
+
+      return true
     } catch (e) {
       console.error(e)
       return false
     }
-  }, [current])
+  }, [
+    applyReferenceRepairPlan,
+    current,
+    requestReferenceRefactor,
+  ])
 
   const beginTitleEdit = React.useCallback(() => {
     if (workspace !== 'notes' || !current || current.is_folder || titleSaving) return
