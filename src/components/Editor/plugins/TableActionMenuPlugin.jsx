@@ -179,8 +179,12 @@ function TableActionMenu({ menuRef, pos, dispatch }) {
       <MenuSection label="行与列">
         <MenuItem onClick={() => dispatch('insertRowAbove', { mode: 'above' })} label="上方插入行" />
         <MenuItem onClick={() => dispatch('insertRowBelow', { mode: 'below' })} label="下方插入行" />
+        <MenuItem onClick={() => dispatch('moveRowUp')} label="当前行上移" />
+        <MenuItem onClick={() => dispatch('moveRowDown')} label="当前行下移" />
         <MenuItem onClick={() => dispatch('insertColLeft', { mode: 'left' })} label="左侧插入列" />
         <MenuItem onClick={() => dispatch('insertColRight', { mode: 'right' })} label="右侧插入列" />
+        <MenuItem onClick={() => dispatch('moveColLeft')} label="当前列左移" />
+        <MenuItem onClick={() => dispatch('moveColRight')} label="当前列右移" />
       </MenuSection>
 
       <MenuSection label="单元格">
