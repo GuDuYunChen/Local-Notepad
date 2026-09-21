@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
-import { $getRoot } from 'lexical'
+import { $getRoot, $getSelection, $isRangeSelection } from 'lexical'
 import { $isHeadingNode } from '@lexical/rich-text'
 
 const levelLabel = {
@@ -10,6 +10,40 @@ const levelLabel = {
   h4: 4,
   h5: 5,
   h6: 6,
+}
+
+export function calculateReadingProgress(scrollTop, scrollHeight, clientHeight) {
+  const top = Math.max(0, Number(scrollTop) || 0)
+  const total = Math.max(0, Number(scrollHeight) || 0)
+  const viewport = Math.max(0, Number(clientHeight) || 0)
+  const maxScroll = Math.max(0, total - viewport)
+
+  if (maxScroll <= 0) return 100
+
+  return Math.max(
+    0,
+    Math.min(100, Math.round((top / maxScroll) * 100))
+  )
+}
+
+export function getOutlineBreadcrumb(nodes, activeKey) {
+  const headings = (Array.isArray(nodes) ? nodes : []).filter(node => node?.isHeading)
+  const targetIndex = headings.findIndex(node => node.key === activeKey)
+  if (targetIndex < 0) return []
+
+  const target = headings[targetIndex]
+  const path = [target]
+  let currentLevel = target.level
+
+  for (let index = targetIndex - 1; index >= 0 && currentLevel > 1; index--) {
+    const candidate = headings[index]
+    if (candidate.level < currentLevel) {
+      path.unshift(candidate)
+      currentLevel = candidate.level
+    }
+  }
+
+  return path
 }
 
 export function getCollapsedOutlineKeys(nodes, collapsedKeys) {
@@ -60,8 +94,13 @@ export default function DocumentOutlinePlugin() {
   const [outlineNodes, setOutlineNodes] = useState([])
   const [collapsedKeys, setCollapsedKeys] = useState(() => new Set())
   const [activeKey, setActiveKey] = useState('')
+  const [caretTopLevelKey, setCaretTopLevelKey] = useState('')
+  const [readingProgress, setReadingProgress] = useState(0)
   const [bodyToggle, setBodyToggle] = useState(null)
   const [open, setOpen] = useState(false)
+  const [canReturn, setCanReturn] = useState(false)
+  const outlineListRef = useRef(null)
+  const navigationOriginRef = useRef(null)
 
   useEffect(() => {
     const collect = editorState => {
@@ -104,9 +143,32 @@ export default function DocumentOutlinePlugin() {
     })
   }, [editor])
 
+  useEffect(() => editor.registerUpdateListener(({ editorState }) => {
+    let nextTopLevelKey = ''
+
+    editorState.read(() => {
+      const selection = $getSelection()
+      if (!$isRangeSelection(selection)) return
+      const anchorNode = selection.anchor.getNode()
+      const topLevel = anchorNode.getTopLevelElement?.()
+      nextTopLevelKey = topLevel?.getKey?.() || ''
+    })
+
+    if (nextTopLevelKey) {
+      setCaretTopLevelKey(previous => (
+        previous === nextTopLevelKey ? previous : nextTopLevelKey
+      ))
+    }
+  }), [editor])
+
   const hiddenKeys = useMemo(
     () => getCollapsedOutlineKeys(outlineNodes, collapsedKeys),
     [outlineNodes, collapsedKeys]
+  )
+
+  const activeBreadcrumb = useMemo(
+    () => getOutlineBreadcrumb(headings, activeKey),
+    [headings, activeKey]
   )
 
   useEffect(() => {
@@ -133,20 +195,26 @@ export default function DocumentOutlinePlugin() {
   }, [editor, outlineNodes, hiddenKeys, collapsedKeys])
 
   useEffect(() => {
-    if (!headings.length) {
-      setActiveKey('')
-      return undefined
-    }
-
     const rootElement = editor.getRootElement()
     const scroller = rootElement?.closest('.editor-container')
-    if (!scroller) return undefined
+    if (!rootElement || !scroller) return undefined
 
     let frame = 0
 
-    const updateActiveHeading = () => {
+    const updateScrollState = () => {
       if (frame) window.cancelAnimationFrame(frame)
       frame = window.requestAnimationFrame(() => {
+        setReadingProgress(calculateReadingProgress(
+          scroller.scrollTop,
+          scroller.scrollHeight,
+          scroller.clientHeight,
+        ))
+
+        if (!headings.length) {
+          setActiveKey('')
+          return
+        }
+
         const scrollerRect = scroller.getBoundingClientRect()
         const anchorY = scrollerRect.top + Math.min(150, scrollerRect.height * 0.22)
         let nextKey = headings.find(heading => !hiddenKeys.has(heading.key))?.key || ''
@@ -160,20 +228,72 @@ export default function DocumentOutlinePlugin() {
           else break
         }
 
-        setActiveKey(nextKey)
+        setActiveKey(previous => previous === nextKey ? previous : nextKey)
       })
     }
 
-    updateActiveHeading()
-    scroller.addEventListener('scroll', updateActiveHeading, { passive: true })
-    window.addEventListener('resize', updateActiveHeading)
+    updateScrollState()
+    scroller.addEventListener('scroll', updateScrollState, { passive: true })
+    window.addEventListener('resize', updateScrollState)
+
+    const resizeObserver = typeof ResizeObserver === 'function'
+      ? new ResizeObserver(updateScrollState)
+      : null
+    resizeObserver?.observe(rootElement)
+    resizeObserver?.observe(scroller)
 
     return () => {
       if (frame) window.cancelAnimationFrame(frame)
-      scroller.removeEventListener('scroll', updateActiveHeading)
-      window.removeEventListener('resize', updateActiveHeading)
+      resizeObserver?.disconnect()
+      scroller.removeEventListener('scroll', updateScrollState)
+      window.removeEventListener('resize', updateScrollState)
     }
   }, [editor, headings, hiddenKeys])
+
+  useEffect(() => {
+    if (!open || !activeKey || !outlineListRef.current) return
+
+    const list = outlineListRef.current
+    const row = Array.from(list.querySelectorAll('[data-outline-key]'))
+      .find(element => element.dataset.outlineKey === activeKey)
+
+    if (!row) return
+
+    const listRect = list.getBoundingClientRect()
+    const rowRect = row.getBoundingClientRect()
+    if (rowRect.top >= listRect.top && rowRect.bottom <= listRect.bottom) return
+
+    const nextTop = list.scrollTop + rowRect.top - listRect.top - listRect.height * 0.35
+    list.scrollTo({
+      top: Math.max(0, nextTop),
+      behavior: 'smooth',
+    })
+  }, [activeKey, open])
+
+  useEffect(() => {
+    const toggleOutline = () => {
+      if (headings.length < 2) return
+      setOpen(value => !value)
+    }
+
+    const onKeyDown = event => {
+      if (
+        (event.ctrlKey || event.metaKey) &&
+        event.shiftKey &&
+        event.key.toLowerCase() === 'o'
+      ) {
+        event.preventDefault()
+        toggleOutline()
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('editor:toggle-outline', toggleOutline)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('editor:toggle-outline', toggleOutline)
+    }
+  }, [headings.length])
 
   useEffect(() => {
     const rootElement = editor.getRootElement()
@@ -215,30 +335,37 @@ export default function DocumentOutlinePlugin() {
     }
   }, [editor, headings, outlineNodes, collapsedKeys])
 
+  const expandForTopLevelKey = topLevelKey => {
+    if (!topLevelKey || !outlineNodes.length) return null
+
+    const heading = findOutlineHeadingForKey(outlineNodes, topLevelKey)
+    if (!heading) return null
+
+    setCollapsedKeys(previous => {
+      if (!previous.size) return previous
+
+      let changed = false
+      const next = new Set(previous)
+
+      for (const collapsedKey of previous) {
+        const hiddenByHeading = getCollapsedOutlineKeys(outlineNodes, new Set([collapsedKey]))
+        if (hiddenByHeading.has(topLevelKey) || hiddenByHeading.has(heading.key)) {
+          next.delete(collapsedKey)
+          changed = true
+        }
+      }
+
+      return changed ? next : previous
+    })
+
+    return heading
+  }
+
   useEffect(() => {
     const onSearchMatch = event => {
       const topLevelKey = event.detail?.topLevelKey
-      if (!topLevelKey || !outlineNodes.length) return
-
-      const heading = findOutlineHeadingForKey(outlineNodes, topLevelKey)
+      const heading = expandForTopLevelKey(topLevelKey)
       if (!heading) return
-
-      setCollapsedKeys(previous => {
-        if (!previous.size) return previous
-
-        let changed = false
-        const next = new Set(previous)
-
-        for (const collapsedKey of previous) {
-          const hiddenByHeading = getCollapsedOutlineKeys(outlineNodes, new Set([collapsedKey]))
-          if (hiddenByHeading.has(topLevelKey) || hiddenByHeading.has(heading.key)) {
-            next.delete(collapsedKey)
-            changed = true
-          }
-        }
-
-        return changed ? next : previous
-      })
 
       setActiveKey(heading.key)
       if (headings.length >= 2) setOpen(true)
@@ -248,24 +375,78 @@ export default function DocumentOutlinePlugin() {
     return () => window.removeEventListener('editor:search-match', onSearchMatch)
   }, [outlineNodes, headings.length])
 
-  if (headings.length === 0) return null
+  const getScroller = () => (
+    editor.getRootElement()?.closest('.editor-container') || null
+  )
 
-  const visibleHeadings = headings.filter(heading => !hiddenKeys.has(heading.key))
+  const scrollToElement = (element, behavior = 'smooth') => {
+    const scroller = getScroller()
+    if (!scroller || !element) return
 
-  const goToHeading = key => {
-    const element = editor.getElementByKey(key)
-    if (!element) return
+    const scrollerRect = scroller.getBoundingClientRect()
+    const elementRect = element.getBoundingClientRect()
+    const targetTop = Math.max(
+      0,
+      scroller.scrollTop + elementRect.top - scrollerRect.top - 24
+    )
 
-    setActiveKey(key)
-    element.scrollIntoView({
-      behavior: 'smooth',
-      block: 'start',
+    scroller.scrollTo({
+      top: targetTop,
+      behavior,
     })
+  }
 
+  const rememberNavigationOrigin = () => {
+    const scroller = getScroller()
+    if (!scroller) return
+    navigationOriginRef.current = scroller.scrollTop
+    setCanReturn(true)
+  }
+
+  const flashElement = element => {
     window.setTimeout(() => {
       element.classList.add('outline-target-flash')
       window.setTimeout(() => element.classList.remove('outline-target-flash'), 900)
     }, 180)
+  }
+
+  const goToHeading = (key, rememberOrigin = true) => {
+    const element = editor.getElementByKey(key)
+    if (!element) return
+
+    if (rememberOrigin) rememberNavigationOrigin()
+    setActiveKey(key)
+    scrollToElement(element)
+    flashElement(element)
+  }
+
+  const goToCaret = () => {
+    if (!caretTopLevelKey) return
+
+    const heading = expandForTopLevelKey(caretTopLevelKey)
+    const element = editor.getElementByKey(caretTopLevelKey)
+    if (!element) return
+
+    rememberNavigationOrigin()
+    if (heading) setActiveKey(heading.key)
+
+    window.requestAnimationFrame(() => {
+      scrollToElement(element)
+      flashElement(element)
+    })
+  }
+
+  const returnToOrigin = () => {
+    const scroller = getScroller()
+    const origin = navigationOriginRef.current
+    if (!scroller || typeof origin !== 'number') return
+
+    scroller.scrollTo({
+      top: origin,
+      behavior: 'smooth',
+    })
+    navigationOriginRef.current = null
+    setCanReturn(false)
   }
 
   const toggleCollapsed = key => {
@@ -277,12 +458,22 @@ export default function DocumentOutlinePlugin() {
     })
   }
 
+  const visibleHeadings = headings.filter(heading => !hiddenKeys.has(heading.key))
+
   return (
     <>
+      <div
+        className="document-reading-progress"
+        aria-hidden="true"
+        title={'阅读进度 ' + readingProgress + '%'}
+      >
+        <span style={{ width: String(readingProgress) + '%' }} />
+      </div>
+
       {bodyToggle && (
         <button
           type="button"
-          className={`heading-body-collapse${bodyToggle.collapsed ? ' collapsed' : ''}`}
+          className={'heading-body-collapse' + (bodyToggle.collapsed ? ' collapsed' : '')}
           style={{ top: bodyToggle.top, left: bodyToggle.left }}
           onMouseDown={event => event.preventDefault()}
           onClick={() => {
@@ -297,65 +488,112 @@ export default function DocumentOutlinePlugin() {
       )}
 
       {headings.length >= 2 && (
-        <div className={`document-outline${open ? ' open' : ''}`}>
-      <button
-        type="button"
-        className="document-outline-toggle"
-        onClick={() => setOpen(prev => !prev)}
-        aria-expanded={open}
-        aria-label="文档目录"
-        title="文档目录"
-      >
-        <span aria-hidden="true">☰</span>
-        <span>{headings.length}</span>
-      </button>
+        <div className={'document-outline' + (open ? ' open' : '')}>
+          <button
+            type="button"
+            className="document-outline-toggle"
+            onClick={() => setOpen(prev => !prev)}
+            aria-expanded={open}
+            aria-label="文档目录"
+            title="文档目录 (Ctrl+Shift+O)"
+          >
+            <span aria-hidden="true">☰</span>
+            <span>{headings.length}</span>
+          </button>
 
-      {open && (
-        <div className="document-outline-panel">
-          <div className="document-outline-header">
-            <div>
-              <strong>文档目录</strong>
-              <small>点击跳转 · 箭头折叠章节</small>
-            </div>
-            <span>{headings.length} 个标题</span>
-          </div>
+          {open && (
+            <div className="document-outline-panel">
+              <div
+                className="document-outline-progress-track"
+                aria-label={'阅读进度 ' + readingProgress + '%'}
+              >
+                <span style={{ width: String(readingProgress) + '%' }} />
+              </div>
 
-          <div className="document-outline-list">
-            {visibleHeadings.map(heading => {
-              const collapsible = hasCollapsibleContent(outlineNodes, heading.key)
-              const collapsed = collapsedKeys.has(heading.key)
-
-              return (
-                <div
-                  key={heading.key}
-                  className={`document-outline-row level-${Math.min(heading.level, 4)}${activeKey === heading.key ? ' active' : ''}`}
-                >
-                  <button
-                    type="button"
-                    className="document-outline-collapse"
-                    onClick={() => collapsible && toggleCollapsed(heading.key)}
-                    disabled={!collapsible}
-                    aria-label={collapsed ? '展开章节' : '折叠章节'}
-                    title={collapsible ? (collapsed ? '展开章节' : '折叠章节') : ''}
-                  >
-                    <span className={collapsed ? '' : 'open'}>›</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    className="document-outline-item"
-                    onClick={() => goToHeading(heading.key)}
-                    title={heading.text}
-                    aria-current={activeKey === heading.key ? 'location' : undefined}
-                  >
-                    {heading.text}
-                  </button>
+              <div className="document-outline-header">
+                <div>
+                  <strong>文档目录</strong>
+                  <small>滚动自动跟随 · Ctrl+Shift+O 开关</small>
                 </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
+                <div className="document-outline-header-actions">
+                  <span>{readingProgress}%</span>
+                  <button
+                    type="button"
+                    onClick={goToCaret}
+                    disabled={!caretTopLevelKey}
+                    title="回到最后输入位置"
+                  >
+                    光标
+                  </button>
+                  {canReturn && (
+                    <button
+                      type="button"
+                      onClick={returnToOrigin}
+                      title="返回目录跳转前的位置"
+                    >
+                      返回
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {activeBreadcrumb.length > 0 && (
+                <div className="document-outline-context" aria-label="当前章节路径">
+                  <span>当前位置</span>
+                  <div>
+                    {activeBreadcrumb.map((heading, index) => (
+                      <React.Fragment key={heading.key}>
+                        {index > 0 && <i aria-hidden="true">›</i>}
+                        <button
+                          type="button"
+                          onClick={() => goToHeading(heading.key)}
+                          title={heading.text}
+                        >
+                          {heading.text}
+                        </button>
+                      </React.Fragment>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="document-outline-list" ref={outlineListRef}>
+                {visibleHeadings.map(heading => {
+                  const collapsible = hasCollapsibleContent(outlineNodes, heading.key)
+                  const collapsed = collapsedKeys.has(heading.key)
+
+                  return (
+                    <div
+                      key={heading.key}
+                      data-outline-key={heading.key}
+                      className={'document-outline-row level-' + Math.min(heading.level, 4) + (activeKey === heading.key ? ' active' : '')}
+                    >
+                      <button
+                        type="button"
+                        className="document-outline-collapse"
+                        onClick={() => collapsible && toggleCollapsed(heading.key)}
+                        disabled={!collapsible}
+                        aria-label={collapsed ? '展开章节' : '折叠章节'}
+                        title={collapsible ? (collapsed ? '展开章节' : '折叠章节') : ''}
+                      >
+                        <span className={collapsed ? '' : 'open'}>›</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        className="document-outline-item"
+                        onClick={() => goToHeading(heading.key)}
+                        title={heading.text}
+                        aria-current={activeKey === heading.key ? 'location' : undefined}
+                      >
+                        {heading.text}
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </>
