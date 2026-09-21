@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useDeferredValue, useEffect, useRef } from 'react';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import { $getRoot, $getSelection, $isRangeSelection, $createRangeSelection } from 'lexical';
 import { mergeRegister } from '@lexical/utils';
@@ -49,6 +49,7 @@ export default function SearchPlugin() {
   const [isOpen, setIsOpen] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [replaceText, setReplaceText] = useState('');
+  const deferredSearchText = useDeferredValue(searchText);
   const [matchCount, setMatchCount] = useState(0);
   const [currentIndex, setCurrentIndex] = useState(-1);
   const inputRef = useRef(null);
@@ -68,7 +69,7 @@ export default function SearchPlugin() {
     }
 
     editor.update(() => {
-      const results = $findAllTextNodes(searchText);
+      const results = $findAllTextNodes(deferredSearchText);
       setMatchCount(results.length);
       if (results.length > 0) {
         setCurrentIndex(0);
@@ -77,11 +78,11 @@ export default function SearchPlugin() {
         notifySearchMatch(node);
       }
     });
-  }, [isOpen, searchText, editor]);
+  }, [isOpen, deferredSearchText, editor]);
 
   const goToMatch = useCallback((index) => {
     editor.update(() => {
-      const results = $findAllTextNodes(searchText);
+      const results = $findAllTextNodes(deferredSearchText);
       if (results.length === 0) return;
       const idx = ((index % results.length) + results.length) % results.length;
       setCurrentIndex(idx);
@@ -89,7 +90,7 @@ export default function SearchPlugin() {
       node.select(offset, offset + length);
       notifySearchMatch(node);
     });
-  }, [editor, searchText]);
+  }, [editor, deferredSearchText]);
 
   const handleFindNext = useCallback(() => {
     goToMatch(currentIndex + 1);
