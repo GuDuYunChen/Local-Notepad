@@ -238,14 +238,20 @@ export default function App() {
           content: refactorState.currentContent,
         })
 
-        review = await requestReferenceRefactor({
-          mode: 'structure',
-          targetTitle: current.title || '当前笔记',
-          plan,
-        })
+        const affectedReferences =
+          (Number(plan.summary?.repairable) || 0) +
+          (Number(plan.summary?.broken) || 0)
 
-        if (!review?.proceed) return null
-        review = { ...review, plan }
+        if (affectedReferences > 0) {
+          review = await requestReferenceRefactor({
+            mode: 'structure',
+            targetTitle: current.title || '当前笔记',
+            plan,
+          })
+
+          if (!review?.proceed) return null
+          review = { ...review, plan }
+        }
       }
 
       const updated = await editorRef.current.save()
