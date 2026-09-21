@@ -35,6 +35,7 @@ import SlashMenuPlugin from "./plugins/SlashMenuPlugin";
 import BlockHandlePlugin from "./plugins/BlockHandlePlugin";
 import MentionPlugin from "./plugins/MentionPlugin";
 import WikiLinkPlugin from "./plugins/WikiLinkPlugin";
+import LinkInteractionPlugin from "./plugins/LinkInteractionPlugin";
 import DragDropPlugin from "./plugins/DragDropPlugin";
 import EditorShortcutPlugin from "./plugins/EditorShortcutPlugin";
 import FormulaShortcutPlugin from "./plugins/FormulaShortcutPlugin";
@@ -209,6 +210,7 @@ export default function Editor({ documentId, initialContent, onChange, readOnly 
           <CheckListPlugin />
           <TabIndentationPlugin maxIndent={8} />
           <LinkPlugin />
+          <LinkInteractionPlugin readOnly={readOnly} />
           <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
           {!readOnly && <CodeBlockPlugin />}
           {!readOnly && <SlashMenuPlugin />}
