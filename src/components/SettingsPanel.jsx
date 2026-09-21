@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import ThemeToggle from './ThemeToggle'
+import LibraryReferenceHealthPanel from './LibraryReferenceHealthPanel'
 import { api } from '~/services/api'
 import { toast } from '~/services/toast'
 
@@ -75,6 +76,7 @@ export default function SettingsPanel({
   onClose,
   onOpenBackup,
   onOpenShortcuts,
+  onOpenFile,
 }) {
   const [server, setServer] = useState(null)
   const [appInfo, setAppInfo] = useState(null)
@@ -200,6 +202,16 @@ export default function SettingsPanel({
               打开附件文件夹
             </button>
           </div>
+        </section>
+
+        <section className="settings-card consumer-settings-section">
+          <div className="settings-card-header">
+            <div>
+              <h3>知识库引用</h3>
+              <p>检查整个本地知识库的 WikiLink 与章节引用。</p>
+            </div>
+          </div>
+          <LibraryReferenceHealthPanel onOpenFile={onOpenFile} />
         </section>
 
         <section className="settings-card consumer-settings-section">
