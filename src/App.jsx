@@ -751,13 +751,29 @@ export default function App() {
                         selectedId={current?.id}
                         updatedItem={current}
                         onSelect={handleSelectFile}
+                        onBeforeRename={({ item, nextTitle }) => (
+                          reviewRenameRefactor(item, nextTitle)
+                        )}
+                        onAfterRename={async ({ review }) => {
+                          const result = await applyReferenceRepairPlan(review.plan)
+                          if (result.skipped.length) {
+                            toast.warning(
+                              result.repairedReferences +
+                              ' 处引用已同步，' +
+                              result.skipped.length +
+                              ' 篇来源需稍后体检'
+                            )
+                          } else if (result.repairedReferences) {
+                            toast.success('已同步 ' + result.repairedReferences + ' 处引用')
+                          }
+                        }}
+                        onBeforeDelete={reviewDeleteRefactor}
                         onBeforeNew={async () => {
                           if (!unsaved) return true
                           return new Promise((resolve) => {
                             setDialog({ type: 'unsaved', next: () => resolve(true), cancel: () => resolve(false) })
                           })
                         }}
-                        onBeforeDelete={async () => true}
                         onItemsChanged={(list) => {
                           if (current) {
                             const matched = list.find(i => i.id === current.id)
@@ -902,6 +918,30 @@ export default function App() {
 
       <ToastViewport />
 
+      {referenceRefactor && (
+        <ReferenceRefactorDialog
+          mode={referenceRefactor.mode}
+          targetTitle={referenceRefactor.targetTitle}
+          nextTitle={referenceRefactor.nextTitle}
+          plan={referenceRefactor.plan}
+          onCancel={() => closeReferenceRefactor({
+            proceed: false,
+            sync: false,
+          })}
+          onConfirm={() => closeReferenceRefactor({
+            proceed: true,
+            sync: referenceRefactor.mode !== 'delete',
+          })}
+          onOpenSource={(id) => {
+            closeReferenceRefactor({
+              proceed: false,
+              sync: false,
+            })
+            window.requestAnimationFrame(() => handleInspectorSelectFile(id))
+          }}
+        />
+      )}
+
       {dialog?.type === 'unsaved' && (
         <ConfirmDialog
           title="当前笔记未保存"
@@ -914,9 +954,11 @@ export default function App() {
               onClick: async () => {
                 setDialog(prev => ({ ...prev, saving: true }))
                 const ok = await saveCurrent()
-                if (ok) {
+                if (ok === true) {
                   setDialog(null)
                   dialog.next()
+                } else if (ok === null) {
+                  setDialog(prev => ({ ...prev, saving: false }))
                 } else {
                   toast.error('保存失败，请重试')
                   setDialog(prev => ({ ...prev, saving: false }))
