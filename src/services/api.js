@@ -83,3 +83,34 @@ export async function listAllFiles(query = '') {
 
   return Array.from(byId.values())
 }
+
+
+export async function listAllFilesWithContent() {
+  const pageSize = 200
+  const byId = new Map()
+
+  for (let page = 1; ; page += 1) {
+    const params = new URLSearchParams({
+      page: String(page),
+      size: String(pageSize),
+    })
+
+    const batch = await api('/api/files?' + params.toString())
+    const items = Array.isArray(batch) ? batch : []
+
+    for (const item of items) {
+      if (item?.id) byId.set(item.id, item)
+    }
+
+    if (items.length < pageSize) break
+  }
+
+  return Array.from(byId.values())
+}
+
+export async function createFileVersionSnapshot(fileId) {
+  if (!fileId) throw new Error('文件 ID 不能为空')
+  return api('/api/files/' + fileId + '/versions/snapshot', {
+    method: 'POST',
+  })
+}
