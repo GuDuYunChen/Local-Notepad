@@ -126,6 +126,19 @@ func processNode(node interface{}, md *strings.Builder, depth int) {
 			}
 		}
 		md.WriteString("\n")
+
+	case "formula":
+		expression, _ := n["expression"].(string)
+		displayMode, _ := n["displayMode"].(bool)
+		if displayMode {
+			md.WriteString("$\n")
+			md.WriteString(expression)
+			md.WriteString("\n$\n\n")
+		} else {
+			md.WriteString("$")
+			md.WriteString(expression)
+			md.WriteString("$")
+		}
 		
 	default:
 		if children, ok := n["children"].([]interface{}); ok {
@@ -139,6 +152,21 @@ func processNode(node interface{}, md *strings.Builder, depth int) {
 func processInlineNode(node interface{}, md *strings.Builder) {
 	n, ok := node.(map[string]interface{})
 	if !ok {
+		return
+	}
+
+	nodeType, _ := n["type"].(string)
+	if nodeType == "formula" {
+		expression, _ := n["expression"].(string)
+		if displayMode, _ := n["displayMode"].(bool); displayMode {
+			md.WriteString("$\n")
+			md.WriteString(expression)
+			md.WriteString("\n$")
+		} else {
+			md.WriteString("$")
+			md.WriteString(expression)
+			md.WriteString("$")
+		}
 		return
 	}
 
@@ -195,9 +223,17 @@ func processListNode(node interface{}, md *strings.Builder, listType string, lev
 	
 	if nodeType == "listitem" {
 		prefix := strings.Repeat("  ", level-1)
-		if listType == "bullet" {
+		switch listType {
+		case "bullet":
 			md.WriteString(prefix + "- ")
-		} else {
+		case "check":
+			checked, _ := n["checked"].(bool)
+			if checked {
+				md.WriteString(prefix + "- [x] ")
+			} else {
+				md.WriteString(prefix + "- [ ] ")
+			}
+		default:
 			md.WriteString(prefix + "1. ")
 		}
 		
