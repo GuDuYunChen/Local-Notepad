@@ -51,13 +51,12 @@ export default function FormulaShortcutPlugin() {
       const shortcut = matchFormulaShortcut(beforeCursor)
       if (!shortcut) return false
 
-      event?.preventDefault?.()
-
       if (shortcut.type === 'block') {
         const parent = node.getParent()
         if (!parent || parent.getType?.() !== 'paragraph') return false
-        if (parent.getTextContent().trim() !== '$$') return false
+        if (parent.getTextContent().trim() !== '$') return false
 
+        event?.preventDefault?.()
         parent.replace($createFormulaNode({
           expression: '',
           displayMode: true,
@@ -67,6 +66,7 @@ export default function FormulaShortcutPlugin() {
 
       if (!shortcut.expression) return false
 
+      event?.preventDefault?.()
       const matchLength = shortcut.end - shortcut.start
       let targetNode = node
 
