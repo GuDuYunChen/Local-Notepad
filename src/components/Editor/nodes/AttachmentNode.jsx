@@ -240,6 +240,11 @@ function AttachmentComponent({ nodeKey, src, name, size, mime }) {
   const replaceAttachment = async event => {
     const file = event.target.files?.[0]
     if (!file) return
+    if (file.size > 100 * 1024 * 1024) {
+      console.warn('替换附件超过 100 MB，已取消')
+      event.target.value = ''
+      return
+    }
 
     setReplacing(true)
     try {
