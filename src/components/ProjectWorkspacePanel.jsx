@@ -595,6 +595,138 @@ export default function ProjectWorkspacePanel({
         </div>
       </div>
 
+      <section className="project-creative-console" aria-label="创作项目控制台">
+        <div className="project-console-card project-progress-card">
+          <div className="project-console-card-head">
+            <div>
+              <strong>创作进度</strong>
+              <span>目标字数与章节完成度</span>
+            </div>
+            <button
+              type="button"
+              className="btn small"
+              disabled={templateBusy}
+              onClick={() => void applyProjectTemplate()}
+            >
+              {templateBusy
+                ? '初始化中…'
+                : workspace.project.type === 'script'
+                  ? '套用剧本模板'
+                  : '套用小说模板'}
+            </button>
+          </div>
+
+          <label className="project-target-input">
+            <span>目标字数</span>
+            <input
+              type="number"
+              min="0"
+              step="1000"
+              value={projectMeta.targetWords || ''}
+              placeholder={workspace.project.type === 'script' ? '例如 30000' : '例如 500000'}
+              onChange={event => {
+                const value = Math.max(0, Number(event.target.value) || 0)
+                updateMeta(previous => ({
+                  ...previous,
+                  targetWords: value,
+                }))
+              }}
+            />
+          </label>
+
+          <div className="project-progress-line">
+            <div>
+              <span>字数</span>
+              <strong>
+                {formatCount(progress.totalWords)}
+                {progress.targetWords > 0 ? ' / ' + formatCount(progress.targetWords) : ''}
+              </strong>
+            </div>
+            <div className="project-progress-track">
+              <span style={{ width: String(progress.wordProgress) + '%' }} />
+            </div>
+            <small>{progress.targetWords > 0 ? progress.wordProgress + '%' : '未设目标'}</small>
+          </div>
+
+          <div className="project-progress-line">
+            <div>
+              <span>完成章节</span>
+              <strong>{progress.completed} / {progress.totalChapters}</strong>
+            </div>
+            <div className="project-progress-track">
+              <span style={{ width: String(progress.chapterProgress) + '%' }} />
+            </div>
+            <small>{progress.chapterProgress}%</small>
+          </div>
+        </div>
+
+        <div className="project-console-card project-activity-card">
+          <div className="project-console-card-head">
+            <div>
+              <strong>最近写作</strong>
+              <span>按最后更新时间排序</span>
+            </div>
+          </div>
+          <div className="project-activity-list">
+            {recentActivity.length ? recentActivity.map(note => (
+              <button
+                key={note.id}
+                type="button"
+                onClick={() => onOpenFile?.(note.id)}
+              >
+                <span>
+                  <strong>{displayTitle(note.title)}</strong>
+                  <small>{note.volumeTitle || labels.ungrouped}</small>
+                </span>
+                <em>{formatUpdated(note.updated_at)}</em>
+              </button>
+            )) : (
+              <div className="project-console-empty">还没有写作活动。</div>
+            )}
+          </div>
+        </div>
+
+        <div className="project-console-card project-index-card">
+          <div className="project-console-card-head">
+            <div>
+              <strong>项目索引</strong>
+              <span>复用“角色 / 地点 / 伏笔”标签</span>
+            </div>
+            {indexLoading && <small>更新中…</small>}
+          </div>
+
+          <div className="project-index-groups">
+            {[
+              ['characters', '角色'],
+              ['locations', '地点'],
+              ['foreshadows', '伏笔'],
+            ].map(([key, label]) => (
+              <div key={key} className="project-index-group">
+                <div className="project-index-group-head">
+                  <strong>{label}</strong>
+                  <span>{projectIndexes[key]?.length || 0}</span>
+                </div>
+                <div className="project-index-items">
+                  {(projectIndexes[key] || []).slice(0, 4).map(item => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => onOpenFile?.(item.id)}
+                      title={item.title}
+                    >
+                      {displayTitle(item.title)}
+                    </button>
+                  ))}
+                  {(projectIndexes[key] || []).length === 0 && (
+                    <small>给项目笔记添加“{label}”标签后会出现在这里。</small>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <div className="project-workspace-board">
         {workspace.volumes.map(volume => {
           const parentId = volume.id || workspace.project.id
@@ -716,16 +848,51 @@ export default function ProjectWorkspacePanel({
                         void moveNote(draggedNoteId, parentId, targetIndex)
                       }}
                     >
-                      <button
-                        type="button"
-                        className="project-chapter-open"
-                        onClick={() => onOpenFile?.(note.id)}
-                      >
-                        <strong>{displayTitle(note.title)}</strong>
-                        <span>
-                          {formatCount(note.wordCount)} 字 · {formatUpdated(note.updated_at)}
-                        </span>
-                      </button>
+                      <div className="project-chapter-main">
+                        <button
+                          type="button"
+                          className="project-chapter-open"
+                          onClick={() => onOpenFile?.(note.id)}
+                        >
+                          <strong>{displayTitle(note.title)}</strong>
+                          <span>
+                            {formatCount(note.wordCount)} 字 · {formatUpdated(note.updated_at)}
+                          </span>
+                        </button>
+
+                        {editingSummaryId === note.id ? (
+                          <div className="project-chapter-summary-editor">
+                            <textarea
+                              value={summaryDraft}
+                              onChange={event => setSummaryDraft(event.target.value)}
+                              placeholder="一句话概括这一章的目标、冲突或推进…"
+                              maxLength={240}
+                              autoFocus
+                            />
+                            <div>
+                              <button type="button" onClick={() => saveSummary(note.id)}>保存</button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingSummaryId('')
+                                  setSummaryDraft('')
+                                }}
+                              >
+                                取消
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            className="project-chapter-summary"
+                            onClick={() => beginSummaryEdit(note)}
+                            title="编辑章节摘要"
+                          >
+                            {getProjectChapterSummary(note, projectMeta)}
+                          </button>
+                        )}
+                      </div>
 
                       <button
                         type="button"
