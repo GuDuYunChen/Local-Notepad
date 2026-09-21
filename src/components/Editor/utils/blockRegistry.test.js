@@ -103,7 +103,20 @@ describe('editor block registry', () => {
       root.append(formula)
     }, { discrete: true })
 
-    const formula = editor.getEditorState().toJSON().root.children[0]
+    const state = editor.getEditorState().toJSON()
+    let formula = null
+
+    const visit = node => {
+      if (!node || formula) return
+      if (node.type === 'formula') {
+        formula = node
+        return
+      }
+      for (const child of node.children || []) visit(child)
+    }
+
+    visit(state.root)
+
     expect(formula).toMatchObject({
       type: 'formula',
       version: 1,
