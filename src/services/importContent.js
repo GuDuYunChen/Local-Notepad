@@ -3,6 +3,7 @@ import {
   $createParagraphNode,
   $createTextNode,
   $getRoot,
+  $isTextNode,
 } from 'lexical'
 import { HeadingNode, QuoteNode } from '@lexical/rich-text'
 import { ListItemNode, ListNode } from '@lexical/list'
@@ -18,6 +19,7 @@ import {
 } from '@lexical/table'
 import { $convertFromMarkdownString, TRANSFORMERS } from '@lexical/markdown'
 import { DividerNode, $createDividerNode } from '~/components/Editor/nodes/DividerNode'
+import { FormulaNode, $createFormulaNode } from '~/components/Editor/nodes/FormulaNode'
 
 const IMPORT_NODES = [
   HeadingNode,
@@ -32,6 +34,7 @@ const IMPORT_NODES = [
   TableRowNode,
   TableCellNode,
   DividerNode,
+  FormulaNode,
 ]
 
 function createImportEditor() {
@@ -42,6 +45,99 @@ function createImportEditor() {
       throw error
     },
   })
+}
+
+
+function extractMarkdownFormulas(markdown) {
+  const source = String(markdown || '').replace(/\r\n/g, '\n')
+  const blockFormulas = []
+  const inlineFormulas = []
+
+  const withBlocks = source.replace(
+    /(^|\n)\s*\$\$\s*\n([\s\S]*?)\n\s*\$\$\s*(?=\n|$)/g,
+    (match, prefix, expression) => {
+      const marker = 'LOCALNOTEPADBLOCKFORMULA' + blockFormulas.length + 'PLACEHOLDER'
+      blockFormulas.push({ marker, expression: expression.trim() })
+      return prefix + '\n' + marker + '\n'
+    }
+  )
+
+  const markdownWithMarkers = withBlocks.replace(
+    /(^|[^\\$])\$([^\n$]+?)\$/g,
+    (match, prefix, expression) => {
+      const marker = 'LOCALNOTEPADINLINEFORMULA' + inlineFormulas.length + 'PLACEHOLDER'
+      inlineFormulas.push({ marker, expression: expression.trim() })
+      return prefix + marker
+    }
+  )
+
+  return {
+    markdown: markdownWithMarkers,
+    blockFormulas,
+    inlineFormulas,
+  }
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^$()|[\]\\]/g, '\\function parseTableRow(line) {')
+}
+
+function restoreMarkdownFormulas(blockFormulas, inlineFormulas) {
+  const blockMap = new Map(blockFormulas.map(item => [item.marker, item.expression]))
+  const inlineMap = new Map(inlineFormulas.map(item => [item.marker, item.expression]))
+
+  const root = $getRoot()
+
+  for (const node of root.getChildren()) {
+    const marker = node.getTextContent().trim()
+    const expression = blockMap.get(marker)
+    if (expression !== undefined) {
+      node.replace($createFormulaNode({ expression, displayMode: true }))
+    }
+  }
+
+  if (!inlineMap.size) return
+
+  const visit = node => {
+    if ($isTextNode(node)) {
+      const text = node.getTextContent()
+      const matchedMarkers = [...inlineMap.keys()].filter(marker => text.includes(marker))
+      if (!matchedMarkers.length) return
+
+      const pattern = new RegExp(
+        '(' + matchedMarkers.map(escapeRegExp).join('|') + ')',
+        'g'
+      )
+      const parts = text.split(pattern).filter(Boolean)
+      const replacements = []
+
+      for (const part of parts) {
+        const expression = inlineMap.get(part)
+        if (expression !== undefined) {
+          replacements.push($createFormulaNode({ expression, displayMode: false }))
+        } else {
+          const textNode = $createTextNode(part)
+          if (typeof node.getFormat === 'function') textNode.setFormat(node.getFormat())
+          if (typeof node.getStyle === 'function') textNode.setStyle(node.getStyle())
+          replacements.push(textNode)
+        }
+      }
+
+      if (replacements.length) {
+        node.replace(replacements[0])
+        let previous = replacements[0]
+        for (const replacement of replacements.slice(1)) {
+          previous.insertAfter(replacement)
+          previous = replacement
+        }
+      }
+      return
+    }
+
+    for (const child of node.getChildren?.() || []) visit(child)
+  }
+
+  for (const child of root.getChildren()) visit(child)
 }
 
 function parseTableRow(line) {
@@ -214,13 +310,18 @@ export function plainTextToLexical(text) {
 
 export function markdownToLexical(markdown) {
   const editor = createImportEditor()
-  const extractedTables = extractMarkdownTables(markdown)
+  const extractedFormulas = extractMarkdownFormulas(markdown)
+  const extractedTables = extractMarkdownTables(extractedFormulas.markdown)
   const extractedDividers = extractMarkdownDividers(extractedTables.markdown)
 
   editor.update(() => {
     $convertFromMarkdownString(extractedDividers.markdown, TRANSFORMERS)
     restoreMarkdownTables(extractedTables.tables)
     restoreMarkdownDividers(extractedDividers.dividers)
+    restoreMarkdownFormulas(
+      extractedFormulas.blockFormulas,
+      extractedFormulas.inlineFormulas
+    )
   }, { discrete: true })
 
   return JSON.stringify(editor.getEditorState().toJSON())
