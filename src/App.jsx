@@ -333,6 +333,41 @@ export default function App() {
     })
   }
 
+  const handleInspectorSelectFile = (id, options = {}) => {
+    if (!id) return
+
+    const headingPath = Array.isArray(options?.headingPath)
+      ? options.headingPath.filter(Boolean)
+      : []
+
+    api(`/api/files/${id}`)
+      .then(file => {
+        handleSelectFile(file, {
+          afterSelect: () => {
+            if (!headingPath.length) return
+
+            if (current?.id === id) {
+              window.requestAnimationFrame(() => {
+                window.dispatchEvent(new CustomEvent('editor:open-heading-anchor', {
+                  detail: { path: headingPath },
+                }))
+              })
+              return
+            }
+
+            pendingEditorNavigationRef.current = {
+              id,
+              headingPath,
+            }
+          },
+        })
+      })
+      .catch(error => {
+        console.error('打开引用目标失败', error)
+        toast.error('目标笔记不存在或已删除')
+      })
+  }
+
   useEffect(() => {
     const openWikiLink = (event) => {
       const id = event.detail?.id
@@ -597,7 +632,7 @@ export default function App() {
                   <React.Suspense fallback={<div className="workspace-loading">正在加载知识图谱…</div>}>
                     <GraphPanel
                       onClose={() => setWorkspace('notes')}
-                      onSelectFile={loadAndSelect}
+                      onSelectFile={handleInspectorSelectFile}
                     />
                   </React.Suspense>
                 )}
