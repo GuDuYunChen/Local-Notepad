@@ -23,7 +23,7 @@ describe('findTextMatchOffsets', () => {
       '测试 文本测试 测试。',
       '测试',
       { wholeWord: true },
-    )).toEqual([0, 9])
+    )).toEqual([0, 8])
   })
 
   it('returns no matches for an empty query', () => {
