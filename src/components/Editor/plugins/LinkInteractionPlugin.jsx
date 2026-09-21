@@ -92,12 +92,7 @@ export default function LinkInteractionPlugin({ readOnly = false }) {
       event.preventDefault()
 
       const href = anchor.getAttribute('href') || ''
-      if (isHeadingAnchor(href)) {
-        openUrl(href)
-        return
-      }
-
-      if (event.ctrlKey || event.metaKey) {
+      if (readOnly || event.ctrlKey || event.metaKey) {
         openUrl(href)
         return
       }
@@ -127,7 +122,7 @@ export default function LinkInteractionPlugin({ readOnly = false }) {
 
     root.addEventListener('click', onClick)
     return () => root.removeEventListener('click', onClick)
-  }, [editor, openUrl])
+  }, [editor, openUrl, readOnly])
 
   useEffect(() => {
     if (!popover) return undefined
@@ -203,7 +198,7 @@ export default function LinkInteractionPlugin({ readOnly = false }) {
   }
 
   const copyUrl = async () => {
-    const value = popover?.url || draftUrl
+    const value = draftUrl || popover?.url
     if (!value) return
 
     try {
