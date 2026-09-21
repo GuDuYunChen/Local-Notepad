@@ -300,15 +300,19 @@ export function analyzeWikiReferenceHealth(content, targets) {
       issues.push(section.repairable ? 'section-moved' : 'section-missing')
     }
 
+    const hasUnresolvedIssue = issues.includes('section-missing')
+
     return {
       ...reference,
       target: {
         id: String(target.id || reference.id),
         title: String(target.title || reference.title || ''),
       },
-      status: issues.length
-        ? (titleStale || section.repairable ? 'repairable' : 'broken')
-        : 'healthy',
+      status: hasUnresolvedIssue
+        ? 'broken'
+        : issues.length
+          ? 'repairable'
+          : 'healthy',
       repairable: titleStale || section.repairable,
       issues,
       suggestedSectionPath: section.repairable
