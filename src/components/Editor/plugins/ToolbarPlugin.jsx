@@ -701,6 +701,16 @@ export default function ToolbarPlugin() {
         命令
       </button>
 
+      <button
+        type="button"
+        className="btn toolbar-text-btn toolbar-view-btn"
+        onClick={() => window.dispatchEvent(new Event('editor:open-view-settings'))}
+        aria-label="写作视图设置"
+        title="写作视图设置"
+      >
+        视图
+      </button>
+
       <span className="toolbar-slash-hint">输入 / 快速插入</span>
       {isUploading && <span className="toolbar-progress">处理中…</span>}
 
