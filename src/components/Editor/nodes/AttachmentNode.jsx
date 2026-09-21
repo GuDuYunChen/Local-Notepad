@@ -1,5 +1,7 @@
-import { DecoratorNode } from 'lexical'
-import React, { useEffect, useState } from 'react'
+import { $getNodeByKey, DecoratorNode } from 'lexical'
+import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
+import React, { useEffect, useRef, useState } from 'react'
+import { uploadFile } from '../utils/fileUpload'
 
 export class AttachmentNode extends DecoratorNode {
   __src
@@ -43,6 +45,14 @@ export class AttachmentNode extends DecoratorNode {
     this.__mime = mime
   }
 
+  setFile({ src, name, size, mime }) {
+    const writable = this.getWritable()
+    if (src !== undefined) writable.__src = src
+    if (name !== undefined) writable.__name = name
+    if (size !== undefined) writable.__size = size
+    if (mime !== undefined) writable.__mime = mime
+  }
+
   createDOM() {
     return document.createElement('div')
   }
@@ -58,6 +68,7 @@ export class AttachmentNode extends DecoratorNode {
   decorate() {
     return (
       <AttachmentComponent
+        nodeKey={this.__key}
         src={this.__src}
         name={this.__name}
         size={this.__size}
@@ -125,12 +136,15 @@ export function getAttachmentPreviewType(name, mime) {
   return null
 }
 
-function AttachmentComponent({ src, name, size, mime }) {
+function AttachmentComponent({ nodeKey, src, name, size, mime }) {
+  const [editor] = useLexicalComposerContext()
   const [downloading, setDownloading] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [textPreview, setTextPreview] = useState('')
   const [sheetPreview, setSheetPreview] = useState([])
   const [previewLoading, setPreviewLoading] = useState(false)
+  const [replacing, setReplacing] = useState(false)
+  const replaceInputRef = useRef(null)
   const previewType = getAttachmentPreviewType(name, mime)
 
   useEffect(() => {
@@ -223,6 +237,37 @@ function AttachmentComponent({ src, name, size, mime }) {
   }, [previewOpen, previewType, src, textPreview, sheetPreview.length])
 
 
+  const replaceAttachment = async event => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    setReplacing(true)
+    try {
+      const result = await uploadFile(file)
+      if (!result?.url) return
+
+      editor.update(() => {
+        const node = $getNodeByKey(nodeKey)
+        if (!$isAttachmentNode(node)) return
+        node.setFile({
+          src: result.url,
+          name: file.name,
+          size: file.size,
+          mime: file.type || '',
+        })
+      })
+
+      setTextPreview('')
+      setSheetPreview([])
+      setPreviewOpen(false)
+    } catch (error) {
+      console.error('替换附件失败', error)
+    } finally {
+      setReplacing(false)
+      event.target.value = ''
+    }
+  }
+
   const download = async () => {
     if (!src || downloading) return
 
@@ -257,6 +302,15 @@ function AttachmentComponent({ src, name, size, mime }) {
         </div>
 
         <div className="attachment-actions">
+          <button
+            type="button"
+            className="attachment-replace-button"
+            onClick={() => replaceInputRef.current?.click()}
+            disabled={replacing}
+          >
+            {replacing ? '替换中…' : '替换'}
+          </button>
+          <input ref={replaceInputRef} type="file" hidden onChange={replaceAttachment} />
           {previewType && (
             <button
               type="button"
