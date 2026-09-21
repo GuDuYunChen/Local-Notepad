@@ -193,6 +193,18 @@ function serializeBlock(node) {
   }
 }
 
+function hasUnsupportedBlockFormatting(node) {
+  const format = node?.format
+  const indent = Number(node?.indent) || 0
+  const direction = node?.direction
+
+  return (
+    (format !== undefined && format !== null && format !== '' && format !== 0) ||
+    indent > 0 ||
+    Boolean(direction)
+  )
+}
+
 function collectCompatibilityIssues(node, issues) {
   if (!node) return
 
@@ -206,7 +218,35 @@ function collectCompatibilityIssues(node, issues) {
     if (String(node.style || '').trim()) issues.add('自定义字体、字号、颜色或高亮样式')
   }
 
+  if (
+    ['paragraph', 'heading', 'quote', 'listitem'].includes(node.type) &&
+    hasUnsupportedBlockFormatting(node)
+  ) {
+    issues.add('段落对齐、缩进或文字方向')
+  }
+
+  if (
+    node.type === 'list' &&
+    node.listType === 'number' &&
+    Number(node.start || 1) !== 1
+  ) {
+    issues.add('有序列表自定义起始序号')
+  }
+
+  if (
+    (node.type === 'link' || node.type === 'autolink') &&
+    (node.target || node.rel || node.title)
+  ) {
+    issues.add('链接窗口、关系或标题属性')
+  }
+
   if (node.type === 'tablecell') {
+    if (Number(node.colSpan || 1) !== 1 || Number(node.rowSpan || 1) !== 1) {
+      issues.add('合并表格单元格')
+    }
+    if (Number(node.headerState || 0) !== 0 || String(node.backgroundColor || '').trim()) {
+      issues.add('表格单元格样式')
+    }
     const children = node.children || []
     if (children.some(child => child.type !== 'paragraph')) {
       issues.add('复杂表格单元格')
