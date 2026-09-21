@@ -93,6 +93,9 @@ describe('project workspace utilities', () => {
       type: 'script',
       targetWords: 42000,
       chapterTargetWords: 0,
+      dailyGoal: 0,
+      weeklyGoal: 0,
+      deadline: '',
       statuses: {
         'chapter-1': 'review',
       },
@@ -101,12 +104,17 @@ describe('project workspace utilities', () => {
       },
       supportNoteIds: ['support-1'],
       foreshadowStates: {},
+      volumeMilestones: {},
+      chapterQueue: [],
     })
 
     expect(readProjectWorkspaceMeta('project')).toEqual({
       type: 'script',
       targetWords: 42000,
       chapterTargetWords: 0,
+      dailyGoal: 0,
+      weeklyGoal: 0,
+      deadline: '',
       statuses: {
         'chapter-1': 'review',
       },
@@ -269,6 +277,8 @@ describe('project workspace utilities', () => {
       summaries: {},
       supportNoteIds: [],
       foreshadowStates: {},
+      volumeMilestones: {},
+      chapterQueue: [],
     })
   })
 
