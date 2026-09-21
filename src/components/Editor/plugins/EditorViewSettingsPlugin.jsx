@@ -159,7 +159,9 @@ export default function EditorViewSettingsPlugin({ readOnly = false }) {
         editor.getEditorState().read(() => {
           const selection = $getSelection()
           if (!$isRangeSelection(selection) || !selection.isCollapsed()) return
-          targetKey = selection.anchor.getNode().getTopLevelElementOrThrow().getKey()
+          const anchorNode = selection.anchor.getNode()
+          const topLevel = anchorNode.getTopLevelElement?.()
+          if (topLevel) targetKey = topLevel.getKey()
         })
 
         if (!targetKey) return
