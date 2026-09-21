@@ -1,0 +1,225 @@
+.long-structure-panel {
+  padding: 12px 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.long-structure-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.long-structure-summary > div {
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+}
+
+.long-structure-summary span,
+.long-structure-summary strong {
+  display: block;
+}
+
+.long-structure-summary span {
+  color: var(--ink-muted);
+  font-size: 8px;
+}
+
+.long-structure-summary strong {
+  margin-top: 2px;
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.long-structure-help {
+  padding: 8px 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink-muted);
+  font-size: 8px;
+  line-height: 1.5;
+}
+
+.long-structure-help span {
+  display: block;
+}
+
+.long-structure-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.long-structure-row {
+  --structure-depth: 0;
+  min-height: 36px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 5px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+}
+
+.long-structure-row:hover {
+  border-color: var(--line);
+  background: var(--surface-hover);
+}
+
+.long-structure-row.dragging {
+  opacity: .42;
+}
+
+.long-structure-row.drop-target.before::before,
+.long-structure-row.drop-target.after::after {
+  content: '';
+  position: absolute;
+  left: calc(7px + var(--structure-depth) * 13px);
+  right: 7px;
+  height: 2px;
+  border-radius: 99px;
+  background: var(--clay);
+}
+
+.long-structure-row.drop-target.before::before {
+  top: -2px;
+}
+
+.long-structure-row.drop-target.after::after {
+  bottom: -2px;
+}
+
+.long-structure-indent {
+  flex: 0 0 auto;
+}
+
+.long-structure-expand {
+  width: 18px;
+  height: 22px;
+  flex: 0 0 18px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink-muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.long-structure-expand:disabled {
+  cursor: default;
+  opacity: .35;
+}
+
+.long-structure-kind {
+  width: 23px;
+  height: 20px;
+  flex: 0 0 23px;
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+  background: var(--paper);
+  color: var(--ink-muted);
+  font-size: 7px;
+  font-weight: 700;
+}
+
+.long-structure-kind.level-1 {
+  background: var(--clay-light);
+  color: var(--clay);
+}
+
+.long-structure-kind.level-2 {
+  background: color-mix(in srgb, #4f8fae 10%, var(--surface));
+  color: #4c7890;
+}
+
+.long-structure-kind.level-3 {
+  background: color-mix(in srgb, #7d8a4d 10%, var(--surface));
+  color: #68733f;
+}
+
+.long-structure-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.long-structure-copy strong,
+.long-structure-copy small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.long-structure-copy strong {
+  color: var(--ink);
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.long-structure-copy small {
+  margin-top: 1px;
+  color: var(--ink-muted);
+  font-size: 7px;
+}
+
+.long-structure-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: .35;
+}
+
+.long-structure-row:hover .long-structure-actions,
+.long-structure-row:focus-within .long-structure-actions {
+  opacity: 1;
+}
+
+.long-structure-actions button {
+  min-width: 22px;
+  height: 23px;
+  padding: 0 4px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ink-muted);
+  font: inherit;
+  font-size: 8px;
+  cursor: pointer;
+}
+
+.long-structure-actions button:hover:not(:disabled) {
+  border-color: var(--line);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.long-structure-actions button:disabled {
+  opacity: .28;
+  cursor: default;
+}
+
+.long-structure-empty {
+  padding: 22px 14px;
+  color: var(--ink-muted);
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.long-structure-empty strong,
+.long-structure-empty span {
+  display: block;
+}
+
+.long-structure-empty strong {
+  margin-bottom: 3px;
+  color: var(--ink);
+  font-size: 11px;
+}
