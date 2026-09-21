@@ -504,6 +504,7 @@
   gap: 6px;
 }
 
+.attachment-replace-button,
 .attachment-preview-button,
 .attachment-download {
   min-width: 58px;
@@ -518,12 +519,14 @@
   cursor: pointer;
 }
 
+.attachment-replace-button:hover:not(:disabled),
 .attachment-preview-button:hover:not(:disabled),
 .attachment-download:hover:not(:disabled) {
   border-color: var(--border-strong, rgba(0,0,0,.18));
   background: var(--toolbar-btn-hover, rgba(0,0,0,.04));
 }
 
+.attachment-replace-button:disabled,
 .attachment-preview-button:disabled,
 .attachment-download:disabled {
   opacity: .45;
