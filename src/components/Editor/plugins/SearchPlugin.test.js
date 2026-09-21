@@ -1,5 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { findTextMatchOffsets } from './SearchPlugin'
+import {
+  $createParagraphNode,
+  $createTextNode,
+  $getRoot,
+  createEditor,
+} from 'lexical'
+import {
+  $findAllSearchMatches,
+  findTextMatchOffsets,
+} from './SearchPlugin'
+import {
+  $createCodeBlockNode,
+  CodeBlockNode,
+} from '../nodes/CodeBlockNode'
 
 describe('findTextMatchOffsets', () => {
   it('finds case-insensitive matches by default', () => {
@@ -28,5 +41,40 @@ describe('findTextMatchOffsets', () => {
 
   it('returns no matches for an empty query', () => {
     expect(findTextMatchOffsets('anything', '')).toEqual([])
+  })
+
+  it('collects ordinary text and custom code-block matches in document order', () => {
+    const editor = createEditor({
+      namespace: 'SearchCodeBlockTest',
+      nodes: [CodeBlockNode],
+      onError(error) {
+        throw error
+      },
+    })
+
+    let result = []
+
+    editor.update(() => {
+      const root = $getRoot()
+      root.clear()
+
+      const paragraph = $createParagraphNode()
+      paragraph.append($createTextNode('alpha outside'))
+      root.append(
+        paragraph,
+        $createCodeBlockNode('const alpha = 1;\n// alpha again', 'javascript'),
+      )
+
+      result = $findAllSearchMatches('alpha').map(match => ({
+        kind: match.kind,
+        offset: match.offset,
+      }))
+    }, { discrete: true })
+
+    expect(result).toEqual([
+      { kind: 'text', offset: 0 },
+      { kind: 'code-block', offset: 6 },
+      { kind: 'code-block', offset: 20 },
+    ])
   })
 })
