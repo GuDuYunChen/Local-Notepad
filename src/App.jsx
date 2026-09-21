@@ -31,6 +31,7 @@ export default function App() {
   const titleInputRef = useRef(null)
   const skipTitleCommitRef = useRef(false)
   const pendingEditorNavigationRef = useRef(null)
+  const referenceRefactorResolverRef = useRef(null)
   const [ready, setReady] = useState(false)
   const [workspace, setWorkspace] = useState('notes')
   const [inspectorOpen, setInspectorOpen] = useState(false)
@@ -109,18 +110,16 @@ export default function App() {
     }
 
     return new Promise(resolve => {
-      setReferenceRefactor({
-        ...config,
-        resolve,
-      })
+      referenceRefactorResolverRef.current = resolve
+      setReferenceRefactor(config)
     })
   }, [])
 
   const closeReferenceRefactor = React.useCallback((decision) => {
-    setReferenceRefactor(currentDialog => {
-      currentDialog?.resolve?.(decision)
-      return null
-    })
+    const resolve = referenceRefactorResolverRef.current
+    referenceRefactorResolverRef.current = null
+    setReferenceRefactor(null)
+    resolve?.(decision)
   }, [])
 
   const applyReferenceRepairPlan = React.useCallback(async (
