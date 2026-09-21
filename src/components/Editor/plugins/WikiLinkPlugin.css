@@ -201,3 +201,60 @@
     width: min(286px, calc(100vw - 72px));
   }
 }
+
+
+/* 4.19 structured section references */
+.wiki-link-section {
+  max-width: 180px;
+  overflow: hidden;
+  color: var(--ink-muted, #9a96a3);
+  font-size: .86em;
+  font-weight: 520;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wiki-link-menu-copy {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wiki-link-menu-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.wiki-link-menu-title em {
+  flex: 0 0 auto;
+  padding: 1px 4px;
+  border-radius: 99px;
+  background: var(--paper, #f7f6fa);
+  color: var(--ink-muted, #9a96a3);
+  font-size: 7px;
+  font-style: normal;
+  font-weight: 650;
+}
+
+.wiki-link-menu-section {
+  overflow: hidden;
+  color: var(--ink-muted, #9a96a3);
+  font-size: 8px;
+  font-weight: 450;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wiki-link-preview-section {
+  overflow: hidden;
+  color: var(--clay, #7057d9);
+  font-size: 9px;
+  font-weight: 560;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
