@@ -18,6 +18,8 @@ const shortcuts = [
     { key: 'Ctrl + B', desc: '加粗' },
     { key: 'Ctrl + I', desc: '斜体' },
     { key: 'Ctrl + U', desc: '下划线' },
+    { key: 'Ctrl + Alt + E', desc: '插入数学公式' },
+    { key: 'Ctrl + Alt + T', desc: '切换 / 插入待办清单' },
   ]},
   { category: '导航操作', items: [
     { key: '↑ / ↓', desc: '在笔记列表或快速搜索中移动' },
