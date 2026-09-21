@@ -7,6 +7,7 @@ import {
   formatWikiReferenceText,
   normalizeSectionPath,
   rememberReference,
+  resolveSectionReference,
 } from '../utils/referenceUtils'
 
 const previewCache = new Map()
@@ -113,11 +114,21 @@ function WikiLinkView({ id, title, sectionPath = [] }) {
         .replace(/\s+/g, ' ')
         .trim()
 
+      const resolvedTitle = file?.title || title || '未命名'
+      const sectionHealth = resolveSectionReference(
+        file?.content || '',
+        normalizedSectionPath,
+      )
+
       const next = {
-        title: file?.title || title || '未命名',
+        title: resolvedTitle,
         excerpt: text.slice(0, 180) || '这篇笔记还没有正文内容。',
         updatedAt: file?.updated_at || 0,
         backlinkCount: Array.isArray(backlinks) ? backlinks.length : 0,
+        titleChanged: Boolean(file?.title && file.title !== title),
+        sectionMissing: normalizedSectionPath.length > 0 && !sectionHealth.valid,
+        sectionRepairable: Boolean(sectionHealth.repairable),
+        suggestedSectionPath: sectionHealth.nextPath || normalizedSectionPath,
       }
 
       previewCache.set(id, next)
@@ -126,7 +137,7 @@ function WikiLinkView({ id, title, sectionPath = [] }) {
       console.error('加载 Wiki 链接预览失败', error)
       setPreview({
         title: title || '笔记',
-        excerpt: '暂时无法读取这篇笔记的预览。',
+        excerpt: '目标笔记不存在、已删除或暂时无法读取。',
         unavailable: true,
       })
     } finally {
@@ -169,7 +180,14 @@ function WikiLinkView({ id, title, sectionPath = [] }) {
 
   return (
     <span
-      className="wiki-link"
+      className={
+        'wiki-link' +
+        (preview?.unavailable
+          ? ' broken'
+          : (preview?.titleChanged || preview?.sectionMissing)
+            ? ' stale'
+            : '')
+      }
       role="link"
       tabIndex={0}
       title={sectionLabel ? ('打开：' + title + ' › ' + sectionLabel) : ('打开笔记：' + title)}
@@ -202,11 +220,29 @@ function WikiLinkView({ id, title, sectionPath = [] }) {
           onMouseLeave={hidePreview}
         >
           <span className="wiki-link-preview-kicker">
-            {sectionLabel ? '关联章节' : '关联笔记'}
+            {preview?.unavailable
+              ? '失效引用'
+              : preview?.titleChanged || preview?.sectionMissing
+                ? '引用需要修复'
+                : sectionLabel
+                  ? '关联章节'
+                  : '关联笔记'}
           </span>
           <strong>{preview?.title || title}</strong>
           {sectionLabel && (
             <span className="wiki-link-preview-section">{sectionLabel}</span>
+          )}
+          {preview?.titleChanged && (
+            <span className="wiki-link-preview-health">
+              当前标题：{preview.title}
+            </span>
+          )}
+          {preview?.sectionMissing && (
+            <span className="wiki-link-preview-health">
+              {preview.sectionRepairable
+                ? '章节已移动，可在“引用”面板安全修复'
+                : '章节不存在或匹配不唯一'}
+            </span>
           )}
           <span className={`wiki-link-preview-excerpt${preview?.unavailable ? ' unavailable' : ''}`}>
             {loading && !preview ? '正在读取预览…' : (preview?.excerpt || '正在读取预览…')}
