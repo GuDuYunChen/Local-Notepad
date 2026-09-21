@@ -131,6 +131,11 @@ describe('editor block registry', () => {
       image.setWidth('100%')
       image.setCaption('新的图片说明')
       image.setAlign('right')
+      image.setSource({
+        src: 'http://127.0.0.1:27121/uploads/replaced.jpg',
+        originalSrc: 'http://127.0.0.1:27121/uploads/replaced-original.jpg',
+        alt: '替换后的图片',
+      })
       root.append(image)
     }, { discrete: true })
 
@@ -141,6 +146,9 @@ describe('editor block registry', () => {
       width: '100%',
       caption: '新的图片说明',
       align: 'right',
+      src: 'http://127.0.0.1:27121/uploads/replaced.jpg',
+      originalSrc: 'http://127.0.0.1:27121/uploads/replaced-original.jpg',
+      alt: '替换后的图片',
     })
   })
 
@@ -188,21 +196,28 @@ describe('editor block registry', () => {
     editor.update(() => {
       const root = $getRoot()
       root.clear()
-      root.append($createAttachmentNode({
+      const attachment = $createAttachmentNode({
         src: 'http://127.0.0.1:27121/uploads/report.pdf',
         name: 'report.pdf',
         size: 2048,
         mime: 'application/pdf',
-      }))
+      })
+      attachment.setFile({
+        src: 'http://127.0.0.1:27121/uploads/report-v2.docx',
+        name: 'report-v2.docx',
+        size: 4096,
+        mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      })
+      root.append(attachment)
     }, { discrete: true })
 
     const attachment = editor.getEditorState().toJSON().root.children[0]
     expect(attachment).toMatchObject({
       type: 'attachment',
-      src: 'http://127.0.0.1:27121/uploads/report.pdf',
-      name: 'report.pdf',
-      size: 2048,
-      mime: 'application/pdf',
+      src: 'http://127.0.0.1:27121/uploads/report-v2.docx',
+      name: 'report-v2.docx',
+      size: 4096,
+      mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     })
   })
 
