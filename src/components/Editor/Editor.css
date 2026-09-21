@@ -1854,3 +1854,56 @@
   cursor: col-resize;
   user-select: none;
 }
+
+
+/* Native checklist */
+.editor-list-item-checked,
+.editor-list-item-unchecked {
+  position: relative;
+  margin: .34em 0;
+  padding-left: 1.9em;
+  list-style: none;
+  line-height: 1.78;
+}
+
+.editor-list-item-checked::before,
+.editor-list-item-unchecked::before {
+  content: '';
+  position: absolute;
+  left: .15em;
+  top: .34em;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  background: var(--surface);
+  box-sizing: border-box;
+}
+
+.editor-list-item-unchecked:hover::before {
+  border-color: var(--clay);
+  background: var(--clay-light);
+}
+
+.editor-list-item-checked {
+  color: var(--ink-muted);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+.editor-list-item-checked::before {
+  border-color: var(--clay);
+  background: var(--clay);
+}
+
+.editor-list-item-checked::after {
+  content: '';
+  position: absolute;
+  left: .47em;
+  top: .58em;
+  width: 7px;
+  height: 4px;
+  border-left: 1.7px solid #fff;
+  border-bottom: 1.7px solid #fff;
+  transform: rotate(-45deg);
+}
