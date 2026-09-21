@@ -327,8 +327,22 @@ describe('UI redesign smoke tests', () => {
     expect(container.textContent).toContain('创作分析')
     expect(container.textContent).toContain('写作节奏')
     expect(container.textContent).toContain('卷级完成度')
+    expect(container.textContent).toContain('创作计划')
+    expect(container.textContent).toContain('项目节奏')
+    expect(container.textContent).toContain('卷级里程碑')
+    expect(container.textContent).toContain('下一章节队列')
     expect(container.textContent).toContain('未设目标')
     expect(container.textContent).toContain('一二三')
+
+    const presetButton = Array.from(container.querySelectorAll('button'))
+      .find(button => button.textContent === '应用小说节奏')
+    expect(presetButton).toBeTruthy()
+    await click(presetButton)
+
+    const dailyGoalInput = container.querySelector('input[aria-label="每日写作目标"]')
+    const weeklyGoalInput = container.querySelector('input[aria-label="每周写作目标"]')
+    expect(dailyGoalInput.value).toBe('2000')
+    expect(weeklyGoalInput.value).toBe('12000')
 
     const statusButton = Array.from(container.querySelectorAll('button'))
       .find(button => button.textContent === '草稿')
