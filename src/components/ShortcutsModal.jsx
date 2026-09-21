@@ -9,7 +9,7 @@ const shortcuts = [
   { category: '笔记', items: [
     { key: 'Ctrl + N', desc: '新建笔记' },
     { key: 'Ctrl + Shift + N', desc: '新建文件夹' },
-    { key: 'Ctrl + S', desc: '保存当前笔记' },
+    { key: 'Ctrl + S', desc: '保存；章节结构变化时先检查引用影响' },
     { key: 'Ctrl + Z', desc: '撤销笔记列表操作' },
   ]},
   { category: '编辑操作', items: [
