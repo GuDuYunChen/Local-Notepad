@@ -169,6 +169,9 @@ export function readProjectWorkspaceMeta(projectId) {
       type: value.type === 'script' ? 'script' : 'novel',
       targetWords: Math.max(0, Number(value.targetWords) || 0),
       chapterTargetWords: Math.max(0, Number(value.chapterTargetWords) || 0),
+      dailyGoal: Math.max(0, Number(value.dailyGoal) || 0),
+      weeklyGoal: Math.max(0, Number(value.weeklyGoal) || 0),
+      deadline: typeof value.deadline === 'string' ? value.deadline : '',
       statuses: value.statuses && typeof value.statuses === 'object'
         ? { ...value.statuses }
         : {},
@@ -181,16 +184,27 @@ export function readProjectWorkspaceMeta(projectId) {
       foreshadowStates: value.foreshadowStates && typeof value.foreshadowStates === 'object'
         ? { ...value.foreshadowStates }
         : {},
+      volumeMilestones: value.volumeMilestones && typeof value.volumeMilestones === 'object'
+        ? { ...value.volumeMilestones }
+        : {},
+      chapterQueue: Array.isArray(value.chapterQueue)
+        ? [...new Set(value.chapterQueue.map(normalizeId).filter(Boolean))]
+        : [],
     }
   } catch {
     return {
       type: 'novel',
       targetWords: 0,
       chapterTargetWords: 0,
+      dailyGoal: 0,
+      weeklyGoal: 0,
+      deadline: '',
       statuses: {},
       summaries: {},
       supportNoteIds: [],
       foreshadowStates: {},
+      volumeMilestones: {},
+      chapterQueue: [],
     }
   }
 }
@@ -205,6 +219,9 @@ export function writeProjectWorkspaceMeta(projectId, nextMeta) {
       type: nextMeta?.type === 'script' ? 'script' : 'novel',
       targetWords: Math.max(0, Number(nextMeta?.targetWords) || 0),
       chapterTargetWords: Math.max(0, Number(nextMeta?.chapterTargetWords) || 0),
+      dailyGoal: Math.max(0, Number(nextMeta?.dailyGoal) || 0),
+      weeklyGoal: Math.max(0, Number(nextMeta?.weeklyGoal) || 0),
+      deadline: typeof nextMeta?.deadline === 'string' ? nextMeta.deadline : '',
       statuses: nextMeta?.statuses && typeof nextMeta.statuses === 'object'
         ? nextMeta.statuses
         : {},
@@ -217,6 +234,12 @@ export function writeProjectWorkspaceMeta(projectId, nextMeta) {
       foreshadowStates: nextMeta?.foreshadowStates && typeof nextMeta.foreshadowStates === 'object'
         ? nextMeta.foreshadowStates
         : {},
+      volumeMilestones: nextMeta?.volumeMilestones && typeof nextMeta.volumeMilestones === 'object'
+        ? nextMeta.volumeMilestones
+        : {},
+      chapterQueue: Array.isArray(nextMeta?.chapterQueue)
+        ? [...new Set(nextMeta.chapterQueue.map(normalizeId).filter(Boolean))]
+        : [],
     }
     localStorage.setItem(PROJECT_META_KEY, JSON.stringify(all))
   } catch {
