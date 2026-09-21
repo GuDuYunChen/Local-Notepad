@@ -8,8 +8,9 @@ import { matchFormulaShortcut } from './FormulaShortcutPlugin'
 import { getChecklistEnterAction } from './ChecklistKeyboardPlugin'
 import { appendImageGridItems, reorderImageGridItems, replaceImageGridItem } from '../nodes/ImageGridNode'
 import { getAttachmentPreviewType } from '../nodes/AttachmentNode'
-import { rememberFormulaExpression } from '../nodes/FormulaNode'
+import { rememberFormulaExpression, toggleFormulaFavorite } from '../nodes/FormulaNode'
 import { filterCommandPaletteCommands } from './CommandPalettePlugin'
+import { describeSerializedResource } from './ResourceManagerPlugin'
 
 describe('mature editor interactions', () => {
   it('collapses only the section under the selected heading', () => {
@@ -162,6 +163,59 @@ describe('mature editor interactions', () => {
       'E=mc^2',
       'a+b',
     ])
+  })
+
+  it('toggles formula favorites predictably', () => {
+    expect(toggleFormulaFavorite(['a+b'], 'E=mc^2', 3)).toEqual([
+      'E=mc^2',
+      'a+b',
+    ])
+    expect(toggleFormulaFavorite(['E=mc^2', 'a+b'], 'E=mc^2', 3)).toEqual([
+      'a+b',
+    ])
+    expect(toggleFormulaFavorite(['a', 'b', 'c'], 'd', 3)).toEqual([
+      'd',
+      'a',
+      'b',
+    ])
+  })
+
+  it('describes serialized document resources for the resource manager', () => {
+    expect(describeSerializedResource({
+      type: 'image',
+      caption: '封面',
+      alt: 'cover.png',
+      src: 'cover.png',
+    }, 'image-1')).toMatchObject({
+      key: 'image-1',
+      kind: 'image',
+      label: '封面',
+      preview: 'cover.png',
+    })
+
+    expect(describeSerializedResource({
+      type: 'image-grid',
+      items: [
+        { src: 'a.jpg', caption: 'A' },
+        { src: 'b.jpg', caption: 'B' },
+      ],
+    }, 'grid-1')).toMatchObject({
+      kind: 'image-grid',
+      label: '图片组 · 2 张',
+      preview: 'a.jpg',
+    })
+
+    expect(describeSerializedResource({
+      type: 'attachment',
+      name: 'report.pdf',
+      mime: 'application/pdf',
+      size: 2048,
+    }, 'attachment-1')).toMatchObject({
+      kind: 'attachment',
+      label: 'report.pdf',
+    })
+
+    expect(describeSerializedResource({ type: 'paragraph' }, 'p1')).toBeNull()
   })
 
   it('filters command palette entries by label description and keywords', () => {
