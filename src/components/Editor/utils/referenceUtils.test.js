@@ -466,6 +466,90 @@ describe('structured reference utilities', () => {
     expect(inferHeadingRenameMappings(before, after)).toEqual([])
   })
 
+  it('uses explicit structure mappings for deterministic merges', () => {
+    const source = {
+      id: 'source',
+      title: '引用笔记',
+      content: JSON.stringify({
+        root: {
+          children: [{
+            type: 'wiki-link',
+            id: 'target',
+            title: '正文',
+            sectionPath: ['第一卷', '第二章', '第二场'],
+          }],
+        },
+      }),
+    }
+    const target = {
+      id: 'target',
+      title: '正文',
+      content: JSON.stringify({
+        root: {
+          children: [
+            {
+              type: 'heading',
+              tag: 'h1',
+              children: [{ type: 'text', text: '第一卷' }],
+            },
+            {
+              type: 'heading',
+              tag: 'h2',
+              children: [{ type: 'text', text: '第二章' }],
+            },
+            {
+              type: 'heading',
+              tag: 'h3',
+              children: [{ type: 'text', text: '第二场' }],
+            },
+          ],
+        },
+      }),
+    }
+    const afterMerge = JSON.stringify({
+      root: {
+        children: [
+          {
+            type: 'heading',
+            tag: 'h1',
+            children: [{ type: 'text', text: '第一卷' }],
+          },
+          {
+            type: 'heading',
+            tag: 'h2',
+            children: [{ type: 'text', text: '第一章' }],
+          },
+          {
+            type: 'heading',
+            tag: 'h3',
+            children: [{ type: 'text', text: '第二场' }],
+          },
+        ],
+      },
+    })
+
+    const plan = planTargetReferenceRefactor(
+      [source, target],
+      'target',
+      {
+        content: afterMerge,
+        sectionPathMappings: [{
+          before: ['第一卷', '第二章', '第二场'],
+          after: ['第一卷', '第一章', '第二场'],
+        }],
+      },
+    )
+
+    expect(plan.summary).toMatchObject({
+      repairable: 1,
+      broken: 0,
+    })
+    expect(plan.sources[0].changes[0]).toMatchObject({
+      before: '[[正文#第一卷 › 第二章 › 第二场]]',
+      after: '[[正文#第一卷 › 第一章 › 第二场]]',
+    })
+  })
+
   it('plans title propagation and moved-section repairs before a refactor', () => {
     const sourceContent = JSON.stringify({
       root: {
