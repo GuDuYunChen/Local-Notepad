@@ -10,6 +10,7 @@ import QuickSwitcher, { buildHighlightSegments, getSearchMatchScope } from './Qu
 import ToastViewport from './ToastViewport'
 import NameDialog from './NameDialog'
 import ReferenceRefactorDialog from './ReferenceRefactorDialog'
+import LongFormStructurePanel from './LongFormStructurePanel'
 import { compareLibraryItems } from './FileList'
 import { statusLabel } from './InspectorPanel'
 import { toast } from '~/services/toast'
@@ -238,6 +239,74 @@ describe('UI redesign smoke tests', () => {
 
     expect(onSelectFile).toHaveBeenCalledWith(expect.objectContaining({ id: 'file-1' }))
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('renders and reorders a long-form volume chapter structure', async () => {
+    const onApplyDraft = vi.fn()
+    const structuredContent = JSON.stringify({
+      root: {
+        children: [
+          {
+            type: 'heading',
+            tag: 'h1',
+            children: [{ type: 'text', text: '第一卷' }],
+          },
+          {
+            type: 'heading',
+            tag: 'h2',
+            children: [{ type: 'text', text: '第一章' }],
+          },
+          {
+            type: 'paragraph',
+            children: [{ type: 'text', text: 'A' }],
+          },
+          {
+            type: 'heading',
+            tag: 'h2',
+            children: [{ type: 'text', text: '第二章' }],
+          },
+          {
+            type: 'paragraph',
+            children: [{ type: 'text', text: 'B' }],
+          },
+        ],
+      },
+    })
+
+    await act(async () => {
+      root.render(
+        <LongFormStructurePanel
+          content={structuredContent}
+          onApplyDraft={onApplyDraft}
+          onExtractSection={() => {}}
+        />
+      )
+    })
+
+    expect(container.textContent).toContain('第一卷')
+    const expand = Array.from(container.querySelectorAll('.long-structure-expand'))
+      .find(button => !button.disabled)
+    expect(expand).toBeTruthy()
+    await click(expand)
+
+    expect(container.textContent).toContain('第一章')
+    expect(container.textContent).toContain('第二章')
+
+    const secondRow = Array.from(container.querySelectorAll('.long-structure-row'))
+      .find(row => row.textContent.includes('第二章'))
+    const up = Array.from(secondRow.querySelectorAll('button'))
+      .find(button => button.getAttribute('aria-label') === '上移 第二章')
+
+    expect(up).toBeTruthy()
+    await click(up)
+
+    expect(onApplyDraft).toHaveBeenCalledTimes(1)
+    expect(onApplyDraft.mock.calls[0][1]).toMatchObject({
+      reason: 'reorder',
+      sectionPathMappings: [],
+    })
+    expect(onApplyDraft.mock.calls[0][0].indexOf('第二章'))
+      .toBeLessThan(onApplyDraft.mock.calls[0][0].indexOf('第一章'))
   })
 
   it('shows proactive reference impact before a refactor', async () => {
