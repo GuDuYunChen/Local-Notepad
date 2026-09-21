@@ -222,24 +222,30 @@ export default function App() {
     const ids = Array.isArray(targetIds) ? targetIds.filter(Boolean) : []
     if (!ids.length) return true
 
-    let files = await listAllFilesWithContent()
-    if (current?.id && unsaved) {
-      const draft = editorRef.current?.getReferenceRefactorState?.()?.currentContent
-      files = files.map(file => (
-        file.id === current.id
-          ? { ...file, content: String(draft ?? file.content ?? '') }
-          : file
-      ))
+    try {
+      let files = await listAllFilesWithContent()
+      if (current?.id && unsaved) {
+        const draft = editorRef.current?.getReferenceRefactorState?.()?.currentContent
+        files = files.map(file => (
+          file.id === current.id
+            ? { ...file, content: String(draft ?? file.content ?? '') }
+            : file
+        ))
+      }
+
+      const plan = planDeleteReferenceImpact(files, ids)
+      const decision = await requestReferenceRefactor({
+        mode: 'delete',
+        targetTitle: targetTitle || '所选内容',
+        plan,
+      })
+
+      return Boolean(decision?.proceed)
+    } catch (error) {
+      console.error('删除前引用检查失败', error)
+      toast.error('无法检查引用影响，已取消删除')
+      return false
     }
-
-    const plan = planDeleteReferenceImpact(files, ids)
-    const decision = await requestReferenceRefactor({
-      mode: 'delete',
-      targetTitle: targetTitle || '所选内容',
-      plan,
-    })
-
-    return Boolean(decision?.proceed)
   }, [current?.id, requestReferenceRefactor, unsaved])
 
   const saveCurrent = React.useCallback(async () => {
