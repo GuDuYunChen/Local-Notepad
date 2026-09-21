@@ -3,7 +3,12 @@ import { spawn } from 'node:child_process'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 
-import { processExport, exportToPDF, exportToHTML } from './export.js'
+import {
+  processExport,
+  exportCombinedManuscript,
+  exportToPDF,
+  exportToHTML,
+} from './export.js'
 import { parseImportPaths, selectAndParseFiles } from './import.js'
 import { ensureBackupDir, getDefaultBackupDir, getDefaultDataDir, listBackups } from './backup.js'
 import { stopChildProcess, waitForHttpService } from './backend-process.js'
@@ -228,6 +233,24 @@ ipcMain.handle('export:docx', async (event, { ids, targetDir, format = 'docx' })
   try {
     const errors = await processExport(ids, targetDir, format)
     return { success: true, errors }
+  } catch (e) {
+    console.error(e)
+    return { success: false, message: e.message }
+  }
+})
+
+ipcMain.handle('export:combined-manuscript', async (
+  event,
+  { ids = [], targetDir, format = 'docx', title = '合并稿' } = {}
+) => {
+  try {
+    const outputPath = await exportCombinedManuscript(
+      ids,
+      targetDir,
+      format,
+      title,
+    )
+    return { success: true, path: outputPath }
   } catch (e) {
     console.error(e)
     return { success: false, message: e.message }
