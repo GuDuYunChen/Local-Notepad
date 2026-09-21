@@ -940,7 +940,9 @@ export default function App() {
                 ? '保存失败'
                 : editorStatus.saving
                   ? '保存中…'
-                  : '未保存'}
+                  : editorStatus.structureDirty
+                    ? '结构待确认'
+                    : '未保存'}
             </span>
           )}
         </div>
