@@ -107,6 +107,21 @@ export function getAttachmentPreviewType(name, mime) {
     return 'text'
   }
 
+  if (
+    ext === 'docx' ||
+    normalizedMime.includes('wordprocessingml.document')
+  ) {
+    return 'word'
+  }
+
+  if (
+    ['xlsx', 'xls'].includes(ext) ||
+    normalizedMime.includes('spreadsheetml.sheet') ||
+    normalizedMime.includes('ms-excel')
+  ) {
+    return 'sheet'
+  }
+
   return null
 }
 
@@ -114,6 +129,7 @@ function AttachmentComponent({ src, name, size, mime }) {
   const [downloading, setDownloading] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [textPreview, setTextPreview] = useState('')
+  const [sheetPreview, setSheetPreview] = useState([])
   const [previewLoading, setPreviewLoading] = useState(false)
   const previewType = getAttachmentPreviewType(name, mime)
 
@@ -155,6 +171,57 @@ function AttachmentComponent({ src, name, size, mime }) {
 
     return () => { alive = false }
   }, [previewOpen, previewType, src, textPreview])
+
+  useEffect(() => {
+    if (!previewOpen || !src) return undefined
+    if (!['word', 'sheet'].includes(previewType)) return undefined
+    if (previewType === 'word' && textPreview) return undefined
+    if (previewType === 'sheet' && sheetPreview.length) return undefined
+
+    let alive = true
+    setPreviewLoading(true)
+
+    const load = async () => {
+      const response = await fetch(src)
+      if (!response.ok) throw new Error('读取附件失败')
+      const arrayBuffer = await response.arrayBuffer()
+
+      if (previewType === 'word') {
+        const mammothModule = await import('mammoth')
+        const mammoth = mammothModule.default || mammothModule
+        const result = await mammoth.extractRawText({ arrayBuffer })
+        const text = String(result?.value || '').trim()
+        const limit = 300000
+        if (alive) {
+          setTextPreview(text.length > limit ? `${text.slice(0, limit)}\n\n… 内容过长，预览已截断` : (text || '文档没有可预览的正文内容。'))
+        }
+        return
+      }
+
+      const xlsxModule = await import('xlsx')
+      const XLSX = xlsxModule.default || xlsxModule
+      const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' })
+      const firstSheetName = workbook.SheetNames?.[0]
+      const sheet = firstSheetName ? workbook.Sheets[firstSheetName] : null
+      const rows = sheet ? XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' }) : []
+      const limitedRows = rows.slice(0, 200).map(row => row.slice(0, 40).map(cell => String(cell ?? '')))
+      if (alive) setSheetPreview(limitedRows)
+    }
+
+    load()
+      .catch(error => {
+        if (!alive) return
+        console.error('读取 Office 附件预览失败', error)
+        if (previewType === 'word') setTextPreview('暂时无法读取这个 Word 附件。')
+        else setSheetPreview([['暂时无法读取这个表格附件。']])
+      })
+      .finally(() => {
+        if (alive) setPreviewLoading(false)
+      })
+
+    return () => { alive = false }
+  }, [previewOpen, previewType, src, textPreview, sheetPreview.length])
+
 
   const download = async () => {
     if (!src || downloading) return
@@ -257,6 +324,24 @@ function AttachmentComponent({ src, name, size, mime }) {
                   title={name || 'PDF 预览'}
                   className="attachment-pdf-preview"
                 />
+              ) : previewType === 'sheet' ? (
+                <div className="attachment-sheet-preview">
+                  {previewLoading && !sheetPreview.length ? (
+                    <div className="attachment-preview-loading">正在读取表格…</div>
+                  ) : (
+                    <table>
+                      <tbody>
+                        {sheetPreview.map((row, rowIndex) => (
+                          <tr key={rowIndex}>
+                            {row.map((cell, cellIndex) => (
+                              <td key={cellIndex} title={cell}>{cell}</td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
               ) : (
                 <pre className="attachment-text-preview">
                   {previewLoading && !textPreview ? '正在读取预览…' : textPreview}
