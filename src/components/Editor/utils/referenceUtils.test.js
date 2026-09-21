@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   extractHeadingReferences,
   findWikiLinkOccurrences,
@@ -89,7 +89,7 @@ describe('structured reference utilities', () => {
   })
 
   it('keeps recent references deduplicated and newest first', () => {
-    vi.spyOn(Date, 'now')
+    const nowSpy = vi.spyOn(Date, 'now')
       .mockReturnValueOnce(100)
       .mockReturnValueOnce(200)
       .mockReturnValueOnce(300)
@@ -108,6 +108,6 @@ describe('structured reference utilities', () => {
     })
     expect(recent[1]).toMatchObject({ id: 'b', usedAt: 200 })
 
-    Date.now.mockRestore()
+    nowSpy.mockRestore()
   })
 })
