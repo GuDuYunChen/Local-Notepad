@@ -217,6 +217,13 @@ function sectionRepairForTarget(target, sectionPath) {
   }
 }
 
+export function resolveSectionReference(targetContent, sectionPath) {
+  return sectionRepairForTarget(
+    { content: targetContent || '' },
+    sectionPath,
+  )
+}
+
 export function collectWikiReferences(content) {
   let state
   try {
