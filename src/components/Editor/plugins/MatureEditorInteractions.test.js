@@ -49,11 +49,13 @@ describe('mature editor interactions', () => {
     expect(original.map(item => item.src)).toEqual(['a.jpg', 'b.jpg', 'c.jpg'])
   })
 
-  it('recognizes previewable image and PDF attachments', () => {
+  it('recognizes previewable image PDF and text attachments', () => {
     expect(getAttachmentPreviewType('photo.jpg', '')).toBe('image')
     expect(getAttachmentPreviewType('scan.bin', 'image/png')).toBe('image')
     expect(getAttachmentPreviewType('manual.pdf', '')).toBe('pdf')
     expect(getAttachmentPreviewType('manual.bin', 'application/pdf')).toBe('pdf')
+    expect(getAttachmentPreviewType('notes.md', '')).toBe('text')
+    expect(getAttachmentPreviewType('trace.bin', 'text/plain')).toBe('text')
     expect(getAttachmentPreviewType('archive.zip', 'application/zip')).toBeNull()
   })
 
