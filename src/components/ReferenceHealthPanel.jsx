@@ -224,9 +224,11 @@ export default function ReferenceHealthPanel({
                   <button
                     type="button"
                     onClick={() => onSelectFile?.(item.target.id, {
-                      headingPath: item.status === 'repairable'
-                        ? item.suggestedSectionPath
-                        : item.sectionPath,
+                      headingPath: item.issues.includes('section-missing')
+                        ? []
+                        : item.repairable
+                          ? item.suggestedSectionPath
+                          : item.sectionPath,
                     })}
                   >
                     打开目标
