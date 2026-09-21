@@ -65,6 +65,41 @@ describe('import content normalization', () => {
     expect(state.root.children.some(node => node.type === 'divider')).toBe(true)
   })
 
+  it('imports block and inline Markdown formulas as native formula nodes', () => {
+    const serialized = markdownToLexical([
+      '## 公式',
+      '',
+      '行内公式 $E = mc^2$ 继续正文。',
+      '',
+      '$',
+      '\\int_0^1 x^2 \\, dx',
+      '$',
+    ].join('\n'))
+
+    const state = JSON.parse(serialized)
+    const formulas = []
+
+    const visit = node => {
+      if (!node) return
+      if (node.type === 'formula') formulas.push(node)
+      for (const child of node.children || []) visit(child)
+    }
+
+    visit(state.root)
+
+    expect(formulas).toHaveLength(2)
+    expect(formulas).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        expression: 'E = mc^2',
+        displayMode: false,
+      }),
+      expect.objectContaining({
+        expression: '\\int_0^1 x^2 \\, dx',
+        displayMode: true,
+      }),
+    ]))
+  })
+
   it('honors parser content type for legacy Word plain text', () => {
     const serialized = JSON.parse(normalizeImportedContent({
       title: 'legacy.doc',
