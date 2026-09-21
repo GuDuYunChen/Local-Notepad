@@ -188,7 +188,16 @@ export default function App() {
       return { proceed: true, sync: false, plan: null }
     }
 
-    const files = await listAllFilesWithContent()
+    let files = await listAllFilesWithContent()
+    if (current?.id && unsaved) {
+      const draft = editorRef.current?.getReferenceRefactorState?.()?.currentContent
+      files = files.map(file => (
+        file.id === current.id
+          ? { ...file, content: String(draft ?? file.content ?? '') }
+          : file
+      ))
+    }
+
     const plan = planTargetReferenceRefactor(files, item.id, {
       title: nextTitle,
     })
@@ -204,7 +213,7 @@ export default function App() {
       ...decision,
       plan,
     }
-  }, [requestReferenceRefactor])
+  }, [current?.id, requestReferenceRefactor, unsaved])
 
   const reviewDeleteRefactor = React.useCallback(async ({
     targetIds,
@@ -213,7 +222,16 @@ export default function App() {
     const ids = Array.isArray(targetIds) ? targetIds.filter(Boolean) : []
     if (!ids.length) return true
 
-    const files = await listAllFilesWithContent()
+    let files = await listAllFilesWithContent()
+    if (current?.id && unsaved) {
+      const draft = editorRef.current?.getReferenceRefactorState?.()?.currentContent
+      files = files.map(file => (
+        file.id === current.id
+          ? { ...file, content: String(draft ?? file.content ?? '') }
+          : file
+      ))
+    }
+
     const plan = planDeleteReferenceImpact(files, ids)
     const decision = await requestReferenceRefactor({
       mode: 'delete',
@@ -222,7 +240,7 @@ export default function App() {
     })
 
     return Boolean(decision?.proceed)
-  }, [requestReferenceRefactor])
+  }, [current?.id, requestReferenceRefactor, unsaved])
 
   const saveCurrent = React.useCallback(async () => {
     if (!current || !editorRef.current) return false
