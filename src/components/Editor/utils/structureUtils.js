@@ -418,6 +418,7 @@ export function planSectionExtractionImpact(
           ? [...node.sectionPath]
           : []
         matches.push({
+          ordinal: matches.length,
           before: '[[' + String(node.title || '') +
             (sectionPath.length ? '#' + sectionPath.join(' › ') : '') + ']]',
           after: '[[' + String(targetTitle || '') +
