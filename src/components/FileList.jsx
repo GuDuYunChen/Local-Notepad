@@ -334,6 +334,20 @@ export default function FileList({
 
       let referenceReview = null
       try {
+          if (action.type === 'create' && onBeforeDelete) {
+              const item = items.find(entry => entry.id === action.data.id)
+              if (item) {
+                  const allowed = await onBeforeDelete({
+                      targetIds: collectDeleteTargetIds([item.id]),
+                      targetTitle: item.title,
+                  })
+                  if (!allowed) {
+                      historyRef.current.undo.push(action)
+                      return
+                  }
+              }
+          }
+
           if (action.type === 'rename' && onBeforeRename) {
               const item = items.find(entry => entry.id === action.data.id)
               if (item && !item.is_folder) {
@@ -378,6 +392,20 @@ export default function FileList({
 
       let referenceReview = null
       try {
+          if (action.type === 'delete' && onBeforeDelete) {
+              const item = items.find(entry => entry.id === action.data.id)
+              if (item) {
+                  const allowed = await onBeforeDelete({
+                      targetIds: collectDeleteTargetIds([item.id]),
+                      targetTitle: item.title,
+                  })
+                  if (!allowed) {
+                      historyRef.current.redo.push(action)
+                      return
+                  }
+              }
+          }
+
           if (action.type === 'rename' && onBeforeRename) {
               const item = items.find(entry => entry.id === action.data.id)
               if (item && !item.is_folder) {
@@ -434,7 +462,7 @@ export default function FileList({
       }
       window.addEventListener('keydown', handleUndoRedo)
       return () => window.removeEventListener('keydown', handleUndoRedo)
-  }, [items, onAfterRename, onBeforeRename])
+  }, [items, onAfterRename, onBeforeDelete, onBeforeRename])
 
 
   useEffect(() => {
