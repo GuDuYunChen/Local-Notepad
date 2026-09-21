@@ -263,6 +263,7 @@ export default function App() {
         const plan = planTargetReferenceRefactor(files, current.id, {
           title: current.title,
           content: refactorState.currentContent,
+          sectionPathMappings: refactorState.sectionPathMappings || [],
         })
 
         const affectedReferences =
