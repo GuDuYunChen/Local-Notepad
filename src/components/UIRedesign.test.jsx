@@ -343,6 +343,76 @@ describe('UI redesign smoke tests', () => {
     expect(container.textContent).toContain('剧本项目')
   })
 
+  it('initializes a structured novel project template without overwriting existing work', async () => {
+    const initialFiles = [{
+      id: 'project',
+      title: '新小说',
+      is_folder: true,
+      parent_id: '',
+      sort_order: 100,
+    }]
+
+    listAllFilesWithContent.mockResolvedValue(initialFiles)
+    tagApi.list.mockResolvedValue([])
+    tagApi.create.mockImplementation(async ({ name }) => ({
+      id: 'tag-' + name,
+      name,
+    }))
+    tagApi.addFileTag.mockResolvedValue(null)
+
+    let createdIndex = 0
+    api.mockImplementation(async (path, init) => {
+      if (path === '/api/files' && init?.method === 'POST') {
+        const payload = JSON.parse(init.body)
+        createdIndex += 1
+        return {
+          id: 'created-' + createdIndex,
+          ...payload,
+          sort_order: createdIndex * 1000,
+          updated_at: 1,
+        }
+      }
+      throw new Error('Unexpected request: ' + path)
+    })
+
+    await act(async () => {
+      root.render(
+        <ProjectWorkspacePanel
+          onOpenFile={() => {}}
+          onClose={() => {}}
+        />
+      )
+    })
+    await flushPromises()
+
+    const templateButton = Array.from(container.querySelectorAll('button'))
+      .find(button => button.textContent === '套用小说模板')
+    expect(templateButton).toBeTruthy()
+
+    await click(templateButton)
+    await flushPromises()
+    await flushPromises()
+
+    const createCalls = api.mock.calls
+      .filter(([path, init]) => path === '/api/files' && init?.method === 'POST')
+      .map(([, init]) => JSON.parse(init.body))
+
+    expect(createCalls.some(call => call.is_folder && call.title === '第一卷')).toBe(true)
+
+    const firstChapter = createCalls.find(call => call.title === '第一章.md')
+    expect(firstChapter).toBeTruthy()
+    const chapterState = JSON.parse(firstChapter.content)
+    expect(chapterState.root.children[0]).toMatchObject({
+      type: 'heading',
+      tag: 'h1',
+    })
+
+    expect(tagApi.create).toHaveBeenCalledWith({ name: '角色' })
+    expect(tagApi.create).toHaveBeenCalledWith({ name: '地点' })
+    expect(tagApi.create).toHaveBeenCalledWith({ name: '伏笔' })
+    expect(tagApi.addFileTag).toHaveBeenCalled()
+  })
+
   it('renders tagged character location and foreshadow indexes', async () => {
     listAllFilesWithContent.mockResolvedValue([
       {
