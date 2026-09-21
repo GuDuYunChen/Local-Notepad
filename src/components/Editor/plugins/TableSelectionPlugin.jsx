@@ -76,6 +76,14 @@ export default function TableSelectionPlugin() {
 
     const onKey = (e) => { ctrlRef.current = e.ctrlKey || e.metaKey }
     const onShortcut = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setRects([])
+        setActive(false)
+        window.dispatchEvent(new CustomEvent('tableSelection:mode', { detail: false }))
+        editor.focus()
+        return
+      }
       if (!(e.ctrlKey || e.metaKey) || !e.altKey) return
       if (e.key.toLowerCase() === 'm') { e.preventDefault(); doMerge() }
       if (e.key.toLowerCase() === 's') { e.preventDefault(); doSplit() }
