@@ -220,6 +220,27 @@ func (l *FileLogic) Restore(ctx context.Context, id string) error {
 	return l.FileDAO.RestoreRecursive(ctx, id)
 }
 
+func (l *FileLogic) CreateVersionSnapshot(ctx context.Context, id string) error {
+	if l.VersionDAO == nil {
+		return fmt.Errorf("版本功能未启用")
+	}
+
+	f, err := l.FileDAO.GetByID(ctx, id)
+	if err != nil {
+		return fmt.Errorf("文件不存在: %w", err)
+	}
+
+	if err := l.VersionDAO.CreateSnapshot(ctx, id, f.Title, f.Content); err != nil {
+		return fmt.Errorf("创建版本快照失败: %w", err)
+	}
+
+	if err := l.VersionDAO.DeleteOldVersions(ctx, id, 50); err != nil {
+		log.Printf("清理旧版本失败: %v", err)
+	}
+
+	return nil
+}
+
 func (l *FileLogic) GetVersions(ctx context.Context, id string) ([]*model.FileVersion, error) {
 	if l.VersionDAO == nil {
 		return []*model.FileVersion{}, nil
