@@ -21,7 +21,7 @@ func (d *VersionDAO) CreateSnapshot(ctx context.Context, fileID, title, content 
 
 func (d *VersionDAO) GetVersions(ctx context.Context, fileID string) ([]*model.FileVersion, error) {
 	rows, err := d.DB.QueryContext(ctx,
-		`SELECT id, file_id, title, content, created_at FROM file_versions WHERE file_id = ? ORDER BY created_at DESC LIMIT 50`,
+		`SELECT id, file_id, title, content, created_at FROM file_versions WHERE file_id = ? ORDER BY created_at DESC, id DESC LIMIT 50`,
 		fileID)
 	if err != nil {
 		return nil, err
@@ -55,7 +55,7 @@ func (d *VersionDAO) GetVersion(ctx context.Context, versionID int64) (*model.Fi
 
 func (d *VersionDAO) DeleteOldVersions(ctx context.Context, fileID string, keepCount int) error {
 	_, err := d.DB.ExecContext(ctx,
-		`DELETE FROM file_versions WHERE file_id = ? AND id NOT IN (SELECT id FROM file_versions WHERE file_id = ? ORDER BY created_at DESC LIMIT ?)`,
+		`DELETE FROM file_versions WHERE file_id = ? AND id NOT IN (SELECT id FROM file_versions WHERE file_id = ? ORDER BY created_at DESC, id DESC LIMIT ?)`,
 		fileID, fileID, keepCount)
 	return err
 }
