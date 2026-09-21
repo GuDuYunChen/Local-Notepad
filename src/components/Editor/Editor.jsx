@@ -39,6 +39,7 @@ import DragDropPlugin from "./plugins/DragDropPlugin";
 import EditorShortcutPlugin from "./plugins/EditorShortcutPlugin";
 import FormulaShortcutPlugin from "./plugins/FormulaShortcutPlugin";
 import ChecklistKeyboardPlugin from "./plugins/ChecklistKeyboardPlugin";
+import CommandPalettePlugin from "./plugins/CommandPalettePlugin";
 import { ImageNode } from "./nodes/ImageNode";
 import { VideoNode } from "./nodes/VideoNode";
 import { ImageGridNode } from "./nodes/ImageGridNode";
@@ -184,6 +185,7 @@ export default function Editor({ initialContent, onChange, readOnly }) {
       <div className="editor-shell">
         {!readOnly && <ToolbarPlugin />}
         <SearchPlugin />
+        <CommandPalettePlugin />
         <FloatingTextToolbarPlugin />
         <DocumentOutlinePlugin />
         <PasteImagePlugin />
