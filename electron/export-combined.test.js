@@ -45,7 +45,22 @@ describe('combined manuscript export', () => {
           id: 'chapter-2',
           title: '第二章.md',
           is_folder: false,
-          content: lexical('第二章正文'),
+          content: JSON.stringify({
+            root: {
+              children: [{
+                type: 'paragraph',
+                children: [
+                  { type: 'text', text: '第二章正文 ', format: 0 },
+                  {
+                    type: 'wiki-link',
+                    id: 'setting',
+                    title: '设定集',
+                    sectionPath: ['宗门', '青莲剑宗'],
+                  },
+                ],
+              }],
+            },
+          }),
         },
         'chapter-1': {
           id: 'chapter-1',
@@ -72,6 +87,7 @@ describe('combined manuscript export', () => {
 
       expect(markdown).toContain('# 第二章')
       expect(markdown).toContain('第二章正文')
+      expect(markdown).toContain('[[设定集#宗门 › 青莲剑宗]]')
       expect(markdown).toContain('# 第一章')
       expect(markdown.indexOf('# 第二章')).toBeLessThan(
         markdown.indexOf('# 第一章')
