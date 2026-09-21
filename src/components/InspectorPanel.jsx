@@ -4,6 +4,7 @@ import VersionHistory from './VersionHistory'
 import TagSelector from './TagSelector'
 import { tagApi } from '~/services/tagApi'
 import { toast } from '~/services/toast'
+import { rememberReference } from './Editor/utils/referenceUtils'
 
 function formatUpdated(ts) {
   if (!ts) return '—'
@@ -97,6 +98,11 @@ export default function InspectorPanel({
   const copyWikiReference = async () => {
     try {
       await copyText(`[[${file.title || '未命名'}]]`)
+      rememberReference({
+        id: file.id,
+        title: file.title || '未命名',
+        sectionPath: [],
+      })
       toast.success('笔记引用已复制')
     } catch (error) {
       console.error('复制笔记引用失败', error)
