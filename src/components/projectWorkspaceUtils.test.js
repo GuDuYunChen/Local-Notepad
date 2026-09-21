@@ -106,6 +106,7 @@ describe('project workspace utilities', () => {
     expect(readProjectWorkspaceMeta('project')).toEqual({
       type: 'script',
       targetWords: 42000,
+      chapterTargetWords: 0,
       statuses: {
         'chapter-1': 'review',
       },
@@ -113,6 +114,7 @@ describe('project workspace utilities', () => {
         'chapter-1': '主角第一次做出关键选择',
       },
       supportNoteIds: ['support-1'],
+      foreshadowStates: {},
     })
     expect(nextProjectStatus('draft')).toBe('review')
     expect(nextProjectStatus('review')).toBe('done')
