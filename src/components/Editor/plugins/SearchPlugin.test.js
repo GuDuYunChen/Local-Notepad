@@ -9,7 +9,7 @@ describe('advanced editor find rules', () => {
 
   it('supports whole-word matching for latin and Chinese text', () => {
     expect(findTextMatchOffsets('note notebook note', 'note', { wholeWord: true })).toEqual([0, 14])
-    expect(findTextMatchOffsets('这是笔记 不是笔记本', '笔记', { wholeWord: true })).toEqual([2])
+    expect(findTextMatchOffsets('这是 笔记，不是笔记本', '笔记', { wholeWord: true })).toEqual([3])
   })
 
   it('returns no matches for empty queries', () => {
