@@ -4,7 +4,6 @@ import { $createListNode, $createListItemNode, INSERT_CHECK_LIST_COMMAND } from 
 import { $createCodeNode } from '@lexical/code'
 import { INSERT_TABLE_COMMAND } from '@lexical/table'
 import { $createImageNode } from '../nodes/ImageNode'
-import { $createTodoNode } from '../nodes/TodoNode'
 import { $createDividerNode } from '../nodes/DividerNode'
 import { $createCalloutNode } from '../nodes/CalloutNode'
 import { $createToggleNode } from '../nodes/ToggleNode'
