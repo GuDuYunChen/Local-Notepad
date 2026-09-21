@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   analyzeWikiReferenceHealth,
   diagnoseLibraryReferences,
+  expandRefactorTargetIds,
   extractHeadingReferences,
   findWikiLinkOccurrences,
   formatSectionPath,
@@ -529,6 +530,21 @@ describe('structured reference utilities', () => {
       after: '[[新标题#世界观 › 青莲剑宗]]',
       issues: ['title-stale', 'section-moved'],
     })
+  })
+
+  it('expands recursive delete targets from the full library tree', () => {
+    expect(expandRefactorTargetIds([
+      { id: 'folder', parent_id: '', is_folder: true },
+      { id: 'child-folder', parent_id: 'folder', is_folder: true },
+      { id: 'note-a', parent_id: 'folder', is_folder: false },
+      { id: 'note-b', parent_id: 'child-folder', is_folder: false },
+      { id: 'outside', parent_id: '', is_folder: false },
+    ], ['folder']).sort()).toEqual([
+      'child-folder',
+      'folder',
+      'note-a',
+      'note-b',
+    ])
   })
 
   it('reports incoming references before deleting notes or folders', () => {
