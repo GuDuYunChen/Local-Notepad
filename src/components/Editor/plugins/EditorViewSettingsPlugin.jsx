@@ -37,6 +37,15 @@ export const DEFAULT_EDITOR_VIEW_SETTINGS = {
   typewriter: false,
 }
 
+export function getEditorWheelFontStep(event) {
+  if (!event || (!event.ctrlKey && !event.metaKey)) return 0
+  if (event.altKey || event.shiftKey) return 0
+
+  const deltaY = Number(event.deltaY)
+  if (!Number.isFinite(deltaY) || deltaY === 0) return 0
+  return deltaY < 0 ? 1 : -1
+}
+
 export function normalizeEditorViewSettings(value) {
   const source = value && typeof value === 'object' ? value : {}
   const fontSize = Math.max(13, Math.min(22, Number(source.fontSize) || DEFAULT_EDITOR_VIEW_SETTINGS.fontSize))
@@ -123,6 +132,26 @@ export default function EditorViewSettingsPlugin({ readOnly = false }) {
   }, [])
 
   useEffect(() => {
+    const rootElement = editor.getRootElement()
+    const shell = rootElement?.closest('.editor-shell')
+    if (!shell) return undefined
+
+    const onWheel = event => {
+      const step = getEditorWheelFontStep(event)
+      if (!step) return
+
+      event.preventDefault()
+      setSettings(current => normalizeEditorViewSettings({
+        ...current,
+        fontSize: current.fontSize + step,
+      }))
+    }
+
+    shell.addEventListener('wheel', onWheel, { passive: false })
+    return () => shell.removeEventListener('wheel', onWheel)
+  }, [editor])
+
+  useEffect(() => {
     if (!open) return
 
     const onPointerDown = event => {
@@ -198,7 +227,7 @@ export default function EditorViewSettingsPlugin({ readOnly = false }) {
           <header>
             <div>
               <strong>写作视图</strong>
-              <span>只影响显示，不修改正文格式</span>
+              <span>只影响显示，不修改正文格式 · Ctrl/Cmd + 滚轮快速调字号</span>
             </div>
             <button type="button" onClick={() => setOpen(false)} aria-label="关闭">×</button>
           </header>
