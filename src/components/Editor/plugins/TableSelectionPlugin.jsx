@@ -984,6 +984,9 @@ export default function TableSelectionPlugin() {
             <button type="button" onClick={() => applyBackground('#fff3cd')} disabled={selectedCellCount === 0}>浅黄</button>
             <button type="button" onClick={() => applyBackground('')} disabled={selectedCellCount === 0}>清底色</button>
             <button type="button" onClick={() => applyHorizontal('left')} disabled={selectedCellCount === 0}>左对齐</button>
+            <button type="button" onClick={() => applyHorizontal('center')} disabled={selectedCellCount === 0}>居中</button>
+            <button type="button" onClick={() => applyHorizontal('right')} disabled={selectedCellCount === 0}>右对齐</button>
+            <button type="button" onClick={() => applyAlign('middle')} disabled={selectedCellCount === 0}>垂直居中</button>
             <button type="button" onClick={doMerge} disabled={selectedCellCount < 2}>合并</button>
             <button type="button" onClick={doSplit} disabled={selectedCellCount === 0}>拆分</button>
             <button type="button" onClick={() => doClear()} disabled={selectedCellCount === 0}>清空</button>
