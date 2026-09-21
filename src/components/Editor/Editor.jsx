@@ -185,7 +185,7 @@ export default function Editor({ initialContent, onChange, readOnly }) {
       <div className="editor-shell">
         {!readOnly && <ToolbarPlugin />}
         <SearchPlugin />
-        <CommandPalettePlugin />
+        {!readOnly && <CommandPalettePlugin />}
         <FloatingTextToolbarPlugin />
         <DocumentOutlinePlugin />
         <PasteImagePlugin />
