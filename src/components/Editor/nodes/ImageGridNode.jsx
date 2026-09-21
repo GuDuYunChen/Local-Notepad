@@ -1,6 +1,7 @@
 import { $getNodeByKey, DecoratorNode } from 'lexical'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { uploadFile } from '../utils/fileUpload'
 
 export class ImageGridNode extends DecoratorNode {
   __items
@@ -115,7 +116,11 @@ function ImageGridComponent({ nodeKey, items, columns, gap }) {
   const [currentItems, setCurrentItems] = useState(() => normalizeItems(items))
   const [dragIndex, setDragIndex] = useState(-1)
   const [dragOverIndex, setDragOverIndex] = useState(-1)
+  const [uploading, setUploading] = useState(false)
+  const [replaceIndex, setReplaceIndex] = useState(-1)
   const wrapperRef = useRef(null)
+  const addInputRef = useRef(null)
+  const replaceInputRef = useRef(null)
 
   useEffect(() => setCurrentColumns(columns || 3), [columns])
   useEffect(() => setCurrentGap(gap || 8), [gap])
@@ -199,6 +204,81 @@ function ImageGridComponent({ nodeKey, items, columns, gap }) {
     setDragOverIndex(-1)
   }
 
+  const uploadImageFiles = async files => {
+    const validFiles = Array.from(files || []).filter(file => file.size <= 10 * 1024 * 1024)
+    if (!validFiles.length) return []
+
+    const results = []
+    for (const file of validFiles) {
+      try {
+        const result = await uploadFile(file)
+        if (result?.url) {
+          results.push({
+            src: result.url,
+            originalSrc: result.url,
+            alt: file.name,
+            caption: file.name,
+          })
+        }
+      } catch (error) {
+        console.error('图片组上传失败', error)
+      }
+    }
+
+    return results
+  }
+
+  const handleAddImages = async event => {
+    const files = event.target.files
+    if (!files?.length) return
+
+    setUploading(true)
+    try {
+      const additions = await uploadImageFiles(files)
+      if (!additions.length) return
+      const nextItems = [...currentItems, ...additions]
+      setCurrentItems(nextItems)
+      updateNode({ items: nextItems })
+    } finally {
+      setUploading(false)
+      event.target.value = ''
+    }
+  }
+
+  const handleReplaceImage = async event => {
+    const file = event.target.files?.[0]
+    if (!file || replaceIndex < 0) return
+    if (file.size > 10 * 1024 * 1024) {
+      event.target.value = ''
+      return
+    }
+
+    setUploading(true)
+    try {
+      const result = await uploadFile(file)
+      if (!result?.url) return
+
+      const nextItems = currentItems.map((item, index) => (
+        index === replaceIndex
+          ? {
+              ...item,
+              src: result.url,
+              originalSrc: result.url,
+              alt: file.name,
+            }
+          : item
+      ))
+      setCurrentItems(nextItems)
+      updateNode({ items: nextItems })
+    } catch (error) {
+      console.error('替换图片组图片失败', error)
+    } finally {
+      setUploading(false)
+      setReplaceIndex(-1)
+      event.target.value = ''
+    }
+  }
+
   const removeItem = index => {
     const nextItems = currentItems.filter((_, itemIndex) => itemIndex !== index)
 
@@ -269,6 +349,25 @@ function ImageGridComponent({ nodeKey, items, columns, gap }) {
 
           <button
             type="button"
+            onClick={event => {
+              event.stopPropagation()
+              addInputRef.current?.click()
+            }}
+            disabled={uploading}
+          >
+            {uploading ? '处理中…' : '添加图片'}
+          </button>
+          <input
+            ref={addInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            hidden
+            onChange={handleAddImages}
+          />
+
+          <button
+            type="button"
             className="danger"
             onClick={event => {
               event.stopPropagation()
@@ -317,9 +416,24 @@ function ImageGridComponent({ nodeKey, items, columns, gap }) {
               />
 
               {selected && (
-                <button
-                  type="button"
-                  className="editor-image-grid-remove"
+                <div className="editor-image-grid-card-actions">
+                  <button
+                    type="button"
+                    className="editor-image-grid-replace"
+                    onClick={event => {
+                      event.stopPropagation()
+                      setReplaceIndex(index)
+                      replaceInputRef.current?.click()
+                    }}
+                    disabled={uploading}
+                    aria-label={`替换图片 ${index + 1}`}
+                    title="替换图片"
+                  >
+                    ↻
+                  </button>
+                  <button
+                    type="button"
+                    className="editor-image-grid-remove"
                   onClick={event => {
                     event.stopPropagation()
                     removeItem(index)
@@ -329,6 +443,7 @@ function ImageGridComponent({ nodeKey, items, columns, gap }) {
                 >
                   ×
                 </button>
+                </div>
               )}
             </div>
 
@@ -345,6 +460,13 @@ function ImageGridComponent({ nodeKey, items, columns, gap }) {
           </div>
         ))}
       </div>
+      <input
+        ref={replaceInputRef}
+        type="file"
+        accept="image/*"
+        hidden
+        onChange={handleReplaceImage}
+      />
     </figure>
   )
 }
