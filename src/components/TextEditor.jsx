@@ -22,7 +22,7 @@ function TextEditorInternal({
   const intervalRef = useRef(null)
   const saveControllersRef = useRef(new Set())
   const loadAbortRef = useRef(null)
-  const inFlightSaveRef = useRef(null)
+  const inFlightSavesRef = useRef(new Map())
   const savingCountsRef = useRef(new Map())
   const currentIdRef = useRef(null)
   const [loading, setLoading] = useState(false)
@@ -84,12 +84,13 @@ function TextEditorInternal({
       return { id, content: text, skipped: true }
     }
 
-    if (inFlightSaveRef.current?.id === id) {
-      if (inFlightSaveRef.current.content === text) {
-        return inFlightSaveRef.current.promise
+    const inFlight = inFlightSavesRef.current.get(id)
+    if (inFlight) {
+      if (inFlight.content === text) {
+        return inFlight.promise
       }
       const queuedText = text
-      return inFlightSaveRef.current.promise.then(() => saveNow(reason, id, queuedText))
+      return inFlight.promise.then(() => saveNow(reason, id, queuedText))
     }
 
     const ctl = new AbortController()
@@ -121,12 +122,14 @@ function TextEditorInternal({
         throw e
       } finally {
         saveControllersRef.current.delete(ctl)
-        if (inFlightSaveRef.current?.promise === savePromise) inFlightSaveRef.current = null
+        if (inFlightSavesRef.current.get(id)?.promise === savePromise) {
+          inFlightSavesRef.current.delete(id)
+        }
         endSaving(id)
       }
     })()
 
-    inFlightSaveRef.current = { id, content: text, promise: savePromise }
+    inFlightSavesRef.current.set(id, { content: text, promise: savePromise })
     return savePromise
   }, [beginSaving, endSaving])
 
@@ -219,6 +222,7 @@ function TextEditorInternal({
       controller.abort()
     }
     saveControllersRef.current.clear()
+    inFlightSavesRef.current.clear()
   }, [])
 
   useEffect(() => {
