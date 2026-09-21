@@ -9,6 +9,7 @@ import TemplateSelector from './TemplateSelector'
 import QuickSwitcher, { buildHighlightSegments, getSearchMatchScope } from './QuickSwitcher'
 import ToastViewport from './ToastViewport'
 import NameDialog from './NameDialog'
+import { compareLibraryItems } from './FileList'
 import { statusLabel } from './InspectorPanel'
 import { toast } from '~/services/toast'
 import { api, searchFiles } from '~/services/api'
@@ -139,6 +140,24 @@ describe('UI redesign smoke tests', () => {
     expect(container.querySelector('.workspace-sidebar').classList.contains('collapsed')).toBe(true)
     expect(container.querySelector('[data-library="true"]')).toBeNull()
     expect(container.querySelector('button[aria-label="展开侧边栏"]')).toBeTruthy()
+  })
+
+  it('sorts pinned and newly created library items predictably', () => {
+    const items = [
+      { id: 'old', sort_order: 0, created_at: 100, is_pinned: false },
+      { id: 'new', sort_order: 0, created_at: 200, is_pinned: false },
+      { id: 'manual-top', sort_order: 5000, created_at: 50, is_pinned: false },
+      { id: 'pinned', sort_order: 10, created_at: 1, is_pinned: true },
+    ]
+
+    const sorted = [...items].sort(compareLibraryItems)
+
+    expect(sorted.map(item => item.id)).toEqual([
+      'pinned',
+      'manual-top',
+      'new',
+      'old',
+    ])
   })
 
   it('highlights the first search match without regex side effects', () => {
