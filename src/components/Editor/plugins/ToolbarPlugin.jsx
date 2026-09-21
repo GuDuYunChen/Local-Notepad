@@ -711,6 +711,16 @@ export default function ToolbarPlugin() {
         视图
       </button>
 
+      <button
+        type="button"
+        className="btn toolbar-text-btn toolbar-source-btn"
+        onClick={() => window.dispatchEvent(new Event('editor:toggle-source-mode'))}
+        aria-label="Markdown 源码"
+        title="Markdown 源码 / 视觉编辑"
+      >
+        源码
+      </button>
+
       <span className="toolbar-slash-hint">输入 / 快速插入</span>
       {isUploading && <span className="toolbar-progress">处理中…</span>}
 
