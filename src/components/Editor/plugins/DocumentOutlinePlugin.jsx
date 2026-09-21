@@ -33,6 +33,17 @@ export function getCollapsedOutlineKeys(nodes, collapsedKeys) {
   return hidden
 }
 
+export function findOutlineHeadingForKey(nodes, topLevelKey) {
+  const targetIndex = (Array.isArray(nodes) ? nodes : []).findIndex(node => node.key === topLevelKey)
+  if (targetIndex < 0) return null
+
+  for (let index = targetIndex; index >= 0; index--) {
+    if (nodes[index]?.isHeading) return nodes[index]
+  }
+
+  return null
+}
+
 function hasCollapsibleContent(nodes, headingKey) {
   const index = nodes.findIndex(node => node.key === headingKey)
   const heading = nodes[index]
@@ -205,17 +216,7 @@ export default function DocumentOutlinePlugin() {
       const topLevelKey = event.detail?.topLevelKey
       if (!topLevelKey || !outlineNodes.length) return
 
-      const targetIndex = outlineNodes.findIndex(node => node.key === topLevelKey)
-      if (targetIndex < 0) return
-
-      let heading = null
-      for (let index = targetIndex; index >= 0; index--) {
-        if (outlineNodes[index]?.isHeading) {
-          heading = outlineNodes[index]
-          break
-        }
-      }
-
+      const heading = findOutlineHeadingForKey(outlineNodes, topLevelKey)
       if (!heading) return
 
       setCollapsedKeys(previous => {
