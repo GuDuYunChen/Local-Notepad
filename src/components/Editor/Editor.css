@@ -2760,3 +2760,268 @@
   background: color-mix(in srgb, var(--clay-light) 68%, var(--surface));
   color: var(--ink);
 }
+
+
+/* 4.14 writing view preferences */
+.editor-shell {
+  --editor-view-font-size: 16px;
+  --editor-view-line-height: 1.85;
+  --editor-view-page-width: 860px;
+  --editor-view-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+.editor-shell .editor-input {
+  max-width: var(--editor-view-page-width);
+  font-size: var(--editor-view-font-size);
+  line-height: var(--editor-view-line-height);
+  font-family: var(--editor-view-font-family);
+}
+
+.toolbar-view-btn {
+  white-space: nowrap;
+}
+
+.editor-view-settings-host {
+  position: absolute;
+  top: 48px;
+  right: 12px;
+  z-index: 1450;
+}
+
+.editor-view-settings {
+  width: 320px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--surface) 97%, transparent);
+  box-shadow: 0 20px 58px rgba(20, 16, 34, .2);
+  backdrop-filter: blur(16px);
+}
+
+.editor-view-settings > header {
+  min-height: 54px;
+  padding: 10px 10px 9px 13px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.editor-view-settings > header > div {
+  min-width: 0;
+  flex: 1;
+}
+
+.editor-view-settings > header strong,
+.editor-view-settings > header span {
+  display: block;
+}
+
+.editor-view-settings > header strong {
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 680;
+}
+
+.editor-view-settings > header span {
+  margin-top: 2px;
+  color: var(--ink-muted);
+  font-size: 8px;
+}
+
+.editor-view-settings > header > button {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-muted);
+  font: inherit;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.editor-view-settings > header > button:hover {
+  background: var(--surface-hover);
+  color: var(--ink);
+}
+
+.editor-view-settings-body {
+  padding: 7px 10px 9px;
+}
+
+.editor-view-setting-row {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 74%, transparent);
+  color: var(--ink-soft);
+  font-size: 9px;
+}
+
+.editor-view-setting-row.stacked {
+  padding: 8px 0;
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.editor-view-setting-row > select {
+  min-width: 116px;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  outline: 0;
+  background: var(--paper);
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 9px;
+}
+
+.editor-view-stepper {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.editor-view-stepper button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink-soft);
+  font: inherit;
+  cursor: pointer;
+}
+
+.editor-view-stepper button:hover {
+  background: var(--surface-hover);
+  border-color: var(--line-strong);
+}
+
+.editor-view-stepper strong {
+  min-width: 50px;
+  color: var(--ink);
+  font-size: 9px;
+  font-weight: 620;
+  text-align: center;
+}
+
+.editor-view-segments {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+
+.editor-view-segments button {
+  min-height: 29px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink-muted);
+  font: inherit;
+  font-size: 8px;
+  cursor: pointer;
+}
+
+.editor-view-segments button:hover,
+.editor-view-segments button.active {
+  border-color: var(--line-strong);
+  background: var(--surface-hover);
+  color: var(--ink);
+}
+
+.editor-view-segments button.active {
+  border-color: color-mix(in srgb, var(--clay) 40%, var(--line));
+  background: var(--clay-light);
+  color: var(--clay);
+}
+
+.editor-view-toggle-row {
+  min-height: 52px;
+  padding: 8px 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.editor-view-toggle-row > span {
+  min-width: 0;
+  flex: 1;
+}
+
+.editor-view-toggle-row strong,
+.editor-view-toggle-row small {
+  display: block;
+}
+
+.editor-view-toggle-row strong {
+  color: var(--ink);
+  font-size: 9px;
+  font-weight: 650;
+}
+
+.editor-view-toggle-row small {
+  margin-top: 2px;
+  color: var(--ink-muted);
+  font-size: 8px;
+  line-height: 1.4;
+}
+
+.editor-view-toggle-row input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--clay);
+}
+
+.editor-view-settings > footer {
+  padding: 8px 10px 10px;
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid var(--line);
+}
+
+.editor-view-settings > footer button {
+  min-height: 29px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink-muted);
+  font: inherit;
+  font-size: 8px;
+  cursor: pointer;
+}
+
+.editor-view-settings > footer button:hover {
+  background: var(--surface-hover);
+  color: var(--ink);
+}
+
+.editor-typewriter-mode .editor-container {
+  scroll-padding-top: 36vh;
+  scroll-padding-bottom: 36vh;
+}
+
+@media (max-width: 640px) {
+  .editor-view-settings-host {
+    left: 8px;
+    right: 8px;
+  }
+
+  .editor-view-settings {
+    width: 100%;
+  }
+
+  .editor-shell .editor-input {
+    max-width: 100%;
+  }
+}
