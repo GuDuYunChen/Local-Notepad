@@ -89,7 +89,10 @@ export default function ProjectWorkspacePanel({
   }, [load])
 
   useEffect(() => {
-    const refresh = () => void load()
+    const refresh = event => {
+      if (event?.detail?.source === 'project-workspace') return
+      void load()
+    }
     window.addEventListener('library:refresh', refresh)
     return () => window.removeEventListener('library:refresh', refresh)
   }, [load])
@@ -163,15 +166,30 @@ export default function ProjectWorkspacePanel({
 
     setMovingId(noteId)
     try {
-      await api('/api/files/' + noteId, {
-        method: 'PUT',
-        body: JSON.stringify({
-          parent_id: patch.parent_id,
-          sort_order: patch.sort_order,
-        }),
-      })
+      if (Array.isArray(patch.rebalance) && patch.rebalance.length) {
+        for (const item of patch.rebalance) {
+          await api('/api/files/' + item.id, {
+            method: 'PUT',
+            body: JSON.stringify({
+              parent_id: item.parent_id,
+              sort_order: item.sort_order,
+            }),
+          })
+        }
+      } else {
+        await api('/api/files/' + noteId, {
+          method: 'PUT',
+          body: JSON.stringify({
+            parent_id: patch.parent_id,
+            sort_order: patch.sort_order,
+          }),
+        })
+      }
+
       await load()
-      window.dispatchEvent(new Event('library:refresh'))
+      window.dispatchEvent(new CustomEvent('library:refresh', {
+        detail: { source: 'project-workspace' },
+      }))
     } catch (error) {
       console.error('移动章节失败', error)
       toast.error(error.message || '移动章节失败')
