@@ -468,3 +468,260 @@ export function diagnoseLibraryReferences(files) {
     sources,
   }
 }
+
+
+export function getHeadingStructureSignature(content) {
+  return JSON.stringify(
+    extractHeadingReferences(content).map(item => ({
+      level: item.level,
+      path: item.path,
+    }))
+  )
+}
+
+export function hasHeadingStructureChanged(beforeContent, afterContent) {
+  return getHeadingStructureSignature(beforeContent) !==
+    getHeadingStructureSignature(afterContent)
+}
+
+function analyzeReferenceAgainstTarget(reference, target) {
+  if (!target || target.is_deleted) {
+    return {
+      ...reference,
+      target: null,
+      status: 'broken',
+      repairable: false,
+      issues: ['target-missing'],
+      suggestedSectionPath: reference.sectionPath,
+    }
+  }
+
+  const titleStale = String(reference.title || '') !== String(target.title || '')
+  const section = sectionRepairForTarget(target, reference.sectionPath)
+  const issues = []
+
+  if (titleStale) issues.push('title-stale')
+  if (!section.valid) {
+    issues.push(section.repairable ? 'section-moved' : 'section-missing')
+  }
+
+  const hasUnresolvedIssue = issues.includes('section-missing')
+
+  return {
+    ...reference,
+    target: {
+      id: String(target.id || reference.id),
+      title: String(target.title || reference.title || ''),
+    },
+    status: hasUnresolvedIssue
+      ? 'broken'
+      : issues.length
+        ? 'repairable'
+        : 'healthy',
+    repairable: titleStale || section.repairable,
+    issues,
+    suggestedSectionPath: section.repairable
+      ? section.nextPath
+      : reference.sectionPath,
+    sectionCandidates: section.candidates,
+  }
+}
+
+export function repairReferencesToTarget(content, targetId, target) {
+  const id = String(targetId || '')
+  let state
+  try {
+    state = typeof content === 'string' ? JSON.parse(content) : structuredClone(content)
+  } catch {
+    return {
+      content: String(content || ''),
+      changed: false,
+      repairedCount: 0,
+      unresolvedCount: 0,
+    }
+  }
+
+  let repairedCount = 0
+  let unresolvedCount = 0
+
+  const walk = node => {
+    if (!node || typeof node !== 'object') return
+
+    if (node.type === 'wiki-link' && String(node.id || '') === id) {
+      if (!target || target.is_deleted) {
+        unresolvedCount += 1
+      } else {
+        let changedNode = false
+        const targetTitle = String(target.title || '')
+
+        if (targetTitle && String(node.title || '') !== targetTitle) {
+          node.title = targetTitle
+          changedNode = true
+        }
+
+        const section = sectionRepairForTarget(target, node.sectionPath)
+        if (!section.valid) {
+          if (section.repairable) {
+            node.sectionPath = section.nextPath
+            changedNode = true
+          } else {
+            unresolvedCount += 1
+          }
+        }
+
+        if (changedNode) repairedCount += 1
+      }
+    }
+
+    for (const child of node.children || []) walk(child)
+  }
+
+  walk(state?.root)
+
+  return {
+    content: JSON.stringify(state),
+    changed: repairedCount > 0,
+    repairedCount,
+    unresolvedCount,
+  }
+}
+
+export function planTargetReferenceRefactor(files, targetId, targetOverride = {}) {
+  const id = String(targetId || '')
+  const notes = (Array.isArray(files) ? files : [])
+    .filter(file => file && !file.is_folder && !file.is_deleted && !String(file.title || '').startsWith('__tpl__'))
+
+  const currentTarget = notes.find(file => String(file.id || '') === id) || null
+  const nextTarget = currentTarget
+    ? { ...currentTarget, ...targetOverride, id }
+    : null
+
+  const sources = []
+  let incomingReferences = 0
+  let repairable = 0
+  let broken = 0
+  let repairableFiles = 0
+
+  for (const source of notes) {
+    const references = collectWikiReferences(source.content || '')
+      .filter(reference => reference.id === id)
+
+    if (!references.length) continue
+
+    const health = references.map(reference =>
+      analyzeReferenceAgainstTarget(reference, nextTarget)
+    )
+
+    const repair = repairReferencesToTarget(
+      source.content || '',
+      id,
+      nextTarget,
+    )
+
+    const changes = health
+      .filter(item => item.repairable)
+      .map(item => {
+        const nextTitle = item.target?.title || item.title
+        const nextSectionPath = item.issues.includes('section-moved')
+          ? item.suggestedSectionPath
+          : item.sectionPath
+
+        return {
+          ordinal: item.ordinal,
+          before: formatWikiReferenceText(item.title, item.sectionPath),
+          after: formatWikiReferenceText(nextTitle, nextSectionPath),
+          issues: [...item.issues],
+        }
+      })
+
+    const sourceRepairable = health.filter(item => item.repairable).length
+    const sourceBroken = health.filter(item => item.status === 'broken').length
+
+    incomingReferences += health.length
+    repairable += sourceRepairable
+    broken += sourceBroken
+    if (repair.changed) repairableFiles += 1
+
+    sources.push({
+      id: String(source.id || ''),
+      title: String(source.title || '未命名'),
+      content: String(source.content || ''),
+      incomingReferences: health.length,
+      repairable: sourceRepairable,
+      broken: sourceBroken,
+      health,
+      changes,
+      repairContent: repair.changed ? repair.content : null,
+      repairedCount: repair.repairedCount,
+      unresolvedCount: repair.unresolvedCount,
+    })
+  }
+
+  sources.sort((a, b) => {
+    if (a.broken !== b.broken) return b.broken - a.broken
+    if (a.repairable !== b.repairable) return b.repairable - a.repairable
+    return a.title.localeCompare(b.title, 'zh-CN')
+  })
+
+  return {
+    target: nextTarget,
+    summary: {
+      incomingReferences,
+      affectedFiles: sources.length,
+      repairable,
+      broken,
+      repairableFiles,
+    },
+    sources,
+  }
+}
+
+export function planDeleteReferenceImpact(files, targetIds) {
+  const ids = new Set(
+    (Array.isArray(targetIds) ? targetIds : [targetIds])
+      .map(value => String(value || ''))
+      .filter(Boolean)
+  )
+
+  const notes = (Array.isArray(files) ? files : [])
+    .filter(file => file && !file.is_folder && !file.is_deleted && !String(file.title || '').startsWith('__tpl__'))
+
+  const targetTitles = new Map(
+    notes
+      .filter(file => ids.has(String(file.id || '')))
+      .map(file => [String(file.id || ''), String(file.title || '未命名')])
+  )
+
+  const sources = []
+  let incomingReferences = 0
+
+  for (const source of notes) {
+    if (ids.has(String(source.id || ''))) continue
+
+    const references = collectWikiReferences(source.content || '')
+      .filter(reference => ids.has(reference.id))
+
+    if (!references.length) continue
+
+    incomingReferences += references.length
+    sources.push({
+      id: String(source.id || ''),
+      title: String(source.title || '未命名'),
+      references: references.map(reference => ({
+        ...reference,
+        targetTitle: targetTitles.get(reference.id) || reference.title || '未知目标',
+      })),
+    })
+  }
+
+  sources.sort((a, b) => b.references.length - a.references.length)
+
+  return {
+    summary: {
+      incomingReferences,
+      affectedFiles: sources.length,
+      targetCount: ids.size,
+    },
+    sources,
+  }
+}
