@@ -104,6 +104,7 @@ export default function SearchPlugin() {
   const deferredSearchText = useDeferredValue(searchText)
   const [matchCount, setMatchCount] = useState(0)
   const [currentIndex, setCurrentIndex] = useState(-1)
+  const [contentRevision, setContentRevision] = useState(0)
   const inputRef = useRef(null)
 
   const options = {
@@ -119,6 +120,20 @@ export default function SearchPlugin() {
       inputRef.current?.select()
     })
   }, [isOpen, showReplace])
+
+  useEffect(() => {
+    if (!isOpen) return undefined
+
+    return editor.registerUpdateListener(({ dirtyElements, dirtyLeaves }) => {
+      const hasContentChanges =
+        (dirtyElements?.size || 0) > 0 ||
+        (dirtyLeaves?.size || 0) > 0
+
+      if (hasContentChanges) {
+        setContentRevision(value => value + 1)
+      }
+    })
+  }, [editor, isOpen])
 
   useEffect(() => {
     if (!isOpen || !deferredSearchText) {
@@ -141,7 +156,7 @@ export default function SearchPlugin() {
       node.select(offset, offset + length)
       notifySearchMatch(node)
     })
-  }, [isOpen, deferredSearchText, editor, matchCase, wholeWord])
+  }, [isOpen, deferredSearchText, editor, matchCase, wholeWord, contentRevision])
 
   const goToMatch = useCallback((index) => {
     editor.update(() => {
