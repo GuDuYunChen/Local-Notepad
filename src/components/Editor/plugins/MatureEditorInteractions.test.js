@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
-import { getCollapsedOutlineKeys } from './DocumentOutlinePlugin'
+import { findOutlineHeadingForKey, getCollapsedOutlineKeys } from './DocumentOutlinePlugin'
 import { clampTableColumnWidth } from './TableColumnResizePlugin'
+import { countSelectedTableCells } from './TableSelectionPlugin'
+import { getEditorShortcut } from './EditorShortcutPlugin'
 import { reorderImageGridItems } from '../nodes/ImageGridNode'
 import { getAttachmentPreviewType } from '../nodes/AttachmentNode'
 
@@ -68,4 +70,31 @@ describe('mature editor interactions', () => {
     expect(clampTableColumnWidth(180.4)).toBe(180)
     expect(clampTableColumnWidth(900)).toBe(600)
   })
+
+  it('counts selected table rectangles for the visible multi-select mode', () => {
+    expect(countSelectedTableCells([
+      { r1: 0, c1: 0, r2: 1, c2: 2 },
+      { r1: 3, c1: 1, r2: 3, c2: 1 },
+    ])).toBe(7)
+  })
+
+  it('maps editor productivity shortcuts without hijacking unrelated keys', () => {
+    expect(getEditorShortcut({ ctrlKey: true, metaKey: false, altKey: true, key: 'e' })).toBe('formula')
+    expect(getEditorShortcut({ ctrlKey: true, metaKey: false, altKey: true, key: 'T' })).toBe('checklist')
+    expect(getEditorShortcut({ ctrlKey: true, metaKey: false, altKey: false, key: 'e' })).toBeNull()
+  })
+
+  it('resolves a search hit to its nearest preceding outline heading', () => {
+    const nodes = [
+      { key: 'h1', isHeading: true, level: 1, text: '第一章' },
+      { key: 'p1', isHeading: false, level: null, text: '' },
+      { key: 'h2', isHeading: true, level: 2, text: '细节' },
+      { key: 'p2', isHeading: false, level: null, text: '' },
+    ]
+
+    expect(findOutlineHeadingForKey(nodes, 'p2')).toMatchObject({ key: 'h2', text: '细节' })
+    expect(findOutlineHeadingForKey(nodes, 'p1')).toMatchObject({ key: 'h1', text: '第一章' })
+    expect(findOutlineHeadingForKey(nodes, 'missing')).toBeNull()
+  })
+
 })
