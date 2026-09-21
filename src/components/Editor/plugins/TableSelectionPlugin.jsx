@@ -15,7 +15,7 @@ export function countSelectedTableCells(rects) {
 
 export function tableMatrixToTSV(matrix) {
   return (Array.isArray(matrix) ? matrix : [])
-    .map(row => (Array.isArray(row) ? row : []).map(value => String(value ?? '').replace(/\t/g, ' ')).join('\t'))
+    .map(row => (Array.isArray(row) ? row : []).map(value => String(value ?? '').replace(/[\t\r\n]+/g, ' ')).join('\t'))
     .join('\n')
 }
 
@@ -104,9 +104,23 @@ export default function TableSelectionPlugin() {
         editor.focus()
         return
       }
-      if (!(e.ctrlKey || e.metaKey) || !e.altKey) return
-      if (e.key.toLowerCase() === 'm') { e.preventDefault(); doMerge() }
-      if (e.key.toLowerCase() === 's') { e.preventDefault(); doSplit() }
+      const modifier = e.ctrlKey || e.metaKey
+      const key = e.key.toLowerCase()
+
+      if (modifier && !e.altKey && key === 'c') {
+        e.preventDefault()
+        void copySelection()
+        return
+      }
+      if (modifier && !e.altKey && key === 'v') {
+        e.preventDefault()
+        void pasteSelection()
+        return
+      }
+
+      if (!modifier || !e.altKey) return
+      if (key === 'm') { e.preventDefault(); doMerge() }
+      if (key === 's') { e.preventDefault(); doSplit() }
     }
     const onDown = (e) => {
       const cell = getCell(e.target)
@@ -160,7 +174,7 @@ export default function TableSelectionPlugin() {
       window.removeEventListener('keyup', onKey)
       container.removeEventListener('mouseover', onOver)
     }
-  }, [active])
+  }, [active, rects, editor])
 
 
   const getCurrentCellInfo = () => {
