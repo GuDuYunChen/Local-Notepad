@@ -193,6 +193,11 @@ function ImageComponent({ nodeKey, src, alt, width, height, originalSrc, caption
   const handleReplace = async (event) => {
     const file = event.target.files?.[0]
     if (!file) return
+    if (file.size > 10 * 1024 * 1024) {
+      console.warn('替换图片超过 10 MB，已取消')
+      event.target.value = ''
+      return
+    }
 
     setReplacing(true)
     try {
