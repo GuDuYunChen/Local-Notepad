@@ -23,6 +23,7 @@ import {
 } from './components/Editor/utils/structureUtils'
 
 const GraphPanel = React.lazy(() => import('./components/GraphPanel'))
+const ProjectWorkspacePanel = React.lazy(() => import('./components/ProjectWorkspacePanel'))
 const DailyNotesPanel = React.lazy(() => import('./components/DailyNotesPanel'))
 const InspectorPanel = React.lazy(() => import('./components/InspectorPanel'))
 const ShortcutsModal = React.lazy(() => import('./components/ShortcutsModal'))
@@ -885,10 +886,12 @@ export default function App() {
     return () => window.removeEventListener('wikiLink:open', openWikiLink)
   }, [current, deletedIds, unsaved, select])
 
-  const workspaceTitle = workspace === 'daily'
-    ? '每日笔记'
-    : workspace === 'graph'
-      ? '知识图谱'
+  const workspaceTitle = workspace === 'projects'
+    ? '项目工作台'
+    : workspace === 'daily'
+      ? '每日笔记'
+      : workspace === 'graph'
+        ? '知识图谱'
       : workspace === 'trash'
         ? '回收站'
         : workspace === 'settings'
