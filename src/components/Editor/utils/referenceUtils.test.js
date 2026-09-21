@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  analyzeWikiReferenceHealth,
   extractHeadingReferences,
   findWikiLinkOccurrences,
   formatSectionPath,
   formatWikiReferenceText,
   getRecentReferences,
   rememberReference,
+  repairWikiReferences,
 } from './referenceUtils'
 
 const content = JSON.stringify({
@@ -86,6 +88,155 @@ describe('structured reference utilities', () => {
     expect(formatWikiReferenceText('正文', ['第一卷', '第一章']))
       .toBe('[[正文#第一卷 › 第一章]]')
     expect(formatWikiReferenceText('正文')).toBe('[[正文]]')
+  })
+
+  it('detects stale titles, moved sections, and broken targets', () => {
+    const source = JSON.stringify({
+      root: {
+        children: [
+          {
+            type: 'wiki-link',
+            id: 'target-a',
+            title: '旧标题',
+            sectionPath: ['旧层级', '青莲剑宗'],
+          },
+          {
+            type: 'wiki-link',
+            id: 'missing-target',
+            title: '已删除目标',
+            sectionPath: [],
+          },
+        ],
+      },
+    })
+
+    const targets = new Map([
+      ['target-a', {
+        id: 'target-a',
+        title: '新标题',
+        content: JSON.stringify({
+          root: {
+            children: [
+              {
+                type: 'heading',
+                tag: 'h1',
+                children: [{ type: 'text', text: '世界观' }],
+              },
+              {
+                type: 'heading',
+                tag: 'h2',
+                children: [{ type: 'text', text: '青莲剑宗' }],
+              },
+            ],
+          },
+        }),
+      }],
+      ['missing-target', null],
+    ])
+
+    const health = analyzeWikiReferenceHealth(source, targets)
+    expect(health[0]).toMatchObject({
+      status: 'repairable',
+      repairable: true,
+      issues: ['title-stale', 'section-moved'],
+      suggestedSectionPath: ['世界观', '青莲剑宗'],
+    })
+    expect(health[1]).toMatchObject({
+      status: 'broken',
+      repairable: false,
+      issues: ['target-missing'],
+    })
+  })
+
+  it('repairs only unambiguous references and preserves unresolved ones', () => {
+    const source = JSON.stringify({
+      root: {
+        children: [
+          {
+            type: 'wiki-link',
+            id: 'target-a',
+            title: '旧标题',
+            sectionPath: ['旧层级', '青莲剑宗'],
+          },
+          {
+            type: 'wiki-link',
+            id: 'target-b',
+            title: 'B',
+            sectionPath: ['旧层级', '第一场'],
+          },
+        ],
+      },
+    })
+
+    const targets = new Map([
+      ['target-a', {
+        id: 'target-a',
+        title: '新标题',
+        content: JSON.stringify({
+          root: {
+            children: [
+              {
+                type: 'heading',
+                tag: 'h1',
+                children: [{ type: 'text', text: '世界观' }],
+              },
+              {
+                type: 'heading',
+                tag: 'h2',
+                children: [{ type: 'text', text: '青莲剑宗' }],
+              },
+            ],
+          },
+        }),
+      }],
+      ['target-b', {
+        id: 'target-b',
+        title: 'B',
+        content: JSON.stringify({
+          root: {
+            children: [
+              {
+                type: 'heading',
+                tag: 'h1',
+                children: [{ type: 'text', text: '上篇' }],
+              },
+              {
+                type: 'heading',
+                tag: 'h2',
+                children: [{ type: 'text', text: '第一场' }],
+              },
+              {
+                type: 'heading',
+                tag: 'h1',
+                children: [{ type: 'text', text: '下篇' }],
+              },
+              {
+                type: 'heading',
+                tag: 'h2',
+                children: [{ type: 'text', text: '第一场' }],
+              },
+            ],
+          },
+        }),
+      }],
+    ])
+
+    const repaired = repairWikiReferences(source, targets)
+    expect(repaired).toMatchObject({
+      changed: true,
+      repairedCount: 1,
+      unresolvedCount: 1,
+    })
+
+    const state = JSON.parse(repaired.content)
+    expect(state.root.children[0]).toMatchObject({
+      title: '新标题',
+      sectionPath: ['世界观', '青莲剑宗'],
+    })
+    expect(state.root.children[1]).toMatchObject({
+      title: 'B',
+      sectionPath: ['旧层级', '第一场'],
+    })
   })
 
   it('keeps recent references deduplicated and newest first', () => {
