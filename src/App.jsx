@@ -16,6 +16,11 @@ import {
   planDeleteReferenceImpact,
   planTargetReferenceRefactor,
 } from './components/Editor/utils/referenceUtils'
+import {
+  extractStructureSection,
+  planSectionExtractionImpact,
+  rewriteSectionTargetReferences,
+} from './components/Editor/utils/structureUtils'
 
 const GraphPanel = React.lazy(() => import('./components/GraphPanel'))
 const DailyNotesPanel = React.lazy(() => import('./components/DailyNotesPanel'))
@@ -26,6 +31,29 @@ const QuickSwitcher = React.lazy(() => import('./components/QuickSwitcher'))
 const TrashPanel = React.lazy(() => import('./components/TrashPanel'))
 const SettingsPanel = React.lazy(() => import('./components/SettingsPanel'))
 import ErrorBoundary from './components/ErrorBoundary'
+
+function buildExtractedNoteTitle(files, sourceFile, sectionText) {
+  const sourceTitle = String(sourceFile?.title || '')
+  const extensionMatch = sourceTitle.match(/(\.[^.]+)$/)
+  const extension = extensionMatch?.[1] || '.md'
+  const base = String(sectionText || '拆分章节')
+    .trim()
+    .replace(/[\\/:*?"<>|]/g, '_') || '拆分章节'
+  const parentId = String(sourceFile?.parent_id || '')
+  const siblings = new Set(
+    (Array.isArray(files) ? files : [])
+      .filter(file => String(file?.parent_id || '') === parentId)
+      .map(file => String(file?.title || '').toLocaleLowerCase())
+  )
+
+  let candidate = base + extension
+  let suffix = 2
+  while (siblings.has(candidate.toLocaleLowerCase())) {
+    candidate = base + ' (' + suffix + ')' + extension
+    suffix += 1
+  }
+  return candidate
+}
 
 export default function App() {
   const editorRef = useRef(null)
@@ -316,6 +344,187 @@ export default function App() {
     applyReferenceRepairPlan,
     current,
     requestReferenceRefactor,
+  ])
+
+  const handleExtractStructureSection = React.useCallback(async (section) => {
+    if (!current?.id || !section?.path?.length || !editorRef.current) return
+
+    try {
+      if (unsaved) {
+        const saved = await saveCurrent()
+        if (saved !== true) return
+      }
+
+      const latestSource = await api('/api/files/' + current.id)
+      const extraction = extractStructureSection(
+        latestSource?.content || '',
+        section.path,
+      )
+
+      if (!extraction.changed || !extraction.section) {
+        toast.warning('章节结构已经变化，请刷新后重试')
+        return
+      }
+
+      let files = await listAllFilesWithContent()
+      files = files.map(file => (
+        file.id === latestSource.id
+          ? latestSource
+          : file
+      ))
+
+      const targetTitle = buildExtractedNoteTitle(
+        files,
+        latestSource,
+        extraction.section.text,
+      )
+      const plan = planSectionExtractionImpact(
+        files,
+        latestSource.id,
+        extraction.section.path,
+        targetTitle,
+      )
+
+      const review = await requestReferenceRefactor({
+        mode: 'extract',
+        targetTitle: latestSource.title || '当前笔记',
+        nextTitle: targetTitle,
+        plan,
+      })
+      if (!review?.proceed) return
+
+      await createFileVersionSnapshot(latestSource.id)
+
+      let created = null
+      let sourceSaved = false
+      try {
+        created = await api('/api/files', {
+          method: 'POST',
+          body: JSON.stringify({
+            title: targetTitle,
+            content: extraction.extractedContent,
+            is_folder: false,
+            parent_id: latestSource.parent_id || '',
+          }),
+        })
+
+        const targetRewrite = rewriteSectionTargetReferences(
+          extraction.extractedContent,
+          latestSource.id,
+          extraction.section.path,
+          created.id,
+          created.title || targetTitle,
+        )
+
+        if (targetRewrite.changed) {
+          created = await api('/api/files/' + created.id, {
+            method: 'PUT',
+            body: JSON.stringify({
+              content: targetRewrite.content,
+            }),
+          })
+        }
+
+        const sourceRewrite = rewriteSectionTargetReferences(
+          extraction.sourceContent,
+          latestSource.id,
+          extraction.section.path,
+          created.id,
+          created.title || targetTitle,
+        )
+
+        const updatedSource = await api('/api/files/' + latestSource.id, {
+          method: 'PUT',
+          body: JSON.stringify({
+            content: sourceRewrite.content,
+          }),
+        })
+        sourceSaved = true
+
+        const finalSourceContent = String(
+          updatedSource?.content ?? sourceRewrite.content
+        )
+        editorRef.current?.replaceSavedContent?.(
+          finalSourceContent,
+          updatedSource?.updated_at,
+        )
+        setContent(finalSourceContent)
+        setCurrent(prev => (
+          prev?.id === latestSource.id
+            ? { ...prev, ...updatedSource, content: finalSourceContent }
+            : prev
+        ))
+
+        let rewrittenReferences = sourceRewrite.rewrittenCount || 0
+        let skippedReferences = 0
+
+        for (const source of plan.sources || []) {
+          if (source.id === latestSource.id) continue
+
+          try {
+            const latest = await api('/api/files/' + source.id)
+            if (String(latest?.content || '') !== String(source.content || '')) {
+              skippedReferences += source.incomingReferences || 0
+              continue
+            }
+
+            const rewritten = rewriteSectionTargetReferences(
+              latest.content || '',
+              latestSource.id,
+              extraction.section.path,
+              created.id,
+              created.title || targetTitle,
+            )
+            if (!rewritten.changed) continue
+
+            await createFileVersionSnapshot(source.id)
+            await api('/api/files/' + source.id, {
+              method: 'PUT',
+              body: JSON.stringify({ content: rewritten.content }),
+            })
+            rewrittenReferences += rewritten.rewrittenCount
+          } catch (error) {
+            console.error('拆分章节引用同步失败', source.id, error)
+            skippedReferences += source.incomingReferences || 0
+          }
+        }
+
+        toast.success(
+          '已拆出“' + extraction.section.text + '”' +
+          (rewrittenReferences
+            ? '，并迁移 ' + rewrittenReferences + ' 处引用'
+            : '')
+        )
+
+        if (skippedReferences) {
+          toast.warning(
+            skippedReferences +
+            ' 处引用因来源正文变化未自动迁移，可在“全库引用体检”继续处理'
+          )
+        }
+
+        const finalTarget = await api('/api/files/' + created.id)
+        select(finalTarget)
+      } catch (error) {
+        if (created?.id && !sourceSaved) {
+          try {
+            await api('/api/files/' + created.id, { method: 'DELETE' })
+          } catch {
+            // Best-effort rollback only. The original source remains intact.
+          }
+        }
+        throw error
+      }
+    } catch (error) {
+      console.error('拆出章节失败', error)
+      toast.error(error.message || '拆出章节失败')
+    }
+  }, [
+    current,
+    requestReferenceRefactor,
+    saveCurrent,
+    select,
+    unsaved,
   ])
 
   const beginTitleEdit = React.useCallback(() => {
@@ -936,6 +1145,7 @@ export default function App() {
                 <React.Suspense fallback={<aside className="inspector-panel inspector-loading">正在加载…</aside>}>
                   <InspectorPanel
                     file={current}
+                    draftContent={content}
                     activeTab={inspectorTab}
                     onTabChange={setInspectorTab}
                     onClose={() => setInspectorOpen(false)}
@@ -944,6 +1154,13 @@ export default function App() {
                     editorStatus={editorStatus}
                     unsaved={unsaved}
                     onUpdateFile={updateCurrentFile}
+                    onApplyDraftContent={(nextContent, metadata) => {
+                      editorRef.current?.replaceDraftContent?.(
+                        nextContent,
+                        metadata,
+                      )
+                    }}
+                    onExtractSection={handleExtractStructureSection}
                   />
                 </React.Suspense>
               )}
