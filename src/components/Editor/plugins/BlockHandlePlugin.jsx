@@ -1,13 +1,24 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
-import { $createParagraphNode, $createTextNode, $getNodeByKey, $getRoot, $getSelection, $isRangeSelection } from 'lexical'
+import { $createNodeSelection, $createParagraphNode, $createTextNode, $getNodeByKey, $getRoot, $getSelection, $isRangeSelection } from 'lexical'
 import { $isHeadingNode } from '@lexical/rich-text'
 import { $isListNode } from '@lexical/list'
 import { $isCodeNode } from '@lexical/code'
 import { $isTableNode } from '@lexical/table'
 import { blockRegistry, getBlockByType } from '../utils/blockRegistry'
 import { $getNearestBlockElementAncestorOrThrow } from '@lexical/utils'
+import { $generateJSONFromSelectedNodes, $generateNodesFromSerializedNodes } from '@lexical/clipboard'
 import './BlockHandlePlugin.css'
+
+let internalBlockClipboard = null
+
+export function getInternalBlockClipboard() {
+  return internalBlockClipboard
+}
+
+export function setInternalBlockClipboard(payload) {
+  internalBlockClipboard = payload
+}
 
 function getBlockTypeFromNode(node) {
   if (!node) return null
@@ -159,6 +170,66 @@ export default function BlockHandlePlugin() {
     setShowMenu(false)
   }
 
+  const serializeBlock = () => {
+    const blockNode = getBlockNode()
+    if (!blockNode) return null
+
+    const selection = $createNodeSelection()
+    selection.add(blockNode.getKey())
+    const payload = $generateJSONFromSelectedNodes(editor, selection)
+
+    return payload?.nodes?.length ? payload : null
+  }
+
+  const copyBlock = () => {
+    editor.update(() => {
+      const payload = serializeBlock()
+      if (!payload) return
+      setInternalBlockClipboard(payload)
+
+      const blockNode = getBlockNode()
+      const plainText = blockNode?.getTextContent?.() || ''
+      if (plainText && navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(plainText).catch(() => {})
+      }
+    })
+    setShowMenu(false)
+  }
+
+  const insertSerializedNodesAfter = payload => {
+    const blockNode = getBlockNode()
+    if (!blockNode || !payload?.nodes?.length) return
+
+    const nodes = $generateNodesFromSerializedNodes(payload.nodes)
+    let cursor = blockNode
+    for (const node of nodes) {
+      cursor.insertAfter(node)
+      cursor = node
+    }
+
+    if (typeof cursor.selectEnd === 'function') cursor.selectEnd()
+    setBlockKey(cursor.getKey())
+  }
+
+  const pasteBlockAfter = () => {
+    const payload = getInternalBlockClipboard()
+    if (!payload) return
+
+    editor.update(() => {
+      insertSerializedNodesAfter(payload)
+    })
+    setShowMenu(false)
+  }
+
+  const duplicateBlock = () => {
+    editor.update(() => {
+      const payload = serializeBlock()
+      if (!payload) return
+      insertSerializedNodesAfter(payload)
+    })
+    setShowMenu(false)
+  }
+
   const insertSibling = (position) => {
     editor.update(() => {
       const blockNode = getBlockNode()
@@ -223,6 +294,26 @@ export default function BlockHandlePlugin() {
           <button type="button" className="block-menu-item" onClick={() => insertSibling('after')} role="menuitem">
             <span className="block-menu-icon">↓</span>
             <span>下方插入空白块</span>
+          </button>
+
+          <div className="block-menu-divider" />
+          <button type="button" className="block-menu-item" onClick={copyBlock} role="menuitem">
+            <span className="block-menu-icon">⧉</span>
+            <span>复制当前块</span>
+          </button>
+          <button
+            type="button"
+            className="block-menu-item"
+            onClick={pasteBlockAfter}
+            role="menuitem"
+            disabled={!getInternalBlockClipboard()}
+          >
+            <span className="block-menu-icon">⇣</span>
+            <span>粘贴复制块到下方</span>
+          </button>
+          <button type="button" className="block-menu-item" onClick={duplicateBlock} role="menuitem">
+            <span className="block-menu-icon">＋</span>
+            <span>重复当前块</span>
           </button>
 
           <div className="block-menu-divider" />
