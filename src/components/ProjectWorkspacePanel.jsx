@@ -11,6 +11,7 @@ import {
   calculateProjectCardMove,
   getProjectCandidates,
   getProjectChapterSummary,
+  getProjectDescendantNoteIds,
   getProjectExportIds,
   getProjectIndexAliases,
   getProjectLabels,
@@ -100,7 +101,7 @@ export default function ProjectWorkspacePanel({
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [files])
 
   useEffect(() => {
     void load()
@@ -137,10 +138,10 @@ export default function ProjectWorkspacePanel({
 
   const loadProjectIndexes = useCallback(async (workspaceValue) => {
     const noteIds = new Set(
-      (workspaceValue?.volumes || [])
-        .flatMap(volume => volume.notes || [])
-        .map(note => note.id)
-        .filter(Boolean)
+      getProjectDescendantNoteIds(
+        files,
+        workspaceValue?.project?.id,
+      )
     )
 
     if (!noteIds.size) {
@@ -257,6 +258,7 @@ export default function ProjectWorkspacePanel({
       const projectId = workspace.project.id
       const currentFiles = await listAllFilesWithContent()
       const folderIds = new Map()
+      const supportNoteIds = new Set(projectMeta.supportNoteIds || [])
       let createdCount = 0
 
       for (const folderSpec of template.folders) {
@@ -336,6 +338,10 @@ export default function ProjectWorkspacePanel({
         else if (/世界观|场景/.test(title)) categoryTag = '地点'
         else if (/伏笔/.test(title)) categoryTag = '伏笔'
 
+        if (noteSpec.role === 'support' && targetNote?.id) {
+          supportNoteIds.add(targetNote.id)
+        }
+
         const tag = tagsByName.get(categoryTag)
         if (tag?.id) {
           try {
@@ -349,6 +355,10 @@ export default function ProjectWorkspacePanel({
       updateMeta(previous => ({
         ...previous,
         type: template.id,
+        targetWords: Number(previous.targetWords) > 0
+          ? previous.targetWords
+          : template.targetWords,
+        supportNoteIds: Array.from(supportNoteIds),
       }))
 
       await load()
