@@ -9,6 +9,7 @@ import TemplateSelector from './TemplateSelector'
 import QuickSwitcher, { buildHighlightSegments, getSearchMatchScope } from './QuickSwitcher'
 import ToastViewport from './ToastViewport'
 import NameDialog from './NameDialog'
+import ReferenceRefactorDialog from './ReferenceRefactorDialog'
 import { compareLibraryItems } from './FileList'
 import { statusLabel } from './InspectorPanel'
 import { toast } from '~/services/toast'
@@ -237,6 +238,58 @@ describe('UI redesign smoke tests', () => {
 
     expect(onSelectFile).toHaveBeenCalledWith(expect.objectContaining({ id: 'file-1' }))
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows proactive reference impact before a refactor', async () => {
+    const onConfirm = vi.fn()
+    const onCancel = vi.fn()
+
+    await act(async () => {
+      root.render(
+        <ReferenceRefactorDialog
+          mode="rename"
+          targetTitle="旧标题"
+          nextTitle="新标题"
+          onConfirm={onConfirm}
+          onCancel={onCancel}
+          plan={{
+            summary: {
+              incomingReferences: 2,
+              affectedFiles: 1,
+              repairable: 1,
+              broken: 1,
+            },
+            sources: [{
+              id: 'source-1',
+              title: '正文',
+              incomingReferences: 2,
+              repairable: 1,
+              broken: 1,
+              changes: [{
+                ordinal: 0,
+                before: '[[旧标题#旧层级 › 青莲剑宗]]',
+                after: '[[新标题#世界观 › 青莲剑宗]]',
+                issues: ['title-stale', 'section-moved'],
+              }],
+            }],
+          }}
+        />
+      )
+    })
+
+    expect(container.textContent).toContain('改名前检查引用影响')
+    expect(container.textContent).toContain('旧标题')
+    expect(container.textContent).toContain('新标题')
+    expect(container.textContent).toContain('正文')
+    expect(container.textContent).toContain('章节可自动迁移')
+    expect(container.textContent).toContain('1 处引用无法唯一判断')
+
+    const confirm = Array.from(container.querySelectorAll('button'))
+      .find(button => button.textContent === '继续改名')
+    expect(confirm).toBeTruthy()
+
+    await click(confirm)
+    expect(onConfirm).toHaveBeenCalledTimes(1)
   })
 
   it('calculates recycle-bin retention without going below zero', () => {
