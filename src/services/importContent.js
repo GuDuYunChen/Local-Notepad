@@ -20,6 +20,7 @@ import {
 import { $convertFromMarkdownString, TRANSFORMERS } from '@lexical/markdown'
 import { DividerNode, $createDividerNode } from '~/components/Editor/nodes/DividerNode'
 import { FormulaNode, $createFormulaNode } from '~/components/Editor/nodes/FormulaNode'
+import { CodeBlockNode, $createCodeBlockNode, validateLanguage } from '~/components/Editor/nodes/CodeBlockNode'
 
 const IMPORT_NODES = [
   HeadingNode,
@@ -35,6 +36,7 @@ const IMPORT_NODES = [
   TableCellNode,
   DividerNode,
   FormulaNode,
+  CodeBlockNode,
 ]
 
 function createImportEditor() {
@@ -47,6 +49,69 @@ function createImportEditor() {
   })
 }
 
+
+function extractMarkdownCodeBlocks(markdown) {
+  const lines = String(markdown || '').replace(/\r\n/g, '\n').split('\n')
+  const blocks = []
+  const output = []
+
+  for (let index = 0; index < lines.length;) {
+    const start = lines[index].match(/^\s*```([^\s`]*)\s*$/)
+    if (!start) {
+      output.push(lines[index])
+      index += 1
+      continue
+    }
+
+    const language = validateLanguage(start[1] || 'plaintext')
+    const codeLines = []
+    let cursor = index + 1
+    let closed = false
+
+    while (cursor < lines.length) {
+      if (/^\s*```\s*$/.test(lines[cursor])) {
+        closed = true
+        break
+      }
+      codeLines.push(lines[cursor])
+      cursor += 1
+    }
+
+    if (!closed) {
+      output.push(lines[index])
+      index += 1
+      continue
+    }
+
+    const marker = 'LOCALNOTEPADCODEBLOCK' + blocks.length + 'PLACEHOLDER'
+    blocks.push({
+      marker,
+      language,
+      code: codeLines.join('\n'),
+    })
+
+    output.push('')
+    output.push(marker)
+    output.push('')
+    index = cursor + 1
+  }
+
+  return {
+    markdown: output.join('\n'),
+    blocks,
+  }
+}
+
+function restoreMarkdownCodeBlocks(blocks) {
+  if (!blocks.length) return
+
+  const byMarker = new Map(blocks.map(block => [block.marker, block]))
+  for (const node of $getRoot().getChildren()) {
+    const block = byMarker.get(node.getTextContent().trim())
+    if (!block) continue
+    node.replace($createCodeBlockNode(block.code, block.language))
+  }
+}
 
 function extractMarkdownFormulas(markdown) {
   const source = String(markdown || '').replace(/\r\n/g, '\n')
@@ -310,7 +375,8 @@ export function plainTextToLexical(text) {
 
 export function markdownToLexical(markdown) {
   const editor = createImportEditor()
-  const extractedFormulas = extractMarkdownFormulas(markdown)
+  const extractedCode = extractMarkdownCodeBlocks(markdown)
+  const extractedFormulas = extractMarkdownFormulas(extractedCode.markdown)
   const extractedTables = extractMarkdownTables(extractedFormulas.markdown)
   const extractedDividers = extractMarkdownDividers(extractedTables.markdown)
 
@@ -318,6 +384,7 @@ export function markdownToLexical(markdown) {
     $convertFromMarkdownString(extractedDividers.markdown, TRANSFORMERS)
     restoreMarkdownTables(extractedTables.tables)
     restoreMarkdownDividers(extractedDividers.dividers)
+    restoreMarkdownCodeBlocks(extractedCode.blocks)
     restoreMarkdownFormulas(
       extractedFormulas.blockFormulas,
       extractedFormulas.inlineFormulas
