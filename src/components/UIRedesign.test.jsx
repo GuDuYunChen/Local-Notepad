@@ -16,6 +16,7 @@ import { compareLibraryItems } from './FileList'
 import { statusLabel } from './InspectorPanel'
 import { toast } from '~/services/toast'
 import { api, listAllFilesWithContent, searchFiles } from '~/services/api'
+import { tagApi } from '~/services/tagApi'
 
 vi.mock('./ThemeToggle', () => ({
   default: function MockThemeToggle() {
@@ -27,6 +28,17 @@ vi.mock('~/services/api', () => ({
   api: vi.fn(),
   listAllFilesWithContent: vi.fn(),
   searchFiles: vi.fn(),
+}))
+
+vi.mock('~/services/tagApi', () => ({
+  tagApi: {
+    list: vi.fn(),
+    create: vi.fn(),
+    getFileTags: vi.fn(),
+    addFileTag: vi.fn(),
+    removeFileTag: vi.fn(),
+    getFilesByTag: vi.fn(),
+  },
 }))
 
 function click(element) {
@@ -52,6 +64,15 @@ describe('UI redesign smoke tests', () => {
     api.mockReset()
     listAllFilesWithContent.mockReset()
     searchFiles.mockReset()
+    tagApi.list.mockReset()
+    tagApi.create.mockReset()
+    tagApi.getFileTags.mockReset()
+    tagApi.addFileTag.mockReset()
+    tagApi.removeFileTag.mockReset()
+    tagApi.getFilesByTag.mockReset()
+    tagApi.list.mockResolvedValue([])
+    tagApi.getFilesByTag.mockResolvedValue([])
+    localStorage.clear()
     container = document.createElement('div')
     document.body.appendChild(container)
     root = createRoot(container)
@@ -300,6 +321,11 @@ describe('UI redesign smoke tests', () => {
     expect(container.textContent).toContain('第一章')
     expect(container.textContent).toContain('3 字')
     expect(container.textContent).toContain('草稿')
+    expect(container.textContent).toContain('创作进度')
+    expect(container.textContent).toContain('最近写作')
+    expect(container.textContent).toContain('项目索引')
+    expect(container.textContent).toContain('未设目标')
+    expect(container.textContent).toContain('一二三')
 
     const statusButton = Array.from(container.querySelectorAll('button'))
       .find(button => button.textContent === '草稿')
@@ -315,6 +341,100 @@ describe('UI redesign smoke tests', () => {
       .find(button => button.textContent === '剧本')
     await click(scriptButton)
     expect(container.textContent).toContain('剧本项目')
+  })
+
+  it('renders tagged character location and foreshadow indexes', async () => {
+    listAllFilesWithContent.mockResolvedValue([
+      {
+        id: 'project',
+        title: '长篇小说',
+        is_folder: true,
+        parent_id: '',
+        sort_order: 100,
+      },
+      {
+        id: 'volume',
+        title: '第一卷',
+        is_folder: true,
+        parent_id: 'project',
+        sort_order: 100,
+      },
+      {
+        id: 'character-note',
+        title: '关关.md',
+        is_folder: false,
+        parent_id: 'volume',
+        sort_order: 100,
+        updated_at: 20,
+        content: JSON.stringify({
+          root: {
+            children: [{
+              type: 'paragraph',
+              children: [{ type: 'text', text: '主角设定' }],
+            }],
+          },
+        }),
+      },
+      {
+        id: 'location-note',
+        title: '青崖镇.md',
+        is_folder: false,
+        parent_id: 'volume',
+        sort_order: 200,
+        updated_at: 10,
+        content: JSON.stringify({
+          root: {
+            children: [{
+              type: 'paragraph',
+              children: [{ type: 'text', text: '地点设定' }],
+            }],
+          },
+        }),
+      },
+      {
+        id: 'foreshadow-note',
+        title: '剑鞘伏笔.md',
+        is_folder: false,
+        parent_id: 'volume',
+        sort_order: 300,
+        updated_at: 5,
+        content: JSON.stringify({
+          root: {
+            children: [{
+              type: 'paragraph',
+              children: [{ type: 'text', text: '伏笔设定' }],
+            }],
+          },
+        }),
+      },
+    ])
+
+    tagApi.list.mockResolvedValue([
+      { id: 'tag-character', name: '角色' },
+      { id: 'tag-location', name: '地点' },
+      { id: 'tag-foreshadow', name: '伏笔' },
+    ])
+    tagApi.getFilesByTag.mockImplementation(async tagId => {
+      if (tagId === 'tag-character') return [{ id: 'character-note', title: '关关.md' }]
+      if (tagId === 'tag-location') return [{ id: 'location-note', title: '青崖镇.md' }]
+      if (tagId === 'tag-foreshadow') return [{ id: 'foreshadow-note', title: '剑鞘伏笔.md' }]
+      return []
+    })
+
+    await act(async () => {
+      root.render(
+        <ProjectWorkspacePanel
+          onOpenFile={() => {}}
+          onClose={() => {}}
+        />
+      )
+    })
+    await flushPromises()
+    await flushPromises()
+
+    expect(container.textContent).toContain('关关')
+    expect(container.textContent).toContain('青崖镇')
+    expect(container.textContent).toContain('剑鞘伏笔')
   })
 
   it('renders and reorders a long-form volume chapter structure', async () => {
