@@ -4,12 +4,18 @@ import {
   listAllFilesWithContent,
 } from '~/services/api'
 import { toast } from '~/services/toast'
+import { tagApi } from '~/services/tagApi'
 import {
   buildProjectWorkspace,
   calculateProjectCardMove,
   getProjectCandidates,
+  getProjectChapterSummary,
   getProjectExportIds,
+  getProjectIndexAliases,
   getProjectLabels,
+  getProjectProgress,
+  getProjectTemplate,
+  getRecentProjectActivity,
   getVolumeExportIds,
   nextProjectStatus,
   readProjectWorkspaceMeta,
@@ -58,8 +64,19 @@ export default function ProjectWorkspacePanel({
   )
   const [projectMeta, setProjectMeta] = useState({
     type: 'novel',
+    targetWords: 0,
     statuses: {},
+    summaries: {},
   })
+  const [projectIndexes, setProjectIndexes] = useState({
+    characters: [],
+    locations: [],
+    foreshadows: [],
+  })
+  const [indexLoading, setIndexLoading] = useState(false)
+  const [templateBusy, setTemplateBusy] = useState(false)
+  const [editingSummaryId, setEditingSummaryId] = useState('')
+  const [summaryDraft, setSummaryDraft] = useState('')
   const [draggedNoteId, setDraggedNoteId] = useState('')
   const [dropTarget, setDropTarget] = useState(null)
 
@@ -104,7 +121,12 @@ export default function ProjectWorkspacePanel({
 
   useEffect(() => {
     if (!selectedProjectId) {
-      setProjectMeta({ type: 'novel', statuses: {} })
+      setProjectMeta({
+        type: 'novel',
+        targetWords: 0,
+        statuses: {},
+        summaries: {},
+      })
       return
     }
 
@@ -112,12 +134,86 @@ export default function ProjectWorkspacePanel({
     setProjectMeta(readProjectWorkspaceMeta(selectedProjectId))
   }, [selectedProjectId])
 
+  const loadProjectIndexes = useCallback(async (workspaceValue) => {
+    const noteIds = new Set(
+      (workspaceValue?.volumes || [])
+        .flatMap(volume => volume.notes || [])
+        .map(note => note.id)
+        .filter(Boolean)
+    )
+
+    if (!noteIds.size) {
+      setProjectIndexes({
+        characters: [],
+        locations: [],
+        foreshadows: [],
+      })
+      return
+    }
+
+    setIndexLoading(true)
+    try {
+      const tags = await tagApi.list()
+      const aliases = getProjectIndexAliases()
+      const normalizedTags = (tags || []).map(tag => ({
+        ...tag,
+        normalizedName: String(tag.name || '').trim().toLocaleLowerCase(),
+      }))
+
+      const next = {}
+      for (const [category, names] of Object.entries(aliases)) {
+        const normalizedAliases = new Set(
+          names.map(name => String(name).toLocaleLowerCase())
+        )
+        const matchingTags = normalizedTags.filter(tag => (
+          normalizedAliases.has(tag.normalizedName)
+        ))
+
+        const groups = await Promise.all(
+          matchingTags.map(tag => tagApi.getFilesByTag(tag.id).catch(() => []))
+        )
+
+        const byId = new Map()
+        for (const group of groups) {
+          for (const item of group || []) {
+            if (noteIds.has(item.id)) byId.set(item.id, item)
+          }
+        }
+
+        next[category] = Array.from(byId.values())
+          .sort((a, b) => Number(b.updated_at || 0) - Number(a.updated_at || 0))
+      }
+
+      setProjectIndexes({
+        characters: next.characters || [],
+        locations: next.locations || [],
+        foreshadows: next.foreshadows || [],
+      })
+    } catch (error) {
+      console.error('加载项目索引失败', error)
+      setProjectIndexes({
+        characters: [],
+        locations: [],
+        foreshadows: [],
+      })
+    } finally {
+      setIndexLoading(false)
+    }
+  }, [])
+
   const workspace = useMemo(
     () => buildProjectWorkspace(files, selectedProjectId, projectMeta),
     [files, projectMeta, selectedProjectId]
   )
 
+  useEffect(() => {
+    if (!workspace?.project?.id) return
+    void loadProjectIndexes(workspace)
+  }, [loadProjectIndexes, workspace?.project?.id, files])
+
   const labels = getProjectLabels(workspace?.project?.type || projectMeta.type)
+  const progress = getProjectProgress(workspace, projectMeta)
+  const recentActivity = getRecentProjectActivity(workspace, 6)
 
   const updateMeta = next => {
     setProjectMeta(previous => {
@@ -132,6 +228,142 @@ export default function ProjectWorkspacePanel({
       ...previous,
       type: type === 'script' ? 'script' : 'novel',
     }))
+  }
+
+  const saveSummary = noteId => {
+    updateMeta(previous => ({
+      ...previous,
+      summaries: {
+        ...previous.summaries,
+        [noteId]: summaryDraft.trim(),
+      },
+    }))
+    setEditingSummaryId('')
+    setSummaryDraft('')
+  }
+
+  const beginSummaryEdit = note => {
+    setEditingSummaryId(note.id)
+    setSummaryDraft(String(projectMeta.summaries?.[note.id] || ''))
+  }
+
+  const applyProjectTemplate = async () => {
+    if (!workspace?.project?.id || templateBusy) return
+
+    setTemplateBusy(true)
+    try {
+      const template = getProjectTemplate(workspace.project.type)
+      const projectId = workspace.project.id
+      const currentFiles = await listAllFilesWithContent()
+      const folderIds = new Map()
+      let createdCount = 0
+
+      for (const folderSpec of template.folders) {
+        const existing = currentFiles.find(item => (
+          item.is_folder &&
+          String(item.parent_id || '') === String(projectId) &&
+          String(item.title || '') === folderSpec.title
+        ))
+
+        if (existing) {
+          folderIds.set(folderSpec.key, existing.id)
+          continue
+        }
+
+        const created = await api('/api/files', {
+          method: 'POST',
+          body: JSON.stringify({
+            title: folderSpec.title,
+            content: '',
+            is_folder: true,
+            parent_id: projectId,
+          }),
+        })
+        folderIds.set(folderSpec.key, created.id)
+        currentFiles.push(created)
+        createdCount += 1
+      }
+
+      const tagNames = new Set(['角色', '地点', '伏笔'])
+      const allTags = await tagApi.list()
+      const tagsByName = new Map(
+        (allTags || []).map(tag => [
+          String(tag.name || '').trim(),
+          tag,
+        ])
+      )
+
+      for (const tagName of tagNames) {
+        if (!tagsByName.has(tagName)) {
+          try {
+            const createdTag = await tagApi.create({ name: tagName })
+            tagsByName.set(tagName, createdTag)
+          } catch (error) {
+            console.warn('创建项目索引标签失败', tagName, error)
+          }
+        }
+      }
+
+      for (const noteSpec of template.notes) {
+        const parentId = noteSpec.parentKey
+          ? (folderIds.get(noteSpec.parentKey) || projectId)
+          : projectId
+
+        const existing = currentFiles.find(item => (
+          !item.is_folder &&
+          String(item.parent_id || '') === String(parentId) &&
+          String(item.title || '') === noteSpec.title
+        ))
+        if (existing) continue
+
+        const created = await api('/api/files', {
+          method: 'POST',
+          body: JSON.stringify({
+            title: noteSpec.title,
+            content: noteSpec.content,
+            is_folder: false,
+            parent_id: parentId,
+          }),
+        })
+        currentFiles.push(created)
+        createdCount += 1
+
+        const title = String(noteSpec.title || '')
+        let categoryTag = ''
+        if (/人物|角色/.test(title)) categoryTag = '角色'
+        else if (/世界观|场景/.test(title)) categoryTag = '地点'
+        else if (/伏笔/.test(title)) categoryTag = '伏笔'
+
+        const tag = tagsByName.get(categoryTag)
+        if (tag?.id) {
+          try {
+            await tagApi.addFileTag(created.id, tag.id)
+          } catch (error) {
+            console.warn('初始化项目索引标签失败', created.id, error)
+          }
+        }
+      }
+
+      updateMeta(previous => ({
+        ...previous,
+        type: template.id,
+      }))
+
+      await load()
+      toast.success(
+        createdCount
+          ? template.label + '已初始化，共新增 ' + createdCount + ' 项'
+          : '项目模板内容已存在，没有覆盖现有创作'
+      )
+      window.dispatchEvent(new CustomEvent('library:refresh', {
+        detail: { source: 'project-workspace' },
+      }))
+    } catch (error) {
+      console.error('初始化项目模板失败', error)
+      toast.error(error.message || '初始化项目模板失败')
+    } finally {
+      setTemplateBusy(false)
+    }
   }
 
   const cycleStatus = note => {
