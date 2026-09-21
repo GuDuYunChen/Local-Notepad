@@ -5,6 +5,7 @@ import {
 } from '~/services/api'
 import { toast } from '~/services/toast'
 import { tagApi } from '~/services/tagApi'
+import { markdownToLexical } from '~/services/importContent'
 import {
   buildProjectWorkspace,
   calculateProjectCardMove,
@@ -309,24 +310,25 @@ export default function ProjectWorkspacePanel({
           ? (folderIds.get(noteSpec.parentKey) || projectId)
           : projectId
 
-        const existing = currentFiles.find(item => (
+        let targetNote = currentFiles.find(item => (
           !item.is_folder &&
           String(item.parent_id || '') === String(parentId) &&
           String(item.title || '') === noteSpec.title
         ))
-        if (existing) continue
 
-        const created = await api('/api/files', {
-          method: 'POST',
-          body: JSON.stringify({
-            title: noteSpec.title,
-            content: noteSpec.content,
-            is_folder: false,
-            parent_id: parentId,
-          }),
-        })
-        currentFiles.push(created)
-        createdCount += 1
+        if (!targetNote) {
+          targetNote = await api('/api/files', {
+            method: 'POST',
+            body: JSON.stringify({
+              title: noteSpec.title,
+              content: markdownToLexical(noteSpec.content),
+              is_folder: false,
+              parent_id: parentId,
+            }),
+          })
+          currentFiles.push(targetNote)
+          createdCount += 1
+        }
 
         const title = String(noteSpec.title || '')
         let categoryTag = ''
@@ -337,9 +339,9 @@ export default function ProjectWorkspacePanel({
         const tag = tagsByName.get(categoryTag)
         if (tag?.id) {
           try {
-            await tagApi.addFileTag(created.id, tag.id)
+            await tagApi.addFileTag(targetNote.id, tag.id)
           } catch (error) {
-            console.warn('初始化项目索引标签失败', created.id, error)
+            console.warn('初始化项目索引标签失败', targetNote.id, error)
           }
         }
       }
