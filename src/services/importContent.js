@@ -79,9 +79,7 @@ function extractMarkdownFormulas(markdown) {
 }
 
 function escapeRegExp(value) {
-  return value.replace(/[.*+?^$()|[\]\\]/g, '\\function escapeRegExp(value) {
-  return value.replace(/[.*+?^$()|[\]\\]/g, '\\function parseTableRow(line) {')
-}')
+  return value.replace(/[.*+?^$()|[\]\\]/g, match => '\\' + match)
 }
 
 function restoreMarkdownFormulas(blockFormulas, inlineFormulas) {
