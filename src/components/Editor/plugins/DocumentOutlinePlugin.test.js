@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   calculateReadingProgress,
+  findHeadingByPath,
   findOutlineHeadingForKey,
   getCollapsedOutlineKeys,
   getOutlineBreadcrumb,
@@ -49,6 +50,12 @@ describe('document outline helpers', () => {
   it('finds the heading that owns an ordinary top-level block', () => {
     expect(findOutlineHeadingForKey(outlineNodes, 'p-c')?.key).toBe('h3-a')
     expect(findOutlineHeadingForKey(outlineNodes, 'p-d')?.key).toBe('h2-b')
+  })
+
+  it('resolves a hierarchical heading anchor to the intended section', () => {
+    expect(findHeadingByPath(outlineNodes, ['第一卷', '第一章', '第一场'])?.key).toBe('h3-a')
+    expect(findHeadingByPath(outlineNodes, ['第一卷', '第二章'])?.key).toBe('h2-b')
+    expect(findHeadingByPath(outlineNodes, ['第二章'])).toBeNull()
   })
 
   it('hides only the collapsed heading descendants until a sibling boundary', () => {
