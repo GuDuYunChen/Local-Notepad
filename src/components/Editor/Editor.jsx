@@ -7,6 +7,8 @@ import { AutoFocusPlugin } from '@lexical/react/LexicalAutoFocusPlugin';
 import { TablePlugin } from '@lexical/react/LexicalTablePlugin';
 import { LinkPlugin } from '@lexical/react/LexicalLinkPlugin';
 import { ListPlugin } from '@lexical/react/LexicalListPlugin';
+import { CheckListPlugin } from '@lexical/react/LexicalCheckListPlugin';
+import { TabIndentationPlugin } from '@lexical/react/LexicalTabIndentationPlugin';
 import { MarkdownShortcutPlugin } from '@lexical/react/LexicalMarkdownShortcutPlugin';
 import { TRANSFORMERS } from '@lexical/markdown';
 import {LexicalErrorBoundary} from '@lexical/react/LexicalErrorBoundary';
@@ -46,6 +48,7 @@ import { InlineCodeNode } from "./nodes/InlineCodeNode";
 import { MentionNode } from "./nodes/MentionNode";
 import { WikiLinkNode } from "./nodes/WikiLinkNode";
 import { AttachmentNode } from "./nodes/AttachmentNode";
+import { FormulaNode } from "./nodes/FormulaNode";
 import './Editor.css';
 import './nodes/BlockNodes.css';
 
@@ -64,6 +67,8 @@ const theme = {
     ol: 'editor-list-ol',
     ul: 'editor-list-ul',
     listitem: 'editor-list-item',
+    listitemChecked: 'editor-list-item-checked',
+    listitemUnchecked: 'editor-list-item-unchecked',
     nested: {
       listitem: 'editor-nested-list-item',
     },
@@ -147,7 +152,8 @@ const EDITOR_NODES = [
   TodoNode, DividerNode, CalloutNode,
   ToggleNode, EmbedNode,
   InlineCodeNode, MentionNode, WikiLinkNode,
-  AttachmentNode
+  AttachmentNode,
+  FormulaNode
 ];
 
 export default function Editor({ initialContent, onChange, readOnly }) {
@@ -179,6 +185,8 @@ export default function Editor({ initialContent, onChange, readOnly }) {
           <AutoFocusPlugin />
           <TablePlugin />
           <ListPlugin />
+          <CheckListPlugin />
+          <TabIndentationPlugin maxIndent={8} />
           <LinkPlugin />
           <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
           <CodeBlockPlugin />
