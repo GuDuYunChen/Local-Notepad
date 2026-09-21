@@ -164,6 +164,16 @@ export default function App() {
         : []
 
       if (headingPath.length) {
+        if (current?.id === id) {
+          select(file)
+          window.requestAnimationFrame(() => {
+            window.dispatchEvent(new CustomEvent('editor:open-heading-anchor', {
+              detail: { path: headingPath },
+            }))
+          })
+          return
+        }
+
         pendingEditorNavigationRef.current = {
           id,
           headingPath,
@@ -172,7 +182,7 @@ export default function App() {
 
       select(file)
     })
-  }, [select])
+  }, [current?.id, select])
 
   const updateCurrentFile = React.useCallback(async (patch) => {
     const id = current?.id
