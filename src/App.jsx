@@ -695,6 +695,18 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    const openStructureManager = () => {
+      if (!current || current.is_folder) return
+      setInspectorOpen(true)
+      setInspectorTab('structure')
+      setWorkspace('notes')
+    }
+
+    window.addEventListener('editor:open-structure-manager', openStructureManager)
+    return () => window.removeEventListener('editor:open-structure-manager', openStructureManager)
+  }, [current])
+
+  useEffect(() => {
     const onKey = (e) => {
       const k = e.key.toLowerCase()
       if ((e.ctrlKey || e.metaKey) && k === 's') {
