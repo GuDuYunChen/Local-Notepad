@@ -43,6 +43,7 @@ import CommandPalettePlugin from "./plugins/CommandPalettePlugin";
 import ResourceManagerPlugin from "./plugins/ResourceManagerPlugin";
 import EditorViewSettingsPlugin from "./plugins/EditorViewSettingsPlugin";
 import DocumentSessionPlugin from "./plugins/DocumentSessionPlugin";
+import MarkdownSourcePlugin from "./plugins/MarkdownSourcePlugin";
 import { ImageNode } from "./nodes/ImageNode";
 import { VideoNode } from "./nodes/VideoNode";
 import { ImageGridNode } from "./nodes/ImageGridNode";
@@ -190,6 +191,7 @@ export default function Editor({ documentId, initialContent, onChange, readOnly 
         <SearchPlugin />
         {!readOnly && <CommandPalettePlugin />}
         <EditorViewSettingsPlugin readOnly={readOnly} />
+        <MarkdownSourcePlugin readOnly={readOnly} />
         <ResourceManagerPlugin readOnly={readOnly} />
         {!readOnly && <FloatingTextToolbarPlugin />}
         <DocumentOutlinePlugin />
@@ -219,7 +221,7 @@ export default function Editor({ documentId, initialContent, onChange, readOnly 
           {!readOnly && <ChecklistKeyboardPlugin />}
           {!readOnly && <OnChangePlugin onChange={onChange} />}
           <LoadContentPlugin content={initialContent} />
-          <DocumentSessionPlugin documentId={documentId} />
+          <DocumentSessionPlugin documentId={documentId} restoreSelection={!readOnly} />
           {!readOnly && <TableSelectionPlugin />}
           {!readOnly && <TableActionMenuPlugin />}
           {!readOnly && <TableColumnResizePlugin />}
