@@ -1,9 +1,14 @@
 import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+
+function readRedesignCss() {
+  return readFileSync(join(process.cwd(), 'src', 'styles', 'redesign.css'), 'utf8')
+}
 
 describe('redesign stylesheet architecture', () => {
   it('does not reintroduce removed legacy navigation shell selectors', () => {
-    const css = readFileSync(new URL('./redesign.css', import.meta.url), 'utf8')
+    const css = readRedesignCss()
     const legacySelectors = [
       '.navigation-rail',
       '.minimal-navigation-rail',
@@ -22,7 +27,7 @@ describe('redesign stylesheet architecture', () => {
   })
 
   it('keeps the redesign stylesheet below the post-cleanup growth budget', () => {
-    const css = readFileSync(new URL('./redesign.css', import.meta.url), 'utf8')
+    const css = readRedesignCss()
     expect(Buffer.byteLength(css, 'utf8')).toBeLessThan(106_000)
   })
 })
