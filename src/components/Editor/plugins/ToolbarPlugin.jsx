@@ -6,6 +6,7 @@ import {
   $createTableRowNode,
 } from '@lexical/table'
 import {
+  INSERT_CHECK_LIST_COMMAND,
   INSERT_ORDERED_LIST_COMMAND,
   INSERT_UNORDERED_LIST_COMMAND,
   REMOVE_LIST_COMMAND,
@@ -40,12 +41,12 @@ import { INSERT_CODE_BLOCK_COMMAND } from './CodeBlockPlugin'
 import { $createImageNode } from '../nodes/ImageNode'
 import { $createImageGridNode } from '../nodes/ImageGridNode'
 import { $createVideoNode } from '../nodes/VideoNode'
-import { $createTodoNode } from '../nodes/TodoNode'
 import { $createCalloutNode } from '../nodes/CalloutNode'
 import { $createDividerNode } from '../nodes/DividerNode'
 import { $createToggleNode } from '../nodes/ToggleNode'
 import { $createEmbedNode } from '../nodes/EmbedNode'
 import { $createAttachmentNode } from '../nodes/AttachmentNode'
+import { $createFormulaNode } from '../nodes/FormulaNode'
 import { compressImage, generateVideoMetadata, loadXLSX, uploadFile } from '../utils/fileUpload'
 import { toast } from '~/services/toast'
 import TableMenu from './TableMenu'
@@ -109,6 +110,7 @@ export default function ToolbarPlugin() {
   const [blockType, setBlockType] = useState('paragraph')
   const [isBulletList, setIsBulletList] = useState(false)
   const [isNumberList, setIsNumberList] = useState(false)
+  const [isCheckList, setIsCheckList] = useState(false)
   const [hasSelection, setHasSelection] = useState(false)
   const [elementFormat, setElementFormat] = useState('left')
   const [showColorPicker, setShowColorPicker] = useState(false)
@@ -220,6 +222,7 @@ export default function ToolbarPlugin() {
       setBlockType(element.getTag())
       setIsBulletList(false)
       setIsNumberList(false)
+      setIsCheckList(false)
       return
     }
 
@@ -227,6 +230,7 @@ export default function ToolbarPlugin() {
       setBlockType('quote')
       setIsBulletList(false)
       setIsNumberList(false)
+      setIsCheckList(false)
       return
     }
 
@@ -235,12 +239,14 @@ export default function ToolbarPlugin() {
       setBlockType('paragraph')
       setIsBulletList(listType === 'bullet')
       setIsNumberList(listType === 'number')
+      setIsCheckList(listType === 'check')
       return
     }
 
     setBlockType('paragraph')
     setIsBulletList(false)
     setIsNumberList(false)
+    setIsCheckList(false)
   }, [])
 
   useEffect(() => mergeRegister(
@@ -277,14 +283,19 @@ export default function ToolbarPlugin() {
   }
 
   const toggleList = (type) => {
-    const active = type === 'bullet' ? isBulletList : isNumberList
-    editor.dispatchCommand(
-      active
-        ? REMOVE_LIST_COMMAND
-        : type === 'bullet'
-          ? INSERT_UNORDERED_LIST_COMMAND
-          : INSERT_ORDERED_LIST_COMMAND
-    )
+    const active = type === 'bullet'
+      ? isBulletList
+      : type === 'number'
+        ? isNumberList
+        : isCheckList
+
+    const command = type === 'bullet'
+      ? INSERT_UNORDERED_LIST_COMMAND
+      : type === 'number'
+        ? INSERT_ORDERED_LIST_COMMAND
+        : INSERT_CHECK_LIST_COMMAND
+
+    editor.dispatchCommand(active ? REMOVE_LIST_COMMAND : command)
     editor.focus()
   }
 
@@ -294,10 +305,6 @@ export default function ToolbarPlugin() {
     })
     setInsertOpen(false)
     editor.focus()
-  }
-
-  const insertTodo = () => {
-    insertNode($createTodoNode())
   }
 
   const applyLink = () => {
@@ -621,12 +628,12 @@ export default function ToolbarPlugin() {
         </button>
         <button
           type="button"
-          className="btn toolbar-text-btn"
-          onClick={insertTodo}
-          aria-label="插入待办"
-          title="插入待办"
+          className={`btn toolbar-text-btn${isCheckList ? ' active' : ''}`}
+          onClick={() => toggleList('check')}
+          aria-label="待办清单"
+          title="待办清单 · Tab/Shift+Tab 调整层级"
         >
-          ☐ 待办
+          ☐ 清单
         </button>
       </div>
 
@@ -728,6 +735,9 @@ export default function ToolbarPlugin() {
                   }}
                 >
                   代码块
+                </button>
+                <button type="button" className="btn toolbar-menu-action" onClick={() => insertNode($createFormulaNode())}>
+                  数学公式
                 </button>
                 <button type="button" className="btn toolbar-menu-action" onClick={() => insertNode($createCalloutNode())}>
                   提示块
