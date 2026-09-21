@@ -19,6 +19,13 @@ const EXTRA_COMMANDS = [
     run: () => window.dispatchEvent(new Event('editor:toggle-outline')),
   },
   {
+    id: 'long-form-structure',
+    label: '长篇结构管理',
+    description: '管理卷、章、场的重排、合并与拆出',
+    keywords: ['structure', '结构', '卷', '章', '场', '重排', '拆分', '合并'],
+    run: () => window.dispatchEvent(new Event('editor:open-structure-manager')),
+  },
+  {
     id: 'copy-reference',
     label: '复制当前章节引用',
     description: '复制当前笔记与章节的结构化引用',
