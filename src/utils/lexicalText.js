@@ -15,7 +15,15 @@ export function extractLexicalText(content) {
     if (node.type === 'code-block') return node.code || ''
     if (node.type === 'todo') return node.text || ''
     if (node.type === 'image') return node.caption || node.alt || ''
-    if (node.type === 'wiki-link') return node.title ? `[[${node.title}]]` : ''
+    if (node.type === 'wiki-link') {
+      if (!node.title) return ''
+      const section = Array.isArray(node.sectionPath)
+        ? node.sectionPath.map(value => String(value || '').trim()).filter(Boolean).join(' › ')
+        : ''
+      return section
+        ? `[[${node.title}#${section}]]`
+        : `[[${node.title}]]`
+    }
 
     if (!Array.isArray(node.children)) return ''
     return node.children.map(collect).join('')
