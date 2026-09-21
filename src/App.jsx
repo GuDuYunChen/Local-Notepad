@@ -504,6 +504,7 @@ export default function App() {
         }
 
         const finalTarget = await api('/api/files/' + created.id)
+        window.dispatchEvent(new Event('library:refresh'))
         select(finalTarget)
       } catch (error) {
         if (created?.id && !sourceSaved) {
