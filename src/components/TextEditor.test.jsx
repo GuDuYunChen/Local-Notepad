@@ -506,6 +506,68 @@ describe('TextEditor save coordination', () => {
     })
   })
 
+  it('replaces repaired content as a saved editor state without re-saving stale content', async () => {
+    const original = '{"root":{"children":[{"type":"paragraph","children":[{"type":"text","text":"old"}]}]}}'
+    const repaired = '{"root":{"children":[{"type":"paragraph","children":[{"type":"text","text":"repaired"}]}]}}'
+    const statuses = []
+
+    api.mockImplementation((path, init) => {
+      if (!init?.method) {
+        return Promise.resolve({
+          id: 'file-1',
+          content: original,
+          updated_at: 1,
+        })
+      }
+      return Promise.reject(new Error('repaired saved content should not be written again'))
+    })
+
+    const editorRef = React.createRef()
+    await act(async () => {
+      root.render(
+        <TextEditor
+          ref={editorRef}
+          activeId="file-1"
+          deletedIds={new Set()}
+          autoSaveOnSwitch={false}
+          onChange={() => {}}
+          onLoaded={() => {}}
+          onSaved={() => {}}
+          onStatusChange={(status) => statuses.push(status)}
+        />
+      )
+    })
+    await flushPromises()
+
+    await act(async () => {
+      editorRef.current.replaceSavedContent(repaired, 7)
+      await Promise.resolve()
+    })
+
+    expect(globalThis.__textEditorMockInitialContent).toBe(repaired)
+    expect(JSON.parse(localStorage.getItem('editor:cache:file-1'))).toMatchObject({
+      content: repaired,
+      savedAt: 7000,
+    })
+    expect(statuses.at(-1)).toMatchObject({
+      activeId: 'file-1',
+      dirty: false,
+      saveError: false,
+    })
+
+    let result
+    await act(async () => {
+      result = await editorRef.current.save()
+    })
+
+    expect(result).toMatchObject({
+      id: 'file-1',
+      content: repaired,
+      skipped: true,
+    })
+    expect(api).toHaveBeenCalledTimes(1)
+  })
+
   it('reuses the in-flight save when interval save overlaps manual save', async () => {
     const putRequests = []
 
