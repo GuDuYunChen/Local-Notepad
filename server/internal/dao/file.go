@@ -13,6 +13,23 @@ type FileDAO struct {
 	DB *sql.DB
 }
 
+func (d *FileDAO) NextSortOrder(ctx context.Context, parentID string) (int64, error) {
+	var maxSort sql.NullInt64
+	err := d.DB.QueryRowContext(
+		ctx,
+		`SELECT MAX(sort_order) FROM files WHERE parent_id = ? AND is_deleted = 0`,
+		parentID,
+	).Scan(&maxSort)
+	if err != nil {
+		return 0, err
+	}
+
+	if !maxSort.Valid {
+		return 1000, nil
+	}
+	return maxSort.Int64 + 1000, nil
+}
+
 func (d *FileDAO) Create(ctx context.Context, f *model.File) error {
 	now := time.Now().Unix()
 	f.CreatedAt = now
@@ -321,7 +338,7 @@ func (d *FileDAO) List(ctx context.Context, q string, page, size int) ([]*model.
 			FROM files
 			WHERE is_deleted = 0
 			  AND NOT (is_folder = 0 AND substr(title, 1, 7) = '__tpl__')
-			ORDER BY is_pinned DESC, sort_order DESC LIMIT ? OFFSET ?`
+			ORDER BY is_pinned DESC, sort_order DESC, created_at DESC, id DESC LIMIT ? OFFSET ?`
 		args = []interface{}{size, offset}
 	}
 
@@ -351,7 +368,7 @@ func (d *FileDAO) ListAllMetadata(ctx context.Context) ([]*model.File, error) {
 		 FROM files
 		 WHERE is_deleted = 0
 		   AND NOT (is_folder = 0 AND substr(title, 1, 7) = '__tpl__')
-		 ORDER BY is_pinned DESC, sort_order DESC`)
+		 ORDER BY is_pinned DESC, sort_order DESC, created_at DESC, id DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -449,7 +466,8 @@ func (d *FileDAO) CheckDuplicate(ctx context.Context, parentID, title, excludeID
 func (d *FileDAO) GetChildren(ctx context.Context, parentID string) ([]*model.File, error) {
 	rows, err := d.DB.QueryContext(ctx,
 		`SELECT id, title, content, created_at, updated_at, is_folder, parent_id, sort_order, is_deleted, deleted_at, is_pinned 
-		 FROM files WHERE parent_id = ? AND is_deleted = 0`, parentID)
+		 FROM files WHERE parent_id = ? AND is_deleted = 0
+		 ORDER BY is_pinned DESC, sort_order DESC, created_at DESC, id DESC`, parentID)
 	if err != nil {
 		return nil, err
 	}
