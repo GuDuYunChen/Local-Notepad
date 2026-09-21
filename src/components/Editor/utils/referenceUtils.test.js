@@ -10,6 +10,7 @@ import {
   planTargetReferenceRefactor,
   planDeleteReferenceImpact,
   hasHeadingStructureChanged,
+  inferHeadingRenameMappings,
   getHeadingStructureSignature,
   rememberReference,
   repairWikiReferences,
@@ -371,6 +372,97 @@ describe('structured reference utilities', () => {
     )
     expect(hasHeadingStructureChanged(before, bodyOnly)).toBe(false)
     expect(hasHeadingStructureChanged(before, renamedHeading)).toBe(true)
+  })
+
+  it('infers a single heading rename and migrates descendant paths', () => {
+    const before = JSON.stringify({
+      root: {
+        children: [
+          {
+            type: 'heading',
+            tag: 'h1',
+            children: [{ type: 'text', text: '第一卷' }],
+          },
+          {
+            type: 'heading',
+            tag: 'h2',
+            children: [{ type: 'text', text: '第一章' }],
+          },
+          {
+            type: 'heading',
+            tag: 'h3',
+            children: [{ type: 'text', text: '第一场' }],
+          },
+        ],
+      },
+    })
+    const after = JSON.stringify({
+      root: {
+        children: [
+          {
+            type: 'heading',
+            tag: 'h1',
+            children: [{ type: 'text', text: '上卷' }],
+          },
+          {
+            type: 'heading',
+            tag: 'h2',
+            children: [{ type: 'text', text: '第一章' }],
+          },
+          {
+            type: 'heading',
+            tag: 'h3',
+            children: [{ type: 'text', text: '第一场' }],
+          },
+        ],
+      },
+    })
+
+    expect(inferHeadingRenameMappings(before, after)).toEqual([
+      { before: ['第一卷'], after: ['上卷'] },
+      { before: ['第一卷', '第一章'], after: ['上卷', '第一章'] },
+      {
+        before: ['第一卷', '第一章', '第一场'],
+        after: ['上卷', '第一章', '第一场'],
+      },
+    ])
+  })
+
+  it('does not infer rename mappings when multiple heading texts change', () => {
+    const before = JSON.stringify({
+      root: {
+        children: [
+          {
+            type: 'heading',
+            tag: 'h1',
+            children: [{ type: 'text', text: '第一卷' }],
+          },
+          {
+            type: 'heading',
+            tag: 'h2',
+            children: [{ type: 'text', text: '第一章' }],
+          },
+        ],
+      },
+    })
+    const after = JSON.stringify({
+      root: {
+        children: [
+          {
+            type: 'heading',
+            tag: 'h1',
+            children: [{ type: 'text', text: '上卷' }],
+          },
+          {
+            type: 'heading',
+            tag: 'h2',
+            children: [{ type: 'text', text: '开篇' }],
+          },
+        ],
+      },
+    })
+
+    expect(inferHeadingRenameMappings(before, after)).toEqual([])
   })
 
   it('plans title propagation and moved-section repairs before a refactor', () => {
