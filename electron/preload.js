@@ -9,6 +9,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveContentAs: (payload) => ipcRenderer.invoke('file:saveContentAs', payload),
   openDirectoryDialog: () => ipcRenderer.invoke('dialog:openDirectory'),
   exportToDocx: (ids, targetDir, format) => ipcRenderer.invoke('export:docx', { ids, targetDir, format }),
+  exportCombinedManuscript: (ids, targetDir, format, title) => ipcRenderer.invoke(
+    'export:combined-manuscript',
+    { ids, targetDir, format, title }
+  ),
   exportToPDF: (file, outputPath) => ipcRenderer.invoke('export:pdf', { file, outputPath }),
   exportToHTML: (file, outputPath) => ipcRenderer.invoke('export:html', { file, outputPath }),
   importFiles: () => ipcRenderer.invoke('import:files'),
