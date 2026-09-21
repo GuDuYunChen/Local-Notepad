@@ -738,6 +738,29 @@ export function planTargetReferenceRefactor(files, targetId, targetOverride = {}
   }
 }
 
+export function expandRefactorTargetIds(files, targetIds) {
+  const ids = new Set(
+    (Array.isArray(targetIds) ? targetIds : [targetIds])
+      .map(value => String(value || ''))
+      .filter(Boolean)
+  )
+
+  let changed = true
+  while (changed) {
+    changed = false
+    for (const file of Array.isArray(files) ? files : []) {
+      const id = String(file?.id || '')
+      const parentId = String(file?.parent_id || '')
+      if (id && parentId && ids.has(parentId) && !ids.has(id)) {
+        ids.add(id)
+        changed = true
+      }
+    }
+  }
+
+  return Array.from(ids)
+}
+
 export function planDeleteReferenceImpact(files, targetIds) {
   const ids = new Set(
     (Array.isArray(targetIds) ? targetIds : [targetIds])
