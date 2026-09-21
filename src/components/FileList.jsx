@@ -5,24 +5,20 @@ import { api, listAllFiles } from '~/services/api'
 import { toast } from '~/services/toast'
 import { executeFileHistoryAction } from '~/services/fileHistory'
 import ConfirmDialog from './ConfirmDialog'
+import {
+  buildLibraryTree,
+  compareLibraryItems,
+  findFirstFileInFolder as findFirstFileInFolderUtil,
+  findFirstFileInTree as findFirstFileInTreeUtil,
+  getFolderPathLabel,
+} from './fileTreeUtils'
+
+export { compareLibraryItems } from './fileTreeUtils'
 
 const NameDialog = React.lazy(() => import('./NameDialog'))
 const FileSelectorDialog = React.lazy(() => import('./FileSelectorDialog'))
 const TemplateSelector = React.lazy(() => import('./TemplateSelector'))
 const ItemType = 'FILE_NODE'
-
-export function compareLibraryItems(a, b) {
-    const pinnedDelta = Number(Boolean(b?.is_pinned)) - Number(Boolean(a?.is_pinned))
-    if (pinnedDelta !== 0) return pinnedDelta
-
-    const sortDelta = Number(b?.sort_order || 0) - Number(a?.sort_order || 0)
-    if (sortDelta !== 0) return sortDelta
-
-    const createdDelta = Number(b?.created_at || 0) - Number(a?.created_at || 0)
-    if (createdDelta !== 0) return createdDelta
-
-    return String(b?.id || '').localeCompare(String(a?.id || ''))
-}
 
 const FileNode = ({ 
     node, 
@@ -454,67 +450,9 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
     })
   }, [updatedItem])
 
-  // Helper to build tree from flat items (for internal logic usage)
-  const buildTree = React.useMemo(() => {
-    return (flatItems) => {
-        const map = {}
-        const roots = []
-        flatItems.forEach(i => {
-            map[i.id] = { ...i, children: [] }
-        })
-        flatItems.forEach(i => {
-            if (i.parent_id && map[i.parent_id]) {
-                map[i.parent_id].children.push(map[i.id])
-            } else {
-                roots.push(map[i.id])
-            }
-        })
-        
-        const sortFn = compareLibraryItems
-        
-        const sortRecursive = (nodes) => {
-            nodes.sort(sortFn)
-            nodes.forEach(n => sortRecursive(n.children))
-        }
-        sortRecursive(roots)
-        return roots
-    }
-  }, [])
-
-  // Helper to find the first file (DFS)
-  const findFirstFileInTree = React.useMemo(() => {
-      return (nodes) => {
-          for (const node of nodes) {
-              if (!node.is_folder) return node
-              const found = findFirstFileInTree(node.children)
-              if (found) return found
-          }
-          return null
-      }
-  }, [])
-  
-  // Helper to find first file in a specific folder (by ID)
-  const findFirstFileInFolder = React.useMemo(() => {
-      return (tree, folderId) => {
-          let targetFolder = null
-          const findFolder = (nodes) => {
-              for (const node of nodes) {
-                  if (node.id === folderId) {
-                      targetFolder = node
-                      return
-                  }
-                  if (node.children) findFolder(node.children)
-                  if (targetFolder) return
-              }
-          }
-          findFolder(tree)
-          
-          if (targetFolder && targetFolder.children.length > 0) {
-              return findFirstFileInTree(targetFolder.children)
-          }
-          return null
-      }
-  }, [findFirstFileInTree])
+  const buildTree = buildLibraryTree
+  const findFirstFileInTree = findFirstFileInTreeUtil
+  const findFirstFileInFolder = findFirstFileInFolderUtil
 
   async function load(retryCount = 0) {
     setLoading(true)
@@ -543,17 +481,7 @@ export default function FileList({ selectedId, onSelect, onBeforeNew, onBeforeDe
     }
   }
 
-  // Helper to get path label
-  const getPathLabel = (folderId) => {
-      if (!folderId) return '根目录'
-      const parts = []
-      let curr = items.find(i => i.id === folderId)
-      while (curr) {
-          parts.unshift(curr.title)
-          curr = items.find(i => i.id === curr.parent_id)
-      }
-      return parts.join(' / ') || '根目录'
-  }
+  const getPathLabel = folderId => getFolderPathLabel(items, folderId)
 
   // 构建树形结构 (Memoized for rendering)
   const tree = useMemo(() => {
