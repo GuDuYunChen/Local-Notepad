@@ -85,7 +85,9 @@ export default function ReferenceHealthPanel({
     }
 
     for (const item of health) {
-      result[item.status] += 1
+      if (item.status === 'healthy') result.healthy += 1
+      if (item.status === 'broken') result.broken += 1
+      if (item.repairable) result.repairable += 1
     }
 
     return result
