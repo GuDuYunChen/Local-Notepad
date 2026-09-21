@@ -2,29 +2,41 @@ import { DecoratorNode } from 'lexical'
 import React, { useEffect, useRef, useState } from 'react'
 import { api, getBacklinks } from '~/services/api'
 import { extractLexicalText } from '~/utils/lexicalText'
+import {
+  formatSectionPath,
+  formatWikiReferenceText,
+  normalizeSectionPath,
+  rememberReference,
+} from '../utils/referenceUtils'
 
 const previewCache = new Map()
 
 export class WikiLinkNode extends DecoratorNode {
   __id
   __title
+  __sectionPath
 
   static getType() {
     return 'wiki-link'
   }
 
   static clone(node) {
-    return new WikiLinkNode(node.__id, node.__title, node.__key)
+    return new WikiLinkNode(node.__id, node.__title, node.__sectionPath, node.__key)
   }
 
   static importJSON(serializedNode) {
-    return new WikiLinkNode(serializedNode.id, serializedNode.title)
+    return new WikiLinkNode(
+      serializedNode.id,
+      serializedNode.title,
+      normalizeSectionPath(serializedNode.sectionPath)
+    )
   }
 
-  constructor(id, title, key) {
+  constructor(id, title, sectionPath = [], key) {
     super(key)
     this.__id = id
     this.__title = title
+    this.__sectionPath = normalizeSectionPath(sectionPath)
   }
 
   exportJSON() {
@@ -33,6 +45,7 @@ export class WikiLinkNode extends DecoratorNode {
       version: 1,
       id: this.__id,
       title: this.__title,
+      sectionPath: this.__sectionPath,
     }
   }
 
@@ -44,8 +57,12 @@ export class WikiLinkNode extends DecoratorNode {
     return this.__title
   }
 
+  getSectionPath() {
+    return [...this.__sectionPath]
+  }
+
   getTextContent() {
-    return `[[${this.__title}]]`
+    return formatWikiReferenceText(this.__title, this.__sectionPath)
   }
 
   isInline() {
@@ -61,11 +78,17 @@ export class WikiLinkNode extends DecoratorNode {
   }
 
   decorate() {
-    return <WikiLinkView id={this.__id} title={this.__title} />
+    return (
+      <WikiLinkView
+        id={this.__id}
+        title={this.__title}
+        sectionPath={this.__sectionPath}
+      />
+    )
   }
 }
 
-function WikiLinkView({ id, title }) {
+function WikiLinkView({ id, title, sectionPath = [] }) {
   const cached = previewCache.get(id)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [preview, setPreview] = useState(cached || null)
@@ -128,11 +151,18 @@ function WikiLinkView({ id, title }) {
     event.preventDefault()
     event.stopPropagation()
     setPreviewOpen(false)
+    rememberReference({ id, title, sectionPath: normalizedSectionPath })
     window.dispatchEvent(new CustomEvent('wikiLink:open', {
-      detail: { id, title },
+      detail: {
+        id,
+        title,
+        headingPath: normalizedSectionPath,
+      },
     }))
   }
 
+  const normalizedSectionPath = normalizeSectionPath(sectionPath)
+  const sectionLabel = formatSectionPath(normalizedSectionPath)
   const updatedLabel = preview?.updatedAt
     ? new Date(preview.updatedAt * 1000).toLocaleDateString('zh-CN')
     : ''
@@ -142,7 +172,7 @@ function WikiLinkView({ id, title }) {
       className="wiki-link"
       role="link"
       tabIndex={0}
-      title={`打开笔记：${title}`}
+      title={sectionLabel ? ('打开：' + title + ' › ' + sectionLabel) : ('打开笔记：' + title)}
       onMouseEnter={showPreview}
       onMouseLeave={hidePreview}
       onFocus={showPreview}
@@ -158,6 +188,9 @@ function WikiLinkView({ id, title }) {
         <path d="M9 9h6M9 13h6M9 17h4" />
       </svg>
       <span>{title}</span>
+      {sectionLabel && (
+        <small className="wiki-link-section">› {normalizedSectionPath[normalizedSectionPath.length - 1]}</small>
+      )}
 
       {previewOpen && (
         <span
@@ -168,8 +201,13 @@ function WikiLinkView({ id, title }) {
           }}
           onMouseLeave={hidePreview}
         >
-          <span className="wiki-link-preview-kicker">关联笔记</span>
+          <span className="wiki-link-preview-kicker">
+            {sectionLabel ? '关联章节' : '关联笔记'}
+          </span>
           <strong>{preview?.title || title}</strong>
+          {sectionLabel && (
+            <span className="wiki-link-preview-section">{sectionLabel}</span>
+          )}
           <span className={`wiki-link-preview-excerpt${preview?.unavailable ? ' unavailable' : ''}`}>
             {loading && !preview ? '正在读取预览…' : (preview?.excerpt || '正在读取预览…')}
           </span>
@@ -189,8 +227,8 @@ function WikiLinkView({ id, title }) {
   )
 }
 
-export function $createWikiLinkNode(id, title) {
-  return new WikiLinkNode(id, title)
+export function $createWikiLinkNode(id, title, sectionPath = []) {
+  return new WikiLinkNode(id, title, sectionPath)
 }
 
 export function $isWikiLinkNode(node) {
