@@ -41,6 +41,8 @@ import FormulaShortcutPlugin from "./plugins/FormulaShortcutPlugin";
 import ChecklistKeyboardPlugin from "./plugins/ChecklistKeyboardPlugin";
 import CommandPalettePlugin from "./plugins/CommandPalettePlugin";
 import ResourceManagerPlugin from "./plugins/ResourceManagerPlugin";
+import EditorViewSettingsPlugin from "./plugins/EditorViewSettingsPlugin";
+import DocumentSessionPlugin from "./plugins/DocumentSessionPlugin";
 import { ImageNode } from "./nodes/ImageNode";
 import { VideoNode } from "./nodes/VideoNode";
 import { ImageGridNode } from "./nodes/ImageGridNode";
@@ -170,7 +172,7 @@ const EDITOR_NODES = [
   FormulaNode
 ];
 
-export default function Editor({ initialContent, onChange, readOnly }) {
+export default function Editor({ documentId, initialContent, onChange, readOnly }) {
   const initialConfig = useMemo(() => ({
     namespace: 'MyEditor',
     theme,
@@ -187,6 +189,7 @@ export default function Editor({ initialContent, onChange, readOnly }) {
         {!readOnly && <ToolbarPlugin />}
         <SearchPlugin />
         {!readOnly && <CommandPalettePlugin />}
+        <EditorViewSettingsPlugin readOnly={readOnly} />
         <ResourceManagerPlugin readOnly={readOnly} />
         {!readOnly && <FloatingTextToolbarPlugin />}
         <DocumentOutlinePlugin />
@@ -216,6 +219,7 @@ export default function Editor({ initialContent, onChange, readOnly }) {
           {!readOnly && <ChecklistKeyboardPlugin />}
           {!readOnly && <OnChangePlugin onChange={onChange} />}
           <LoadContentPlugin content={initialContent} />
+          <DocumentSessionPlugin documentId={documentId} />
           {!readOnly && <TableSelectionPlugin />}
           {!readOnly && <TableActionMenuPlugin />}
           {!readOnly && <TableColumnResizePlugin />}
