@@ -352,11 +352,16 @@ export default function FileList({
           historyRef.current.redo.push(action)
 
           if (referenceReview?.sync && referenceReview?.plan && onAfterRename) {
-              await onAfterRename({
-                  item: items.find(entry => entry.id === action.data.id),
-                  updated: null,
-                  review: referenceReview,
-              })
+              try {
+                  await onAfterRename({
+                      item: items.find(entry => entry.id === action.data.id),
+                      updated: null,
+                      review: referenceReview,
+                  })
+              } catch (error) {
+                  console.error('撤销/重做后的引用同步失败', error)
+                  toast.warning('重命名已完成，但部分引用同步失败，可在“引用体检”中继续修复')
+              }
           }
 
           void load()
@@ -391,11 +396,16 @@ export default function FileList({
           historyRef.current.undo.push(action)
 
           if (referenceReview?.sync && referenceReview?.plan && onAfterRename) {
-              await onAfterRename({
-                  item: items.find(entry => entry.id === action.data.id),
-                  updated: null,
-                  review: referenceReview,
-              })
+              try {
+                  await onAfterRename({
+                      item: items.find(entry => entry.id === action.data.id),
+                      updated: null,
+                      review: referenceReview,
+                  })
+              } catch (error) {
+                  console.error('撤销/重做后的引用同步失败', error)
+                  toast.warning('重命名已完成，但部分引用同步失败，可在“引用体检”中继续修复')
+              }
           }
 
           void load()
