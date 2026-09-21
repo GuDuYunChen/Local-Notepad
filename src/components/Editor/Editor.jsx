@@ -187,10 +187,10 @@ export default function Editor({ initialContent, onChange, readOnly }) {
         {!readOnly && <ToolbarPlugin />}
         <SearchPlugin />
         {!readOnly && <CommandPalettePlugin />}
-        <ResourceManagerPlugin />
-        <FloatingTextToolbarPlugin />
+        <ResourceManagerPlugin readOnly={readOnly} />
+        {!readOnly && <FloatingTextToolbarPlugin />}
         <DocumentOutlinePlugin />
-        <PasteImagePlugin />
+        {!readOnly && <PasteImagePlugin />}
         <div className="editor-container">
           <RichTextPlugin
             contentEditable={<ContentEditable className="editor-input" />}
@@ -205,21 +205,21 @@ export default function Editor({ initialContent, onChange, readOnly }) {
           <TabIndentationPlugin maxIndent={8} />
           <LinkPlugin />
           <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
-          <CodeBlockPlugin />
-          <SlashMenuPlugin />
-          <BlockHandlePlugin />
-          <MentionPlugin />
+          {!readOnly && <CodeBlockPlugin />}
+          {!readOnly && <SlashMenuPlugin />}
+          {!readOnly && <BlockHandlePlugin />}
+          {!readOnly && <MentionPlugin />}
           <WikiLinkPlugin />
-          <DragDropPlugin />
-          <EditorShortcutPlugin />
-          <FormulaShortcutPlugin />
-          <ChecklistKeyboardPlugin />
-          <OnChangePlugin onChange={onChange} />
+          {!readOnly && <DragDropPlugin />}
+          {!readOnly && <EditorShortcutPlugin />}
+          {!readOnly && <FormulaShortcutPlugin />}
+          {!readOnly && <ChecklistKeyboardPlugin />}
+          {!readOnly && <OnChangePlugin onChange={onChange} />}
           <LoadContentPlugin content={initialContent} />
-          <TableSelectionPlugin />
-          <TableActionMenuPlugin />
-          <TableColumnResizePlugin />
-          <TableReorderPlugin />
+          {!readOnly && <TableSelectionPlugin />}
+          {!readOnly && <TableActionMenuPlugin />}
+          {!readOnly && <TableColumnResizePlugin />}
+          {!readOnly && <TableReorderPlugin />}
         </div>
       </div>
     </LexicalComposer>
