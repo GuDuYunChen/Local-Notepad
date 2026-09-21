@@ -1,4 +1,5 @@
 .reference-health-panel {
+  padding: 12px 14px 16px;
   display: flex;
   flex-direction: column;
   gap: 12px;
