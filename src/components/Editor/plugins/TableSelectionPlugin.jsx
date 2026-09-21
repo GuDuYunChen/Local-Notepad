@@ -382,7 +382,7 @@ export default function TableSelectionPlugin() {
 
     try {
       await navigator.clipboard.writeText(text)
-      toast.success('已复制所选单元格')
+      toast.success(rects.length > 1 ? '已复制第一个连续选区' : '已复制所选单元格')
     } catch (error) {
       console.error('复制表格内容失败', error)
       toast.error('复制失败，请检查剪贴板权限')
@@ -795,7 +795,7 @@ export default function TableSelectionPlugin() {
         if (cell) cell.setVerticalAlign?.(v)
       }
     })
-    setRects([])
+    if (!active) setRects([])
   }
 
   const applyHorizontal = (payload) => {
@@ -827,7 +827,7 @@ export default function TableSelectionPlugin() {
         if (cell) applyCell(cell)
       }
     })
-    setRects([])
+    if (!active) setRects([])
   }
 
   const applyBorder = (payload) => {
@@ -865,7 +865,7 @@ export default function TableSelectionPlugin() {
         if (cell) applyCell(cell)
       }
     })
-    setRects([])
+    if (!active) setRects([])
   }
 
   const applyBackground = (payload) => {
@@ -895,7 +895,7 @@ export default function TableSelectionPlugin() {
         if (cell) cell.setBackgroundColor?.(color)
       }
     })
-    setRects([])
+    if (!active) setRects([])
   }
 
   const mergeStyle = (prev, patch) => {
