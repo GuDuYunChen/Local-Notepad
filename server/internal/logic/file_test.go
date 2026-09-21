@@ -273,7 +273,7 @@ func TestRestoreRecursiveSucceedsWithoutConflict(t *testing.T) {
 func TestParseWikiLinksPrefersSerializedWikiNodeIDsAndKeepsLegacySyntax(t *testing.T) {
 	content := `{"root":{"children":[
 		{"type":"paragraph","children":[
-			{"type":"wiki-link","id":"target-id","title":"Target title"},
+			{"type":"wiki-link","id":"target-id","title":"Target title","sectionPath":["第一卷","第一章"]},
 			{"type":"text","text":" legacy [[legacy-id]] duplicate [[legacy-id]]"}
 		]}
 	]}}`
@@ -344,7 +344,7 @@ func TestCreateSyncsSerializedWikiLinksImmediately(t *testing.T) {
 		FileDAO: &dao.FileDAO{DB: db},
 		LinkDAO: &dao.LinkDAO{DB: db},
 	}
-	content := `{"root":{"children":[{"type":"wiki-link","id":"target-id","title":"Target"}]}}`
+	content := `{"root":{"children":[{"type":"wiki-link","id":"target-id","title":"Target","sectionPath":["第一卷","第一章"]}]}}`
 
 	file, err := fileLogic.Create(context.Background(), "Source.md", content, false, "")
 	if err != nil {
