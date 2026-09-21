@@ -19,6 +19,13 @@ const EXTRA_COMMANDS = [
     run: () => window.dispatchEvent(new Event('editor:toggle-outline')),
   },
   {
+    id: 'copy-reference',
+    label: '复制当前章节引用',
+    description: '复制当前笔记与章节的结构化引用',
+    keywords: ['reference', '引用', '章节引用', '复制引用', 'wiki'],
+    run: () => window.dispatchEvent(new Event('editor:copy-current-reference')),
+  },
+  {
     id: 'table-selection',
     label: '表格多选模式',
     description: '框选多个单元格并批量操作',
