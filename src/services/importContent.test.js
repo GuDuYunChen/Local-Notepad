@@ -71,9 +71,9 @@ describe('import content normalization', () => {
       '',
       '行内公式 $E = mc^2$ 继续正文。',
       '',
-      '$',
+      '$$',
       '\\int_0^1 x^2 \\, dx',
-      '$',
+      '$$',
     ].join('\n'))
 
     const state = JSON.parse(serialized)
