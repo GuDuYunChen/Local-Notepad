@@ -123,6 +123,8 @@ describe('project workspace utilities', () => {
       },
       supportNoteIds: ['support-1'],
       foreshadowStates: {},
+      volumeMilestones: {},
+      chapterQueue: [],
     })
     expect(nextProjectStatus('draft')).toBe('review')
     expect(nextProjectStatus('review')).toBe('done')
