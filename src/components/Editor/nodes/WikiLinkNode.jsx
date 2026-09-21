@@ -90,7 +90,9 @@ export class WikiLinkNode extends DecoratorNode {
 }
 
 function WikiLinkView({ id, title, sectionPath = [] }) {
-  const cached = previewCache.get(id)
+  const normalizedSectionPath = normalizeSectionPath(sectionPath)
+  const previewCacheKey = [id, ...normalizedSectionPath].join('\u001f')
+  const cached = previewCache.get(previewCacheKey)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [preview, setPreview] = useState(cached || null)
   const [loading, setLoading] = useState(false)
@@ -131,7 +133,7 @@ function WikiLinkView({ id, title, sectionPath = [] }) {
         suggestedSectionPath: sectionHealth.nextPath || normalizedSectionPath,
       }
 
-      previewCache.set(id, next)
+      previewCache.set(previewCacheKey, next)
       setPreview(next)
     } catch (error) {
       console.error('加载 Wiki 链接预览失败', error)
@@ -172,7 +174,6 @@ function WikiLinkView({ id, title, sectionPath = [] }) {
     }))
   }
 
-  const normalizedSectionPath = normalizeSectionPath(sectionPath)
   const sectionLabel = formatSectionPath(normalizedSectionPath)
   const updatedLabel = preview?.updatedAt
     ? new Date(preview.updatedAt * 1000).toLocaleDateString('zh-CN')
