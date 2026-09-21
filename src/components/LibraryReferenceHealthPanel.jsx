@@ -6,8 +6,10 @@ import {
 } from '~/services/api'
 import { toast } from '~/services/toast'
 import {
+  collectWikiReferences,
   diagnoseLibraryReferences,
   formatSectionPath,
+  repairWikiReferences,
 } from './Editor/utils/referenceUtils'
 import './LibraryReferenceHealthPanel.css'
 
@@ -78,15 +80,41 @@ export default function LibraryReferenceHealthPanel({ onOpenFile }) {
       const source = repairSources[index]
 
       try {
+        const latestSource = await api('/api/files/' + source.id)
+        const latestReferences = collectWikiReferences(latestSource?.content || '')
+        const targetIds = [
+          ...new Set(latestReferences.map(item => item.id).filter(Boolean)),
+        ]
+
+        const targetEntries = await Promise.all(targetIds.map(async id => {
+          try {
+            return [id, await api('/api/files/' + id)]
+          } catch {
+            return [id, null]
+          }
+        }))
+
+        const freshRepair = repairWikiReferences(
+          latestSource?.content || '',
+          new Map(targetEntries),
+        )
+
+        if (
+          !freshRepair.changed ||
+          freshRepair.content !== source.repairContent
+        ) {
+          throw new Error('扫描后引用关系已变化，请重新扫描后再修复')
+        }
+
         await createFileVersionSnapshot(source.id)
 
         await api('/api/files/' + source.id, {
           method: 'PUT',
-          body: JSON.stringify({ content: source.repairContent }),
+          body: JSON.stringify({ content: freshRepair.content }),
         })
 
         repairedFiles += 1
-        repairedReferences += source.repairedCount
+        repairedReferences += freshRepair.repairedCount
       } catch (error) {
         console.error('批量修复引用失败', source.id, error)
         failed.push({
