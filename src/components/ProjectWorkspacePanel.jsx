@@ -23,6 +23,7 @@ import {
   readProjectWorkspaceMeta,
   writeProjectWorkspaceMeta,
 } from './projectWorkspaceUtils'
+import ProjectAnalyticsPanel from './ProjectAnalyticsPanel'
 import './ProjectWorkspacePanel.css'
 
 const LAST_PROJECT_KEY = 'localNotepad.projectWorkspace.lastProject'
@@ -67,9 +68,11 @@ export default function ProjectWorkspacePanel({
   const [projectMeta, setProjectMeta] = useState({
     type: 'novel',
     targetWords: 0,
+    chapterTargetWords: 0,
     statuses: {},
     summaries: {},
     supportNoteIds: [],
+    foreshadowStates: {},
   })
   const [projectIndexes, setProjectIndexes] = useState({
     characters: [],
@@ -127,9 +130,11 @@ export default function ProjectWorkspacePanel({
       setProjectMeta({
         type: 'novel',
         targetWords: 0,
+        chapterTargetWords: 0,
         statuses: {},
         summaries: {},
         supportNoteIds: [],
+        foreshadowStates: {},
       })
       return
     }
@@ -740,6 +745,14 @@ export default function ProjectWorkspacePanel({
           </div>
         </div>
       </section>
+
+      <ProjectAnalyticsPanel
+        workspace={workspace}
+        projectMeta={projectMeta}
+        projectIndexes={projectIndexes}
+        onMetaChange={updateMeta}
+        onOpenFile={onOpenFile}
+      />
 
       <div className="project-workspace-board">
         {workspace.volumes.map(volume => {
