@@ -106,6 +106,16 @@ describe('project workspace utilities', () => {
       foreshadowStates: {},
       volumeMilestones: {},
       chapterQueue: [],
+      sprint: {
+        startDate: '2026-09-21',
+        durationDays: 7,
+        startWords: 12000,
+        goalWords: 14000,
+        active: true,
+      },
+      dailyReviews: {
+        '2026-09-21': '完成第一场冲突。',
+      },
     })
 
     expect(readProjectWorkspaceMeta('project')).toEqual({
@@ -125,6 +135,16 @@ describe('project workspace utilities', () => {
       foreshadowStates: {},
       volumeMilestones: {},
       chapterQueue: [],
+      sprint: {
+        startDate: '2026-09-21',
+        durationDays: 7,
+        startWords: 12000,
+        goalWords: 14000,
+        active: true,
+      },
+      dailyReviews: {
+        '2026-09-21': '完成第一场冲突。',
+      },
     })
     expect(nextProjectStatus('draft')).toBe('review')
     expect(nextProjectStatus('review')).toBe('done')
@@ -284,6 +304,8 @@ describe('project workspace utilities', () => {
       foreshadowStates: {},
       volumeMilestones: {},
       chapterQueue: [],
+      sprint: null,
+      dailyReviews: {},
     })
   })
 
