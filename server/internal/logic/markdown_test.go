@@ -65,3 +65,59 @@ func TestExportToMarkdownPreservesFormulasAndChecklists(t *testing.T) {
 		}
 	}
 }
+
+
+func TestExportToMarkdownPreservesModernLexicalStructure(t *testing.T) {
+	state := `{
+	  "root": {
+	    "children": [
+	      {
+	        "type":"heading",
+	        "tag":"h2",
+	        "children":[{"type":"text","text":"二级标题","format":0}]
+	      },
+	      {
+	        "type":"paragraph",
+	        "children":[
+	          {"type":"text","text":"删除","format":4},
+	          {"type":"text","text":" "},
+	          {
+	            "type":"link",
+	            "url":"https://example.com/docs",
+	            "children":[{"type":"text","text":"链接","format":0}]
+	          }
+	        ]
+	      },
+	      {
+	        "type":"code-block",
+	        "language":"javascript",
+	        "code":"const answer = 42;"
+	      },
+	      {"type":"divider","version":1}
+	    ]
+	  }
+	}`
+
+	path := filepath.Join(t.TempDir(), "modern.md")
+	if err := ExportToMarkdown(state, path); err != nil {
+		t.Fatalf("ExportToMarkdown: %v", err)
+	}
+
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read markdown: %v", err)
+	}
+	got := string(raw)
+
+	for _, want := range []string{
+		"## 二级标题",
+		"~~删除~~",
+		"[链接](https://example.com/docs)",
+		"```javascript\nconst answer = 42;\n```",
+		"---",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("markdown missing %q:\n%s", want, got)
+		}
+	}
+}
