@@ -459,6 +459,7 @@ export default function ProjectWorkspacePanel({
                       onDragOver={event => {
                         if (!draggedNoteId || draggedNoteId === note.id) return
                         event.preventDefault()
+                        event.stopPropagation()
                         const rect = event.currentTarget.getBoundingClientRect()
                         const position = event.clientY < rect.top + rect.height / 2
                           ? 'before'
