@@ -43,6 +43,7 @@ function TextEditorInternal({
   const [structureDirty, setStructureDirty] = useState(false)
   const [dragOver, setDragOver] = useState(false)
   const statusRef = useRef(null)
+  const pendingStructureMappingsRef = useRef([])
   const [editorContent, setEditorContent] = useState('')
 
   const onChangeRef = useRef(onChange)
@@ -134,6 +135,7 @@ function TextEditorInternal({
         if (id === currentIdRef.current) {
           lastSavedContentRef.current = text
           setStructureDirty(false)
+          pendingStructureMappingsRef.current = []
           setLastSavedAt(now)
           writeEditorDraft(id, text, now)
           onSavedRef.current?.(updated)
@@ -170,7 +172,36 @@ function TextEditorInternal({
         lastSavedContentRef.current,
         contentRef.current,
       ),
+      sectionPathMappings: [...pendingStructureMappingsRef.current],
     }),
+    replaceDraftContent: (nextContent, options = {}) => {
+      const text = String(nextContent ?? '')
+      const mappings = Array.isArray(options.sectionPathMappings)
+        ? options.sectionPathMappings
+        : []
+
+      contentRef.current = text
+      pendingStructureMappingsRef.current = [
+        ...pendingStructureMappingsRef.current,
+        ...mappings,
+      ]
+      setEditorContent(text)
+      setWordCount(countLexicalCharacters(text))
+      setStructureDirty(hasHeadingStructureChanged(
+        lastSavedContentRef.current,
+        text,
+      ))
+
+      if (currentIdRef.current) {
+        writeEditorDraft(
+          currentIdRef.current,
+          text,
+          lastSavedAt,
+        )
+      }
+
+      onChangeRef.current?.(text)
+    },
     replaceSavedContent: (nextContent, updatedAt) => {
       const text = String(nextContent ?? '')
       const rawUpdatedAt = Number(updatedAt) || 0
@@ -185,6 +216,7 @@ function TextEditorInternal({
       setLastSavedAt(savedAt)
       setSaveError(false)
       setStructureDirty(false)
+      pendingStructureMappingsRef.current = []
 
       if (currentIdRef.current) {
         writeEditorDraft(currentIdRef.current, text, savedAt)
@@ -223,6 +255,7 @@ function TextEditorInternal({
       contentRef.current = ''
       setEditorContent('')
       setStructureDirty(false)
+      pendingStructureMappingsRef.current = []
       return
     }
 
@@ -238,6 +271,7 @@ function TextEditorInternal({
         const text = useCache ? cached.content : serverText
 
         lastSavedContentRef.current = serverText
+        pendingStructureMappingsRef.current = []
         setStructureDirty(hasHeadingStructureChanged(serverText, text || ''))
         setLastSavedAt(f.updated_at ? f.updated_at * 1000 : null)
         contentRef.current = text || ''
