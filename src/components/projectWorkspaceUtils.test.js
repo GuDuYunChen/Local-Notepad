@@ -11,6 +11,9 @@ import {
   getProjectProgress,
   getProjectIndexAliases,
   getProjectChapterSummary,
+  buildProjectChapterMarkdown,
+  getProjectChapterPresets,
+  getProjectVolumeByNoteId,
   splitProjectChapterContent,
   suggestProjectChapterTitle,
   uniqueProjectChapterTitle,
@@ -315,6 +318,56 @@ describe('project workspace utilities', () => {
     })
     expect(tail.root.children[0].children[0].text).toBe('夜入青崖镇')
     expect(tail.root.children[1].children[0].text).toBe('后半正文')
+  })
+
+  it('provides type-specific chapter presets and continuation skeletons', () => {
+    expect(getProjectChapterPresets('novel').map(item => item.id))
+      .toEqual(['standard', 'conflict', 'reveal', 'blank'])
+    expect(getProjectChapterPresets('script').map(item => item.id))
+      .toEqual(['standard', 'action', 'dialogue', 'blank'])
+
+    const source = JSON.stringify({
+      root: {
+        children: [
+          {
+            type: 'heading',
+            tag: 'h1',
+            children: [{ type: 'text', text: '第一章' }],
+          },
+          {
+            type: 'heading',
+            tag: 'h2',
+            children: [{ type: 'text', text: '冲突建立' }],
+          },
+          {
+            type: 'paragraph',
+            children: [{ type: 'text', text: '不会被复制的正文' }],
+          },
+          {
+            type: 'heading',
+            tag: 'h2',
+            children: [{ type: 'text', text: '转折' }],
+          },
+        ],
+      },
+    })
+
+    const continued = buildProjectChapterMarkdown(
+      '第二章.md',
+      'novel',
+      'continue',
+      source,
+    )
+    expect(continued).toContain('# 第二章')
+    expect(continued).toContain('## 冲突建立')
+    expect(continued).toContain('## 转折')
+    expect(continued).not.toContain('不会被复制的正文')
+  })
+
+  it('finds the containing project volume for a chapter', () => {
+    const workspace = buildProjectWorkspace(files, 'project', {})
+    expect(getProjectVolumeByNoteId(workspace, 'chapter-3')?.id).toBe('volume-2')
+    expect(getProjectVolumeByNoteId(workspace, 'missing')).toBeNull()
   })
 
   it('splits legacy chapters that begin with prose before a same-level heading', () => {
