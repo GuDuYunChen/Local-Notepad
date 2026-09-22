@@ -841,6 +841,222 @@ describe('UI redesign smoke tests', () => {
     expect(splitHead.root.children).toHaveLength(2)
   })
 
+  it('uses chapter presets continuation volume management and relative inserts', async () => {
+    localStorage.setItem(
+      'localNotepad.projectWorkspace.activeView',
+      'project'
+    )
+
+    const chapterOne = JSON.stringify({
+      root: {
+        children: [
+          {
+            type: 'heading',
+            tag: 'h1',
+            children: [{ type: 'text', text: '第一章' }],
+          },
+          {
+            type: 'heading',
+            tag: 'h2',
+            children: [{ type: 'text', text: '冲突建立' }],
+          },
+          {
+            type: 'paragraph',
+            children: [{ type: 'text', text: '第一章正文不应续建复制' }],
+          },
+          {
+            type: 'heading',
+            tag: 'h2',
+            children: [{ type: 'text', text: '转折' }],
+          },
+        ],
+      },
+    })
+    const chapterTwo = JSON.stringify({
+      root: {
+        children: [
+          {
+            type: 'heading',
+            tag: 'h1',
+            children: [{ type: 'text', text: '第二章' }],
+          },
+          {
+            type: 'heading',
+            tag: 'h2',
+            children: [{ type: 'text', text: '线索推进' }],
+          },
+          {
+            type: 'paragraph',
+            children: [{ type: 'text', text: '第二章正文不应续建复制' }],
+          },
+        ],
+      },
+    })
+
+    const projectFiles = [
+      {
+        id: 'project',
+        title: '模板项目',
+        is_folder: true,
+        parent_id: '',
+        sort_order: 100,
+      },
+      {
+        id: 'volume-1',
+        title: '第一卷',
+        is_folder: true,
+        parent_id: 'project',
+        sort_order: 100,
+      },
+      {
+        id: 'chapter-1',
+        title: '第一章.md',
+        is_folder: false,
+        parent_id: 'volume-1',
+        sort_order: 100,
+        content: chapterOne,
+      },
+      {
+        id: 'chapter-2',
+        title: '第二章.md',
+        is_folder: false,
+        parent_id: 'volume-1',
+        sort_order: 200,
+        content: chapterTwo,
+      },
+    ]
+
+    listAllFilesWithContent.mockResolvedValue(projectFiles)
+    let createdIndex = 0
+    api.mockImplementation(async (requestPath, init) => {
+      if (requestPath === '/api/files' && init?.method === 'POST') {
+        const payload = JSON.parse(init.body)
+        createdIndex += 1
+        return {
+          id: 'created-template-' + createdIndex,
+          ...payload,
+          sort_order: 1000 + createdIndex * 1000,
+          updated_at: 1,
+        }
+      }
+      if (requestPath.startsWith('/api/files/') && init?.method === 'PUT') {
+        return null
+      }
+      throw new Error('Unexpected request: ' + requestPath)
+    })
+
+    const onOpenFile = vi.fn()
+    await act(async () => {
+      root.render(
+        <ProjectWorkspacePanel
+          onOpenFile={onOpenFile}
+          onClose={() => {}}
+        />
+      )
+    })
+    await flushPromises()
+
+    const volumeColumn = Array.from(
+      container.querySelectorAll('.project-volume-column')
+    ).find(column => column.textContent.includes('第一卷'))
+    expect(volumeColumn).toBeTruthy()
+
+    const manageVolume = Array.from(volumeColumn.querySelectorAll('button'))
+      .find(button => button.textContent === '管理')
+    await click(manageVolume)
+
+    let bulkbar = container.querySelector('.project-board-bulkbar')
+    expect(bulkbar).toBeTruthy()
+    expect(bulkbar.textContent).toContain('已选 2 章节')
+    expect(container.querySelectorAll('.project-chapter-card.selected'))
+      .toHaveLength(2)
+
+    const endSelection = Array.from(container.querySelectorAll('button'))
+      .find(button => button.textContent === '结束多选')
+    await click(endSelection)
+
+    const createInVolume = Array.from(volumeColumn.querySelectorAll('button'))
+      .find(button => button.textContent === '＋')
+    await click(createInVolume)
+
+    let createbar = container.querySelector('.project-board-createbar')
+    expect(createbar).toBeTruthy()
+    expect(
+      createbar.querySelector('select[aria-label="新建目标卷"]').value
+    ).toBe('volume-1')
+
+    const presetSelect = createbar.querySelector('select[aria-label="章节模板"]')
+    expect(Array.from(presetSelect.options).map(option => option.textContent))
+      .toEqual(['标准章节', '冲突推进', '信息揭示', '空白'])
+
+    await act(async () => {
+      presetSelect.value = 'conflict'
+      presetSelect.dispatchEvent(new Event('change', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    const quickCreate = Array.from(createbar.querySelectorAll('button'))
+      .find(button => button.textContent === '快速新建')
+    await click(quickCreate)
+    await flushPromises()
+
+    const postsAfterPreset = api.mock.calls
+      .filter(([requestPath, init]) => (
+        requestPath === '/api/files' && init?.method === 'POST'
+      ))
+      .map(([, init]) => JSON.parse(init.body))
+
+    expect(postsAfterPreset[0].title).toBe('第三章.md')
+    expect(postsAfterPreset[0].parent_id).toBe('volume-1')
+    expect(postsAfterPreset[0].content).toContain('冲突建立')
+    expect(postsAfterPreset[0].content).toContain('章末钩子')
+
+    createbar = container.querySelector('.project-board-createbar')
+    const continueButton = Array.from(createbar.querySelectorAll('button'))
+      .find(button => button.textContent === '从上一章续建')
+    expect(continueButton).toBeTruthy()
+    expect(continueButton.disabled).toBe(false)
+    await click(continueButton)
+    await flushPromises()
+
+    const postsAfterContinue = api.mock.calls
+      .filter(([requestPath, init]) => (
+        requestPath === '/api/files' && init?.method === 'POST'
+      ))
+      .map(([, init]) => JSON.parse(init.body))
+
+    expect(postsAfterContinue[1].content).toContain('线索推进')
+    expect(postsAfterContinue[1].content).not.toContain('第二章正文不应续建复制')
+
+    const firstCard = Array.from(container.querySelectorAll('.project-chapter-card'))
+      .find(card => card.textContent.includes('第一章'))
+    expect(firstCard).toBeTruthy()
+
+    const afterInsert = Array.from(firstCard.querySelectorAll('button'))
+      .find(button => button.textContent === '后插')
+    expect(afterInsert).toBeTruthy()
+    await click(afterInsert)
+    await flushPromises()
+
+    const postsAfterInsert = api.mock.calls
+      .filter(([requestPath, init]) => (
+        requestPath === '/api/files' && init?.method === 'POST'
+      ))
+      .map(([, init]) => JSON.parse(init.body))
+
+    expect(postsAfterInsert[2].content).toContain('冲突建立')
+    expect(postsAfterInsert[2].content).toContain('转折')
+    expect(postsAfterInsert[2].content).not.toContain('第一章正文不应续建复制')
+    expect(onOpenFile).toHaveBeenCalledWith('created-template-3')
+
+    const reorderCalls = api.mock.calls.filter(([requestPath, init]) => (
+      requestPath.startsWith('/api/files/') &&
+      init?.method === 'PUT' &&
+      JSON.parse(init.body).sort_order !== undefined
+    ))
+    expect(reorderCalls.length).toBeGreaterThan(0)
+  })
+
   it('switches project views with Alt shortcuts without hijacking form input', async () => {
     listAllFilesWithContent.mockResolvedValue([
       {
