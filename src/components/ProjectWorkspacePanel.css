@@ -457,6 +457,21 @@
   gap: 4px;
 }
 
+.project-board-bulk-export {
+  padding-left: 7px;
+  border-left: 1px solid var(--line);
+}
+
+.project-board-bulk-export > span {
+  color: var(--ink-muted);
+  font-size: 7px;
+  font-weight: 650;
+}
+
+.project-board-bulk-export .btn {
+  min-width: 34px;
+}
+
 .project-board-bulk-group select {
   height: 28px;
   max-width: 132px;
