@@ -388,6 +388,22 @@ export default function ProjectWorkspacePanel({
   const selectedVisibleCount = visibleProjectNoteIds.filter(
     id => selectedNoteIdSet.has(id)
   ).length
+  const selectedExportIds = useMemo(
+    () => getProjectExportIds(workspace)
+      .filter(id => selectedNoteIdSet.has(id)),
+    [selectedNoteIdSet, workspace]
+  )
+  const selectedProjectWordCount = useMemo(
+    () => (workspace?.volumes || [])
+      .flatMap(volume => volume.notes || [])
+      .filter(note => selectedNoteIdSet.has(note.id))
+      .reduce((sum, note) => sum + Number(note.wordCount || 0), 0),
+    [selectedNoteIdSet, workspace]
+  )
+  const hiddenSelectedCount = Math.max(
+    0,
+    selectedNoteIds.length - selectedVisibleCount,
+  )
   const allVisibleSelected = Boolean(
     visibleProjectNoteIds.length &&
     selectedVisibleCount === visibleProjectNoteIds.length
@@ -1234,9 +1250,16 @@ export default function ProjectWorkspacePanel({
       {selectionMode && (
         <section className="project-board-bulkbar" aria-label="章节批量操作">
           <div className="project-board-bulk-summary">
-            <strong>已选 {selectedNoteIds.length} {labels.chapter}</strong>
+            <strong>
+              已选 {selectedNoteIds.length} {labels.chapter}
+              {' · '}
+              {formatCount(selectedProjectWordCount)} 字
+            </strong>
             <span>
               当前结果中 {selectedVisibleCount} 项已选
+              {hiddenSelectedCount > 0
+                ? ' · 另有 ' + hiddenSelectedCount + ' 项不在当前筛选结果中'
+                : ''}
             </span>
           </div>
 
@@ -1266,6 +1289,39 @@ export default function ProjectWorkspacePanel({
               onClick={applyBulkStatus}
             >
               应用状态
+            </button>
+          </div>
+
+          <div
+            className="project-board-bulk-group project-board-bulk-export"
+            title="按项目阅读顺序合并导出选中章节"
+          >
+            <span>导出</span>
+            <button
+              type="button"
+              className="btn small"
+              disabled={!selectedExportIds.length || Boolean(exportingKey)}
+              onClick={() => void exportCombined({
+                ids: selectedExportIds,
+                title: workspace.project.title + '-选中' + labels.chapter,
+                format: 'markdown',
+                key: 'selection-md',
+              })}
+            >
+              {exportingKey === 'selection-md' ? '导出中…' : 'MD'}
+            </button>
+            <button
+              type="button"
+              className="btn small"
+              disabled={!selectedExportIds.length || Boolean(exportingKey)}
+              onClick={() => void exportCombined({
+                ids: selectedExportIds,
+                title: workspace.project.title + '-选中' + labels.chapter,
+                format: 'docx',
+                key: 'selection-docx',
+              })}
+            >
+              {exportingKey === 'selection-docx' ? '导出中…' : 'Word'}
             </button>
           </div>
 
