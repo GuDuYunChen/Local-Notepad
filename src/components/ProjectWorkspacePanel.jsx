@@ -989,6 +989,13 @@ export default function ProjectWorkspacePanel({
         }
       }
       console.error('拆分卷失败', error)
+      if (movedCount > 0) {
+        await load()
+        setVolumeManageId('')
+        window.dispatchEvent(new CustomEvent('library:refresh', {
+          detail: { source: 'project-workspace' },
+        }))
+      }
       toast.error(
         movedCount > 0
           ? '拆分只完成了一部分，已保留新旧' + labels.volume + '避免章节丢失，请检查后继续'
@@ -1008,6 +1015,7 @@ export default function ProjectWorkspacePanel({
 
     setVolumeBusy('merge:' + volume.id)
     let allMoved = false
+    let movedCount = 0
     try {
       const ids = (volume.notes || []).map(note => note.id).filter(Boolean)
       const plan = buildProjectBatchMovePlan(files, ids, target.id)
@@ -1019,6 +1027,7 @@ export default function ProjectWorkspacePanel({
             sort_order: item.sort_order,
           }),
         })
+        movedCount += 1
       }
       allMoved = true
       await api('/api/files/' + volume.id, { method: 'DELETE' })
@@ -1042,10 +1051,19 @@ export default function ProjectWorkspacePanel({
       }))
     } catch (error) {
       console.error('合并卷失败', error)
+      if (movedCount > 0 || allMoved) {
+        await load()
+        setVolumeManageId('')
+        window.dispatchEvent(new CustomEvent('library:refresh', {
+          detail: { source: 'project-workspace' },
+        }))
+      }
       toast.error(
         allMoved
           ? '章节已移动，但源' + labels.volume + '未能删除，请手动检查'
-          : (error.message || '合并' + labels.volume + '失败')
+          : movedCount > 0
+            ? '合并只完成了一部分，已保留当前结构避免章节丢失，请检查后继续'
+            : (error.message || '合并' + labels.volume + '失败')
       )
     } finally {
       setVolumeBusy('')
