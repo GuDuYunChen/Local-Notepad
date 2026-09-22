@@ -103,6 +103,30 @@ describe('editor document presentation', () => {
     expect(css).toContain('.editor-shell.editor-fluid-page .editor-placeholder {\n  top: 32px !important')
   })
 
+  it('keeps long CJK tables compact and proportioned', () => {
+    const css = read(['src', 'styles', 'editor-document.css'])
+
+    expect(css).toContain('line-break: strict')
+    expect(css).toContain('hyphens: auto')
+    expect(css).toContain('.editor-input .editor-table-cell .editor-paragraph {\n  margin: 0;')
+    expect(css).toContain('max-width: 180px')
+    expect(css).toContain('min-width: 150px')
+    expect(css).toContain('max-width: 360px')
+    expect(css).toContain('.editor-input .editor-heading-h3 + .editor-table')
+  })
+
+  it('uses explicit document contrast tokens for dark mode', () => {
+    const css = read(['src', 'styles', 'editor-document.css'])
+
+    expect(css).toContain('--document-table-border')
+    expect(css).toContain('--document-table-head')
+    expect(css).toContain('--document-quote-border')
+    expect(css).toContain('--document-quote-text')
+    expect(css).toContain('[data-theme="dark"] .editor-shell')
+    expect(css).toContain('color-mix(in srgb, #ffffff 16%, var(--surface))')
+    expect(css).toContain('color-mix(in srgb, #ffffff 72%, var(--surface))')
+  })
+
   it('keeps focus writing on the same continuous document surface', () => {
     const css = read(['src', 'styles', 'editor-document.css'])
 
