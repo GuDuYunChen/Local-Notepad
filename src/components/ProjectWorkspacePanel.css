@@ -341,6 +341,97 @@
   gap: 6px;
 }
 
+
+.project-board-toolbar {
+  flex: 0 0 auto;
+  padding: 10px 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--paper);
+}
+
+.project-board-search {
+  min-width: 180px;
+  max-width: 360px;
+  flex: 1;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.project-board-search span {
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+
+.project-board-search input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 9px;
+}
+
+.project-board-toolbar select {
+  height: 32px;
+  padding: 0 26px 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 8px;
+}
+
+.project-board-filter-summary {
+  min-width: 88px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.15;
+}
+
+.project-board-filter-summary strong {
+  color: var(--ink);
+  font-size: 10px;
+}
+
+.project-board-filter-summary span {
+  margin-top: 2px;
+  color: var(--ink-muted);
+  font-size: 7px;
+}
+
+.project-board-filter-empty {
+  min-height: 180px;
+  flex: 1;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 7px;
+  padding: 24px;
+  color: var(--ink-muted);
+  text-align: center;
+}
+
+.project-board-filter-empty strong {
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.project-board-filter-empty span {
+  font-size: 9px;
+}
+
 .project-workspace-board {
   min-height: 0;
   flex: 1;
@@ -1047,5 +1138,26 @@
   .project-board-empty-state > div:last-child {
     flex-wrap: wrap;
     justify-content: center;
+  }
+}
+
+@media (max-width: 760px) {
+  .project-board-toolbar {
+    padding: 8px 8px 0;
+    flex-wrap: wrap;
+  }
+
+  .project-board-search {
+    min-width: 100%;
+    max-width: none;
+  }
+
+  .project-board-toolbar select {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .project-board-filter-summary {
+    min-width: 72px;
   }
 }
