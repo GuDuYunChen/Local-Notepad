@@ -32,6 +32,23 @@ import ProjectInsightsPanel from './ProjectInsightsPanel'
 import './ProjectWorkspacePanel.css'
 
 const LAST_PROJECT_KEY = 'localNotepad.projectWorkspace.lastProject'
+const PROJECT_VIEW_KEY = 'localNotepad.projectWorkspace.activeView'
+const PROJECT_VIEWS = [
+  { id: 'today', label: '今日', description: '今日任务、冲刺与每日复盘' },
+  { id: 'project', label: '项目', description: '项目进度、索引与卷章看板' },
+  { id: 'planning', label: '计划', description: '目标、截止日期与章节队列' },
+  { id: 'analysis', label: '分析', description: '创作与 Session 数据分析' },
+  { id: 'insights', label: '洞察', description: '异常提醒与自动周报/月报' },
+]
+
+function initialProjectView() {
+  try {
+    const stored = localStorage.getItem(PROJECT_VIEW_KEY)
+    return PROJECT_VIEWS.some(view => view.id === stored) ? stored : 'today'
+  } catch {
+    return 'today'
+  }
+}
 
 function displayTitle(title) {
   return String(title || '未命名').replace(/\.[^.]+$/, '')
@@ -65,6 +82,7 @@ export default function ProjectWorkspacePanel({
   onClose,
 }) {
   const [files, setFiles] = useState([])
+  const [activeView, setActiveView] = useState(initialProjectView)
   const [loading, setLoading] = useState(true)
   const [movingId, setMovingId] = useState('')
   const [exportingKey, setExportingKey] = useState('')
@@ -123,6 +141,14 @@ export default function ProjectWorkspacePanel({
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(PROJECT_VIEW_KEY, activeView)
+    } catch {
+      // View preference is optional and must never block project rendering.
+    }
+  }, [activeView])
 
   useEffect(() => {
     const refresh = event => {
