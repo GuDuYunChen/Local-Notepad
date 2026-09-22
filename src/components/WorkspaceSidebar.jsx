@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import ThemeToggle from './ThemeToggle'
+import { APP_ICON_DATA_URL } from '../assets/appIconData'
 
 const Icon = ({ children, size = 18 }) => (
   <svg
@@ -87,7 +88,7 @@ export default function WorkspaceSidebar({
             aria-label="返回笔记"
             title="记事本"
           >
-            N
+            <img src={APP_ICON_DATA_URL} alt="" aria-hidden="true" />
           </button>
 
           {!collapsed && (
