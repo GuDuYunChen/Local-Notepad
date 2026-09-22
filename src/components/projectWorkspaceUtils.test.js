@@ -128,6 +128,17 @@ describe('project workspace utilities', () => {
       dailyReviews: {
         '2026-09-21': '完成第一场冲突。',
       },
+      storylines: [{
+        id: 'track-1',
+        title: '主线',
+        type: 'plot',
+        events: [{
+          id: 'event-1',
+          noteId: 'chapter-1',
+          stage: 'setup',
+          note: '',
+        }],
+      }],
     })
 
     expect(readProjectWorkspaceMeta('project')).toEqual({
@@ -157,6 +168,19 @@ describe('project workspace utilities', () => {
       dailyReviews: {
         '2026-09-21': '完成第一场冲突。',
       },
+      storylines: [{
+        id: 'track-1',
+        title: '主线',
+        type: 'plot',
+        description: '',
+        sourceNoteId: '',
+        events: [{
+          id: 'event-1',
+          noteId: 'chapter-1',
+          stage: 'setup',
+          note: '',
+        }],
+      }],
     })
     expect(nextProjectStatus('draft')).toBe('review')
     expect(nextProjectStatus('review')).toBe('done')
@@ -608,6 +632,7 @@ describe('project workspace utilities', () => {
       chapterQueue: [],
       sprint: null,
       dailyReviews: {},
+      storylines: [],
     })
   })
 
