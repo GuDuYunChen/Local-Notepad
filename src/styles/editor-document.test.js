@@ -19,7 +19,7 @@ describe('editor document presentation', () => {
   it('uses editor view variables instead of hard-coded content dimensions', () => {
     const css = read(['src', 'styles', 'editor-document.css'])
 
-    expect(css).toContain('var(--editor-view-page-width, 860px)')
+    expect(css).toContain('var(--editor-view-page-width, 100%)')
     expect(css).toContain('var(--editor-view-font-size, 13px)')
     expect(css).toContain('var(--editor-view-line-height, 1.7)')
     expect(css).toContain('var(--editor-view-font-family')
@@ -42,6 +42,14 @@ describe('editor document presentation', () => {
     expect(css).toContain('.editor-input .code-block-wrapper')
     expect(css).toContain('.editor-input .callout-block')
     expect(css).toContain('.editor-input .formula-rendered.block')
+  })
+
+  it('uses a fluid 60px content gutter by default', () => {
+    const css = read(['src', 'styles', 'editor-document.css'])
+
+    expect(css).toContain('.editor-shell.editor-fluid-page .editor-input')
+    expect(css).toContain('padding: 32px 60px 96px !important')
+    expect(css).toContain('var(--editor-view-page-width, 100%)')
   })
 
   it('keeps stable top breathing room across viewport sizes', () => {
