@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import {
   buildProjectWorkspace,
   calculateProjectCardMove,
+  filterProjectVolumes,
   getProjectCandidates,
   getProjectExportIds,
   getRecentProjectActivity,
@@ -212,6 +213,41 @@ describe('project workspace utilities', () => {
       expect.objectContaining({ id: 'c', sort_order: 2000 }),
       expect.objectContaining({ id: 'b', sort_order: 3000 }),
     ])
+  })
+
+  it('filters project volumes by query status and volume while recomputing words', () => {
+    const workspace = buildProjectWorkspace(files, 'project', {
+      statuses: {
+        'chapter-2': 'review',
+        'chapter-3': 'done',
+      },
+      summaries: {
+        'chapter-2': '青崖镇冲突升级',
+      },
+    })
+
+    expect(filterProjectVolumes(workspace, {
+      summaries: {
+        'chapter-2': '青崖镇冲突升级',
+      },
+    }, {
+      query: '青崖镇',
+      status: 'review',
+      volumeId: 'volume-1',
+    })).toEqual([
+      expect.objectContaining({
+        id: 'volume-1',
+        wordCount: 2,
+        notes: [
+          expect.objectContaining({ id: 'chapter-2' }),
+        ],
+      }),
+    ])
+
+    expect(filterProjectVolumes(workspace, {}, {
+      status: 'done',
+    }).flatMap(volume => volume.notes).map(note => note.id))
+      .toEqual(['chapter-3'])
   })
 
   it('tracks word goals chapter progress and recent activity', () => {
