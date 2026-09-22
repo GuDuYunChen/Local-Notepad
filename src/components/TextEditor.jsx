@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useImperativeHandle } from 'react'
 import { api } from '~/services/api'
 import { countLexicalCharacters } from '~/utils/lexicalText'
+import { normalizeLegacyTableBreakMarkup } from '~/services/legacyContentCompatibility'
 import { hasHeadingStructureChanged } from './Editor/utils/referenceUtils'
 import {
   isFreshEditorDraft,
@@ -267,8 +268,11 @@ function TextEditorInternal({
 
         const cached = readEditorDraft(id)
         const useCache = isFreshEditorDraft(cached) && cached.editedAt && (!f.updated_at || cached.editedAt > f.updated_at * 1000)
-        const serverText = f.content || ''
-        const text = useCache ? cached.content : serverText
+        const serverText = normalizeLegacyTableBreakMarkup(f.content || '')
+        const cachedText = useCache
+          ? normalizeLegacyTableBreakMarkup(cached.content || '')
+          : ''
+        const text = useCache ? cachedText : serverText
 
         lastSavedContentRef.current = serverText
         pendingStructureMappingsRef.current = []
