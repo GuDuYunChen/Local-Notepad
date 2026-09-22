@@ -279,7 +279,7 @@ describe('UI redesign smoke tests', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
-  it('renders a project board with chapter stats and local status', async () => {
+  it('organizes project work into persistent focused views', async () => {
     const onOpenFile = vi.fn()
     listAllFilesWithContent.mockResolvedValue([
       {
@@ -326,60 +326,83 @@ describe('UI redesign smoke tests', () => {
 
     expect(container.textContent).toContain('项目工作台')
     expect(container.textContent).toContain('太初宇宙')
-    expect(container.textContent).toContain('第一卷')
-    expect(container.textContent).toContain('第一章')
-    expect(container.textContent).toContain('3 字')
-    expect(container.textContent).toContain('草稿')
+
+    const viewButtons = Array.from(
+      container.querySelectorAll('.project-workspace-view-tabs button')
+    )
+    expect(viewButtons.map(button => button.querySelector('strong')?.textContent))
+      .toEqual(['今日', '项目', '计划', '分析', '洞察'])
+
     expect(container.textContent).toContain('今日创作中心')
-    expect(container.textContent).toContain('今日任务')
-    expect(container.textContent).toContain('今日 Session')
-    expect(container.textContent).toContain('创作进度')
-    expect(container.textContent).toContain('最近写作')
-    expect(container.textContent).toContain('项目索引')
-    expect(container.textContent).toContain('创作分析')
-    expect(container.textContent).toContain('写作节奏')
-    expect(container.textContent).toContain('卷级完成度')
-    expect(container.textContent).toContain('创作计划')
-    expect(container.textContent).toContain('项目节奏')
-    expect(container.textContent).toContain('卷级里程碑')
-    expect(container.textContent).toContain('下一章节队列')
     expect(container.textContent).toContain('创作日历与冲刺')
-    expect(container.textContent).toContain('写作日历')
-    expect(container.textContent).toContain('今日执行')
-    expect(container.textContent).toContain('写作冲刺')
-    expect(container.textContent).toContain('每日复盘')
-    expect(container.textContent).toContain('未设目标')
-    expect(container.textContent).toContain('一二三')
-
-    const presetButton = Array.from(container.querySelectorAll('button'))
-      .find(button => button.textContent === '应用小说节奏')
-    expect(presetButton).toBeTruthy()
-    await click(presetButton)
-
-    const dailyGoalInput = container.querySelector('input[aria-label="每日写作目标"]')
-    const weeklyGoalInput = container.querySelector('input[aria-label="每周写作目标"]')
-    expect(dailyGoalInput.value).toBe('2000')
-    expect(weeklyGoalInput.value).toBe('12000')
+    expect(container.textContent).not.toContain('创作计划')
+    expect(container.textContent).not.toContain('创作分析')
+    expect(container.textContent).not.toContain('创作洞察与自动复盘')
 
     const sprintButton = Array.from(container.querySelectorAll('button'))
       .find(button => button.textContent.includes('7 天'))
     expect(sprintButton).toBeTruthy()
     await click(sprintButton)
     expect(container.textContent).toContain('冲刺进度')
-    expect(container.textContent).toContain('结束当前冲刺')
 
     const reviewInput = container.querySelector('textarea[aria-label="今日写作复盘"]')
     expect(reviewInput).toBeTruthy()
-    await act(async () => {
-      reviewInput.value = '今天完成第一场冲突，明天处理余波。'
-      reviewInput.dispatchEvent(new Event('input', { bubbles: true }))
-      reviewInput.dispatchEvent(new Event('change', { bubbles: true }))
-      await Promise.resolve()
-    })
-    const saveReviewButton = Array.from(container.querySelectorAll('button'))
-      .find(button => button.textContent === '保存今日复盘')
-    expect(saveReviewButton).toBeTruthy()
-    await click(saveReviewButton)
+
+    const planningTab = viewButtons.find(
+      button => button.querySelector('strong')?.textContent === '计划'
+    )
+    await click(planningTab)
+
+    expect(container.textContent).toContain('创作计划')
+    expect(container.textContent).toContain('项目节奏')
+    expect(container.textContent).toContain('卷级里程碑')
+    expect(container.textContent).toContain('下一章节队列')
+    expect(container.textContent).not.toContain('今日创作中心')
+
+    const presetButton = Array.from(container.querySelectorAll('button'))
+      .find(button => button.textContent === '应用小说节奏')
+    expect(presetButton).toBeTruthy()
+    await click(presetButton)
+
+    expect(container.querySelector('input[aria-label="每日写作目标"]').value)
+      .toBe('2000')
+    expect(container.querySelector('input[aria-label="每周写作目标"]').value)
+      .toBe('12000')
+
+    const analysisTab = viewButtons.find(
+      button => button.querySelector('strong')?.textContent === '分析'
+    )
+    await click(analysisTab)
+
+    expect(container.textContent).toContain('创作分析')
+    expect(container.textContent).toContain('写作节奏')
+    expect(container.textContent).toContain('Session 分析与复盘')
+    expect(container.textContent).not.toContain('创作计划')
+
+    const insightsTab = viewButtons.find(
+      button => button.querySelector('strong')?.textContent === '洞察'
+    )
+    await click(insightsTab)
+
+    expect(container.textContent).toContain('创作洞察与自动复盘')
+    expect(container.textContent).toContain('需要注意')
+    expect(container.textContent).not.toContain('创作分析')
+
+    const projectTab = viewButtons.find(
+      button => button.querySelector('strong')?.textContent === '项目'
+    )
+    await click(projectTab)
+
+    expect(container.textContent).toContain('创作进度')
+    expect(container.textContent).toContain('最近写作')
+    expect(container.textContent).toContain('项目索引')
+    expect(container.textContent).toContain('第一卷')
+    expect(container.textContent).toContain('第一章')
+    expect(container.textContent).toContain('3 字')
+    expect(container.textContent).toContain('草稿')
+    expect(container.textContent).not.toContain('创作计划')
+    expect(localStorage.getItem('localNotepad.projectWorkspace.activeView'))
+      .toBe('project')
 
     const statusButton = Array.from(container.querySelectorAll('button'))
       .find(button => button.textContent === '草稿')
@@ -387,7 +410,10 @@ describe('UI redesign smoke tests', () => {
     expect(container.textContent).toContain('修订')
 
     const chapterButton = Array.from(container.querySelectorAll('button'))
-      .find(button => button.textContent.includes('第一章') && button.classList.contains('project-chapter-open'))
+      .find(button => (
+        button.textContent.includes('第一章') &&
+        button.classList.contains('project-chapter-open')
+      ))
     await click(chapterButton)
     expect(onOpenFile).toHaveBeenCalledWith('chapter-1')
 
