@@ -15,6 +15,7 @@ import ProjectWorkspacePanel from './ProjectWorkspacePanel'
 import ProjectTodayCenter from './ProjectTodayCenter'
 import FocusSessionBar from './FocusSessionBar'
 import FocusSessionAnalyticsPanel from './FocusSessionAnalyticsPanel'
+import ProjectInsightsPanel from './ProjectInsightsPanel'
 import { compareLibraryItems } from './FileList'
 import { statusLabel } from './InspectorPanel'
 import { toast } from '~/services/toast'
@@ -728,6 +729,7 @@ describe('UI redesign smoke tests', () => {
     })
 
     expect(container.textContent).toContain('Session 分析与复盘')
+    expect(container.textContent).toContain('创作洞察与自动复盘')
     expect(container.textContent).toContain('专注效率')
     expect(container.textContent).toContain('最佳写作时段')
     expect(container.textContent).toContain('25 / 50 / 90 分钟效果')
@@ -762,6 +764,198 @@ describe('UI redesign smoke tests', () => {
 
     expect(container.textContent)
       .toContain('上午进入状态很快，下次继续从冲突段直接开始。')
+  })
+
+  it('renders creative insights and copies an auto report', async () => {
+    const projectId = 'insight-project'
+    const onOpenFile = vi.fn()
+    const now = new Date()
+    const dayKey = offset => {
+      const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() - offset, 12)
+      return [
+        date.getFullYear(),
+        String(date.getMonth() + 1).padStart(2, '0'),
+        String(date.getDate()).padStart(2, '0'),
+      ].join('-')
+    }
+    const at = (offset, hour) => (
+      new Date(now.getFullYear(), now.getMonth(), now.getDate() - offset, hour).getTime()
+    )
+
+    localStorage.setItem('localNotepad.projectAnalytics.v1', JSON.stringify({
+      [projectId]: [
+        { date: dayKey(2), totalWords: 48000, noteWords: {} },
+        { date: dayKey(1), totalWords: 49000, noteWords: {} },
+        { date: dayKey(0), totalWords: 50000, noteWords: {} },
+      ],
+    }))
+
+    localStorage.setItem('localNotepad.focusSessions.v1', JSON.stringify({
+      [projectId]: [
+        {
+          id: 'a1',
+          projectId,
+          noteId: 'chapter-1',
+          noteTitle: '第一章.md',
+          durationMinutes: 50,
+          startedAt: at(2, 8),
+          endedAt: at(2, 8) + 1800000,
+          elapsedSeconds: 1800,
+          wordDelta: 1000,
+          completedTimer: true,
+          reviewNote: '顺利',
+        },
+        {
+          id: 'a2',
+          projectId,
+          noteId: 'chapter-1',
+          noteTitle: '第一章.md',
+          durationMinutes: 50,
+          startedAt: at(1, 8),
+          endedAt: at(1, 8) + 1800000,
+          elapsedSeconds: 1800,
+          wordDelta: 900,
+          completedTimer: true,
+          reviewNote: '',
+        },
+        {
+          id: 'b1',
+          projectId,
+          noteId: 'chapter-2',
+          noteTitle: '第二章.md',
+          durationMinutes: 50,
+          startedAt: at(2, 20),
+          endedAt: at(2, 20) + 1800000,
+          elapsedSeconds: 1800,
+          wordDelta: 120,
+          completedTimer: false,
+          reviewNote: '',
+        },
+        {
+          id: 'b2',
+          projectId,
+          noteId: 'chapter-2',
+          noteTitle: '第二章.md',
+          durationMinutes: 50,
+          startedAt: at(1, 20),
+          endedAt: at(1, 20) + 1800000,
+          elapsedSeconds: 1800,
+          wordDelta: 100,
+          completedTimer: false,
+          reviewNote: '',
+        },
+        {
+          id: 'b3',
+          projectId,
+          noteId: 'chapter-2',
+          noteTitle: '第二章.md',
+          durationMinutes: 50,
+          startedAt: at(0, 20),
+          endedAt: at(0, 20) + 1800000,
+          elapsedSeconds: 1800,
+          wordDelta: 80,
+          completedTimer: false,
+          reviewNote: '',
+        },
+      ],
+    }))
+
+    const clipboardWrite = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: clipboardWrite },
+    })
+
+    const workspace = {
+      project: {
+        id: projectId,
+        title: '太初宇宙',
+        type: 'novel',
+      },
+      totalWords: 50000,
+      volumes: [{
+        id: 'volume-1',
+        title: '第一卷',
+        notes: [
+          {
+            id: 'chapter-1',
+            title: '第一章.md',
+            status: 'done',
+            wordCount: 25000,
+            updated_at: Math.floor(at(0, 8) / 1000),
+          },
+          {
+            id: 'chapter-2',
+            title: '第二章.md',
+            status: 'draft',
+            wordCount: 25000,
+            updated_at: Math.floor(at(20, 8) / 1000),
+          },
+        ],
+      }],
+    }
+
+    await act(async () => {
+      root.render(
+        <ProjectInsightsPanel
+          workspace={workspace}
+          projectMeta={{
+            targetWords: 100000,
+            dailyGoal: 2000,
+            weeklyGoal: 12000,
+            deadline: dayKey(-10),
+            statuses: {
+              'chapter-1': 'done',
+              'chapter-2': 'draft',
+            },
+            foreshadowStates: {},
+          }}
+          projectIndexes={{
+            foreshadows: [
+              { id: 'f1', title: '伏笔1.md' },
+              { id: 'f2', title: '伏笔2.md' },
+              { id: 'f3', title: '伏笔3.md' },
+              { id: 'f4', title: '伏笔4.md' },
+              { id: 'f5', title: '伏笔5.md' },
+            ],
+          }}
+          onOpenFile={onOpenFile}
+        />
+      )
+    })
+    await flushPromises()
+
+    expect(container.textContent).toContain('创作洞察与自动复盘')
+    expect(container.textContent).toContain('需要注意')
+    expect(container.textContent).toContain('难写章节')
+    expect(container.textContent).toContain('下一阶段建议')
+    expect(container.textContent).toContain('自动周度复盘')
+    expect(container.textContent).toContain('第二章')
+
+    const difficult = container.querySelector('.project-difficult-list button')
+    expect(difficult).toBeTruthy()
+    await click(difficult)
+    expect(onOpenFile).toHaveBeenCalledWith('chapter-2')
+
+    const thirty = Array.from(container.querySelectorAll('.project-insights-period button'))
+      .find(button => button.textContent === '30 天')
+    await click(thirty)
+
+    expect(container.textContent).toContain('自动月度复盘')
+    expect(container.textContent).toContain('真实历史')
+
+    const preview = Array.from(container.querySelectorAll('button'))
+      .find(button => button.textContent === '预览报告')
+    await click(preview)
+
+    expect(container.querySelector('.project-insight-report-preview').textContent)
+      .toContain('## 写作产出')
+
+    const copy = Array.from(container.querySelectorAll('button'))
+      .find(button => button.textContent === '复制报告')
+    await click(copy)
+    expect(clipboardWrite).toHaveBeenCalledTimes(1)
+    expect(clipboardWrite.mock.calls[0][0]).toContain('# 太初宇宙 · 30 天复盘')
   })
 
   it('renders and reorders a long-form volume chapter structure', async () => {
