@@ -41,6 +41,7 @@ import ProjectSprintPanel from './ProjectSprintPanel'
 import ProjectTodayCenter from './ProjectTodayCenter'
 import FocusSessionAnalyticsPanel from './FocusSessionAnalyticsPanel'
 import ProjectInsightsPanel from './ProjectInsightsPanel'
+import ProjectStructurePanel from './ProjectStructurePanel'
 import './ProjectWorkspacePanel.css'
 
 const LAST_PROJECT_KEY = 'localNotepad.projectWorkspace.lastProject'
@@ -51,6 +52,7 @@ const PROJECT_VIEWS = [
   { id: 'planning', label: '计划', description: '目标、截止日期与章节队列' },
   { id: 'analysis', label: '分析', description: '创作与 Session 数据分析' },
   { id: 'insights', label: '洞察', description: '异常提醒与自动周报/月报' },
+  { id: 'structure', label: '结构', description: '长篇故事地图与索引覆盖' },
 ]
 
 function initialProjectView() {
@@ -1880,6 +1882,16 @@ export default function ProjectWorkspacePanel({
 
       {activeView === 'insights' && (
         <ProjectInsightsPanel
+          workspace={workspace}
+          projectMeta={projectMeta}
+          projectIndexes={projectIndexes}
+          onOpenFile={onOpenFile}
+          onNavigateView={setActiveView}
+        />
+      )}
+
+      {activeView === 'structure' && (
+        <ProjectStructurePanel
           workspace={workspace}
           projectMeta={projectMeta}
           projectIndexes={projectIndexes}
