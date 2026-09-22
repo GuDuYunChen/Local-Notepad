@@ -357,6 +357,45 @@ export function getProjectDescendantNoteIds(files, projectId) {
     .filter(Boolean)
 }
 
+export function filterProjectVolumes(workspace, projectMeta = {}, filters = {}) {
+  const query = String(filters.query || '').trim().toLocaleLowerCase()
+  const status = ['draft', 'review', 'done'].includes(filters.status)
+    ? filters.status
+    : 'all'
+  const volumeId = String(filters.volumeId || 'all')
+
+  return (workspace?.volumes || [])
+    .filter(volume => (
+      volumeId === 'all' ||
+      String(volume.id || '__ungrouped__') === volumeId
+    ))
+    .map(volume => {
+      const notes = (volume.notes || []).filter(note => {
+        if (status !== 'all' && note.status !== status) return false
+        if (!query) return true
+
+        const haystack = [
+          note.title,
+          getProjectChapterSummary(note, projectMeta, 240),
+        ]
+          .join(' ')
+          .toLocaleLowerCase()
+
+        return haystack.includes(query)
+      })
+
+      return {
+        ...volume,
+        notes,
+        wordCount: notes.reduce(
+          (sum, note) => sum + (Number(note.wordCount) || 0),
+          0,
+        ),
+      }
+    })
+    .filter(volume => volume.notes.length > 0)
+}
+
 export function getProjectProgress(workspace, projectMeta = {}) {
   const totalWords = Number(workspace?.totalWords) || 0
   const targetWords = Math.max(0, Number(projectMeta?.targetWords) || 0)
