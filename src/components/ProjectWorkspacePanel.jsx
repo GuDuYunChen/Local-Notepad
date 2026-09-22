@@ -656,29 +656,33 @@ export default function ProjectWorkspacePanel({
         }),
       })
 
-      const targetIndex = Math.max(
-        0,
-        sourceIndex + (position === 'after' ? 1 : 0),
-      )
-      const patch = calculateProjectCardMove(
-        [...files, created],
-        created.id,
-        parentId,
-        targetIndex,
-      )
-      if (patch) {
-        const patches = Array.isArray(patch.rebalance) && patch.rebalance.length
-          ? patch.rebalance
-          : [patch]
-        for (const item of patches) {
-          await api('/api/files/' + item.id, {
-            method: 'PUT',
-            body: JSON.stringify({
-              parent_id: item.parent_id,
-              sort_order: item.sort_order,
-            }),
-          })
+      try {
+        const targetIndex = Math.max(
+          0,
+          sourceIndex + (position === 'after' ? 1 : 0),
+        )
+        const patch = calculateProjectCardMove(
+          [...files, created],
+          created.id,
+          parentId,
+          targetIndex,
+        )
+        if (patch) {
+          const patches = Array.isArray(patch.rebalance) && patch.rebalance.length
+            ? patch.rebalance
+            : [patch]
+          for (const item of patches) {
+            await api('/api/files/' + item.id, {
+              method: 'PUT',
+              body: JSON.stringify({
+                parent_id: item.parent_id,
+                sort_order: item.sort_order,
+              }),
+            })
+          }
         }
+      } catch (orderError) {
+        console.warn('章节创建成功，但插入位置调整失败，将保留在当前卷末', orderError)
       }
 
       await load()
