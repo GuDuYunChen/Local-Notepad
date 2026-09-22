@@ -364,6 +364,8 @@ export function filterProjectVolumes(workspace, projectMeta = {}, filters = {}) 
     : 'all'
   const volumeId = String(filters.volumeId || 'all')
 
+  const contentFilterActive = Boolean(query || status !== 'all')
+
   return (workspace?.volumes || [])
     .filter(volume => (
       volumeId === 'all' ||
@@ -393,7 +395,7 @@ export function filterProjectVolumes(workspace, projectMeta = {}, filters = {}) 
         ),
       }
     })
-    .filter(volume => volume.notes.length > 0)
+    .filter(volume => !contentFilterActive || volume.notes.length > 0)
 }
 
 export function buildProjectBatchMovePlan(files, noteIds, targetParentId) {
@@ -756,6 +758,84 @@ export function splitProjectChapterContent(content) {
     splitIndex,
     headContent: JSON.stringify(headState),
     tailContent: JSON.stringify(tailState),
+  }
+}
+
+export function uniqueProjectVolumeTitle(files, projectId, requestedTitle) {
+  const parentId = normalizeId(projectId)
+  const raw = String(requestedTitle || '').trim() || '未命名卷'
+  const existing = new Set(
+    activeItems(files)
+      .filter(item => (
+        item.is_folder &&
+        normalizeId(item.parent_id) === parentId
+      ))
+      .map(item => String(item.title || '').trim().toLocaleLowerCase())
+  )
+
+  if (!existing.has(raw.toLocaleLowerCase())) return raw
+
+  let index = 2
+  while (existing.has((raw + ' (' + index + ')').toLocaleLowerCase())) {
+    index += 1
+  }
+  return raw + ' (' + index + ')'
+}
+
+export function suggestProjectVolumeTitle(workspace) {
+  const count = Math.max(0, Number(workspace?.volumeCount) || 0) + 1
+  const suffix = workspace?.project?.type === 'script' ? '集' : '卷'
+  return '第' + chineseProjectNumber(count) + suffix
+}
+
+export function calculateProjectVolumeMove(files, projectId, volumeId, targetIndex) {
+  const items = activeItems(files)
+  const project = normalizeId(projectId)
+  const id = normalizeId(volumeId)
+  const volumes = sortAscendingByLibraryOrder(
+    items.filter(item => (
+      item.is_folder &&
+      normalizeId(item.parent_id) === project
+    ))
+  )
+  const sourceIndex = volumes.findIndex(item => normalizeId(item.id) === id)
+  if (sourceIndex < 0) return []
+
+  const [volume] = volumes.splice(sourceIndex, 1)
+  let requestedIndex = Math.max(0, Math.min(
+    Number(targetIndex) || 0,
+    volumes.length,
+  ))
+  volumes.splice(requestedIndex, 0, volume)
+
+  return volumes.map((item, index) => ({
+    id: item.id,
+    parent_id: project,
+    sort_order: (index + 1) * 1000,
+  }))
+}
+
+export function getProjectVolumeProgress(volume, projectMeta = {}) {
+  const key = volume?.id || '__ungrouped__'
+  const config = projectMeta?.volumeMilestones?.[key] || {}
+  const targetWords = Math.max(0, Number(config.targetWords) || 0)
+  const wordCount = Math.max(0, Number(volume?.wordCount) || 0)
+  const notes = volume?.notes || []
+  const completed = notes.filter(note => note.status === 'done').length
+  const total = notes.length
+
+  return {
+    key,
+    wordCount,
+    targetWords,
+    wordPercent: targetWords > 0
+      ? Math.max(0, Math.min(100, Math.round((wordCount / targetWords) * 100)))
+      : 0,
+    completed,
+    total,
+    chapterPercent: total > 0
+      ? Math.round((completed / total) * 100)
+      : 0,
   }
 }
 
