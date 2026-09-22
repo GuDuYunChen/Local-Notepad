@@ -701,7 +701,7 @@ describe('UI redesign smoke tests', () => {
     expect(createToggle).toBeTruthy()
     await click(createToggle)
 
-    const createbar = container.querySelector('.project-board-createbar')
+    let createbar = container.querySelector('.project-board-createbar')
     expect(createbar).toBeTruthy()
 
     const createTarget = createbar.querySelector('select[aria-label="新建目标卷"]')
@@ -729,6 +729,8 @@ describe('UI redesign smoke tests', () => {
     })
     expect(onOpenFile).toHaveBeenCalledWith('created-1')
 
+    createbar = container.querySelector('.project-board-createbar')
+    expect(createbar).toBeTruthy()
     const titleTextarea = createbar.querySelector('textarea[aria-label="批量新增章节标题"]')
     await act(async () => {
       const setter = Object.getOwnPropertyDescriptor(
