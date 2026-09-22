@@ -598,6 +598,247 @@ describe('UI redesign smoke tests', () => {
     delete window.electronAPI
   })
 
+  it('quick creates batches duplicates and safely splits project chapters', async () => {
+    localStorage.setItem(
+      'localNotepad.projectWorkspace.activeView',
+      'project'
+    )
+
+    const structuredChapter = JSON.stringify({
+      root: {
+        type: 'root',
+        version: 1,
+        children: [
+          {
+            type: 'heading',
+            tag: 'h1',
+            version: 1,
+            children: [{ type: 'text', text: '第一章', version: 1 }],
+          },
+          {
+            type: 'paragraph',
+            version: 1,
+            children: [{ type: 'text', text: '前半正文', version: 1 }],
+          },
+          {
+            type: 'heading',
+            tag: 'h2',
+            version: 1,
+            children: [{ type: 'text', text: '夜入青崖镇', version: 1 }],
+          },
+          {
+            type: 'paragraph',
+            version: 1,
+            children: [{ type: 'text', text: '后半正文', version: 1 }],
+          },
+        ],
+      },
+    })
+
+    const projectFiles = [
+      {
+        id: 'project',
+        title: '章节管理项目',
+        is_folder: true,
+        parent_id: '',
+        sort_order: 100,
+      },
+      {
+        id: 'volume-1',
+        title: '第一卷',
+        is_folder: true,
+        parent_id: 'project',
+        sort_order: 100,
+      },
+      {
+        id: 'chapter-1',
+        title: '第一章.md',
+        is_folder: false,
+        parent_id: 'volume-1',
+        sort_order: 100,
+        content: structuredChapter,
+      },
+    ]
+
+    listAllFilesWithContent.mockResolvedValue(projectFiles)
+    let createdIndex = 0
+    api.mockImplementation(async (requestPath, init) => {
+      if (requestPath === '/api/files' && init?.method === 'POST') {
+        const payload = JSON.parse(init.body)
+        createdIndex += 1
+        return {
+          id: 'created-' + createdIndex,
+          ...payload,
+          sort_order: 1000 + createdIndex * 1000,
+          updated_at: 1,
+        }
+      }
+      if (requestPath.endsWith('/versions/snapshot') && init?.method === 'POST') {
+        return null
+      }
+      if (requestPath.startsWith('/api/files/') && init?.method === 'PUT') {
+        return null
+      }
+      if (requestPath.startsWith('/api/files/') && init?.method === 'DELETE') {
+        return null
+      }
+      throw new Error('Unexpected request: ' + requestPath)
+    })
+
+    const onOpenFile = vi.fn()
+    await act(async () => {
+      root.render(
+        <ProjectWorkspacePanel
+          onOpenFile={onOpenFile}
+          onClose={() => {}}
+        />
+      )
+    })
+    await flushPromises()
+
+    const createToggle = Array.from(container.querySelectorAll('button'))
+      .find(button => button.textContent === '新增章节')
+    expect(createToggle).toBeTruthy()
+    await click(createToggle)
+
+    const createbar = container.querySelector('.project-board-createbar')
+    expect(createbar).toBeTruthy()
+
+    const createTarget = createbar.querySelector('select[aria-label="新建目标卷"]')
+    await act(async () => {
+      createTarget.value = 'volume-1'
+      createTarget.dispatchEvent(new Event('change', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    const quickCreate = Array.from(createbar.querySelectorAll('button'))
+      .find(button => button.textContent === '快速新建')
+    await click(quickCreate)
+    await flushPromises()
+
+    const postBodiesAfterQuick = api.mock.calls
+      .filter(([requestPath, init]) => (
+        requestPath === '/api/files' && init?.method === 'POST'
+      ))
+      .map(([, init]) => JSON.parse(init.body))
+
+    expect(postBodiesAfterQuick[0]).toMatchObject({
+      title: '第二章.md',
+      parent_id: 'volume-1',
+      is_folder: false,
+    })
+    expect(onOpenFile).toHaveBeenCalledWith('created-1')
+
+    const titleTextarea = createbar.querySelector('textarea[aria-label="批量新增章节标题"]')
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        'value',
+      ).set
+      setter.call(titleTextarea, '番外一\n番外二')
+      titleTextarea.dispatchEvent(new Event('input', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    const batchCreate = Array.from(createbar.querySelectorAll('button'))
+      .find(button => button.textContent === '批量创建')
+    await click(batchCreate)
+    await flushPromises()
+
+    const postBodiesAfterBatch = api.mock.calls
+      .filter(([requestPath, init]) => (
+        requestPath === '/api/files' && init?.method === 'POST'
+      ))
+      .map(([, init]) => JSON.parse(init.body))
+
+    expect(postBodiesAfterBatch.slice(1, 3).map(body => body.title))
+      .toEqual(['番外一.md', '番外二.md'])
+
+    const bulkToggle = Array.from(container.querySelectorAll('button'))
+      .find(button => button.textContent === '批量选择')
+    await click(bulkToggle)
+
+    let checkbox = container.querySelector(
+      'input[aria-label="选择章节 第一章"]'
+    )
+    await act(async () => {
+      checkbox.click()
+      await Promise.resolve()
+    })
+
+    let bulkbar = container.querySelector('.project-board-bulkbar')
+    const duplicate = Array.from(bulkbar.querySelectorAll('button'))
+      .find(button => button.textContent === '复制')
+    await click(duplicate)
+    await flushPromises()
+
+    const postBodiesAfterDuplicate = api.mock.calls
+      .filter(([requestPath, init]) => (
+        requestPath === '/api/files' && init?.method === 'POST'
+      ))
+      .map(([, init]) => JSON.parse(init.body))
+    expect(postBodiesAfterDuplicate[3]).toMatchObject({
+      title: '第一章 副本.md',
+      content: structuredChapter,
+      parent_id: 'volume-1',
+    })
+
+    checkbox = container.querySelector(
+      'input[aria-label="选择章节 第一章"]'
+    )
+    await act(async () => {
+      checkbox.click()
+      await Promise.resolve()
+    })
+
+    bulkbar = container.querySelector('.project-board-bulkbar')
+    const split = Array.from(bulkbar.querySelectorAll('button'))
+      .find(button => button.textContent === '拆分')
+    expect(split).toBeTruthy()
+    await click(split)
+
+    const preview = container.querySelector('.project-board-split-preview')
+    expect(preview).toBeTruthy()
+    expect(preview.textContent).toContain('夜入青崖镇')
+    expect(
+      preview.querySelector('input[aria-label="拆分后的新章节标题"]').value
+    ).toBe('夜入青崖镇.md')
+
+    const confirmSplit = Array.from(preview.querySelectorAll('button'))
+      .find(button => button.textContent === '确认拆分')
+    await click(confirmSplit)
+    await flushPromises()
+
+    expect(api).toHaveBeenCalledWith(
+      '/api/files/chapter-1/versions/snapshot',
+      { method: 'POST' },
+    )
+
+    const splitCreate = api.mock.calls
+      .filter(([requestPath, init]) => (
+        requestPath === '/api/files' && init?.method === 'POST'
+      ))
+      .map(([, init]) => JSON.parse(init.body))
+      .find(body => body.title === '夜入青崖镇.md')
+
+    expect(splitCreate).toBeTruthy()
+    const splitTail = JSON.parse(splitCreate.content)
+    expect(splitTail.root.children[0]).toMatchObject({
+      type: 'heading',
+      tag: 'h1',
+    })
+
+    const sourceUpdate = api.mock.calls.find(([requestPath, init]) => (
+      requestPath === '/api/files/chapter-1' &&
+      init?.method === 'PUT' &&
+      JSON.parse(init.body).content
+    ))
+    expect(sourceUpdate).toBeTruthy()
+    const sourceBody = JSON.parse(sourceUpdate[1].body)
+    const splitHead = JSON.parse(sourceBody.content)
+    expect(splitHead.root.children).toHaveLength(2)
+  })
+
   it('switches project views with Alt shortcuts without hijacking form input', async () => {
     listAllFilesWithContent.mockResolvedValue([
       {
