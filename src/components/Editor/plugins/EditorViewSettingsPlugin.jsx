@@ -31,7 +31,7 @@ const WIDTH_OPTIONS = [
 
 export const DEFAULT_EDITOR_VIEW_SETTINGS = {
   fontSize: 16,
-  lineHeight: 1.85,
+  lineHeight: 1.7,
   pageWidth: 860,
   fontFamily: 'system',
   typewriter: false,
@@ -68,7 +68,22 @@ export function normalizeEditorViewSettings(value) {
 
 function loadSettings() {
   try {
-    return normalizeEditorViewSettings(JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'))
+    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')
+    const normalized = normalizeEditorViewSettings(stored)
+
+    // 4.30.1 visual refresh: migrate the previous default 1.9 line-height
+    // without overriding an intentionally customized view.
+    const looksLikeLegacyDefault = (
+      Number(stored?.fontSize || 16) === 16 &&
+      Number(stored?.pageWidth || 860) === 860 &&
+      (stored?.fontFamily || 'system') === 'system' &&
+      !stored?.typewriter &&
+      Number(stored?.lineHeight || 1.9) >= 1.9
+    )
+
+    return looksLikeLegacyDefault
+      ? { ...normalized, lineHeight: DEFAULT_EDITOR_VIEW_SETTINGS.lineHeight }
+      : normalized
   } catch {
     return { ...DEFAULT_EDITOR_VIEW_SETTINGS }
   }
