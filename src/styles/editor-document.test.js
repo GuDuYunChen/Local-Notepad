@@ -27,10 +27,13 @@ describe('editor document presentation', () => {
     expect(css).not.toContain('line-height: 1.85 !important')
   })
 
-  it('keeps Office-inspired document rhythm and neutral block presentation', () => {
+  it('keeps Office-inspired continuous document rhythm and neutral blocks', () => {
     const css = read(['src', 'styles', 'editor-document.css'])
 
-    expect(css).toContain('--document-canvas: color-mix(in srgb, var(--ink) 4%, var(--surface))')
+    expect(css).toContain('--document-canvas: var(--surface)')
+    expect(css).toContain('Continuous document surface')
+    expect(css).toContain('padding: 54px 60px 110px')
+    expect(css).not.toContain('--document-page-shadow')
     expect(css).toContain('margin-top: 24px')
     expect(css).toContain('margin-bottom: 16px')
     expect(css).toContain('border-left: 5px solid')
@@ -40,7 +43,7 @@ describe('editor document presentation', () => {
     expect(css).toContain('.editor-input .formula-rendered.block')
   })
 
-  it('keeps focus writing free of the page-card chrome', () => {
+  it('keeps focus writing on the same continuous document surface', () => {
     const css = read(['src', 'styles', 'editor-document.css'])
 
     expect(css).toContain('.focus-mode .editor-input')
