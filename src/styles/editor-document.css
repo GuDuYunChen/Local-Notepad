@@ -118,6 +118,8 @@
   font-size: var(--editor-view-font-size, 13px) !important;
   line-height: var(--editor-view-line-height, 1.7) !important;
   letter-spacing: 0;
+  font-variant-ligatures: no-common-ligatures;
+  text-rendering: optimizeLegibility;
   word-break: break-word;
   overflow-wrap: anywhere;
 }
@@ -168,7 +170,7 @@
   margin-top: 24px;
   margin-bottom: 16px;
   color: var(--ink);
-  font-weight: 650;
+  font-weight: 600;
   line-height: 1.25;
   letter-spacing: -0.012em;
 }
@@ -184,17 +186,18 @@
 }
 
 .editor-input .editor-text-bold {
-  font-weight: 650;
+  font-weight: 600;
   color: var(--ink);
 }
 
 .editor-input .editor-quote {
   margin: 0 0 16px;
   padding: 0 1em;
-  border-left: 5px solid var(--line-strong);
+  border-left: 5px solid color-mix(in srgb, var(--ink) 18%, var(--surface));
   background: transparent;
-  color: var(--ink-soft);
+  color: color-mix(in srgb, var(--ink) 68%, var(--surface));
   font-size: 1em;
+  font-style: normal;
   line-height: inherit;
 }
 
@@ -257,12 +260,33 @@
   min-width: 80px;
   max-width: 300px;
   padding: 6px 13px;
-  border: 1px solid var(--line) !important;
+  border: 1px solid color-mix(in srgb, var(--ink) 14%, var(--surface)) !important;
   background: var(--surface);
   vertical-align: top;
   overflow-wrap: anywhere;
   word-break: break-word;
   white-space: normal;
+}
+
+.editor-input .editor-table {
+  scrollbar-width: thin;
+  scrollbar-color:
+    color-mix(in srgb, var(--ink) 18%, transparent)
+    transparent;
+  overscroll-behavior-x: contain;
+}
+
+.editor-input .editor-table::-webkit-scrollbar {
+  height: 7px;
+}
+
+.editor-input .editor-table::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.editor-input .editor-table::-webkit-scrollbar-thumb {
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--ink) 18%, transparent);
 }
 
 .editor-input .editor-table-cell:first-child::after {
@@ -275,22 +299,22 @@
 .editor-input .editor-table tr:first-child .editor-table-cell,
 .editor-input .editor-table-cell-header {
   background: color-mix(in srgb, var(--ink) 5%, var(--surface)) !important;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 /* Code uses a quieter Vditor-like document block instead of a heavy card. */
 .editor-input .code-block-wrapper {
-  margin: 1.15em 0 1.35em;
+  margin: 1em 0;
   overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 7px;
+  border-radius: 5px;
   background: var(--document-code-bg);
   box-shadow: none;
 }
 
 .editor-input .code-block-header {
-  min-height: 32px;
-  padding: 5px 10px;
+  min-height: 26px;
+  padding: 3px 9px;
   background: color-mix(in srgb, var(--ink) 5%, var(--surface));
 }
 
@@ -307,8 +331,8 @@
 .editor-input .code-textarea,
 .editor-input .code-preview,
 .editor-input .line-number {
-  font-size: 0.82em;
-  line-height: 1.65;
+  font-size: 0.85em;
+  line-height: 1.6;
 }
 
 /* Media follows the document flow instead of looking like a widget. */
