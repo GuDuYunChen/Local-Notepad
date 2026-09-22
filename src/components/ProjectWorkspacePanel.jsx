@@ -1165,7 +1165,7 @@ export default function ProjectWorkspacePanel({
                         (isBefore ? ' drop-before' : '') +
                         (isAfter ? ' drop-after' : '')
                       }
-                      draggable={!movingId && editingSummaryId !== note.id}
+                      draggable={!projectBoardFilterActive && !movingId && editingSummaryId !== note.id}
                       onDragStart={event => {
                         setDraggedNoteId(note.id)
                         event.dataTransfer.effectAllowed = 'move'
@@ -1176,7 +1176,7 @@ export default function ProjectWorkspacePanel({
                         setDropTarget(null)
                       }}
                       onDragOver={event => {
-                        if (!draggedNoteId || draggedNoteId === note.id) return
+                        if (projectBoardFilterActive || !draggedNoteId || draggedNoteId === note.id) return
                         event.preventDefault()
                         event.stopPropagation()
                         const rect = event.currentTarget.getBoundingClientRect()
@@ -1190,7 +1190,7 @@ export default function ProjectWorkspacePanel({
                         })
                       }}
                       onDrop={event => {
-                        if (!draggedNoteId || draggedNoteId === note.id) return
+                        if (projectBoardFilterActive || !draggedNoteId || draggedNoteId === note.id) return
                         event.preventDefault()
                         event.stopPropagation()
 
