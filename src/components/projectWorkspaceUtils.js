@@ -1,5 +1,6 @@
 import { countLexicalCharacters } from '~/utils/lexicalText'
 import { compareLibraryItems } from './fileTreeUtils'
+import { normalizeProjectStorylines } from './projectStorylineUtils'
 
 export const PROJECT_META_KEY = 'localNotepad.projectWorkspace.v1'
 
@@ -196,6 +197,7 @@ export function readProjectWorkspaceMeta(projectId) {
       dailyReviews: value.dailyReviews && typeof value.dailyReviews === 'object'
         ? { ...value.dailyReviews }
         : {},
+      storylines: normalizeProjectStorylines(value.storylines),
     }
   } catch {
     return {
@@ -213,6 +215,7 @@ export function readProjectWorkspaceMeta(projectId) {
       chapterQueue: [],
       sprint: null,
       dailyReviews: {},
+      storylines: [],
     }
   }
 }
@@ -254,6 +257,7 @@ export function writeProjectWorkspaceMeta(projectId, nextMeta) {
       dailyReviews: nextMeta?.dailyReviews && typeof nextMeta.dailyReviews === 'object'
         ? nextMeta.dailyReviews
         : {},
+      storylines: normalizeProjectStorylines(nextMeta?.storylines),
     }
     localStorage.setItem(PROJECT_META_KEY, JSON.stringify(all))
   } catch {
