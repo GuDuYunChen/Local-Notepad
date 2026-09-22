@@ -285,6 +285,7 @@
   word-break: normal;
   line-break: strict;
   white-space: normal;
+  hyphens: auto;
 }
 
 .editor-input .editor-table {
@@ -306,6 +307,15 @@
 .editor-input .editor-table::-webkit-scrollbar-thumb {
   border-radius: 99px;
   background: color-mix(in srgb, var(--ink) 18%, transparent);
+}
+
+.editor-input .editor-table-cell .editor-paragraph {
+  margin: 0;
+  line-height: inherit;
+}
+
+.editor-input .editor-table-cell br {
+  line-height: inherit;
 }
 
 .editor-input .editor-table-cell:first-child {
@@ -344,7 +354,7 @@
 .editor-input .code-block-header {
   min-height: 26px;
   padding: 3px 9px;
-  background: color-mix(in srgb, var(--ink) 5%, var(--surface));
+  background: var(--document-table-head);
 }
 
 .editor-input .code-block-content {
@@ -354,7 +364,7 @@
 .editor-input .line-numbers {
   min-width: 36px;
   padding: 10px 7px;
-  background: color-mix(in srgb, var(--ink) 3%, var(--surface));
+  background: var(--document-soft-bg);
 }
 
 .editor-input .code-textarea,
