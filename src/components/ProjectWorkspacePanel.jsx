@@ -28,6 +28,7 @@ import ProjectPlanningPanel from './ProjectPlanningPanel'
 import ProjectSprintPanel from './ProjectSprintPanel'
 import ProjectTodayCenter from './ProjectTodayCenter'
 import FocusSessionAnalyticsPanel from './FocusSessionAnalyticsPanel'
+import ProjectInsightsPanel from './ProjectInsightsPanel'
 import './ProjectWorkspacePanel.css'
 
 const LAST_PROJECT_KEY = 'localNotepad.projectWorkspace.lastProject'
@@ -798,6 +799,13 @@ export default function ProjectWorkspacePanel({
 
       <FocusSessionAnalyticsPanel
         workspace={workspace}
+        onOpenFile={onOpenFile}
+      />
+
+      <ProjectInsightsPanel
+        workspace={workspace}
+        projectMeta={projectMeta}
+        projectIndexes={projectIndexes}
         onOpenFile={onOpenFile}
       />
 
