@@ -8,6 +8,7 @@ import { tagApi } from '~/services/tagApi'
 import { markdownToLexical } from '~/services/importContent'
 import {
   buildProjectWorkspace,
+  buildProjectBatchMovePlan,
   calculateProjectCardMove,
   getProjectCandidates,
   getProjectChapterSummary,
@@ -122,6 +123,11 @@ export default function ProjectWorkspacePanel({
   const [projectBoardQuery, setProjectBoardQuery] = useState('')
   const [projectBoardStatus, setProjectBoardStatus] = useState('all')
   const [projectBoardVolume, setProjectBoardVolume] = useState('all')
+  const [selectionMode, setSelectionMode] = useState(false)
+  const [selectedNoteIds, setSelectedNoteIds] = useState([])
+  const [batchStatusTarget, setBatchStatusTarget] = useState('review')
+  const [batchMoveTarget, setBatchMoveTarget] = useState('__ungrouped__')
+  const [batchBusy, setBatchBusy] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -218,6 +224,10 @@ export default function ProjectWorkspacePanel({
   )
 
   useEffect(() => {
+    setSelectionMode(false)
+    setSelectedNoteIds([])
+    setBatchMoveTarget('__ungrouped__')
+
     if (!selectedProjectId) {
       setProjectMeta({
         type: 'novel',
@@ -241,6 +251,12 @@ export default function ProjectWorkspacePanel({
     localStorage.setItem(LAST_PROJECT_KEY, selectedProjectId)
     setProjectMeta(readProjectWorkspaceMeta(selectedProjectId))
   }, [selectedProjectId])
+
+  useEffect(() => {
+    if (activeView === 'project') return
+    setSelectionMode(false)
+    setSelectedNoteIds([])
+  }, [activeView])
 
   const loadProjectIndexes = useCallback(async (workspaceValue) => {
     const noteIds = new Set(
@@ -343,6 +359,24 @@ export default function ProjectWorkspacePanel({
     (sum, volume) => sum + Number(volume.wordCount || 0),
     0,
   )
+  const visibleProjectNoteIds = useMemo(
+    () => filteredProjectVolumes.flatMap(
+      volume => volume.notes.map(note => note.id)
+    ),
+    [filteredProjectVolumes]
+  )
+  const selectedNoteIdSet = useMemo(
+    () => new Set(selectedNoteIds),
+    [selectedNoteIds]
+  )
+  const selectedVisibleCount = visibleProjectNoteIds.filter(
+    id => selectedNoteIdSet.has(id)
+  ).length
+  const allVisibleSelected = Boolean(
+    visibleProjectNoteIds.length &&
+    selectedVisibleCount === visibleProjectNoteIds.length
+  )
+  const projectBoardInteractionLocked = selectionMode || projectBoardFilterActive
 
   const updateMeta = next => {
     setProjectMeta(previous => {
@@ -350,6 +384,89 @@ export default function ProjectWorkspacePanel({
       writeProjectWorkspaceMeta(selectedProjectId, value)
       return value
     })
+  }
+
+  const toggleNoteSelection = noteId => {
+    const id = String(noteId || '')
+    if (!id) return
+    setSelectedNoteIds(previous => (
+      previous.includes(id)
+        ? previous.filter(item => item !== id)
+        : [...previous, id]
+    ))
+  }
+
+  const toggleVisibleSelection = () => {
+    setSelectedNoteIds(previous => {
+      const current = new Set(previous)
+      if (allVisibleSelected) {
+        for (const id of visibleProjectNoteIds) current.delete(id)
+      } else {
+        for (const id of visibleProjectNoteIds) current.add(id)
+      }
+      return Array.from(current)
+    })
+  }
+
+  const applyBulkStatus = () => {
+    if (!selectedNoteIds.length) return
+
+    updateMeta(previous => ({
+      ...previous,
+      statuses: {
+        ...previous.statuses,
+        ...Object.fromEntries(
+          selectedNoteIds.map(id => [id, batchStatusTarget])
+        ),
+      },
+    }))
+    toast.success(
+      '已将 ' + selectedNoteIds.length + ' 个' + labels.chapter +
+      '设为“' + statusCopy(batchStatusTarget) + '”'
+    )
+  }
+
+  const moveSelectedNotes = async () => {
+    if (!selectedNoteIds.length || batchBusy || !workspace?.project?.id) return
+
+    const selectedInOrder = getProjectExportIds(workspace)
+      .filter(id => selectedNoteIdSet.has(id))
+    const targetParentId = batchMoveTarget === '__ungrouped__'
+      ? workspace.project.id
+      : batchMoveTarget
+    const plan = buildProjectBatchMovePlan(
+      files,
+      selectedInOrder,
+      targetParentId,
+    )
+    if (!plan.length) return
+
+    setBatchBusy(true)
+    try {
+      for (const item of plan) {
+        await api('/api/files/' + item.id, {
+          method: 'PUT',
+          body: JSON.stringify({
+            parent_id: item.parent_id,
+            sort_order: item.sort_order,
+          }),
+        })
+      }
+
+      await load()
+      setSelectedNoteIds([])
+      toast.success(
+        '已移动 ' + plan.length + ' 个' + labels.chapter
+      )
+      window.dispatchEvent(new CustomEvent('library:refresh', {
+        detail: { source: 'project-workspace' },
+      }))
+    } catch (error) {
+      console.error('批量移动章节失败', error)
+      toast.error(error.message || '批量移动章节失败')
+    } finally {
+      setBatchBusy(false)
+    }
   }
 
   const setProjectType = type => {
@@ -1079,7 +1196,95 @@ export default function ProjectWorkspacePanel({
             清除筛选
           </button>
         )}
+        <button
+          type="button"
+          className={'btn small project-board-select-toggle' + (selectionMode ? ' active' : '')}
+          aria-pressed={selectionMode}
+          onClick={() => {
+            setSelectionMode(value => {
+              const next = !value
+              if (!next) setSelectedNoteIds([])
+              return next
+            })
+            setEditingSummaryId('')
+            setSummaryDraft('')
+          }}
+        >
+          {selectionMode ? '结束多选' : '批量选择'}
+        </button>
       </section>
+
+      {selectionMode && (
+        <section className="project-board-bulkbar" aria-label="章节批量操作">
+          <div className="project-board-bulk-summary">
+            <strong>已选 {selectedNoteIds.length} {labels.chapter}</strong>
+            <span>
+              当前结果中 {selectedVisibleCount} 项已选
+            </span>
+          </div>
+
+          <button
+            type="button"
+            className="btn small"
+            disabled={!visibleProjectNoteIds.length}
+            onClick={toggleVisibleSelection}
+          >
+            {allVisibleSelected ? '取消当前结果' : '选择当前结果'}
+          </button>
+
+          <div className="project-board-bulk-group">
+            <select
+              value={batchStatusTarget}
+              onChange={event => setBatchStatusTarget(event.target.value)}
+              aria-label="批量设置章节状态"
+            >
+              <option value="draft">设为草稿</option>
+              <option value="review">设为修订</option>
+              <option value="done">设为完成</option>
+            </select>
+            <button
+              type="button"
+              className="btn small"
+              disabled={!selectedNoteIds.length}
+              onClick={applyBulkStatus}
+            >
+              应用状态
+            </button>
+          </div>
+
+          <div className="project-board-bulk-group">
+            <select
+              value={batchMoveTarget}
+              onChange={event => setBatchMoveTarget(event.target.value)}
+              aria-label={'批量移动目标' + labels.volume}
+            >
+              <option value="__ungrouped__">{labels.ungrouped}</option>
+              {workspace.volumes.filter(volume => volume.id).map(volume => (
+                <option key={volume.id} value={volume.id}>
+                  {volume.title}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="btn small"
+              disabled={!selectedNoteIds.length || batchBusy}
+              onClick={() => void moveSelectedNotes()}
+            >
+              {batchBusy ? '移动中…' : '移动'}
+            </button>
+          </div>
+
+          <button
+            type="button"
+            className="btn small"
+            disabled={!selectedNoteIds.length}
+            onClick={() => setSelectedNoteIds([])}
+          >
+            取消选择
+          </button>
+        </section>
+      )}
 
       {filteredProjectVolumes.length ? (
       <div className="project-workspace-board">
@@ -1095,7 +1300,7 @@ export default function ProjectWorkspacePanel({
               key={volume.id || '__ungrouped__'}
               className="project-volume-column"
               onDragOver={event => {
-                if (!draggedNoteId) return
+                if (projectBoardInteractionLocked || !draggedNoteId) return
                 event.preventDefault()
                 setDropTarget({
                   volumeId: parentId,
@@ -1104,7 +1309,7 @@ export default function ProjectWorkspacePanel({
                 })
               }}
               onDrop={event => {
-                if (!draggedNoteId) return
+                if (projectBoardInteractionLocked || !draggedNoteId) return
                 event.preventDefault()
                 void moveNote(
                   draggedNoteId,
@@ -1163,9 +1368,11 @@ export default function ProjectWorkspacePanel({
                         'project-chapter-card' +
                         (isDragging ? ' dragging' : '') +
                         (isBefore ? ' drop-before' : '') +
-                        (isAfter ? ' drop-after' : '')
+                        (isAfter ? ' drop-after' : '') +
+                        (selectedNoteIdSet.has(note.id) ? ' selected' : '') +
+                        (selectionMode ? ' selection-mode' : '')
                       }
-                      draggable={!projectBoardFilterActive && !movingId && editingSummaryId !== note.id}
+                      draggable={!projectBoardInteractionLocked && !movingId && editingSummaryId !== note.id}
                       onDragStart={event => {
                         setDraggedNoteId(note.id)
                         event.dataTransfer.effectAllowed = 'move'
@@ -1176,7 +1383,7 @@ export default function ProjectWorkspacePanel({
                         setDropTarget(null)
                       }}
                       onDragOver={event => {
-                        if (projectBoardFilterActive || !draggedNoteId || draggedNoteId === note.id) return
+                        if (projectBoardInteractionLocked || !draggedNoteId || draggedNoteId === note.id) return
                         event.preventDefault()
                         event.stopPropagation()
                         const rect = event.currentTarget.getBoundingClientRect()
@@ -1190,7 +1397,7 @@ export default function ProjectWorkspacePanel({
                         })
                       }}
                       onDrop={event => {
-                        if (projectBoardFilterActive || !draggedNoteId || draggedNoteId === note.id) return
+                        if (projectBoardInteractionLocked || !draggedNoteId || draggedNoteId === note.id) return
                         event.preventDefault()
                         event.stopPropagation()
 
@@ -1203,11 +1410,30 @@ export default function ProjectWorkspacePanel({
                         void moveNote(draggedNoteId, parentId, targetIndex)
                       }}
                     >
+                      {selectionMode && (
+                        <label
+                          className="project-chapter-select"
+                          title={'选择' + displayTitle(note.title)}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedNoteIdSet.has(note.id)}
+                            onChange={() => toggleNoteSelection(note.id)}
+                            aria-label={'选择章节 ' + displayTitle(note.title)}
+                          />
+                          <span aria-hidden="true">✓</span>
+                        </label>
+                      )}
+
                       <div className="project-chapter-main">
                         <button
                           type="button"
                           className="project-chapter-open"
-                          onClick={() => onOpenFile?.(note.id)}
+                          onClick={() => (
+                            selectionMode
+                              ? toggleNoteSelection(note.id)
+                              : onOpenFile?.(note.id)
+                          )}
                         >
                           <strong>{displayTitle(note.title)}</strong>
                           <span>
@@ -1241,8 +1467,12 @@ export default function ProjectWorkspacePanel({
                           <button
                             type="button"
                             className="project-chapter-summary"
-                            onClick={() => beginSummaryEdit(note)}
-                            title="编辑章节摘要"
+                            onClick={() => (
+                              selectionMode
+                                ? toggleNoteSelection(note.id)
+                                : beginSummaryEdit(note)
+                            )}
+                            title={selectionMode ? '选择章节' : '编辑章节摘要'}
                           >
                             {getProjectChapterSummary(note, projectMeta)}
                           </button>
@@ -1252,8 +1482,12 @@ export default function ProjectWorkspacePanel({
                       <button
                         type="button"
                         className={'project-chapter-status ' + note.status}
-                        onClick={() => cycleStatus(note)}
-                        title="点击切换章节状态"
+                        onClick={() => (
+                          selectionMode
+                            ? toggleNoteSelection(note.id)
+                            : cycleStatus(note)
+                        )}
+                        title={selectionMode ? '选择章节' : '点击切换章节状态'}
                       >
                         {statusCopy(note.status)}
                       </button>
@@ -1292,7 +1526,13 @@ export default function ProjectWorkspacePanel({
       )}
 
       <footer className="project-workspace-footer">
-        <span>{projectBoardFilterActive ? '筛选状态下仅用于查找与打开章节。' : '拖动章节卡可跨' + labels.volume + '移动和调整顺序。'}</span>
+        <span>{
+          selectionMode
+            ? '批量选择中：点击章节卡即可勾选，拖动排序暂时关闭。'
+            : projectBoardFilterActive
+              ? '筛选状态下仅用于查找与打开章节。'
+              : '拖动章节卡可跨' + labels.volume + '移动和调整顺序。'
+        }</span>
         <span>状态仅是本机项目视图偏好，不修改正文或现有数据库。</span>
       </footer>
         </>
