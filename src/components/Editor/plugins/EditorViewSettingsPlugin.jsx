@@ -25,10 +25,10 @@ const FONT_OPTIONS = [
 ]
 
 const WIDTH_OPTIONS = [
+  { value: 0, label: '铺满（默认）' },
   { value: 720, label: '窄' },
   { value: 860, label: '舒适' },
   { value: 1040, label: '宽' },
-  { value: 0, label: '铺满' },
 ]
 
 export const DEFAULT_EDITOR_VIEW_SETTINGS = {
@@ -82,22 +82,33 @@ function loadSettings() {
       storedLineHeight === 1.7
     )
     const legacyWidth = Number(stored?.pageWidth ?? 860)
+    const storedFontSize = Number(stored?.fontSize)
+    const legacyV2Default = (
+      (!Number.isFinite(storedFontSize) || storedFontSize === 16) &&
+      legacyLineHeight
+    )
+    const legacyV3Default = (
+      storedFontSize === 13 &&
+      storedLineHeight === 1.7
+    )
     const looksLikeLegacyDefault = (
       densityVersion !== VISUAL_DENSITY_VERSION &&
-      Number(stored?.fontSize || 16) === 16 &&
       legacyWidth === 860 &&
       (stored?.fontFamily || 'system') === 'system' &&
       !stored?.typewriter &&
-      legacyLineHeight
+      (legacyV2Default || legacyV3Default)
     )
 
     if (looksLikeLegacyDefault) {
-      return {
+      const migrated = {
         ...normalized,
         fontSize: DEFAULT_EDITOR_VIEW_SETTINGS.fontSize,
         lineHeight: DEFAULT_EDITOR_VIEW_SETTINGS.lineHeight,
         pageWidth: DEFAULT_EDITOR_VIEW_SETTINGS.pageWidth,
       }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated))
+      localStorage.setItem(VISUAL_DENSITY_VERSION_KEY, VISUAL_DENSITY_VERSION)
+      return migrated
     }
 
     return normalized
