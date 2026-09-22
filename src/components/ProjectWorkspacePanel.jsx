@@ -9,9 +9,11 @@ import { markdownToLexical } from '~/services/importContent'
 import {
   buildProjectWorkspace,
   buildProjectBatchMovePlan,
+  buildProjectChapterMarkdown,
   calculateProjectCardMove,
   getProjectCandidates,
   getProjectChapterSummary,
+  getProjectChapterPresets,
   getProjectDescendantNoteIds,
   getProjectExportIds,
   getProjectIndexAliases,
@@ -19,6 +21,7 @@ import {
   getProjectProgress,
   filterProjectVolumes,
   getProjectTemplate,
+  getProjectVolumeByNoteId,
   getRecentProjectActivity,
   getVolumeExportIds,
   nextProjectStatus,
@@ -134,7 +137,9 @@ export default function ProjectWorkspacePanel({
   const [chapterCreateOpen, setChapterCreateOpen] = useState(false)
   const [chapterCreateTarget, setChapterCreateTarget] = useState('__ungrouped__')
   const [chapterCreateDraft, setChapterCreateDraft] = useState('')
+  const [chapterCreateTemplate, setChapterCreateTemplate] = useState('standard')
   const [chapterCreateBusy, setChapterCreateBusy] = useState(false)
+  const [relativeCreateBusy, setRelativeCreateBusy] = useState('')
   const [duplicateBusy, setDuplicateBusy] = useState(false)
   const [splitPreview, setSplitPreview] = useState(null)
   const [splitBusy, setSplitBusy] = useState(false)
@@ -256,6 +261,8 @@ export default function ProjectWorkspacePanel({
     setChapterCreateOpen(false)
     setChapterCreateTarget('__ungrouped__')
     setChapterCreateDraft('')
+    setChapterCreateTemplate('standard')
+    setRelativeCreateBusy('')
     setSplitPreview(null)
 
     if (!selectedProjectId) {
@@ -425,6 +432,13 @@ export default function ProjectWorkspacePanel({
     selectedVisibleCount === visibleProjectNoteIds.length
   )
   const projectBoardInteractionLocked = selectionMode || projectBoardFilterActive
+  const chapterCreatePresets = getProjectChapterPresets(workspace?.project?.type)
+  const chapterCreateVolume = (workspace?.volumes || []).find(volume => (
+    String(volume.id || '__ungrouped__') === String(chapterCreateTarget)
+  )) || null
+  const continuationSource = chapterCreateVolume?.notes?.[
+    Math.max(0, (chapterCreateVolume?.notes?.length || 1) - 1)
+  ] || null
 
   const updateMeta = next => {
     setProjectMeta(previous => {
@@ -522,6 +536,8 @@ export default function ProjectWorkspacePanel({
   const createProjectChapters = async ({
     quick = false,
     targetOverride = '',
+    presetOverride = '',
+    sourceOverride = null,
   } = {}) => {
     if (chapterCreateBusy || !workspace?.project?.id) return
 
@@ -541,6 +557,14 @@ export default function ProjectWorkspacePanel({
       return
     }
 
+    const presetId = presetOverride || chapterCreateTemplate || 'standard'
+    const targetVolume = (workspace?.volumes || []).find(volume => (
+      String(volume.id || '__ungrouped__') === String(targetValue)
+    ))
+    let sourceNote = sourceOverride || targetVolume?.notes?.[
+      Math.max(0, (targetVolume?.notes?.length || 1) - 1)
+    ] || null
+
     setChapterCreateBusy(true)
     try {
       const workingFiles = [...files]
@@ -552,19 +576,24 @@ export default function ProjectWorkspacePanel({
           targetParentId,
           requestedTitle,
         )
+        const markdown = buildProjectChapterMarkdown(
+          title,
+          workspace.project.type,
+          presetId,
+          sourceNote?.content || '',
+        )
         const note = await api('/api/files', {
           method: 'POST',
           body: JSON.stringify({
             title,
-            content: markdownToLexical(
-              '# ' + displayTitle(title) + '\n\n'
-            ),
+            content: markdownToLexical(markdown),
             is_folder: false,
             parent_id: targetParentId,
           }),
         })
         workingFiles.push(note)
         created.push(note)
+        if (presetId === 'continue') sourceNote = note
       }
 
       await load()
@@ -587,6 +616,94 @@ export default function ProjectWorkspacePanel({
     } finally {
       setChapterCreateBusy(false)
     }
+  }
+
+  const createChapterRelative = async (note, position = 'after') => {
+    if (!note?.id || relativeCreateBusy || !workspace?.project?.id) return
+
+    const volume = getProjectVolumeByNoteId(workspace, note.id)
+    const parentId = volume?.id || workspace.project.id
+    const sourceNotes = volume?.notes || []
+    const sourceIndex = sourceNotes.findIndex(item => (
+      String(item.id) === String(note.id)
+    ))
+    const requestedTitle = suggestProjectChapterTitle(workspace)
+    const title = uniqueProjectChapterTitle(files, parentId, requestedTitle)
+    const presetId = position === 'after' ? 'continue' : 'standard'
+    const markdown = buildProjectChapterMarkdown(
+      title,
+      workspace.project.type,
+      presetId,
+      note.content || '',
+    )
+    const busyKey = note.id + ':' + position
+    setRelativeCreateBusy(busyKey)
+
+    let created = null
+    try {
+      created = await api('/api/files', {
+        method: 'POST',
+        body: JSON.stringify({
+          title,
+          content: markdownToLexical(markdown),
+          is_folder: false,
+          parent_id: parentId,
+        }),
+      })
+
+      const targetIndex = Math.max(
+        0,
+        sourceIndex + (position === 'after' ? 1 : 0),
+      )
+      const patch = calculateProjectCardMove(
+        [...files, created],
+        created.id,
+        parentId,
+        targetIndex,
+      )
+      if (patch) {
+        const patches = Array.isArray(patch.rebalance) && patch.rebalance.length
+          ? patch.rebalance
+          : [patch]
+        for (const item of patches) {
+          await api('/api/files/' + item.id, {
+            method: 'PUT',
+            body: JSON.stringify({
+              parent_id: item.parent_id,
+              sort_order: item.sort_order,
+            }),
+          })
+        }
+      }
+
+      await load()
+      toast.success(
+        '已在“' + displayTitle(note.title) + '”' +
+        (position === 'after' ? '后' : '前') +
+        '插入“' + displayTitle(created.title) + '”'
+      )
+      window.dispatchEvent(new CustomEvent('library:refresh', {
+        detail: { source: 'project-workspace' },
+      }))
+      onOpenFile?.(created.id)
+    } catch (error) {
+      console.error('插入章节失败', error)
+      toast.error(error.message || '插入' + labels.chapter + '失败')
+    } finally {
+      setRelativeCreateBusy('')
+    }
+  }
+
+  const manageWholeVolume = volume => {
+    const realVolume = (workspace?.volumes || []).find(item => (
+      String(item.id || '__ungrouped__') === String(volume.id || '__ungrouped__')
+    )) || volume
+    const ids = (realVolume.notes || []).map(note => note.id).filter(Boolean)
+    setChapterCreateOpen(false)
+    setSplitPreview(null)
+    setSelectionMode(true)
+    setSelectedNoteIds(ids)
+    setBatchMoveTarget(realVolume.id || '__ungrouped__')
   }
 
   const duplicateSelectedNotes = async () => {
@@ -1563,6 +1680,18 @@ export default function ProjectWorkspacePanel({
             ))}
           </select>
 
+          <select
+            value={chapterCreateTemplate}
+            onChange={event => setChapterCreateTemplate(event.target.value)}
+            aria-label={labels.chapter + '模板'}
+          >
+            {chapterCreatePresets.map(preset => (
+              <option key={preset.id} value={preset.id}>
+                {preset.label}
+              </option>
+            ))}
+          </select>
+
           <textarea
             value={chapterCreateDraft}
             onChange={event => setChapterCreateDraft(event.target.value)}
@@ -1578,6 +1707,21 @@ export default function ProjectWorkspacePanel({
             onClick={() => void createProjectChapters({ quick: true })}
           >
             {chapterCreateBusy ? '创建中…' : '快速新建'}
+          </button>
+          <button
+            type="button"
+            className="btn small"
+            disabled={chapterCreateBusy || !continuationSource}
+            onClick={() => void createProjectChapters({
+              quick: true,
+              presetOverride: 'continue',
+              sourceOverride: continuationSource,
+            })}
+            title={continuationSource
+              ? '沿用上一章的标题结构，不复制正文'
+              : '当前目标卷还没有可续建的章节'}
+          >
+            从上一章续建
           </button>
           <button
             type="button"
@@ -1802,6 +1946,30 @@ export default function ProjectWorkspacePanel({
                 <div className="project-volume-export">
                   <button
                     type="button"
+                    className="project-volume-manage"
+                    disabled={!volume.notes.length}
+                    onClick={() => manageWholeVolume(volume)}
+                    title={'管理本' + labels.volume}
+                  >
+                    管理
+                  </button>
+                  <button
+                    type="button"
+                    className="project-volume-create"
+                    disabled={chapterCreateBusy}
+                    onClick={() => {
+                      setChapterCreateOpen(true)
+                      setSelectionMode(false)
+                      setSelectedNoteIds([])
+                      setSplitPreview(null)
+                      setChapterCreateTarget(volume.id || '__ungrouped__')
+                    }}
+                    title={'在本' + labels.volume + '新增' + labels.chapter}
+                  >
+                    ＋
+                  </button>
+                  <button
+                    type="button"
                     disabled={!exportIds.length || Boolean(exportingKey)}
                     onClick={() => void exportCombined({
                       ids: exportIds,
@@ -1952,6 +2120,27 @@ export default function ProjectWorkspacePanel({
                           </button>
                         )}
                       </div>
+
+                      {!selectionMode && (
+                        <div className="project-chapter-quick-actions">
+                          <button
+                            type="button"
+                            onClick={() => void createChapterRelative(note, 'before')}
+                            disabled={Boolean(relativeCreateBusy)}
+                            title={'在此' + labels.chapter + '前插入'}
+                          >
+                            前插
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void createChapterRelative(note, 'after')}
+                            disabled={Boolean(relativeCreateBusy)}
+                            title={'在此' + labels.chapter + '后续建'}
+                          >
+                            后插
+                          </button>
+                        </div>
+                      )}
 
                       <button
                         type="button"
