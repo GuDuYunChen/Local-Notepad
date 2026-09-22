@@ -1,8 +1,14 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import {
   buildProjectStoryMap,
   filterProjectStoryMap,
 } from './projectStructureUtils'
+import {
+  buildProjectStorylineModel,
+  getProjectStorylineStages,
+  getProjectStorylineSuggestions,
+  getProjectStorylineTypes,
+} from './projectStorylineUtils'
 import './ProjectStructurePanel.css'
 
 function stripExtension(value) {
@@ -29,6 +35,7 @@ export default function ProjectStructurePanel({
   workspace,
   projectMeta,
   projectIndexes,
+  onMetaChange,
   onOpenFile,
   onNavigateView,
 }) {
@@ -36,6 +43,14 @@ export default function ProjectStructurePanel({
   const [status, setStatus] = useState('all')
   const [marker, setMarker] = useState('all')
   const [detailMode, setDetailMode] = useState(true)
+  const [storylineType, setStorylineType] = useState('plot')
+  const [storylineTitle, setStorylineTitle] = useState('')
+  const [storylineSource, setStorylineSource] = useState('')
+  const [selectedTrackId, setSelectedTrackId] = useState('')
+  const [eventChapterId, setEventChapterId] = useState('')
+  const [eventStage, setEventStage] = useState('setup')
+  const [eventNote, setEventNote] = useState('')
+  const [deleteConfirmId, setDeleteConfirmId] = useState('')
 
   const storyMap = useMemo(
     () => buildProjectStoryMap(
@@ -54,6 +69,47 @@ export default function ProjectStructurePanel({
     }),
     [marker, query, status, storyMap]
   )
+
+  const storylineModel = useMemo(
+    () => buildProjectStorylineModel(workspace, projectMeta),
+    [projectMeta, workspace]
+  )
+  const storylineTypes = useMemo(
+    () => getProjectStorylineTypes(),
+    []
+  )
+  const selectedTrack = storylineModel.tracks.find(track => (
+    track.id === selectedTrackId
+  )) || null
+  const storylineStages = useMemo(
+    () => getProjectStorylineStages(selectedTrack?.type || storylineType),
+    [selectedTrack?.type, storylineType]
+  )
+  const storylineSuggestions = useMemo(
+    () => getProjectStorylineSuggestions(
+      projectIndexes,
+      projectMeta?.storylines,
+      storylineType,
+    ),
+    [projectIndexes, projectMeta?.storylines, storylineType]
+  )
+
+  useEffect(() => {
+    const stages = getProjectStorylineStages(selectedTrack?.type || storylineType)
+    setEventStage(stages[0]?.id || '')
+    setEventChapterId('')
+    setEventNote('')
+    setDeleteConfirmId('')
+  }, [selectedTrack?.id, selectedTrack?.type, storylineType])
+
+  useEffect(() => {
+    if (
+      selectedTrackId &&
+      !storylineModel.tracks.some(track => track.id === selectedTrackId)
+    ) {
+      setSelectedTrackId('')
+    }
+  }, [selectedTrackId, storylineModel.tracks])
 
   if (!workspace?.project?.id) return null
 
@@ -118,6 +174,159 @@ export default function ProjectStructurePanel({
       items: storyMap.indexes.foreshadows,
     },
   ]
+
+  const updateStorylines = updater => {
+    onMetaChange?.(previous => ({
+      ...previous,
+      storylines: typeof updater === 'function'
+        ? updater(previous.storylines || [])
+        : updater,
+    }))
+  }
+
+  const createStoryline = () => {
+    const typeCopy = storylineTypes.find(item => item.id === storylineType)
+    const source = storylineSuggestions.find(item => (
+      String(item.id) === String(storylineSource)
+    ))
+    const title = storylineTitle.trim() ||
+      stripExtension(source?.title) ||
+      ((typeCopy?.label || '轨迹') + ' ' + (storylineModel.totals.tracks + 1))
+    const id = 'storyline-' + Date.now().toString(36) + '-' +
+      (storylineModel.totals.tracks + 1)
+
+    updateStorylines(previous => [
+      ...previous,
+      {
+        id,
+        title,
+        type: storylineType,
+        description: '',
+        sourceNoteId: storylineSource,
+        events: [],
+      },
+    ])
+    setSelectedTrackId(id)
+    setStorylineTitle('')
+    setStorylineSource('')
+  }
+
+  const updateTrack = patch => {
+    if (!selectedTrack) return
+    updateStorylines(previous => previous.map(track => (
+      track.id === selectedTrack.id
+        ? { ...track, ...patch }
+        : track
+    )))
+  }
+
+  const addTrackEvent = () => {
+    if (!selectedTrack || !eventChapterId || !eventStage) return
+    const existing = selectedTrack.events.find(event => (
+      event.noteId === eventChapterId &&
+      event.stage === eventStage
+    ))
+    if (existing) {
+      updateStorylines(previous => previous.map(track => (
+        track.id !== selectedTrack.id
+          ? track
+          : {
+            ...track,
+            events: track.events.map(event => (
+              event.id === existing.id
+                ? { ...event, note: eventNote.trim() }
+                : event
+            )),
+          }
+      )))
+      setEventNote('')
+      return
+    }
+
+    const eventId = 'event-' + Date.now().toString(36) + '-' +
+      (selectedTrack.events.length + 1)
+    updateStorylines(previous => previous.map(track => (
+      track.id !== selectedTrack.id
+        ? track
+        : {
+          ...track,
+          events: [
+            ...track.events,
+            {
+              id: eventId,
+              noteId: eventChapterId,
+              stage: eventStage,
+              note: eventNote.trim(),
+            },
+          ],
+        }
+    )))
+
+    if (
+      selectedTrack.type === 'foreshadow' &&
+      selectedTrack.sourceNoteId &&
+      eventStage === 'payoff'
+    ) {
+      onMetaChange?.(previous => ({
+        ...previous,
+        storylines: (previous.storylines || []).map(track => (
+          track.id !== selectedTrack.id
+            ? track
+            : {
+              ...track,
+              events: track.events.some(event => (
+                event.noteId === eventChapterId &&
+                event.stage === eventStage
+              ))
+                ? track.events.map(event => (
+                  event.noteId === eventChapterId && event.stage === eventStage
+                    ? { ...event, note: eventNote.trim() }
+                    : event
+                ))
+                : [
+                  ...track.events,
+                  {
+                    id: eventId,
+                    noteId: eventChapterId,
+                    stage: eventStage,
+                    note: eventNote.trim(),
+                  },
+                ],
+            }
+        )),
+        foreshadowStates: {
+          ...previous.foreshadowStates,
+          [selectedTrack.sourceNoteId]: 'recovered',
+        },
+      }))
+    }
+
+    setEventNote('')
+  }
+
+  const removeTrackEvent = (trackId, eventId) => {
+    updateStorylines(previous => previous.map(track => (
+      track.id !== trackId
+        ? track
+        : {
+          ...track,
+          events: track.events.filter(event => event.id !== eventId),
+        }
+    )))
+  }
+
+  const deleteSelectedTrack = () => {
+    if (!selectedTrack) return
+    if (deleteConfirmId !== selectedTrack.id) {
+      setDeleteConfirmId(selectedTrack.id)
+      return
+    }
+    updateStorylines(previous => previous.filter(track => (
+      track.id !== selectedTrack.id
+    )))
+    setSelectedTrackId('')
+    setDeleteConfirmId('')
+  }
 
   return (
     <section className="project-structure-panel" aria-label="长篇结构总览">
@@ -258,6 +467,302 @@ export default function ProjectStructurePanel({
         </section>
       )}
 
+      <section className="project-storyline-system" aria-label="故事线与生命周期">
+        <header>
+          <div>
+            <strong>故事线与生命周期</strong>
+            <span>
+              将剧情线、人物弧光和伏笔生命周期绑定到真实{labels.chapter}节点。
+            </span>
+          </div>
+          <div className="project-storyline-metrics">
+            <span><b>{storylineModel.totals.tracks}</b>轨迹</span>
+            <span><b>{storylineModel.totals.events}</b>节点</span>
+            <span><b>{storylineModel.totals.active}</b>进行中</span>
+            <span><b>{storylineModel.totals.resolved}</b>已收束</span>
+          </div>
+        </header>
+
+        <div className="project-storyline-create">
+          <select
+            value={storylineType}
+            onChange={event => {
+              setStorylineType(event.target.value)
+              setStorylineSource('')
+            }}
+            aria-label="新建轨迹类型"
+          >
+            {storylineTypes.map(item => (
+              <option key={item.id} value={item.id}>{item.label}</option>
+            ))}
+          </select>
+
+          {(storylineType === 'character' || storylineType === 'foreshadow') && (
+            <select
+              value={storylineSource}
+              onChange={event => {
+                const value = event.target.value
+                setStorylineSource(value)
+                if (!storylineTitle.trim()) {
+                  const item = storylineSuggestions.find(entry => (
+                    String(entry.id) === String(value)
+                  ))
+                  if (item) setStorylineTitle(stripExtension(item.title))
+                }
+              }}
+              aria-label="关联现有索引"
+            >
+              <option value="">不关联索引笔记</option>
+              {storylineSuggestions.map(item => (
+                <option key={item.id} value={item.id}>
+                  {stripExtension(item.title)}
+                </option>
+              ))}
+            </select>
+          )}
+
+          <input
+            value={storylineTitle}
+            onChange={event => setStorylineTitle(event.target.value)}
+            placeholder="轨迹名称"
+            aria-label="轨迹名称"
+          />
+          <button
+            type="button"
+            className="btn small primary"
+            onClick={createStoryline}
+          >
+            新建轨迹
+          </button>
+        </div>
+
+        <div className="project-storyline-workspace">
+          <aside className="project-storyline-list">
+            {storylineModel.tracks.map(track => (
+              <button
+                key={track.id}
+                type="button"
+                className={
+                  'type-' + track.type +
+                  (selectedTrackId === track.id ? ' active' : '')
+                }
+                onClick={() => setSelectedTrackId(track.id)}
+              >
+                <span>
+                  {storylineTypes.find(item => item.id === track.type)?.label}
+                </span>
+                <strong>{track.title}</strong>
+                <small>
+                  {track.events.length} 节点 ·
+                  {' '}
+                  {track.status === 'resolved'
+                    ? '已收束'
+                    : track.status === 'active'
+                      ? '进行中'
+                      : '未开始'}
+                </small>
+              </button>
+            ))}
+            {!storylineModel.tracks.length && (
+              <div className="project-storyline-empty">
+                还没有轨迹。可从剧情线、人物弧光或伏笔生命周期开始。
+              </div>
+            )}
+          </aside>
+
+          <div className="project-storyline-editor">
+            {selectedTrack ? (
+              <>
+                <div className="project-storyline-editor-head">
+                  <div>
+                    <span>
+                      {storylineTypes.find(item => item.id === selectedTrack.type)?.label}
+                    </span>
+                    <strong>{selectedTrack.title}</strong>
+                  </div>
+                  <em className={'status-' + selectedTrack.status}>
+                    {selectedTrack.status === 'resolved'
+                      ? '已收束'
+                      : selectedTrack.status === 'active'
+                        ? '进行中'
+                        : '未开始'}
+                  </em>
+                </div>
+
+                <div className="project-storyline-fields">
+                  <label>
+                    <span>名称</span>
+                    <input
+                      value={selectedTrack.title}
+                      onChange={event => updateTrack({
+                        title: event.target.value,
+                      })}
+                      aria-label="编辑轨迹名称"
+                    />
+                  </label>
+                  <label className="wide">
+                    <span>轨迹说明</span>
+                    <input
+                      value={selectedTrack.description}
+                      onChange={event => updateTrack({
+                        description: event.target.value,
+                      })}
+                      placeholder="这条线在整部作品中承担什么作用"
+                      aria-label="轨迹说明"
+                    />
+                  </label>
+                  {selectedTrack.sourceNoteId && (
+                    <button
+                      type="button"
+                      className="btn small"
+                      onClick={() => onOpenFile?.(selectedTrack.sourceNoteId)}
+                    >
+                      打开关联索引
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="btn small danger"
+                    onClick={deleteSelectedTrack}
+                  >
+                    {deleteConfirmId === selectedTrack.id
+                      ? '确认删除'
+                      : '删除轨迹'}
+                  </button>
+                </div>
+
+                <div className="project-storyline-event-form">
+                  <select
+                    value={eventChapterId}
+                    onChange={event => setEventChapterId(event.target.value)}
+                    aria-label="轨迹节点章节"
+                  >
+                    <option value="">选择{labels.chapter}</option>
+                    {storylineModel.catalog.map(chapter => (
+                      <option key={chapter.id} value={chapter.id}>
+                        #{chapter.ordinal} {stripExtension(chapter.title)}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={eventStage}
+                    onChange={event => setEventStage(event.target.value)}
+                    aria-label="轨迹生命周期阶段"
+                  >
+                    {storylineStages.map(stage => (
+                      <option key={stage.id} value={stage.id}>
+                        {stage.label}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    value={eventNote}
+                    onChange={event => setEventNote(event.target.value)}
+                    placeholder="节点说明（可选）"
+                    aria-label="轨迹节点说明"
+                  />
+                  <button
+                    type="button"
+                    className="btn small primary"
+                    disabled={!eventChapterId}
+                    onClick={addTrackEvent}
+                  >
+                    添加节点
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="project-storyline-select-empty">
+                选择左侧轨迹即可编辑说明、生命周期节点和章节关联。
+              </div>
+            )}
+          </div>
+        </div>
+
+        {storylineModel.tracks.length > 0 && (
+          <div className="project-storyline-lanes">
+            {storylineModel.tracks.map(track => (
+              <article key={track.id} className={'type-' + track.type}>
+                <header>
+                  <span>
+                    {storylineTypes.find(item => item.id === track.type)?.label}
+                  </span>
+                  <strong>{track.title}</strong>
+                  <small>
+                    {track.startOrdinal && track.endOrdinal
+                      ? '#' + track.startOrdinal + ' → #' + track.endOrdinal
+                      : '尚未绑定章节'}
+                  </small>
+                </header>
+                <div>
+                  {track.events.map(event => (
+                    <span
+                      key={event.id}
+                      className={'project-storyline-event' + (!event.chapter ? ' orphan' : '')}
+                    >
+                      <button
+                        type="button"
+                        disabled={!event.chapter}
+                        onClick={() => event.chapter && onOpenFile?.(event.noteId)}
+                      >
+                        <b>{event.stageLabel}</b>
+                        <em>
+                          {event.chapter
+                            ? '#' + event.chapter.ordinal + ' ' +
+                              stripExtension(event.chapter.title)
+                            : '原章节已不存在'}
+                        </em>
+                        {event.note && <small>{event.note}</small>}
+                      </button>
+                      {selectedTrackId === track.id && (
+                        <button
+                          type="button"
+                          className="remove"
+                          onClick={() => removeTrackEvent(track.id, event.id)}
+                          aria-label={'删除轨迹节点 ' + event.stageLabel}
+                        >
+                          ×
+                        </button>
+                      )}
+                    </span>
+                  ))}
+                  {!track.events.length && (
+                    <em className="project-storyline-lane-empty">
+                      尚未添加生命周期节点
+                    </em>
+                  )}
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+
+        {(storylineModel.signals.unresolvedForeshadows > 0 ||
+          storylineModel.signals.emptyTracks > 0 ||
+          storylineModel.signals.orphanEvents > 0) && (
+          <div className="project-storyline-signals">
+            {storylineModel.signals.unresolvedForeshadows > 0 && (
+              <span>
+                <b>{storylineModel.signals.unresolvedForeshadows}</b>
+                条伏笔轨迹尚未回收
+              </span>
+            )}
+            {storylineModel.signals.emptyTracks > 0 && (
+              <span>
+                <b>{storylineModel.signals.emptyTracks}</b>
+                条轨迹尚未绑定章节
+              </span>
+            )}
+            {storylineModel.signals.orphanEvents > 0 && (
+              <span>
+                <b>{storylineModel.signals.orphanEvents}</b>
+                个节点引用了已不存在章节
+              </span>
+            )}
+          </div>
+        )}
+      </section>
+
       <div className="project-story-map">
         {filtered.volumes.map(volume => {
           const progress = volume.progress || {}
@@ -327,6 +832,19 @@ export default function ProjectStructurePanel({
                             {MARKER_COPY[item]}
                           </i>
                         ))}
+                      </span>
+                    )}
+
+                    {(storylineModel.chapterEvents[chapter.id] || []).length > 0 && (
+                      <span className="project-storyline-node-links">
+                        {(storylineModel.chapterEvents[chapter.id] || []).slice(0, 3).map(item => (
+                          <i key={item.eventId} className={'type-' + item.trackType}>
+                            {item.stageLabel}
+                          </i>
+                        ))}
+                        {(storylineModel.chapterEvents[chapter.id] || []).length > 3 && (
+                          <i>+{storylineModel.chapterEvents[chapter.id].length - 3}</i>
+                        )}
                       </span>
                     )}
                   </button>
