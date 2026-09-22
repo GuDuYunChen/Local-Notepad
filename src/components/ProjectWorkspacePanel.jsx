@@ -23,6 +23,9 @@ import {
   getVolumeExportIds,
   nextProjectStatus,
   readProjectWorkspaceMeta,
+  splitProjectChapterContent,
+  suggestProjectChapterTitle,
+  uniqueProjectChapterTitle,
   writeProjectWorkspaceMeta,
 } from './projectWorkspaceUtils'
 import ProjectAnalyticsPanel from './ProjectAnalyticsPanel'
@@ -128,6 +131,13 @@ export default function ProjectWorkspacePanel({
   const [batchStatusTarget, setBatchStatusTarget] = useState('review')
   const [batchMoveTarget, setBatchMoveTarget] = useState('__ungrouped__')
   const [batchBusy, setBatchBusy] = useState(false)
+  const [chapterCreateOpen, setChapterCreateOpen] = useState(false)
+  const [chapterCreateTarget, setChapterCreateTarget] = useState('__ungrouped__')
+  const [chapterCreateDraft, setChapterCreateDraft] = useState('')
+  const [chapterCreateBusy, setChapterCreateBusy] = useState(false)
+  const [duplicateBusy, setDuplicateBusy] = useState(false)
+  const [splitPreview, setSplitPreview] = useState(null)
+  const [splitBusy, setSplitBusy] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -243,6 +253,10 @@ export default function ProjectWorkspacePanel({
     setProjectBoardQuery('')
     setProjectBoardStatus('all')
     setProjectBoardVolume('all')
+    setChapterCreateOpen(false)
+    setChapterCreateTarget('__ungrouped__')
+    setChapterCreateDraft('')
+    setSplitPreview(null)
 
     if (!selectedProjectId) {
       setProjectMeta({
@@ -272,6 +286,8 @@ export default function ProjectWorkspacePanel({
     if (activeView === 'project') return
     setSelectionMode(false)
     setSelectedNoteIds([])
+    setChapterCreateOpen(false)
+    setSplitPreview(null)
   }, [activeView])
 
   const loadProjectIndexes = useCallback(async (workspaceValue) => {
@@ -419,6 +435,7 @@ export default function ProjectWorkspacePanel({
   }
 
   const toggleNoteSelection = noteId => {
+    setSplitPreview(null)
     const id = String(noteId || '')
     if (!id) return
     setSelectedNoteIds(previous => (
@@ -429,6 +446,7 @@ export default function ProjectWorkspacePanel({
   }
 
   const toggleVisibleSelection = () => {
+    setSplitPreview(null)
     setSelectedNoteIds(previous => {
       const current = new Set(previous)
       if (allVisibleSelected) {
@@ -498,6 +516,235 @@ export default function ProjectWorkspacePanel({
       toast.error(error.message || '批量移动章节失败')
     } finally {
       setBatchBusy(false)
+    }
+  }
+
+  const createProjectChapters = async ({ quick = false } = {}) => {
+    if (chapterCreateBusy || !workspace?.project?.id) return
+
+    const targetParentId = chapterCreateTarget === '__ungrouped__'
+      ? workspace.project.id
+      : chapterCreateTarget
+    const requested = quick
+      ? [suggestProjectChapterTitle(workspace)]
+      : chapterCreateDraft
+        .split(/\r?\n/)
+        .map(value => value.trim())
+        .filter(Boolean)
+
+    if (!requested.length) {
+      toast.error('请每行输入一个' + labels.chapter + '标题')
+      return
+    }
+
+    setChapterCreateBusy(true)
+    try {
+      const workingFiles = [...files]
+      const created = []
+
+      for (const requestedTitle of requested.slice(0, 50)) {
+        const title = uniqueProjectChapterTitle(
+          workingFiles,
+          targetParentId,
+          requestedTitle,
+        )
+        const note = await api('/api/files', {
+          method: 'POST',
+          body: JSON.stringify({
+            title,
+            content: markdownToLexical(
+              '# ' + displayTitle(title) + '\n\n'
+            ),
+            is_folder: false,
+            parent_id: targetParentId,
+          }),
+        })
+        workingFiles.push(note)
+        created.push(note)
+      }
+
+      await load()
+      setChapterCreateDraft('')
+      toast.success(
+        created.length === 1
+          ? '已新建' + labels.chapter + '“' + displayTitle(created[0].title) + '”'
+          : '已批量新建 ' + created.length + ' 个' + labels.chapter
+      )
+      window.dispatchEvent(new CustomEvent('library:refresh', {
+        detail: { source: 'project-workspace' },
+      }))
+
+      if (quick && created[0]?.id) {
+        onOpenFile?.(created[0].id)
+      }
+    } catch (error) {
+      console.error('新建项目章节失败', error)
+      toast.error(error.message || '新建' + labels.chapter + '失败')
+    } finally {
+      setChapterCreateBusy(false)
+    }
+  }
+
+  const duplicateSelectedNotes = async () => {
+    if (!selectedExportIds.length || duplicateBusy) return
+
+    setDuplicateBusy(true)
+    try {
+      const workingFiles = [...files]
+      let createdCount = 0
+
+      for (const id of selectedExportIds) {
+        const source = workingFiles.find(item => (
+          !item.is_folder && String(item.id) === String(id)
+        ))
+        if (!source) continue
+
+        const extension = String(source.title || '').match(/\.[^.]+$/)?.[0] || '.md'
+        const stem = String(source.title || '未命名').replace(/\.[^.]+$/, '')
+        const title = uniqueProjectChapterTitle(
+          workingFiles,
+          source.parent_id,
+          stem + ' 副本' + extension,
+        )
+        const created = await api('/api/files', {
+          method: 'POST',
+          body: JSON.stringify({
+            title,
+            content: source.content || '',
+            is_folder: false,
+            parent_id: source.parent_id || workspace.project.id,
+          }),
+        })
+        workingFiles.push(created)
+        createdCount += 1
+      }
+
+      await load()
+      setSelectedNoteIds([])
+      toast.success('已复制 ' + createdCount + ' 个' + labels.chapter)
+      window.dispatchEvent(new CustomEvent('library:refresh', {
+        detail: { source: 'project-workspace' },
+      }))
+    } catch (error) {
+      console.error('复制章节失败', error)
+      toast.error(error.message || '复制' + labels.chapter + '失败')
+    } finally {
+      setDuplicateBusy(false)
+    }
+  }
+
+  const previewSelectedSplit = () => {
+    if (selectedExportIds.length !== 1) return
+    const noteId = selectedExportIds[0]
+    const source = files.find(item => (
+      !item.is_folder && String(item.id) === String(noteId)
+    ))
+    if (!source) return
+
+    const split = splitProjectChapterContent(source.content || '')
+    if (!split) {
+      toast.error('未找到可用于拆分的子标题')
+      setSplitPreview(null)
+      return
+    }
+
+    const extension = String(source.title || '').match(/\.[^.]+$/)?.[0] || '.md'
+    setSplitPreview({
+      noteId: source.id,
+      sourceTitle: source.title,
+      parentId: source.parent_id || workspace.project.id,
+      newTitle: uniqueProjectChapterTitle(
+        files,
+        source.parent_id || workspace.project.id,
+        split.title + extension,
+      ),
+      heading: split.title,
+      headContent: split.headContent,
+      tailContent: split.tailContent,
+    })
+  }
+
+  const confirmSplitChapter = async () => {
+    if (!splitPreview || splitBusy) return
+
+    setSplitBusy(true)
+    let created = null
+    try {
+      await api('/api/files/' + splitPreview.noteId + '/versions/snapshot', {
+        method: 'POST',
+      })
+
+      created = await api('/api/files', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: uniqueProjectChapterTitle(
+            files,
+            splitPreview.parentId,
+            splitPreview.newTitle,
+          ),
+          content: splitPreview.tailContent,
+          is_folder: false,
+          parent_id: splitPreview.parentId,
+        }),
+      })
+
+      await api('/api/files/' + splitPreview.noteId, {
+        method: 'PUT',
+        body: JSON.stringify({
+          content: splitPreview.headContent,
+        }),
+      })
+
+      const siblings = files
+        .filter(item => (
+          !item.is_folder &&
+          String(item.parent_id || '') === String(splitPreview.parentId || '')
+        ))
+        .sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0))
+      const sourceIndex = siblings.findIndex(item => (
+        String(item.id) === String(splitPreview.noteId)
+      ))
+      const movePatch = calculateProjectCardMove(
+        [...files, created],
+        created.id,
+        splitPreview.parentId,
+        Math.max(0, sourceIndex + 1),
+      )
+
+      if (movePatch) {
+        const patches = Array.isArray(movePatch.rebalance) && movePatch.rebalance.length
+          ? movePatch.rebalance
+          : [movePatch]
+        for (const item of patches) {
+          await api('/api/files/' + item.id, {
+            method: 'PUT',
+            body: JSON.stringify({
+              parent_id: item.parent_id,
+              sort_order: item.sort_order,
+            }),
+          })
+        }
+      }
+
+      await load()
+      setSelectedNoteIds([])
+      setSplitPreview(null)
+      toast.success('已拆分并创建“' + displayTitle(created.title) + '”')
+      window.dispatchEvent(new CustomEvent('library:refresh', {
+        detail: { source: 'project-workspace' },
+      }))
+    } catch (error) {
+      if (created?.id) {
+        try {
+          await api('/api/files/' + created.id, { method: 'DELETE' })
+        } catch (cleanupError) {
+          console.warn('清理拆分失败的临时章节失败', cleanupError)
+        }
+      }
+      console.error('拆分章节失败', error)
+      toast.error(error.message || '拆分' + labels.chapter + '失败')
+    } finally {
+      setSplitBusy(false)
     }
   }
 
@@ -1163,6 +1410,14 @@ export default function ProjectWorkspacePanel({
             <button
               type="button"
               className="btn primary"
+              disabled={chapterCreateBusy}
+              onClick={() => void createProjectChapters({ quick: true })}
+            >
+              {chapterCreateBusy ? '新建中…' : '新建第一个' + labels.chapter}
+            </button>
+            <button
+              type="button"
+              className="btn"
               disabled={templateBusy}
               onClick={() => void applyProjectTemplate()}
             >
@@ -1230,10 +1485,34 @@ export default function ProjectWorkspacePanel({
         )}
         <button
           type="button"
+          className={'btn small project-board-create-toggle' + (chapterCreateOpen ? ' active' : '')}
+          aria-pressed={chapterCreateOpen}
+          onClick={() => {
+            setChapterCreateOpen(value => !value)
+            setSelectionMode(false)
+            setSelectedNoteIds([])
+            setSplitPreview(null)
+            if (
+              projectBoardVolume !== 'all' &&
+              workspace.volumes.some(volume => (
+                String(volume.id || '__ungrouped__') === String(projectBoardVolume)
+              ))
+            ) {
+              setChapterCreateTarget(projectBoardVolume)
+            }
+          }}
+        >
+          {chapterCreateOpen ? '收起新增' : '新增' + labels.chapter}
+        </button>
+
+        <button
+          type="button"
           className={'btn small project-board-select-toggle' + (selectionMode ? ' active' : '')}
           aria-pressed={selectionMode}
           onClick={() => {
             setProjectActionsOpen(false)
+            setChapterCreateOpen(false)
+            setSplitPreview(null)
             setSelectionMode(value => {
               const next = !value
               if (!next) setSelectedNoteIds([])
@@ -1246,6 +1525,53 @@ export default function ProjectWorkspacePanel({
           {selectionMode ? '结束多选' : '批量选择'}
         </button>
       </section>
+
+      {chapterCreateOpen && (
+        <section className="project-board-createbar" aria-label={'新增' + labels.chapter}>
+          <div className="project-board-create-copy">
+            <strong>新增{labels.chapter}</strong>
+            <span>快速新建会自动命名；批量创建时每行输入一个标题，最多 50 个。</span>
+          </div>
+
+          <select
+            value={chapterCreateTarget}
+            onChange={event => setChapterCreateTarget(event.target.value)}
+            aria-label={'新建目标' + labels.volume}
+          >
+            <option value="__ungrouped__">{labels.ungrouped}</option>
+            {workspace.volumes.filter(volume => volume.id).map(volume => (
+              <option key={volume.id} value={volume.id}>
+                {volume.title}
+              </option>
+            ))}
+          </select>
+
+          <textarea
+            value={chapterCreateDraft}
+            onChange={event => setChapterCreateDraft(event.target.value)}
+            placeholder={'每行一个标题，例如：\n' + suggestProjectChapterTitle(workspace).replace(/\.md$/, '')}
+            aria-label={'批量新增' + labels.chapter + '标题'}
+            rows={2}
+          />
+
+          <button
+            type="button"
+            className="btn small"
+            disabled={chapterCreateBusy}
+            onClick={() => void createProjectChapters({ quick: true })}
+          >
+            {chapterCreateBusy ? '创建中…' : '快速新建'}
+          </button>
+          <button
+            type="button"
+            className="btn small primary"
+            disabled={chapterCreateBusy || !chapterCreateDraft.trim()}
+            onClick={() => void createProjectChapters()}
+          >
+            批量创建
+          </button>
+        </section>
+      )}
 
       {selectionMode && (
         <section className="project-board-bulkbar" aria-label="章节批量操作">
@@ -1289,6 +1615,25 @@ export default function ProjectWorkspacePanel({
               onClick={applyBulkStatus}
             >
               应用状态
+            </button>
+          </div>
+
+          <div className="project-board-bulk-group project-board-bulk-manage">
+            <button
+              type="button"
+              className="btn small"
+              disabled={!selectedExportIds.length || duplicateBusy}
+              onClick={() => void duplicateSelectedNotes()}
+            >
+              {duplicateBusy ? '复制中…' : '复制'}
+            </button>
+            <button
+              type="button"
+              className="btn small"
+              disabled={selectedExportIds.length !== 1 || splitBusy}
+              onClick={previewSelectedSplit}
+            >
+              拆分
             </button>
           </div>
 
@@ -1355,6 +1700,45 @@ export default function ProjectWorkspacePanel({
             onClick={() => setSelectedNoteIds([])}
           >
             取消选择
+          </button>
+        </section>
+      )}
+
+      {selectionMode && splitPreview && (
+        <section className="project-board-split-preview" aria-label="拆分章节预览">
+          <div>
+            <strong>拆分预览</strong>
+            <span>
+              “{displayTitle(splitPreview.sourceTitle)}”将在子标题
+              “{splitPreview.heading}”处拆分；原章节保留前半内容。
+            </span>
+          </div>
+          <label>
+            <span>新章节标题</span>
+            <input
+              value={splitPreview.newTitle}
+              onChange={event => setSplitPreview(previous => ({
+                ...previous,
+                newTitle: event.target.value,
+              }))}
+              aria-label="拆分后的新章节标题"
+            />
+          </label>
+          <button
+            type="button"
+            className="btn small"
+            onClick={() => setSplitPreview(null)}
+            disabled={splitBusy}
+          >
+            取消
+          </button>
+          <button
+            type="button"
+            className="btn small primary"
+            onClick={() => void confirmSplitChapter()}
+            disabled={splitBusy || !splitPreview.newTitle.trim()}
+          >
+            {splitBusy ? '拆分中…' : '确认拆分'}
           </button>
         </section>
       )}
