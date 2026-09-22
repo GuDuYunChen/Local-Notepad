@@ -1496,6 +1496,177 @@ describe('UI redesign smoke tests', () => {
     expect(adjustPlan).toBeTruthy()
     await click(adjustPlan)
     expect(container.textContent).toContain('创作计划')
+
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', {
+        key: '6',
+        altKey: true,
+      }))
+      await Promise.resolve()
+    })
+    expect(container.textContent).toContain('长篇结构总览')
+    expect(
+      container.querySelector('.project-workspace-view-tabs button.active strong')
+        .textContent
+    ).toBe('结构')
+  })
+
+  it('renders and filters the long-form story map with project index coverage', async () => {
+    localStorage.setItem(
+      'localNotepad.projectWorkspace.activeView',
+      'structure'
+    )
+    localStorage.setItem(
+      'localNotepad.projectWorkspace.v1',
+      JSON.stringify({
+        project: {
+          type: 'novel',
+          targetWords: 100000,
+          chapterTargetWords: 3000,
+          statuses: {
+            'chapter-1': 'done',
+            'chapter-2': 'review',
+          },
+          summaries: {
+            'chapter-2': '青崖镇冲突升级',
+          },
+          supportNoteIds: [],
+          foreshadowStates: {},
+          volumeMilestones: {
+            'volume-1': {
+              targetWords: 12000,
+            },
+          },
+          chapterQueue: [],
+          sprint: null,
+          dailyReviews: {},
+        },
+      })
+    )
+
+    listAllFilesWithContent.mockResolvedValue([
+      {
+        id: 'project',
+        title: '故事地图项目',
+        is_folder: true,
+        parent_id: '',
+        sort_order: 100,
+      },
+      {
+        id: 'volume-1',
+        title: '第一卷',
+        is_folder: true,
+        parent_id: 'project',
+        sort_order: 100,
+      },
+      {
+        id: 'volume-2',
+        title: '第二卷',
+        is_folder: true,
+        parent_id: 'project',
+        sort_order: 200,
+      },
+      {
+        id: 'chapter-1',
+        title: '第一章.md',
+        is_folder: false,
+        parent_id: 'volume-1',
+        sort_order: 100,
+        content: JSON.stringify({
+          root: {
+            children: [{
+              type: 'paragraph',
+              children: [{ type: 'text', text: '开篇正文' }],
+            }],
+          },
+        }),
+      },
+      {
+        id: 'chapter-2',
+        title: '第二章.md',
+        is_folder: false,
+        parent_id: 'volume-1',
+        sort_order: 200,
+        content: JSON.stringify({
+          root: {
+            children: [{
+              type: 'paragraph',
+              children: [{ type: 'text', text: '青崖镇正文' }],
+            }],
+          },
+        }),
+      },
+    ])
+
+    tagApi.list.mockResolvedValue([
+      { id: 'tag-character', name: '角色' },
+      { id: 'tag-location', name: '地点' },
+      { id: 'tag-foreshadow', name: '伏笔' },
+    ])
+    tagApi.getFilesByTag.mockImplementation(async tagId => {
+      if (tagId === 'tag-character') {
+        return [{ id: 'chapter-1', title: '第一章.md', updated_at: 1 }]
+      }
+      if (tagId === 'tag-location') {
+        return [{ id: 'chapter-2', title: '第二章.md', updated_at: 2 }]
+      }
+      if (tagId === 'tag-foreshadow') {
+        return [{ id: 'chapter-2', title: '第二章.md', updated_at: 2 }]
+      }
+      return []
+    })
+
+    const onOpenFile = vi.fn()
+    await act(async () => {
+      root.render(
+        <ProjectWorkspacePanel
+          onOpenFile={onOpenFile}
+          onClose={() => {}}
+        />
+      )
+    })
+    await flushPromises()
+    await flushPromises()
+
+    expect(container.textContent).toContain('长篇结构总览')
+    expect(container.textContent).toContain('第一卷')
+    expect(container.textContent).toContain('第二卷')
+    expect(container.querySelectorAll('.project-story-node')).toHaveLength(2)
+    expect(container.textContent).toContain('人物索引')
+    expect(container.textContent).toContain('地点索引')
+    expect(container.textContent).toContain('伏笔索引')
+    expect(container.textContent).toContain('人物')
+    expect(container.textContent).toContain('地点')
+    expect(container.textContent).toContain('伏笔')
+
+    const search = container.querySelector('input[aria-label="搜索故事地图"]')
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        'value',
+      ).set
+      setter.call(search, '青崖镇')
+      search.dispatchEvent(new Event('input', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    expect(container.querySelectorAll('.project-story-node')).toHaveLength(1)
+    const visibleNode = container.querySelector('.project-story-node')
+    expect(visibleNode.textContent).toContain('第二章')
+    expect(visibleNode.textContent).toContain('青崖镇冲突升级')
+
+    await click(visibleNode)
+    expect(onOpenFile).toHaveBeenCalledWith('chapter-2')
+
+    const markerFilter = container.querySelector(
+      'select[aria-label="故事地图索引筛选"]'
+    )
+    await act(async () => {
+      markerFilter.value = 'foreshadows'
+      markerFilter.dispatchEvent(new Event('change', { bubbles: true }))
+      await Promise.resolve()
+    })
+    expect(container.querySelectorAll('.project-story-node')).toHaveLength(1)
   })
 
   it('offers actionable empty states for projects without manuscript chapters', async () => {
