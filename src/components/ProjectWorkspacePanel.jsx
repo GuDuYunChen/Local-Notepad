@@ -627,7 +627,10 @@ export default function ProjectWorkspacePanel({
         <div className="project-workspace-toolbar-actions">
           <select
             value={selectedProjectId}
-            onChange={event => setSelectedProjectId(event.target.value)}
+            onChange={event => {
+              setSelectedProjectId(event.target.value)
+              setProjectActionsOpen(false)
+            }}
             aria-label="选择项目"
           >
             {projects.map(project => (
@@ -779,6 +782,7 @@ export default function ProjectWorkspacePanel({
               setProjectActionsOpen(false)
             }}
             aria-pressed={activeView === view.id}
+            aria-keyshortcuts={'Alt+' + (PROJECT_VIEWS.indexOf(view) + 1)}
             title={view.label + ' · Alt+' + (PROJECT_VIEWS.indexOf(view) + 1)}
           >
             <strong>{view.label}</strong>
