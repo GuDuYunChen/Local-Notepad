@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>Local Notepad</title>
+  <g fill="none" fill-rule="evenodd">
+    <rect x="72" y="72" width="368" height="372" rx="70" fill="#CB7528"/>
+    <rect x="86" y="58" width="338" height="366" rx="58" fill="#E8D9BE"/>
+    <rect x="99" y="48" width="317" height="362" rx="52" fill="#FFF9EB" stroke="#DDCDB2" stroke-width="3"/>
+    <path d="M326 58c0-9 7-16 16-16h34c9 0 16 7 16 16v107l-33-30-33 30V58Z" fill="#D67020" stroke="#9D4913" stroke-width="3"/>
+    <g fill="#4B525A">
+      <rect x="145" y="150" width="149" height="12" rx="6"/>
+      <rect x="145" y="194" width="165" height="12" rx="6"/>
+      <rect x="145" y="238" width="135" height="12" rx="6"/>
+      <rect x="145" y="282" width="109" height="12" rx="6"/>
+      <rect x="145" y="326" width="80" height="12" rx="6"/>
+    </g>
+    <g stroke="#323C46" stroke-width="18" stroke-linecap="round">
+      <path d="M321 307 373 242"/>
+      <path d="M321 307 277 356"/>
+      <path d="M321 307 376 356"/>
+    </g>
+    <g stroke="#FFF9EB" stroke-width="12">
+      <circle cx="373" cy="242" r="25" fill="#323C46"/>
+      <circle cx="277" cy="356" r="25" fill="#323C46"/>
+      <circle cx="376" cy="356" r="25" fill="#323C46"/>
+      <circle cx="321" cy="307" r="29" fill="#DC9133"/>
+    </g>
+    <path d="m347 410 69-72v72h-69Z" fill="#F6E8CA" stroke="#DDCDB2" stroke-width="3"/>
+  </g>
+</svg>
