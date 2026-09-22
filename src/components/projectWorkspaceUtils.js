@@ -630,11 +630,11 @@ export function buildProjectChapterMarkdown(
   const children = Array.isArray(state?.root?.children)
     ? state.root.children
     : []
-  const headings = children
+  const sourceHeadings = children
     .filter(node => node?.type === 'heading')
     .map(node => {
-      const level = Math.max(
-        2,
+      const rawLevel = Math.max(
+        1,
         Math.min(
           6,
           Number(String(node.tag || '').replace('h', '')) ||
@@ -643,12 +643,15 @@ export function buildProjectChapterMarkdown(
         ),
       )
       return {
-        level,
+        rawLevel,
+        level: Math.max(2, rawLevel),
         text: projectNodeText(node).trim().replace(/\s+/g, ' '),
       }
     })
     .filter(item => item.text)
-    .slice(1)
+  const headings = sourceHeadings[0]?.rawLevel === 1
+    ? sourceHeadings.slice(1)
+    : sourceHeadings
 
   if (!headings.length) {
     return presetMarkdown(safeTitle, normalizedType, 'standard')
