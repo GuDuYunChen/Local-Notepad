@@ -253,6 +253,80 @@ describe('project insight utilities', () => {
     )
   })
 
+  it('flags a sustained low-efficiency streak only when the last three effective sessions qualify', () => {
+    const lowSeries = [
+      session({
+        id: 'high-1',
+        noteId: 'a',
+        noteTitle: '第一章.md',
+        hour: 8,
+        elapsedSeconds: 1800,
+        wordDelta: 1200,
+        day: 16,
+      }),
+      session({
+        id: 'high-2',
+        noteId: 'a',
+        noteTitle: '第一章.md',
+        hour: 8,
+        elapsedSeconds: 1800,
+        wordDelta: 1000,
+        day: 17,
+      }),
+      session({
+        id: 'low-1',
+        noteId: 'b',
+        noteTitle: '第二章.md',
+        hour: 20,
+        elapsedSeconds: 1800,
+        wordDelta: 100,
+        day: 19,
+      }),
+      session({
+        id: 'low-2',
+        noteId: 'b',
+        noteTitle: '第二章.md',
+        hour: 20,
+        elapsedSeconds: 1800,
+        wordDelta: 80,
+        day: 20,
+      }),
+      session({
+        id: 'low-3',
+        noteId: 'b',
+        noteTitle: '第二章.md',
+        hour: 20,
+        elapsedSeconds: 1800,
+        wordDelta: 60,
+        day: 21,
+      }),
+    ]
+
+    const snapshot = buildProjectInsights({
+      workspace: workspace(),
+      projectMeta: {
+        targetWords: 100000,
+        dailyGoal: 1000,
+        weeklyGoal: 10000,
+        statuses: {
+          a: 'done',
+          b: 'draft',
+          c: 'review',
+        },
+      },
+      analyticsHistory: analyticsHistory(),
+      sessionHistory: lowSeries,
+      projectIndexes: { foreshadows: [] },
+      periodDays: 7,
+      now,
+    })
+
+    expect(snapshot.alerts.map(item => item.id))
+      .toContain('low-efficiency-streak')
+    expect(snapshot.recommendations.map(item => item.id))
+      .toContain('shorter-session')
+  })
+
   it('generates a report that discloses the observed data window', () => {
     const snapshot = buildProjectInsights({
       workspace: workspace(),
