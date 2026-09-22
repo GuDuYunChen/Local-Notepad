@@ -811,13 +811,6 @@ export default function ProjectWorkspacePanel({
               <strong>创作进度</strong>
               <span>目标字数与章节完成度</span>
             </div>
-            <button
-              type="button"
-              className="btn small"
-              onClick={() => setProjectActionsOpen(true)}
-            >
-              项目操作
-            </button>
           </div>
 
           <label className="project-target-input">
