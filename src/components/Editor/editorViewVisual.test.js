@@ -14,6 +14,15 @@ describe('editor visual defaults', () => {
     })
   })
 
+  it('uses fluid width as the Office Viewer default', () => {
+    expect(DEFAULT_EDITOR_VIEW_SETTINGS.pageWidth).toBe(0)
+    expect(normalizeEditorViewSettings({})).toMatchObject({
+      fontSize: 13,
+      lineHeight: 1.7,
+      pageWidth: 0,
+    })
+  })
+
   it('preserves explicit user view choices within supported bounds', () => {
     expect(normalizeEditorViewSettings({
       fontSize: 18,
