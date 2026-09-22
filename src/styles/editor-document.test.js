@@ -83,6 +83,26 @@ describe('editor document presentation', () => {
     expect(css).not.toContain('nth-child(even)')
   })
 
+  it('refines document block typography and long-table scrolling', () => {
+    const css = read(['src', 'styles', 'editor-document.css'])
+
+    expect(css).toContain('font-variant-ligatures: no-common-ligatures')
+    expect(css).toContain('text-rendering: optimizeLegibility')
+    expect(css).toContain('font-weight: 600')
+    expect(css).toContain('color-mix(in srgb, var(--ink) 68%, var(--surface))')
+    expect(css).toContain('scrollbar-width: thin')
+    expect(css).toContain('overscroll-behavior-x: contain')
+    expect(css).toContain('min-height: 26px')
+    expect(css).toContain('font-size: 0.85em')
+    expect(css).toContain('line-height: 1.6')
+  })
+
+  it('aligns the fluid placeholder with the 32px document inset', () => {
+    const css = read(['src', 'styles', 'editor-document.css'])
+
+    expect(css).toContain('.editor-shell.editor-fluid-page .editor-placeholder {\n  top: 32px !important')
+  })
+
   it('keeps focus writing on the same continuous document surface', () => {
     const css = read(['src', 'styles', 'editor-document.css'])
 
