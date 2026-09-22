@@ -32,16 +32,25 @@ describe('editor document presentation', () => {
 
     expect(css).toContain('--document-canvas: var(--surface)')
     expect(css).toContain('Continuous document surface')
-    expect(css).toContain('padding: 0 60px 96px')
+    expect(css).toContain('padding: 32px 60px 96px')
     expect(css).toContain('.editor-input > :first-child')
     expect(css).not.toContain('--document-page-shadow')
-    expect(css).toContain('margin-top: 24px')
+    expect(css).toContain('margin-top: 0')
     expect(css).toContain('margin-bottom: 16px')
     expect(css).toContain('border-left: 5px solid')
     expect(css).toContain('border-collapse: collapse !important')
     expect(css).toContain('.editor-input .code-block-wrapper')
     expect(css).toContain('.editor-input .callout-block')
     expect(css).toContain('.editor-input .formula-rendered.block')
+  })
+
+  it('keeps stable top breathing room across viewport sizes', () => {
+    const css = read(['src', 'styles', 'editor-document.css'])
+
+    expect(css).toContain('padding: 32px 60px 96px !important')
+    expect(css).toContain('padding: 28px 44px 84px !important')
+    expect(css).toContain('padding: 22px 22px 64px !important')
+    expect(css).toContain('.editor-input > :first-child {\n  margin-top: 0;')
   })
 
   it('sizes markdown tables by content instead of stretching them', () => {
