@@ -11,6 +11,9 @@ import {
   getProjectProgress,
   getProjectIndexAliases,
   getProjectChapterSummary,
+  splitProjectChapterContent,
+  suggestProjectChapterTitle,
+  uniqueProjectChapterTitle,
   getVolumeExportIds,
   nextProjectStatus,
   readProjectWorkspaceMeta,
@@ -233,6 +236,85 @@ describe('project workspace utilities', () => {
         sort_order: 2200,
       },
     ])
+  })
+
+  it('suggests the next long-form chapter title for novels and scripts', () => {
+    const novel = buildProjectWorkspace(files, 'project', { type: 'novel' })
+    const script = buildProjectWorkspace(files, 'project', { type: 'script' })
+
+    expect(suggestProjectChapterTitle(novel)).toBe('第五章.md')
+    expect(suggestProjectChapterTitle(script)).toBe('第五场.md')
+  })
+
+  it('generates duplicate-safe chapter titles inside the target volume', () => {
+    expect(uniqueProjectChapterTitle(
+      files,
+      'volume-1',
+      '第一章.md',
+    )).toBe('第一章 (2).md')
+
+    expect(uniqueProjectChapterTitle(
+      [
+        ...files,
+        {
+          id: 'chapter-copy',
+          title: '第一章 (2).md',
+          is_folder: false,
+          parent_id: 'volume-1',
+        },
+      ],
+      'volume-1',
+      '第一章.md',
+    )).toBe('第一章 (3).md')
+  })
+
+  it('splits a structured chapter at its first child heading and promotes the new title', () => {
+    const content = JSON.stringify({
+      root: {
+        type: 'root',
+        version: 1,
+        children: [
+          {
+            type: 'heading',
+            tag: 'h1',
+            version: 1,
+            children: [{ type: 'text', text: '第一章', version: 1 }],
+          },
+          {
+            type: 'paragraph',
+            version: 1,
+            children: [{ type: 'text', text: '前半正文', version: 1 }],
+          },
+          {
+            type: 'heading',
+            tag: 'h2',
+            version: 1,
+            children: [{ type: 'text', text: '夜入青崖镇', version: 1 }],
+          },
+          {
+            type: 'paragraph',
+            version: 1,
+            children: [{ type: 'text', text: '后半正文', version: 1 }],
+          },
+        ],
+      },
+    })
+
+    const split = splitProjectChapterContent(content)
+    expect(split).toMatchObject({
+      title: '夜入青崖镇',
+      splitIndex: 2,
+    })
+
+    const head = JSON.parse(split.headContent)
+    const tail = JSON.parse(split.tailContent)
+    expect(head.root.children).toHaveLength(2)
+    expect(tail.root.children[0]).toMatchObject({
+      type: 'heading',
+      tag: 'h1',
+    })
+    expect(tail.root.children[0].children[0].text).toBe('夜入青崖镇')
+    expect(tail.root.children[1].children[0].text).toBe('后半正文')
   })
 
   it('filters project volumes by query status and volume while recomputing words', () => {
