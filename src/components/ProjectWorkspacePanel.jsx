@@ -519,12 +519,16 @@ export default function ProjectWorkspacePanel({
     }
   }
 
-  const createProjectChapters = async ({ quick = false } = {}) => {
+  const createProjectChapters = async ({
+    quick = false,
+    targetOverride = '',
+  } = {}) => {
     if (chapterCreateBusy || !workspace?.project?.id) return
 
-    const targetParentId = chapterCreateTarget === '__ungrouped__'
+    const targetValue = targetOverride || chapterCreateTarget
+    const targetParentId = targetValue === '__ungrouped__'
       ? workspace.project.id
-      : chapterCreateTarget
+      : targetValue
     const requested = quick
       ? [suggestProjectChapterTitle(workspace)]
       : chapterCreateDraft
@@ -1417,7 +1421,13 @@ export default function ProjectWorkspacePanel({
               type="button"
               className="btn primary"
               disabled={chapterCreateBusy}
-              onClick={() => void createProjectChapters({ quick: true })}
+              onClick={() => {
+                const firstVolume = workspace.volumes.find(volume => volume.id)
+                void createProjectChapters({
+                  quick: true,
+                  targetOverride: firstVolume?.id || '__ungrouped__',
+                })
+              }}
             >
               {chapterCreateBusy ? '新建中…' : '新建第一个' + labels.chapter}
             </button>
@@ -1498,14 +1508,15 @@ export default function ProjectWorkspacePanel({
             setSelectionMode(false)
             setSelectedNoteIds([])
             setSplitPreview(null)
-            if (
+            const filteredTarget = (
               projectBoardVolume !== 'all' &&
               workspace.volumes.some(volume => (
                 String(volume.id || '__ungrouped__') === String(projectBoardVolume)
               ))
-            ) {
-              setChapterCreateTarget(projectBoardVolume)
-            }
+            )
+              ? projectBoardVolume
+              : (workspace.volumes.find(volume => volume.id)?.id || '__ungrouped__')
+            setChapterCreateTarget(filteredTarget)
           }}
         >
           {chapterCreateOpen ? '收起新增' : '新增' + labels.chapter}
