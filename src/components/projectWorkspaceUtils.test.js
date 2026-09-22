@@ -9,6 +9,7 @@ import {
   getRecentProjectActivity,
   getProjectTemplate,
   getProjectProgress,
+  getProjectVolumeProgress,
   getProjectIndexAliases,
   getProjectChapterSummary,
   buildProjectChapterMarkdown,
@@ -16,7 +17,10 @@ import {
   getProjectVolumeByNoteId,
   splitProjectChapterContent,
   suggestProjectChapterTitle,
+  suggestProjectVolumeTitle,
   uniqueProjectChapterTitle,
+  uniqueProjectVolumeTitle,
+  calculateProjectVolumeMove,
   getVolumeExportIds,
   nextProjectStatus,
   readProjectWorkspaceMeta,
@@ -397,6 +401,83 @@ describe('project workspace utilities', () => {
     expect(JSON.parse(split.tailContent).root.children[0]).toMatchObject({
       type: 'heading',
       tag: 'h1',
+    })
+  })
+
+  it('keeps empty volumes visible until content filters are active', () => {
+    const withEmpty = [
+      ...files,
+      {
+        id: 'volume-empty',
+        title: '第三卷',
+        is_folder: true,
+        parent_id: 'project',
+        sort_order: 300,
+      },
+    ]
+    const workspace = buildProjectWorkspace(withEmpty, 'project', {})
+
+    expect(filterProjectVolumes(workspace, {}, {
+      status: 'all',
+      query: '',
+      volumeId: 'all',
+    }).map(volume => volume.id)).toContain('volume-empty')
+
+    expect(filterProjectVolumes(workspace, {}, {
+      status: 'draft',
+      query: '',
+      volumeId: 'all',
+    }).map(volume => volume.id)).not.toContain('volume-empty')
+  })
+
+  it('suggests duplicate-safe volume names and deterministic volume ordering', () => {
+    const workspace = buildProjectWorkspace(files, 'project', {})
+    expect(suggestProjectVolumeTitle(workspace)).toBe('第三卷')
+    expect(uniqueProjectVolumeTitle(
+      files,
+      'project',
+      '第一卷',
+    )).toBe('第一卷 (2)')
+
+    expect(calculateProjectVolumeMove(
+      files,
+      'project',
+      'volume-2',
+      0,
+    )).toEqual([
+      {
+        id: 'volume-2',
+        parent_id: 'project',
+        sort_order: 1000,
+      },
+      {
+        id: 'volume-1',
+        parent_id: 'project',
+        sort_order: 2000,
+      },
+    ])
+  })
+
+  it('calculates volume word and chapter progress from milestone targets', () => {
+    const workspace = buildProjectWorkspace(files, 'project', {
+      statuses: {
+        'chapter-1': 'done',
+      },
+    })
+    expect(getProjectVolumeProgress(workspace.volumes[1], {
+      volumeMilestones: {
+        'volume-1': {
+          targetWords: 10,
+        },
+      },
+    })).toEqual({
+      key: 'volume-1',
+      wordCount: 5,
+      targetWords: 10,
+      wordPercent: 50,
+      completed: 1,
+      total: 2,
+      chapterPercent: 50,
     })
   })
 
