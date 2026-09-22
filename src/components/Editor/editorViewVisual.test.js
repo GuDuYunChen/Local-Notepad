@@ -9,7 +9,7 @@ describe('editor visual defaults', () => {
     expect(DEFAULT_EDITOR_VIEW_SETTINGS).toMatchObject({
       fontSize: 13,
       lineHeight: 1.7,
-      pageWidth: 860,
+      pageWidth: 0,
       fontFamily: 'system',
     })
   })
