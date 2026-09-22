@@ -71,6 +71,18 @@ describe('editor document presentation', () => {
     expect(css).not.toContain('.editor-input .editor-table {\n  width: 100% !important')
   })
 
+  it('matches Vditor divider inline-code and table density', () => {
+    const css = read(['src', 'styles', 'editor-document.css'])
+
+    expect(css).toContain('height: 2px')
+    expect(css).toContain('margin: 24px 0')
+    expect(css).toContain('font-size: 0.85em')
+    expect(css).toContain('width: max-content !important')
+    expect(css).toContain('padding: 6px 13px')
+    expect(css).toContain('min-height: 24px')
+    expect(css).not.toContain('nth-child(even)')
+  })
+
   it('keeps focus writing on the same continuous document surface', () => {
     const css = read(['src', 'styles', 'editor-document.css'])
 
