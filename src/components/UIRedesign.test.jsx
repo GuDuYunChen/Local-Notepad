@@ -331,7 +331,7 @@ describe('UI redesign smoke tests', () => {
       container.querySelectorAll('.project-workspace-view-tabs button')
     )
     expect(viewButtons.map(button => button.querySelector('strong')?.textContent))
-      .toEqual(['今日', '项目', '计划', '分析', '洞察'])
+      .toEqual(['今日', '项目', '计划', '分析', '洞察', '结构'])
 
     expect(container.textContent).toContain('今日创作中心')
     expect(container.textContent).toContain('创作日历与冲刺')
