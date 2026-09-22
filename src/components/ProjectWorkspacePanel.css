@@ -680,6 +680,27 @@
   font-size: 8px;
 }
 
+.project-volume-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.project-volume-progress {
+  width: 100%;
+  height: 3px;
+  margin-top: 5px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+}
+
+.project-volume-progress i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--clay);
+}
+
 .project-volume-export {
   flex: 0 0 auto;
   display: flex;
@@ -717,6 +738,116 @@
 .project-volume-export button:disabled {
   opacity: .3;
   cursor: default;
+}
+
+.project-volume-manager {
+  flex: 0 0 auto;
+  margin: 8px 16px 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.project-volume-manager-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.project-volume-manager-head > div {
+  min-width: 0;
+  flex: 1;
+}
+
+.project-volume-manager-head strong,
+.project-volume-manager-head span {
+  display: block;
+}
+
+.project-volume-manager-head strong {
+  color: var(--ink);
+  font-size: 10px;
+}
+
+.project-volume-manager-head span {
+  margin-top: 3px;
+  color: var(--ink-muted);
+  font-size: 8px;
+}
+
+.project-volume-manager-grid {
+  margin-top: 9px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px;
+}
+
+.project-volume-manager-grid > label {
+  min-width: 150px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.project-volume-manager-grid label span,
+.project-volume-manager-group > span {
+  color: var(--ink-muted);
+  font-size: 7px;
+  font-weight: 650;
+}
+
+.project-volume-manager-grid input,
+.project-volume-manager-grid select {
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  outline: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: 8px;
+}
+
+.project-volume-manager-grid input:focus,
+.project-volume-manager-grid select:focus {
+  border-color: var(--clay);
+  box-shadow: 0 0 0 2px var(--clay-light);
+}
+
+.project-volume-manager-group {
+  min-height: 48px;
+  padding-left: 8px;
+  display: flex;
+  align-items: end;
+  gap: 5px;
+  border-left: 1px solid var(--line);
+}
+
+.project-volume-manager-group > span {
+  align-self: center;
+  margin-right: 2px;
+}
+
+.project-volume-manager-group select {
+  min-width: 150px;
+}
+
+.project-volume-manager-group.merge {
+  flex: 1 1 290px;
+}
+
+.project-volume-manager-group.merge select {
+  flex: 1;
+  max-width: 220px;
+}
+
+.project-volume-manager .btn.danger {
+  border-color: color-mix(in srgb, #b84444 28%, var(--line));
+  color: #a63b3b;
 }
 
 .project-volume-cards {
@@ -1519,5 +1650,41 @@
 
   .project-volume-export .project-volume-manage {
     padding-inline: 6px;
+  }
+}
+
+@media (max-width: 900px) {
+  .project-volume-manager-grid {
+    align-items: stretch;
+  }
+
+  .project-volume-manager-group {
+    min-height: 0;
+    padding: 7px 0 0;
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+}
+
+@media (max-width: 760px) {
+  .project-volume-manager {
+    margin: 7px 8px 0;
+  }
+
+  .project-volume-manager-grid > label,
+  .project-volume-manager-group,
+  .project-volume-manager-group.merge {
+    min-width: 100%;
+    flex-basis: 100%;
+  }
+
+  .project-volume-manager-group {
+    flex-wrap: wrap;
+  }
+
+  .project-volume-manager-group select,
+  .project-volume-manager-group.merge select {
+    width: 100%;
+    max-width: none;
   }
 }
