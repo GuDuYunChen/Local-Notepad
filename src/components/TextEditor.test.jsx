@@ -277,6 +277,70 @@ describe('TextEditor save coordination', () => {
     })
   })
 
+  it('normalizes legacy table breaks without marking the note dirty', async () => {
+    const legacy = JSON.stringify({
+      root: {
+        type: 'root',
+        children: [{
+          type: 'table',
+          children: [{
+            type: 'tablerow',
+            children: [{
+              type: 'tablecell',
+              children: [{
+                type: 'paragraph',
+                children: [{
+                  type: 'text',
+                  text: '来源：天地灵气。<br>方式：吐纳导引。',
+                  version: 1,
+                }],
+                version: 1,
+              }],
+              version: 1,
+            }],
+            version: 1,
+          }],
+          version: 1,
+        }],
+        version: 1,
+      },
+    })
+    const statuses = []
+
+    api.mockResolvedValue({
+      id: 'file-1',
+      content: legacy,
+      updated_at: 1,
+    })
+
+    await act(async () => {
+      root.render(
+        <TextEditor
+          activeId="file-1"
+          deletedIds={new Set()}
+          autoSaveOnSwitch={false}
+          onChange={() => {}}
+          onLoaded={() => {}}
+          onSaved={() => {}}
+          onStatusChange={(status) => statuses.push(status)}
+        />
+      )
+    })
+    await flushPromises()
+
+    const normalized = JSON.parse(globalThis.__textEditorMockInitialContent)
+    const tableCell = normalized.root.children[0].children[0].children[0]
+    const paragraphChildren = tableCell.children[0].children
+
+    expect(paragraphChildren.some(node => node.type === 'linebreak')).toBe(true)
+    expect(globalThis.__textEditorMockInitialContent).not.toContain('<br>')
+    expect(statuses.at(-1)).toMatchObject({
+      activeId: 'file-1',
+      dirty: false,
+      saveError: false,
+    })
+  })
+
   it('does not write unchanged content on interval or explicit save', async () => {
     api.mockImplementation((path, init) => {
       if (!init?.method) {
