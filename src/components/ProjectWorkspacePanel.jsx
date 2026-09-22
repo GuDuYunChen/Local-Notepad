@@ -120,6 +120,7 @@ export default function ProjectWorkspacePanel({
     chapterQueue: [],
     sprint: null,
     dailyReviews: {},
+    storylines: [],
   })
   const [projectIndexes, setProjectIndexes] = useState({
     characters: [],
@@ -298,6 +299,7 @@ export default function ProjectWorkspacePanel({
         chapterQueue: [],
         sprint: null,
         dailyReviews: {},
+        storylines: [],
       })
       return
     }
@@ -1885,6 +1887,7 @@ export default function ProjectWorkspacePanel({
           workspace={workspace}
           projectMeta={projectMeta}
           projectIndexes={projectIndexes}
+          onMetaChange={updateMeta}
           onOpenFile={onOpenFile}
           onNavigateView={setActiveView}
         />
