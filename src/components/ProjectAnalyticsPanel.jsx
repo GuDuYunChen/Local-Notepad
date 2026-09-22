@@ -26,6 +26,7 @@ export default function ProjectAnalyticsPanel({
   projectIndexes,
   onMetaChange,
   onOpenFile,
+  onNavigateView,
 }) {
   const [history, setHistory] = useState([])
 
@@ -99,6 +100,13 @@ export default function ProjectAnalyticsPanel({
             写作增量从 4.26 第一次打开项目后开始按天记录；不会伪造此前历史。
           </span>
         </div>
+        <button
+          type="button"
+          className="btn small"
+          onClick={() => onNavigateView?.('insights')}
+        >
+          查看洞察
+        </button>
       </div>
 
       <div className="project-analytics-grid">
