@@ -5,6 +5,7 @@ import { HTML5Backend } from 'react-dnd-html5-backend'
 import App from './App'
 import './styles/index.css'
 import './styles/redesign.css'
+import './styles/editor-document.css'
 
 const el = document.getElementById('root')
 if (el) {
