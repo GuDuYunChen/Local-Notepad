@@ -439,6 +439,136 @@ describe('UI redesign smoke tests', () => {
     expect(container.textContent).toContain('剧本项目')
   })
 
+  it('selects visible chapters and applies bulk status and move actions', async () => {
+    localStorage.setItem(
+      'localNotepad.projectWorkspace.activeView',
+      'project'
+    )
+
+    const projectFiles = [
+      {
+        id: 'project',
+        title: '批量项目',
+        is_folder: true,
+        parent_id: '',
+        sort_order: 100,
+      },
+      {
+        id: 'volume-1',
+        title: '第一卷',
+        is_folder: true,
+        parent_id: 'project',
+        sort_order: 100,
+      },
+      {
+        id: 'volume-2',
+        title: '第二卷',
+        is_folder: true,
+        parent_id: 'project',
+        sort_order: 200,
+      },
+      {
+        id: 'chapter-1',
+        title: '第一章.md',
+        is_folder: false,
+        parent_id: 'volume-1',
+        sort_order: 100,
+        content: JSON.stringify({
+          root: {
+            children: [{
+              type: 'paragraph',
+              children: [{ type: 'text', text: '第一章正文' }],
+            }],
+          },
+        }),
+      },
+      {
+        id: 'chapter-2',
+        title: '第二章.md',
+        is_folder: false,
+        parent_id: 'volume-2',
+        sort_order: 100,
+        content: JSON.stringify({
+          root: {
+            children: [{
+              type: 'paragraph',
+              children: [{ type: 'text', text: '第二章正文' }],
+            }],
+          },
+        }),
+      },
+    ]
+
+    listAllFilesWithContent.mockResolvedValue(projectFiles)
+    api.mockResolvedValue(null)
+
+    await act(async () => {
+      root.render(
+        <ProjectWorkspacePanel
+          onOpenFile={() => {}}
+          onClose={() => {}}
+        />
+      )
+    })
+    await flushPromises()
+
+    const bulkToggle = Array.from(container.querySelectorAll('button'))
+      .find(button => button.textContent === '批量选择')
+    expect(bulkToggle).toBeTruthy()
+    await click(bulkToggle)
+
+    const bulkbar = container.querySelector('.project-board-bulkbar')
+    expect(bulkbar).toBeTruthy()
+    expect(container.querySelectorAll('.project-chapter-select input'))
+      .toHaveLength(2)
+
+    const selectVisible = Array.from(bulkbar.querySelectorAll('button'))
+      .find(button => button.textContent === '选择当前结果')
+    await click(selectVisible)
+
+    expect(bulkbar.textContent).toContain('已选 2 章节')
+    expect(container.querySelectorAll('.project-chapter-card.selected'))
+      .toHaveLength(2)
+
+    const applyStatus = Array.from(bulkbar.querySelectorAll('button'))
+      .find(button => button.textContent === '应用状态')
+    await click(applyStatus)
+
+    const saved = JSON.parse(
+      localStorage.getItem('localNotepad.projectWorkspace.v1')
+    )
+    expect(saved.project.statuses).toMatchObject({
+      'chapter-1': 'review',
+      'chapter-2': 'review',
+    })
+
+    const moveTarget = bulkbar.querySelector('select[aria-label="批量移动目标卷"]')
+    await act(async () => {
+      moveTarget.value = 'volume-2'
+      moveTarget.dispatchEvent(new Event('change', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    const move = Array.from(bulkbar.querySelectorAll('button'))
+      .find(button => button.textContent === '移动')
+    await click(move)
+    await flushPromises()
+
+    const moveCalls = api.mock.calls
+      .filter(([requestPath, init]) => (
+        requestPath.startsWith('/api/files/') &&
+        init?.method === 'PUT'
+      ))
+      .map(([requestPath, init]) => ({
+        requestPath,
+        body: JSON.parse(init.body),
+      }))
+
+    expect(moveCalls).toHaveLength(2)
+    expect(moveCalls.every(call => call.body.parent_id === 'volume-2'))
+      .toBe(true)
+  })
+
   it('switches project views with Alt shortcuts without hijacking form input', async () => {
     listAllFilesWithContent.mockResolvedValue([
       {
