@@ -110,6 +110,33 @@ export default function App() {
   const unsaved = !!(current && content !== (current.content || ''))
 
   const select = React.useCallback((f) => {
+    if (
+      focusSession?.active &&
+      (!f?.id || f.id !== focusSession.noteId)
+    ) {
+      const record = finalizeFocusSession(
+        focusSession,
+        editorWordCountRef.current,
+        {
+          endedAt: Date.now(),
+          reason: 'navigation',
+        },
+      )
+
+      if (record) {
+        appendFocusSession(record)
+        window.dispatchEvent(new CustomEvent('focus-session:completed', {
+          detail: {
+            projectId: focusSession.projectId,
+            record,
+          },
+        }))
+      }
+
+      setFocusSession(null)
+      setFocusMode(false)
+    }
+
     setSwitching(true)
     setCurrent(f)
     setContent(f ? (f.content || '') : '')
@@ -137,7 +164,7 @@ export default function App() {
     }
 
     setTimeout(() => setSwitching(false), 180)
-  }, [deletedIds])
+  }, [deletedIds, focusSession])
 
   const requestReferenceRefactor = React.useCallback((config) => {
     const incoming = Number(config?.plan?.summary?.incomingReferences) || 0
@@ -928,7 +955,7 @@ export default function App() {
     return record
   }, [current?.id, focusSession, saveCurrent, workspace])
 
-  const handleStartFocusSession = React.useCallback((
+  const handleStartFocusSession = (
     note,
     durationMinutes,
     project,
@@ -963,34 +990,7 @@ export default function App() {
         console.error('开始专注 Session 失败', error)
         toast.error(error.message || '无法打开目标章节')
       })
-  }, [focusSession?.active])
-
-  useEffect(() => {
-    if (!focusSession?.active) return
-    if (!current?.id || current.id === focusSession.noteId) return
-
-    const record = finalizeFocusSession(
-      focusSession,
-      editorWordCountRef.current,
-      {
-        endedAt: Date.now(),
-        reason: 'navigation',
-      },
-    )
-
-    if (record) {
-      appendFocusSession(record)
-      window.dispatchEvent(new CustomEvent('focus-session:completed', {
-        detail: {
-          projectId: focusSession.projectId,
-          record,
-        },
-      }))
-    }
-
-    setFocusSession(null)
-    setFocusMode(false)
-  }, [current?.id, focusSession])
+  }
 
   const workspaceTitle = workspace === 'projects'
     ? '项目工作台'
