@@ -433,6 +433,148 @@ export function buildProjectBatchMovePlan(files, noteIds, targetParentId) {
     }))
 }
 
+function projectNodeText(node) {
+  if (!node) return ''
+  if (node.type === 'text') return String(node.text || '')
+  if (node.type === 'wiki-link') return String(node.title || '')
+  return (node.children || []).map(projectNodeText).join('')
+}
+
+function chineseProjectNumber(value) {
+  const n = Math.max(1, Math.floor(Number(value) || 1))
+  if (n > 999) return String(n)
+
+  const digits = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九']
+  const underHundred = number => {
+    if (number < 10) return digits[number]
+    const tens = Math.floor(number / 10)
+    const ones = number % 10
+    return (tens === 1 ? '' : digits[tens]) + '十' + (ones ? digits[ones] : '')
+  }
+
+  if (n < 100) return underHundred(n)
+
+  const hundreds = Math.floor(n / 100)
+  const rest = n % 100
+  if (!rest) return digits[hundreds] + '百'
+  if (rest < 10) return digits[hundreds] + '百零' + digits[rest]
+  return digits[hundreds] + '百' + underHundred(rest)
+}
+
+export function suggestProjectChapterTitle(workspace) {
+  const count = Math.max(0, Number(workspace?.chapterCount) || 0) + 1
+  const isScript = workspace?.project?.type === 'script'
+  return '第' + chineseProjectNumber(count) + (isScript ? '场.md' : '章.md')
+}
+
+export function uniqueProjectChapterTitle(files, parentId, requestedTitle) {
+  const targetParent = normalizeId(parentId)
+  const raw = String(requestedTitle || '').trim() || '未命名.md'
+  const hasExtension = /\.[^.]+$/.test(raw)
+  const baseTitle = hasExtension ? raw : raw + '.md'
+  const dot = baseTitle.lastIndexOf('.')
+  const stem = dot > 0 ? baseTitle.slice(0, dot) : baseTitle
+  const extension = dot > 0 ? baseTitle.slice(dot) : ''
+  const existing = new Set(
+    activeItems(files)
+      .filter(item => normalizeId(item.parent_id) === targetParent)
+      .map(item => String(item.title || '').trim().toLocaleLowerCase())
+  )
+
+  if (!existing.has(baseTitle.toLocaleLowerCase())) return baseTitle
+
+  let index = 2
+  while (existing.has(
+    (stem + ' (' + index + ')' + extension).toLocaleLowerCase()
+  )) {
+    index += 1
+  }
+  return stem + ' (' + index + ')' + extension
+}
+
+export function splitProjectChapterContent(content) {
+  let state
+  try {
+    state = typeof content === 'string' ? JSON.parse(content) : content
+  } catch {
+    return null
+  }
+
+  const root = state?.root
+  const children = Array.isArray(root?.children) ? root.children : []
+  if (children.length < 2) return null
+
+  const firstHeadingIndex = children.findIndex(node => node?.type === 'heading')
+  const firstHeadingLevel = firstHeadingIndex >= 0
+    ? Math.max(
+      1,
+      Math.min(
+        6,
+        Number(String(children[firstHeadingIndex]?.tag || '').replace('h', '')) ||
+        Number(children[firstHeadingIndex]?.level) ||
+        1,
+      ),
+    )
+    : 0
+
+  let splitIndex = -1
+  for (let index = Math.max(1, firstHeadingIndex + 1); index < children.length; index++) {
+    const node = children[index]
+    if (node?.type !== 'heading') continue
+    const level = Math.max(
+      1,
+      Math.min(
+        6,
+        Number(String(node.tag || '').replace('h', '')) ||
+        Number(node.level) ||
+        1,
+      ),
+    )
+
+    if (!firstHeadingLevel || level > firstHeadingLevel) {
+      splitIndex = index
+      break
+    }
+  }
+
+  if (splitIndex < 0) return null
+
+  const splitHeading = children[splitIndex]
+  const title = projectNodeText(splitHeading)
+    .trim()
+    .replace(/\s+/g, ' ') || '拆分章节'
+  const tailHeading = {
+    ...splitHeading,
+    tag: 'h1',
+  }
+  if ('level' in tailHeading) tailHeading.level = 1
+
+  const headState = {
+    ...state,
+    root: {
+      ...root,
+      children: children.slice(0, splitIndex),
+    },
+  }
+  const tailState = {
+    ...state,
+    root: {
+      ...root,
+      children: [
+        tailHeading,
+        ...children.slice(splitIndex + 1),
+      ],
+    },
+  }
+
+  return {
+    title,
+    splitIndex,
+    headContent: JSON.stringify(headState),
+    tailContent: JSON.stringify(tailState),
+  }
+}
+
 export function getProjectProgress(workspace, projectMeta = {}) {
   const totalWords = Number(workspace?.totalWords) || 0
   const targetWords = Math.max(0, Number(projectMeta?.targetWords) || 0)
