@@ -12,11 +12,18 @@ import NameDialog from './NameDialog'
 import ReferenceRefactorDialog from './ReferenceRefactorDialog'
 import LongFormStructurePanel from './LongFormStructurePanel'
 import ProjectWorkspacePanel from './ProjectWorkspacePanel'
+import ProjectTodayCenter from './ProjectTodayCenter'
+import FocusSessionBar from './FocusSessionBar'
 import { compareLibraryItems } from './FileList'
 import { statusLabel } from './InspectorPanel'
 import { toast } from '~/services/toast'
 import { api, listAllFilesWithContent, searchFiles } from '~/services/api'
 import { tagApi } from '~/services/tagApi'
+import {
+  appendFocusSession,
+  createFocusSession,
+  finalizeFocusSession,
+} from './focusSessionUtils'
 
 vi.mock('./ThemeToggle', () => ({
   default: function MockThemeToggle() {
@@ -321,6 +328,9 @@ describe('UI redesign smoke tests', () => {
     expect(container.textContent).toContain('第一章')
     expect(container.textContent).toContain('3 字')
     expect(container.textContent).toContain('草稿')
+    expect(container.textContent).toContain('今日创作中心')
+    expect(container.textContent).toContain('今日任务')
+    expect(container.textContent).toContain('今日 Session')
     expect(container.textContent).toContain('创作进度')
     expect(container.textContent).toContain('最近写作')
     expect(container.textContent).toContain('项目索引')
@@ -555,6 +565,115 @@ describe('UI redesign smoke tests', () => {
     expect(foreshadowState).toBeTruthy()
     await click(foreshadowState)
     expect(container.textContent).toContain('已回收')
+  })
+
+  it('starts a timed focus session from the today creative center', async () => {
+    const onStartFocus = vi.fn()
+    const onOpenFile = vi.fn()
+    const workspace = {
+      project: { id: 'project', title: '长篇小说', type: 'novel' },
+      volumes: [{
+        id: 'v1',
+        title: '第一卷',
+        notes: [
+          {
+            id: 'chapter-1',
+            title: '第一章.md',
+            status: 'draft',
+          },
+          {
+            id: 'chapter-2',
+            title: '第二章.md',
+            status: 'review',
+          },
+        ],
+      }],
+    }
+
+    const completed = finalizeFocusSession(
+      createFocusSession({
+        projectId: 'project',
+        noteId: 'chapter-2',
+        noteTitle: '第二章.md',
+        durationMinutes: 25,
+        startWords: 1000,
+        startedAt: Date.now() - 1800000,
+      }),
+      1450,
+      {
+        endedAt: Date.now() - 300000,
+      },
+    )
+    appendFocusSession(completed)
+
+    await act(async () => {
+      root.render(
+        <ProjectTodayCenter
+          workspace={workspace}
+          projectMeta={{
+            chapterQueue: ['chapter-1', 'chapter-2'],
+            dailyReviews: {},
+          }}
+          onOpenFile={onOpenFile}
+          onStartFocus={onStartFocus}
+        />
+      )
+    })
+
+    expect(container.textContent).toContain('今日创作中心')
+    expect(container.textContent).toContain('第一章')
+    expect(container.textContent).toContain('最近 Session')
+    expect(container.textContent).toContain('+450 字')
+
+    const primary = Array.from(container.querySelectorAll('button'))
+      .find(button => button.textContent.includes('开始下一章 · 50 分钟'))
+    expect(primary).toBeTruthy()
+    await click(primary)
+
+    expect(onStartFocus).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'chapter-1' }),
+      50,
+    )
+  })
+
+  it('shows focus session words timer controls and end action', async () => {
+    const onEnd = vi.fn()
+    const onToggleFocus = vi.fn()
+    const session = createFocusSession({
+      projectId: 'project',
+      noteId: 'chapter-1',
+      noteTitle: '第一章.md',
+      durationMinutes: 50,
+      startWords: 1000,
+      startedAt: Date.now(),
+    })
+
+    await act(async () => {
+      root.render(
+        <FocusSessionBar
+          session={session}
+          currentWords={1280}
+          focused
+          onToggleFocus={onToggleFocus}
+          onEnd={onEnd}
+        />
+      )
+    })
+
+    expect(container.textContent).toContain('专注 Session')
+    expect(container.textContent).toContain('第一章')
+    expect(container.textContent).toContain('+280')
+    expect(container.textContent).toContain('结束 Session')
+
+    const toggle = Array.from(container.querySelectorAll('button'))
+      .find(button => button.textContent === '显示界面')
+    await click(toggle)
+    expect(onToggleFocus).toHaveBeenCalledTimes(1)
+
+    const end = Array.from(container.querySelectorAll('button'))
+      .find(button => button.textContent === '结束 Session')
+    await click(end)
+    expect(onEnd).toHaveBeenCalledTimes(1)
   })
 
   it('renders and reorders a long-form volume chapter structure', async () => {
