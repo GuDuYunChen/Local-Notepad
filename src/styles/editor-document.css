@@ -99,7 +99,7 @@
   max-width: var(--editor-view-page-width, 860px) !important;
   min-height: 100% !important;
   margin: 0 auto !important;
-  padding: 54px 60px 110px !important;
+  padding: 0 60px 96px !important;
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -115,7 +115,7 @@
     "Microsoft YaHei",
     sans-serif
   ) !important;
-  font-size: var(--editor-view-font-size, 16px) !important;
+  font-size: var(--editor-view-font-size, 13px) !important;
   line-height: var(--editor-view-line-height, 1.7) !important;
   letter-spacing: 0;
   word-break: break-word;
@@ -127,7 +127,7 @@
 }
 
 .editor-placeholder {
-  top: 54px !important;
+  top: 18px !important;
   left: 50% !important;
   width: min(var(--editor-view-page-width, 860px), calc(100% - 32px));
   padding-left: 60px;
@@ -135,7 +135,7 @@
   box-sizing: border-box;
   color: var(--ink-muted);
   font-family: var(--editor-view-font-family, inherit);
-  font-size: var(--editor-view-font-size, 16px) !important;
+  font-size: var(--editor-view-font-size, 13px) !important;
   opacity: 0.5;
 }
 
@@ -144,13 +144,26 @@
   max-width: none !important;
   min-height: 100% !important;
   margin: 0 !important;
-  padding: 54px max(32px, 6vw) 96px !important;
+  padding: 0 max(32px, 6vw) 96px !important;
 }
 
 .editor-shell.editor-fluid-page .editor-placeholder {
-  top: 54px !important;
+  top: 18px !important;
   width: 100%;
   padding-left: max(32px, 6vw);
+}
+
+.editor-input > :first-child {
+  margin-top: 18px;
+}
+
+.editor-input > .editor-heading-h1:first-child,
+.editor-input > .editor-heading-h2:first-child,
+.editor-input > .editor-heading-h3:first-child,
+.editor-input > .editor-heading-h4:first-child,
+.editor-input > .editor-heading-h5:first-child,
+.editor-input > .editor-heading-h6:first-child {
+  margin-top: 24px;
 }
 
 /* Document rhythm follows the Office Viewer/Vditor reset model:
@@ -180,10 +193,10 @@
 }
 
 .editor-input .editor-heading-h1 { font-size: 1.75em; }
-.editor-input .editor-heading-h2 { font-size: 1.52em; }
-.editor-input .editor-heading-h3 { font-size: 1.32em; }
-.editor-input .editor-heading-h4 { font-size: 1.18em; }
-.editor-input .editor-heading-h5 { font-size: 1.06em; }
+.editor-input .editor-heading-h2 { font-size: 1.55em; }
+.editor-input .editor-heading-h3 { font-size: 1.38em; }
+.editor-input .editor-heading-h4 { font-size: 1.25em; }
+.editor-input .editor-heading-h5 { font-size: 1.13em; }
 .editor-input .editor-heading-h6 {
   font-size: 1em;
   color: var(--ink-soft);
@@ -247,14 +260,14 @@
   border: 0;
   border-radius: 0;
   background: transparent;
-  font-size: 0.9em;
-  line-height: 1.55;
+  font-size: 1em;
+  line-height: 1.5;
 }
 
 .editor-input .editor-table-cell {
   min-width: 80px;
   max-width: 320px;
-  padding: 7px 11px;
+  padding: 6px 13px;
   border: 1px solid var(--line) !important;
   background: var(--surface);
   vertical-align: top;
@@ -330,7 +343,7 @@
 /* Custom blocks share one document visual language. */
 .editor-input .divider-block {
   height: 1px;
-  margin: 24px 0;
+  margin: 12px 0;
   background: var(--line);
 }
 
@@ -427,7 +440,7 @@
 }
 
 .focus-mode .editor-placeholder {
-  top: 54px !important;
+  top: 18px !important;
 }
 
 .focus-session-active .editor-input {
@@ -449,11 +462,11 @@
     width: calc(100% - 24px) !important;
     min-height: 100% !important;
     margin: 0 auto !important;
-    padding: 48px 44px 84px !important;
+    padding: 0 44px 84px !important;
   }
 
   .editor-placeholder {
-    top: 48px !important;
+    top: 18px !important;
     width: calc(100% - 24px);
     padding-left: 44px;
   }
@@ -470,11 +483,11 @@
     max-width: 100% !important;
     min-height: 100% !important;
     margin: 0 !important;
-    padding: 34px 22px 64px !important;
+    padding: 0 22px 64px !important;
   }
 
   .editor-placeholder {
-    top: 34px !important;
+    top: 18px !important;
     width: 100%;
     padding-left: 22px;
   }
