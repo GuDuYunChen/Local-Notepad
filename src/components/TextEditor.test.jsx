@@ -4,6 +4,7 @@ import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import TextEditor from './TextEditor'
 import { api } from '~/services/api'
+import { removeEditorDraft } from '~/services/editorDraftCache'
 
 vi.mock('~/services/api', () => ({
   api: vi.fn(),
@@ -43,6 +44,9 @@ describe('TextEditor save coordination', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     api.mockReset()
+    localStorage.clear()
+    removeEditorDraft('file-1')
+    removeEditorDraft('file-2')
     globalThis.IS_REACT_ACT_ENVIRONMENT = true
     container = document.createElement('div')
     document.body.appendChild(container)
