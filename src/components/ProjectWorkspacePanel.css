@@ -411,6 +411,64 @@
   font-size: 7px;
 }
 
+.project-board-select-toggle.active {
+  border-color: color-mix(in srgb, var(--clay) 38%, var(--line));
+  background: var(--clay-light);
+  color: var(--clay);
+}
+
+.project-board-bulkbar {
+  flex: 0 0 auto;
+  margin: 8px 16px 0;
+  padding: 7px 8px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid color-mix(in srgb, var(--clay) 26%, var(--line));
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--clay-light) 42%, var(--surface));
+}
+
+.project-board-bulk-summary {
+  min-width: 124px;
+  margin-right: auto;
+}
+
+.project-board-bulk-summary strong,
+.project-board-bulk-summary span {
+  display: block;
+}
+
+.project-board-bulk-summary strong {
+  color: var(--ink);
+  font-size: 9px;
+  font-weight: 680;
+}
+
+.project-board-bulk-summary span {
+  margin-top: 2px;
+  color: var(--ink-muted);
+  font-size: 7px;
+}
+
+.project-board-bulk-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.project-board-bulk-group select {
+  height: 28px;
+  max-width: 132px;
+  padding: 0 24px 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 8px;
+}
+
 .project-board-filter-empty {
   min-height: 180px;
   flex: 1;
@@ -545,6 +603,56 @@
   border-radius: 8px;
   background: var(--paper);
   cursor: grab;
+}
+
+.project-chapter-card.selection-mode {
+  cursor: default;
+}
+
+.project-chapter-card.selected {
+  border-color: color-mix(in srgb, var(--clay) 48%, var(--line));
+  background: color-mix(in srgb, var(--clay-light) 34%, var(--paper));
+  box-shadow: inset 2px 0 0 var(--clay);
+}
+
+.project-chapter-select {
+  width: 22px;
+  min-width: 22px;
+  display: grid;
+  place-items: center;
+  align-self: stretch;
+  cursor: pointer;
+}
+
+.project-chapter-select input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.project-chapter-select span {
+  width: 15px;
+  height: 15px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  background: var(--surface);
+  color: transparent;
+  font-size: 9px;
+  font-weight: 750;
+  transition: border-color .12s ease, background .12s ease, color .12s ease;
+}
+
+.project-chapter-select input:checked + span {
+  border-color: var(--clay);
+  background: var(--clay);
+  color: var(--surface);
+}
+
+.project-chapter-select input:focus-visible + span {
+  outline: 2px solid color-mix(in srgb, var(--clay) 35%, transparent);
+  outline-offset: 2px;
 }
 
 .project-chapter-card:hover {
@@ -1159,5 +1267,32 @@
 
   .project-board-filter-summary {
     min-width: 72px;
+  }
+}
+
+@media (max-width: 900px) {
+  .project-board-bulkbar {
+    flex-wrap: wrap;
+  }
+
+  .project-board-bulk-summary {
+    min-width: 100%;
+    margin-right: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .project-board-bulkbar {
+    margin: 7px 8px 0;
+  }
+
+  .project-board-bulk-group {
+    flex: 1 1 170px;
+  }
+
+  .project-board-bulk-group select {
+    min-width: 0;
+    max-width: none;
+    flex: 1;
   }
 }
