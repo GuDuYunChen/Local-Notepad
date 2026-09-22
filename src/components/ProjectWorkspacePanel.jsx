@@ -1887,7 +1887,6 @@ export default function ProjectWorkspacePanel({
           workspace={workspace}
           projectMeta={projectMeta}
           projectIndexes={projectIndexes}
-          onMetaChange={updateMeta}
           onOpenFile={onOpenFile}
           onNavigateView={setActiveView}
         />
@@ -1898,6 +1897,7 @@ export default function ProjectWorkspacePanel({
           workspace={workspace}
           projectMeta={projectMeta}
           projectIndexes={projectIndexes}
+          onMetaChange={updateMeta}
           onOpenFile={onOpenFile}
           onNavigateView={setActiveView}
         />
