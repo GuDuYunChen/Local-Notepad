@@ -5,6 +5,7 @@ import { BrowserWindow } from 'electron'
 import {
     codeBlockText,
     embedLocalImagesInLexical,
+    materializeLocalAssetsInLexical,
     fetchAllFileMetadata,
     headingLevel,
     indexChildrenByParent,
