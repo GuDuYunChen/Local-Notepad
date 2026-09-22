@@ -23,11 +23,13 @@ describe('WikiLinkNode', () => {
         version: 1,
         id: 'file-123',
         title: '目标笔记',
+        sectionPath: [],
       })
 
       const restored = WikiLinkNode.importJSON(json)
       expect(restored.getId()).toBe('file-123')
       expect(restored.getTitle()).toBe('目标笔记')
+      expect(restored.getSectionPath()).toEqual([])
       expect(restored.getTextContent()).toBe('[[目标笔记]]')
       expect(restored.isInline()).toBe(true)
     }, { discrete: true })
