@@ -54,6 +54,7 @@ export default function ProjectInsightsPanel({
   projectMeta,
   projectIndexes,
   onOpenFile,
+  onNavigateView,
 }) {
   const projectId = workspace?.project?.id || ''
   const [periodDays, setPeriodDays] = useState(7)
@@ -167,7 +168,15 @@ export default function ProjectInsightsPanel({
           </span>
         </div>
 
-        <div className="project-insights-period">
+        <div className="project-insights-head-actions">
+          <button
+            type="button"
+            className="btn small"
+            onClick={() => onNavigateView?.('planning')}
+          >
+            调整计划
+          </button>
+          <div className="project-insights-period">
           {[7, 30].map(days => (
             <button
               key={days}
@@ -181,6 +190,7 @@ export default function ProjectInsightsPanel({
               {days} 天
             </button>
           ))}
+          </div>
         </div>
       </div>
 
