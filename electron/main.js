@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, shell } from 'electron'
 import { spawn } from 'node:child_process'
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -13,6 +13,7 @@ import { parseImportPaths, selectAndParseFiles } from './import.js'
 import { ensureBackupDir, getDefaultBackupDir, getDefaultDataDir, listBackups } from './backup.js'
 import { stopChildProcess, waitForHttpService } from './backend-process.js'
 import { classifyNavigation } from './navigation.js'
+import { APP_ICON_DATA_URL } from '../src/assets/appIconData.js'
 
 // 应用主进程：负责创建窗口、设置安全选项
 let mainWindow = null
@@ -21,12 +22,7 @@ let allowQuit = false
 
 async function createWindow() {
   const isDev = !app.isPackaged
-  // 确保开发和生产环境都能正确找到图标
-  // 在开发环境，使用 __dirname 向上查找 build 目录
-  // 在生产环境，build/icon.ico 已被打包到 resources 目录或 app.asar 中
-  const iconPath = isDev 
-    ? path.join(__dirname, '../../build/icon.ico')
-    : path.join(app.getAppPath(), 'build/icon.ico')
+  const appIcon = nativeImage.createFromDataURL(APP_ICON_DATA_URL)
 
   mainWindow = new BrowserWindow({
     width: 1100,
@@ -36,7 +32,7 @@ async function createWindow() {
     show: false,
     backgroundColor: '#f6f6f8',
     title: 'Notepad',
-    icon: iconPath, // Windows 上传字符串路径兼容性通常更好
+    icon: appIcon,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
