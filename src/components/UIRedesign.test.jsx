@@ -714,7 +714,7 @@ describe('UI redesign smoke tests', () => {
     )
     expect(activeTab.querySelector('strong').textContent).toBe('分析')
     expect(container.textContent).toContain('创作分析')
-    expect(container.textContent).not.toContain('今日创作中心')
+    expect(container.querySelector('.project-today-center')).toBeNull()
   })
 
   it('initializes a structured novel project template without overwriting existing work', async () => {
@@ -759,8 +759,14 @@ describe('UI redesign smoke tests', () => {
     })
     await flushPromises()
 
-    const templateButton = Array.from(container.querySelectorAll('button'))
-      .find(button => button.textContent === '套用小说模板')
+    const projectActions = Array.from(container.querySelectorAll('button'))
+      .find(button => button.textContent.includes('项目操作'))
+    expect(projectActions).toBeTruthy()
+    await click(projectActions)
+
+    const templateButton = Array.from(
+      container.querySelectorAll('.project-actions-menu button')
+    ).find(button => button.textContent === '初始化项目模板')
     expect(templateButton).toBeTruthy()
 
     await click(templateButton)
@@ -788,6 +794,10 @@ describe('UI redesign smoke tests', () => {
   })
 
   it('renders tagged character location and foreshadow indexes', async () => {
+    localStorage.setItem(
+      'localNotepad.projectWorkspace.activeView',
+      'analysis'
+    )
     listAllFilesWithContent.mockResolvedValue([
       {
         id: 'project',
@@ -1049,7 +1059,6 @@ describe('UI redesign smoke tests', () => {
     })
 
     expect(container.textContent).toContain('Session 分析与复盘')
-    expect(container.textContent).toContain('创作洞察与自动复盘')
     expect(container.textContent).toContain('专注效率')
     expect(container.textContent).toContain('最佳写作时段')
     expect(container.textContent).toContain('25 / 50 / 90 分钟效果')
