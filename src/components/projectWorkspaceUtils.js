@@ -492,6 +492,182 @@ export function uniqueProjectChapterTitle(files, parentId, requestedTitle) {
   return stem + ' (' + index + ')' + extension
 }
 
+export function getProjectChapterPresets(type = 'novel') {
+  if (type === 'script') {
+    return [
+      { id: 'standard', label: '标准场次' },
+      { id: 'action', label: '动作场' },
+      { id: 'dialogue', label: '对话场' },
+      { id: 'blank', label: '空白' },
+    ]
+  }
+
+  return [
+    { id: 'standard', label: '标准章节' },
+    { id: 'conflict', label: '冲突推进' },
+    { id: 'reveal', label: '信息揭示' },
+    { id: 'blank', label: '空白' },
+  ]
+}
+
+function presetMarkdown(title, type, presetId) {
+  const heading = '# ' + String(title || '未命名').replace(/\.[^.]+$/, '')
+
+  if (presetId === 'blank') {
+    return heading + '\n\n'
+  }
+
+  if (type === 'script') {
+    if (presetId === 'action') {
+      return [
+        heading,
+        '',
+        '## 场景目标',
+        '',
+        '## 动作节拍',
+        '',
+        '## 冲突升级',
+        '',
+        '## 收束',
+        '',
+      ].join('\n')
+    }
+    if (presetId === 'dialogue') {
+      return [
+        heading,
+        '',
+        '## 场景目标',
+        '',
+        '## 对话推进',
+        '',
+        '## 潜台词与信息差',
+        '',
+        '## 转折',
+        '',
+      ].join('\n')
+    }
+    return [
+      heading,
+      '',
+      '## 场景目标',
+      '',
+      '## 动作与对白',
+      '',
+      '## 转折',
+      '',
+    ].join('\n')
+  }
+
+  if (presetId === 'conflict') {
+    return [
+      heading,
+      '',
+      '## 本章目标',
+      '',
+      '## 冲突建立',
+      '',
+      '## 压力升级',
+      '',
+      '## 关键转折',
+      '',
+      '## 章末钩子',
+      '',
+    ].join('\n')
+  }
+  if (presetId === 'reveal') {
+    return [
+      heading,
+      '',
+      '## 本章目标',
+      '',
+      '## 线索铺垫',
+      '',
+      '## 信息揭示',
+      '',
+      '## 角色反应',
+      '',
+      '## 后续悬念',
+      '',
+    ].join('\n')
+  }
+
+  return [
+    heading,
+    '',
+    '## 本章目标',
+    '',
+    '## 核心推进',
+    '',
+    '## 关键转折',
+    '',
+    '## 收束与钩子',
+    '',
+  ].join('\n')
+}
+
+export function buildProjectChapterMarkdown(
+  title,
+  type = 'novel',
+  presetId = 'standard',
+  sourceContent = '',
+) {
+  const normalizedType = type === 'script' ? 'script' : 'novel'
+  const safeTitle = String(title || '未命名').trim() || '未命名'
+
+  if (presetId !== 'continue') {
+    return presetMarkdown(safeTitle, normalizedType, presetId)
+  }
+
+  let state
+  try {
+    state = typeof sourceContent === 'string'
+      ? JSON.parse(sourceContent)
+      : sourceContent
+  } catch {
+    state = null
+  }
+
+  const children = Array.isArray(state?.root?.children)
+    ? state.root.children
+    : []
+  const headings = children
+    .filter(node => node?.type === 'heading')
+    .map(node => {
+      const level = Math.max(
+        2,
+        Math.min(
+          6,
+          Number(String(node.tag || '').replace('h', '')) ||
+          Number(node.level) ||
+          2,
+        ),
+      )
+      return {
+        level,
+        text: projectNodeText(node).trim().replace(/\s+/g, ' '),
+      }
+    })
+    .filter(item => item.text)
+    .slice(1)
+
+  if (!headings.length) {
+    return presetMarkdown(safeTitle, normalizedType, 'standard')
+  }
+
+  const lines = ['# ' + safeTitle.replace(/\.[^.]+$/, ''), '']
+  for (const item of headings.slice(0, 12)) {
+    lines.push('#'.repeat(item.level) + ' ' + item.text, '')
+  }
+  return lines.join('\n')
+}
+
+export function getProjectVolumeByNoteId(workspace, noteId) {
+  const id = normalizeId(noteId)
+  return (workspace?.volumes || []).find(volume => (
+    (volume.notes || []).some(note => normalizeId(note.id) === id)
+  )) || null
+}
+
 export function splitProjectChapterContent(content) {
   let state
   try {
