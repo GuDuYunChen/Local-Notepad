@@ -191,6 +191,19 @@ export default function ProjectWorkspacePanel({
   }, [])
 
   useEffect(() => {
+    if (!selectionMode) return undefined
+
+    const exitSelection = event => {
+      if (event.key !== 'Escape') return
+      setSelectionMode(false)
+      setSelectedNoteIds([])
+    }
+
+    window.addEventListener('keydown', exitSelection)
+    return () => window.removeEventListener('keydown', exitSelection)
+  }, [selectionMode])
+
+  useEffect(() => {
     if (!projectActionsOpen) return undefined
 
     const close = event => {
@@ -1201,6 +1214,7 @@ export default function ProjectWorkspacePanel({
           className={'btn small project-board-select-toggle' + (selectionMode ? ' active' : '')}
           aria-pressed={selectionMode}
           onClick={() => {
+            setProjectActionsOpen(false)
             setSelectionMode(value => {
               const next = !value
               if (!next) setSelectedNoteIds([])
