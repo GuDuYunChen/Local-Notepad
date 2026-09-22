@@ -440,6 +440,11 @@ export default function ProjectWorkspacePanel({
     Math.max(0, (chapterCreateVolume?.notes?.length || 1) - 1)
   ] || null
 
+  useEffect(() => {
+    if (chapterCreatePresets.some(preset => preset.id === chapterCreateTemplate)) return
+    setChapterCreateTemplate('standard')
+  }, [chapterCreatePresets, chapterCreateTemplate])
+
   const updateMeta = next => {
     setProjectMeta(previous => {
       const value = typeof next === 'function' ? next(previous) : next
