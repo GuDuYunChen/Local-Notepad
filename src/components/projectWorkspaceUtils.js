@@ -396,6 +396,43 @@ export function filterProjectVolumes(workspace, projectMeta = {}, filters = {}) 
     .filter(volume => volume.notes.length > 0)
 }
 
+export function buildProjectBatchMovePlan(files, noteIds, targetParentId) {
+  const ids = [...new Set(
+    (Array.isArray(noteIds) ? noteIds : [])
+      .map(normalizeId)
+      .filter(Boolean)
+  )]
+  if (!ids.length) return []
+
+  const items = activeItems(files)
+  const selectedSet = new Set(ids)
+  const notesById = new Map(
+    items
+      .filter(item => !item.is_folder)
+      .map(item => [normalizeId(item.id), item])
+  )
+  const targetId = normalizeId(targetParentId)
+  const targetSiblings = sortAscendingByLibraryOrder(
+    items.filter(item => (
+      !item.is_folder &&
+      normalizeId(item.parent_id) === targetId &&
+      !selectedSet.has(normalizeId(item.id))
+    ))
+  )
+  const lastSortOrder = targetSiblings.reduce(
+    (max, item) => Math.max(max, Number(item.sort_order) || 0),
+    0,
+  )
+
+  return ids
+    .filter(id => notesById.has(id))
+    .map((id, index) => ({
+      id,
+      parent_id: targetId,
+      sort_order: lastSortOrder + ((index + 1) * 1000),
+    }))
+}
+
 export function getProjectProgress(workspace, projectMeta = {}) {
   const totalWords = Number(workspace?.totalWords) || 0
   const targetWords = Math.max(0, Number(projectMeta?.targetWords) || 0)
