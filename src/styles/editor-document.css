@@ -226,7 +226,7 @@
   border-radius: 4px;
   background: color-mix(in srgb, var(--ink) 5%, var(--surface));
   color: var(--ink-soft);
-  font-size: 0.88em;
+  font-size: 0.85em;
 }
 
 /* Tables are document blocks, not spreadsheet chrome. */
@@ -261,14 +261,17 @@
   white-space: normal;
 }
 
+.editor-input .editor-table-cell:first-child::after {
+  content: "";
+  display: inline-block;
+  min-height: 24px;
+  vertical-align: top;
+}
+
 .editor-input .editor-table tr:first-child .editor-table-cell,
 .editor-input .editor-table-cell-header {
   background: color-mix(in srgb, var(--ink) 5%, var(--surface)) !important;
   font-weight: 650;
-}
-
-.editor-input .editor-table tr:nth-child(even):not(:first-child) .editor-table-cell {
-  background: color-mix(in srgb, var(--ink) 2%, var(--surface));
 }
 
 /* Code uses a quieter Vditor-like document block instead of a heavy card. */
@@ -329,8 +332,8 @@
 
 /* Custom blocks share one document visual language. */
 .editor-input .divider-block {
-  height: 1px;
-  margin: 12px 0;
+  height: 2px;
+  margin: 24px 0;
   background: var(--line);
 }
 
