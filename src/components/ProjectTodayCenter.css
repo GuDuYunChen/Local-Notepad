@@ -1,0 +1,307 @@
+.project-today-center {
+  padding: 12px 16px 0;
+  background: var(--paper);
+}
+
+.project-today-center-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 7px;
+}
+
+.project-today-center-head > div {
+  min-width: 0;
+}
+
+.project-today-center-head strong,
+.project-today-center-head span {
+  display: block;
+}
+
+.project-today-center-head strong {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.project-today-center-head span {
+  margin-top: 2px;
+  color: var(--ink-muted);
+  font-size: 8px;
+}
+
+.project-today-center-grid {
+  display: grid;
+  grid-template-columns: 1.25fr 1fr 1fr;
+  gap: 8px;
+}
+
+.project-today-card {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.project-today-card > header {
+  min-height: 29px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.project-today-card > header strong,
+.project-today-card > header span {
+  display: block;
+}
+
+.project-today-card > header strong {
+  color: var(--ink);
+  font-size: 9px;
+  font-weight: 650;
+}
+
+.project-today-card > header span {
+  margin-top: 2px;
+  color: var(--ink-muted);
+  font-size: 7px;
+}
+
+.project-today-task-list,
+.project-today-history-list {
+  margin-top: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.project-today-task-list > div {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px;
+  border-radius: 7px;
+  background: var(--paper);
+}
+
+.project-today-task-order {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 99px;
+  background: var(--surface);
+  color: var(--clay);
+  font-size: 7px;
+  font-weight: 700;
+}
+
+.project-today-task-open {
+  min-width: 0;
+  flex: 1;
+  padding: 1px 2px;
+  border: 0;
+  background: transparent;
+  color: var(--ink-soft);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.project-today-task-open strong,
+.project-today-task-open small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-today-task-open strong {
+  font-size: 8px;
+}
+
+.project-today-task-open small {
+  color: var(--ink-muted);
+  font-size: 7px;
+}
+
+.project-today-focus-actions {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 2px;
+}
+
+.project-today-focus-actions button {
+  min-width: 26px;
+  height: 24px;
+  padding: 0 4px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--ink-muted);
+  font: inherit;
+  font-size: 7px;
+  cursor: pointer;
+}
+
+.project-today-focus-actions button:hover {
+  border-color: var(--clay);
+  color: var(--clay);
+}
+
+.project-today-session-metrics {
+  margin-top: 5px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.project-today-session-metrics > div {
+  padding: 6px;
+  border-radius: 7px;
+  background: var(--paper);
+}
+
+.project-today-session-metrics span,
+.project-today-session-metrics strong {
+  display: block;
+}
+
+.project-today-session-metrics span {
+  color: var(--ink-muted);
+  font-size: 7px;
+}
+
+.project-today-session-metrics strong {
+  margin-top: 2px;
+  color: var(--ink-soft);
+  font-size: 10px;
+}
+
+.project-today-review-state {
+  margin-top: 7px;
+  padding: 7px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 7px;
+  background: var(--paper);
+}
+
+.project-today-review-state > div {
+  min-width: 0;
+  flex: 1;
+}
+
+.project-today-review-state strong,
+.project-today-review-state span {
+  display: block;
+}
+
+.project-today-review-state strong {
+  color: var(--ink-soft);
+  font-size: 8px;
+}
+
+.project-today-review-state span {
+  margin-top: 2px;
+  overflow: hidden;
+  color: var(--ink-muted);
+  font-size: 7px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-today-review-state button {
+  flex: 0 0 auto;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 7px;
+  cursor: pointer;
+}
+
+.project-today-history-list > button {
+  min-width: 0;
+  padding: 5px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink-soft);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.project-today-history-list > button:hover {
+  background: var(--surface-hover);
+}
+
+.project-today-history-list > button > span {
+  min-width: 0;
+  flex: 1;
+}
+
+.project-today-history-list strong,
+.project-today-history-list small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-today-history-list strong {
+  font-size: 8px;
+}
+
+.project-today-history-list small {
+  margin-top: 1px;
+  color: var(--ink-muted);
+  font-size: 7px;
+}
+
+.project-today-history-list em {
+  flex: 0 0 auto;
+  color: var(--ink-muted);
+  font-size: 7px;
+  font-style: normal;
+}
+
+.project-today-empty {
+  padding: 10px 4px;
+  color: var(--ink-muted);
+  font-size: 7px;
+  line-height: 1.5;
+}
+
+@media (max-width: 1180px) {
+  .project-today-center-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .project-today-card.tasks {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 820px) {
+  .project-today-center-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .project-today-card.tasks {
+    grid-column: auto;
+  }
+}
