@@ -186,12 +186,6 @@
   letter-spacing: -0.012em;
 }
 
-.editor-input > .editor-heading-h1:first-child,
-.editor-input > .editor-heading-h2:first-child,
-.editor-input > .editor-heading-h3:first-child {
-  margin-top: 0;
-}
-
 .editor-input .editor-heading-h1 { font-size: 1.75em; }
 .editor-input .editor-heading-h2 { font-size: 1.55em; }
 .editor-input .editor-heading-h3 { font-size: 1.38em; }
