@@ -411,6 +411,119 @@
   font-size: 7px;
 }
 
+.project-board-create-toggle.active {
+  border-color: color-mix(in srgb, var(--clay) 38%, var(--line));
+  background: var(--clay-light);
+  color: var(--clay);
+}
+
+.project-board-createbar,
+.project-board-split-preview {
+  flex: 0 0 auto;
+  margin: 8px 16px 0;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.project-board-create-copy,
+.project-board-split-preview > div:first-child {
+  min-width: 170px;
+  max-width: 280px;
+  margin-right: auto;
+}
+
+.project-board-create-copy strong,
+.project-board-create-copy span,
+.project-board-split-preview > div:first-child strong,
+.project-board-split-preview > div:first-child span {
+  display: block;
+}
+
+.project-board-create-copy strong,
+.project-board-split-preview > div:first-child strong {
+  color: var(--ink);
+  font-size: 9px;
+  font-weight: 680;
+}
+
+.project-board-create-copy span,
+.project-board-split-preview > div:first-child span {
+  margin-top: 2px;
+  color: var(--ink-muted);
+  font-size: 7px;
+  line-height: 1.4;
+}
+
+.project-board-createbar select,
+.project-board-split-preview input {
+  height: 30px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  outline: 0;
+  background: var(--paper);
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 8px;
+}
+
+.project-board-createbar textarea {
+  width: min(280px, 30vw);
+  min-width: 170px;
+  min-height: 46px;
+  max-height: 92px;
+  padding: 6px 8px;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  outline: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: 8px;
+  line-height: 1.4;
+  box-sizing: border-box;
+}
+
+.project-board-createbar textarea:focus,
+.project-board-split-preview input:focus {
+  border-color: var(--clay);
+  box-shadow: 0 0 0 2px var(--clay-light);
+}
+
+.project-board-split-preview {
+  border-color: color-mix(in srgb, #b97820 26%, var(--line));
+  background: color-mix(in srgb, #b97820 5%, var(--surface));
+}
+
+.project-board-split-preview label {
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.project-board-split-preview label span {
+  color: var(--ink-muted);
+  font-size: 7px;
+}
+
+.project-board-split-preview input {
+  width: 220px;
+  box-sizing: border-box;
+}
+
+.project-board-bulk-manage {
+  padding-left: 7px;
+  border-left: 1px solid var(--line);
+}
+
 .project-board-select-toggle.active {
   border-color: color-mix(in srgb, var(--clay) 38%, var(--line));
   background: var(--clay-light);
@@ -1309,5 +1422,43 @@
     min-width: 0;
     max-width: none;
     flex: 1;
+  }
+}
+
+@media (max-width: 900px) {
+  .project-board-createbar,
+  .project-board-split-preview {
+    flex-wrap: wrap;
+  }
+
+  .project-board-create-copy,
+  .project-board-split-preview > div:first-child {
+    min-width: 100%;
+    max-width: none;
+    margin-right: 0;
+  }
+
+  .project-board-createbar textarea {
+    width: auto;
+    flex: 1 1 240px;
+  }
+}
+
+@media (max-width: 760px) {
+  .project-board-createbar,
+  .project-board-split-preview {
+    margin: 7px 8px 0;
+  }
+
+  .project-board-createbar select,
+  .project-board-createbar textarea,
+  .project-board-split-preview label,
+  .project-board-split-preview input {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .project-board-createbar textarea {
+    flex-basis: 100%;
   }
 }
