@@ -348,10 +348,10 @@ describe('UI redesign smoke tests', () => {
     const reviewInput = container.querySelector('textarea[aria-label="今日写作复盘"]')
     expect(reviewInput).toBeTruthy()
 
-    const planningTab = viewButtons.find(
-      button => button.querySelector('strong')?.textContent === '计划'
-    )
-    await click(planningTab)
+    const todayPlanJump = Array.from(container.querySelectorAll('button'))
+      .find(button => button.textContent === '查看计划')
+    expect(todayPlanJump).toBeTruthy()
+    await click(todayPlanJump)
 
     expect(container.textContent).toContain('创作计划')
     expect(container.textContent).toContain('项目节奏')
@@ -379,10 +379,10 @@ describe('UI redesign smoke tests', () => {
     expect(container.textContent).toContain('Session 分析与复盘')
     expect(container.textContent).not.toContain('创作计划')
 
-    const insightsTab = viewButtons.find(
-      button => button.querySelector('strong')?.textContent === '洞察'
-    )
-    await click(insightsTab)
+    const insightJump = Array.from(container.querySelectorAll('button'))
+      .find(button => button.textContent === '查看洞察')
+    expect(insightJump).toBeTruthy()
+    await click(insightJump)
 
     expect(container.textContent).toContain('创作洞察与自动复盘')
     expect(container.textContent).toContain('需要注意')
@@ -417,10 +417,136 @@ describe('UI redesign smoke tests', () => {
     await click(chapterButton)
     expect(onOpenFile).toHaveBeenCalledWith('chapter-1')
 
-    const scriptButton = Array.from(container.querySelectorAll('button'))
+    const projectActions = Array.from(container.querySelectorAll('button'))
+      .find(button => button.textContent.includes('项目操作'))
+    expect(projectActions).toBeTruthy()
+    await click(projectActions)
+
+    const actionsMenu = container.querySelector('.project-actions-menu')
+    expect(actionsMenu).toBeTruthy()
+    expect(actionsMenu.textContent).toContain('初始化项目模板')
+    expect(actionsMenu.textContent).toContain('合并导出 Markdown')
+    expect(actionsMenu.textContent).toContain('合并导出 Word')
+
+    const scriptButton = Array.from(actionsMenu.querySelectorAll('button'))
       .find(button => button.textContent === '剧本')
     await click(scriptButton)
     expect(container.textContent).toContain('剧本项目')
+  })
+
+  it('switches project views with Alt shortcuts without hijacking form input', async () => {
+    listAllFilesWithContent.mockResolvedValue([
+      {
+        id: 'project',
+        title: '快捷项目',
+        is_folder: true,
+        parent_id: '',
+        sort_order: 100,
+      },
+      {
+        id: 'chapter-1',
+        title: '第一章.md',
+        is_folder: false,
+        parent_id: 'project',
+        sort_order: 100,
+        content: JSON.stringify({
+          root: {
+            children: [{
+              type: 'paragraph',
+              children: [{ type: 'text', text: '正文' }],
+            }],
+          },
+        }),
+      },
+    ])
+
+    await act(async () => {
+      root.render(
+        <ProjectWorkspacePanel
+          onOpenFile={() => {}}
+          onClose={() => {}}
+        />
+      )
+    })
+    await flushPromises()
+
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', {
+        key: '3',
+        altKey: true,
+      }))
+      await Promise.resolve()
+    })
+    expect(container.textContent).toContain('创作计划')
+
+    const dailyGoal = container.querySelector('input[aria-label="每日写作目标"]')
+    expect(dailyGoal).toBeTruthy()
+
+    await act(async () => {
+      dailyGoal.dispatchEvent(new KeyboardEvent('keydown', {
+        key: '5',
+        altKey: true,
+        bubbles: true,
+      }))
+      await Promise.resolve()
+    })
+    expect(container.textContent).toContain('创作计划')
+    expect(container.textContent).not.toContain('创作洞察与自动复盘')
+
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', {
+        key: '4',
+        altKey: true,
+      }))
+      await Promise.resolve()
+    })
+    expect(container.textContent).toContain('创作分析')
+
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', {
+        key: '5',
+        altKey: true,
+      }))
+      await Promise.resolve()
+    })
+    expect(container.textContent).toContain('创作洞察与自动复盘')
+
+    const adjustPlan = Array.from(container.querySelectorAll('button'))
+      .find(button => button.textContent === '调整计划')
+    expect(adjustPlan).toBeTruthy()
+    await click(adjustPlan)
+    expect(container.textContent).toContain('创作计划')
+  })
+
+  it('offers actionable empty states for projects without manuscript chapters', async () => {
+    localStorage.setItem(
+      'localNotepad.projectWorkspace.activeView',
+      'project'
+    )
+    listAllFilesWithContent.mockResolvedValue([
+      {
+        id: 'project',
+        title: '空项目',
+        is_folder: true,
+        parent_id: '',
+        sort_order: 100,
+      },
+    ])
+
+    await act(async () => {
+      root.render(
+        <ProjectWorkspacePanel
+          onOpenFile={() => {}}
+          onClose={() => {}}
+        />
+      )
+    })
+    await flushPromises()
+
+    expect(container.textContent).toContain('这个项目还没有正文章节')
+    expect(container.textContent).toContain('初始化项目模板')
+    expect(container.textContent).toContain('返回笔记')
+    expect(container.querySelector('.project-workspace-board')).toBeNull()
   })
 
   it('restores the last project workspace view', async () => {
