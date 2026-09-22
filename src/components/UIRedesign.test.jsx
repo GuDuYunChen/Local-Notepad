@@ -1669,6 +1669,240 @@ describe('UI redesign smoke tests', () => {
     expect(container.querySelectorAll('.project-story-node')).toHaveLength(1)
   })
 
+  it('creates character arcs and foreshadow lifecycle nodes on real chapters', async () => {
+    localStorage.setItem(
+      'localNotepad.projectWorkspace.activeView',
+      'structure'
+    )
+
+    listAllFilesWithContent.mockResolvedValue([
+      {
+        id: 'project',
+        title: '生命周期项目',
+        is_folder: true,
+        parent_id: '',
+        sort_order: 100,
+      },
+      {
+        id: 'volume-1',
+        title: '第一卷',
+        is_folder: true,
+        parent_id: 'project',
+        sort_order: 100,
+      },
+      {
+        id: 'chapter-1',
+        title: '第一章.md',
+        is_folder: false,
+        parent_id: 'volume-1',
+        sort_order: 100,
+        content: JSON.stringify({
+          root: {
+            children: [{
+              type: 'paragraph',
+              children: [{ type: 'text', text: '关关初次登场' }],
+            }],
+          },
+        }),
+      },
+      {
+        id: 'chapter-2',
+        title: '第二章.md',
+        is_folder: false,
+        parent_id: 'volume-1',
+        sort_order: 200,
+        content: JSON.stringify({
+          root: {
+            children: [{
+              type: 'paragraph',
+              children: [{ type: 'text', text: '黑铁副印揭示' }],
+            }],
+          },
+        }),
+      },
+    ])
+
+    tagApi.list.mockResolvedValue([
+      { id: 'tag-character', name: '角色' },
+      { id: 'tag-foreshadow', name: '伏笔' },
+    ])
+    tagApi.getFilesByTag.mockImplementation(async tagId => {
+      if (tagId === 'tag-character') {
+        return [{ id: 'chapter-1', title: '第一章.md', updated_at: 1 }]
+      }
+      if (tagId === 'tag-foreshadow') {
+        return [{ id: 'chapter-2', title: '第二章.md', updated_at: 2 }]
+      }
+      return []
+    })
+
+    await act(async () => {
+      root.render(
+        <ProjectWorkspacePanel
+          onOpenFile={() => {}}
+          onClose={() => {}}
+        />
+      )
+    })
+    await flushPromises()
+    await flushPromises()
+
+    const typeSelect = container.querySelector(
+      'select[aria-label="新建轨迹类型"]'
+    )
+    expect(typeSelect).toBeTruthy()
+
+    await act(async () => {
+      typeSelect.value = 'character'
+      typeSelect.dispatchEvent(new Event('change', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    let sourceSelect = container.querySelector(
+      'select[aria-label="关联现有索引"]'
+    )
+    expect(sourceSelect).toBeTruthy()
+    await act(async () => {
+      sourceSelect.value = 'chapter-1'
+      sourceSelect.dispatchEvent(new Event('change', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    let trackTitle = container.querySelector('input[aria-label="轨迹名称"]')
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        'value',
+      ).set
+      setter.call(trackTitle, '关关弧光')
+      trackTitle.dispatchEvent(new Event('input', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    let createTrack = Array.from(container.querySelectorAll('button'))
+      .find(button => button.textContent === '新建轨迹')
+    await click(createTrack)
+    await flushPromises()
+
+    let chapterSelect = container.querySelector(
+      'select[aria-label="轨迹节点章节"]'
+    )
+    await act(async () => {
+      chapterSelect.value = 'chapter-1'
+      chapterSelect.dispatchEvent(new Event('change', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    let noteInput = container.querySelector('input[aria-label="轨迹节点说明"]')
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        'value',
+      ).set
+      setter.call(noteInput, '初次登场并建立核心欲望')
+      noteInput.dispatchEvent(new Event('input', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    let addNode = Array.from(container.querySelectorAll('button'))
+      .find(button => button.textContent === '添加节点')
+    await click(addNode)
+    await flushPromises()
+
+    let stored = JSON.parse(
+      localStorage.getItem('localNotepad.projectWorkspace.v1')
+    )
+    expect(stored.project.storylines).toHaveLength(1)
+    expect(stored.project.storylines[0]).toMatchObject({
+      title: '关关弧光',
+      type: 'character',
+      sourceNoteId: 'chapter-1',
+    })
+    expect(stored.project.storylines[0].events).toEqual([
+      expect.objectContaining({
+        noteId: 'chapter-1',
+        stage: 'entry',
+        note: '初次登场并建立核心欲望',
+      }),
+    ])
+
+    await act(async () => {
+      typeSelect.value = 'foreshadow'
+      typeSelect.dispatchEvent(new Event('change', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    sourceSelect = container.querySelector(
+      'select[aria-label="关联现有索引"]'
+    )
+    await act(async () => {
+      sourceSelect.value = 'chapter-2'
+      sourceSelect.dispatchEvent(new Event('change', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    trackTitle = container.querySelector('input[aria-label="轨迹名称"]')
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        'value',
+      ).set
+      setter.call(trackTitle, '黑铁副印')
+      trackTitle.dispatchEvent(new Event('input', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    createTrack = Array.from(container.querySelectorAll('button'))
+      .find(button => button.textContent === '新建轨迹')
+    await click(createTrack)
+    await flushPromises()
+
+    chapterSelect = container.querySelector(
+      'select[aria-label="轨迹节点章节"]'
+    )
+    await act(async () => {
+      chapterSelect.value = 'chapter-2'
+      chapterSelect.dispatchEvent(new Event('change', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    const stageSelect = container.querySelector(
+      'select[aria-label="轨迹生命周期阶段"]'
+    )
+    await act(async () => {
+      stageSelect.value = 'payoff'
+      stageSelect.dispatchEvent(new Event('change', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    addNode = Array.from(container.querySelectorAll('button'))
+      .find(button => button.textContent === '添加节点')
+    await click(addNode)
+    await flushPromises()
+
+    stored = JSON.parse(
+      localStorage.getItem('localNotepad.projectWorkspace.v1')
+    )
+    expect(stored.project.storylines).toHaveLength(2)
+    expect(stored.project.storylines[1].events).toHaveLength(1)
+    expect(stored.project.storylines[1].events[0]).toMatchObject({
+      noteId: 'chapter-2',
+      stage: 'payoff',
+    })
+    expect(stored.project.foreshadowStates['chapter-2']).toBe('recovered')
+
+    const secondNode = Array.from(
+      container.querySelectorAll('.project-story-node')
+    ).find(node => node.textContent.includes('第二章'))
+    expect(secondNode).toBeTruthy()
+    expect(secondNode.textContent).toContain('回收')
+
+    const foreshadowTrack = Array.from(
+      container.querySelectorAll('.project-storyline-list > button')
+    ).find(button => button.textContent.includes('黑铁副印'))
+    expect(foreshadowTrack.textContent).toContain('已收束')
+  })
+
   it('offers actionable empty states for projects without manuscript chapters', async () => {
     localStorage.setItem(
       'localNotepad.projectWorkspace.activeView',
