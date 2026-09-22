@@ -202,9 +202,9 @@
 }
 
 .editor-input .editor-quote {
-  margin: 0 0 1em;
+  margin: 0 0 16px;
   padding: 0 1em;
-  border-left: 5px solid color-mix(in srgb, var(--clay) 36%, var(--line-strong));
+  border-left: 5px solid var(--line-strong);
   background: transparent;
   color: var(--ink-soft);
   font-size: 1em;
@@ -213,7 +213,7 @@
 
 .editor-input .editor-list-ul,
 .editor-input .editor-list-ol {
-  margin: 0 0 1em;
+  margin: 0 0 16px;
   padding-left: 2em;
 }
 
@@ -245,7 +245,7 @@
 /* Tables are document blocks, not spreadsheet chrome. */
 .editor-input .editor-table {
   width: 100% !important;
-  margin: 1.15em 0 1.45em !important;
+  margin: 8px 0 16px !important;
   margin-left: 0 !important;
   margin-right: 0 !important;
   border-collapse: collapse !important;
@@ -410,6 +410,21 @@
 .editor-input .formula-rendered.block {
   padding: 14px 18px;
   background: var(--document-soft-bg);
+}
+
+/* Office Viewer first-block spacing: non-headings start at 18px,
+   headings start at 24px. Kept late in the cascade on purpose. */
+.editor-input > :first-child:not(.editor-heading-h1):not(.editor-heading-h2):not(.editor-heading-h3):not(.editor-heading-h4):not(.editor-heading-h5):not(.editor-heading-h6) {
+  margin-top: 18px;
+}
+
+.editor-input > .editor-heading-h1:first-child,
+.editor-input > .editor-heading-h2:first-child,
+.editor-input > .editor-heading-h3:first-child,
+.editor-input > .editor-heading-h4:first-child,
+.editor-input > .editor-heading-h5:first-child,
+.editor-input > .editor-heading-h6:first-child {
+  margin-top: 24px;
 }
 
 /* Status is present but visually subordinate. */
