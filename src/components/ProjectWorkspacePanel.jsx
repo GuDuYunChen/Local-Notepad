@@ -660,6 +660,24 @@ export default function ProjectWorkspacePanel({
         </div>
       </div>
 
+      <nav className="project-workspace-view-tabs" aria-label="项目工作台视图">
+        {PROJECT_VIEWS.map(view => (
+          <button
+            key={view.id}
+            type="button"
+            className={activeView === view.id ? 'active' : ''}
+            onClick={() => setActiveView(view.id)}
+            aria-pressed={activeView === view.id}
+          >
+            <strong>{view.label}</strong>
+            <span>{view.description}</span>
+          </button>
+        ))}
+      </nav>
+
+      <div className={'project-workspace-view-content view-' + activeView}>
+      {activeView === 'today' && (
+        <>
       <ProjectTodayCenter
         workspace={workspace}
         projectMeta={projectMeta}
@@ -668,7 +686,11 @@ export default function ProjectWorkspacePanel({
           onStartFocus?.(note, durationMinutes, workspace.project)
         )}
       />
+        </>
+      )}
 
+      {activeView === 'project' && (
+        <>
       <section className="project-creative-console" aria-label="创作项目控制台">
         <div className="project-console-card project-progress-card">
           <div className="project-console-card-head">
@@ -801,39 +823,49 @@ export default function ProjectWorkspacePanel({
         </div>
       </section>
 
-      <ProjectAnalyticsPanel
-        workspace={workspace}
-        projectMeta={projectMeta}
-        projectIndexes={projectIndexes}
-        onMetaChange={updateMeta}
-        onOpenFile={onOpenFile}
-      />
+      {activeView === 'analysis' && (
+        <ProjectAnalyticsPanel
+          workspace={workspace}
+          projectMeta={projectMeta}
+          projectIndexes={projectIndexes}
+          onMetaChange={updateMeta}
+          onOpenFile={onOpenFile}
+        />
+      )}
 
-      <ProjectPlanningPanel
-        workspace={workspace}
-        projectMeta={projectMeta}
-        onMetaChange={updateMeta}
-        onOpenFile={onOpenFile}
-      />
+      {activeView === 'planning' && (
+        <ProjectPlanningPanel
+          workspace={workspace}
+          projectMeta={projectMeta}
+          onMetaChange={updateMeta}
+          onOpenFile={onOpenFile}
+        />
+      )}
 
-      <ProjectSprintPanel
-        workspace={workspace}
-        projectMeta={projectMeta}
-        onMetaChange={updateMeta}
-        onOpenFile={onOpenFile}
-      />
+      {activeView === 'today' && (
+        <ProjectSprintPanel
+          workspace={workspace}
+          projectMeta={projectMeta}
+          onMetaChange={updateMeta}
+          onOpenFile={onOpenFile}
+        />
+      )}
 
-      <FocusSessionAnalyticsPanel
-        workspace={workspace}
-        onOpenFile={onOpenFile}
-      />
+      {activeView === 'analysis' && (
+        <FocusSessionAnalyticsPanel
+          workspace={workspace}
+          onOpenFile={onOpenFile}
+        />
+      )}
 
-      <ProjectInsightsPanel
-        workspace={workspace}
-        projectMeta={projectMeta}
-        projectIndexes={projectIndexes}
-        onOpenFile={onOpenFile}
-      />
+      {activeView === 'insights' && (
+        <ProjectInsightsPanel
+          workspace={workspace}
+          projectMeta={projectMeta}
+          projectIndexes={projectIndexes}
+          onOpenFile={onOpenFile}
+        />
+      )}
 
       <div className="project-workspace-board">
         {workspace.volumes.map(volume => {
@@ -1029,6 +1061,9 @@ export default function ProjectWorkspacePanel({
         <span>拖动章节卡可跨{labels.volume}移动和调整顺序。</span>
         <span>状态仅是本机项目视图偏好，不修改正文或现有数据库。</span>
       </footer>
+        </>
+      )}
+      </div>
     </div>
   )
 }
