@@ -7,7 +7,7 @@ import {
 describe('editor visual defaults', () => {
   it('uses the denser Office-inspired reading baseline', () => {
     expect(DEFAULT_EDITOR_VIEW_SETTINGS).toMatchObject({
-      fontSize: 16,
+      fontSize: 13,
       lineHeight: 1.7,
       pageWidth: 860,
       fontFamily: 'system',
