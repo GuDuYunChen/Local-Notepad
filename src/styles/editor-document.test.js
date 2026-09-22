@@ -44,6 +44,16 @@ describe('editor document presentation', () => {
     expect(css).toContain('.editor-input .formula-rendered.block')
   })
 
+  it('sizes markdown tables by content instead of stretching them', () => {
+    const css = read(['src', 'styles', 'editor-document.css'])
+
+    expect(css).toContain('width: max-content !important')
+    expect(css).toContain('max-width: 100% !important')
+    expect(css).toContain('padding: 6px 13px')
+    expect(css).toContain('max-width: 300px')
+    expect(css).not.toContain('.editor-input .editor-table {\n  width: 100% !important')
+  })
+
   it('keeps focus writing on the same continuous document surface', () => {
     const css = read(['src', 'styles', 'editor-document.css'])
 
