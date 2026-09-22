@@ -29,6 +29,7 @@ export default function ProjectTodayCenter({
   projectMeta,
   onOpenFile,
   onStartFocus,
+  onNavigateView,
 }) {
   const projectId = workspace?.project?.id || ''
   const [history, setHistory] = useState(() => (
@@ -75,15 +76,24 @@ export default function ProjectTodayCenter({
           <span>选一章，进入专注 Session，把计划落成实际写作。</span>
         </div>
 
-        {primary && (
+        <div className="project-today-center-actions">
           <button
             type="button"
-            className="btn primary"
-            onClick={() => onStartFocus?.(primary, 50)}
+            className="btn"
+            onClick={() => onNavigateView?.('planning')}
           >
-            开始下一章 · 50 分钟
+            查看计划
           </button>
-        )}
+          {primary && (
+            <button
+              type="button"
+              className="btn primary"
+              onClick={() => onStartFocus?.(primary, 50)}
+            >
+              开始下一章 · 50 分钟
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="project-today-center-grid">
@@ -135,8 +145,17 @@ export default function ProjectTodayCenter({
                 </div>
               </div>
             )) : (
-              <div className="project-today-empty">
-                当前没有未完成章节。
+              <div className="project-today-empty project-today-empty-action">
+                <strong>当前没有待写章节</strong>
+                <span>可以到“项目”检查卷章结构，或到“计划”调整下一章节队列。</span>
+                <div>
+                  <button type="button" onClick={() => onNavigateView?.('project')}>
+                    查看项目
+                  </button>
+                  <button type="button" onClick={() => onNavigateView?.('planning')}>
+                    调整计划
+                  </button>
+                </div>
               </div>
             )}
           </div>
