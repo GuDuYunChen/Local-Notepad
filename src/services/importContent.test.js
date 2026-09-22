@@ -50,6 +50,28 @@ describe('import content normalization', () => {
     expect(textFromState(JSON.stringify({ root: { children: [table] } }))).toContain('重剑')
   })
 
+  it('turns table <br> markup into native line breaks', () => {
+    const serialized = markdownToLexical([
+      '|境界|能量来源与炼化方式|',
+      '|---|---|',
+      '|1\\. 启灵|来源：天地灵气。<br>方式：吐纳导引。|',
+    ].join('\n'))
+
+    const state = JSON.parse(serialized)
+    const table = state.root.children.find(node => node.type === 'table')
+    const cell = table.children[1].children[1]
+    const paragraph = cell.children[0]
+
+    expect(paragraph.children.some(node => node.type === 'linebreak')).toBe(true)
+    expect(
+      paragraph.children
+        .filter(node => node.type === 'text')
+        .map(node => node.text)
+        .join('')
+    ).toBe('来源：天地灵气。方式：吐纳导引。')
+    expect(textFromState(serialized)).not.toContain('<br>')
+  })
+
   it('preserves fenced code blocks as native custom code blocks', () => {
     const serialized = markdownToLexical([
       '# Code',
