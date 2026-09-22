@@ -3,6 +3,8 @@ import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext
 import { $getSelection, $isRangeSelection } from 'lexical'
 
 const STORAGE_KEY = 'localNotepad.editorView.v1'
+const VISUAL_DENSITY_VERSION_KEY = 'localNotepad.editorView.visualDensityVersion'
+const VISUAL_DENSITY_VERSION = '3'
 
 const FONT_OPTIONS = [
   {
@@ -30,7 +32,7 @@ const WIDTH_OPTIONS = [
 ]
 
 export const DEFAULT_EDITOR_VIEW_SETTINGS = {
-  fontSize: 16,
+  fontSize: 13,
   lineHeight: 1.7,
   pageWidth: 860,
   fontFamily: 'system',
@@ -48,7 +50,7 @@ export function getEditorWheelFontStep(event) {
 
 export function normalizeEditorViewSettings(value) {
   const source = value && typeof value === 'object' ? value : {}
-  const fontSize = Math.max(13, Math.min(22, Number(source.fontSize) || DEFAULT_EDITOR_VIEW_SETTINGS.fontSize))
+  const fontSize = Math.max(11, Math.min(22, Number(source.fontSize) || DEFAULT_EDITOR_VIEW_SETTINGS.fontSize))
   const lineHeight = Math.max(1.4, Math.min(2.3, Number(source.lineHeight) || DEFAULT_EDITOR_VIEW_SETTINGS.lineHeight))
   const pageWidth = [0, 720, 860, 1040].includes(Number(source.pageWidth))
     ? Number(source.pageWidth)
@@ -70,16 +72,17 @@ function loadSettings() {
   try {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')
     const normalized = normalizeEditorViewSettings(stored)
+    const densityVersion = localStorage.getItem(VISUAL_DENSITY_VERSION_KEY)
 
-    // 4.30.1 visual refresh: migrate the previous default 1.9 line-height
-    // without overriding an intentionally customized view.
     const storedLineHeight = Number(stored?.lineHeight)
     const legacyLineHeight = (
       !Number.isFinite(storedLineHeight) ||
       storedLineHeight === 1.85 ||
-      storedLineHeight === 1.9
+      storedLineHeight === 1.9 ||
+      storedLineHeight === 1.7
     )
     const looksLikeLegacyDefault = (
+      densityVersion !== VISUAL_DENSITY_VERSION &&
       Number(stored?.fontSize || 16) === 16 &&
       Number(stored?.pageWidth || 860) === 860 &&
       (stored?.fontFamily || 'system') === 'system' &&
@@ -87,9 +90,15 @@ function loadSettings() {
       legacyLineHeight
     )
 
-    return looksLikeLegacyDefault
-      ? { ...normalized, lineHeight: DEFAULT_EDITOR_VIEW_SETTINGS.lineHeight }
-      : normalized
+    if (looksLikeLegacyDefault) {
+      return {
+        ...normalized,
+        fontSize: DEFAULT_EDITOR_VIEW_SETTINGS.fontSize,
+        lineHeight: DEFAULT_EDITOR_VIEW_SETTINGS.lineHeight,
+      }
+    }
+
+    return normalized
   } catch {
     return { ...DEFAULT_EDITOR_VIEW_SETTINGS }
   }
@@ -98,6 +107,7 @@ function loadSettings() {
 function saveSettings(settings) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings))
+    localStorage.setItem(VISUAL_DENSITY_VERSION_KEY, VISUAL_DENSITY_VERSION)
   } catch {
     // View preferences are optional and should never block editing.
   }
@@ -259,7 +269,7 @@ export default function EditorViewSettingsPlugin({ readOnly = false }) {
             <Stepper
               label="正文字号"
               value={settings.fontSize}
-              min={13}
+              min={11}
               max={22}
               suffix="px"
               onChange={fontSize => update({ fontSize })}
