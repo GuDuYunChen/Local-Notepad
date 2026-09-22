@@ -64,6 +64,34 @@
   margin-inline: 3px !important;
 }
 
+.editor-toolbar .toolbar-structure .btn,
+.editor-toolbar .toolbar-link-wrap > .btn,
+.editor-toolbar .toolbar-find-btn,
+.editor-toolbar .toolbar-command-btn,
+.editor-toolbar .toolbar-view-btn,
+.editor-toolbar .toolbar-source-btn {
+  width: 28px !important;
+  min-width: 28px !important;
+  padding: 0 !important;
+  font-size: 12px !important;
+  font-weight: 600;
+}
+
+.editor-toolbar .toolbar-inline-code,
+.editor-toolbar .toolbar-source-btn {
+  font-size: 10px !important;
+}
+
+.editor-toolbar .toolbar-more-trigger {
+  min-width: 30px !important;
+  width: 30px;
+  padding: 0 !important;
+}
+
+.editor-toolbar .toolbar-plus {
+  font-size: 16px;
+}
+
 /* Canvas + page. The surrounding workspace and document are deliberately
    different surfaces, which is the largest visual change from the old editor. */
 .editor-container,
@@ -78,7 +106,10 @@
 .editor-input {
   width: min(var(--editor-view-page-width, 860px), calc(100% - 48px)) !important;
   max-width: var(--editor-view-page-width, 860px) !important;
-  min-height: calc(100% - 56px) !important;
+  min-height: max(
+    calc(100% - 56px),
+    var(--editor-view-page-min-height, 1216px)
+  ) !important;
   margin: 28px auto 68px !important;
   padding: 64px 72px 96px !important;
   border: 1px solid var(--document-page-border);
@@ -122,6 +153,28 @@
   font-family: var(--editor-view-font-family, inherit);
   font-size: var(--editor-view-font-size, 16px) !important;
   opacity: 0.5;
+}
+
+.editor-shell.editor-fluid-page .editor-container,
+.editor-shell.editor-fluid-page .editor-scroller {
+  background: var(--surface) !important;
+}
+
+.editor-shell.editor-fluid-page .editor-input {
+  width: 100% !important;
+  max-width: none !important;
+  min-height: 100% !important;
+  margin: 0 !important;
+  padding: 52px max(28px, 6vw) 88px !important;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.editor-shell.editor-fluid-page .editor-placeholder {
+  top: 52px !important;
+  width: 100%;
+  padding-left: max(28px, 6vw);
 }
 
 /* Document rhythm follows the Office Viewer/Vditor reset model:
