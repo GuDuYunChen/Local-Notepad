@@ -1080,9 +1080,15 @@ describe('UI redesign smoke tests', () => {
     expect(textarea).toBeTruthy()
 
     await act(async () => {
-      textarea.value = '上午进入状态很快，下次继续从冲突段直接开始。'
+      const valueSetter = Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        'value',
+      ).set
+      valueSetter.call(
+        textarea,
+        '上午进入状态很快，下次继续从冲突段直接开始。',
+      )
       textarea.dispatchEvent(new Event('input', { bubbles: true }))
-      textarea.dispatchEvent(new Event('change', { bubbles: true }))
       await Promise.resolve()
     })
 
