@@ -11,6 +11,7 @@ import {
   buildProjectBatchMovePlan,
   buildProjectChapterMarkdown,
   calculateProjectCardMove,
+  calculateProjectVolumeMove,
   getProjectCandidates,
   getProjectChapterSummary,
   getProjectChapterPresets,
@@ -19,6 +20,7 @@ import {
   getProjectIndexAliases,
   getProjectLabels,
   getProjectProgress,
+  getProjectVolumeProgress,
   filterProjectVolumes,
   getProjectTemplate,
   getProjectVolumeByNoteId,
@@ -28,7 +30,9 @@ import {
   readProjectWorkspaceMeta,
   splitProjectChapterContent,
   suggestProjectChapterTitle,
+  suggestProjectVolumeTitle,
   uniqueProjectChapterTitle,
+  uniqueProjectVolumeTitle,
   writeProjectWorkspaceMeta,
 } from './projectWorkspaceUtils'
 import ProjectAnalyticsPanel from './ProjectAnalyticsPanel'
@@ -143,6 +147,12 @@ export default function ProjectWorkspacePanel({
   const [duplicateBusy, setDuplicateBusy] = useState(false)
   const [splitPreview, setSplitPreview] = useState(null)
   const [splitBusy, setSplitBusy] = useState(false)
+  const [volumeManageId, setVolumeManageId] = useState('')
+  const [volumeNameDraft, setVolumeNameDraft] = useState('')
+  const [volumeTargetWordsDraft, setVolumeTargetWordsDraft] = useState('')
+  const [volumeSplitStartId, setVolumeSplitStartId] = useState('')
+  const [volumeMergeTarget, setVolumeMergeTarget] = useState('')
+  const [volumeBusy, setVolumeBusy] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -264,6 +274,11 @@ export default function ProjectWorkspacePanel({
     setChapterCreateTemplate('standard')
     setRelativeCreateBusy('')
     setSplitPreview(null)
+    setVolumeManageId('')
+    setVolumeNameDraft('')
+    setVolumeTargetWordsDraft('')
+    setVolumeSplitStartId('')
+    setVolumeMergeTarget('')
 
     if (!selectedProjectId) {
       setProjectMeta({
@@ -295,6 +310,7 @@ export default function ProjectWorkspacePanel({
     setSelectedNoteIds([])
     setChapterCreateOpen(false)
     setSplitPreview(null)
+    setVolumeManageId('')
   }, [activeView])
 
   const loadProjectIndexes = useCallback(async (workspaceValue) => {
@@ -713,6 +729,321 @@ export default function ProjectWorkspacePanel({
     setSelectionMode(true)
     setSelectedNoteIds(ids)
     setBatchMoveTarget(realVolume.id || '__ungrouped__')
+  }
+
+  const openVolumeManager = volume => {
+    const key = volume.id || '__ungrouped__'
+    const progressValue = getProjectVolumeProgress(volume, projectMeta)
+    setVolumeManageId(key)
+    setVolumeNameDraft(volume.id ? volume.title : labels.ungrouped)
+    setVolumeTargetWordsDraft(
+      progressValue.targetWords > 0 ? String(progressValue.targetWords) : ''
+    )
+    setVolumeSplitStartId(volume.notes?.[1]?.id || '')
+    const firstMergeTarget = (workspace?.volumes || []).find(item => (
+      item.id &&
+      String(item.id) !== String(volume.id || '')
+    ))
+    setVolumeMergeTarget(firstMergeTarget?.id || '')
+    setChapterCreateOpen(false)
+    setSelectionMode(false)
+    setSelectedNoteIds([])
+    setSplitPreview(null)
+  }
+
+  const createProjectVolume = async () => {
+    if (volumeBusy || !workspace?.project?.id) return
+    const title = uniqueProjectVolumeTitle(
+      files,
+      workspace.project.id,
+      suggestProjectVolumeTitle(workspace),
+    )
+
+    setVolumeBusy('create')
+    try {
+      const created = await api('/api/files', {
+        method: 'POST',
+        body: JSON.stringify({
+          title,
+          content: '',
+          is_folder: true,
+          parent_id: workspace.project.id,
+        }),
+      })
+      await load()
+      setVolumeManageId(created.id)
+      setVolumeNameDraft(created.title)
+      setVolumeTargetWordsDraft('')
+      setVolumeSplitStartId('')
+      setVolumeMergeTarget(
+        (workspace?.volumes || []).find(volume => volume.id)?.id || ''
+      )
+      toast.success('已新建' + labels.volume + '“' + created.title + '”')
+      window.dispatchEvent(new CustomEvent('library:refresh', {
+        detail: { source: 'project-workspace' },
+      }))
+    } catch (error) {
+      console.error('新建卷失败', error)
+      toast.error(error.message || '新建' + labels.volume + '失败')
+    } finally {
+      setVolumeBusy('')
+    }
+  }
+
+  const saveVolumeSettings = async volume => {
+    if (!volume || volumeBusy) return
+    const key = volume.id || '__ungrouped__'
+    setVolumeBusy('save:' + key)
+    try {
+      if (volume.id) {
+        const title = String(volumeNameDraft || '').trim()
+        if (!title) throw new Error(labels.volume + '名称不能为空')
+        if (title !== volume.title) {
+          await api('/api/files/' + volume.id, {
+            method: 'PUT',
+            body: JSON.stringify({ title }),
+          })
+        }
+      }
+
+      updateMeta(previous => ({
+        ...previous,
+        volumeMilestones: {
+          ...previous.volumeMilestones,
+          [key]: {
+            ...(previous.volumeMilestones?.[key] || {}),
+            targetWords: Math.max(0, Number(volumeTargetWordsDraft) || 0),
+          },
+        },
+      }))
+      await load()
+      toast.success(labels.volume + '设置已保存')
+    } catch (error) {
+      console.error('保存卷设置失败', error)
+      toast.error(error.message || '保存' + labels.volume + '设置失败')
+    } finally {
+      setVolumeBusy('')
+    }
+  }
+
+  const moveVolume = async (volumeId, direction) => {
+    if (!volumeId || volumeBusy || !workspace?.project?.id) return
+    const realVolumes = (workspace.volumes || []).filter(volume => volume.id)
+    const index = realVolumes.findIndex(volume => String(volume.id) === String(volumeId))
+    if (index < 0) return
+    const targetIndex = direction === 'left' ? index - 1 : index + 1
+    if (targetIndex < 0 || targetIndex >= realVolumes.length) return
+
+    const plan = calculateProjectVolumeMove(
+      files,
+      workspace.project.id,
+      volumeId,
+      targetIndex,
+    )
+    if (!plan.length) return
+
+    setVolumeBusy('move:' + volumeId)
+    try {
+      for (const item of plan) {
+        await api('/api/files/' + item.id, {
+          method: 'PUT',
+          body: JSON.stringify({
+            parent_id: item.parent_id,
+            sort_order: item.sort_order,
+          }),
+        })
+      }
+      await load()
+      window.dispatchEvent(new CustomEvent('library:refresh', {
+        detail: { source: 'project-workspace' },
+      }))
+    } catch (error) {
+      console.error('调整卷顺序失败', error)
+      toast.error(error.message || '调整' + labels.volume + '顺序失败')
+    } finally {
+      setVolumeBusy('')
+    }
+  }
+
+  const duplicateVolume = async volume => {
+    if (!volume?.id || volumeBusy || !workspace?.project?.id) return
+    setVolumeBusy('duplicate:' + volume.id)
+
+    try {
+      const title = uniqueProjectVolumeTitle(
+        files,
+        workspace.project.id,
+        volume.title + ' 副本',
+      )
+      const createdVolume = await api('/api/files', {
+        method: 'POST',
+        body: JSON.stringify({
+          title,
+          content: '',
+          is_folder: true,
+          parent_id: workspace.project.id,
+        }),
+      })
+
+      for (const note of volume.notes || []) {
+        await api('/api/files', {
+          method: 'POST',
+          body: JSON.stringify({
+            title: note.title,
+            content: note.content || '',
+            is_folder: false,
+            parent_id: createdVolume.id,
+          }),
+        })
+      }
+
+      const sourceConfig = projectMeta.volumeMilestones?.[volume.id]
+      if (sourceConfig) {
+        updateMeta(previous => ({
+          ...previous,
+          volumeMilestones: {
+            ...previous.volumeMilestones,
+            [createdVolume.id]: {
+              ...sourceConfig,
+              deadline: '',
+            },
+          },
+        }))
+      }
+
+      await load()
+      toast.success('已复制' + labels.volume + '“' + title + '”')
+      window.dispatchEvent(new CustomEvent('library:refresh', {
+        detail: { source: 'project-workspace' },
+      }))
+    } catch (error) {
+      console.error('复制卷失败', error)
+      toast.error(error.message || '复制' + labels.volume + '失败')
+    } finally {
+      setVolumeBusy('')
+    }
+  }
+
+  const splitVolume = async volume => {
+    if (!volume?.id || !volumeSplitStartId || volumeBusy) return
+    const splitIndex = (volume.notes || []).findIndex(note => (
+      String(note.id) === String(volumeSplitStartId)
+    ))
+    if (splitIndex <= 0) {
+      toast.error('请选择第二个或之后的' + labels.chapter + '作为拆分起点')
+      return
+    }
+
+    const movingIds = volume.notes.slice(splitIndex).map(note => note.id)
+    const newTitle = uniqueProjectVolumeTitle(
+      files,
+      workspace.project.id,
+      suggestProjectVolumeTitle(workspace),
+    )
+    setVolumeBusy('split:' + volume.id)
+
+    let createdVolume = null
+    try {
+      createdVolume = await api('/api/files', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: newTitle,
+          content: '',
+          is_folder: true,
+          parent_id: workspace.project.id,
+        }),
+      })
+
+      const plan = buildProjectBatchMovePlan(
+        files,
+        movingIds,
+        createdVolume.id,
+      )
+      for (const item of plan) {
+        await api('/api/files/' + item.id, {
+          method: 'PUT',
+          body: JSON.stringify({
+            parent_id: item.parent_id,
+            sort_order: item.sort_order,
+          }),
+        })
+      }
+
+      await load()
+      setVolumeManageId('')
+      toast.success(
+        '已从“' + displayTitle(volume.notes[splitIndex].title) +
+        '”开始拆分为“' + newTitle + '”'
+      )
+      window.dispatchEvent(new CustomEvent('library:refresh', {
+        detail: { source: 'project-workspace' },
+      }))
+    } catch (error) {
+      if (createdVolume?.id) {
+        try {
+          await api('/api/files/' + createdVolume.id, { method: 'DELETE' })
+        } catch (cleanupError) {
+          console.warn('清理拆卷临时文件夹失败', cleanupError)
+        }
+      }
+      console.error('拆分卷失败', error)
+      toast.error(error.message || '拆分' + labels.volume + '失败')
+    } finally {
+      setVolumeBusy('')
+    }
+  }
+
+  const mergeVolume = async volume => {
+    if (!volume?.id || !volumeMergeTarget || volumeBusy) return
+    const target = (workspace?.volumes || []).find(item => (
+      String(item.id) === String(volumeMergeTarget)
+    ))
+    if (!target?.id || target.id === volume.id) return
+
+    setVolumeBusy('merge:' + volume.id)
+    let allMoved = false
+    try {
+      const ids = (volume.notes || []).map(note => note.id).filter(Boolean)
+      const plan = buildProjectBatchMovePlan(files, ids, target.id)
+      for (const item of plan) {
+        await api('/api/files/' + item.id, {
+          method: 'PUT',
+          body: JSON.stringify({
+            parent_id: item.parent_id,
+            sort_order: item.sort_order,
+          }),
+        })
+      }
+      allMoved = true
+      await api('/api/files/' + volume.id, { method: 'DELETE' })
+
+      updateMeta(previous => {
+        const nextMilestones = { ...previous.volumeMilestones }
+        delete nextMilestones[volume.id]
+        return {
+          ...previous,
+          volumeMilestones: nextMilestones,
+        }
+      })
+
+      await load()
+      setVolumeManageId('')
+      toast.success(
+        '已将“' + volume.title + '”合并到“' + target.title + '”'
+      )
+      window.dispatchEvent(new CustomEvent('library:refresh', {
+        detail: { source: 'project-workspace' },
+      }))
+    } catch (error) {
+      console.error('合并卷失败', error)
+      toast.error(
+        allMoved
+          ? '章节已移动，但源' + labels.volume + '未能删除，请手动检查'
+          : (error.message || '合并' + labels.volume + '失败')
+      )
+    } finally {
+      setVolumeBusy('')
+    }
   }
 
   const duplicateSelectedNotes = async () => {
@@ -1560,6 +1891,14 @@ export default function ProjectWorkspacePanel({
             <button
               type="button"
               className="btn"
+              disabled={Boolean(volumeBusy)}
+              onClick={() => void createProjectVolume()}
+            >
+              {volumeBusy === 'create' ? '新建中…' : '新建' + labels.volume}
+            </button>
+            <button
+              type="button"
+              className="btn"
               disabled={templateBusy}
               onClick={() => void applyProjectTemplate()}
             >
@@ -1625,6 +1964,15 @@ export default function ProjectWorkspacePanel({
             清除筛选
           </button>
         )}
+        <button
+          type="button"
+          className="btn small"
+          disabled={Boolean(volumeBusy)}
+          onClick={() => void createProjectVolume()}
+        >
+          {volumeBusy === 'create' ? '新建中…' : '新增' + labels.volume}
+        </button>
+
         <button
           type="button"
           className={'btn small project-board-create-toggle' + (chapterCreateOpen ? ' active' : '')}
@@ -1874,6 +2222,159 @@ export default function ProjectWorkspacePanel({
         </section>
       )}
 
+      {volumeManageId && (() => {
+        const volume = (workspace?.volumes || []).find(item => (
+          String(item.id || '__ungrouped__') === String(volumeManageId)
+        ))
+        if (!volume) return null
+        const progressValue = getProjectVolumeProgress(volume, projectMeta)
+        const realVolumes = (workspace?.volumes || []).filter(item => item.id)
+        const volumeIndex = realVolumes.findIndex(item => item.id === volume.id)
+
+        return (
+          <section className="project-volume-manager" aria-label={labels.volume + '管理'}>
+            <div className="project-volume-manager-head">
+              <div>
+                <strong>{volume.id ? volume.title : labels.ungrouped} · {labels.volume}管理</strong>
+                <span>
+                  {progressValue.completed}/{progressValue.total} {labels.chapter}完成 ·
+                  {' '}{formatCount(progressValue.wordCount)} 字
+                  {progressValue.targetWords > 0
+                    ? ' · 字数目标 ' + progressValue.wordPercent + '%'
+                    : ''}
+                </span>
+              </div>
+              <button
+                type="button"
+                className="btn small"
+                onClick={() => setVolumeManageId('')}
+              >
+                关闭
+              </button>
+            </div>
+
+            <div className="project-volume-manager-grid">
+              <label>
+                <span>{labels.volume}名称</span>
+                <input
+                  value={volumeNameDraft}
+                  onChange={event => setVolumeNameDraft(event.target.value)}
+                  disabled={!volume.id}
+                  aria-label={labels.volume + '名称'}
+                />
+              </label>
+              <label>
+                <span>目标字数</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="1000"
+                  value={volumeTargetWordsDraft}
+                  onChange={event => setVolumeTargetWordsDraft(event.target.value)}
+                  placeholder="例如 80000"
+                  aria-label={volume.title + '目标字数'}
+                />
+              </label>
+              <button
+                type="button"
+                className="btn small primary"
+                disabled={Boolean(volumeBusy)}
+                onClick={() => void saveVolumeSettings(volume)}
+              >
+                保存设置
+              </button>
+
+              {volume.id && (
+                <>
+                  <div className="project-volume-manager-group">
+                    <span>顺序</span>
+                    <button
+                      type="button"
+                      className="btn small"
+                      disabled={volumeIndex <= 0 || Boolean(volumeBusy)}
+                      onClick={() => void moveVolume(volume.id, 'left')}
+                    >
+                      ← 前移
+                    </button>
+                    <button
+                      type="button"
+                      className="btn small"
+                      disabled={volumeIndex < 0 || volumeIndex >= realVolumes.length - 1 || Boolean(volumeBusy)}
+                      onClick={() => void moveVolume(volume.id, 'right')}
+                    >
+                      后移 →
+                    </button>
+                  </div>
+
+                  <div className="project-volume-manager-group">
+                    <span>复制</span>
+                    <button
+                      type="button"
+                      className="btn small"
+                      disabled={Boolean(volumeBusy)}
+                      onClick={() => void duplicateVolume(volume)}
+                    >
+                      复制整{labels.volume}
+                    </button>
+                  </div>
+
+                  <div className="project-volume-manager-group split">
+                    <span>拆分</span>
+                    <select
+                      value={volumeSplitStartId}
+                      onChange={event => setVolumeSplitStartId(event.target.value)}
+                      aria-label={'选择' + labels.volume + '拆分起点'}
+                      disabled={(volume.notes || []).length < 2}
+                    >
+                      <option value="">选择拆分起点</option>
+                      {(volume.notes || []).slice(1).map(note => (
+                        <option key={note.id} value={note.id}>
+                          从 {displayTitle(note.title)} 开始
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      className="btn small"
+                      disabled={!volumeSplitStartId || Boolean(volumeBusy)}
+                      onClick={() => void splitVolume(volume)}
+                    >
+                      拆为新{labels.volume}
+                    </button>
+                  </div>
+
+                  <div className="project-volume-manager-group merge">
+                    <span>合并</span>
+                    <select
+                      value={volumeMergeTarget}
+                      onChange={event => setVolumeMergeTarget(event.target.value)}
+                      aria-label={'合并目标' + labels.volume}
+                    >
+                      <option value="">选择目标{labels.volume}</option>
+                      {realVolumes
+                        .filter(item => item.id !== volume.id)
+                        .map(item => (
+                          <option key={item.id} value={item.id}>
+                            {item.title}
+                          </option>
+                        ))}
+                    </select>
+                    <button
+                      type="button"
+                      className="btn small danger"
+                      disabled={!volumeMergeTarget || Boolean(volumeBusy)}
+                      onClick={() => void mergeVolume(volume)}
+                    >
+                      合并并删除当前{labels.volume}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </section>
+        )
+      })()}
+
       {selectionMode && splitPreview && (
         <section className="project-board-split-preview" aria-label="拆分章节预览">
           <div>
@@ -1946,21 +2447,50 @@ export default function ProjectWorkspacePanel({
               }}
             >
               <header className="project-volume-header">
-                <div>
+                <div className="project-volume-copy">
                   <strong>{volumeTitle}</strong>
-                  <span>
-                    {volume.notes.length} {labels.chapter} · {formatCount(volume.wordCount)} 字
-                  </span>
+                  {(() => {
+                    const volumeProgress = getProjectVolumeProgress(volume, projectMeta)
+                    return (
+                      <>
+                        <span>
+                          {volume.notes.length} {labels.chapter} · {formatCount(volume.wordCount)} 字
+                          {volumeProgress.targetWords > 0
+                            ? ' / ' + formatCount(volumeProgress.targetWords) + ' 字'
+                            : ''}
+                        </span>
+                        {(volumeProgress.targetWords > 0 || volumeProgress.total > 0) && (
+                          <div className="project-volume-progress" aria-label={volumeTitle + '进度'}>
+                            <i style={{
+                              width: (
+                                volumeProgress.targetWords > 0
+                                  ? volumeProgress.wordPercent
+                                  : volumeProgress.chapterPercent
+                              ) + '%',
+                            }} />
+                          </div>
+                        )}
+                      </>
+                    )
+                  })()}
                 </div>
                 <div className="project-volume-export">
+                  <button
+                    type="button"
+                    className="project-volume-settings"
+                    onClick={() => openVolumeManager(volume)}
+                    title={labels.volume + '设置'}
+                  >
+                    设置
+                  </button>
                   <button
                     type="button"
                     className="project-volume-manage"
                     disabled={!volume.notes.length}
                     onClick={() => manageWholeVolume(volume)}
-                    title={'管理本' + labels.volume}
+                    title={'批量管理本' + labels.volume + '章节'}
                   >
-                    管理
+                    批量
                   </button>
                   <button
                     type="button"
