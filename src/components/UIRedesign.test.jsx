@@ -956,6 +956,69 @@ describe('UI redesign smoke tests', () => {
     expect(container.querySelector('.project-workspace-board')).toBeNull()
   })
 
+  it('creates the first chapter inside an existing first volume', async () => {
+    localStorage.setItem(
+      'localNotepad.projectWorkspace.activeView',
+      'project'
+    )
+    listAllFilesWithContent.mockResolvedValue([
+      {
+        id: 'project',
+        title: '空长篇',
+        is_folder: true,
+        parent_id: '',
+        sort_order: 100,
+      },
+      {
+        id: 'volume-1',
+        title: '第一卷',
+        is_folder: true,
+        parent_id: 'project',
+        sort_order: 100,
+      },
+    ])
+    api.mockImplementation(async (requestPath, init) => {
+      if (requestPath === '/api/files' && init?.method === 'POST') {
+        const body = JSON.parse(init.body)
+        return {
+          id: 'first-created',
+          ...body,
+          sort_order: 1000,
+          updated_at: 1,
+        }
+      }
+      throw new Error('Unexpected request: ' + requestPath)
+    })
+
+    const onOpenFile = vi.fn()
+    await act(async () => {
+      root.render(
+        <ProjectWorkspacePanel
+          onOpenFile={onOpenFile}
+          onClose={() => {}}
+        />
+      )
+    })
+    await flushPromises()
+
+    const createFirst = Array.from(container.querySelectorAll('button'))
+      .find(button => button.textContent === '新建第一个章节')
+    expect(createFirst).toBeTruthy()
+    await click(createFirst)
+    await flushPromises()
+
+    const createCall = api.mock.calls.find(([requestPath, init]) => (
+      requestPath === '/api/files' && init?.method === 'POST'
+    ))
+    expect(createCall).toBeTruthy()
+    expect(JSON.parse(createCall[1].body)).toMatchObject({
+      title: '第一章.md',
+      parent_id: 'volume-1',
+      is_folder: false,
+    })
+    expect(onOpenFile).toHaveBeenCalledWith('first-created')
+  })
+
   it('restores the last project workspace view', async () => {
     localStorage.setItem(
       'localNotepad.projectWorkspace.activeView',
