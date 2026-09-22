@@ -244,10 +244,13 @@
 
 /* Tables are document blocks, not spreadsheet chrome. */
 .editor-input .editor-table {
-  width: 100% !important;
+  display: block;
+  width: max-content !important;
+  max-width: 100% !important;
   margin: 8px 0 16px !important;
   margin-left: 0 !important;
   margin-right: 0 !important;
+  overflow: auto;
   border-collapse: collapse !important;
   border-spacing: 0;
   table-layout: auto;
@@ -256,16 +259,19 @@
   background: transparent;
   font-size: 1em;
   line-height: 1.5;
+  word-break: keep-all;
 }
 
 .editor-input .editor-table-cell {
   min-width: 80px;
-  max-width: 320px;
+  max-width: 300px;
   padding: 6px 13px;
   border: 1px solid var(--line) !important;
   background: var(--surface);
   vertical-align: top;
   overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
 }
 
 .editor-input .editor-table tr:first-child .editor-table-cell,
