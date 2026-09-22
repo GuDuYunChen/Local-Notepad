@@ -123,7 +123,10 @@ function serializeTable(node) {
         if (child.type === 'paragraph') return (child.children || []).map(serializeInline).join('')
         return serializeInline(child)
       }).join(' ')
-      return value.replace(/\|/g, '\\|').replace(/\n/g, '<br>')
+      return value
+        .replace(/\|/g, '\\|')
+        .replace(/ {2}\n/g, '<br>')
+        .replace(/\n/g, '<br>')
     })
   ))
 
