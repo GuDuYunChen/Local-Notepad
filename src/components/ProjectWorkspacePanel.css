@@ -686,6 +686,15 @@
   gap: 2px;
 }
 
+.project-volume-export .project-volume-manage {
+  width: auto;
+  padding: 0 7px;
+}
+
+.project-volume-export .project-volume-create {
+  font-size: 11px;
+}
+
 .project-volume-export button {
   width: 25px;
   height: 24px;
@@ -841,6 +850,45 @@
   margin-top: 4px;
   color: var(--ink-muted);
   font-size: 7px;
+}
+
+.project-chapter-quick-actions {
+  align-self: center;
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transform: translateX(2px);
+  transition: opacity .12s ease, transform .12s ease;
+}
+
+.project-chapter-card:hover .project-chapter-quick-actions,
+.project-chapter-card:focus-within .project-chapter-quick-actions {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.project-chapter-quick-actions button {
+  min-width: 30px;
+  height: 23px;
+  padding: 0 5px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ink-muted);
+  font: inherit;
+  font-size: 7px;
+  cursor: pointer;
+}
+
+.project-chapter-quick-actions button:hover:not(:disabled) {
+  border-color: var(--line);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.project-chapter-quick-actions button:disabled {
+  opacity: .45;
+  cursor: default;
 }
 
 .project-chapter-status {
@@ -1460,5 +1508,16 @@
 
   .project-board-createbar textarea {
     flex-basis: 100%;
+  }
+}
+
+@media (max-width: 760px) {
+  .project-chapter-quick-actions {
+    opacity: 1;
+    transform: none;
+  }
+
+  .project-volume-export .project-volume-manage {
+    padding-inline: 6px;
   }
 }
