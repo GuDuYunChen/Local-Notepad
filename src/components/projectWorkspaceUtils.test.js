@@ -317,6 +317,36 @@ describe('project workspace utilities', () => {
     expect(tail.root.children[1].children[0].text).toBe('后半正文')
   })
 
+  it('splits legacy chapters that begin with prose before a same-level heading', () => {
+    const content = JSON.stringify({
+      root: {
+        children: [
+          {
+            type: 'paragraph',
+            children: [{ type: 'text', text: '无标题开场' }],
+          },
+          {
+            type: 'heading',
+            tag: 'h2',
+            children: [{ type: 'text', text: '第二段' }],
+          },
+          {
+            type: 'paragraph',
+            children: [{ type: 'text', text: '后半正文' }],
+          },
+        ],
+      },
+    })
+
+    const split = splitProjectChapterContent(content)
+    expect(split.title).toBe('第二段')
+    expect(JSON.parse(split.headContent).root.children).toHaveLength(1)
+    expect(JSON.parse(split.tailContent).root.children[0]).toMatchObject({
+      type: 'heading',
+      tag: 'h1',
+    })
+  })
+
   it('filters project volumes by query status and volume while recomputing words', () => {
     const workspace = buildProjectWorkspace(files, 'project', {
       statuses: {
