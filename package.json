@@ -78,7 +78,8 @@
       "dist/**",
       "out/electron/**",
       "package.json",
-      "build/icon.svg"
+      "build/icon.svg",
+      "build/icon.ico"
     ],
     "extraResources": [
       {
@@ -98,7 +99,7 @@
       "target": [
         "nsis"
       ],
-      "icon": "build/icon.svg",
+      "icon": "build/icon.ico",
       "artifactName": "Notepad-${version}-Setup.exe"
     }
   },
