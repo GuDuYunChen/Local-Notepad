@@ -136,12 +136,20 @@ export default function EditorViewSettingsPlugin({ readOnly = false }) {
     shell.style.setProperty('--editor-view-font-size', `${settings.fontSize}px`)
     shell.style.setProperty('--editor-view-line-height', String(settings.lineHeight))
     shell.style.setProperty('--editor-view-page-width', settings.pageWidth ? `${settings.pageWidth}px` : '100%')
+    shell.style.setProperty(
+      '--editor-view-page-min-height',
+      settings.pageWidth
+        ? `${Math.round(settings.pageWidth * 1.414)}px`
+        : '100%'
+    )
     shell.style.setProperty('--editor-view-font-family', fontCss)
+    shell.classList.toggle('editor-fluid-page', settings.pageWidth === 0)
     shell.classList.toggle('editor-typewriter-mode', settings.typewriter && !readOnly)
 
     saveSettings(settings)
 
     return () => {
+      shell.classList.remove('editor-fluid-page')
       shell.classList.remove('editor-typewriter-mode')
     }
   }, [editor, fontCss, readOnly, settings])
