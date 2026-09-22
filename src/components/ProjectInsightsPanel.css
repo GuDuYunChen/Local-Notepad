@@ -1,0 +1,398 @@
+.project-insights-panel {
+  padding: 0 16px 12px;
+  background: var(--paper);
+}
+
+.project-insights-head {
+  padding: 10px 0 7px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.project-insights-head > div:first-child {
+  min-width: 0;
+}
+
+.project-insights-head strong,
+.project-insights-head span {
+  display: block;
+}
+
+.project-insights-head strong {
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 680;
+}
+
+.project-insights-head span {
+  margin-top: 2px;
+  color: var(--ink-muted);
+  font-size: 8px;
+}
+
+.project-insights-period {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+}
+
+.project-insights-period button {
+  height: 25px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ink-muted);
+  font: inherit;
+  font-size: 8px;
+  cursor: pointer;
+}
+
+.project-insights-period button.active {
+  background: var(--paper);
+  color: var(--clay);
+  box-shadow: var(--shadow-soft);
+}
+
+.project-insights-data-note {
+  margin-bottom: 7px;
+  padding: 7px 9px;
+  border: 1px solid color-mix(in srgb, #b97820 24%, var(--line));
+  border-radius: 7px;
+  background: color-mix(in srgb, #b97820 7%, var(--surface));
+  color: #95621c;
+  font-size: 7px;
+}
+
+.project-insights-overview {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.project-insights-overview > div {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.project-insights-overview span,
+.project-insights-overview strong,
+.project-insights-overview small {
+  display: block;
+}
+
+.project-insights-overview span,
+.project-insights-overview small {
+  color: var(--ink-muted);
+  font-size: 7px;
+}
+
+.project-insights-overview strong {
+  margin-top: 2px;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-insights-overview small {
+  margin-top: 2px;
+}
+
+.project-insights-overview .tone-done,
+.project-insights-overview .tone-ahead {
+  color: #417e55;
+}
+
+.project-insights-overview .tone-behind {
+  color: var(--red, #c7433c);
+}
+
+.project-insights-overview .tone-warning {
+  color: #95621c;
+}
+
+.project-insights-overview .tone-track,
+.project-insights-overview .tone-forecast {
+  color: var(--clay);
+}
+
+.project-insights-grid {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.project-insight-card {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.project-insight-card > header {
+  min-height: 28px;
+}
+
+.project-insight-card > header strong,
+.project-insight-card > header span {
+  display: block;
+}
+
+.project-insight-card > header strong {
+  color: var(--ink);
+  font-size: 9px;
+  font-weight: 650;
+}
+
+.project-insight-card > header span {
+  margin-top: 2px;
+  color: var(--ink-muted);
+  font-size: 7px;
+}
+
+.project-insight-alert-list,
+.project-difficult-list,
+.project-recommendation-list {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.project-insight-alert-list button,
+.project-difficult-list button {
+  min-width: 0;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: var(--paper);
+  color: var(--ink-soft);
+  font: inherit;
+  text-align: left;
+}
+
+.project-insight-alert-list button:not(:disabled),
+.project-difficult-list button {
+  cursor: pointer;
+}
+
+.project-insight-alert-list button:disabled {
+  cursor: default;
+}
+
+.project-insight-alert-list button > span,
+.project-difficult-list button > span {
+  min-width: 0;
+  flex: 1;
+}
+
+.project-insight-alert-list strong,
+.project-insight-alert-list small,
+.project-difficult-list strong,
+.project-difficult-list small {
+  display: block;
+}
+
+.project-insight-alert-list strong,
+.project-difficult-list strong {
+  color: var(--ink-soft);
+  font-size: 8px;
+  font-weight: 620;
+}
+
+.project-insight-alert-list small,
+.project-difficult-list small {
+  margin-top: 2px;
+  color: var(--ink-muted);
+  font-size: 7px;
+  line-height: 1.45;
+}
+
+.project-insight-alert-list em,
+.project-difficult-list em {
+  flex: 0 0 auto;
+  font-size: 7px;
+  font-style: normal;
+}
+
+.project-insight-alert-list .tone-high {
+  border-color: color-mix(in srgb, var(--red, #c7433c) 20%, transparent);
+}
+
+.project-insight-alert-list .tone-medium {
+  border-color: color-mix(in srgb, #b97820 20%, transparent);
+}
+
+.project-insight-alert-list .tone-good {
+  border-color: color-mix(in srgb, #4f9a67 18%, transparent);
+}
+
+.difficulty-high {
+  color: var(--red, #c7433c);
+}
+
+.difficulty-medium {
+  color: #95621c;
+}
+
+.project-recommendation-list button {
+  width: 100%;
+  min-height: 42px;
+  padding: 5px;
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--paper);
+  color: var(--ink-soft);
+  font: inherit;
+  text-align: left;
+}
+
+.project-recommendation-list button:not(:disabled) {
+  cursor: pointer;
+}
+
+.project-recommendation-list button > span {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 99px;
+  background: var(--surface);
+  color: var(--clay);
+  font-size: 7px;
+  font-weight: 700;
+}
+
+.project-recommendation-list button > div {
+  min-width: 0;
+}
+
+.project-recommendation-list strong,
+.project-recommendation-list small {
+  display: block;
+}
+
+.project-recommendation-list strong {
+  color: var(--ink-soft);
+  font-size: 8px;
+}
+
+.project-recommendation-list small {
+  margin-top: 2px;
+  color: var(--ink-muted);
+  font-size: 7px;
+  line-height: 1.45;
+}
+
+.project-insight-empty {
+  padding: 12px 4px;
+  color: var(--ink-muted);
+  font-size: 7px;
+  line-height: 1.45;
+}
+
+.project-insight-report {
+  margin-top: 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.project-insight-report > header {
+  min-height: 47px;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.project-insight-report > header > div:first-child {
+  min-width: 0;
+}
+
+.project-insight-report > header strong,
+.project-insight-report > header span {
+  display: block;
+}
+
+.project-insight-report > header strong {
+  color: var(--ink);
+  font-size: 9px;
+}
+
+.project-insight-report > header span {
+  margin-top: 2px;
+  color: var(--ink-muted);
+  font-size: 7px;
+}
+
+.project-insight-report > header > div:last-child {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 4px;
+}
+
+.project-insight-report-preview {
+  max-height: 320px;
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  border-top: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink-soft);
+  font: 8px/1.6 "SFMono-Regular", Consolas, monospace;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 1180px) {
+  .project-insights-overview {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .project-insights-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .project-insight-card.recommendations {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 820px) {
+  .project-insights-overview,
+  .project-insights-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .project-insight-card.recommendations {
+    grid-column: auto;
+  }
+
+  .project-insights-head,
+  .project-insight-report > header {
+    align-items: flex-start;
+  }
+}
