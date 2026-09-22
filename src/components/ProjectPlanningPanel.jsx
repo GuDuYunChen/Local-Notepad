@@ -96,13 +96,13 @@ export default function ProjectPlanningPanel({
     })
   }
 
-  const setMilestone = (key, deadline) => {
+  const setMilestone = (key, patch) => {
     updateMeta(previous => ({
       volumeMilestones: {
         ...previous.volumeMilestones,
         [key]: {
           ...(previous.volumeMilestones?.[key] || {}),
-          deadline,
+          ...patch,
         },
       },
     }))
@@ -240,12 +240,28 @@ export default function ProjectPlanningPanel({
                   <strong>{item.title}</strong>
                   <span>
                     {item.completed}/{item.total} · {item.percent}% · {formatWords(item.wordCount)} 字
+                    {item.targetWords > 0
+                      ? ' / ' + formatWords(item.targetWords) + ' · ' + item.wordPercent + '%'
+                      : ''}
                   </span>
                 </div>
                 <input
+                  type="number"
+                  min="0"
+                  step="1000"
+                  value={item.targetWords || ''}
+                  placeholder="目标字数"
+                  onChange={event => setMilestone(item.key, {
+                    targetWords: Math.max(0, Number(event.target.value) || 0),
+                  })}
+                  aria-label={'设置' + item.title + '目标字数'}
+                />
+                <input
                   type="date"
                   value={item.deadline || ''}
-                  onChange={event => setMilestone(item.key, event.target.value)}
+                  onChange={event => setMilestone(item.key, {
+                    deadline: event.target.value,
+                  })}
                   aria-label={'设置' + item.title + '里程碑日期'}
                 />
                 <em>
