@@ -1057,6 +1057,363 @@ describe('UI redesign smoke tests', () => {
     expect(reorderCalls.length).toBeGreaterThan(0)
   })
 
+  it('creates renames targets reorders and duplicates project volumes', async () => {
+    localStorage.setItem(
+      'localNotepad.projectWorkspace.activeView',
+      'project'
+    )
+
+    const fileStore = [
+      {
+        id: 'project',
+        title: '卷管理项目',
+        is_folder: true,
+        parent_id: '',
+        sort_order: 100,
+      },
+      {
+        id: 'volume-1',
+        title: '第一卷',
+        is_folder: true,
+        parent_id: 'project',
+        sort_order: 100,
+      },
+      {
+        id: 'volume-2',
+        title: '第二卷',
+        is_folder: true,
+        parent_id: 'project',
+        sort_order: 200,
+      },
+      {
+        id: 'chapter-1',
+        title: '第一章.md',
+        is_folder: false,
+        parent_id: 'volume-1',
+        sort_order: 100,
+        content: JSON.stringify({
+          root: {
+            children: [{
+              type: 'paragraph',
+              children: [{ type: 'text', text: '第一章正文' }],
+            }],
+          },
+        }),
+      },
+      {
+        id: 'chapter-2',
+        title: '第二章.md',
+        is_folder: false,
+        parent_id: 'volume-1',
+        sort_order: 200,
+        content: JSON.stringify({
+          root: {
+            children: [{
+              type: 'paragraph',
+              children: [{ type: 'text', text: '第二章正文' }],
+            }],
+          },
+        }),
+      },
+      {
+        id: 'chapter-3',
+        title: '第三章.md',
+        is_folder: false,
+        parent_id: 'volume-2',
+        sort_order: 100,
+        content: JSON.stringify({
+          root: {
+            children: [{
+              type: 'paragraph',
+              children: [{ type: 'text', text: '第三章正文' }],
+            }],
+          },
+        }),
+      },
+    ]
+    let createdIndex = 0
+    listAllFilesWithContent.mockImplementation(async () => (
+      fileStore.map(item => ({ ...item }))
+    ))
+    api.mockImplementation(async (requestPath, init) => {
+      if (requestPath === '/api/files' && init?.method === 'POST') {
+        const payload = JSON.parse(init.body)
+        createdIndex += 1
+        const siblings = fileStore.filter(item => (
+          String(item.parent_id || '') === String(payload.parent_id || '')
+        ))
+        const created = {
+          id: 'volume-created-' + createdIndex,
+          ...payload,
+          sort_order: siblings.reduce(
+            (max, item) => Math.max(max, Number(item.sort_order) || 0),
+            0,
+          ) + 1000,
+          updated_at: 1,
+        }
+        fileStore.push(created)
+        return { ...created }
+      }
+
+      if (requestPath.startsWith('/api/files/') && init?.method === 'PUT') {
+        const id = requestPath.split('/').pop()
+        const target = fileStore.find(item => item.id === id)
+        if (!target) throw new Error('missing file ' + id)
+        Object.assign(target, JSON.parse(init.body))
+        return { ...target }
+      }
+
+      if (requestPath.startsWith('/api/files/') && init?.method === 'DELETE') {
+        const id = requestPath.split('/').pop()
+        const index = fileStore.findIndex(item => item.id === id)
+        if (index >= 0) fileStore.splice(index, 1)
+        return null
+      }
+
+      throw new Error('Unexpected request: ' + requestPath)
+    })
+
+    await act(async () => {
+      root.render(
+        <ProjectWorkspacePanel
+          onOpenFile={() => {}}
+          onClose={() => {}}
+        />
+      )
+    })
+    await flushPromises()
+
+    const newVolume = Array.from(container.querySelectorAll('button'))
+      .find(button => button.textContent === '新增卷')
+    expect(newVolume).toBeTruthy()
+    await click(newVolume)
+    await flushPromises()
+
+    const createdEmptyVolume = fileStore.find(item => (
+      item.is_folder && item.title === '第三卷'
+    ))
+    expect(createdEmptyVolume).toBeTruthy()
+    expect(container.textContent).toContain('第三卷')
+
+    let firstVolume = Array.from(
+      container.querySelectorAll('.project-volume-column')
+    ).find(column => (
+      column.querySelector('.project-volume-header strong')?.textContent === '第一卷'
+    ))
+    expect(firstVolume).toBeTruthy()
+
+    let settings = Array.from(firstVolume.querySelectorAll('button'))
+      .find(button => button.textContent === '设置')
+    await click(settings)
+
+    let manager = container.querySelector('.project-volume-manager')
+    expect(manager).toBeTruthy()
+
+    const nameInput = manager.querySelector('input[aria-label="卷名称"]')
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        'value',
+      ).set
+      setter.call(nameInput, '开篇卷')
+      nameInput.dispatchEvent(new Event('input', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    const targetInput = manager.querySelector(
+      'input[aria-label="第一卷目标字数"]'
+    )
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        'value',
+      ).set
+      setter.call(targetInput, '50000')
+      targetInput.dispatchEvent(new Event('input', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    const saveSettings = Array.from(manager.querySelectorAll('button'))
+      .find(button => button.textContent === '保存设置')
+    await click(saveSettings)
+    await flushPromises()
+
+    expect(fileStore.find(item => item.id === 'volume-1').title)
+      .toBe('开篇卷')
+    const storedMeta = JSON.parse(
+      localStorage.getItem('localNotepad.projectWorkspace.v1')
+    )
+    expect(storedMeta.project.volumeMilestones['volume-1'].targetWords)
+      .toBe(50000)
+
+    firstVolume = Array.from(
+      container.querySelectorAll('.project-volume-column')
+    ).find(column => (
+      column.querySelector('.project-volume-header strong')?.textContent === '开篇卷'
+    ))
+    settings = Array.from(firstVolume.querySelectorAll('button'))
+      .find(button => button.textContent === '设置')
+    await click(settings)
+
+    manager = container.querySelector('.project-volume-manager')
+    const moveRight = Array.from(manager.querySelectorAll('button'))
+      .find(button => button.textContent === '后移 →')
+    await click(moveRight)
+    await flushPromises()
+
+    expect(fileStore.find(item => item.id === 'volume-2').sort_order)
+      .toBeLessThan(fileStore.find(item => item.id === 'volume-1').sort_order)
+
+    manager = container.querySelector('.project-volume-manager')
+    const duplicateVolumeButton = Array.from(manager.querySelectorAll('button'))
+      .find(button => button.textContent === '复制整卷')
+    await click(duplicateVolumeButton)
+    await flushPromises()
+
+    const duplicatedVolume = fileStore.find(item => (
+      item.is_folder && item.title === '开篇卷 副本'
+    ))
+    expect(duplicatedVolume).toBeTruthy()
+    expect(fileStore.filter(item => (
+      !item.is_folder && item.parent_id === duplicatedVolume.id
+    )).map(item => item.title)).toEqual([
+      '第一章.md',
+      '第二章.md',
+    ])
+  })
+
+  it('splits and merges complete project volumes without losing chapter ownership', async () => {
+    localStorage.setItem(
+      'localNotepad.projectWorkspace.activeView',
+      'project'
+    )
+
+    const lexical = text => JSON.stringify({
+      root: {
+        children: [{
+          type: 'paragraph',
+          children: [{ type: 'text', text }],
+        }],
+      },
+    })
+    const fileStore = [
+      { id: 'project', title: '拆卷项目', is_folder: true, parent_id: '', sort_order: 100 },
+      { id: 'volume-1', title: '第一卷', is_folder: true, parent_id: 'project', sort_order: 100 },
+      { id: 'volume-2', title: '第二卷', is_folder: true, parent_id: 'project', sort_order: 200 },
+      { id: 'chapter-1', title: '第一章.md', is_folder: false, parent_id: 'volume-1', sort_order: 100, content: lexical('一') },
+      { id: 'chapter-2', title: '第二章.md', is_folder: false, parent_id: 'volume-1', sort_order: 200, content: lexical('二') },
+      { id: 'chapter-3', title: '第三章.md', is_folder: false, parent_id: 'volume-1', sort_order: 300, content: lexical('三') },
+      { id: 'chapter-4', title: '第四章.md', is_folder: false, parent_id: 'volume-2', sort_order: 100, content: lexical('四') },
+    ]
+    let createdIndex = 0
+    listAllFilesWithContent.mockImplementation(async () => (
+      fileStore.map(item => ({ ...item }))
+    ))
+    api.mockImplementation(async (requestPath, init) => {
+      if (requestPath === '/api/files' && init?.method === 'POST') {
+        const payload = JSON.parse(init.body)
+        createdIndex += 1
+        const created = {
+          id: 'split-volume-' + createdIndex,
+          ...payload,
+          sort_order: 1000 + createdIndex * 1000,
+          updated_at: 1,
+        }
+        fileStore.push(created)
+        return { ...created }
+      }
+      if (requestPath.startsWith('/api/files/') && init?.method === 'PUT') {
+        const id = requestPath.split('/').pop()
+        const target = fileStore.find(item => item.id === id)
+        Object.assign(target, JSON.parse(init.body))
+        return { ...target }
+      }
+      if (requestPath.startsWith('/api/files/') && init?.method === 'DELETE') {
+        const id = requestPath.split('/').pop()
+        const index = fileStore.findIndex(item => item.id === id)
+        if (index >= 0) fileStore.splice(index, 1)
+        return null
+      }
+      throw new Error('Unexpected request: ' + requestPath)
+    })
+
+    await act(async () => {
+      root.render(
+        <ProjectWorkspacePanel
+          onOpenFile={() => {}}
+          onClose={() => {}}
+        />
+      )
+    })
+    await flushPromises()
+
+    let firstVolume = Array.from(
+      container.querySelectorAll('.project-volume-column')
+    ).find(column => (
+      column.querySelector('.project-volume-header strong')?.textContent === '第一卷'
+    ))
+    let settings = Array.from(firstVolume.querySelectorAll('button'))
+      .find(button => button.textContent === '设置')
+    await click(settings)
+
+    let manager = container.querySelector('.project-volume-manager')
+    const splitStart = manager.querySelector(
+      'select[aria-label="选择卷拆分起点"]'
+    )
+    await act(async () => {
+      splitStart.value = 'chapter-2'
+      splitStart.dispatchEvent(new Event('change', { bubbles: true }))
+      await Promise.resolve()
+    })
+    const splitButton = Array.from(manager.querySelectorAll('button'))
+      .find(button => button.textContent === '拆为新卷')
+    await click(splitButton)
+    await flushPromises()
+
+    const splitFolder = fileStore.find(item => (
+      item.is_folder &&
+      item.parent_id === 'project' &&
+      item.title === '第三卷'
+    ))
+    expect(splitFolder).toBeTruthy()
+    expect(fileStore.find(item => item.id === 'chapter-1').parent_id)
+      .toBe('volume-1')
+    expect(fileStore.find(item => item.id === 'chapter-2').parent_id)
+      .toBe(splitFolder.id)
+    expect(fileStore.find(item => item.id === 'chapter-3').parent_id)
+      .toBe(splitFolder.id)
+
+    const splitColumn = Array.from(
+      container.querySelectorAll('.project-volume-column')
+    ).find(column => (
+      column.querySelector('.project-volume-header strong')?.textContent === '第三卷'
+    ))
+    expect(splitColumn).toBeTruthy()
+    settings = Array.from(splitColumn.querySelectorAll('button'))
+      .find(button => button.textContent === '设置')
+    await click(settings)
+
+    manager = container.querySelector('.project-volume-manager')
+    const mergeTarget = manager.querySelector(
+      'select[aria-label="合并目标卷"]'
+    )
+    await act(async () => {
+      mergeTarget.value = 'volume-2'
+      mergeTarget.dispatchEvent(new Event('change', { bubbles: true }))
+      await Promise.resolve()
+    })
+    const mergeButton = Array.from(manager.querySelectorAll('button'))
+      .find(button => button.textContent === '合并并删除当前卷')
+    await click(mergeButton)
+    await flushPromises()
+
+    expect(fileStore.some(item => item.id === splitFolder.id)).toBe(false)
+    expect(fileStore.find(item => item.id === 'chapter-2').parent_id)
+      .toBe('volume-2')
+    expect(fileStore.find(item => item.id === 'chapter-3').parent_id)
+      .toBe('volume-2')
+  })
+
   it('switches project views with Alt shortcuts without hijacking form input', async () => {
     listAllFilesWithContent.mockResolvedValue([
       {
