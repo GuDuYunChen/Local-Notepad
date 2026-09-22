@@ -144,13 +144,13 @@
   max-width: none !important;
   min-height: 100% !important;
   margin: 0 !important;
-  padding: 32px max(32px, 6vw) 96px !important;
+  padding: 32px 60px 96px !important;
 }
 
 .editor-shell.editor-fluid-page .editor-placeholder {
   top: 18px !important;
   width: 100%;
-  padding-left: max(32px, 6vw);
+  padding-left: 60px;
 }
 
 /* Document rhythm follows the Office Viewer/Vditor reset model:
@@ -215,9 +215,13 @@
 }
 
 .editor-input .editor-link {
-  color: var(--clay);
+  color: #0969da;
   text-decoration-thickness: 1px;
   text-underline-offset: 3px;
+}
+
+[data-theme="dark"] .editor-input .editor-link {
+  color: #58a6ff;
 }
 
 .editor-input .inline-code {
