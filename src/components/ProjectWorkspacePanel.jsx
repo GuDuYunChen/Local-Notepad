@@ -26,6 +26,7 @@ import {
 import ProjectAnalyticsPanel from './ProjectAnalyticsPanel'
 import ProjectPlanningPanel from './ProjectPlanningPanel'
 import ProjectSprintPanel from './ProjectSprintPanel'
+import ProjectTodayCenter from './ProjectTodayCenter'
 import './ProjectWorkspacePanel.css'
 
 const LAST_PROJECT_KEY = 'localNotepad.projectWorkspace.lastProject'
@@ -58,6 +59,7 @@ function statusCopy(status) {
 
 export default function ProjectWorkspacePanel({
   onOpenFile,
+  onStartFocus,
   onClose,
 }) {
   const [files, setFiles] = useState([])
@@ -629,6 +631,15 @@ export default function ProjectWorkspacePanel({
           </strong>
         </div>
       </div>
+
+      <ProjectTodayCenter
+        workspace={workspace}
+        projectMeta={projectMeta}
+        onOpenFile={onOpenFile}
+        onStartFocus={(note, durationMinutes) => (
+          onStartFocus?.(note, durationMinutes, workspace.project)
+        )}
+      />
 
       <section className="project-creative-console" aria-label="创作项目控制台">
         <div className="project-console-card project-progress-card">
