@@ -180,3 +180,40 @@ export function formatCountdown(seconds) {
   const secs = value % 60
   return String(minutes).padStart(2, '0') + ':' + String(secs).padStart(2, '0')
 }
+
+
+export function updateFocusSessionReview(
+  projectId,
+  sessionId,
+  reviewNote,
+) {
+  const project = normalizeId(projectId)
+  const id = String(sessionId || '')
+  if (!project || !id) return null
+
+  const all = readAll()
+  const history = Array.isArray(all[project]) ? all[project] : []
+  const index = history.findIndex(item => String(item?.id || '') === id)
+  if (index < 0) return null
+
+  const value = String(reviewNote || '').trim()
+  const nextRecord = {
+    ...history[index],
+    reviewNote: value,
+  }
+  const next = [...history]
+  next[index] = nextRecord
+
+  try {
+    all[project] = next
+    localStorage.setItem(FOCUS_SESSIONS_KEY, JSON.stringify(all))
+  } catch {
+    // Review notes are optional and must never block writing.
+  }
+
+  return nextRecord
+}
+
+export function getFocusSessionReviewNote(session) {
+  return String(session?.reviewNote || '')
+}
