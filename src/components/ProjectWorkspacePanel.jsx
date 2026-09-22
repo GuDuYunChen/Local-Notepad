@@ -240,6 +240,9 @@ export default function ProjectWorkspacePanel({
     setSelectionMode(false)
     setSelectedNoteIds([])
     setBatchMoveTarget('__ungrouped__')
+    setProjectBoardQuery('')
+    setProjectBoardStatus('all')
+    setProjectBoardVolume('all')
 
     if (!selectedProjectId) {
       setProjectMeta({
