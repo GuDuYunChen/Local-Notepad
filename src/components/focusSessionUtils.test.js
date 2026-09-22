@@ -9,6 +9,7 @@ import {
   getFocusSessionRemainingSeconds,
   getTodayFocusSummary,
   readFocusSessionHistory,
+  updateFocusSessionReview,
 } from './focusSessionUtils'
 
 describe('focus session utilities', () => {
@@ -88,6 +89,32 @@ describe('focus session utilities', () => {
       'b',
       'a',
     ])
+  })
+
+  it('updates a saved session review note', () => {
+    const record = finalizeFocusSession(
+      createFocusSession({
+        projectId: 'project',
+        noteId: 'chapter-1',
+        noteTitle: '第一章.md',
+        durationMinutes: 25,
+        startWords: 100,
+        startedAt: 1000,
+      }),
+      300,
+      { endedAt: 1510000 },
+    )
+
+    appendFocusSession(record)
+    const updated = updateFocusSessionReview(
+      'project',
+      record.id,
+      '上午状态最好，下次直接从冲突段开始。',
+    )
+
+    expect(updated.reviewNote).toBe('上午状态最好，下次直接从冲突段开始。')
+    expect(readFocusSessionHistory('project')[0].reviewNote)
+      .toBe('上午状态最好，下次直接从冲突段开始。')
   })
 
   it('summarizes today focus time and word delta', () => {
