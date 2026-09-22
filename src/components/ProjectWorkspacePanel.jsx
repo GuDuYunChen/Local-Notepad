@@ -822,6 +822,8 @@ export default function ProjectWorkspacePanel({
           </div>
         </div>
       </section>
+        </>
+      )}
 
       {activeView === 'analysis' && (
         <ProjectAnalyticsPanel
@@ -867,6 +869,8 @@ export default function ProjectWorkspacePanel({
         />
       )}
 
+      {activeView === 'project' && (
+        <>
       <div className="project-workspace-board">
         {workspace.volumes.map(volume => {
           const parentId = volume.id || workspace.project.id
