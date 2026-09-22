@@ -423,6 +423,39 @@ describe('UI redesign smoke tests', () => {
     expect(container.textContent).toContain('剧本项目')
   })
 
+  it('restores the last project workspace view', async () => {
+    localStorage.setItem(
+      'localNotepad.projectWorkspace.activeView',
+      'analysis'
+    )
+    listAllFilesWithContent.mockResolvedValue([
+      {
+        id: 'project',
+        title: '分析项目',
+        is_folder: true,
+        parent_id: '',
+        sort_order: 100,
+      },
+    ])
+
+    await act(async () => {
+      root.render(
+        <ProjectWorkspacePanel
+          onOpenFile={() => {}}
+          onClose={() => {}}
+        />
+      )
+    })
+    await flushPromises()
+
+    const activeTab = container.querySelector(
+      '.project-workspace-view-tabs button.active'
+    )
+    expect(activeTab.querySelector('strong').textContent).toBe('分析')
+    expect(container.textContent).toContain('创作分析')
+    expect(container.textContent).not.toContain('今日创作中心')
+  })
+
   it('initializes a structured novel project template without overwriting existing work', async () => {
     const initialFiles = [{
       id: 'project',
