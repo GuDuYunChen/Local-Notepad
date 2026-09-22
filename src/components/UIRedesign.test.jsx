@@ -962,7 +962,7 @@ describe('UI redesign smoke tests', () => {
     expect(volumeColumn).toBeTruthy()
 
     const manageVolume = Array.from(volumeColumn.querySelectorAll('button'))
-      .find(button => button.textContent === '管理')
+      .find(button => button.textContent === '批量')
     await click(manageVolume)
 
     let bulkbar = container.querySelector('.project-board-bulkbar')
