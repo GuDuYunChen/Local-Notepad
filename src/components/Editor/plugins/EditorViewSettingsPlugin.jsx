@@ -4,7 +4,7 @@ import { $getSelection, $isRangeSelection } from 'lexical'
 
 const STORAGE_KEY = 'localNotepad.editorView.v1'
 const VISUAL_DENSITY_VERSION_KEY = 'localNotepad.editorView.visualDensityVersion'
-const VISUAL_DENSITY_VERSION = '3'
+const VISUAL_DENSITY_VERSION = '4'
 
 const FONT_OPTIONS = [
   {
@@ -34,7 +34,7 @@ const WIDTH_OPTIONS = [
 export const DEFAULT_EDITOR_VIEW_SETTINGS = {
   fontSize: 13,
   lineHeight: 1.7,
-  pageWidth: 860,
+  pageWidth: 0,
   fontFamily: 'system',
   typewriter: false,
 }
@@ -81,10 +81,11 @@ function loadSettings() {
       storedLineHeight === 1.9 ||
       storedLineHeight === 1.7
     )
+    const legacyWidth = Number(stored?.pageWidth ?? 860)
     const looksLikeLegacyDefault = (
       densityVersion !== VISUAL_DENSITY_VERSION &&
       Number(stored?.fontSize || 16) === 16 &&
-      Number(stored?.pageWidth || 860) === 860 &&
+      legacyWidth === 860 &&
       (stored?.fontFamily || 'system') === 'system' &&
       !stored?.typewriter &&
       legacyLineHeight
@@ -95,6 +96,7 @@ function loadSettings() {
         ...normalized,
         fontSize: DEFAULT_EDITOR_VIEW_SETTINGS.fontSize,
         lineHeight: DEFAULT_EDITOR_VIEW_SETTINGS.lineHeight,
+        pageWidth: DEFAULT_EDITOR_VIEW_SETTINGS.pageWidth,
       }
     }
 
