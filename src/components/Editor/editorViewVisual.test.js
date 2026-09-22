@@ -1,0 +1,32 @@
+import { describe, expect, it } from 'vitest'
+import {
+  DEFAULT_EDITOR_VIEW_SETTINGS,
+  normalizeEditorViewSettings,
+} from './plugins/EditorViewSettingsPlugin'
+
+describe('editor visual defaults', () => {
+  it('uses the denser Office-inspired reading baseline', () => {
+    expect(DEFAULT_EDITOR_VIEW_SETTINGS).toMatchObject({
+      fontSize: 16,
+      lineHeight: 1.7,
+      pageWidth: 860,
+      fontFamily: 'system',
+    })
+  })
+
+  it('preserves explicit user view choices within supported bounds', () => {
+    expect(normalizeEditorViewSettings({
+      fontSize: 18,
+      lineHeight: 2,
+      pageWidth: 1040,
+      fontFamily: 'serif',
+      typewriter: true,
+    })).toEqual({
+      fontSize: 18,
+      lineHeight: 2,
+      pageWidth: 1040,
+      fontFamily: 'serif',
+      typewriter: true,
+    })
+  })
+})
