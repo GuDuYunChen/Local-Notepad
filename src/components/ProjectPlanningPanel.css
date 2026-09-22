@@ -213,7 +213,7 @@
   min-width: 0;
   padding: 5px 6px;
   display: grid;
-  grid-template-columns: minmax(82px, 1fr) 112px 42px;
+  grid-template-columns: minmax(82px, 1fr) 86px 112px 42px;
   align-items: center;
   gap: 5px;
   border-radius: 7px;
