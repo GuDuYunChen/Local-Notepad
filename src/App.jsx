@@ -801,6 +801,15 @@ export default function App() {
     if (!nextWorkspace || nextWorkspace === workspace) return
 
     if (
+      focusSession?.active &&
+      workspace === 'notes' &&
+      nextWorkspace !== 'notes'
+    ) {
+      toast.warning('请先结束当前专注 Session')
+      return
+    }
+
+    if (
       workspace === 'notes' &&
       nextWorkspace !== 'notes' &&
       current &&
@@ -815,7 +824,7 @@ export default function App() {
     }
 
     setWorkspace(nextWorkspace)
-  }, [workspace, current, deletedIds, unsaved])
+  }, [workspace, current, deletedIds, unsaved, focusSession?.active])
 
   const handleNavigation = React.useCallback((nextWorkspace) => {
     changeWorkspace(nextWorkspace)
