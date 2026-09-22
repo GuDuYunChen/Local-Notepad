@@ -199,7 +199,14 @@ export default function Editor({ documentId, documentTitle, initialContent, onCh
         {!readOnly && <PasteImagePlugin />}
         <div className="editor-container">
           <RichTextPlugin
-            contentEditable={<ContentEditable className="editor-input" />}
+            contentEditable={(
+              <ContentEditable
+                className="editor-input"
+                spellCheck={false}
+                autoCorrect="off"
+                autoCapitalize="off"
+              />
+            )}
             placeholder={<Placeholder />}
             ErrorBoundary={LexicalErrorBoundary}
           />
