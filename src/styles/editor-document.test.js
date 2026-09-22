@@ -20,7 +20,7 @@ describe('editor document presentation', () => {
     const css = read(['src', 'styles', 'editor-document.css'])
 
     expect(css).toContain('var(--editor-view-page-width, 860px)')
-    expect(css).toContain('var(--editor-view-font-size, 16px)')
+    expect(css).toContain('var(--editor-view-font-size, 13px)')
     expect(css).toContain('var(--editor-view-line-height, 1.7)')
     expect(css).toContain('var(--editor-view-font-family')
     expect(css).not.toContain('font-size: 15px !important')
@@ -32,7 +32,8 @@ describe('editor document presentation', () => {
 
     expect(css).toContain('--document-canvas: var(--surface)')
     expect(css).toContain('Continuous document surface')
-    expect(css).toContain('padding: 54px 60px 110px')
+    expect(css).toContain('padding: 0 60px 96px')
+    expect(css).toContain('.editor-input > :first-child')
     expect(css).not.toContain('--document-page-shadow')
     expect(css).toContain('margin-top: 24px')
     expect(css).toContain('margin-bottom: 16px')
