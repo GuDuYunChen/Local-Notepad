@@ -943,6 +943,7 @@ export default function ProjectWorkspacePanel({
     setVolumeBusy('split:' + volume.id)
 
     let createdVolume = null
+    let movedCount = 0
     try {
       createdVolume = await api('/api/files', {
         method: 'POST',
@@ -967,6 +968,7 @@ export default function ProjectWorkspacePanel({
             sort_order: item.sort_order,
           }),
         })
+        movedCount += 1
       }
 
       await load()
@@ -979,7 +981,7 @@ export default function ProjectWorkspacePanel({
         detail: { source: 'project-workspace' },
       }))
     } catch (error) {
-      if (createdVolume?.id) {
+      if (createdVolume?.id && movedCount === 0) {
         try {
           await api('/api/files/' + createdVolume.id, { method: 'DELETE' })
         } catch (cleanupError) {
@@ -987,7 +989,11 @@ export default function ProjectWorkspacePanel({
         }
       }
       console.error('拆分卷失败', error)
-      toast.error(error.message || '拆分' + labels.volume + '失败')
+      toast.error(
+        movedCount > 0
+          ? '拆分只完成了一部分，已保留新旧' + labels.volume + '避免章节丢失，请检查后继续'
+          : (error.message || '拆分' + labels.volume + '失败')
+      )
     } finally {
       setVolumeBusy('')
     }
