@@ -99,7 +99,7 @@
   max-width: var(--editor-view-page-width, 860px) !important;
   min-height: 100% !important;
   margin: 0 auto !important;
-  padding: 0 60px 96px !important;
+  padding: 32px 60px 96px !important;
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -127,7 +127,7 @@
 }
 
 .editor-placeholder {
-  top: 18px !important;
+  top: 32px !important;
   left: 50% !important;
   width: min(var(--editor-view-page-width, 860px), calc(100% - 32px));
   padding-left: 60px;
@@ -144,26 +144,13 @@
   max-width: none !important;
   min-height: 100% !important;
   margin: 0 !important;
-  padding: 0 max(32px, 6vw) 96px !important;
+  padding: 32px max(32px, 6vw) 96px !important;
 }
 
 .editor-shell.editor-fluid-page .editor-placeholder {
   top: 18px !important;
   width: 100%;
   padding-left: max(32px, 6vw);
-}
-
-.editor-input > :first-child {
-  margin-top: 18px;
-}
-
-.editor-input > .editor-heading-h1:first-child,
-.editor-input > .editor-heading-h2:first-child,
-.editor-input > .editor-heading-h3:first-child,
-.editor-input > .editor-heading-h4:first-child,
-.editor-input > .editor-heading-h5:first-child,
-.editor-input > .editor-heading-h6:first-child {
-  margin-top: 24px;
 }
 
 /* Document rhythm follows the Office Viewer/Vditor reset model:
@@ -418,19 +405,10 @@
   background: var(--document-soft-bg);
 }
 
-/* Office Viewer first-block spacing: non-headings start at 18px,
-   headings start at 24px. Kept late in the cascade on purpose. */
-.editor-input > :first-child:not(.editor-heading-h1):not(.editor-heading-h2):not(.editor-heading-h3):not(.editor-heading-h4):not(.editor-heading-h5):not(.editor-heading-h6) {
-  margin-top: 18px;
-}
-
-.editor-input > .editor-heading-h1:first-child,
-.editor-input > .editor-heading-h2:first-child,
-.editor-input > .editor-heading-h3:first-child,
-.editor-input > .editor-heading-h4:first-child,
-.editor-input > .editor-heading-h5:first-child,
-.editor-input > .editor-heading-h6:first-child {
-  margin-top: 24px;
+/* The document owns the toolbar/content gap via padding so the first block
+   cannot collapse upward against the editor chrome. */
+.editor-input > :first-child {
+  margin-top: 0;
 }
 
 /* Status is present but visually subordinate. */
@@ -455,7 +433,7 @@
 }
 
 .focus-mode .editor-placeholder {
-  top: 18px !important;
+  top: 32px !important;
 }
 
 .focus-session-active .editor-input {
@@ -477,11 +455,11 @@
     width: calc(100% - 24px) !important;
     min-height: 100% !important;
     margin: 0 auto !important;
-    padding: 0 44px 84px !important;
+    padding: 28px 44px 84px !important;
   }
 
   .editor-placeholder {
-    top: 18px !important;
+    top: 28px !important;
     width: calc(100% - 24px);
     padding-left: 44px;
   }
@@ -498,11 +476,11 @@
     max-width: 100% !important;
     min-height: 100% !important;
     margin: 0 !important;
-    padding: 0 22px 64px !important;
+    padding: 22px 22px 64px !important;
   }
 
   .editor-placeholder {
-    top: 18px !important;
+    top: 22px !important;
     width: 100%;
     padding-left: 22px;
   }
