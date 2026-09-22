@@ -1,5 +1,6 @@
 import {
   createEditor,
+  $createLineBreakNode,
   $createParagraphNode,
   $createTextNode,
   $getRoot,
@@ -308,6 +309,20 @@ function extractMarkdownDividers(markdown) {
   }
 }
 
+function appendTableCellContent(paragraph, value) {
+  const source = String(value || '')
+  if (!source) return
+
+  const parts = source.split(/(<br\s*\/?>)/gi).filter(Boolean)
+  for (const part of parts) {
+    if (/^<br\s*\/?>$/i.test(part)) {
+      paragraph.append($createLineBreakNode())
+    } else {
+      paragraph.append($createTextNode(part))
+    }
+  }
+}
+
 function createTableFromRows(rows) {
   const table = $createTableNode()
 
@@ -316,7 +331,7 @@ function createTableFromRows(rows) {
     row.forEach((value) => {
       const cellNode = $createTableCellNode()
       const paragraph = $createParagraphNode()
-      if (value) paragraph.append($createTextNode(value))
+      appendTableCellContent(paragraph, value)
       cellNode.append(paragraph)
       rowNode.append(cellNode)
     })
