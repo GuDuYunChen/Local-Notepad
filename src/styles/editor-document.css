@@ -4,19 +4,19 @@
 /* -------------------------------------------------------------------------- */
 
 .editor-shell {
-  --document-canvas: color-mix(in srgb, var(--paper-deep) 58%, var(--surface));
+  --document-canvas: color-mix(in srgb, var(--ink) 4%, var(--surface));
   --document-page: var(--surface);
   --document-page-border: color-mix(in srgb, var(--line-strong) 70%, transparent);
   --document-page-shadow:
     0 1px 2px rgba(24, 18, 44, 0.05),
     0 16px 44px rgba(31, 22, 61, 0.08);
-  --document-code-bg: color-mix(in srgb, var(--paper-deep) 54%, var(--surface));
-  --document-soft-bg: color-mix(in srgb, var(--paper) 58%, var(--surface));
+  --document-code-bg: color-mix(in srgb, var(--ink) 4.5%, var(--surface));
+  --document-soft-bg: color-mix(in srgb, var(--ink) 3%, var(--surface));
   background: var(--document-canvas) !important;
 }
 
 [data-theme="dark"] .editor-shell {
-  --document-canvas: color-mix(in srgb, var(--paper) 72%, #0e0c19);
+  --document-canvas: color-mix(in srgb, var(--ink) 6%, var(--surface));
   --document-page-border: color-mix(in srgb, var(--line-strong) 78%, transparent);
   --document-page-shadow:
     0 1px 2px rgba(0, 0, 0, 0.28),
@@ -201,7 +201,7 @@
   padding: 0.18em 0.4em;
   border: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
   border-radius: 4px;
-  background: color-mix(in srgb, var(--paper-deep) 64%, var(--surface));
+  background: color-mix(in srgb, var(--ink) 5%, var(--surface));
   color: var(--ink-soft);
   font-size: 0.88em;
 }
@@ -234,12 +234,12 @@
 
 .editor-input .editor-table tr:first-child .editor-table-cell,
 .editor-input .editor-table-cell-header {
-  background: color-mix(in srgb, var(--paper-deep) 70%, var(--surface)) !important;
+  background: color-mix(in srgb, var(--ink) 5%, var(--surface)) !important;
   font-weight: 650;
 }
 
 .editor-input .editor-table tr:nth-child(even):not(:first-child) .editor-table-cell {
-  background: color-mix(in srgb, var(--paper) 52%, var(--surface));
+  background: color-mix(in srgb, var(--ink) 2%, var(--surface));
 }
 
 /* Code uses a quieter Vditor-like document block instead of a heavy card. */
@@ -255,7 +255,7 @@
 .editor-input .code-block-header {
   min-height: 32px;
   padding: 5px 10px;
-  background: color-mix(in srgb, var(--paper-deep) 72%, var(--surface));
+  background: color-mix(in srgb, var(--ink) 5%, var(--surface));
 }
 
 .editor-input .code-block-content {
@@ -265,7 +265,7 @@
 .editor-input .line-numbers {
   min-width: 36px;
   padding: 10px 7px;
-  background: color-mix(in srgb, var(--paper-deep) 42%, var(--surface));
+  background: color-mix(in srgb, var(--ink) 3%, var(--surface));
 }
 
 .editor-input .code-textarea,
