@@ -67,7 +67,7 @@ describe('editor document presentation', () => {
     expect(css).toContain('width: max-content !important')
     expect(css).toContain('max-width: 100% !important')
     expect(css).toContain('padding: 6px 13px')
-    expect(css).toContain('max-width: 300px')
+    expect(css).toContain('max-width: 360px')
     expect(css).not.toContain('.editor-input .editor-table {\n  width: 100% !important')
   })
 
