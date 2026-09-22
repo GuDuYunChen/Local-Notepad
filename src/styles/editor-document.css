@@ -1,0 +1,467 @@
+/* -------------------------------------------------------------------------- */
+/* Office Viewer-inspired document presentation                               */
+/* Loaded after redesign.css so the editor has one dedicated visual layer.    */
+/* -------------------------------------------------------------------------- */
+
+.editor-shell {
+  --document-canvas: color-mix(in srgb, var(--paper-deep) 58%, var(--surface));
+  --document-page: var(--surface);
+  --document-page-border: color-mix(in srgb, var(--line-strong) 70%, transparent);
+  --document-page-shadow:
+    0 1px 2px rgba(24, 18, 44, 0.05),
+    0 16px 44px rgba(31, 22, 61, 0.08);
+  --document-code-bg: color-mix(in srgb, var(--paper-deep) 54%, var(--surface));
+  --document-soft-bg: color-mix(in srgb, var(--paper) 58%, var(--surface));
+  background: var(--document-canvas) !important;
+}
+
+[data-theme="dark"] .editor-shell {
+  --document-canvas: color-mix(in srgb, var(--paper) 72%, #0e0c19);
+  --document-page-border: color-mix(in srgb, var(--line-strong) 78%, transparent);
+  --document-page-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.28),
+    0 18px 48px rgba(0, 0, 0, 0.32);
+}
+
+/* Editor chrome: compact, quiet and secondary to the document. */
+.editor-toolbar {
+  min-height: 36px !important;
+  flex-wrap: nowrap !important;
+  gap: 2px !important;
+  padding: 3px 10px !important;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: color-mix(in srgb, var(--surface) 96%, transparent) !important;
+  border-bottom: 1px solid var(--line) !important;
+  box-shadow: 0 1px 0 rgba(20, 15, 38, 0.02);
+  scrollbar-width: none;
+}
+
+.editor-toolbar::-webkit-scrollbar {
+  display: none;
+}
+
+.editor-toolbar .toolbar-group {
+  flex-wrap: nowrap;
+}
+
+.editor-toolbar .group-label,
+.editor-toolbar .toolbar-slash-hint {
+  display: none;
+}
+
+.editor-toolbar .btn,
+.editor-toolbar .select {
+  height: 28px !important;
+  min-width: 28px !important;
+  padding-inline: 7px !important;
+  border-radius: 6px !important;
+  font-size: 11px !important;
+}
+
+.editor-toolbar .divider {
+  height: 16px !important;
+  margin-inline: 3px !important;
+}
+
+/* Canvas + page. The surrounding workspace and document are deliberately
+   different surfaces, which is the largest visual change from the old editor. */
+.editor-container,
+.editor-scroller {
+  background: var(--document-canvas) !important;
+}
+
+.editor-container {
+  padding-bottom: 0 !important;
+}
+
+.editor-input {
+  width: min(var(--editor-view-page-width, 860px), calc(100% - 48px)) !important;
+  max-width: var(--editor-view-page-width, 860px) !important;
+  min-height: calc(100% - 56px) !important;
+  margin: 28px auto 68px !important;
+  padding: 64px 72px 96px !important;
+  border: 1px solid var(--document-page-border);
+  border-radius: 4px;
+  background: var(--document-page);
+  box-shadow: var(--document-page-shadow);
+  box-sizing: border-box;
+  color: var(--ink);
+  font-family: var(
+    --editor-view-font-family,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    "PingFang SC",
+    "Microsoft YaHei",
+    sans-serif
+  ) !important;
+  font-size: var(--editor-view-font-size, 16px) !important;
+  line-height: var(--editor-view-line-height, 1.7) !important;
+  letter-spacing: 0;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.editor-input:focus-visible {
+  border-color: color-mix(
+    in srgb,
+    var(--clay) 28%,
+    var(--document-page-border)
+  );
+}
+
+.editor-placeholder {
+  top: 92px !important;
+  left: 50% !important;
+  width: min(var(--editor-view-page-width, 860px), calc(100% - 48px));
+  padding-left: 72px;
+  transform: translateX(-50%);
+  box-sizing: border-box;
+  color: var(--ink-muted);
+  font-family: var(--editor-view-font-family, inherit);
+  font-size: var(--editor-view-font-size, 16px) !important;
+  opacity: 0.5;
+}
+
+/* Document rhythm follows the Office Viewer/Vditor reset model:
+   stable paragraph gaps and consistent 24/16 heading spacing. */
+.editor-input .editor-paragraph {
+  margin: 0 0 1em;
+}
+
+.editor-input .editor-heading-h1,
+.editor-input .editor-heading-h2,
+.editor-input .editor-heading-h3,
+.editor-input .editor-heading-h4,
+.editor-input .editor-heading-h5,
+.editor-input .editor-heading-h6 {
+  margin-top: 24px;
+  margin-bottom: 16px;
+  color: var(--ink);
+  font-weight: 650;
+  line-height: 1.25;
+  letter-spacing: -0.012em;
+}
+
+.editor-input > .editor-heading-h1:first-child,
+.editor-input > .editor-heading-h2:first-child,
+.editor-input > .editor-heading-h3:first-child {
+  margin-top: 0;
+}
+
+.editor-input .editor-heading-h1 { font-size: 1.75em; }
+.editor-input .editor-heading-h2 { font-size: 1.52em; }
+.editor-input .editor-heading-h3 { font-size: 1.32em; }
+.editor-input .editor-heading-h4 { font-size: 1.18em; }
+.editor-input .editor-heading-h5 { font-size: 1.06em; }
+.editor-input .editor-heading-h6 {
+  font-size: 1em;
+  color: var(--ink-soft);
+}
+
+.editor-input .editor-text-bold {
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.editor-input .editor-quote {
+  margin: 0 0 1em;
+  padding: 0 1em;
+  border-left: 5px solid color-mix(in srgb, var(--clay) 36%, var(--line-strong));
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 1em;
+  line-height: inherit;
+}
+
+.editor-input .editor-list-ul,
+.editor-input .editor-list-ol {
+  margin: 0 0 1em;
+  padding-left: 2em;
+}
+
+.editor-input .editor-list-item {
+  margin: 0;
+  padding-left: 0.12em;
+  line-height: inherit;
+}
+
+.editor-input .editor-list-item::marker {
+  color: var(--ink-muted);
+}
+
+.editor-input .editor-link {
+  color: var(--clay);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.editor-input .inline-code {
+  padding: 0.18em 0.4em;
+  border: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--paper-deep) 64%, var(--surface));
+  color: var(--ink-soft);
+  font-size: 0.88em;
+}
+
+/* Tables are document blocks, not spreadsheet chrome. */
+.editor-input .editor-table {
+  width: 100% !important;
+  margin: 1.15em 0 1.45em !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  border-collapse: collapse !important;
+  border-spacing: 0;
+  table-layout: auto;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: 0.9em;
+  line-height: 1.55;
+}
+
+.editor-input .editor-table-cell {
+  min-width: 80px;
+  max-width: 320px;
+  padding: 7px 11px;
+  border: 1px solid var(--line) !important;
+  background: var(--surface);
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.editor-input .editor-table tr:first-child .editor-table-cell,
+.editor-input .editor-table-cell-header {
+  background: color-mix(in srgb, var(--paper-deep) 70%, var(--surface)) !important;
+  font-weight: 650;
+}
+
+.editor-input .editor-table tr:nth-child(even):not(:first-child) .editor-table-cell {
+  background: color-mix(in srgb, var(--paper) 52%, var(--surface));
+}
+
+/* Code uses a quieter Vditor-like document block instead of a heavy card. */
+.editor-input .code-block-wrapper {
+  margin: 1.15em 0 1.35em;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--document-code-bg);
+  box-shadow: none;
+}
+
+.editor-input .code-block-header {
+  min-height: 32px;
+  padding: 5px 10px;
+  background: color-mix(in srgb, var(--paper-deep) 72%, var(--surface));
+}
+
+.editor-input .code-block-content {
+  background: transparent;
+}
+
+.editor-input .line-numbers {
+  min-width: 36px;
+  padding: 10px 7px;
+  background: color-mix(in srgb, var(--paper-deep) 42%, var(--surface));
+}
+
+.editor-input .code-textarea,
+.editor-input .code-preview,
+.editor-input .line-number {
+  font-size: 0.82em;
+  line-height: 1.65;
+}
+
+/* Media follows the document flow instead of looking like a widget. */
+.editor-input .editor-image,
+.editor-input .editor-video {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  margin: 1.2em auto 1.35em;
+  border-radius: 4px;
+}
+
+.editor-input .editor-image img,
+.editor-input .editor-video video {
+  max-width: 100%;
+  max-height: 70vh;
+  border-radius: 4px;
+}
+
+.editor-input .editor-image-caption {
+  margin-top: 7px;
+  color: var(--ink-muted);
+  font-size: 0.78em;
+}
+
+/* Custom blocks share one document visual language. */
+.editor-input .divider-block {
+  height: 1px;
+  margin: 24px 0;
+  background: var(--line);
+}
+
+.editor-input .callout-block {
+  margin: 1em 0;
+  padding: 12px 14px;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-left: 4px solid color-mix(in srgb, var(--clay) 65%, var(--line-strong));
+  border-radius: 6px;
+  background: var(--document-soft-bg);
+}
+
+.editor-input .callout-textarea,
+.editor-input .todo-text,
+.editor-input .todo-text-button,
+.editor-input .todo-input,
+.editor-input .toggle-title,
+.editor-input .toggle-title-input,
+.editor-input .toggle-textarea {
+  font-size: 0.92em;
+  line-height: 1.65;
+}
+
+.editor-input .todo-block {
+  margin: 0.25em 0;
+  padding: 5px 7px;
+  border-radius: 5px;
+}
+
+.editor-input .todo-block:hover {
+  background: var(--document-soft-bg);
+}
+
+.editor-input .toggle-block,
+.editor-input .embed-block,
+.editor-input .attachment-block,
+.editor-input .formula-rendered.block,
+.editor-input .formula-editor {
+  margin: 1em 0;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  box-shadow: none;
+}
+
+.editor-input .toggle-header,
+.editor-input .embed-title {
+  padding: 9px 11px;
+  background: var(--document-soft-bg);
+  border-color: var(--line);
+}
+
+.editor-input .toggle-content {
+  padding: 12px;
+  background: var(--surface);
+}
+
+.editor-input .attachment-block {
+  min-height: 58px;
+  padding: 9px 11px;
+}
+
+.editor-input .attachment-block:hover {
+  border-color: var(--line-strong);
+  background: var(--document-soft-bg);
+  box-shadow: none;
+}
+
+.editor-input .formula-rendered.block {
+  padding: 14px 18px;
+  background: var(--document-soft-bg);
+}
+
+/* Status is present but visually subordinate. */
+.editor-status-bar {
+  min-height: 28px !important;
+  padding: 0 12px !important;
+  background: color-mix(in srgb, var(--surface) 96%, transparent) !important;
+  border-top: 1px solid var(--line) !important;
+  color: var(--ink-muted) !important;
+  font-size: 10px !important;
+}
+
+/* Focus mode removes the page card while preserving the typography. */
+.focus-mode .workspace-content,
+.focus-mode .editor-container,
+.focus-mode .editor-scroller {
+  background: var(--surface) !important;
+}
+
+.focus-mode .editor-input {
+  width: min(var(--editor-view-page-width, 860px), calc(100% - 32px)) !important;
+  margin-top: 0 !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.focus-session-active .editor-input {
+  width: min(760px, calc(100% - 32px)) !important;
+  max-width: 760px !important;
+  margin: 0 auto !important;
+  padding-top: 56px !important;
+  padding-bottom: 120px !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+@media (max-width: 980px) {
+  .editor-input {
+    width: calc(100% - 32px) !important;
+    min-height: calc(100% - 32px) !important;
+    margin: 16px auto 48px !important;
+    padding: 52px 48px 80px !important;
+  }
+
+  .editor-placeholder {
+    top: 68px !important;
+    width: calc(100% - 32px);
+    padding-left: 48px;
+  }
+}
+
+@media (max-width: 720px) {
+  .editor-container,
+  .editor-scroller {
+    background: var(--surface) !important;
+  }
+
+  .editor-input {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: 100% !important;
+    margin: 0 !important;
+    padding: 36px 22px 64px !important;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .editor-placeholder {
+    top: 36px !important;
+    width: 100%;
+    padding-left: 22px;
+  }
+
+  .editor-toolbar {
+    min-height: 38px !important;
+    padding-inline: 7px !important;
+  }
+
+  .editor-input .editor-heading-h1 { font-size: 1.6em; }
+  .editor-input .editor-heading-h2 { font-size: 1.4em; }
+
+  .editor-input .editor-table {
+    font-size: 0.82em;
+  }
+
+  .editor-input .editor-table-cell {
+    min-width: 72px;
+    padding: 6px 8px;
+  }
+}
