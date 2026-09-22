@@ -125,8 +125,8 @@ describe('project planning utilities', () => {
       workspace(),
       {
         volumeMilestones: {
-          v1: { deadline: '2026-09-20' },
-          v2: { deadline: '2026-09-30' },
+          v1: { deadline: '2026-09-20', targetWords: 60000 },
+          v2: { deadline: '2026-09-30', targetWords: 20000 },
         },
       },
       new Date(2026, 8, 21, 12),
@@ -139,11 +139,15 @@ describe('project planning utilities', () => {
       percent: 33,
       overdue: true,
       daysRemaining: -1,
+      targetWords: 60000,
+      wordPercent: 50,
     })
     expect(milestones[1]).toMatchObject({
       id: 'v2',
       overdue: false,
       daysRemaining: 9,
+      targetWords: 20000,
+      wordPercent: 100,
     })
   })
 
