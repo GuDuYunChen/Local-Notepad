@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
   buildProjectWorkspace,
+  buildProjectBatchMovePlan,
   calculateProjectCardMove,
   filterProjectVolumes,
   getProjectCandidates,
@@ -212,6 +213,25 @@ describe('project workspace utilities', () => {
       expect.objectContaining({ id: 'a', sort_order: 1000 }),
       expect.objectContaining({ id: 'c', sort_order: 2000 }),
       expect.objectContaining({ id: 'b', sort_order: 3000 }),
+    ])
+  })
+
+  it('plans batch chapter moves in caller order after existing target notes', () => {
+    expect(buildProjectBatchMovePlan(
+      files,
+      ['chapter-3', 'chapter-1'],
+      'volume-1',
+    )).toEqual([
+      {
+        id: 'chapter-3',
+        parent_id: 'volume-1',
+        sort_order: 1200,
+      },
+      {
+        id: 'chapter-1',
+        parent_id: 'volume-1',
+        sort_order: 2200,
+      },
     ])
   })
 
