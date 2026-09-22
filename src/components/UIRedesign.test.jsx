@@ -502,6 +502,19 @@ describe('UI redesign smoke tests', () => {
     listAllFilesWithContent.mockResolvedValue(projectFiles)
     api.mockResolvedValue(null)
 
+    const openDirectoryDialog = vi.fn().mockResolvedValue('C:/exports')
+    const exportCombinedManuscript = vi.fn().mockResolvedValue({
+      success: true,
+      path: 'C:/exports/批量项目-选中章节.md',
+    })
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: {
+        openDirectoryDialog,
+        exportCombinedManuscript,
+      },
+    })
+
     await act(async () => {
       root.render(
         <ProjectWorkspacePanel
@@ -542,6 +555,20 @@ describe('UI redesign smoke tests', () => {
       'chapter-2': 'review',
     })
 
+    const exportMarkdown = Array.from(bulkbar.querySelectorAll('button'))
+      .find(button => button.textContent === 'MD')
+    expect(exportMarkdown).toBeTruthy()
+    await click(exportMarkdown)
+    await flushPromises()
+
+    expect(openDirectoryDialog).toHaveBeenCalledTimes(1)
+    expect(exportCombinedManuscript).toHaveBeenCalledWith(
+      ['chapter-1', 'chapter-2'],
+      'C:/exports',
+      'markdown',
+      '批量项目-选中章节',
+    )
+
     const moveTarget = bulkbar.querySelector('select[aria-label="批量移动目标卷"]')
     await act(async () => {
       moveTarget.value = 'volume-2'
@@ -567,6 +594,8 @@ describe('UI redesign smoke tests', () => {
     expect(moveCalls).toHaveLength(2)
     expect(moveCalls.every(call => call.body.parent_id === 'volume-2'))
       .toBe(true)
+
+    delete window.electronAPI
   })
 
   it('switches project views with Alt shortcuts without hijacking form input', async () => {
