@@ -3,9 +3,12 @@ import { createRoot } from 'react-dom/client'
 import { DndProvider } from 'react-dnd'
 import { HTML5Backend } from 'react-dnd-html5-backend'
 import App from './App'
+import { initializeThemeFromStorage } from './services/themePreference'
 import './styles/index.css'
 import './styles/redesign.css'
 import './styles/editor-document.css'
+
+initializeThemeFromStorage()
 
 const el = document.getElementById('root')
 if (el) {
