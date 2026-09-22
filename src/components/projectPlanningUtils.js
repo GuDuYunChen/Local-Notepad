@@ -178,6 +178,11 @@ export function getVolumeMilestonePlan(workspace, projectMeta = {}, now = new Da
     const completed = notes.filter(note => note.status === 'done').length
     const total = notes.length
     const percent = total ? Math.round((completed / total) * 100) : 0
+    const wordCount = Number(volume.wordCount) || 0
+    const targetWords = Math.max(0, Number(config.targetWords) || 0)
+    const wordPercent = targetWords > 0
+      ? Math.max(0, Math.min(100, Math.round((wordCount / targetWords) * 100)))
+      : 0
     const overdue = Boolean(
       deadlineDate &&
       daysBetween(today, deadlineDate) < 0 &&
@@ -196,7 +201,9 @@ export function getVolumeMilestonePlan(workspace, projectMeta = {}, now = new Da
       daysRemaining: deadlineDate
         ? daysBetween(today, deadlineDate)
         : null,
-      wordCount: Number(volume.wordCount) || 0,
+      wordCount,
+      targetWords,
+      wordPercent,
     }
   })
 }
