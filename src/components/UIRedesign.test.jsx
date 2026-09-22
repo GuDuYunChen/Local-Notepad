@@ -14,6 +14,7 @@ import LongFormStructurePanel from './LongFormStructurePanel'
 import ProjectWorkspacePanel from './ProjectWorkspacePanel'
 import ProjectTodayCenter from './ProjectTodayCenter'
 import FocusSessionBar from './FocusSessionBar'
+import FocusSessionAnalyticsPanel from './FocusSessionAnalyticsPanel'
 import { compareLibraryItems } from './FileList'
 import { statusLabel } from './InspectorPanel'
 import { toast } from '~/services/toast'
@@ -674,6 +675,93 @@ describe('UI redesign smoke tests', () => {
       .find(button => button.textContent === '结束 Session')
     await click(end)
     expect(onEnd).toHaveBeenCalledTimes(1)
+  })
+
+  it('renders focus session analytics and saves a review note', async () => {
+    const projectId = 'analytics-project'
+    const base = new Date(2026, 8, 21, 8).getTime()
+
+    const first = finalizeFocusSession(
+      createFocusSession({
+        projectId,
+        noteId: 'chapter-1',
+        noteTitle: '第一章.md',
+        durationMinutes: 25,
+        startWords: 1000,
+        startedAt: base,
+      }),
+      1750,
+      {
+        endedAt: base + 1500 * 1000,
+        reason: 'timer',
+      },
+    )
+    const second = finalizeFocusSession(
+      createFocusSession({
+        projectId,
+        noteId: 'chapter-2',
+        noteTitle: '第二章.md',
+        durationMinutes: 50,
+        startWords: 2000,
+        startedAt: base + 2 * 60 * 60 * 1000,
+      }),
+      3200,
+      {
+        endedAt: base + 2 * 60 * 60 * 1000 + 3000 * 1000,
+        reason: 'timer',
+      },
+    )
+
+    appendFocusSession(first)
+    appendFocusSession(second)
+
+    await act(async () => {
+      root.render(
+        <FocusSessionAnalyticsPanel
+          workspace={{
+            project: { id: projectId, title: '长篇小说' },
+            volumes: [],
+          }}
+          onOpenFile={() => {}}
+        />
+      )
+    })
+
+    expect(container.textContent).toContain('Session 分析与复盘')
+    expect(container.textContent).toContain('专注效率')
+    expect(container.textContent).toContain('最佳写作时段')
+    expect(container.textContent).toContain('25 / 50 / 90 分钟效果')
+    expect(container.textContent).toContain('专注趋势')
+    expect(container.textContent).toContain('章节 Session 效率')
+    expect(container.textContent).toContain('Session 复盘')
+
+    const thirtyDay = Array.from(container.querySelectorAll('button'))
+      .find(button => button.textContent === '30 天')
+    expect(thirtyDay).toBeTruthy()
+    await click(thirtyDay)
+
+    const reviewButton = Array.from(container.querySelectorAll('button'))
+      .find(button => button.textContent === '复盘')
+    expect(reviewButton).toBeTruthy()
+    await click(reviewButton)
+
+    const textarea = container.querySelector('textarea[aria-label="Session 复盘备注"]')
+    expect(textarea).toBeTruthy()
+
+    await act(async () => {
+      textarea.value = '上午进入状态很快，下次继续从冲突段直接开始。'
+      textarea.dispatchEvent(new Event('input', { bubbles: true }))
+      textarea.dispatchEvent(new Event('change', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    const save = Array.from(container.querySelectorAll('button'))
+      .find(button => button.textContent === '保存复盘')
+    expect(save).toBeTruthy()
+    await click(save)
+
+    expect(container.textContent)
+      .toContain('上午进入状态很快，下次继续从冲突段直接开始。')
   })
 
   it('renders and reorders a long-form volume chapter structure', async () => {
