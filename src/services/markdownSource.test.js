@@ -109,6 +109,61 @@ describe('Markdown source compatibility', () => {
     ]))
   })
 
+  it('round-trips table line breaks as clean <br> markup', () => {
+    const result = analyzeMarkdownSourceCompatibility(stateWith([
+      {
+        type: 'table',
+        version: 1,
+        children: [
+          {
+            type: 'tablerow',
+            version: 1,
+            children: [
+              {
+                type: 'tablecell',
+                version: 1,
+                children: [paragraph('境界')],
+              },
+              {
+                type: 'tablecell',
+                version: 1,
+                children: [paragraph('能量来源与炼化方式')],
+              },
+            ],
+          },
+          {
+            type: 'tablerow',
+            version: 1,
+            children: [
+              {
+                type: 'tablecell',
+                version: 1,
+                children: [paragraph('1. 启灵')],
+              },
+              {
+                type: 'tablecell',
+                version: 1,
+                children: [{
+                  type: 'paragraph',
+                  version: 1,
+                  children: [
+                    { type: 'text', version: 1, text: '来源：天地灵气。', format: 0, style: '' },
+                    { type: 'linebreak', version: 1 },
+                    { type: 'text', version: 1, text: '方式：吐纳导引。', format: 0, style: '' },
+                  ],
+                }],
+              },
+            ],
+          },
+        ],
+      },
+    ]))
+
+    expect(result.editable).toBe(true)
+    expect(result.markdown).toContain('来源：天地灵气。<br>方式：吐纳导引。')
+    expect(result.markdown).not.toContain('  <br>')
+  })
+
   it('protects link metadata that Markdown links cannot round-trip', () => {
     const result = analyzeMarkdownSourceCompatibility(stateWith([
       {
