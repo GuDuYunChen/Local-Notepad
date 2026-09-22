@@ -10,7 +10,14 @@ import {
 import ConfirmDialog from './components/ConfirmDialog'
 import ToastViewport from './components/ToastViewport'
 import ReferenceRefactorDialog from './components/ReferenceRefactorDialog'
+import FocusSessionBar from './components/FocusSessionBar'
 import { toast } from '~/services/toast'
+import {
+  appendFocusSession,
+  createFocusSession,
+  finalizeFocusSession,
+} from './components/focusSessionUtils'
+import { countLexicalCharacters } from './utils/lexicalText'
 import {
   expandRefactorTargetIds,
   planDeleteReferenceImpact,
@@ -61,6 +68,8 @@ export default function App() {
   const titleInputRef = useRef(null)
   const skipTitleCommitRef = useRef(false)
   const pendingEditorNavigationRef = useRef(null)
+  const pendingFocusSessionRef = useRef(null)
+  const editorWordCountRef = useRef(0)
   const referenceRefactorResolverRef = useRef(null)
   const [ready, setReady] = useState(false)
   const [workspace, setWorkspace] = useState('notes')
@@ -86,6 +95,7 @@ export default function App() {
   const [backupOpen, setBackupOpen] = useState(false)
   const [quickSearchOpen, setQuickSearchOpen] = useState(false)
   const [focusMode, setFocusMode] = useState(false)
+  const [focusSession, setFocusSession] = useState(null)
   const [editorStatus, setEditorStatus] = useState({
     saving: false,
     saveError: false,
@@ -886,6 +896,102 @@ export default function App() {
     return () => window.removeEventListener('wikiLink:open', openWikiLink)
   }, [current, deletedIds, unsaved, select])
 
+  const finishFocusSession = React.useCallback((reason = 'manual') => {
+    if (!focusSession?.active) return null
+
+    const record = finalizeFocusSession(
+      focusSession,
+      editorWordCountRef.current,
+      {
+        endedAt: Date.now(),
+        reason,
+      },
+    )
+
+    if (record) {
+      appendFocusSession(record)
+      window.dispatchEvent(new CustomEvent('focus-session:completed', {
+        detail: {
+          projectId: focusSession.projectId,
+          record,
+        },
+      }))
+    }
+
+    setFocusSession(null)
+    setFocusMode(false)
+
+    if (workspace === 'notes' && current?.id === focusSession.noteId) {
+      void saveCurrent()
+    }
+
+    return record
+  }, [current?.id, focusSession, saveCurrent, workspace])
+
+  const handleStartFocusSession = React.useCallback((
+    note,
+    durationMinutes,
+    project,
+  ) => {
+    if (!note?.id || !project?.id) return
+
+    if (focusSession?.active) {
+      toast.warning('请先结束当前专注 Session')
+      return
+    }
+
+    api('/api/files/' + note.id)
+      .then(file => {
+        pendingFocusSessionRef.current = {
+          projectId: project.id,
+          projectTitle: project.title || '项目',
+          noteId: file.id,
+          noteTitle: file.title || note.title || '未命名',
+          durationMinutes,
+        }
+
+        handleSelectFile(file, {
+          afterSelect: () => {
+            setFocusMode(true)
+          },
+          onCancel: () => {
+            pendingFocusSessionRef.current = null
+          },
+        })
+      })
+      .catch(error => {
+        console.error('开始专注 Session 失败', error)
+        toast.error(error.message || '无法打开目标章节')
+      })
+  }, [focusSession?.active])
+
+  useEffect(() => {
+    if (!focusSession?.active) return
+    if (!current?.id || current.id === focusSession.noteId) return
+
+    const record = finalizeFocusSession(
+      focusSession,
+      editorWordCountRef.current,
+      {
+        endedAt: Date.now(),
+        reason: 'navigation',
+      },
+    )
+
+    if (record) {
+      appendFocusSession(record)
+      window.dispatchEvent(new CustomEvent('focus-session:completed', {
+        detail: {
+          projectId: focusSession.projectId,
+          record,
+        },
+      }))
+    }
+
+    setFocusSession(null)
+    setFocusMode(false)
+  }, [current?.id, focusSession])
+
   const workspaceTitle = workspace === 'projects'
     ? '项目工作台'
     : workspace === 'daily'
@@ -979,14 +1085,28 @@ export default function App() {
   ) : null
 
   return (
-    <div className={`app-shell${focusMode ? ' focus-mode' : ''}`}>
+    <div className={
+      'app-shell' +
+      (focusMode ? ' focus-mode' : '') +
+      (focusMode && focusSession?.active ? ' focus-session-active' : '')
+    }>
       <div className="app-surface">
 
 
-        {focusMode && (
+        {focusMode && !focusSession?.active && (
           <button className="focus-exit-floating" onClick={() => setFocusMode(false)} title="退出专注模式 (F11)" aria-label="退出专注模式">
             ✕ 退出专注
           </button>
+        )}
+
+        {focusSession?.active && (
+          <FocusSessionBar
+            session={focusSession}
+            currentWords={editorWordCountRef.current}
+            focused={focusMode}
+            onToggleFocus={() => setFocusMode(prev => !prev)}
+            onEnd={finishFocusSession}
+          />
         )}
 
         <main className="workspace-frame" style={{ '--sidebar-w': `${sidebarW}px` }}>
@@ -1085,6 +1205,22 @@ export default function App() {
                           setCurrent(prev => ({ ...prev, content: text }))
                           setContent(text)
 
+                          const pendingFocus = pendingFocusSessionRef.current
+                          if (pendingFocus?.noteId === current.id) {
+                            pendingFocusSessionRef.current = null
+                            const startWords = countLexicalCharacters(text)
+                            editorWordCountRef.current = startWords
+                            setFocusSession(createFocusSession({
+                              projectId: pendingFocus.projectId,
+                              noteId: current.id,
+                              noteTitle: pendingFocus.noteTitle || current.title,
+                              durationMinutes: pendingFocus.durationMinutes,
+                              startWords,
+                              startedAt: Date.now(),
+                            }))
+                            setFocusMode(true)
+                          }
+
                           const pending = pendingEditorNavigationRef.current
                           if (pending?.id === current.id && pending.headingPath?.length) {
                             pendingEditorNavigationRef.current = null
@@ -1098,7 +1234,10 @@ export default function App() {
                           }
                         }
                       }}
-                      onStatusChange={setEditorStatus}
+                      onStatusChange={(status) => {
+                        editorWordCountRef.current = Number(status?.wordCount) || 0
+                        setEditorStatus(status)
+                      }}
                       onSaved={(updated) => {
                         if (current) {
                           const finalContent = updated.content !== undefined ? updated.content : content
@@ -1114,6 +1253,7 @@ export default function App() {
                     <ProjectWorkspacePanel
                       onClose={() => setWorkspace('notes')}
                       onOpenFile={handleInspectorSelectFile}
+                      onStartFocus={handleStartFocusSession}
                     />
                   </React.Suspense>
                 )}
