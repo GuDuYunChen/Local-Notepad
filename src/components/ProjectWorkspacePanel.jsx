@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   api,
   listAllFilesWithContent,
@@ -83,6 +83,8 @@ export default function ProjectWorkspacePanel({
 }) {
   const [files, setFiles] = useState([])
   const [activeView, setActiveView] = useState(initialProjectView)
+  const [projectActionsOpen, setProjectActionsOpen] = useState(false)
+  const projectActionsRef = useRef(null)
   const [loading, setLoading] = useState(true)
   const [movingId, setMovingId] = useState('')
   const [exportingKey, setExportingKey] = useState('')
@@ -149,6 +151,53 @@ export default function ProjectWorkspacePanel({
       // View preference is optional and must never block project rendering.
     }
   }, [activeView])
+
+  useEffect(() => {
+    const onKeyDown = event => {
+      if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
+
+      const target = event.target
+      const tag = target?.tagName?.toLowerCase()
+      if (
+        tag === 'input' ||
+        tag === 'textarea' ||
+        tag === 'select' ||
+        target?.isContentEditable
+      ) {
+        return
+      }
+
+      const index = Number(event.key) - 1
+      const view = PROJECT_VIEWS[index]
+      if (!view) return
+
+      event.preventDefault()
+      setActiveView(view.id)
+      setProjectActionsOpen(false)
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
+
+  useEffect(() => {
+    if (!projectActionsOpen) return undefined
+
+    const close = event => {
+      if (projectActionsRef.current?.contains(event.target)) return
+      setProjectActionsOpen(false)
+    }
+    const closeOnEscape = event => {
+      if (event.key === 'Escape') setProjectActionsOpen(false)
+    }
+
+    document.addEventListener('pointerdown', close)
+    window.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('pointerdown', close)
+      window.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [projectActionsOpen])
 
   useEffect(() => {
     const refresh = event => {
@@ -588,50 +637,109 @@ export default function ProjectWorkspacePanel({
             ))}
           </select>
 
-          <div className="project-type-switch" role="group" aria-label="项目类型">
+          <div
+            className="project-actions-menu-wrap"
+            ref={projectActionsRef}
+          >
             <button
               type="button"
-              className={workspace.project.type === 'novel' ? 'active' : ''}
-              onClick={() => setProjectType('novel')}
+              className="btn small project-actions-trigger"
+              onClick={() => setProjectActionsOpen(value => !value)}
+              aria-haspopup="menu"
+              aria-expanded={projectActionsOpen}
             >
-              小说
+              项目操作
+              <span aria-hidden="true">⌄</span>
             </button>
-            <button
-              type="button"
-              className={workspace.project.type === 'script' ? 'active' : ''}
-              onClick={() => setProjectType('script')}
-            >
-              剧本
-            </button>
+
+            {projectActionsOpen && (
+              <div className="project-actions-menu" role="menu">
+                <div className="project-actions-menu-section">
+                  <span>项目类型</span>
+                  <div className="project-actions-type-switch">
+                    <button
+                      type="button"
+                      className={workspace.project.type === 'novel' ? 'active' : ''}
+                      onClick={() => {
+                        setProjectType('novel')
+                        setProjectActionsOpen(false)
+                      }}
+                    >
+                      小说
+                    </button>
+                    <button
+                      type="button"
+                      className={workspace.project.type === 'script' ? 'active' : ''}
+                      onClick={() => {
+                        setProjectType('script')
+                        setProjectActionsOpen(false)
+                      }}
+                    >
+                      剧本
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={templateBusy}
+                  onClick={() => {
+                    setProjectActionsOpen(false)
+                    void applyProjectTemplate()
+                  }}
+                >
+                  {templateBusy ? '正在初始化模板…' : '初始化项目模板'}
+                </button>
+
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={!projectIds.length || Boolean(exportingKey)}
+                  onClick={() => {
+                    setProjectActionsOpen(false)
+                    void exportCombined({
+                      ids: projectIds,
+                      title: workspace.project.title,
+                      format: 'markdown',
+                      key: 'project-md',
+                    })
+                  }}
+                >
+                  合并导出 Markdown
+                </button>
+
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={!projectIds.length || Boolean(exportingKey)}
+                  onClick={() => {
+                    setProjectActionsOpen(false)
+                    void exportCombined({
+                      ids: projectIds,
+                      title: workspace.project.title,
+                      format: 'docx',
+                      key: 'project-docx',
+                    })
+                  }}
+                >
+                  合并导出 Word
+                </button>
+
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setProjectActionsOpen(false)
+                    void load()
+                  }}
+                >
+                  刷新项目数据
+                </button>
+              </div>
+            )}
           </div>
 
-          <button
-            type="button"
-            className="btn small"
-            disabled={!projectIds.length || Boolean(exportingKey)}
-            onClick={() => void exportCombined({
-              ids: projectIds,
-              title: workspace.project.title,
-              format: 'markdown',
-              key: 'project-md',
-            })}
-          >
-            合并 MD
-          </button>
-          <button
-            type="button"
-            className="btn small"
-            disabled={!projectIds.length || Boolean(exportingKey)}
-            onClick={() => void exportCombined({
-              ids: projectIds,
-              title: workspace.project.title,
-              format: 'docx',
-              key: 'project-docx',
-            })}
-          >
-            合并 Word
-          </button>
-          <button type="button" className="icon-btn" onClick={() => void load()} title="刷新" aria-label="刷新">↻</button>
           <button type="button" className="icon-btn" onClick={onClose} title="返回笔记" aria-label="返回笔记">×</button>
         </div>
       </header>
@@ -666,8 +774,12 @@ export default function ProjectWorkspacePanel({
             key={view.id}
             type="button"
             className={activeView === view.id ? 'active' : ''}
-            onClick={() => setActiveView(view.id)}
+            onClick={() => {
+              setActiveView(view.id)
+              setProjectActionsOpen(false)
+            }}
             aria-pressed={activeView === view.id}
+            title={view.label + ' · Alt+' + (PROJECT_VIEWS.indexOf(view) + 1)}
           >
             <strong>{view.label}</strong>
             <span>{view.description}</span>
@@ -685,6 +797,7 @@ export default function ProjectWorkspacePanel({
         onStartFocus={(note, durationMinutes) => (
           onStartFocus?.(note, durationMinutes, workspace.project)
         )}
+        onNavigateView={setActiveView}
       />
         </>
       )}
@@ -701,14 +814,9 @@ export default function ProjectWorkspacePanel({
             <button
               type="button"
               className="btn small"
-              disabled={templateBusy}
-              onClick={() => void applyProjectTemplate()}
+              onClick={() => setProjectActionsOpen(true)}
             >
-              {templateBusy
-                ? '初始化中…'
-                : workspace.project.type === 'script'
-                  ? '套用剧本模板'
-                  : '套用小说模板'}
+              项目操作
             </button>
           </div>
 
@@ -832,6 +940,7 @@ export default function ProjectWorkspacePanel({
           projectIndexes={projectIndexes}
           onMetaChange={updateMeta}
           onOpenFile={onOpenFile}
+          onNavigateView={setActiveView}
         />
       )}
 
@@ -866,11 +975,34 @@ export default function ProjectWorkspacePanel({
           projectMeta={projectMeta}
           projectIndexes={projectIndexes}
           onOpenFile={onOpenFile}
+          onNavigateView={setActiveView}
         />
       )}
 
       {activeView === 'project' && (
         <>
+      {workspace.chapterCount === 0 ? (
+        <div className="project-board-empty-state">
+          <div className="project-board-empty-mark">▤</div>
+          <strong>这个项目还没有正文章节</strong>
+          <span>
+            可以先初始化项目模板，或返回笔记创建卷 / 章节后再回来管理。
+          </span>
+          <div>
+            <button
+              type="button"
+              className="btn primary"
+              disabled={templateBusy}
+              onClick={() => void applyProjectTemplate()}
+            >
+              {templateBusy ? '初始化中…' : '初始化项目模板'}
+            </button>
+            <button type="button" className="btn" onClick={onClose}>
+              返回笔记
+            </button>
+          </div>
+        </div>
+      ) : (
       <div className="project-workspace-board">
         {workspace.volumes.map(volume => {
           const parentId = volume.id || workspace.project.id
@@ -1060,6 +1192,7 @@ export default function ProjectWorkspacePanel({
           )
         })}
       </div>
+      )}
 
       <footer className="project-workspace-footer">
         <span>拖动章节卡可跨{labels.volume}移动和调整顺序。</span>
