@@ -13,6 +13,17 @@ describe('WikiLinkPlugin helpers', () => {
     expect(matchWikiQuery('See [[Tar', 9)).toEqual({
       raw: '[[Tar',
       query: 'Tar',
+      noteQuery: 'Tar',
+      sectionQuery: '',
+      hasSectionQuery: false,
+      start: 4,
+    })
+    expect(matchWikiQuery('See [[Target#Chap', 17)).toEqual({
+      raw: '[[Target#Chap',
+      query: 'Target#Chap',
+      noteQuery: 'Target',
+      sectionQuery: 'Chap',
+      hasSectionQuery: true,
       start: 4,
     })
     expect(matchWikiQuery('See [[Target]]', 14)).toBeNull()
