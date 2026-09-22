@@ -16,6 +16,7 @@ import {
   getProjectIndexAliases,
   getProjectLabels,
   getProjectProgress,
+  filterProjectVolumes,
   getProjectTemplate,
   getRecentProjectActivity,
   getVolumeExportIds,
@@ -118,6 +119,9 @@ export default function ProjectWorkspacePanel({
   const [summaryDraft, setSummaryDraft] = useState('')
   const [draggedNoteId, setDraggedNoteId] = useState('')
   const [dropTarget, setDropTarget] = useState(null)
+  const [projectBoardQuery, setProjectBoardQuery] = useState('')
+  const [projectBoardStatus, setProjectBoardStatus] = useState('all')
+  const [projectBoardVolume, setProjectBoardVolume] = useState('all')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -318,6 +322,27 @@ export default function ProjectWorkspacePanel({
   const labels = getProjectLabels(workspace?.project?.type || projectMeta.type)
   const progress = getProjectProgress(workspace, projectMeta)
   const recentActivity = getRecentProjectActivity(workspace, 6)
+  const filteredProjectVolumes = useMemo(
+    () => filterProjectVolumes(workspace, projectMeta, {
+      query: projectBoardQuery,
+      status: projectBoardStatus,
+      volumeId: projectBoardVolume,
+    }),
+    [projectBoardQuery, projectBoardStatus, projectBoardVolume, projectMeta, workspace]
+  )
+  const projectBoardFilterActive = Boolean(
+    projectBoardQuery.trim() ||
+    projectBoardStatus !== 'all' ||
+    projectBoardVolume !== 'all'
+  )
+  const filteredProjectChapterCount = filteredProjectVolumes.reduce(
+    (sum, volume) => sum + volume.notes.length,
+    0,
+  )
+  const filteredProjectWordCount = filteredProjectVolumes.reduce(
+    (sum, volume) => sum + Number(volume.wordCount || 0),
+    0,
+  )
 
   const updateMeta = next => {
     setProjectMeta(previous => {
@@ -1000,8 +1025,65 @@ export default function ProjectWorkspacePanel({
           </div>
         </div>
       ) : (
+      <>
+      <section className="project-board-toolbar" aria-label="项目章节筛选">
+        <div className="project-board-search">
+          <span aria-hidden="true">⌕</span>
+          <input
+            type="search"
+            value={projectBoardQuery}
+            onChange={event => setProjectBoardQuery(event.target.value)}
+            placeholder="搜索章节标题或摘要"
+            aria-label="搜索项目章节"
+          />
+        </div>
+        <select
+          value={projectBoardStatus}
+          onChange={event => setProjectBoardStatus(event.target.value)}
+          aria-label="按章节状态筛选"
+        >
+          <option value="all">全部状态</option>
+          <option value="draft">草稿</option>
+          <option value="review">修订</option>
+          <option value="done">完成</option>
+        </select>
+        <select
+          value={projectBoardVolume}
+          onChange={event => setProjectBoardVolume(event.target.value)}
+          aria-label="按卷筛选"
+        >
+          <option value="all">全部{labels.volume}</option>
+          {workspace.volumes.map(volume => (
+            <option
+              key={volume.id || '__ungrouped__'}
+              value={volume.id || '__ungrouped__'}
+            >
+              {volume.title}
+            </option>
+          ))}
+        </select>
+        <div className="project-board-filter-summary">
+          <strong>{filteredProjectChapterCount}</strong>
+          <span>{labels.chapter} · {formatCount(filteredProjectWordCount)} 字</span>
+        </div>
+        {projectBoardFilterActive && (
+          <button
+            type="button"
+            className="btn small"
+            onClick={() => {
+              setProjectBoardQuery('')
+              setProjectBoardStatus('all')
+              setProjectBoardVolume('all')
+            }}
+          >
+            清除筛选
+          </button>
+        )}
+      </section>
+
+      {filteredProjectVolumes.length ? (
       <div className="project-workspace-board">
-        {workspace.volumes.map(volume => {
+        {filteredProjectVolumes.map(volume => {
           const parentId = volume.id || workspace.project.id
           const exportIds = getVolumeExportIds(volume)
           const volumeTitle = volume.id
@@ -1189,10 +1271,28 @@ export default function ProjectWorkspacePanel({
           )
         })}
       </div>
+      ) : (
+        <div className="project-board-filter-empty">
+          <strong>没有匹配的章节</strong>
+          <span>换一个关键词、状态或{labels.volume}筛选条件。</span>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => {
+              setProjectBoardQuery('')
+              setProjectBoardStatus('all')
+              setProjectBoardVolume('all')
+            }}
+          >
+            清除筛选
+          </button>
+        </div>
+      )}
+      </>
       )}
 
       <footer className="project-workspace-footer">
-        <span>拖动章节卡可跨{labels.volume}移动和调整顺序。</span>
+        <span>{projectBoardFilterActive ? '筛选状态下仅用于查找与打开章节。' : '拖动章节卡可跨' + labels.volume + '移动和调整顺序。'}</span>
         <span>状态仅是本机项目视图偏好，不修改正文或现有数据库。</span>
       </footer>
         </>
