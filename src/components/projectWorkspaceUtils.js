@@ -517,23 +517,28 @@ export function splitProjectChapterContent(content) {
     )
     : 0
 
-  let splitIndex = -1
-  for (let index = Math.max(1, firstHeadingIndex + 1); index < children.length; index++) {
-    const node = children[index]
-    if (node?.type !== 'heading') continue
-    const level = Math.max(
-      1,
-      Math.min(
-        6,
-        Number(String(node.tag || '').replace('h', '')) ||
-        Number(node.level) ||
+  let splitIndex = firstHeadingIndex > 0 ? firstHeadingIndex : -1
+  if (splitIndex < 0) {
+    for (let index = Math.max(1, firstHeadingIndex + 1); index < children.length; index++) {
+      const node = children[index]
+      if (node?.type !== 'heading') continue
+      const level = Math.max(
         1,
-      ),
-    )
+        Math.min(
+          6,
+          Number(String(node.tag || '').replace('h', '')) ||
+          Number(node.level) ||
+          1,
+        ),
+      )
 
-    if (!firstHeadingLevel || level > firstHeadingLevel) {
-      splitIndex = index
-      break
+      const canSplit = firstHeadingLevel === 1
+        ? level > firstHeadingLevel
+        : level >= firstHeadingLevel
+      if (!firstHeadingLevel || canSplit) {
+        splitIndex = index
+        break
+      }
     }
   }
 
