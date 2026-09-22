@@ -619,7 +619,7 @@ export default function ToolbarPlugin() {
           aria-label="无序列表"
           title="无序列表"
         >
-          • 列表
+          <span aria-hidden="true">•≡</span>
         </button>
         <button
           type="button"
@@ -628,7 +628,7 @@ export default function ToolbarPlugin() {
           aria-label="有序列表"
           title="有序列表"
         >
-          1. 列表
+          <span aria-hidden="true">1.</span>
         </button>
         <button
           type="button"
@@ -637,7 +637,7 @@ export default function ToolbarPlugin() {
           aria-label="待办清单"
           title="待办清单 · Ctrl+Alt+T · Tab/Shift+Tab 调整层级"
         >
-          ☐ 清单
+          <span aria-hidden="true">☑</span>
         </button>
       </div>
 
@@ -650,7 +650,7 @@ export default function ToolbarPlugin() {
           aria-label="添加链接"
           title={hasSelection ? '添加链接' : '先选中文字'}
         >
-          链接
+          <span aria-hidden="true">⌁</span>
         </button>
 
         {linkOpen && (
@@ -692,7 +692,7 @@ export default function ToolbarPlugin() {
         aria-label="文内查找与替换"
         title="文内查找与替换 (Ctrl+F)"
       >
-        查找
+        <span aria-hidden="true">⌕</span>
       </button>
 
       <button
@@ -702,7 +702,7 @@ export default function ToolbarPlugin() {
         aria-label="编辑器命令"
         title="编辑器命令 (Ctrl+Shift+P)"
       >
-        命令
+        <span aria-hidden="true">⌘</span>
       </button>
 
       <button
@@ -712,7 +712,7 @@ export default function ToolbarPlugin() {
         aria-label="写作视图设置"
         title="写作视图设置"
       >
-        视图
+        <span aria-hidden="true">◫</span>
       </button>
 
       <button
@@ -722,7 +722,7 @@ export default function ToolbarPlugin() {
         aria-label="Markdown 源码"
         title="Markdown 源码 / 视觉编辑"
       >
-        源码
+        <span aria-hidden="true">&lt;/&gt;</span>
       </button>
 
       <span className="toolbar-slash-hint">输入 / 快速插入</span>
@@ -740,7 +740,6 @@ export default function ToolbarPlugin() {
           title="插入内容"
         >
           <span className="toolbar-plus">＋</span>
-          <span>插入</span>
         </button>
 
         {insertOpen && (
