@@ -73,12 +73,18 @@ function loadSettings() {
 
     // 4.30.1 visual refresh: migrate the previous default 1.9 line-height
     // without overriding an intentionally customized view.
+    const storedLineHeight = Number(stored?.lineHeight)
+    const legacyLineHeight = (
+      !Number.isFinite(storedLineHeight) ||
+      storedLineHeight === 1.85 ||
+      storedLineHeight === 1.9
+    )
     const looksLikeLegacyDefault = (
       Number(stored?.fontSize || 16) === 16 &&
       Number(stored?.pageWidth || 860) === 860 &&
       (stored?.fontFamily || 'system') === 'system' &&
       !stored?.typewriter &&
-      Number(stored?.lineHeight || 1.9) >= 1.9
+      legacyLineHeight
     )
 
     return looksLikeLegacyDefault
