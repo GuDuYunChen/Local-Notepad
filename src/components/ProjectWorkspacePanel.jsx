@@ -669,6 +669,7 @@ export default function ProjectWorkspacePanel({
 
     setSplitBusy(true)
     let created = null
+    let sourceUpdated = false
     try {
       await api('/api/files/' + splitPreview.noteId + '/versions/snapshot', {
         method: 'POST',
@@ -694,36 +695,41 @@ export default function ProjectWorkspacePanel({
           content: splitPreview.headContent,
         }),
       })
+      sourceUpdated = true
 
-      const siblings = files
-        .filter(item => (
-          !item.is_folder &&
-          String(item.parent_id || '') === String(splitPreview.parentId || '')
+      try {
+        const siblings = files
+          .filter(item => (
+            !item.is_folder &&
+            String(item.parent_id || '') === String(splitPreview.parentId || '')
+          ))
+          .sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0))
+        const sourceIndex = siblings.findIndex(item => (
+          String(item.id) === String(splitPreview.noteId)
         ))
-        .sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0))
-      const sourceIndex = siblings.findIndex(item => (
-        String(item.id) === String(splitPreview.noteId)
-      ))
-      const movePatch = calculateProjectCardMove(
-        [...files, created],
-        created.id,
-        splitPreview.parentId,
-        Math.max(0, sourceIndex + 1),
-      )
+        const movePatch = calculateProjectCardMove(
+          [...files, created],
+          created.id,
+          splitPreview.parentId,
+          Math.max(0, sourceIndex + 1),
+        )
 
-      if (movePatch) {
-        const patches = Array.isArray(movePatch.rebalance) && movePatch.rebalance.length
-          ? movePatch.rebalance
-          : [movePatch]
-        for (const item of patches) {
-          await api('/api/files/' + item.id, {
-            method: 'PUT',
-            body: JSON.stringify({
-              parent_id: item.parent_id,
-              sort_order: item.sort_order,
-            }),
-          })
+        if (movePatch) {
+          const patches = Array.isArray(movePatch.rebalance) && movePatch.rebalance.length
+            ? movePatch.rebalance
+            : [movePatch]
+          for (const item of patches) {
+            await api('/api/files/' + item.id, {
+              method: 'PUT',
+              body: JSON.stringify({
+                parent_id: item.parent_id,
+                sort_order: item.sort_order,
+              }),
+            })
+          }
         }
+      } catch (orderError) {
+        console.warn('拆分成功，但新章节排序失败，将保留在当前卷末', orderError)
       }
 
       await load()
@@ -734,7 +740,7 @@ export default function ProjectWorkspacePanel({
         detail: { source: 'project-workspace' },
       }))
     } catch (error) {
-      if (created?.id) {
+      if (created?.id && !sourceUpdated) {
         try {
           await api('/api/files/' + created.id, { method: 'DELETE' })
         } catch (cleanupError) {
