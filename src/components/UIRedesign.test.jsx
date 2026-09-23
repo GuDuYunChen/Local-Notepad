@@ -2369,6 +2369,11 @@ describe('UI redesign smoke tests', () => {
     expect(container.textContent).toContain('关系演化时间轴')
     expect(container.textContent).toContain('破裂')
     expect(container.textContent).toContain('立场冲突导致决裂')
+    const secondStoryNode = Array.from(
+      container.querySelectorAll('.project-story-node')
+    ).find(node => node.textContent.includes('第二章'))
+    expect(secondStoryNode).toBeTruthy()
+    expect(secondStoryNode.textContent).toContain('关系·破裂')
 
     chapterSelect = container.querySelector(
       'select[aria-label="关系变化章节"]'
