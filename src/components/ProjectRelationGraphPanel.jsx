@@ -297,6 +297,11 @@ export default function ProjectRelationGraphPanel({
   const relationTypeConfig = relationTypes.find(item => (
     item.id === newRelationType
   ))
+  const relationDisplayLabel = relation => {
+    const evolved = evolution.relationById.get(relation?.id)
+    const current = evolved?.currentTypeLabel || relation?.typeLabel || '关联'
+    return relation?.label ? relation.label + ' · ' + current : current
+  }
 
   return (
     <section className="project-relation-panel" aria-label="项目实体关系图">
@@ -542,7 +547,7 @@ export default function ProjectRelationGraphPanel({
                         markerEnd={edge.directed ? 'url(#project-relation-arrow)' : undefined}
                       />
                       <text x={midX} y={midY - 4}>
-                        {edge.label || edge.typeLabel}
+                        {relationDisplayLabel(edge)}
                       </text>
                     </g>
                   )
@@ -640,7 +645,7 @@ export default function ProjectRelationGraphPanel({
                         setSelectedRelationId(edge.id)
                       }}
                     >
-                      <span>{edge.label || edge.typeLabel}</span>
+                      <span>{relationDisplayLabel(edge)}</span>
                       <strong>{other.label}</strong>
                     </button>
                   )
@@ -664,7 +669,7 @@ export default function ProjectRelationGraphPanel({
             <>
               <header>
                 <div>
-                  <span>{selectedRelation.typeLabel}</span>
+                  <span>{selectedRelation.currentTypeLabel}</span>
                   <strong>
                     {selectedRelation.source.label}
                     {selectedRelation.directed ? ' → ' : ' ↔ '}
@@ -840,7 +845,7 @@ export default function ProjectRelationGraphPanel({
                         <span>{event.eventLabel}</span>
                         <strong>
                           {event.sourceLabel}
-                          {' → '}
+                          {event.directed ? ' → ' : ' ↔ '}
                           {event.targetLabel}
                         </strong>
                         <small>
