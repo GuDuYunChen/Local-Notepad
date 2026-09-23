@@ -124,6 +124,7 @@ export default function ProjectWorkspacePanel({
     relationEntities: [],
     relations: [],
     relationSuggestionIgnores: [],
+    entityAliases: {},
   })
   const [projectIndexes, setProjectIndexes] = useState({
     characters: [],
@@ -306,6 +307,7 @@ export default function ProjectWorkspacePanel({
         relationEntities: [],
         relations: [],
         relationSuggestionIgnores: [],
+        entityAliases: {},
       })
       return
     }
