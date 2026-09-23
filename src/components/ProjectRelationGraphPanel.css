@@ -1,0 +1,492 @@
+.project-relation-panel {
+  margin-top: 8px;
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.project-relation-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.project-relation-head strong,
+.project-relation-head span {
+  display: block;
+}
+
+.project-relation-head strong {
+  color: var(--ink);
+  font-size: 9px;
+  font-weight: 680;
+}
+
+.project-relation-head span {
+  margin-top: 2px;
+  color: var(--ink-muted);
+  font-size: 7px;
+  line-height: 1.45;
+}
+
+.project-relation-metrics {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.project-relation-metrics span {
+  margin: 0;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: var(--paper);
+  white-space: nowrap;
+}
+
+.project-relation-metrics b {
+  margin-right: 3px;
+  color: var(--ink);
+}
+
+.project-relation-controls {
+  margin-top: 8px;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+}
+
+.project-relation-search {
+  min-width: 170px;
+  flex: 1;
+  height: 29px;
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+}
+
+.project-relation-search span {
+  color: var(--ink-muted);
+  font-size: 8px;
+}
+
+.project-relation-search input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 8px;
+}
+
+.project-relation-controls select,
+.project-relation-create-grid select,
+.project-relation-create-grid input {
+  min-width: 0;
+  height: 29px;
+  padding: 0 7px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  outline: 0;
+  background: var(--surface);
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 7px;
+}
+
+.project-relation-controls select:focus,
+.project-relation-create-grid select:focus,
+.project-relation-create-grid input:focus {
+  border-color: var(--clay);
+  box-shadow: 0 0 0 2px var(--clay-light);
+}
+
+.project-relation-visible {
+  flex: 0 0 auto;
+  color: var(--ink-muted);
+  font-size: 7px;
+  white-space: nowrap;
+}
+
+.project-relation-create-grid {
+  margin-top: 7px;
+  display: grid;
+  grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr);
+  gap: 7px;
+}
+
+.project-relation-create-grid article {
+  min-width: 0;
+  padding: 7px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+}
+
+.project-relation-create-grid header strong,
+.project-relation-create-grid header span {
+  display: block;
+}
+
+.project-relation-create-grid header strong {
+  color: var(--ink);
+  font-size: 8px;
+}
+
+.project-relation-create-grid header span {
+  margin-top: 2px;
+  color: var(--ink-muted);
+  font-size: 6px;
+}
+
+.project-relation-create-grid article > div {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.project-relation-create-grid article:first-child select {
+  width: 88px;
+}
+
+.project-relation-create-grid article:first-child input {
+  flex: 1 1 130px;
+}
+
+.project-relation-create-grid article:last-child select {
+  flex: 1 1 125px;
+}
+
+.project-relation-create-grid article:last-child input {
+  flex: 1 1 125px;
+}
+
+.project-relation-direction {
+  height: 29px;
+  padding: 0 7px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink-muted);
+  font-size: 7px;
+  white-space: nowrap;
+}
+
+.project-relation-direction input {
+  width: 12px !important;
+  height: 12px !important;
+  padding: 0 !important;
+  margin: 0;
+  box-shadow: none !important;
+}
+
+.project-relation-signals {
+  margin-top: 7px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.project-relation-signals span {
+  padding: 4px 6px;
+  border-radius: 99px;
+  background: color-mix(in srgb, #b97820 6%, var(--paper));
+  color: #95621c;
+  font-size: 7px;
+}
+
+.project-relation-signals b {
+  margin-right: 3px;
+}
+
+.project-relation-workspace {
+  min-height: 390px;
+  margin-top: 7px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 7px;
+}
+
+.project-relation-canvas {
+  min-width: 0;
+  min-height: 390px;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background:
+    radial-gradient(circle at center, color-mix(in srgb, var(--clay) 5%, transparent), transparent 52%),
+    var(--paper);
+}
+
+.project-relation-canvas svg {
+  width: 100%;
+  height: 100%;
+  min-height: 390px;
+  display: block;
+}
+
+.project-relation-edges g {
+  cursor: pointer;
+}
+
+.project-relation-edges line {
+  stroke: var(--line-strong);
+  stroke-width: 1.4;
+  opacity: .72;
+}
+
+.project-relation-edges g.selected line {
+  stroke: var(--clay);
+  stroke-width: 2.2;
+  opacity: 1;
+}
+
+.project-relation-edges text {
+  fill: var(--ink-muted);
+  font-size: 9px;
+  text-anchor: middle;
+  paint-order: stroke;
+  stroke: var(--paper);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
+.project-relation-edges marker path {
+  fill: var(--line-strong);
+}
+
+.project-relation-node {
+  cursor: pointer;
+  outline: none;
+}
+
+.project-relation-node circle {
+  fill: var(--surface);
+  stroke: var(--line-strong);
+  stroke-width: 1.6;
+  transition: stroke-width .12s ease, filter .12s ease;
+}
+
+.project-relation-node text {
+  fill: var(--ink-soft);
+  font-size: 10px;
+  font-weight: 650;
+  text-anchor: middle;
+  pointer-events: none;
+}
+
+.project-relation-node:hover circle,
+.project-relation-node:focus-visible circle,
+.project-relation-node.selected circle,
+.project-relation-node.focused circle {
+  stroke-width: 3px;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,.09));
+}
+
+.project-relation-node.type-character circle {
+  stroke: #725f9c;
+}
+
+.project-relation-node.type-location circle {
+  stroke: #477e6b;
+}
+
+.project-relation-node.type-foreshadow circle {
+  stroke: #95621c;
+}
+
+.project-relation-node.type-faction circle {
+  stroke: #4e6f9e;
+}
+
+.project-relation-node.type-object circle {
+  stroke: #8a6f52;
+}
+
+.project-relation-node.type-concept circle {
+  stroke: var(--clay);
+}
+
+.project-relation-node.selected circle,
+.project-relation-node.focused circle {
+  fill: color-mix(in srgb, var(--clay-light) 58%, var(--surface));
+}
+
+.project-relation-empty {
+  min-height: 390px;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  color: var(--ink-muted);
+  font-size: 8px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.project-relation-detail {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--paper);
+}
+
+.project-relation-detail > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.project-relation-detail header span,
+.project-relation-detail header strong,
+.project-relation-detail header small {
+  display: block;
+}
+
+.project-relation-detail header span,
+.project-relation-detail header small {
+  color: var(--ink-muted);
+  font-size: 6px;
+}
+
+.project-relation-detail header strong {
+  margin-top: 2px;
+  color: var(--ink);
+  font-size: 9px;
+}
+
+.project-relation-detail header small {
+  margin-top: 2px;
+}
+
+.project-relation-detail > p {
+  margin: 7px 0;
+  color: var(--ink-muted);
+  font-size: 7px;
+  line-height: 1.5;
+}
+
+.project-relation-neighbors {
+  margin: 8px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.project-relation-neighbors button {
+  width: 100%;
+  padding: 5px 6px;
+  display: block;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink-soft);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.project-relation-neighbors button span,
+.project-relation-neighbors button strong {
+  display: block;
+}
+
+.project-relation-neighbors button span {
+  color: var(--ink-muted);
+  font-size: 6px;
+}
+
+.project-relation-neighbors button strong {
+  margin-top: 1px;
+  font-size: 7px;
+}
+
+.project-relation-neighbors em,
+.project-relation-detail-empty {
+  color: var(--ink-muted);
+  font-size: 7px;
+  font-style: normal;
+  line-height: 1.5;
+}
+
+.project-relation-detail .btn.danger {
+  border-color: color-mix(in srgb, #b84444 28%, var(--line));
+  color: #a63b3b;
+}
+
+@media (max-width: 1000px) {
+  .project-relation-workspace {
+    grid-template-columns: minmax(0, 1fr) 190px;
+  }
+
+  .project-relation-create-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 820px) {
+  .project-relation-head {
+    flex-direction: column;
+  }
+
+  .project-relation-metrics {
+    justify-content: flex-start;
+  }
+
+  .project-relation-controls {
+    flex-wrap: wrap;
+  }
+
+  .project-relation-search {
+    min-width: 100%;
+  }
+
+  .project-relation-controls select {
+    flex: 1;
+  }
+
+  .project-relation-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .project-relation-detail {
+    min-height: 120px;
+  }
+}
+
+@media (max-width: 700px) {
+  .project-relation-create-grid article > div {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .project-relation-create-grid article:first-child select,
+  .project-relation-create-grid article:first-child input,
+  .project-relation-create-grid article:last-child select,
+  .project-relation-create-grid article:last-child input,
+  .project-relation-direction {
+    width: 100%;
+    flex-basis: auto;
+  }
+}
