@@ -2225,6 +2225,193 @@ describe('UI redesign smoke tests', () => {
     expect(stored.project.relations).toEqual([])
   })
 
+  it('records relationship evolution on chapters and updates the current graph state', async () => {
+    localStorage.setItem(
+      'localNotepad.projectWorkspace.activeView',
+      'structure'
+    )
+    localStorage.setItem(
+      'localNotepad.projectWorkspace.v1',
+      JSON.stringify({
+        project: {
+          type: 'novel',
+          targetWords: 0,
+          chapterTargetWords: 0,
+          dailyGoal: 0,
+          weeklyGoal: 0,
+          deadline: '',
+          statuses: {},
+          summaries: {},
+          supportNoteIds: [],
+          foreshadowStates: {},
+          volumeMilestones: {},
+          chapterQueue: [],
+          sprint: null,
+          dailyReviews: {},
+          storylines: [],
+          relationEntities: [],
+          relations: [{
+            id: 'relationship-1',
+            sourceId: 'index:chapter-1',
+            targetId: 'index:chapter-2',
+            type: 'ally',
+            directed: false,
+            label: '旧友',
+            note: '',
+            events: [{
+              id: 'relationship-event-1',
+              noteId: 'chapter-1',
+              eventType: 'establish',
+              relationType: 'ally',
+              label: '结识',
+              note: '第一次并肩',
+            }],
+          }],
+        },
+      })
+    )
+
+    const lexical = text => JSON.stringify({
+      root: {
+        children: [{
+          type: 'paragraph',
+          children: [{ type: 'text', text }],
+        }],
+      },
+    })
+
+    listAllFilesWithContent.mockResolvedValue([
+      { id: 'project', title: '关系演化项目', is_folder: true, parent_id: '', sort_order: 100 },
+      { id: 'volume-1', title: '第一卷', is_folder: true, parent_id: 'project', sort_order: 100 },
+      { id: 'chapter-1', title: '第一章.md', is_folder: false, parent_id: 'volume-1', sort_order: 100, content: lexical('一') },
+      { id: 'chapter-2', title: '第二章.md', is_folder: false, parent_id: 'volume-1', sort_order: 200, content: lexical('二') },
+      { id: 'chapter-3', title: '第三章.md', is_folder: false, parent_id: 'volume-1', sort_order: 300, content: lexical('三') },
+    ])
+    tagApi.list.mockResolvedValue([
+      { id: 'tag-character', name: '角色' },
+    ])
+    tagApi.getFilesByTag.mockImplementation(async tagId => (
+      tagId === 'tag-character'
+        ? [
+          { id: 'chapter-1', title: '关关.md', updated_at: 3 },
+          { id: 'chapter-2', title: '赵三.md', updated_at: 2 },
+        ]
+        : []
+    ))
+
+    const onOpenFile = vi.fn()
+    await act(async () => {
+      root.render(
+        <ProjectWorkspacePanel
+          onOpenFile={onOpenFile}
+          onClose={() => {}}
+        />
+      )
+    })
+    await flushPromises()
+    await flushPromises()
+
+    let relationEdge = container.querySelector('.project-relation-edges > g')
+    expect(relationEdge).toBeTruthy()
+    expect(relationEdge.textContent).toContain('旧友')
+    expect(relationEdge.textContent).toContain('同盟')
+    await click(relationEdge)
+
+    let chapterSelect = container.querySelector(
+      'select[aria-label="关系变化章节"]'
+    )
+    let eventType = container.querySelector(
+      'select[aria-label="关系变化类型"]'
+    )
+    let resultingType = container.querySelector(
+      'select[aria-label="变化后的关系类型"]'
+    )
+    let eventNote = container.querySelector(
+      'input[aria-label="关系变化说明"]'
+    )
+    expect(chapterSelect).toBeTruthy()
+
+    await act(async () => {
+      chapterSelect.value = 'chapter-2'
+      chapterSelect.dispatchEvent(new Event('change', { bubbles: true }))
+      eventType.value = 'break'
+      eventType.dispatchEvent(new Event('change', { bubbles: true }))
+      resultingType.value = 'rival'
+      resultingType.dispatchEvent(new Event('change', { bubbles: true }))
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        'value',
+      ).set
+      setter.call(eventNote, '立场冲突导致决裂')
+      eventNote.dispatchEvent(new Event('input', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    let recordChange = Array.from(
+      container.querySelectorAll('.project-relation-detail button')
+    ).find(button => button.textContent === '记录关系变化')
+    await click(recordChange)
+    await flushPromises()
+
+    let stored = JSON.parse(
+      localStorage.getItem('localNotepad.projectWorkspace.v1')
+    )
+    expect(stored.project.relations[0].events).toHaveLength(2)
+    expect(stored.project.relations[0].events[1]).toMatchObject({
+      noteId: 'chapter-2',
+      eventType: 'break',
+      relationType: 'rival',
+      note: '立场冲突导致决裂',
+    })
+
+    relationEdge = container.querySelector('.project-relation-edges > g')
+    expect(relationEdge.textContent).toContain('对立')
+    expect(container.textContent).toContain('关系演化时间轴')
+    expect(container.textContent).toContain('破裂')
+    expect(container.textContent).toContain('立场冲突导致决裂')
+
+    chapterSelect = container.querySelector(
+      'select[aria-label="关系变化章节"]'
+    )
+    eventType = container.querySelector(
+      'select[aria-label="关系变化类型"]'
+    )
+    resultingType = container.querySelector(
+      'select[aria-label="变化后的关系类型"]'
+    )
+    await act(async () => {
+      chapterSelect.value = 'chapter-3'
+      chapterSelect.dispatchEvent(new Event('change', { bubbles: true }))
+      eventType.value = 'repair'
+      eventType.dispatchEvent(new Event('change', { bubbles: true }))
+      resultingType.value = 'ally'
+      resultingType.dispatchEvent(new Event('change', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    recordChange = Array.from(
+      container.querySelectorAll('.project-relation-detail button')
+    ).find(button => button.textContent === '记录关系变化')
+    await click(recordChange)
+    await flushPromises()
+
+    stored = JSON.parse(
+      localStorage.getItem('localNotepad.projectWorkspace.v1')
+    )
+    expect(stored.project.relations[0].events).toHaveLength(3)
+    expect(container.querySelector('.project-relation-current-state').textContent)
+      .toContain('同盟')
+    expect(container.querySelector('.project-relation-current-state').textContent)
+      .toContain('2 次类型变化')
+
+    const secondChapterTimeline = Array.from(
+      container.querySelectorAll('.project-relation-timeline-chapter')
+    ).find(button => button.textContent.includes('第二章'))
+    expect(secondChapterTimeline).toBeTruthy()
+    await click(secondChapterTimeline)
+    expect(onOpenFile).toHaveBeenCalledWith('chapter-2')
+  })
+
   it('offers actionable empty states for projects without manuscript chapters', async () => {
     localStorage.setItem(
       'localNotepad.projectWorkspace.activeView',
