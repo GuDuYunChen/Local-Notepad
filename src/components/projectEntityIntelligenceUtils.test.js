@@ -182,6 +182,53 @@ describe('project entity intelligence', () => {
     })
   })
 
+  it('suppresses ambiguous aliases that collide with another entity identity', () => {
+    const workspace = {
+      project: { id: 'project', title: '别名冲突', type: 'novel' },
+      volumes: [{
+        id: 'v1',
+        title: '第一卷',
+        notes: [
+          {
+            id: 'c1',
+            title: '一.md',
+            content: content({ text: '阿三来到青崖镇。' }),
+          },
+          {
+            id: 'c2',
+            title: '二.md',
+            content: content({ text: '阿三仍在青崖镇。' }),
+          },
+        ],
+      }],
+    }
+
+    const model = buildProjectEntityIntelligence(
+      workspace,
+      indexes,
+      {
+        entityAliases: {
+          'index:char-1': ['阿三'],
+          'index:char-2': ['阿三'],
+        },
+      },
+      { minChapters: 2 },
+    )
+
+    expect(model.aliasConflicts).toEqual([
+      expect.objectContaining({
+        alias: '阿三',
+        entityIds: expect.arrayContaining([
+          'index:char-1',
+          'index:char-2',
+        ]),
+      }),
+    ])
+    expect(model.stats.aliasConflictCount).toBe(1)
+    expect(model.stats.aliasMentions).toBe(0)
+    expect(model.suggestions).toEqual([])
+  })
+
   it('excludes existing and ignored pairs from intelligence suggestions', () => {
     const workspace = {
       project: { id: 'project', title: '过滤项目', type: 'novel' },
