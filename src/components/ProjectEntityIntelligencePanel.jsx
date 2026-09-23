@@ -70,6 +70,22 @@ export default function ProjectEntityIntelligencePanel({
       return
     }
 
+    const collision = intelligence.entities.find(entity => (
+      entity.id !== selectedEntity.id &&
+      (
+        entity.label.toLocaleLowerCase() === alias.toLocaleLowerCase() ||
+        entity.aliases.some(item => (
+          item.toLocaleLowerCase() === alias.toLocaleLowerCase()
+        ))
+      )
+    ))
+    if (collision) {
+      toast.error(
+        '别名“' + alias + '”已被“' + collision.label + '”占用，避免歧义请换一个'
+      )
+      return
+    }
+
     onMetaChange?.(previous => ({
       ...previous,
       entityAliases: {
@@ -122,8 +138,26 @@ export default function ProjectEntityIntelligencePanel({
           <span><b>{intelligence.stats.recognizedWikiReferences}</b>WikiLink</span>
           <span><b>{intelligence.stats.plainTextMentions}</b>原名提及</span>
           <span><b>{intelligence.stats.aliasMentions}</b>别名提及</span>
+          {intelligence.stats.aliasConflictCount > 0 && (
+            <span className="warning">
+              <b>{intelligence.stats.aliasConflictCount}</b>别名冲突
+            </span>
+          )}
         </div>
       </header>
+
+      {intelligence.aliasConflicts.length > 0 && (
+        <div className="project-entity-alias-conflicts">
+          <strong>别名冲突已停止参与自动识别</strong>
+          <div>
+            {intelligence.aliasConflicts.map(item => (
+              <span key={item.alias}>
+                {item.alias} · {item.entityIds.length} 个实体
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="project-entity-intelligence-grid">
         <article className="project-entity-alias-editor">
