@@ -229,7 +229,7 @@ describe('project storyline utilities', () => {
         },
       })
     expect(model.totals).toMatchObject({
-      intersections: 1,
+      intersections: 2,
       overloadedChapters: 1,
       crossVolumeTracks: 2,
       terminalMissingTracks: 2,
