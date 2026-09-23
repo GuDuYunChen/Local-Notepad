@@ -2030,6 +2030,201 @@ describe('UI redesign smoke tests', () => {
     expect(matrixRows).toHaveLength(3)
   })
 
+  it('creates filters focuses opens and deletes project entity relationships', async () => {
+    localStorage.setItem(
+      'localNotepad.projectWorkspace.activeView',
+      'structure'
+    )
+
+    const lexical = text => JSON.stringify({
+      root: {
+        children: [{
+          type: 'paragraph',
+          children: [{ type: 'text', text }],
+        }],
+      },
+    })
+
+    listAllFilesWithContent.mockResolvedValue([
+      { id: 'project', title: '关系图项目', is_folder: true, parent_id: '', sort_order: 100 },
+      { id: 'volume-1', title: '第一卷', is_folder: true, parent_id: 'project', sort_order: 100 },
+      { id: 'chapter-1', title: '关关.md', is_folder: false, parent_id: 'volume-1', sort_order: 100, content: lexical('人物') },
+      { id: 'chapter-2', title: '青崖镇.md', is_folder: false, parent_id: 'volume-1', sort_order: 200, content: lexical('地点') },
+      { id: 'chapter-3', title: '黑铁副印.md', is_folder: false, parent_id: 'volume-1', sort_order: 300, content: lexical('伏笔') },
+    ])
+    tagApi.list.mockResolvedValue([
+      { id: 'tag-character', name: '角色' },
+      { id: 'tag-location', name: '地点' },
+      { id: 'tag-foreshadow', name: '伏笔' },
+    ])
+    tagApi.getFilesByTag.mockImplementation(async tagId => {
+      if (tagId === 'tag-character') {
+        return [{ id: 'chapter-1', title: '关关.md', updated_at: 3 }]
+      }
+      if (tagId === 'tag-location') {
+        return [{ id: 'chapter-2', title: '青崖镇.md', updated_at: 2 }]
+      }
+      if (tagId === 'tag-foreshadow') {
+        return [{ id: 'chapter-3', title: '黑铁副印.md', updated_at: 1 }]
+      }
+      return []
+    })
+
+    const onOpenFile = vi.fn()
+    await act(async () => {
+      root.render(
+        <ProjectWorkspacePanel
+          onOpenFile={onOpenFile}
+          onClose={() => {}}
+        />
+      )
+    })
+    await flushPromises()
+    await flushPromises()
+
+    const relationPanel = container.querySelector('.project-relation-panel')
+    expect(relationPanel).toBeTruthy()
+    expect(relationPanel.textContent).toContain('实体关系图')
+    expect(relationPanel.querySelectorAll('.project-relation-node'))
+      .toHaveLength(3)
+
+    const entityType = relationPanel.querySelector(
+      'select[aria-label="自定义实体类型"]'
+    )
+    await act(async () => {
+      entityType.value = 'faction'
+      entityType.dispatchEvent(new Event('change', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    const entityName = relationPanel.querySelector(
+      'input[aria-label="自定义实体名称"]'
+    )
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        'value',
+      ).set
+      setter.call(entityName, '青莲剑宗')
+      entityName.dispatchEvent(new Event('input', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    const addEntity = Array.from(relationPanel.querySelectorAll('button'))
+      .find(button => button.textContent === '添加实体')
+    await click(addEntity)
+    await flushPromises()
+
+    expect(container.querySelectorAll('.project-relation-node'))
+      .toHaveLength(4)
+
+    const source = container.querySelector(
+      'select[aria-label="关系源实体"]'
+    )
+    const target = container.querySelector(
+      'select[aria-label="关系目标实体"]'
+    )
+    const relationType = container.querySelector(
+      'select[aria-label="新建关系类型"]'
+    )
+    const factionOption = Array.from(target.options)
+      .find(option => option.textContent.includes('青莲剑宗'))
+    expect(factionOption).toBeTruthy()
+
+    await act(async () => {
+      source.value = 'index:chapter-1'
+      source.dispatchEvent(new Event('change', { bubbles: true }))
+      relationType.value = 'belongs'
+      relationType.dispatchEvent(new Event('change', { bubbles: true }))
+      target.value = factionOption.value
+      target.dispatchEvent(new Event('change', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    const relationLabel = container.querySelector(
+      'input[aria-label="自定义关系标签"]'
+    )
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        'value',
+      ).set
+      setter.call(relationLabel, '宗门弟子')
+      relationLabel.dispatchEvent(new Event('input', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    const addRelation = Array.from(
+      container.querySelectorAll('.project-relation-create-grid button')
+    ).find(button => button.textContent === '添加关系')
+    await click(addRelation)
+    await flushPromises()
+
+    let stored = JSON.parse(
+      localStorage.getItem('localNotepad.projectWorkspace.v1')
+    )
+    expect(stored.project.relationEntities).toEqual([
+      expect.objectContaining({
+        label: '青莲剑宗',
+        type: 'faction',
+      }),
+    ])
+    expect(stored.project.relations).toEqual([
+      expect.objectContaining({
+        sourceId: 'index:chapter-1',
+        targetId: factionOption.value,
+        type: 'belongs',
+        directed: true,
+        label: '宗门弟子',
+      }),
+    ])
+    expect(container.querySelectorAll('.project-relation-edges > g'))
+      .toHaveLength(1)
+
+    const factionNode = Array.from(
+      container.querySelectorAll('.project-relation-node')
+    ).find(node => node.textContent.includes('青莲剑宗'))
+    expect(factionNode).toBeTruthy()
+    await click(factionNode)
+
+    const focusNeighbor = Array.from(
+      container.querySelectorAll('.project-relation-detail button')
+    ).find(button => button.textContent === '只看相邻')
+    expect(focusNeighbor).toBeTruthy()
+    await click(focusNeighbor)
+    expect(container.querySelectorAll('.project-relation-node'))
+      .toHaveLength(2)
+
+    const clearFilters = Array.from(
+      container.querySelectorAll('.project-relation-controls button')
+    ).find(button => button.textContent === '清除筛选')
+    await click(clearFilters)
+
+    const characterNode = Array.from(
+      container.querySelectorAll('.project-relation-node')
+    ).find(node => node.textContent.includes('关关'))
+    await click(characterNode)
+    const openNote = Array.from(
+      container.querySelectorAll('.project-relation-detail button')
+    ).find(button => button.textContent === '打开关联笔记')
+    await click(openNote)
+    expect(onOpenFile).toHaveBeenCalledWith('chapter-1')
+
+    const relationEdge = container.querySelector('.project-relation-edges > g')
+    await click(relationEdge)
+    const deleteRelation = Array.from(
+      container.querySelectorAll('.project-relation-detail button')
+    ).find(button => button.textContent === '删除关系')
+    expect(deleteRelation).toBeTruthy()
+    await click(deleteRelation)
+    await flushPromises()
+
+    stored = JSON.parse(
+      localStorage.getItem('localNotepad.projectWorkspace.v1')
+    )
+    expect(stored.project.relations).toEqual([])
+  })
+
   it('offers actionable empty states for projects without manuscript chapters', async () => {
     localStorage.setItem(
       'localNotepad.projectWorkspace.activeView',
