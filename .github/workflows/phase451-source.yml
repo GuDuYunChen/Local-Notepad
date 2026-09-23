@@ -1,0 +1,27 @@
+name: Phase 451 source snapshot
+on:
+  push:
+    branches: [feature/ui-redesign-v1]
+    paths: [.github/workflows/phase451-source.yml]
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Archive tracked source
+        run: |
+          git archive --format=tar.gz HEAD > /tmp/phase451-source.tar.gz
+          git ls-tree -r HEAD > /tmp/phase451-tree.txt
+          git rev-parse HEAD > /tmp/phase451-head.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: phase451-source-${{ github.sha }}
+          path: /tmp/phase451-*
+          retention-days: 1
+          compression-level: 0
+          if-no-files-found: error
