@@ -1,0 +1,15 @@
+.editor-input .editor-evidence-target {
+  outline: 2px solid var(--clay);
+  outline-offset: 3px;
+  border-radius: 3px;
+  background-color: var(--clay-light);
+}
+
+.project-entity-evidence-excerpt > button,
+.project-entity-evidence-wiki-item > button {
+  margin-top: 6px;
+}
+
+.project-entity-evidence-wiki-item + .project-entity-evidence-wiki-item {
+  margin-top: 8px;
+}

@@ -44,6 +44,8 @@ import CommandPalettePlugin from "./plugins/CommandPalettePlugin";
 import ResourceManagerPlugin from "./plugins/ResourceManagerPlugin";
 import EditorViewSettingsPlugin from "./plugins/EditorViewSettingsPlugin";
 import DocumentSessionPlugin from "./plugins/DocumentSessionPlugin";
+import EvidenceNavigationPlugin from "./plugins/EvidenceNavigationPlugin";
+import { beginEvidenceContentLoad, completeEvidenceContentLoad, cancelEvidenceContentLoad } from '~/services/evidenceNavigation';
 import MarkdownSourcePlugin from "./plugins/MarkdownSourcePlugin";
 import { ImageNode } from "./nodes/ImageNode";
 import { VideoNode } from "./nodes/VideoNode";
@@ -130,10 +132,11 @@ function OnChangePlugin({ onChange }) {
   return null;
 }
 
-function LoadContentPlugin({ content }) {
+export function LoadContentPlugin({ content, documentId }) {
   const [editor] = useLexicalComposerContext();
   useEffect(() => {
     let cancelled = false;
+    const loadToken = beginEvidenceContentLoad(editor, documentId, content);
     const run = () => {
       if (cancelled) return;
       editor.update(() => {
@@ -153,11 +156,13 @@ function LoadContentPlugin({ content }) {
             root.append(p);
           }
         }
-      });
+      }, { onUpdate: () => {
+        if (!cancelled) completeEvidenceContentLoad(editor, loadToken);
+      } });
     };
     Promise.resolve().then(run);
-    return () => { cancelled = true };
-  }, [editor, content]);
+    return () => { cancelled = true; cancelEvidenceContentLoad(editor, loadToken) };
+  }, [editor, content, documentId]);
   return null;
 }
 
@@ -229,8 +234,9 @@ export default function Editor({ documentId, documentTitle, initialContent, onCh
           {!readOnly && <FormulaShortcutPlugin />}
           {!readOnly && <ChecklistKeyboardPlugin />}
           {!readOnly && <OnChangePlugin onChange={onChange} />}
-          <LoadContentPlugin content={initialContent} />
+          <LoadContentPlugin content={initialContent} documentId={documentId} />
           <DocumentSessionPlugin documentId={documentId} restoreSelection={!readOnly} />
+          <EvidenceNavigationPlugin documentId={documentId} initialContent={initialContent} />
           {!readOnly && <TableSelectionPlugin />}
           {!readOnly && <TableActionMenuPlugin />}
           {!readOnly && <TableColumnResizePlugin />}

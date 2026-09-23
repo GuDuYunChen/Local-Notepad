@@ -1,6 +1,6 @@
 {
   "name": "notepad-desktop",
-  "version": "4.47.0",
+  "version": "4.48.0",
   "private": true,
   "type": "module",
   "main": "out/electron/main.cjs",
@@ -11,8 +11,8 @@
     "build": "npm run ci:build-backend-win && npm run build:main && vite build && electron-builder --publish never",
     "build:main": "esbuild electron/main.js --bundle --platform=node --format=cjs --external:electron --outfile=out/electron/main.cjs && esbuild electron/preload.js --bundle --platform=node --format=cjs --external:electron --outfile=out/electron/preload.cjs",
     "build:main:watch": "concurrently \"esbuild electron/main.js --bundle --platform=node --format=cjs --external:electron --outfile=out/electron/main.cjs --watch\" \"esbuild electron/preload.js --bundle --platform=node --format=cjs --external:electron --outfile=out/electron/preload.cjs --watch\"",
-    "test:entity-core": "node --test scripts/check-entity-mentions.mjs scripts/check-entity-evidence.mjs",
-    "test:ui": "npm run test:entity-core && vitest run --root=. src/components/TextEditor.test.jsx src/components/UIRedesign.test.jsx src/components/ThemeToggle.test.jsx src/components/fileTreeUtils.test.js src/components/projectWorkspaceUtils.test.js src/components/projectStructureUtils.test.js src/components/projectStorylineUtils.test.js src/components/projectRelationsUtils.test.js src/components/projectRelationSuggestionUtils.test.js src/components/projectEntityIntelligenceUtils.test.js src/components/ProjectEntityEvidencePanel.test.jsx src/components/projectAnalyticsUtils.test.js src/components/projectPlanningUtils.test.js src/components/projectSprintUtils.test.js src/components/projectInsightUtils.test.js src/components/focusSessionUtils.test.js src/components/focusSessionAnalyticsUtils.test.js src/styles/redesign.test.js src/styles/editor-document.test.js src/services/api.test.js src/services/editorDraftCache.test.js src/services/fileHistory.test.js src/services/importContent.test.js src/services/legacyContentCompatibility.test.js src/services/markdownSource.test.js src/utils/lexicalText.test.js",
+    "test:entity-core": "node --test scripts/check-entity-mentions.mjs scripts/check-entity-evidence.mjs scripts/check-evidence-navigation.mjs",
+    "test:ui": "npm run test:entity-core && vitest run --root=. src/components/TextEditor.test.jsx src/components/UIRedesign.test.jsx src/components/ThemeToggle.test.jsx src/components/fileTreeUtils.test.js src/components/projectWorkspaceUtils.test.js src/components/projectStructureUtils.test.js src/components/projectStorylineUtils.test.js src/components/projectRelationsUtils.test.js src/components/projectRelationSuggestionUtils.test.js src/components/projectEntityIntelligenceUtils.test.js src/components/ProjectEntityEvidencePanel.test.jsx src/components/EvidenceLocateButton.test.jsx src/components/projectAnalyticsUtils.test.js src/components/projectPlanningUtils.test.js src/components/projectSprintUtils.test.js src/components/projectInsightUtils.test.js src/components/focusSessionUtils.test.js src/components/focusSessionAnalyticsUtils.test.js src/styles/redesign.test.js src/styles/editor-document.test.js src/services/api.test.js src/services/editorDraftCache.test.js src/services/fileHistory.test.js src/services/importContent.test.js src/services/legacyContentCompatibility.test.js src/services/markdownSource.test.js src/utils/lexicalText.test.js",
     "test:editor": "vitest run --root=. src/components/Editor/",
     "test:electron": "vitest run --root=. electron/*.test.js",
     "dev:backend": "go -C server run ./cmd/notepad-server",

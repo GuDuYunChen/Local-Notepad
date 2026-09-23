@@ -5,6 +5,8 @@ import {
   buildEntityChapterPreview,
   selectProjectEntityEvidence,
 } from './projectEntityEvidenceUtils'
+import EvidenceLocateButton from './EvidenceLocateButton'
+import { evidenceNavigation } from '~/services/evidenceNavigation'
 import './ProjectEntityEvidencePanel.css'
 
 function title(value) {
@@ -26,7 +28,7 @@ function ChapterEvidenceCard({ row, chapter, entity, termIndex, source, onOpenFi
         <button
           type="button"
           disabled={!chapter || !onOpenFile}
-          onClick={() => onOpenFile?.(row.chapterId)}
+          onClick={() => { evidenceNavigation.cancel(); onOpenFile?.(row.chapterId) }}
           aria-label={'打开证据章节 ' + title(row.chapterTitle)}
         >
           打开章节
@@ -46,16 +48,24 @@ function ChapterEvidenceCard({ row, chapter, entity, termIndex, source, onOpenFi
                 <mark>{sample.match}</mark>
                 {sample.after}{sample.trailingEllipsis && '…'}
               </p>
+              <EvidenceLocateButton chapterId={row.chapterId} content={chapter.content}
+                sample={sample} onOpenFile={onOpenFile}
+                label={'定位正文证据 ' + row.ordinal + ' ' + sample.start} />
             </div>
           ))}
           {preview.wikiLinks.length > 0 && (
             <div className="project-entity-evidence-wiki">
               <small>明确 WikiLink（链接标签，不是正文节选）</small>
               {preview.wikiLinks.map((link, index) => (
-                <code key={index}>
-                  {'[[' + (link.title || '未命名链接') +
-                    (link.sectionPath.length ? '#' + link.sectionPath.join(' › ') : '') + ']]'}
-                </code>
+                <div key={index} className="project-entity-evidence-wiki-item">
+                  <code>
+                    {'[[' + (link.title || '未命名链接') +
+                      (link.sectionPath.length ? '#' + link.sectionPath.join(' › ') : '') + ']]'}
+                  </code>
+                  <EvidenceLocateButton chapterId={row.chapterId} content={chapter.content}
+                    noteId={entity.noteId} occurrence={index} onOpenFile={onOpenFile}
+                    label={'定位 WikiLink 证据 ' + row.ordinal + ' ' + (index + 1)} />
+                </div>
               ))}
             </div>
           )}
@@ -103,7 +113,7 @@ function EvidenceBrowser({ intelligence, entityId, projectMeta, onOpenFile }) {
     <section className="project-entity-evidence-browser" aria-label="实体正文证据">
       <header>
         <h4>正文证据回看{entity ? ' · ' + entity.label : ''}</h4>
-        <p>节选按当前正文生成，样式与连续空白已归一化。提及或同章共现不等于关系成立。</p>
+        <p>节选按当前正文生成，样式与连续空白已归一化。点击“定位此处”可跳到正文；过期证据需刷新。提及或同章共现不等于关系成立。</p>
       </header>
       {!entity ? <p className="project-entity-evidence-note">请选择一个实体查看正文证据。</p> : (
         <>

@@ -9,6 +9,8 @@ import {
   $setSelection,
 } from 'lexical'
 
+import { evidenceNavigation } from '~/services/evidenceNavigation'
+
 const STORAGE_PREFIX = 'localNotepad.editorSession.v2:'
 
 export function getDocumentSessionKey(documentId) {
@@ -188,11 +190,14 @@ export default function DocumentSessionPlugin({ documentId, restoreSelection = t
     if (!scroller) return undefined
 
     const session = readDocumentSession(documentId)
+    const skipRestore = Boolean(evidenceNavigation.peek(documentId))
+    const navigationVersion = evidenceNavigation.version()
     let cancelled = false
 
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        if (cancelled) return
+        if (cancelled || skipRestore || evidenceNavigation.peek(documentId) ||
+          evidenceNavigation.version() !== navigationVersion) return
 
         scroller.scrollTop = session?.scrollTop ?? 0
 
