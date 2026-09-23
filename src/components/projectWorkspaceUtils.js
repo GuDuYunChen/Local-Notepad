@@ -5,6 +5,7 @@ import {
   normalizeProjectRelationEntities,
   normalizeProjectRelations,
 } from './projectRelationsUtils'
+import { normalizeProjectEntityAliases } from './projectEntityIntelligenceUtils'
 
 export const PROJECT_META_KEY = 'localNotepad.projectWorkspace.v1'
 
@@ -209,6 +210,7 @@ export function readProjectWorkspaceMeta(projectId) {
           value.relationSuggestionIgnores.map(normalizeId).filter(Boolean)
         )]
         : [],
+      entityAliases: normalizeProjectEntityAliases(value.entityAliases),
     }
   } catch {
     return {
@@ -230,6 +232,7 @@ export function readProjectWorkspaceMeta(projectId) {
       relationEntities: [],
       relations: [],
       relationSuggestionIgnores: [],
+      entityAliases: {},
     }
   }
 }
@@ -279,6 +282,7 @@ export function writeProjectWorkspaceMeta(projectId, nextMeta) {
           nextMeta.relationSuggestionIgnores.map(normalizeId).filter(Boolean)
         )]
         : [],
+      entityAliases: normalizeProjectEntityAliases(nextMeta?.entityAliases),
     }
     localStorage.setItem(PROJECT_META_KEY, JSON.stringify(all))
   } catch {
