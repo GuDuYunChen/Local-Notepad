@@ -208,6 +208,7 @@ describe('project workspace utilities', () => {
         directed: true,
         label: '',
         note: '',
+        events: [],
       }],
     })
     expect(nextProjectStatus('draft')).toBe('review')
