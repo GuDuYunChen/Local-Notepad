@@ -3,6 +3,7 @@ import {
   buildProjectStoryMap,
   filterProjectStoryMap,
 } from './projectStructureUtils'
+import ProjectRelationGraphPanel from './ProjectRelationGraphPanel'
 import {
   buildProjectStorylineDiagnostics,
   buildProjectStorylineModel,
@@ -890,6 +891,13 @@ export default function ProjectStructurePanel({
           )}
         </section>
       )}
+
+      <ProjectRelationGraphPanel
+        projectIndexes={projectIndexes}
+        projectMeta={projectMeta}
+        onMetaChange={onMetaChange}
+        onOpenFile={onOpenFile}
+      />
 
       <div className="project-story-map">
         {filtered.volumes.map(volume => {
