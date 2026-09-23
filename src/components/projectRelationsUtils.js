@@ -20,6 +20,17 @@ const RELATION_TYPES = [
   { id: 'involved', label: '卷入', directed: true },
 ]
 
+const RELATION_EVENT_TYPES = [
+  { id: 'establish', label: '建立' },
+  { id: 'strengthen', label: '强化' },
+  { id: 'weaken', label: '弱化' },
+  { id: 'transform', label: '转变' },
+  { id: 'conflict', label: '冲突' },
+  { id: 'break', label: '破裂' },
+  { id: 'repair', label: '修复' },
+  { id: 'reveal', label: '揭示' },
+]
+
 function normalizeId(value) {
   return String(value || '').trim()
 }
@@ -48,6 +59,10 @@ export function getProjectRelationTypes() {
   return RELATION_TYPES.map(item => ({ ...item }))
 }
 
+export function getProjectRelationEventTypes() {
+  return RELATION_EVENT_TYPES.map(item => ({ ...item }))
+}
+
 export function normalizeProjectRelationEntities(value) {
   if (!Array.isArray(value)) return []
 
@@ -67,6 +82,38 @@ export function normalizeProjectRelationEntities(value) {
       type: normalizeEntityType(raw?.type),
       description: String(raw?.description || '').trim(),
       noteId: normalizeId(raw?.noteId),
+    })
+  }
+  return result
+}
+
+export function normalizeProjectRelationEvents(value) {
+  if (!Array.isArray(value)) return []
+
+  const seen = new Set()
+  const result = []
+  for (const raw of value) {
+    const id = normalizeId(raw?.id)
+    const noteId = normalizeId(raw?.noteId)
+    if (!id || !noteId || seen.has(id)) continue
+    seen.add(id)
+
+    const eventType = RELATION_EVENT_TYPES.some(item => item.id === raw?.eventType)
+      ? raw.eventType
+      : 'transform'
+    const relationType = raw?.relationType &&
+      RELATION_TYPES.some(item => item.id === raw.relationType)
+      ? raw.relationType
+      : ''
+
+    result.push({
+      id,
+      noteId,
+      eventType,
+      relationType,
+      label: String(raw?.label || '').trim(),
+      note: String(raw?.note || '').trim(),
+      events: normalizeProjectRelationEvents(raw?.events),
     })
   }
   return result
@@ -231,6 +278,7 @@ export function buildProjectRelationGraph(projectIndexes = {}, projectMeta = {})
       target,
       typeLabel: RELATION_TYPES.find(item => item.id === relation.type)?.label ||
         '关联',
+      eventCount: relation.events.length,
     })
     source.degree += 1
     target.degree += 1
@@ -363,5 +411,154 @@ export function buildProjectRelationLayout(graph, width = 960, height = 520) {
       source: positioned.find(node => node.id === edge.sourceId) || edge.source,
       target: positioned.find(node => node.id === edge.targetId) || edge.target,
     })),
+  }
+}
+
+
+function manuscriptCatalog(workspace) {
+  const result = []
+  let ordinal = 0
+  for (const volume of workspace?.volumes || []) {
+    for (const note of volume.notes || []) {
+      ordinal += 1
+      result.push({
+        id: normalizeId(note.id),
+        title: note.title,
+        ordinal,
+        volumeId: normalizeId(volume.id),
+        volumeTitle: volume.title,
+      })
+    }
+  }
+  return result
+}
+
+export function buildProjectRelationEvolution(
+  workspace,
+  projectIndexes = {},
+  projectMeta = {},
+) {
+  const graph = buildProjectRelationGraph(projectIndexes, projectMeta)
+  const catalog = manuscriptCatalog(workspace)
+  const chapterById = new Map(catalog.map(item => [item.id, item]))
+  const chapterEvents = {}
+  let orphanEvents = 0
+
+  const relations = graph.edges.map(edge => {
+    const events = (edge.events || []).map(event => {
+      const chapter = chapterById.get(normalizeId(event.noteId)) || null
+      if (!chapter) orphanEvents += 1
+
+      const eventLabel = RELATION_EVENT_TYPES.find(item => (
+        item.id === event.eventType
+      ))?.label || '转变'
+      const resultingType = event.relationType || edge.type
+      const resultingTypeLabel = RELATION_TYPES.find(item => (
+        item.id === resultingType
+      ))?.label || edge.typeLabel
+
+      const enriched = {
+        ...event,
+        chapter,
+        eventLabel,
+        resultingType,
+        resultingTypeLabel,
+      }
+
+      if (chapter) {
+        const bucket = chapterEvents[chapter.id] || []
+        bucket.push({
+          relationId: edge.id,
+          relationLabel: edge.label || edge.typeLabel,
+          sourceId: edge.sourceId,
+          sourceLabel: edge.source.label,
+          targetId: edge.targetId,
+          targetLabel: edge.target.label,
+          eventId: event.id,
+          eventType: event.eventType,
+          eventLabel,
+          resultingType,
+          resultingTypeLabel,
+          note: event.note,
+        })
+        chapterEvents[chapter.id] = bucket
+      }
+
+      return enriched
+    }).sort((a, b) => (
+      Number(a.chapter?.ordinal || Number.MAX_SAFE_INTEGER) -
+      Number(b.chapter?.ordinal || Number.MAX_SAFE_INTEGER)
+    ))
+
+    const validEvents = events.filter(event => event.chapter)
+    const latest = validEvents[validEvents.length - 1] || null
+    const currentType = latest?.resultingType || edge.type
+    const currentTypeLabel = RELATION_TYPES.find(item => (
+      item.id === currentType
+    ))?.label || edge.typeLabel
+
+    let previousType = edge.type
+    let typeChanges = 0
+    for (const event of validEvents) {
+      const nextType = event.resultingType || previousType
+      if (nextType !== previousType) typeChanges += 1
+      previousType = nextType
+    }
+
+    return {
+      ...edge,
+      events,
+      currentType,
+      currentTypeLabel,
+      latestEvent: latest,
+      typeChanges,
+      startOrdinal: validEvents[0]?.chapter?.ordinal || 0,
+      endOrdinal: latest?.chapter?.ordinal || 0,
+      hasTimeline: validEvents.length > 0,
+    }
+  })
+
+  const timeline = relations
+    .flatMap(relation => relation.events
+      .filter(event => event.chapter)
+      .map(event => ({
+        ...event,
+        relationId: relation.id,
+        relationTitle:
+          relation.source.label +
+          (relation.directed ? ' → ' : ' ↔ ') +
+          relation.target.label,
+        relationBaseType: relation.type,
+      })))
+    .sort((a, b) => (
+      Number(a.chapter?.ordinal || 0) -
+      Number(b.chapter?.ordinal || 0)
+    ))
+
+  const chapters = catalog.map(chapter => ({
+    ...chapter,
+    events: chapterEvents[chapter.id] || [],
+  }))
+
+  return {
+    graph,
+    catalog,
+    relations,
+    relationById: new Map(relations.map(item => [item.id, item])),
+    chapterEvents,
+    chapters,
+    timeline,
+    totals: {
+      relations: relations.length,
+      events: timeline.length,
+      evolvingRelations: relations.filter(item => item.hasTimeline).length,
+      typeChangedRelations: relations.filter(item => item.typeChanges > 0).length,
+      chaptersWithChanges: chapters.filter(item => item.events.length > 0).length,
+    },
+    signals: {
+      orphanEvents,
+      relationsWithoutTimeline: relations.filter(item => !item.hasTimeline).length,
+      multiChangeChapters: chapters.filter(item => item.events.length >= 2).length,
+    },
   }
 }
