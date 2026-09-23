@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { toast } from '~/services/toast'
 import ProjectRelationSuggestionsPanel from './ProjectRelationSuggestionsPanel'
+import ProjectEntityIntelligencePanel from './ProjectEntityIntelligencePanel'
 import {
   buildProjectRelationEvolution,
   buildProjectRelationGraph,
@@ -500,6 +501,14 @@ export default function ProjectRelationGraphPanel({
           )}
         </div>
       )}
+
+      <ProjectEntityIntelligencePanel
+        workspace={workspace}
+        projectIndexes={projectIndexes}
+        projectMeta={projectMeta}
+        onMetaChange={onMetaChange}
+        onOpenFile={onOpenFile}
+      />
 
       <ProjectRelationSuggestionsPanel
         workspace={workspace}
