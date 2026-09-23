@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildProjectRelationEvolution,
   buildProjectRelationGraph,
   buildProjectRelationLayout,
   filterProjectRelationGraph,
+  getProjectRelationEventTypes,
   normalizeProjectRelationEntities,
   normalizeProjectRelations,
 } from './projectRelationsUtils'
@@ -70,8 +72,132 @@ describe('project relation graph utilities', () => {
         directed: true,
         label: '',
         note: '',
+        events: [],
       },
     ])
+  })
+
+  it('normalizes relationship evolution events and exposes event types', () => {
+    expect(getProjectRelationEventTypes().map(item => item.label))
+      .toEqual(['建立', '强化', '弱化', '转变', '冲突', '破裂', '修复', '揭示'])
+
+    expect(normalizeProjectRelations([{
+      id: 'relation-events',
+      sourceId: 'index:char-1',
+      targetId: 'index:char-2',
+      type: 'ally',
+      events: [
+        {
+          id: 'event-1',
+          noteId: 'c1',
+          eventType: 'establish',
+          relationType: 'ally',
+          label: '联手',
+          note: '第一次并肩行动',
+        },
+        {
+          id: 'event-2',
+          noteId: '',
+          eventType: 'break',
+        },
+      ],
+    }])[0].events).toEqual([
+      {
+        id: 'event-1',
+        noteId: 'c1',
+        eventType: 'establish',
+        relationType: 'ally',
+        label: '联手',
+        note: '第一次并肩行动',
+      },
+    ])
+  })
+
+  it('builds relationship evolution in manuscript order and tracks current relation state', () => {
+    const workspace = {
+      project: { id: 'project', title: '关系演化项目', type: 'novel' },
+      volumes: [
+        {
+          id: 'v1',
+          title: '第一卷',
+          notes: [
+            { id: 'c1', title: '第一章.md' },
+            { id: 'c2', title: '第二章.md' },
+          ],
+        },
+        {
+          id: 'v2',
+          title: '第二卷',
+          notes: [
+            { id: 'c3', title: '第三章.md' },
+          ],
+        },
+      ],
+    }
+    const evolution = buildProjectRelationEvolution(workspace, indexes, {
+      relations: [{
+        id: 'relation-arc',
+        sourceId: 'index:char-1',
+        targetId: 'index:char-2',
+        type: 'ally',
+        directed: false,
+        events: [
+          {
+            id: 'event-3',
+            noteId: 'c3',
+            eventType: 'repair',
+            relationType: 'ally',
+            note: '重新并肩',
+          },
+          {
+            id: 'event-1',
+            noteId: 'c1',
+            eventType: 'establish',
+            relationType: 'ally',
+            note: '初次合作',
+          },
+          {
+            id: 'event-2',
+            noteId: 'c2',
+            eventType: 'break',
+            relationType: 'rival',
+            note: '立场决裂',
+          },
+          {
+            id: 'orphan',
+            noteId: 'missing',
+            eventType: 'conflict',
+            relationType: 'rival',
+          },
+        ],
+      }],
+    })
+
+    expect(evolution.relations[0].events.map(event => event.noteId))
+      .toEqual(['c1', 'c2', 'c3', 'missing'])
+    expect(evolution.relations[0]).toMatchObject({
+      currentType: 'ally',
+      currentTypeLabel: '同盟',
+      typeChanges: 2,
+      startOrdinal: 1,
+      endOrdinal: 3,
+      hasTimeline: true,
+    })
+    expect(evolution.timeline.map(event => event.eventLabel))
+      .toEqual(['建立', '破裂', '修复'])
+    expect(evolution.chapterEvents.c2[0]).toMatchObject({
+      eventLabel: '破裂',
+      resultingType: 'rival',
+      resultingTypeLabel: '对立',
+    })
+    expect(evolution.totals).toMatchObject({
+      relations: 1,
+      events: 3,
+      evolvingRelations: 1,
+      typeChangedRelations: 1,
+      chaptersWithChanges: 3,
+    })
+    expect(evolution.signals.orphanEvents).toBe(1)
   })
 
   it('builds graph metrics from indexes custom entities and directed edges', () => {
