@@ -151,6 +151,7 @@ describe('project workspace utilities', () => {
         targetId: 'entity-sect',
         type: 'belongs',
       }],
+      relationSuggestionIgnores: ['index:a::index:b'],
     })
 
     expect(readProjectWorkspaceMeta('project')).toEqual({
@@ -210,6 +211,7 @@ describe('project workspace utilities', () => {
         note: '',
         events: [],
       }],
+      relationSuggestionIgnores: ['index:a::index:b'],
     })
     expect(nextProjectStatus('draft')).toBe('review')
     expect(nextProjectStatus('review')).toBe('done')
@@ -664,6 +666,7 @@ describe('project workspace utilities', () => {
       storylines: [],
       relationEntities: [],
       relations: [],
+      relationSuggestionIgnores: [],
     })
   })
 
