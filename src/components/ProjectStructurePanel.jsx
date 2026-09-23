@@ -893,6 +893,7 @@ export default function ProjectStructurePanel({
       )}
 
       <ProjectRelationGraphPanel
+        workspace={workspace}
         projectIndexes={projectIndexes}
         projectMeta={projectMeta}
         onMetaChange={onMetaChange}
