@@ -1,0 +1,301 @@
+.project-relation-suggestions {
+  margin-top: 8px;
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--paper);
+}
+
+.project-relation-suggestions > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.project-relation-suggestions > header strong,
+.project-relation-suggestions > header span {
+  display: block;
+}
+
+.project-relation-suggestions > header strong {
+  color: var(--ink);
+  font-size: 8px;
+  font-weight: 680;
+}
+
+.project-relation-suggestions > header span {
+  margin-top: 2px;
+  color: var(--ink-muted);
+  font-size: 6px;
+  line-height: 1.45;
+}
+
+.project-relation-suggestion-metrics {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.project-relation-suggestion-metrics span {
+  margin: 0 !important;
+  padding: 3px 5px;
+  border-radius: 6px;
+  background: var(--surface);
+  white-space: nowrap;
+}
+
+.project-relation-suggestion-metrics b {
+  margin-right: 3px;
+  color: var(--ink);
+}
+
+.project-relation-suggestion-controls {
+  margin-top: 7px;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+}
+
+.project-relation-suggestion-controls label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.project-relation-suggestion-controls label > span,
+.project-relation-suggestion-controls > span {
+  color: var(--ink-muted);
+  font-size: 7px;
+}
+
+.project-relation-suggestion-controls > span {
+  margin-left: auto;
+}
+
+.project-relation-suggestion-controls select,
+.project-relation-suggestion-actions select {
+  height: 28px;
+  padding: 0 22px 0 7px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 7px;
+}
+
+.project-relation-suggestion-list {
+  margin-top: 7px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.project-relation-suggestion-list article {
+  padding: 7px;
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(180px, .9fr) auto;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.project-relation-suggestion-main {
+  min-width: 0;
+}
+
+.project-relation-suggestion-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr);
+  gap: 4px;
+  align-items: center;
+}
+
+.project-relation-suggestion-pair > div {
+  min-width: 0;
+}
+
+.project-relation-suggestion-pair span,
+.project-relation-suggestion-pair strong {
+  display: block;
+}
+
+.project-relation-suggestion-pair span {
+  color: var(--ink-muted);
+  font-size: 6px;
+}
+
+.project-relation-suggestion-pair strong {
+  margin-top: 1px;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-relation-suggestion-pair > b {
+  color: var(--clay);
+  font-size: 11px;
+  text-align: center;
+}
+
+.project-relation-suggestion-stats {
+  margin-top: 5px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.project-relation-suggestion-stats span,
+.project-relation-suggestion-stats em {
+  color: var(--ink-muted);
+  font-size: 6px;
+  font-style: normal;
+}
+
+.project-relation-suggestion-stats b {
+  color: var(--ink);
+}
+
+.project-relation-suggestion-stats em {
+  padding: 2px 4px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--clay) 8%, var(--paper));
+  color: var(--clay);
+}
+
+.project-relation-suggestion-evidence {
+  min-width: 0;
+}
+
+.project-relation-suggestion-evidence > strong {
+  color: var(--ink-muted);
+  font-size: 6px;
+}
+
+.project-relation-suggestion-evidence > div {
+  margin-top: 4px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.project-relation-suggestion-evidence button {
+  min-width: 0;
+  padding: 3px 5px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 6px;
+  cursor: pointer;
+}
+
+.project-relation-suggestion-evidence button:hover {
+  border-color: color-mix(in srgb, var(--clay) 35%, var(--line));
+  color: var(--clay);
+}
+
+.project-relation-suggestion-evidence button b {
+  color: var(--clay);
+}
+
+.project-relation-suggestion-evidence button span {
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-relation-suggestion-evidence em {
+  align-self: center;
+  color: var(--ink-muted);
+  font-size: 6px;
+  font-style: normal;
+}
+
+.project-relation-suggestion-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.project-relation-suggestion-empty {
+  margin-top: 7px;
+  padding: 12px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: var(--ink-muted);
+  text-align: center;
+}
+
+.project-relation-suggestion-empty strong,
+.project-relation-suggestion-empty span {
+  display: block;
+}
+
+.project-relation-suggestion-empty strong {
+  color: var(--ink-soft);
+  font-size: 7px;
+}
+
+.project-relation-suggestion-empty span {
+  margin-top: 3px;
+  font-size: 6px;
+  line-height: 1.5;
+}
+
+@media (max-width: 1050px) {
+  .project-relation-suggestion-list article {
+    grid-template-columns: minmax(220px, 1fr) minmax(180px, .9fr);
+  }
+
+  .project-relation-suggestion-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 760px) {
+  .project-relation-suggestions > header {
+    flex-direction: column;
+  }
+
+  .project-relation-suggestion-metrics {
+    justify-content: flex-start;
+  }
+
+  .project-relation-suggestion-controls {
+    flex-wrap: wrap;
+  }
+
+  .project-relation-suggestion-controls > span {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .project-relation-suggestion-list article {
+    grid-template-columns: 1fr;
+  }
+
+  .project-relation-suggestion-actions {
+    grid-column: auto;
+  }
+}
