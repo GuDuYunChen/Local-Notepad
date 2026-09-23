@@ -139,6 +139,18 @@ describe('project workspace utilities', () => {
           note: '',
         }],
       }],
+      relationEntities: [{
+        id: 'entity-sect',
+        label: '青莲剑宗',
+        type: 'faction',
+        description: '宗门',
+      }],
+      relations: [{
+        id: 'relation-1',
+        sourceId: 'index:character-note',
+        targetId: 'entity-sect',
+        type: 'belongs',
+      }],
     })
 
     expect(readProjectWorkspaceMeta('project')).toEqual({
@@ -180,6 +192,22 @@ describe('project workspace utilities', () => {
           stage: 'setup',
           note: '',
         }],
+      }],
+      relationEntities: [{
+        id: 'entity-sect',
+        label: '青莲剑宗',
+        type: 'faction',
+        description: '宗门',
+        noteId: '',
+      }],
+      relations: [{
+        id: 'relation-1',
+        sourceId: 'index:character-note',
+        targetId: 'entity-sect',
+        type: 'belongs',
+        directed: true,
+        label: '',
+        note: '',
       }],
     })
     expect(nextProjectStatus('draft')).toBe('review')
