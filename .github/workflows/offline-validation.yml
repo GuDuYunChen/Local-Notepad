@@ -1,0 +1,40 @@
+name: Offline Development Validation
+
+on:
+  push:
+    branches: [feature/ui-redesign-v1]
+    paths: [.github/workflows/offline-validation.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  validation-bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Install validation dependencies
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+        run: npm install --no-audit --no-fund
+      - name: Assemble tracked source and offline dependencies
+        run: |
+          mkdir -p /tmp/notepad-validation/repository
+          git archive HEAD | tar -x -C /tmp/notepad-validation/repository
+          cp -a node_modules /tmp/notepad-validation/repository/
+          cp package-lock.json /tmp/notepad-validation/repository/validation-package-lock.json
+          git rev-parse HEAD > /tmp/notepad-validation/repository/VALIDATION_SOURCE_SHA
+          tar -czf /tmp/notepad-validation.tar.gz -C /tmp/notepad-validation repository
+      - uses: actions/upload-artifact@v4
+        with:
+          name: offline-validation-${{ github.sha }}
+          path: /tmp/notepad-validation.tar.gz
+          retention-days: 1
+          compression-level: 0
+          if-no-files-found: error
