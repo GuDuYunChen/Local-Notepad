@@ -8,6 +8,7 @@ import {
   normalizeEntityTerm,
   normalizeProjectEntityAliases,
 } from './projectEntityMentionUtils'
+import ProjectEntityEvidencePanel from './ProjectEntityEvidencePanel'
 import './ProjectEntityIntelligencePanel.css'
 
 function stripExtension(value) {
@@ -250,25 +251,6 @@ export default function ProjectEntityIntelligencePanel({
                 </button>
               </div>
 
-              <div className="project-entity-evidence-list">
-                {selectedEntity.evidence.slice(0, 10).map(item => (
-                  <button
-                    key={item.chapterId}
-                    type="button"
-                    onClick={() => onOpenFile?.(item.chapterId)}
-                  >
-                    <b>#{item.ordinal}</b>
-                    <strong>{stripExtension(item.chapterTitle)}</strong>
-                    <span>{item.sourceLabel}</span>
-                    {item.aliasesMatched?.length > 0 && (
-                      <small>{item.aliasesMatched.join(' / ')}</small>
-                    )}
-                  </button>
-                ))}
-                {!selectedEntity.evidence.length && (
-                  <em>正文中尚未识别到这个实体</em>
-                )}
-              </div>
             </>
           ) : (
             <div className="project-entity-alias-empty">
@@ -381,6 +363,13 @@ export default function ProjectEntityIntelligencePanel({
           </div>
         </article>
       </div>
+      <ProjectEntityEvidencePanel
+        projectId={workspace?.project?.id}
+        intelligence={intelligence}
+        entityId={selectedEntityId}
+        projectMeta={projectMeta}
+        onOpenFile={onOpenFile}
+      />
     </section>
   )
 }

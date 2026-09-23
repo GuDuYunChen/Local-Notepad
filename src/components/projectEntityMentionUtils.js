@@ -144,7 +144,12 @@ export function buildEntityTermIndex(nodes = [], rawAliases = {}) {
   return { entries, aliasConflicts, canonicalConflicts }
 }
 
-export function scanProjectEntityMentions(text, index) {
+export function scanProjectEntityMentions(text, index, options = {}) {
+  // Sampling is opt-in and bounded per source; overview counts stay unchanged.
+  const requestedLimit = Number(options.sampleLimit)
+  const sampleLimit = Number.isFinite(requestedLimit)
+    ? Math.max(0, Math.min(10, Math.floor(requestedLimit)))
+    : 0
   const occurrences = []
   const normalized = typeof text === 'string' ? text.normalize('NFC') : ''
   for (const entry of index.entries) {
@@ -171,6 +176,12 @@ export function scanProjectEntityMentions(text, index) {
     else {
       item.aliasCount += 1
       item.aliasesMatched.add(term)
+    }
+    if (sampleLimit > 0) {
+      if (!item.samples) item.samples = []
+      if (item.samples.filter(sample => sample.source === source).length < sampleLimit) {
+        item.samples.push({ start: occurrence.start, end: occurrence.end, source, term })
+      }
     }
     evidence.set(entityId, item)
   }
