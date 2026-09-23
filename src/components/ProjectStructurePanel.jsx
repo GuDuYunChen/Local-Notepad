@@ -222,15 +222,26 @@ export default function ProjectStructurePanel({
 
   const addTrackEvent = () => {
     if (!selectedTrack || !eventChapterId || !eventStage) return
-    const existing = selectedTrack.events.find(event => (
-      event.noteId === eventChapterId &&
-      event.stage === eventStage
-    ))
-    if (existing) {
-      updateStorylines(previous => previous.map(track => (
-        track.id !== selectedTrack.id
-          ? track
-          : {
+
+    const eventId = 'event-' + Date.now().toString(36) + '-' +
+      (selectedTrack.events.length + 1)
+    const shouldRecover = Boolean(
+      selectedTrack.type === 'foreshadow' &&
+      selectedTrack.sourceNoteId &&
+      eventStage === 'payoff'
+    )
+
+    onMetaChange?.(previous => ({
+      ...previous,
+      storylines: (previous.storylines || []).map(track => {
+        if (track.id !== selectedTrack.id) return track
+        const existing = (track.events || []).find(event => (
+          event.noteId === eventChapterId &&
+          event.stage === eventStage
+        ))
+
+        if (existing) {
+          return {
             ...track,
             events: track.events.map(event => (
               event.id === existing.id
@@ -238,20 +249,12 @@ export default function ProjectStructurePanel({
                 : event
             )),
           }
-      )))
-      setEventNote('')
-      return
-    }
+        }
 
-    const eventId = 'event-' + Date.now().toString(36) + '-' +
-      (selectedTrack.events.length + 1)
-    updateStorylines(previous => previous.map(track => (
-      track.id !== selectedTrack.id
-        ? track
-        : {
+        return {
           ...track,
           events: [
-            ...track.events,
+            ...(track.events || []),
             {
               id: eventId,
               noteId: eventChapterId,
@@ -260,46 +263,14 @@ export default function ProjectStructurePanel({
             },
           ],
         }
-    )))
-
-    if (
-      selectedTrack.type === 'foreshadow' &&
-      selectedTrack.sourceNoteId &&
-      eventStage === 'payoff'
-    ) {
-      onMetaChange?.(previous => ({
-        ...previous,
-        storylines: (previous.storylines || []).map(track => (
-          track.id !== selectedTrack.id
-            ? track
-            : {
-              ...track,
-              events: track.events.some(event => (
-                event.noteId === eventChapterId &&
-                event.stage === eventStage
-              ))
-                ? track.events.map(event => (
-                  event.noteId === eventChapterId && event.stage === eventStage
-                    ? { ...event, note: eventNote.trim() }
-                    : event
-                ))
-                : [
-                  ...track.events,
-                  {
-                    id: eventId,
-                    noteId: eventChapterId,
-                    stage: eventStage,
-                    note: eventNote.trim(),
-                  },
-                ],
-            }
-        )),
-        foreshadowStates: {
+      }),
+      foreshadowStates: shouldRecover
+        ? {
           ...previous.foreshadowStates,
           [selectedTrack.sourceNoteId]: 'recovered',
-        },
-      }))
-    }
+        }
+        : previous.foreshadowStates,
+    }))
 
     setEventNote('')
   }
