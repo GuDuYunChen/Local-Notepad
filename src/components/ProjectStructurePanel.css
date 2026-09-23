@@ -661,6 +661,22 @@
   color: #95621c;
 }
 
+.project-relation-node-links {
+  margin-top: 3px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.project-relation-node-links i {
+  padding: 2px 4px;
+  border-radius: 99px;
+  background: color-mix(in srgb, #b84444 7%, var(--surface));
+  color: #9a4a4a;
+  font-size: 6px;
+  font-style: normal;
+}
+
 .project-storyline-diagnostics {
   margin-top: 8px;
   padding: 9px;
