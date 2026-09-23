@@ -4,6 +4,7 @@ import {
   filterProjectStoryMap,
 } from './projectStructureUtils'
 import {
+  buildProjectStorylineDiagnostics,
   buildProjectStorylineModel,
   getProjectStorylineStages,
   getProjectStorylineSuggestions,
@@ -72,6 +73,10 @@ export default function ProjectStructurePanel({
 
   const storylineModel = useMemo(
     () => buildProjectStorylineModel(workspace, projectMeta),
+    [projectMeta, workspace]
+  )
+  const storylineDiagnostics = useMemo(
+    () => buildProjectStorylineDiagnostics(workspace, projectMeta),
     [projectMeta, workspace]
   )
   const storylineTypes = useMemo(
@@ -734,6 +739,154 @@ export default function ProjectStructurePanel({
         )}
       </section>
 
+      {storylineModel.tracks.length > 0 && (
+        <section className="project-storyline-diagnostics" aria-label="剧情线交叉与节奏诊断">
+          <header>
+            <div>
+              <strong>剧情线交叉与节奏诊断</strong>
+              <span>
+                只按章节位置、轨迹节点和生命周期阶段计算，不评价剧情好坏。
+              </span>
+            </div>
+            <div className="project-storyline-diagnostic-metrics">
+              <span><b>{storylineDiagnostics.totals.intersections}</b>交汇章</span>
+              <span><b>{storylineDiagnostics.totals.overloadedChapters}</b>高密度章</span>
+              <span><b>{storylineDiagnostics.totals.longGapTracks}</b>长断档轨迹</span>
+              <span><b>{storylineDiagnostics.totals.regressionTracks}</b>阶段倒退</span>
+            </div>
+          </header>
+
+          <div className="project-storyline-diagnostic-grid">
+            <article className="project-storyline-matrix-card">
+              <header>
+                <strong>跨卷轨迹矩阵</strong>
+                <span>数字表示该轨迹在对应{labels.volume}中的节点数</span>
+              </header>
+              <div className="project-storyline-matrix">
+                <div className="project-storyline-matrix-row head">
+                  <span>轨迹</span>
+                  {(workspace.volumes || []).map(volume => (
+                    <b key={volume.id || '__ungrouped__'}>
+                      {volume.id ? volume.title : labels.ungrouped}
+                    </b>
+                  ))}
+                </div>
+                {storylineDiagnostics.volumeMatrix.map(track => (
+                  <div
+                    key={track.id}
+                    className={'project-storyline-matrix-row type-' + track.type}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setSelectedTrackId(track.id)}
+                      title={track.title}
+                    >
+                      {track.title}
+                    </button>
+                    {(workspace.volumes || []).map(volume => {
+                      const key = String(volume.id || '__ungrouped__')
+                      const cell = track.byVolume[key] || { count: 0, stages: [] }
+                      return (
+                        <span
+                          key={key}
+                          className={cell.count > 0 ? 'active' : ''}
+                          title={cell.stages.join(' / ') || '本卷无节点'}
+                        >
+                          {cell.count || '·'}
+                        </span>
+                      )
+                    })}
+                  </div>
+                ))}
+              </div>
+            </article>
+
+            <article className="project-storyline-rhythm-card">
+              <header>
+                <strong>轨迹节奏</strong>
+                <span>断档 ≥3 章、生命周期缺失或阶段倒退会明确标记</span>
+              </header>
+              <div className="project-storyline-rhythm-list">
+                {storylineDiagnostics.tracks.map(track => (
+                  <button
+                    key={track.id}
+                    type="button"
+                    onClick={() => setSelectedTrackId(track.id)}
+                    className={
+                      (track.longGap || track.regressions > 0 || track.terminalMissing)
+                        ? 'attention'
+                        : ''
+                    }
+                  >
+                    <span>
+                      <strong>{track.title}</strong>
+                      <small>
+                        {track.eventCount} 节点 · 跨 {track.volumeCount || 0} {labels.volume}
+                        {' · '}覆盖 {track.span || 0} {labels.chapter}
+                      </small>
+                    </span>
+                    <em>
+                      {track.longGap
+                        ? '最长断档 ' + track.maxGap + ' 章'
+                        : track.regressions > 0
+                          ? '阶段倒退 ' + track.regressions + ' 次'
+                          : track.terminalMissing
+                            ? '尚未收束'
+                            : '节奏连续'}
+                    </em>
+                  </button>
+                ))}
+              </div>
+            </article>
+
+            <article className="project-storyline-stage-card">
+              <header>
+                <strong>生命周期缺口</strong>
+                <span>列出每条轨迹尚未出现的标准阶段</span>
+              </header>
+              <div className="project-storyline-stage-list">
+                {storylineDiagnostics.tracks.map(track => (
+                  <button
+                    key={track.id}
+                    type="button"
+                    onClick={() => setSelectedTrackId(track.id)}
+                  >
+                    <strong>{track.title}</strong>
+                    <span>
+                      {track.missingStages.length
+                        ? track.missingStages.join(' · ')
+                        : '阶段已覆盖'}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </article>
+          </div>
+
+          {storylineDiagnostics.chapterLoad.some(item => item.intersection) && (
+            <div className="project-storyline-hotspots">
+              <strong>章节交汇热点</strong>
+              <div>
+                {storylineDiagnostics.chapterLoad
+                  .filter(item => item.intersection)
+                  .map(item => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className={item.overloaded ? 'overloaded' : ''}
+                      onClick={() => onOpenFile?.(item.id)}
+                    >
+                      <b>#{item.ordinal}</b>
+                      <span>{stripExtension(item.title)}</span>
+                      <em>{item.trackCount} 条轨迹 / {item.eventCount} 节点</em>
+                    </button>
+                  ))}
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+
       <div className="project-story-map">
         {filtered.volumes.map(volume => {
           const progress = volume.progress || {}
@@ -776,7 +929,12 @@ export default function ProjectStructurePanel({
                     type="button"
                     className={
                       'project-story-node status-' + chapter.status +
-                      ' word-' + chapter.wordBand
+                      ' word-' + chapter.wordBand +
+                      (
+                        storylineDiagnostics.chapterLoadById.get(String(chapter.id))?.overloaded
+                          ? ' storyline-overloaded'
+                          : ''
+                      )
                     }
                     onClick={() => onOpenFile?.(chapter.id)}
                     title={'打开 ' + stripExtension(chapter.title)}
