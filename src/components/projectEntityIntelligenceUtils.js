@@ -15,6 +15,10 @@ function normalizeAlias(value) {
   return String(value || '').trim().replace(/\s+/g, ' ')
 }
 
+function aliasKey(value) {
+  return normalizeAlias(value).toLocaleLowerCase()
+}
+
 function pairSignature(left, right) {
   return [normalizeId(left), normalizeId(right)]
     .filter(Boolean)
@@ -182,6 +186,41 @@ export function buildProjectEntityIntelligence(
   const graph = buildProjectRelationGraph(projectIndexes, projectMeta)
   const aliases = normalizeProjectEntityAliases(projectMeta?.entityAliases)
   const chapters = manuscriptCatalog(workspace)
+
+  const canonicalOwners = new Map()
+  for (const node of graph.nodes) {
+    const key = aliasKey(node.label)
+    if (!key) continue
+    const owners = canonicalOwners.get(key) || new Set()
+    owners.add(node.id)
+    canonicalOwners.set(key, owners)
+  }
+
+  const aliasOwners = new Map()
+  for (const [entityId, values] of Object.entries(aliases)) {
+    for (const alias of values) {
+      const key = aliasKey(alias)
+      if (!key) continue
+      const owners = aliasOwners.get(key) || new Set()
+      owners.add(entityId)
+      aliasOwners.set(key, owners)
+    }
+  }
+
+  const aliasConflicts = []
+  const ambiguousAliases = new Set()
+  for (const [key, owners] of aliasOwners.entries()) {
+    const combined = new Set(owners)
+    for (const owner of canonicalOwners.get(key) || []) combined.add(owner)
+    if (combined.size <= 1) continue
+    ambiguousAliases.add(key)
+    aliasConflicts.push({
+      alias: [...Object.values(aliases)]
+        .flat()
+        .find(value => aliasKey(value) === key) || key,
+      entityIds: [...combined],
+    })
+  }
   const minChapters = Math.max(1, Number(options.minChapters) || 2)
   const minConfidence = ['high', 'medium', 'exploratory'].includes(
     options.minConfidence,
@@ -273,6 +312,7 @@ export function buildProjectEntityIntelligence(
 
       for (const alias of aliases[node.id] || []) {
         if (alias === node.label) continue
+        if (ambiguousAliases.has(aliasKey(alias))) continue
         const count = countTerm(plainText, alias)
         if (!count) continue
         evidence.aliasCount += count
@@ -439,6 +479,7 @@ export function buildProjectEntityIntelligence(
     entityById: new Map(entities.map(entity => [entity.id, entity])),
     chapterEntities,
     suggestions,
+    aliasConflicts,
     stats: {
       chapters: chapters.length,
       entities: graph.nodes.length,
@@ -447,6 +488,7 @@ export function buildProjectEntityIntelligence(
       recognizedWikiReferences,
       plainTextMentions,
       aliasMentions,
+      aliasConflictCount: aliasConflicts.length,
       chaptersWithEntities,
       chaptersWithCooccurrence,
       candidateCount: suggestions.length,
