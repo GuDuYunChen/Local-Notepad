@@ -2422,6 +2422,18 @@ describe('UI redesign smoke tests', () => {
       'localNotepad.projectWorkspace.activeView',
       'structure'
     )
+    localStorage.setItem(
+      'localNotepad.projectWorkspace.v1',
+      JSON.stringify({
+        project: {
+          supportNoteIds: [
+            'character-note',
+            'location-note',
+            'foreshadow-note',
+          ],
+        },
+      })
+    )
 
     const linkedContent = ids => JSON.stringify({
       root: {
@@ -2440,6 +2452,30 @@ describe('UI redesign smoke tests', () => {
     listAllFilesWithContent.mockResolvedValue([
       { id: 'project', title: '共现项目', is_folder: true, parent_id: '', sort_order: 100 },
       { id: 'volume-1', title: '第一卷', is_folder: true, parent_id: 'project', sort_order: 100 },
+      {
+        id: 'character-note',
+        title: '关关.md',
+        is_folder: false,
+        parent_id: 'project',
+        sort_order: 10,
+        content: linkedContent([]),
+      },
+      {
+        id: 'location-note',
+        title: '青崖镇.md',
+        is_folder: false,
+        parent_id: 'project',
+        sort_order: 20,
+        content: linkedContent([]),
+      },
+      {
+        id: 'foreshadow-note',
+        title: '黑铁副印.md',
+        is_folder: false,
+        parent_id: 'project',
+        sort_order: 30,
+        content: linkedContent([]),
+      },
       {
         id: 'chapter-1',
         title: '第一章.md',
