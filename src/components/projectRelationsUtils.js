@@ -445,28 +445,49 @@ export function buildProjectRelationEvolution(
   let orphanEvents = 0
 
   const relations = graph.edges.map(edge => {
-    const events = (edge.events || []).map(event => {
+    const sortedEvents = (edge.events || []).map(event => {
       const chapter = chapterById.get(normalizeId(event.noteId)) || null
       if (!chapter) orphanEvents += 1
 
-      const eventLabel = RELATION_EVENT_TYPES.find(item => (
-        item.id === event.eventType
-      ))?.label || '转变'
-      const resultingType = event.relationType || edge.type
+      return {
+        ...event,
+        chapter,
+        eventLabel: RELATION_EVENT_TYPES.find(item => (
+          item.id === event.eventType
+        ))?.label || '转变',
+      }
+    }).sort((a, b) => (
+      Number(a.chapter?.ordinal || Number.MAX_SAFE_INTEGER) -
+      Number(b.chapter?.ordinal || Number.MAX_SAFE_INTEGER)
+    ))
+
+    let runningType = edge.type
+    let typeChanges = 0
+    const events = sortedEvents.map(event => {
+      const previousType = runningType
+      if (event.chapter && event.relationType) {
+        runningType = event.relationType
+      }
+
+      const resultingType = event.chapter
+        ? runningType
+        : (event.relationType || runningType)
       const resultingTypeLabel = RELATION_TYPES.find(item => (
         item.id === resultingType
       ))?.label || edge.typeLabel
 
+      if (event.chapter && resultingType !== previousType) {
+        typeChanges += 1
+      }
+
       const enriched = {
         ...event,
-        chapter,
-        eventLabel,
         resultingType,
         resultingTypeLabel,
       }
 
-      if (chapter) {
-        const bucket = chapterEvents[chapter.id] || []
+      if (event.chapter) {
+        const bucket = chapterEvents[event.chapter.id] || []
         bucket.push({
           relationId: edge.id,
           relationLabel: edge.label || edge.typeLabel,
@@ -477,19 +498,16 @@ export function buildProjectRelationEvolution(
           directed: edge.directed,
           eventId: event.id,
           eventType: event.eventType,
-          eventLabel,
+          eventLabel: event.eventLabel,
           resultingType,
           resultingTypeLabel,
           note: event.note,
         })
-        chapterEvents[chapter.id] = bucket
+        chapterEvents[event.chapter.id] = bucket
       }
 
       return enriched
-    }).sort((a, b) => (
-      Number(a.chapter?.ordinal || Number.MAX_SAFE_INTEGER) -
-      Number(b.chapter?.ordinal || Number.MAX_SAFE_INTEGER)
-    ))
+    })
 
     const validEvents = events.filter(event => event.chapter)
     const latest = validEvents[validEvents.length - 1] || null
@@ -497,14 +515,6 @@ export function buildProjectRelationEvolution(
     const currentTypeLabel = RELATION_TYPES.find(item => (
       item.id === currentType
     ))?.label || edge.typeLabel
-
-    let previousType = edge.type
-    let typeChanges = 0
-    for (const event of validEvents) {
-      const nextType = event.resultingType || previousType
-      if (nextType !== previousType) typeChanges += 1
-      previousType = nextType
-    }
 
     return {
       ...edge,
