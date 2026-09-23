@@ -204,6 +204,11 @@ export function readProjectWorkspaceMeta(projectId) {
       storylines: normalizeProjectStorylines(value.storylines),
       relationEntities: normalizeProjectRelationEntities(value.relationEntities),
       relations: normalizeProjectRelations(value.relations),
+      relationSuggestionIgnores: Array.isArray(value.relationSuggestionIgnores)
+        ? [...new Set(
+          value.relationSuggestionIgnores.map(normalizeId).filter(Boolean)
+        )]
+        : [],
     }
   } catch {
     return {
@@ -224,6 +229,7 @@ export function readProjectWorkspaceMeta(projectId) {
       storylines: [],
       relationEntities: [],
       relations: [],
+      relationSuggestionIgnores: [],
     }
   }
 }
@@ -268,6 +274,11 @@ export function writeProjectWorkspaceMeta(projectId, nextMeta) {
       storylines: normalizeProjectStorylines(nextMeta?.storylines),
       relationEntities: normalizeProjectRelationEntities(nextMeta?.relationEntities),
       relations: normalizeProjectRelations(nextMeta?.relations),
+      relationSuggestionIgnores: Array.isArray(nextMeta?.relationSuggestionIgnores)
+        ? [...new Set(
+          nextMeta.relationSuggestionIgnores.map(normalizeId).filter(Boolean)
+        )]
+        : [],
     }
     localStorage.setItem(PROJECT_META_KEY, JSON.stringify(all))
   } catch {
