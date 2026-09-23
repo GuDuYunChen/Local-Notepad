@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { evidenceReview } from '~/services/evidenceReviewSession'
 import { evidenceNavigation } from '~/services/evidenceNavigation'
 import { toast } from '~/services/toast'
+import { nextUnreviewedChapter, getReviewAnnotation } from '~/services/evidenceReviewReport'
+import EvidenceReviewRecords from './EvidenceReviewRecords'
 import './EvidenceReviewBar.css'
 
 export default function EvidenceReviewBar({ documentId, dirty = false, onOpenFile, onReturn }) {
@@ -22,10 +24,9 @@ export default function EvidenceReviewBar({ documentId, dirty = false, onOpenFil
     toast.warning('请先关闭 Markdown 源码面板；未应用的源码不会被自动覆盖或丢弃')
     return true
   }
-  const open = async offset => {
-    if (busyRef.current || !session || index < 0 || sourceModeBlocksNavigation()) return
-    const target = session.chapters[index + offset]
-    if (!target || !onOpenFile) return
+  const openChapter = async target => {
+    if (busyRef.current || !session || sourceModeBlocksNavigation()) return false
+    if (!target || !onOpenFile) return false
     busyRef.current = true
     setBusy(true)
     evidenceNavigation.cancel()
@@ -34,8 +35,10 @@ export default function EvidenceReviewBar({ documentId, dirty = false, onOpenFil
       // cancelled. Do not advance progress on click or failed file retrieval.
       const accepted = await onOpenFile(target.id)
       if (accepted !== false) evidenceReview.visit(session.id, target.id)
+      return accepted
     } catch {
       toast.error('无法打开证据章节，本轮位置未改变')
+      return false
     } finally {
       busyRef.current = false
       if (mounted.current) setBusy(false)
@@ -43,6 +46,8 @@ export default function EvidenceReviewBar({ documentId, dirty = false, onOpenFil
   }
   if (!session) return null
   const reviewed = session.reviewedIds.includes(documentId)
+  const needsChanges = getReviewAnnotation(session, documentId)?.needsChanges
+  const next = nextUnreviewedChapter(session, documentId)
   return (
     <section className="evidence-review-bar" aria-label="证据连续核对" aria-busy={busy}>
       <div className="evidence-review-heading">
@@ -54,20 +59,20 @@ export default function EvidenceReviewBar({ documentId, dirty = false, onOpenFil
         <small>范围来自进入时的筛选；相邻按钮打开整章，返回列表可定位具体片段。</small>
       </div>
       <div className="evidence-review-actions">
-        <button type="button" disabled={busy || index <= 0 || !onOpenFile} onClick={() => void open(-1)}>上一证据章</button>
-        <button type="button" disabled={busy || index < 0 || index >= session.chapters.length - 1 || !onOpenFile} onClick={() => void open(1)}>下一证据章</button>
-        <button type="button" aria-pressed={reviewed} disabled={busy || index < 0 || dirty}
+        <button type="button" disabled={busy || index <= 0 || !onOpenFile} onClick={() => void openChapter(session.chapters[index - 1])}>上一证据章</button>
+        <button type="button" disabled={busy || index < 0 || index >= session.chapters.length - 1 || !onOpenFile} onClick={() => void openChapter(session.chapters[index + 1])}>下一证据章</button>
+        <button type="button" aria-pressed={reviewed} disabled={busy || index < 0 || dirty || needsChanges}
           title={dirty ? '保存修改后再标记；编辑会清除本章的已核对标记' : '仅记录本轮进度，不确认关系或修改正文'}
           onClick={() => evidenceReview.setReviewed(session.id, documentId, !reviewed)}>
-          {dirty ? '保存后可标记' : reviewed ? '已核对' : '标记已核对'}
+          {dirty ? '保存后可标记' : needsChanges ? '处理待修改后可标记' : reviewed ? '已核对' : '标记已核对'}
         </button>
         <button type="button" className="evidence-review-return" disabled={busy || !onReturn}
           onClick={() => { if (!sourceModeBlocksNavigation()) onReturn?.(session.id) }}>返回证据列表</button>
-        <button type="button" disabled={busy} onClick={() => {
-          evidenceNavigation.cancel()
-          evidenceReview.end(session.id)
-        }}>结束核对</button>
+        <button type="button" disabled={busy || !next || !onOpenFile}
+          onClick={() => void openChapter(next)}>下一未核对章</button>
       </div>
+      <EvidenceReviewRecords documentId={documentId} dirty={dirty} busy={busy}
+        onOpenFile={onOpenFile ? id => openChapter(session.chapters.find(item => item.id === id)) : undefined} />
     </section>
   )
 }

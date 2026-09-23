@@ -8,7 +8,9 @@ import {
 import EvidenceLocateButton from './EvidenceLocateButton'
 import { evidenceNavigation } from '~/services/evidenceNavigation'
 import { evidenceReview } from '~/services/evidenceReviewSession'
+import { hasReviewAnnotations } from '~/services/evidenceReviewReport'
 import { toast } from '~/services/toast'
+import EvidenceReviewRecords from './EvidenceReviewRecords'
 import './ProjectEntityEvidencePanel.css'
 
 function title(value) {
@@ -141,15 +143,21 @@ function EvidenceBrowser({ projectId, intelligence, entityId, projectMeta, onOpe
   }, [entity, returning, view.page, view.rows])
 
   const openForReview = onOpenFile ? id => {
+    const previous = evidenceReview.getSnapshot()
     const session = evidenceReview.start({
       projectId, entityId, entityLabel: entity?.label,
       filters: { ...filters, page: view.page },
     }, view.chapterQueue, id)
+    if (!session && hasReviewAnnotations(previous)) {
+      toast.warning('本轮有核对备注或待修改项，请先在编辑器核对栏导出并结束本轮，再更换核对范围', 6)
+      return false
+    }
     if (!session && projectId) toast.warning('本次范围无法建立连续核对，仍可直接打开章节')
-    const cancel = () => { if (session) evidenceReview.end(session.id) }
+    const cancel = () => { if (session) evidenceReview.cancelStart(session.id) }
     try {
       return Promise.resolve(onOpenFile(id)).then(accepted => {
         if (accepted === false) cancel()
+        else if (session) evidenceReview.commitStart(session.id)
         return accepted
       }, error => { cancel(); throw error })
     } catch (error) { cancel(); throw error }
@@ -161,6 +169,7 @@ function EvidenceBrowser({ projectId, intelligence, entityId, projectMeta, onOpe
         <h4>正文证据回看{entity ? ' · ' + entity.label : ''}</h4>
         <p>节选按当前正文生成，样式与连续空白已归一化。点击“定位此处”可跳到正文；过期证据需刷新。提及或同章共现不等于关系成立。</p>
       </header>
+      <EvidenceReviewRecords onOpenFile={onOpenFile} />
       {!entity ? <p className="project-entity-evidence-note">请选择一个实体查看正文证据。</p> : (
         <>
           <div className="project-entity-evidence-filters">
