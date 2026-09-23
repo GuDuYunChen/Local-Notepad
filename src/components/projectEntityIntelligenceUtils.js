@@ -1,5 +1,13 @@
 import { collectWikiReferences } from './Editor/utils/referenceUtils'
 import { buildProjectRelationGraph } from './projectRelationsUtils'
+import {
+  buildEntityTermIndex,
+  collectProjectPlainText,
+  normalizeProjectEntityAliases,
+  scanProjectEntityMentions,
+} from './projectEntityMentionUtils'
+
+export { normalizeProjectEntityAliases } from './projectEntityMentionUtils'
 
 const SOURCE_WEIGHT = {
   wiki: 100,
@@ -9,14 +17,6 @@ const SOURCE_WEIGHT = {
 
 function normalizeId(value) {
   return String(value || '').trim()
-}
-
-function normalizeAlias(value) {
-  return String(value || '').trim().replace(/\s+/g, ' ')
-}
-
-function aliasKey(value) {
-  return normalizeAlias(value).toLocaleLowerCase()
 }
 
 function pairSignature(left, right) {
@@ -43,92 +43,6 @@ function manuscriptCatalog(workspace) {
     }
   }
   return chapters
-}
-
-function collectPlainLexicalText(content) {
-  let state
-  try {
-    state = typeof content === 'string' ? JSON.parse(content) : content
-  } catch {
-    return String(content || '')
-  }
-
-  const parts = []
-  const walk = node => {
-    if (!node) return
-    if (node.type === 'wiki-link') return
-    if (node.type === 'code-block') return
-    if (node.type === 'text') {
-      if (node.text) parts.push(String(node.text))
-      return
-    }
-    if (node.type === 'linebreak') {
-      parts.push('\n')
-      return
-    }
-    if (node.type === 'todo' && node.text) {
-      parts.push(String(node.text))
-    }
-    for (const child of node.children || []) walk(child)
-  }
-  walk(state?.root)
-
-  return parts
-    .join(' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
-
-function escapeRegExp(value) {
-  return String(value).replace(/[.*+?^\${}()|[\]\\]/g, '\\$&')
-}
-
-function isAsciiWord(value) {
-  return /^[\p{L}\p{N}_ -]+$/u.test(value) &&
-    !/[\u3400-\u9fff\uf900-\ufaff]/u.test(value)
-}
-
-function countTerm(text, term) {
-  const value = normalizeAlias(term)
-  if (!value || value.length < 2) return 0
-
-  if (isAsciiWord(value)) {
-    const expression = new RegExp(
-      '(^|[^\\p{L}\\p{N}_])' +
-      escapeRegExp(value) +
-      '(?=$|[^\\p{L}\\p{N}_])',
-      'giu',
-    )
-    return [...String(text || '').matchAll(expression)].length
-  }
-
-  const haystack = String(text || '')
-  let count = 0
-  let offset = 0
-  while (offset < haystack.length) {
-    const index = haystack.indexOf(value, offset)
-    if (index < 0) break
-    count += 1
-    offset = index + value.length
-  }
-  return count
-}
-
-export function normalizeProjectEntityAliases(value) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
-
-  const result = {}
-  for (const [entityId, aliases] of Object.entries(value)) {
-    const id = normalizeId(entityId)
-    if (!id || !Array.isArray(aliases)) continue
-    const normalized = [...new Set(
-      aliases
-        .map(normalizeAlias)
-        .filter(alias => alias.length >= 2)
-    )]
-    if (normalized.length) result[id] = normalized.slice(0, 24)
-  }
-  return result
 }
 
 function classifyConfidence(score) {
@@ -187,40 +101,8 @@ export function buildProjectEntityIntelligence(
   const aliases = normalizeProjectEntityAliases(projectMeta?.entityAliases)
   const chapters = manuscriptCatalog(workspace)
 
-  const canonicalOwners = new Map()
-  for (const node of graph.nodes) {
-    const key = aliasKey(node.label)
-    if (!key) continue
-    const owners = canonicalOwners.get(key) || new Set()
-    owners.add(node.id)
-    canonicalOwners.set(key, owners)
-  }
-
-  const aliasOwners = new Map()
-  for (const [entityId, values] of Object.entries(aliases)) {
-    for (const alias of values) {
-      const key = aliasKey(alias)
-      if (!key) continue
-      const owners = aliasOwners.get(key) || new Set()
-      owners.add(entityId)
-      aliasOwners.set(key, owners)
-    }
-  }
-
-  const aliasConflicts = []
-  const ambiguousAliases = new Set()
-  for (const [key, owners] of aliasOwners.entries()) {
-    const combined = new Set(owners)
-    for (const owner of canonicalOwners.get(key) || []) combined.add(owner)
-    if (combined.size <= 1) continue
-    ambiguousAliases.add(key)
-    aliasConflicts.push({
-      alias: [...Object.values(aliases)]
-        .flat()
-        .find(value => aliasKey(value) === key) || key,
-      entityIds: [...combined],
-    })
-  }
+  const termIndex = buildEntityTermIndex(graph.nodes, aliases)
+  const { aliasConflicts, canonicalConflicts } = termIndex
   const minChapters = Math.max(1, Number(options.minChapters) || 2)
   const minConfidence = ['high', 'medium', 'exploratory'].includes(
     options.minConfidence,
@@ -252,7 +134,7 @@ export function buildProjectEntityIntelligence(
       node.id,
       {
         ...node,
-        aliases: aliases[node.id] || [],
+        aliases: Object.hasOwn(aliases, node.id) ? aliases[node.id] : [],
         evidence: [],
         mentionCount: 0,
         chapterCount: 0,
@@ -277,7 +159,8 @@ export function buildProjectEntityIntelligence(
   for (const chapter of chapters) {
     const wikiReferences = collectWikiReferences(chapter.content)
     explicitWikiReferences += wikiReferences.length
-    const plainText = collectPlainLexicalText(chapter.content)
+    const plainText = collectProjectPlainText(chapter.content)
+    const textEvidence = scanProjectEntityMentions(plainText, termIndex)
     const evidenceByEntity = new Map()
 
     for (const reference of wikiReferences) {
@@ -304,20 +187,13 @@ export function buildProjectEntityIntelligence(
         aliasesMatched: new Set(),
       }
 
-      const canonicalCount = countTerm(plainText, node.label)
-      if (canonicalCount > 0) {
-        evidence.canonicalCount += canonicalCount
-        plainTextMentions += canonicalCount
-      }
-
-      for (const alias of aliases[node.id] || []) {
-        if (alias === node.label) continue
-        if (ambiguousAliases.has(aliasKey(alias))) continue
-        const count = countTerm(plainText, alias)
-        if (!count) continue
-        evidence.aliasCount += count
-        aliasMentions += count
-        evidence.aliasesMatched.add(alias)
+      const mentions = textEvidence.get(node.id)
+      if (mentions) {
+        evidence.canonicalCount += mentions.canonicalCount
+        evidence.aliasCount += mentions.aliasCount
+        plainTextMentions += mentions.canonicalCount
+        aliasMentions += mentions.aliasCount
+        evidence.aliasesMatched = mentions.aliasesMatched
       }
 
       if (
@@ -480,6 +356,7 @@ export function buildProjectEntityIntelligence(
     chapterEntities,
     suggestions,
     aliasConflicts,
+    canonicalConflicts,
     stats: {
       chapters: chapters.length,
       entities: graph.nodes.length,
@@ -489,6 +366,7 @@ export function buildProjectEntityIntelligence(
       plainTextMentions,
       aliasMentions,
       aliasConflictCount: aliasConflicts.length,
+      canonicalConflictCount: canonicalConflicts.length,
       chaptersWithEntities,
       chaptersWithCooccurrence,
       candidateCount: suggestions.length,

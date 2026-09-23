@@ -2,6 +2,12 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { toast } from '~/services/toast'
 import { buildProjectEntityIntelligence } from './projectEntityIntelligenceUtils'
 import { getProjectRelationEntityTypes } from './projectRelationsUtils'
+import {
+  entityTermKey,
+  getProjectEntityAliasError,
+  normalizeEntityTerm,
+  normalizeProjectEntityAliases,
+} from './projectEntityMentionUtils'
 import './ProjectEntityIntelligencePanel.css'
 
 function stripExtension(value) {
@@ -56,59 +62,39 @@ export default function ProjectEntityIntelligencePanel({
 
   const addAlias = () => {
     if (!selectedEntity) return
-    const alias = aliasDraft.trim().replace(/\s+/g, ' ')
-    if (alias.length < 2) {
-      toast.error('别名至少需要 2 个字符，避免把代词误当实体')
-      return
-    }
-    if (alias === selectedEntity.label) {
-      toast.error('别名与实体原名相同')
-      return
-    }
-    if (selectedAliases.includes(alias)) {
-      toast.error('这个别名已经存在')
+    const alias = normalizeEntityTerm(aliasDraft)
+    const error = getProjectEntityAliasError(
+      intelligence.entities, selectedEntity.id, alias,
+    )
+    if (error) {
+      toast.error(error)
       return
     }
 
-    const collision = intelligence.entities.find(entity => (
-      entity.id !== selectedEntity.id &&
-      (
-        entity.label.toLocaleLowerCase() === alias.toLocaleLowerCase() ||
-        entity.aliases.some(item => (
-          item.toLocaleLowerCase() === alias.toLocaleLowerCase()
-        ))
-      )
-    ))
-    if (collision) {
-      toast.error(
-        '别名“' + alias + '”已被“' + collision.label + '”占用，避免歧义请换一个'
-      )
-      return
-    }
-
-    onMetaChange?.(previous => ({
-      ...previous,
-      entityAliases: {
-        ...(previous.entityAliases || {}),
-        [selectedEntity.id]: [
-          ...new Set([
-            ...((previous.entityAliases || {})[selectedEntity.id] || []),
-            alias,
-          ]),
-        ],
-      },
-    }))
+    onMetaChange?.(previous => {
+      const aliases = normalizeProjectEntityAliases(previous.entityAliases)
+      const current = Object.hasOwn(aliases, selectedEntity.id)
+        ? aliases[selectedEntity.id]
+        : []
+      return {
+        ...previous,
+        entityAliases: normalizeProjectEntityAliases({
+          ...aliases,
+          [selectedEntity.id]: [...current, alias],
+        }),
+      }
+    })
     setAliasDraft('')
   }
 
   const removeAlias = alias => {
     if (!selectedEntity) return
     onMetaChange?.(previous => {
-      const nextAliases = {
-        ...(previous.entityAliases || {}),
-      }
-      const remaining = (nextAliases[selectedEntity.id] || [])
-        .filter(item => item !== alias)
+      const nextAliases = normalizeProjectEntityAliases(previous.entityAliases)
+      const current = Object.hasOwn(nextAliases, selectedEntity.id)
+        ? nextAliases[selectedEntity.id]
+        : []
+      const remaining = current.filter(item => entityTermKey(item) !== entityTermKey(alias))
       if (remaining.length) {
         nextAliases[selectedEntity.id] = remaining
       } else {
@@ -138,6 +124,11 @@ export default function ProjectEntityIntelligencePanel({
           <span><b>{intelligence.stats.recognizedWikiReferences}</b>WikiLink</span>
           <span><b>{intelligence.stats.plainTextMentions}</b>原名提及</span>
           <span><b>{intelligence.stats.aliasMentions}</b>别名提及</span>
+          {intelligence.stats.canonicalConflictCount > 0 && (
+            <span className="warning">
+              <b>{intelligence.stats.canonicalConflictCount}</b>原名冲突
+            </span>
+          )}
           {intelligence.stats.aliasConflictCount > 0 && (
             <span className="warning">
               <b>{intelligence.stats.aliasConflictCount}</b>别名冲突
@@ -145,6 +136,19 @@ export default function ProjectEntityIntelligencePanel({
           )}
         </div>
       </header>
+
+      {intelligence.canonicalConflicts.length > 0 && (
+        <div className="project-entity-alias-conflicts" role="status">
+          <strong>同名实体已暂停原名识别，请用 WikiLink 或独有别名区分</strong>
+          <div>
+            {intelligence.canonicalConflicts.map(item => (
+              <span key={item.label}>
+                {item.label} · {item.entityIds.length} 个实体
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {intelligence.aliasConflicts.length > 0 && (
         <div className="project-entity-alias-conflicts">
@@ -163,7 +167,7 @@ export default function ProjectEntityIntelligencePanel({
         <article className="project-entity-alias-editor">
           <header>
             <strong>实体别名库</strong>
-            <span>只识别你确认过的别名；单字代词默认不参与扫描。</span>
+            <span>只识别你确认过的别名；单字代词默认不参与扫描，每个实体最多 24 个别名。</span>
           </header>
 
           <select
@@ -229,7 +233,7 @@ export default function ProjectEntityIntelligencePanel({
                   value={aliasDraft}
                   onChange={event => setAliasDraft(event.target.value)}
                   onKeyDown={event => {
-                    if (event.key === 'Enter') {
+                    if (event.key === 'Enter' && !event.nativeEvent?.isComposing && event.keyCode !== 229) {
                       event.preventDefault()
                       addAlias()
                     }
