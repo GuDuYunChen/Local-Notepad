@@ -661,6 +661,278 @@
   color: #95621c;
 }
 
+.project-storyline-diagnostics {
+  margin-top: 8px;
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.project-storyline-diagnostics > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.project-storyline-diagnostics > header strong,
+.project-storyline-diagnostics > header span {
+  display: block;
+}
+
+.project-storyline-diagnostics > header strong {
+  color: var(--ink);
+  font-size: 9px;
+  font-weight: 680;
+}
+
+.project-storyline-diagnostics > header span {
+  margin-top: 2px;
+  color: var(--ink-muted);
+  font-size: 7px;
+}
+
+.project-storyline-diagnostic-metrics {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.project-storyline-diagnostic-metrics span {
+  margin: 0;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: var(--paper);
+  white-space: nowrap;
+}
+
+.project-storyline-diagnostic-metrics b {
+  margin-right: 3px;
+  color: var(--ink);
+}
+
+.project-storyline-diagnostic-grid {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(220px, .85fr) minmax(200px, .7fr);
+  gap: 7px;
+}
+
+.project-storyline-diagnostic-grid article {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+}
+
+.project-storyline-diagnostic-grid article > header strong,
+.project-storyline-diagnostic-grid article > header span {
+  display: block;
+}
+
+.project-storyline-diagnostic-grid article > header strong {
+  color: var(--ink);
+  font-size: 8px;
+}
+
+.project-storyline-diagnostic-grid article > header span {
+  margin-top: 2px;
+  color: var(--ink-muted);
+  font-size: 6px;
+}
+
+.project-storyline-matrix {
+  margin-top: 6px;
+  overflow-x: auto;
+}
+
+.project-storyline-matrix-row {
+  min-width: 420px;
+  display: grid;
+  grid-template-columns: minmax(110px, 1.4fr) repeat(var(--story-volume-count, 4), minmax(48px, .7fr));
+  border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+}
+
+.project-storyline-matrix-row:first-child {
+  border-top: 0;
+}
+
+.project-storyline-matrix-row > button,
+.project-storyline-matrix-row > span,
+.project-storyline-matrix-row > b {
+  min-width: 0;
+  min-height: 27px;
+  padding: 5px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-right: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  background: transparent;
+  color: var(--ink-muted);
+  font: inherit;
+  font-size: 7px;
+  text-align: center;
+}
+
+.project-storyline-matrix-row > button {
+  place-items: center start;
+  color: var(--ink-soft);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-storyline-matrix-row > button:hover {
+  color: var(--clay);
+}
+
+.project-storyline-matrix-row > span.active {
+  background: color-mix(in srgb, var(--clay) 8%, var(--surface));
+  color: var(--ink);
+  font-weight: 680;
+}
+
+.project-storyline-matrix-row.type-character > span.active {
+  background: color-mix(in srgb, #725f9c 8%, var(--surface));
+}
+
+.project-storyline-matrix-row.type-foreshadow > span.active {
+  background: color-mix(in srgb, #95621c 8%, var(--surface));
+}
+
+.project-storyline-rhythm-list,
+.project-storyline-stage-list {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.project-storyline-rhythm-list button,
+.project-storyline-stage-list button {
+  width: 100%;
+  min-width: 0;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink-soft);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.project-storyline-rhythm-list button:hover,
+.project-storyline-stage-list button:hover {
+  border-color: var(--line);
+}
+
+.project-storyline-rhythm-list button.attention {
+  border-color: color-mix(in srgb, #b97820 20%, var(--line));
+}
+
+.project-storyline-rhythm-list button > span {
+  min-width: 0;
+  flex: 1;
+}
+
+.project-storyline-rhythm-list strong,
+.project-storyline-rhythm-list small,
+.project-storyline-rhythm-list em,
+.project-storyline-stage-list strong,
+.project-storyline-stage-list span {
+  display: block;
+}
+
+.project-storyline-rhythm-list strong,
+.project-storyline-stage-list strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 7px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-storyline-rhythm-list small,
+.project-storyline-stage-list span {
+  margin-top: 2px;
+  color: var(--ink-muted);
+  font-size: 6px;
+  line-height: 1.4;
+}
+
+.project-storyline-rhythm-list em {
+  flex: 0 0 auto;
+  color: #95621c;
+  font-size: 6px;
+  font-style: normal;
+}
+
+.project-storyline-stage-list button {
+  display: block;
+}
+
+.project-storyline-hotspots {
+  margin-top: 7px;
+  padding-top: 7px;
+  border-top: 1px solid var(--line);
+}
+
+.project-storyline-hotspots > strong {
+  color: var(--ink);
+  font-size: 8px;
+}
+
+.project-storyline-hotspots > div {
+  margin-top: 5px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.project-storyline-hotspots button {
+  min-width: 0;
+  padding: 4px 6px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--paper);
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 7px;
+  cursor: pointer;
+}
+
+.project-storyline-hotspots button.overloaded {
+  border-color: color-mix(in srgb, #b97820 28%, var(--line));
+  background: color-mix(in srgb, #b97820 5%, var(--paper));
+}
+
+.project-storyline-hotspots button b {
+  color: var(--clay);
+}
+
+.project-storyline-hotspots button em {
+  color: var(--ink-muted);
+  font-size: 6px;
+  font-style: normal;
+}
+
+.project-story-node.storyline-overloaded {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #b97820 34%, transparent);
+}
+
 .project-story-map {
   margin-top: 8px;
   display: flex;
@@ -1095,5 +1367,33 @@
 
   .project-storyline-lanes article {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1100px) {
+  .project-storyline-diagnostic-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .project-storyline-matrix-card {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 760px) {
+  .project-storyline-diagnostics > header {
+    flex-direction: column;
+  }
+
+  .project-storyline-diagnostic-metrics {
+    justify-content: flex-start;
+  }
+
+  .project-storyline-diagnostic-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .project-storyline-matrix-card {
+    grid-column: auto;
   }
 }
