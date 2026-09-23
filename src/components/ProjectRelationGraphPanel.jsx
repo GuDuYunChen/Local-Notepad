@@ -1,10 +1,12 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { toast } from '~/services/toast'
 import {
+  buildProjectRelationEvolution,
   buildProjectRelationGraph,
   buildProjectRelationLayout,
   filterProjectRelationGraph,
   getProjectRelationEntityTypes,
+  getProjectRelationEventTypes,
   getProjectRelationTypes,
 } from './projectRelationsUtils'
 import './ProjectRelationGraphPanel.css'
@@ -14,6 +16,7 @@ function typeLabel(types, value) {
 }
 
 export default function ProjectRelationGraphPanel({
+  workspace,
   projectIndexes,
   projectMeta,
   onMetaChange,
@@ -37,13 +40,30 @@ export default function ProjectRelationGraphPanel({
   const [relationLabel, setRelationLabel] = useState('')
   const [relationNote, setRelationNote] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState('')
+  const [evolutionChapterId, setEvolutionChapterId] = useState('')
+  const [evolutionEventType, setEvolutionEventType] = useState('establish')
+  const [evolutionRelationType, setEvolutionRelationType] = useState('')
+  const [evolutionLabel, setEvolutionLabel] = useState('')
+  const [evolutionNote, setEvolutionNote] = useState('')
 
   const entityTypes = useMemo(() => getProjectRelationEntityTypes(), [])
   const relationTypes = useMemo(() => getProjectRelationTypes(), [])
+  const relationEventTypes = useMemo(
+    () => getProjectRelationEventTypes(),
+    [],
+  )
 
   const graph = useMemo(
     () => buildProjectRelationGraph(projectIndexes, projectMeta),
     [projectIndexes, projectMeta],
+  )
+  const evolution = useMemo(
+    () => buildProjectRelationEvolution(
+      workspace,
+      projectIndexes,
+      projectMeta,
+    ),
+    [projectIndexes, projectMeta, workspace],
   )
   const filtered = useMemo(
     () => filterProjectRelationGraph(graph, {
@@ -60,9 +80,24 @@ export default function ProjectRelationGraphPanel({
   )
 
   const selectedNode = graph.nodeById.get(selectedNodeId) || null
-  const selectedRelation = graph.edges.find(edge => (
-    edge.id === selectedRelationId
-  )) || null
+  const selectedRelation = evolution.relationById.get(
+    selectedRelationId
+  ) || null
+  useEffect(() => {
+    setEvolutionChapterId('')
+    setEvolutionEventType('establish')
+    setEvolutionRelationType(
+      selectedRelation?.currentType || selectedRelation?.type || ''
+    )
+    setEvolutionLabel('')
+    setEvolutionNote('')
+    setDeleteConfirm('')
+  }, [
+    selectedRelation?.currentType,
+    selectedRelation?.id,
+    selectedRelation?.type,
+  ])
+
   const filterActive = Boolean(
     query.trim() ||
     entityType !== 'all' ||
@@ -146,12 +181,78 @@ export default function ProjectRelationGraphPanel({
           directed: relationDirected,
           label: relationLabel.trim(),
           note: relationNote.trim(),
+          events: [],
         },
       ],
     }))
     setRelationLabel('')
     setRelationNote('')
     setSelectedRelationId(id)
+  }
+
+  const addRelationEvolution = () => {
+    if (!selectedRelation || !evolutionChapterId) {
+      toast.error('请选择关系变化发生的章节')
+      return
+    }
+
+    const eventId = 'relation-event-' + Date.now().toString(36) + '-' +
+      ((selectedRelation.events?.length || 0) + 1)
+    updateRelationMeta(previous => ({
+      relations: (previous.relations || []).map(relation => {
+        if (relation.id !== selectedRelation.id) return relation
+        const existing = (relation.events || []).find(event => (
+          event.noteId === evolutionChapterId &&
+          event.eventType === evolutionEventType
+        ))
+        if (existing) {
+          return {
+            ...relation,
+            events: (relation.events || []).map(event => (
+              event.id === existing.id
+                ? {
+                  ...event,
+                  relationType: evolutionRelationType,
+                  label: evolutionLabel.trim(),
+                  note: evolutionNote.trim(),
+                }
+                : event
+            )),
+          }
+        }
+        return {
+          ...relation,
+          events: [
+            ...(relation.events || []),
+            {
+              id: eventId,
+              noteId: evolutionChapterId,
+              eventType: evolutionEventType,
+              relationType: evolutionRelationType,
+              label: evolutionLabel.trim(),
+              note: evolutionNote.trim(),
+            },
+          ],
+        }
+      }),
+    }))
+    setEvolutionLabel('')
+    setEvolutionNote('')
+  }
+
+  const removeRelationEvolution = (relationId, eventId) => {
+    updateRelationMeta(previous => ({
+      relations: (previous.relations || []).map(relation => (
+        relation.id !== relationId
+          ? relation
+          : {
+            ...relation,
+            events: (relation.events || []).filter(event => (
+              event.id !== eventId
+            )),
+          }
+      )),
+    }))
   }
 
   const removeRelation = relationId => {
@@ -211,6 +312,7 @@ export default function ProjectRelationGraphPanel({
           <span><b>{graph.totals.edges}</b>关系</span>
           <span><b>{graph.totals.components}</b>连通组</span>
           <span><b>{graph.totals.isolated}</b>孤立节点</span>
+          <span><b>{evolution.totals.events}</b>关系变化</span>
         </div>
       </header>
 
@@ -572,6 +674,113 @@ export default function ProjectRelationGraphPanel({
               </header>
               {selectedRelation.label && <p>{selectedRelation.label}</p>}
               {selectedRelation.note && <p>{selectedRelation.note}</p>}
+
+              <div className="project-relation-current-state">
+                <span>当前关系</span>
+                <strong>{selectedRelation.currentTypeLabel}</strong>
+                <small>
+                  {selectedRelation.typeChanges > 0
+                    ? '已发生 ' + selectedRelation.typeChanges + ' 次类型变化'
+                    : '尚未发生类型变化'}
+                </small>
+              </div>
+
+              <div className="project-relation-evolution-form">
+                <select
+                  value={evolutionChapterId}
+                  onChange={event => setEvolutionChapterId(event.target.value)}
+                  aria-label="关系变化章节"
+                >
+                  <option value="">选择发生章节</option>
+                  {evolution.catalog.map(chapter => (
+                    <option key={chapter.id} value={chapter.id}>
+                      #{chapter.ordinal} {chapter.title.replace(/\.[^.]+$/, '')}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={evolutionEventType}
+                  onChange={event => setEvolutionEventType(event.target.value)}
+                  aria-label="关系变化类型"
+                >
+                  {relationEventTypes.map(item => (
+                    <option key={item.id} value={item.id}>{item.label}</option>
+                  ))}
+                </select>
+                <select
+                  value={evolutionRelationType}
+                  onChange={event => setEvolutionRelationType(event.target.value)}
+                  aria-label="变化后的关系类型"
+                >
+                  <option value="">保持当前关系</option>
+                  {relationTypes.map(item => (
+                    <option key={item.id} value={item.id}>{item.label}</option>
+                  ))}
+                </select>
+                <input
+                  value={evolutionLabel}
+                  onChange={event => setEvolutionLabel(event.target.value)}
+                  placeholder="变化标签（可选）"
+                  aria-label="关系变化标签"
+                />
+                <input
+                  value={evolutionNote}
+                  onChange={event => setEvolutionNote(event.target.value)}
+                  placeholder="关系变化说明（可选）"
+                  aria-label="关系变化说明"
+                />
+                <button
+                  type="button"
+                  className="btn small primary"
+                  disabled={!evolutionChapterId}
+                  onClick={addRelationEvolution}
+                >
+                  记录关系变化
+                </button>
+              </div>
+
+              <div className="project-relation-evolution-list">
+                {(selectedRelation.events || []).map(event => (
+                  <div
+                    key={event.id}
+                    className={!event.chapter ? 'orphan' : ''}
+                  >
+                    <button
+                      type="button"
+                      disabled={!event.chapter}
+                      onClick={() => event.chapter && onOpenFile?.(event.noteId)}
+                    >
+                      <span>{event.eventLabel}</span>
+                      <strong>
+                        {event.chapter
+                          ? '#' + event.chapter.ordinal + ' ' +
+                            event.chapter.title.replace(/\.[^.]+$/, '')
+                          : '原章节已不存在'}
+                      </strong>
+                      <small>
+                        {event.resultingTypeLabel}
+                        {event.label ? ' · ' + event.label : ''}
+                      </small>
+                      {event.note && <em>{event.note}</em>}
+                    </button>
+                    <button
+                      type="button"
+                      className="remove"
+                      onClick={() => removeRelationEvolution(
+                        selectedRelation.id,
+                        event.id,
+                      )}
+                      aria-label={'删除关系变化 ' + event.eventLabel}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+                {!selectedRelation.events?.length && (
+                  <em>尚未记录章节级关系变化</em>
+                )}
+              </div>
+
               <button
                 type="button"
                 className="btn small danger"
@@ -587,6 +796,83 @@ export default function ProjectRelationGraphPanel({
           )}
         </aside>
       </div>
+
+      {evolution.timeline.length > 0 && (
+        <section className="project-relation-timeline" aria-label="关系演化时间轴">
+          <header>
+            <div>
+              <strong>关系演化时间轴</strong>
+              <span>
+                按真实章节顺序查看关系建立、强化、转变、破裂与修复。
+              </span>
+            </div>
+            <div>
+              <span><b>{evolution.totals.evolvingRelations}</b>有历史关系</span>
+              <span><b>{evolution.totals.chaptersWithChanges}</b>变化章节</span>
+              <span><b>{evolution.totals.typeChangedRelations}</b>类型变化关系</span>
+            </div>
+          </header>
+
+          <div className="project-relation-timeline-track">
+            {evolution.chapters
+              .filter(chapter => chapter.events.length > 0)
+              .map(chapter => (
+                <article key={chapter.id}>
+                  <button
+                    type="button"
+                    className="project-relation-timeline-chapter"
+                    onClick={() => onOpenFile?.(chapter.id)}
+                  >
+                    <b>#{chapter.ordinal}</b>
+                    <strong>{chapter.title.replace(/\.[^.]+$/, '')}</strong>
+                    <span>{chapter.events.length} 项关系变化</span>
+                  </button>
+                  <div>
+                    {chapter.events.map(event => (
+                      <button
+                        key={event.eventId}
+                        type="button"
+                        onClick={() => {
+                          setSelectedRelationId(event.relationId)
+                          setSelectedNodeId('')
+                        }}
+                      >
+                        <span>{event.eventLabel}</span>
+                        <strong>
+                          {event.sourceLabel}
+                          {' → '}
+                          {event.targetLabel}
+                        </strong>
+                        <small>
+                          {event.resultingTypeLabel}
+                          {event.note ? ' · ' + event.note : ''}
+                        </small>
+                      </button>
+                    ))}
+                  </div>
+                </article>
+              ))}
+          </div>
+
+          {(evolution.signals.orphanEvents > 0 ||
+            evolution.signals.relationsWithoutTimeline > 0) && (
+            <div className="project-relation-timeline-signals">
+              {evolution.signals.orphanEvents > 0 && (
+                <span>
+                  <b>{evolution.signals.orphanEvents}</b>
+                  个关系变化引用了已不存在章节
+                </span>
+              )}
+              {evolution.signals.relationsWithoutTimeline > 0 && (
+                <span>
+                  <b>{evolution.signals.relationsWithoutTimeline}</b>
+                  条关系还没有章节级变化记录
+                </span>
+              )}
+            </div>
+          )}
+        </section>
+      )}
     </section>
   )
 }
