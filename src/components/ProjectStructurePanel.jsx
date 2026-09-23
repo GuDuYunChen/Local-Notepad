@@ -763,7 +763,10 @@ export default function ProjectStructurePanel({
                 <span>数字表示该轨迹在对应{labels.volume}中的节点数</span>
               </header>
               <div className="project-storyline-matrix">
-                <div className="project-storyline-matrix-row head">
+                <div
+                  className="project-storyline-matrix-row head"
+                  style={{ '--story-volume-count': Math.max(1, (workspace.volumes || []).length) }}
+                >
                   <span>轨迹</span>
                   {(workspace.volumes || []).map(volume => (
                     <b key={volume.id || '__ungrouped__'}>
@@ -775,6 +778,7 @@ export default function ProjectStructurePanel({
                   <div
                     key={track.id}
                     className={'project-storyline-matrix-row type-' + track.type}
+                    style={{ '--story-volume-count': Math.max(1, (workspace.volumes || []).length) }}
                   >
                     <button
                       type="button"
