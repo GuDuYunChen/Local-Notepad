@@ -8,7 +8,11 @@ export const MAX_LOCAL_REVIEW_ARCHIVES = 40
 export function createReviewArchiveStore({ storage = () => globalThis.localStorage,
   createId = () => globalThis.crypto.randomUUID(), now = () => new Date() } = {}) {
   const listeners = new Set()
-  const publish = () => { for (const listener of [...listeners]) listener() }
+  const publish = () => {
+    for (const listener of [...listeners]) {
+      try { listener() } catch (error) { console.error('核对存档视图刷新失败，存储操作已完成', error) }
+    }
+  }
   function getStorage() {
     const value = storage()
     if (!value || typeof value.getItem !== 'function') throw new Error('本地存储不可用，请导出清单留存')

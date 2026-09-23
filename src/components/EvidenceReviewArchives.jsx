@@ -8,6 +8,7 @@ import { selectProjectEntityEvidence } from './projectEntityEvidenceUtils'
 import { toast } from '~/services/toast'
 import ConfirmDialog from './ConfirmDialog'
 import EvidenceReviewArchiveComparison from './EvidenceReviewArchiveComparison'
+import EvidenceReviewBackup from './EvidenceReviewBackup'
 import './EvidenceReviewArchives.css'
 
 export function SaveReviewArchiveButton({ disabled = false }) {
@@ -109,6 +110,8 @@ function ArchiveManager({ projectId, entityId, intelligence, onRestored }) {
         <button type="button" onClick={() => setResult(reviewArchives.list())}>刷新存档列表</button>
       </div>
       {result.error && <p role="alert">{result.error}</p>}
+      <EvidenceReviewBackup key={scope} entries={entries} storageError={result.error}
+        scopeLabel={scope === 'current' ? '当前项目与实体' : '全部本地存档'} />
       <EvidenceReviewArchiveComparison entries={entries} storageError={result.error} />
       {!result.error && !entries.length && <p>此范围暂无存档。可在本轮记录中点击“保存本地存档”，或切换至全部本地存档。</p>}
       <ul>
