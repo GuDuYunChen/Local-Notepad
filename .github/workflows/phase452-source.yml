@@ -1,0 +1,29 @@
+name: Phase 452 source snapshot
+on:
+  push:
+    branches: [feature/ui-redesign-v1]
+    paths: [.github/workflows/phase452-source.yml]
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Export tracked source and verification manifest
+        run: |
+          git archive --format=tar.gz HEAD > /tmp/phase452-source.tar.gz
+          git ls-tree -r HEAD > /tmp/phase452-tree.txt
+          git rev-parse HEAD HEAD^{tree} > /tmp/phase452-sha.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: phase452-source-${{ github.sha }}
+          path: |
+            /tmp/phase452-source.tar.gz
+            /tmp/phase452-tree.txt
+            /tmp/phase452-sha.txt
+          retention-days: 1
+          if-no-files-found: error
