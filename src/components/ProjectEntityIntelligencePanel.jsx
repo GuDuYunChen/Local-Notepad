@@ -259,7 +259,10 @@ export default function ProjectEntityIntelligencePanel({
           </header>
 
           <div className="project-entity-heatmap">
-            <div className="project-entity-heatmap-row head">
+            <div
+              className="project-entity-heatmap-row head"
+              style={{ '--chapter-count': Math.max(1, intelligence.chapters.length) }}
+            >
               <span>实体</span>
               {intelligence.chapters.map(chapter => (
                 <b
@@ -278,6 +281,7 @@ export default function ProjectEntityIntelligencePanel({
               <div
                 key={entity.id}
                 className="project-entity-heatmap-row"
+                style={{ '--chapter-count': Math.max(1, intelligence.chapters.length) }}
               >
                 <button
                   type="button"
