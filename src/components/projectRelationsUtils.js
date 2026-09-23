@@ -474,6 +474,7 @@ export function buildProjectRelationEvolution(
           sourceLabel: edge.source.label,
           targetId: edge.targetId,
           targetLabel: edge.target.label,
+          directed: edge.directed,
           eventId: event.id,
           eventType: event.eventType,
           eventLabel,
