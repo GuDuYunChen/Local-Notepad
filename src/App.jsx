@@ -11,6 +11,9 @@ import ConfirmDialog from './components/ConfirmDialog'
 import ToastViewport from './components/ToastViewport'
 import ReferenceRefactorDialog from './components/ReferenceRefactorDialog'
 import FocusSessionBar from './components/FocusSessionBar'
+import EvidenceReviewBar from './components/EvidenceReviewBar'
+import { evidenceReview } from '~/services/evidenceReviewSession'
+import useGuardedNoteOpener from './hooks/useGuardedNoteOpener'
 import { toast } from '~/services/toast'
 import {
   appendFocusSession,
@@ -65,6 +68,7 @@ function buildExtractedNoteTitle(files, sourceFile, sectionText) {
 
 export default function App() {
   const editorRef = useRef(null)
+  const navigationEpoch = useRef(0)
   const titleInputRef = useRef(null)
   const skipTitleCommitRef = useRef(false)
   const pendingEditorNavigationRef = useRef(null)
@@ -110,6 +114,7 @@ export default function App() {
   const unsaved = !!(current && content !== (current.content || ''))
 
   const select = React.useCallback((f) => {
+    navigationEpoch.current += 1
     if (
       focusSession?.active &&
       (!f?.id || f.id !== focusSession.noteId)
@@ -797,8 +802,15 @@ export default function App() {
     }
   }, [dragging])
 
-  const changeWorkspace = React.useCallback((nextWorkspace) => {
+  const changeWorkspace = React.useCallback((nextWorkspace, options = {}) => {
     if (!nextWorkspace || nextWorkspace === workspace) return
+
+    const proceed = () => {
+      if (options.beforeChange?.() === false) return
+      navigationEpoch.current += 1
+      setFocusMode(false)
+      setWorkspace(nextWorkspace)
+    }
 
     if (
       focusSession?.active &&
@@ -818,12 +830,12 @@ export default function App() {
     ) {
       setDialog({
         type: 'unsaved',
-        next: () => setWorkspace(nextWorkspace),
+        next: proceed,
       })
       return
     }
 
-    setWorkspace(nextWorkspace)
+    proceed()
   }, [workspace, current, deletedIds, unsaved, focusSession?.active])
 
   const handleNavigation = React.useCallback((nextWorkspace) => {
@@ -831,7 +843,9 @@ export default function App() {
   }, [changeWorkspace])
 
   const handleSelectFile = (f, options = {}) => {
+    if (options.shouldSelect?.() === false) { options.onCancel?.(); return }
     const performSelect = () => {
+      if (options.shouldSelect?.() === false) { options.onCancel?.(); return }
       select(f)
       options.afterSelect?.(f)
     }
@@ -852,40 +866,23 @@ export default function App() {
     })
   }
 
-  const handleInspectorSelectFile = (id, options = {}) => {
-    if (!id) return
-
-    const headingPath = Array.isArray(options?.headingPath)
-      ? options.headingPath.filter(Boolean)
-      : []
-
-    api(`/api/files/${id}`)
-      .then(file => {
-        handleSelectFile(file, {
-          afterSelect: () => {
-            if (!headingPath.length) return
-
-            if (current?.id === id) {
-              window.requestAnimationFrame(() => {
-                window.dispatchEvent(new CustomEvent('editor:open-heading-anchor', {
-                  detail: { path: headingPath },
-                }))
-              })
-              return
-            }
-
-            pendingEditorNavigationRef.current = {
-              id,
-              headingPath,
-            }
-          },
+  const handleInspectorSelectFile = useGuardedNoteOpener({
+    currentId: current?.id,
+    workspace,
+    navigationEpoch,
+    onSelectFile: handleSelectFile,
+    onHeading: (id, headingPath, isCurrent) => {
+      if (isCurrent) {
+        window.requestAnimationFrame(() => {
+          window.dispatchEvent(new CustomEvent('editor:open-heading-anchor', {
+            detail: { path: headingPath },
+          }))
         })
-      })
-      .catch(error => {
-        console.error('打开引用目标失败', error)
-        toast.error('目标笔记不存在或已删除')
-      })
-  }
+      } else {
+        pendingEditorNavigationRef.current = { id, headingPath }
+      }
+    },
+  })
 
   useEffect(() => {
     const openWikiLink = (event) => {
@@ -1198,6 +1195,16 @@ export default function App() {
               <section className={`workspace-content${switching ? ' switching' : ''}`}>
                 {documentHeader}
                 {workspace === 'notes' && (
+                  <EvidenceReviewBar
+                    documentId={current?.id}
+                    dirty={unsaved || editorStatus.dirty}
+                    onOpenFile={handleInspectorSelectFile}
+                    onReturn={id => changeWorkspace('projects', {
+                      beforeChange: () => evidenceReview.requestReturn(id),
+                    })}
+                  />
+                )}
+                {workspace === 'notes' && (
                   <ErrorBoundary label="编辑器">
                     <TextEditor
                       ref={editorRef}
@@ -1399,6 +1406,10 @@ export default function App() {
               disabled: dialog.saving,
               onClick: () => {
                 editorRef.current?.clearCache()
+                // Discard the in-memory dirty flag as well as the draft cache.
+                // Otherwise returning via Projects asks about the discarded draft again.
+                setContent(current?.content || '')
+                setEditorStatus(previous => ({ ...previous, dirty: false, structureDirty: false, saveError: false }))
                 setDialog(null)
                 dialog.next()
               }

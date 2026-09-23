@@ -42,6 +42,7 @@ import ProjectTodayCenter from './ProjectTodayCenter'
 import FocusSessionAnalyticsPanel from './FocusSessionAnalyticsPanel'
 import ProjectInsightsPanel from './ProjectInsightsPanel'
 import ProjectStructurePanel from './ProjectStructurePanel'
+import { evidenceReview } from '~/services/evidenceReviewSession'
 import './ProjectWorkspacePanel.css'
 
 const LAST_PROJECT_KEY = 'localNotepad.projectWorkspace.lastProject'
@@ -95,15 +96,16 @@ export default function ProjectWorkspacePanel({
   onStartFocus,
   onClose,
 }) {
+  const [evidenceReturn] = useState(() => evidenceReview.getReturn())
   const [files, setFiles] = useState([])
-  const [activeView, setActiveView] = useState(initialProjectView)
+  const [activeView, setActiveView] = useState(() => evidenceReturn ? 'structure' : initialProjectView())
   const [projectActionsOpen, setProjectActionsOpen] = useState(false)
   const projectActionsRef = useRef(null)
   const [loading, setLoading] = useState(true)
   const [movingId, setMovingId] = useState('')
   const [exportingKey, setExportingKey] = useState('')
   const [selectedProjectId, setSelectedProjectId] = useState(
-    () => localStorage.getItem(LAST_PROJECT_KEY) || ''
+    () => evidenceReturn?.projectId || localStorage.getItem(LAST_PROJECT_KEY) || ''
   )
   const [projectMeta, setProjectMeta] = useState({
     type: 'novel',
@@ -132,6 +134,8 @@ export default function ProjectWorkspacePanel({
     foreshadows: [],
   })
   const [indexLoading, setIndexLoading] = useState(false)
+  const [indexesForProject, setIndexesForProject] = useState('')
+  const indexLoadSequence = useRef(0)
   const [templateBusy, setTemplateBusy] = useState(false)
   const [editingSummaryId, setEditingSummaryId] = useState('')
   const [summaryDraft, setSummaryDraft] = useState('')
@@ -168,6 +172,12 @@ export default function ProjectWorkspacePanel({
       setFiles(next)
 
       const projects = getProjectCandidates(next)
+      if (evidenceReturn && !projects.some(project => project.id === evidenceReturn.projectId)) {
+        evidenceReview.end(evidenceReturn.id)
+        toast.warning('原项目已不存在，未恢复到其他项目。请返回后重新选择项目')
+        setSelectedProjectId('')
+        return
+      }
       setSelectedProjectId(current => {
         if (current && projects.some(project => project.id === current)) {
           return current
@@ -326,6 +336,8 @@ export default function ProjectWorkspacePanel({
   }, [activeView])
 
   const loadProjectIndexes = useCallback(async (workspaceValue) => {
+    const sequence = ++indexLoadSequence.current
+    const projectId = workspaceValue?.project?.id || ''
     const noteIds = new Set(
       getProjectDescendantNoteIds(
         files,
@@ -334,6 +346,8 @@ export default function ProjectWorkspacePanel({
     )
 
     if (!noteIds.size) {
+      setIndexesForProject(projectId)
+      setIndexLoading(false)
       setProjectIndexes({
         characters: [],
         locations: [],
@@ -375,12 +389,14 @@ export default function ProjectWorkspacePanel({
           .sort((a, b) => Number(b.updated_at || 0) - Number(a.updated_at || 0))
       }
 
+      if (sequence !== indexLoadSequence.current) return
       setProjectIndexes({
         characters: next.characters || [],
         locations: next.locations || [],
         foreshadows: next.foreshadows || [],
       })
     } catch (error) {
+      if (sequence !== indexLoadSequence.current) return
       console.error('加载项目索引失败', error)
       setProjectIndexes({
         characters: [],
@@ -388,7 +404,10 @@ export default function ProjectWorkspacePanel({
         foreshadows: [],
       })
     } finally {
-      setIndexLoading(false)
+      if (sequence === indexLoadSequence.current) {
+        setIndexesForProject(projectId)
+        setIndexLoading(false)
+      }
     }
   }, [files])
 
@@ -1533,7 +1552,12 @@ export default function ProjectWorkspacePanel({
     )
   }
 
-  if (!workspace) return null
+  if (!workspace) return evidenceReturn ? (
+    <div className="project-workspace-panel">
+      <p role="alert">原项目已不存在，未恢复到其他项目。</p>
+      <button type="button" className="btn" onClick={onClose}>返回笔记</button>
+    </div>
+  ) : null
 
   const projectIds = getProjectExportIds(workspace)
 
@@ -1900,7 +1924,10 @@ export default function ProjectWorkspacePanel({
         />
       )}
 
-      {activeView === 'structure' && (
+      {activeView === 'structure' && evidenceReturn && indexesForProject !== workspace.project.id && (
+        <p role="status">正在恢复原项目的证据索引…</p>
+      )}
+      {activeView === 'structure' && (!evidenceReturn || indexesForProject === workspace.project.id) && (
         <ProjectStructurePanel
           workspace={workspace}
           projectMeta={projectMeta}

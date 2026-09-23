@@ -34,6 +34,10 @@ function TextEditorInternal({
   const inFlightSavesRef = useRef(new Map())
   const savingCountsRef = useRef(new Map())
   const currentIdRef = useRef(null)
+  const loadedDocumentRef = useRef(null)
+  const [loadedDocumentId, setLoadedDocumentId] = useState(null)
+  const [loadError, setLoadError] = useState(false)
+  const [loadAttempt, setLoadAttempt] = useState(0)
   const [loading, setLoading] = useState(false)
   const [switching, setSwitching] = useState(false)
   const [lastSavedAt, setLastSavedAt] = useState(null)
@@ -85,7 +89,7 @@ function TextEditorInternal({
 
   const saveNow = React.useCallback(async (reason, specificId = null, contentOverride = null) => {
     const id = specificId || currentIdRef.current
-    if (!id) return
+    if (!id || (!specificId && loadedDocumentRef.current !== id)) return
 
     if (deletedIdsRef.current?.has(id)) return
 
@@ -228,13 +232,15 @@ function TextEditorInternal({
   }))
 
   useEffect(() => {
-    if (activeId === currentIdRef.current) return
-
+    // Mount the editor only after this exact load has produced its content.
+    // A matching ID alone is not enough during A → B → A or StrictMode replay.
     setSwitching(true)
+    setLoadError(false)
+    setLoadedDocumentId(null)
     setSaveError(false)
 
     const prevId = currentIdRef.current
-    if (prevId && contentRef.current !== undefined) {
+    if (prevId && prevId !== activeId && loadedDocumentRef.current === prevId) {
       const isDeleted = deletedIds?.has(prevId)
       if (!isDeleted && autoSaveOnSwitch) {
         writeEditorDraft(prevId, contentRef.current)
@@ -242,10 +248,17 @@ function TextEditorInternal({
       }
     }
 
+    if (saveTimerRef.current) {
+      window.clearTimeout(saveTimerRef.current)
+      saveTimerRef.current = null
+    }
+    loadedDocumentRef.current = null
     loadAbortRef.current?.abort()
     const loadCtl = new AbortController()
     loadAbortRef.current = loadCtl
     currentIdRef.current = activeId || null
+    contentRef.current = ''
+    lastSavedContentRef.current = ''
     syncCurrentSavingState(activeId || null)
 
     if (!activeId) {
@@ -263,8 +276,8 @@ function TextEditorInternal({
     const load = async (id) => {
       setLoading(true)
       try {
-        const f = await api(`/api/files/${id}`)
-        if (id !== currentIdRef.current) return
+        const f = await api(`/api/files/${id}`, { signal: loadCtl.signal })
+        if (loadCtl.signal.aborted || loadAbortRef.current !== loadCtl || id !== currentIdRef.current) return
 
         const cached = readEditorDraft(id)
         const useCache = isFreshEditorDraft(cached) && cached.editedAt && (!f.updated_at || cached.editedAt > f.updated_at * 1000)
@@ -281,12 +294,17 @@ function TextEditorInternal({
         contentRef.current = text || ''
         setWordCount(countLexicalCharacters(text || ''))
         setEditorContent(text || '')
+        loadedDocumentRef.current = id
+        setLoadedDocumentId(id)
         onChangeRef.current?.(contentRef.current)
         onLoadedRef.current?.(contentRef.current)
       } catch (e) {
-        if (e.name !== 'AbortError') console.error('加载内容失败', e)
+        if (!loadCtl.signal.aborted && loadAbortRef.current === loadCtl && e.name !== 'AbortError') {
+          setLoadError(true)
+          console.error('加载内容失败', e)
+        }
       } finally {
-        if (id === currentIdRef.current) {
+        if (!loadCtl.signal.aborted && loadAbortRef.current === loadCtl && id === currentIdRef.current) {
           setLoading(false)
           setSwitching(false)
         }
@@ -299,7 +317,8 @@ function TextEditorInternal({
       loadCtl.abort()
       if (loadAbortRef.current === loadCtl) loadAbortRef.current = null
     }
-  }, [activeId, autoSaveOnSwitch, saveNow, syncCurrentSavingState])
+  // autoSaveOnSwitch is consulted on a document switch, not a reason to reload an active draft.
+  }, [activeId, loadAttempt, saveNow, syncCurrentSavingState])
 
   useEffect(() => () => {
     if (saveTimerRef.current) {
@@ -418,7 +437,12 @@ function TextEditorInternal({
             <span><kbd>Ctrl K</kbd> 搜索</span>
           </div>
         </div>
-      ) : loading ? (
+      ) : loadError ? (
+        <div className="placeholder" role="alert">
+          正文加载失败，尚未打开编辑器。
+          <button type="button" className="btn" onClick={() => setLoadAttempt(value => value + 1)}>重试加载正文</button>
+        </div>
+      ) : loading || loadedDocumentId !== activeId ? (
         <div className="placeholder">加载中…</div>
       ) : (
         <>

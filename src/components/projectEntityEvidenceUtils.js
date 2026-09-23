@@ -62,9 +62,13 @@ export function selectProjectEntityEvidence(model, entityId, filters = {}) {
 
   const pageSize = boundedInteger(filters.pageSize ?? 6, 6, 1, 20)
   const pageCount = Math.max(1, Math.ceil(rows.length / pageSize))
-  const page = boundedInteger(filters.page ?? 1, 1, 1, pageCount)
+  const focusIndex = typeof filters.focusChapterId === 'string'
+    ? rows.findIndex(row => row.chapterId === filters.focusChapterId) : -1
+  const page = focusIndex >= 0 ? Math.floor(focusIndex / pageSize) + 1
+    : boundedInteger(filters.page ?? 1, 1, 1, pageCount)
   return {
     source,
+    chapterQueue: rows.map(row => ({ id: row.chapterId, title: row.chapterTitle, ordinal: row.ordinal })),
     rows: rows.slice((page - 1) * pageSize, page * pageSize),
     totalRows: rows.length,
     totalMentions: rows.reduce((sum, item) => sum + item.matchCount, 0),

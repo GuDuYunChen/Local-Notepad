@@ -9,6 +9,7 @@ import {
   normalizeProjectEntityAliases,
 } from './projectEntityMentionUtils'
 import ProjectEntityEvidencePanel from './ProjectEntityEvidencePanel'
+import { evidenceReview } from '~/services/evidenceReviewSession'
 import './ProjectEntityIntelligencePanel.css'
 
 function stripExtension(value) {
@@ -22,7 +23,9 @@ export default function ProjectEntityIntelligencePanel({
   onMetaChange,
   onOpenFile,
 }) {
-  const [selectedEntityId, setSelectedEntityId] = useState('')
+  const [selectedEntityId, setSelectedEntityId] = useState(
+    () => evidenceReview.getReturn(workspace?.project?.id)?.entityId || '',
+  )
   const [aliasDraft, setAliasDraft] = useState('')
   const [heatmapLimit, setHeatmapLimit] = useState(12)
 
@@ -42,6 +45,15 @@ export default function ProjectEntityIntelligencePanel({
     .slice(0, heatmapLimit)
 
   useEffect(() => {
+    const returning = evidenceReview.getReturn(workspace?.project?.id)
+    if (returning) {
+      if (intelligence.entityById.has(returning.entityId)) {
+        setSelectedEntityId(returning.entityId)
+        return
+      }
+      evidenceReview.finishReturn(returning.id, returning.returnToken)
+      toast.warning('原实体已不存在或索引未能加载，未恢复旧证据')
+    }
     if (
       selectedEntityId &&
       intelligence.entityById.has(selectedEntityId)
@@ -53,7 +65,7 @@ export default function ProjectEntityIntelligencePanel({
       intelligence.entities[0]?.id ||
       '',
     )
-  }, [intelligence, selectedEntityId])
+  }, [intelligence, selectedEntityId, workspace?.project?.id])
 
   const selectedEntity = intelligence.entityById.get(selectedEntityId) || null
   const selectedAliases = selectedEntity?.aliases || []

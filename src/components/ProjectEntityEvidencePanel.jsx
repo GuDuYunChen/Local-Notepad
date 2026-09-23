@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { buildEntityTermIndex } from './projectEntityMentionUtils'
 import {
   ENTITY_EVIDENCE_SOURCES,
@@ -7,6 +7,8 @@ import {
 } from './projectEntityEvidenceUtils'
 import EvidenceLocateButton from './EvidenceLocateButton'
 import { evidenceNavigation } from '~/services/evidenceNavigation'
+import { evidenceReview } from '~/services/evidenceReviewSession'
+import { toast } from '~/services/toast'
 import './ProjectEntityEvidencePanel.css'
 
 function title(value) {
@@ -19,7 +21,7 @@ function ChapterEvidenceCard({ row, chapter, entity, termIndex, source, onOpenFi
     [chapter, termIndex, entity, source],
   )
   return (
-    <article className="project-entity-evidence-card" aria-label={'正文证据章节 ' + row.ordinal}>
+    <article className="project-entity-evidence-card" data-evidence-chapter={row.chapterId} aria-label={'正文证据章节 ' + row.ordinal}>
       <header>
         <div>
           <strong>#{row.ordinal} {title(row.chapterTitle)}</strong>
@@ -28,7 +30,12 @@ function ChapterEvidenceCard({ row, chapter, entity, termIndex, source, onOpenFi
         <button
           type="button"
           disabled={!chapter || !onOpenFile}
-          onClick={() => { evidenceNavigation.cancel(); onOpenFile?.(row.chapterId) }}
+          onClick={() => {
+            evidenceNavigation.cancel()
+            try {
+              Promise.resolve(onOpenFile?.(row.chapterId)).catch(() => toast.error('打开证据章节失败'))
+            } catch { toast.error('打开证据章节失败') }
+          }}
           aria-label={'打开证据章节 ' + title(row.chapterTitle)}
         >
           打开章节
@@ -83,8 +90,13 @@ function ChapterEvidenceCard({ row, chapter, entity, termIndex, source, onOpenFi
   )
 }
 
-function EvidenceBrowser({ intelligence, entityId, projectMeta, onOpenFile }) {
-  const [filters, setFilters] = useState({ query: '', source: 'all', volumeId: null, page: 1 })
+function EvidenceBrowser({ projectId, intelligence, entityId, projectMeta, onOpenFile }) {
+  const [returning] = useState(() => evidenceReview.getReturn(projectId, entityId))
+  const sectionRef = useRef(null)
+  const restored = useRef(false)
+  const [filters, setFilters] = useState(() => returning
+    ? { ...returning.filters, focusChapterId: returning.chapterId }
+    : { query: '', source: 'all', volumeId: null, page: 1 })
   const entity = intelligence?.entityById?.get(entityId)
   const view = useMemo(
     () => selectProjectEntityEvidence(intelligence, entityId, filters),
@@ -105,12 +117,46 @@ function EvidenceBrowser({ intelligence, entityId, projectMeta, onOpenFile }) {
       .filter(node => String(node.noteId || '').trim() === String(entity.noteId).trim())
     return owners[owners.length - 1]?.id === entity.id ? entity : { ...entity, noteId: '' }
   }, [entity, intelligence?.graph])
-  const updateFilters = patch => setFilters(previous => ({ ...previous, ...patch, page: 1 }))
+  const updateFilters = patch => setFilters(previous => ({ ...previous, ...patch, focusChapterId: undefined, page: 1 }))
   const resetFilters = () => setFilters({ query: '', source: 'all', volumeId: null, page: 1 })
   const missingVolume = filters.volumeId !== null && !view.volumes.some(volume => volume.id === filters.volumeId)
 
+  useEffect(() => {
+    if (!returning || restored.current || !entity) return undefined
+    const frame = requestAnimationFrame(() => {
+      if (!evidenceReview.finishReturn(returning.id, returning.returnToken)) return
+      restored.current = true
+      setFilters(previous => ({ ...previous, focusChapterId: undefined, page: view.page }))
+      const card = [...(sectionRef.current?.querySelectorAll('[data-evidence-chapter]') || [])]
+        .find(element => element.dataset.evidenceChapter === returning.chapterId)
+      const target = card || sectionRef.current
+      target?.scrollIntoView?.({ block: 'center', behavior: 'auto' })
+      if (card) card.querySelector('button')?.focus({ preventScroll: true })
+      else {
+        sectionRef.current?.querySelector('input')?.focus({ preventScroll: true })
+        toast.warning('原证据章节已不符合筛选，已按最新正文恢复列表')
+      }
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [entity, returning, view.page, view.rows])
+
+  const openForReview = onOpenFile ? id => {
+    const session = evidenceReview.start({
+      projectId, entityId, entityLabel: entity?.label,
+      filters: { ...filters, page: view.page },
+    }, view.chapterQueue, id)
+    if (!session && projectId) toast.warning('本次范围无法建立连续核对，仍可直接打开章节')
+    const cancel = () => { if (session) evidenceReview.end(session.id) }
+    try {
+      return Promise.resolve(onOpenFile(id)).then(accepted => {
+        if (accepted === false) cancel()
+        return accepted
+      }, error => { cancel(); throw error })
+    } catch (error) { cancel(); throw error }
+  } : undefined
+
   return (
-    <section className="project-entity-evidence-browser" aria-label="实体正文证据">
+    <section ref={sectionRef} className="project-entity-evidence-browser" aria-label="实体正文证据">
       <header>
         <h4>正文证据回看{entity ? ' · ' + entity.label : ''}</h4>
         <p>节选按当前正文生成，样式与连续空白已归一化。点击“定位此处”可跳到正文；过期证据需刷新。提及或同章共现不等于关系成立。</p>
@@ -167,7 +213,7 @@ function EvidenceBrowser({ intelligence, entityId, projectMeta, onOpenFile }) {
                 entity={previewEntity}
                 termIndex={termIndex}
                 source={view.source}
-                onOpenFile={onOpenFile}
+                onOpenFile={openForReview}
               />
             ))}
           </div>

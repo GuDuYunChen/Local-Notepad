@@ -19,7 +19,9 @@ export default function EvidenceLocateButton({ chapterId, content, sample, noteI
       if (evidenceNavigation.cancel(id)) toast.error('打开证据章节失败，定位已取消')
     }
     try {
-      Promise.resolve(onOpenFile(chapterId)).catch(failed)
+      Promise.resolve(onOpenFile(chapterId)).then(accepted => {
+        if (accepted === false) evidenceNavigation.cancel(id)
+      }, failed)
     } catch { failed() }
   }
   return (
