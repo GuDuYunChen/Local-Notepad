@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import {
-  buildProjectRelationSuggestions,
-} from './projectRelationSuggestionUtils'
+  buildProjectEntityIntelligence,
+} from './projectEntityIntelligenceUtils'
 import {
   getProjectRelationEntityTypes,
   getProjectRelationTypes,
@@ -20,18 +20,19 @@ export default function ProjectRelationSuggestionsPanel({
   onOpenFile,
 }) {
   const [minChapters, setMinChapters] = useState(2)
+  const [minConfidence, setMinConfidence] = useState('exploratory')
   const [drafts, setDrafts] = useState({})
 
   const relationTypes = useMemo(() => getProjectRelationTypes(), [])
   const entityTypes = useMemo(() => getProjectRelationEntityTypes(), [])
   const model = useMemo(
-    () => buildProjectRelationSuggestions(
+    () => buildProjectEntityIntelligence(
       workspace,
       projectIndexes,
       projectMeta,
-      { minChapters },
+      { minChapters, minConfidence },
     ),
-    [minChapters, projectIndexes, projectMeta, workspace],
+    [minChapters, minConfidence, projectIndexes, projectMeta, workspace],
   )
 
   const typeLabel = type => (
@@ -76,9 +77,15 @@ export default function ProjectRelationSuggestionsPanel({
           directed: Boolean(relationType?.directed),
           label: '',
           note:
-            '由正文明确 WikiLink 共现建议建立；证据 ' +
+            '由正文实体智能建议建立；证据 ' +
             suggestion.chapterCount +
-            ' 个章节。',
+            ' 个章节，置信度 ' +
+            suggestion.confidence.label +
+            ' ' +
+            suggestion.confidenceScore +
+            ' 分；来源 ' +
+            suggestion.sourceLabels.join(' / ') +
+            '。',
           events: [],
         },
       ],
@@ -119,12 +126,13 @@ export default function ProjectRelationSuggestionsPanel({
         <div>
           <strong>关系自动发现</strong>
           <span>
-            仅分析正文中明确的 [[WikiLink]] 共现；系统不会自动写入关系图。
+            仅分析正文中明确的 [[WikiLink]] 共现，并结合实体原名与已确认别名；系统不会自动写入关系图。
           </span>
         </div>
         <div className="project-relation-suggestion-metrics">
-          <span><b>{model.stats.recognizedReferences}</b>已识别引用</span>
-          <span><b>{model.stats.chaptersWithCooccurrence}</b>共现章节</span>
+          <span><b>{model.stats.recognizedWikiReferences}</b>WikiLink证据</span>
+          <span><b>{model.stats.plainTextMentions}</b>原名提及</span>
+          <span><b>{model.stats.aliasMentions}</b>别名提及</span>
           <span><b>{model.stats.candidateCount}</b>候选关系</span>
         </div>
       </header>
@@ -143,9 +151,22 @@ export default function ProjectRelationSuggestionsPanel({
             <option value="5">5 章</option>
           </select>
         </label>
+        <label>
+          <span>最低置信度</span>
+          <select
+            value={minConfidence}
+            onChange={event => setMinConfidence(event.target.value)}
+            aria-label="关系建议最低置信度"
+          >
+            <option value="exploratory">探索及以上</option>
+            <option value="medium">中置信及以上</option>
+            <option value="high">仅高置信</option>
+          </select>
+        </label>
         <span>
           已扫描 {model.stats.chapters} 章 ·
-          {' '}{model.stats.totalWikiReferences} 个 WikiLink
+          {' '}{model.stats.explicitWikiReferences} 个 WikiLink ·
+          {' '}{model.stats.chaptersWithCooccurrence} 个共现章节
         </span>
         {model.stats.ignoredCount > 0 && (
           <button
@@ -197,6 +218,12 @@ export default function ProjectRelationSuggestionsPanel({
                       跨 {suggestion.volumeCount} 卷 ·
                       覆盖全书 {suggestion.coveragePercent}%
                     </span>
+                    <em className={'confidence-' + suggestion.confidence.id}>
+                      {suggestion.confidence.label} · {suggestion.confidenceScore}
+                    </em>
+                    <span className="project-relation-suggestion-sources">
+                      {suggestion.sourceLabels.join(' / ')}
+                    </span>
                     {suggestion.repeatedAcrossVolumes && (
                       <em>跨卷重复共现</em>
                     )}
@@ -218,6 +245,9 @@ export default function ProjectRelationSuggestionsPanel({
                       >
                         <b>#{item.ordinal}</b>
                         <span>{stripExtension(item.chapterTitle)}</span>
+                        <small>
+                          {item.leftSourceLabel} × {item.rightSourceLabel}
+                        </small>
                       </button>
                     ))}
                     {suggestion.evidence.length > 8 && (
@@ -283,7 +313,7 @@ export default function ProjectRelationSuggestionsPanel({
         <div className="project-relation-suggestion-empty">
           <strong>当前没有满足阈值的新关系候选</strong>
           <span>
-            只有正文中明确链接到人物 / 地点 / 伏笔索引，并在多个章节共同出现的实体对才会被建议。
+            只有正文中有可解释证据（WikiLink、实体原名或已确认别名）并达到当前章节数与置信度阈值的实体对才会被建议。
           </span>
         </div>
       )}
