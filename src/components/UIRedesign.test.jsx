@@ -2647,6 +2647,193 @@ describe('UI redesign smoke tests', () => {
     ).toBe(true)
   })
 
+  it('uses confirmed aliases to discover medium-confidence plain-text relationships', async () => {
+    localStorage.setItem(
+      'localNotepad.projectWorkspace.activeView',
+      'structure'
+    )
+    localStorage.setItem(
+      'localNotepad.projectWorkspace.v1',
+      JSON.stringify({
+        project: {
+          supportNoteIds: ['character-note', 'location-note'],
+        },
+      })
+    )
+
+    const lexical = text => JSON.stringify({
+      root: {
+        children: [{
+          type: 'paragraph',
+          children: [{ type: 'text', text }],
+        }],
+      },
+    })
+
+    listAllFilesWithContent.mockResolvedValue([
+      { id: 'project', title: '实体智能项目', is_folder: true, parent_id: '', sort_order: 100 },
+      { id: 'volume-1', title: '第一卷', is_folder: true, parent_id: 'project', sort_order: 100 },
+      { id: 'character-note', title: '关关.md', is_folder: false, parent_id: 'project', sort_order: 10, content: lexical('人物设定') },
+      { id: 'location-note', title: '青崖镇.md', is_folder: false, parent_id: 'project', sort_order: 20, content: lexical('地点设定') },
+      { id: 'chapter-1', title: '第一章.md', is_folder: false, parent_id: 'volume-1', sort_order: 100, content: lexical('关姑娘来到青崖镇寻找线索。') },
+      { id: 'chapter-2', title: '第二章.md', is_folder: false, parent_id: 'volume-1', sort_order: 200, content: lexical('关姑娘再次回到青崖镇。') },
+    ])
+
+    tagApi.list.mockResolvedValue([
+      { id: 'tag-character', name: '角色' },
+      { id: 'tag-location', name: '地点' },
+    ])
+    tagApi.getFilesByTag.mockImplementation(async tagId => {
+      if (tagId === 'tag-character') {
+        return [{ id: 'character-note', title: '关关.md', updated_at: 2 }]
+      }
+      if (tagId === 'tag-location') {
+        return [{ id: 'location-note', title: '青崖镇.md', updated_at: 1 }]
+      }
+      return []
+    })
+
+    await act(async () => {
+      root.render(
+        <ProjectWorkspacePanel
+          onOpenFile={() => {}}
+          onClose={() => {}}
+        />
+      )
+    })
+    await flushPromises()
+    await flushPromises()
+
+    const intelligence = container.querySelector(
+      '.project-entity-intelligence'
+    )
+    expect(intelligence).toBeTruthy()
+    expect(intelligence.textContent).toContain('实体智能层')
+
+    const entitySelect = intelligence.querySelector(
+      'select[aria-label="选择实体别名对象"]'
+    )
+    await act(async () => {
+      entitySelect.value = 'index:character-note'
+      entitySelect.dispatchEvent(new Event('change', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    const aliasInput = intelligence.querySelector(
+      'input[aria-label="新增实体别名"]'
+    )
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        'value',
+      ).set
+      setter.call(aliasInput, '关姑娘')
+      aliasInput.dispatchEvent(new Event('input', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    const addAlias = Array.from(intelligence.querySelectorAll('button'))
+      .find(button => button.textContent === '添加别名')
+    await click(addAlias)
+    await flushPromises()
+
+    let stored = JSON.parse(
+      localStorage.getItem('localNotepad.projectWorkspace.v1')
+    )
+    expect(stored.project.entityAliases).toEqual({
+      'index:character-note': ['关姑娘'],
+    })
+
+    const heatmapRows = Array.from(
+      container.querySelectorAll('.project-entity-heatmap-row')
+    )
+    const characterRow = heatmapRows.find(row => (
+      row.textContent.includes('关关') && !row.classList.contains('head')
+    ))
+    expect(characterRow).toBeTruthy()
+    expect(characterRow.querySelectorAll(
+      '.project-entity-heatmap-cell.active'
+    )).toHaveLength(2)
+    expect(characterRow.textContent).toContain('A')
+
+    let suggestionPanel = container.querySelector(
+      '.project-relation-suggestions'
+    )
+    let suggestion = Array.from(
+      suggestionPanel.querySelectorAll(
+        '.project-relation-suggestion-list article'
+      )
+    ).find(article => (
+      article.textContent.includes('关关') &&
+      article.textContent.includes('青崖镇')
+    ))
+    expect(suggestion).toBeTruthy()
+    expect(suggestion.textContent).toContain('中置信')
+    expect(suggestion.textContent).toContain('别名')
+    expect(suggestion.textContent).toContain('原名')
+
+    const confidenceFilter = suggestionPanel.querySelector(
+      'select[aria-label="关系建议最低置信度"]'
+    )
+    await act(async () => {
+      confidenceFilter.value = 'high'
+      confidenceFilter.dispatchEvent(new Event('change', { bubbles: true }))
+      await Promise.resolve()
+    })
+    expect(
+      container.querySelectorAll(
+        '.project-relation-suggestion-list article'
+      )
+    ).toHaveLength(0)
+
+    suggestionPanel = container.querySelector('.project-relation-suggestions')
+    const confidenceFilterAgain = suggestionPanel.querySelector(
+      'select[aria-label="关系建议最低置信度"]'
+    )
+    await act(async () => {
+      confidenceFilterAgain.value = 'medium'
+      confidenceFilterAgain.dispatchEvent(new Event('change', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    suggestion = Array.from(
+      container.querySelectorAll(
+        '.project-relation-suggestion-list article'
+      )
+    ).find(article => (
+      article.textContent.includes('关关') &&
+      article.textContent.includes('青崖镇')
+    ))
+    expect(suggestion).toBeTruthy()
+
+    const typeSelect = suggestion.querySelector(
+      'select[aria-label^="候选关系类型"]'
+    )
+    await act(async () => {
+      typeSelect.value = 'located'
+      typeSelect.dispatchEvent(new Event('change', { bubbles: true }))
+      await Promise.resolve()
+    })
+    const accept = Array.from(suggestion.querySelectorAll('button'))
+      .find(button => button.textContent === '接受建议')
+    await click(accept)
+    await flushPromises()
+
+    stored = JSON.parse(
+      localStorage.getItem('localNotepad.projectWorkspace.v1')
+    )
+    expect(stored.project.relations).toEqual([
+      expect.objectContaining({
+        sourceId: 'index:character-note',
+        targetId: 'index:location-note',
+        type: 'located',
+        note: expect.stringContaining('中置信'),
+      }),
+    ])
+    expect(stored.project.relations[0].note)
+      .toContain('别名 / 原名')
+  })
+
   it('offers actionable empty states for projects without manuscript chapters', async () => {
     localStorage.setItem(
       'localNotepad.projectWorkspace.activeView',
