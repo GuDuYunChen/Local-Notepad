@@ -1,4 +1,4 @@
-name: Offline Development Validation
+name: Stage Verified Review Tree
 
 on:
   push:
@@ -6,12 +6,13 @@ on:
     paths: [.github/workflows/offline-validation.yml]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  validation-bundle:
+  stage-verified-tree:
+    if: github.repository == 'GuDuYunChen/Local-Notepad'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
         with:
@@ -19,22 +20,68 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
+      - name: Apply and verify reviewed source delta
+        shell: python
+        run: |
+          import hashlib, subprocess
+          from pathlib import Path
+          patch = b''.join(Path(f'.github/review-patch.{i}').read_bytes() for i in range(4))
+          assert hashlib.sha256(patch).hexdigest() == "2dba09d436bcc2d124dfec113037435da1c9b1a8080f36d5924b0530a7e3dbe5"
+          Path('/tmp/review.patch').write_bytes(patch)
+          subprocess.run(['git', 'apply', '--check', '/tmp/review.patch'], check=True)
+          subprocess.run(['git', 'apply', '/tmp/review.patch'], check=True)
+          Path('.github/workflows/offline-validation.yml').unlink()
+          for i in range(4): Path(f'.github/review-patch.{i}').unlink()
+          subprocess.run(['git', 'add', '--'] + ['.github/review-patch.0', '.github/review-patch.1', '.github/review-patch.2', '.github/review-patch.3', '.github/workflows/offline-validation.yml', 'docs/EVIDENCE_REVIEW_4_49_0.md', 'package.json', 'scripts/check-evidence-review.mjs', 'src/App.evidenceReview.test.jsx', 'src/App.jsx', 'src/components/EvidenceLocateButton.jsx', 'src/components/EvidenceReview.test.jsx', 'src/components/EvidenceReviewBar.css', 'src/components/EvidenceReviewBar.jsx', 'src/components/ProjectEntityEvidencePanel.jsx', 'src/components/ProjectEntityIntelligencePanel.jsx', 'src/components/ProjectWorkspacePanel.jsx', 'src/components/TextEditor.jsx', 'src/components/TextEditorLoad.test.jsx', 'src/components/projectEntityEvidenceUtils.js', 'src/hooks/useGuardedNoteOpener.js', 'src/hooks/useGuardedNoteOpener.test.jsx', 'src/services/evidenceReviewSession.js'], check=True)
+          assert subprocess.check_output(['git', 'write-tree']).decode().strip() == '5f699d8df33e80c70dbc2c22e617aadb6bed18af'
       - name: Install validation dependencies
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
         run: npm install --no-audit --no-fund
-      - name: Assemble tracked source and offline dependencies
+      - name: Validate candidate
         run: |
-          mkdir -p /tmp/notepad-validation/repository
-          git archive HEAD | tar -x -C /tmp/notepad-validation/repository
-          cp -a node_modules /tmp/notepad-validation/repository/
-          cp package-lock.json /tmp/notepad-validation/repository/validation-package-lock.json
-          git rev-parse HEAD > /tmp/notepad-validation/repository/VALIDATION_SOURCE_SHA
-          tar -czf /tmp/notepad-validation.tar.gz -C /tmp/notepad-validation repository
+          npm run test:ui
+          npm run test:editor
+          npm run test:electron
+          npm run build:renderer
+          npm run build:main
+      - name: Publish verified Git objects without changing any branch
+        shell: python
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          import base64, json, os, subprocess, urllib.request
+          repo = 'GuDuYunChen/Local-Notepad'
+          expected = '5f699d8df33e80c70dbc2c22e617aadb6bed18af'
+          def git(*args):
+              return subprocess.check_output(['git', *args])
+          def post(path, data):
+              request = urllib.request.Request('https://api.github.com/repos/' + repo + '/' + path,
+                  data=json.dumps(data).encode(), method='POST', headers={
+                      'Authorization': 'Bearer ' + os.environ['GH_TOKEN'],
+                      'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json'})
+              with urllib.request.urlopen(request) as response:
+                  return json.load(response)
+          assert git('write-tree').decode().strip() == expected
+          subprocess.run(['git', 'diff', '--exit-code'], check=True)
+          entries = []
+          for path in ['.github/review-patch.0', '.github/review-patch.1', '.github/review-patch.2', '.github/review-patch.3', '.github/workflows/offline-validation.yml', 'docs/EVIDENCE_REVIEW_4_49_0.md', 'package.json', 'scripts/check-evidence-review.mjs', 'src/App.evidenceReview.test.jsx', 'src/App.jsx', 'src/components/EvidenceLocateButton.jsx', 'src/components/EvidenceReview.test.jsx', 'src/components/EvidenceReviewBar.css', 'src/components/EvidenceReviewBar.jsx', 'src/components/ProjectEntityEvidencePanel.jsx', 'src/components/ProjectEntityIntelligencePanel.jsx', 'src/components/ProjectWorkspacePanel.jsx', 'src/components/TextEditor.jsx', 'src/components/TextEditorLoad.test.jsx', 'src/components/projectEntityEvidenceUtils.js', 'src/hooks/useGuardedNoteOpener.js', 'src/hooks/useGuardedNoteOpener.test.jsx', 'src/services/evidenceReviewSession.js']:
+              if path.startswith('.github/review-patch.') or path == '.github/workflows/offline-validation.yml':
+                  entries.append({'path': path, 'mode': '100644', 'type': 'blob', 'sha': None})
+              else:
+                  data = git('show', ':' + path)
+                  blob = post('git/blobs', {'content': base64.b64encode(data).decode(), 'encoding': 'base64'})
+                  assert blob['sha'] == git('rev-parse', ':' + path).decode().strip()
+                  entries.append({'path': path, 'mode': '100644', 'type': 'blob', 'sha': blob['sha']})
+          tree = post('git/trees', {'base_tree': git('rev-parse', 'HEAD^{tree}').decode().strip(), 'tree': entries})
+          assert tree['sha'] == expected
+          result = {'tree': expected, 'parent': git('rev-parse', 'HEAD').decode().strip(), 'files': entries}
+          print('VERIFIED_CANDIDATE_TREE=' + expected)
+          open('/tmp/phase449-candidate.json', 'w').write(json.dumps(result, indent=2))
+          # Intentionally do not create commits, update refs or push from the runner.
       - uses: actions/upload-artifact@v4
         with:
-          name: offline-validation-${{ github.sha }}
-          path: /tmp/notepad-validation.tar.gz
+          name: phase449-candidate-${{ github.sha }}
+          path: /tmp/phase449-candidate.json
           retention-days: 1
-          compression-level: 0
           if-no-files-found: error

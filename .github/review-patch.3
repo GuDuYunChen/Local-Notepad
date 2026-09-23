@@ -1,0 +1,320 @@
++  it('StrictMode cleanup cannot cancel the replayed load or publish the obsolete response', async () => {
++    const loads = []
++    api.mockImplementation(() => { const d = deferred(); loads.push(d); return d.promise })
++    await render('c1', {}, true)
++    expect(loads.length).toBe(2)
++    await resolve(loads[0], 'c1', body('旧数据'))
++    expect(container.querySelector('.editor-input')).toBeNull()
++    await resolve(loads[1], 'c1', body('最新正文'))
++    expect(container.querySelector('.editor-input').textContent).toBe('最新正文')
++  })
++
++  it('A to B to A ignores a stale response even when its document ID matches again', async () => {
++    const loads = []; api.mockImplementation(() => { const d = deferred(); loads.push(d); return d.promise })
++    await render('a'); await render('b'); await render('a')
++    await resolve(loads[2], 'a', body('新版本'))
++    await resolve(loads[0], 'a', body('旧版本'))
++    await resolve(loads[1], 'b', body('其他章节'))
++    expect(container.querySelector('.editor-input').textContent).toBe('新版本')
++  })
++
++  it('loading failure is noneditable and a successful retry mounts the intended document', async () => {
++    const request = deferred(); api.mockReturnValueOnce(request.promise)
++    await render('c1')
++    await act(async () => { request.reject(new Error('offline')); await request.promise.catch(() => {}) })
++    expect(container.querySelector('.editor-input')).toBeNull()
++    expect(container.querySelector('[role="alert"]').textContent).toContain('正文加载失败')
++    api.mockResolvedValueOnce({ id: 'c1', content: body('重试成功') })
++    await act(async () => container.querySelector('button').click())
++    expect(container.querySelector('.editor-input').textContent).toBe('重试成功')
++  })
++
++  it('external save while loading cannot overwrite the new document with old or empty content', async () => {
++    const request = deferred(); api.mockReturnValue(request.promise)
++    const ref = React.createRef()
++    await render('c1', { ref })
++    await act(async () => { expect(await ref.current.save()).toBeUndefined() })
++    expect(api.mock.calls.every(([, options]) => !options?.method)).toBe(true)
++  })
++
++  it('changing autosave preference does not reload the current document', async () => {
++    api.mockResolvedValue({ id: 'c1', content: body('当前正文') })
++    await render('c1')
++    await render('c1', { autoSaveOnSwitch: true })
++    expect(api).toHaveBeenCalledOnce()
++    expect(container.querySelector('.editor-input').textContent).toBe('当前正文')
++  })
++
++  it('a genuinely empty loaded file still opens as an editable empty paragraph', async () => {
++    api.mockResolvedValue({ id: 'c1', content: '', updated_at: 1 })
++    await render('c1')
++    expect(container.querySelector('.editor-input')).not.toBeNull()
++    expect(container.querySelector('.editor-input').textContent).toBe('')
++  })
++})
+diff --git a/src/components/projectEntityEvidenceUtils.js b/src/components/projectEntityEvidenceUtils.js
+index d461b38..141d6d3 100644
+--- a/src/components/projectEntityEvidenceUtils.js
++++ b/src/components/projectEntityEvidenceUtils.js
+@@ -62,9 +62,13 @@ export function selectProjectEntityEvidence(model, entityId, filters = {}) {
+ 
+   const pageSize = boundedInteger(filters.pageSize ?? 6, 6, 1, 20)
+   const pageCount = Math.max(1, Math.ceil(rows.length / pageSize))
+-  const page = boundedInteger(filters.page ?? 1, 1, 1, pageCount)
++  const focusIndex = typeof filters.focusChapterId === 'string'
++    ? rows.findIndex(row => row.chapterId === filters.focusChapterId) : -1
++  const page = focusIndex >= 0 ? Math.floor(focusIndex / pageSize) + 1
++    : boundedInteger(filters.page ?? 1, 1, 1, pageCount)
+   return {
+     source,
++    chapterQueue: rows.map(row => ({ id: row.chapterId, title: row.chapterTitle, ordinal: row.ordinal })),
+     rows: rows.slice((page - 1) * pageSize, page * pageSize),
+     totalRows: rows.length,
+     totalMentions: rows.reduce((sum, item) => sum + item.matchCount, 0),
+diff --git a/src/hooks/useGuardedNoteOpener.js b/src/hooks/useGuardedNoteOpener.js
+new file mode 100644
+index 0000000..1d8f8ac
+--- /dev/null
++++ b/src/hooks/useGuardedNoteOpener.js
+@@ -0,0 +1,61 @@
++import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
++import { api } from '~/services/api'
++import { toast } from '~/services/toast'
++
++// Fetching a file is not permission to leave the current draft. Invoke the latest
++// selection guard only after the fetch completes, and resolve after its decision.
++export default function useGuardedNoteOpener({ currentId, workspace, navigationEpoch, onSelectFile, onHeading }) {
++  const latest = useRef({ currentId, onSelectFile, onHeading })
++  const pending = useRef(null)
++  const generation = useRef(0)
++  useLayoutEffect(() => { latest.current = { currentId, onSelectFile, onHeading } })
++  const cancel = useCallback(() => {
++    if (!pending.current) return
++    const operation = pending.current
++    pending.current = null
++    operation.controller.abort()
++    operation.resolve(false)
++  }, [])
++  useEffect(() => {
++    if (pending.current && pending.current.epoch !== navigationEpoch.current) cancel()
++  }, [currentId, workspace, navigationEpoch, cancel])
++  useEffect(() => cancel, [cancel])
++
++  return useCallback((id, options = {}) => {
++    if (!id) return Promise.resolve(false)
++    cancel()
++    const sequence = ++generation.current
++    const epoch = navigationEpoch.current
++    const controller = new AbortController()
++    return new Promise(resolve => {
++      const operation = { sequence, epoch, controller, resolve }
++      pending.current = operation
++      const valid = () => pending.current === operation && navigationEpoch.current === epoch
++      const finish = accepted => {
++        if (pending.current === operation) pending.current = null
++        resolve(accepted)
++      }
++      Promise.resolve().then(() => api(`/api/files/${id}`, { signal: controller.signal }))
++        .then(file => {
++          if (!valid()) { finish(false); return }
++          if (!file || file.is_deleted || file.is_folder || String(file.id) !== String(id)) {
++            throw new Error('目标笔记不存在或已删除')
++          }
++          const headingPath = Array.isArray(options?.headingPath) ? options.headingPath.filter(Boolean) : []
++          latest.current.onSelectFile(file, {
++            shouldSelect: valid,
++            onCancel: () => finish(false),
++            afterSelect: () => {
++              // onSelectFile has synchronously crossed its save/discard guard.
++              if (headingPath.length) latest.current.onHeading?.(id, headingPath, latest.current.currentId === id)
++              finish(true)
++            },
++          })
++        })
++        .catch(error => {
++          if (valid() && error?.name !== 'AbortError') toast.error('目标笔记不存在或暂时无法打开')
++          finish(false)
++        })
++    })
++  }, [cancel, navigationEpoch])
++}
+diff --git a/src/hooks/useGuardedNoteOpener.test.jsx b/src/hooks/useGuardedNoteOpener.test.jsx
+new file mode 100644
+index 0000000..125ec80
+--- /dev/null
++++ b/src/hooks/useGuardedNoteOpener.test.jsx
+@@ -0,0 +1,72 @@
++import React, { act } from 'react'
++import { createRoot } from 'react-dom/client'
++import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
++import useGuardedNoteOpener from './useGuardedNoteOpener'
++import { api } from '~/services/api'
++import { toast } from '~/services/toast'
++vi.mock('~/services/api', () => ({ api: vi.fn() }))
++let host, root, open, epoch
++function Harness(props) { open = useGuardedNoteOpener({ currentId: 'c1', workspace: 'notes', navigationEpoch: epoch, ...props }); return null }
++const render = props => act(async () => root.render(<Harness {...props} />))
++const drain = () => act(async () => { await Promise.resolve(); await Promise.resolve() })
++beforeEach(() => {
++  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true); api.mockReset()
++  vi.spyOn(toast, 'error').mockImplementation(() => {})
++  host = document.createElement('div'); document.body.append(host); root = createRoot(host); epoch = { current: 0 }
++})
++afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals() })
++describe('guarded chapter opens', () => {
++  it('resolves only after the save/discard guard confirms or cancels', async () => {
++    api.mockResolvedValue({ id: 'c2' }); let guard
++    await render({ onSelectFile: (_file, options) => { guard = options } })
++    const result = open('c2'); await drain()
++    let settled = false; result.then(() => { settled = true }); await drain(); expect(settled).toBe(false)
++    guard.onCancel(); expect(await result).toBe(false)
++  })
++  it('passes headings through only after accepted selection', async () => {
++    api.mockResolvedValue({ id: 'c2' }); const onHeading = vi.fn()
++    await render({ onSelectFile: (_file, options) => options.afterSelect(), onHeading })
++    expect(await open('c2', { headingPath: ['身世'] })).toBe(true)
++    expect(onHeading).toHaveBeenCalledWith('c2', ['身世'], false)
++  })
++  it('uses the newest draft guard when typing happens during file retrieval', async () => {
++    let resolve; api.mockImplementation(() => new Promise(yes => { resolve = yes }))
++    const oldGuard = vi.fn(); let newest
++    await render({ onSelectFile: oldGuard }); const result = open('c2'); await drain()
++    await render({ onSelectFile: (_file, options) => { newest = options } })
++    await act(async () => { resolve({ id: 'c2' }); await Promise.resolve() })
++    expect(oldGuard).not.toHaveBeenCalled(); newest.onCancel(); expect(await result).toBe(false)
++  })
++  it('older fetch completion cannot reopen a chapter after a later request', async () => {
++    const resolvers = []; api.mockImplementation(() => new Promise(yes => resolvers.push(yes)))
++    const selected = vi.fn((_file, options) => options.afterSelect())
++    await render({ onSelectFile: selected }); const first = open('c2'); await drain(); const second = open('c3'); await drain()
++    resolvers[0]({ id: 'c2' }); resolvers[1]({ id: 'c3' }); await drain()
++    expect(await first).toBe(false); expect(await second).toBe(true)
++    expect(selected).toHaveBeenCalledTimes(1); expect(selected.mock.calls[0][0].id).toBe('c3')
++  })
++  it('unrelated navigation invalidates an outstanding response and dialog action', async () => {
++    api.mockResolvedValue({ id: 'c2' }); let guard
++    await render({ onSelectFile: (_file, options) => { guard = options } })
++    const result = open('c2'); await drain(); epoch.current++
++    await render({ currentId: 'other', onSelectFile: vi.fn() })
++    expect(await result).toBe(false); expect(guard.shouldSelect()).toBe(false)
++  })
++  it('handles deleted wrong-identity and folder targets without selecting', async () => {
++    const selected = vi.fn(); await render({ onSelectFile: selected })
++    for (const file of [{ id: 'c2', is_deleted: true }, { id: 'other' }, { id: 'c2', is_folder: true }, null]) {
++      api.mockResolvedValue(file); expect(await open('c2')).toBe(false)
++    }
++    expect(selected).not.toHaveBeenCalled()
++  })
++  it('reports active errors but never stale abort errors', async () => {
++    api.mockRejectedValue(new Error('offline')); await render({ onSelectFile: vi.fn() })
++    expect(await open('c2')).toBe(false); expect(toast.error).toHaveBeenCalledTimes(1)
++  })
++  it('unmounting resolves the pending decision and aborts its request', async () => {
++    let signal; api.mockImplementation((_path, options) => { signal = options.signal; return new Promise(() => {}) })
++    await render({ onSelectFile: vi.fn() }); const result = open('c2'); await drain()
++    await act(async () => root.render(null))
++    expect(await result).toBe(false); expect(signal.aborted).toBe(true)
++  })
++})
+diff --git a/src/services/evidenceReviewSession.js b/src/services/evidenceReviewSession.js
+new file mode 100644
+index 0000000..b8a8e5c
+--- /dev/null
++++ b/src/services/evidenceReviewSession.js
+@@ -0,0 +1,96 @@
++// A single in-memory review, containing IDs and view state only. No manuscript
++// snapshots, automatic relationship acceptance, localStorage or network writes.
++export const MAX_REVIEW_CHAPTERS = 10000
++
++export function normalizeEvidenceReviewFilters(value = {}) {
++  const page = Number(value?.page)
++  return {
++    query: typeof value?.query === 'string' ? value.query.slice(0, 500) : '',
++    source: ['all', 'wiki', 'canonical', 'alias'].includes(value?.source) ? value.source : 'all',
++    volumeId: typeof value?.volumeId === 'string' ? value.volumeId : null,
++    page: Number.isFinite(page) ? Math.max(1, Math.floor(page)) : 1,
++  }
++}
++
++export function createEvidenceReviewSession() {
++  let snapshot = null
++  let sequence = 0
++  let returnSequence = 0
++  const listeners = new Set()
++  const publish = value => {
++    snapshot = value ? Object.freeze(value) : null
++    for (const listener of [...listeners]) listener()
++  }
++  const getSnapshot = () => snapshot
++  return {
++    getSnapshot,
++    subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener) },
++    start(context, candidates, chapterId) {
++      if (!context?.projectId || !context?.entityId || !Array.isArray(candidates) || candidates.length > MAX_REVIEW_CHAPTERS) return null
++      const seen = new Set()
++      const chapters = candidates.filter(item => {
++        if (!item || typeof item.id !== 'string' || !item.id || seen.has(item.id)) return false
++        seen.add(item.id)
++        return true
++      }).map(item => Object.freeze({
++        id: item.id,
++        title: typeof item.title === 'string' ? item.title : '未命名',
++        ordinal: Number.isFinite(Number(item.ordinal)) ? Number(item.ordinal) : 0,
++      }))
++      if (!seen.has(chapterId)) return null
++      const filters = Object.freeze(normalizeEvidenceReviewFilters(context.filters))
++      const sameScope = snapshot?.projectId === String(context.projectId) &&
++        snapshot?.entityId === String(context.entityId) &&
++        ['query', 'source', 'volumeId'].every(key => snapshot.filters[key] === filters[key])
++      const reviewedIds = sameScope ? snapshot.reviewedIds.filter(id => seen.has(id)) : []
++      publish({
++        id: ++sequence,
++        projectId: String(context.projectId),
++        entityId: String(context.entityId),
++        entityLabel: String(context.entityLabel || ''),
++        filters,
++        chapters: Object.freeze(chapters),
++        chapterId,
++        reviewedIds: Object.freeze(reviewedIds),
++        returnToken: null,
++      })
++      return snapshot
++    },
++    end(expectedId) {
++      if (!snapshot || (expectedId !== undefined && snapshot.id !== expectedId)) return false
++      publish(null)
++      return true
++    },
++    visit(expectedId, chapterId) {
++      if (snapshot?.id !== expectedId || !snapshot.chapters.some(item => item.id === chapterId)) return false
++      if (snapshot.chapterId !== chapterId) publish({ ...snapshot, chapterId })
++      return true
++    },
++    setReviewed(expectedId, chapterId, reviewed) {
++      if (snapshot?.id !== expectedId || !snapshot.chapters.some(item => item.id === chapterId)) return false
++      const ids = new Set(snapshot.reviewedIds)
++      if (ids.has(chapterId) === Boolean(reviewed)) return true
++      if (reviewed) ids.add(chapterId)
++      else ids.delete(chapterId)
++      publish({ ...snapshot, reviewedIds: Object.freeze([...ids]) })
++      return true
++    },
++    requestReturn(expectedId) {
++      if (snapshot?.id !== expectedId) return false
++      publish({ ...snapshot, returnToken: ++returnSequence })
++      return true
++    },
++    getReturn(projectId, entityId) {
++      return snapshot?.returnToken &&
++        (projectId === undefined || snapshot.projectId === String(projectId)) &&
++        (entityId === undefined || snapshot.entityId === String(entityId)) ? snapshot : null
++    },
++    finishReturn(expectedId, returnToken) {
++      if (snapshot?.id !== expectedId || snapshot.returnToken !== returnToken || !returnToken) return false
++      publish({ ...snapshot, returnToken: null })
++      return true
++    },
++  }
++}
++
++export const evidenceReview = createEvidenceReviewSession()
