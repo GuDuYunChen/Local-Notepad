@@ -4,6 +4,7 @@ import {
   filterProjectStoryMap,
 } from './projectStructureUtils'
 import ProjectRelationGraphPanel from './ProjectRelationGraphPanel'
+import { buildProjectRelationEvolution } from './projectRelationsUtils'
 import {
   buildProjectStorylineDiagnostics,
   buildProjectStorylineModel,
@@ -79,6 +80,14 @@ export default function ProjectStructurePanel({
   const storylineDiagnostics = useMemo(
     () => buildProjectStorylineDiagnostics(workspace, projectMeta),
     [projectMeta, workspace]
+  )
+  const relationEvolution = useMemo(
+    () => buildProjectRelationEvolution(
+      workspace,
+      projectIndexes,
+      projectMeta,
+    ),
+    [projectIndexes, projectMeta, workspace]
   )
   const storylineTypes = useMemo(
     () => getProjectStorylineTypes(),
@@ -986,6 +995,19 @@ export default function ProjectStructurePanel({
                         ))}
                         {(storylineModel.chapterEvents[chapter.id] || []).length > 3 && (
                           <i>+{storylineModel.chapterEvents[chapter.id].length - 3}</i>
+                        )}
+                      </span>
+                    )}
+
+                    {(relationEvolution.chapterEvents[chapter.id] || []).length > 0 && (
+                      <span className="project-relation-node-links">
+                        {(relationEvolution.chapterEvents[chapter.id] || []).slice(0, 2).map(item => (
+                          <i key={item.eventId}>
+                            关系·{item.eventLabel}
+                          </i>
+                        ))}
+                        {(relationEvolution.chapterEvents[chapter.id] || []).length > 2 && (
+                          <i>+{relationEvolution.chapterEvents[chapter.id].length - 2}</i>
                         )}
                       </span>
                     )}
