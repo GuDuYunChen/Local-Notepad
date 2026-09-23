@@ -661,6 +661,8 @@ describe('project workspace utilities', () => {
       sprint: null,
       dailyReviews: {},
       storylines: [],
+      relationEntities: [],
+      relations: [],
     })
   })
 
