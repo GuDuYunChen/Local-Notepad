@@ -152,6 +152,9 @@ describe('project workspace utilities', () => {
         type: 'belongs',
       }],
       relationSuggestionIgnores: ['index:a::index:b'],
+      entityAliases: {
+        'index:character-note': ['关姑娘', '小关', '关姑娘'],
+      },
     })
 
     expect(readProjectWorkspaceMeta('project')).toEqual({
@@ -212,6 +215,9 @@ describe('project workspace utilities', () => {
         events: [],
       }],
       relationSuggestionIgnores: ['index:a::index:b'],
+      entityAliases: {
+        'index:character-note': ['关姑娘', '小关'],
+      },
     })
     expect(nextProjectStatus('draft')).toBe('review')
     expect(nextProjectStatus('review')).toBe('done')
@@ -667,6 +673,7 @@ describe('project workspace utilities', () => {
       relationEntities: [],
       relations: [],
       relationSuggestionIgnores: [],
+      entityAliases: {},
     })
   })
 
