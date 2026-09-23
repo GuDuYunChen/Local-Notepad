@@ -121,6 +121,8 @@ export default function ProjectWorkspacePanel({
     sprint: null,
     dailyReviews: {},
     storylines: [],
+    relationEntities: [],
+    relations: [],
   })
   const [projectIndexes, setProjectIndexes] = useState({
     characters: [],
@@ -300,6 +302,8 @@ export default function ProjectWorkspacePanel({
         sprint: null,
         dailyReviews: {},
         storylines: [],
+        relationEntities: [],
+        relations: [],
       })
       return
     }
