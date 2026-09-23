@@ -1,0 +1,406 @@
+.project-entity-intelligence {
+  margin-top: 8px;
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--paper);
+}
+
+.project-entity-intelligence > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.project-entity-intelligence > header strong,
+.project-entity-intelligence > header span {
+  display: block;
+}
+
+.project-entity-intelligence > header strong {
+  color: var(--ink);
+  font-size: 8px;
+  font-weight: 680;
+}
+
+.project-entity-intelligence > header span {
+  margin-top: 2px;
+  color: var(--ink-muted);
+  font-size: 6px;
+  line-height: 1.45;
+}
+
+.project-entity-intelligence-metrics {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.project-entity-intelligence-metrics span {
+  margin: 0 !important;
+  padding: 3px 5px;
+  border-radius: 6px;
+  background: var(--surface);
+  white-space: nowrap;
+}
+
+.project-entity-intelligence-metrics b {
+  margin-right: 3px;
+  color: var(--ink);
+}
+
+.project-entity-intelligence-grid {
+  margin-top: 7px;
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 7px;
+}
+
+.project-entity-intelligence-grid article {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.project-entity-intelligence-grid article > header strong,
+.project-entity-intelligence-grid article > header span {
+  display: block;
+}
+
+.project-entity-intelligence-grid article > header strong {
+  color: var(--ink);
+  font-size: 8px;
+}
+
+.project-entity-intelligence-grid article > header span {
+  margin-top: 2px;
+  color: var(--ink-muted);
+  font-size: 6px;
+  line-height: 1.45;
+}
+
+.project-entity-alias-editor > select,
+.project-entity-heatmap-card > header select,
+.project-entity-alias-add input {
+  height: 29px;
+  padding: 0 7px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  outline: 0;
+  background: var(--paper);
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 7px;
+}
+
+.project-entity-alias-editor > select {
+  width: 100%;
+  margin-top: 7px;
+}
+
+.project-entity-alias-editor > select:focus,
+.project-entity-heatmap-card > header select:focus,
+.project-entity-alias-add input:focus {
+  border-color: var(--clay);
+  box-shadow: 0 0 0 2px var(--clay-light);
+}
+
+.project-entity-alias-summary {
+  margin-top: 7px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.project-entity-alias-summary span,
+.project-entity-alias-summary strong,
+.project-entity-alias-summary small {
+  display: block;
+}
+
+.project-entity-alias-summary span,
+.project-entity-alias-summary small {
+  color: var(--ink-muted);
+  font-size: 6px;
+}
+
+.project-entity-alias-summary strong {
+  margin-top: 1px;
+  color: var(--ink);
+  font-size: 9px;
+}
+
+.project-entity-alias-summary small {
+  margin-top: 2px;
+  line-height: 1.4;
+}
+
+.project-entity-alias-list {
+  margin-top: 7px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.project-entity-alias-list > span {
+  padding: 3px 5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 99px;
+  background: var(--paper);
+  color: var(--ink-soft);
+  font-size: 6px;
+}
+
+.project-entity-alias-list > span.canonical {
+  background: color-mix(in srgb, var(--clay) 8%, var(--paper));
+  color: var(--clay);
+}
+
+.project-entity-alias-list button {
+  width: 13px;
+  height: 13px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink-muted);
+  font: inherit;
+  font-size: 8px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.project-entity-alias-list button:hover {
+  background: color-mix(in srgb, #b84444 8%, transparent);
+  color: #a63b3b;
+}
+
+.project-entity-alias-list em {
+  align-self: center;
+  color: var(--ink-muted);
+  font-size: 6px;
+  font-style: normal;
+}
+
+.project-entity-alias-add {
+  margin-top: 6px;
+  display: flex;
+  gap: 4px;
+}
+
+.project-entity-alias-add input {
+  min-width: 0;
+  flex: 1;
+}
+
+.project-entity-evidence-list {
+  margin-top: 8px;
+  max-height: 190px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+}
+
+.project-entity-evidence-list button {
+  width: 100%;
+  padding: 5px 6px;
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) auto;
+  gap: 5px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--paper);
+  color: var(--ink-soft);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.project-entity-evidence-list button:hover {
+  border-color: color-mix(in srgb, var(--clay) 35%, var(--line));
+}
+
+.project-entity-evidence-list b {
+  color: var(--clay);
+  font-size: 6px;
+}
+
+.project-entity-evidence-list strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 7px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-entity-evidence-list span {
+  color: var(--ink-muted);
+  font-size: 6px;
+}
+
+.project-entity-evidence-list small {
+  grid-column: 2 / -1;
+  color: var(--ink-muted);
+  font-size: 6px;
+}
+
+.project-entity-evidence-list > em,
+.project-entity-alias-empty {
+  color: var(--ink-muted);
+  font-size: 7px;
+  font-style: normal;
+  line-height: 1.5;
+}
+
+.project-entity-alias-empty {
+  margin-top: 8px;
+  padding: 12px;
+  text-align: center;
+}
+
+.project-entity-heatmap-card > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 7px;
+}
+
+.project-entity-heatmap-card > header > div {
+  min-width: 0;
+}
+
+.project-entity-heatmap-card > header select {
+  flex: 0 0 auto;
+}
+
+.project-entity-heatmap {
+  margin-top: 7px;
+  overflow-x: auto;
+}
+
+.project-entity-heatmap-row {
+  min-width: max-content;
+  display: grid;
+  grid-template-columns: 120px repeat(var(--chapter-count, 12), 26px);
+  gap: 2px;
+  align-items: center;
+  margin-top: 2px;
+}
+
+.project-entity-heatmap-row.head {
+  margin-top: 0;
+}
+
+.project-entity-heatmap-row > button:first-child,
+.project-entity-heatmap-row > span:first-child {
+  width: 120px;
+  min-width: 120px;
+}
+
+.project-entity-heatmap-row.head > span {
+  color: var(--ink-muted);
+  font-size: 6px;
+}
+
+.project-entity-heatmap-row.head b {
+  width: 26px;
+  color: var(--ink-muted);
+  font-size: 6px;
+  font-weight: 650;
+  text-align: center;
+}
+
+.project-entity-heatmap-row > button:first-child {
+  padding: 4px 5px;
+  display: block;
+  overflow: hidden;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ink-soft);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.project-entity-heatmap-row > button:first-child:hover {
+  background: var(--paper);
+}
+
+.project-entity-heatmap-row > button:first-child strong,
+.project-entity-heatmap-row > button:first-child small {
+  display: block;
+}
+
+.project-entity-heatmap-row > button:first-child strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 7px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-entity-heatmap-row > button:first-child small {
+  margin-top: 1px;
+  color: var(--ink-muted);
+  font-size: 6px;
+}
+
+.project-entity-heatmap-cell {
+  width: 26px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--ink) 3%, transparent);
+  color: var(--ink-muted);
+  font: inherit;
+  font-size: 6px;
+}
+
+.project-entity-heatmap-cell.active {
+  border-color: color-mix(in srgb, var(--clay) 16%, var(--line));
+  background: color-mix(in srgb, var(--clay) 9%, var(--paper));
+  color: var(--clay);
+  cursor: pointer;
+}
+
+.project-entity-heatmap-cell.strong {
+  background: color-mix(in srgb, var(--clay) 18%, var(--paper));
+  font-weight: 750;
+}
+
+.project-entity-heatmap-empty {
+  padding: 16px;
+  color: var(--ink-muted);
+  font-size: 7px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+@media (max-width: 980px) {
+  .project-entity-intelligence-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .project-entity-intelligence > header {
+    flex-direction: column;
+  }
+
+  .project-entity-intelligence-metrics {
+    justify-content: flex-start;
+  }
+}
