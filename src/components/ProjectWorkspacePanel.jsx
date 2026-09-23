@@ -123,6 +123,7 @@ export default function ProjectWorkspacePanel({
     storylines: [],
     relationEntities: [],
     relations: [],
+    relationSuggestionIgnores: [],
   })
   const [projectIndexes, setProjectIndexes] = useState({
     characters: [],
@@ -304,6 +305,7 @@ export default function ProjectWorkspacePanel({
         storylines: [],
         relationEntities: [],
         relations: [],
+        relationSuggestionIgnores: [],
       })
       return
     }
