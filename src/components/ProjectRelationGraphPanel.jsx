@@ -415,7 +415,11 @@ export default function ProjectRelationGraphPanel({
                         'type-' + edge.type +
                         (selectedRelationId === edge.id ? ' selected' : '')
                       }
-                      onClick={() => setSelectedRelationId(edge.id)}
+                      onClick={() => {
+                        setSelectedRelationId(edge.id)
+                        setSelectedNodeId('')
+                        setDeleteConfirm('')
+                      }}
                     >
                       <line
                         x1={edge.source.x}
@@ -446,12 +450,14 @@ export default function ProjectRelationGraphPanel({
                     tabIndex="0"
                     onClick={() => {
                       setSelectedNodeId(node.id)
+                      setSelectedRelationId('')
                       setDeleteConfirm('')
                     }}
                     onKeyDown={event => {
                       if (event.key === 'Enter' || event.key === ' ') {
                         event.preventDefault()
                         setSelectedNodeId(node.id)
+                        setSelectedRelationId('')
                       }
                     }}
                   >
