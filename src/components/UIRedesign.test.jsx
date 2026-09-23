@@ -2417,6 +2417,200 @@ describe('UI redesign smoke tests', () => {
     expect(onOpenFile).toHaveBeenCalledWith('chapter-2')
   })
 
+  it('discovers reviewable relation candidates from repeated explicit WikiLink co-occurrence', async () => {
+    localStorage.setItem(
+      'localNotepad.projectWorkspace.activeView',
+      'structure'
+    )
+
+    const linkedContent = ids => JSON.stringify({
+      root: {
+        children: [{
+          type: 'paragraph',
+          children: ids.map((id, index) => ({
+            type: 'wiki-link',
+            id,
+            title: ['关关', '青崖镇', '黑铁副印'][index] || ('实体' + index),
+            sectionPath: [],
+          })),
+        }],
+      },
+    })
+
+    listAllFilesWithContent.mockResolvedValue([
+      { id: 'project', title: '共现项目', is_folder: true, parent_id: '', sort_order: 100 },
+      { id: 'volume-1', title: '第一卷', is_folder: true, parent_id: 'project', sort_order: 100 },
+      {
+        id: 'chapter-1',
+        title: '第一章.md',
+        is_folder: false,
+        parent_id: 'volume-1',
+        sort_order: 100,
+        content: linkedContent(['character-note', 'location-note', 'foreshadow-note']),
+      },
+      {
+        id: 'chapter-2',
+        title: '第二章.md',
+        is_folder: false,
+        parent_id: 'volume-1',
+        sort_order: 200,
+        content: linkedContent(['character-note', 'location-note', 'foreshadow-note']),
+      },
+      {
+        id: 'chapter-3',
+        title: '第三章.md',
+        is_folder: false,
+        parent_id: 'volume-1',
+        sort_order: 300,
+        content: linkedContent(['character-note', 'location-note']),
+      },
+    ])
+
+    tagApi.list.mockResolvedValue([
+      { id: 'tag-character', name: '角色' },
+      { id: 'tag-location', name: '地点' },
+      { id: 'tag-foreshadow', name: '伏笔' },
+    ])
+    tagApi.getFilesByTag.mockImplementation(async tagId => {
+      if (tagId === 'tag-character') {
+        return [{ id: 'character-note', title: '关关.md', updated_at: 3 }]
+      }
+      if (tagId === 'tag-location') {
+        return [{ id: 'location-note', title: '青崖镇.md', updated_at: 2 }]
+      }
+      if (tagId === 'tag-foreshadow') {
+        return [{ id: 'foreshadow-note', title: '黑铁副印.md', updated_at: 1 }]
+      }
+      return []
+    })
+
+    const onOpenFile = vi.fn()
+    await act(async () => {
+      root.render(
+        <ProjectWorkspacePanel
+          onOpenFile={onOpenFile}
+          onClose={() => {}}
+        />
+      )
+    })
+    await flushPromises()
+    await flushPromises()
+
+    let suggestionPanel = container.querySelector(
+      '.project-relation-suggestions'
+    )
+    expect(suggestionPanel).toBeTruthy()
+    expect(suggestionPanel.textContent).toContain('关系自动发现')
+    expect(suggestionPanel.textContent).toContain('仅分析正文中明确的 [[WikiLink]] 共现')
+    expect(suggestionPanel.querySelectorAll(
+      '.project-relation-suggestion-list article'
+    )).toHaveLength(3)
+
+    const primarySuggestion = Array.from(
+      suggestionPanel.querySelectorAll(
+        '.project-relation-suggestion-list article'
+      )
+    ).find(article => (
+      article.textContent.includes('关关') &&
+      article.textContent.includes('青崖镇')
+    ))
+    expect(primarySuggestion).toBeTruthy()
+    expect(primarySuggestion.textContent).toContain('3 章共同出现')
+    expect(primarySuggestion.textContent).toContain('覆盖全书 100%')
+
+    const firstEvidence = Array.from(
+      primarySuggestion.querySelectorAll(
+        '.project-relation-suggestion-evidence button'
+      )
+    ).find(button => button.textContent.includes('第一章'))
+    expect(firstEvidence).toBeTruthy()
+    await click(firstEvidence)
+    expect(onOpenFile).toHaveBeenCalledWith('chapter-1')
+
+    const typeSelect = primarySuggestion.querySelector(
+      'select[aria-label^="候选关系类型"]'
+    )
+    await act(async () => {
+      typeSelect.value = 'located'
+      typeSelect.dispatchEvent(new Event('change', { bubbles: true }))
+      await Promise.resolve()
+    })
+
+    const accept = Array.from(primarySuggestion.querySelectorAll('button'))
+      .find(button => button.textContent === '接受建议')
+    await click(accept)
+    await flushPromises()
+
+    let stored = JSON.parse(
+      localStorage.getItem('localNotepad.projectWorkspace.v1')
+    )
+    expect(stored.project.relations).toEqual([
+      expect.objectContaining({
+        sourceId: 'index:character-note',
+        targetId: 'index:location-note',
+        type: 'located',
+        directed: true,
+        note: expect.stringContaining('证据 3 个章节'),
+      }),
+    ])
+
+    suggestionPanel = container.querySelector('.project-relation-suggestions')
+    expect(
+      Array.from(suggestionPanel.querySelectorAll(
+        '.project-relation-suggestion-list article'
+      )).some(article => (
+        article.textContent.includes('关关') &&
+        article.textContent.includes('青崖镇')
+      ))
+    ).toBe(false)
+
+    const ignoredSuggestion = Array.from(
+      suggestionPanel.querySelectorAll(
+        '.project-relation-suggestion-list article'
+      )
+    ).find(article => (
+      article.textContent.includes('关关') &&
+      article.textContent.includes('黑铁副印')
+    ))
+    expect(ignoredSuggestion).toBeTruthy()
+
+    const ignore = Array.from(ignoredSuggestion.querySelectorAll('button'))
+      .find(button => button.textContent === '忽略')
+    await click(ignore)
+    await flushPromises()
+
+    stored = JSON.parse(
+      localStorage.getItem('localNotepad.projectWorkspace.v1')
+    )
+    expect(stored.project.relationSuggestionIgnores).toHaveLength(1)
+
+    suggestionPanel = container.querySelector('.project-relation-suggestions')
+    expect(suggestionPanel.textContent).toContain('恢复 1 个已忽略候选')
+    expect(
+      Array.from(suggestionPanel.querySelectorAll(
+        '.project-relation-suggestion-list article'
+      )).some(article => (
+        article.textContent.includes('关关') &&
+        article.textContent.includes('黑铁副印')
+      ))
+    ).toBe(false)
+
+    const restore = Array.from(suggestionPanel.querySelectorAll('button'))
+      .find(button => button.textContent === '恢复 1 个已忽略候选')
+    await click(restore)
+    await flushPromises()
+
+    suggestionPanel = container.querySelector('.project-relation-suggestions')
+    expect(
+      Array.from(suggestionPanel.querySelectorAll(
+        '.project-relation-suggestion-list article'
+      )).some(article => (
+        article.textContent.includes('关关') &&
+        article.textContent.includes('黑铁副印')
+      ))
+    ).toBe(true)
+  })
+
   it('offers actionable empty states for projects without manuscript chapters', async () => {
     localStorage.setItem(
       'localNotepad.projectWorkspace.activeView',
