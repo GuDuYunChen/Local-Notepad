@@ -11,6 +11,7 @@ import { evidenceReview } from '~/services/evidenceReviewSession'
 import { hasReviewAnnotations } from '~/services/evidenceReviewReport'
 import { toast } from '~/services/toast'
 import EvidenceReviewRecords from './EvidenceReviewRecords'
+import EvidenceReviewArchives from './EvidenceReviewArchives'
 import './ProjectEntityEvidencePanel.css'
 
 function title(value) {
@@ -93,7 +94,7 @@ function ChapterEvidenceCard({ row, chapter, entity, termIndex, source, onOpenFi
 }
 
 function EvidenceBrowser({ projectId, intelligence, entityId, projectMeta, onOpenFile }) {
-  const [returning] = useState(() => evidenceReview.getReturn(projectId, entityId))
+  const [returning, setReturning] = useState(() => evidenceReview.getReturn(projectId, entityId))
   const sectionRef = useRef(null)
   const restored = useRef(false)
   const [filters, setFilters] = useState(() => returning
@@ -170,6 +171,13 @@ function EvidenceBrowser({ projectId, intelligence, entityId, projectMeta, onOpe
         <p>节选按当前正文生成，样式与连续空白已归一化。点击“定位此处”可跳到正文；过期证据需刷新。提及或同章共现不等于关系成立。</p>
       </header>
       <EvidenceReviewRecords onOpenFile={onOpenFile} />
+      <EvidenceReviewArchives projectId={projectId} entityId={entityId} intelligence={intelligence}
+        onRestored={session => {
+          restored.current = false
+          evidenceReview.requestReturn(session.id)
+          setReturning(evidenceReview.getReturn(projectId, entityId))
+          setFilters({ ...session.filters, focusChapterId: session.chapterId })
+        }} />
       {!entity ? <p className="project-entity-evidence-note">请选择一个实体查看正文证据。</p> : (
         <>
           <div className="project-entity-evidence-filters">

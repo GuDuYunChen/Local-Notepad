@@ -7,6 +7,7 @@ import {
 } from '~/services/evidenceReviewReport'
 import { toast } from '~/services/toast'
 import ConfirmDialog from './ConfirmDialog'
+import { SaveReviewArchiveButton } from './EvidenceReviewArchives'
 import './EvidenceReviewRecords.css'
 
 export default function EvidenceReviewRecords({ documentId, dirty = false, busy = false, onOpenFile }) {
@@ -65,6 +66,7 @@ export default function EvidenceReviewRecords({ documentId, dirty = false, busy 
       <div className="evidence-review-records-tools">
         <span>本轮记录 · {session.entityLabel || '实体证据'} · {totals.changes} 章待修改</span>
         <button type="button" onClick={exportReport}>导出本轮清单</button>
+        <SaveReviewArchiveButton disabled={blocked} />
         <button type="button" ref={endButton} disabled={blocked} onClick={() => {
           if (hasReviewAnnotations(session)) setEndingId(session.id)
           else finish()
@@ -74,7 +76,7 @@ export default function EvidenceReviewRecords({ documentId, dirty = false, busy 
         <summary>核对备注与待修改清单</summary>
         <div className="evidence-review-records-body">
           <p className="evidence-review-records-notice">
-            备注仅保留在当前窗口，刷新或重启会清除；需要留存请导出。本轮标记不代表关系成立。
+            未存档的备注仅保留在当前窗口；需跨重启保留，请手动保存本地存档，或导出 JSON 备份。本轮标记不代表关系成立。
           </p>
           <div className="evidence-review-records-grid">
             <section className="evidence-review-note-editor" aria-label="本章核对备注">
@@ -136,7 +138,7 @@ export default function EvidenceReviewRecords({ documentId, dirty = false, busy 
         </div>
       </details>
       {endingId === session.id && <ConfirmDialog title="结束本轮核对？"
-        message="本轮有备注或待修改标记，结束后会清除。可先导出清单；导出不会自动结束核对。"
+        message="本轮有备注或待修改标记，结束后会清除当前窗口记录，但不删除已保存的存档。后续修改不会自动存档；请先保存或导出清单。"
         onClose={cancelEnd} actions={[
           { label: '先导出清单', onClick: exportReport },
           { label: '保留并继续', kind: 'primary', onClick: cancelEnd },

@@ -1,0 +1,16 @@
+.evidence-archive-save { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.evidence-archive-save small { color: var(--ink-muted); font-size: 12px; }
+.evidence-review-archives { margin: 12px 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font-size: 12px; line-height: 1.6; min-width: 0; }
+.evidence-review-archives > summary { min-height: 36px; padding: 8px 12px; cursor: pointer; }
+.evidence-review-archives-body { padding: 0 12px 12px; max-height: 60vh; overflow: auto; overscroll-behavior: contain; }
+.evidence-review-archives p { color: var(--ink-muted); margin: 6px 0; overflow-wrap: anywhere; }
+.evidence-review-archives-tools, .evidence-review-archives-actions, .evidence-review-archives nav { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.evidence-review-archives label { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.evidence-review-archives :is(button, select) { min-height: 36px; max-width: 100%; padding: 6px 10px; border: 1px solid var(--line); border-radius: 7px; color: var(--ink); background: var(--paper); font: inherit; cursor: pointer; }
+.evidence-review-archives button:disabled { opacity: .5; cursor: default; }
+.evidence-review-archives button:hover:not(:disabled) { border-color: var(--clay); background: var(--clay-light); }
+.evidence-review-archives :is(button, select, summary):focus-visible { outline: 2px solid var(--clay); outline-offset: 2px; }
+.evidence-review-archives ul { margin: 10px 0; padding: 0; list-style: none; }
+.evidence-review-archives li { padding: 10px 0; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
+.evidence-review-archives time { display: block; color: var(--ink-soft); }
+.evidence-review-archives nav { justify-content: center; }

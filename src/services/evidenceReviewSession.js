@@ -1,7 +1,8 @@
 // A single in-memory review, containing IDs and view state only. No manuscript
 // snapshots, automatic relationship acceptance, localStorage or network writes.
 import { MAX_REVIEW_NOTE_LENGTH, hasReviewAnnotations } from './evidenceReviewReport.js'
-export const MAX_REVIEW_CHAPTERS = 10000
+import { copyArchivedReviewData, MAX_REVIEW_CHAPTERS } from './evidenceReviewArchiveData.js'
+export { MAX_REVIEW_CHAPTERS } from './evidenceReviewArchiveData.js'
 
 export function normalizeEvidenceReviewFilters(value = {}) {
   const page = Number(value?.page)
@@ -63,6 +64,14 @@ export function createEvidenceReviewSession() {
         annotations,
         returnToken: null,
       })
+      return snapshot
+    },
+    restoreArchive(value) {
+      // Do not overwrite even an unannotated active round or a pending open.
+      if (snapshot || staged) return null
+      let data
+      try { data = copyArchivedReviewData(value) } catch { return null }
+      publish({ ...data, id: ++sequence, reviewedIds: Object.freeze([]), returnToken: null })
       return snapshot
     },
     commitStart(expectedId) {
