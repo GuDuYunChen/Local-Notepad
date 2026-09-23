@@ -200,6 +200,57 @@ describe('project relation graph utilities', () => {
     expect(evolution.signals.orphanEvents).toBe(1)
   })
 
+  it('inherits the last effective relationship type when later events omit a new type', () => {
+    const workspace = {
+      project: { id: 'project', title: '继承关系项目', type: 'novel' },
+      volumes: [{
+        id: 'v1',
+        title: '第一卷',
+        notes: [
+          { id: 'c1', title: '第一章.md' },
+          { id: 'c2', title: '第二章.md' },
+          { id: 'c3', title: '第三章.md' },
+        ],
+      }],
+    }
+    const evolution = buildProjectRelationEvolution(workspace, indexes, {
+      relations: [{
+        id: 'inherit',
+        sourceId: 'index:char-1',
+        targetId: 'index:char-2',
+        type: 'ally',
+        events: [
+          {
+            id: 'e1',
+            noteId: 'c1',
+            eventType: 'establish',
+            relationType: 'ally',
+          },
+          {
+            id: 'e2',
+            noteId: 'c2',
+            eventType: 'break',
+            relationType: 'rival',
+          },
+          {
+            id: 'e3',
+            noteId: 'c3',
+            eventType: 'conflict',
+            relationType: '',
+          },
+        ],
+      }],
+    })
+
+    expect(evolution.relations[0].events.map(event => event.resultingType))
+      .toEqual(['ally', 'rival', 'rival'])
+    expect(evolution.relations[0]).toMatchObject({
+      currentType: 'rival',
+      currentTypeLabel: '对立',
+      typeChanges: 1,
+    })
+  })
+
   it('builds graph metrics from indexes custom entities and directed edges', () => {
     const graph = buildProjectRelationGraph(indexes, {
       relationEntities: [
