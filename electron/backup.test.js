@@ -56,3 +56,16 @@ describe('automatic backup helpers', () => {
     }
   })
 })
+
+describe('verified snapshot listing', () => {
+  it('parses manual and collision-safe automatic timestamps', () => {
+    for (const name of ['backup-manual-20260923-120000-aabbccddeeff.db', 'backup-20260923-120000-aabbccddeeff.db']) {
+      const date = new Date(parseBackupTimestamp(name)); expect(date.getFullYear()).toBe(2026); expect(date.getHours()).toBe(12)
+    }
+  })
+  it('does not list directories with backup-looking names', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'backup-safe-'))
+    try { fs.mkdirSync(path.join(dir, 'backup-folder.db')); expect(await listBackups(dir)).toEqual([]) }
+    finally { fs.rmSync(dir, { recursive: true, force: true }) }
+  })
+})

@@ -27,7 +27,7 @@ export function ensureBackupDir() {
 }
 
 export function parseBackupTimestamp(filename, fallbackDate = null) {
-  const match = /^backup-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})\.db$/.exec(filename)
+  const match = /^backup-(?:manual-)?(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})(?:-[a-f0-9]{12})?\.db$/.exec(filename)
   if (match) {
     const [, year, month, day, hour, minute, second] = match
     const date = new Date(
@@ -58,12 +58,14 @@ export async function listBackups(backupDir = '') {
     .reverse()
     .map(file => {
       const filePath = path.join(resolvedDir, file)
-      const stat = fs.statSync(filePath)
+      const stat = fs.lstatSync(filePath)
+      if (!stat.isFile() || stat.isSymbolicLink()) return null
       return {
         name: file,
         path: filePath,
         size: stat.size,
         date: parseBackupTimestamp(file, stat.mtime),
       }
-    })
+    }).filter(Boolean)
 }
+

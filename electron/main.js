@@ -12,6 +12,7 @@ import {
 import { parseImportPaths, selectAndParseFiles } from './import.js'
 import { ensureBackupDir, getDefaultBackupDir, getDefaultDataDir, listBackups } from './backup.js'
 import { stopChildProcess, waitForHttpService } from './backend-process.js'
+import { createDataSafetyService, runBackupCommand, registerDataSafetyHandlers } from './data-safety.js'
 import { classifyNavigation } from './navigation.js'
 import { APP_ICON_DATA_URL } from '../src/assets/appIconData.js'
 
@@ -349,3 +350,22 @@ ipcMain.handle('backup:openFolder', async () => {
     return { success: false, message: e.message }
   }
 })
+
+// This bridge exposes only creation, verification and save-as, never live DB replacement.
+const dataSafety = createDataSafetyService({
+  dataDir: getDefaultDataDir(),
+  run: args => {
+    const filename = process.platform === 'win32' ? 'notepad-server.exe' : 'notepad-server'
+    const binary = app.isPackaged ? path.join(process.resourcesPath, 'bin', filename) :
+      path.join(app.getAppPath(), 'server', 'bin', filename)
+    return runBackupCommand(binary, getDefaultDataDir(), args)
+  },
+  chooseDestination: name => dialog.showSaveDialog(mainWindow, {
+    title: '另存已校验的数据库备份', defaultPath: path.join(app.getPath('documents'), name),
+    filters: [{ name: 'SQLite 数据库备份', extensions: ['db'] }],
+  }),
+})
+registerDataSafetyHandlers(ipcMain, dataSafety, event => Boolean(
+  mainWindow && !mainWindow.isDestroyed() && event.sender === mainWindow.webContents &&
+  event.senderFrame === mainWindow.webContents.mainFrame
+))

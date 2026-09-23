@@ -87,6 +87,9 @@ function Test-NotepadBackend {
       throw "$Label diagnostics check failed: $($diagnostics | ConvertTo-Json -Depth 6)"
     }
 
+    $note = Invoke-RestMethod -Uri "http://127.0.0.1:$Port/api/files" -Method Post -ContentType 'application/json' -Headers @{ Origin = 'null' } -Body '{"title":"Data safety fixture.md","content":"committed WAL evidence","is_folder":false,"parent_id":""}'
+    if ($note.code -ne 0) { throw "$Label could not create the temporary WAL test note." }
+    & (Join-Path $PSScriptRoot 'windows-data-safety-smoke.ps1') -BackendPath $BackendPath -DataDir $DataDir -Label $Label
     Write-Host "$Label backend health check passed."
   } finally {
     if ($process -and -not $process.HasExited) {
@@ -164,7 +167,7 @@ Write-Host "Installed application exe: $($installedApp.Name)"
 
 Test-NotepadBackend `
   -BackendPath $installedBackend `
-  -DataDir (Join-Path $env:RUNNER_TEMP 'local-notepad-installed-data') `
+  -DataDir (Join-Path $env:RUNNER_TEMP "local-notepad-installed-用户 O'Brien") `
   -Port 27140 `
   -Label 'installed'
 

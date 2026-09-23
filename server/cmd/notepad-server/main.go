@@ -9,12 +9,12 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
-	"sort"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
+	"notepad-server/internal/backup"
 	"notepad-server/internal/controller"
 	"notepad-server/internal/dao"
 	"notepad-server/internal/logic"
@@ -52,10 +52,18 @@ func applySQLitePragmas(ctx context.Context, db *sql.DB) {
 
 // 程序入口：启动 HTTP 服务并初始化数据库
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "--data-safety" {
+		runDataSafety(os.Args[2:])
+		return
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	dbPath := resolveDBPath()
+	if err := backup.CheckPending(dbPath); err != nil {
+		g.Log().Fatal(ctx, err)
+		return
+	}
 	if err := os.MkdirAll(filepath.Dir(dbPath), 0o755); err != nil {
 		g.Log().Fatal(ctx, fmt.Errorf("初始化数据目录失败: %w", err))
 		return
@@ -72,7 +80,7 @@ func main() {
 			_ = db.Close()
 		}
 	}()
-	
+
 	// 检测数据库是否损坏
 	if err := checkDatabaseIntegrity(db); err != nil {
 		g.Log().Warning(ctx, fmt.Errorf("数据库完整性检查失败: %w", err))
@@ -97,7 +105,7 @@ func main() {
 			return
 		}
 	}
-	
+
 	applySQLitePragmas(ctx, db)
 
 	if err := migrate(ctx, db); err != nil {
@@ -116,12 +124,12 @@ func main() {
 	go func() {
 		backupTicker := time.NewTicker(8 * time.Hour)
 		defer backupTicker.Stop()
-		
+
 		cleanupTicker := time.NewTicker(24 * time.Hour)
 		defer cleanupTicker.Stop()
-		
+
 		fileLogic := &logic.FileLogic{FileDAO: &dao.FileDAO{DB: db}}
-		
+
 		for {
 			select {
 			case <-backupTicker.C:
@@ -177,23 +185,23 @@ func main() {
 
 	// 注册业务路由
 	group := s.Group("/api")
-	
+
 	fileDAO := &dao.FileDAO{DB: db}
 	linkDAO := &dao.LinkDAO{DB: db}
 	versionDAO := &dao.VersionDAO{DB: db}
 	fileLogic := &logic.FileLogic{FileDAO: fileDAO, LinkDAO: linkDAO, VersionDAO: versionDAO}
 	fileController := &controller.FileController{FileLogic: fileLogic, LinkDAO: linkDAO}
-	
+
 	settingsDAO := &dao.SettingsDAO{DB: db}
 	settingsLogic := &logic.SettingsLogic{SettingsDAO: settingsDAO}
 	settingsController := &controller.SettingsController{SettingsLogic: settingsLogic}
-	
+
 	tagDAO := &dao.TagDAO{DB: db}
 	tagLogic := &logic.TagLogic{TagDAO: tagDAO}
 	tagController := &controller.TagController{TagLogic: tagLogic}
-	
+
 	uploadController := &controller.UploadController{UploadDir: uploadPath}
-	
+
 	fileController.Register(group)
 	settingsController.Register(group)
 	uploadController.Register(group)
@@ -595,78 +603,10 @@ func sqliteColumnExists(ctx context.Context, db *sql.DB, tableName string, colum
 	return false, nil
 }
 
-// 自动备份逻辑
+// Automatic snapshots share the verified backup engine; manual copies are retained.
 func performBackup(ctx context.Context, db *sql.DB, dbPath string) {
-	backupDir := filepath.Join(filepath.Dir(dbPath), "backups")
-	if err := os.MkdirAll(backupDir, 0755); err != nil {
-		g.Log().Error(ctx, "创建备份目录失败:", err)
-		return
-	}
-
-	entries, err := os.ReadDir(backupDir)
-	if err != nil {
-		g.Log().Error(ctx, "读取备份目录失败:", err)
-		return
-	}
-
-	var backups []string
-	for _, e := range entries {
-		if !e.IsDir() && strings.HasPrefix(e.Name(), "backup-") && strings.HasSuffix(e.Name(), ".db") {
-			backups = append(backups, e.Name())
-		}
-	}
-	// 按文件名排序（时间戳格式保证顺序）
-	sort.Strings(backups)
-
-	shouldBackup := true
-	if len(backups) > 0 {
-		lastBackup := backups[len(backups)-1]
-		// 解析文件名中的时间戳 backup-20060102-150405.db
-		tsStr := strings.TrimSuffix(strings.TrimPrefix(lastBackup, "backup-"), ".db")
-		if lastTime, err := time.Parse("20060102-150405", tsStr); err == nil {
-			// 如果距离上次备份不足 8 小时，则跳过
-			if time.Since(lastTime) < 8*time.Hour {
-				shouldBackup = false
-				g.Log().Debug(ctx, "距离上次备份不足8小时，跳过本次备份")
-			}
-		}
-	}
-
-	if shouldBackup {
-		newBackupName := fmt.Sprintf("backup-%s.db", time.Now().Format("20060102-150405"))
-		newBackupPath := filepath.Join(backupDir, newBackupName)
-
-		// 使用 VACUUM INTO 进行热备份
-		// 注意：VACUUM INTO 需要 SQLite 3.27.0+
-		// 这里使用参数化查询可能不被支持，直接拼接路径（路径由代码生成，相对安全）
-		// 为了防止路径中的反斜杠问题（Windows），最好替换为正斜杠或转义
-		// 但 sql.Exec 在处理字符串字面量时通常需要单引号
-
-		// 简单处理：将路径中的 \ 替换为 /
-		safePath := filepath.ToSlash(newBackupPath)
-
-		_, err = db.ExecContext(ctx, fmt.Sprintf("VACUUM INTO '%s'", safePath))
-		if err != nil {
-			g.Log().Error(ctx, "执行备份失败:", err)
-		} else {
-			g.Log().Info(ctx, "备份成功:", newBackupName)
-			backups = append(backups, newBackupName)
-		}
-	}
-
-	// 保留最近 100 个备份
-	if len(backups) > 100 {
-		toDelete := len(backups) - 100
-		g.Log().Info(ctx, fmt.Sprintf("当前备份数量: %d，需要删除 %d 个旧备份", len(backups), toDelete))
-		
-		for i := 0; i < toDelete; i++ {
-			path := filepath.Join(backupDir, backups[i])
-			if err := os.Remove(path); err != nil {
-				g.Log().Warning(ctx, "删除旧备份失败:", path, err)
-			} else {
-				g.Log().Info(ctx, "删除旧备份:", backups[i])
-			}
-		}
+	if err := backup.Automatic(ctx, db, dbPath); err != nil {
+		g.Log().Error(ctx, "自动备份失败，旧备份未因失败被清理:", err)
 	}
 }
 
@@ -683,60 +623,15 @@ func checkDatabaseIntegrity(db *sql.DB) error {
 	return nil
 }
 
-// 尝试从备份恢复数据库
+// The DB is closed by the caller. Every original is preserved before replacement.
 func tryRecoverDatabase(dbPath string) bool {
-	backupDir := filepath.Join(filepath.Dir(dbPath), "backups")
-	
-	// 查找最新备份
-	entries, err := os.ReadDir(backupDir)
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+	result, err := backup.Recover(ctx, dbPath)
 	if err != nil {
+		g.Log().Error(ctx, "自动恢复停止，原数据保留:", err)
 		return false
 	}
-	
-	var latestBackup string
-	var latestTime time.Time
-	
-	for _, e := range entries {
-		if e.IsDir() || !strings.HasPrefix(e.Name(), "backup-") || !strings.HasSuffix(e.Name(), ".db") {
-			continue
-		}
-		
-		tsStr := strings.TrimSuffix(strings.TrimPrefix(e.Name(), "backup-"), ".db")
-		if t, err := time.Parse("20060102-150405", tsStr); err == nil {
-			if t.After(latestTime) {
-				latestTime = t
-				latestBackup = e.Name()
-			}
-		}
-	}
-	
-	if latestBackup == "" {
-		return false
-	}
-	
-	// 关闭并删除损坏的数据库及相关文件
-	os.Remove(dbPath)
-	os.Remove(dbPath + "-shm")
-	os.Remove(dbPath + "-wal")
-	
-	// 复制备份
-	src := filepath.Join(backupDir, latestBackup)
-	dst := dbPath
-	
-	srcFile, err := os.Open(src)
-	if err != nil {
-		return false
-	}
-	defer srcFile.Close()
-	
-	dstFile, err := os.Create(dst)
-	if err != nil {
-		return false
-	}
-	defer dstFile.Close()
-	
-	_, err = io.Copy(dstFile, srcFile)
-	return err == nil
+	g.Log().Warning(ctx, "数据库已恢复；原数据库与伴随文件保留于:", result.PreservedDir)
+	return true
 }
-
-// 删除占位路由函数
