@@ -1903,6 +1903,133 @@ describe('UI redesign smoke tests', () => {
     expect(foreshadowTrack.textContent).toContain('已收束')
   })
 
+  it('renders storyline intersection matrix rhythm diagnostics and chapter hotspots', async () => {
+    localStorage.setItem(
+      'localNotepad.projectWorkspace.activeView',
+      'structure'
+    )
+    localStorage.setItem(
+      'localNotepad.projectWorkspace.v1',
+      JSON.stringify({
+        project: {
+          type: 'novel',
+          targetWords: 0,
+          chapterTargetWords: 0,
+          dailyGoal: 0,
+          weeklyGoal: 0,
+          deadline: '',
+          statuses: {},
+          summaries: {},
+          supportNoteIds: [],
+          foreshadowStates: {},
+          volumeMilestones: {},
+          chapterQueue: [],
+          sprint: null,
+          dailyReviews: {},
+          storylines: [
+            {
+              id: 'plot-main',
+              title: '调查主线',
+              type: 'plot',
+              sourceNoteId: '',
+              description: '',
+              events: [
+                { id: 'p1', noteId: 'chapter-1', stage: 'setup', note: '' },
+                { id: 'p2', noteId: 'chapter-5', stage: 'advance', note: '' },
+              ],
+            },
+            {
+              id: 'char-main',
+              title: '关关弧光',
+              type: 'character',
+              sourceNoteId: '',
+              description: '',
+              events: [
+                { id: 'c1', noteId: 'chapter-1', stage: 'entry', note: '' },
+                { id: 'c2', noteId: 'chapter-2', stage: 'desire', note: '' },
+              ],
+            },
+            {
+              id: 'foreshadow-main',
+              title: '副印伏笔',
+              type: 'foreshadow',
+              sourceNoteId: '',
+              description: '',
+              events: [
+                { id: 'f1', noteId: 'chapter-1', stage: 'plant', note: '' },
+                { id: 'f2', noteId: 'chapter-5', stage: 'payoff', note: '' },
+              ],
+            },
+          ],
+        },
+      })
+    )
+
+    const lexical = text => JSON.stringify({
+      root: {
+        children: [{
+          type: 'paragraph',
+          children: [{ type: 'text', text }],
+        }],
+      },
+    })
+
+    listAllFilesWithContent.mockResolvedValue([
+      { id: 'project', title: '交叉诊断项目', is_folder: true, parent_id: '', sort_order: 100 },
+      { id: 'volume-1', title: '第一卷', is_folder: true, parent_id: 'project', sort_order: 100 },
+      { id: 'volume-2', title: '第二卷', is_folder: true, parent_id: 'project', sort_order: 200 },
+      { id: 'chapter-1', title: '第一章.md', is_folder: false, parent_id: 'volume-1', sort_order: 100, content: lexical('一') },
+      { id: 'chapter-2', title: '第二章.md', is_folder: false, parent_id: 'volume-1', sort_order: 200, content: lexical('二') },
+      { id: 'chapter-3', title: '第三章.md', is_folder: false, parent_id: 'volume-1', sort_order: 300, content: lexical('三') },
+      { id: 'chapter-4', title: '第四章.md', is_folder: false, parent_id: 'volume-2', sort_order: 100, content: lexical('四') },
+      { id: 'chapter-5', title: '第五章.md', is_folder: false, parent_id: 'volume-2', sort_order: 200, content: lexical('五') },
+    ])
+    tagApi.list.mockResolvedValue([])
+    tagApi.getFilesByTag.mockResolvedValue([])
+
+    const onOpenFile = vi.fn()
+    await act(async () => {
+      root.render(
+        <ProjectWorkspacePanel
+          onOpenFile={onOpenFile}
+          onClose={() => {}}
+        />
+      )
+    })
+    await flushPromises()
+    await flushPromises()
+
+    const diagnostics = container.querySelector(
+      '.project-storyline-diagnostics'
+    )
+    expect(diagnostics).toBeTruthy()
+    expect(diagnostics.textContent).toContain('剧情线交叉与节奏诊断')
+    expect(diagnostics.textContent).toContain('跨卷轨迹矩阵')
+    expect(diagnostics.textContent).toContain('调查主线')
+    expect(diagnostics.textContent).toContain('最长断档 3 章')
+    expect(diagnostics.textContent).toContain('生命周期缺口')
+    expect(diagnostics.textContent).toContain('收束')
+    expect(diagnostics.textContent).toContain('章节交汇热点')
+    expect(diagnostics.textContent).toContain('3 条轨迹 / 3 节点')
+
+    const overloadedNode = Array.from(
+      container.querySelectorAll('.project-story-node.storyline-overloaded')
+    ).find(node => node.textContent.includes('第一章'))
+    expect(overloadedNode).toBeTruthy()
+
+    const hotspot = Array.from(
+      diagnostics.querySelectorAll('.project-storyline-hotspots button')
+    ).find(button => button.textContent.includes('第一章'))
+    expect(hotspot).toBeTruthy()
+    await click(hotspot)
+    expect(onOpenFile).toHaveBeenCalledWith('chapter-1')
+
+    const matrixRows = diagnostics.querySelectorAll(
+      '.project-storyline-matrix-row:not(.head)'
+    )
+    expect(matrixRows).toHaveLength(3)
+  })
+
   it('offers actionable empty states for projects without manuscript chapters', async () => {
     localStorage.setItem(
       'localNotepad.projectWorkspace.activeView',
