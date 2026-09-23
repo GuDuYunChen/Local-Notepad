@@ -299,3 +299,35 @@
     grid-column: auto;
   }
 }
+
+
+.project-relation-suggestion-stats em.confidence-high {
+  background: color-mix(in srgb, #4f9a67 10%, var(--paper));
+  color: #3f8557;
+}
+
+.project-relation-suggestion-stats em.confidence-medium {
+  background: color-mix(in srgb, #b97820 10%, var(--paper));
+  color: #95621c;
+}
+
+.project-relation-suggestion-stats em.confidence-exploratory {
+  background: color-mix(in srgb, var(--ink-muted) 7%, var(--paper));
+  color: var(--ink-muted);
+}
+
+.project-relation-suggestion-sources {
+  padding: 2px 4px;
+  border-radius: 99px;
+  background: var(--paper);
+}
+
+.project-relation-suggestion-evidence button {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.project-relation-suggestion-evidence button small {
+  grid-column: 1 / -1;
+  color: var(--ink-muted);
+  font-size: 5px;
+}
