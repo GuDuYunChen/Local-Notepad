@@ -247,3 +247,148 @@ export function getProjectStorylineSuggestions(
       title: item.title,
     }))
 }
+
+
+export function buildProjectStorylineDiagnostics(workspace, projectMeta = {}) {
+  const model = buildProjectStorylineModel(workspace, projectMeta)
+  const chapterCount = model.catalog.length
+  const chapterLoad = model.catalog.map(chapter => {
+    const events = model.chapterEvents[chapter.id] || []
+    const trackIds = [...new Set(events.map(item => item.trackId))]
+    const types = [...new Set(events.map(item => item.trackType))]
+    return {
+      ...chapter,
+      eventCount: events.length,
+      trackCount: trackIds.length,
+      trackIds,
+      types,
+      overloaded: trackIds.length >= 3,
+      intersection: trackIds.length >= 2,
+    }
+  })
+  const chapterLoadById = new Map(
+    chapterLoad.map(chapter => [chapter.id, chapter])
+  )
+
+  const tracks = model.tracks.map(track => {
+    const validEvents = track.events.filter(event => event.chapter)
+    const stages = getProjectStorylineStages(track.type)
+    const stageIndex = new Map(
+      stages.map((stage, index) => [stage.id, index])
+    )
+    const usedStages = new Set(validEvents.map(event => event.stage))
+    const missingStages = stages
+      .filter(stage => !usedStages.has(stage.id))
+      .map(stage => stage.label)
+
+    let maxGap = 0
+    let regressions = 0
+    let previousStageIndex = -1
+    for (let index = 0; index < validEvents.length; index += 1) {
+      const event = validEvents[index]
+      if (index > 0) {
+        const previous = validEvents[index - 1]
+        maxGap = Math.max(
+          maxGap,
+          Math.max(
+            0,
+            Number(event.chapter?.ordinal || 0) -
+            Number(previous.chapter?.ordinal || 0) -
+            1,
+          ),
+        )
+      }
+      const currentStageIndex = stageIndex.get(event.stage) ?? 0
+      if (previousStageIndex > currentStageIndex) regressions += 1
+      previousStageIndex = currentStageIndex
+    }
+
+    const volumeIds = [...new Set(
+      validEvents
+        .map(event => event.chapter?.volumeId)
+        .filter(Boolean)
+    )]
+    const span = validEvents.length
+      ? Math.max(
+        1,
+        Number(validEvents[validEvents.length - 1].chapter?.ordinal || 0) -
+        Number(validEvents[0].chapter?.ordinal || 0) +
+        1,
+      )
+      : 0
+
+    return {
+      id: track.id,
+      title: track.title,
+      type: track.type,
+      status: track.status,
+      eventCount: validEvents.length,
+      volumeCount: volumeIds.length,
+      span,
+      densityPercent: span > 0
+        ? Math.round((validEvents.length / span) * 100)
+        : 0,
+      maxGap,
+      longGap: maxGap >= 3,
+      missingStages,
+      regressions,
+      terminalMissing: Boolean(
+        validEvents.length &&
+        !track.resolved
+      ),
+    }
+  })
+
+  const volumeMatrix = model.tracks.map(track => {
+    const byVolume = {}
+    for (const volume of workspace?.volumes || []) {
+      const key = normalizeId(volume.id) || '__ungrouped__'
+      byVolume[key] = {
+        count: 0,
+        stages: [],
+      }
+    }
+
+    for (const event of track.events) {
+      if (!event.chapter) continue
+      const key = normalizeId(event.chapter.volumeId) || '__ungrouped__'
+      const bucket = byVolume[key] || {
+        count: 0,
+        stages: [],
+      }
+      bucket.count += 1
+      if (!bucket.stages.includes(event.stageLabel)) {
+        bucket.stages.push(event.stageLabel)
+      }
+      byVolume[key] = bucket
+    }
+
+    return {
+      id: track.id,
+      title: track.title,
+      type: track.type,
+      byVolume,
+    }
+  })
+
+  return {
+    model,
+    chapterLoad,
+    chapterLoadById,
+    tracks,
+    volumeMatrix,
+    totals: {
+      intersections: chapterLoad.filter(item => item.intersection).length,
+      overloadedChapters: chapterLoad.filter(item => item.overloaded).length,
+      longGapTracks: tracks.filter(track => track.longGap).length,
+      regressionTracks: tracks.filter(track => track.regressions > 0).length,
+      incompleteTracks: tracks.filter(track => (
+        track.eventCount > 0 &&
+        track.missingStages.length > 0
+      )).length,
+      terminalMissingTracks: tracks.filter(track => track.terminalMissing).length,
+      crossVolumeTracks: tracks.filter(track => track.volumeCount > 1).length,
+      chapterCount,
+    },
+  }
+}
