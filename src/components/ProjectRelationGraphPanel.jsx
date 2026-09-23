@@ -114,9 +114,19 @@ export default function ProjectRelationGraphPanel({
     }
 
     const existing = (projectMeta?.relations || []).find(item => (
-      item.sourceId === sourceId &&
-      item.targetId === targetId &&
-      item.type === newRelationType
+      item.type === newRelationType &&
+      (
+        (
+          item.sourceId === sourceId &&
+          item.targetId === targetId
+        ) ||
+        (
+          !relationDirected &&
+          item.directed === false &&
+          item.sourceId === targetId &&
+          item.targetId === sourceId
+        )
+      )
     ))
     if (existing) {
       toast.error('相同方向和类型的关系已经存在')
@@ -172,6 +182,7 @@ export default function ProjectRelationGraphPanel({
     }))
     if (selectedNodeId === entityId) setSelectedNodeId('')
     if (focusId === entityId) setFocusId('')
+    setSelectedRelationId('')
     setDeleteConfirm('')
   }
 
