@@ -113,7 +113,6 @@ export function normalizeProjectRelationEvents(value) {
       relationType,
       label: String(raw?.label || '').trim(),
       note: String(raw?.note || '').trim(),
-      events: normalizeProjectRelationEvents(raw?.events),
     })
   }
   return result
@@ -151,6 +150,7 @@ export function normalizeProjectRelations(value) {
         : Boolean(relationType?.directed),
       label: String(raw?.label || '').trim(),
       note: String(raw?.note || '').trim(),
+      events: normalizeProjectRelationEvents(raw?.events),
     })
   }
   return result
