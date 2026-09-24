@@ -7,6 +7,7 @@ import { initializeThemeFromStorage } from './services/themePreference'
 import './styles/index.css'
 import './styles/redesign.css'
 import './styles/editor-document.css'
+import './styles/dark-theme.css'
 
 initializeThemeFromStorage()
 

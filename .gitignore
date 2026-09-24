@@ -32,3 +32,9 @@ release
 bin
 test-results
 *.kiro
+
+# Generated from the shared brand master by npm run prepare:brand
+build/icon.png
+build/icon.ico
+build/icon.svg
+src/public/brand/
