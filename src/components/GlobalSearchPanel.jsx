@@ -4,6 +4,7 @@ import { evidenceNavigation } from '~/services/evidenceNavigation'
 import { toast } from '~/services/toast'
 import { searchLibrary, searchTitleSegments, prepareSearchLocation, SEARCH_KINDS, SEARCH_SOURCES } from '~/services/globalSearch'
 import SearchCollectionsPanel from './SearchCollectionsPanel'
+import CollectionStudyHub from './CollectionStudyHub'
 import useSearchCollections from '~/hooks/useSearchCollections'
 import SearchPresetsPanel from './SearchPresetsPanel'
 import SearchResultExportPanel from './SearchResultExportPanel'
@@ -33,7 +34,8 @@ function DialogFrame({ onClose, inputRef, children }) {
 // round-trip. Closing cancels requests and releases result snippets, not the draft.
 export default function GlobalSearchPanel({ open, onClose, onOpenFile, seed, onOpened, returnRequest }) {
   const [mode, setMode] = useState('search')
-  const collectionTabRef = useRef(null), searchTabRef = useRef(null)
+  const collectionTabRef = useRef(null), searchTabRef = useRef(null), studyTabRef = useRef(null)
+  const tabs = [['search', '检索结果', searchTabRef], ['collections', '本地资料集', collectionTabRef], ['study', '阅读批注', studyTabRef]]
   const [filters, setFilters] = useState(defaults)
   const [response, setResponse] = useState(null)
   const [folders, setFolders] = useState([])
@@ -189,20 +191,21 @@ export default function GlobalSearchPanel({ open, onClose, onOpenFile, seed, onO
   if (!open) return null
   // Unmount the focus trap while App's existing save/discard/cancel guard is open.
   if (opening) return <div className="global-search-opening" role="status">正在打开笔记；如有未保存内容，请先处理保存确认。</div>
-  return <DialogFrame onClose={close} inputRef={mode === 'search' ? inputRef : collectionTabRef}>
+  return <DialogFrame onClose={close} inputRef={mode === 'search' ? inputRef : mode === 'collections' ? collectionTabRef : studyTabRef}>
     <header className="global-search-header">
       <div><h2 id="global-search-title">全局检索</h2><p>在所有已保存笔记中查找，先看上下文，再回到正文。</p></div>
       <button type="button" onClick={close} aria-label="关闭全局检索">×</button>
     </header>
     <div className="global-search-tabs" role="tablist" aria-label="检索工作区">
-      {[['search', '检索结果', searchTabRef], ['collections', '本地资料集', collectionTabRef]].map(([id, title, ref]) =>
+      {tabs.map(([id, title, ref]) =>
         <button key={id} ref={ref} type="button" role="tab" id={'search-tab-' + id} aria-selected={mode === id}
           aria-controls={'search-mode-' + id} tabIndex={mode === id ? 0 : -1}
           onClick={() => setMode(id)} onKeyDown={event => {
-            if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+            if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key) || event.nativeEvent?.isComposing || event.keyCode === 229) return
             event.preventDefault()
-            const next = event.key === 'Home' ? 'search' : event.key === 'End' ? 'collections' : mode === 'search' ? 'collections' : 'search'
-            setMode(next); (next === 'search' ? searchTabRef : collectionTabRef).current?.focus()
+            const index = tabs.findIndex(item => item[0] === mode)
+            const target = event.key === 'Home' ? tabs[0] : event.key === 'End' ? tabs.at(-1) : tabs[(index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length]
+            setMode(target[0]); target[2].current?.focus()
           }}>{title}</button>)}
     </div>
     <div className="global-search-mode" role="tabpanel" id="search-mode-search" aria-labelledby="search-tab-search" hidden={mode !== 'search'}>
@@ -296,6 +299,12 @@ export default function GlobalSearchPanel({ open, onClose, onOpenFile, seed, onO
     <div className="global-search-mode" role="tabpanel" id="search-mode-collections" aria-labelledby="search-tab-collections" hidden={mode !== 'collections'}>
       {openError && mode === 'collections' && <p className="global-search-notice" role="alert">{openError}</p>}
       <SearchCollectionsPanel model={archives} onOpenFile={onOpenFile ? item => openResult(item, null, true) : null} />
+    </div>
+    <div className="global-search-mode" role="tabpanel" id="search-mode-study" aria-labelledby="search-tab-study" hidden={mode !== 'study'}>
+      <CollectionStudyHub active={open && mode === 'study'} onLocate={target => {
+        if (!archives.showStudy(target.entry, target.documentId)) throw new Error('资料集已更改或删除，请刷新阅读工作台')
+        setMode('collections'); collectionTabRef.current?.focus()
+      }} />
     </div>
   </DialogFrame>
 }

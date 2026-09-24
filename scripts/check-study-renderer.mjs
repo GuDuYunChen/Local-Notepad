@@ -12,7 +12,7 @@ const require = createRequire(import.meta.url)
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const directory = await mkdtemp(path.join(os.tmpdir(), 'notepad-study-native-'))
 try {
-  await build({ stdin: { contents: `export * from './src/services/collectionStudy.js'; export * from './src/services/collectionPackage.js'; export { createSearchCollectionStore } from './src/services/searchCollections.js';`,
+  await build({ stdin: { contents: `export * from './src/services/collectionStudy.js'; export * from './src/services/collectionPackage.js'; export * from './src/services/collectionStudyHub.js'; export { createSearchCollectionStore } from './src/services/searchCollections.js';`,
     resolveDir: root }, bundle: true, platform: 'browser', format: 'iife', globalName: 'StudyNative', outfile: path.join(directory, 'study.js') })
   const page = path.join(directory, 'study.html')
   await writeFile(page, '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Isolated study storage check</title></head><body><script src="./study.js"></script></body></html>')

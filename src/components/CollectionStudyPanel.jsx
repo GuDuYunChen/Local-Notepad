@@ -6,14 +6,15 @@ import { searchCollections } from '~/services/searchCollections'
 import CollectionStudyEditor from './CollectionStudyEditor'
 import './CollectionStudy.css'
 
-export default function CollectionStudyPanel({ entry, onResume, disabled = false, sourceStore = searchCollections, studyStore = collectionStudy }) {
-  return entry?.collection ? <StudyPanel key={entry.key + ':' + entry.raw} entry={entry} onResume={onResume} disabled={disabled} sourceStore={sourceStore} studyStore={studyStore} /> : null
+export default function CollectionStudyPanel({ entry, onResume, focusRequest = null, disabled = false, sourceStore = searchCollections, studyStore = collectionStudy }) {
+  return entry?.collection ? <StudyPanel key={entry.key + ':' + entry.raw} entry={entry} onResume={onResume} focusRequest={focusRequest} disabled={disabled} sourceStore={sourceStore} studyStore={studyStore} /> : null
 }
-function StudyPanel({ entry, onResume, disabled, sourceStore, studyStore }) {
+function StudyPanel({ entry, onResume, focusRequest, disabled, sourceStore, studyStore }) {
   const model = useCollectionStudy(entry, { sourceStore, studyStore })
   const [editing, setEditing] = useState(''), [status, setStatus] = useState('all'), [query, setQuery] = useState(''), [page, setPage] = useState(1)
   const [message, setMessage] = useState(''), [preview, setPreview] = useState(null), [reading, setReading] = useState(false)
   const operation = useRef(0), live = useRef(true)
+  const detailsRef = useRef(null), editorRef = useRef(null), appliedFocus = useRef(null)
   useEffect(() => { live.current = true; return () => { live.current = false; operation.current++ } }, [])
   useEffect(() => { if (disabled) { operation.current++; setReading(false); setPreview(null) } }, [disabled])
   const snapshot = model.snapshot, counts = snapshot ? summarizeCollectionStudy(snapshot) : null
@@ -27,6 +28,19 @@ function StudyPanel({ entry, onResume, disabled, sourceStore, studyStore }) {
   })
   const pages = Math.max(1, Math.ceil(rows.length / 8)), currentPage = Math.min(page, pages)
   const locked = disabled || model.busy || model.loading || reading
+  useEffect(() => {
+    if (!focusRequest || !snapshot || model.loading || focusRequest.key !== entry.key || focusRequest.raw !== entry.raw || appliedFocus.current === focusRequest.token) return
+    const index = snapshot.collection.report.items.findIndex(item => item.id === focusRequest.documentId)
+    if (index < 0) return
+    appliedFocus.current = focusRequest.token
+    setQuery(''); setStatus('all'); setPage(Math.floor(index / 8) + 1); setEditing(focusRequest.documentId)
+    if (detailsRef.current) detailsRef.current.open = true
+  }, [focusRequest, snapshot, model.loading, entry.key, entry.raw])
+  useEffect(() => {
+    if (editing && focusRequest?.documentId === editing && appliedFocus.current === focusRequest.token) {
+      editorRef.current?.focus({ preventScroll: true }); editorRef.current?.scrollIntoView?.({ block: 'nearest' })
+    }
+  }, [editing, focusRequest])
   const importFile = async file => {
     if (!file || locked) return
     const seq = ++operation.current; setReading(true); setPreview(null); setMessage('')
@@ -38,7 +52,7 @@ function StudyPanel({ entry, onResume, disabled, sourceStore, studyStore }) {
     } catch (failure) { if (live.current && seq === operation.current) setMessage(failure.message || '文件读取失败') }
     finally { if (live.current && seq === operation.current) setReading(false) }
   }
-  return <details className="collection-study-panel"><summary>阅读进度与批注{counts ? ` · 已读 ${counts.read} / ${snapshot.collection.report.count}` : ''}</summary>
+  return <details ref={detailsRef} className="collection-study-panel"><summary>阅读进度与批注{counts ? ` · 已读 ${counts.read} / ${snapshot.collection.report.count}` : ''}</summary>
     <p>点击保存才写入本地。只保存人工标记、批注与笔记级书签，不保存正文或光标位置；批注与历史资料集分开存储。</p>
     {model.error && <p role="alert">{model.error}</p>}
     {message && <p role="status">{message}</p>}
@@ -77,7 +91,7 @@ function StudyPanel({ entry, onResume, disabled, sourceStore, studyStore }) {
       </article>)}</div>
       {!rows.length && <p>没有符合条件的已存阅读记录；未删除任何条目。</p>}
       <nav className="collection-study-actions" aria-label="阅读记录分页"><button type="button" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>阅读记录上一页</button><span>第 {currentPage} / {pages} 页 · {rows.length} 篇</span><button type="button" disabled={currentPage >= pages} onClick={() => setPage(currentPage + 1)}>阅读记录下一页</button></nav>
-      {editing && <div key={editing}><h4>编辑：{snapshot.collection.report.items.find(item => item.id === editing)?.title || editing}</h4><CollectionStudyEditor model={model} documentId={editing} disabled={locked || !!preview} /></div>}
+      {editing && <div ref={editorRef} tabIndex={-1} key={editing} aria-label="工作台定位的批注编辑器"><h4>编辑：{snapshot.collection.report.items.find(item => item.id === editing)?.title || editing}</h4><CollectionStudyEditor model={model} documentId={editing} disabled={locked || !!preview} /></div>}
     </>}
   </details>
 }

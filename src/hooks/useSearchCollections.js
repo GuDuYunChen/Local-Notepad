@@ -16,6 +16,8 @@ export default function useSearchCollections({ active, store = searchCollections
   const [deleting, setDeleting] = useState(null), [preview, setPreview] = useState(null)
   const [restoreTick, setRestoreTick] = useState(0), [focusRequest, setFocusRequest] = useState(null)
   const [checkStale, setCheckStale] = useState(false)
+  const [studyTarget, setStudyTarget] = useState(null)
+  const studySequence = useRef(0)
   const pendingRestore = useRef(null)
   const operation = useRef(null), latest = useRef(null)
   const selected = shelf.entries.find(entry => entry.key === selectedKey) || null
@@ -53,7 +55,7 @@ export default function useSearchCollections({ active, store = searchCollections
     try { return action() } catch (failure) { setError(failure.message || '操作未完成，原资料集保留'); refresh() }
   }
   const choose = key => {
-    cancel(); setSelectedKey(key); setCheck(null); setPage(1); setQuery(''); setStatus('all'); setMessage(''); setError(''); setDeleting(null)
+    cancel(); setStudyTarget(null); setSelectedKey(key); setCheck(null); setPage(1); setQuery(''); setStatus('all'); setMessage(''); setError(''); setDeleting(null)
   }
   const inspect = async (reportFormat = null) => {
     if (!active || !selected?.collection || operation.current) return
@@ -91,7 +93,15 @@ export default function useSearchCollections({ active, store = searchCollections
     } catch (failure) { if (operation.current === controller && !controller.signal.aborted) setError(failure.message || '文件读取失败') }
     finally { if (operation.current === controller) { operation.current = null; setBusy(false) } }
   }
-  return { store, shelf, selected, check, checkStale, focusRequest, page, setPage, query, status, message, error, busy, progress, deleting, preview,
+  return { store, shelf, selected, studyTarget,
+    showStudy: (entry, documentId) => run(() => {
+      const collection = readSearchCollection(store.readUnchanged(entry))
+      if (!collection.report.items.some(item => item.id === documentId)) throw new Error('批注条目不在来源资料集中')
+      choose(entry.key); refresh()
+      setStudyTarget({ key: entry.key, raw: entry.raw, documentId, token: ++studySequence.current })
+      return true
+    }),
+    check, checkStale, focusRequest, page, setPage, query, status, message, error, busy, progress, deleting, preview,
     exportReview: format => inspect(format),
     prepareOpen: item => run(() => {
       if (!selected?.collection) return null

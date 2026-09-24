@@ -45,7 +45,22 @@ app.whenReady().then(async () => {
     const restoredEntry = source.list().entries.find(item => item.collection?.id === packagePreview.collection.id)
     const paired = await study.load(restoredEntry, source)
     if (paired.data.bookmark.id !== 'native-64' || paired.data.records[0].note !== saved.data.records[0].note || source.list().entries.length !== 2) throw new Error('Restored pair differs after restart')
-    return { pairedRestore: true, records: saved.data.records.length, bookmark: saved.data.bookmark.id, secure: isSecureContext, locks: !!navigator.locks }
+    const hub = StudyNative.createCollectionStudyHub({ sourceStore: source, studyStore: study })
+    const aggregate = await hub.load()
+    if (aggregate.rows.length !== 130 || aggregate.counts.notes !== 2 || aggregate.issues.length) throw new Error('Native study hub coverage differs')
+    const selected = StudyNative.selectCollectionStudyHub(aggregate, { notesOnly: true })
+    if (selected.total !== 2 || new Set(selected.rows.map(row => row.key)).size !== 2) throw new Error('Hub merged separate annotations')
+    const readingList = JSON.parse(hub.export(aggregate, { notesOnly: true }, 'json').text)
+    if (readingList.count !== 2 || !readingList.items.every(item => item.note === saved.data.records[0].note)) throw new Error('Native hub export lost annotations')
+    const located = hub.locate(aggregate, selected.rows[0].key)
+    if (located.documentId !== 'native-64') throw new Error('Native hub mapped wrong note')
+    const currentStudy = await study.load(entry, source)
+    const changedBookmark = await study.bookmark(currentStudy, 'native-0', { sourceStore: source })
+    let staleHubRejected = false
+    try { hub.export(aggregate, {}, 'json') } catch { staleHubRejected = true }
+    if (!staleHubRejected) throw new Error('Native hub exported stale storage')
+    await study.bookmark(changedBookmark, 'native-64', { sourceStore: source })
+    return { studyHub: true, pairedRestore: true, records: saved.data.records.length, bookmark: saved.data.bookmark.id, secure: isSecureContext, locks: !!navigator.locks }
   })()`)
   console.log('STUDY_NATIVE_OK:' + phase + ' ' + JSON.stringify(result))
   window.webContents.session.flushStorageData()

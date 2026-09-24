@@ -35,7 +35,7 @@ export default function SearchCollectionsPanel({ model, onOpenFile }) {
     <CollectionPackageTransfer entry={selected} disabled={locked || !!shelf.error} onImported={value => {
       model.refresh(); model.choose('localNotepad.searchCollection.v1:' + value.id)
     }} />
-    <CollectionStudyPanel entry={selected} sourceStore={model.store} onResume={onOpenFile ? (item, options) => onOpenFile({ ...item, studyResume: options?.unfiltered === true }) : null} disabled={locked} />
+    <CollectionStudyPanel focusRequest={model.studyTarget} entry={selected} sourceStore={model.store} onResume={onOpenFile ? (item, options) => onOpenFile({ ...item, studyResume: options?.unfiltered === true }) : null} disabled={locked} />
     <details className="search-collections-review-report"><summary>复查报告与阅读说明</summary>
       <p>导出前会重新读取原范围的全部当前结果。报告包含全部历史条目与当前额外匹配，不受下面的筛选、分页限制；不含正文或节选，不会更新或覆盖资料集。</p>
       <div className="search-collections-tools">
