@@ -102,6 +102,9 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: npm run build
 
+      - name: Verify native reading storage
+        run: node scripts/check-study-renderer.mjs
+
       - name: Verify packaged Windows application
         shell: pwsh
         run: .\.github\scripts\windows-package-smoke.ps1

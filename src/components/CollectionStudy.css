@@ -1,0 +1,16 @@
+.collection-study-panel, .collection-study-editor { min-width: 0; margin-top: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); color: var(--ink); font-size: 13px; line-height: 1.7; }
+.collection-study-panel summary, .collection-reading-study > summary { cursor: pointer; font-weight: 600; }
+.collection-study-panel p, .collection-study-editor p { overflow-wrap: anywhere; }
+.collection-study-actions, .collection-study-filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0; }
+.collection-study-filters label, .collection-study-editor label { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1 1 160px; margin: 6px 0; }
+.collection-study-panel :is(input, select, textarea), .collection-study-editor :is(select, textarea) { width: 100%; min-width: 0; box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); color: var(--ink); font: inherit; }
+.collection-study-editor textarea { resize: vertical; min-height: 90px; max-height: 220px; }
+.collection-study-panel button, .collection-study-editor button { min-height: 36px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--ink); cursor: pointer; }
+.collection-study-panel :is(button,input,select,textarea):focus-visible, .collection-study-editor :is(button,select,textarea):focus-visible { outline: 2px solid var(--clay); outline-offset: 2px; }
+.collection-study-panel button:disabled, .collection-study-editor button:disabled { opacity: .5; cursor: default; }
+.collection-study-list { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,280px),1fr)); gap: 8px; }
+.collection-study-list article { min-width: 0; border: 1px solid var(--line); border-radius: 8px; padding: 10px; overflow-wrap: anywhere; }
+.collection-study-list span { display: block; color: var(--ink-muted); font-size: 12px; }
+.collection-study-note { white-space: pre-wrap; }
+.collection-reading-study { flex: 1 1 100%; min-width: 0; max-height: min(45vh,400px); overflow: auto; }
+.collection-study-editor small { color: var(--ink-muted); }

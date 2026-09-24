@@ -1,14 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { SEARCH_COLLECTION_PREFIX, searchCollections } from '~/services/searchCollections'
 import { readCollectionReadingContext, stepCollectionReading } from '~/services/collectionReading'
+import useCollectionStudy from '~/hooks/useCollectionStudy'
+import { collectionStudy, nextUnreadCollectionItem, summarizeCollectionStudy } from '~/services/collectionStudy'
+import { createCollectionReadingContext } from '~/services/collectionReading'
+import CollectionStudyEditor from './CollectionStudyEditor'
 import './SearchReturnBar.css'
 
-export default function CollectionReadingBar({ origin, documentId, dirty, paused = false, onOpenFile, onMove, onReturn, onEnd, store = searchCollections }) {
+export default function CollectionReadingBar({ origin, documentId, dirty, paused = false, onOpenFile, onMove, onReturn, onEnd, store = searchCollections, studyStore = collectionStudy }) {
   const [busy, setBusy] = useState(false), [error, setError] = useState('')
   const [stale, setStale] = useState(false)
   const operation = useRef(null), latest = useRef(null)
   latest.current = { origin, documentId, paused }
   const visible = origin?.kind === 'collection' && origin.documentId === documentId
+  const study = useCollectionStudy(visible ? origin.entry : null, { sourceStore: store, studyStore })
   const cancel = () => { operation.current?.abort(); operation.current = null; setBusy(false) }
   useEffect(() => {
     setError(''); setBusy(false)
@@ -24,7 +29,7 @@ export default function CollectionReadingBar({ origin, documentId, dirty, paused
   }, [origin, visible, store])
   useEffect(() => { if (paused) cancel() }, [paused])
   const move = async direction => {
-    if (!visible || paused || operation.current || !onOpenFile) return
+    if (!visible || paused || study.busy || operation.current || !onOpenFile) return
     const controller = new AbortController(); operation.current = controller
     setBusy(true); setError('')
     const valid = () => {
@@ -32,7 +37,8 @@ export default function CollectionReadingBar({ origin, documentId, dirty, paused
       try { readCollectionReadingContext(origin, store); return true } catch { return false }
     }
     try {
-      const next = stepCollectionReading(origin, direction, store)
+      const unread = direction === 'unread' && study.snapshot ? nextUnreadCollectionItem(study.snapshot, documentId, origin.queue) : null
+      const next = direction === 'unread' ? (unread ? createCollectionReadingContext(origin.entry, origin.checkReport ? { currentReport: origin.checkReport } : null, origin.view, unread.id) : null) : stepCollectionReading(origin, direction, store)
       if (!next) return
       const accepted = await onOpenFile(next.documentId, { signal: controller.signal, shouldSelect: valid })
       if (controller.signal.aborted || operation.current !== controller) return
@@ -51,9 +57,20 @@ export default function CollectionReadingBar({ origin, documentId, dirty, paused
       {error && <p role="alert">{error}</p>}
       {busy && <small role="status">正在打开；请处理未保存确认，取消后不推进位置。</small>}
     </div>
-    <button type="button" disabled={busy || paused || stale || origin.index <= 0 || !onOpenFile} onClick={() => void move(-1)}>上一资料</button>
-    <button type="button" disabled={busy || paused || stale || origin.index >= origin.queue.length - 1 || !onOpenFile} onClick={() => void move(1)}>下一资料</button>
-    <button type="button" disabled={busy || paused} onClick={onReturn}>返回资料集</button>
-    <button type="button" disabled={busy || paused} onClick={onEnd}>结束资料集阅读</button>
+    <button type="button" disabled={busy || study.busy || paused || stale || origin.index <= 0 || !onOpenFile} onClick={() => void move(-1)}>上一资料</button>
+    <button type="button" disabled={busy || study.busy || paused || stale || origin.index >= origin.queue.length - 1 || !onOpenFile} onClick={() => void move(1)}>下一资料</button>
+    <button type="button" disabled={busy || study.busy || paused || stale || !onOpenFile || !study.snapshot || study.loading || !nextUnreadCollectionItem(study.snapshot, documentId, origin.queue)} onClick={() => void move('unread')}>下一未读资料</button>
+    <button type="button" disabled={busy || study.busy || paused} onClick={onReturn}>返回资料集</button>
+    <button type="button" disabled={busy || study.busy || paused} onClick={onEnd}>结束资料集阅读</button>
+    <details className="collection-reading-study"><summary>阅读进度与批注</summary>
+      {study.error && <p role="alert">{study.error}</p>}
+      {study.loading && <p role="status">正在读取阅读记录…</p>}
+      {study.snapshot && <>
+        <p>已读 {summarizeCollectionStudy(study.snapshot).read} / {study.snapshot.collection.report.count} 篇（整份资料集）；下一未读只遍历本次阅读队列，待复看也会保留。</p>
+        <button type="button" disabled={busy || study.busy || paused || stale || study.busy || study.loading} onClick={() => void study.write((snapshot, options) => studyStore.bookmark(snapshot, documentId, options))}>记住当前阅读位置</button>
+      </>}
+      <CollectionStudyEditor key={origin.entry.key + documentId} model={study} documentId={documentId} disabled={busy || study.busy || paused} />
+      <button type="button" disabled={study.busy || study.loading || busy || paused} onClick={() => void study.refresh()}>重新读取阅读记录</button>
+    </details>
   </section>
 }

@@ -91,12 +91,12 @@ export default function useSearchCollections({ active, store = searchCollections
     } catch (failure) { if (operation.current === controller && !controller.signal.aborted) setError(failure.message || '文件读取失败') }
     finally { if (operation.current === controller) { operation.current = null; setBusy(false) } }
   }
-  return { shelf, selected, check, checkStale, focusRequest, page, setPage, query, status, message, error, busy, progress, deleting, preview,
+  return { store, shelf, selected, check, checkStale, focusRequest, page, setPage, query, status, message, error, busy, progress, deleting, preview,
     exportReview: format => inspect(format),
     prepareOpen: item => run(() => {
       if (!selected?.collection) return null
       const raw = store.readUnchanged(selected)
-      return createCollectionReadingContext({ key: selected.key, raw }, check, { query, status }, item.id)
+      return createCollectionReadingContext({ key: selected.key, raw }, item.studyResume === true ? null : check, item.studyResume === true ? { query: '', status: 'all' } : { query, status }, item.id)
     }),
     markOpened: () => setCheckStale(Boolean(check)),
     restoreReading: context => run(() => {

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react'
 import { MAX_SEARCH_COLLECTIONS } from '~/services/searchCollections'
 import { selectCollectionRows, COLLECTION_STATUS_LABELS as labels } from '~/services/collectionReading'
+import CollectionStudyPanel from './CollectionStudyPanel'
 import './SearchCollectionsPanel.css'
 
 const date = value => new Date(value).toLocaleString('zh-CN')
@@ -30,6 +31,7 @@ export default function SearchCollectionsPanel({ model, onOpenFile }) {
       <button type="button" disabled={locked || !collection || !!shelf.error} onClick={model.export}>备份此资料集 JSON</button>
       <button type="button" disabled={locked || !selected || !!shelf.error} onClick={model.requestDelete}>删除此资料集</button>
     </div>
+    <CollectionStudyPanel entry={selected} sourceStore={model.store} onResume={onOpenFile ? (item, options) => onOpenFile({ ...item, studyResume: options?.unfiltered === true }) : null} disabled={locked} />
     <details className="search-collections-review-report"><summary>复查报告与阅读说明</summary>
       <p>导出前会重新读取原范围的全部当前结果。报告包含全部历史条目与当前额外匹配，不受下面的筛选、分页限制；不含正文或节选，不会更新或覆盖资料集。</p>
       <div className="search-collections-tools">
@@ -51,7 +53,7 @@ export default function SearchCollectionsPanel({ model, onOpenFile }) {
       <button type="button" onClick={model.confirmImport}>确认导入独立资料集</button>
     </div>}
     {deleting && <div className="search-collections-notice" role="group" aria-label="确认删除资料集">
-      <p>删除“{deleting.collection?.name || '不可读取的资料集'}”？只移除此份本地清单，不删除笔记；需要保留时请先备份。</p>
+      <p>删除“{deleting.collection?.name || '不可读取的资料集'}”？只移除此份本地清单，不删除笔记；单独保存的阅读记录不会自动删除，需要保留时请先分别备份资料集与阅读记录。</p>
       <button type="button" onClick={() => { model.cancelDelete(); selectRef.current?.focus() }}>取消删除资料集</button>
       <button type="button" onClick={() => { model.confirmDelete(); selectRef.current?.focus() }}>确认删除资料集</button>
     </div>}
