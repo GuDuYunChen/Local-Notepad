@@ -9,6 +9,7 @@ import SearchPresetsPanel from './SearchPresetsPanel'
 import SearchResultExportPanel from './SearchResultExportPanel'
 import useSearchResultExport from '~/hooks/useSearchResultExport'
 import { createSearchReturnContext, restoreSearchReturnFilters } from '~/services/searchReturn'
+import { readCollectionReadingContext } from '~/services/collectionReading'
 import { applySearchPresetFilters } from '~/services/searchPresets'
 import './GlobalSearchPanel.css'
 
@@ -69,6 +70,7 @@ export default function GlobalSearchPanel({ open, onClose, onOpenFile, seed, onO
 
   useEffect(() => {
     if (!open || !returnRequest || appliedReturn.current === returnRequest) return
+    if (returnRequest.context?.kind === 'collection') { setMode('collections'); return }
     appliedReturn.current = returnRequest
     setMode('search')
     try {
@@ -119,6 +121,11 @@ export default function GlobalSearchPanel({ open, onClose, onOpenFile, seed, onO
   const collection = useSearchResultExport({ open, ready: ready && mode === 'search', filters, response, opening })
   const archives = useSearchCollections({ active: open && mode === 'collections' && !opening })
   useEffect(() => {
+    if (!open || mode !== 'collections' || opening || returnRequest?.context?.kind !== 'collection' || appliedReturn.current === returnRequest) return
+    appliedReturn.current = returnRequest
+    setOpenError(''); archives.restoreReading(returnRequest.context)
+  }, [open, mode, opening, returnRequest])
+  useEffect(() => {
     if (!open || !ready || !listRef.current) return
     const saved = listScroll.current
     listRef.current.scrollTop = saved.page === response.page ? saved.top : 0
@@ -135,16 +142,24 @@ export default function GlobalSearchPanel({ open, onClose, onOpenFile, seed, onO
   }
   const openResult = async (item, snippet, archived = false) => {
     if ((!ready && !archived) || operation.current || !onOpenFile || !item) return
-    if (archived && !archives.canOpen(item)) return
+    const archiveContext = archived ? archives.prepareOpen(item) : null
+    if (archived && !archiveContext) return
     const controller = new AbortController(); operation.current = controller
     setOpening(true); setOpenError('')
     try {
       const target = snippet ? await prepareSearchLocation(item, snippet, controller.signal) : null
       if (controller.signal.aborted || !current.current.open) return
-      const context = archived ? null : createSearchReturnContext(item, filters, response, listRef.current?.scrollTop ?? listScroll.current.top)
-      const accepted = await current.current.onOpenFile(item.id)
+      const context = archived ? archiveContext : createSearchReturnContext(item, filters, response, listRef.current?.scrollTop ?? listScroll.current.top)
+      const accepted = archived ? await current.current.onOpenFile(item.id, {
+        signal: controller.signal,
+        shouldSelect: () => {
+          if (controller.signal.aborted || !current.current.open || operation.current !== controller) return false
+          try { readCollectionReadingContext(archiveContext); return true } catch { return false }
+        },
+      }) : await current.current.onOpenFile(item.id)
       if (controller.signal.aborted || !current.current.open) return
       if (accepted === false) { setOpenError('已取消打开，原草稿与检索条件均已保留。'); return }
+      if (archived) archives.markOpened()
       if (archived || context) current.current.onOpened?.(context)
       if (target) evidenceNavigation.start(item.id, target, () => toast.warning('笔记尚未就绪，定位已取消；请重新检索后定位'))
       setFilters(previous => ({ ...previous, revision: '' })); current.current.onClose?.()

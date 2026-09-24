@@ -14,6 +14,7 @@ export default function useGuardedNoteOpener({ currentId, workspace, navigationE
     const operation = pending.current
     pending.current = null
     operation.controller.abort()
+    operation.cleanup?.()
     operation.resolve(false)
   }, [])
   useEffect(() => {
@@ -22,7 +23,7 @@ export default function useGuardedNoteOpener({ currentId, workspace, navigationE
   useEffect(() => cancel, [cancel])
 
   return useCallback((id, options = {}) => {
-    if (!id) return Promise.resolve(false)
+    if (!id || options.signal?.aborted) return Promise.resolve(false)
     cancel()
     const sequence = ++generation.current
     const epoch = navigationEpoch.current
@@ -30,8 +31,15 @@ export default function useGuardedNoteOpener({ currentId, workspace, navigationE
     return new Promise(resolve => {
       const operation = { sequence, epoch, controller, resolve }
       pending.current = operation
-      const valid = () => pending.current === operation && navigationEpoch.current === epoch
+      const abort = () => { if (pending.current === operation) cancel() }
+      operation.cleanup = () => options.signal?.removeEventListener('abort', abort)
+      options.signal?.addEventListener('abort', abort, { once: true })
+      const valid = () => {
+        if (pending.current !== operation || navigationEpoch.current !== epoch || controller.signal.aborted || options.signal?.aborted) return false
+        try { return options.shouldSelect?.() !== false } catch { return false }
+      }
       const finish = accepted => {
+        operation.cleanup()
         if (pending.current === operation) pending.current = null
         resolve(accepted)
       }

@@ -77,3 +77,32 @@ describe('guarded chapter opens', () => {
     expect(await open(id)).toBe(true)
     expect(api.mock.calls[0][0]).toBe('/api/files/' + encodeURIComponent(id))
   })
+
+it('an already-aborted external signal never fetches or starts a guard', async () => {
+  const selected = vi.fn(), controller = new AbortController(); controller.abort()
+  await render({ onSelectFile: selected }); expect(await open('c2', { signal: controller.signal })).toBe(false)
+  expect(api).not.toHaveBeenCalled(); expect(selected).not.toHaveBeenCalled()
+})
+it('external cancellation settles a hanging file read and ignores its late return', async () => {
+  let finish; api.mockImplementation(() => new Promise(resolve => { finish = resolve }))
+  const selected = vi.fn(), controller = new AbortController(); await render({ onSelectFile: selected })
+  const result = open('c2', { signal: controller.signal }); await drain(); controller.abort()
+  expect(await result).toBe(false); finish({ id: 'c2' }); await drain(); expect(selected).not.toHaveBeenCalled()
+})
+it('checks source validity after the fetch and again before committing a delayed guard', async () => {
+  api.mockResolvedValue({ id: 'c2' }); let valid = true, guard
+  await render({ onSelectFile: (_file, options) => { guard = options } })
+  const result = open('c2', { shouldSelect: () => valid }); await drain(); valid = false
+  expect(guard.shouldSelect()).toBe(false); guard.onCancel(); expect(await result).toBe(false)
+})
+it('a throwing source validator fails closed without selecting a note', async () => {
+  api.mockResolvedValue({ id: 'c2' }); const selected = vi.fn(); await render({ onSelectFile: selected })
+  expect(await open('c2', { shouldSelect: () => { throw new Error('unavailable') } })).toBe(false)
+  expect(selected).not.toHaveBeenCalled()
+})
+it('removes external abort listeners after success and cancellation', async () => {
+  api.mockResolvedValue({ id: 'c2' }); const controller = new AbortController()
+  const remove = vi.spyOn(controller.signal, 'removeEventListener')
+  await render({ onSelectFile: (_file, options) => options.afterSelect() })
+  expect(await open('c2', { signal: controller.signal })).toBe(true); expect(remove).toHaveBeenCalledWith('abort', expect.any(Function))
+})

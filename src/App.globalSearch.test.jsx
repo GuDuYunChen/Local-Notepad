@@ -106,3 +106,69 @@ it('saved collection discard opens current note without restoring archived conte
  expect(container.querySelector('[aria-label="检索返回导航"]')).toBeNull()
  expect(mocks.clear).toHaveBeenCalledOnce();expect(evidenceNavigation.peek()).toBeNull()
 })
+
+async function startCollectionReading(target = 'n7', prepare = true) {
+  const { collectionReport } = await import('./test/collectionFixtures')
+  if (prepare) {
+    searchCollections.save('连续阅读资料', collectionReport())
+    api.mockImplementation(async path => {
+      if (path.startsWith('/api/files/')) { const id = decodeURIComponent(path.slice('/api/files/'.length)); return { id, title: '当前 ' + id, content: '已存正文' } }
+      return result()
+    })
+  }
+  await click('打开全局检索入口'); await settle(); await click('本地资料集')
+  const select = container.querySelector('[aria-label="已保存资料集"]')
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(select, searchCollections.list().entries[0].key)
+    select.dispatchEvent(new Event('change', { bubbles: true }))
+  })
+  const row = container.querySelector('[aria-label="资料集条目 ' + target + '"]')
+  await act(async () => row.querySelector('button').click()); await settle()
+}
+it('shows a collection reading bar and returns across pages by identity without dropping a draft', async () => {
+  await startCollectionReading()
+  expect(container.querySelector('[aria-label="资料集连续阅读"]')).toBeTruthy()
+  expect(container.querySelector('[aria-label="检索返回导航"]')).toBeNull()
+  await click('下一资料'); await settle()
+  expect(container.querySelector('.workspace-title-button').textContent).toBe('当前 n8')
+  expect(container.querySelector('[aria-label="资料集连续阅读"]').textContent).toContain('第 9 / 23 篇')
+  await click('编辑测试正文'); await click('返回资料集'); await settle()
+  const row = container.querySelector('[aria-label="资料集条目 n8"]')
+  expect(row).toBeTruthy(); expect(document.activeElement).toBe(row)
+  expect(container.querySelector('.workspace-save-chip').textContent).toBe('未保存'); expect(mocks.clear).not.toHaveBeenCalled()
+})
+it('next collection note uses cancel and discard decisions before advancing the reading position', async () => {
+  await startCollectionReading(); await click('编辑测试正文'); await click('下一资料'); await click('取消'); await settle()
+  expect(container.querySelector('.workspace-title-button').textContent).toBe('当前 n7')
+  expect(container.querySelector('[aria-label="资料集连续阅读"]').textContent).toContain('第 8 / 23 篇')
+  expect(container.querySelector('.workspace-save-chip').textContent).toBe('未保存')
+  await click('下一资料'); await click('不保存'); await settle()
+  expect(container.querySelector('.workspace-title-button').textContent).toBe('当前 n8')
+  expect(container.querySelector('[aria-label="资料集连续阅读"]').textContent).toContain('第 9 / 23 篇')
+  expect(mocks.clear).toHaveBeenCalledOnce()
+})
+it('a missing next note does not advance or skip to a different identity', async () => {
+  await startCollectionReading()
+  api.mockImplementation(async path => path === '/api/files/n8' ? { id: 'n8', is_deleted: true } : result())
+  await click('下一资料'); await settle()
+  expect(container.querySelector('.workspace-title-button').textContent).toBe('当前 n7')
+  expect(container.querySelector('[aria-label="资料集连续阅读"]').textContent).toContain('第 8 / 23 篇')
+  expect(container.textContent).toContain('不自动跳过')
+  expect(api.mock.calls.some(([path]) => path === '/api/files/n9')).toBe(false)
+})
+it('deleting a source while the save dialog is open prevents the destination from being selected', async () => {
+  await startCollectionReading(); await click('编辑测试正文'); await click('下一资料')
+  const entry = searchCollections.list().entries[0]
+  await act(async () => searchCollections.remove(entry))
+  await click('不保存'); await settle()
+  expect(container.querySelector('.workspace-title-button').textContent).toBe('当前 n7')
+  expect(container.querySelector('[aria-label="资料集连续阅读"]').textContent).toContain('已停用')
+  expect(container.querySelector('.workspace-save-chip').textContent).toBe('未保存'); expect(mocks.clear).not.toHaveBeenCalled()
+})
+it('ending collection reading only removes the navigation bar and preserves the current draft', async () => {
+  await startCollectionReading(); await click('编辑测试正文'); await click('结束资料集阅读'); await settle()
+  expect(container.querySelector('[aria-label="资料集连续阅读"]')).toBeNull()
+  expect(container.querySelector('.workspace-title-button').textContent).toBe('当前 n7')
+  expect(container.querySelector('.workspace-save-chip').textContent).toBe('未保存')
+  expect(searchCollections.list().entries).toHaveLength(1); expect(mocks.clear).not.toHaveBeenCalled()
+})

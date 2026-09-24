@@ -13,6 +13,7 @@ import ReferenceRefactorDialog from './components/ReferenceRefactorDialog'
 import FocusSessionBar from './components/FocusSessionBar'
 import EvidenceReviewBar from './components/EvidenceReviewBar'
 import SearchReturnBar from './components/SearchReturnBar'
+import CollectionReadingBar from './components/CollectionReadingBar'
 import { evidenceReview } from '~/services/evidenceReviewSession'
 import useGuardedNoteOpener from './hooks/useGuardedNoteOpener'
 import { toast } from '~/services/toast'
@@ -876,6 +877,7 @@ export default function App() {
     setDialog({
       type: 'unsaved',
       next: performSelect,
+      canProceed: options.shouldSelect,
       cancel: () => options.onCancel?.(),
     })
   }
@@ -1208,6 +1210,11 @@ export default function App() {
 
               <section className={`workspace-content${switching ? ' switching' : ''}`}>
                 {documentHeader}
+                {workspace === 'notes' && <CollectionReadingBar origin={searchOrigin} documentId={current?.id}
+                  dirty={unsaved} paused={globalSearchOpen || quickSearchOpen} onOpenFile={handleInspectorSelectFile}
+                  onMove={(expected, next) => setSearchOrigin(previous => previous === expected ? next : previous)}
+                  onReturn={() => { setSearchReturnRequest({ context: searchOrigin }); openGlobalSearch() }}
+                  onEnd={() => { setSearchOrigin(null); setSearchReturnRequest(null) }} />}
                 {workspace === 'notes' && <SearchReturnBar origin={searchOrigin} documentId={current?.id}
                   dirty={unsaved || editorStatus.dirty}
                   onReturn={() => { setSearchReturnRequest({ context: searchOrigin }); openGlobalSearch() }}
@@ -1406,6 +1413,11 @@ export default function App() {
               kind: 'primary',
               loading: dialog.saving,
               onClick: async () => {
+                if (dialog.canProceed?.() === false) {
+                  dialog.cancel?.(); setDialog(null)
+                  toast.warning('目标或来源已变化，已取消跳转，当前草稿保留')
+                  return
+                }
                 setDialog(prev => ({ ...prev, saving: true }))
                 const ok = await saveCurrent()
                 if (ok === true) {
@@ -1423,6 +1435,12 @@ export default function App() {
               label: '不保存',
               disabled: dialog.saving,
               onClick: () => {
+                // Validate the pending destination before discarding any draft.
+                if (dialog.canProceed?.() === false) {
+                  dialog.cancel?.(); setDialog(null)
+                  toast.warning('目标或来源已变化，已取消跳转，当前草稿保留')
+                  return
+                }
                 editorRef.current?.clearCache()
                 // Discard the in-memory dirty flag as well as the draft cache.
                 // Otherwise returning via Projects asks about the discarded draft again.
