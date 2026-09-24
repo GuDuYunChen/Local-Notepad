@@ -70,3 +70,10 @@ describe('guarded chapter opens', () => {
     expect(await result).toBe(false); expect(signal.aborted).toBe(true)
   })
 })
+
+ it('encodes imported note IDs as a single URL path segment before the existing identity guard', async () => {
+    const id = 'note/with?query#fragment'
+    api.mockResolvedValue({ id }); await render({ onSelectFile: (_file, options) => options.afterSelect() })
+    expect(await open(id)).toBe(true)
+    expect(api.mock.calls[0][0]).toBe('/api/files/' + encodeURIComponent(id))
+  })

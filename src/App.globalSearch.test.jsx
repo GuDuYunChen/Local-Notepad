@@ -3,6 +3,8 @@ import { createRoot } from 'react-dom/client'
 import { beforeEach, afterEach, it, expect, vi } from 'vitest'
 import App from './App'
 import { api } from '~/services/api'
+import { searchCollections } from '~/services/searchCollections'
+import { collectSearchResultReport } from '~/services/searchResultExport'
 import { evidenceNavigation } from '~/services/evidenceNavigation'
 const mocks = vi.hoisted(() => ({ selectFile: null, clear: vi.fn() }))
 vi.mock('~/services/api', () => ({ api: vi.fn(), createFileVersionSnapshot: vi.fn(), listAllFilesWithContent: vi.fn(), searchFiles: vi.fn().mockResolvedValue([]) }))
@@ -77,4 +79,30 @@ it('ending a search round removes only the return bar, not the draft or current 
 it('cancelled selection never creates a return bar for an unopened note', async () => {
  await click('编辑测试正文');await click('打开全局检索入口');await settle();await click('打开笔记');await click('取消');await settle()
  expect(container.querySelector('[aria-label="检索返回导航"]')).toBeNull()
+})
+
+async function openSavedCollection() {
+ const report = await collectSearchResultReport({query:''}, result(), {mode:'all', request:async()=>result()})
+ await act(async()=>searchCollections.save('App资料集', report))
+ await click('打开全局检索入口');await settle();await click('本地资料集')
+ await act(async()=>{
+   const el=container.querySelector('[aria-label="已保存资料集"]')
+   Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(el,searchCollections.list().entries[0].key)
+   el.dispatchEvent(new Event('change',{bubbles:true}))
+ })
+}
+it('saved collection uses the real App draft confirmation and cancelling preserves its view',async()=>{
+ await click('编辑测试正文');await openSavedCollection();await click('打开当前笔记');await click('取消');await settle()
+ expect(container.querySelector('[aria-label="资料集条目 b"]')).toBeTruthy()
+ expect(container.querySelector('[role="tab"][aria-selected="true"]').textContent).toBe('本地资料集')
+ expect(container.querySelector('.workspace-save-chip').textContent).toBe('未保存')
+ expect(container.querySelector('.workspace-title-button').textContent).toBe('第一章.md')
+ expect(mocks.clear).not.toHaveBeenCalled();expect(evidenceNavigation.peek()).toBeNull()
+})
+it('saved collection discard opens current note without restoring archived content or old search origin',async()=>{
+ await click('编辑测试正文');await openSavedCollection();await click('打开当前笔记');await click('不保存');await settle()
+ expect(container.querySelector('.workspace-title-button').textContent).toBe('第二章.md')
+ expect(container.querySelector('[aria-label="全局检索结果"]')).toBeNull()
+ expect(container.querySelector('[aria-label="检索返回导航"]')).toBeNull()
+ expect(mocks.clear).toHaveBeenCalledOnce();expect(evidenceNavigation.peek()).toBeNull()
 })

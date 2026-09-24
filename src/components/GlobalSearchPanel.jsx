@@ -3,6 +3,8 @@ import useBackupDialogFocus from '~/hooks/useBackupDialogFocus'
 import { evidenceNavigation } from '~/services/evidenceNavigation'
 import { toast } from '~/services/toast'
 import { searchLibrary, searchTitleSegments, prepareSearchLocation, SEARCH_KINDS, SEARCH_SOURCES } from '~/services/globalSearch'
+import SearchCollectionsPanel from './SearchCollectionsPanel'
+import useSearchCollections from '~/hooks/useSearchCollections'
 import SearchPresetsPanel from './SearchPresetsPanel'
 import SearchResultExportPanel from './SearchResultExportPanel'
 import useSearchResultExport from '~/hooks/useSearchResultExport'
@@ -29,6 +31,8 @@ function DialogFrame({ onClose, inputRef, children }) {
 // Remains mounted after first use so filters survive a result -> editor -> search
 // round-trip. Closing cancels requests and releases result snippets, not the draft.
 export default function GlobalSearchPanel({ open, onClose, onOpenFile, seed, onOpened, returnRequest }) {
+  const [mode, setMode] = useState('search')
+  const collectionTabRef = useRef(null), searchTabRef = useRef(null)
   const [filters, setFilters] = useState(defaults)
   const [response, setResponse] = useState(null)
   const [folders, setFolders] = useState([])
@@ -51,6 +55,7 @@ export default function GlobalSearchPanel({ open, onClose, onOpenFile, seed, onO
   useEffect(() => {
     if (!seed || seedRef.current === seed) return
     seedRef.current = seed
+    setMode('search')
     setFilters({ ...defaults(), query: String(seed.query || '') })
   }, [seed])
   // Initial seed is supplied by the quick switcher when entering for the first time.
@@ -65,6 +70,7 @@ export default function GlobalSearchPanel({ open, onClose, onOpenFile, seed, onO
   useEffect(() => {
     if (!open || !returnRequest || appliedReturn.current === returnRequest) return
     appliedReturn.current = returnRequest
+    setMode('search')
     try {
       const context = returnRequest.context
       const next = restoreSearchReturnFilters(context)
@@ -79,6 +85,7 @@ export default function GlobalSearchPanel({ open, onClose, onOpenFile, seed, onO
     const token = ++generation.current
     const controller = new AbortController()
     if (!open) { setResponse(null); setStatus('loading'); setOpenError(''); return }
+    if (mode !== 'search') return () => controller.abort()
     setStatus('loading'); setError('')
     const timer = setTimeout(async () => {
       try {
@@ -98,7 +105,7 @@ export default function GlobalSearchPanel({ open, onClose, onOpenFile, seed, onO
       }
     }, filters.query.trim() ? 200 : 0)
     return () => { clearTimeout(timer); controller.abort() }
-  }, [open, requestKey, refresh])
+  }, [open, mode, requestKey, refresh])
 
   useEffect(() => {
     if (!open && operation.current) { operation.current.abort(); operation.current = null; setOpening(false) }
@@ -109,7 +116,8 @@ export default function GlobalSearchPanel({ open, onClose, onOpenFile, seed, onO
   const retry = () => { setReturnNotice(''); pageLanding.current = null; listScroll.current = { page: 1, top: 0 }; setFilters(previous => applySearchPresetFilters(previous)); setRefresh(value => value + 1) }
   const ready = status === 'ready' && responseKey.current === requestKey
   const selected = ready ? response?.items.find(item => item.id === selectedId) : null
-  const collection = useSearchResultExport({ open, ready, filters, response, opening })
+  const collection = useSearchResultExport({ open, ready: ready && mode === 'search', filters, response, opening })
+  const archives = useSearchCollections({ active: open && mode === 'collections' && !opening })
   useEffect(() => {
     if (!open || !ready || !listRef.current) return
     const saved = listScroll.current
@@ -125,18 +133,19 @@ export default function GlobalSearchPanel({ open, onClose, onOpenFile, seed, onO
     // Reopening refreshes the same filters/page against a new committed snapshot.
     setFilters(previous => ({ ...previous, revision: '' })); onClose?.()
   }
-  const openResult = async (item, snippet) => {
-    if (!ready || operation.current || !onOpenFile || !item) return
+  const openResult = async (item, snippet, archived = false) => {
+    if ((!ready && !archived) || operation.current || !onOpenFile || !item) return
+    if (archived && !archives.canOpen(item)) return
     const controller = new AbortController(); operation.current = controller
     setOpening(true); setOpenError('')
     try {
       const target = snippet ? await prepareSearchLocation(item, snippet, controller.signal) : null
       if (controller.signal.aborted || !current.current.open) return
-      const context = createSearchReturnContext(item, filters, response, listRef.current?.scrollTop ?? listScroll.current.top)
+      const context = archived ? null : createSearchReturnContext(item, filters, response, listRef.current?.scrollTop ?? listScroll.current.top)
       const accepted = await current.current.onOpenFile(item.id)
       if (controller.signal.aborted || !current.current.open) return
       if (accepted === false) { setOpenError('已取消打开，原草稿与检索条件均已保留。'); return }
-      if (context) current.current.onOpened?.(context)
+      if (archived || context) current.current.onOpened?.(context)
       if (target) evidenceNavigation.start(item.id, target, () => toast.warning('笔记尚未就绪，定位已取消；请重新检索后定位'))
       setFilters(previous => ({ ...previous, revision: '' })); current.current.onClose?.()
     } catch (failure) {
@@ -165,11 +174,23 @@ export default function GlobalSearchPanel({ open, onClose, onOpenFile, seed, onO
   if (!open) return null
   // Unmount the focus trap while App's existing save/discard/cancel guard is open.
   if (opening) return <div className="global-search-opening" role="status">正在打开笔记；如有未保存内容，请先处理保存确认。</div>
-  return <DialogFrame onClose={close} inputRef={inputRef}>
+  return <DialogFrame onClose={close} inputRef={mode === 'search' ? inputRef : collectionTabRef}>
     <header className="global-search-header">
       <div><h2 id="global-search-title">全局检索</h2><p>在所有已保存笔记中查找，先看上下文，再回到正文。</p></div>
       <button type="button" onClick={close} aria-label="关闭全局检索">×</button>
     </header>
+    <div className="global-search-tabs" role="tablist" aria-label="检索工作区">
+      {[['search', '检索结果', searchTabRef], ['collections', '本地资料集', collectionTabRef]].map(([id, title, ref]) =>
+        <button key={id} ref={ref} type="button" role="tab" id={'search-tab-' + id} aria-selected={mode === id}
+          aria-controls={'search-mode-' + id} tabIndex={mode === id ? 0 : -1}
+          onClick={() => setMode(id)} onKeyDown={event => {
+            if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+            event.preventDefault()
+            const next = event.key === 'Home' ? 'search' : event.key === 'End' ? 'collections' : mode === 'search' ? 'collections' : 'search'
+            setMode(next); (next === 'search' ? searchTabRef : collectionTabRef).current?.focus()
+          }}>{title}</button>)}
+    </div>
+    <div className="global-search-mode" role="tabpanel" id="search-mode-search" aria-labelledby="search-tab-search" hidden={mode !== 'search'}>
     <div className="global-search-query">
       <input ref={inputRef} aria-label="全局检索关键词" placeholder="输入词语或完整短语；留空浏览笔记" value={filters.query}
         onChange={event => update({ query: event.target.value })}
@@ -256,5 +277,10 @@ export default function GlobalSearchPanel({ open, onClose, onOpenFile, seed, onO
       </section>
     </div>
     <footer className="global-search-footer">字面短语检索，不执行正则或逻辑运算符。仅已保存笔记，不含回收站、模板、外部附件文件内容及未保存草稿。未手动保存的检索条件仅在当前窗口保留。</footer>
+    </div>
+    <div className="global-search-mode" role="tabpanel" id="search-mode-collections" aria-labelledby="search-tab-collections" hidden={mode !== 'collections'}>
+      {openError && mode === 'collections' && <p className="global-search-notice" role="alert">{openError}</p>}
+      <SearchCollectionsPanel model={archives} onOpenFile={onOpenFile ? item => openResult(item, null, true) : null} />
+    </div>
   </DialogFrame>
 }

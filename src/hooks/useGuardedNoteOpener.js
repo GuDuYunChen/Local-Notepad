@@ -35,7 +35,7 @@ export default function useGuardedNoteOpener({ currentId, workspace, navigationE
         if (pending.current === operation) pending.current = null
         resolve(accepted)
       }
-      Promise.resolve().then(() => api(`/api/files/${id}`, { signal: controller.signal }))
+      Promise.resolve().then(() => api(`/api/files/${encodeURIComponent(id)}`, { signal: controller.signal }))
         .then(file => {
           if (!valid()) { finish(false); return }
           if (!file || file.is_deleted || file.is_folder || String(file.id) !== String(id)) {

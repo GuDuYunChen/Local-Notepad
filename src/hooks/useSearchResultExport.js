@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { collectionName, searchCollections } from '~/services/searchCollections'
 import { collectSearchResultReport, downloadSearchResultReport, searchExportFilterKey, MAX_SEARCH_EXPORT_ITEMS } from '~/services/searchResultExport'
 
 export default function useSearchResultExport({ open, ready, filters, response, opening }) {
@@ -53,17 +54,24 @@ export default function useSearchResultExport({ open, ready, filters, response, 
     const ids = new Set(response.items.map(item => item.id))
     setSelection({ key, entries: entries.filter(entry => !ids.has(entry.id)) }); setMessage('')
   }
-  const start = async mode => {
+  const start = async (mode, saveAs) => {
     if (!open || !ready || opening || operation.current || !key) return
+    let name
+    try { if (saveAs !== undefined) name = collectionName(saveAs) } catch (failure) { setMessage(failure.message); return }
     const controller = new AbortController(); operation.current = controller
     setBusy(true); setProgress(null); setMessage('')
     const isCurrent = () => operation.current === controller && !controller.signal.aborted && active.current.open && active.current.ready && !active.current.opening && active.current.key === key
     try {
-      const report = await collectSearchResultReport(filters, response, { mode, selection: entries, includeSnippets,
+      const report = await collectSearchResultReport(filters, response, { mode, selection: entries, includeSnippets: name ? false : includeSnippets,
         signal: controller.signal, onProgress: value => { if (isCurrent()) setProgress(value) } })
       if (!isCurrent()) return
-      const filename = downloadSearchResultReport(report, format)
-      setMessage(`已发起 ${report.count} 篇结果清单下载：${filename}。请在下载目录核对文件；笔记未修改。`)
+      if (name) {
+        searchCollections.save(name, report)
+        setMessage(`已保存资料集“${name}” · ${report.count} 篇；不含正文节选，可在“本地资料集”中重开。`)
+      } else {
+        const filename = downloadSearchResultReport(report, format)
+        setMessage(`已发起 ${report.count} 篇结果清单下载：${filename}。请在下载目录核对文件；笔记未修改。`)
+      }
     } catch (failure) {
       if (isCurrent()) setMessage(failure.message || '导出未完成，请重试；没有下载部分清单。')
     } finally {

@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict'
 import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises'
 import os from 'node:os'
+import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { build } from 'esbuild'
@@ -46,6 +47,38 @@ try {
   await writeFile(jsonFile, serializeSearchResultReport(report, 'json'))
   assert.equal(JSON.parse(await readFile(jsonFile, 'utf8')).items.length, 65)
   await assert.rejects(collectSearchResultReport(filters, { ...initial, revision: '0'.repeat(64) }, { mode: 'all' }))
+  const collectionModule = path.join(directory, 'collections.mjs')
+  await build({ entryPoints: [path.join(root, 'src/services/searchCollections.js')], bundle: true, platform: 'node', format: 'esm', outfile: collectionModule })
+  const { createSearchCollectionStore, checkSearchCollection, readSearchCollection } = await import(pathToFileURL(collectionModule).href)
+  // File-backed isolated test storage verifies serialized records survive a fresh
+  // service instance. It is not a claim about browser/Electron localStorage.
+  const storagePath = path.join(directory, 'collection-storage')
+  fs.mkdirSync(storagePath)
+  const diskStorage = () => ({
+    get length() { return fs.readdirSync(storagePath).length },
+    key: index => { const name = fs.readdirSync(storagePath)[index]; return name ? decodeURIComponent(name) : null },
+    getItem: key => { const file = path.join(storagePath, encodeURIComponent(key)); return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null },
+    setItem: (key, value) => fs.writeFileSync(path.join(storagePath, encodeURIComponent(key)), value, { flag: 'wx' }),
+    removeItem: key => fs.unlinkSync(path.join(storagePath, encodeURIComponent(key))),
+  })
+  const shelf = createSearchCollectionStore({ storage: diskStorage, createId: () => 'fixture-collection' })
+  shelf.save('65篇检索资料', report)
+  const reopened = createSearchCollectionStore({ storage: diskStorage }).list()
+  assert.equal(reopened.entries[0].collection.report.count, 65)
+  const checked = await checkSearchCollection(reopened.entries[0].collection)
+  assert.equal(checked.counts.unchanged, 65)
+  const raw = shelf.export(reopened.entries[0])
+  assert.equal(readSearchCollection(raw).report.items.at(-1).id, report.items.at(-1).id)
+  assert.ok(!raw.includes('"snippets"') && !raw.includes('"content"'))
+  const historical = structuredClone(reopened.entries[0].collection)
+  historical.report.items[0].title = '历史标题'
+  historical.report.items[1].contentSHA256 = '0'.repeat(64)
+  historical.report.items[2].id = 'missing-fixture-record'
+  const drift = await checkSearchCollection(historical)
+  assert.deepEqual(drift.counts, { unchanged: 62, body: 1, metadata: 1, outside: 1 })
+  assert.equal(drift.otherMatches, 1)
+  assert.equal(shelf.list().entries[0].raw, reopened.entries[0].raw)
+  console.log('Search collection HTTP smoke passed: 65 notes, 4-page current inspection, file-backed metadata roundtrip, synthetic historical body/title/outside differences, unchanged stored history; GET only. Browser persistence not exercised.')
   console.log('Search result export HTTP smoke passed: real service, 65 notes, 4 pages, final revision check, selected first/last pages, metadata-only default, opt-in Unicode snippets, JSON roundtrip, stale-version rejection; GET only.')
 } finally {
   globalThis.fetch = nativeFetch
