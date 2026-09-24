@@ -21,7 +21,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-const SupportedSchemaVersion = 9
+const SupportedSchemaVersion = 10
 
 var autoName = regexp.MustCompile(`^backup-(\d{8}-\d{6})(?:-[a-f0-9]{12})?\.db$`)
 var safeName = regexp.MustCompile(`^backup-(?:manual-)?[a-zA-Z0-9-]+\.db$`)
@@ -155,6 +155,13 @@ func Inspect(ctx context.Context, filename string) (Info, error) {
 	}
 	if info.SchemaVersion < 1 || info.SchemaVersion > SupportedSchemaVersion {
 		return info, fmt.Errorf("数据库版本 %d 不受当前应用支持", info.SchemaVersion)
+	}
+	if info.SchemaVersion >= 10 {
+		rows, schemaErr := db.QueryContext(ctx, `SELECT request_id,payload_sha256,file_id,title,parent_id,created_at FROM research_note_requests LIMIT 0`)
+		if schemaErr != nil {
+			return info, fmt.Errorf("研究任务回执表结构不兼容: %w", schemaErr)
+		}
+		rows.Close()
 	}
 	if err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM files").Scan(&info.Files); err != nil {
 		return info, err

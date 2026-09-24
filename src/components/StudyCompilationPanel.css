@@ -15,3 +15,11 @@
 .study-compilation-result { margin: 10px 16px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); display: flex; flex-wrap: wrap; gap: 10px; align-items: center; overflow-wrap: anywhere; }
 .study-compilation-result p { flex: 1 1 240px; margin: 0; }
 .study-compilation-result button { border: 1px solid var(--line); background: var(--paper); color: var(--ink); padding: 8px 12px; border-radius: 6px; font: inherit; cursor: pointer; }
+
+.research-task-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 10px; margin: 14px 0; }
+.research-task-list button { display: flex; flex-direction: column; text-align: left; gap: 5px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; overflow-wrap: anywhere; min-width: 0; cursor: pointer; }
+.research-task-list button[aria-pressed="true"] { border-color: var(--clay); background: var(--clay-light); }
+.research-task-list :is(span,small) { font-size: 12px; color: var(--ink-muted); }
+.research-task-confirm { display: flex; align-items: flex-start; gap: 8px; margin: 14px 0; line-height: 1.6; }
+.research-task-confirm input { flex: 0 0 auto; margin-top: 5px; }
+.research-tasks :is(button, input, [tabindex]):focus-visible { outline: 2px solid var(--clay); outline-offset: 2px; }

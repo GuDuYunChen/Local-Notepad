@@ -20,6 +20,8 @@ type FileController struct {
 
 func (c *FileController) Register(group *ghttp.RouterGroup) {
 	group.GET("/search", c.GlobalSearch)
+	group.GET("/research-notes/{requestId}", c.ResearchReceipt)
+	group.POST("/research-notes/{requestId}", c.CreateResearch)
 	group.GET("/files/trash", c.ListTrash)
 	group.DELETE("/files/trash", c.EmptyTrash)
 	group.POST("/files", c.Create)
@@ -450,4 +452,3 @@ func (c *FileController) DeleteTemplate(r *ghttp.Request) {
 	}
 	writeOK(r, nil)
 }
-

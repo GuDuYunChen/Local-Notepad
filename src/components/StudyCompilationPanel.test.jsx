@@ -1,3 +1,4 @@
+import { researchReceipt, RESEARCH_FILE_ID, testLocks } from '../test/researchFixtures'
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { beforeEach, afterEach, it, expect, vi } from 'vitest'
@@ -22,11 +23,12 @@ async function prepare() { await click('选择本页批注'); await click('预�
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   vi.stubGlobal('crypto', { randomUUID, subtle: { digest: async (_alg, bytes) => Uint8Array.from(createHash('sha256').update(bytes).digest()).buffer } })
+  vi.stubGlobal('localStorage', memoryStorage()); vi.stubGlobal('navigator', { locks: testLocks })
   const storage = memoryStorage(); source = createSearchCollectionStore({ storage: () => storage, createId: () => 'fixture' })
   source.save('资料', collectionReport(23)); entry = source.list().entries[0]
   study = createCollectionStudyStore({ storage: () => storage, locks: () => ({ request: (_n, _o, fn) => Promise.resolve().then(fn) }) })
   hub = createCollectionStudyHub({ storage: () => storage, sourceStore: source, studyStore: study }); onReceipt = vi.fn()
-  api.mockReset().mockImplementation(async (_url, init) => ({ id: 'research', ...JSON.parse(init.body) }))
+  api.mockReset().mockImplementation(async (url, init) => init?.method === 'POST' ? researchReceipt(url, JSON.parse(init.body)) : { found: false, request_id: url.split('/').at(-1) })
   host = document.createElement('div'); document.body.append(host); root = createRoot(host)
 })
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.clearAllMocks() })
@@ -34,7 +36,7 @@ it('creates only after explicit preview and confirm', async () => {
   await seed(); await render(); await prepare()
   expect(label('研究笔记完整预览')).toBeTruthy(); expect(api).not.toHaveBeenCalled()
   await click('确认创建独立研究笔记')
-  expect(api).toHaveBeenCalledTimes(1); expect(onReceipt).toHaveBeenLastCalledWith(expect.objectContaining({ status: 'confirmed', id: 'research' }))
+  expect(api.mock.calls.filter(([,init]) => init?.method === 'POST')).toHaveLength(1); expect(onReceipt).toHaveBeenLastCalledWith(expect.objectContaining({ status: 'confirmed', id: RESEARCH_FILE_ID }))
   expect(button('确认创建独立研究笔记').disabled).toBe(true)
 })
 it('previews every selected page, not just the last page', async () => {
@@ -51,7 +53,7 @@ it('changing selection or reading filter invalidates the preview', async () => {
 it('uses actual destination ID and verifies it before creating', async () => {
   await seed(); await render({ folders: [{ id: 'folder', label: '项目 / 研究' }] }); await change('研究笔记存放目录', 'folder'); await prepare()
   api.mockResolvedValueOnce({ id: 'folder', is_folder: true }); await click('确认创建独立研究笔记')
-  expect(api.mock.calls[0][0]).toBe('/api/files/folder'); expect(JSON.parse(api.mock.calls[1][1].body).parent_id).toBe('folder')
+  expect(api.mock.calls[0][0]).toBe('/api/files/folder'); expect(JSON.parse(api.mock.calls.find(([,init]) => init?.method === 'POST')[1].body).parent_id).toBe('folder')
 })
 it('download uses the complete preview and does not create or modify a note', async () => {
   await seed(2); await render(); await prepare(); await click('下载研究笔记 Markdown')
@@ -63,9 +65,9 @@ it('hostile-looking user text remains ordinary text in the preview', async () =>
   expect(label('研究笔记完整预览').textContent).toContain('<img src=x')
 })
 it('failed POST is reported as uncertain and disables replay while keeping the preview', async () => {
-  await seed(); await render(); await prepare(); api.mockRejectedValueOnce(new Error('网络断开')); await click('确认创建独立研究笔记')
-  expect(host.textContent).toContain('可能已经写入'); expect(button('确认创建独立研究笔记').disabled).toBe(true)
-  expect(label('研究笔记完整预览')).toBeTruthy(); await click('下载研究笔记 Markdown'); expect(api).toHaveBeenCalledTimes(1)
+  await seed(); await render(); await prepare(); api.mockImplementation(async (url, init) => { if (init?.method === 'POST') throw new Error('网络断开'); return { found: false, request_id: url.split('/').at(-1) } }); await click('确认创建独立研究笔记')
+  expect(host.textContent).toContain('可能已写入'); expect(button('确认创建独立研究笔记').disabled).toBe(true)
+  expect(label('研究笔记完整预览')).toBeTruthy(); await click('下载研究笔记 Markdown'); expect(api.mock.calls.filter(([,init]) => init?.method === 'POST')).toHaveLength(1)
 })
 it('new source storage changes make confirmation unavailable until refreshed', async () => {
   await seed(); await render(); await prepare(); await act(async () => seed(2))
@@ -84,5 +86,23 @@ it('late preparation after tab switch cannot show an obsolete preview', async ()
 })
 it('receipt observer failure does not turn a successful creation into failure', async () => {
   onReceipt.mockImplementation(() => { throw new Error('view failed') }); await seed(); await render(); await prepare(); await click('确认创建独立研究笔记')
-  expect(host.textContent).toContain('独立研究笔记已创建'); expect(api).toHaveBeenCalledTimes(1)
+  expect(host.textContent).toContain('独立研究笔记已创建'); expect(api.mock.calls.filter(([,init]) => init?.method === 'POST')).toHaveLength(1)
+})
+
+it('explicitly saves a research draft without issuing a request and retains it on remount', async () => {
+  await seed(2); await render(); await prepare(); await click('保存研究预览草稿')
+  expect(api).not.toHaveBeenCalled()
+  const key = Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i)).find(key => key.startsWith('localNotepad.researchTask.v1:'))
+  expect(key).toBeTruthy(); const saved = JSON.parse(localStorage.getItem(key))
+  expect(saved.phase).toBe('draft'); expect(saved.document.rows).toHaveLength(2)
+  await act(async () => root.render(null)); await render()
+  expect(JSON.parse(localStorage.getItem(key)).id).toBe(saved.id)
+})
+it('creating after an explicit draft save reuses that exact persisted task ID', async () => {
+  await seed(); await render(); await prepare(); await click('保存研究预览草稿')
+  const key = Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i)).find(key => key.startsWith('localNotepad.researchTask.v1:'))
+  const id = JSON.parse(localStorage.getItem(key)).id
+  await click('确认创建独立研究笔记')
+  expect(api.mock.calls.find(([, init]) => init?.method === 'POST')[0]).toBe('/api/research-notes/' + id)
+  expect(localStorage.length).toBe(1)
 })

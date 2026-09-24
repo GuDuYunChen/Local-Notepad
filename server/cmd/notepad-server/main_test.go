@@ -152,7 +152,7 @@ func TestMigrationV9CleansHistoricalOrphansWithoutDroppingUnresolvedTargets(t *t
 		t.Fatalf("initial migrate: %v", err)
 	}
 
-	if _, err := db.Exec(`DELETE FROM schema_migrations WHERE version = 9`); err != nil {
+	if _, err := db.Exec(`DELETE FROM schema_migrations WHERE version >= 9`); err != nil {
 		t.Fatalf("rewind migration version: %v", err)
 	}
 	if _, err := db.Exec(`INSERT INTO files
@@ -295,5 +295,27 @@ func TestFlattenUploadEntriesFlattensSingleFileDirectory(t *testing.T) {
 	content, err := os.ReadFile(filepath.Join(root, "asset-key"))
 	if err != nil || string(content) != "image" {
 		t.Fatalf("unexpected flattened content: %q, %v", content, err)
+	}
+}
+
+func TestResearchMigrationIsAdditiveAndPreservesCreationReceipt(t *testing.T) {
+	db := openMigrationTestDB(t)
+	ctx := context.Background()
+	if err := migrate(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+	var latest int
+	if err := db.QueryRow(`SELECT MAX(version) FROM schema_migrations`).Scan(&latest); err != nil || latest != 10 {
+		t.Fatal(latest, err)
+	}
+	if _, err := db.Exec(`INSERT INTO research_note_requests VALUES('request','hash','file','标题','',1)`); err != nil {
+		t.Fatal(err)
+	}
+	if err := migrate(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+	var count int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM research_note_requests`).Scan(&count); err != nil || count != 1 {
+		t.Fatal(count, err)
 	}
 }

@@ -1,3 +1,4 @@
+import ResearchTasksPanel from './ResearchTasksPanel'
 import React, { useEffect, useRef, useState } from 'react'
 import useBackupDialogFocus from '~/hooks/useBackupDialogFocus'
 import { evidenceNavigation } from '~/services/evidenceNavigation'
@@ -327,6 +328,7 @@ export default function GlobalSearchPanel({ open, onClose, onOpenFile, seed, onO
       <SearchCollectionsPanel model={archives} onOpenFile={onOpenFile ? item => openResult(item, null, true) : null} />
     </div>
     <div className="global-search-mode" role="tabpanel" id="search-mode-study" aria-labelledby="search-tab-study" hidden={mode !== 'study'}>
+      <ResearchTasksPanel active={open && mode === 'study'} onReceipt={setCompilationReceipt} />
       <CollectionStudyHub active={open && mode === 'study'} folders={folders} compilationReceipt={compilationReceipt} onCompilationReceipt={setCompilationReceipt} onLocate={target => {
         if (!archives.showStudy(target.entry, target.documentId)) throw new Error('资料集已更改或删除，请刷新阅读工作台')
         setMode('collections'); collectionTabRef.current?.focus()

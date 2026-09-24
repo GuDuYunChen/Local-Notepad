@@ -98,7 +98,7 @@ func TestInspectRejectsEmptyCorruptAndForeignFiles(t *testing.T) {
 }
 func TestFutureSchemaRejectedWithoutRewriting(t *testing.T) {
 	db, p := testDB(t, "")
-	db.Exec("INSERT INTO schema_migrations VALUES(10)")
+	db.Exec("INSERT INTO schema_migrations VALUES(11)")
 	db.Close()
 	before := bytesAt(t, p)
 	if _, e := Inspect(context.Background(), p); e == nil {
@@ -335,7 +335,7 @@ func TestConcurrentNewTargetNeverOverwrittenAndRetainsMarker(t *testing.T) {
 }
 func TestUnsupportedBackupNeverReplacesOriginal(t *testing.T) {
 	db, p := testDB(t, "")
-	db.Exec("INSERT INTO schema_migrations VALUES(10)")
+	db.Exec("INSERT INTO schema_migrations VALUES(11)")
 	db.Close()
 	dir := filepath.Join(filepath.Dir(p), "backups")
 	os.MkdirAll(dir, 0700)
@@ -346,5 +346,16 @@ func TestUnsupportedBackupNeverReplacesOriginal(t *testing.T) {
 	}
 	if bytesAt(t, p) != "original" {
 		t.Fatal("original lost")
+	}
+}
+
+func TestResearchSchemaRequiresReceiptTable(t *testing.T) {
+	db, p := testDB(t, "")
+	if _, err := db.Exec(`INSERT INTO schema_migrations VALUES(10)`); err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+	if _, err := Inspect(context.Background(), p); err == nil {
+		t.Fatal("accepted schema 10 without its receipt table")
 	}
 }

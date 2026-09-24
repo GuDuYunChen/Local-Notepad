@@ -1,3 +1,4 @@
+import { researchReceipt, RESEARCH_FILE_ID, testLocks } from './test/researchFixtures'
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { beforeEach, afterEach, it, expect, vi } from 'vitest'
@@ -176,6 +177,7 @@ it('ending collection reading only removes the navigation bar and preserves the 
 async function createResearchFromSavedAnnotation() {
  const { createHash, randomUUID } = await import('node:crypto')
  vi.stubGlobal('crypto', { randomUUID, subtle: { digest: async (_alg, bytes) => Uint8Array.from(createHash('sha256').update(bytes).digest()).buffer } })
+ vi.stubGlobal('navigator', { locks: testLocks })
  const { createCollectionStudyStore } = await import('./services/collectionStudy')
  const report = await collectSearchResultReport({ query: '' }, result(), { mode: 'all', request: async () => result() })
  let entry
@@ -186,8 +188,11 @@ async function createResearchFromSavedAnnotation() {
  })
  let created
  api.mockImplementation(async (path, init) => {
-  if (init?.method === 'POST' && path === '/api/files') { created = { id: 'research-1', ...JSON.parse(init.body) }; return created }
-  if (path === '/api/files/research-1') return created
+  if (path.startsWith('/api/research-notes/')) {
+   if (init?.method === 'POST') { created = { id: RESEARCH_FILE_ID, ...JSON.parse(init.body) }; return researchReceipt(path, JSON.parse(init.body)) }
+   return { found: false, request_id: path.split('/').at(-1) }
+  }
+  if (path === '/api/files/' + RESEARCH_FILE_ID) return created
   if (path.startsWith('/api/search?')) return result()
   return { id: 'b', title: '第二章.md', content: '已存正文' }
  })

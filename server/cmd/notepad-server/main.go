@@ -494,12 +494,17 @@ func migrate(ctx context.Context, db *sql.DB) error {
 				 WHERE NOT EXISTS (SELECT 1 FROM files WHERE files.id = links.source_id)`,
 			},
 		},
+		{version: 10, stmts: []string{dao.ResearchRequestsSchema}},
 	}
 
 	var currentVersion int
 	err := db.QueryRowContext(ctx, `SELECT COALESCE(MAX(version), 0) FROM schema_migrations`).Scan(&currentVersion)
 	if err != nil {
 		return fmt.Errorf("查询当前版本失败: %w", err)
+	}
+
+	if currentVersion > backup.SupportedSchemaVersion {
+		return fmt.Errorf("数据库版本 %d 高于当前应用支持的版本，请勿降级打开", currentVersion)
 	}
 
 	for _, m := range migrations {

@@ -88,7 +88,23 @@ app.whenReady().then(async () => {
     const loadedResearch = JSON.parse(research.content)
     const researchLinks = loadedResearch.root.children.flatMap(node => node.children || []).filter(node => node.type === 'wiki-link')
     if (researchLinks.length !== 2 || researchLinks.some(node => node.id !== 'native-64')) throw new Error('Native research links differ')
-    return { researchCompilation: true, batchStatuses: true, studyHub: true, pairedRestore: true, records: saved.data.records.length, bookmark: saved.data.bookmark.id, secure: isSecureContext, locks: !!navigator.locks }
+    const taskStore = StudyNative.createResearchTaskStore()
+    if (${JSON.stringify(phase)} === 'write') {
+      const draft = await taskStore.save(research)
+      const pending = await taskStore.update(draft, 'uncertain')
+      const task = taskStore.read(pending)
+      localStorage.setItem('isolated-research-check', JSON.stringify({ id: task.id, hash: task.payloadSHA256, content: task.preview.content }))
+    }
+    const remembered = JSON.parse(localStorage.getItem('isolated-research-check'))
+    const pendingTasks = taskStore.list()
+    if (pendingTasks.length !== 1 || pendingTasks[0].error) throw Error('research draft journal did not persist')
+    const task = taskStore.read(pendingTasks[0])
+    if (task.id !== remembered.id || task.phase !== 'uncertain' || task.preview.content !== remembered.content ||
+        task.payloadSHA256 !== remembered.hash || await StudyNative.researchPayloadFingerprint(task.preview) !== remembered.hash) {
+      throw Error('research task identity/content changed across process restart')
+    }
+    if (!task.preview.content.includes('native-64') || !task.preview.markdown.includes('😀')) throw Error('research provenance/Unicode missing')
+    return { persistentResearchTasks: true, researchCompilation: true, batchStatuses: true, studyHub: true, pairedRestore: true, records: saved.data.records.length, bookmark: saved.data.bookmark.id, secure: isSecureContext, locks: !!navigator.locks }
   })()`)
   console.log('STUDY_NATIVE_OK:' + phase + ' ' + JSON.stringify(result))
   window.webContents.session.flushStorageData()

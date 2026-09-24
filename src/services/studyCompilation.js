@@ -60,7 +60,7 @@ export function buildStudyCompilation(rows, config, preparedAt, loadedAt) {
 // Creation uses the existing create-only endpoint. Once a POST is sent, this
 // preview is never retried automatically: a lost response is not proof of failure.
 export function createStudyCompilation({ hub = collectionStudyHub, sourceStore = searchCollections,
-  studyStore = collectionStudy, drafts = collectionStudyDrafts, request = api, now = () => new Date() } = {}) {
+  studyStore = collectionStudy, drafts = collectionStudyDrafts, request = api, now = () => new Date(), creationService = null } = {}) {
   const receipts = new WeakMap()
   const validate = receipt => {
     hub.assertCurrent(receipt.model)
@@ -69,7 +69,16 @@ export function createStudyCompilation({ hub = collectionStudyHub, sourceStore =
       for (const id of group.ids) if (drafts.get(studyDraftKey(group.snapshot, id))) fail('所选批注有未保存草稿，请先保存或处理草稿；不会使用旧批注代替草稿')
     }
   }
+  const saveDraft = async (preview, options = {}) => {
+    const receipt = receipts.get(preview)
+    if (!receipt || !creationService) fail('当前服务不支持持久化研究草稿')
+    checkAlive(options); validate(receipt)
+    if (receipt.task) { creationService.store.read(receipt.task); return receipt.task }
+    receipt.task = await creationService.save(preview, options)
+    return receipt.task
+  }
   return {
+    saveDraft: creationService ? saveDraft : undefined,
     async prepare(model, keys, config, options = {}) {
       checkAlive(options); hub.assertCurrent(model)
       if (model.issues.length) fail('工作台存在未读取或未关联记录，请先处理提示，未生成不完整研究笔记')
@@ -108,6 +117,19 @@ export function createStudyCompilation({ hub = collectionStudyHub, sourceStore =
         }
         checkAlive(options); validate(receipt)
       } catch (failure) { receipt.phase = 'ready'; throw failure }
+      if (creationService) {
+        try {
+          const entry = await saveDraft(preview, options)
+          receipt.phase = 'sending'
+          const result = await creationService.submit(entry, { ...options, beforeSend: () => validate(receipt) })
+          receipt.task = result.entry
+          if (result.receipt.state !== 'available') fail('此任务曾创建的笔记已删除或不在当前数据库中，未重新创建；请在研究任务记录中查回')
+          receipt.result = freeze({ id: result.receipt.file_id, title: result.receipt.title, parentId: preview.parentId, count: preview.count,
+            taskId: result.receipt.request_id, localWarning: result.localWarning })
+          receipt.phase = 'confirmed'
+          return receipt.result
+        } catch (failure) { receipt.phase = failure.mayHaveCreated ? 'uncertain' : 'ready'; throw failure }
+      }
       receipt.phase = 'sending'
       const controller = new AbortController()
       const cancel = () => controller.abort()

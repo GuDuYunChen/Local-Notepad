@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { researchTasks } from '~/services/researchTasks'
 import { createStudyCompilation } from '~/services/studyCompilation'
 import { downloadCollectionReviewReport } from '~/services/collectionReviewReport'
 import './StudyCompilationPanel.css'
 
 export default function StudyCompilationPanel({ active, disabled, model, selected, hub, sourceStore, studyStore,
   folders = [], receipt, onReceipt, service: suppliedService }) {
-  const service = useMemo(() => suppliedService || createStudyCompilation({ hub, sourceStore, studyStore }), [suppliedService, hub, sourceStore, studyStore])
+  const service = useMemo(() => suppliedService || createStudyCompilation({ hub, sourceStore, studyStore, creationService: researchTasks }), [suppliedService, hub, sourceStore, studyStore])
   const [config, setConfig] = useState(() => ({ title: '阅读研究笔记 ' + new Date().toISOString().slice(0, 19).replace('T', ' ').replace(/:/g, '-'), goal: '', group: 'collection', parentId: '' }))
   const [preview, setPreview] = useState(null), [notice, setNotice] = useState(''), [error, setError] = useState('')
   const [busy, setBusy] = useState(false), [localReceipt, setLocalReceipt] = useState(null)
@@ -42,11 +43,21 @@ export default function StudyCompilationPanel({ active, disabled, model, selecte
       const file = await service.create(preview, optionsFor(controller))
       publish({ status: 'confirmed', ...file, draft })
       try { window.dispatchEvent(new Event('library:refresh')) } catch { /* library can be refreshed independently */ }
-      if (mounted.current) setNotice('独立研究笔记已创建。未切换正文或清空批注；可用上方按钮打开。')
+      if (mounted.current) setNotice('独立研究笔记已创建。未切换正文或清空批注；可用上方按钮打开。' + (file.localWarning || ''))
     } catch (failure) {
-      publish(failure.mayHaveCreated ? { status: 'uncertain', title: preview.title, message: failure.message, draft } : null)
+      publish(failure.mayHaveCreated ? { status: 'uncertain', title: preview.title, message: failure.message, taskId: failure.taskId, draft } : null)
       if (mounted.current) setError(failure.message)
     } finally { if (operation.current === controller) { operation.current = null; if (mounted.current) setBusy(false) } }
+  }
+  const saveDraft = async () => {
+    if (!preview || operation.current || disabled || attempt || !service.saveDraft) return
+    const controller = new AbortController(); operation.current = controller
+    setBusy(true); setError(''); setNotice('')
+    try {
+      await service.saveDraft(preview, optionsFor(controller))
+      if (mounted.current && !controller.signal.aborted) setNotice('研究预览草稿已保存到本机。重开应用后可在“研究草稿与创建记录”中继续；没有创建正文。')
+    } catch (e) { if (mounted.current) setError(e.message) }
+    finally { if (operation.current === controller) { operation.current = null; if (mounted.current) setBusy(false) } }
   }
   const download = () => {
     try {
@@ -72,11 +83,11 @@ export default function StudyCompilationPanel({ active, disabled, model, selecte
     {busy && <p role="status">{attempt?.status === 'pending' ? '正在创建；关闭窗口不能撤销已经发出的写入。' : '正在核对来源与生成预览…'}</p>}
     {error && <p className="study-hub-notice" role="alert">{error}</p>}
     {notice && <p role="status">{notice}</p>}
-    {attempt?.status === 'uncertain' && <p className="study-hub-notice">请先在资料库检查是否已创建。当前窗口不会重复提交这一请求；可下载保留的预览。</p>}
+    {attempt?.status === 'uncertain' && <p className="study-hub-notice">可在下方“研究草稿与创建记录”中查回或使用同一任务重试；当前预览不会自动重发，草稿仍可下载。</p>}
     {attempt?.status === 'confirmed' && <button type="button" onClick={() => { publish(null); setPreview(null); setNotice(''); setError(''); update({ title: '阅读研究笔记 ' + new Date().toISOString().slice(0, 19).replace('T', ' ').replace(/:/g, '-') }) }}>开始另一份研究笔记</button>}
     {preview && <section className="study-compilation-preview" aria-label="研究笔记完整预览">
       <header><h4>{preview.title}</h4><p>{preview.count} 条已存批注 · {preview.groups.length} 个分组 · 全部所选条目，不限于当前页</p></header>
-      <div className="study-hub-actions"><button type="button" disabled={disabled || busy || !!attempt} onClick={() => void create()}>确认创建独立研究笔记</button><button type="button" disabled={busy || (!attempt && disabled)} onClick={download}>下载研究笔记 Markdown</button></div>
+      <div className="study-hub-actions">{service.saveDraft && <button type="button" disabled={disabled || busy || !!attempt} onClick={() => void saveDraft()}>保存研究预览草稿</button>}<button type="button" disabled={disabled || busy || !!attempt} onClick={() => void create()}>确认创建独立研究笔记</button><button type="button" disabled={busy || (!attempt && disabled)} onClick={download}>下载研究笔记 Markdown</button></div>
       <div className="study-compilation-document"><h4>研究目标</h4><p>{preview.goal || '（待填写）'}</p><h4>我的结论与下一步</h4><p>（请在新笔记中自行填写。）</p>
         {preview.groups.map(group => <section key={group.key}><h4>{group.title}</h4>{group.items.map(item => <article key={JSON.stringify([item.collectionId, item.id])}>
           <h5>{item.title || '未命名'}</h5><small>{item.collectionName} · {item.collectionId} · 原第 {item.ordinal} 条 · {item.folderPath || '根目录'} · 笔记 ID：{item.id}</small><p>{item.note}</p>
