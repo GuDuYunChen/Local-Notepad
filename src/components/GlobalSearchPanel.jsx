@@ -4,6 +4,8 @@ import { evidenceNavigation } from '~/services/evidenceNavigation'
 import { toast } from '~/services/toast'
 import { searchLibrary, searchTitleSegments, prepareSearchLocation, SEARCH_KINDS, SEARCH_SOURCES } from '~/services/globalSearch'
 import SearchPresetsPanel from './SearchPresetsPanel'
+import SearchResultExportPanel from './SearchResultExportPanel'
+import useSearchResultExport from '~/hooks/useSearchResultExport'
 import { createSearchReturnContext, restoreSearchReturnFilters } from '~/services/searchReturn'
 import { applySearchPresetFilters } from '~/services/searchPresets'
 import './GlobalSearchPanel.css'
@@ -107,6 +109,7 @@ export default function GlobalSearchPanel({ open, onClose, onOpenFile, seed, onO
   const retry = () => { setReturnNotice(''); pageLanding.current = null; listScroll.current = { page: 1, top: 0 }; setFilters(previous => applySearchPresetFilters(previous)); setRefresh(value => value + 1) }
   const ready = status === 'ready' && responseKey.current === requestKey
   const selected = ready ? response?.items.find(item => item.id === selectedId) : null
+  const collection = useSearchResultExport({ open, ready, filters, response, opening })
   useEffect(() => {
     if (!open || !ready || !listRef.current) return
     const saved = listScroll.current
@@ -197,6 +200,7 @@ export default function GlobalSearchPanel({ open, onClose, onOpenFile, seed, onO
       <button type="button" onClick={() => { setFilters(defaults()); setOpenError('') }}>重置</button>
     </div>
     <SearchPresetsPanel filters={filters} onApply={next => { update(next); setRefresh(value => value + 1) }} />
+    <SearchResultExportPanel collection={collection} response={response} ready={ready} />
     <div className="global-search-summary" role="status" aria-live="polite">
       {status === 'error' ? '检索未完成，不能据此判断没有结果' : !ready ? '正在检索本地已保存内容…' :
         `${response.total} 篇笔记${response.query ? ' · 正文共 ' + response.total_occurrences + ' 处命中' : ''} · 当前范围 ${response.scanned} 篇`}
@@ -218,7 +222,7 @@ export default function GlobalSearchPanel({ open, onClose, onOpenFile, seed, onO
           }}>
           {ready && response.items.map(item => <button type="button" data-search-result key={item.id} role="option" aria-selected={item.id === selectedId}
             tabIndex={item.id === selectedId ? 0 : -1} onClick={() => selectResult(item)}>
-            <span className="global-search-result-title">{item.is_pinned && <span aria-label="已置顶">★ </span>}<Highlight title={item.title} query={response.query} matchCase={filters.matchCase} /></span>
+            <span className="global-search-result-title">{collection.selectedIds.has(item.id) && <span aria-label="已加入导出清单">✓ </span>}{item.is_pinned && <span aria-label="已置顶">★ </span>}<Highlight title={item.title} query={response.query} matchCase={filters.matchCase} /></span>
             <span className="global-search-result-path">{item.folder_path}</span>
             <span className="global-search-result-meta">{item.title_match ? '标题命中 · ' : ''}{item.body_count ? '正文 ' + item.body_count + ' 处 · ' : ''}{date(item.updated_at)}</span>
           </button>)}
@@ -239,7 +243,8 @@ export default function GlobalSearchPanel({ open, onClose, onOpenFile, seed, onO
             <button type="button" disabled={response.page === response.pages && selectedIndex === response.items.length - 1} onClick={() => moveResult(1)}>下一结果</button>
           </nav>
           <header><small>{selected.folder_path}</small><h3><Highlight title={selected.title} query={response.query} matchCase={filters.matchCase} /></h3>
-            <button type="button" className="primary" disabled={!onOpenFile} onClick={() => void openResult(selected)}>打开笔记</button></header>
+            <button type="button" className="primary" disabled={!onOpenFile} onClick={() => void openResult(selected)}>打开笔记</button>
+            <button type="button" className="search-result-collect" disabled={collection.busy} aria-pressed={collection.selectedIds.has(selected.id)} onClick={() => collection.toggle(selected)}>{collection.selectedIds.has(selected.id) ? '移出导出清单' : '加入导出清单'}</button></header>
           {selected.snippets.map((snippet, index) => <article className="global-search-snippet" key={selected.id + ':' + index}>
             <small>{SEARCH_KINDS[snippet.kind]} · 节选 {index + 1}</small><SnippetText value={snippet} />
             {snippet.kind === 'body' ? <button type="button" disabled={!onOpenFile} onClick={() => void openResult(selected, snippet)}>定位第 {index + 1} 处</button> : <small>打开笔记后查看此类内容；不模拟字符定位。</small>}
