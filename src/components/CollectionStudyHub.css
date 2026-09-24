@@ -27,3 +27,11 @@
 .global-search-tabs { flex-wrap: wrap; }
 
 #search-mode-study { flex: 1; min-height: 0; }
+
+.study-hub-batch { margin: 16px 0; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.study-hub-batch h4 { margin: 0; font-size: 15px; }
+.study-hub-batch .study-hub-actions { margin: 10px 0; }
+.study-hub-batch-preview { border-top: 1px solid var(--line); padding-top: 10px; }
+.study-hub-batch-preview ol { max-height: 220px; overflow: auto; padding-left: 24px; overflow-wrap: anywhere; }
+.study-hub-row-select { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; color: var(--ink-muted); min-height: 32px; cursor: pointer; }
+.study-hub-row-select input { accent-color: var(--clay); }

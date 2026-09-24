@@ -60,7 +60,35 @@ app.whenReady().then(async () => {
     try { hub.export(aggregate, {}, 'json') } catch { staleHubRejected = true }
     if (!staleHubRejected) throw new Error('Native hub exported stale storage')
     await study.bookmark(changedBookmark, 'native-64', { sourceStore: source })
-    return { studyHub: true, pairedRestore: true, records: saved.data.records.length, bookmark: saved.data.bookmark.id, secure: isSecureContext, locks: !!navigator.locks }
+    const batchHub = StudyNative.createCollectionStudyHub({ sourceStore: source, studyStore: study })
+    const batch = StudyNative.createCollectionStudyBatch({ hub: batchHub, sourceStore: source, studyStore: study })
+    const beforeBatch = await batchHub.load()
+    const batchKeys = beforeBatch.rows.filter(row => row.id === 'native-0').map(row => row.key)
+    if (${JSON.stringify(phase)} === 'read' && beforeBatch.rows.filter(row => row.id === 'native-0').some(row => row.status !== 'revisit')) throw new Error('Batch manual status was not retained by a fresh process')
+    const firstBatch = await batch.prepare(beforeBatch, batchKeys, 'read')
+    const competingBatch = await batch.prepare(beforeBatch, batchKeys, 'revisit')
+    const batchResults = await Promise.all([batch.apply(firstBatch), batch.apply(competingBatch)])
+    if (batchResults[0].changed !== 2 || batchResults[1].changed !== 0) throw new Error('Concurrent native batch did not protect saved statuses')
+    const undone = await batch.undo(batchResults[0])
+    if (undone.restored !== 2 || undone.remaining) throw new Error('Native batch undo failed')
+    const persistModel = await batchHub.load()
+    const persistBatch = await batch.prepare(persistModel, batchKeys, 'revisit')
+    await batch.apply(persistBatch)
+    const finished = await batchHub.load()
+    if (finished.rows.filter(row => row.id === 'native-0').some(row => row.status !== 'revisit') || finished.counts.notes !== 2) throw new Error('Native batch altered notes or lost statuses')
+    for (const sourceEntry of source.list().entries) {
+      const check = await study.load(sourceEntry, source)
+      if (check.data.bookmark.id !== 'native-64' || check.data.records.find(row => row.id === 'native-64').note !== saved.data.records[0].note) throw new Error('Native batch changed annotations or bookmarks')
+    }
+    const compiler = StudyNative.createStudyCompilation({ hub: batchHub, sourceStore: source, studyStore: study,
+      request: () => { throw new Error('Native compiler preview must not contact a backend') } })
+    const research = await compiler.prepare(finished, finished.rows.filter(row => row.note).map(row => row.key),
+      { title: '原生研究预览', goal: '检查配套恢复后的批注', parentId: '', group: 'collection' })
+    if (research.count !== 2 || !research.content.includes('批注保留中文与换行') || research.groups.length !== 2) throw new Error('Native research preview lost provenance or annotations')
+    const loadedResearch = JSON.parse(research.content)
+    const researchLinks = loadedResearch.root.children.flatMap(node => node.children || []).filter(node => node.type === 'wiki-link')
+    if (researchLinks.length !== 2 || researchLinks.some(node => node.id !== 'native-64')) throw new Error('Native research links differ')
+    return { researchCompilation: true, batchStatuses: true, studyHub: true, pairedRestore: true, records: saved.data.records.length, bookmark: saved.data.bookmark.id, secure: isSecureContext, locks: !!navigator.locks }
   })()`)
   console.log('STUDY_NATIVE_OK:' + phase + ' ' + JSON.stringify(result))
   window.webContents.session.flushStorageData()

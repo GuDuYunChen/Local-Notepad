@@ -3,6 +3,7 @@ import { readSearchCollection, SEARCH_COLLECTION_PREFIX, searchCollections } fro
 export const COLLECTION_STUDY_PREFIX = 'localNotepad.collectionStudy.v1:'
 export const MAX_STUDY_BYTES = 1024 * 1024
 export const MAX_STUDY_NOTE_LENGTH = 2000
+export const MAX_STUDY_STATUS_BATCH = 200
 export const STUDY_STATUS_LABELS = Object.freeze({ unread: '未读', read: '已读', revisit: '待复看' })
 const FORMAT = 'local-notepad-collection-study'
 const BACKUP = 'local-notepad-collection-study-backup'
@@ -88,10 +89,16 @@ export function createCollectionStudyStore({ storage = () => globalThis.localSto
     if (typeof manager?.request !== 'function') fail('当前环境不支持安全的多窗口保存；阅读记录未写入，请使用桌面应用或导出批注草稿')
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), 5000)
+    const cancel = () => controller.abort()
+    options.signal?.addEventListener('abort', cancel, { once: true })
+    if (options.signal?.aborted) cancel()
     try { return await manager.request('local-notepad-study:' + snapshot.key, { mode: 'exclusive', signal: controller.signal }, () => {
       if (options.isCurrent?.() === false) fail('操作已取消，未写入阅读记录')
       const collection = unchanged(snapshot, sourceStore)
-      const data = normalizeCollectionStudyData(transform(snapshot.data, now().toISOString()), collection, snapshot.data.reportSHA256)
+      const candidate = transform(snapshot.data, now().toISOString())
+      // No-op status batches must not create records or change save timestamps.
+      if (candidate === snapshot.data) return snapshot
+      const data = normalizeCollectionStudyData(candidate, collection, snapshot.data.reportSHA256)
       const raw = bytes(JSON.stringify(data))
       bytes(JSON.stringify({ ...data, format: BACKUP })) // Every accepted save must remain exportable.
       // Recheck after validation and just before the single atomic setItem.
@@ -101,10 +108,12 @@ export function createCollectionStudyStore({ storage = () => globalThis.localSto
       const result = freeze({ ...snapshot, raw, data })
       publish(); return result
     }) } catch (failure) {
-      if (failure?.name === 'AbortError') fail('等待安全保存锁超时，未写入；请重试或先导出批注草稿')
+      if (failure?.name === 'AbortError') fail(options.signal?.aborted
+        ? '操作已取消，未写入阅读记录'
+        : '等待安全保存锁超时，未写入；请重试或先导出批注草稿')
       if (failure?.name === 'SecurityError') fail('当前页面无法获取安全保存锁，未写入；请先导出批注草稿')
       throw failure
-    } finally { clearTimeout(timer) }
+    } finally { clearTimeout(timer); options.signal?.removeEventListener('abort', cancel) }
   }
   function validateExport(snapshot, sourceStore = searchCollections) {
     const collection = unchanged(snapshot, sourceStore)
@@ -121,6 +130,27 @@ export function createCollectionStudyStore({ storage = () => globalThis.localSto
   }
   return {
     load,
+    assertCurrent(snapshot, sourceStore = searchCollections) { unchanged(snapshot, sourceStore); return snapshot },
+    setStatuses(snapshot, targets, options) {
+      return change(snapshot, (before, timestamp) => {
+        if (!Array.isArray(targets) || !targets.length || targets.length > MAX_STUDY_STATUS_BATCH) fail('每次请选择 1 至 200 条阅读记录，未截断或写入')
+        const validIds = new Set(snapshot.collection.report.items.map(item => item.id))
+        const seen = new Set(), records = new Map(before.records.map(item => [item.id, item]))
+        let changed = false
+        for (const target of targets) {
+          if (!record(target) || !validIds.has(target.id) || seen.has(target.id) || !Object.hasOwn(STUDY_STATUS_LABELS, target.status)) fail('批量标记含无效或重复笔记，未写入')
+          seen.add(target.id)
+          const previous = records.get(target.id)
+          if ((previous?.status || 'unread') === target.status) continue
+          changed = true
+          const note = previous?.note || ''
+          if (target.status === 'unread' && note === '') records.delete(target.id)
+          else records.set(target.id, { id: target.id, status: target.status, note, updatedAt: timestamp })
+        }
+        // The bookmark and every annotation are deliberately preserved.
+        return changed ? { ...before, records: [...records.values()], updatedAt: timestamp } : before
+      }, options)
+    },
     subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener) },
     saveNote(snapshot, id, status, note, options) {
       return change(snapshot, (before, timestamp) => {

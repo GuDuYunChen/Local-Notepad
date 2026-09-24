@@ -3,11 +3,13 @@ import { collectionStudyHub, selectCollectionStudyHub } from '~/services/collect
 import { collectionStudy, COLLECTION_STUDY_PREFIX, STUDY_STATUS_LABELS } from '~/services/collectionStudy'
 import { searchCollections, SEARCH_COLLECTION_PREFIX } from '~/services/searchCollections'
 import { downloadCollectionReviewReport } from '~/services/collectionReviewReport'
+import CollectionStudyBatchPanel, { useStudyBatch } from './CollectionStudyBatchPanel'
+import StudyCompilationPanel from './StudyCompilationPanel'
 import './CollectionStudyHub.css'
 
 const defaults = () => ({ query: '', status: 'all', collectionKey: '', notesOnly: true, sort: 'updated', page: 1 })
 export default function CollectionStudyHub({ active, onLocate, service = collectionStudyHub,
-  sourceStore = searchCollections, studyStore = collectionStudy }) {
+  sourceStore = searchCollections, studyStore = collectionStudy, folders = [], compilationReceipt, onCompilationReceipt }) {
   const [model, setModel] = useState(null), [filters, setFilters] = useState(defaults)
   const [loading, setLoading] = useState(false), [stale, setStale] = useState(false)
   const [error, setError] = useState(''), [message, setMessage] = useState('')
@@ -43,6 +45,7 @@ export default function CollectionStudyHub({ active, onLocate, service = collect
   const view = useMemo(() => selectCollectionStudyHub(model, filters), [model, filters])
   const update = patch => setFilters(previous => ({ ...previous, ...patch, page: 1 }))
   const disabled = !active || loading || stale || !model
+  const batch = useStudyBatch({ active, disabled, model, filters: view.filters, hub: service, sourceStore, studyStore, onCommitted: refresh })
   const run = action => {
     setError(''); setMessage('')
     try { action() } catch (failure) { setError(failure.message || '操作未完成'); setStale(true) }
@@ -83,7 +86,11 @@ export default function CollectionStudyHub({ active, onLocate, service = collect
         <button type="button" onClick={() => setFilters(defaults())}>重置阅读筛选</button>
       </div>
       <p role="status">符合筛选 {view.total} 条 · 每页 12 条{stale ? '（旧快照）' : ''}</p>
+      <CollectionStudyBatchPanel batch={batch} disabled={disabled || model.issues.length > 0} rows={view.rows} />
+      <StudyCompilationPanel active={active} disabled={disabled || batch.busy || model.issues.length > 0} model={model} selected={batch.selected}
+        hub={service} sourceStore={sourceStore} studyStore={studyStore} folders={folders} receipt={compilationReceipt} onReceipt={onCompilationReceipt} />
       <div className="study-hub-rows">{view.rows.map(row => <article key={row.key} aria-label={'阅读批注 ' + row.collectionId + ' ' + row.id}>
+        <label className="study-hub-row-select"><input type="checkbox" aria-label={'选择批注 ' + row.collectionId + ' ' + row.id} checked={batch.selected.has(row.key)} disabled={disabled || batch.busy || model.issues.length > 0} onChange={() => batch.toggle(row.key)} />加入批量选择</label>
         <header><strong>{row.title || '未命名'}</strong><span>{STUDY_STATUS_LABELS[row.status]}{row.bookmarked ? ' · 上次书签' : ''}</span></header>
         <p className="study-hub-caption">{row.collectionName} · 原第 {row.ordinal} 条 · {row.folderPath || '根目录'}</p>
         <p className="study-hub-note">{row.note || '（无已存批注）'}</p>
@@ -93,6 +100,6 @@ export default function CollectionStudyHub({ active, onLocate, service = collect
       {!view.total && <p className="study-hub-empty">当前筛选没有条目。可取消“只看有批注”查看未读和待复看资料；未删除任何记录。</p>}
       <nav className="study-hub-actions" aria-label="阅读工作台分页"><button type="button" disabled={view.page <= 1} onClick={() => setFilters(previous => ({ ...previous, page: view.page - 1 }))}>批注上一页</button><span>第 {view.page} / {view.pages} 页</span><button type="button" disabled={view.page >= view.pages} onClick={() => setFilters(previous => ({ ...previous, page: view.page + 1 }))}>批注下一页</button></nav>
     </>}
-    <footer>仅汇总已存记录，不检索正文或未保存批注。导出覆盖当前筛选全部分页，最多 8 MiB；清单不是可恢复备份。修改批注仍需进入对应资料集后明确保存。</footer>
+    <footer>仅汇总已存记录，不检索正文或未保存批注。导出覆盖当前筛选全部分页，最多 8 MiB；清单不是可恢复备份。批量操作仅改变已存人工状态；修改批注文字仍需进入对应资料集后明确保存。</footer>
   </section>
 }

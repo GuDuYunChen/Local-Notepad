@@ -12,6 +12,7 @@ import useSearchResultExport from '~/hooks/useSearchResultExport'
 import { createSearchReturnContext, restoreSearchReturnFilters } from '~/services/searchReturn'
 import { readCollectionReadingContext } from '~/services/collectionReading'
 import { applySearchPresetFilters } from '~/services/searchPresets'
+import { downloadCollectionReviewReport } from '~/services/collectionReviewReport'
 import './GlobalSearchPanel.css'
 
 const defaults = () => ({ query: '', source: 'all', folderId: '', pinned: false, matchCase: false, days: '0', since: 0, sort: 'relevance', page: 1, revision: '' })
@@ -34,6 +35,7 @@ function DialogFrame({ onClose, inputRef, children }) {
 // round-trip. Closing cancels requests and releases result snippets, not the draft.
 export default function GlobalSearchPanel({ open, onClose, onOpenFile, seed, onOpened, returnRequest }) {
   const [mode, setMode] = useState('search')
+  const [compilationReceipt, setCompilationReceipt] = useState(null)
   const collectionTabRef = useRef(null), searchTabRef = useRef(null), studyTabRef = useRef(null)
   const tabs = [['search', '检索结果', searchTabRef], ['collections', '本地资料集', collectionTabRef], ['study', '阅读批注', studyTabRef]]
   const [filters, setFilters] = useState(defaults)
@@ -176,6 +178,22 @@ export default function GlobalSearchPanel({ open, onClose, onOpenFile, seed, onO
     pageLanding.current = landing; listScroll.current = { page, top: 0 }
     setReturnNotice(''); setFilters(previous => ({ ...previous, page, revision: response.revision, anchorId: '' }))
   }
+  const openResearchNote = async () => {
+    if (compilationReceipt?.status !== 'confirmed' || operation.current || !onOpenFile) return
+    const controller = new AbortController(); operation.current = controller
+    setOpening(true); setOpenError('')
+    try {
+      const accepted = await current.current.onOpenFile(compilationReceipt.id, {
+        signal: controller.signal,
+        shouldSelect: () => current.current.open && operation.current === controller && !controller.signal.aborted,
+      })
+      if (controller.signal.aborted || !current.current.open) return
+      if (accepted === false) { setOpenError('已取消打开，研究笔记仍已保存，原正文草稿保留。'); return }
+      current.current.onOpened?.(null)
+      setFilters(previous => ({ ...previous, revision: '' })); current.current.onClose?.()
+    } catch (failure) { if (!controller.signal.aborted) setOpenError('研究笔记已保存，但打开未完成：' + failure.message) }
+    finally { if (operation.current === controller) { operation.current = null; setOpening(false) } }
+  }
   const selectedIndex = ready ? response.items.findIndex(item => item.id === selectedId) : -1
   const moveResult = direction => {
     if (!ready || selectedIndex < 0) return
@@ -196,6 +214,14 @@ export default function GlobalSearchPanel({ open, onClose, onOpenFile, seed, onO
       <div><h2 id="global-search-title">全局检索</h2><p>在所有已保存笔记中查找，先看上下文，再回到正文。</p></div>
       <button type="button" onClick={close} aria-label="关闭全局检索">×</button>
     </header>
+    {compilationReceipt && <section className="study-compilation-result" aria-label="研究笔记创建结果">
+      <p role="status">{compilationReceipt.status === 'confirmed' ? '研究笔记已保存：' + compilationReceipt.title : compilationReceipt.status === 'pending' ? '研究笔记正在创建；关闭检索不撤销已发出的请求。' : compilationReceipt.message}</p>
+      {compilationReceipt.status === 'confirmed' && <button type="button" disabled={!onOpenFile} onClick={() => void openResearchNote()}>打开新研究笔记</button>}
+      {compilationReceipt.draft && compilationReceipt.status !== 'pending' && <button type="button" onClick={() => {
+        try { downloadCollectionReviewReport(compilationReceipt.draft) } catch (failure) { setOpenError('研究草稿下载未完成：' + failure.message) }
+      }}>下载保留的研究草稿</button>}
+      {openError && <p role="alert">{openError}</p>}
+    </section>}
     <div className="global-search-tabs" role="tablist" aria-label="检索工作区">
       {tabs.map(([id, title, ref]) =>
         <button key={id} ref={ref} type="button" role="tab" id={'search-tab-' + id} aria-selected={mode === id}
@@ -301,7 +327,7 @@ export default function GlobalSearchPanel({ open, onClose, onOpenFile, seed, onO
       <SearchCollectionsPanel model={archives} onOpenFile={onOpenFile ? item => openResult(item, null, true) : null} />
     </div>
     <div className="global-search-mode" role="tabpanel" id="search-mode-study" aria-labelledby="search-tab-study" hidden={mode !== 'study'}>
-      <CollectionStudyHub active={open && mode === 'study'} onLocate={target => {
+      <CollectionStudyHub active={open && mode === 'study'} folders={folders} compilationReceipt={compilationReceipt} onCompilationReceipt={setCompilationReceipt} onLocate={target => {
         if (!archives.showStudy(target.entry, target.documentId)) throw new Error('资料集已更改或删除，请刷新阅读工作台')
         setMode('collections'); collectionTabRef.current?.focus()
       }} />

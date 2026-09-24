@@ -1,0 +1,17 @@
+.study-compilation { margin: 16px 0; padding: 16px; background: var(--paper); border: 1px solid var(--line); border-radius: 10px; }
+.study-compilation > summary { cursor: pointer; font-weight: 600; font-size: 15px; padding: 4px 0; }
+.study-compilation-form { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; border: 0; padding: 8px 0; min-width: 0; }
+.study-compilation-form label { display: flex; flex-direction: column; gap: 6px; flex: 1 1 180px; min-width: 0; }
+.study-compilation-form .study-compilation-goal { flex-basis: 100%; }
+.study-compilation textarea { padding: 10px; min-width: 0; resize: vertical; border: 1px solid var(--line); border-radius: 7px; background: var(--paper); color: var(--ink); font: inherit; line-height: 1.65; }
+.study-compilation :is(summary,textarea):focus-visible { outline: 2px solid var(--clay); outline-offset: 3px; }
+.study-compilation-preview { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 12px; }
+.study-compilation-preview h4 { margin: 10px 0; font-size: 15px; }
+.study-compilation-preview h5 { font-size: 14px; margin: 8px 0; }
+.study-compilation-document { max-height: 440px; overflow: auto; padding: 16px; background: var(--surface); border-radius: 8px; overflow-wrap: anywhere; }
+.study-compilation-document article { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.study-compilation-document p { white-space: pre-wrap; }
+.study-compilation-document small, .study-compilation-boundary { color: var(--ink-muted); font-size: 12px; }
+.study-compilation-result { margin: 10px 16px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); display: flex; flex-wrap: wrap; gap: 10px; align-items: center; overflow-wrap: anywhere; }
+.study-compilation-result p { flex: 1 1 240px; margin: 0; }
+.study-compilation-result button { border: 1px solid var(--line); background: var(--paper); color: var(--ink); padding: 8px 12px; border-radius: 6px; font: inherit; cursor: pointer; }

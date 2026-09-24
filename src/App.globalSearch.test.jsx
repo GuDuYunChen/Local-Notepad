@@ -172,3 +172,46 @@ it('ending collection reading only removes the navigation bar and preserves the 
   expect(container.querySelector('.workspace-save-chip').textContent).toBe('未保存')
   expect(searchCollections.list().entries).toHaveLength(1); expect(mocks.clear).not.toHaveBeenCalled()
 })
+
+async function createResearchFromSavedAnnotation() {
+ const { createHash, randomUUID } = await import('node:crypto')
+ vi.stubGlobal('crypto', { randomUUID, subtle: { digest: async (_alg, bytes) => Uint8Array.from(createHash('sha256').update(bytes).digest()).buffer } })
+ const { createCollectionStudyStore } = await import('./services/collectionStudy')
+ const report = await collectSearchResultReport({ query: '' }, result(), { mode: 'all', request: async () => result() })
+ let entry
+ await act(async () => {
+  searchCollections.save('研究来源', report); entry = searchCollections.list().entries[0]
+  const study = createCollectionStudyStore({ locks: () => ({ request: (_name, _options, fn) => Promise.resolve().then(fn) }) })
+  await study.saveNote(await study.load(entry), 'b', 'revisit', '关于设定的一条批注')
+ })
+ let created
+ api.mockImplementation(async (path, init) => {
+  if (init?.method === 'POST' && path === '/api/files') { created = { id: 'research-1', ...JSON.parse(init.body) }; return created }
+  if (path === '/api/files/research-1') return created
+  if (path.startsWith('/api/search?')) return result()
+  return { id: 'b', title: '第二章.md', content: '已存正文' }
+ })
+ await click('打开全局检索入口'); await settle(); await click('阅读批注'); await settle()
+ await click('选择本页批注'); await click('预览所选批注研究笔记'); await click('确认创建独立研究笔记'); await settle()
+ return () => created
+}
+it('creating a research note leaves the current dirty manuscript untouched', async () => {
+ await click('编辑测试正文'); const getCreated = await createResearchFromSavedAnnotation()
+ expect(getCreated().content).toContain('关于设定的一条批注')
+ expect(container.querySelector('.workspace-save-chip').textContent).toBe('未保存')
+ expect(container.querySelector('.workspace-title-button').textContent).toBe('第一章.md')
+ expect(mocks.clear).not.toHaveBeenCalled(); expect(api.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1)
+ expect(api.mock.calls.filter(([, init]) => init?.method === 'PUT')).toHaveLength(0)
+})
+it('cancelling the guard retains the creation receipt and draft without creating twice', async () => {
+ await click('编辑测试正文'); await createResearchFromSavedAnnotation(); await click('打开新研究笔记'); await click('取消'); await settle()
+ expect(container.querySelector('[aria-label="研究笔记创建结果"]').textContent).toContain('研究笔记已保存')
+ expect(container.querySelector('.workspace-save-chip').textContent).toBe('未保存'); expect(mocks.clear).not.toHaveBeenCalled()
+ expect(button('打开新研究笔记')).toBeTruthy(); expect(api.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1)
+})
+it('only explicit discard opens the created note and clears the old navigation context', async () => {
+ await click('编辑测试正文'); await createResearchFromSavedAnnotation(); await click('打开新研究笔记'); await click('不保存'); await settle()
+ expect(container.querySelector('[aria-label="全局检索结果"]')).toBeNull()
+ expect(container.querySelector('.workspace-title-button').textContent).toContain('阅读研究笔记')
+ expect(mocks.clear).toHaveBeenCalledOnce(); expect(container.querySelector('[aria-label="检索返回导航"]')).toBeNull()
+})

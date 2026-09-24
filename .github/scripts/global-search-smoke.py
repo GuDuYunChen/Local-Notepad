@@ -42,6 +42,7 @@ for page in (2, 3, 4):
     all_ids.update(item["id"] for item in batch["items"])
 assert len(all_ids) == 65, len(all_ids)
 subprocess.run(["node", str(Path(__file__).with_name("search-result-export-smoke.mjs")), base, project["id"]], check=True)
+subprocess.run(["node", str(Path(__file__).with_name("study-compilation-smoke.mjs")), base, project["id"]], check=True)
 anchored = search(q=word, folder_id=project["id"], size=20, sort="title", anchor_id=files[-1]["id"])
 assert anchored["anchor_found"] and anchored["page"] == 4 and anchored["anchor_id"] == files[-1]["id"], anchored
 call("/api/files/" + files[-1]["id"], "PUT", {"title": "000-移至首条.md"})
