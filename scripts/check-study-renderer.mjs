@@ -12,7 +12,7 @@ const require = createRequire(import.meta.url)
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const directory = await mkdtemp(path.join(os.tmpdir(), 'notepad-study-native-'))
 try {
-  await build({ stdin: { contents: `export * from './src/services/collectionStudy.js'; export { createSearchCollectionStore } from './src/services/searchCollections.js';`,
+  await build({ stdin: { contents: `export * from './src/services/collectionStudy.js'; export * from './src/services/collectionPackage.js'; export { createSearchCollectionStore } from './src/services/searchCollections.js';`,
     resolveDir: root }, bundle: true, platform: 'browser', format: 'iife', globalName: 'StudyNative', outfile: path.join(directory, 'study.js') })
   const page = path.join(directory, 'study.html')
   await writeFile(page, '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Isolated study storage check</title></head><body><script src="./study.js"></script></body></html>')
@@ -23,5 +23,5 @@ try {
     assert.ok(output.includes('STUDY_NATIVE_OK:' + phase), output)
     console.log(output.trim())
   }
-  console.log('Native Electron file-page reading storage passed: real Web Locks, WebCrypto, localStorage and fresh-process read of synthetic marks/bookmark/Unicode notes. Not a full application UI test.')
+  console.log('Native Electron file-page reading storage passed: real Web Locks, WebCrypto, localStorage and fresh-process read of synthetic marks/bookmark/Unicode notes. Paired-package restore/reimport and persisted last-page annotations also passed. Not a full application UI test.')
 } finally { await rm(directory, { recursive: true, force: true }) }

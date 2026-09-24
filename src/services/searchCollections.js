@@ -117,6 +117,7 @@ export function createSearchCollectionStore({ storage = () => globalThis.localSt
     publish(); return value
   }
   return { list, save, readUnchanged,
+    notifyImported: publish, // Paired import publishes only after both records are available.
     subscribe(callback) { listeners.add(callback); return () => listeners.delete(callback) },
     remove(entry) { readUnchanged(entry); db().removeItem(entry.key); publish() },
     export(entry) { return JSON.stringify(readSearchCollection(readUnchanged(entry))) },

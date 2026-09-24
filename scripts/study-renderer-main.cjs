@@ -15,7 +15,7 @@ app.whenReady().then(async () => {
       source.save('原生阅读验收', { format: 'local-notepad-search-results', version: 1, exportedAt: '2026-09-24T09:00:00.000Z', mode: 'all', includeSnippets: false,
         scope: { criteria: { query: '', source: 'all', folderId: '', pinned: false, matchCase: false, since: 0, sort: 'title' }, revision: 'b'.repeat(64), total: 65, pages: 4, pageSize: 20, totalOccurrences: 0, scanned: 65, unsupported: 0, folderLabel: '验收' }, count: 65, exportedBodyOccurrences: 0, items })
     }
-    const entry = source.list().entries[0]
+    const entry = source.list().entries.find(item => item.collection?.id === 'native-study-fixture')
     if (!entry || entry.collection.report.count !== 65) throw new Error('Collection was not retained')
     const study = StudyNative.createCollectionStudyStore()
     let saved = await study.load(entry, source)
@@ -31,7 +31,21 @@ app.whenReady().then(async () => {
     const preview = study.prepareImport(saved, backup, source)
     saved = await study.import(saved, preview, { sourceStore: source })
     if (source.readUnchanged(entry) !== entry.raw) throw new Error('Source collection changed')
-    return { records: saved.data.records.length, bookmark: saved.data.bookmark.id, secure: isSecureContext, locks: !!navigator.locks }
+    const packages = StudyNative.createCollectionPackageService({ sourceStore: source, studyStore: study })
+    if (${JSON.stringify(phase)} === 'write') {
+      const raw = await packages.exportPackage(entry)
+      localStorage.setItem('native-package-fixture', raw)
+      const first = await packages.prepareImport(raw), second = await packages.prepareImport(raw)
+      const results = await Promise.allSettled([packages.confirmImport(first), packages.confirmImport(second)])
+      if (results[0].status !== 'fulfilled' || results[1].status !== 'rejected') throw new Error('Concurrent restore failed to reject stale preview')
+    }
+    const packagePreview = await packages.prepareImport(localStorage.getItem('native-package-fixture'))
+    if (packagePreview.action !== 'existing') throw new Error('Restored pair not retained or was duplicated')
+    await packages.confirmImport(packagePreview)
+    const restoredEntry = source.list().entries.find(item => item.collection?.id === packagePreview.collection.id)
+    const paired = await study.load(restoredEntry, source)
+    if (paired.data.bookmark.id !== 'native-64' || paired.data.records[0].note !== saved.data.records[0].note || source.list().entries.length !== 2) throw new Error('Restored pair differs after restart')
+    return { pairedRestore: true, records: saved.data.records.length, bookmark: saved.data.bookmark.id, secure: isSecureContext, locks: !!navigator.locks }
   })()`)
   console.log('STUDY_NATIVE_OK:' + phase + ' ' + JSON.stringify(result))
   window.webContents.session.flushStorageData()

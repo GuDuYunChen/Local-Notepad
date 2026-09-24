@@ -28,7 +28,7 @@ function text(value) {
   if (typeof value !== 'string' || value.length > MAX_STUDY_NOTE_LENGTH || value.includes('\0')) fail('批注最多 2000 个字符，且不能含空字符')
   return value
 }
-function cleanData(value, collection, reportSHA256) {
+export function normalizeCollectionStudyData(value, collection, reportSHA256) {
   const ids = new Set(collection.report.items.map(item => item.id))
   if (!record(value) || value.format !== FORMAT || value.version !== 1 || value.collectionId !== collection.id ||
       value.reportSHA256 !== reportSHA256 || !Array.isArray(value.records) || value.records.length > ids.size) {
@@ -47,7 +47,7 @@ function cleanData(value, collection, reportSHA256) {
   return freeze({ format: FORMAT, version: 1, collectionId: collection.id, reportSHA256,
     updatedAt: value.updatedAt === null && !records.length && !bookmark ? null : date(value.updatedAt), bookmark, records })
 }
-async function fingerprint(collection) {
+export async function collectionReportFingerprint(collection) {
   if (!globalThis.crypto?.subtle) fail('当前环境无法校验资料集版本，未写入阅读记录')
   const hash = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(collection.report)))
   return [...new Uint8Array(hash)].map(value => value.toString(16).padStart(2, '0')).join('')
@@ -74,13 +74,13 @@ export function createCollectionStudyStore({ storage = () => globalThis.localSto
   async function load(entry, sourceStore = searchCollections) {
     const raw = sourceStore.readUnchanged(entry), collection = readSearchCollection(raw)
     if (entry.key !== SEARCH_COLLECTION_PREFIX + collection.id) fail('资料集身份不一致')
-    const reportSHA256 = await fingerprint(collection)
+    const reportSHA256 = await collectionReportFingerprint(collection)
     sourceStore.readUnchanged(entry)
     const key = COLLECTION_STUDY_PREFIX + collection.id, stored = db().getItem(key)
     const value = stored === null ? { format: FORMAT, version: 1, collectionId: collection.id, reportSHA256,
       updatedAt: null, bookmark: null, records: [] } : JSON.parse(bytes(stored))
     return freeze({ entry: { key: entry.key, raw }, key, raw: stored, collection,
-      data: cleanData(value, collection, reportSHA256) })
+      data: normalizeCollectionStudyData(value, collection, reportSHA256) })
   }
   async function change(snapshot, transform, options = {}) {
     const sourceStore = options.sourceStore || searchCollections
@@ -91,7 +91,7 @@ export function createCollectionStudyStore({ storage = () => globalThis.localSto
     try { return await manager.request('local-notepad-study:' + snapshot.key, { mode: 'exclusive', signal: controller.signal }, () => {
       if (options.isCurrent?.() === false) fail('操作已取消，未写入阅读记录')
       const collection = unchanged(snapshot, sourceStore)
-      const data = cleanData(transform(snapshot.data, now().toISOString()), collection, snapshot.data.reportSHA256)
+      const data = normalizeCollectionStudyData(transform(snapshot.data, now().toISOString()), collection, snapshot.data.reportSHA256)
       const raw = bytes(JSON.stringify(data))
       bytes(JSON.stringify({ ...data, format: BACKUP })) // Every accepted save must remain exportable.
       // Recheck after validation and just before the single atomic setItem.
@@ -108,7 +108,7 @@ export function createCollectionStudyStore({ storage = () => globalThis.localSto
   }
   function validateExport(snapshot, sourceStore = searchCollections) {
     const collection = unchanged(snapshot, sourceStore)
-    return cleanData(snapshot.data, collection, snapshot.data.reportSHA256)
+    return normalizeCollectionStudyData(snapshot.data, collection, snapshot.data.reportSHA256)
   }
   function prepareImport(snapshot, raw, sourceStore = searchCollections) {
     unchanged(snapshot, sourceStore)
@@ -116,7 +116,7 @@ export function createCollectionStudyStore({ storage = () => globalThis.localSto
     if (!record(input) || input.format !== BACKUP || input.version !== 1 || input.reportSHA256 !== snapshot.data.reportSHA256) {
       fail('备份不属于同一份历史检索结果，未创建笔记或替换记录')
     }
-    const data = cleanData({ ...input, format: FORMAT, collectionId: snapshot.collection.id }, snapshot.collection, snapshot.data.reportSHA256)
+    const data = normalizeCollectionStudyData({ ...input, format: FORMAT, collectionId: snapshot.collection.id }, snapshot.collection, snapshot.data.reportSHA256)
     return freeze({ data, reportSHA256: snapshot.data.reportSHA256, expectedRaw: snapshot.raw, key: snapshot.key })
   }
   return {
