@@ -47,6 +47,12 @@ jobs:
         working-directory: server
         run: go test ./...
 
+      - name: Search cache race and parser benchmark
+        working-directory: server
+        run: |
+          go test -race ./internal/search -count=1
+          go test ./internal/search -run '^$' -bench BenchmarkParsedSearch -benchmem -benchtime=200ms -count=3
+
       - name: Cross-build Windows backend
         working-directory: server
         env:

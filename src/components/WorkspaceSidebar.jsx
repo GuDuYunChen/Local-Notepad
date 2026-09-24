@@ -116,7 +116,7 @@ export default function WorkspaceSidebar({
             className="workspace-sidebar-icon-btn"
             onClick={onOpenSearch}
             aria-label="搜索笔记"
-            title="搜索 (Ctrl+K)"
+            title="全局检索 (Ctrl+Shift+K)"
           >
             <Icon><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></Icon>
           </button>
@@ -129,7 +129,7 @@ export default function WorkspaceSidebar({
           >
             <Icon size={16}><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></Icon>
             <span>搜索笔记</span>
-            <kbd>Ctrl K</kbd>
+            <kbd>Ctrl ⇧ K</kbd>
           </button>
         )}
 

@@ -12,6 +12,7 @@ import ToastViewport from './components/ToastViewport'
 import ReferenceRefactorDialog from './components/ReferenceRefactorDialog'
 import FocusSessionBar from './components/FocusSessionBar'
 import EvidenceReviewBar from './components/EvidenceReviewBar'
+import SearchReturnBar from './components/SearchReturnBar'
 import { evidenceReview } from '~/services/evidenceReviewSession'
 import useGuardedNoteOpener from './hooks/useGuardedNoteOpener'
 import { toast } from '~/services/toast'
@@ -39,6 +40,7 @@ const InspectorPanel = React.lazy(() => import('./components/InspectorPanel'))
 const ShortcutsModal = React.lazy(() => import('./components/ShortcutsModal'))
 const BackupPanel = React.lazy(() => import('./components/BackupPanel'))
 const QuickSwitcher = React.lazy(() => import('./components/QuickSwitcher'))
+const GlobalSearchPanel = React.lazy(() => import('./components/GlobalSearchPanel'))
 const TrashPanel = React.lazy(() => import('./components/TrashPanel'))
 const SettingsPanel = React.lazy(() => import('./components/SettingsPanel'))
 import ErrorBoundary from './components/ErrorBoundary'
@@ -98,6 +100,17 @@ export default function App() {
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [backupOpen, setBackupOpen] = useState(false)
   const [quickSearchOpen, setQuickSearchOpen] = useState(false)
+  const [globalSearchOpen, setGlobalSearchOpen] = useState(false)
+  const [globalSearchMounted, setGlobalSearchMounted] = useState(false)
+  const [globalSearchSeed, setGlobalSearchSeed] = useState(null)
+  const [searchOrigin, setSearchOrigin] = useState(null)
+  const [searchReturnRequest, setSearchReturnRequest] = useState(null)
+  const openGlobalSearch = (query) => {
+    setQuickSearchOpen(false)
+    if (typeof query === 'string') setGlobalSearchSeed({ query })
+    setGlobalSearchMounted(true)
+    setGlobalSearchOpen(true)
+  }
   const [focusMode, setFocusMode] = useState(false)
   const [focusSession, setFocusSession] = useState(null)
   const [editorStatus, setEditorStatus] = useState({
@@ -757,7 +770,8 @@ export default function App() {
       }
       if ((e.ctrlKey || e.metaKey) && k === 'k') {
         e.preventDefault()
-        setQuickSearchOpen(true)
+        if (e.shiftKey) openGlobalSearch()
+        else { setGlobalSearchOpen(false); setQuickSearchOpen(true) }
       }
       if (k === '/' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault()
@@ -1131,7 +1145,7 @@ export default function App() {
                       })
                     }}
                     onChangeWorkspace={handleNavigation}
-                    onOpenSearch={() => setQuickSearchOpen(true)}
+                    onOpenSearch={() => openGlobalSearch()}
                     onOpenBackup={() => setBackupOpen(true)}
                     onOpenShortcuts={() => setShortcutsOpen(true)}
                   >
@@ -1194,6 +1208,10 @@ export default function App() {
 
               <section className={`workspace-content${switching ? ' switching' : ''}`}>
                 {documentHeader}
+                {workspace === 'notes' && <SearchReturnBar origin={searchOrigin} documentId={current?.id}
+                  dirty={unsaved || editorStatus.dirty}
+                  onReturn={() => { setSearchReturnRequest({ context: searchOrigin }); openGlobalSearch() }}
+                  onEnd={() => { setSearchOrigin(null); setSearchReturnRequest(null) }} />}
                 {workspace === 'notes' && (
                   <EvidenceReviewBar
                     documentId={current?.id}
@@ -1213,7 +1231,7 @@ export default function App() {
                       deletedIds={deletedIds}
                       autoSaveOnSwitch={false}
                       onCreateNote={() => window.dispatchEvent(new Event('library:create-note'))}
-                      onOpenSearch={() => setQuickSearchOpen(true)}
+                      onOpenSearch={() => openGlobalSearch()}
                       onOpenDaily={() => changeWorkspace('daily')}
                       onChange={setContent}
                       onLoaded={(text) => {
@@ -1431,6 +1449,9 @@ export default function App() {
         />
       )}
 
+      {globalSearchMounted && <React.Suspense fallback={null}>
+        <GlobalSearchPanel open={globalSearchOpen} seed={globalSearchSeed} returnRequest={searchReturnRequest} onOpened={setSearchOrigin} onClose={() => setGlobalSearchOpen(false)} onOpenFile={handleInspectorSelectFile} />
+      </React.Suspense>}
       {(shortcutsOpen || backupOpen || quickSearchOpen) && (
         <React.Suspense fallback={null}>
           <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
@@ -1439,6 +1460,7 @@ export default function App() {
             open={quickSearchOpen}
             onClose={() => setQuickSearchOpen(false)}
             onSelectFile={handleSelectFile}
+            onOpenSearchWorkspace={query => openGlobalSearch(query)}
           />
         </React.Suspense>
       )}

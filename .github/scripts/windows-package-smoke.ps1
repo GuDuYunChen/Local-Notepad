@@ -87,6 +87,10 @@ function Test-NotepadBackend {
       throw "$Label diagnostics check failed: $($diagnostics | ConvertTo-Json -Depth 6)"
     }
 
+    # Run the same UTF-8/literal/pagination checks against the actual bundled backend.
+    python (Join-Path $root '.github\scripts\global-search-smoke.py') "http://127.0.0.1:$Port"
+    if ($LASTEXITCODE -ne 0) { throw "$Label global search HTTP smoke failed." }
+
     $note = Invoke-RestMethod -Uri "http://127.0.0.1:$Port/api/files" -Method Post -ContentType 'application/json' -Headers @{ Origin = 'null' } -Body '{"title":"Data safety fixture.md","content":"committed WAL evidence","is_folder":false,"parent_id":""}'
     if ($note.code -ne 0) { throw "$Label could not create the temporary WAL test note." }
     & (Join-Path $PSScriptRoot 'windows-data-safety-smoke.ps1') -BackendPath $BackendPath -DataDir $DataDir -Label $Label

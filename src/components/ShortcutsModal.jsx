@@ -3,6 +3,7 @@ import React from 'react'
 const shortcuts = [
   { category: '全局', items: [
     { key: 'Ctrl + K', desc: '快速搜索 / 切换笔记' },
+    { key: 'Ctrl + Shift + K', desc: '全局检索 / 目录筛选 / 上下文定位' },
     { key: 'Ctrl + /', desc: '打开快捷键面板' },
     { key: 'F11', desc: '进入 / 退出专注模式' },
   ]},

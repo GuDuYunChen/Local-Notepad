@@ -19,6 +19,7 @@ type FileController struct {
 }
 
 func (c *FileController) Register(group *ghttp.RouterGroup) {
+	group.GET("/search", c.GlobalSearch)
 	group.GET("/files/trash", c.ListTrash)
 	group.DELETE("/files/trash", c.EmptyTrash)
 	group.POST("/files", c.Create)

@@ -90,10 +90,12 @@ function normalizeRecentFiles(list) {
   })
 }
 
-export default function QuickSwitcher({ open, onClose, onSelectFile }) {
+export default function QuickSwitcher({ open, onClose, onSelectFile, onOpenSearchWorkspace }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [retry, setRetry] = useState(0)
   const [activeIndex, setActiveIndex] = useState(0)
   const inputRef = useRef(null)
   const resultsRef = useRef(null)
@@ -120,6 +122,7 @@ export default function QuickSwitcher({ open, onClose, onSelectFile }) {
     const hasQuery = Boolean(query.trim())
     const requestId = ++requestRef.current
     setLoading(true)
+    setError('')
 
     const runSearch = async () => {
       try {
@@ -128,11 +131,13 @@ export default function QuickSwitcher({ open, onClose, onSelectFile }) {
           : await api('/api/files?size=200')
 
         if (requestRef.current !== requestId) return
+        if (!Array.isArray(list)) throw new Error('搜索回执不完整，请更新后端后重试')
         setResults(hasQuery ? normalizeFiles(list) : normalizeRecentFiles(list))
         setActiveIndex(0)
       } catch (error) {
         if (requestRef.current === requestId) {
           console.error('快速搜索失败', error)
+          setError(error.message || '读取失败，请重试')
           setResults([])
         }
       } finally {
@@ -150,7 +155,7 @@ export default function QuickSwitcher({ open, onClose, onSelectFile }) {
     }, 180)
 
     return () => window.clearTimeout(timer)
-  }, [open, query])
+  }, [open, query, retry])
 
   const visibleResults = useMemo(() => results.slice(0, 20), [results])
 
@@ -170,12 +175,13 @@ export default function QuickSwitcher({ open, onClose, onSelectFile }) {
   if (!open) return null
 
   const choose = (file) => {
-    if (!file) return
+    if (!file || loading) return
     onSelectFile?.(file)
     onClose?.()
   }
 
   const handleKeyDown = (event) => {
+    if (event.nativeEvent?.isComposing || event.keyCode === 229) return
     if (event.key === 'Escape') {
       event.preventDefault()
       onClose?.()
@@ -233,7 +239,7 @@ export default function QuickSwitcher({ open, onClose, onSelectFile }) {
 
         <div className="quick-switcher-meta" role="status" aria-live="polite">
           <span>{query.trim() ? '搜索结果' : '最近笔记'}</span>
-          <span>{loading ? '搜索中…' : `${visibleResults.length} 项`}</span>
+          <span>{loading ? '搜索中…' : error ? '读取失败' : `${visibleResults.length} 项`}</span>
         </div>
 
         <div
@@ -243,7 +249,7 @@ export default function QuickSwitcher({ open, onClose, onSelectFile }) {
           role="listbox"
           aria-label="搜索结果"
         >
-          {!loading && visibleResults.length === 0 ? (
+          {error ? (<div className="quick-switcher-empty" role="alert"><strong>快速搜索未完成</strong><span>{error}</span><button type="button" className="btn small" onClick={() => setRetry(value => value + 1)}>重试快速搜索</button></div>) : !loading && visibleResults.length === 0 ? (
             <div className="quick-switcher-empty">
               <strong>{query.trim() ? '没有找到匹配的笔记' : '还没有可打开的笔记'}</strong>
               <span>{query.trim() ? '换一个关键词试试。' : '先创建一篇笔记，然后就能在这里快速打开。'}</span>
@@ -261,6 +267,7 @@ export default function QuickSwitcher({ open, onClose, onSelectFile }) {
               return (
                 <button
                   type="button"
+                  disabled={loading}
                   id={`quick-result-${file.id}`}
                   data-result-index={index}
                   key={file.id}
@@ -289,6 +296,7 @@ export default function QuickSwitcher({ open, onClose, onSelectFile }) {
           )}
         </div>
 
+        {onOpenSearchWorkspace && <div className="quick-switcher-meta"><button type="button" className="btn small" onClick={() => onOpenSearchWorkspace(query)}>完整检索与筛选</button><span>快速结果最多展示 20 项</span></div>}
         <footer className="quick-switcher-footer">
           <span><kbd>↑</kbd><kbd>↓</kbd> 选择</span>
           <span><kbd>Enter</kbd> 打开</span>

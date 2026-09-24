@@ -5,12 +5,14 @@ import (
 	"database/sql"
 	"fmt"
 	"notepad-server/internal/model"
+	notesearch "notepad-server/internal/search"
 	"strings"
 	"time"
 )
 
 type FileDAO struct {
-	DB *sql.DB
+	DB          *sql.DB
+	searchCache notesearch.DocumentCache
 }
 
 func (d *FileDAO) NextSortOrder(ctx context.Context, parentID string) (int64, error) {

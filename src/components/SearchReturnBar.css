@@ -1,0 +1,8 @@
+.search-return-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 18px; border-bottom: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+.search-return-bar > div { flex: 1 1 240px; min-width: 0; }
+.search-return-bar strong { margin-right: 10px; font-size: 13px; }
+.search-return-bar span { font-size: 12px; overflow-wrap: anywhere; }
+.search-return-bar small { display: block; margin-top: 3px; font-size: 12px; color: var(--ink-muted); }
+.search-return-bar button { min-height: 36px; padding: 6px 12px; border: 1px solid var(--line); border-radius: 7px; background: var(--paper); color: var(--ink); cursor: pointer; }
+.search-return-bar button:focus-visible { outline: 2px solid var(--clay); outline-offset: 2px; }
+@media (max-width: 640px) { .search-return-bar { padding: 10px 12px; } .search-return-bar > div { flex-basis: 100%; } }

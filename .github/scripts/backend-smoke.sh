@@ -145,4 +145,6 @@ CORS_HEADERS="$(
 )"
 printf '%s' "$CORS_HEADERS" | grep -qi '^Access-Control-Allow-Origin: null'
 
+python3 "$ROOT_DIR/.github/scripts/global-search-smoke.py" "$BASE"
+
 echo "Backend HTTP smoke passed for $FILE_ID"
