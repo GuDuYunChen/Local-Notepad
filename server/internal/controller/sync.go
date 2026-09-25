@@ -1,0 +1,48 @@
+package controller
+
+import (
+	"notepad-server/internal/syncengine"
+
+	"github.com/gogf/gf/v2/net/ghttp"
+)
+
+type SyncController struct {
+	Engine *syncengine.Engine
+}
+
+func (c *SyncController) Register(group *ghttp.RouterGroup) {
+	group.GET("/sync/status", c.Status)
+	group.POST("/sync/plan", c.Plan)
+	group.POST("/sync/run", c.Run)
+	group.GET("/sync/conflicts", c.Conflicts)
+	group.POST("/sync/conflicts/{id}/resolve", c.Resolve)
+}
+
+func (c *SyncController) Status(r *ghttp.Request) {
+	value, err := c.Engine.Status(r.GetCtx())
+	if err != nil { writeErrWithDetail(r, 4001, "读取同步状态失败", err); return }
+	writeOK(r, value)
+}
+func (c *SyncController) Plan(r *ghttp.Request) {
+	value, err := c.Engine.Plan(r.GetCtx())
+	if err != nil { writeErrWithDetail(r, 4002, "同步预演失败", err); return }
+	writeOK(r, value)
+}
+func (c *SyncController) Run(r *ghttp.Request) {
+	value, err := c.Engine.Run(r.GetCtx())
+	if err != nil { writeErrWithDetail(r, 4003, "同步执行失败", err); return }
+	writeOK(r, value)
+}
+func (c *SyncController) Conflicts(r *ghttp.Request) {
+	value, err := c.Engine.Conflicts(r.GetCtx())
+	if err != nil { writeErrWithDetail(r, 4004, "读取同步冲突失败", err); return }
+	writeOK(r, value)
+}
+func (c *SyncController) Resolve(r *ghttp.Request) {
+	var input struct { Choice string `json:"choice"` }
+	if err := r.Parse(&input); err != nil { writeErr(r, 4005, "冲突解决参数错误", err); return }
+	if err := c.Engine.Resolve(r.GetCtx(), r.Get("id").String(), input.Choice); err != nil {
+		writeErrWithDetail(r, 4006, "解决同步冲突失败", err); return
+	}
+	writeOK(r, nil)
+}

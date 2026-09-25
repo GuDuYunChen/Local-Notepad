@@ -118,9 +118,10 @@ type RunResult struct {
 }
 
 type Engine struct {
-	DB      *sql.DB
-	DataDir string
-	Now     func() time.Time
+	DB         *sql.DB
+	DataDir    string
+	RemoteRoot string
+	Now        func() time.Time
 }
 
 func (e *Engine) now() time.Time {
@@ -204,7 +205,9 @@ func (e *Engine) remote(ctx context.Context) (*DirRemote, error) {
 		return nil, fmt.Errorf("当前阶段仅支持本地同步实验室 provider")
 	}
 	if e.DataDir == "" { return nil, fmt.Errorf("同步数据目录未配置") }
-	return NewDirRemote(filepath.Join(e.DataDir, "sync-lab-remote"))
+	root := e.RemoteRoot
+	if root == "" { root = filepath.Join(e.DataDir, "sync-lab-remote") }
+	return NewDirRemote(root)
 }
 
 func (e *Engine) localFiles(ctx context.Context) (map[string]Record, error) {
@@ -354,7 +357,7 @@ func validateRemoteStructure(manifest Manifest, remote *DirRemote, cache map[str
 			}
 		}
 		if !f.IsDeleted {
-			key := f.ParentID+"\x00"+strings.ToLocaleLower(f.Title)
+			key := f.ParentID+"\x00"+strings.ToLower(f.Title)
 			if previous, ok := activeNames[key]; ok && previous != id {
 				return fmt.Errorf("远端同一目录存在重复标题: %s", f.Title)
 			}

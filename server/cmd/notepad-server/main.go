@@ -19,6 +19,7 @@ import (
 	"notepad-server/internal/dao"
 	"notepad-server/internal/logic"
 	"notepad-server/internal/middleware"
+	"notepad-server/internal/syncengine"
 
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
@@ -201,11 +202,13 @@ func main() {
 	tagController := &controller.TagController{TagLogic: tagLogic}
 
 	uploadController := &controller.UploadController{UploadDir: uploadPath}
+	syncController := &controller.SyncController{Engine: &syncengine.Engine{DB: db, DataDir: filepath.Dir(dbPath)}}
 
 	fileController.Register(group)
 	settingsController.Register(group)
 	uploadController.Register(group)
 	tagController.Register(group)
+	syncController.Register(group)
 
 	// 优雅退出：监听系统信号
 	quit := make(chan os.Signal, 1)
@@ -495,6 +498,43 @@ func migrate(ctx context.Context, db *sql.DB) error {
 			},
 		},
 		{version: 10, stmts: []string{dao.ResearchRequestsSchema}},
+		{
+			version: 11,
+			stmts: []string{
+				"ALTER TABLE settings ADD COLUMN sync_provider TEXT DEFAULT ''",
+				`CREATE TABLE IF NOT EXISTS sync_state (
+					id INTEGER PRIMARY KEY CHECK(id = 1),
+					device_id TEXT NOT NULL,
+					remote_store_id TEXT NOT NULL DEFAULT '',
+					remote_revision TEXT NOT NULL DEFAULT '',
+					last_sync_at INTEGER NOT NULL DEFAULT 0,
+					last_status TEXT NOT NULL DEFAULT 'never',
+					last_error TEXT NOT NULL DEFAULT ''
+				)`,
+				`INSERT OR IGNORE INTO sync_state(id, device_id)
+				 VALUES(1, lower(hex(randomblob(16))))`,
+				`CREATE TABLE IF NOT EXISTS sync_base (
+					item_id TEXT PRIMARY KEY,
+					object_hash TEXT NOT NULL,
+					synced_at INTEGER NOT NULL
+				)`,
+				`CREATE TABLE IF NOT EXISTS sync_conflicts (
+					id TEXT PRIMARY KEY,
+					item_id TEXT NOT NULL,
+					base_hash TEXT NOT NULL,
+					local_hash TEXT NOT NULL,
+					remote_hash TEXT NOT NULL,
+					local_record TEXT NOT NULL,
+					remote_record TEXT NOT NULL,
+					created_at INTEGER NOT NULL,
+					status TEXT NOT NULL DEFAULT 'open',
+					resolution TEXT NOT NULL DEFAULT '',
+					resolved_at INTEGER NOT NULL DEFAULT 0
+				)`,
+				`CREATE INDEX IF NOT EXISTS idx_sync_conflicts_status_created ON sync_conflicts(status, created_at DESC)`,
+				`CREATE INDEX IF NOT EXISTS idx_sync_conflicts_item ON sync_conflicts(item_id, status)`,
+			},
+		},
 	}
 
 	var currentVersion int
@@ -559,6 +599,7 @@ func ensureCompatibleSchema(ctx context.Context, db *sql.DB) error {
 		{table: "files", column: "is_deleted", definition: "INTEGER DEFAULT 0"},
 		{table: "files", column: "deleted_at", definition: "INTEGER DEFAULT 0"},
 		{table: "files", column: "is_pinned", definition: "INTEGER DEFAULT 0"},
+		{table: "settings", column: "sync_provider", definition: "TEXT DEFAULT ''"},
 	}
 
 	for _, item := range requiredColumns {

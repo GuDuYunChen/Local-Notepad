@@ -31,10 +31,11 @@ func newSettingsLogicTest(t *testing.T) (*SettingsLogic, *sql.DB, string) {
 			theme TEXT NOT NULL,
 			editor_opts TEXT,
 			sync_enabled INTEGER,
-			sync_endpoint TEXT
+			sync_endpoint TEXT,
+			sync_provider TEXT
 		)`,
-		`INSERT INTO settings (id, theme, editor_opts, sync_enabled, sync_endpoint)
-		 VALUES (1, 'light', '{"fontSize":15,"lineHeight":1.8}', 1, 'http://sync.local')`,
+		`INSERT INTO settings (id, theme, editor_opts, sync_enabled, sync_endpoint, sync_provider)
+		 VALUES (1, 'light', '{"fontSize":15,"lineHeight":1.8}', 1, 'http://sync.local', 'local-lab')`,
 		`CREATE TABLE files (
 			id TEXT PRIMARY KEY,
 			title TEXT NOT NULL,
@@ -84,7 +85,7 @@ func TestSettingsGetAndPartialUpdatePreserveExistingPreferences(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get settings: %v", err)
 	}
-	if settings.Theme != "light" || !settings.SyncEnabled || settings.SyncEndpoint != "http://sync.local" {
+	if settings.Theme != "light" || !settings.SyncEnabled || settings.SyncEndpoint != "http://sync.local" || settings.SyncProvider != "local-lab" {
 		t.Fatalf("unexpected settings: %#v", settings)
 	}
 	if settings.EditorOpts["fontSize"] != float64(15) {
@@ -99,7 +100,7 @@ func TestSettingsGetAndPartialUpdatePreserveExistingPreferences(t *testing.T) {
 	if updated.Theme != "dark" {
 		t.Fatalf("theme = %q, want dark", updated.Theme)
 	}
-	if !updated.SyncEnabled || updated.SyncEndpoint != "http://sync.local" {
+	if !updated.SyncEnabled || updated.SyncEndpoint != "http://sync.local" || updated.SyncProvider != "local-lab" {
 		t.Fatalf("partial update cleared sync settings: %#v", updated)
 	}
 	if updated.EditorOpts["lineHeight"] != 1.8 {
@@ -109,6 +110,10 @@ func TestSettingsGetAndPartialUpdatePreserveExistingPreferences(t *testing.T) {
 	invalid := "sepia"
 	if _, err := logic.Update(ctx, &model.SettingsPatch{Theme: &invalid}); err == nil {
 		t.Fatal("expected invalid theme to fail")
+	}
+	provider := "webdav"
+	if _, err := logic.Update(ctx, &model.SettingsPatch{SyncProvider: &provider}); err == nil {
+		t.Fatal("expected unsupported sync provider to fail in phase 2A")
 	}
 }
 

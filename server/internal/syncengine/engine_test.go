@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -55,15 +56,9 @@ func TestInitialUploadAndPull(t *testing.T){
 	ctx:=context.Background()
 	dbA,rootA:=testDB(t);dbB,rootB:=testDB(t)
 	remoteRoot:=filepath.Join(t.TempDir(),"remote")
-	// Both devices point at the same simulated remote.
-	rootAData:=rootA;rootBData:=rootB
-	_ = rootAData; _ = rootBData
 	addFile(t,dbA,"n1","One","alpha",10)
-	engineA:=testEngine(dbA,rootA,"device-a")
-	engineB:=testEngine(dbB,rootB,"device-b")
-	// Redirect both lab remotes to one shared root by symlinking the fixed lab path.
-	if err:=os.Symlink(remoteRoot,filepath.Join(rootA,"sync-lab-remote"));err!=nil{t.Skip("symlink fixture unavailable")}
-	if err:=os.Symlink(remoteRoot,filepath.Join(rootB,"sync-lab-remote"));err!=nil{t.Skip("symlink fixture unavailable")}
+	engineA:=testEngine(dbA,rootA,"device-a");engineA.RemoteRoot=remoteRoot
+	engineB:=testEngine(dbB,rootB,"device-b");engineB.RemoteRoot=remoteRoot
 	if _,err:=engineA.Run(ctx);err!=nil{t.Fatal(err)}
 	result,err:=engineB.Run(ctx);if err!=nil{t.Fatal(err)}
 	if result.AppliedDown!=1{t.Fatalf("expected one download: %+v",result)}

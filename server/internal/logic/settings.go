@@ -40,7 +40,16 @@ func (l *SettingsLogic) Update(ctx context.Context, patch *model.SettingsPatch) 
 		current.SyncEnabled = *patch.SyncEnabled
 	}
 	if patch.SyncEndpoint != nil {
-		current.SyncEndpoint = *patch.SyncEndpoint
+		if len(*patch.SyncEndpoint) > 2048 { return nil, fmt.Errorf("同步端点长度超过限制") }
+		current.SyncEndpoint = strings.TrimSpace(*patch.SyncEndpoint)
+	}
+	if patch.SyncProvider != nil {
+		provider := strings.TrimSpace(*patch.SyncProvider)
+		if provider != "" && provider != "local-lab" { return nil, fmt.Errorf("当前不支持的同步 provider: %s", provider) }
+		current.SyncProvider = provider
+	}
+	if current.SyncEnabled && current.SyncProvider == "" {
+		return nil, fmt.Errorf("启用同步前需要选择同步 provider")
 	}
 
 	if current.EditorOpts == nil {

@@ -17,16 +17,18 @@ func (d *SettingsDAO) Get(ctx context.Context) (*model.Settings, error) {
 	var s model.Settings
 	var editorOpts sql.NullString
 	var syncEndpoint sql.NullString
+	var syncProvider sql.NullString
 	var syncEnabled int
 
 	row := d.DB.QueryRowContext(ctx,
-		`SELECT theme, editor_opts, sync_enabled, sync_endpoint FROM settings WHERE id = 1`)
-	if err := row.Scan(&s.Theme, &editorOpts, &syncEnabled, &syncEndpoint); err != nil {
+		`SELECT theme, editor_opts, sync_enabled, sync_endpoint, COALESCE(sync_provider,'') FROM settings WHERE id = 1`)
+	if err := row.Scan(&s.Theme, &editorOpts, &syncEnabled, &syncEndpoint, &syncProvider); err != nil {
 		return nil, err
 	}
 
 	s.SyncEnabled = syncEnabled != 0
 	s.SyncEndpoint = syncEndpoint.String
+	s.SyncProvider = syncProvider.String
 	s.EditorOpts = map[string]interface{}{}
 
 	if editorOpts.Valid && editorOpts.String != "" {
@@ -46,9 +48,9 @@ func (d *SettingsDAO) Update(ctx context.Context, s *model.Settings) error {
 
 	_, err = d.DB.ExecContext(ctx,
 		`UPDATE settings
-		 SET theme = ?, editor_opts = ?, sync_enabled = ?, sync_endpoint = ?
+		 SET theme = ?, editor_opts = ?, sync_enabled = ?, sync_endpoint = ?, sync_provider = ?
 		 WHERE id = 1`,
-		s.Theme, string(editorJSON), s.SyncEnabled, s.SyncEndpoint)
+		s.Theme, string(editorJSON), s.SyncEnabled, s.SyncEndpoint, s.SyncProvider)
 	return err
 }
 

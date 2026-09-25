@@ -6,6 +6,7 @@ type Settings struct {
 	EditorOpts   map[string]interface{} `json:"editor_opts"`
 	SyncEnabled  bool                   `json:"sync_enabled"`
 	SyncEndpoint string                 `json:"sync_endpoint"`
+	SyncProvider string                 `json:"sync_provider"`
 }
 
 type SettingsPatch struct {
@@ -13,4 +14,5 @@ type SettingsPatch struct {
 	EditorOpts   *map[string]interface{}  `json:"editor_opts"`
 	SyncEnabled  *bool                    `json:"sync_enabled"`
 	SyncEndpoint *string                  `json:"sync_endpoint"`
+	SyncProvider *string                  `json:"sync_provider"`
 }

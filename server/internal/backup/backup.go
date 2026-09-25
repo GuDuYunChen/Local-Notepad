@@ -21,7 +21,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-const SupportedSchemaVersion = 10
+const SupportedSchemaVersion = 11
 
 var autoName = regexp.MustCompile(`^backup-(\d{8}-\d{6})(?:-[a-f0-9]{12})?\.db$`)
 var safeName = regexp.MustCompile(`^backup-(?:manual-)?[a-zA-Z0-9-]+\.db$`)
@@ -162,6 +162,17 @@ func Inspect(ctx context.Context, filename string) (Info, error) {
 			return info, fmt.Errorf("研究任务回执表结构不兼容: %w", schemaErr)
 		}
 		rows.Close()
+	}
+	if info.SchemaVersion >= 11 {
+		for _, query := range []string{
+			`SELECT device_id,remote_store_id,remote_revision,last_sync_at,last_status,last_error FROM sync_state LIMIT 0`,
+			`SELECT item_id,object_hash,synced_at FROM sync_base LIMIT 0`,
+			`SELECT id,item_id,base_hash,local_hash,remote_hash,status,resolution FROM sync_conflicts LIMIT 0`,
+		} {
+			rows, schemaErr := db.QueryContext(ctx, query)
+			if schemaErr != nil { return info, fmt.Errorf("同步状态表结构不兼容: %w", schemaErr) }
+			rows.Close()
+		}
 	}
 	if err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM files").Scan(&info.Files); err != nil {
 		return info, err
