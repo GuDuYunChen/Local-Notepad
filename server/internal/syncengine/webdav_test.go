@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 
 	xwebdav "golang.org/x/net/webdav"
@@ -107,4 +108,27 @@ func TestWebDAVRejectsInsecureExternalEndpointAndBadCredentials(t *testing.T) {
 	remote, err := NewWebDAVRemote(endpoint, "alice", "wrong")
 	if err != nil { t.Fatal(err) }
 	if _, err := remote.LoadManifest(); err == nil { t.Fatal("expected bad WebDAV credentials to fail") }
+}
+
+
+func TestWebDAVPlanIsStrictlyReadOnly(t *testing.T) {
+	root:=t.TempDir()
+	handler:=&xwebdav.Handler{Prefix:"/",FileSystem:xwebdav.Dir(root),LockSystem:xwebdav.NewMemLS()}
+	var writes atomic.Int64
+	server:=httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter,r *http.Request){
+		username,password,ok:=r.BasicAuth()
+		if !ok||username!="alice"||password!="secret"{http.Error(w,"unauthorized",http.StatusUnauthorized);return}
+		switch r.Method{case "MKCOL",http.MethodPut,http.MethodDelete,"MOVE","COPY":writes.Add(1)}
+		handler.ServeHTTP(w,r)
+	}))
+	defer server.Close()
+
+	db,dataRoot:=testDB(t)
+	addFile(t,db,"n1","One","preview-only",10)
+	if _,err:=db.Exec(`UPDATE settings SET sync_provider='webdav',sync_endpoint=?,sync_username='alice',sync_password='secret'`,server.URL+"/local-notepad");err!=nil{t.Fatal(err)}
+	engine:=testEngine(db,dataRoot,"device-a")
+	plan,err:=engine.Plan(context.Background())
+	if err!=nil{t.Fatal(err)}
+	if plan.Uploads!=1||!plan.NeedsInit{t.Fatalf("unexpected preview plan: %+v",plan)}
+	if got:=writes.Load();got!=0{t.Fatalf("WebDAV preview performed %d remote writes",got)}
 }
