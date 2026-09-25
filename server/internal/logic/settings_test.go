@@ -3,8 +3,10 @@ package logic
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"notepad-server/internal/dao"
@@ -32,10 +34,12 @@ func newSettingsLogicTest(t *testing.T) (*SettingsLogic, *sql.DB, string) {
 			editor_opts TEXT,
 			sync_enabled INTEGER,
 			sync_endpoint TEXT,
-			sync_provider TEXT
+			sync_provider TEXT,
+			sync_username TEXT,
+			sync_password TEXT
 		)`,
-		`INSERT INTO settings (id, theme, editor_opts, sync_enabled, sync_endpoint, sync_provider)
-		 VALUES (1, 'light', '{"fontSize":15,"lineHeight":1.8}', 1, 'http://sync.local', 'local-lab')`,
+		`INSERT INTO settings (id, theme, editor_opts, sync_enabled, sync_endpoint, sync_provider, sync_username, sync_password)
+		 VALUES (1, 'light', '{"fontSize":15,"lineHeight":1.8}', 1, 'http://sync.local', 'local-lab', '', '')`,
 		`CREATE TABLE files (
 			id TEXT PRIMARY KEY,
 			title TEXT NOT NULL,
@@ -112,8 +116,24 @@ func TestSettingsGetAndPartialUpdatePreserveExistingPreferences(t *testing.T) {
 		t.Fatal("expected invalid theme to fail")
 	}
 	provider := "webdav"
-	if _, err := logic.Update(ctx, &model.SettingsPatch{SyncProvider: &provider}); err == nil {
-		t.Fatal("expected unsupported sync provider to fail in phase 2A")
+	endpoint := "https://dav.example.test/notepad"
+	username := "alice"
+	password := "secret-value"
+	webdav, err := logic.Update(ctx, &model.SettingsPatch{
+		SyncProvider: &provider, SyncEndpoint: &endpoint, SyncUsername: &username, SyncPassword: &password,
+	})
+	if err != nil { t.Fatalf("enable webdav settings: %v", err) }
+	if webdav.SyncProvider != "webdav" || webdav.SyncUsername != "alice" || !webdav.SyncPasswordSet {
+		t.Fatalf("unexpected webdav settings: %#v", webdav)
+	}
+	encoded, err := json.Marshal(webdav)
+	if err != nil { t.Fatal(err) }
+	if strings.Contains(string(encoded), password) || strings.Contains(string(encoded), "sync_password\"") {
+		t.Fatalf("password leaked in settings JSON: %s", encoded)
+	}
+	insecure := "http://dav.example.test/notepad"
+	if _, err := logic.Update(ctx, &model.SettingsPatch{SyncEndpoint: &insecure}); err == nil {
+		t.Fatal("expected insecure non-loopback WebDAV endpoint to fail")
 	}
 }
 
