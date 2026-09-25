@@ -1,6 +1,5 @@
 import fs from 'node:fs/promises'
 import { createReadStream } from 'node:fs'
-import { once } from 'node:events'
 import { createHash } from 'node:crypto'
 import path from 'node:path'
 
@@ -309,12 +308,27 @@ export async function inspectWorkspacePackage(filename) {
   }
 }
 
-async function writeChunk(stream, chunk) {
-  if (!stream.write(chunk)) await once(stream, 'drain')
+async function writeChunk(handle, chunk, position) {
+  let offset = 0
+  while (offset < chunk.length) {
+    const { bytesWritten } = await handle.write(
+      chunk,
+      offset,
+      chunk.length - offset,
+      position + offset,
+    )
+    if (!bytesWritten) fail('工作区便携包写入中断')
+    offset += bytesWritten
+  }
+  return position + chunk.length
 }
 
-async function copyIntoStream(source, stream) {
-  for await (const chunk of createReadStream(source)) await writeChunk(stream, chunk)
+async function copyIntoFile(source, handle, position) {
+  let cursor = position
+  for await (const chunk of createReadStream(source)) {
+    cursor = await writeChunk(handle, chunk, cursor)
+  }
+  return cursor
 }
 
 async function resolveSnapshot(dataDir, info) {
@@ -381,18 +395,16 @@ export function createWorkspacePackageService({
           throw error
         }
         owned = await handle.stat()
-        const output = handle.createWriteStream({ autoClose: false })
-        try {
-          await writeChunk(output, header)
-          await copyIntoStream(snapshot, output)
-          for (const attachment of attachments) await copyIntoStream(attachment.source, output)
-          output.end()
-          await once(output, 'finish')
-          await handle.sync()
-        } catch (error) {
-          output.destroy()
-          throw error
+        let position = 0
+        position = await writeChunk(handle, header, position)
+        position = await copyIntoFile(snapshot, handle, position)
+        for (const attachment of attachments) {
+          position = await copyIntoFile(attachment.source, handle, position)
         }
+        const expectedBytes = header.length + backup.size +
+          attachments.reduce((sum, attachment) => sum + attachment.size, 0)
+        if (position !== expectedBytes) fail('工作区便携包写入字节数与清单不一致')
+        await handle.sync()
         await handle.close(); handle = null
 
         const inspected = await inspectWorkspacePackage(target)
