@@ -321,38 +321,59 @@ func (r *WebDAVRemote) SaveManifest(manifest Manifest) (Manifest, error) {
 	return manifest, nil
 }
 
-func (r *WebDAVRemote) readLock() (webDAVLockPayload, string, error) {
+func (r *WebDAVRemote) readLock() (webDAVLockPayload, error) {
 	var payload webDAVLockPayload
-	raw, etag, err := r.getBytes("locks/sync.lock", 64*1024)
-	if err != nil { return payload, "", err }
-	if err := json.Unmarshal(raw, &payload); err != nil || payload.Token == "" || payload.At == "" { return payload, "", fmt.Errorf("WebDAV 同步锁格式无效") }
-	return payload, etag, nil
+	raw, _, err := r.getBytes("locks/sync.lock/owner.json", 64*1024)
+	if err != nil { return payload, err }
+	if err := json.Unmarshal(raw, &payload); err != nil || payload.Token == "" || payload.At == "" {
+		return payload, fmt.Errorf("WebDAV 同步锁格式无效")
+	}
+	return payload, nil
 }
 
 func (r *WebDAVRemote) createLock(token string) (bool, error) {
-	payload, _ := json.Marshal(webDAVLockPayload{Token: token, At: time.Now().UTC().Format(time.RFC3339Nano)})
-	resp, err := r.request(http.MethodPut, "locks/sync.lock", bytes.NewReader(payload), int64(len(payload)), map[string]string{"If-None-Match": "*"})
+	resp, err := r.request("MKCOL", "locks/sync.lock", nil, 0, nil)
 	if err != nil { return false, err }
-	defer closeResponse(resp)
-	if resp.StatusCode == http.StatusPreconditionFailed { return false, nil }
-	if resp.StatusCode != http.StatusCreated { return false, webDAVStatusError(resp, "创建 WebDAV 同步锁") }
+	status := resp.StatusCode
+	if status == http.StatusMethodNotAllowed {
+		closeResponse(resp)
+		return false, nil
+	}
+	if status != http.StatusCreated {
+		defer closeResponse(resp)
+		return false, webDAVStatusError(resp, "创建 WebDAV 同步锁")
+	}
+	closeResponse(resp)
+
+	payload, _ := json.Marshal(webDAVLockPayload{Token: token, At: time.Now().UTC().Format(time.RFC3339Nano)})
+	resp, err = r.request(http.MethodPut, "locks/sync.lock/owner.json", bytes.NewReader(payload), int64(len(payload)), nil)
+	if err != nil {
+		_ = r.deleteLock()
+		return false, err
+	}
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
+		defer closeResponse(resp)
+		_ = r.deleteLock()
+		return false, webDAVStatusError(resp, "写入 WebDAV 同步锁")
+	}
+	closeResponse(resp)
 	return true, nil
 }
 
-func (r *WebDAVRemote) deleteLock(etag string) error {
-	headers := map[string]string{}
-	if strings.TrimSpace(etag) != "" { headers["If-Match"] = etag }
-	resp, err := r.request(http.MethodDelete, "locks/sync.lock", nil, -1, headers)
+func (r *WebDAVRemote) deleteLock() error {
+	resp, err := r.request(http.MethodDelete, "locks/sync.lock", nil, -1, nil)
 	if err != nil { return err }
 	defer closeResponse(resp)
-	if resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusNoContent || resp.StatusCode == http.StatusOK { return nil }
+	if resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusNoContent || resp.StatusCode == http.StatusOK {
+		return nil
+	}
 	return webDAVStatusError(resp, "删除 WebDAV 同步锁")
 }
 
 func (r *WebDAVRemote) releaseLock(token string) {
-	current, etag, err := r.readLock()
+	current, err := r.readLock()
 	if err != nil || current.Token != token { return }
-	_ = r.deleteLock(etag)
+	_ = r.deleteLock()
 }
 
 func (r *WebDAVRemote) AcquireLock() (*RemoteLock, error) {
@@ -360,12 +381,15 @@ func (r *WebDAVRemote) AcquireLock() (*RemoteLock, error) {
 	token, err := randomID(16); if err != nil { return nil, err }
 	created, err := r.createLock(token); if err != nil { return nil, err }
 	if !created {
-		current, etag, readErr := r.readLock(); if readErr != nil { return nil, readErr }
+		current, readErr := r.readLock()
+		if readErr != nil {
+			return nil, fmt.Errorf("WebDAV 同步锁已存在但不可验证，拒绝自动覆盖: %w", readErr)
+		}
 		createdAt, parseErr := time.Parse(time.RFC3339Nano, current.At)
 		if parseErr != nil { return nil, fmt.Errorf("WebDAV 同步锁时间无效，拒绝自动回收") }
 		age := time.Since(createdAt)
 		if age < 0 || age <= staleLockAge { return nil, fmt.Errorf("WebDAV 远端正被其他设备使用，请稍后重试") }
-		if err := r.deleteLock(etag); err != nil { return nil, fmt.Errorf("无法安全回收过期 WebDAV 同步锁: %w", err) }
+		if err := r.deleteLock(); err != nil { return nil, fmt.Errorf("无法安全回收过期 WebDAV 同步锁: %w", err) }
 		created, err = r.createLock(token); if err != nil { return nil, err }
 		if !created { return nil, fmt.Errorf("WebDAV 同步锁被其他设备抢先取得，请稍后重试") }
 	}
