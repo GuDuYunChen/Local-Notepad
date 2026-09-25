@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/ui-redesign-v1
+      - feature/knowledge-os-phase1
   pull_request:
     branches:
       - master
@@ -95,6 +96,9 @@ jobs:
 
       - name: Install dependencies
         run: npm install --no-audit --no-fund
+
+      - name: Verify portable workspace transactions on Windows
+        run: npx vitest run --root=. electron/workspace-package.test.js electron/workspace-restore.test.js
 
       - name: Build unsigned Windows NSIS package
         shell: pwsh
