@@ -45,13 +45,33 @@ type FilePayload struct {
 	IsPinned  bool   `json:"is_pinned"`
 }
 
+type TagPayload struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Color string `json:"color"`
+}
+
+type FileTagPayload struct {
+	FileID string `json:"file_id"`
+	TagID  string `json:"tag_id"`
+}
+
+type AttachmentPayload struct {
+	Name     string `json:"name"`
+	Size     int64  `json:"size"`
+	BlobHash string `json:"blob_hash"`
+}
+
 type Record struct {
-	Format  string       `json:"format"`
-	Version int          `json:"version"`
-	Kind    string       `json:"kind"`
-	ID      string       `json:"id"`
-	State   string       `json:"state"`
-	File    *FilePayload `json:"file,omitempty"`
+	Format     string             `json:"format"`
+	Version    int                `json:"version"`
+	Kind       string             `json:"kind"`
+	ID         string             `json:"id"`
+	State      string             `json:"state"`
+	File       *FilePayload       `json:"file,omitempty"`
+	Tag        *TagPayload        `json:"tag,omitempty"`
+	FileTag    *FileTagPayload    `json:"file_tag,omitempty"`
+	Attachment *AttachmentPayload `json:"attachment,omitempty"`
 }
 
 type Manifest struct {
@@ -141,21 +161,83 @@ func randomID(bytes int) (string, error) {
 	return hex.EncodeToString(raw), nil
 }
 
+func tagItemKey(id string) string { return "tag:" + id }
+func fileTagItemKey(fileID, tagID string) string { return "filetag:" + fileID + ":" + tagID }
+func attachmentItemKey(name string) string { return "attachment:" + hex.EncodeToString([]byte(name)) }
+
+func safeAttachmentName(name string) bool {
+	return name!="" && name!="." && name!=".." &&
+		filepath.Base(name)==name && !strings.ContainsRune(name,'\x00') &&
+		!strings.ContainsAny(name,"/\\")
+}
+
+func attachmentNameFromKey(key string) (string,bool) {
+	if !strings.HasPrefix(key,"attachment:") { return "",false }
+	raw,err:=hex.DecodeString(strings.TrimPrefix(key,"attachment:"))
+	if err!=nil { return "",false }
+	name:=string(raw)
+	return name,safeAttachmentName(name)
+}
+
+func recordItemKey(record Record) (string,error) {
+	switch record.Kind {
+	case "file":
+		if strings.TrimSpace(record.ID)=="" { return "",fmt.Errorf("文件同步对象 ID 为空") }
+		return record.ID,nil
+	case "tag":
+		if record.Tag!=nil { return tagItemKey(record.Tag.ID),nil }
+		if strings.HasPrefix(record.ID,"tag:") { return record.ID,nil }
+	case "file-tag":
+		if record.FileTag!=nil { return fileTagItemKey(record.FileTag.FileID,record.FileTag.TagID),nil }
+		if strings.HasPrefix(record.ID,"filetag:") { return record.ID,nil }
+	case "attachment":
+		if record.Attachment!=nil { return attachmentItemKey(record.Attachment.Name),nil }
+		if _,ok:=attachmentNameFromKey(record.ID);ok { return record.ID,nil }
+	}
+	return "",fmt.Errorf("同步对象键无效")
+}
+
+func kindForItemKey(key string) string {
+	switch {
+	case strings.HasPrefix(key,"tag:"): return "tag"
+	case strings.HasPrefix(key,"filetag:"): return "file-tag"
+	case strings.HasPrefix(key,"attachment:"): return "attachment"
+	default: return "file"
+	}
+}
+
 func normalizeRecord(record Record) (Record, error) {
-	if record.Format != RecordFormat || record.Version != RecordVersion || record.Kind != "file" || strings.TrimSpace(record.ID) == "" {
+	if record.Format != RecordFormat || record.Version != RecordVersion || strings.TrimSpace(record.ID)=="" {
 		return Record{}, fmt.Errorf("同步对象格式无效")
 	}
-	if record.State != "present" && record.State != "purged" {
-		return Record{}, fmt.Errorf("同步对象状态无效")
-	}
-	if record.State == "present" {
-		if record.File == nil || record.File.ID != record.ID || strings.TrimSpace(record.File.Title) == "" {
-			return Record{}, fmt.Errorf("同步文件对象无效")
+	if record.State!="present" && record.State!="purged" { return Record{},fmt.Errorf("同步对象状态无效") }
+	if record.State=="purged" {
+		if record.File!=nil||record.Tag!=nil||record.FileTag!=nil||record.Attachment!=nil {
+			return Record{},fmt.Errorf("永久删除标记不能携带对象内容")
 		}
-	} else if record.File != nil {
-		return Record{}, fmt.Errorf("永久删除标记不能携带文件正文")
+		if kindForItemKey(record.ID)!=record.Kind { return Record{},fmt.Errorf("永久删除标记类型与键不一致") }
+		return record,nil
 	}
-	return record, nil
+	switch record.Kind {
+	case "file":
+		if record.File==nil||record.File.ID!=record.ID||strings.TrimSpace(record.File.Title)=="" { return Record{},fmt.Errorf("同步文件对象无效") }
+		if record.Tag!=nil||record.FileTag!=nil||record.Attachment!=nil { return Record{},fmt.Errorf("同步文件对象包含额外 payload") }
+	case "tag":
+		if record.Tag==nil||strings.TrimSpace(record.Tag.ID)==""||strings.TrimSpace(record.Tag.Name)==""||record.ID!=tagItemKey(record.Tag.ID) { return Record{},fmt.Errorf("同步标签对象无效") }
+		if record.File!=nil||record.FileTag!=nil||record.Attachment!=nil { return Record{},fmt.Errorf("同步标签对象包含额外 payload") }
+	case "file-tag":
+		if record.FileTag==nil||record.FileTag.FileID==""||record.FileTag.TagID==""||record.ID!=fileTagItemKey(record.FileTag.FileID,record.FileTag.TagID) { return Record{},fmt.Errorf("同步标签关联对象无效") }
+		if record.File!=nil||record.Tag!=nil||record.Attachment!=nil { return Record{},fmt.Errorf("同步标签关联对象包含额外 payload") }
+	case "attachment":
+		if record.Attachment==nil||!safeAttachmentName(record.Attachment.Name)||record.Attachment.Size<0||
+			!objectHashPattern.MatchString(record.Attachment.BlobHash)||record.ID!=attachmentItemKey(record.Attachment.Name) {
+			return Record{},fmt.Errorf("同步附件对象无效")
+		}
+		if record.File!=nil||record.Tag!=nil||record.FileTag!=nil { return Record{},fmt.Errorf("同步附件对象包含额外 payload") }
+	default:
+		return Record{},fmt.Errorf("未知同步对象类型: %s",record.Kind)
+	}
+	return record,nil
 }
 
 func encodeRecord(record Record) ([]byte, string, error) {
@@ -167,12 +249,37 @@ func encodeRecord(record Record) ([]byte, string, error) {
 }
 
 func presentRecord(file FilePayload) Record {
-	return Record{Format: RecordFormat, Version: RecordVersion, Kind: "file", ID: file.ID, State: "present", File: &file}
+	return Record{Format:RecordFormat,Version:RecordVersion,Kind:"file",ID:file.ID,State:"present",File:&file}
+}
+func presentTagRecord(tag TagPayload) Record {
+	id:=tagItemKey(tag.ID)
+	return Record{Format:RecordFormat,Version:RecordVersion,Kind:"tag",ID:id,State:"present",Tag:&tag}
+}
+func presentFileTagRecord(link FileTagPayload) Record {
+	id:=fileTagItemKey(link.FileID,link.TagID)
+	return Record{Format:RecordFormat,Version:RecordVersion,Kind:"file-tag",ID:id,State:"present",FileTag:&link}
+}
+func presentAttachmentRecord(attachment AttachmentPayload) Record {
+	id:=attachmentItemKey(attachment.Name)
+	return Record{Format:RecordFormat,Version:RecordVersion,Kind:"attachment",ID:id,State:"present",Attachment:&attachment}
+}
+func purgedRecordForKey(key string) Record {
+	return Record{Format:RecordFormat,Version:RecordVersion,Kind:kindForItemKey(key),ID:key,State:"purged"}
 }
 
-func purgedRecord(id string) Record {
-	return Record{Format: RecordFormat, Version: RecordVersion, Kind: "file", ID: id, State: "purged"}
+func stableFileDigest(filename string) (int64,string,error) {
+	before,err:=os.Lstat(filename);if err!=nil{return 0,"",err}
+	if !before.Mode().IsRegular()||before.Mode()&os.ModeSymlink!=0{return 0,"",fmt.Errorf("附件不是普通文件: %s",filepath.Base(filename))}
+	file,err:=os.Open(filename);if err!=nil{return 0,"",err}
+	h:=sha256.New();_,copyErr:=io.Copy(h,file);closeErr:=file.Close()
+	if copyErr!=nil{return 0,"",copyErr};if closeErr!=nil{return 0,"",closeErr}
+	after,err:=os.Lstat(filename);if err!=nil{return 0,"",err}
+	if !os.SameFile(before,after)||before.Size()!=after.Size()||!before.ModTime().Equal(after.ModTime()){
+		return 0,"",fmt.Errorf("附件在计算哈希期间发生变化: %s",filepath.Base(filename))
+	}
+	return after.Size(),hex.EncodeToString(h.Sum(nil)),nil
 }
+
 
 func (e *Engine) config(ctx context.Context) (enabled bool, provider string, err error) {
 	var flag int
@@ -211,19 +318,50 @@ func (e *Engine) remote(ctx context.Context) (*DirRemote, error) {
 	return NewDirRemote(root)
 }
 
-func (e *Engine) localFiles(ctx context.Context) (map[string]Record, error) {
-	rows, err := e.DB.QueryContext(ctx, `SELECT id,title,content,created_at,updated_at,is_folder,parent_id,sort_order,is_deleted,deleted_at,is_pinned FROM files`)
-	if err != nil { return nil, err }
-	defer rows.Close()
-	out := map[string]Record{}
-	for rows.Next() {
+func (e *Engine) localRecords(ctx context.Context) (map[string]Record, error) {
+	out:=map[string]Record{}
+	rows,err:=e.DB.QueryContext(ctx,`SELECT id,title,content,created_at,updated_at,is_folder,parent_id,sort_order,is_deleted,deleted_at,is_pinned FROM files`)
+	if err!=nil{return nil,err}
+	for rows.Next(){
 		var f FilePayload
-		if err := rows.Scan(&f.ID,&f.Title,&f.Content,&f.CreatedAt,&f.UpdatedAt,&f.IsFolder,&f.ParentID,&f.SortOrder,&f.IsDeleted,&f.DeletedAt,&f.IsPinned); err != nil {
-			return nil, err
-		}
-		out[f.ID] = presentRecord(f)
+		if err:=rows.Scan(&f.ID,&f.Title,&f.Content,&f.CreatedAt,&f.UpdatedAt,&f.IsFolder,&f.ParentID,&f.SortOrder,&f.IsDeleted,&f.DeletedAt,&f.IsPinned);err!=nil{rows.Close();return nil,err}
+		out[f.ID]=presentRecord(f)
 	}
-	return out, rows.Err()
+	if err=rows.Close();err!=nil{return nil,err};if err=rows.Err();err!=nil{return nil,err}
+
+	rows,err=e.DB.QueryContext(ctx,`SELECT id,name,color FROM tags`)
+	if err!=nil{return nil,err}
+	for rows.Next(){
+		var tag TagPayload
+		if err:=rows.Scan(&tag.ID,&tag.Name,&tag.Color);err!=nil{rows.Close();return nil,err}
+		record:=presentTagRecord(tag);out[record.ID]=record
+	}
+	if err=rows.Close();err!=nil{return nil,err};if err=rows.Err();err!=nil{return nil,err}
+
+	rows,err=e.DB.QueryContext(ctx,`SELECT file_id,tag_id FROM file_tags ORDER BY file_id,tag_id`)
+	if err!=nil{return nil,err}
+	for rows.Next(){
+		var link FileTagPayload
+		if err:=rows.Scan(&link.FileID,&link.TagID);err!=nil{rows.Close();return nil,err}
+		record:=presentFileTagRecord(link);out[record.ID]=record
+	}
+	if err=rows.Close();err!=nil{return nil,err};if err=rows.Err();err!=nil{return nil,err}
+
+	uploadDir:=filepath.Join(e.DataDir,"uploads")
+	info,err:=os.Lstat(uploadDir)
+	if err!=nil {
+		if os.IsNotExist(err){return out,nil}
+		return nil,err
+	}
+	if !info.IsDir()||info.Mode()&os.ModeSymlink!=0{return nil,fmt.Errorf("附件目录不安全，拒绝同步")}
+	entries,err:=os.ReadDir(uploadDir);if err!=nil{return nil,err}
+	for _,entry:=range entries{
+		if !safeAttachmentName(entry.Name())||entry.IsDir()||entry.Type()&os.ModeSymlink!=0{return nil,fmt.Errorf("附件目录包含不受支持的条目: %s",entry.Name())}
+		size,hash,err:=stableFileDigest(filepath.Join(uploadDir,entry.Name()));if err!=nil{return nil,err}
+		record:=presentAttachmentRecord(AttachmentPayload{Name:entry.Name(),Size:size,BlobHash:hash})
+		out[record.ID]=record
+	}
+	return out,nil
 }
 
 func (e *Engine) base(ctx context.Context) (map[string]string, error) {
@@ -245,16 +383,11 @@ func recordHash(record Record) (string, error) {
 }
 
 func localRecordFor(id string, locals map[string]Record, base map[string]string) (Record, string, bool, error) {
-	if record, ok := locals[id]; ok {
-		hash, err := recordHash(record)
-		return record, hash, true, err
+	if record,ok:=locals[id];ok { hash,err:=recordHash(record);return record,hash,true,err }
+	if _,hadBase:=base[id];hadBase {
+		record:=purgedRecordForKey(id);hash,err:=recordHash(record);return record,hash,true,err
 	}
-	if _, hadBase := base[id]; hadBase {
-		record := purgedRecord(id)
-		hash, err := recordHash(record)
-		return record, hash, true, err
-	}
-	return Record{}, "", false, nil
+	return Record{},"",false,nil
 }
 
 func unionIDs(locals map[string]Record, base map[string]string, remote map[string]string) []string {
@@ -267,7 +400,14 @@ func unionIDs(locals map[string]Record, base map[string]string, remote map[strin
 	return ids
 }
 
-func classify(baseHash, localHash, remoteHash string, localExists bool) string {
+func classifyItem(id, baseHash, localHash, remoteHash string, localExists bool) string {
+	if kindForItemKey(id)=="attachment" && baseHash!="" {
+		if localHash==remoteHash && remoteHash!="" { return "noop" }
+		if localHash==baseHash && remoteHash==baseHash { return "noop" }
+		// Attachment names become immutable slots once a common base exists.
+		// Byte changes or deletion on either side require explicit resolution.
+		return "conflict"
+	}
 	if localExists && localHash == remoteHash && remoteHash != "" { return "noop" }
 	if baseHash == "" {
 		if !localExists && remoteHash != "" { return "download" }
@@ -290,7 +430,7 @@ func classify(baseHash, localHash, remoteHash string, localExists bool) string {
 }
 
 func (e *Engine) buildPlan(ctx context.Context, remote *DirRemote, manifest Manifest) (Plan, map[string]Record, map[string]Record, map[string]string, error) {
-	locals, err := e.localFiles(ctx)
+	locals, err := e.localRecords(ctx)
 	if err != nil { return Plan{}, nil,nil,nil,err }
 	base, err := e.base(ctx)
 	if err != nil { return Plan{}, nil,nil,nil,err }
@@ -307,7 +447,7 @@ func (e *Engine) buildPlan(ctx context.Context, remote *DirRemote, manifest Mani
 		local, localHash, localExists, err := localRecordFor(id, locals, base)
 		if err != nil { return Plan{},nil,nil,nil,err }
 		remoteHash := manifest.Items[id]
-		action := classify(base[id], localHash, remoteHash, localExists)
+		action := classifyItem(id, base[id], localHash, remoteHash, localExists)
 		item := PlanItem{ID:id,Action:action,BaseHash:base[id],LocalHash:localHash,RemoteHash:remoteHash}
 		plan.Items = append(plan.Items,item)
 		switch action {
@@ -335,45 +475,54 @@ func (e *Engine) buildPlan(ctx context.Context, remote *DirRemote, manifest Mani
 }
 
 func validateRemoteStructure(manifest Manifest, remote *DirRemote, cache map[string]Record) error {
-	records := map[string]Record{}
-	for id, hash := range manifest.Items {
-		record, ok := cache[id]
-		if !ok {
-			var err error
-			record, err = remote.LoadRecord(hash)
-			if err != nil { return err }
-		}
-		if record.ID != id { return fmt.Errorf("远端对象 ID 与清单不一致") }
-		records[id]=record
+	records:=map[string]Record{}
+	for key,hash:=range manifest.Items{
+		record,ok:=cache[key]
+		if !ok { var err error;record,err=remote.LoadRecord(hash);if err!=nil{return err} }
+		actual,err:=recordItemKey(record);if err!=nil{return err}
+		if actual!=key{return fmt.Errorf("远端对象键与清单不一致: %s",key)}
+		records[key]=record
 	}
-	activeNames := map[string]string{}
-	for id, record := range records {
-		if record.State != "present" || record.File == nil { continue }
-		f := record.File
-		if f.ParentID == id { return fmt.Errorf("远端文件层级包含自引用: %s", id) }
-		if f.ParentID != "" {
-			parent, ok := records[f.ParentID]
-			if !ok || parent.State!="present" || parent.File==nil || !parent.File.IsFolder {
-				return fmt.Errorf("远端文件层级缺少有效父目录: %s", id)
+	activeNames:=map[string]string{}
+	tagNames:=map[string]string{}
+	for key,record:=range records{
+		if record.State!="present"{continue}
+		switch record.Kind{
+		case "file":
+			f:=record.File
+			if f.ParentID==f.ID{return fmt.Errorf("远端文件层级包含自引用: %s",f.ID)}
+			if f.ParentID!=""{
+				parent,ok:=records[f.ParentID]
+				if !ok||parent.State!="present"||parent.Kind!="file"||parent.File==nil||!parent.File.IsFolder{return fmt.Errorf("远端文件层级缺少有效父目录: %s",f.ID)}
 			}
-		}
-		if !f.IsDeleted {
-			key := f.ParentID+"\x00"+strings.ToLower(f.Title)
-			if previous, ok := activeNames[key]; ok && previous != id {
-				return fmt.Errorf("远端同一目录存在重复标题: %s", f.Title)
+			if !f.IsDeleted{
+				nameKey:=f.ParentID+"\x00"+strings.ToLower(f.Title)
+				if previous,ok:=activeNames[nameKey];ok&&previous!=key{return fmt.Errorf("远端同一目录存在重复标题: %s",f.Title)}
+				activeNames[nameKey]=key
 			}
-			activeNames[key]=id
+		case "tag":
+			nameKey:=strings.ToLower(record.Tag.Name)
+			if previous,ok:=tagNames[nameKey];ok&&previous!=key{return fmt.Errorf("远端存在重复标签名: %s",record.Tag.Name)}
+			tagNames[nameKey]=key
+		case "file-tag":
+			fileRecord,fileOK:=records[record.FileTag.FileID]
+			tagRecord,tagOK:=records[tagItemKey(record.FileTag.TagID)]
+			if !fileOK||fileRecord.State!="present"||fileRecord.Kind!="file"||!tagOK||tagRecord.State!="present"||tagRecord.Kind!="tag"{
+				return fmt.Errorf("远端标签关联引用不存在的文件或标签: %s",key)
+			}
+		case "attachment":
+			if record.Attachment.Size<0||!objectHashPattern.MatchString(record.Attachment.BlobHash){return fmt.Errorf("远端附件元数据无效: %s",key)}
 		}
 	}
-	for id, record := range records {
-		if record.State!="present" || record.File==nil || !record.File.IsFolder { continue }
-		seen:=map[string]bool{id:true}
+	for key,record:=range records{
+		if record.State!="present"||record.Kind!="file"||record.File==nil||!record.File.IsFolder{continue}
+		seen:=map[string]bool{record.File.ID:true}
 		parent:=record.File.ParentID
-		for parent!="" {
-			if seen[parent] { return fmt.Errorf("远端文件夹层级存在循环: %s", id) }
+		for parent!=""{
+			if seen[parent]{return fmt.Errorf("远端文件夹层级存在循环: %s",key)}
 			seen[parent]=true
 			p:=records[parent]
-			if p.File==nil { break }
+			if p.File==nil{break}
 			parent=p.File.ParentID
 		}
 	}
@@ -485,37 +634,64 @@ func parseWikiLinks(content string) []string {
 }
 
 func (e *Engine) applyRemoteTx(ctx context.Context, tx *sql.Tx, record Record) error {
-	record, err := normalizeRecord(record)
-	if err != nil { return err }
-	if record.State=="purged" {
-		for _,query:=range []string{
-			`DELETE FROM file_tags WHERE file_id=?`,
-			`DELETE FROM file_versions WHERE file_id=?`,
-			`DELETE FROM links WHERE source_id=? OR target_id=?`,
-			`DELETE FROM files WHERE id=?`,
-		}{
-			args:=[]interface{}{record.ID}
-			if strings.Contains(query," OR ") { args=[]interface{}{record.ID,record.ID} }
-			if _,err=tx.ExecContext(ctx,query,args...);err!=nil{return err}
+	record,err:=normalizeRecord(record);if err!=nil{return err}
+	if record.State=="purged"{
+		switch record.Kind{
+		case "file":
+			for _,query:=range []string{
+				`DELETE FROM file_tags WHERE file_id=?`,
+				`DELETE FROM file_versions WHERE file_id=?`,
+				`DELETE FROM links WHERE source_id=? OR target_id=?`,
+				`DELETE FROM files WHERE id=?`,
+			}{
+				args:=[]interface{}{record.ID};if strings.Contains(query," OR "){args=[]interface{}{record.ID,record.ID}}
+				if _,err=tx.ExecContext(ctx,query,args...);err!=nil{return err}
+			}
+		case "tag":
+			tagID:=strings.TrimPrefix(record.ID,"tag:")
+			if _,err=tx.ExecContext(ctx,`DELETE FROM file_tags WHERE tag_id=?`,tagID);err!=nil{return err}
+			if _,err=tx.ExecContext(ctx,`DELETE FROM tags WHERE id=?`,tagID);err!=nil{return err}
+		case "file-tag":
+			parts:=strings.Split(strings.TrimPrefix(record.ID,"filetag:"),":")
+			if len(parts)!=2{return fmt.Errorf("标签关联 tombstone 无效")}
+			if _,err=tx.ExecContext(ctx,`DELETE FROM file_tags WHERE file_id=? AND tag_id=?`,parts[0],parts[1]);err!=nil{return err}
+		case "attachment":
+			// Filesystem attachment deletion is deliberately never auto-applied.
+			return fmt.Errorf("附件删除必须通过冲突中心明确确认")
 		}
 		return nil
 	}
-	f:=record.File
-	var oldTitle,oldContent string
-	err=tx.QueryRowContext(ctx,`SELECT title,content FROM files WHERE id=?`,f.ID).Scan(&oldTitle,&oldContent)
-	if err==nil && (oldTitle!=f.Title || oldContent!=f.Content) {
-		_,_ = tx.ExecContext(ctx,`INSERT INTO file_versions(file_id,content,title,created_at) VALUES(?,?,?,?)`,f.ID,oldContent,oldTitle,e.now().Unix())
-	} else if err!=nil && !errors.Is(err,sql.ErrNoRows) { return err }
-	_,err=tx.ExecContext(ctx,`INSERT INTO files(id,title,content,created_at,updated_at,is_folder,parent_id,sort_order,is_deleted,deleted_at,is_pinned)
-		VALUES(?,?,?,?,?,?,?,?,?,?,?)
-		ON CONFLICT(id) DO UPDATE SET title=excluded.title,content=excluded.content,created_at=excluded.created_at,updated_at=excluded.updated_at,
-		is_folder=excluded.is_folder,parent_id=excluded.parent_id,sort_order=excluded.sort_order,is_deleted=excluded.is_deleted,deleted_at=excluded.deleted_at,is_pinned=excluded.is_pinned`,
-		f.ID,f.Title,f.Content,f.CreatedAt,f.UpdatedAt,f.IsFolder,f.ParentID,f.SortOrder,f.IsDeleted,f.DeletedAt,f.IsPinned)
-	if err!=nil{return err}
-	if _,err=tx.ExecContext(ctx,`DELETE FROM links WHERE source_id=?`,f.ID);err!=nil{return err}
-	now:=e.now().Unix()
-	for _,target:=range parseWikiLinks(f.Content) {
-		if _,err=tx.ExecContext(ctx,`INSERT OR IGNORE INTO links(source_id,target_id,created_at) VALUES(?,?,?)`,f.ID,target,now);err!=nil{return err}
+
+	switch record.Kind{
+	case "file":
+		f:=record.File
+		var oldTitle,oldContent string
+		err=tx.QueryRowContext(ctx,`SELECT title,content FROM files WHERE id=?`,f.ID).Scan(&oldTitle,&oldContent)
+		if err==nil&&(oldTitle!=f.Title||oldContent!=f.Content){
+			_,_=tx.ExecContext(ctx,`INSERT INTO file_versions(file_id,content,title,created_at) VALUES(?,?,?,?)`,f.ID,oldContent,oldTitle,e.now().Unix())
+		}else if err!=nil&&!errors.Is(err,sql.ErrNoRows){return err}
+		_,err=tx.ExecContext(ctx,`INSERT INTO files(id,title,content,created_at,updated_at,is_folder,parent_id,sort_order,is_deleted,deleted_at,is_pinned)
+			VALUES(?,?,?,?,?,?,?,?,?,?,?)
+			ON CONFLICT(id) DO UPDATE SET title=excluded.title,content=excluded.content,created_at=excluded.created_at,updated_at=excluded.updated_at,
+			is_folder=excluded.is_folder,parent_id=excluded.parent_id,sort_order=excluded.sort_order,is_deleted=excluded.is_deleted,deleted_at=excluded.deleted_at,is_pinned=excluded.is_pinned`,
+			f.ID,f.Title,f.Content,f.CreatedAt,f.UpdatedAt,f.IsFolder,f.ParentID,f.SortOrder,f.IsDeleted,f.DeletedAt,f.IsPinned)
+		if err!=nil{return err}
+		if _,err=tx.ExecContext(ctx,`DELETE FROM links WHERE source_id=?`,f.ID);err!=nil{return err}
+		now:=e.now().Unix()
+		for _,target:=range parseWikiLinks(f.Content){
+			if _,err=tx.ExecContext(ctx,`INSERT OR IGNORE INTO links(source_id,target_id,created_at) VALUES(?,?,?)`,f.ID,target,now);err!=nil{return err}
+		}
+	case "tag":
+		t:=record.Tag
+		_,err=tx.ExecContext(ctx,`INSERT INTO tags(id,name,color) VALUES(?,?,?)
+			ON CONFLICT(id) DO UPDATE SET name=excluded.name,color=excluded.color`,t.ID,t.Name,t.Color)
+		if err!=nil{return err}
+	case "file-tag":
+		link:=record.FileTag
+		if _,err=tx.ExecContext(ctx,`INSERT OR IGNORE INTO file_tags(file_id,tag_id) VALUES(?,?)`,link.FileID,link.TagID);err!=nil{return err}
+	case "attachment":
+		// Blob materialization happens before the SQLite transaction.
+		return nil
 	}
 	return nil
 }
@@ -564,9 +740,27 @@ func (e *Engine) Run(ctx context.Context) (RunResult,error) {
 		data,hash,err:=encodeRecord(record)
 		if err!=nil{return RunResult{},err}
 		if hash!=item.LocalHash{return RunResult{},fmt.Errorf("本机对象在同步计划后发生变化: %s",item.ID)}
+		if record.Kind=="attachment"&&record.State=="present"{
+			source:=filepath.Join(e.DataDir,"uploads",record.Attachment.Name)
+			if err=remote.SaveBlobFile(record.Attachment.BlobHash,source,record.Attachment.Size);err!=nil{return RunResult{},err}
+		}
 		if err=remote.SaveObject(hash,data);err!=nil{return RunResult{},err}
 		nextItems[item.ID]=hash
 		uploads++
+	}
+
+	createdAttachments:=[]string{}
+	cleanupAttachments:=true
+	defer func(){if cleanupAttachments{for _,filename:=range createdAttachments{_ = os.Remove(filename)}}}()
+	uploadDir:=filepath.Join(e.DataDir,"uploads")
+	if err=os.MkdirAll(uploadDir,0700);err!=nil{return RunResult{},err}
+	for _,item:=range plan.Items{
+		if item.Action!="download"{continue}
+		record:=remotes[item.ID]
+		if record.Kind!="attachment"||record.State!="present"{continue}
+		target:=filepath.Join(uploadDir,record.Attachment.Name)
+		if err=remote.MaterializeBlobExclusive(record.Attachment.BlobHash,record.Attachment.Size,target);err!=nil{return RunResult{},err}
+		createdAttachments=append(createdAttachments,target)
 	}
 
 	tx, err := e.DB.BeginTx(ctx,nil)
@@ -614,6 +808,7 @@ func (e *Engine) Run(ctx context.Context) (RunResult,error) {
 		_ = e.updateState(ctx,manifest,"error",err.Error())
 		return RunResult{},err
 	}
+	cleanupAttachments=false
 
 	status:="ok"
 	if plan.Conflicts>0{status="conflicts"}
@@ -638,6 +833,27 @@ func (e *Engine) Conflicts(ctx context.Context) ([]Conflict,error) {
 	return out,rows.Err()
 }
 
+func (e *Engine) applyRemoteAttachmentChoice(remote *DirRemote, record Record) (string,error) {
+	if record.Kind!="attachment"{return "",fmt.Errorf("不是附件冲突")}
+	name,ok:=attachmentNameFromKey(record.ID);if !ok{return "",fmt.Errorf("附件冲突键无效")}
+	uploadDir:=filepath.Join(e.DataDir,"uploads")
+	if err:=os.MkdirAll(uploadDir,0700);err!=nil{return "",err}
+	target:=filepath.Join(uploadDir,name)
+	preserveRoot:=filepath.Join(e.DataDir,"sync-preserved")
+	if err:=os.MkdirAll(preserveRoot,0700);err!=nil{return "",err}
+	preserved:=""
+	if info,err:=os.Lstat(target);err==nil{
+		if !info.Mode().IsRegular()||info.Mode()&os.ModeSymlink!=0{return "",fmt.Errorf("本机附件目标不安全")}
+		suffix,randErr:=randomID(6);if randErr!=nil{return "",randErr}
+		preserved=filepath.Join(preserveRoot,name+"."+suffix)
+		if err=os.Rename(target,preserved);err!=nil{return "",err}
+	}else if !os.IsNotExist(err){return "",err}
+	rollback:=func(){if preserved!=""{_ = os.Rename(preserved,target)}}
+	if record.State=="purged"{return preserved,nil}
+	if err:=remote.MaterializeBlobExclusive(record.Attachment.BlobHash,record.Attachment.Size,target);err!=nil{rollback();return "",err}
+	return preserved,nil
+}
+
 func (e *Engine) Resolve(ctx context.Context, conflictID, choice string) error {
 	if choice!="local"&&choice!="remote"{return fmt.Errorf("冲突解决方式仅支持 local 或 remote")}
 	remote,err:=e.remote(ctx);if err!=nil{return err}
@@ -650,7 +866,7 @@ func (e *Engine) Resolve(ctx context.Context, conflictID, choice string) error {
 	if err!=nil{return fmt.Errorf("同步冲突不存在或已解决")}
 	base,err:=e.base(ctx);if err!=nil{return err}
 	if base[c.ItemID]!=c.BaseHash{return fmt.Errorf("冲突基线已变化，请重新同步生成冲突")}
-	locals,err:=e.localFiles(ctx);if err!=nil{return err}
+	locals,err:=e.localRecords(ctx);if err!=nil{return err}
 	localRecord,localHash,localExists,err:=localRecordFor(c.ItemID,locals,base);if err!=nil{return err}
 	if localHash!=c.LocalHash{return fmt.Errorf("本机内容在冲突产生后已变化，请重新同步")}
 	manifest,err:=remote.LoadManifest();if err!=nil{return err}
@@ -658,6 +874,10 @@ func (e *Engine) Resolve(ctx context.Context, conflictID, choice string) error {
 	if choice=="local"{
 		if !localExists{return fmt.Errorf("本机冲突对象不可用")}
 		data,hash,err:=encodeRecord(localRecord);if err!=nil{return err}
+		if localRecord.Kind=="attachment"&&localRecord.State=="present"{
+			source:=filepath.Join(e.DataDir,"uploads",localRecord.Attachment.Name)
+			if err=remote.SaveBlobFile(localRecord.Attachment.BlobHash,source,localRecord.Attachment.Size);err!=nil{return err}
+		}
 		if err=remote.SaveObject(hash,data);err!=nil{return err}
 		manifest.Items=copyItems(manifest.Items);manifest.Items[c.ItemID]=hash;manifest.Generation++
 		manifest.UpdatedAt=e.now().UTC().Format(time.RFC3339Nano)
@@ -666,7 +886,11 @@ func (e *Engine) Resolve(ctx context.Context, conflictID, choice string) error {
 		if err=e.setBase(ctx,c.ItemID,hash);err!=nil{return err}
 	}else{
 		record,err:=remote.LoadRecord(c.RemoteHash);if err!=nil{return err}
-		if err=e.applyRemote(ctx,record);err!=nil{return err}
+		if record.Kind=="attachment"{
+			if _,err=e.applyRemoteAttachmentChoice(remote,record);err!=nil{return err}
+		}else{
+			if err=e.applyRemote(ctx,record);err!=nil{return err}
+		}
 		if err=e.setBase(ctx,c.ItemID,c.RemoteHash);err!=nil{return err}
 	}
 	_,err=e.DB.ExecContext(ctx,`UPDATE sync_conflicts SET status='resolved',resolution=?,resolved_at=? WHERE id=? AND status='open'`,choice,e.now().Unix(),conflictID)
@@ -687,7 +911,7 @@ func NewDirRemote(root string) (*DirRemote,error) {
 }
 
 func (r *DirRemote) ensure() error {
-	for _,dir:=range []string{r.Root,filepath.Join(r.Root,"objects"),filepath.Join(r.Root,"manifests"),filepath.Join(r.Root,"locks")} {
+	for _,dir:=range []string{r.Root,filepath.Join(r.Root,"objects"),filepath.Join(r.Root,"blobs"),filepath.Join(r.Root,"manifests"),filepath.Join(r.Root,"locks")} {
 		if err:=os.MkdirAll(dir,0700);err!=nil{return err}
 		info,err:=os.Lstat(dir);if err!=nil{return err}
 		if !info.IsDir()||info.Mode()&os.ModeSymlink!=0{return fmt.Errorf("同步远端目录不安全: %s",dir)}
@@ -768,6 +992,61 @@ func (r *DirRemote) LoadRecord(hash string) (Record,error) {
 	if hashBytes(data)!=hash{return record,fmt.Errorf("远端对象 SHA-256 校验失败")}
 	if err=json.Unmarshal(data,&record);err!=nil{return record,fmt.Errorf("远端对象 JSON 无效: %w",err)}
 	return normalizeRecord(record)
+}
+
+func (r *DirRemote) blobPath(hash string) (string,error) {
+	if !objectHashPattern.MatchString(hash){return "",fmt.Errorf("附件 blob 哈希无效")}
+	if err:=r.ensure();err!=nil{return "",err}
+	return filepath.Join(r.Root,"blobs",hash),nil
+}
+
+func (r *DirRemote) VerifyBlob(hash string,size int64) error {
+	filename,err:=r.blobPath(hash);if err!=nil{return err}
+	info,err:=os.Lstat(filename);if err!=nil{return err}
+	if !info.Mode().IsRegular()||info.Mode()&os.ModeSymlink!=0||info.Size()!=size{return fmt.Errorf("远端附件 blob 元数据不匹配")}
+	actualSize,actualHash,err:=stableFileDigest(filename);if err!=nil{return err}
+	if actualSize!=size||actualHash!=hash{return fmt.Errorf("远端附件 blob SHA-256 校验失败")}
+	return nil
+}
+
+func (r *DirRemote) SaveBlobFile(hash,source string,size int64) error {
+	if err:=r.ensure();err!=nil{return err}
+	target,err:=r.blobPath(hash);if err!=nil{return err}
+	if info,statErr:=os.Lstat(target);statErr==nil{
+		if !info.Mode().IsRegular()||info.Mode()&os.ModeSymlink!=0{return fmt.Errorf("远端附件 blob 目标不安全")}
+		return r.VerifyBlob(hash,size)
+	}else if !os.IsNotExist(statErr){return statErr}
+	before,err:=os.Lstat(source);if err!=nil{return err}
+	if !before.Mode().IsRegular()||before.Mode()&os.ModeSymlink!=0||before.Size()!=size{return fmt.Errorf("本机附件在同步前发生变化")}
+	in,err:=os.Open(source);if err!=nil{return err};defer in.Close()
+	tmp,err:=os.CreateTemp(filepath.Dir(target),".blob-*.partial");if err!=nil{return err}
+	tmpName:=tmp.Name();defer os.Remove(tmpName)
+	h:=sha256.New();written,copyErr:=io.Copy(io.MultiWriter(tmp,h),in)
+	if copyErr!=nil{tmp.Close();return copyErr}
+	if written!=size||hex.EncodeToString(h.Sum(nil))!=hash{tmp.Close();return fmt.Errorf("本机附件内容与同步计划不一致")}
+	if err=tmp.Sync();err!=nil{tmp.Close();return err};if err=tmp.Close();err!=nil{return err}
+	after,err:=os.Lstat(source);if err!=nil{return err}
+	if !os.SameFile(before,after)||before.Size()!=after.Size()||!before.ModTime().Equal(after.ModTime()){return fmt.Errorf("本机附件在上传期间发生变化")}
+	if err=os.Link(tmpName,target);err!=nil{
+		if os.IsExist(err){return r.VerifyBlob(hash,size)}
+		return err
+	}
+	return nil
+}
+
+func (r *DirRemote) MaterializeBlobExclusive(hash string,size int64,target string) error {
+	if err:=r.VerifyBlob(hash,size);err!=nil{return err}
+	if _,err:=os.Lstat(target);err==nil{return fmt.Errorf("本机附件目标已存在，拒绝覆盖: %s",filepath.Base(target))}else if !os.IsNotExist(err){return err}
+	source,_:=r.blobPath(hash)
+	tmp,err:=os.CreateTemp(filepath.Dir(target),".sync-download-*.partial");if err!=nil{return err}
+	tmpName:=tmp.Name();defer os.Remove(tmpName)
+	in,err:=os.Open(source);if err!=nil{tmp.Close();return err}
+	h:=sha256.New();written,copyErr:=io.Copy(io.MultiWriter(tmp,h),in);closeIn:=in.Close()
+	if copyErr!=nil{tmp.Close();return copyErr};if closeIn!=nil{tmp.Close();return closeIn}
+	if written!=size||hex.EncodeToString(h.Sum(nil))!=hash{tmp.Close();return fmt.Errorf("远端附件下载校验失败")}
+	if err=tmp.Sync();err!=nil{tmp.Close();return err};if err=tmp.Close();err!=nil{return err}
+	if err=os.Link(tmpName,target);err!=nil{return fmt.Errorf("发布下载附件失败: %w",err)}
+	return nil
 }
 
 func (r *DirRemote) LoadManifest() (Manifest,error) {
