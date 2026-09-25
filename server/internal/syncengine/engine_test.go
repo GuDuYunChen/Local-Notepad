@@ -98,7 +98,8 @@ func TestResolveConflictLocalThenRemote(t *testing.T){
 	lock,_:=remote.AcquireLock();manifest.Items["n1"]=h;manifest.Generation++;manifest.UpdatedAt="2026-09-25T12:02:00Z";manifest.DeviceID="device-b";_,_=remote.SaveManifest(manifest);lock.Release()
 	_,_=engine.Run(ctx);conflicts,_:=engine.Conflicts(ctx)
 	if err:=engine.Resolve(ctx,conflicts[0].ID,"local");err!=nil{t.Fatal(err)}
-	if lenMust(t,engine.Conflicts(ctx))!=0{t.Fatal("conflict still open")}
+	remaining, remainingErr := engine.Conflicts(ctx)
+	if lenMust(t,remaining,remainingErr)!=0{t.Fatal("conflict still open")}
 	manifest,_=remote.LoadManifest();record,err:=remote.LoadRecord(manifest.Items["n1"]);if err!=nil{t.Fatal(err)}
 	if record.File.Content!="local"{t.Fatalf("local resolution not published: %q",record.File.Content)}
 }

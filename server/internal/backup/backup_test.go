@@ -98,7 +98,7 @@ func TestInspectRejectsEmptyCorruptAndForeignFiles(t *testing.T) {
 }
 func TestFutureSchemaRejectedWithoutRewriting(t *testing.T) {
 	db, p := testDB(t, "")
-	db.Exec("INSERT INTO schema_migrations VALUES(11)")
+	db.Exec("INSERT INTO schema_migrations VALUES(12)")
 	db.Close()
 	before := bytesAt(t, p)
 	if _, e := Inspect(context.Background(), p); e == nil {
@@ -335,7 +335,7 @@ func TestConcurrentNewTargetNeverOverwrittenAndRetainsMarker(t *testing.T) {
 }
 func TestUnsupportedBackupNeverReplacesOriginal(t *testing.T) {
 	db, p := testDB(t, "")
-	db.Exec("INSERT INTO schema_migrations VALUES(11)")
+	db.Exec("INSERT INTO schema_migrations VALUES(12)")
 	db.Close()
 	dir := filepath.Join(filepath.Dir(p), "backups")
 	os.MkdirAll(dir, 0700)

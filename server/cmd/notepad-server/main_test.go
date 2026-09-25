@@ -305,8 +305,12 @@ func TestResearchMigrationIsAdditiveAndPreservesCreationReceipt(t *testing.T) {
 		t.Fatal(err)
 	}
 	var latest int
-	if err := db.QueryRow(`SELECT MAX(version) FROM schema_migrations`).Scan(&latest); err != nil || latest != 10 {
+	if err := db.QueryRow(`SELECT MAX(version) FROM schema_migrations`).Scan(&latest); err != nil || latest != 11 {
 		t.Fatal(latest, err)
+	}
+	var syncTables int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('sync_state','sync_base','sync_conflicts')`).Scan(&syncTables); err != nil || syncTables != 3 {
+		t.Fatal("schema 11 sync tables missing", syncTables, err)
 	}
 	if _, err := db.Exec(`INSERT INTO research_note_requests VALUES('request','hash','file','标题','',1)`); err != nil {
 		t.Fatal(err)
