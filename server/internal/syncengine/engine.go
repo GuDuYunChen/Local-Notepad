@@ -16,6 +16,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -139,11 +140,18 @@ type RunResult struct {
 	Conflicts  int  `json:"conflicts"`
 }
 
+type AutoTickResult struct {
+	Ran    bool      `json:"ran"`
+	Reason string    `json:"reason"`
+	Result RunResult `json:"result"`
+}
+
 type Engine struct {
 	DB         *sql.DB
 	DataDir    string
 	RemoteRoot string
 	Now        func() time.Time
+	runMu      sync.Mutex
 }
 
 type SyncRemote interface {
@@ -331,6 +339,7 @@ func (e *Engine) Rebind(ctx context.Context) (State, error) {
 	if _, err = tx.ExecContext(ctx, `UPDATE sync_state
 		SET remote_store_id='',remote_revision='',last_sync_at=0,last_status='rebound',last_error=''
 		WHERE id=1`); err != nil { return State{}, err }
+	if _, err = tx.ExecContext(ctx, `UPDATE settings SET sync_auto_enabled=0 WHERE id=1`); err != nil { return State{}, err }
 	if err = tx.Commit(); err != nil { return State{}, err }
 	return e.state(ctx)
 }
@@ -754,7 +763,65 @@ func (e *Engine) updateState(ctx context.Context, manifest Manifest, status, las
 	return err
 }
 
+func (e *Engine) autoConfig(ctx context.Context) (bool, time.Duration, error) {
+	var syncEnabled, autoEnabled, intervalMinutes int
+	var provider string
+	err := e.DB.QueryRowContext(ctx, `SELECT COALESCE(sync_enabled,0),COALESCE(sync_auto_enabled,0),
+		COALESCE(sync_interval_minutes,5),COALESCE(sync_provider,'') FROM settings WHERE id=1`).
+		Scan(&syncEnabled,&autoEnabled,&intervalMinutes,&provider)
+	if err != nil { return false,0,err }
+	if intervalMinutes < 1 || intervalMinutes > 1440 { return false,0,fmt.Errorf("自动同步间隔无效") }
+	enabled := syncEnabled != 0 && autoEnabled != 0 && provider == ProviderWebDAV
+	return enabled,time.Duration(intervalMinutes)*time.Minute,nil
+}
+
+func (e *Engine) recordRunError(ctx context.Context, err error) {
+	if err == nil { return }
+	message:=err.Error()
+	if len(message)>2048 { message=message[:2048] }
+	_,_=e.DB.ExecContext(ctx,`UPDATE sync_state SET last_sync_at=?,last_status='error',last_error=? WHERE id=1`,e.now().Unix(),message)
+}
+
+func (e *Engine) AutoTick(ctx context.Context) (AutoTickResult,error) {
+	enabled,interval,err:=e.autoConfig(ctx)
+	if err!=nil{return AutoTickResult{},err}
+	if !enabled{return AutoTickResult{Reason:"disabled"},nil}
+	state,err:=e.state(ctx)
+	if err!=nil{return AutoTickResult{},err}
+	if state.OpenConflicts>0{return AutoTickResult{Reason:"conflicts"},nil}
+	if state.LastSyncAt>0 && e.now().Sub(time.Unix(state.LastSyncAt,0))<interval{
+		return AutoTickResult{Reason:"not-due"},nil
+	}
+	if !e.runMu.TryLock(){return AutoTickResult{Reason:"busy"},nil}
+	defer e.runMu.Unlock()
+	result,err:=e.runUnlocked(ctx)
+	if err!=nil{e.recordRunError(ctx,err);return AutoTickResult{Ran:true,Reason:"error"},err}
+	return AutoTickResult{Ran:true,Reason:"ok",Result:result},nil
+}
+
+func RunAutoScheduler(ctx context.Context,e *Engine,startupDelay,pollInterval time.Duration) {
+	if e==nil{return}
+	if startupDelay<0{startupDelay=0}
+	if pollInterval<=0{pollInterval=30*time.Second}
+	timer:=time.NewTimer(startupDelay)
+	defer timer.Stop()
+	select{case <-ctx.Done():return;case <-timer.C:}
+	for{
+		_,_=e.AutoTick(ctx)
+		timer.Reset(pollInterval)
+		select{case <-ctx.Done():return;case <-timer.C:}
+	}
+}
+
 func (e *Engine) Run(ctx context.Context) (RunResult,error) {
+	e.runMu.Lock()
+	defer e.runMu.Unlock()
+	result,err:=e.runUnlocked(ctx)
+	if err!=nil{e.recordRunError(ctx,err)}
+	return result,err
+}
+
+func (e *Engine) runUnlocked(ctx context.Context) (RunResult,error) {
 	remote, err := e.remote(ctx)
 	if err!=nil{return RunResult{},err}
 	lock, err := remote.AcquireLock()

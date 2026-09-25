@@ -132,3 +132,18 @@ func TestWebDAVPlanIsStrictlyReadOnly(t *testing.T) {
 	if plan.Uploads!=1||!plan.NeedsInit{t.Fatalf("unexpected preview plan: %+v",plan)}
 	if got:=writes.Load();got!=0{t.Fatalf("WebDAV preview performed %d remote writes",got)}
 }
+
+
+func TestWebDAVAutomaticSyncRunsWhenDueThenWaitsForInterval(t *testing.T) {
+	_,endpoint:=newWebDAVTestServer(t)
+	db,root:=testDB(t)
+	addFile(t,db,"n-auto","Auto","background",10)
+	if _,err:=db.Exec(`UPDATE settings SET sync_provider='webdav',sync_endpoint=?,sync_username='alice',sync_password='secret',sync_auto_enabled=1,sync_interval_minutes=1`,endpoint);err!=nil{t.Fatal(err)}
+	engine:=testEngine(db,root,"device-auto")
+	first,err:=engine.AutoTick(context.Background())
+	if err!=nil{t.Fatal(err)}
+	if !first.Ran||first.Reason!="ok"||first.Result.AppliedUp!=1{t.Fatalf("unexpected first auto tick: %+v",first)}
+	second,err:=engine.AutoTick(context.Background())
+	if err!=nil{t.Fatal(err)}
+	if second.Ran||second.Reason!="not-due"{t.Fatalf("unexpected second auto tick: %+v",second)}
+}

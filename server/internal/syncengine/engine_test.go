@@ -30,8 +30,8 @@ func testDB(t *testing.T) (*sql.DB,string) {
 		`CREATE TABLE file_tags(file_id TEXT,tag_id TEXT,PRIMARY KEY(file_id,tag_id))`,
 		`CREATE TABLE file_versions(id INTEGER PRIMARY KEY AUTOINCREMENT,file_id TEXT,content TEXT,title TEXT,created_at INTEGER)`,
 		`CREATE TABLE links(id INTEGER PRIMARY KEY AUTOINCREMENT,source_id TEXT,target_id TEXT,created_at INTEGER,UNIQUE(source_id,target_id))`,
-		`CREATE TABLE settings(id INTEGER PRIMARY KEY,theme TEXT,sync_enabled INTEGER,sync_endpoint TEXT,sync_provider TEXT,sync_username TEXT DEFAULT '',sync_password TEXT DEFAULT '')`,
-		`INSERT INTO settings(id,theme,sync_enabled,sync_provider,sync_username,sync_password) VALUES(1,'light',1,'local-lab','','')`,
+		`CREATE TABLE settings(id INTEGER PRIMARY KEY,theme TEXT,sync_enabled INTEGER,sync_endpoint TEXT,sync_provider TEXT,sync_username TEXT DEFAULT '',sync_password TEXT DEFAULT '',sync_auto_enabled INTEGER DEFAULT 0,sync_interval_minutes INTEGER DEFAULT 5)`,
+		`INSERT INTO settings(id,theme,sync_enabled,sync_provider,sync_username,sync_password,sync_auto_enabled,sync_interval_minutes) VALUES(1,'light',1,'local-lab','','',0,5)`,
 		`CREATE TABLE sync_state(id INTEGER PRIMARY KEY,device_id TEXT NOT NULL,remote_store_id TEXT NOT NULL DEFAULT '',remote_revision TEXT NOT NULL DEFAULT '',last_sync_at INTEGER NOT NULL DEFAULT 0,last_status TEXT NOT NULL DEFAULT 'never',last_error TEXT NOT NULL DEFAULT '')`,
 		`INSERT INTO sync_state(id,device_id) VALUES(1,'device-a')`,
 		`CREATE TABLE sync_base(item_id TEXT PRIMARY KEY,object_hash TEXT NOT NULL,synced_at INTEGER NOT NULL)`,
@@ -409,4 +409,35 @@ func TestPlanDoesNotCreateLocalRemoteDirectories(t *testing.T) {
 	if err!=nil{t.Fatal(err)}
 	if plan.Uploads!=1||!plan.NeedsInit{t.Fatalf("unexpected plan: %+v",plan)}
 	if _,err:=os.Lstat(remoteRoot);!os.IsNotExist(err){t.Fatalf("plan created remote directory: %v",err)}
+}
+
+
+func TestAutoTickSkipsDisabledNotDueAndConflicts(t *testing.T){
+	ctx:=context.Background()
+	db,root:=testDB(t)
+	engine:=testEngine(db,root,"device-a")
+	result,err:=engine.AutoTick(ctx);if err!=nil{t.Fatal(err)}
+	if result.Ran||result.Reason!="disabled"{t.Fatalf("unexpected disabled result: %+v",result)}
+
+	if _,err=db.Exec(`UPDATE settings SET sync_provider='webdav',sync_endpoint='https://example.invalid/dav',sync_auto_enabled=1,sync_interval_minutes=5`);err!=nil{t.Fatal(err)}
+	if _,err=db.Exec(`UPDATE sync_state SET last_sync_at=? WHERE id=1`,engine.now().Unix());err!=nil{t.Fatal(err)}
+	result,err=engine.AutoTick(ctx);if err!=nil{t.Fatal(err)}
+	if result.Ran||result.Reason!="not-due"{t.Fatalf("unexpected not-due result: %+v",result)}
+
+	if _,err=db.Exec(`UPDATE sync_state SET last_sync_at=0 WHERE id=1`);err!=nil{t.Fatal(err)}
+	if _,err=db.Exec(`INSERT INTO sync_conflicts(id,item_id,base_hash,local_hash,remote_hash,local_record,remote_record,created_at,status,resolution,resolved_at)
+		VALUES('auto-conflict','n1','a','b','c','','',1,'open','',0)`);err!=nil{t.Fatal(err)}
+	result,err=engine.AutoTick(ctx);if err!=nil{t.Fatal(err)}
+	if result.Ran||result.Reason!="conflicts"{t.Fatalf("unexpected conflict result: %+v",result)}
+}
+
+func TestRebindPausesAutomaticSync(t *testing.T){
+	ctx:=context.Background()
+	db,root:=testDB(t)
+	if _,err:=db.Exec(`UPDATE settings SET sync_provider='webdav',sync_endpoint='https://example.invalid/dav',sync_auto_enabled=1`);err!=nil{t.Fatal(err)}
+	engine:=testEngine(db,root,"device-a")
+	if _,err:=engine.Rebind(ctx);err!=nil{t.Fatal(err)}
+	var enabled int
+	if err:=db.QueryRow(`SELECT sync_auto_enabled FROM settings WHERE id=1`).Scan(&enabled);err!=nil{t.Fatal(err)}
+	if enabled!=0{t.Fatal("rebind did not pause automatic sync")}
 }
