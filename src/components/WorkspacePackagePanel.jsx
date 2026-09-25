@@ -43,7 +43,7 @@ export default function WorkspacePackagePanel() {
       alive.current = false
       const pending = restoreRef.current
       if (pending && typeof window.electronAPI?.workspaceCancelRestore === 'function') {
-        void window.electronAPI.workspaceCancelRestore(pending.id).catch(() => {})
+        void Promise.resolve(window.electronAPI.workspaceCancelRestore(pending.id)).catch(() => {})
       }
     }
   }, [])
@@ -78,7 +78,7 @@ export default function WorkspacePackagePanel() {
       finishTask({
         message: method === 'workspaceExport'
           ? '工作区便携包已创建并完成逐文件 SHA-256 校验。'
-          : '工作区便携包结构、清单和逐文件 SHA-256 校验通过。',
+          : '工作区便携包只读校验通过：结构、清单和逐文件 SHA-256 均一致。',
         path: result.path || '',
         pack,
       })
