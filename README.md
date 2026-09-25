@@ -1,3 +1,9 @@
+## Phase 2D · 系统保护凭据（4.188.0）
+
+桌面打包版现在把新保存的 WebDAV 密码放入 Electron `safeStorage` 保护的独立凭据文件，并在启动 Go 后端时只通过运行期环境注入解密后的密码。新凭据不会写入新的 SQLite / `.lnw` 工作区备份。Windows 使用系统级保护；Linux 如果 Electron 只能退化到未加密的 `basic_text`，应用会明确拒绝把它当成安全存储。
+
+旧版 SQLite 中的 WebDAV 密码仍作为升级兼容 fallback；用户重新输入一次密码并保存后，打包版会把它迁移到系统保护存储并清空数据库中的明文。开发模式若后端不是由 Electron 管理，会明确保留兼容 DB 副本以便当前开发后端继续工作。
+
 ## Phase 2C · 自动同步（4.187.0）
 
 WebDAV 现在支持可选自动同步。后台调度不会与手动同步重入：应用启动后延迟检查，并按用户设置的 1–60 分钟常用间隔执行。存在未处理冲突时自动同步暂停，不会替用户选择版本；切换 provider/endpoint 或重新绑定远端也会自动暂停后台同步，要求用户重新确认。
@@ -185,7 +191,7 @@ NOTEPAD_DATA=/path/to/data go run ./cmd/notepad-server/main.go
 
 同步采用上次共同基线、本机当前状态、远端当前状态三方比较，不使用“最后修改时间覆盖”。同名附件一旦建立共同基线，后续修改或删除必须进入冲突中心，由用户明确选择本机或远端；被替换的本机附件会保留到 `sync-preserved`。
 
-WebDAV 支持 Basic Auth；公网端点必须使用 HTTPS，localhost/loopback 才允许 HTTP。密码不会通过设置读取接口回显。切换 provider 或 WebDAV 地址时应先在同步中心执行“重新绑定远端”，该操作只重置同步元数据、不删除本机或远端内容，并会暂停自动同步。自动同步遇到未处理冲突时也会暂停，手动预演/同步始终保留。
+WebDAV 支持 Basic Auth；公网端点必须使用 HTTPS，localhost/loopback 才允许 HTTP。桌面打包版的新密码由 Electron safeStorage 保护并在后端启动时做运行期注入，不进入新的 SQLite / .lnw 备份；旧版数据库密码只作为升级兼容 fallback。切换 provider 或 WebDAV 地址时应先在同步中心执行“重新绑定远端”，该操作只重置同步元数据、不删除本机或远端内容，并会暂停自动同步。自动同步遇到未处理冲突时也会暂停，手动预演/同步始终保留。
 
 ## 数据备份与恢复
 
