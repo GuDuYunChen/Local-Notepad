@@ -5,8 +5,11 @@ type Settings struct {
 	Theme        string                 `json:"theme"`
 	EditorOpts   map[string]interface{} `json:"editor_opts"`
 	SyncEnabled  bool                   `json:"sync_enabled"`
-	SyncEndpoint string                 `json:"sync_endpoint"`
-	SyncProvider string                 `json:"sync_provider"`
+	SyncEndpoint    string                 `json:"sync_endpoint"`
+	SyncProvider    string                 `json:"sync_provider"`
+	SyncUsername    string                 `json:"sync_username"`
+	SyncPassword    string                 `json:"-"`
+	SyncPasswordSet bool                   `json:"sync_password_set"`
 }
 
 type SettingsPatch struct {
@@ -15,4 +18,6 @@ type SettingsPatch struct {
 	SyncEnabled  *bool                    `json:"sync_enabled"`
 	SyncEndpoint *string                  `json:"sync_endpoint"`
 	SyncProvider *string                  `json:"sync_provider"`
+	SyncUsername *string                  `json:"sync_username"`
+	SyncPassword *string                  `json:"sync_password"`
 }

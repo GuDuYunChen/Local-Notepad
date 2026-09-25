@@ -18,17 +18,23 @@ func (d *SettingsDAO) Get(ctx context.Context) (*model.Settings, error) {
 	var editorOpts sql.NullString
 	var syncEndpoint sql.NullString
 	var syncProvider sql.NullString
+	var syncUsername sql.NullString
+	var syncPassword sql.NullString
 	var syncEnabled int
 
 	row := d.DB.QueryRowContext(ctx,
-		`SELECT theme, editor_opts, sync_enabled, sync_endpoint, COALESCE(sync_provider,'') FROM settings WHERE id = 1`)
-	if err := row.Scan(&s.Theme, &editorOpts, &syncEnabled, &syncEndpoint, &syncProvider); err != nil {
+		`SELECT theme, editor_opts, sync_enabled, sync_endpoint, COALESCE(sync_provider,''),
+			COALESCE(sync_username,''), COALESCE(sync_password,'') FROM settings WHERE id = 1`)
+	if err := row.Scan(&s.Theme, &editorOpts, &syncEnabled, &syncEndpoint, &syncProvider, &syncUsername, &syncPassword); err != nil {
 		return nil, err
 	}
 
 	s.SyncEnabled = syncEnabled != 0
 	s.SyncEndpoint = syncEndpoint.String
 	s.SyncProvider = syncProvider.String
+	s.SyncUsername = syncUsername.String
+	s.SyncPassword = syncPassword.String
+	s.SyncPasswordSet = syncPassword.String != ""
 	s.EditorOpts = map[string]interface{}{}
 
 	if editorOpts.Valid && editorOpts.String != "" {
@@ -48,9 +54,10 @@ func (d *SettingsDAO) Update(ctx context.Context, s *model.Settings) error {
 
 	_, err = d.DB.ExecContext(ctx,
 		`UPDATE settings
-		 SET theme = ?, editor_opts = ?, sync_enabled = ?, sync_endpoint = ?, sync_provider = ?
+		 SET theme = ?, editor_opts = ?, sync_enabled = ?, sync_endpoint = ?, sync_provider = ?,
+		     sync_username = ?, sync_password = ?
 		 WHERE id = 1`,
-		s.Theme, string(editorJSON), s.SyncEnabled, s.SyncEndpoint, s.SyncProvider)
+		s.Theme, string(editorJSON), s.SyncEnabled, s.SyncEndpoint, s.SyncProvider, s.SyncUsername, s.SyncPassword)
 	return err
 }
 
