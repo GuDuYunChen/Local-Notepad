@@ -176,7 +176,6 @@ func (r *WebDAVRemote) SaveObject(hash string, data []byte) error {
 func (r *WebDAVRemote) LoadRecord(hash string) (Record, error) {
 	var record Record
 	if !objectHashPattern.MatchString(hash) { return record, fmt.Errorf("远端对象哈希无效") }
-	if err := r.ensure(); err != nil { return record, err }
 	data, _, err := r.getBytes("objects/"+hash+".json", maxWebDAVJSONBytes)
 	if err != nil { return record, err }
 	if hashBytes(data) != hash { return record, fmt.Errorf("远端对象 SHA-256 校验失败") }
@@ -186,7 +185,6 @@ func (r *WebDAVRemote) LoadRecord(hash string) (Record, error) {
 
 func (r *WebDAVRemote) VerifyBlob(hash string, size int64) error {
 	if !objectHashPattern.MatchString(hash) || size < 0 { return fmt.Errorf("附件 blob 元数据无效") }
-	if err := r.ensure(); err != nil { return err }
 	resp, err := r.request(http.MethodGet, "blobs/"+hash, nil, -1, nil)
 	if err != nil { return err }
 	defer closeResponse(resp)
@@ -235,7 +233,6 @@ func (r *WebDAVRemote) MaterializeBlobExclusive(hash string, size int64, target 
 	if _, err := os.Lstat(target); err == nil {
 		return fmt.Errorf("本机附件目标已存在，拒绝覆盖: %s", filepath.Base(target))
 	} else if !os.IsNotExist(err) { return err }
-	if err := r.ensure(); err != nil { return err }
 	resp, err := r.request(http.MethodGet, "blobs/"+hash, nil, -1, nil)
 	if err != nil { return err }
 	defer closeResponse(resp)
@@ -260,6 +257,7 @@ func (r *WebDAVRemote) manifestNames() ([]string, error) {
 	resp, err := r.request("PROPFIND", "manifests", body, int64(body.Len()), map[string]string{"Depth": "1", "Content-Type": "application/xml; charset=utf-8"})
 	if err != nil { return nil, err }
 	defer closeResponse(resp)
+	if resp.StatusCode == http.StatusNotFound { return []string{}, nil }
 	if resp.StatusCode != http.StatusMultiStatus { return nil, webDAVStatusError(resp, "列出 WebDAV manifest") }
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, maxWebDAVJSONBytes+1))
 	if err != nil { return nil, err }
@@ -279,7 +277,6 @@ func (r *WebDAVRemote) manifestNames() ([]string, error) {
 
 func (r *WebDAVRemote) LoadManifest() (Manifest, error) {
 	empty := Manifest{Format: ManifestFormat, Version: ManifestVersion, Items: map[string]string{}}
-	if err := r.ensure(); err != nil { return empty, err }
 	names, err := r.manifestNames(); if err != nil { return empty, err }
 	type candidate struct { name string; generation int64; hash string }
 	list := make([]candidate, 0, len(names))

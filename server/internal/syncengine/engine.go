@@ -1056,7 +1056,6 @@ func (r *DirRemote) SaveObject(hash string,data []byte) error {
 func (r *DirRemote) LoadRecord(hash string) (Record,error) {
 	var record Record
 	if !objectHashPattern.MatchString(hash){return record,fmt.Errorf("远端对象哈希无效")}
-	if err:=r.ensure();err!=nil{return record,err}
 	filename:=filepath.Join(r.Root,"objects",hash+".json")
 	info,err:=os.Lstat(filename);if err!=nil{return record,err}
 	if !info.Mode().IsRegular()||info.Mode()&os.ModeSymlink!=0{return record,fmt.Errorf("远端对象不是普通文件")}
@@ -1068,7 +1067,6 @@ func (r *DirRemote) LoadRecord(hash string) (Record,error) {
 
 func (r *DirRemote) blobPath(hash string) (string,error) {
 	if !objectHashPattern.MatchString(hash){return "",fmt.Errorf("附件 blob 哈希无效")}
-	if err:=r.ensure();err!=nil{return "",err}
 	return filepath.Join(r.Root,"blobs",hash),nil
 }
 
@@ -1123,8 +1121,16 @@ func (r *DirRemote) MaterializeBlobExclusive(hash string,size int64,target strin
 
 func (r *DirRemote) LoadManifest() (Manifest,error) {
 	empty:=Manifest{Format:ManifestFormat,Version:ManifestVersion,Items:map[string]string{}}
-	if err:=r.ensure();err!=nil{return empty,err}
-	entries,err:=os.ReadDir(filepath.Join(r.Root,"manifests"));if err!=nil{return empty,err}
+	rootInfo,err:=os.Lstat(r.Root)
+	if os.IsNotExist(err){return empty,nil}
+	if err!=nil{return empty,err}
+	if !rootInfo.IsDir()||rootInfo.Mode()&os.ModeSymlink!=0{return empty,fmt.Errorf("同步远端目录不安全: %s",r.Root)}
+	manifestDir:=filepath.Join(r.Root,"manifests")
+	info,err:=os.Lstat(manifestDir)
+	if os.IsNotExist(err){return empty,nil}
+	if err!=nil{return empty,err}
+	if !info.IsDir()||info.Mode()&os.ModeSymlink!=0{return empty,fmt.Errorf("远端 manifest 目录不安全")}
+	entries,err:=os.ReadDir(manifestDir);if err!=nil{return empty,err}
 	type candidate struct{name string;generation int64;hash string}
 	list:=[]candidate{}
 	for _,entry:=range entries{

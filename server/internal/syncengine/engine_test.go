@@ -396,3 +396,17 @@ func TestRebindClearsOnlySyncMetadata(t *testing.T) {
 	if err:=db.QueryRow(`SELECT status,resolution FROM sync_conflicts WHERE id='manual'`).Scan(&status,&resolution);err!=nil{t.Fatal(err)}
 	if status!="superseded"||resolution!="remote-rebind"{t.Fatalf("old conflict not preserved as superseded: %s %s",status,resolution)}
 }
+
+
+func TestPlanDoesNotCreateLocalRemoteDirectories(t *testing.T) {
+	ctx:=context.Background()
+	db,root:=testDB(t)
+	addFile(t,db,"n1","One","alpha",10)
+	remoteRoot:=filepath.Join(t.TempDir(),"does-not-exist")
+	engine:=testEngine(db,root,"device-a")
+	engine.RemoteRoot=remoteRoot
+	plan,err:=engine.Plan(ctx)
+	if err!=nil{t.Fatal(err)}
+	if plan.Uploads!=1||!plan.NeedsInit{t.Fatalf("unexpected plan: %+v",plan)}
+	if _,err:=os.Lstat(remoteRoot);!os.IsNotExist(err){t.Fatalf("plan created remote directory: %v",err)}
+}
