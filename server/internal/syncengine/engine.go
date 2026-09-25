@@ -26,6 +26,7 @@ const (
 	ManifestFormat = "local-notepad-sync-manifest"
 	ManifestVersion = 1
 	ProviderLocalLab = "local-lab"
+	ProviderWebDAV   = "webdav"
 )
 
 var objectHashPattern = regexp.MustCompile("^[a-f0-9]{64}$")
@@ -143,6 +144,17 @@ type Engine struct {
 	DataDir    string
 	RemoteRoot string
 	Now        func() time.Time
+}
+
+type SyncRemote interface {
+	AcquireLock() (*RemoteLock, error)
+	SaveObject(hash string, data []byte) error
+	LoadRecord(hash string) (Record, error)
+	VerifyBlob(hash string, size int64) error
+	SaveBlobFile(hash, source string, size int64) error
+	MaterializeBlobExclusive(hash string, size int64, target string) error
+	LoadManifest() (Manifest, error)
+	SaveManifest(manifest Manifest) (Manifest, error)
 }
 
 func (e *Engine) now() time.Time {
@@ -281,11 +293,13 @@ func stableFileDigest(filename string) (int64,string,error) {
 }
 
 
-func (e *Engine) config(ctx context.Context) (enabled bool, provider string, err error) {
+func (e *Engine) config(ctx context.Context) (enabled bool, provider, endpoint, username, password string, err error) {
 	var flag int
-	err = e.DB.QueryRowContext(ctx, `SELECT COALESCE(sync_enabled,0), COALESCE(sync_provider,'') FROM settings WHERE id=1`).Scan(&flag, &provider)
-	if err != nil { return false, "", err }
-	return flag != 0, provider, nil
+	err = e.DB.QueryRowContext(ctx, `SELECT COALESCE(sync_enabled,0), COALESCE(sync_provider,''), COALESCE(sync_endpoint,''),
+		COALESCE(sync_username,''), COALESCE(sync_password,'') FROM settings WHERE id=1`).
+		Scan(&flag, &provider, &endpoint, &username, &password)
+	if err != nil { return false, "", "", "", "", err }
+	return flag != 0, provider, endpoint, username, password, nil
 }
 
 func (e *Engine) state(ctx context.Context) (State, error) {
@@ -305,17 +319,21 @@ func (e *Engine) state(ctx context.Context) (State, error) {
 
 func (e *Engine) Status(ctx context.Context) (State, error) { return e.state(ctx) }
 
-func (e *Engine) remote(ctx context.Context) (*DirRemote, error) {
-	enabled, provider, err := e.config(ctx)
+func (e *Engine) remote(ctx context.Context) (SyncRemote, error) {
+	enabled, provider, endpoint, username, password, err := e.config(ctx)
 	if err != nil { return nil, err }
 	if !enabled { return nil, fmt.Errorf("同步尚未启用") }
-	if provider != ProviderLocalLab {
-		return nil, fmt.Errorf("当前阶段仅支持本地同步实验室 provider")
-	}
 	if e.DataDir == "" { return nil, fmt.Errorf("同步数据目录未配置") }
-	root := e.RemoteRoot
-	if root == "" { root = filepath.Join(e.DataDir, "sync-lab-remote") }
-	return NewDirRemote(root)
+	switch provider {
+	case ProviderLocalLab:
+		root := e.RemoteRoot
+		if root == "" { root = filepath.Join(e.DataDir, "sync-lab-remote") }
+		return NewDirRemote(root)
+	case ProviderWebDAV:
+		return NewWebDAVRemote(endpoint, username, password)
+	default:
+		return nil, fmt.Errorf("不支持的同步 provider: %s", provider)
+	}
 }
 
 func (e *Engine) ensureUploadDir() (string,error) {
@@ -431,7 +449,7 @@ func classifyItem(id, baseHash, localHash, remoteHash string, localExists bool) 
 	return "conflict"
 }
 
-func (e *Engine) buildPlan(ctx context.Context, remote *DirRemote, manifest Manifest) (Plan, map[string]Record, map[string]Record, map[string]string, error) {
+func (e *Engine) buildPlan(ctx context.Context, remote SyncRemote, manifest Manifest) (Plan, map[string]Record, map[string]Record, map[string]string, error) {
 	locals, err := e.localRecords(ctx)
 	if err != nil { return Plan{}, nil,nil,nil,err }
 	base, err := e.base(ctx)
@@ -476,7 +494,7 @@ func (e *Engine) buildPlan(ctx context.Context, remote *DirRemote, manifest Mani
 	return plan, localResolved, remoteResolved, base, nil
 }
 
-func validateRemoteStructure(manifest Manifest, remote *DirRemote, cache map[string]Record) error {
+func validateRemoteStructure(manifest Manifest, remote SyncRemote, cache map[string]Record) error {
 	records:=map[string]Record{}
 	for key,hash:=range manifest.Items{
 		record,ok:=cache[key]
@@ -864,7 +882,7 @@ func (e *Engine) Conflicts(ctx context.Context) ([]Conflict,error) {
 	return out,rows.Err()
 }
 
-func (e *Engine) applyRemoteAttachmentChoice(remote *DirRemote, record Record) (string,error) {
+func (e *Engine) applyRemoteAttachmentChoice(remote SyncRemote, record Record) (string,error) {
 	if record.Kind!="attachment"{return "",fmt.Errorf("不是附件冲突")}
 	name,ok:=attachmentNameFromKey(record.ID);if !ok{return "",fmt.Errorf("附件冲突键无效")}
 	uploadDir,err:=e.ensureUploadDir();if err!=nil{return "",err}
@@ -936,7 +954,11 @@ func (e *Engine) Resolve(ctx context.Context, conflictID, choice string) error {
 // protocol before WebDAV/S3/Git adapters are added. All objects/manifests are immutable.
 type DirRemote struct { Root string }
 
-type RemoteLock struct { path string; file *os.File }
+type RemoteLock struct {
+	path    string
+	file    *os.File
+	release func()
+}
 
 func NewDirRemote(root string) (*DirRemote,error) {
 	if strings.TrimSpace(root)=="" { return nil,fmt.Errorf("同步远端目录为空") }
@@ -980,6 +1002,7 @@ func (r *DirRemote) AcquireLock() (*RemoteLock,error) {
 
 func (l *RemoteLock) Release() {
 	if l==nil{return}
+	if l.release!=nil{l.release();return}
 	if l.file!=nil{_ = l.file.Close()}
 	_ = os.Remove(l.path)
 }
