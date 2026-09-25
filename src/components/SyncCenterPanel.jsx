@@ -104,6 +104,9 @@ export default function SyncCenterPanel() {
     if (password && typeof window.electronAPI?.webdavSecretSave !== 'function') {
       throw new Error('当前环境无法使用系统安全存储，请在桌面应用中保存 WebDAV 密码')
     }
+    if (password && secretStatus?.available !== true) {
+      throw new Error('系统安全存储不可用，未修改 WebDAV 配置')
+    }
     await api('/api/settings', {
       method: 'PUT',
       body: JSON.stringify({

@@ -51,3 +51,15 @@ it('shows OS-protected secret status without requiring a SQLite password flag',a
   expect(container.textContent).toContain('操作系统保护存储')
   expect(container.textContent).toContain('不写入新的 SQLite / .lnw')
 })
+
+
+it('does not partially change WebDAV settings when secure storage is unavailable',async()=>{
+  window.electronAPI.webdavSecretStatus.mockResolvedValue({success:true,available:false,stored:false,managed:true,backend:'basic_text'})
+  await render()
+  await input('WebDAV 端点','https://dav.example.test/notepad')
+  await input('WebDAV 用户名','alice')
+  await input('WebDAV 密码','secret')
+  await click(button('保存并启用 WebDAV'))
+  expect(window.electronAPI.webdavSecretSave).not.toHaveBeenCalled()
+  expect(api.mock.calls.filter(([path,init])=>path==='/api/settings'&&init?.method==='PUT')).toHaveLength(0)
+})
