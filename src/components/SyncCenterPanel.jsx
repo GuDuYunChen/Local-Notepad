@@ -60,6 +60,12 @@ export default function SyncCenterPanel() {
     }
   }, [refresh])
 
+  useEffect(() => {
+    if (!settings?.sync_auto_enabled) return undefined
+    const timer = window.setInterval(() => { void refresh() }, 15000)
+    return () => window.clearInterval(timer)
+  }, [refresh, settings?.sync_auto_enabled])
+
   const exclusive = async (key, task) => {
     if (operation.current) return
     operation.current = true
@@ -99,6 +105,12 @@ export default function SyncCenterPanel() {
   }
 
   const pause = () => updateSettings('settings', { sync_enabled: false }, '已暂停同步')
+
+  const updateAuto = (enabled, interval = settings?.sync_interval_minutes || 5) =>
+    updateSettings('auto', {
+      sync_auto_enabled: enabled,
+      sync_interval_minutes: Number(interval),
+    }, enabled ? '已开启自动同步' : '已暂停自动同步')
 
   const rebind = () => {
     if (!window.confirm('重新绑定只会清除本机同步基线、旧远端身份和未决冲突状态，不会删除笔记、附件或远端数据。继续吗？')) return
@@ -150,7 +162,7 @@ export default function SyncCenterPanel() {
     <div className="settings-card-header">
       <div>
         <h3>同步中心</h3>
-        <p>Phase 2B · Local-first 三方同步 + WebDAV transport</p>
+        <p>Phase 2C · WebDAV 自动同步与冲突保护</p>
       </div>
       <span className={'settings-status-pill ' + (enabled ? 'ok' : 'neutral')}>
         {enabled ? ('已启用 · ' + providerName(provider)) : '未启用'}
@@ -185,6 +197,25 @@ export default function SyncCenterPanel() {
           onChange={event => setWebdav(value => ({ ...value, password: event.target.value }))}/></label>
         {settings?.sync_password_set && <small className="sync-secret-state">密码已保存；输入新密码会替换，留空保持不变。</small>}
         <small>密码不会通过设置读取接口回显；当前版本保存在本机 SQLite 中，请保护系统账户与工作区备份。</small>
+        {enabled && isWebDAV && <div className="sync-auto-controls">
+          <div>
+            <strong>自动同步</strong>
+            <span>{settings?.sync_auto_enabled ? '已开启；有未处理冲突时会自动暂停。' : '关闭时仍可手动预演和同步。'}</span>
+          </div>
+          <label>间隔
+            <select aria-label="自动同步间隔" value={settings?.sync_interval_minutes || 5} disabled={!!busy}
+              onChange={event => void updateAuto(settings?.sync_auto_enabled === true, event.target.value)}>
+              <option value="1">1 分钟</option>
+              <option value="5">5 分钟</option>
+              <option value="15">15 分钟</option>
+              <option value="30">30 分钟</option>
+              <option value="60">60 分钟</option>
+            </select>
+          </label>
+          <button className="btn" disabled={!!busy} onClick={() => void updateAuto(settings?.sync_auto_enabled !== true)}>
+            {busy === 'auto' ? '更新中…' : (settings?.sync_auto_enabled ? '暂停自动同步' : '开启自动同步')}
+          </button>
+        </div>}
         <button className="btn primary" disabled={!!busy || !settings || !webdav.endpoint.trim()} onClick={() => void saveWebDAV()}>
           {busy === 'webdav' ? '保存中…' : (enabled && isWebDAV ? '保存 WebDAV 设置' : '保存并启用 WebDAV')}
         </button>
@@ -205,7 +236,7 @@ export default function SyncCenterPanel() {
         <div><strong>{status?.last_status || 'never'}</strong><span>最近状态</span></div>
       </div>
       {status?.base_items > 0 && <div className="sync-rebind-notice">
-        <div><strong>切换 provider 或 WebDAV 地址？</strong><span>先重新绑定，避免把旧远端身份误带到新目标。此操作只重置同步元数据。</span></div>
+        <div><strong>切换 provider 或 WebDAV 地址？</strong><span>先重新绑定，避免把旧远端身份误带到新目标。此操作只重置同步元数据，并会暂停自动同步直到你重新开启。</span></div>
         <button className="btn" disabled={!!busy} onClick={() => void rebind()}>{busy === 'rebind' ? '重置中…' : '重新绑定远端'}</button>
       </div>}
       <div className="settings-action-row consumer-settings-actions">

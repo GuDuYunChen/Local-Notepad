@@ -202,13 +202,18 @@ func main() {
 	tagController := &controller.TagController{TagLogic: tagLogic}
 
 	uploadController := &controller.UploadController{UploadDir: uploadPath}
-	syncController := &controller.SyncController{Engine: &syncengine.Engine{DB: db, DataDir: filepath.Dir(dbPath)}}
+	syncEngine := &syncengine.Engine{DB: db, DataDir: filepath.Dir(dbPath)}
+	syncController := &controller.SyncController{Engine: syncEngine}
 
 	fileController.Register(group)
 	settingsController.Register(group)
 	uploadController.Register(group)
 	tagController.Register(group)
 	syncController.Register(group)
+
+	// Background sync starts after the local API has had time to settle. The
+	// engine itself enforces due-time, conflict and single-run guards.
+	go syncengine.RunAutoScheduler(ctx, syncEngine, 15*time.Second, 30*time.Second)
 
 	// 优雅退出：监听系统信号
 	quit := make(chan os.Signal, 1)
