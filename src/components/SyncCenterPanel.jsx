@@ -183,6 +183,7 @@ export default function SyncCenterPanel() {
           autoComplete="new-password"
           placeholder={settings?.sync_password_set ? '已保存；留空保持不变' : '输入 WebDAV 密码'}
           onChange={event => setWebdav(value => ({ ...value, password: event.target.value }))}/></label>
+        {settings?.sync_password_set && <small className="sync-secret-state">密码已保存；输入新密码会替换，留空保持不变。</small>}
         <small>密码不会通过设置读取接口回显；当前版本保存在本机 SQLite 中，请保护系统账户与工作区备份。</small>
         <button className="btn primary" disabled={!!busy || !settings || !webdav.endpoint.trim()} onClick={() => void saveWebDAV()}>
           {busy === 'webdav' ? '保存中…' : (enabled && isWebDAV ? '保存 WebDAV 设置' : '保存并启用 WebDAV')}
