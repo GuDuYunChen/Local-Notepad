@@ -146,7 +146,7 @@ func TestRemoteManifestAndObjectTamperAreRejected(t *testing.T){
 	db,root:=testDB(t);addFile(t,db,"n1","One","base",10)
 	engine:=testEngine(db,root,"device-a");if _,err:=engine.Run(ctx);err!=nil{t.Fatal(err)}
 	remote,_:=engine.remote(ctx);manifest,_:=remote.LoadManifest()
-	obj:=filepath.Join(remote.Root,"objects",manifest.Items["n1"]+".json")
+	obj:=filepath.Join(root,"sync-lab-remote","objects",manifest.Items["n1"]+".json")
 	if err:=os.WriteFile(obj,[]byte("tampered"),0600);err!=nil{t.Fatal(err)}
 	if _,err:=engine.Plan(ctx);err==nil||!strings.Contains(err.Error(),"SHA-256"){t.Fatalf("expected tamper rejection: %v",err)}
 }
@@ -327,7 +327,7 @@ func TestAttachmentBlobTamperIsRejected(t *testing.T){
 	if _,err:=engineA.Run(ctx);err!=nil{t.Fatal(err)}
 	remote,_:=engineA.remote(ctx);manifest,_:=remote.LoadManifest()
 	record,err:=remote.LoadRecord(manifest.Items[attachmentItemKey("asset.txt")]);if err!=nil{t.Fatal(err)}
-	if err=os.WriteFile(filepath.Join(remote.Root,"blobs",record.Attachment.BlobHash),[]byte("tampered"),0600);err!=nil{t.Fatal(err)}
+	if err=os.WriteFile(filepath.Join(remoteRoot,"blobs",record.Attachment.BlobHash),[]byte("tampered"),0600);err!=nil{t.Fatal(err)}
 	if _,err=engineB.Run(ctx);err==nil||!strings.Contains(err.Error(),"blob"){t.Fatalf("expected blob integrity rejection: %v",err)}
 	if _,err=os.Stat(filepath.Join(rootB,"uploads","asset.txt"));!os.IsNotExist(err){t.Fatal("tampered attachment was materialized")}
 }
