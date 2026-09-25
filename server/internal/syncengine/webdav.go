@@ -210,7 +210,10 @@ func (r *WebDAVRemote) SaveBlobFile(hash, source string, size int64) error {
 	in, err := os.Open(source)
 	if err != nil { return err }
 	resp, requestErr := r.request(http.MethodPut, "blobs/"+hash, in, size, map[string]string{"If-None-Match": "*"})
-	closeErr := in.Close()
+	// net/http owns and closes request bodies after Do returns. Closing an
+	// already-closed read-only file is harmless and must not turn a successful
+	// upload into a sync failure.
+	_ = in.Close()
 	if requestErr != nil {
 		if verifyErr := r.VerifyBlob(hash, size); verifyErr == nil { return nil }
 		return requestErr
@@ -221,7 +224,6 @@ func (r *WebDAVRemote) SaveBlobFile(hash, source string, size int64) error {
 		return webDAVStatusError(resp, "上传附件 blob")
 	}
 	closeResponse(resp)
-	if closeErr != nil { return closeErr }
 	after, err := os.Lstat(source)
 	if err != nil { return err }
 	if !os.SameFile(before, after) || before.Size() != after.Size() || !before.ModTime().Equal(after.ModTime()) { return fmt.Errorf("本机附件在上传期间发生变化") }
