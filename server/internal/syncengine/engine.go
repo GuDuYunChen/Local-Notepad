@@ -146,6 +146,15 @@ type AutoTickResult struct {
 	Result RunResult `json:"result"`
 }
 
+type RemoteCheck struct {
+	Provider    string `json:"provider"`
+	Initialized bool   `json:"initialized"`
+	StoreID     string `json:"store_id"`
+	Generation  int64  `json:"generation"`
+	Revision    string `json:"revision"`
+	Items       int    `json:"items"`
+}
+
 type Engine struct {
 	DB         *sql.DB
 	DataDir    string
@@ -574,6 +583,32 @@ func validateRemoteStructure(manifest Manifest, remote SyncRemote, cache map[str
 		}
 	}
 	return nil
+}
+
+func (e *Engine) CheckRemote(ctx context.Context) (RemoteCheck,error) {
+	e.runMu.Lock()
+	defer e.runMu.Unlock()
+	remote,err:=e.remote(ctx)
+	if err!=nil{return RemoteCheck{},err}
+	manifest,err:=remote.LoadManifest()
+	if err!=nil{return RemoteCheck{},err}
+	state,err:=e.state(ctx)
+	if err!=nil{return RemoteCheck{},err}
+	if state.RemoteStoreID!=""{
+		if manifest.StoreID==""{return RemoteCheck{},fmt.Errorf("远端同步仓库已被清空或切换")}
+		if manifest.StoreID!=state.RemoteStoreID{return RemoteCheck{},fmt.Errorf("远端同步仓库身份发生变化")}
+	}
+	if manifest.StoreID!=""{
+		if err=validateRemoteStructure(manifest,remote,nil);err!=nil{return RemoteCheck{},fmt.Errorf("远端结构校验失败: %w",err)}
+	}
+	return RemoteCheck{
+		Provider:state.Provider,
+		Initialized:manifest.StoreID!="",
+		StoreID:manifest.StoreID,
+		Generation:manifest.Generation,
+		Revision:manifest.Revision,
+		Items:len(manifest.Items),
+	},nil
 }
 
 func (e *Engine) Plan(ctx context.Context) (Plan, error) {

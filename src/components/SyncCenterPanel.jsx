@@ -163,6 +163,15 @@ export default function SyncCenterPanel() {
     })
   }
 
+  const checkConnection = () => exclusive('check', async () => {
+    const result = await api('/api/sync/check', { method: 'POST', body: '{}' })
+    if (!alive.current) return
+    const detail = result?.initialized
+      ? `远端可用 · 第 ${result.generation || 0} 代 · ${result.items || 0} 个对象`
+      : '远端可用 · 尚未初始化，同步前不会写入任何探针'
+    toast.success(detail)
+  })
+
   const preview = () => exclusive('plan', async () => {
     const next = await api('/api/sync/plan', { method: 'POST', body: '{}' })
     if (!alive.current) return
@@ -245,6 +254,9 @@ export default function SyncCenterPanel() {
           <small className="sync-secret-state warning">开发模式后端不由 Electron 管理；新密码需要兼容 DB 副本才能立即生效。</small>}
         {hasAnySecret && <button className="btn small" disabled={!!busy} onClick={() => void clearWebDAVPassword()}>
           {busy === 'secret' ? '清除中…' : '清除已保存密码'}
+        </button>}
+        {enabled && isWebDAV && <button className="btn" disabled={!!busy} onClick={() => void checkConnection()}>
+          {busy === 'check' ? '检查中…' : '测试连接（只读）'}
         </button>}
         {enabled && isWebDAV && <div className="sync-auto-controls">
           <div>

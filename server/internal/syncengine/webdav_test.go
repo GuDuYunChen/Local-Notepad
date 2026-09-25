@@ -160,3 +160,29 @@ func TestRuntimeWebDAVSecretOverridesLegacyDatabasePassword(t *testing.T) {
 	if err!=nil{t.Fatal(err)}
 	if result.AppliedUp!=1{t.Fatalf("runtime secret was not used: %+v",result)}
 }
+
+
+func TestWebDAVConnectionCheckIsReadOnlyAndValidatesStructure(t *testing.T) {
+	root:=t.TempDir()
+	handler:=&xwebdav.Handler{Prefix:"/",FileSystem:xwebdav.Dir(root),LockSystem:xwebdav.NewMemLS()}
+	var writes atomic.Int64
+	server:=httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter,r *http.Request){
+		username,password,ok:=r.BasicAuth()
+		if !ok||username!="alice"||password!="secret"{http.Error(w,"unauthorized",http.StatusUnauthorized);return}
+		switch r.Method{case "MKCOL",http.MethodPut,http.MethodDelete,"MOVE","COPY":writes.Add(1)}
+		handler.ServeHTTP(w,r)
+	}))
+	defer server.Close()
+
+	db,dataRoot:=testDB(t)
+	if _,err:=db.Exec(`UPDATE settings SET sync_provider='webdav',sync_endpoint=?,sync_username='alice',sync_password='wrong'`,server.URL+"/local-notepad");err!=nil{t.Fatal(err)}
+	engine:=testEngine(db,dataRoot,"device-check")
+	engine.WebDAVPassword="secret"
+	check,err:=engine.CheckRemote(context.Background())
+	if err!=nil{t.Fatal(err)}
+	if check.Provider!="webdav"||check.Initialized||check.Items!=0{t.Fatalf("unexpected check: %+v",check)}
+	if got:=writes.Load();got!=0{t.Fatalf("connection check performed %d remote writes",got)}
+
+	if _,err:=db.Exec(`UPDATE settings SET sync_username='bad'`);err!=nil{t.Fatal(err)}
+	if _,err:=engine.CheckRemote(context.Background());err==nil{t.Fatal("expected bad credentials to fail")}
+}

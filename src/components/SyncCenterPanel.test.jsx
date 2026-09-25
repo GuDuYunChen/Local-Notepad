@@ -8,7 +8,7 @@ vi.mock('~/services/toast',()=>({toast:{success:vi.fn(),error:vi.fn()}}))
 let container,root
 const settings={sync_enabled:true,sync_provider:'local-lab',sync_endpoint:'',sync_username:'',sync_password_set:false,sync_auto_enabled:false,sync_interval_minutes:5}
 const status={device_id:'device-a',provider:'local-lab',enabled:true,base_items:2,open_conflicts:0,last_status:'ok',last_error:''}
-beforeEach(()=>{container=document.createElement('div');document.body.appendChild(container);root=createRoot(container);window.confirm=vi.fn(()=>true);window.electronAPI={openAppFolder:vi.fn().mockResolvedValue({success:true}),webdavSecretStatus:vi.fn().mockResolvedValue({success:true,available:true,stored:false,managed:true,backend:'dpapi'}),webdavSecretSave:vi.fn().mockResolvedValue({success:true,stored:true,restarted:true,restartRequired:false}),webdavSecretClear:vi.fn().mockResolvedValue({success:true,stored:false,restarted:true,restartRequired:false})};api.mockImplementation(async(path,init)=>{if(path==='/api/settings'&&!init)return settings;if(path==='/api/sync/status')return status;if(path==='/api/sync/conflicts')return[];if(path==='/api/sync/plan')return{uploads:1,downloads:2,conflicts:0,noops:3,needs_init:false};if(path==='/api/sync/run')return{plan:{uploads:1,downloads:0,conflicts:0,noops:2},conflicts:0};if(path==='/api/sync/rebind')return{...status,base_items:0,open_conflicts:0,remote_store_id:'',remote_revision:'',last_status:'rebound'};if(path==='/api/settings'&&init?.method==='PUT')return settings;return null})})
+beforeEach(()=>{container=document.createElement('div');document.body.appendChild(container);root=createRoot(container);window.confirm=vi.fn(()=>true);window.electronAPI={openAppFolder:vi.fn().mockResolvedValue({success:true}),webdavSecretStatus:vi.fn().mockResolvedValue({success:true,available:true,stored:false,managed:true,backend:'dpapi'}),webdavSecretSave:vi.fn().mockResolvedValue({success:true,stored:true,restarted:true,restartRequired:false}),webdavSecretClear:vi.fn().mockResolvedValue({success:true,stored:false,restarted:true,restartRequired:false})};api.mockImplementation(async(path,init)=>{if(path==='/api/settings'&&!init)return settings;if(path==='/api/sync/status')return status;if(path==='/api/sync/conflicts')return[];if(path==='/api/sync/check')return{provider:'webdav',initialized:true,generation:3,items:7};if(path==='/api/sync/plan')return{uploads:1,downloads:2,conflicts:0,noops:3,needs_init:false};if(path==='/api/sync/run')return{plan:{uploads:1,downloads:0,conflicts:0,noops:2},conflicts:0};if(path==='/api/sync/rebind')return{...status,base_items:0,open_conflicts:0,remote_store_id:'',remote_revision:'',last_status:'rebound'};if(path==='/api/settings'&&init?.method==='PUT')return settings;return null})})
 afterEach(async()=>{await act(async()=>root.unmount());container.remove();delete window.electronAPI;vi.clearAllMocks()})
 const button=text=>[...container.querySelectorAll('button')].find(node=>node.textContent===text)
 async function render(){await act(async()=>{root.render(<SyncCenterPanel/>);await Promise.resolve();await Promise.resolve()})}
@@ -62,4 +62,20 @@ it('does not partially change WebDAV settings when secure storage is unavailable
   await click(button('保存并启用 WebDAV'))
   expect(window.electronAPI.webdavSecretSave).not.toHaveBeenCalled()
   expect(api.mock.calls.filter(([path,init])=>path==='/api/settings'&&init?.method==='PUT')).toHaveLength(0)
+})
+
+
+it('checks a saved WebDAV connection without replacing manual sync actions',async()=>{
+  api.mockImplementation(async(path,init)=>{
+    if(path==='/api/settings'&&!init)return{...settings,sync_enabled:true,sync_provider:'webdav',sync_endpoint:'https://dav.example.test/notepad',sync_password_set:false}
+    if(path==='/api/sync/status')return{...status,provider:'webdav'}
+    if(path==='/api/sync/conflicts')return[]
+    if(path==='/api/sync/check')return{provider:'webdav',initialized:true,generation:4,items:12}
+    return null
+  })
+  await render()
+  await click(button('测试连接（只读）'))
+  expect(api).toHaveBeenCalledWith('/api/sync/check',{method:'POST',body:'{}'})
+  expect(button('预演同步')).toBeTruthy()
+  expect(button('执行同步')).toBeTruthy()
 })
