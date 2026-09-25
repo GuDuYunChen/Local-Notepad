@@ -377,3 +377,22 @@ func TestMergedDuplicateTagNamesAreRejectedBeforeManifestPublish(t *testing.T){
 	after,err:=remote.LoadManifest();if err!=nil{t.Fatal(err)}
 	if after.Revision!=before.Revision{t.Fatal("invalid tag merge was published")}
 }
+
+
+func TestRebindClearsOnlySyncMetadata(t *testing.T) {
+	ctx:=context.Background()
+	db,root:=testDB(t)
+	addFile(t,db,"n1","One","keep-me",10)
+	engine:=testEngine(db,root,"device-a")
+	if _,err:=engine.Run(ctx);err!=nil{t.Fatal(err)}
+	if _,err:=db.Exec(`INSERT INTO sync_conflicts(id,item_id,base_hash,local_hash,remote_hash,local_record,remote_record,created_at,status,resolution,resolved_at)
+		VALUES('manual','n1','a','b','c','','',1,'open','',0)`);err!=nil{t.Fatal(err)}
+	state,err:=engine.Rebind(ctx);if err!=nil{t.Fatal(err)}
+	if state.BaseItems!=0||state.OpenConflicts!=0||state.RemoteStoreID!=""||state.RemoteRevision!=""||state.LastStatus!="rebound"{
+		t.Fatalf("unexpected rebound state: %+v",state)
+	}
+	if got:=fileContent(t,db,"n1");got!="keep-me"{t.Fatalf("rebind changed local note: %q",got)}
+	var status,resolution string
+	if err:=db.QueryRow(`SELECT status,resolution FROM sync_conflicts WHERE id='manual'`).Scan(&status,&resolution);err!=nil{t.Fatal(err)}
+	if status!="superseded"||resolution!="remote-rebind"{t.Fatalf("old conflict not preserved as superseded: %s %s",status,resolution)}
+}

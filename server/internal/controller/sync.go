@@ -14,6 +14,7 @@ func (c *SyncController) Register(group *ghttp.RouterGroup) {
 	group.GET("/sync/status", c.Status)
 	group.POST("/sync/plan", c.Plan)
 	group.POST("/sync/run", c.Run)
+	group.POST("/sync/rebind", c.Rebind)
 	group.GET("/sync/conflicts", c.Conflicts)
 	group.POST("/sync/conflicts/{id}/resolve", c.Resolve)
 }
@@ -31,6 +32,11 @@ func (c *SyncController) Plan(r *ghttp.Request) {
 func (c *SyncController) Run(r *ghttp.Request) {
 	value, err := c.Engine.Run(r.GetCtx())
 	if err != nil { writeErrWithDetail(r, 4003, "同步执行失败", err); return }
+	writeOK(r, value)
+}
+func (c *SyncController) Rebind(r *ghttp.Request) {
+	value, err := c.Engine.Rebind(r.GetCtx())
+	if err != nil { writeErrWithDetail(r, 4007, "重新绑定同步远端失败", err); return }
 	writeOK(r, value)
 }
 func (c *SyncController) Conflicts(r *ghttp.Request) {

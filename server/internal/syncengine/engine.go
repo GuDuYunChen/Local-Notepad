@@ -319,6 +319,22 @@ func (e *Engine) state(ctx context.Context) (State, error) {
 
 func (e *Engine) Status(ctx context.Context) (State, error) { return e.state(ctx) }
 
+func (e *Engine) Rebind(ctx context.Context) (State, error) {
+	tx, err := e.DB.BeginTx(ctx, nil)
+	if err != nil { return State{}, err }
+	defer tx.Rollback()
+	now := e.now().Unix()
+	if _, err = tx.ExecContext(ctx, `DELETE FROM sync_base`); err != nil { return State{}, err }
+	if _, err = tx.ExecContext(ctx, `UPDATE sync_conflicts
+		SET status='superseded',resolution='remote-rebind',resolved_at=?
+		WHERE status='open'`, now); err != nil { return State{}, err }
+	if _, err = tx.ExecContext(ctx, `UPDATE sync_state
+		SET remote_store_id='',remote_revision='',last_sync_at=0,last_status='rebound',last_error=''
+		WHERE id=1`); err != nil { return State{}, err }
+	if err = tx.Commit(); err != nil { return State{}, err }
+	return e.state(ctx)
+}
+
 func (e *Engine) remote(ctx context.Context) (SyncRemote, error) {
 	enabled, provider, endpoint, username, password, err := e.config(ctx)
 	if err != nil { return nil, err }
