@@ -120,7 +120,8 @@ export default function SyncCenterPanel() {
       setPlan(null)
       setStatus(next)
       setConflicts([])
-      toast.success('已重新绑定同步目标；请先预演同步')
+      setSettings(current => current ? ({ ...current, sync_auto_enabled: false }) : current)
+      toast.success('已重新绑定同步目标并暂停自动同步；请先预演同步')
     })
   }
 
