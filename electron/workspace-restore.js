@@ -20,6 +20,7 @@ export const RESTORE_PENDING_FORMAT = 'local-notepad-workspace-restore-pending'
 export const RESTORE_PENDING_VERSION = 1
 export const RESTORE_STAGE_DIR = 'workspace-restore-staging'
 export const RESTORE_PENDING_FILE = 'workspace-restore-pending.json'
+export const RESTORE_APPLYING_FILE = 'workspace-restore-applying.json'
 
 const idPattern = /^[a-f0-9]{24}$/
 const shaPattern = /^[a-f0-9]{64}$/
@@ -362,6 +363,18 @@ export async function stageWorkspaceRestore({
     throw error
   }
 }
+async function publishNoReplaceJSON(target, temp, value) {
+  const bytes = Buffer.from(JSON.stringify(value), 'utf8')
+  await writeExclusive(temp, bytes)
+  try {
+    await fs.link(temp, target)
+  } catch (error) {
+    if (error.code === 'EEXIST') fail('已有一个工作区恢复事务正在等待或执行；请先重启应用完成或检查它')
+    throw error
+  } finally {
+    await fs.rm(temp, { force: true }).catch(() => {})
+  }
+}
 async function writePendingMarker(dataDir, restore) {
   const marker = {
     format: RESTORE_PENDING_FORMAT,
@@ -370,19 +383,35 @@ async function writePendingMarker(dataDir, restore) {
     receiptSHA256: restore.receiptSHA256,
     confirmedAt: new Date().toISOString(),
   }
-  const bytes = Buffer.from(JSON.stringify(marker), 'utf8')
   const target = path.join(dataDir, RESTORE_PENDING_FILE)
   const temp = path.join(dataDir, '.' + RESTORE_PENDING_FILE + '.' + restore.id + '.partial')
-  await writeExclusive(temp, bytes)
-  try {
-    await fs.link(temp, target)
-  } catch (error) {
-    if (error.code === 'EEXIST') fail('已有一个待执行的工作区恢复；请先重启应用完成或检查它')
-    throw error
-  } finally {
-    await fs.rm(temp, { force: true }).catch(() => {})
-  }
+  await publishNoReplaceJSON(target, temp, marker)
   return marker
+}
+async function writeApplyingJournal(dataDir, staged, preservedDir, now) {
+  const value = {
+    format: 'local-notepad-workspace-restore-applying',
+    version: 1,
+    id: staged.receipt.id,
+    receiptSHA256: staged.receiptSHA256,
+    preservedDir: path.basename(preservedDir),
+    startedAt: now().toISOString(),
+  }
+  const target = path.join(dataDir, RESTORE_APPLYING_FILE)
+  const temp = path.join(dataDir, '.' + RESTORE_APPLYING_FILE + '.' + staged.receipt.id + '.partial')
+  await publishNoReplaceJSON(target, temp, value)
+  return target
+}
+function validateApplyingJournal(value) {
+  if (!isObject(value) || value.format !== 'local-notepad-workspace-restore-applying' ||
+      value.version !== 1 || !idPattern.test(value.id || '') ||
+      !shaPattern.test(value.receiptSHA256 || '') ||
+      typeof value.preservedDir !== 'string' ||
+      !value.preservedDir.startsWith('workspace-restore-preserved-') ||
+      path.basename(value.preservedDir) !== value.preservedDir) {
+    fail('工作区恢复执行日志损坏', 'WorkspaceRestoreCriticalError')
+  }
+  return value
 }
 function validatePendingMarker(value) {
   if (!isObject(value) || value.format !== RESTORE_PENDING_FORMAT ||
@@ -404,6 +433,23 @@ async function readPendingMarker(dataDir) {
   catch { fail('待恢复标记不是有效 JSON') }
   return { filename, marker: validatePendingMarker(value) }
 }
+async function readApplyingJournal(dataDir) {
+  const filename = path.join(dataDir, RESTORE_APPLYING_FILE)
+  let stat
+  try { stat = await fs.lstat(filename) }
+  catch (error) {
+    if (error.code === 'ENOENT') return null
+    throw error
+  }
+  if (!stat.isFile() || stat.isSymbolicLink()) {
+    fail('工作区恢复执行日志不是安全的普通文件', 'WorkspaceRestoreCriticalError')
+  }
+  let value
+  try { value = JSON.parse(await fs.readFile(filename, 'utf8')) }
+  catch { fail('工作区恢复执行日志不是有效 JSON', 'WorkspaceRestoreCriticalError') }
+  return { filename, journal: validateApplyingJournal(value) }
+}
+
 async function activePathState(filename, kind) {
   try {
     const stat = await fs.lstat(filename)
@@ -463,6 +509,73 @@ async function verifyActiveState(dataDir, receipt) {
     }
   }
 }
+export async function recoverInterruptedWorkspaceRestore({
+  dataDir,
+  now = () => new Date(),
+  rename = fs.rename,
+} = {}) {
+  const applying = await readApplyingJournal(dataDir)
+  if (!applying) return null
+  const preservedDir = path.join(dataDir, applying.journal.preservedDir)
+  try {
+    await ensureSafeDirectory(preservedDir)
+  } catch (error) {
+    fail(
+      '检测到未完成工作区恢复，但恢复前数据目录不可用：' + (error?.message || error),
+      'WorkspaceRestoreCriticalError',
+    )
+  }
+
+  let failedDir = ''
+  try {
+    for (const [name, kind] of [['data.db','file'],['data.db-wal','file'],['data.db-shm','file'],['uploads','dir']]) {
+      const preserved = path.join(preservedDir, name)
+      if (!await activePathState(preserved, kind)) continue
+      const active = path.join(dataDir, name)
+      if (await activePathState(active, kind)) {
+        if (!failedDir) {
+          failedDir = path.join(
+            dataDir,
+            'workspace-restore-interrupted-failed-' +
+              now().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z') +
+              '-' + applying.journal.id.slice(0, 8),
+          )
+          await fs.mkdir(failedDir, { mode: 0o700 })
+        }
+        await rename(active, path.join(failedDir, name))
+      }
+      await rename(preserved, active)
+    }
+    if (!await activePathState(path.join(dataDir, 'data.db'), 'file')) {
+      fail('中断恢复后没有可用的原数据库', 'WorkspaceRestoreCriticalError')
+    }
+    const pending = path.join(dataDir, RESTORE_PENDING_FILE)
+    await fs.rm(pending, { force: true })
+    await rename(
+      applying.filename,
+      path.join(preservedDir, 'restore-interrupted-applying.json'),
+    )
+    await fs.writeFile(
+      path.join(preservedDir, 'interrupted.txt'),
+      'An interrupted workspace restore was rolled back at ' + now().toISOString(),
+      'utf8',
+    )
+    return {
+      status: 'rolled-back-interrupted',
+      id: applying.journal.id,
+      preservedDir,
+      failedDir,
+      error: '检测到上次恢复在进程退出前未完成，已优先恢复原工作区。',
+    }
+  } catch (error) {
+    fail(
+      '检测到未完成工作区恢复，且自动恢复原数据失败：' + (error?.message || error) +
+      '；请保持应用关闭并检查 ' + preservedDir,
+      'WorkspaceRestoreCriticalError',
+    )
+  }
+}
+
 export async function applyPendingWorkspaceRestore({
   dataDir,
   inspectBackup,
@@ -470,6 +583,8 @@ export async function applyPendingWorkspaceRestore({
   rename = fs.rename,
   faultInjector = null,
 } = {}) {
+  const interrupted = await recoverInterruptedWorkspaceRestore({ dataDir, now, rename })
+  if (interrupted) return interrupted
   const pending = await readPendingMarker(dataDir)
   if (!pending) return { status: 'none' }
   const staged = await verifyStagedRestore(
@@ -511,6 +626,7 @@ export async function applyPendingWorkspaceRestore({
       appliedAt: now().toISOString(),
     }
     await writeExclusive(path.join(preservedDir, 'restore.json'), Buffer.from(JSON.stringify(audit), 'utf8'))
+    const applyingFile = await writeApplyingJournal(dataDir, staged, preservedDir, now)
 
     for (const [name, kind] of [['data.db','file'],['data.db-wal','file'],['data.db-shm','file'],['uploads','dir']]) {
       await moveIfExists(path.join(dataDir, name), path.join(preservedDir, name), kind, rename, moved)
@@ -529,7 +645,10 @@ export async function applyPendingWorkspaceRestore({
     if (typeof faultInjector === 'function') await faultInjector('after-publish')
 
     await verifyActiveState(dataDir, staged.receipt)
+    // Remove pending first. If the process dies before the applying journal is
+    // removed, next startup rolls back to the preserved original state.
     await fs.rm(pending.filename, { force: true })
+    await fs.rm(path.join(dataDir, RESTORE_APPLYING_FILE), { force: true })
     await fs.rm(staged.receiptPath, { force: true })
     await fs.rm(staged.stageRoot, { recursive: true, force: true }).catch(() => {})
 
@@ -549,6 +668,10 @@ export async function applyPendingWorkspaceRestore({
       await restoreMovedOriginals(moved, rename)
       await fs.rename(pending.filename, path.join(preservedDir, 'restore-failed-pending.json')).catch(async () => {
         await fs.rm(pending.filename, { force: true })
+      })
+      const applyingFile = path.join(dataDir, RESTORE_APPLYING_FILE)
+      await fs.rename(applyingFile, path.join(preservedDir, 'restore-failed-applying.json')).catch(async () => {
+        await fs.rm(applyingFile, { force: true })
       })
       await fs.writeFile(path.join(preservedDir, 'failure.txt'), String(error?.message || error), 'utf8').catch(() => {})
       return {
@@ -669,10 +792,9 @@ export function createWorkspaceRestoreService({
     cancel: id => exclusive(async () => {
       const receiptSHA256 = issued.get(id)
       if (!receiptSHA256) return { success: true, canceled: true }
-      const staged = await readReceipt(dataDir, id, receiptSHA256)
-      const backup = path.join(dataDir, 'backups', staged.receipt.database.backupName)
+      const staged = await verifyStagedRestore(dataDir, id, receiptSHA256, inspectBackup)
       await fs.rm(staged.stageRoot, { recursive: true, force: true })
-      await fs.rm(backup, { force: true })
+      await fs.rm(staged.backupPath, { force: true })
       issued.delete(id)
       return { success: true, canceled: true }
     }),

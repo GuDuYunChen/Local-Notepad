@@ -5,9 +5,11 @@ import { createHash } from 'node:crypto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createWorkspacePackageService } from './workspace-package.js'
 import {
+  RESTORE_APPLYING_FILE,
   RESTORE_PENDING_FILE,
   applyPendingWorkspaceRestore,
   createWorkspaceRestoreService,
+  recoverInterruptedWorkspaceRestore,
   registerWorkspaceRestoreHandlers,
   rollbackAppliedWorkspaceRestore,
   stageWorkspaceRestore,
@@ -194,6 +196,50 @@ describe('staged workspace restore', () => {
       dataDir: f.dataDir, inspectBackup: f.inspectBackup,
     })).rejects.toThrow('已变化')
     expect(await fs.readFile(path.join(f.dataDir, 'data.db'))).toEqual(f.oldDB)
+  })
+
+  it('recovers the original workspace after a process dies mid-restore', async () => {
+    const f = await fixture()
+    const { service } = await makeService(f)
+    const prepared = await service.prepare()
+    await service.confirm(prepared.restore.id)
+
+    const preservedDir = path.join(
+      f.dataDir,
+      'workspace-restore-preserved-crash-' + prepared.restore.id.slice(0, 8),
+    )
+    await fs.mkdir(preservedDir)
+    await fs.rename(path.join(f.dataDir, 'data.db'), path.join(preservedDir, 'data.db'))
+    await fs.rename(path.join(f.dataDir, 'uploads'), path.join(preservedDir, 'uploads'))
+    // Simulate that the new DB had already been published before the process died.
+    await fs.copyFile(
+      path.join(f.dataDir, 'backups', prepared.restore.database.backupName),
+      path.join(f.dataDir, 'data.db'),
+    )
+    await fs.mkdir(path.join(f.dataDir, 'uploads'))
+    await fs.writeFile(path.join(f.dataDir, 'uploads', 'new-a.txt'), 'partial new state')
+    await fs.writeFile(
+      path.join(f.dataDir, RESTORE_APPLYING_FILE),
+      JSON.stringify({
+        format: 'local-notepad-workspace-restore-applying',
+        version: 1,
+        id: prepared.restore.id,
+        receiptSHA256: prepared.restore.receiptSHA256,
+        preservedDir: path.basename(preservedDir),
+        startedAt: '2026-09-25T14:00:00.000Z',
+      }),
+    )
+
+    const result = await recoverInterruptedWorkspaceRestore({
+      dataDir: f.dataDir,
+      now: () => new Date('2026-09-25T14:10:00.000Z'),
+    })
+    expect(result.status).toBe('rolled-back-interrupted')
+    expect(await fs.readFile(path.join(f.dataDir, 'data.db'))).toEqual(f.oldDB)
+    expect(await fs.readFile(path.join(f.dataDir, 'uploads', 'old.txt'), 'utf8')).toBe('old attachment')
+    await expect(fs.stat(path.join(f.dataDir, RESTORE_PENDING_FILE))).rejects.toThrow()
+    await expect(fs.stat(path.join(f.dataDir, RESTORE_APPLYING_FILE))).rejects.toThrow()
+    expect(await fs.readFile(path.join(result.failedDir, 'data.db'))).toEqual(f.newDB)
   })
 
   it('serializes prepare/confirm operations and requires an issued preview', async () => {
