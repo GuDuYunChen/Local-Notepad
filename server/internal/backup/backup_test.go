@@ -368,7 +368,8 @@ func TestWebDAVSchemaRequiresCredentialColumns(t *testing.T) {
 		`CREATE TABLE sync_state(id INTEGER PRIMARY KEY,device_id TEXT,remote_store_id TEXT,remote_revision TEXT,last_sync_at INTEGER,last_status TEXT,last_error TEXT)`,
 		`CREATE TABLE sync_base(item_id TEXT PRIMARY KEY,object_hash TEXT,synced_at INTEGER)`,
 		`CREATE TABLE sync_conflicts(id TEXT PRIMARY KEY,item_id TEXT,base_hash TEXT,local_hash TEXT,remote_hash TEXT,status TEXT,resolution TEXT)`,
-		`ALTER TABLE settings ADD COLUMN sync_provider TEXT DEFAULT ''`,
+		`CREATE TABLE settings(id INTEGER PRIMARY KEY,sync_provider TEXT DEFAULT '')`,
+		`INSERT INTO settings(id,sync_provider) VALUES(1,'webdav')`,
 		`INSERT INTO schema_migrations VALUES(12)`,
 	}{if _,err:=db.Exec(stmt);err!=nil{t.Fatal(err)}}
 	db.Close()
