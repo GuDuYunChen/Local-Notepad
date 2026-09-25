@@ -305,12 +305,12 @@ func TestResearchMigrationIsAdditiveAndPreservesCreationReceipt(t *testing.T) {
 		t.Fatal(err)
 	}
 	var latest int
-	if err := db.QueryRow(`SELECT MAX(version) FROM schema_migrations`).Scan(&latest); err != nil || latest != 11 {
+	if err := db.QueryRow(`SELECT MAX(version) FROM schema_migrations`).Scan(&latest); err != nil || latest != 12 {
 		t.Fatal(latest, err)
 	}
 	var syncTables int
 	if err := db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('sync_state','sync_base','sync_conflicts')`).Scan(&syncTables); err != nil || syncTables != 3 {
-		t.Fatal("schema 11 sync tables missing", syncTables, err)
+		t.Fatal("schema 11/12 sync tables missing", syncTables, err)
 	}
 	if _, err := db.Exec(`INSERT INTO research_note_requests VALUES('request','hash','file','标题','',1)`); err != nil {
 		t.Fatal(err)
@@ -328,14 +328,14 @@ func TestSyncMigrationToleratesPreexistingProviderColumn(t *testing.T) {
 	db := openMigrationTestDB(t)
 	ctx := context.Background()
 	if err := migrate(ctx, db); err != nil { t.Fatal(err) }
-	if _, err := db.Exec(`DELETE FROM schema_migrations WHERE version=11`); err != nil { t.Fatal(err) }
+	if _, err := db.Exec(`DELETE FROM schema_migrations WHERE version>=11`); err != nil { t.Fatal(err) }
 	if _, err := db.Exec(`DROP TABLE sync_conflicts`); err != nil { t.Fatal(err) }
 	if _, err := db.Exec(`DROP TABLE sync_base`); err != nil { t.Fatal(err) }
 	if _, err := db.Exec(`DROP TABLE sync_state`); err != nil { t.Fatal(err) }
 	// sync_provider remains from ensureCompatibleSchema / the first migration pass.
 	if err := migrate(ctx, db); err != nil { t.Fatal(err) }
 	var latest, tables int
-	if err := db.QueryRow(`SELECT MAX(version) FROM schema_migrations`).Scan(&latest); err != nil || latest != 11 { t.Fatal(latest, err) }
+	if err := db.QueryRow(`SELECT MAX(version) FROM schema_migrations`).Scan(&latest); err != nil || latest != 12 { t.Fatal(latest, err) }
 	if err := db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('sync_state','sync_base','sync_conflicts')`).Scan(&tables); err != nil || tables != 3 {
 		t.Fatal("sync tables were not rebuilt", tables, err)
 	}

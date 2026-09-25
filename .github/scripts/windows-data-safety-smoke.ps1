@@ -16,7 +16,7 @@ if ($name -notmatch '^backup-manual-[0-9]{8}-[0-9]{6}-[a-f0-9]{12}\.db$') {
 }
 $copy = Join-Path (Join-Path $DataDir 'backups') $name
 $actual = (Get-FileHash -LiteralPath $copy -Algorithm SHA256).Hash.ToLowerInvariant()
-if ($actual -ne $created.backup.sha256 -or $created.backup.schemaVersion -ne 11 -or $created.backup.files -lt 1) {
+if ($actual -ne $created.backup.sha256 -or $created.backup.schemaVersion -ne 12 -or $created.backup.files -lt 1) {
   throw "$Label snapshot receipt differs from the actual file."
 }
 $checked = (& $BackendPath --data-safety inspect $name | Out-String | ConvertFrom-Json)

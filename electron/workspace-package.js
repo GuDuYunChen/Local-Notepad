@@ -10,7 +10,7 @@ export const WORKSPACE_MAGIC = Buffer.from('LNWPKG1\n', 'ascii')
 export const WORKSPACE_HEADER_BYTES = 44
 export const MAX_WORKSPACE_MANIFEST_BYTES = 8 * 1024 * 1024
 export const MAX_WORKSPACE_ENTRIES = 100000
-export const SUPPORTED_SCHEMA_VERSION = 11
+export const SUPPORTED_SCHEMA_VERSION = 12
 
 const hex64 = /^[a-f0-9]{64}$/
 const backupName = /^backup-(?:manual-)?[a-zA-Z0-9-]+\.db$/
