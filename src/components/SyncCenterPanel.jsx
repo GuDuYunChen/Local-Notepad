@@ -18,6 +18,8 @@ const recordLabel = (record, fallback) => {
   return record?.file?.title || fallback || '未知对象'
 }
 
+const providerName = provider => provider === 'webdav' ? 'WebDAV' : '本地实验室'
+
 export default function SyncCenterPanel() {
   const alive = useRef(false)
   const operation = useRef(false)
@@ -26,6 +28,7 @@ export default function SyncCenterPanel() {
   const [plan, setPlan] = useState(null)
   const [conflicts, setConflicts] = useState([])
   const [busy, setBusy] = useState('')
+  const [webdav, setWebdav] = useState({ endpoint: '', username: '', password: '' })
 
   const refresh = useCallback(async () => {
     try {
@@ -38,6 +41,11 @@ export default function SyncCenterPanel() {
       setSettings(nextSettings)
       setStatus(nextStatus)
       setConflicts(Array.isArray(nextConflicts) ? nextConflicts : [])
+      setWebdav(current => ({
+        endpoint: nextSettings?.sync_endpoint || '',
+        username: nextSettings?.sync_username || '',
+        password: current.password,
+      }))
     } catch (error) {
       if (alive.current) toast.error(error?.message || '读取同步状态失败')
     }
@@ -66,19 +74,31 @@ export default function SyncCenterPanel() {
     }
   }
 
-  const updateLab = enabled => exclusive('settings', async () => {
-    await api('/api/settings', {
-      method: 'PUT',
-      body: JSON.stringify({
-        sync_enabled: enabled,
-        sync_provider: enabled ? 'local-lab' : (settings?.sync_provider || 'local-lab'),
-      }),
-    })
+  const updateSettings = (key, patch, message) => exclusive(key, async () => {
+    await api('/api/settings', { method: 'PUT', body: JSON.stringify(patch) })
     if (!alive.current) return
     setPlan(null)
     await refresh()
-    if (alive.current) toast.success(enabled ? '已启用本地同步实验室' : '已暂停同步')
+    if (alive.current) toast.success(message)
   })
+
+  const enableLab = () => updateSettings('settings', {
+    sync_enabled: true,
+    sync_provider: 'local-lab',
+  }, '已启用本地同步实验室')
+
+  const saveWebDAV = () => {
+    const patch = {
+      sync_enabled: true,
+      sync_provider: 'webdav',
+      sync_endpoint: webdav.endpoint.trim(),
+      sync_username: webdav.username.trim(),
+    }
+    if (webdav.password !== '') patch.sync_password = webdav.password
+    return updateSettings('webdav', patch, 'WebDAV 已保存并启用')
+  }
+
+  const pause = () => updateSettings('settings', { sync_enabled: false }, '已暂停同步')
 
   const preview = () => exclusive('plan', async () => {
     const next = await api('/api/sync/plan', { method: 'POST', body: '{}' })
@@ -109,27 +129,60 @@ export default function SyncCenterPanel() {
     if (result && result.success === false) throw new Error(result.message || '打开模拟远端失败')
   })
 
-  const enabled = settings?.sync_enabled === true && settings?.sync_provider === 'local-lab'
+  const enabled = settings?.sync_enabled === true
+  const provider = settings?.sync_provider || 'local-lab'
+  const isLab = provider === 'local-lab'
+  const isWebDAV = provider === 'webdav'
 
   return <section className="settings-card consumer-settings-section sync-center-card">
     <div className="settings-card-header">
       <div>
-        <h3>同步实验室</h3>
-        <p>Phase 2A · Local-first 三方同步协议</p>
+        <h3>同步中心</h3>
+        <p>Phase 2B · Local-first 三方同步 + WebDAV transport</p>
       </div>
-      <span className={'settings-status-pill ' + (enabled ? 'ok' : 'neutral')}>{enabled ? '已启用' : '未启用'}</span>
+      <span className={'settings-status-pill ' + (enabled ? 'ok' : 'neutral')}>
+        {enabled ? ('已启用 · ' + providerName(provider)) : '未启用'}
+      </span>
     </div>
 
     <div className="sync-center-explainer">
-      <strong>先验证同步正确性，不把实验室伪装成正式云同步。</strong>
-      <span>当前同步笔记、文件夹、标签、标签关联和附件。附件使用内容寻址 SHA-256 blob；同名附件建立共同基线后，修改或删除必须进入冲突中心明确选择，不会静默覆盖。所有对象都不按时间戳自动选赢家。</span>
+      <strong>WebDAV 只替换传输层，不改变冲突规则。</strong>
+      <span>笔记、文件夹、标签、标签关联和附件继续使用同一套 manifest、SHA-256 与三方合并。正文和附件都不会按时间戳静默覆盖；冲突仍需明确选择。</span>
+    </div>
+
+    <div className="sync-provider-grid">
+      <div className={'sync-provider-card ' + (enabled && isLab ? 'active' : '')}>
+        <strong>本地实验室</strong>
+        <span>用于离线验证同步协议，不连接云端。</span>
+        <button className="btn" disabled={!!busy || !settings} onClick={() => void enableLab()}>
+          {busy === 'settings' ? '更新中…' : (enabled && isLab ? '已启用' : '启用本地实验室')}
+        </button>
+      </div>
+      <div className={'sync-provider-card ' + (enabled && isWebDAV ? 'active' : '')}>
+        <strong>WebDAV</strong>
+        <span>支持自建 WebDAV、NAS 与兼容服务。公网端点必须使用 HTTPS。</span>
+        <label>端点<input aria-label="WebDAV 端点" value={webdav.endpoint} disabled={!!busy}
+          placeholder="https://dav.example.com/local-notepad"
+          onChange={event => setWebdav(value => ({ ...value, endpoint: event.target.value }))}/></label>
+        <label>用户名<input aria-label="WebDAV 用户名" value={webdav.username} disabled={!!busy}
+          autoComplete="username"
+          onChange={event => setWebdav(value => ({ ...value, username: event.target.value }))}/></label>
+        <label>密码<input aria-label="WebDAV 密码" type="password" value={webdav.password} disabled={!!busy}
+          autoComplete="new-password"
+          placeholder={settings?.sync_password_set ? '已保存；留空保持不变' : '输入 WebDAV 密码'}
+          onChange={event => setWebdav(value => ({ ...value, password: event.target.value }))}/></label>
+        <small>密码不会通过设置读取接口回显；当前版本保存在本机 SQLite 中，请保护系统账户与工作区备份。</small>
+        <button className="btn primary" disabled={!!busy || !settings || !webdav.endpoint.trim()} onClick={() => void saveWebDAV()}>
+          {busy === 'webdav' ? '保存中…' : (enabled && isWebDAV ? '保存 WebDAV 设置' : '保存并启用 WebDAV')}
+        </button>
+      </div>
     </div>
 
     <div className="settings-row">
       <div><strong>设备身份</strong><span className="sync-device-id">{status?.device_id || '正在读取…'}</span></div>
-      <button className="btn" disabled={!!busy || !settings} onClick={() => void updateLab(!enabled)}>
-        {busy === 'settings' ? '更新中…' : (enabled ? '暂停实验室' : '启用实验室')}
-      </button>
+      {enabled && <button className="btn" disabled={!!busy} onClick={() => void pause()}>
+        {busy === 'settings' ? '更新中…' : '暂停同步'}
+      </button>}
     </div>
 
     {enabled && <>
@@ -141,7 +194,7 @@ export default function SyncCenterPanel() {
       <div className="settings-action-row consumer-settings-actions">
         <button className="btn" disabled={!!busy} onClick={() => void preview()}>{busy === 'plan' ? '预演中…' : '预演同步'}</button>
         <button className="btn primary" disabled={!!busy} onClick={() => void synchronize()}>{busy === 'run' ? '同步中…' : '执行同步'}</button>
-        <button className="btn" disabled={!!busy || typeof window.electronAPI?.openAppFolder !== 'function'} onClick={() => void openLab()}>打开模拟远端</button>
+        {isLab && <button className="btn" disabled={!!busy || typeof window.electronAPI?.openAppFolder !== 'function'} onClick={() => void openLab()}>打开模拟远端</button>}
       </div>
       {plan && <div className="sync-plan-summary" role="status">
         <strong>最近同步计划</strong><span>{describePlan(plan)}</span>
