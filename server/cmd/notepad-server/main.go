@@ -560,12 +560,15 @@ func migrate(ctx context.Context, db *sql.DB) error {
 		allSuccess := true
 		for _, stmt := range m.stmts {
 			if _, err := tx.ExecContext(ctx, stmt); err != nil {
-				allSuccess = false
 				if strings.Contains(err.Error(), "duplicate column name") || strings.Contains(err.Error(), "table already exists") {
+					// A partially upgraded legacy database may already contain an additive
+					// schema element. Treat that as idempotent success so the remaining
+					// statements can commit and the migration version can be recorded.
 					g.Log().Debug(ctx, fmt.Sprintf("迁移 %d 跳过(已存在): %s", m.version, stmt))
-				} else {
-					g.Log().Warning(ctx, fmt.Sprintf("迁移 %d 语句失败: %s, 错误: %v", m.version, stmt, err))
+					continue
 				}
+				allSuccess = false
+				g.Log().Warning(ctx, fmt.Sprintf("迁移 %d 语句失败: %s, 错误: %v", m.version, stmt, err))
 			}
 		}
 
