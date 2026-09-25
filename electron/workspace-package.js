@@ -33,7 +33,7 @@ function inside(root, target) {
 function safeAttachmentName(name) {
   if (typeof name !== 'string' || !name || Buffer.byteLength(name, 'utf8') > 512 ||
       name === '.' || name === '..' || /[\/\\\0]/.test(name)) {
-    fail('附件名称包含不安全路径，未创建便携包')
+    fail('附件路径包含不安全名称，未创建便携包')
   }
   return name
 }
@@ -266,8 +266,18 @@ async function readWorkspaceHeader(filename) {
 export async function inspectWorkspacePackage(filename) {
   const absolute = path.resolve(filename)
   const header = await readWorkspaceHeader(absolute)
-  let offset = header.dataOffset
 
+  const databaseHandle = await fs.open(absolute, 'r')
+  try {
+    const signature = await readExact(databaseHandle, 16, header.dataOffset)
+    if (!signature.equals(Buffer.from('SQLite format 3\0', 'binary'))) {
+      fail('工作区便携包中的数据库不是 SQLite 文件')
+    }
+  } finally {
+    await databaseHandle.close()
+  }
+
+  let offset = header.dataOffset
   for (const entry of header.manifest.entries) {
     let digest
     if (entry.size === 0) {
@@ -380,8 +390,9 @@ export function createWorkspacePackageService({
           output.end()
           await finished(output)
           await handle.sync()
-        } finally {
-          if (!output.destroyed) output.destroy()
+        } catch (error) {
+          output.destroy()
+          throw error
         }
         await handle.close(); handle = null
 

@@ -30,6 +30,7 @@ async function fixture({ attachments = true } = {}) {
   if (attachments) await fs.mkdir(uploadDir, { recursive: true })
 
   const db = Buffer.alloc(4096, 23)
+  Buffer.from('SQLite format 3\0', 'binary').copy(db, 0)
   const name = 'backup-manual-20260924-120000-aabbccddeeff.db'
   await fs.writeFile(path.join(backupDir, name), db)
   const info = { name, size: db.length, sha256: digest(db), files: 7, schemaVersion: 10 }

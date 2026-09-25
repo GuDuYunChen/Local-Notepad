@@ -178,7 +178,7 @@ function BackupCenter({ onClose }) {
       role="dialog" aria-modal="true" aria-labelledby="backup-dialog-title">
       <header className="selector-modal-header">
         <div><h2 className="modal-title" id="backup-dialog-title" ref={heading} tabIndex={-1}>备份与恢复</h2>
-          <div className="modal-message">工作区便携包负责已保存正文与附件；数据库快照和核对存档仍可独立管理与校验。</div></div>
+          <div className="modal-message">工作区便携包负责已保存正文与附件；数据库快照和核对存档仍可独立管理与校验，不会自动合并未保存草稿或核对存档。</div></div>
         <button type="button" className="icon-btn" onClick={onClose} aria-label="关闭备份中心" title="关闭">×</button>
       </header>
       <div className="backup-center-tabs" role="tablist" aria-label="备份数据类型">
