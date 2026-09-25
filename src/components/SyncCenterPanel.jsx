@@ -29,18 +29,24 @@ export default function SyncCenterPanel() {
   const [conflicts, setConflicts] = useState([])
   const [busy, setBusy] = useState('')
   const [webdav, setWebdav] = useState({ endpoint: '', username: '', password: '' })
+  const [secretStatus, setSecretStatus] = useState({ available: false, stored: false, managed: false, backend: '' })
 
   const refresh = useCallback(async () => {
     try {
-      const [nextSettings, nextStatus, nextConflicts] = await Promise.all([
+      const secretPromise = typeof window.electronAPI?.webdavSecretStatus === 'function'
+        ? window.electronAPI.webdavSecretStatus()
+        : Promise.resolve({ success: false, available: false, stored: false, managed: false, backend: '' })
+      const [nextSettings, nextStatus, nextConflicts, nextSecret] = await Promise.all([
         api('/api/settings'),
         api('/api/sync/status'),
         api('/api/sync/conflicts'),
+        secretPromise,
       ])
       if (!alive.current) return
       setSettings(nextSettings)
       setStatus(nextStatus)
       setConflicts(Array.isArray(nextConflicts) ? nextConflicts : [])
+      setSecretStatus(nextSecret && typeof nextSecret === 'object' ? nextSecret : { available: false, stored: false, managed: false, backend: '' })
       setWebdav(current => ({
         endpoint: nextSettings?.sync_endpoint || '',
         username: nextSettings?.sync_username || '',
@@ -93,16 +99,45 @@ export default function SyncCenterPanel() {
     sync_provider: 'local-lab',
   }, '已启用本地同步实验室')
 
-  const saveWebDAV = () => {
-    const patch = {
-      sync_enabled: true,
-      sync_provider: 'webdav',
-      sync_endpoint: webdav.endpoint.trim(),
-      sync_username: webdav.username.trim(),
+  const saveWebDAV = () => exclusive('webdav', async () => {
+    const password = webdav.password
+    if (password && typeof window.electronAPI?.webdavSecretSave !== 'function') {
+      throw new Error('当前环境无法使用系统安全存储，请在桌面应用中保存 WebDAV 密码')
     }
-    if (webdav.password !== '') patch.sync_password = webdav.password
-    return updateSettings('webdav', patch, 'WebDAV 已保存并启用')
-  }
+    await api('/api/settings', {
+      method: 'PUT',
+      body: JSON.stringify({
+        sync_enabled: true,
+        sync_provider: 'webdav',
+        sync_endpoint: webdav.endpoint.trim(),
+        sync_username: webdav.username.trim(),
+      }),
+    })
+    if (password) {
+      const secret = await window.electronAPI.webdavSecretSave(password)
+      if (secret?.success !== true || secret?.stored !== true) throw new Error(secret?.message || '系统安全存储未保存 WebDAV 密码')
+      await api('/api/settings', {
+        method: 'PUT',
+        body: JSON.stringify({ sync_password: secret.restartRequired ? password : '' }),
+      })
+      setWebdav(current => ({ ...current, password: '' }))
+    }
+    if (!alive.current) return
+    setPlan(null)
+    await refresh()
+    if (alive.current) toast.success(password ? 'WebDAV 已保存；密码已迁移到系统保护存储' : 'WebDAV 已保存并启用')
+  })
+
+  const clearWebDAVPassword = () => exclusive('secret', async () => {
+    if (secretStatus.stored && typeof window.electronAPI?.webdavSecretClear === 'function') {
+      const result = await window.electronAPI.webdavSecretClear()
+      if (result?.success !== true) throw new Error(result?.message || '清除系统 WebDAV 密码失败')
+    }
+    await api('/api/settings', { method: 'PUT', body: JSON.stringify({ sync_password: '' }) })
+    setWebdav(current => ({ ...current, password: '' }))
+    await refresh()
+    if (alive.current) toast.success('已清除 WebDAV 密码')
+  })
 
   const pause = () => updateSettings('settings', { sync_enabled: false }, '已暂停同步')
 
@@ -158,12 +193,15 @@ export default function SyncCenterPanel() {
   const provider = settings?.sync_provider || 'local-lab'
   const isLab = provider === 'local-lab'
   const isWebDAV = provider === 'webdav'
+  const hasSecureSecret = secretStatus?.stored === true
+  const hasLegacySecret = settings?.sync_password_set === true
+  const hasAnySecret = hasSecureSecret || hasLegacySecret
 
   return <section className="settings-card consumer-settings-section sync-center-card">
     <div className="settings-card-header">
       <div>
         <h3>同步中心</h3>
-        <p>Phase 2C · WebDAV 自动同步与冲突保护</p>
+        <p>Phase 2D · WebDAV 系统保护凭据</p>
       </div>
       <span className={'settings-status-pill ' + (enabled ? 'ok' : 'neutral')}>
         {enabled ? ('已启用 · ' + providerName(provider)) : '未启用'}
@@ -194,10 +232,17 @@ export default function SyncCenterPanel() {
           onChange={event => setWebdav(value => ({ ...value, username: event.target.value }))}/></label>
         <label>密码<input aria-label="WebDAV 密码" type="password" value={webdav.password} disabled={!!busy}
           autoComplete="new-password"
-          placeholder={settings?.sync_password_set ? '已保存；留空保持不变' : '输入 WebDAV 密码'}
+          placeholder={hasAnySecret ? '已保存；留空保持不变' : '输入 WebDAV 密码'}
           onChange={event => setWebdav(value => ({ ...value, password: event.target.value }))}/></label>
-        {settings?.sync_password_set && <small className="sync-secret-state">密码已保存；输入新密码会替换，留空保持不变。</small>}
-        <small>密码不会通过设置读取接口回显；当前版本保存在本机 SQLite 中，请保护系统账户与工作区备份。</small>
+        {hasSecureSecret && <small className="sync-secret-state secure">密码已由操作系统保护存储持有，不写入新的 SQLite / .lnw 工作区备份。</small>}
+        {!hasSecureSecret && hasLegacySecret && <small className="sync-secret-state warning">检测到旧版工作区密码。重新输入一次密码并保存，即可迁移到系统保护存储并清理 SQLite 明文。</small>}
+        {!secretStatus?.available && typeof window.electronAPI?.webdavSecretStatus === 'function' &&
+          <small className="sync-secret-state warning">当前系统安全存储不可用；不会把新密码伪装成安全凭据。Linux basic_text 降级也会被拒绝。</small>}
+        {secretStatus?.managed === false && typeof window.electronAPI?.webdavSecretStatus === 'function' &&
+          <small className="sync-secret-state warning">开发模式后端不由 Electron 管理；新密码需要兼容 DB 副本才能立即生效。</small>}
+        {hasAnySecret && <button className="btn small" disabled={!!busy} onClick={() => void clearWebDAVPassword()}>
+          {busy === 'secret' ? '清除中…' : '清除已保存密码'}
+        </button>}
         {enabled && isWebDAV && <div className="sync-auto-controls">
           <div>
             <strong>自动同步</strong>

@@ -147,3 +147,16 @@ func TestWebDAVAutomaticSyncRunsWhenDueThenWaitsForInterval(t *testing.T) {
 	if err!=nil{t.Fatal(err)}
 	if second.Ran||second.Reason!="not-due"{t.Fatalf("unexpected second auto tick: %+v",second)}
 }
+
+
+func TestRuntimeWebDAVSecretOverridesLegacyDatabasePassword(t *testing.T) {
+	_,endpoint:=newWebDAVTestServer(t)
+	db,root:=testDB(t)
+	addFile(t,db,"n-secure","Secure","runtime-secret",10)
+	if _,err:=db.Exec(`UPDATE settings SET sync_provider='webdav',sync_endpoint=?,sync_username='alice',sync_password='wrong'`,endpoint);err!=nil{t.Fatal(err)}
+	engine:=testEngine(db,root,"device-secure")
+	engine.WebDAVPassword="secret"
+	result,err:=engine.Run(context.Background())
+	if err!=nil{t.Fatal(err)}
+	if result.AppliedUp!=1{t.Fatalf("runtime secret was not used: %+v",result)}
+}
