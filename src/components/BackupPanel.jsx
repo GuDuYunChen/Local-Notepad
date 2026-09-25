@@ -67,7 +67,7 @@ function DatabaseBackups() {
       if (result?.success !== true) throw new Error(result?.message || '数据库操作未完成')
       const info = result.backup
       if (!info || !/^[a-f0-9]{64}$/.test(info.sha256) || !Number.isSafeInteger(info.files) || info.files < 0 ||
-        !Number.isInteger(info.schemaVersion) || info.schemaVersion < 1 || info.schemaVersion > 10 ||
+        !Number.isInteger(info.schemaVersion) || info.schemaVersion < 1 || info.schemaVersion > 11 ||
         (name && info.name !== name) || (method === 'backupExport' && !result.path)) {
         throw new Error('校验回执不完整，未将本次操作标记为成功')
       }

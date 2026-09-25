@@ -7,7 +7,7 @@ function normalizePackage(result) {
       !/^[a-f0-9]{64}$/.test(value.sha256 || '') ||
       !Number.isSafeInteger(value.size) || value.size < 1 ||
       !value.database || !Number.isSafeInteger(value.database.files) || value.database.files < 0 ||
-      !Number.isInteger(value.database.schemaVersion) || value.database.schemaVersion < 1 || value.database.schemaVersion > 10 ||
+      !Number.isInteger(value.database.schemaVersion) || value.database.schemaVersion < 1 || value.database.schemaVersion > 11 ||
       !value.attachments || !Number.isSafeInteger(value.attachments.count) || value.attachments.count < 0 ||
       !Number.isSafeInteger(value.attachments.totalBytes) || value.attachments.totalBytes < 0) {
     throw new Error('工作区便携包回执不完整，未将操作标记为成功')
@@ -22,7 +22,7 @@ function normalizeRestore(result) {
       !Number.isSafeInteger(value.package.size) || value.package.size < 1 ||
       !value.database || !/^[a-f0-9]{64}$/.test(value.database.sha256 || '') ||
       !Number.isSafeInteger(value.database.files) || value.database.files < 0 ||
-      !Number.isInteger(value.database.schemaVersion) || value.database.schemaVersion < 1 || value.database.schemaVersion > 10 ||
+      !Number.isInteger(value.database.schemaVersion) || value.database.schemaVersion < 1 || value.database.schemaVersion > 11 ||
       !value.attachments || !Number.isSafeInteger(value.attachments.count) || value.attachments.count < 0 ||
       !Number.isSafeInteger(value.attachments.totalBytes) || value.attachments.totalBytes < 0) {
     throw new Error('工作区恢复预检回执不完整，未安排恢复')
