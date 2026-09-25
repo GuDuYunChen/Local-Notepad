@@ -13,6 +13,7 @@ import { parseImportPaths, selectAndParseFiles } from './import.js'
 import { ensureBackupDir, getDefaultBackupDir, getDefaultDataDir, listBackups } from './backup.js'
 import { stopChildProcess, waitForHttpService } from './backend-process.js'
 import { createDataSafetyService, runBackupCommand, registerDataSafetyHandlers } from './data-safety.js'
+import { createWorkspacePackageService, registerWorkspacePackageHandlers } from './workspace-package.js'
 import { classifyNavigation } from './navigation.js'
 import { APP_ICON_DATA_URL } from '../src/assets/appIconData.js'
 
@@ -351,21 +352,41 @@ ipcMain.handle('backup:openFolder', async () => {
   }
 })
 
-// This bridge exposes only creation, verification and save-as, never live DB replacement.
+// These bridges expose only native-dialog backup/package creation and read-only
+// inspection. Neither path performs a live database or attachment replacement.
+const trustedMainFrame = event => Boolean(
+  mainWindow && !mainWindow.isDestroyed() && event.sender === mainWindow.webContents &&
+  event.senderFrame === mainWindow.webContents.mainFrame
+)
+const runDataSafety = args => {
+  const filename = process.platform === 'win32' ? 'notepad-server.exe' : 'notepad-server'
+  const binary = app.isPackaged ? path.join(process.resourcesPath, 'bin', filename) :
+    path.join(app.getAppPath(), 'server', 'bin', filename)
+  return runBackupCommand(binary, getDefaultDataDir(), args)
+}
 const dataSafety = createDataSafetyService({
   dataDir: getDefaultDataDir(),
-  run: args => {
-    const filename = process.platform === 'win32' ? 'notepad-server.exe' : 'notepad-server'
-    const binary = app.isPackaged ? path.join(process.resourcesPath, 'bin', filename) :
-      path.join(app.getAppPath(), 'server', 'bin', filename)
-    return runBackupCommand(binary, getDefaultDataDir(), args)
-  },
+  run: runDataSafety,
   chooseDestination: name => dialog.showSaveDialog(mainWindow, {
     title: '另存已校验的数据库备份', defaultPath: path.join(app.getPath('documents'), name),
     filters: [{ name: 'SQLite 数据库备份', extensions: ['db'] }],
   }),
 })
-registerDataSafetyHandlers(ipcMain, dataSafety, event => Boolean(
-  mainWindow && !mainWindow.isDestroyed() && event.sender === mainWindow.webContents &&
-  event.senderFrame === mainWindow.webContents.mainFrame
-))
+registerDataSafetyHandlers(ipcMain, dataSafety, trustedMainFrame)
+
+const workspacePackages = createWorkspacePackageService({
+  dataDir: getDefaultDataDir(),
+  appVersion: app.getVersion(),
+  runBackup: runDataSafety,
+  chooseDestination: suggestedName => dialog.showSaveDialog(mainWindow, {
+    title: '导出 Local-Notepad 工作区便携包',
+    defaultPath: path.join(app.getPath('documents'), suggestedName),
+    filters: [{ name: 'Local-Notepad 工作区便携包', extensions: ['lnw'] }],
+  }),
+  chooseSource: () => dialog.showOpenDialog(mainWindow, {
+    title: '校验 Local-Notepad 工作区便携包',
+    properties: ['openFile'],
+    filters: [{ name: 'Local-Notepad 工作区便携包', extensions: ['lnw'] }],
+  }),
+})
+registerWorkspacePackageHandlers(ipcMain, workspacePackages, trustedMainFrame)

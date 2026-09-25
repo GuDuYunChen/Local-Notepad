@@ -23,6 +23,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   backupExport: name => ipcRenderer.invoke('backup:export', name),
   backupList: () => ipcRenderer.invoke('backup:list'),
   backupOpenFolder: () => ipcRenderer.invoke('backup:openFolder'),
+  workspaceExport: () => ipcRenderer.invoke('workspace:export'),
+  workspaceInspect: () => ipcRenderer.invoke('workspace:inspect'),
   appDiagnostics: () => ipcRenderer.invoke('app:diagnostics'),
   openAppFolder: (kind) => ipcRenderer.invoke('app:openFolder', { kind }),
   onReload: (callback) => ipcRenderer.on('app:reload', callback),
