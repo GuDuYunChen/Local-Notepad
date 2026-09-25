@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -157,6 +158,35 @@ func TestRemoteLockPreventsConcurrentRuns(t *testing.T){
 	lock,err:=remote.AcquireLock();if err!=nil{t.Fatal(err)}
 	defer lock.Release()
 	if _,err=remote.AcquireLock();err==nil{t.Fatal("expected lock rejection")}
+}
+
+func TestStaleRemoteLockIsPreservedAndReclaimed(t *testing.T){
+	_,root:=testDB(t)
+	remote,_:=NewDirRemote(filepath.Join(root,"remote"))
+	if err:=remote.ensure();err!=nil{t.Fatal(err)}
+	lockPath:=filepath.Join(remote.Root,"locks","sync.lock")
+	if err:=os.WriteFile(lockPath,[]byte(`{"pid":999,"at":"old"}`),0600);err!=nil{t.Fatal(err)}
+	old:=time.Now().Add(-staleLockAge-time.Minute)
+	if err:=os.Chtimes(lockPath,old,old);err!=nil{t.Fatal(err)}
+	lock,err:=remote.AcquireLock();if err!=nil{t.Fatal(err)}
+	defer lock.Release()
+	entries,err:=os.ReadDir(filepath.Join(remote.Root,"locks"));if err!=nil{t.Fatal(err)}
+	foundStale:=false
+	for _,entry:=range entries{if strings.HasPrefix(entry.Name(),"sync.lock.stale-"){foundStale=true}}
+	if !foundStale{t.Fatal("stale lock was not preserved")}
+}
+
+func TestSameGenerationManifestsAreRejected(t *testing.T){
+	root:=t.TempDir();remote,_:=NewDirRemote(root)
+	if err:=remote.ensure();err!=nil{t.Fatal(err)}
+	for _,device:=range []string{"a","b"}{
+		m:=Manifest{Format:ManifestFormat,Version:1,StoreID:"store",Generation:1,UpdatedAt:"2026-09-25T12:00:00Z",DeviceID:device,Items:map[string]string{}}
+		data,err:=json.Marshal(m);if err!=nil{t.Fatal(err)}
+		hash:=hashBytes(data)
+		name:=fmt.Sprintf("%020d-%s.json",1,hash)
+		if err=os.WriteFile(filepath.Join(root,"manifests",name),data,0600);err!=nil{t.Fatal(err)}
+	}
+	if _,err:=remote.LoadManifest();err==nil||!strings.Contains(err.Error(),"同一代"){t.Fatalf("expected ambiguity rejection: %v",err)}
 }
 
 func TestManifestPublicationIsImmutableAndSelfChecking(t *testing.T){

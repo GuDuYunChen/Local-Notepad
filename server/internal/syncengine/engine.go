@@ -20,6 +20,7 @@ import (
 )
 
 const (
+	staleLockAge = 15 * time.Minute
 	RecordFormat   = "local-notepad-sync-record"
 	RecordVersion  = 1
 	ManifestFormat = "local-notepad-sync-manifest"
@@ -659,11 +660,23 @@ func (r *DirRemote) ensure() error {
 func (r *DirRemote) AcquireLock() (*RemoteLock,error) {
 	if err:=r.ensure();err!=nil{return nil,err}
 	filename:=filepath.Join(r.Root,"locks","sync.lock")
-	file,err:=os.OpenFile(filename,os.O_CREATE|os.O_EXCL|os.O_WRONLY,0600)
-	if err!=nil {
-		if os.IsExist(err){return nil,fmt.Errorf("同步远端正被其他设备使用，请稍后重试")}
-		return nil,err
+	open := func() (*os.File,error) {
+		return os.OpenFile(filename,os.O_CREATE|os.O_EXCL|os.O_WRONLY,0600)
 	}
+	file,err:=open()
+	if err!=nil && os.IsExist(err) {
+		info,statErr:=os.Lstat(filename)
+		if statErr!=nil{return nil,statErr}
+		if !info.Mode().IsRegular()||info.Mode()&os.ModeSymlink!=0{return nil,fmt.Errorf("同步锁文件不安全，拒绝自动处理")}
+		age:=time.Since(info.ModTime())
+		if age<0 || age<=staleLockAge{return nil,fmt.Errorf("同步远端正被其他设备使用，请稍后重试")}
+		suffix,randErr:=randomID(6);if randErr!=nil{return nil,randErr}
+		stale:=filename+".stale-"+suffix
+		if linkErr:=os.Link(filename,stale);linkErr!=nil{return nil,fmt.Errorf("无法保留过期同步锁: %w",linkErr)}
+		if removeErr:=os.Remove(filename);removeErr!=nil{return nil,fmt.Errorf("无法回收过期同步锁: %w",removeErr)}
+		file,err=open()
+	}
+	if err!=nil{return nil,err}
 	payload,_:=json.Marshal(map[string]interface{}{"pid":os.Getpid(),"at":time.Now().UTC().Format(time.RFC3339Nano)})
 	if _,err=file.Write(payload);err!=nil{file.Close();os.Remove(filename);return nil,err}
 	if err=file.Sync();err!=nil{file.Close();os.Remove(filename);return nil,err}
@@ -732,7 +745,13 @@ func (r *DirRemote) LoadManifest() (Manifest,error) {
 		list=append(list,candidate{entry.Name(),gen,match[2]})
 	}
 	if len(list)==0{return empty,nil}
-	sort.Slice(list,func(i,j int)bool{return list[i].generation>list[j].generation})
+	sort.Slice(list,func(i,j int)bool{
+		if list[i].generation==list[j].generation{return list[i].name<list[j].name}
+		return list[i].generation>list[j].generation
+	})
+	if len(list)>1 && list[0].generation==list[1].generation {
+		return empty,fmt.Errorf("远端存在同一代的多个 manifest，拒绝猜测当前版本")
+	}
 	item:=list[0]
 	filename:=filepath.Join(r.Root,"manifests",item.name)
 	info,err:=os.Lstat(filename);if err!=nil{return empty,err}

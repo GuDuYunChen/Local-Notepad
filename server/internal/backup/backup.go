@@ -168,6 +168,7 @@ func Inspect(ctx context.Context, filename string) (Info, error) {
 			`SELECT device_id,remote_store_id,remote_revision,last_sync_at,last_status,last_error FROM sync_state LIMIT 0`,
 			`SELECT item_id,object_hash,synced_at FROM sync_base LIMIT 0`,
 			`SELECT id,item_id,base_hash,local_hash,remote_hash,status,resolution FROM sync_conflicts LIMIT 0`,
+			`SELECT sync_provider FROM settings LIMIT 0`,
 		} {
 			rows, schemaErr := db.QueryContext(ctx, query)
 			if schemaErr != nil { return info, fmt.Errorf("同步状态表结构不兼容: %w", schemaErr) }
