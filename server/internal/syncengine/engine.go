@@ -1149,8 +1149,8 @@ func (r *DirRemote) LoadManifest() (Manifest,error) {
 	}
 	item:=list[0]
 	filename:=filepath.Join(r.Root,"manifests",item.name)
-	info,err:=os.Lstat(filename);if err!=nil{return empty,err}
-	if !info.Mode().IsRegular()||info.Mode()&os.ModeSymlink!=0{return empty,fmt.Errorf("远端清单不是普通文件")}
+	fileInfo,err:=os.Lstat(filename);if err!=nil{return empty,err}
+	if !fileInfo.Mode().IsRegular()||fileInfo.Mode()&os.ModeSymlink!=0{return empty,fmt.Errorf("远端清单不是普通文件")}
 	data,err:=os.ReadFile(filename);if err!=nil{return empty,err}
 	if hashBytes(data)!=item.hash{return empty,fmt.Errorf("远端清单 SHA-256 校验失败")}
 	var manifest Manifest
