@@ -344,3 +344,36 @@ func TestRemoteTagRelationMustReferenceExistingObjects(t *testing.T){
 	if err!=nil{t.Fatal(err)}
 	if _,err=engine.Plan(ctx);err==nil||!strings.Contains(err.Error(),"标签关联"){t.Fatalf("expected relation validation error: %v",err)}
 }
+
+func TestMergedDuplicateNamesAreRejectedBeforeManifestPublish(t *testing.T){
+	ctx:=context.Background()
+	dbA,rootA:=testDB(t);dbB,rootB:=testDB(t)
+	remoteRoot:=filepath.Join(t.TempDir(),"remote")
+	addFile(t,dbA,"a-id","Same","a",10)
+	engineA:=testEngine(dbA,rootA,"device-a");engineA.RemoteRoot=remoteRoot
+	engineB:=testEngine(dbB,rootB,"device-b");engineB.RemoteRoot=remoteRoot
+	if _,err:=engineA.Run(ctx);err!=nil{t.Fatal(err)}
+	// Device B has never synced and independently created the same active title.
+	addFile(t,dbB,"b-id","Same","b",20)
+	remote,_:=engineB.remote(ctx);before,err:=remote.LoadManifest();if err!=nil{t.Fatal(err)}
+	if _,err=engineB.Run(ctx);err==nil||!strings.Contains(err.Error(),"重复标题"){t.Fatalf("expected merged duplicate rejection: %v",err)}
+	after,err:=remote.LoadManifest();if err!=nil{t.Fatal(err)}
+	if after.Revision!=before.Revision{t.Fatal("invalid merged structure was published")}
+	var count int
+	if err=dbB.QueryRow(`SELECT COUNT(*) FROM files`).Scan(&count);err!=nil||count!=1{t.Fatalf("local database changed after rejected merge: %d %v",count,err)}
+}
+
+func TestMergedDuplicateTagNamesAreRejectedBeforeManifestPublish(t *testing.T){
+	ctx:=context.Background()
+	dbA,rootA:=testDB(t);dbB,rootB:=testDB(t)
+	remoteRoot:=filepath.Join(t.TempDir(),"remote")
+	addTag(t,dbA,"tag-a","Same","#111111")
+	engineA:=testEngine(dbA,rootA,"device-a");engineA.RemoteRoot=remoteRoot
+	engineB:=testEngine(dbB,rootB,"device-b");engineB.RemoteRoot=remoteRoot
+	if _,err:=engineA.Run(ctx);err!=nil{t.Fatal(err)}
+	addTag(t,dbB,"tag-b","same","#222222")
+	remote,_:=engineB.remote(ctx);before,err:=remote.LoadManifest();if err!=nil{t.Fatal(err)}
+	if _,err=engineB.Run(ctx);err==nil||!strings.Contains(err.Error(),"重复标签名"){t.Fatalf("expected merged tag rejection: %v",err)}
+	after,err:=remote.LoadManifest();if err!=nil{t.Fatal(err)}
+	if after.Revision!=before.Revision{t.Fatal("invalid tag merge was published")}
+}

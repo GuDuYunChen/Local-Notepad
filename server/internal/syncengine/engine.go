@@ -816,6 +816,14 @@ func (e *Engine) Run(ctx context.Context) (RunResult,error) {
 
 	manifestChanged:=uploads>0 || manifest.Generation==0
 	if manifestChanged {
+		candidate:=manifest
+		candidate.Items=nextItems
+		if err=validateRemoteStructure(candidate,remote,nil);err!=nil{
+			_ = tx.Rollback()
+			_ = e.updateState(ctx,manifest,"error",err.Error())
+			return RunResult{},fmt.Errorf("同步后的远端结构无效，未发布: %w",err)
+		}
+
 		manifest.Items=nextItems
 		manifest.Generation++
 		manifest.UpdatedAt=e.now().UTC().Format(time.RFC3339Nano)
