@@ -203,3 +203,31 @@ func TestManifestPublicationIsImmutableAndSelfChecking(t *testing.T){
 	sum:=sha256.Sum256(data);if hex.EncodeToString(sum[:])!=saved.Revision{t.Fatal("filename revision mismatch")}
 	var decoded Manifest;if json.Unmarshal(data,&decoded)!=nil||decoded.Generation!=1{t.Fatal("invalid manifest JSON")}
 }
+
+func TestLocalApplyFailureDoesNotPublishUploadManifest(t *testing.T){
+	ctx:=context.Background()
+	dbA,rootA:=testDB(t);dbB,rootB:=testDB(t)
+	remoteRoot:=filepath.Join(t.TempDir(),"remote")
+	addFile(t,dbA,"n1","One","base-a",10)
+	addFile(t,dbA,"n2","Two","base-b",10)
+	engineA:=testEngine(dbA,rootA,"device-a");engineA.RemoteRoot=remoteRoot
+	engineB:=testEngine(dbB,rootB,"device-b");engineB.RemoteRoot=remoteRoot
+	if _,err:=engineA.Run(ctx);err!=nil{t.Fatal(err)}
+	if _,err:=engineB.Run(ctx);err!=nil{t.Fatal(err)}
+
+	if _,err:=dbA.Exec(`UPDATE files SET content='local-a',updated_at=20 WHERE id='n1'`);err!=nil{t.Fatal(err)}
+	if _,err:=dbB.Exec(`UPDATE files SET content='remote-b',updated_at=30 WHERE id='n2'`);err!=nil{t.Fatal(err)}
+	if _,err:=engineB.Run(ctx);err!=nil{t.Fatal(err)}
+
+	remote,_:=engineA.remote(ctx)
+	before,err:=remote.LoadManifest();if err!=nil{t.Fatal(err)}
+	beforeN1:=before.Items["n1"]
+
+	if _,err:=dbA.Exec(`CREATE TRIGGER reject_n2 BEFORE UPDATE ON files WHEN new.id='n2' BEGIN SELECT RAISE(ABORT,'synthetic apply failure'); END`);err!=nil{t.Fatal(err)}
+	if _,err:=engineA.Run(ctx);err==nil||!strings.Contains(err.Error(),"synthetic apply failure"){t.Fatalf("expected apply failure, got %v",err)}
+
+	after,err:=remote.LoadManifest();if err!=nil{t.Fatal(err)}
+	if after.Items["n1"]!=beforeN1{t.Fatal("local upload was published despite failed local download transaction")}
+	if got:=fileContent(t,dbA,"n1");got!="local-a"{t.Fatalf("local change was lost: %q",got)}
+	if got:=fileContent(t,dbA,"n2");got!="base-b"{t.Fatalf("failed remote download partially applied: %q",got)}
+}

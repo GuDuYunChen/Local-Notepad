@@ -409,22 +409,34 @@ func nullableRecord(record Record, ok bool) string {
 	return string(data)
 }
 
-func (e *Engine) storeConflict(ctx context.Context, item PlanItem, local Record, localOK bool, remote Record, remoteOK bool) error {
+type sqlExecer interface {
+	ExecContext(context.Context, string, ...interface{}) (sql.Result, error)
+}
+
+func (e *Engine) storeConflictWith(exec sqlExecer, ctx context.Context, item PlanItem, local Record, localOK bool, remote Record, remoteOK bool) error {
 	id := conflictID(item)
 	now := e.now().Unix()
-	_, err := e.DB.ExecContext(ctx, `UPDATE sync_conflicts SET status='superseded', resolved_at=? WHERE item_id=? AND status='open' AND id<>?`, now,item.ID,id)
+	_, err := exec.ExecContext(ctx, `UPDATE sync_conflicts SET status='superseded', resolved_at=? WHERE item_id=? AND status='open' AND id<>?`, now,item.ID,id)
 	if err != nil { return err }
-	_, err = e.DB.ExecContext(ctx, `INSERT OR IGNORE INTO sync_conflicts
+	_, err = exec.ExecContext(ctx, `INSERT OR IGNORE INTO sync_conflicts
 		(id,item_id,base_hash,local_hash,remote_hash,local_record,remote_record,created_at,status,resolution,resolved_at)
 		VALUES(?,?,?,?,?,?,?,?, 'open','',0)`,
 		id,item.ID,item.BaseHash,item.LocalHash,item.RemoteHash,nullableRecord(local,localOK),nullableRecord(remote,remoteOK),now)
 	return err
 }
 
-func (e *Engine) setBase(ctx context.Context, id, hash string) error {
-	_, err := e.DB.ExecContext(ctx, `INSERT INTO sync_base(item_id,object_hash,synced_at) VALUES(?,?,?)
+func (e *Engine) storeConflict(ctx context.Context, item PlanItem, local Record, localOK bool, remote Record, remoteOK bool) error {
+	return e.storeConflictWith(e.DB, ctx, item, local, localOK, remote, remoteOK)
+}
+
+func (e *Engine) setBaseWith(exec sqlExecer, ctx context.Context, id, hash string) error {
+	_, err := exec.ExecContext(ctx, `INSERT INTO sync_base(item_id,object_hash,synced_at) VALUES(?,?,?)
 		ON CONFLICT(item_id) DO UPDATE SET object_hash=excluded.object_hash,synced_at=excluded.synced_at`, id,hash,e.now().Unix())
 	return err
+}
+
+func (e *Engine) setBase(ctx context.Context, id, hash string) error {
+	return e.setBaseWith(e.DB, ctx, id, hash)
 }
 
 func parseWikiLinks(content string) []string {
@@ -472,12 +484,9 @@ func parseWikiLinks(content string) []string {
 	return ids
 }
 
-func (e *Engine) applyRemote(ctx context.Context, record Record) error {
+func (e *Engine) applyRemoteTx(ctx context.Context, tx *sql.Tx, record Record) error {
 	record, err := normalizeRecord(record)
 	if err != nil { return err }
-	tx, err := e.DB.BeginTx(ctx,nil)
-	if err != nil { return err }
-	defer tx.Rollback()
 	if record.State=="purged" {
 		for _,query:=range []string{
 			`DELETE FROM file_tags WHERE file_id=?`,
@@ -489,7 +498,7 @@ func (e *Engine) applyRemote(ctx context.Context, record Record) error {
 			if strings.Contains(query," OR ") { args=[]interface{}{record.ID,record.ID} }
 			if _,err=tx.ExecContext(ctx,query,args...);err!=nil{return err}
 		}
-		return tx.Commit()
+		return nil
 	}
 	f:=record.File
 	var oldTitle,oldContent string
@@ -508,6 +517,15 @@ func (e *Engine) applyRemote(ctx context.Context, record Record) error {
 	for _,target:=range parseWikiLinks(f.Content) {
 		if _,err=tx.ExecContext(ctx,`INSERT OR IGNORE INTO links(source_id,target_id,created_at) VALUES(?,?,?)`,f.ID,target,now);err!=nil{return err}
 	}
+	return nil
+}
+}
+
+func (e *Engine) applyRemote(ctx context.Context, record Record) error {
+	tx, err := e.DB.BeginTx(ctx,nil)
+	if err != nil { return err }
+	defer tx.Rollback()
+	if err = e.applyRemoteTx(ctx, tx, record); err != nil { return err }
 	return tx.Commit()
 }
 
@@ -529,6 +547,7 @@ func (e *Engine) Run(ctx context.Context) (RunResult,error) {
 	lock, err := remote.AcquireLock()
 	if err!=nil{return RunResult{},err}
 	defer lock.Release()
+
 	manifest, err := remote.LoadManifest()
 	if err!=nil{return RunResult{},err}
 	plan,locals,remotes,_,err:=e.buildPlan(ctx,remote,manifest)
@@ -536,6 +555,8 @@ func (e *Engine) Run(ctx context.Context) (RunResult,error) {
 	if err=e.ensureStoreID(&manifest);err!=nil{return RunResult{},err}
 	if plan.StoreID=="" { plan.StoreID=manifest.StoreID; plan.NeedsInit=true }
 
+	// Upload immutable objects first. They are unreachable until a manifest is
+	// published, so a later local failure can leave only harmless orphan data.
 	nextItems:=copyItems(manifest.Items)
 	uploads:=0
 	for _,item:=range plan.Items {
@@ -548,6 +569,34 @@ func (e *Engine) Run(ctx context.Context) (RunResult,error) {
 		nextItems[item.ID]=hash
 		uploads++
 	}
+
+	tx, err := e.DB.BeginTx(ctx,nil)
+	if err!=nil{return RunResult{},err}
+	defer tx.Rollback()
+
+	downloads:=0
+	for _,item:=range plan.Items {
+		switch item.Action {
+		case "download":
+			if err=e.applyRemoteTx(ctx,tx,remotes[item.ID]);err!=nil{
+				_ = e.updateState(ctx,manifest,"error",err.Error())
+				return RunResult{},err
+			}
+			if err=e.setBaseWith(tx,ctx,item.ID,item.RemoteHash);err!=nil{return RunResult{},err}
+			downloads++
+		case "upload":
+			if err=e.setBaseWith(tx,ctx,item.ID,item.LocalHash);err!=nil{return RunResult{},err}
+		case "noop":
+			hash:=item.LocalHash
+			if hash==""{hash=item.RemoteHash}
+			if hash!=""{if err=e.setBaseWith(tx,ctx,item.ID,hash);err!=nil{return RunResult{},err}}
+		case "conflict":
+			local,localOK:=locals[item.ID]
+			remoteRecord,remoteOK:=remotes[item.ID]
+			if err=e.storeConflictWith(tx,ctx,item,local,localOK,remoteRecord,remoteOK);err!=nil{return RunResult{},err}
+		}
+	}
+
 	manifestChanged:=uploads>0 || manifest.Generation==0
 	if manifestChanged {
 		manifest.Items=nextItems
@@ -558,25 +607,15 @@ func (e *Engine) Run(ctx context.Context) (RunResult,error) {
 		manifest,err=remote.SaveManifest(manifest)
 		if err!=nil{return RunResult{},err}
 	}
-	downloads:=0
-	for _,item:=range plan.Items {
-		switch item.Action {
-		case "download":
-			if err=e.applyRemote(ctx,remotes[item.ID]);err!=nil{_ = e.updateState(ctx,manifest,"error",err.Error());return RunResult{},err}
-			if err=e.setBase(ctx,item.ID,item.RemoteHash);err!=nil{return RunResult{},err}
-			downloads++
-		case "upload":
-			if err=e.setBase(ctx,item.ID,item.LocalHash);err!=nil{return RunResult{},err}
-		case "noop":
-			hash:=item.LocalHash
-			if hash==""{hash=item.RemoteHash}
-			if hash!=""{if err=e.setBase(ctx,item.ID,hash);err!=nil{return RunResult{},err}}
-		case "conflict":
-			local,localOK:=locals[item.ID]
-			remoteRecord,remoteOK:=remotes[item.ID]
-			if err=e.storeConflict(ctx,item,local,localOK,remoteRecord,remoteOK);err!=nil{return RunResult{},err}
-		}
+
+	// Commit only after the remote manifest is durably published. If commit
+	// unexpectedly fails, the next sync can recover from immutable remote state;
+	// the reverse ordering could expose remote changes after a local apply error.
+	if err=tx.Commit();err!=nil{
+		_ = e.updateState(ctx,manifest,"error",err.Error())
+		return RunResult{},err
 	}
+
 	status:="ok"
 	if plan.Conflicts>0{status="conflicts"}
 	if err=e.updateState(ctx,manifest,status,"");err!=nil{return RunResult{},err}
