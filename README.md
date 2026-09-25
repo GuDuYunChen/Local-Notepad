@@ -1,3 +1,8 @@
+
+## Phase 2B · WebDAV 同步（4.186.0）
+
+同步中心现在支持本地实验室与 WebDAV 两种 transport，共用同一套 immutable object/blob、manifest、三方合并与冲突语义。WebDAV 支持 Basic Auth，公网端点强制 HTTPS；设置读取接口不会回显密码。密码当前保存在本机 SQLite，因此工作区备份也应按敏感数据保护。
+
 # Notepad 桌面应用
 
 ## 项目介绍
