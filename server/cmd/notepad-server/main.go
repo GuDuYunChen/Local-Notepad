@@ -542,6 +542,13 @@ func migrate(ctx context.Context, db *sql.DB) error {
 				"ALTER TABLE settings ADD COLUMN sync_password TEXT DEFAULT ''",
 			},
 		},
+		{
+			version: 13,
+			stmts: []string{
+				"ALTER TABLE settings ADD COLUMN sync_auto_enabled INTEGER DEFAULT 0",
+				"ALTER TABLE settings ADD COLUMN sync_interval_minutes INTEGER DEFAULT 5",
+			},
+		},
 	}
 
 	var currentVersion int
@@ -612,6 +619,8 @@ func ensureCompatibleSchema(ctx context.Context, db *sql.DB) error {
 		{table: "settings", column: "sync_provider", definition: "TEXT DEFAULT ''"},
 		{table: "settings", column: "sync_username", definition: "TEXT DEFAULT ''"},
 		{table: "settings", column: "sync_password", definition: "TEXT DEFAULT ''"},
+		{table: "settings", column: "sync_auto_enabled", definition: "INTEGER DEFAULT 0"},
+		{table: "settings", column: "sync_interval_minutes", definition: "INTEGER DEFAULT 5"},
 	}
 
 	for _, item := range requiredColumns {
