@@ -1,6 +1,5 @@
 import fs from 'node:fs/promises'
 import { createReadStream } from 'node:fs'
-import { finished } from 'node:stream/promises'
 import { once } from 'node:events'
 import { createHash } from 'node:crypto'
 import path from 'node:path'
@@ -388,7 +387,7 @@ export function createWorkspacePackageService({
           await copyIntoStream(snapshot, output)
           for (const attachment of attachments) await copyIntoStream(attachment.source, output)
           output.end()
-          await finished(output)
+          await once(output, 'finish')
           await handle.sync()
         } catch (error) {
           output.destroy()
