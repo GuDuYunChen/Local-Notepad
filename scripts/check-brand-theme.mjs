@@ -74,6 +74,11 @@ test('styles preserve transparent code input and avoid global inversion', () => 
   assert.ok(css.includes('caret-color: var(--ink) !important'))
   assert.ok(!/filter:\s*(invert|brightness)/.test(css))
 })
+test('dark controls keep an explicit keyboard focus ring', () => {
+  assert.ok(css.includes(':focus-visible'))
+  assert.ok(css.includes('outline: 2px solid var(--clay) !important'))
+  assert.ok(css.includes('outline-offset: 2px'))
+})
 test('master is valid indexed PNG with transparent margins and opaque artwork', () => {
   const image = decodeBrandPng(source)
   assert.equal(image.width, 256); assert.equal(image.height, 256)
