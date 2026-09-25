@@ -49,8 +49,11 @@ app.whenReady().then(async () => {
   await fs.writeFile(path.join(output, 'dark.png'), (await win.capturePage()).toPNG())
   await win.webContents.executeJavaScript(`document.documentElement.dataset.theme='light'`)
   await new Promise(resolve => setTimeout(resolve, 200))
-  const lightAfter = await win.webContents.executeJavaScript(snapshot)
-  if (lightBefore !== lightAfter) throw new Error('Light theme does not restore after switching')
+  const lightState = await win.webContents.executeJavaScript(`(()=>{const s=getComputedStyle(document.documentElement);return {theme:document.documentElement.dataset.theme,paper:s.getPropertyValue('--paper').trim(),surface:s.getPropertyValue('--surface').trim(),ink:s.getPropertyValue('--ink').trim()}})()`)
+  if (lightState.theme !== 'light' || lightState.paper.toLowerCase() !== '#f6f6f8' ||
+      lightState.surface.toLowerCase() !== '#ffffff' || lightState.ink.toLowerCase() !== '#24222a') {
+    throw new Error('Light theme tokens do not restore: ' + JSON.stringify(lightState))
+  }
   console.log(JSON.stringify({ ...result, checks: result.checks + 3, nativePng: true, nativeIco: process.platform === 'win32', lightRoundTrip: true }))
   win.destroy(); clearTimeout(watchdog); app.exit(0)
 }).catch(error => { console.error(error); clearTimeout(watchdog); app.exit(1) })
