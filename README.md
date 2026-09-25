@@ -169,9 +169,9 @@ NOTEPAD_DATA=/path/to/data go run ./cmd/notepad-server/main.go
 - 若检测到旧版本遗留的根目录 `uploads/` 或 `server/uploads/`，后端会在启动时复制迁移到用户数据目录；已有目标文件不会被覆盖。
 - “备份与恢复”中的 **工作区便携包（.lnw）** 会把经过校验的 SQLite 快照和当前附件一起导出，并对清单与每个文件做 SHA-256 校验。
 
-## Local-first 同步实验室
+## Local-first 同步
 
-4.185.0 在设置中提供 Phase 2A 本地同步实验室，用应用数据目录下的 `sync-lab-remote` 模拟第二端存储，验证正式网络同步前的冲突协议。
+4.186.0 的同步中心支持两种 transport：`local-lab` 用于离线协议验证，`webdav` 用于真实多设备同步。两者共用同一套三方比较、不可变对象/附件 blob、manifest 和冲突语义。
 
 当前同步对象包括：
 
@@ -181,7 +181,7 @@ NOTEPAD_DATA=/path/to/data go run ./cmd/notepad-server/main.go
 
 同步采用上次共同基线、本机当前状态、远端当前状态三方比较，不使用“最后修改时间覆盖”。同名附件一旦建立共同基线，后续修改或删除必须进入冲突中心，由用户明确选择本机或远端；被替换的本机附件会保留到 `sync-preserved`。
 
-当前 provider 仍是本机 `local-lab`，不是正式 WebDAV/S3/Git 多设备同步。
+WebDAV 支持 Basic Auth；公网端点必须使用 HTTPS，localhost/loopback 才允许 HTTP。密码不会通过设置读取接口回显。切换 provider 或 WebDAV 地址时应先在同步中心执行“重新绑定远端”，该操作只重置同步元数据，不删除本机或远端内容。
 
 ## 数据备份与恢复
 
