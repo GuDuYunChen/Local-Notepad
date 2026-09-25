@@ -100,6 +100,18 @@ export default function SyncCenterPanel() {
 
   const pause = () => updateSettings('settings', { sync_enabled: false }, '已暂停同步')
 
+  const rebind = () => {
+    if (!window.confirm('重新绑定只会清除本机同步基线、旧远端身份和未决冲突状态，不会删除笔记、附件或远端数据。继续吗？')) return
+    return exclusive('rebind', async () => {
+      const next = await api('/api/sync/rebind', { method: 'POST', body: '{}' })
+      if (!alive.current) return
+      setPlan(null)
+      setStatus(next)
+      setConflicts([])
+      toast.success('已重新绑定同步目标；请先预演同步')
+    })
+  }
+
   const preview = () => exclusive('plan', async () => {
     const next = await api('/api/sync/plan', { method: 'POST', body: '{}' })
     if (!alive.current) return
@@ -191,6 +203,10 @@ export default function SyncCenterPanel() {
         <div><strong>{status?.open_conflicts ?? conflicts.length}</strong><span>待处理冲突</span></div>
         <div><strong>{status?.last_status || 'never'}</strong><span>最近状态</span></div>
       </div>
+      {status?.base_items > 0 && <div className="sync-rebind-notice">
+        <div><strong>切换 provider 或 WebDAV 地址？</strong><span>先重新绑定，避免把旧远端身份误带到新目标。此操作只重置同步元数据。</span></div>
+        <button className="btn" disabled={!!busy} onClick={() => void rebind()}>{busy === 'rebind' ? '重置中…' : '重新绑定远端'}</button>
+      </div>}
       <div className="settings-action-row consumer-settings-actions">
         <button className="btn" disabled={!!busy} onClick={() => void preview()}>{busy === 'plan' ? '预演中…' : '预演同步'}</button>
         <button className="btn primary" disabled={!!busy} onClick={() => void synchronize()}>{busy === 'run' ? '同步中…' : '执行同步'}</button>
