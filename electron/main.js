@@ -391,6 +391,7 @@ ipcMain.handle('app:openFolder', async (event, { kind } = {}) => {
       data: dataDir,
       backups: path.join(dataDir, 'backups'),
       uploads: path.join(dataDir, 'uploads'),
+      syncLab: path.join(dataDir, 'sync-lab-remote'),
     }
     const target = allowed[kind]
     if (!target) {
