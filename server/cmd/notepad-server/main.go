@@ -535,6 +535,13 @@ func migrate(ctx context.Context, db *sql.DB) error {
 				`CREATE INDEX IF NOT EXISTS idx_sync_conflicts_item ON sync_conflicts(item_id, status)`,
 			},
 		},
+		{
+			version: 12,
+			stmts: []string{
+				"ALTER TABLE settings ADD COLUMN sync_username TEXT DEFAULT ''",
+				"ALTER TABLE settings ADD COLUMN sync_password TEXT DEFAULT ''",
+			},
+		},
 	}
 
 	var currentVersion int
@@ -603,6 +610,8 @@ func ensureCompatibleSchema(ctx context.Context, db *sql.DB) error {
 		{table: "files", column: "deleted_at", definition: "INTEGER DEFAULT 0"},
 		{table: "files", column: "is_pinned", definition: "INTEGER DEFAULT 0"},
 		{table: "settings", column: "sync_provider", definition: "TEXT DEFAULT ''"},
+		{table: "settings", column: "sync_username", definition: "TEXT DEFAULT ''"},
+		{table: "settings", column: "sync_password", definition: "TEXT DEFAULT ''"},
 	}
 
 	for _, item := range requiredColumns {
