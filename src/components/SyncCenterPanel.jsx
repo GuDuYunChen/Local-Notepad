@@ -235,7 +235,7 @@ export default function SyncCenterPanel() {
           placeholder={hasAnySecret ? '已保存；留空保持不变' : '输入 WebDAV 密码'}
           onChange={event => setWebdav(value => ({ ...value, password: event.target.value }))}/></label>
         {hasSecureSecret && <small className="sync-secret-state secure">密码已由操作系统保护存储持有，不写入新的 SQLite / .lnw 工作区备份。</small>}
-        {!hasSecureSecret && hasLegacySecret && <small className="sync-secret-state warning">检测到旧版工作区密码。重新输入一次密码并保存，即可迁移到系统保护存储并清理 SQLite 明文。</small>}
+        {!hasSecureSecret && hasLegacySecret && <small className="sync-secret-state warning">检测到旧版工作区密码；留空保持不变。重新输入一次密码并保存，即可迁移到系统保护存储并清理 SQLite 明文。</small>}
         {!secretStatus?.available && typeof window.electronAPI?.webdavSecretStatus === 'function' &&
           <small className="sync-secret-state warning">当前系统安全存储不可用；不会把新密码伪装成安全凭据。Linux basic_text 降级也会被拒绝。</small>}
         {secretStatus?.managed === false && typeof window.electronAPI?.webdavSecretStatus === 'function' &&

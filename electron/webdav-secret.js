@@ -17,9 +17,10 @@ function safeStorageState(safeStorage) {
       typeof safeStorage.encryptString !== 'function' || typeof safeStorage.decryptString !== 'function') {
     return { available: false, backend: '' }
   }
-  const backend = typeof safeStorage.getSelectedStorageBackend === 'function'
-    ? String(safeStorage.getSelectedStorageBackend() || '')
-    : ''
+  let backend = ''
+  if (typeof safeStorage.getSelectedStorageBackend === 'function') {
+    try { backend = String(safeStorage.getSelectedStorageBackend() || '') } catch { backend = '' }
+  }
   const available = Boolean(safeStorage.isEncryptionAvailable()) && backend !== 'basic_text'
   return { available, backend }
 }
