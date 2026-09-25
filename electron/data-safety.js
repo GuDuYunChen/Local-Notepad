@@ -39,7 +39,7 @@ export async function runBackupCommand(binary, dataDir, args) {
   const info = result.backup
   if (!info || !backupName.test(info.name) || !/^[a-f0-9]{64}$/.test(info.sha256) ||
     !Number.isSafeInteger(info.size) || info.size < 100 || !Number.isSafeInteger(info.files) || info.files < 0 ||
-    !Number.isInteger(info.schemaVersion) || info.schemaVersion < 1 || info.schemaVersion > 12) {
+    !Number.isInteger(info.schemaVersion) || info.schemaVersion < 1 || info.schemaVersion > 13) {
     throw new Error('数据库校验回执不完整')
   }
   return info
