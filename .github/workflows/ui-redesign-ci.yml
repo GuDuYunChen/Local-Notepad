@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/ui-redesign-v1
+      - feature/knowledge-os-phase1
   pull_request:
     branches:
       - master
