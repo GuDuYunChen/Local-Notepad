@@ -12,12 +12,23 @@ async function optionalLstat(fsApi, target) {
   }
 }
 
-function requireSafeStorage(safeStorage) {
+function safeStorageState(safeStorage) {
   if (!safeStorage || typeof safeStorage.isEncryptionAvailable !== 'function' ||
       typeof safeStorage.encryptString !== 'function' || typeof safeStorage.decryptString !== 'function') {
-    throw new Error('系统安全存储不可用')
+    return { available: false, backend: '' }
   }
-  if (!safeStorage.isEncryptionAvailable()) throw new Error('系统安全存储当前不可用')
+  const backend = typeof safeStorage.getSelectedStorageBackend === 'function'
+    ? String(safeStorage.getSelectedStorageBackend() || '')
+    : ''
+  const available = Boolean(safeStorage.isEncryptionAvailable()) && backend !== 'basic_text'
+  return { available, backend }
+}
+
+function requireSafeStorage(safeStorage) {
+  const state = safeStorageState(safeStorage)
+  if (!state.available) throw new Error(
+    state.backend === 'basic_text' ? '系统安全存储退化为未加密 basic_text，拒绝保存凭据' : '系统安全存储当前不可用'
+  )
 }
 
 export function createWebDAVSecretStore({ dataDir, safeStorage, fsApi = fs }) {
@@ -42,9 +53,9 @@ export function createWebDAVSecretStore({ dataDir, safeStorage, fsApi = fs }) {
   return {
     path: secretPath,
     async status() {
-      const available = Boolean(safeStorage?.isEncryptionAvailable?.())
+      const state = safeStorageState(safeStorage)
       const info = await inspectFile()
-      return { available, stored: Boolean(info) }
+      return { available: state.available, stored: Boolean(info), backend: state.backend }
     },
     async load() {
       const info = await inspectFile()
