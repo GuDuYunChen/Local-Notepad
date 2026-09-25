@@ -14,6 +14,12 @@ import { ensureBackupDir, getDefaultBackupDir, getDefaultDataDir, listBackups } 
 import { stopChildProcess, waitForHttpService } from './backend-process.js'
 import { createDataSafetyService, runBackupCommand, registerDataSafetyHandlers } from './data-safety.js'
 import { createWorkspacePackageService, registerWorkspacePackageHandlers } from './workspace-package.js'
+import {
+  applyPendingWorkspaceRestore,
+  createWorkspaceRestoreService,
+  registerWorkspaceRestoreHandlers,
+  rollbackAppliedWorkspaceRestore,
+} from './workspace-restore.js'
 import { classifyNavigation } from './navigation.js'
 import { APP_ICON_DATA_URL } from '../src/assets/appIconData.js'
 
@@ -22,7 +28,7 @@ let mainWindow = null
 let backend = null
 let allowQuit = false
 
-async function createWindow() {
+async function createWindow(startupRestore = { status: 'none' }) {
   const isDev = !app.isPackaged
   const appIcon = nativeImage.createFromDataURL(APP_ICON_DATA_URL)
 
@@ -81,19 +87,72 @@ async function createWindow() {
     const indexPath = path.join(app.getAppPath(), 'dist/index.html')
     startBackend()
 
-    const backendReady = await waitForHttpService(`${process.env.API_BASE}/api/health`, {
+    let backendReady = await waitForHttpService(`${process.env.API_BASE}/api/health`, {
       timeoutMs: 8000,
       intervalMs: 120,
     })
+    let healthRollback = null
+    if (!backendReady && startupRestore?.status === 'applied') {
+      const failedChild = backend
+      backend = null
+      if (failedChild) await stopChildProcess(failedChild, 2500).catch(() => {})
+      try {
+        healthRollback = await rollbackAppliedWorkspaceRestore({
+          dataDir: getDefaultDataDir(),
+          restore: startupRestore,
+        })
+        startBackend()
+        backendReady = await waitForHttpService(`${process.env.API_BASE}/api/health`, {
+          timeoutMs: 8000,
+          intervalMs: 120,
+        })
+      } catch (error) {
+        dialog.showErrorBox(
+          '工作区恢复回滚失败',
+          String(error?.message || error) + '\n\n为避免继续写入不确定的数据状态，应用将退出。'
+        )
+        allowQuit = true
+        app.quit()
+        return
+      }
+    }
+
     if (!backendReady) {
       dialog.showErrorBox(
         '后端服务未就绪',
-        '本地数据服务未能在 8 秒内启动。应用仍会打开，但文件功能可能暂时不可用。'
+        healthRollback
+          ? '恢复后的工作区未通过启动验证，已尝试回滚到恢复前数据，但本地数据服务仍未能启动。请检查恢复保留目录后再继续。'
+          : '本地数据服务未能在 8 秒内启动。应用仍会打开，但文件功能可能暂时不可用。'
       )
     }
 
     if (mainWindow && !mainWindow.isDestroyed()) {
       await mainWindow.loadFile(indexPath)
+    }
+
+    if (mainWindow && !mainWindow.isDestroyed() && backendReady) {
+      if (healthRollback) {
+        void dialog.showMessageBox(mainWindow, {
+          type: 'warning',
+          title: '工作区恢复已自动回滚',
+          message: '新工作区未通过后端启动验证，应用已恢复到恢复前的数据。',
+          detail: '本次失败的数据保留在：' + healthRollback.failedDir,
+        })
+      } else if (startupRestore?.status === 'rolled-back') {
+        void dialog.showMessageBox(mainWindow, {
+          type: 'warning',
+          title: '工作区恢复未应用',
+          message: '恢复过程中出现问题，原数据已自动回滚。',
+          detail: String(startupRestore.error || '') + '\n恢复前数据记录：' + String(startupRestore.preservedDir || ''),
+        })
+      } else if (startupRestore?.status === 'applied') {
+        void dialog.showMessageBox(mainWindow, {
+          type: 'info',
+          title: '工作区恢复完成',
+          message: '正文数据库和附件已恢复，并通过本地服务启动验证。',
+          detail: '恢复前的数据已永久保留在：' + startupRestore.preservedDir,
+        })
+      }
     }
   }
 
@@ -136,17 +195,36 @@ app.whenReady().then(async () => {
     app.quit()
     return
   }
+
+  let startupRestore = { status: 'none' }
+  if (app.isPackaged) {
+    try {
+      startupRestore = await applyPendingWorkspaceRestore({
+        dataDir: getDefaultDataDir(),
+        inspectBackup: runDataSafety,
+      })
+    } catch (error) {
+      dialog.showErrorBox(
+        '工作区恢复需要人工检查',
+        String(error?.message || error) + '\n\n为避免创建空数据库或继续写入，应用不会启动本地数据服务。'
+      )
+      allowQuit = true
+      app.quit()
+      return
+    }
+  }
+
   app.on('second-instance', () => {
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore()
       mainWindow.focus()
     }
   })
-  await createWindow()
+  await createWindow(startupRestore)
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      void createWindow()
+      void createWindow({ status: 'none' })
     }
   })
 })
@@ -374,6 +452,11 @@ const dataSafety = createDataSafetyService({
 })
 registerDataSafetyHandlers(ipcMain, dataSafety, trustedMainFrame)
 
+const chooseWorkspacePackage = title => dialog.showOpenDialog(mainWindow, {
+  title,
+  properties: ['openFile'],
+  filters: [{ name: 'Local-Notepad 工作区便携包', extensions: ['lnw'] }],
+})
 const workspacePackages = createWorkspacePackageService({
   dataDir: getDefaultDataDir(),
   appVersion: app.getVersion(),
@@ -383,10 +466,21 @@ const workspacePackages = createWorkspacePackageService({
     defaultPath: path.join(app.getPath('documents'), suggestedName),
     filters: [{ name: 'Local-Notepad 工作区便携包', extensions: ['lnw'] }],
   }),
-  chooseSource: () => dialog.showOpenDialog(mainWindow, {
-    title: '校验 Local-Notepad 工作区便携包',
-    properties: ['openFile'],
-    filters: [{ name: 'Local-Notepad 工作区便携包', extensions: ['lnw'] }],
-  }),
+  chooseSource: () => chooseWorkspacePackage('校验 Local-Notepad 工作区便携包'),
 })
 registerWorkspacePackageHandlers(ipcMain, workspacePackages, trustedMainFrame)
+
+const workspaceRestore = createWorkspaceRestoreService({
+  dataDir: getDefaultDataDir(),
+  inspectBackup: runDataSafety,
+  chooseSource: () => chooseWorkspacePackage('预检并恢复 Local-Notepad 工作区便携包'),
+  canRestore: () => app.isPackaged,
+  scheduleRestart: () => {
+    setTimeout(() => {
+      if (!app.isPackaged) return
+      app.relaunch()
+      app.quit()
+    }, 450)
+  },
+})
+registerWorkspaceRestoreHandlers(ipcMain, workspaceRestore, trustedMainFrame)

@@ -54,3 +54,8 @@
 .backup-center-workspace .backup-center-section-heading { margin-bottom: 8px; }
 .backup-center-workspace > p code { font-size: 12px; color: var(--clay); }
 .backup-center-workspace + .backup-center-section-heading { padding-top: 4px; border-top: 1px solid var(--line); }
+
+.backup-center-restore-preview { margin: 14px 0 0; padding: 14px; border: 1px solid var(--warning, var(--clay)); border-radius: 10px; background: var(--warning-light, var(--paper)); color: var(--ink); }
+.backup-center-restore-preview > strong { display: block; font-size: 14px; }
+.backup-center-restore-preview p { margin: 6px 0; color: var(--ink-soft); }
+.backup-center-restore-preview .backup-center-actions { margin-top: 10px; }
