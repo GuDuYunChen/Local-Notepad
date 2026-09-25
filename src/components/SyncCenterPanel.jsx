@@ -7,8 +7,16 @@ const describePlan = plan => plan
   ? `上传 ${plan.uploads || 0} · 下载 ${plan.downloads || 0} · 冲突 ${plan.conflicts || 0} · 无变化 ${plan.noops || 0}`
   : ''
 
-const recordLabel = (record, fallback) =>
-  record?.state === 'purged' ? '已永久删除' : (record?.file?.title || fallback || '未知对象')
+const recordLabel = (record, fallback) => {
+  if (record?.state === 'purged') return '已永久删除'
+  if (record?.kind === 'attachment') return record?.attachment?.name || fallback || '附件'
+  if (record?.kind === 'tag') return record?.tag?.name ? ('标签：' + record.tag.name) : (fallback || '标签')
+  if (record?.kind === 'file-tag') {
+    const link = record?.file_tag
+    return link ? ('标签关联：' + link.file_id + ' ↔ ' + link.tag_id) : (fallback || '标签关联')
+  }
+  return record?.file?.title || fallback || '未知对象'
+}
 
 export default function SyncCenterPanel() {
   const alive = useRef(false)
@@ -114,7 +122,7 @@ export default function SyncCenterPanel() {
 
     <div className="sync-center-explainer">
       <strong>先验证同步正确性，不把实验室伪装成正式云同步。</strong>
-      <span>当前只同步笔记、文件夹及删除状态；附件、标签尚未纳入。双方同时修改同一对象时进入冲突中心，不按时间戳自动选赢家。</span>
+      <span>当前同步笔记、文件夹、标签、标签关联和附件。附件使用内容寻址 SHA-256 blob；同名附件建立共同基线后，修改或删除必须进入冲突中心明确选择，不会静默覆盖。所有对象都不按时间戳自动选赢家。</span>
     </div>
 
     <div className="settings-row">
