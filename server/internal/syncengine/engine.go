@@ -318,6 +318,14 @@ func (e *Engine) remote(ctx context.Context) (*DirRemote, error) {
 	return NewDirRemote(root)
 }
 
+func (e *Engine) ensureUploadDir() (string,error) {
+	dir:=filepath.Join(e.DataDir,"uploads")
+	if err:=os.MkdirAll(dir,0700);err!=nil{return "",err}
+	info,err:=os.Lstat(dir);if err!=nil{return "",err}
+	if !info.IsDir()||info.Mode()&os.ModeSymlink!=0{return "",fmt.Errorf("附件目录不安全，拒绝同步")}
+	return dir,nil
+}
+
 func (e *Engine) localRecords(ctx context.Context) (map[string]Record, error) {
 	out:=map[string]Record{}
 	rows,err:=e.DB.QueryContext(ctx,`SELECT id,title,content,created_at,updated_at,is_folder,parent_id,sort_order,is_deleted,deleted_at,is_pinned FROM files`)
@@ -347,13 +355,7 @@ func (e *Engine) localRecords(ctx context.Context) (map[string]Record, error) {
 	}
 	if err=rows.Close();err!=nil{return nil,err};if err=rows.Err();err!=nil{return nil,err}
 
-	uploadDir:=filepath.Join(e.DataDir,"uploads")
-	info,err:=os.Lstat(uploadDir)
-	if err!=nil {
-		if os.IsNotExist(err){return out,nil}
-		return nil,err
-	}
-	if !info.IsDir()||info.Mode()&os.ModeSymlink!=0{return nil,fmt.Errorf("附件目录不安全，拒绝同步")}
+	uploadDir,err:=e.ensureUploadDir();if err!=nil{return nil,err}
 	entries,err:=os.ReadDir(uploadDir);if err!=nil{return nil,err}
 	for _,entry:=range entries{
 		if !safeAttachmentName(entry.Name())||entry.IsDir()||entry.Type()&os.ModeSymlink!=0{return nil,fmt.Errorf("附件目录包含不受支持的条目: %s",entry.Name())}
@@ -656,8 +658,10 @@ func (e *Engine) applyRemoteTx(ctx context.Context, tx *sql.Tx, record Record) e
 			if len(parts)!=2{return fmt.Errorf("标签关联 tombstone 无效")}
 			if _,err=tx.ExecContext(ctx,`DELETE FROM file_tags WHERE file_id=? AND tag_id=?`,parts[0],parts[1]);err!=nil{return err}
 		case "attachment":
-			// Filesystem attachment deletion is deliberately never auto-applied.
-			return fmt.Errorf("附件删除必须通过冲突中心明确确认")
+			// A remote tombstone on a device that never had the attachment only
+			// establishes base state. Existing attachment deletion is classified
+			// as a conflict and handled by the explicit filesystem resolver.
+			return nil
 		}
 		return nil
 	}
@@ -733,6 +737,9 @@ func (e *Engine) Run(ctx context.Context) (RunResult,error) {
 	// Upload immutable objects first. They are unreachable until a manifest is
 	// published, so a later local failure can leave only harmless orphan data.
 	nextItems:=copyItems(manifest.Items)
+	currentState,stateErr:=e.state(ctx)
+	if stateErr!=nil{return RunResult{},stateErr}
+	deviceID:=currentState.DeviceID
 	uploads:=0
 	for _,item:=range plan.Items {
 		if item.Action!="upload"{continue}
@@ -741,7 +748,8 @@ func (e *Engine) Run(ctx context.Context) (RunResult,error) {
 		if err!=nil{return RunResult{},err}
 		if hash!=item.LocalHash{return RunResult{},fmt.Errorf("本机对象在同步计划后发生变化: %s",item.ID)}
 		if record.Kind=="attachment"&&record.State=="present"{
-			source:=filepath.Join(e.DataDir,"uploads",record.Attachment.Name)
+			uploadDir,dirErr:=e.ensureUploadDir();if dirErr!=nil{return RunResult{},dirErr}
+			source:=filepath.Join(uploadDir,record.Attachment.Name)
 			if err=remote.SaveBlobFile(record.Attachment.BlobHash,source,record.Attachment.Size);err!=nil{return RunResult{},err}
 		}
 		if err=remote.SaveObject(hash,data);err!=nil{return RunResult{},err}
@@ -752,8 +760,7 @@ func (e *Engine) Run(ctx context.Context) (RunResult,error) {
 	createdAttachments:=[]string{}
 	cleanupAttachments:=true
 	defer func(){if cleanupAttachments{for _,filename:=range createdAttachments{_ = os.Remove(filename)}}}()
-	uploadDir:=filepath.Join(e.DataDir,"uploads")
-	if err=os.MkdirAll(uploadDir,0700);err!=nil{return RunResult{},err}
+	uploadDir,err:=e.ensureUploadDir();if err!=nil{return RunResult{},err}
 	for _,item:=range plan.Items{
 		if item.Action!="download"{continue}
 		record:=remotes[item.ID]
@@ -768,25 +775,42 @@ func (e *Engine) Run(ctx context.Context) (RunResult,error) {
 	defer tx.Rollback()
 
 	downloads:=0
-	for _,item:=range plan.Items {
+	applyItem:=func(item PlanItem) error {
 		switch item.Action {
 		case "download":
-			if err=e.applyRemoteTx(ctx,tx,remotes[item.ID]);err!=nil{
-				_ = e.updateState(ctx,manifest,"error",err.Error())
-				return RunResult{},err
-			}
-			if err=e.setBaseWith(tx,ctx,item.ID,item.RemoteHash);err!=nil{return RunResult{},err}
+			if err=e.applyRemoteTx(ctx,tx,remotes[item.ID]);err!=nil{return err}
+			if err=e.setBaseWith(tx,ctx,item.ID,item.RemoteHash);err!=nil{return err}
 			downloads++
 		case "upload":
-			if err=e.setBaseWith(tx,ctx,item.ID,item.LocalHash);err!=nil{return RunResult{},err}
+			if err=e.setBaseWith(tx,ctx,item.ID,item.LocalHash);err!=nil{return err}
 		case "noop":
 			hash:=item.LocalHash
 			if hash==""{hash=item.RemoteHash}
-			if hash!=""{if err=e.setBaseWith(tx,ctx,item.ID,hash);err!=nil{return RunResult{},err}}
+			if hash!=""{if err=e.setBaseWith(tx,ctx,item.ID,hash);err!=nil{return err}}
 		case "conflict":
 			local,localOK:=locals[item.ID]
 			remoteRecord,remoteOK:=remotes[item.ID]
-			if err=e.storeConflictWith(tx,ctx,item,local,localOK,remoteRecord,remoteOK);err!=nil{return RunResult{},err}
+			if err=e.storeConflictWith(tx,ctx,item,local,localOK,remoteRecord,remoteOK);err!=nil{return err}
+		}
+		return nil
+	}
+	// File-tag relations depend on both file and tag rows. Apply all other
+	// records first, then relations, inside the same transaction.
+	for _,item:=range plan.Items {
+		record:=remotes[item.ID]
+		if item.Action=="download"&&record.Kind=="file-tag"{continue}
+		if err=applyItem(item);err!=nil{
+			_ = tx.Rollback()
+			_ = e.updateState(ctx,manifest,"error",err.Error())
+			return RunResult{},err
+		}
+	}
+	for _,item:=range plan.Items {
+		if item.Action!="download"||remotes[item.ID].Kind!="file-tag"{continue}
+		if err=applyItem(item);err!=nil{
+			_ = tx.Rollback()
+			_ = e.updateState(ctx,manifest,"error",err.Error())
+			return RunResult{},err
 		}
 	}
 
@@ -795,8 +819,7 @@ func (e *Engine) Run(ctx context.Context) (RunResult,error) {
 		manifest.Items=nextItems
 		manifest.Generation++
 		manifest.UpdatedAt=e.now().UTC().Format(time.RFC3339Nano)
-		state,_:=e.state(ctx)
-		manifest.DeviceID=state.DeviceID
+		manifest.DeviceID=deviceID
 		manifest,err=remote.SaveManifest(manifest)
 		if err!=nil{return RunResult{},err}
 	}
@@ -836,11 +859,12 @@ func (e *Engine) Conflicts(ctx context.Context) ([]Conflict,error) {
 func (e *Engine) applyRemoteAttachmentChoice(remote *DirRemote, record Record) (string,error) {
 	if record.Kind!="attachment"{return "",fmt.Errorf("不是附件冲突")}
 	name,ok:=attachmentNameFromKey(record.ID);if !ok{return "",fmt.Errorf("附件冲突键无效")}
-	uploadDir:=filepath.Join(e.DataDir,"uploads")
-	if err:=os.MkdirAll(uploadDir,0700);err!=nil{return "",err}
+	uploadDir,err:=e.ensureUploadDir();if err!=nil{return "",err}
 	target:=filepath.Join(uploadDir,name)
 	preserveRoot:=filepath.Join(e.DataDir,"sync-preserved")
 	if err:=os.MkdirAll(preserveRoot,0700);err!=nil{return "",err}
+	preserveInfo,err:=os.Lstat(preserveRoot);if err!=nil{return "",err}
+	if !preserveInfo.IsDir()||preserveInfo.Mode()&os.ModeSymlink!=0{return "",fmt.Errorf("同步保留目录不安全")}
 	preserved:=""
 	if info,err:=os.Lstat(target);err==nil{
 		if !info.Mode().IsRegular()||info.Mode()&os.ModeSymlink!=0{return "",fmt.Errorf("本机附件目标不安全")}
@@ -875,7 +899,8 @@ func (e *Engine) Resolve(ctx context.Context, conflictID, choice string) error {
 		if !localExists{return fmt.Errorf("本机冲突对象不可用")}
 		data,hash,err:=encodeRecord(localRecord);if err!=nil{return err}
 		if localRecord.Kind=="attachment"&&localRecord.State=="present"{
-			source:=filepath.Join(e.DataDir,"uploads",localRecord.Attachment.Name)
+			uploadDir,dirErr:=e.ensureUploadDir();if dirErr!=nil{return dirErr}
+			source:=filepath.Join(uploadDir,localRecord.Attachment.Name)
 			if err=remote.SaveBlobFile(localRecord.Attachment.BlobHash,source,localRecord.Attachment.Size);err!=nil{return err}
 		}
 		if err=remote.SaveObject(hash,data);err!=nil{return err}
