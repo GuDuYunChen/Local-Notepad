@@ -519,7 +519,6 @@ func (e *Engine) applyRemoteTx(ctx context.Context, tx *sql.Tx, record Record) e
 	}
 	return nil
 }
-}
 
 func (e *Engine) applyRemote(ctx context.Context, record Record) error {
 	tx, err := e.DB.BeginTx(ctx,nil)
