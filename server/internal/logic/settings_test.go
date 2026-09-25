@@ -36,10 +36,12 @@ func newSettingsLogicTest(t *testing.T) (*SettingsLogic, *sql.DB, string) {
 			sync_endpoint TEXT,
 			sync_provider TEXT,
 			sync_username TEXT,
-			sync_password TEXT
+			sync_password TEXT,
+			sync_auto_enabled INTEGER DEFAULT 0,
+			sync_interval_minutes INTEGER DEFAULT 5
 		)`,
-		`INSERT INTO settings (id, theme, editor_opts, sync_enabled, sync_endpoint, sync_provider, sync_username, sync_password)
-		 VALUES (1, 'light', '{"fontSize":15,"lineHeight":1.8}', 1, 'http://sync.local', 'local-lab', '', '')`,
+		`INSERT INTO settings (id, theme, editor_opts, sync_enabled, sync_endpoint, sync_provider, sync_username, sync_password, sync_auto_enabled, sync_interval_minutes)
+		 VALUES (1, 'light', '{"fontSize":15,"lineHeight":1.8}', 1, 'http://sync.local', 'local-lab', '', '', 0, 5)`,
 		`CREATE TABLE files (
 			id TEXT PRIMARY KEY,
 			title TEXT NOT NULL,
@@ -130,6 +132,19 @@ func TestSettingsGetAndPartialUpdatePreserveExistingPreferences(t *testing.T) {
 	if err != nil { t.Fatal(err) }
 	if strings.Contains(string(encoded), password) || strings.Contains(string(encoded), "sync_password\"") {
 		t.Fatalf("password leaked in settings JSON: %s", encoded)
+	}
+	auto := true
+	interval := 15
+	webdav, err = logic.Update(ctx, &model.SettingsPatch{SyncAutoEnabled:&auto, SyncIntervalMinutes:&interval})
+	if err != nil { t.Fatalf("enable automatic sync: %v", err) }
+	if !webdav.SyncAutoEnabled || webdav.SyncIntervalMinutes != 15 { t.Fatalf("unexpected auto settings: %#v", webdav) }
+	newEndpoint := "https://dav.example.test/other"
+	webdav, err = logic.Update(ctx, &model.SettingsPatch{SyncEndpoint:&newEndpoint})
+	if err != nil { t.Fatalf("change endpoint: %v", err) }
+	if webdav.SyncAutoEnabled { t.Fatal("endpoint change did not pause automatic sync") }
+	tooShort := 0
+	if _, err := logic.Update(ctx, &model.SettingsPatch{SyncIntervalMinutes:&tooShort}); err == nil {
+		t.Fatal("accepted invalid automatic sync interval")
 	}
 	insecure := "http://dav.example.test/notepad"
 	if _, err := logic.Update(ctx, &model.SettingsPatch{SyncEndpoint: &insecure}); err == nil {

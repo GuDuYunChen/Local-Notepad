@@ -40,7 +40,10 @@ func (l *SettingsLogic) Update(ctx context.Context, patch *model.SettingsPatch) 
 	}
 	if patch.SyncEnabled != nil {
 		current.SyncEnabled = *patch.SyncEnabled
+		if !current.SyncEnabled { current.SyncAutoEnabled = false }
 	}
+	previousProvider := current.SyncProvider
+	previousEndpoint := current.SyncEndpoint
 	if patch.SyncEndpoint != nil {
 		if len(*patch.SyncEndpoint) > 2048 { return nil, fmt.Errorf("同步端点长度超过限制") }
 		current.SyncEndpoint = strings.TrimSpace(*patch.SyncEndpoint)
@@ -61,6 +64,25 @@ func (l *SettingsLogic) Update(ctx context.Context, patch *model.SettingsPatch) 
 		if len(*patch.SyncPassword) > 4096 { return nil, fmt.Errorf("WebDAV 密码长度超过限制") }
 		current.SyncPassword = *patch.SyncPassword
 		current.SyncPasswordSet = current.SyncPassword != ""
+	}
+	if patch.SyncIntervalMinutes != nil {
+		if *patch.SyncIntervalMinutes < 1 || *patch.SyncIntervalMinutes > 1440 {
+			return nil, fmt.Errorf("自动同步间隔必须在 1 到 1440 分钟之间")
+		}
+		current.SyncIntervalMinutes = *patch.SyncIntervalMinutes
+	}
+	if patch.SyncAutoEnabled != nil {
+		current.SyncAutoEnabled = *patch.SyncAutoEnabled
+	}
+	if current.SyncIntervalMinutes <= 0 { current.SyncIntervalMinutes = 5 }
+	if current.SyncProvider != previousProvider || current.SyncEndpoint != previousEndpoint {
+		current.SyncAutoEnabled = false
+	}
+	if current.SyncProvider != "webdav" {
+		current.SyncAutoEnabled = false
+	}
+	if current.SyncAutoEnabled && (!current.SyncEnabled || current.SyncProvider != "webdav") {
+		return nil, fmt.Errorf("自动同步仅可在已启用的 WebDAV provider 上使用")
 	}
 	if current.SyncEnabled && current.SyncProvider == "" {
 		return nil, fmt.Errorf("启用同步前需要选择同步 provider")
