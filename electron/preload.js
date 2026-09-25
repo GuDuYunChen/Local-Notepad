@@ -30,5 +30,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   workspaceCancelRestore: id => ipcRenderer.invoke('workspace:restore:cancel', id),
   appDiagnostics: () => ipcRenderer.invoke('app:diagnostics'),
   openAppFolder: (kind) => ipcRenderer.invoke('app:openFolder', { kind }),
+  webdavSecretStatus: () => ipcRenderer.invoke('sync:webdav-secret:status'),
+  webdavSecretSave: password => ipcRenderer.invoke('sync:webdav-secret:save', password),
+  webdavSecretClear: () => ipcRenderer.invoke('sync:webdav-secret:clear'),
   onReload: (callback) => ipcRenderer.on('app:reload', callback),
 })

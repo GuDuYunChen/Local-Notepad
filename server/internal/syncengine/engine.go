@@ -149,9 +149,10 @@ type AutoTickResult struct {
 type Engine struct {
 	DB         *sql.DB
 	DataDir    string
-	RemoteRoot string
-	Now        func() time.Time
-	runMu      sync.Mutex
+	RemoteRoot      string
+	WebDAVPassword  string
+	Now             func() time.Time
+	runMu           sync.Mutex
 }
 
 type SyncRemote interface {
@@ -307,6 +308,7 @@ func (e *Engine) config(ctx context.Context) (enabled bool, provider, endpoint, 
 		COALESCE(sync_username,''), COALESCE(sync_password,'') FROM settings WHERE id=1`).
 		Scan(&flag, &provider, &endpoint, &username, &password)
 	if err != nil { return false, "", "", "", "", err }
+	if e.WebDAVPassword != "" { password = e.WebDAVPassword }
 	return flag != 0, provider, endpoint, username, password, nil
 }
 

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, safeStorage, shell } from 'electron'
 import { spawn } from 'node:child_process'
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -12,6 +12,7 @@ import {
 import { parseImportPaths, selectAndParseFiles } from './import.js'
 import { ensureBackupDir, getDefaultBackupDir, getDefaultDataDir, listBackups } from './backup.js'
 import { stopChildProcess, waitForHttpService } from './backend-process.js'
+import { createWebDAVSecretStore } from './webdav-secret.js'
 import { createDataSafetyService, runBackupCommand, registerDataSafetyHandlers } from './data-safety.js'
 import { createWorkspacePackageService, registerWorkspacePackageHandlers } from './workspace-package.js'
 import {
@@ -27,6 +28,7 @@ import { APP_ICON_DATA_URL } from '../src/assets/appIconData.js'
 let mainWindow = null
 let backend = null
 let allowQuit = false
+const webdavSecrets = createWebDAVSecretStore({ dataDir: getDefaultDataDir(), safeStorage })
 
 async function createWindow(startupRestore = { status: 'none' }) {
   const isDev = !app.isPackaged
@@ -85,7 +87,7 @@ async function createWindow(startupRestore = { status: 'none' }) {
     process.env.API_BASE = 'http://127.0.0.1:27121'
     // 使用 app.getAppPath() 获取应用根目录 (asar 内部根目录)，确保路径解析正确
     const indexPath = path.join(app.getAppPath(), 'dist/index.html')
-    startBackend()
+    await startBackend()
 
     let backendReady = await waitForHttpService(`${process.env.API_BASE}/api/health`, {
       timeoutMs: 8000,
@@ -101,7 +103,7 @@ async function createWindow(startupRestore = { status: 'none' }) {
           dataDir: getDefaultDataDir(),
           restore: startupRestore,
         })
-        startBackend()
+        await startBackend()
         backendReady = await waitForHttpService(`${process.env.API_BASE}/api/health`, {
           timeoutMs: 8000,
           intervalMs: 120,
@@ -247,18 +249,41 @@ app.on('before-quit', (event) => {
 })
 
 // 启动后端进程（生产模式）
-function startBackend() {
+async function startBackend() {
   if (backend) return
   try {
     const backendBin = process.platform === 'win32' ? 'notepad-server.exe' : 'notepad-server'
     const exe = path.join(process.resourcesPath, 'bin', backendBin)
-    backend = spawn(exe, { stdio: 'ignore' })
+    const env = { ...process.env }
+    try {
+      const secret = await webdavSecrets.load()
+      if (secret) env.NOTEPAD_WEBDAV_PASSWORD = secret
+      else delete env.NOTEPAD_WEBDAV_PASSWORD
+    } catch (error) {
+      delete env.NOTEPAD_WEBDAV_PASSWORD
+      console.error('WebDAV secure secret unavailable:', error)
+    }
+    backend = spawn(exe, { stdio: 'ignore', env })
     backend.on('error', (err) => {
       dialog.showErrorBox('后端启动失败', `无法启动后端服务: ${err.message}`)
     })
   } catch (e) {
     dialog.showErrorBox('后端启动失败', String(e))
   }
+}
+
+async function restartBackendForWebDAVSecret() {
+  if (!app.isPackaged) return { restarted: false, restartRequired: true }
+  const child = backend
+  backend = null
+  if (child) await stopChildProcess(child, 2500)
+  await startBackend()
+  const ready = await waitForHttpService(`${process.env.API_BASE || 'http://127.0.0.1:27121'}/api/health`, {
+    timeoutMs: 8000,
+    intervalMs: 120,
+  })
+  if (!ready) throw new Error('安全凭据已保存，但本地数据服务重启失败')
+  return { restarted: true, restartRequired: false }
 }
 
 // IPC 对话框：打开文件与保存文件
@@ -437,6 +462,24 @@ const trustedMainFrame = event => Boolean(
   mainWindow && !mainWindow.isDestroyed() && event.sender === mainWindow.webContents &&
   event.senderFrame === mainWindow.webContents.mainFrame
 )
+ipcMain.handle('sync:webdav-secret:status', async event => {
+  if (!trustedMainFrame(event)) throw new Error('不可信的 WebDAV 凭据状态请求')
+  const status = await webdavSecrets.status()
+  return { success: true, ...status, managed: app.isPackaged }
+})
+ipcMain.handle('sync:webdav-secret:save', async (event, password) => {
+  if (!trustedMainFrame(event)) throw new Error('不可信的 WebDAV 凭据写入请求')
+  await webdavSecrets.save(String(password ?? ''))
+  const restart = await restartBackendForWebDAVSecret()
+  return { success: true, stored: true, ...restart }
+})
+ipcMain.handle('sync:webdav-secret:clear', async event => {
+  if (!trustedMainFrame(event)) throw new Error('不可信的 WebDAV 凭据清理请求')
+  await webdavSecrets.clear()
+  const restart = await restartBackendForWebDAVSecret()
+  return { success: true, stored: false, ...restart }
+})
+
 const runDataSafety = args => {
   const filename = process.platform === 'win32' ? 'notepad-server.exe' : 'notepad-server'
   const binary = app.isPackaged ? path.join(process.resourcesPath, 'bin', filename) :

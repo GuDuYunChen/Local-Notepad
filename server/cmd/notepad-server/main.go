@@ -202,7 +202,7 @@ func main() {
 	tagController := &controller.TagController{TagLogic: tagLogic}
 
 	uploadController := &controller.UploadController{UploadDir: uploadPath}
-	syncEngine := &syncengine.Engine{DB: db, DataDir: filepath.Dir(dbPath)}
+	syncEngine := &syncengine.Engine{DB: db, DataDir: filepath.Dir(dbPath), WebDAVPassword: os.Getenv("NOTEPAD_WEBDAV_PASSWORD")}
 	syncController := &controller.SyncController{Engine: syncEngine}
 
 	fileController.Register(group)
