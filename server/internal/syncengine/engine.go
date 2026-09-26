@@ -808,7 +808,8 @@ func (e *Engine) applyRemoteTx(ctx context.Context, tx *sql.Tx, record Record) e
 		var oldTitle,oldContent string
 		err=tx.QueryRowContext(ctx,`SELECT title,content FROM files WHERE id=?`,f.ID).Scan(&oldTitle,&oldContent)
 		if err==nil&&(oldTitle!=f.Title||oldContent!=f.Content){
-			_,_=tx.ExecContext(ctx,`INSERT INTO file_versions(file_id,content,title,created_at) VALUES(?,?,?,?)`,f.ID,oldContent,oldTitle,e.now().Unix())
+			result, historyErr := tx.ExecContext(ctx,`INSERT INTO file_versions(file_id,content,title,created_at) VALUES(?,?,?,?)`,f.ID,oldContent,oldTitle,e.now().Unix())
+			if err = requireOneResolutionWrite(result, historyErr, "保存覆盖前的历史版本"); err != nil { return err }
 		}else if err!=nil&&!errors.Is(err,sql.ErrNoRows){return err}
 		_,err=tx.ExecContext(ctx,`INSERT INTO files(id,title,content,created_at,updated_at,is_folder,parent_id,sort_order,is_deleted,deleted_at,is_pinned)
 			VALUES(?,?,?,?,?,?,?,?,?,?,?)
@@ -1124,19 +1125,17 @@ func (e *Engine) Resolve(ctx context.Context, conflictID, choice string) error {
 		manifest.UpdatedAt=e.now().UTC().Format(time.RFC3339Nano)
 		manifest.DeviceID=state.DeviceID
 		manifest,err=remote.SaveManifest(manifest);if err!=nil{return err}
-		if err=e.setBase(ctx,c.ItemID,hash);err!=nil{return err}
+		if err=e.finishResolution(ctx,c,"local");err!=nil{return err}
 	}else{
 		record,err:=remote.LoadRecord(c.RemoteHash);if err!=nil{return err}
 		if record.Kind=="attachment"{
 			if err=validateLocalResolution(ctx,locals,record);err!=nil{return err}
 			if _,err=e.applyRemoteAttachmentChoice(remote,record);err!=nil{return err}
-			if err=e.setBase(ctx,c.ItemID,c.RemoteHash);err!=nil{return err}
+			if err=e.finishResolution(ctx,c,"remote");err!=nil{return err}
 		}else{
 			if err=e.applyResolutionRecord(ctx,c,record);err!=nil{return err}
 		}
 	}
-	_,err=e.DB.ExecContext(ctx,`UPDATE sync_conflicts SET status='resolved',resolution=?,resolved_at=? WHERE id=? AND status='open'`,choice,e.now().Unix(),conflictID)
-	if err!=nil{return err}
 	latest,err:=remote.LoadManifest();if err==nil{_ = e.updateState(ctx,latest,"ok","")}
 	return err
 }

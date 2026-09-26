@@ -67,6 +67,11 @@ jobs:
       - name: Verify conflict destination integrity
         run: go -C server test -race ./internal/syncengine -run '^TestResolutionGuard' -count=3 -v
 
+      - name: Verify sync history and resolution atomicity
+        run: |
+          node scripts/check-sync-resolution-baseline.mjs
+          go -C server test -race ./internal/syncengine -run '^TestResolutionAtomic' -count=3 -v
+
       - name: Verify editor exit save handshake
         run: |
           node --test scripts/editor-quit.node.mjs
@@ -146,6 +151,9 @@ jobs:
 
       - name: Verify conflict destination integrity on Windows
         run: go -C server test ./internal/syncengine -run '^TestResolutionGuard' -count=1 -v
+
+      - name: Verify resolution atomicity on Windows
+        run: go -C server test ./internal/syncengine -run '^TestResolutionAtomic' -count=1 -v
 
       - name: Build unsigned Windows NSIS package
         shell: pwsh
