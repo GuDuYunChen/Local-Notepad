@@ -21,8 +21,8 @@ it('runs only on explicit click',async()=>{await render();await click(button('�
 it('requires conflict side selection',async()=>{api.mockImplementation(async(path)=>{if(path==='/api/settings')return settings;if(path==='/api/sync/status')return{...status,open_conflicts:1,last_status:'conflicts'};if(path==='/api/sync/conflicts')return[{id:'c1',item_id:'n1',local_record:{state:'present',file:{title:'本机标题'}},remote_record:{state:'present',file:{title:'远端标题'}}}];return null});await render();expect(container.textContent).toContain('不会自动覆盖');await click(button('保留本机'));expect(api).toHaveBeenCalledWith('/api/sync/conflicts/c1/resolve',{method:'POST',body:JSON.stringify({choice:'local'})})})
 it('opens app-owned remote folder only for local lab',async()=>{await render();await click(button('打开模拟远端'));expect(window.electronAPI.openAppFolder).toHaveBeenCalledWith('syncLab')})
 it('shows readable attachment conflict labels',async()=>{api.mockImplementation(async(path)=>{if(path==='/api/settings')return settings;if(path==='/api/sync/status')return{...status,open_conflicts:1,last_status:'conflicts'};if(path==='/api/sync/conflicts')return[{id:'a1',item_id:'attachment:00',local_record:{kind:'attachment',state:'present',attachment:{name:'资料.pdf'}},remote_record:{kind:'attachment',state:'purged'}}];return null});await render();expect(container.textContent).toContain('资料.pdf');expect(container.textContent).toContain('已永久删除')})
-it('migrates a newly entered WebDAV password into the desktop secure store',async()=>{await render();await input('WebDAV 端点','https://dav.example.test/notepad');await input('WebDAV 用户名','alice');await input('WebDAV 密码','secret');await click(button('保存并启用 WebDAV'));const calls=api.mock.calls.filter(([path,init])=>path==='/api/settings'&&init?.method==='PUT');expect(JSON.parse(calls[0][1].body)).toEqual({sync_enabled:true,sync_provider:'webdav',sync_endpoint:'https://dav.example.test/notepad',sync_username:'alice'});expect(window.electronAPI.webdavSecretSave).toHaveBeenCalledWith('secret');expect(JSON.parse(calls[1][1].body)).toEqual({sync_password:''})})
-it('does not send an empty password over an already configured WebDAV secret',async()=>{api.mockImplementation(async(path,init)=>{if(path==='/api/settings'&&!init)return{...settings,sync_enabled:true,sync_provider:'webdav',sync_endpoint:'https://dav.example.test/notepad',sync_username:'alice',sync_password_set:true};if(path==='/api/sync/status')return{...status,provider:'webdav'};if(path==='/api/sync/conflicts')return[];if(path==='/api/settings'&&init?.method==='PUT')return{};return null});await render();await click(button('保存 WebDAV 设置'));const call=api.mock.calls.find(([path,init])=>path==='/api/settings'&&init?.method==='PUT');expect(JSON.parse(call[1].body)).not.toHaveProperty('sync_password');expect(container.textContent).toContain('留空保持不变')})
+it('migrates a new password, verifies read-only, then enables WebDAV',async()=>{await render();await input('WebDAV 端点','https://dav.example.test/notepad');await input('WebDAV 用户名','alice');await input('WebDAV 密码','secret');await click(button('保存、验证并启用 WebDAV'));const calls=api.mock.calls.filter(([path,init])=>path==='/api/settings'&&init?.method==='PUT');expect(JSON.parse(calls[0][1].body)).toEqual({sync_enabled:false,sync_auto_enabled:false,sync_provider:'webdav',sync_endpoint:'https://dav.example.test/notepad',sync_username:'alice'});expect(window.electronAPI.webdavSecretSave).toHaveBeenCalledWith('secret');expect(JSON.parse(calls[1][1].body)).toEqual({sync_password:''});expect(api).toHaveBeenCalledWith('/api/sync/check',{method:'POST',body:'{}'});expect(JSON.parse(calls[2][1].body)).toEqual({sync_enabled:true})})
+it('does not send an empty password over an already configured WebDAV secret',async()=>{api.mockImplementation(async(path,init)=>{if(path==='/api/settings'&&!init)return{...settings,sync_enabled:true,sync_provider:'webdav',sync_endpoint:'https://dav.example.test/notepad',sync_username:'alice',sync_password_set:true};if(path==='/api/sync/status')return{...status,provider:'webdav'};if(path==='/api/sync/conflicts')return[];if(path==='/api/sync/check')return{provider:'webdav',initialized:true,generation:1,items:0};if(path==='/api/settings'&&init?.method==='PUT')return{};return null});await render();await click(button('保存并重新验证 WebDAV'));const calls=api.mock.calls.filter(([path,init])=>path==='/api/settings'&&init?.method==='PUT');expect(calls.some(([,init])=>Object.prototype.hasOwnProperty.call(JSON.parse(init.body),'sync_password'))).toBe(false);expect(container.textContent).toContain('留空保持不变')})
 it('rebinds remote metadata only after explicit confirmation',async()=>{await render();expect(button('重新绑定远端')).toBeTruthy();await click(button('重新绑定远端'));expect(window.confirm).toHaveBeenCalledTimes(1);expect(api).toHaveBeenCalledWith('/api/sync/rebind',{method:'POST',body:'{}'});expect(container.textContent).not.toContain('重新绑定远端')})
 })
 
@@ -37,8 +37,7 @@ it('configures automatic WebDAV sync without replacing manual controls',async()=
   await render()
   expect(button('开启自动同步')).toBeTruthy()
   await click(button('开启自动同步'))
-  const call=api.mock.calls.find(([path,init])=>path==='/api/settings'&&init?.method==='PUT')
-  expect(JSON.parse(call[1].body)).toEqual({sync_auto_enabled:true,sync_interval_minutes:5})
+  expect(api).toHaveBeenCalledWith('/api/sync/auto',{method:'POST',body:JSON.stringify({enabled:true,interval_minutes:5})})
   expect(button('预演同步')).toBeTruthy()
   expect(button('执行同步')).toBeTruthy()
 })
@@ -59,7 +58,7 @@ it('does not partially change WebDAV settings when secure storage is unavailable
   await input('WebDAV 端点','https://dav.example.test/notepad')
   await input('WebDAV 用户名','alice')
   await input('WebDAV 密码','secret')
-  await click(button('保存并启用 WebDAV'))
+  await click(button('保存、验证并启用 WebDAV'))
   expect(window.electronAPI.webdavSecretSave).not.toHaveBeenCalled()
   expect(api.mock.calls.filter(([path,init])=>path==='/api/settings'&&init?.method==='PUT')).toHaveLength(0)
 })
@@ -78,4 +77,37 @@ it('checks a saved WebDAV connection without replacing manual sync actions',asyn
   expect(api).toHaveBeenCalledWith('/api/sync/check',{method:'POST',body:'{}'})
   expect(button('预演同步')).toBeTruthy()
   expect(button('执行同步')).toBeTruthy()
+})
+
+
+it('leaves WebDAV disabled when read-only validation fails',async()=>{
+  api.mockImplementation(async(path,init)=>{
+    if(path==='/api/settings'&&!init)return settings
+    if(path==='/api/sync/status')return status
+    if(path==='/api/sync/conflicts')return[]
+    if(path==='/api/sync/check')throw new Error('401 unauthorized')
+    if(path==='/api/settings'&&init?.method==='PUT')return{}
+    return null
+  })
+  await render()
+  await input('WebDAV 端点','https://dav.example.test/notepad')
+  await input('WebDAV 用户名','alice')
+  await click(button('保存、验证并启用 WebDAV'))
+  const calls=api.mock.calls.filter(([path,init])=>path==='/api/settings'&&init?.method==='PUT').map(([,init])=>JSON.parse(init.body))
+  expect(calls[0]).toEqual({sync_enabled:false,sync_auto_enabled:false,sync_provider:'webdav',sync_endpoint:'https://dav.example.test/notepad',sync_username:'alice'})
+  expect(calls.some(body=>body.sync_enabled===true)).toBe(false)
+})
+
+it('allows read-only connection check while WebDAV is saved but disabled',async()=>{
+  api.mockImplementation(async(path)=>{
+    if(path==='/api/settings')return{...settings,sync_enabled:false,sync_provider:'webdav',sync_endpoint:'https://dav.example.test/notepad'}
+    if(path==='/api/sync/status')return{...status,enabled:false,provider:'webdav'}
+    if(path==='/api/sync/conflicts')return[]
+    if(path==='/api/sync/check')return{provider:'webdav',initialized:false,generation:0,items:0}
+    return null
+  })
+  await render()
+  expect(button('测试连接（只读）')).toBeTruthy()
+  await click(button('测试连接（只读）'))
+  expect(api).toHaveBeenCalledWith('/api/sync/check',{method:'POST',body:'{}'})
 })

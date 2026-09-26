@@ -107,28 +107,36 @@ export default function SyncCenterPanel() {
     if (password && secretStatus?.available !== true) {
       throw new Error('系统安全存储不可用，未修改 WebDAV 配置')
     }
-    await api('/api/settings', {
-      method: 'PUT',
-      body: JSON.stringify({
-        sync_enabled: true,
-        sync_provider: 'webdav',
-        sync_endpoint: webdav.endpoint.trim(),
-        sync_username: webdav.username.trim(),
-      }),
-    })
-    if (password) {
-      const secret = await window.electronAPI.webdavSecretSave(password)
-      if (secret?.success !== true || secret?.stored !== true) throw new Error(secret?.message || '系统安全存储未保存 WebDAV 密码')
+    try {
       await api('/api/settings', {
         method: 'PUT',
-        body: JSON.stringify({ sync_password: secret.restartRequired ? password : '' }),
+        body: JSON.stringify({
+          sync_enabled: false,
+          sync_auto_enabled: false,
+          sync_provider: 'webdav',
+          sync_endpoint: webdav.endpoint.trim(),
+          sync_username: webdav.username.trim(),
+        }),
       })
-      setWebdav(current => ({ ...current, password: '' }))
+      if (password) {
+        const secret = await window.electronAPI.webdavSecretSave(password)
+        if (secret?.success !== true || secret?.stored !== true) throw new Error(secret?.message || '系统安全存储未保存 WebDAV 密码')
+        await api('/api/settings', {
+          method: 'PUT',
+          body: JSON.stringify({ sync_password: secret.restartRequired ? password : '' }),
+        })
+        setWebdav(current => ({ ...current, password: '' }))
+      }
+      await api('/api/sync/check', { method: 'POST', body: '{}' })
+      await api('/api/settings', { method: 'PUT', body: JSON.stringify({ sync_enabled: true }) })
+      if (!alive.current) return
+      setPlan(null)
+      await refresh()
+      if (alive.current) toast.success(password ? 'WebDAV 已验证并启用；密码已迁移到系统保护存储' : 'WebDAV 已验证并启用')
+    } catch (error) {
+      if (alive.current) await refresh()
+      throw error
     }
-    if (!alive.current) return
-    setPlan(null)
-    await refresh()
-    if (alive.current) toast.success(password ? 'WebDAV 已保存；密码已迁移到系统保护存储' : 'WebDAV 已保存并启用')
   })
 
   const clearWebDAVPassword = () => exclusive('secret', async () => {
@@ -144,11 +152,15 @@ export default function SyncCenterPanel() {
 
   const pause = () => updateSettings('settings', { sync_enabled: false }, '已暂停同步')
 
-  const updateAuto = (enabled, interval = settings?.sync_interval_minutes || 5) =>
-    updateSettings('auto', {
-      sync_auto_enabled: enabled,
-      sync_interval_minutes: Number(interval),
-    }, enabled ? '已开启自动同步' : '已暂停自动同步')
+  const updateAuto = (enabled, interval = settings?.sync_interval_minutes || 5) => exclusive('auto', async () => {
+    await api('/api/sync/auto', {
+      method: 'POST',
+      body: JSON.stringify({ enabled, interval_minutes: Number(interval) }),
+    })
+    if (!alive.current) return
+    await refresh()
+    if (alive.current) toast.success(enabled ? '连接验证通过，已开启自动同步' : '已暂停自动同步')
+  })
 
   const rebind = () => {
     if (!window.confirm('重新绑定只会清除本机同步基线、旧远端身份和未决冲突状态，不会删除笔记、附件或远端数据。继续吗？')) return
@@ -213,7 +225,7 @@ export default function SyncCenterPanel() {
     <div className="settings-card-header">
       <div>
         <h3>同步中心</h3>
-        <p>Phase 2D · WebDAV 系统保护凭据</p>
+        <p>Phase 2E · WebDAV 验证后启用</p>
       </div>
       <span className={'settings-status-pill ' + (enabled ? 'ok' : 'neutral')}>
         {enabled ? ('已启用 · ' + providerName(provider)) : '未启用'}
@@ -255,7 +267,7 @@ export default function SyncCenterPanel() {
         {hasAnySecret && <button className="btn small" disabled={!!busy} onClick={() => void clearWebDAVPassword()}>
           {busy === 'secret' ? '清除中…' : '清除已保存密码'}
         </button>}
-        {enabled && isWebDAV && <button className="btn" disabled={!!busy} onClick={() => void checkConnection()}>
+        {isWebDAV && webdav.endpoint.trim() && <button className="btn" disabled={!!busy} onClick={() => void checkConnection()}>
           {busy === 'check' ? '检查中…' : '测试连接（只读）'}
         </button>}
         {enabled && isWebDAV && <div className="sync-auto-controls">
@@ -278,7 +290,7 @@ export default function SyncCenterPanel() {
           </button>
         </div>}
         <button className="btn primary" disabled={!!busy || !settings || !webdav.endpoint.trim()} onClick={() => void saveWebDAV()}>
-          {busy === 'webdav' ? '保存中…' : (enabled && isWebDAV ? '保存 WebDAV 设置' : '保存并启用 WebDAV')}
+          {busy === 'webdav' ? '验证中…' : (enabled && isWebDAV ? '保存并重新验证 WebDAV' : '保存、验证并启用 WebDAV')}
         </button>
       </div>
     </div>
@@ -290,16 +302,17 @@ export default function SyncCenterPanel() {
       </button>}
     </div>
 
+    {status?.base_items > 0 && <div className="sync-rebind-notice">
+      <div><strong>切换 provider 或 WebDAV 地址？</strong><span>先重新绑定，避免把旧远端身份误带到新目标。此操作只重置同步元数据，并会暂停自动同步直到你重新开启。</span></div>
+      <button className="btn" disabled={!!busy} onClick={() => void rebind()}>{busy === 'rebind' ? '重置中…' : '重新绑定远端'}</button>
+    </div>}
+
     {enabled && <>
       <div className="sync-center-metrics">
         <div><strong>{status?.base_items ?? 0}</strong><span>已建立基线</span></div>
         <div><strong>{status?.open_conflicts ?? conflicts.length}</strong><span>待处理冲突</span></div>
         <div><strong>{status?.last_status || 'never'}</strong><span>最近状态</span></div>
       </div>
-      {status?.base_items > 0 && <div className="sync-rebind-notice">
-        <div><strong>切换 provider 或 WebDAV 地址？</strong><span>先重新绑定，避免把旧远端身份误带到新目标。此操作只重置同步元数据，并会暂停自动同步直到你重新开启。</span></div>
-        <button className="btn" disabled={!!busy} onClick={() => void rebind()}>{busy === 'rebind' ? '重置中…' : '重新绑定远端'}</button>
-      </div>}
       <div className="settings-action-row consumer-settings-actions">
         <button className="btn" disabled={!!busy} onClick={() => void preview()}>{busy === 'plan' ? '预演中…' : '预演同步'}</button>
         <button className="btn primary" disabled={!!busy} onClick={() => void synchronize()}>{busy === 'run' ? '同步中…' : '执行同步'}</button>
