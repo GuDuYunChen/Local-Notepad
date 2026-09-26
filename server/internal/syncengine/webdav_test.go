@@ -186,3 +186,45 @@ func TestWebDAVConnectionCheckIsReadOnlyAndValidatesStructure(t *testing.T) {
 	if _,err:=db.Exec(`UPDATE settings SET sync_username='bad'`);err!=nil{t.Fatal(err)}
 	if _,err:=engine.CheckRemote(context.Background());err==nil{t.Fatal("expected bad credentials to fail")}
 }
+
+
+func TestWebDAVConnectionCheckWorksBeforeSyncIsEnabled(t *testing.T) {
+	root:=t.TempDir()
+	handler:=&xwebdav.Handler{Prefix:"/",FileSystem:xwebdav.Dir(root),LockSystem:xwebdav.NewMemLS()}
+	var writes atomic.Int64
+	server:=httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter,r *http.Request){
+		username,password,ok:=r.BasicAuth()
+		if !ok||username!="alice"||password!="secret"{http.Error(w,"unauthorized",http.StatusUnauthorized);return}
+		switch r.Method{case "MKCOL",http.MethodPut,http.MethodDelete,"MOVE","COPY":writes.Add(1)}
+		handler.ServeHTTP(w,r)
+	}))
+	defer server.Close()
+
+	db,dataRoot:=testDB(t)
+	if _,err:=db.Exec(`UPDATE settings SET sync_enabled=0,sync_provider='webdav',sync_endpoint=?,sync_username='alice',sync_password='wrong'`,server.URL+"/local-notepad");err!=nil{t.Fatal(err)}
+	engine:=testEngine(db,dataRoot,"device-preflight")
+	engine.WebDAVPassword="secret"
+	check,err:=engine.CheckRemote(context.Background())
+	if err!=nil{t.Fatal(err)}
+	if check.Provider!="webdav"||check.Initialized{t.Fatalf("unexpected disabled preflight check: %+v",check)}
+	if got:=writes.Load();got!=0{t.Fatalf("disabled preflight wrote %d remote operations",got)}
+}
+
+func TestConfigureAutoRequiresSuccessfulRemoteVerification(t *testing.T) {
+	_,endpoint:=newWebDAVTestServer(t)
+	db,root:=testDB(t)
+	if _,err:=db.Exec(`UPDATE settings SET sync_provider='webdav',sync_endpoint=?,sync_username='bad',sync_password='wrong',sync_auto_enabled=0,sync_interval_minutes=5`,endpoint);err!=nil{t.Fatal(err)}
+	engine:=testEngine(db,root,"device-auto-verify")
+	engine.WebDAVPassword="secret"
+	if _,err:=engine.ConfigureAuto(context.Background(),true,5);err==nil{t.Fatal("enabled automatic sync without valid remote credentials")}
+	var enabled int
+	if err:=db.QueryRow(`SELECT sync_auto_enabled FROM settings WHERE id=1`).Scan(&enabled);err!=nil{t.Fatal(err)}
+	if enabled!=0{t.Fatal("failed verification still enabled automatic sync")}
+	if _,err:=db.Exec(`UPDATE settings SET sync_username='alice'`);err!=nil{t.Fatal(err)}
+	state,err:=engine.ConfigureAuto(context.Background(),true,15)
+	if err!=nil{t.Fatal(err)}
+	if !state.Enabled||state.Provider!="webdav"{t.Fatalf("unexpected state after verified auto enable: %+v",state)}
+	var interval int
+	if err:=db.QueryRow(`SELECT sync_auto_enabled,sync_interval_minutes FROM settings WHERE id=1`).Scan(&enabled,&interval);err!=nil{t.Fatal(err)}
+	if enabled!=1||interval!=15{t.Fatalf("unexpected verified automatic settings: %d %d",enabled,interval)}
+}
