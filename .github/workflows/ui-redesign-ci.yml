@@ -169,9 +169,12 @@ jobs:
         run: go -C server test ./internal/syncengine -run '^TestResolutionWitness' -count=1 -v
 
       - name: Verify read-only sync plan explorer on Windows
+        shell: pwsh
         run: |
           node --test scripts/sync-plan-view.node.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npx vitest run --root=. src/components/SyncPlanPanel.test.jsx src/components/SyncPlanIntegration.test.jsx
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build unsigned Windows NSIS package
         shell: pwsh
