@@ -105,6 +105,10 @@ jobs:
     needs: renderer-build
     runs-on: windows-latest
     timeout-minutes: 30
+    # Keep developers' local mirror preference; CI uses the upstream tool host.
+    # The NPM_CONFIG key takes precedence over .npmrc in electron-builder 24.13.3.
+    env:
+      NPM_CONFIG_ELECTRON_BUILDER_BINARIES_MIRROR: https://github.com/electron-userland/electron-builder-binaries/releases/download/
     steps:
       - name: Checkout
         uses: actions/checkout@v7
