@@ -61,6 +61,11 @@ jobs:
           node --test scripts/sync-conflict-review.node.mjs
           npx vitest run --root=. src/components/SyncConflictReview.test.jsx src/components/SyncCenterPanel.test.jsx
 
+      - name: Verify conflict text difference navigation
+        run: |
+          node --test scripts/sync-conflict-diff.node.mjs
+          npx vitest run --root=. src/components/SyncConflictDiff.test.jsx
+
       - name: Verify conflict lifecycle recovery
         run: go -C server test -race ./internal/syncengine -run '^TestConflictLifecycle' -count=3 -v
 
@@ -190,6 +195,14 @@ jobs:
           npx vitest run --root=. src/components/SyncPlanLifecycle.test.jsx
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Verify conflict text differences on Windows
+        shell: pwsh
+        run: |
+          node --test scripts/sync-conflict-diff.node.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npx vitest run --root=. src/components/SyncConflictDiff.test.jsx src/components/SyncConflictReview.test.jsx
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Build unsigned Windows NSIS package
         shell: pwsh
         env:
@@ -210,6 +223,20 @@ jobs:
         with:
           name: local-notepad-theme-${{ github.sha }}
           path: test-results/brand-theme/*.png
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Verify native conflict difference rendering
+        run: npx electron scripts/check-sync-conflict-diff-render.cjs
+
+      - name: Upload conflict difference render checks
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-notepad-conflict-diff-${{ github.sha }}
+          path: |
+            test-results/sync-conflict-diff/*.png
+            test-results/sync-conflict-diff/checks.json
           if-no-files-found: ignore
           retention-days: 7
 

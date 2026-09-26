@@ -3,6 +3,7 @@ import {
   captureConflictReview, matchesConflictReview, createConflictReviewGuard, conflictRecordLabel,
   conflictVersionSummary, conflictChangedFields,
 } from '~/services/syncConflictReview.mjs'
+import SyncConflictDiff from './SyncConflictDiff'
 import './SyncConflictReview.css'
 
 function Version({ record, side }) {
@@ -102,6 +103,7 @@ export default function SyncConflictReview({ conflict, scope, disabled = false, 
       <p>差异项：{changes.length ? changes.join('、') : '已展示字段相同，版本摘要仍不同；请核对完整内容'}。</p>
       <p className="sync-review-caption">这是冲突产生时的两端快照，不是实时编辑器。确认时会重读冲突；后台仍会校验基线和两端内容，不会自动合并或猜测版本。</p>
       <div className="sync-review-columns"><Version record={review.local_record} side="本机"/><Version record={review.remote_record} side="远端"/></div>
+      <SyncConflictDiff review={review} stale={stale}/>
       {stale && <p className="sync-review-warning" role="alert">冲突或同步目标已变化，旧对照不能提交。即使内容恢复原样，也需重新对照并确认。</p>}
       <fieldset disabled={locked || stale} className="sync-review-choice">
         <legend>选择要采用的版本</legend>
