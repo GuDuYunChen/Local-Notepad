@@ -38,7 +38,7 @@ export default function SyncActivityPanel({ wakeKey = '', onSettled = () => {} }
           if (requestedID.current === previous.id) {
             setMessage('原任务已结束；请以同步恢复状态确认结果，取消不等于回滚。')
           }
-          settled.current()
+          settled.current(previous)
         }
       },
     })

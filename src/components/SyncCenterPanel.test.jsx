@@ -52,7 +52,7 @@ function useWebDAV() { Object.assign(settings, { sync_provider: 'webdav', sync_e
 
 describe('SyncCenterPanel', () => {
   it('shows shared local-first scope and identity', async () => { await render(); expect(container.textContent).toContain('WebDAV 只替换传输层'); expect(container.textContent).toContain('笔记、文件夹、标签、标签关联和附件'); expect(container.textContent).toContain('device-a') })
-  it('previews without running', async () => { await render(); await click(button('预演同步')); expect(api).toHaveBeenCalledWith('/api/sync/plan', { method: 'POST', body: '{}' }); expect(container.textContent).toContain('上传 1 · 下载 2 · 冲突 0 · 无变化 3') })
+  it('previews without running', async () => { await render(); await click(button('预演同步')); expect(api).toHaveBeenCalledWith('/api/sync/plan', { method: 'POST', body: '{}', signal: expect.any(AbortSignal) }); expect(container.textContent).toContain('上传 1 · 下载 2 · 冲突 0 · 无变化 3') })
   it('runs only on explicit click', async () => { await render(); expect(api.mock.calls.some(([path]) => path === '/api/sync/run')).toBe(false); await click(button('执行同步')); expect(api).toHaveBeenCalledWith('/api/sync/run', { method: 'POST', body: '{}' }) })
   it('requires conflict side selection', async () => {
     status.open_conflicts = 1; status.last_status = 'conflicts'

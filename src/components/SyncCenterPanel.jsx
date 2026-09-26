@@ -5,6 +5,7 @@ import { createSyncStatusReader, mergeSyncDraft, syncHealthLabel, syncStatusLabe
 import SyncActivityPanel from './SyncActivityPanel'
 import SyncConflictReview from './SyncConflictReview'
 import SyncPlanPanel from './SyncPlanPanel'
+import { readSyncPlan } from '~/services/syncPlanRead.mjs'
 import { captureSyncPlan, invalidateSyncPlan, syncPlanObservation } from '~/services/syncPlanView.mjs'
 import { conflictScope, applyReviewedConflict } from '~/services/syncConflictReview.mjs'
 import './SyncCenterPanel.css'
@@ -23,6 +24,8 @@ export default function SyncCenterPanel() {
   const operation = useRef(false)
   const reader = useRef(null)
   const conflictRead = useRef(null)
+  const planRead = useRef(null)
+  const pendingTaskRefresh = useRef(false)
   const dirty = useRef({ endpoint: false, username: false })
   const autoEnabled = useRef(false)
   const [settings, setSettings] = useState(null)
@@ -83,17 +86,25 @@ export default function SyncCenterPanel() {
     return () => {
       alive.current = false
       conflictRead.current?.abort()
+      planRead.current?.abort()
+      pendingTaskRefresh.current = false
       current.dispose()
       if (reader.current === current) reader.current = null
     }
   }, [invalidatePlan])
 
   const refresh = useCallback(() => reader.current?.refresh({ allowPaused: true }) ?? Promise.resolve(false), [])
-  const refreshAfterTask = useCallback(() => {
-    if (alive.current && !operation.current) {
-      invalidatePlan()
-      void refresh()
+  const refreshAfterTask = useCallback(ended => {
+    if (!alive.current) return
+    // A completed preview/check cannot itself change the data it just read.
+    // Unknown kinds stay conservative; never drop a write-capable task's
+    // invalidation merely because another preview is still awaiting its reply.
+    if (!['plan', 'check'].includes(ended?.kind)) invalidatePlan()
+    if (operation.current) {
+      pendingTaskRefresh.current = true
+      return
     }
+    void refresh()
   }, [refresh, invalidatePlan])
   const refreshAfterChange = async message => {
     const fresh = await refresh()
@@ -122,6 +133,10 @@ export default function SyncCenterPanel() {
       if (alive.current) {
         setBusy('')
         reader.current?.setPaused(false)
+        if (pendingTaskRefresh.current) {
+          pendingTaskRefresh.current = false
+          void refresh()
+        }
       }
     }
   }
@@ -197,12 +212,20 @@ export default function SyncCenterPanel() {
   })
   const preview = () => exclusive('plan', async () => {
     const epoch = planEpoch.current
-    const next = await api('/api/sync/plan', { method: 'POST', body: '{}' })
-    if (!alive.current) return
-    const snapshot = captureSyncPlan(next, 'preview')
-    setPlan(epoch === planEpoch.current ? snapshot : invalidateSyncPlan(snapshot))
-    if (snapshot.detailState === 'invalid') toast.error(snapshot.message)
-    else toast.success('同步预演完成；没有写入远端或本机正文')
+    const controller = new AbortController()
+    planRead.current = controller
+    try {
+      const next = await readSyncPlan(signal => api('/api/sync/plan', {
+        method: 'POST', body: '{}', signal,
+      }), { signal: controller.signal })
+      if (!alive.current || controller.signal.aborted || planRead.current !== controller) return
+      const snapshot = captureSyncPlan(next, 'preview')
+      setPlan(epoch === planEpoch.current ? snapshot : invalidateSyncPlan(snapshot))
+      if (snapshot.detailState === 'invalid') toast.error(snapshot.message)
+      else toast.success('同步预演完成；没有写入远端或本机正文')
+    } finally {
+      if (planRead.current === controller) planRead.current = null
+    }
   })
   const synchronize = () => {
     const uncertain = ['applying', 'review_required'].includes(status?.recovery?.mode)
@@ -343,6 +366,7 @@ export default function SyncCenterPanel() {
       </div>
       <div className="settings-action-row consumer-settings-actions">
         <button className="btn" disabled={!!busy || draftChanged} onClick={() => void preview()}>{busy === 'plan' ? '预演中…' : '预演同步'}</button>
+        {busy === 'plan' && <button type="button" className="btn" onClick={() => planRead.current?.abort()}>停止等待预演</button>}
         <button className="btn primary" disabled={!!busy} onClick={() => void synchronize()}>{busy === 'run' ? '同步中…' : '执行同步'}</button>
         {isLab && <button className="btn" disabled={!!busy || typeof window.electronAPI?.openAppFolder !== 'function'} onClick={() => void openLab()}>打开模拟远端</button>}
       </div>

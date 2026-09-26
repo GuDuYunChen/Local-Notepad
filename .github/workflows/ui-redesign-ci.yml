@@ -82,6 +82,12 @@ jobs:
           node --test scripts/sync-plan-view.node.mjs
           npx vitest run --root=. src/components/SyncPlanPanel.test.jsx src/components/SyncPlanIntegration.test.jsx
 
+      - name: Verify sync plan read lifecycle
+        run: |
+          node scripts/check-sync-plan-lifecycle-baseline.mjs
+          node --test scripts/sync-plan-read.node.mjs
+          npx vitest run --root=. src/components/SyncPlanLifecycle.test.jsx
+
       - name: Verify editor exit save handshake
         run: |
           node --test scripts/editor-quit.node.mjs
@@ -174,6 +180,14 @@ jobs:
           node --test scripts/sync-plan-view.node.mjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npx vitest run --root=. src/components/SyncPlanPanel.test.jsx src/components/SyncPlanIntegration.test.jsx
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify sync plan read lifecycle on Windows
+        shell: pwsh
+        run: |
+          node --test scripts/sync-plan-read.node.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npx vitest run --root=. src/components/SyncPlanLifecycle.test.jsx
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build unsigned Windows NSIS package
