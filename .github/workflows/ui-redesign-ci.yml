@@ -77,6 +77,11 @@ jobs:
           node scripts/check-sync-write-witness-baseline.mjs
           go -C server test -race ./internal/syncengine -run '^TestResolutionWitness' -count=3 -v
 
+      - name: Verify read-only sync plan explorer
+        run: |
+          node --test scripts/sync-plan-view.node.mjs
+          npx vitest run --root=. src/components/SyncPlanPanel.test.jsx src/components/SyncPlanIntegration.test.jsx
+
       - name: Verify editor exit save handshake
         run: |
           node --test scripts/editor-quit.node.mjs
@@ -162,6 +167,11 @@ jobs:
 
       - name: Verify conflict commit witnesses on Windows
         run: go -C server test ./internal/syncengine -run '^TestResolutionWitness' -count=1 -v
+
+      - name: Verify read-only sync plan explorer on Windows
+        run: |
+          node --test scripts/sync-plan-view.node.mjs
+          npx vitest run --root=. src/components/SyncPlanPanel.test.jsx src/components/SyncPlanIntegration.test.jsx
 
       - name: Build unsigned Windows NSIS package
         shell: pwsh

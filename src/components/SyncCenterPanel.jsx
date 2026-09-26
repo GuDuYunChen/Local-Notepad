@@ -4,12 +4,12 @@ import { toast } from '~/services/toast'
 import { createSyncStatusReader, mergeSyncDraft, syncHealthLabel, syncStatusLabel } from '~/services/syncStatusReader.mjs'
 import SyncActivityPanel from './SyncActivityPanel'
 import SyncConflictReview from './SyncConflictReview'
+import SyncPlanPanel from './SyncPlanPanel'
+import { captureSyncPlan, invalidateSyncPlan, syncPlanObservation } from '~/services/syncPlanView.mjs'
 import { conflictScope, applyReviewedConflict } from '~/services/syncConflictReview.mjs'
 import './SyncCenterPanel.css'
 import './SyncHealth.css'
 
-const describePlan = plan => plan
-  ? `上传 ${plan.uploads || 0} · 下载 ${plan.downloads || 0} · 冲突 ${plan.conflicts || 0} · 无变化 ${plan.noops || 0}` : ''
 const providerName = provider => provider === 'webdav' ? 'WebDAV' : '本地实验室'
 const timeLabel = value => {
   if (!Number.isFinite(value) || value <= 0) return '暂无记录'
@@ -36,6 +36,12 @@ export default function SyncCenterPanel() {
   const [actionError, setActionError] = useState('')
   const [connectionCheck, setConnectionCheck] = useState(null)
   const savedTarget = useRef('')
+  const planEpoch = useRef(0)
+  const observedPlanContext = useRef(null)
+  const invalidatePlan = useCallback(() => {
+    planEpoch.current += 1
+    setPlan(invalidateSyncPlan)
+  }, [])
 
   useEffect(() => {
     alive.current = true
@@ -53,8 +59,14 @@ export default function SyncCenterPanel() {
         return { nextSettings, nextStatus, nextConflicts, nextSecret }
       },
       shouldPoll: () => autoEnabled.current,
-      onHealth: setHealth,
+      onHealth: next => {
+        setHealth(next)
+        if (next.error) invalidatePlan()
+      },
       onSnapshot: ({ nextSettings, nextStatus, nextConflicts, nextSecret }) => {
+        const observation = syncPlanObservation(nextSettings, nextStatus)
+        if (observedPlanContext.current !== null && observedPlanContext.current !== observation) invalidatePlan()
+        observedPlanContext.current = observation
         const target = JSON.stringify([nextSettings.sync_provider, nextSettings.sync_endpoint, nextSettings.sync_username])
         if (savedTarget.current && savedTarget.current !== target) setConnectionCheck(null)
         savedTarget.current = target
@@ -74,12 +86,15 @@ export default function SyncCenterPanel() {
       current.dispose()
       if (reader.current === current) reader.current = null
     }
-  }, [])
+  }, [invalidatePlan])
 
   const refresh = useCallback(() => reader.current?.refresh({ allowPaused: true }) ?? Promise.resolve(false), [])
   const refreshAfterTask = useCallback(() => {
-    if (alive.current && !operation.current) void refresh()
-  }, [refresh])
+    if (alive.current && !operation.current) {
+      invalidatePlan()
+      void refresh()
+    }
+  }, [refresh, invalidatePlan])
   const refreshAfterChange = async message => {
     const fresh = await refresh()
     if (!alive.current) return
@@ -92,7 +107,10 @@ export default function SyncCenterPanel() {
     reader.current?.setPaused(true)
     setBusy(key)
     setActionError('')
-    if (key !== 'check' && key !== 'folder') setConnectionCheck(null)
+    if (key !== 'check' && key !== 'folder') {
+      setConnectionCheck(null)
+      invalidatePlan()
+    }
     try { return await task() } catch (error) {
       if (alive.current) {
         const message = error?.message || '同步操作失败'
@@ -178,10 +196,13 @@ export default function SyncCenterPanel() {
     toast.success(detail)
   })
   const preview = () => exclusive('plan', async () => {
+    const epoch = planEpoch.current
     const next = await api('/api/sync/plan', { method: 'POST', body: '{}' })
     if (!alive.current) return
-    setPlan(next)
-    toast.success('同步预演完成；没有写入远端或本机正文')
+    const snapshot = captureSyncPlan(next, 'preview')
+    setPlan(epoch === planEpoch.current ? snapshot : invalidateSyncPlan(snapshot))
+    if (snapshot.detailState === 'invalid') toast.error(snapshot.message)
+    else toast.success('同步预演完成；没有写入远端或本机正文')
   })
   const synchronize = () => {
     const uncertain = ['applying', 'review_required'].includes(status?.recovery?.mode)
@@ -190,7 +211,7 @@ export default function SyncCenterPanel() {
       try {
         const result = await api('/api/sync/run', { method: 'POST', body: uncertain ? JSON.stringify({ acknowledge_uncertain: true }) : '{}' })
         if (!alive.current) return
-        setPlan(result?.plan || null)
+        setPlan(result?.plan ? captureSyncPlan(result.plan, 'run') : null)
         await refreshAfterChange(result?.conflicts ? '同步完成，有冲突需要人工处理' : '同步完成')
       } catch (error) {
         if (alive.current) await refresh()
@@ -231,6 +252,7 @@ export default function SyncCenterPanel() {
     if (result && result.success === false) throw new Error(result.message || '打开模拟远端失败')
   })
   const editDraft = (field, value) => {
+    invalidatePlan()
     if (field !== 'password') dirty.current[field] = true
     setWebdav(current => ({ ...current, [field]: value }))
     setConnectionCheck(null)
@@ -320,11 +342,11 @@ export default function SyncCenterPanel() {
         <div><strong>{syncStatusLabel(status?.last_status)}</strong><span>最近状态</span></div>
       </div>
       <div className="settings-action-row consumer-settings-actions">
-        <button className="btn" disabled={!!busy} onClick={() => void preview()}>{busy === 'plan' ? '预演中…' : '预演同步'}</button>
+        <button className="btn" disabled={!!busy || draftChanged} onClick={() => void preview()}>{busy === 'plan' ? '预演中…' : '预演同步'}</button>
         <button className="btn primary" disabled={!!busy} onClick={() => void synchronize()}>{busy === 'run' ? '同步中…' : '执行同步'}</button>
         {isLab && <button className="btn" disabled={!!busy || typeof window.electronAPI?.openAppFolder !== 'function'} onClick={() => void openLab()}>打开模拟远端</button>}
       </div>
-      {plan && <div className="sync-plan-summary" role="status"><strong>最近同步计划</strong><span>{describePlan(plan)}</span>{plan.needs_init && <small>首次执行会创建新的远端仓库身份。</small>}</div>}
+      <SyncPlanPanel snapshot={plan} disabled={!!busy || draftChanged} onPreview={() => void preview()}/>
       {status?.last_error && <p className="sync-center-error" role="alert">{status.last_error}</p>}
       {conflicts.length > 0 && <div className="sync-conflict-list">
         <div className="sync-conflict-heading"><strong>冲突中心</strong><span>不会自动覆盖，必须明确选择</span></div>
