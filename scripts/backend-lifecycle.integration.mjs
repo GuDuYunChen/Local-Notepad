@@ -48,6 +48,33 @@ test('ordinary CLI does not interpret stdin EOF as shutdown', opts, async t => {
   child.stdin.end(); await sleep(150)
   assert.equal(child.exitCode, null); assert.equal(child.signalCode, null)
 })
+test('fresh backend reads and persists partial settings without enabling sync', opts, async t => {
+  const { base, child } = await start(t)
+  const request = async (init) => {
+    const response = await fetch(base + '/api/settings', { ...init, signal: AbortSignal.timeout(5000) })
+    const result = await response.json()
+    assert.equal(response.ok, true, 'settings HTTP response')
+    assert.equal(result.code, 0, `fresh settings API: HTTP ${response.status} ${JSON.stringify(result)}`)
+    assert.ok(result.data, 'settings API includes its data')
+    return result.data
+  }
+  const initial = await request()
+  assert.equal(initial.theme, 'light')
+  assert.equal(initial.sync_enabled, false)
+  assert.equal(initial.sync_auto_enabled, false)
+  assert.deepEqual(initial.editor_opts, {})
+  await request({ method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ theme: 'dark' }) })
+  const saved = await request()
+  assert.equal(saved.theme, 'dark')
+  assert.equal(saved.sync_enabled, false)
+  assert.equal(saved.sync_auto_enabled, false)
+  assert.equal(saved.sync_provider, initial.sync_provider)
+  assert.equal(saved.sync_endpoint, initial.sync_endpoint)
+  assert.deepEqual(saved.editor_opts, initial.editor_opts)
+  const receipt = await stopChildProcess(child)
+  assert.equal(receipt.clean, true)
+  assert.equal(receipt.forced, false)
+})
 test('real backend shutdown preserves uncertain-write checkpoint', opts, async t => {
   let notify
   const entered = new Promise(r => { notify = r })

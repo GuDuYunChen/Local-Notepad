@@ -25,7 +25,7 @@ func (d *SettingsDAO) Get(ctx context.Context) (*model.Settings, error) {
 	var syncIntervalMinutes int
 
 	row := d.DB.QueryRowContext(ctx,
-		`SELECT theme, editor_opts, sync_enabled, sync_endpoint, COALESCE(sync_provider,''),
+		`SELECT theme, editor_opts, COALESCE(sync_enabled,0), sync_endpoint, COALESCE(sync_provider,''),
 			COALESCE(sync_username,''), COALESCE(sync_password,''),
 			COALESCE(sync_auto_enabled,0), COALESCE(sync_interval_minutes,5)
 		 FROM settings WHERE id = 1`)
