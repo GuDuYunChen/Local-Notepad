@@ -126,3 +126,50 @@ it('large/partial previews disclose their limits without changing the source dat
   await render(); await click(button('对照版本'))
   expect(container.textContent).toContain('预览未包含全部内容'); expect(conflict.local_record.file.content).toBe(content)
 })
+
+it('does not resurrect acknowledged consent after an observed A-B-A version change', async () => {
+  await render(); await click(button('保留本机')); await click(checkbox())
+  const original = conflict
+  conflict = conflictFixture({ remote_hash: 'd'.repeat(64) }); await render()
+  expect(checkbox().checked).toBe(false)
+  conflict = original; await render()
+  expect(button('确认处理此冲突').disabled).toBe(true)
+  expect(container.textContent).toContain('即使内容恢复原样')
+  expect(resolve).not.toHaveBeenCalled()
+  await click(button('重新对照'))
+  expect(checkbox().checked).toBe(false); expect(radio(0).checked).toBe(false)
+  await click(radio(0)); await click(checkbox()); await click(button('确认处理此冲突'))
+  expect(resolve).toHaveBeenCalledTimes(1)
+})
+it('does not resurrect consent after the target changes and then returns', async () => {
+  await render(); await click(button('采用远端')); await click(checkbox())
+  const original = scope
+  scope += '-different'; await render()
+  scope = original; await render()
+  expect(checkbox().checked).toBe(false); expect(button('确认处理此冲突').disabled).toBe(true)
+  expect(resolve).not.toHaveBeenCalled()
+})
+it('unchanged status refresh keeps a valid comparison and its explicit direction', async () => {
+  await render(); await click(button('采用远端')); await click(checkbox())
+  conflict = JSON.parse(JSON.stringify(conflict)); await render()
+  expect(checkbox().checked).toBe(true); expect(radio(1).checked).toBe(true)
+  expect(button('确认处理此冲突').disabled).toBe(false)
+  expect(resolve).not.toHaveBeenCalled()
+})
+it('latches a changed payload even when a caller reuses the same object reference', async () => {
+  await render(); await click(button('保留本机')); await click(checkbox())
+  const original = conflict.remote_record.file.content
+  conflict.remote_record.file.content = 'changed'; await render()
+  conflict.remote_record.file.content = original; await render()
+  expect(checkbox().checked).toBe(false); expect(button('确认处理此冲突').disabled).toBe(true)
+})
+it('a pending submission guard cannot become current again after target A-B-A', async () => {
+  let finish; resolve.mockImplementation(() => new Promise(r => { finish = r }))
+  await render(); await click(button('保留本机')); await click(checkbox()); await click(button('确认处理此冲突'))
+  const guard = resolve.mock.calls[0][2], original = scope
+  expect(guard()).toBe(true)
+  scope += '-changed'; await render(); expect(guard()).toBe(false)
+  scope = original; await render(); expect(guard()).toBe(false)
+  await act(async () => { finish(false); await flush() })
+  expect(resolve).toHaveBeenCalledTimes(1); expect(button('确认处理此冲突').disabled).toBe(true)
+})

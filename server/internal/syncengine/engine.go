@@ -675,19 +675,41 @@ type sqlExecer interface {
 }
 
 func (e *Engine) storeConflictWith(exec sqlExecer, ctx context.Context, item PlanItem, local Record, localOK bool, remote Record, remoteOK bool) error {
-	id := conflictID(item)
+	// A conflict ID identifies one open lifecycle, not just its version tuple.
+	// Reusing an old superseded/resolved ID loses A -> B -> A conflicts and can
+	// revive a previously reviewed request. Identical still-open tuples keep
+	// their existing ID (including legacy deterministic IDs); history is kept.
+	id, err := randomID(16)
+	if err != nil {
+		return err
+	}
 	now := e.now().Unix()
-	_, err := exec.ExecContext(ctx, `UPDATE sync_conflicts SET status='superseded', resolved_at=? WHERE item_id=? AND status='open' AND id<>?`, now,item.ID,id)
-	if err != nil { return err }
-	_, err = exec.ExecContext(ctx, `INSERT OR IGNORE INTO sync_conflicts
+	_, err = exec.ExecContext(ctx, `UPDATE sync_conflicts SET status='superseded', resolved_at=?
+		WHERE item_id=? AND status='open' AND NOT (base_hash=? AND local_hash=? AND remote_hash=?)`,
+		now, item.ID, item.BaseHash, item.LocalHash, item.RemoteHash)
+	if err != nil {
+		return err
+	}
+	_, err = exec.ExecContext(ctx, `INSERT INTO sync_conflicts
 		(id,item_id,base_hash,local_hash,remote_hash,local_record,remote_record,created_at,status,resolution,resolved_at)
-		VALUES(?,?,?,?,?,?,?,?, 'open','',0)`,
-		id,item.ID,item.BaseHash,item.LocalHash,item.RemoteHash,nullableRecord(local,localOK),nullableRecord(remote,remoteOK),now)
+		SELECT ?,?,?,?,?,?,?,?,'open','',0
+		WHERE NOT EXISTS (SELECT 1 FROM sync_conflicts WHERE item_id=? AND status='open'
+			AND base_hash=? AND local_hash=? AND remote_hash=?)`,
+		id, item.ID, item.BaseHash, item.LocalHash, item.RemoteHash, nullableRecord(local, localOK), nullableRecord(remote, remoteOK), now,
+		item.ID, item.BaseHash, item.LocalHash, item.RemoteHash)
 	return err
 }
 
 func (e *Engine) storeConflict(ctx context.Context, item PlanItem, local Record, localOK bool, remote Record, remoteOK bool) error {
-	return e.storeConflictWith(e.DB, ctx, item, local, localOK, remote, remoteOK)
+	tx, err := e.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err = e.storeConflictWith(tx, ctx, item, local, localOK, remote, remoteOK); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (e *Engine) setBaseWith(exec sqlExecer, ctx context.Context, id, hash string) error {
@@ -959,6 +981,14 @@ func (e *Engine) runUnlocked(ctx context.Context) (RunResult,error) {
 			local,localOK:=locals[item.ID]
 			remoteRecord,remoteOK:=remotes[item.ID]
 			if err=e.storeConflictWith(tx,ctx,item,local,localOK,remoteRecord,remoteOK);err!=nil{return err}
+		}
+		// Retire obsolete snapshots only alongside a successfully applied plan.
+		// This is version convergence, not an implicit local/remote resolution.
+		if item.Action == "upload" || item.Action == "download" || item.Action == "noop" {
+			if _, err = tx.ExecContext(ctx, `UPDATE sync_conflicts SET status='superseded',resolved_at=?
+				WHERE item_id=? AND status='open'`, e.now().Unix(), item.ID); err != nil {
+				return err
+			}
 		}
 		return nil
 	}

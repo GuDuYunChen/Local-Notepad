@@ -1,6 +1,6 @@
-import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useLayoutEffect, useId, useMemo, useRef, useState } from 'react'
 import {
-  captureConflictReview, matchesConflictReview, conflictRecordLabel,
+  captureConflictReview, matchesConflictReview, createConflictReviewGuard, conflictRecordLabel,
   conflictVersionSummary, conflictChangedFields,
 } from '~/services/syncConflictReview.mjs'
 import './SyncConflictReview.css'
@@ -27,16 +27,26 @@ export default function SyncConflictReview({ conflict, scope, disabled = false, 
   const [review, setReview] = useState(null)
   const [choice, setChoice] = useState('')
   const [acknowledged, setAcknowledged] = useState(false)
+  const [invalidated, setInvalidated] = useState(false)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState('')
   const [completed, setCompleted] = useState(null)
   const alive = useRef(false), inFlight = useRef(false), latest = useRef(null), activeReview = useRef(null)
-  const heading = useRef(null), opener = useRef(null)
-  latest.current = { conflict, scope }
-  activeReview.current = review
-  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
+  const heading = useRef(null), opener = useRef(null), reviewGuard = useRef(null)
+  useLayoutEffect(() => {
+    latest.current = { conflict, scope }
+    activeReview.current = review
+    if (review && !invalidated && !reviewGuard.current?.observe(conflict, scope)) {
+      setInvalidated(true)
+      setAcknowledged(false)
+    }
+  })
+  useEffect(() => {
+    alive.current = true
+    return () => { alive.current = false; reviewGuard.current?.invalidate() }
+  }, [])
   useEffect(() => { if (review) heading.current?.focus() }, [review])
-  const stale = !!review && !matchesConflictReview(review, conflict, scope)
+  const stale = !!review && (invalidated || !matchesConflictReview(review, conflict, scope))
   const done = !!completed && matchesConflictReview(completed, conflict, scope)
   const locked = disabled || pending || done
   const show = (side = '', event) => {
@@ -44,22 +54,26 @@ export default function SyncConflictReview({ conflict, scope, disabled = false, 
     try {
       const next = captureConflictReview(conflict, scope)
       if (event?.currentTarget) opener.current = event.currentTarget
+      reviewGuard.current?.invalidate()
+      reviewGuard.current = createConflictReviewGuard(next)
+      setInvalidated(false)
       setReview(next); setChoice(next[side + '_record'] ? side : '')
       setAcknowledged(false); setError('')
     } catch (reason) { setError(reason.message) }
   }
   const close = () => {
     if (inFlight.current) return
-    setReview(null); setChoice(''); setAcknowledged(false); setError('')
+    reviewGuard.current?.invalidate()
+    setReview(null); setChoice(''); setAcknowledged(false); setInvalidated(false); setError('')
     if (opener.current?.isConnected) opener.current.focus()
   }
   const choose = side => { setChoice(side); setAcknowledged(false); setError('') }
   const submit = async () => {
     if (locked || stale || inFlight.current || !acknowledged || !review?.[choice + '_record']) return
-    const captured = review, side = choice
+    const captured = review, side = choice, guard = reviewGuard.current
     inFlight.current = true; setPending(true); setError('')
-    const isCurrent = () => alive.current && activeReview.current === captured &&
-      matchesConflictReview(captured, latest.current.conflict, latest.current.scope)
+    const isCurrent = () => alive.current && activeReview.current === captured && guard === reviewGuard.current &&
+      guard?.observe(latest.current.conflict, latest.current.scope) === true
     try {
       const result = await onResolve(captured, side, isCurrent)
       if (!alive.current) return
@@ -88,7 +102,7 @@ export default function SyncConflictReview({ conflict, scope, disabled = false, 
       <p>差异项：{changes.length ? changes.join('、') : '已展示字段相同，版本摘要仍不同；请核对完整内容'}。</p>
       <p className="sync-review-caption">这是冲突产生时的两端快照，不是实时编辑器。确认时会重读冲突；后台仍会校验基线和两端内容，不会自动合并或猜测版本。</p>
       <div className="sync-review-columns"><Version record={review.local_record} side="本机"/><Version record={review.remote_record} side="远端"/></div>
-      {stale && <p className="sync-review-warning" role="alert">冲突或同步目标已变化，旧对照不能提交。请重新对照并确认。</p>}
+      {stale && <p className="sync-review-warning" role="alert">冲突或同步目标已变化，旧对照不能提交。即使内容恢复原样，也需重新对照并确认。</p>}
       <fieldset disabled={locked || stale} className="sync-review-choice">
         <legend>选择要采用的版本</legend>
         <label><input type="radio" name={choiceGroup} checked={choice === 'local'} disabled={!review.local_record} onChange={() => choose('local')}/>保留本机版本 → 更新远端</label>

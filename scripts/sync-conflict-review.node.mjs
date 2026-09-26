@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  captureConflictReview, matchesConflictReview, conflictScope, conflictContentPreview,
+  captureConflictReview, matchesConflictReview, createConflictReviewGuard, conflictScope, conflictContentPreview,
   conflictVersionSummary, conflictChangedFields, applyReviewedConflict,
 } from '../src/services/syncConflictReview.mjs'
 import { conflictFixture, fileRecord, settingsFixture, statusFixture } from './fixtures/sync-conflict-review.mjs'
@@ -181,4 +181,49 @@ test('abort before or during recheck prevents mutation and releases ignored read
   h.load = s => { signal = s; next.abort(); return new Promise(() => {}) }
   await assert.rejects(applyReviewedConflict(h.review, 'local', { ...h, signal: next.signal }), /停止/)
   assert.equal(signal.aborted, true); assert.deepEqual(h.calls, [])
+})
+
+test('review guard latches an observed A-B-A version change', () => {
+  const c = conflictFixture(), review = snapshot(c), guard = createConflictReviewGuard(review)
+  assert.equal(guard.observe(c, scope), true)
+  assert.equal(guard.observe(conflictFixture({ remote_hash: 'd'.repeat(64) }), scope), false)
+  assert.equal(guard.observe(c, scope), false)
+  assert.equal(guard.isCurrent(), false)
+})
+test('review guard latches an A-B-A target change with otherwise identical bytes', () => {
+  const c = conflictFixture(), guard = createConflictReviewGuard(snapshot(c))
+  assert.equal(guard.observe(c, scope + '-other'), false)
+  assert.equal(guard.observe(c, scope), false)
+})
+test('an explicit new review gets a separate guard and cannot revive an old request', () => {
+  const c = conflictFixture(), review = snapshot(c), old = createConflictReviewGuard(review)
+  old.invalidate()
+  const next = createConflictReviewGuard(snapshot(c))
+  assert.equal(next.observe(c, scope), true)
+  assert.equal(old.observe(c, scope), false)
+})
+test('unchanged reordered snapshots do not revoke consent during ordinary refresh', () => {
+  const c = conflictFixture(), guard = createConflictReviewGuard(snapshot(c))
+  for (let i = 0; i < 10; i++) assert.equal(guard.observe(Object.fromEntries(Object.entries(c).reverse()), scope), true)
+})
+test('missing or malformed observed snapshots permanently revoke their guard', () => {
+  const c = conflictFixture()
+  for (const value of [null, {}, { ...c, local_record: null }]) {
+    const guard = createConflictReviewGuard(snapshot(c))
+    assert.equal(guard.observe(value, scope), false)
+    assert.equal(guard.observe(c, scope), false)
+  }
+})
+test('a stale guard prevents submission even after the captured version returns', async () => {
+  const h = harness(), guard = createConflictReviewGuard(h.review)
+  guard.observe({ ...h.c, status: 'superseded' }, scope)
+  guard.observe(h.c, scope)
+  await assert.rejects(applyReviewedConflict(h.review, 'local', { ...h, isCurrent: guard.isCurrent }), /失效/)
+  assert.deepEqual(h.calls, [])
+})
+test('abort after the recheck but before the final send cannot issue a write', async () => {
+  const h = harness(), controller = new AbortController(); let checks = 0
+  const isCurrent = () => { if (++checks === 2) controller.abort(); return true }
+  await assert.rejects(applyReviewedConflict(h.review, 'local', { ...h, signal: controller.signal, isCurrent }), /失效/)
+  assert.deepEqual(h.calls, ['read'])
 })

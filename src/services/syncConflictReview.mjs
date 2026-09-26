@@ -80,6 +80,20 @@ export function matchesConflictReview(review, conflict, scope) {
   try { return JSON.stringify(review) === JSON.stringify(captureConflictReview(conflict, scope)) } catch { return false }
 }
 
+// Once an observed snapshot/target changes, returning to the same bytes must
+// not revive prior consent. A new explicit review gets a new guard.
+export function createConflictReviewGuard(review) {
+  let valid = object(review) && review.status === 'open'
+  return Object.freeze({
+    observe(conflict, scope) {
+      valid = valid && matchesConflictReview(review, conflict, scope)
+      return valid
+    },
+    invalidate() { valid = false },
+    isCurrent() { return valid },
+  })
+}
+
 export function conflictRecordLabel(record, fallback = '未知对象') {
   if (record?.state === 'purged') return '已永久删除'
   if (record?.kind === 'attachment') return typeof record.attachment?.name === 'string' ? record.attachment.name : fallback
@@ -198,7 +212,7 @@ export async function applyReviewedConflict(review, choice, { load, write, isCur
   if (candidates.length !== 1 || !matchesConflictReview(review, candidates[0], current.scope)) {
     throw new Error('冲突或同步目标已变化，请刷新并重新对照；未提交处理请求')
   }
-  if (!isCurrent()) throw new Error('当前对照已失效，未提交处理请求')
+  if (!isCurrent() || signal?.aborted) throw new Error('当前对照已失效，未提交处理请求')
   // One explicit submission only. A rejected/lost response is never auto-replayed.
   return write(review.id, choice)
 }
