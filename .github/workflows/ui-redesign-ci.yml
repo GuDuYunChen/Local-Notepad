@@ -59,7 +59,7 @@ jobs:
       - name: Verify editor exit save handshake
         run: |
           node --test scripts/editor-quit.node.mjs
-          npx vitest run --root=. src/components/EditorQuit.test.jsx
+          npx vitest run --root=. src/components/EditorQuit.test.jsx src/components/EditorQuitSource.test.jsx
 
       - name: Run backend tests
         working-directory: server
