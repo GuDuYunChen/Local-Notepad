@@ -185,12 +185,21 @@ export default function SyncCenterPanel() {
     setPlan(next)
     toast.success('同步预演完成；没有写入远端或本机正文')
   })
-  const synchronize = () => exclusive('run', async () => {
-    const result = await api('/api/sync/run', { method: 'POST', body: '{}' })
-    if (!alive.current) return
-    setPlan(result?.plan || null)
-    await refreshAfterChange(result?.conflicts ? '同步完成，有冲突需要人工处理' : '同步完成')
-  })
+  const synchronize = () => {
+    const uncertain = ['applying', 'review_required'].includes(status?.recovery?.mode)
+    if (uncertain && !window.confirm('上次同步可能已写入远端或本机。请先核查两端数据；继续会重新读取远端并尝试同步，不会自动回滚。确认手动重试吗？')) return
+    return exclusive('run', async () => {
+      try {
+        const result = await api('/api/sync/run', { method: 'POST', body: uncertain ? JSON.stringify({ acknowledge_uncertain: true }) : '{}' })
+        if (!alive.current) return
+        setPlan(result?.plan || null)
+        await refreshAfterChange(result?.conflicts ? '同步完成，有冲突需要人工处理' : '同步完成')
+      } catch (error) {
+        if (alive.current) await refresh()
+        throw error
+      }
+    })
+  }
   const resolve = (id, choice) => exclusive(id + ':' + choice, async () => {
     await api('/api/sync/conflicts/' + encodeURIComponent(id) + '/resolve', { method: 'POST', body: JSON.stringify({ choice }) })
     await refreshAfterChange(choice === 'local' ? '已保留本机版本' : '已采用远端版本')
@@ -225,6 +234,13 @@ export default function SyncCenterPanel() {
       </div>
       <span>最近同步尝试：{timeLabel(Number(status?.last_sync_at) * 1000)} · {syncStatusLabel(status?.last_status)}</span>
       <span>状态读取时间：{timeLabel(health.lastReadAt)}</span>
+      {status?.recovery && <div className="sync-health-warning" role="status" aria-label="同步任务恢复状态">
+        <strong>{status.recovery.mode === 'backoff' ? '同步预检暂缓' : ['applying', 'review_required'].includes(status.recovery.mode) ? '写入结果待确认' : status.recovery.mode === 'blocked' ? '自动同步需要处理' : '同步任务记录'}</strong>
+        <span>最近确认成功：{timeLabel(Number(status.recovery.last_success_at) * 1000)}</span>
+        {status.recovery.next_attempt_at > 0 && <span>同步最早重试时间：{timeLabel(Number(status.recovery.next_attempt_at) * 1000)}。刷新状态不会提前重试。</span>}
+        {['applying', 'review_required'].includes(status.recovery.mode) && <span>任务可能仍在执行，或上次中断后结果尚未确认。自动同步不会重跑；请核查两端数据，再点击“执行同步”明确确认。</span>}
+        {status.recovery.mode === 'blocked' && <span>请修复连接配置或远端问题后手动执行同步。只读连接检查不会解除写入结果待确认状态。</span>}
+      </div>}
       {health.error && <div className="sync-health-warning" role="status">
         <span>{health.error}。连续读取失败 {health.failures} 次。</span>
         {health.retryAt > 0 && <span>下次状态读取：{timeLabel(health.retryAt)}；也可手动刷新。</span>}

@@ -203,7 +203,9 @@ func main() {
 
 	uploadController := &controller.UploadController{UploadDir: uploadPath}
 	syncEngine := &syncengine.Engine{DB: db, DataDir: filepath.Dir(dbPath), WebDAVPassword: os.Getenv("NOTEPAD_WEBDAV_PASSWORD")}
-	syncController := &controller.SyncController{Engine: syncEngine}
+	syncRecovery := syncengine.NewRecoveryRunner(syncEngine)
+	settingsController.SyncGuard = syncRecovery
+	syncController := &controller.SyncController{Engine: syncEngine, Recovery: syncRecovery}
 
 	fileController.Register(group)
 	settingsController.Register(group)
@@ -212,8 +214,8 @@ func main() {
 	syncController.Register(group)
 
 	// Background sync starts after the local API has had time to settle. The
-	// engine itself enforces due-time, conflict and single-run guards.
-	go syncengine.RunAutoScheduler(ctx, syncEngine, 15*time.Second, 30*time.Second)
+	// recovery runner persists preflight delays and blocks ambiguous write retries.
+	go syncengine.RunRecoveryScheduler(ctx, syncRecovery, 15*time.Second, 30*time.Second)
 
 	// 优雅退出：监听系统信号
 	quit := make(chan os.Signal, 1)
