@@ -42,6 +42,11 @@ jobs:
       - name: Build renderer
         run: npm run build:renderer
 
+      - name: Verify editor cache and save receipt regressions
+        run: |
+          node --test scripts/editor-cache-regression.node.mjs
+          npx vitest run --root=. src/components/TextEditor.test.jsx src/components/TextEditorLoad.test.jsx
+
       - name: Run redesign smoke tests
         run: npm run test:ui
 

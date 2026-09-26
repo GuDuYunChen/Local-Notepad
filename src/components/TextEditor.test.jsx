@@ -4,7 +4,8 @@ import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import TextEditor from './TextEditor'
 import { api } from '~/services/api'
-import { removeEditorDraft } from '~/services/editorDraftCache'
+import { readEditorDraft, removeEditorDraft, writeEditorDraft } from '~/services/editorDraftCache'
+import { editorQuit } from '~/services/editorQuit.mjs'
 
 vi.mock('~/services/api', () => ({
   api: vi.fn(),
@@ -47,6 +48,8 @@ describe('TextEditor save coordination', () => {
     localStorage.clear()
     removeEditorDraft('file-1')
     removeEditorDraft('file-2')
+    editorQuit.forget('file-1')
+    editorQuit.forget('file-2')
     globalThis.IS_REACT_ACT_ENVIRONMENT = true
     container = document.createElement('div')
     document.body.appendChild(container)
@@ -65,6 +68,10 @@ describe('TextEditor save coordination', () => {
     delete globalThis.IS_REACT_ACT_ENVIRONMENT
     delete globalThis.__textEditorMockOnChange
     delete globalThis.__textEditorMockInitialContent
+    editorQuit.forget('file-1')
+    editorQuit.forget('file-2')
+    removeEditorDraft('file-1')
+    removeEditorDraft('file-2')
     vi.clearAllTimers()
     vi.useRealTimers()
   })
@@ -532,7 +539,7 @@ describe('TextEditor save coordination', () => {
     await act(async () => {
       pending.get('file-1')({
         id: 'file-1',
-        content: 'saved-one',
+        content: '{"root":{"children":[{"type":"paragraph","children":[{"type":"text","text":"one"}]}]}}',
         updated_at: 2,
       })
       await Promise.resolve()
@@ -543,7 +550,7 @@ describe('TextEditor save coordination', () => {
     await act(async () => {
       pending.get('file-2')({
         id: 'file-2',
-        content: 'saved-two',
+        content: '{"root":{"children":[{"type":"paragraph","children":[{"type":"text","text":"two"}]}]}}',
         updated_at: 3,
       })
       await currentSave
@@ -885,7 +892,7 @@ describe('TextEditor save coordination', () => {
     await act(async () => {
       putRequests[0].resolve({
         id: 'file-1',
-        content: '{"root":{"children":[]}}',
+        content: '{"root":{"children":[{"type":"paragraph","children":[{"type":"text","text":"changed"}]}]}}',
         updated_at: 2,
       })
       await savePromise
@@ -894,6 +901,94 @@ describe('TextEditor save coordination', () => {
     await expect(savePromise).resolves.toMatchObject({
       id: 'file-1',
       updated_at: 2,
+    })
+  })
+
+  describe('exit cache and strict save receipt regression', () => {
+    const baseline = '{"root":{"children":[]}}'
+    const draft = '{"root":{"children":[{"type":"paragraph","children":[{"type":"text","text":"unsent draft"}]}]}}'
+    async function mountNote(props = {}) {
+      await act(async () => root.render(<TextEditor activeId="file-1" autoSaveOnSwitch={false} {...props} />))
+      await flushPromises()
+    }
+    async function edit(content) {
+      await act(async () => { globalThis.__textEditorMockOnChange(content); await Promise.resolve() })
+    }
+    async function removeEditor() {
+      await act(async () => root.render(null))
+    }
+
+    it('does not create a draft when an unchanged note is unmounted', async () => {
+      api.mockResolvedValue({ id: 'file-1', content: baseline, updated_at: 1 })
+      await mountNote(); await removeEditor()
+      expect(readEditorDraft('file-1')).toBeNull()
+    })
+
+    it('reopens a changed server note without a phantom cache from the previous clean mount', async () => {
+      api.mockResolvedValue({ id: 'file-1', content: baseline, updated_at: 1 })
+      await mountNote(); await removeEditor()
+      // No cache reset between the two mounts: this reproduces the old regression.
+      api.mockResolvedValue({ id: 'file-1', content: draft, updated_at: 1 })
+      await mountNote()
+      expect(globalThis.__textEditorMockInitialContent).toBe(draft)
+      expect(readEditorDraft('file-1')).toBeNull()
+    })
+
+    it('keeps the original cache age during a clean quit inspection', async () => {
+      writeEditorDraft('file-1', baseline, 1000)
+      const before = readEditorDraft('file-1')
+      api.mockResolvedValue({ id: 'file-1', content: baseline, updated_at: 1 })
+      await mountNote()
+      await act(async () => { vi.advanceTimersByTime(1000); await editorQuit.flush() })
+      expect(readEditorDraft('file-1')).toEqual(before)
+      expect(api).toHaveBeenCalledTimes(1)
+    })
+
+    it('retains an unsent dirty draft before the cache debounce fires', async () => {
+      api.mockResolvedValue({ id: 'file-1', content: baseline, updated_at: 1 })
+      await mountNote(); await edit(draft)
+      expect(readEditorDraft('file-1')).toBeNull()
+      await removeEditor()
+      expect(readEditorDraft('file-1').content).toBe(draft)
+      // Browser storage clearing must not be mistaken for clearing the memory fallback.
+      localStorage.clear()
+      expect(readEditorDraft('file-1').content).toBe(draft)
+      await expect(editorQuit.flush()).rejects.toMatchObject({ code: 'unresolved' })
+    })
+
+    it('caches a reverted baseline before aborting its older in-flight write', async () => {
+      api.mockImplementation((_path, options) => {
+        if (!options?.method) return Promise.resolve({ id: 'file-1', content: baseline, updated_at: 1 })
+        return new Promise((_resolve, reject) => {
+          options.signal.addEventListener('abort', () => {
+            const error = new Error('aborted'); error.name = 'AbortError'; reject(error)
+          }, { once: true })
+        })
+      })
+      const ref = React.createRef()
+      await mountNote({ ref }); await edit(draft)
+      let pending
+      await act(async () => { pending = ref.current.save(); await Promise.resolve() })
+      await edit(baseline); await removeEditor(); await pending
+      expect(readEditorDraft('file-1').content).toBe(baseline)
+      expect(editorQuit.pending()).toBe(1)
+    })
+
+    it.each([
+      ['missing', undefined],
+      ['wrong-id', { id: 'file-2', content: draft }],
+      ['wrong-content', { id: 'file-1', content: 'not the submitted draft' }],
+      ['missing-content', { id: 'file-1' }],
+    ])('rejects a %s save receipt without approving the draft', async (_name, receipt) => {
+      api.mockImplementation((_path, options) => Promise.resolve(options?.method
+        ? receipt : { id: 'file-1', content: baseline, updated_at: 1 }))
+      const ref = React.createRef(), onSaved = vi.fn()
+      await mountNote({ ref, onSaved }); await edit(draft)
+      await act(async () => { await expect(ref.current.save()).rejects.toThrow('正文保存响应未确认') })
+      expect(ref.current.getReferenceRefactorState().savedContent).toBe(baseline)
+      expect(onSaved).not.toHaveBeenCalled()
+      expect(editorQuit.pending()).toBe(1)
+      expect(container.textContent).toContain('保存失败')
     })
   })
 })

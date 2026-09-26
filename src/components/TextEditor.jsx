@@ -178,6 +178,17 @@ function TextEditorInternal({
     return savePromise
   }, [beginSaving, endSaving])
 
+  // Closing or inspecting a clean document is not a new edit. Stamping it as
+  // a fresh draft can mask newer server content when the document is reopened.
+  // A pending write for this same document still needs a recovery snapshot,
+  // even if the user has reverted the visible text to the previous baseline.
+  const cachePendingDraft = React.useCallback(() => {
+    const id = currentIdRef.current
+    if (!id || loadedDocumentRef.current !== id || deletedIdsRef.current?.has(id)) return
+    if (contentRef.current === lastSavedContentRef.current && !inFlightSavesRef.current.has(id)) return
+    writeEditorDraft(id, contentRef.current)
+  }, [])
+
   useEffect(() => editorQuit.register(createEditorQuitParticipant({
     snapshot: () => ({
       id: currentIdRef.current,
@@ -191,12 +202,10 @@ function TextEditorInternal({
     cache: () => {
       window.clearTimeout(saveTimerRef.current)
       saveTimerRef.current = null
-      if (currentIdRef.current && loadedDocumentRef.current === currentIdRef.current && !deletedIdsRef.current?.has(currentIdRef.current)) {
-        writeEditorDraft(currentIdRef.current, contentRef.current)
-      }
+      cachePendingDraft()
     },
     save: () => saveNow('quit'),
-  })), [saveNow])
+  })), [saveNow, cachePendingDraft])
 
   useImperativeHandle(ref, () => ({
     save: () => saveNow('external'),
@@ -359,9 +368,7 @@ function TextEditorInternal({
   }, [activeId, loadAttempt, saveNow, syncCurrentSavingState])
 
   useEffect(() => () => {
-    if (currentIdRef.current && loadedDocumentRef.current === currentIdRef.current && !deletedIdsRef.current?.has(currentIdRef.current)) {
-      writeEditorDraft(currentIdRef.current, contentRef.current)
-    }
+    cachePendingDraft()
     if (saveTimerRef.current) {
       window.clearTimeout(saveTimerRef.current)
       saveTimerRef.current = null
@@ -375,7 +382,7 @@ function TextEditorInternal({
     }
     saveControllersRef.current.clear()
     inFlightSavesRef.current.clear()
-  }, [])
+  }, [cachePendingDraft])
 
   useEffect(() => {
     if (intervalRef.current) window.clearInterval(intervalRef.current)
