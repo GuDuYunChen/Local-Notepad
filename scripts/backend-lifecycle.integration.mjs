@@ -61,7 +61,8 @@ test('real backend shutdown preserves uncertain-write checkpoint', opts, async t
   const { child, root, base } = await start(t)
   const settings = await fetch(base+'/api/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ sync_enabled: true, sync_provider: 'webdav', sync_endpoint: `http://127.0.0.1:${remote.address().port}/dav` }), signal: AbortSignal.timeout(5000) })
-  assert.equal((await settings.json()).code, 0)
+  const settingsResult = await settings.json()
+  assert.equal(settingsResult.code, 0, `configure lifecycle fixture: HTTP ${settings.status} ${JSON.stringify(settingsResult)}`)
   const run = fetch(base+'/api/sync/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(15000) }).then(r => r.text()).catch(() => '')
   await Promise.race([entered, sleep(8000).then(() => { throw new Error('write stage was not entered') })])
   const receipt = await stopChildProcess(child)
