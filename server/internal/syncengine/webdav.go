@@ -2,6 +2,7 @@ package syncengine
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -30,6 +31,7 @@ type WebDAVRemote struct {
 	username string
 	password string
 	client   *http.Client
+	operationContext context.Context
 }
 
 type webDAVMultiStatus struct {
@@ -85,7 +87,7 @@ func (r *WebDAVRemote) remoteURL(rel string) string {
 }
 
 func (r *WebDAVRemote) request(method, rel string, body io.Reader, size int64, headers map[string]string) (*http.Response, error) {
-	req, err := http.NewRequest(method, r.remoteURL(rel), body)
+	req, err := http.NewRequestWithContext(r.requestContext(), method, r.remoteURL(rel), body)
 	if err != nil { return nil, &WebDAVTransportError{cause: err} }
 	req.Header.Set("User-Agent", "Local-Notepad-WebDAV/1")
 	if size >= 0 { req.ContentLength = size }
@@ -342,12 +344,12 @@ func (r *WebDAVRemote) createLock(token string) (bool, error) {
 	payload, _ := json.Marshal(webDAVLockPayload{Token: token, At: time.Now().UTC().Format(time.RFC3339Nano)})
 	resp, err = r.request(http.MethodPut, "locks/sync.lock/owner.json", bytes.NewReader(payload), int64(len(payload)), nil)
 	if err != nil {
-		_ = r.deleteLock()
+		r.releaseLock(token)
 		return false, err
 	}
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
 		defer closeResponse(resp)
-		_ = r.deleteLock()
+		r.releaseLock(token)
 		return false, webDAVStatusError(resp, "写入 WebDAV 同步锁")
 	}
 	closeResponse(resp)
@@ -365,9 +367,7 @@ func (r *WebDAVRemote) deleteLock() error {
 }
 
 func (r *WebDAVRemote) releaseLock(token string) {
-	current, err := r.readLock()
-	if err != nil || current.Token != token { return }
-	_ = r.deleteLock()
+	r.releaseLockWithin(token, webDAVLockCleanupLimit)
 }
 
 func (r *WebDAVRemote) AcquireLock() (*RemoteLock, error) {

@@ -17,8 +17,10 @@ import (
 // whether a WHOLE attempt is safe to start. It never automatically replays a
 // failed Engine.Run or Engine.Resolve.
 type RecoveryRunner struct {
-	engine *Engine
-	jobs   *syncjob.Coordinator
+	engine      *Engine
+	jobs        *syncjob.Coordinator
+	readTimeout time.Duration
+	runTimeout  time.Duration
 }
 type RecoveryState struct {
 	State
@@ -87,6 +89,8 @@ func (r *RecoveryRunner) Status(ctx context.Context) (RecoveryState, error) {
 	return RecoveryState{State: s, Recovery: j}, nil
 }
 func (r *RecoveryRunner) run(ctx context.Context, manual, acknowledged bool) (RunResult, error) {
+	ctx, cancel := withSyncBudget(ctx, r.runTimeout, syncRunLimit)
+	defer cancel()
 	_, interval, err := r.engine.autoConfig(ctx)
 	if err != nil {
 		return RunResult{}, err
@@ -98,6 +102,8 @@ func (r *RecoveryRunner) run(ctx context.Context, manual, acknowledged bool) (Ru
 	var result RunResult
 	err = r.jobs.Execute(ctx, scope, manual, acknowledged, interval,
 		func(ctx context.Context) error {
+			ctx, cancel := withSyncBudget(ctx, r.readTimeout, syncReadLimit)
+			defer cancel()
 			actual, e := r.scope(ctx)
 			if e != nil {
 				return e
@@ -135,6 +141,8 @@ func (r *RecoveryRunner) Run(ctx context.Context, acknowledged bool) (RunResult,
 	return r.run(ctx, true, acknowledged)
 }
 func (r *RecoveryRunner) AutoTick(ctx context.Context) (AutoTickResult, error) {
+	ctx, cancel := withSyncBudget(ctx, r.runTimeout, syncRunLimit)
+	defer cancel()
 	enabled, interval, err := r.engine.autoConfig(ctx)
 	if err != nil {
 		return AutoTickResult{}, err
@@ -185,6 +193,8 @@ func (r *RecoveryRunner) AutoTick(ctx context.Context) (AutoTickResult, error) {
 	return AutoTickResult{Ran: true, Reason: "ok", Result: result}, nil
 }
 func (r *RecoveryRunner) CheckRemote(ctx context.Context) (RemoteCheck, error) {
+	ctx, cancel := withSyncBudget(ctx, r.readTimeout, syncReadLimit)
+	defer cancel()
 	scope, err := r.scope(ctx)
 	if err != nil {
 		return RemoteCheck{}, err
@@ -194,6 +204,8 @@ func (r *RecoveryRunner) CheckRemote(ctx context.Context) (RemoteCheck, error) {
 	return result, err
 }
 func (r *RecoveryRunner) Plan(ctx context.Context) (Plan, error) {
+	ctx, cancel := withSyncBudget(ctx, r.readTimeout, syncReadLimit)
+	defer cancel()
 	scope, err := r.scope(ctx)
 	if err != nil {
 		return Plan{}, err
@@ -203,6 +215,8 @@ func (r *RecoveryRunner) Plan(ctx context.Context) (Plan, error) {
 	return result, err
 }
 func (r *RecoveryRunner) ConfigureAuto(ctx context.Context, enabled bool, interval int) (State, error) {
+	ctx, cancel := withSyncBudget(ctx, r.readTimeout, syncReadLimit)
+	defer cancel()
 	var result State
 	fn := func(ctx context.Context) error {
 		var e error
@@ -227,12 +241,19 @@ func (r *RecoveryRunner) Rebind(ctx context.Context) (State, error) {
 	return result, err
 }
 func (r *RecoveryRunner) Resolve(ctx context.Context, id, choice string) error {
+	ctx, cancel := withSyncBudget(ctx, r.runTimeout, syncRunLimit)
+	defer cancel()
 	scope, err := r.scope(ctx)
 	if err != nil {
 		return err
 	}
 	return r.jobs.Execute(ctx, scope, true, false, time.Minute,
-		func(ctx context.Context) error { _, e := r.engine.CheckRemote(ctx); return e },
+		func(ctx context.Context) error {
+			ctx, cancel := withSyncBudget(ctx, r.readTimeout, syncReadLimit)
+			defer cancel()
+			_, e := r.engine.CheckRemote(ctx)
+			return e
+		},
 		func(ctx context.Context) error { return r.engine.Resolve(ctx, id, choice) }, classifySyncJobFailure)
 }
 func RunRecoveryScheduler(ctx context.Context, r *RecoveryRunner, startupDelay, pollInterval time.Duration) {

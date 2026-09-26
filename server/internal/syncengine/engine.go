@@ -366,7 +366,7 @@ func (e *Engine) remoteWithPolicy(ctx context.Context, requireEnabled bool) (Syn
 		if root == "" { root = filepath.Join(e.DataDir, "sync-lab-remote") }
 		return NewDirRemote(root)
 	case ProviderWebDAV:
-		return NewWebDAVRemote(endpoint, username, password)
+		return newWebDAVRemoteContext(ctx, endpoint, username, password)
 	default:
 		return nil, fmt.Errorf("不支持的同步 provider: %s", provider)
 	}
