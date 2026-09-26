@@ -139,10 +139,14 @@ func (e *Engine) finishResolutionTx(ctx context.Context, tx *sql.Tx, conflict Co
 	if err := e.setBaseWith(tx, ctx, conflict.ItemID, hash); err != nil {
 		return err
 	}
+	resolvedAt := e.now().Unix()
 	result, err := tx.ExecContext(ctx, `UPDATE sync_conflicts SET status='resolved',resolution=?,resolved_at=?
 		WHERE id=? AND item_id=? AND base_hash=? AND local_hash=? AND remote_hash=? AND status='open'`,
-		choice, e.now().Unix(), conflict.ID, conflict.ItemID, conflict.BaseHash, conflict.LocalHash, conflict.RemoteHash)
-	return requireOneResolutionWrite(result, err, "保存冲突处理回执")
+		choice, resolvedAt, conflict.ID, conflict.ItemID, conflict.BaseHash, conflict.LocalHash, conflict.RemoteHash)
+	if err = requireOneResolutionWrite(result, err, "保存冲突处理回执"); err != nil {
+		return err
+	}
+	return verifyResolutionMetadata(ctx, tx, conflict, choice, hash, resolvedAt)
 }
 
 // Used AFTER publishing a local choice or applying filesystem attachment bytes.
@@ -196,6 +200,9 @@ func (e *Engine) applyResolutionRecord(ctx context.Context, conflict Conflict, c
 		return err
 	}
 	if err = e.finishResolutionTx(ctx, tx, conflict, "remote"); err != nil {
+		return err
+	}
+	if err = verifyAppliedResolution(ctx, tx, chosen); err != nil {
 		return err
 	}
 	return tx.Commit()

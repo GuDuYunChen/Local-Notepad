@@ -72,6 +72,11 @@ jobs:
           node scripts/check-sync-resolution-baseline.mjs
           go -C server test -race ./internal/syncengine -run '^TestResolutionAtomic' -count=3 -v
 
+      - name: Verify conflict commit witnesses
+        run: |
+          node scripts/check-sync-write-witness-baseline.mjs
+          go -C server test -race ./internal/syncengine -run '^TestResolutionWitness' -count=3 -v
+
       - name: Verify editor exit save handshake
         run: |
           node --test scripts/editor-quit.node.mjs
@@ -154,6 +159,9 @@ jobs:
 
       - name: Verify resolution atomicity on Windows
         run: go -C server test ./internal/syncengine -run '^TestResolutionAtomic' -count=1 -v
+
+      - name: Verify conflict commit witnesses on Windows
+        run: go -C server test ./internal/syncengine -run '^TestResolutionWitness' -count=1 -v
 
       - name: Build unsigned Windows NSIS package
         shell: pwsh
