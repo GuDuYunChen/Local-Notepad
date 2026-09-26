@@ -135,9 +135,12 @@ func TestSettingsGetAndPartialUpdatePreserveExistingPreferences(t *testing.T) {
 	}
 	auto := true
 	interval := 15
-	webdav, err = logic.Update(ctx, &model.SettingsPatch{SyncAutoEnabled:&auto, SyncIntervalMinutes:&interval})
-	if err != nil { t.Fatalf("enable automatic sync: %v", err) }
-	if !webdav.SyncAutoEnabled || webdav.SyncIntervalMinutes != 15 { t.Fatalf("unexpected auto settings: %#v", webdav) }
+	if _, err = logic.Update(ctx, &model.SettingsPatch{SyncAutoEnabled:&auto, SyncIntervalMinutes:&interval}); err == nil {
+		t.Fatal("direct settings update bypassed automatic-sync verification")
+	}
+	webdav, err = logic.Update(ctx, &model.SettingsPatch{SyncIntervalMinutes:&interval})
+	if err != nil { t.Fatalf("update automatic sync interval: %v", err) }
+	if webdav.SyncAutoEnabled || webdav.SyncIntervalMinutes != 15 { t.Fatalf("unexpected auto settings: %#v", webdav) }
 	newEndpoint := "https://dav.example.test/other"
 	webdav, err = logic.Update(ctx, &model.SettingsPatch{SyncEndpoint:&newEndpoint})
 	if err != nil { t.Fatalf("change endpoint: %v", err) }

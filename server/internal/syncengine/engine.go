@@ -355,10 +355,10 @@ func (e *Engine) Rebind(ctx context.Context) (State, error) {
 	return e.state(ctx)
 }
 
-func (e *Engine) remote(ctx context.Context) (SyncRemote, error) {
+func (e *Engine) remoteWithPolicy(ctx context.Context, requireEnabled bool) (SyncRemote, error) {
 	enabled, provider, endpoint, username, password, err := e.config(ctx)
 	if err != nil { return nil, err }
-	if !enabled { return nil, fmt.Errorf("同步尚未启用") }
+	if requireEnabled && !enabled { return nil, fmt.Errorf("同步尚未启用") }
 	if e.DataDir == "" { return nil, fmt.Errorf("同步数据目录未配置") }
 	switch provider {
 	case ProviderLocalLab:
@@ -370,6 +370,10 @@ func (e *Engine) remote(ctx context.Context) (SyncRemote, error) {
 	default:
 		return nil, fmt.Errorf("不支持的同步 provider: %s", provider)
 	}
+}
+
+func (e *Engine) remote(ctx context.Context) (SyncRemote, error) {
+	return e.remoteWithPolicy(ctx, true)
 }
 
 func (e *Engine) ensureUploadDir() (string,error) {
@@ -585,10 +589,8 @@ func validateRemoteStructure(manifest Manifest, remote SyncRemote, cache map[str
 	return nil
 }
 
-func (e *Engine) CheckRemote(ctx context.Context) (RemoteCheck,error) {
-	e.runMu.Lock()
-	defer e.runMu.Unlock()
-	remote,err:=e.remote(ctx)
+func (e *Engine) checkRemoteUnlocked(ctx context.Context) (RemoteCheck,error) {
+	remote,err:=e.remoteWithPolicy(ctx,false)
 	if err!=nil{return RemoteCheck{},err}
 	manifest,err:=remote.LoadManifest()
 	if err!=nil{return RemoteCheck{},err}
@@ -609,6 +611,34 @@ func (e *Engine) CheckRemote(ctx context.Context) (RemoteCheck,error) {
 		Revision:manifest.Revision,
 		Items:len(manifest.Items),
 	},nil
+}
+
+func (e *Engine) CheckRemote(ctx context.Context) (RemoteCheck,error) {
+	e.runMu.Lock()
+	defer e.runMu.Unlock()
+	return e.checkRemoteUnlocked(ctx)
+}
+
+func (e *Engine) ConfigureAuto(ctx context.Context, enabled bool, intervalMinutes int) (State,error) {
+	if intervalMinutes < 1 || intervalMinutes > 1440 {
+		return State{},fmt.Errorf("自动同步间隔必须在 1 到 1440 分钟之间")
+	}
+	e.runMu.Lock()
+	defer e.runMu.Unlock()
+	state,err:=e.state(ctx)
+	if err!=nil{return State{},err}
+	if enabled {
+		if !state.Enabled || state.Provider!=ProviderWebDAV {
+			return State{},fmt.Errorf("自动同步仅可在已启用的 WebDAV provider 上使用")
+		}
+		if _,err=e.checkRemoteUnlocked(ctx);err!=nil{
+			return State{},fmt.Errorf("开启自动同步前远端验证失败: %w",err)
+		}
+	}
+	if _,err=e.DB.ExecContext(ctx,`UPDATE settings SET sync_auto_enabled=?,sync_interval_minutes=? WHERE id=1`,enabled,intervalMinutes);err!=nil{
+		return State{},err
+	}
+	return e.state(ctx)
 }
 
 func (e *Engine) Plan(ctx context.Context) (Plan, error) {

@@ -72,7 +72,10 @@ func (l *SettingsLogic) Update(ctx context.Context, patch *model.SettingsPatch) 
 		current.SyncIntervalMinutes = *patch.SyncIntervalMinutes
 	}
 	if patch.SyncAutoEnabled != nil {
-		current.SyncAutoEnabled = *patch.SyncAutoEnabled
+		if *patch.SyncAutoEnabled {
+			return nil, fmt.Errorf("开启自动同步前必须通过同步中心连接验证")
+		}
+		current.SyncAutoEnabled = false
 	}
 	if current.SyncIntervalMinutes <= 0 { current.SyncIntervalMinutes = 5 }
 	if current.SyncProvider != previousProvider || current.SyncEndpoint != previousEndpoint {
