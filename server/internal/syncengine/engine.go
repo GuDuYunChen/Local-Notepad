@@ -385,8 +385,12 @@ func (e *Engine) ensureUploadDir() (string,error) {
 }
 
 func (e *Engine) localRecords(ctx context.Context) (map[string]Record, error) {
+	return e.localRecordsWith(ctx, e.DB)
+}
+
+func (e *Engine) localRecordsWith(ctx context.Context, query localRecordQuery) (map[string]Record, error) {
 	out:=map[string]Record{}
-	rows,err:=e.DB.QueryContext(ctx,`SELECT id,title,content,created_at,updated_at,is_folder,parent_id,sort_order,is_deleted,deleted_at,is_pinned FROM files`)
+	rows,err:=query.QueryContext(ctx,`SELECT id,title,content,created_at,updated_at,is_folder,parent_id,sort_order,is_deleted,deleted_at,is_pinned FROM files`)
 	if err!=nil{return nil,err}
 	for rows.Next(){
 		var f FilePayload
@@ -395,7 +399,7 @@ func (e *Engine) localRecords(ctx context.Context) (map[string]Record, error) {
 	}
 	if err=rows.Close();err!=nil{return nil,err};if err=rows.Err();err!=nil{return nil,err}
 
-	rows,err=e.DB.QueryContext(ctx,`SELECT id,name,color FROM tags`)
+	rows,err=query.QueryContext(ctx,`SELECT id,name,color FROM tags`)
 	if err!=nil{return nil,err}
 	for rows.Next(){
 		var tag TagPayload
@@ -404,7 +408,7 @@ func (e *Engine) localRecords(ctx context.Context) (map[string]Record, error) {
 	}
 	if err=rows.Close();err!=nil{return nil,err};if err=rows.Err();err!=nil{return nil,err}
 
-	rows,err=e.DB.QueryContext(ctx,`SELECT file_id,tag_id FROM file_tags ORDER BY file_id,tag_id`)
+	rows,err=query.QueryContext(ctx,`SELECT file_id,tag_id FROM file_tags ORDER BY file_id,tag_id`)
 	if err!=nil{return nil,err}
 	for rows.Next(){
 		var link FileTagPayload
@@ -1101,9 +1105,15 @@ func (e *Engine) Resolve(ctx context.Context, conflictID, choice string) error {
 	if localHash!=c.LocalHash{return fmt.Errorf("本机内容在冲突产生后已变化，请重新同步")}
 	manifest,err:=remote.LoadManifest();if err!=nil{return err}
 	if manifest.Items[c.ItemID]!=c.RemoteHash{return fmt.Errorf("远端内容在冲突产生后已变化，请重新同步")}
+	state,err:=e.state(ctx);if err!=nil{return err}
+	if state.RemoteStoreID!="" && manifest.StoreID!=state.RemoteStoreID{return fmt.Errorf("远端同步仓库身份发生变化，拒绝处理冲突")}
+	// The runner's preflight precedes acquiring this remote lock. Revalidate
+	// here and validate the selected destination before publishing/applying.
+	if err=validateRemoteStructure(manifest,remote,nil);err!=nil{return err}
 	if choice=="local"{
 		if !localExists{return fmt.Errorf("本机冲突对象不可用")}
 		data,hash,err:=encodeRecord(localRecord);if err!=nil{return err}
+		if err=validateRemoteResolution(ctx,manifest,remote,localRecord);err!=nil{return err}
 		if localRecord.Kind=="attachment"&&localRecord.State=="present"{
 			uploadDir,dirErr:=e.ensureUploadDir();if dirErr!=nil{return dirErr}
 			source:=filepath.Join(uploadDir,localRecord.Attachment.Name)
@@ -1112,17 +1122,18 @@ func (e *Engine) Resolve(ctx context.Context, conflictID, choice string) error {
 		if err=remote.SaveObject(hash,data);err!=nil{return err}
 		manifest.Items=copyItems(manifest.Items);manifest.Items[c.ItemID]=hash;manifest.Generation++
 		manifest.UpdatedAt=e.now().UTC().Format(time.RFC3339Nano)
-		state,_:=e.state(ctx);manifest.DeviceID=state.DeviceID
+		manifest.DeviceID=state.DeviceID
 		manifest,err=remote.SaveManifest(manifest);if err!=nil{return err}
 		if err=e.setBase(ctx,c.ItemID,hash);err!=nil{return err}
 	}else{
 		record,err:=remote.LoadRecord(c.RemoteHash);if err!=nil{return err}
 		if record.Kind=="attachment"{
+			if err=validateLocalResolution(ctx,locals,record);err!=nil{return err}
 			if _,err=e.applyRemoteAttachmentChoice(remote,record);err!=nil{return err}
+			if err=e.setBase(ctx,c.ItemID,c.RemoteHash);err!=nil{return err}
 		}else{
-			if err=e.applyRemote(ctx,record);err!=nil{return err}
+			if err=e.applyResolutionRecord(ctx,c,record);err!=nil{return err}
 		}
-		if err=e.setBase(ctx,c.ItemID,c.RemoteHash);err!=nil{return err}
 	}
 	_,err=e.DB.ExecContext(ctx,`UPDATE sync_conflicts SET status='resolved',resolution=?,resolved_at=? WHERE id=? AND status='open'`,choice,e.now().Unix(),conflictID)
 	if err!=nil{return err}

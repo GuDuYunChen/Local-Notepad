@@ -64,6 +64,9 @@ jobs:
       - name: Verify conflict lifecycle recovery
         run: go -C server test -race ./internal/syncengine -run '^TestConflictLifecycle' -count=3 -v
 
+      - name: Verify conflict destination integrity
+        run: go -C server test -race ./internal/syncengine -run '^TestResolutionGuard' -count=3 -v
+
       - name: Verify editor exit save handshake
         run: |
           node --test scripts/editor-quit.node.mjs
@@ -140,6 +143,9 @@ jobs:
 
       - name: Verify conflict lifecycle on Windows
         run: go -C server test ./internal/syncengine -run '^TestConflictLifecycle' -count=1 -v
+
+      - name: Verify conflict destination integrity on Windows
+        run: go -C server test ./internal/syncengine -run '^TestResolutionGuard' -count=1 -v
 
       - name: Build unsigned Windows NSIS package
         shell: pwsh
