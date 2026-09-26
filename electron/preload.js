@@ -33,5 +33,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
   webdavSecretStatus: () => ipcRenderer.invoke('sync:webdav-secret:status'),
   webdavSecretSave: password => ipcRenderer.invoke('sync:webdav-secret:save', password),
   webdavSecretClear: () => ipcRenderer.invoke('sync:webdav-secret:clear'),
+  onQuitPrepare: callback => {
+    const handler = (_event, value) => callback({ id: value?.id })
+    ipcRenderer.on('editor:quit:prepare', handler)
+    return () => ipcRenderer.removeListener('editor:quit:prepare', handler)
+  },
+  onQuitRelease: callback => {
+    const handler = (_event, value) => callback({ id: value?.id })
+    ipcRenderer.on('editor:quit:release', handler)
+    return () => ipcRenderer.removeListener('editor:quit:release', handler)
+  },
+  reportQuitResult: value => ipcRenderer.send('editor:quit:result', {
+    id: value?.id, ready: value?.ready === true, code: value?.code,
+  }),
   onReload: (callback) => ipcRenderer.on('app:reload', callback),
 })

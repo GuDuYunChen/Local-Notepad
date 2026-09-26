@@ -10,6 +10,8 @@ import {
   writeEditorDraft,
 } from '~/services/editorDraftCache'
 
+import { editorQuit, createEditorQuitParticipant } from '~/services/editorQuit.mjs'
+
 const Editor = React.lazy(() => import('./Editor/Editor'))
 
 function TextEditorInternal({
@@ -61,7 +63,10 @@ function TextEditorInternal({
   useEffect(() => { onLoadedRef.current = onLoaded }, [onLoaded])
   useEffect(() => { onSavedRef.current = onSaved }, [onSaved])
   useEffect(() => { onStatusChangeRef.current = onStatusChange }, [onStatusChange])
-  useEffect(() => { deletedIdsRef.current = deletedIds }, [deletedIds])
+  useEffect(() => {
+    deletedIdsRef.current = deletedIds
+    for (const id of deletedIds || []) editorQuit.forget(id)
+  }, [deletedIds])
 
   const syncCurrentSavingState = React.useCallback((id = currentIdRef.current) => {
     if (!id) {
@@ -109,11 +114,6 @@ function TextEditorInternal({
       }
     }
 
-    if (id === currentIdRef.current && text === lastSavedContentRef.current) {
-      setSaveError(false)
-      return { id, content: text, skipped: true }
-    }
-
     const inFlight = inFlightSavesRef.current.get(id)
     if (inFlight) {
       if (inFlight.content === text) {
@@ -121,6 +121,14 @@ function TextEditorInternal({
       }
       const queuedText = text
       return inFlight.promise.then(() => saveNow(reason, id, queuedText))
+    }
+
+    // A pending older write can change the saved baseline. Do not skip a revert
+    // until that write has settled, otherwise exit could approve the wrong text.
+    if (id === currentIdRef.current && text === lastSavedContentRef.current) {
+      editorQuit.saved(id, text)
+      setSaveError(false)
+      return { id, content: text, skipped: true }
     }
 
     const ctl = new AbortController()
@@ -136,13 +144,18 @@ function TextEditorInternal({
           signal: ctl.signal,
         })
 
+        if (!updated || updated.id !== id || updated.content !== text) {
+          throw new Error('正文保存响应未确认，请重新检查保存状态')
+        }
+        editorQuit.saved(id, text)
         const now = Date.now()
         if (id === currentIdRef.current) {
           lastSavedContentRef.current = text
-          setStructureDirty(false)
-          pendingStructureMappingsRef.current = []
+          setStructureDirty(hasHeadingStructureChanged(text, contentRef.current))
+          if (contentRef.current === text) pendingStructureMappingsRef.current = []
           setLastSavedAt(now)
-          writeEditorDraft(id, text, now)
+          // A delayed acknowledgement must not overwrite a newer cached draft.
+          writeEditorDraft(id, contentRef.current, now)
           onSavedRef.current?.(updated)
         }
         return updated
@@ -165,6 +178,26 @@ function TextEditorInternal({
     return savePromise
   }, [beginSaving, endSaving])
 
+  useEffect(() => editorQuit.register(createEditorQuitParticipant({
+    snapshot: () => ({
+      id: currentIdRef.current,
+      ready: loadedDocumentRef.current === currentIdRef.current,
+      deleted: deletedIdsRef.current?.has(currentIdRef.current),
+      content: contentRef.current,
+      saved: lastSavedContentRef.current,
+      structural: hasHeadingStructureChanged(lastSavedContentRef.current, contentRef.current),
+      pending: [...inFlightSavesRef.current.values()].map(item => item.promise),
+    }),
+    cache: () => {
+      window.clearTimeout(saveTimerRef.current)
+      saveTimerRef.current = null
+      if (currentIdRef.current && loadedDocumentRef.current === currentIdRef.current && !deletedIdsRef.current?.has(currentIdRef.current)) {
+        writeEditorDraft(currentIdRef.current, contentRef.current)
+      }
+    },
+    save: () => saveNow('quit'),
+  })), [saveNow])
+
   useImperativeHandle(ref, () => ({
     save: () => saveNow('external'),
     clearCache: () => {
@@ -186,6 +219,7 @@ function TextEditorInternal({
         : []
 
       contentRef.current = text
+      editorQuit.remember(currentIdRef.current, text)
       pendingStructureMappingsRef.current = [
         ...pendingStructureMappingsRef.current,
         ...mappings,
@@ -215,6 +249,8 @@ function TextEditorInternal({
         : Date.now()
 
       contentRef.current = text
+      editorQuit.remember(currentIdRef.current, text)
+      editorQuit.saved(currentIdRef.current, text)
       lastSavedContentRef.current = text
       setEditorContent(text)
       setWordCount(countLexicalCharacters(text))
@@ -287,6 +323,8 @@ function TextEditorInternal({
           : ''
         const text = useCache ? cachedText : serverText
 
+        editorQuit.saved(id, serverText)
+        if (text !== serverText) editorQuit.remember(id, text)
         lastSavedContentRef.current = serverText
         pendingStructureMappingsRef.current = []
         setStructureDirty(hasHeadingStructureChanged(serverText, text || ''))
@@ -321,6 +359,9 @@ function TextEditorInternal({
   }, [activeId, loadAttempt, saveNow, syncCurrentSavingState])
 
   useEffect(() => () => {
+    if (currentIdRef.current && loadedDocumentRef.current === currentIdRef.current && !deletedIdsRef.current?.has(currentIdRef.current)) {
+      writeEditorDraft(currentIdRef.current, contentRef.current)
+    }
     if (saveTimerRef.current) {
       window.clearTimeout(saveTimerRef.current)
       saveTimerRef.current = null
@@ -394,6 +435,7 @@ function TextEditorInternal({
 
   const handleEditorChange = React.useCallback((newContent) => {
     contentRef.current = newContent
+    editorQuit.remember(currentIdRef.current, newContent)
     setSaveError(false)
     scheduleCache()
     onChangeRef.current?.(newContent)

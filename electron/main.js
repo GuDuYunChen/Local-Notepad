@@ -12,6 +12,7 @@ import {
 import { parseImportPaths, selectAndParseFiles } from './import.js'
 import { ensureBackupDir, getDefaultBackupDir, getDefaultDataDir, listBackups } from './backup.js'
 import { spawnManagedBackend, stopChildProcess, waitForHttpService } from './backend-process.js'
+import { createQuitSaveGate } from './quit-save.mjs'
 import { createWebDAVSecretStore } from './webdav-secret.js'
 import { createDataSafetyService, runBackupCommand, registerDataSafetyHandlers } from './data-safety.js'
 import { createWorkspacePackageService, registerWorkspacePackageHandlers } from './workspace-package.js'
@@ -31,6 +32,9 @@ let allowQuit = false
 let quitting = false
 let quitPromise = null
 let backendStartPromise = null
+const rendererQuit = createQuitSaveGate({ ipcMain })
+const approvedWindowCloses = new WeakSet()
+let windowClosePromise = null
 const webdavSecrets = createWebDAVSecretStore({ dataDir: getDefaultDataDir(), safeStorage })
 
 async function createWindow(startupRestore = { status: 'none' }) {
@@ -54,7 +58,24 @@ async function createWindow(startupRestore = { status: 'none' }) {
     }
   })
 
+  const windowForClose = mainWindow
+  // Intercept X / Alt+F4 before the renderer is destroyed, not window-all-closed.
+  windowForClose.on('close', event => {
+    if (allowQuit || approvedWindowCloses.has(windowForClose)) return
+    event.preventDefault()
+    if (process.platform !== 'darwin' || quitting) { app.quit(); return }
+    // macOS close preserves the running application; Cmd+Q takes before-quit.
+    if (windowClosePromise) return
+    windowClosePromise = rendererQuit.prepare(windowForClose).then(() => {
+      approvedWindowCloses.add(windowForClose)
+      windowForClose.close()
+    }).catch(error => {
+      rendererQuit.release()
+      dialog.showErrorBox('正文尚未确认保存，已取消关闭', String(error?.message || error))
+    }).finally(() => { windowClosePromise = null })
+  })
   mainWindow.on('closed', () => {
+    rendererQuit.release()
     mainWindow = null
   })
   mainWindow.once('ready-to-show', () => {
@@ -71,6 +92,7 @@ async function createWindow(startupRestore = { status: 'none' }) {
   })
 
   mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (quitting || windowClosePromise) { event.preventDefault(); return }
     const classification = classifyNavigation(url, isDev)
     if (classification === 'internal') return
 
@@ -186,7 +208,7 @@ app.whenReady().then(async () => {
     {
       label: '视图',
       submenu: [
-        { role: 'reload', label: '重新加载' },
+        { label: '重新加载', accelerator: 'CmdOrCtrl+R', click: () => { if (!quitting && !windowClosePromise) mainWindow?.reload() } },
         { role: 'toggleDevTools', label: '开发者工具' },
       ],
     },
@@ -245,6 +267,9 @@ app.on('before-quit', (event) => {
   if (quitPromise) return
   quitting = true
   quitPromise = (async () => {
+    // Keep the window and backend alive until the renderer confirms all tracked
+    // editor content is saved. Failure must not send a backend shutdown command.
+    await rendererQuit.prepare(mainWindow)
     // A pending secret load must not spawn a child after shutdown starts.
     await backendStartPromise
     const child = backend
@@ -257,7 +282,8 @@ app.on('before-quit', (event) => {
     app.quit()
   })().catch(error => {
     quitting = false
-    dialog.showErrorBox('尚未确认后端已退出', String(error?.message || error))
+    rendererQuit.release()
+    dialog.showErrorBox('退出未完成，窗口已保留', String(error?.message || error))
   }).finally(() => { quitPromise = null })
 })
 

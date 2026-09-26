@@ -51,6 +51,11 @@ jobs:
           npx vitest run --root=. src/components/SyncActivityPanel.test.jsx
           go -C server test -race ./internal/syncjob -count=1
 
+      - name: Verify editor exit save handshake
+        run: |
+          node --test scripts/editor-quit.node.mjs
+          npx vitest run --root=. src/components/EditorQuit.test.jsx
+
       - name: Run backend tests
         working-directory: server
         run: go test ./...

@@ -84,7 +84,7 @@ import vm from 'node:vm'
 const mainSource = fs.readFileSync(new URL('../electron/main.js', import.meta.url), 'utf8')
 const quitSource = mainSource.slice(mainSource.indexOf("app.on('before-quit',"), mainSource.indexOf('// 启动后端进程'))
 function quitFixture(stop) {
-  const c = { backend: {}, backendStartPromise: null, allowQuit: false, quitting: false, quitPromise: null, handler: null, quitCalls: 0, errors: 0, console }
+  const c = { backend: {}, backendStartPromise: null, mainWindow: null, rendererQuit: { prepare: async () => {}, release() {} }, allowQuit: false, quitting: false, quitPromise: null, handler: null, quitCalls: 0, errors: 0, console }
   c.app = { on(_e, fn) { c.handler = fn }, quit() { c.quitCalls++ } }
   c.dialog = { showErrorBox() { c.errors++ } }; c.stopChildProcess = stop
   vm.createContext(c); vm.runInContext(quitSource, c)

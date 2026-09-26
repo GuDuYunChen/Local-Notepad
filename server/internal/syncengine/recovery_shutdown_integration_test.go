@@ -3,6 +3,7 @@ package syncengine
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -80,21 +81,36 @@ func TestRecoveryShutdownCancelsHTTPAndPreservesCheckpoint(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			entered := make(chan struct{})
+			release := make(chan struct{})
+			serverCancelled := make(chan struct{}, 1)
 			var once sync.Once
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 				if writing && req.Method == "PROPFIND" {
 					w.WriteHeader(http.StatusNotFound)
 					return
 				}
+				// Consume the PROPFIND body before waiting for disconnect. Otherwise
+				// net/http cannot start its background read and the test server can
+				// wait forever even after the client correctly cancels the request.
+				_, _ = io.Copy(io.Discard, req.Body)
 				once.Do(func() { close(entered) })
-				<-req.Context().Done()
+				select {
+				case <-req.Context().Done():
+					select {
+					case serverCancelled <- struct{}{}:
+					default:
+					}
+				case <-release:
+				}
+
 			}))
-			defer srv.Close()
+			defer func() { close(release); srv.Close() }()
 			db, root := testDB(t)
 			if _, err := db.Exec(`UPDATE settings SET sync_provider='webdav',sync_endpoint=?`, srv.URL+"/dav"); err != nil {
 				t.Fatal(err)
 			}
 			r := NewRecoveryRunner(testEngine(db, root, "shutdown-device"))
+			defer r.Stop()
 			finished := make(chan error, 1)
 			go func() { _, e := r.Run(context.Background(), false); finished <- e }()
 			select {
@@ -110,6 +126,11 @@ func TestRecoveryShutdownCancelsHTTPAndPreservesCheckpoint(t *testing.T) {
 			}
 			if err := <-finished; err == nil {
 				t.Fatal("cancelled task reported success")
+			}
+			select {
+			case <-serverCancelled:
+			case <-time.After(3 * time.Second):
+				t.Fatal("server did not observe request cancellation")
 			}
 			snapshot, err := (syncjob.FileStore{DataDir: root}).Load()
 			if err != nil {
