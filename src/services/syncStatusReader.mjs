@@ -34,6 +34,7 @@ export function syncHealthLabel(settings, status, readError = '') {
 export function createSyncStatusReader({
   load, onSnapshot, onHealth = () => {}, shouldPoll = () => false,
   now = Date.now, schedule = setTimeout, cancel = clearTimeout, timeoutMs = 12_000,
+  pollInterval = () => STATUS_POLL_MS,
 }) {
   let disposed = false
   let paused = false
@@ -55,7 +56,9 @@ export function createSyncStatusReader({
   const planNext = () => {
     clearRetry()
     if (disposed || paused || (!failures && !shouldPoll())) return
-    const delay = statusRetryDelay(failures)
+    const requested = Number(pollInterval())
+    const normalDelay = Number.isFinite(requested) ? Math.max(1_000, Math.min(60_000, requested)) : STATUS_POLL_MS
+    const delay = failures ? statusRetryDelay(failures) : normalDelay
     emit({ retryAt: now() + delay })
     retryTimer = schedule(() => { retryTimer = null; void refresh() }, delay)
   }

@@ -15,6 +15,8 @@ func (c *SyncController) Register(group *ghttp.RouterGroup) {
 		c.Recovery = syncengine.NewRecoveryRunner(c.Engine)
 	}
 	group.GET("/sync/status", c.Status)
+	group.GET("/sync/activity", c.Activity)
+	group.POST("/sync/cancel", c.Cancel)
 	group.POST("/sync/check", c.Check)
 	group.POST("/sync/auto", c.ConfigureAuto)
 	group.POST("/sync/plan", c.Plan)
@@ -107,4 +109,25 @@ func (c *SyncController) Resolve(r *ghttp.Request) {
 		return
 	}
 	writeOK(r, nil)
+}
+
+// Separate in-memory endpoint: a sync transaction may hold the only DB connection.
+func (c *SyncController) Activity(r *ghttp.Request) {
+	writeOK(r, c.Recovery.Activity())
+}
+func (c *SyncController) Cancel(r *ghttp.Request) {
+	var input struct {
+		ID string `json:"id"`
+	}
+	if err := r.Parse(&input); err != nil {
+		writeErr(r, 4012, "取消同步参数错误", err)
+		return
+	}
+	value, err := c.Recovery.CancelCurrent(input.ID)
+	if err != nil {
+		writeErrWithDetail(r, 4013, "取消同步请求无效", err)
+		return
+	}
+	// accepted means the signal was sent, NOT that cleanup/rollback finished.
+	writeOK(r, value)
 }

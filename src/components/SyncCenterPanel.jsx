@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '~/services/api'
 import { toast } from '~/services/toast'
 import { createSyncStatusReader, mergeSyncDraft, syncHealthLabel, syncStatusLabel } from '~/services/syncStatusReader.mjs'
+import SyncActivityPanel from './SyncActivityPanel'
 import './SyncCenterPanel.css'
 import './SyncHealth.css'
 
@@ -82,6 +83,9 @@ export default function SyncCenterPanel() {
   }, [])
 
   const refresh = useCallback(() => reader.current?.refresh({ allowPaused: true }) ?? Promise.resolve(false), [])
+  const refreshAfterTask = useCallback(() => {
+    if (alive.current && !operation.current) void refresh()
+  }, [refresh])
   const refreshAfterChange = async message => {
     const fresh = await refresh()
     if (!alive.current) return
@@ -201,8 +205,13 @@ export default function SyncCenterPanel() {
     })
   }
   const resolve = (id, choice) => exclusive(id + ':' + choice, async () => {
-    await api('/api/sync/conflicts/' + encodeURIComponent(id) + '/resolve', { method: 'POST', body: JSON.stringify({ choice }) })
-    await refreshAfterChange(choice === 'local' ? '已保留本机版本' : '已采用远端版本')
+    try {
+      await api('/api/sync/conflicts/' + encodeURIComponent(id) + '/resolve', { method: 'POST', body: JSON.stringify({ choice }) })
+      await refreshAfterChange(choice === 'local' ? '已保留本机版本' : '已采用远端版本')
+    } catch (error) {
+      if (alive.current) await refresh()
+      throw error
+    }
   })
   const openLab = () => exclusive('folder', async () => {
     const result = await window.electronAPI?.openAppFolder?.('syncLab')
@@ -227,6 +236,7 @@ export default function SyncCenterPanel() {
       <div><h3>同步中心</h3><p>同步健康状态 · 验证后启用 WebDAV</p></div>
       <span className={'settings-status-pill ' + (enabled ? 'ok' : 'neutral')}>{enabled ? ('已启用 · ' + providerName(provider)) : '未启用'}</span>
     </div>
+    <SyncActivityPanel wakeKey={busy} onSettled={refreshAfterTask}/>
     <div className="sync-health" aria-label="同步健康状态">
       <div className="sync-health-heading">
         <strong role="status">{syncHealthLabel(settings, status, health.error)}</strong>

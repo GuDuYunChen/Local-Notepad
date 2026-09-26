@@ -21,6 +21,7 @@ type RecoveryRunner struct {
 	jobs        *syncjob.Coordinator
 	readTimeout time.Duration
 	runTimeout  time.Duration
+	activity    syncjob.ActivityTracker
 }
 type RecoveryState struct {
 	State
@@ -91,6 +92,15 @@ func (r *RecoveryRunner) Status(ctx context.Context) (RecoveryState, error) {
 func (r *RecoveryRunner) run(ctx context.Context, manual, acknowledged bool) (RunResult, error) {
 	ctx, cancel := withSyncBudget(ctx, r.runTimeout, syncRunLimit)
 	defer cancel()
+	kind := "sync"
+	if !manual {
+		kind = "auto-sync"
+	}
+	ctx, operation, err := r.beginOperation(ctx, kind)
+	if err != nil {
+		return RunResult{}, err
+	}
+	defer operation.Finish()
 	_, interval, err := r.engine.autoConfig(ctx)
 	if err != nil {
 		return RunResult{}, err
@@ -134,13 +144,21 @@ func (r *RecoveryRunner) run(ctx context.Context, manual, acknowledged bool) (Ru
 			_, e = r.engine.CheckRemote(ctx)
 			return e
 		},
-		func(ctx context.Context) error { var e error; result, e = r.engine.Run(ctx); return e }, classifySyncJobFailure)
+		func(ctx context.Context) error {
+			operation.Applying()
+			var e error
+			result, e = r.engine.Run(ctx)
+			return e
+		}, classifySyncJobFailure)
 	return result, err
 }
 func (r *RecoveryRunner) Run(ctx context.Context, acknowledged bool) (RunResult, error) {
 	return r.run(ctx, true, acknowledged)
 }
 func (r *RecoveryRunner) AutoTick(ctx context.Context) (AutoTickResult, error) {
+	if r.Activity().Active {
+		return AutoTickResult{Reason: "busy"}, syncjob.ErrBusy
+	}
 	ctx, cancel := withSyncBudget(ctx, r.runTimeout, syncRunLimit)
 	defer cancel()
 	enabled, interval, err := r.engine.autoConfig(ctx)
@@ -195,6 +213,11 @@ func (r *RecoveryRunner) AutoTick(ctx context.Context) (AutoTickResult, error) {
 func (r *RecoveryRunner) CheckRemote(ctx context.Context) (RemoteCheck, error) {
 	ctx, cancel := withSyncBudget(ctx, r.readTimeout, syncReadLimit)
 	defer cancel()
+	ctx, operation, err := r.beginOperation(ctx, "check")
+	if err != nil {
+		return RemoteCheck{}, err
+	}
+	defer operation.Finish()
 	scope, err := r.scope(ctx)
 	if err != nil {
 		return RemoteCheck{}, err
@@ -206,6 +229,11 @@ func (r *RecoveryRunner) CheckRemote(ctx context.Context) (RemoteCheck, error) {
 func (r *RecoveryRunner) Plan(ctx context.Context) (Plan, error) {
 	ctx, cancel := withSyncBudget(ctx, r.readTimeout, syncReadLimit)
 	defer cancel()
+	ctx, operation, err := r.beginOperation(ctx, "plan")
+	if err != nil {
+		return Plan{}, err
+	}
+	defer operation.Finish()
 	scope, err := r.scope(ctx)
 	if err != nil {
 		return Plan{}, err
@@ -217,6 +245,15 @@ func (r *RecoveryRunner) Plan(ctx context.Context) (Plan, error) {
 func (r *RecoveryRunner) ConfigureAuto(ctx context.Context, enabled bool, interval int) (State, error) {
 	ctx, cancel := withSyncBudget(ctx, r.readTimeout, syncReadLimit)
 	defer cancel()
+	if enabled {
+		var operation *syncjob.Operation
+		var err error
+		ctx, operation, err = r.beginOperation(ctx, "enable-auto")
+		if err != nil {
+			return State{}, err
+		}
+		defer operation.Finish()
+	}
 	var result State
 	fn := func(ctx context.Context) error {
 		var e error
@@ -243,6 +280,11 @@ func (r *RecoveryRunner) Rebind(ctx context.Context) (State, error) {
 func (r *RecoveryRunner) Resolve(ctx context.Context, id, choice string) error {
 	ctx, cancel := withSyncBudget(ctx, r.runTimeout, syncRunLimit)
 	defer cancel()
+	ctx, operation, err := r.beginOperation(ctx, "resolve")
+	if err != nil {
+		return err
+	}
+	defer operation.Finish()
 	scope, err := r.scope(ctx)
 	if err != nil {
 		return err
@@ -254,7 +296,7 @@ func (r *RecoveryRunner) Resolve(ctx context.Context, id, choice string) error {
 			_, e := r.engine.CheckRemote(ctx)
 			return e
 		},
-		func(ctx context.Context) error { return r.engine.Resolve(ctx, id, choice) }, classifySyncJobFailure)
+		func(ctx context.Context) error { operation.Applying(); return r.engine.Resolve(ctx, id, choice) }, classifySyncJobFailure)
 }
 func RunRecoveryScheduler(ctx context.Context, r *RecoveryRunner, startupDelay, pollInterval time.Duration) {
 	if r == nil {
@@ -283,4 +325,18 @@ func RunRecoveryScheduler(ctx context.Context, r *RecoveryRunner, startupDelay, 
 // between preflight and execution. Note editing does not take this guard.
 func (r *RecoveryRunner) WithSettings(ctx context.Context, fn func(context.Context) error) error {
 	return r.jobs.Exclusive(ctx, false, fn)
+}
+
+// Activity and CancelCurrent intentionally bypass both the database and task gate.
+// Cancelling does not remove a recovery checkpoint or stop the scheduler itself.
+func (r *RecoveryRunner) Activity() syncjob.Activity { return r.activity.Snapshot() }
+func (r *RecoveryRunner) CancelCurrent(id string) (syncjob.CancelReceipt, error) {
+	return r.activity.Cancel(id)
+}
+func (r *RecoveryRunner) beginOperation(ctx context.Context, kind string) (context.Context, *syncjob.Operation, error) {
+	next, operation, err := r.activity.Begin(ctx, kind, r.engine.now())
+	if errors.Is(err, syncjob.ErrActivityBusy) {
+		err = syncjob.ErrBusy
+	}
+	return next, operation, err
 }
