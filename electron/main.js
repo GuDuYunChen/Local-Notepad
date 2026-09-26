@@ -11,7 +11,7 @@ import {
 } from './export.js'
 import { parseImportPaths, selectAndParseFiles } from './import.js'
 import { ensureBackupDir, getDefaultBackupDir, getDefaultDataDir, listBackups } from './backup.js'
-import { stopChildProcess, waitForHttpService } from './backend-process.js'
+import { spawnManagedBackend, stopChildProcess, waitForHttpService } from './backend-process.js'
 import { createWebDAVSecretStore } from './webdav-secret.js'
 import { createDataSafetyService, runBackupCommand, registerDataSafetyHandlers } from './data-safety.js'
 import { createWorkspacePackageService, registerWorkspacePackageHandlers } from './workspace-package.js'
@@ -28,6 +28,9 @@ import { APP_ICON_DATA_URL } from '../src/assets/appIconData.js'
 let mainWindow = null
 let backend = null
 let allowQuit = false
+let quitting = false
+let quitPromise = null
+let backendStartPromise = null
 const webdavSecrets = createWebDAVSecretStore({ dataDir: getDefaultDataDir(), safeStorage })
 
 async function createWindow(startupRestore = { status: 'none' }) {
@@ -96,9 +99,9 @@ async function createWindow(startupRestore = { status: 'none' }) {
     let healthRollback = null
     if (!backendReady && startupRestore?.status === 'applied') {
       const failedChild = backend
-      backend = null
-      if (failedChild) await stopChildProcess(failedChild, 2500).catch(() => {})
       try {
+        if (failedChild) await stopChildProcess(failedChild, 2500)
+        if (backend === failedChild) backend = null
         healthRollback = await rollbackAppliedWorkspaceRestore({
           dataDir: getDefaultDataDir(),
           restore: startupRestore,
@@ -113,7 +116,8 @@ async function createWindow(startupRestore = { status: 'none' }) {
           '工作区恢复回滚失败',
           String(error?.message || error) + '\n\n为避免继续写入不确定的数据状态，应用将退出。'
         )
-        allowQuit = true
+        // A failed stop must not allow live data replacement or bypass shutdown.
+        allowQuit = !backend
         app.quit()
         return
       }
@@ -236,47 +240,64 @@ app.on('window-all-closed', () => {
 })
 
 app.on('before-quit', (event) => {
-  if (allowQuit || !backend) return
-
+  if (allowQuit) return
   event.preventDefault()
-  const child = backend
-  backend = null
-
-  void stopChildProcess(child, 2500).finally(() => {
+  if (quitPromise) return
+  quitting = true
+  quitPromise = (async () => {
+    // A pending secret load must not spawn a child after shutdown starts.
+    await backendStartPromise
+    const child = backend
+    if (child) {
+      const receipt = await stopChildProcess(child, 2500)
+      if (receipt.forced || receipt.clean === false) console.warn('后端异常结束；同步恢复记录保留')
+      if (backend === child) backend = null
+    }
     allowQuit = true
     app.quit()
-  })
+  })().catch(error => {
+    quitting = false
+    dialog.showErrorBox('尚未确认后端已退出', String(error?.message || error))
+  }).finally(() => { quitPromise = null })
 })
 
 // 启动后端进程（生产模式）
 async function startBackend() {
-  if (backend) return
-  try {
-    const backendBin = process.platform === 'win32' ? 'notepad-server.exe' : 'notepad-server'
-    const exe = path.join(process.resourcesPath, 'bin', backendBin)
-    const env = { ...process.env }
+  if (quitting || backend) return
+  if (backendStartPromise) return backendStartPromise
+  backendStartPromise = (async () => {
     try {
-      const secret = await webdavSecrets.load()
-      if (secret) env.NOTEPAD_WEBDAV_PASSWORD = secret
-      else delete env.NOTEPAD_WEBDAV_PASSWORD
-    } catch (error) {
-      delete env.NOTEPAD_WEBDAV_PASSWORD
-      console.error('WebDAV secure secret unavailable:', error)
+      const backendBin = process.platform === 'win32' ? 'notepad-server.exe' : 'notepad-server'
+      const exe = path.join(process.resourcesPath, 'bin', backendBin)
+      const env = { ...process.env }
+      try {
+        const secret = await webdavSecrets.load()
+        if (secret) env.NOTEPAD_WEBDAV_PASSWORD = secret
+        else delete env.NOTEPAD_WEBDAV_PASSWORD
+      } catch (error) {
+        delete env.NOTEPAD_WEBDAV_PASSWORD
+        console.error('WebDAV secure secret unavailable:', error)
+      }
+      if (quitting) return
+      backend = spawnManagedBackend(spawn, exe, { env })
+      backend.on('error', (err) => {
+        dialog.showErrorBox('后端启动失败', `无法启动后端服务: ${err.message}`)
+      })
+    } catch (e) {
+      dialog.showErrorBox('后端启动失败', String(e))
     }
-    backend = spawn(exe, { stdio: 'ignore', env })
-    backend.on('error', (err) => {
-      dialog.showErrorBox('后端启动失败', `无法启动后端服务: ${err.message}`)
-    })
-  } catch (e) {
-    dialog.showErrorBox('后端启动失败', String(e))
-  }
+  })()
+  try { await backendStartPromise } finally { backendStartPromise = null }
 }
 
 async function restartBackendForWebDAVSecret() {
   if (!app.isPackaged) return { restarted: false, restartRequired: true }
+  if (quitting) throw new Error('应用正在退出，凭据将在下次启动时生效')
+  await backendStartPromise
   const child = backend
-  backend = null
   if (child) await stopChildProcess(child, 2500)
+  if (backend === child) backend = null
+  if (quitting) throw new Error('应用正在退出，凭据将在下次启动时生效')
   await startBackend()
   const ready = await waitForHttpService(`${process.env.API_BASE || 'http://127.0.0.1:27121'}/api/health`, {
     timeoutMs: 8000,

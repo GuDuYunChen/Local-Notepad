@@ -22,6 +22,7 @@ type RecoveryRunner struct {
 	readTimeout time.Duration
 	runTimeout  time.Duration
 	activity    syncjob.ActivityTracker
+	lifecycle   syncjob.Lifecycle
 }
 type RecoveryState struct {
 	State
@@ -59,6 +60,11 @@ func classifySyncJobFailure(err error) syncjob.Failure {
 	return syncjob.Failure{Kind: kind, Retryable: kind == "temporary_network"}
 }
 func (r *RecoveryRunner) Status(ctx context.Context) (RecoveryState, error) {
+	ctx, leave, admissionErr := r.lifecycle.Begin(ctx)
+	if admissionErr != nil {
+		return RecoveryState{}, admissionErr
+	}
+	defer leave()
 	s, err := r.engine.Status(ctx)
 	if err != nil {
 		return RecoveryState{}, err
@@ -156,6 +162,11 @@ func (r *RecoveryRunner) Run(ctx context.Context, acknowledged bool) (RunResult,
 	return r.run(ctx, true, acknowledged)
 }
 func (r *RecoveryRunner) AutoTick(ctx context.Context) (AutoTickResult, error) {
+	ctx, leave, admissionErr := r.lifecycle.Begin(ctx)
+	if admissionErr != nil {
+		return AutoTickResult{Reason: "stopping"}, admissionErr
+	}
+	defer leave()
 	if r.Activity().Active {
 		return AutoTickResult{Reason: "busy"}, syncjob.ErrBusy
 	}
@@ -243,10 +254,15 @@ func (r *RecoveryRunner) Plan(ctx context.Context) (Plan, error) {
 	return result, err
 }
 func (r *RecoveryRunner) ConfigureAuto(ctx context.Context, enabled bool, interval int) (State, error) {
+	ctx, leave, admissionErr := r.lifecycle.Begin(ctx)
+	if admissionErr != nil {
+		return State{}, admissionErr
+	}
+	defer leave()
 	ctx, cancel := withSyncBudget(ctx, r.readTimeout, syncReadLimit)
 	defer cancel()
 	if enabled {
-		var operation *syncjob.Operation
+		var operation *managedOperation
 		var err error
 		ctx, operation, err = r.beginOperation(ctx, "enable-auto")
 		if err != nil {
@@ -273,6 +289,11 @@ func (r *RecoveryRunner) ConfigureAuto(ctx context.Context, enabled bool, interv
 	return result, err
 }
 func (r *RecoveryRunner) Rebind(ctx context.Context) (State, error) {
+	ctx, leave, admissionErr := r.lifecycle.Begin(ctx)
+	if admissionErr != nil {
+		return State{}, admissionErr
+	}
+	defer leave()
 	var result State
 	err := r.jobs.Exclusive(ctx, true, func(ctx context.Context) error { var e error; result, e = r.engine.Rebind(ctx); return e })
 	return result, err
@@ -324,6 +345,11 @@ func RunRecoveryScheduler(ctx context.Context, r *RecoveryRunner, startupDelay, 
 // WithSettings prevents full-row settings updates from changing a task target
 // between preflight and execution. Note editing does not take this guard.
 func (r *RecoveryRunner) WithSettings(ctx context.Context, fn func(context.Context) error) error {
+	ctx, leave, err := r.lifecycle.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer leave()
 	return r.jobs.Exclusive(ctx, false, fn)
 }
 
@@ -333,10 +359,32 @@ func (r *RecoveryRunner) Activity() syncjob.Activity { return r.activity.Snapsho
 func (r *RecoveryRunner) CancelCurrent(id string) (syncjob.CancelReceipt, error) {
 	return r.activity.Cancel(id)
 }
-func (r *RecoveryRunner) beginOperation(ctx context.Context, kind string) (context.Context, *syncjob.Operation, error) {
-	next, operation, err := r.activity.Begin(ctx, kind, r.engine.now())
-	if errors.Is(err, syncjob.ErrActivityBusy) {
-		err = syncjob.ErrBusy
+
+// Stop freezes admissions and signals every admitted caller. The barrier closes
+// after task cleanup, coordinator checkpointing and local settings calls return.
+func (r *RecoveryRunner) Stop() <-chan struct{} { return r.lifecycle.Stop() }
+
+type managedOperation struct {
+	*syncjob.Operation
+	leave func()
+}
+
+func (o *managedOperation) Finish() {
+	o.Operation.Finish()
+	o.leave()
+}
+func (r *RecoveryRunner) beginOperation(ctx context.Context, kind string) (context.Context, *managedOperation, error) {
+	ctx, leave, err := r.lifecycle.Begin(ctx)
+	if err != nil {
+		return nil, nil, err
 	}
-	return next, operation, err
+	next, operation, err := r.activity.Begin(ctx, kind, r.engine.now())
+	if err != nil {
+		leave()
+		if errors.Is(err, syncjob.ErrActivityBusy) {
+			err = syncjob.ErrBusy
+		}
+		return nil, nil, err
+	}
+	return next, &managedOperation{Operation: operation, leave: leave}, nil
 }

@@ -6,12 +6,10 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"notepad-server/internal/backup"
@@ -122,7 +120,9 @@ func main() {
 	performBackup(ctx, db, dbPath)
 
 	// 启动定时任务
+	maintenanceDone := make(chan struct{})
 	go func() {
+		defer close(maintenanceDone)
 		backupTicker := time.NewTicker(8 * time.Hour)
 		defer backupTicker.Stop()
 
@@ -150,7 +150,7 @@ func main() {
 
 	s := g.Server()
 	s.SetClientMaxBodySize(100 * 1024 * 1024) // 100MB for video uploads
-	s.SetGraceful(true)
+	s.SetGraceful(false)                      // This process owns shutdown; no framework restart/signals.
 
 	uploadPath := resolveUploadPath(dbPath)
 	if err := os.MkdirAll(uploadPath, 0755); err != nil {
@@ -213,21 +213,13 @@ func main() {
 	tagController.Register(group)
 	syncController.Register(group)
 
-	// Background sync starts after the local API has had time to settle. The
-	// recovery runner persists preflight delays and blocks ambiguous write retries.
-	go syncengine.RunRecoveryScheduler(ctx, syncRecovery, 15*time.Second, 30*time.Second)
-
-	// 优雅退出：监听系统信号
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		<-quit
-		g.Log().Info(ctx, "收到退出信号，正在停止服务…")
-		s.Shutdown()
-		cancel()
-	}()
-
-	s.Run()
+	// serveManaged owns signals, the parent pipe and both background drains.
+	if err := serveManaged(ctx, cancel, s, syncRecovery, maintenanceDone); err != nil {
+		g.Log().Error(context.Background(), err)
+		// Never run deferred DB.Close concurrently with unfinished workers. The
+		// OS closes handles on this abnormal exit; recovery markers remain intact.
+		os.Exit(1)
+	}
 }
 
 // 解析数据库文件路径（跨平台）

@@ -55,6 +55,15 @@ jobs:
         working-directory: server
         run: go test ./...
 
+      - name: Verify managed backend shutdown
+        env:
+          NOTEPAD_TEST_BACKEND: server/bin/notepad-shutdown-smoke
+        run: |
+          node --test scripts/backend-shutdown.node.mjs
+          go -C server test -race ./internal/appshutdown -count=1
+          go -C server build -o bin/notepad-shutdown-smoke ./cmd/notepad-server
+          node --test scripts/backend-lifecycle.integration.mjs
+
       - name: Search cache race and parser benchmark
         working-directory: server
         run: |
@@ -112,6 +121,11 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: npm run build
+
+      - name: Verify parent-pipe shutdown on Windows
+        env:
+          NOTEPAD_TEST_BACKEND: server/bin/notepad-server.exe
+        run: node --test scripts/backend-lifecycle.integration.mjs
 
       - name: Verify brand and dark-theme rendering
         run: npm run test:brand-render
