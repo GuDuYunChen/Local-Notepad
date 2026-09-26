@@ -98,7 +98,7 @@ func TestInspectRejectsEmptyCorruptAndForeignFiles(t *testing.T) {
 }
 func TestFutureSchemaRejectedWithoutRewriting(t *testing.T) {
 	db, p := testDB(t, "")
-	db.Exec("INSERT INTO schema_migrations VALUES(11)")
+	db.Exec("INSERT INTO schema_migrations VALUES(14)")
 	db.Close()
 	before := bytesAt(t, p)
 	if _, e := Inspect(context.Background(), p); e == nil {
@@ -335,7 +335,7 @@ func TestConcurrentNewTargetNeverOverwrittenAndRetainsMarker(t *testing.T) {
 }
 func TestUnsupportedBackupNeverReplacesOriginal(t *testing.T) {
 	db, p := testDB(t, "")
-	db.Exec("INSERT INTO schema_migrations VALUES(11)")
+	db.Exec("INSERT INTO schema_migrations VALUES(14)")
 	db.Close()
 	dir := filepath.Join(filepath.Dir(p), "backups")
 	os.MkdirAll(dir, 0700)
@@ -357,5 +357,41 @@ func TestResearchSchemaRequiresReceiptTable(t *testing.T) {
 	db.Close()
 	if _, err := Inspect(context.Background(), p); err == nil {
 		t.Fatal("accepted schema 10 without its receipt table")
+	}
+}
+
+
+func TestWebDAVSchemaRequiresCredentialColumns(t *testing.T) {
+	db,p:=testDB(t,"")
+	for _,stmt:=range []string{
+		`CREATE TABLE research_note_requests(request_id TEXT,payload_sha256 TEXT,file_id TEXT,title TEXT,parent_id TEXT,created_at INTEGER)`,
+		`CREATE TABLE sync_state(id INTEGER PRIMARY KEY,device_id TEXT,remote_store_id TEXT,remote_revision TEXT,last_sync_at INTEGER,last_status TEXT,last_error TEXT)`,
+		`CREATE TABLE sync_base(item_id TEXT PRIMARY KEY,object_hash TEXT,synced_at INTEGER)`,
+		`CREATE TABLE sync_conflicts(id TEXT PRIMARY KEY,item_id TEXT,base_hash TEXT,local_hash TEXT,remote_hash TEXT,status TEXT,resolution TEXT)`,
+		`CREATE TABLE settings(id INTEGER PRIMARY KEY,sync_provider TEXT DEFAULT '')`,
+		`INSERT INTO settings(id,sync_provider) VALUES(1,'webdav')`,
+		`INSERT INTO schema_migrations VALUES(12)`,
+	}{if _,err:=db.Exec(stmt);err!=nil{t.Fatal(err)}}
+	db.Close()
+	if _,err:=Inspect(context.Background(),p);err==nil{
+		t.Fatal("accepted schema 12 without WebDAV credential columns")
+	}
+}
+
+
+func TestAutoSyncSchemaRequiresSchedulingColumns(t *testing.T) {
+	db,p:=testDB(t,"")
+	for _,stmt:=range []string{
+		`CREATE TABLE research_note_requests(request_id TEXT,payload_sha256 TEXT,file_id TEXT,title TEXT,parent_id TEXT,created_at INTEGER)`,
+		`CREATE TABLE sync_state(id INTEGER PRIMARY KEY,device_id TEXT,remote_store_id TEXT,remote_revision TEXT,last_sync_at INTEGER,last_status TEXT,last_error TEXT)`,
+		`CREATE TABLE sync_base(item_id TEXT PRIMARY KEY,object_hash TEXT,synced_at INTEGER)`,
+		`CREATE TABLE sync_conflicts(id TEXT PRIMARY KEY,item_id TEXT,base_hash TEXT,local_hash TEXT,remote_hash TEXT,status TEXT,resolution TEXT)`,
+		`CREATE TABLE settings(id INTEGER PRIMARY KEY,sync_provider TEXT DEFAULT '',sync_username TEXT DEFAULT '',sync_password TEXT DEFAULT '')`,
+		`INSERT INTO settings(id,sync_provider) VALUES(1,'webdav')`,
+		`INSERT INTO schema_migrations VALUES(13)`,
+	}{if _,err:=db.Exec(stmt);err!=nil{t.Fatal(err)}}
+	db.Close()
+	if _,err:=Inspect(context.Background(),p);err==nil{
+		t.Fatal("accepted schema 13 without automatic sync columns")
 	}
 }

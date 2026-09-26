@@ -6,12 +6,10 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"notepad-server/internal/backup"
@@ -19,6 +17,7 @@ import (
 	"notepad-server/internal/dao"
 	"notepad-server/internal/logic"
 	"notepad-server/internal/middleware"
+	"notepad-server/internal/syncengine"
 
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
@@ -121,7 +120,9 @@ func main() {
 	performBackup(ctx, db, dbPath)
 
 	// 启动定时任务
+	maintenanceDone := make(chan struct{})
 	go func() {
+		defer close(maintenanceDone)
 		backupTicker := time.NewTicker(8 * time.Hour)
 		defer backupTicker.Stop()
 
@@ -149,7 +150,7 @@ func main() {
 
 	s := g.Server()
 	s.SetClientMaxBodySize(100 * 1024 * 1024) // 100MB for video uploads
-	s.SetGraceful(true)
+	s.SetGraceful(false)                      // This process owns shutdown; no framework restart/signals.
 
 	uploadPath := resolveUploadPath(dbPath)
 	if err := os.MkdirAll(uploadPath, 0755); err != nil {
@@ -201,23 +202,24 @@ func main() {
 	tagController := &controller.TagController{TagLogic: tagLogic}
 
 	uploadController := &controller.UploadController{UploadDir: uploadPath}
+	syncEngine := &syncengine.Engine{DB: db, DataDir: filepath.Dir(dbPath), WebDAVPassword: os.Getenv("NOTEPAD_WEBDAV_PASSWORD")}
+	syncRecovery := syncengine.NewRecoveryRunner(syncEngine)
+	settingsController.SyncGuard = syncRecovery
+	syncController := &controller.SyncController{Engine: syncEngine, Recovery: syncRecovery}
 
 	fileController.Register(group)
 	settingsController.Register(group)
 	uploadController.Register(group)
 	tagController.Register(group)
+	syncController.Register(group)
 
-	// 优雅退出：监听系统信号
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		<-quit
-		g.Log().Info(ctx, "收到退出信号，正在停止服务…")
-		s.Shutdown()
-		cancel()
-	}()
-
-	s.Run()
+	// serveManaged owns signals, the parent pipe and both background drains.
+	if err := serveManaged(ctx, cancel, s, syncRecovery, maintenanceDone); err != nil {
+		g.Log().Error(context.Background(), err)
+		// Never run deferred DB.Close concurrently with unfinished workers. The
+		// OS closes handles on this abnormal exit; recovery markers remain intact.
+		os.Exit(1)
+	}
 }
 
 // 解析数据库文件路径（跨平台）
@@ -495,6 +497,57 @@ func migrate(ctx context.Context, db *sql.DB) error {
 			},
 		},
 		{version: 10, stmts: []string{dao.ResearchRequestsSchema}},
+		{
+			version: 11,
+			stmts: []string{
+				"ALTER TABLE settings ADD COLUMN sync_provider TEXT DEFAULT ''",
+				`CREATE TABLE IF NOT EXISTS sync_state (
+					id INTEGER PRIMARY KEY CHECK(id = 1),
+					device_id TEXT NOT NULL,
+					remote_store_id TEXT NOT NULL DEFAULT '',
+					remote_revision TEXT NOT NULL DEFAULT '',
+					last_sync_at INTEGER NOT NULL DEFAULT 0,
+					last_status TEXT NOT NULL DEFAULT 'never',
+					last_error TEXT NOT NULL DEFAULT ''
+				)`,
+				`INSERT OR IGNORE INTO sync_state(id, device_id)
+				 VALUES(1, lower(hex(randomblob(16))))`,
+				`CREATE TABLE IF NOT EXISTS sync_base (
+					item_id TEXT PRIMARY KEY,
+					object_hash TEXT NOT NULL,
+					synced_at INTEGER NOT NULL
+				)`,
+				`CREATE TABLE IF NOT EXISTS sync_conflicts (
+					id TEXT PRIMARY KEY,
+					item_id TEXT NOT NULL,
+					base_hash TEXT NOT NULL,
+					local_hash TEXT NOT NULL,
+					remote_hash TEXT NOT NULL,
+					local_record TEXT NOT NULL,
+					remote_record TEXT NOT NULL,
+					created_at INTEGER NOT NULL,
+					status TEXT NOT NULL DEFAULT 'open',
+					resolution TEXT NOT NULL DEFAULT '',
+					resolved_at INTEGER NOT NULL DEFAULT 0
+				)`,
+				`CREATE INDEX IF NOT EXISTS idx_sync_conflicts_status_created ON sync_conflicts(status, created_at DESC)`,
+				`CREATE INDEX IF NOT EXISTS idx_sync_conflicts_item ON sync_conflicts(item_id, status)`,
+			},
+		},
+		{
+			version: 12,
+			stmts: []string{
+				"ALTER TABLE settings ADD COLUMN sync_username TEXT DEFAULT ''",
+				"ALTER TABLE settings ADD COLUMN sync_password TEXT DEFAULT ''",
+			},
+		},
+		{
+			version: 13,
+			stmts: []string{
+				"ALTER TABLE settings ADD COLUMN sync_auto_enabled INTEGER DEFAULT 0",
+				"ALTER TABLE settings ADD COLUMN sync_interval_minutes INTEGER DEFAULT 5",
+			},
+		},
 	}
 
 	var currentVersion int
@@ -520,12 +573,15 @@ func migrate(ctx context.Context, db *sql.DB) error {
 		allSuccess := true
 		for _, stmt := range m.stmts {
 			if _, err := tx.ExecContext(ctx, stmt); err != nil {
-				allSuccess = false
 				if strings.Contains(err.Error(), "duplicate column name") || strings.Contains(err.Error(), "table already exists") {
+					// A partially upgraded legacy database may already contain an additive
+					// schema element. Treat that as idempotent success so the remaining
+					// statements can commit and the migration version can be recorded.
 					g.Log().Debug(ctx, fmt.Sprintf("迁移 %d 跳过(已存在): %s", m.version, stmt))
-				} else {
-					g.Log().Warning(ctx, fmt.Sprintf("迁移 %d 语句失败: %s, 错误: %v", m.version, stmt, err))
+					continue
 				}
+				allSuccess = false
+				g.Log().Warning(ctx, fmt.Sprintf("迁移 %d 语句失败: %s, 错误: %v", m.version, stmt, err))
 			}
 		}
 
@@ -559,6 +615,11 @@ func ensureCompatibleSchema(ctx context.Context, db *sql.DB) error {
 		{table: "files", column: "is_deleted", definition: "INTEGER DEFAULT 0"},
 		{table: "files", column: "deleted_at", definition: "INTEGER DEFAULT 0"},
 		{table: "files", column: "is_pinned", definition: "INTEGER DEFAULT 0"},
+		{table: "settings", column: "sync_provider", definition: "TEXT DEFAULT ''"},
+		{table: "settings", column: "sync_username", definition: "TEXT DEFAULT ''"},
+		{table: "settings", column: "sync_password", definition: "TEXT DEFAULT ''"},
+		{table: "settings", column: "sync_auto_enabled", definition: "INTEGER DEFAULT 0"},
+		{table: "settings", column: "sync_interval_minutes", definition: "INTEGER DEFAULT 5"},
 	}
 
 	for _, item := range requiredColumns {

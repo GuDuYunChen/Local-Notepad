@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - feature/ui-redesign-v1
+      - feature/knowledge-os-phase1
+      - feature/knowledge-os-phase2
   pull_request:
     branches:
       - master
@@ -40,12 +42,69 @@ jobs:
       - name: Build renderer
         run: npm run build:renderer
 
+      - name: Verify editor cache and save receipt regressions
+        run: |
+          node --test scripts/editor-cache-regression.node.mjs
+          npx vitest run --root=. src/components/TextEditor.test.jsx src/components/TextEditorLoad.test.jsx
+
       - name: Run redesign smoke tests
         run: npm run test:ui
+
+      - name: Verify sync activity and cancellation UI
+        run: |
+          node --test scripts/sync-activity.node.mjs
+          npx vitest run --root=. src/components/SyncActivityPanel.test.jsx
+          go -C server test -race ./internal/syncjob -count=1
+
+      - name: Verify explicit conflict review
+        run: |
+          node --test scripts/sync-conflict-review.node.mjs
+          npx vitest run --root=. src/components/SyncConflictReview.test.jsx src/components/SyncCenterPanel.test.jsx
+
+      - name: Verify conflict lifecycle recovery
+        run: go -C server test -race ./internal/syncengine -run '^TestConflictLifecycle' -count=3 -v
+
+      - name: Verify conflict destination integrity
+        run: go -C server test -race ./internal/syncengine -run '^TestResolutionGuard' -count=3 -v
+
+      - name: Verify sync history and resolution atomicity
+        run: |
+          node scripts/check-sync-resolution-baseline.mjs
+          go -C server test -race ./internal/syncengine -run '^TestResolutionAtomic' -count=3 -v
+
+      - name: Verify conflict commit witnesses
+        run: |
+          node scripts/check-sync-write-witness-baseline.mjs
+          go -C server test -race ./internal/syncengine -run '^TestResolutionWitness' -count=3 -v
+
+      - name: Verify read-only sync plan explorer
+        run: |
+          node --test scripts/sync-plan-view.node.mjs
+          npx vitest run --root=. src/components/SyncPlanPanel.test.jsx src/components/SyncPlanIntegration.test.jsx
+
+      - name: Verify sync plan read lifecycle
+        run: |
+          node scripts/check-sync-plan-lifecycle-baseline.mjs
+          node --test scripts/sync-plan-read.node.mjs
+          npx vitest run --root=. src/components/SyncPlanLifecycle.test.jsx
+
+      - name: Verify editor exit save handshake
+        run: |
+          node --test scripts/editor-quit.node.mjs
+          npx vitest run --root=. src/components/EditorQuit.test.jsx src/components/EditorQuitSource.test.jsx
 
       - name: Run backend tests
         working-directory: server
         run: go test ./...
+
+      - name: Verify managed backend shutdown
+        env:
+          NOTEPAD_TEST_BACKEND: server/bin/notepad-shutdown-smoke
+        run: |
+          node --test scripts/backend-shutdown.node.mjs
+          go -C server test -race ./internal/appshutdown -count=1
+          go -C server build -o bin/notepad-shutdown-smoke ./cmd/notepad-server
+          node --test scripts/backend-lifecycle.integration.mjs
 
       - name: Search cache race and parser benchmark
         working-directory: server
@@ -78,6 +137,10 @@ jobs:
     needs: renderer-build
     runs-on: windows-latest
     timeout-minutes: 30
+    # Keep developers' local mirror preference; CI uses the upstream tool host.
+    # The NPM_CONFIG key takes precedence over .npmrc in electron-builder 24.13.3.
+    env:
+      NPM_CONFIG_ELECTRON_BUILDER_BINARIES_MIRROR: https://github.com/electron-userland/electron-builder-binaries/releases/download/
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -96,11 +159,47 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
+      - name: Verify portable workspace transactions on Windows
+        run: npx vitest run --root=. electron/workspace-package.test.js electron/workspace-restore.test.js
+
+      - name: Verify conflict lifecycle on Windows
+        run: go -C server test ./internal/syncengine -run '^TestConflictLifecycle' -count=1 -v
+
+      - name: Verify conflict destination integrity on Windows
+        run: go -C server test ./internal/syncengine -run '^TestResolutionGuard' -count=1 -v
+
+      - name: Verify resolution atomicity on Windows
+        run: go -C server test ./internal/syncengine -run '^TestResolutionAtomic' -count=1 -v
+
+      - name: Verify conflict commit witnesses on Windows
+        run: go -C server test ./internal/syncengine -run '^TestResolutionWitness' -count=1 -v
+
+      - name: Verify read-only sync plan explorer on Windows
+        shell: pwsh
+        run: |
+          node --test scripts/sync-plan-view.node.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npx vitest run --root=. src/components/SyncPlanPanel.test.jsx src/components/SyncPlanIntegration.test.jsx
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify sync plan read lifecycle on Windows
+        shell: pwsh
+        run: |
+          node --test scripts/sync-plan-read.node.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npx vitest run --root=. src/components/SyncPlanLifecycle.test.jsx
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Build unsigned Windows NSIS package
         shell: pwsh
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: npm run build
+
+      - name: Verify parent-pipe shutdown on Windows
+        env:
+          NOTEPAD_TEST_BACKEND: server/bin/notepad-server.exe
+        run: node --test scripts/backend-lifecycle.integration.mjs
 
       - name: Verify brand and dark-theme rendering
         run: npm run test:brand-render

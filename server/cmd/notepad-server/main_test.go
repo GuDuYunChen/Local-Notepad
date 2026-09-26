@@ -305,8 +305,12 @@ func TestResearchMigrationIsAdditiveAndPreservesCreationReceipt(t *testing.T) {
 		t.Fatal(err)
 	}
 	var latest int
-	if err := db.QueryRow(`SELECT MAX(version) FROM schema_migrations`).Scan(&latest); err != nil || latest != 10 {
+	if err := db.QueryRow(`SELECT MAX(version) FROM schema_migrations`).Scan(&latest); err != nil || latest != 13 {
 		t.Fatal(latest, err)
+	}
+	var syncTables int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('sync_state','sync_base','sync_conflicts')`).Scan(&syncTables); err != nil || syncTables != 3 {
+		t.Fatal("schema 11/13 sync tables missing", syncTables, err)
 	}
 	if _, err := db.Exec(`INSERT INTO research_note_requests VALUES('request','hash','file','标题','',1)`); err != nil {
 		t.Fatal(err)
@@ -318,4 +322,31 @@ func TestResearchMigrationIsAdditiveAndPreservesCreationReceipt(t *testing.T) {
 	if err := db.QueryRow(`SELECT COUNT(*) FROM research_note_requests`).Scan(&count); err != nil || count != 1 {
 		t.Fatal(count, err)
 	}
+}
+
+func TestSyncMigrationToleratesPreexistingProviderColumn(t *testing.T) {
+	db := openMigrationTestDB(t)
+	ctx := context.Background()
+	if err := migrate(ctx, db); err != nil { t.Fatal(err) }
+	if _, err := db.Exec(`DELETE FROM schema_migrations WHERE version>=11`); err != nil { t.Fatal(err) }
+	if _, err := db.Exec(`DROP TABLE sync_conflicts`); err != nil { t.Fatal(err) }
+	if _, err := db.Exec(`DROP TABLE sync_base`); err != nil { t.Fatal(err) }
+	if _, err := db.Exec(`DROP TABLE sync_state`); err != nil { t.Fatal(err) }
+	// sync_provider remains from ensureCompatibleSchema / the first migration pass.
+	if err := migrate(ctx, db); err != nil { t.Fatal(err) }
+	var latest, tables int
+	if err := db.QueryRow(`SELECT MAX(version) FROM schema_migrations`).Scan(&latest); err != nil || latest != 13 { t.Fatal(latest, err) }
+	if err := db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('sync_state','sync_base','sync_conflicts')`).Scan(&tables); err != nil || tables != 3 {
+		t.Fatal("sync tables were not rebuilt", tables, err)
+	}
+}
+
+
+func TestAutoSyncMigrationAddsSafeDefaults(t *testing.T) {
+	db:=openMigrationTestDB(t)
+	ctx:=context.Background()
+	if err:=migrate(ctx,db);err!=nil{t.Fatal(err)}
+	var enabled,interval int
+	if err:=db.QueryRow(`SELECT sync_auto_enabled,sync_interval_minutes FROM settings WHERE id=1`).Scan(&enabled,&interval);err!=nil{t.Fatal(err)}
+	if enabled!=0||interval!=5{t.Fatalf("unexpected automatic sync defaults: %d %d",enabled,interval)}
 }
