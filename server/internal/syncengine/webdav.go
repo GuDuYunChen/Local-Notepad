@@ -86,27 +86,22 @@ func (r *WebDAVRemote) remoteURL(rel string) string {
 
 func (r *WebDAVRemote) request(method, rel string, body io.Reader, size int64, headers map[string]string) (*http.Response, error) {
 	req, err := http.NewRequest(method, r.remoteURL(rel), body)
-	if err != nil { return nil, err }
+	if err != nil { return nil, &WebDAVTransportError{cause: err} }
 	req.Header.Set("User-Agent", "Local-Notepad-WebDAV/1")
 	if size >= 0 { req.ContentLength = size }
 	if r.username != "" || r.password != "" { req.SetBasicAuth(r.username, r.password) }
 	for key, value := range headers { req.Header.Set(key, value) }
-	resp, err := r.client.Do(req)
-	if err != nil { return nil, fmt.Errorf("WebDAV %s 请求失败: %w", method, err) }
-	return resp, nil
+	return doWebDAVRequest(r.client, req)
 }
 
 func closeResponse(resp *http.Response) {
 	if resp == nil || resp.Body == nil { return }
-	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 64*1024))
+	// Do not drain untrusted error bodies; callers already consume successful bodies.
 	_ = resp.Body.Close()
 }
 
 func webDAVStatusError(resp *http.Response, action string) error {
-	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-	message := strings.TrimSpace(string(raw))
-	if message != "" { return fmt.Errorf("%s失败: HTTP %d: %s", action, resp.StatusCode, message) }
-	return fmt.Errorf("%s失败: HTTP %d", action, resp.StatusCode)
+	return webDAVHTTPFailure(resp, action, time.Now())
 }
 
 func (r *WebDAVRemote) ensureCollection(rel string) error {
