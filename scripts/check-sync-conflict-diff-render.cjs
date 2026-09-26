@@ -6,6 +6,7 @@ const path = require('node:path')
 const os = require('node:os')
 const { pathToFileURL } = require('node:url')
 const { build } = require('esbuild')
+const { createDiffFrameGate } = require('./sync-diff-render-frame.cjs')
 const root = path.resolve(__dirname, '..')
 const output = path.join(root, 'test-results', 'sync-conflict-diff')
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-diff-render-'))
@@ -19,7 +20,7 @@ const wait = ms => new Promise(resolve => setTimeout(resolve, ms))
 function inspectDiff() {
   const table = document.querySelector('.sync-diff-table')
   const wrap = document.querySelector('.sync-diff-table-wrap')
-  if (!table || !wrap) return { settled: false, visible: false }
+  if (!table || !wrap) return { themeColorsReady: false, visible: false }
   const canvas = document.createElement('canvas'); canvas.width = canvas.height = 1
   const context = canvas.getContext('2d', { willReadFrequently: true })
   const paint = color => { context.fillStyle = color; context.fillRect(0, 0, 1, 1) }
@@ -38,17 +39,30 @@ function inspectDiff() {
       const background = pixel(); paint(style.color); const foreground = pixel()
       const a = luminance(foreground), b = luminance(background)
       const expected = resolve(style.getPropertyValue('--ink').trim())
+      const cellStyle = getComputedStyle(cell)
+      const expectedFill = cellStyle.getPropertyValue(kind === 'local' ? '--danger-light' : '--success-light').trim() || cellStyle.getPropertyValue('--paper').trim()
+      context.clearRect(0, 0, 1, 1); paint('#ffffff')
+      for (const node of ancestors) paint(node === cell ? expectedFill : getComputedStyle(node).backgroundColor)
+      const expectedBackground = pixel()
       colors.push({ kind, selector, foreground, background,
         ratio: (Math.max(a, b) + .05) / (Math.min(a, b) + .05),
-        finalForeground: foreground.every((value, i) => value === expected[i]) })
+        finalForeground: foreground.every((value, i) => value === expected[i]),
+        finalBackground: background.every((value, i) => value === expectedBackground[i]) })
     }
   }
   const bounds = wrap.getBoundingClientRect()
-  return { settled: colors.every(color => color.finalForeground) && !document.getAnimations().some(animation => animation.playState === 'running'),
-    visible: bounds.top >= 0 && bounds.bottom <= innerHeight,
+  const runningAnimations = document.getAnimations().filter(animation => animation.playState === 'running')
+    .map(animation => ({ target: animation.effect?.target?.tagName, className: animation.effect?.target?.className,
+      property: animation.transitionProperty || animation.animationName || '',
+      currentTime: animation.currentTime, progress: animation.effect?.getComputedTiming?.().progress }))
+  return { themeColorsReady: colors.every(color => color.finalForeground && color.finalBackground),
+    visible: bounds.top >= 0 && bounds.bottom <= innerHeight && bounds.left >= 0 && bounds.right <= innerWidth,
+    bounds: { top: bounds.top, bottom: bounds.bottom, left: bounds.left, right: bounds.right },
+    viewport: { width: innerWidth, height: innerHeight },
     rows: table.tBodies[0].rows.length, bodyOverflow: document.documentElement.scrollWidth - innerWidth,
     tableOverflow: wrap.scrollWidth - wrap.clientWidth, colors, writes: window.__diffWrites,
-    activeContent: table.querySelectorAll('img,script,a,iframe').length }
+    activeContent: table.querySelectorAll('img,script,a,iframe').length,
+    runningAnimations: runningAnimations.slice(0, 30), runningAnimationCount: runningAnimations.length }
 }
 
 app.whenReady().then(async () => {
@@ -85,15 +99,19 @@ app.whenReady().then(async () => {
   await win.webContents.executeJavaScript('document.fonts.ready.then(()=>true)')
   const reports = []
   const capture = async name => {
-    let check
-    // Wait for actual computed colors and scroll geometry, not a guessed 200ms.
-    // All transitions remain enabled; failure to reach the final theme fails CI.
+    let check, stability = { ready: false, samples: 0 }
+    const gate = createDiffFrameGate()
+    // Three consecutive correctly colored and geometrically identical frames,
+    // not page-wide animation completion. Keep transitions enabled and record
+    // animation diagnostics; unrelated animation cannot approve a bad frame.
     for (let i = 0; i < 60; i++) {
       await win.webContents.executeJavaScript(`document.querySelector('.sync-diff-table-wrap').scrollIntoView({block:'center',behavior:'instant'})`)
       await wait(100)
       check = await win.webContents.executeJavaScript('(' + inspectDiff.toString() + ')()')
-      if (check.settled && check.visible) break
+      stability = gate.observe(check)
+      if (stability.ready) break
     }
+    check.settled = stability.ready; check.stableSamples = stability.samples
     await wait(100)
     fs.writeFileSync(path.join(output, name + '.png'), (await win.capturePage()).toPNG())
     reports.push({ name, ...check })

@@ -169,3 +169,69 @@ test('diff styling uses defined semantic theme backgrounds and explicit text col
   assert.match(css, /background:var\(--success-light,var\(--paper\)\)/)
   assert.match(css, /\.sync-diff-table pre\{color:var\(--ink\);background:transparent/)
 })
+
+// Exercise the native capture gate itself without pretending Node is Chromium.
+const { createDiffFrameGate } = await import('./sync-diff-render-frame.cjs')
+const renderFrame = () => ({ themeColorsReady: true, visible: true, writes: 0, activeContent: 0,
+  rows: 4, bodyOverflow: 0, tableOverflow: 0,
+  bounds: { top: 200, bottom: 600, left: 40, right: 500 }, viewport: { width: 560, height: 900 },
+  colors: ['local', 'remote'].flatMap(kind => ['pre', '.sync-diff-line-meta strong', '.sync-diff-line-meta span'].map(selector =>
+    ({ kind, selector, foreground: [234, 242, 255], background: [23, 56, 42], ratio: 11.39, finalForeground: true, finalBackground: true }))) })
+
+test('native frame gate needs three consecutive identical valid observations', () => {
+  const gate = createDiffFrameGate()
+  assert.deepEqual(gate.observe(renderFrame()), { ready: false, samples: 1 })
+  assert.deepEqual(gate.observe(renderFrame()), { ready: false, samples: 2 })
+  assert.deepEqual(gate.observe(renderFrame()), { ready: true, samples: 3 })
+})
+test('native frame gate cannot accept an old foreground or background even when readable', () => {
+  for (const flag of ['finalForeground', 'finalBackground']) {
+    const gate = createDiffFrameGate(), frame = renderFrame(); frame.colors[0][flag] = false
+    for (let i = 0; i < 4; i++) assert.equal(gate.observe(frame).ready, false)
+    assert.equal(gate.observe(renderFrame()).samples, 1)
+  }
+})
+test('native frame gate resets when the visible geometry, colors or viewport changes', () => {
+  for (const change of [frame => { frame.bounds.top++ }, frame => { frame.colors[0].foreground[0]-- }, frame => { frame.viewport.width++ }]) {
+    const gate = createDiffFrameGate(); gate.observe(renderFrame()); gate.observe(renderFrame())
+    const frame = renderFrame(); change(frame)
+    assert.deepEqual(gate.observe(frame), { ready: false, samples: 1 })
+  }
+})
+test('native frame gate rejects low contrast, overflow, hidden layout and malformed evidence', () => {
+  const invalid = [null, {}, ...[frame => { frame.colors[0].ratio = 4.4999 }, frame => { frame.colors[0].ratio = NaN },
+    frame => { frame.tableOverflow = 2 }, frame => { frame.bodyOverflow = Infinity }, frame => { frame.visible = false },
+    frame => { frame.rows = 65 }, frame => { frame.rows = 1 }, frame => { frame.bounds.left = -1 },
+    frame => { frame.bounds.bottom = 901 }, frame => { frame.colors.pop() }, frame => { frame.colors[0].foreground = [] },
+    frame => { frame.themeColorsReady = false }].map(change => { const frame = renderFrame(); change(frame); return frame })]
+  for (const frame of invalid) {
+    const gate = createDiffFrameGate(); gate.observe(renderFrame()); gate.observe(renderFrame())
+    assert.deepEqual(gate.observe(frame), { ready: false, samples: 0 })
+    assert.equal(gate.observe(renderFrame()).samples, 1)
+  }
+})
+test('native frame gate never approves a write or executable markup', () => {
+  for (const field of ['writes', 'activeContent']) {
+    const gate = createDiffFrameGate(), frame = renderFrame(); frame[field] = 1
+    for (let i = 0; i < 4; i++) assert.equal(gate.observe(frame).ready, false)
+  }
+})
+test('unrelated animation diagnostics do not block three correct stable frames', () => {
+  const gate = createDiffFrameGate()
+  for (let i = 1; i <= 3; i++) {
+    const frame = { ...renderFrame(), runningAnimations: [{ target: 'INPUT', property: 'color', currentTime: i * 100 }], runningAnimationCount: 1 }
+    assert.equal(gate.observe(frame).ready, i === 3)
+  }
+})
+test('capture gates are independent and cannot reuse a previous theme approval', () => {
+  const old = createDiffFrameGate(); for (let i = 0; i < 3; i++) old.observe(renderFrame())
+  const next = createDiffFrameGate()
+  assert.deepEqual(next.observe(renderFrame()), { ready: false, samples: 1 })
+})
+test('native frame validation neither mutates evidence nor retains mutable caller objects', () => {
+  const gate = createDiffFrameGate(), frame = renderFrame(), before = JSON.stringify(frame)
+  gate.observe(frame); assert.equal(JSON.stringify(frame), before)
+  frame.bounds.top++
+  assert.deepEqual(gate.observe(frame), { ready: false, samples: 1 })
+  assert.ok(Object.isFrozen(gate.observe(frame)))
+})
