@@ -2,6 +2,7 @@
 // the page may still animate; their lifecycle is not this widget's screenshot.
 const expected = ['local', 'remote'].flatMap(kind =>
   ['pre', '.sync-diff-line-meta strong', '.sync-diff-line-meta span'].map(selector => [kind, selector]))
+const textIDs = ['heading', 'position', 'local-column', 'remote-column', 'text-column', 'summary', 'description', 'range', 'source']
 const rgb = value => Array.isArray(value) && value.length === 3 && value.every(n => Number.isInteger(n) && n >= 0 && n <= 255)
 const finite = value => typeof value === 'number' && Number.isFinite(value)
 
@@ -19,10 +20,13 @@ function createDiffFrameGate() {
       Array.isArray(frame.colors) && frame.colors.length === expected.length && frame.colors.every((color, i) =>
         color?.kind === expected[i][0] && color.selector === expected[i][1] &&
         color.finalForeground === true && color.finalBackground === true && rgb(color.foreground) && rgb(color.background) &&
-        finite(color.ratio) && color.ratio >= 4.5)
+        finite(color.ratio) && color.ratio >= 4.5) &&
+      Array.isArray(frame.textChecks) && frame.textChecks.length === textIDs.length && frame.textChecks.every((text, i) =>
+        text?.id === textIDs[i] && text.finalForeground === true && rgb(text.foreground) && rgb(text.background) &&
+        finite(text.ratio) && text.ratio >= 4.5)
     if (!valid) { previous = ''; samples = 0; return Object.freeze({ ready: false, samples }) }
     const signature = JSON.stringify({ bounds, viewport, rows: frame.rows,
-      bodyOverflow: frame.bodyOverflow, tableOverflow: frame.tableOverflow, colors: frame.colors })
+      bodyOverflow: frame.bodyOverflow, tableOverflow: frame.tableOverflow, colors: frame.colors, textChecks: frame.textChecks })
     samples = signature === previous ? samples + 1 : 1
     previous = signature
     return Object.freeze({ ready: samples >= 3, samples })

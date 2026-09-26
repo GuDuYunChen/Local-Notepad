@@ -168,6 +168,7 @@ test('diff styling uses defined semantic theme backgrounds and explicit text col
   assert.match(css, /background:var\(--danger-light,var\(--paper\)\)/)
   assert.match(css, /background:var\(--success-light,var\(--paper\)\)/)
   assert.match(css, /\.sync-diff-table pre\{color:var\(--ink\);background:transparent/)
+  assert.match(css, /\.sync-diff-heading>strong,\.sync-diff-navigation>strong,\.sync-diff-table th\{color:var\(--ink\)\}/)
 })
 
 // Exercise the native capture gate itself without pretending Node is Chromium.
@@ -175,6 +176,8 @@ const { createDiffFrameGate } = await import('./sync-diff-render-frame.cjs')
 const renderFrame = () => ({ themeColorsReady: true, visible: true, writes: 0, activeContent: 0,
   rows: 4, bodyOverflow: 0, tableOverflow: 0,
   bounds: { top: 200, bottom: 600, left: 40, right: 500 }, viewport: { width: 560, height: 900 },
+  textChecks: ['heading', 'position', 'local-column', 'remote-column', 'text-column', 'summary', 'description', 'range', 'source'].map(id =>
+    ({ id, foreground: [234, 242, 255], background: [23, 56, 42], ratio: 11.39, finalForeground: true })),
   colors: ['local', 'remote'].flatMap(kind => ['pre', '.sync-diff-line-meta strong', '.sync-diff-line-meta span'].map(selector =>
     ({ kind, selector, foreground: [234, 242, 255], background: [23, 56, 42], ratio: 11.39, finalForeground: true, finalBackground: true }))) })
 
@@ -234,4 +237,21 @@ test('native frame validation neither mutates evidence nor retains mutable calle
   frame.bounds.top++
   assert.deepEqual(gate.observe(frame), { ready: false, samples: 1 })
   assert.ok(Object.isFrozen(gate.observe(frame)))
+})
+
+test('native frame gate checks every title, column and caption even when body colors pass', () => {
+  for (let index = 0; index < 9; index++) {
+    const frame = renderFrame(); frame.textChecks[index].finalForeground = false
+    const gate = createDiffFrameGate()
+    for (let i = 0; i < 4; i++) assert.equal(gate.observe(frame).ready, false)
+  }
+  for (const change of [frame => { frame.textChecks.pop() }, frame => { frame.textChecks[0].ratio = 1.18 }]) {
+    const frame = renderFrame(); change(frame)
+    assert.equal(createDiffFrameGate().observe(frame).samples, 0)
+  }
+})
+test('native frame gate resets stability when heading or caption pixels are still changing', () => {
+  const gate = createDiffFrameGate(); gate.observe(renderFrame()); gate.observe(renderFrame())
+  const frame = renderFrame(); frame.textChecks[0].foreground[0]--
+  assert.deepEqual(gate.observe(frame), { ready: false, samples: 1 })
 })

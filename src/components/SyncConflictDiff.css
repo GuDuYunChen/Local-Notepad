@@ -1,5 +1,6 @@
-.sync-conflict-diff{min-width:0;border:1px solid var(--line);border-radius:10px;padding:14px;background:var(--surface,var(--paper))}
+.sync-conflict-diff{color:var(--ink);min-width:0;border:1px solid var(--line);border-radius:10px;padding:14px;background:var(--surface,var(--paper))}
 .sync-diff-heading,.sync-diff-navigation{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px}
+.sync-diff-heading>strong,.sync-diff-navigation>strong,.sync-diff-table th{color:var(--ink)}
 .sync-diff-details{display:grid;gap:12px;margin-top:12px;min-width:0}
 .sync-diff-summary{font-weight:600;color:var(--ink)}
 .sync-diff-notice{padding:10px 12px;border-left:3px solid var(--warning,var(--line));background:var(--warning-light,var(--paper));color:var(--ink);border-radius:6px;overflow-wrap:anywhere}

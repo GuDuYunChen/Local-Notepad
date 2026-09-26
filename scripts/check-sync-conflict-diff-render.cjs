@@ -50,17 +50,42 @@ function inspectDiff() {
         finalBackground: background.every((value, i) => value === expectedBackground[i]) })
     }
   }
+  const textChecks = []
+  for (const [id, selector, token, ordinal] of [
+    ['heading', '.sync-diff-heading > strong', '--ink', 0],
+    ['position', '.sync-diff-navigation > strong', '--ink', 0],
+    ['local-column', '.sync-diff-table th', '--ink-soft', 0],
+    ['remote-column', '.sync-diff-table th', '--ink-soft', 1],
+    ['text-column', '.sync-diff-table th', '--ink', 2],
+    ['summary', '.sync-diff-summary', '--ink', 0],
+    ['description', '.sync-diff-details > p.sync-review-caption', '--ink-soft', 0],
+    ['range', '.sync-diff-details > p.sync-review-caption', '--ink-soft', 1],
+    ['source', '.sync-diff-details > p.sync-review-caption', '--ink-soft', 2],
+  ]) {
+    const element = document.querySelectorAll(selector)[ordinal]
+    if (!element) throw new Error('Missing diff text probe: ' + id)
+    const style = getComputedStyle(element), ancestors = []
+    for (let node = element; node; node = node.parentElement) ancestors.unshift(node)
+    context.clearRect(0, 0, 1, 1); paint('#ffffff')
+    for (const node of ancestors) paint(getComputedStyle(node).backgroundColor)
+    const background = pixel(); paint(style.color); const foreground = pixel()
+    const a = luminance(foreground), b = luminance(background)
+    const expected = resolve(style.getPropertyValue(token).trim())
+    textChecks.push({ id, foreground, background,
+      ratio: (Math.max(a, b) + .05) / (Math.min(a, b) + .05),
+      finalForeground: foreground.every((value, i) => value === expected[i]) })
+  }
   const bounds = wrap.getBoundingClientRect()
   const runningAnimations = document.getAnimations().filter(animation => animation.playState === 'running')
     .map(animation => ({ target: animation.effect?.target?.tagName, className: animation.effect?.target?.className,
       property: animation.transitionProperty || animation.animationName || '',
       currentTime: animation.currentTime, progress: animation.effect?.getComputedTiming?.().progress }))
-  return { themeColorsReady: colors.every(color => color.finalForeground && color.finalBackground),
+  return { themeColorsReady: colors.every(color => color.finalForeground && color.finalBackground) && textChecks.every(text => text.finalForeground),
     visible: bounds.top >= 0 && bounds.bottom <= innerHeight && bounds.left >= 0 && bounds.right <= innerWidth,
     bounds: { top: bounds.top, bottom: bounds.bottom, left: bounds.left, right: bounds.right },
     viewport: { width: innerWidth, height: innerHeight },
     rows: table.tBodies[0].rows.length, bodyOverflow: document.documentElement.scrollWidth - innerWidth,
-    tableOverflow: wrap.scrollWidth - wrap.clientWidth, colors, writes: window.__diffWrites,
+    tableOverflow: wrap.scrollWidth - wrap.clientWidth, colors, textChecks, writes: window.__diffWrites,
     activeContent: table.querySelectorAll('img,script,a,iframe').length,
     runningAnimations: runningAnimations.slice(0, 30), runningAnimationCount: runningAnimations.length }
 }
