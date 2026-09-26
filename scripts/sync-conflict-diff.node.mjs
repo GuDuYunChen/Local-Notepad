@@ -161,3 +161,11 @@ test('diff presentation contains no network, storage, HTML execution, merge or r
     assert.doesNotMatch(source, /dangerouslySetInnerHTML|innerHTML|localStorage|sessionStorage|indexedDB|electronAPI|\bfetch\s*\(|\bapi\s*\(|onResolve|applyReviewedConflict/)
   }
 })
+
+test('diff styling uses defined semantic theme backgrounds and explicit text color', () => {
+  const css = fs.readFileSync(new URL('../src/components/SyncConflictDiff.css', import.meta.url), 'utf8')
+  assert.doesNotMatch(css, /--(?:danger|success|warning)-bg/)
+  assert.match(css, /background:var\(--danger-light,var\(--paper\)\)/)
+  assert.match(css, /background:var\(--success-light,var\(--paper\)\)/)
+  assert.match(css, /\.sync-diff-table pre\{color:var\(--ink\);background:transparent/)
+})
