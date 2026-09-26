@@ -56,6 +56,11 @@ jobs:
           npx vitest run --root=. src/components/SyncActivityPanel.test.jsx
           go -C server test -race ./internal/syncjob -count=1
 
+      - name: Verify explicit conflict review
+        run: |
+          node --test scripts/sync-conflict-review.node.mjs
+          npx vitest run --root=. src/components/SyncConflictReview.test.jsx src/components/SyncCenterPanel.test.jsx
+
       - name: Verify editor exit save handshake
         run: |
           node --test scripts/editor-quit.node.mjs

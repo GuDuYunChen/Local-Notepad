@@ -2,6 +2,7 @@ import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import SyncCenterPanel from './SyncCenterPanel'
+import { conflictFixture } from '../../scripts/fixtures/sync-conflict-review.mjs'
 import { api } from '~/services/api'
 import { toast } from '~/services/toast'
 vi.mock('~/services/api', () => ({ api: vi.fn() }))
@@ -55,8 +56,11 @@ describe('SyncCenterPanel', () => {
   it('runs only on explicit click', async () => { await render(); expect(api.mock.calls.some(([path]) => path === '/api/sync/run')).toBe(false); await click(button('执行同步')); expect(api).toHaveBeenCalledWith('/api/sync/run', { method: 'POST', body: '{}' }) })
   it('requires conflict side selection', async () => {
     status.open_conflicts = 1; status.last_status = 'conflicts'
-    conflicts = [{ id: 'c1', item_id: 'n1', local_record: { state: 'present', file: { title: '本机标题' } }, remote_record: { state: 'present', file: { title: '远端标题' } } }]
+    conflicts = [conflictFixture()]
     await render(); expect(container.textContent).toContain('不会自动覆盖'); await click(button('保留本机'))
+    expect(api.mock.calls.some(([path]) => path.endsWith('/resolve'))).toBe(false)
+    expect(container.textContent).toContain('本机正文'); expect(container.textContent).toContain('远端正文')
+    await click(container.querySelector('input[type="checkbox"]')); await click(button('确认处理此冲突'))
     expect(api).toHaveBeenCalledWith('/api/sync/conflicts/c1/resolve', { method: 'POST', body: JSON.stringify({ choice: 'local' }) })
   })
   it('opens app-owned remote folder only for local lab', async () => { await render(); await click(button('打开模拟远端')); expect(window.electronAPI.openAppFolder).toHaveBeenCalledWith('syncLab') })
@@ -142,5 +146,51 @@ describe('sync health and read recovery', () => {
     vi.useFakeTimers(); useWebDAV(); settings.sync_auto_enabled = true; await render()
     await act(async () => { root.unmount(); await flush() }); root = createRoot(container)
     const before = settingsReads(); await act(async () => { await vi.advanceTimersByTimeAsync(600000); await flush() }); expect(settingsReads()).toBe(before)
+  })
+})
+
+describe('reviewed conflict integration', () => {
+  const submitted = () => api.mock.calls.filter(([path, init]) => path.endsWith('/resolve') && init?.method === 'POST')
+  async function prepare() {
+    status.open_conflicts = 1; conflicts = [conflictFixture()]
+    await render(); await click(button('保留本机'))
+    await click(container.querySelector('input[type="checkbox"]'))
+  }
+  it('rechecks a changed backend conflict before sending any mutation', async () => {
+    await prepare(); conflicts = [conflictFixture({ remote_hash: 'd'.repeat(64) })]
+    await click(button('确认处理此冲突'))
+    expect(submitted()).toHaveLength(0); expect(container.textContent).toContain('冲突或同步目标已变化')
+  })
+  it('rechecks the backend target rather than trusting the previous UI snapshot', async () => {
+    await prepare(); status.remote_store_id = 'different-store'
+    await click(button('确认处理此冲突'))
+    expect(submitted()).toHaveLength(0); expect(container.textContent).toContain('同步目标已变化')
+  })
+  it('an offline recheck refuses mutation and keeps the reviewed body visible', async () => {
+    await prepare(); readError = true; await click(button('确认处理此冲突'))
+    expect(submitted()).toHaveLength(0); expect(container.textContent).toContain('本机正文')
+    expect(button('确认处理此冲突').disabled).toBe(true); expect(toast.success).not.toHaveBeenCalled()
+  })
+  it('a conflict already removed by another action is not submitted again', async () => {
+    await prepare(); conflicts = []; await click(button('确认处理此冲突'))
+    expect(submitted()).toHaveLength(0); expect(toast.success).not.toHaveBeenCalled()
+  })
+  it('a failed mutation is never automatically repeated or reported as success', async () => {
+    await prepare(); const original = api.getMockImplementation()
+    api.mockImplementation(async (path, init) => { if (path.endsWith('/resolve')) throw new Error('write reply lost'); return original(path, init) })
+    await click(button('确认处理此冲突'))
+    expect(submitted()).toHaveLength(1); expect(toast.success).not.toHaveBeenCalled()
+    expect(container.textContent).toContain('处理未确认'); expect(container.querySelector('input[type="checkbox"]').checked).toBe(false)
+  })
+  it('leaving the panel aborts the pre-submission read and blocks a late write', async () => {
+    await prepare(); const original = api.getMockImplementation(); let finish, signal
+    api.mockImplementation((path, init) => {
+      if (path === '/api/sync/conflicts') { signal = init?.signal; return new Promise(r => { finish = r }) }
+      return original(path, init)
+    })
+    await click(button('确认处理此冲突')); expect(signal).toBeTruthy()
+    await act(async () => { root.unmount(); await flush() }); root = createRoot(container)
+    expect(signal.aborted).toBe(true)
+    await act(async () => { finish(conflicts); await flush() }); expect(submitted()).toHaveLength(0)
   })
 })

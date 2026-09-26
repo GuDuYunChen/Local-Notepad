@@ -3,21 +3,13 @@ import { api } from '~/services/api'
 import { toast } from '~/services/toast'
 import { createSyncStatusReader, mergeSyncDraft, syncHealthLabel, syncStatusLabel } from '~/services/syncStatusReader.mjs'
 import SyncActivityPanel from './SyncActivityPanel'
+import SyncConflictReview from './SyncConflictReview'
+import { conflictScope, applyReviewedConflict } from '~/services/syncConflictReview.mjs'
 import './SyncCenterPanel.css'
 import './SyncHealth.css'
 
 const describePlan = plan => plan
   ? `上传 ${plan.uploads || 0} · 下载 ${plan.downloads || 0} · 冲突 ${plan.conflicts || 0} · 无变化 ${plan.noops || 0}` : ''
-const recordLabel = (record, fallback) => {
-  if (record?.state === 'purged') return '已永久删除'
-  if (record?.kind === 'attachment') return record?.attachment?.name || fallback || '附件'
-  if (record?.kind === 'tag') return record?.tag?.name ? ('标签：' + record.tag.name) : (fallback || '标签')
-  if (record?.kind === 'file-tag') {
-    const link = record?.file_tag
-    return link ? ('标签关联：' + link.file_id + ' ↔ ' + link.tag_id) : (fallback || '标签关联')
-  }
-  return record?.file?.title || fallback || '未知对象'
-}
 const providerName = provider => provider === 'webdav' ? 'WebDAV' : '本地实验室'
 const timeLabel = value => {
   if (!Number.isFinite(value) || value <= 0) return '暂无记录'
@@ -30,6 +22,7 @@ export default function SyncCenterPanel() {
   const alive = useRef(false)
   const operation = useRef(false)
   const reader = useRef(null)
+  const conflictRead = useRef(null)
   const dirty = useRef({ endpoint: false, username: false })
   const autoEnabled = useRef(false)
   const [settings, setSettings] = useState(null)
@@ -77,6 +70,7 @@ export default function SyncCenterPanel() {
     void current.refresh()
     return () => {
       alive.current = false
+      conflictRead.current?.abort()
       current.dispose()
       if (reader.current === current) reader.current = null
     }
@@ -99,7 +93,7 @@ export default function SyncCenterPanel() {
     setBusy(key)
     setActionError('')
     if (key !== 'check' && key !== 'folder') setConnectionCheck(null)
-    try { await task() } catch (error) {
+    try { return await task() } catch (error) {
       if (alive.current) {
         const message = error?.message || '同步操作失败'
         setActionError(message)
@@ -204,13 +198,32 @@ export default function SyncCenterPanel() {
       }
     })
   }
-  const resolve = (id, choice) => exclusive(id + ':' + choice, async () => {
+  const resolve = (review, choice, isCurrent) => exclusive(review.id + ':' + choice, async () => {
+    const controller = new AbortController()
+    conflictRead.current = controller
     try {
-      await api('/api/sync/conflicts/' + encodeURIComponent(id) + '/resolve', { method: 'POST', body: JSON.stringify({ choice }) })
+      await applyReviewedConflict(review, choice, {
+        signal: controller.signal,
+        isCurrent: () => alive.current && isCurrent(),
+        load: async signal => {
+          const [nextSettings, nextStatus, nextConflicts] = await Promise.all([
+            api('/api/settings', { signal }), api('/api/sync/status', { signal }), api('/api/sync/conflicts', { signal }),
+          ])
+          return { scope: conflictScope(nextSettings, nextStatus), conflicts: nextConflicts }
+        },
+        write: (id, side) => api('/api/sync/conflicts/' + encodeURIComponent(id) + '/resolve', {
+          method: 'POST', body: JSON.stringify({ choice: side }),
+        }),
+      })
+      if (alive.current) setPlan(null)
       await refreshAfterChange(choice === 'local' ? '已保留本机版本' : '已采用远端版本')
+      return true
     } catch (error) {
       if (alive.current) await refresh()
       throw error
+    } finally {
+      controller.abort()
+      if (conflictRead.current === controller) conflictRead.current = null
     }
   })
   const openLab = () => exclusive('folder', async () => {
@@ -315,13 +328,9 @@ export default function SyncCenterPanel() {
       {status?.last_error && <p className="sync-center-error" role="alert">{status.last_error}</p>}
       {conflicts.length > 0 && <div className="sync-conflict-list">
         <div className="sync-conflict-heading"><strong>冲突中心</strong><span>不会自动覆盖，必须明确选择</span></div>
-        {conflicts.map(conflict => <article className="sync-conflict-item" key={conflict.id}>
-          <div><strong>{recordLabel(conflict.local_record, conflict.item_id)}</strong><span>本机：{recordLabel(conflict.local_record, '不存在')} · 远端：{recordLabel(conflict.remote_record, '不存在')}</span></div>
-          <div className="sync-conflict-actions">
-            <button className="btn small" disabled={!!busy} onClick={() => void resolve(conflict.id, 'remote')}>采用远端</button>
-            <button className="btn small primary" disabled={!!busy} onClick={() => void resolve(conflict.id, 'local')}>保留本机</button>
-          </div>
-        </article>)}
+        {conflicts.map(conflict => <SyncConflictReview key={conflict.id} conflict={conflict}
+          scope={conflictScope(settings, status)} disabled={!!busy || !!health.error || draftChanged}
+          onResolve={resolve} onRefresh={refresh}/>)}
       </div>}
     </>}
   </section>
