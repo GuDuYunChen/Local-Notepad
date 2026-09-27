@@ -66,6 +66,11 @@ jobs:
           node --test scripts/sync-conflict-diff.node.mjs
           npx vitest run --root=. src/components/SyncConflictDiff.test.jsx
 
+      - name: Verify searchable conflict queue
+        run: |
+          node --test scripts/sync-conflict-queue.node.mjs
+          npx vitest run --root=. src/components/SyncConflictQueue.test.jsx
+
       - name: Verify conflict lifecycle recovery
         run: go -C server test -race ./internal/syncengine -run '^TestConflictLifecycle' -count=3 -v
 
@@ -203,6 +208,14 @@ jobs:
           npx vitest run --root=. src/components/SyncConflictDiff.test.jsx src/components/SyncConflictReview.test.jsx
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Verify searchable conflict queue on Windows
+        shell: pwsh
+        run: |
+          node --test scripts/sync-conflict-queue.node.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npx vitest run --root=. src/components/SyncConflictQueue.test.jsx
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Build unsigned Windows NSIS package
         shell: pwsh
         env:
@@ -237,6 +250,20 @@ jobs:
           path: |
             test-results/sync-conflict-diff/*.png
             test-results/sync-conflict-diff/checks.json
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Verify native conflict queue rendering
+        run: npx electron scripts/check-sync-conflict-queue-render.cjs
+
+      - name: Upload conflict queue render checks
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-notepad-conflict-queue-${{ github.sha }}
+          path: |
+            test-results/sync-conflict-queue/*.png
+            test-results/sync-conflict-queue/checks.json
           if-no-files-found: ignore
           retention-days: 7
 

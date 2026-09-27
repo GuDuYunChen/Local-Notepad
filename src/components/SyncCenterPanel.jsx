@@ -3,7 +3,7 @@ import { api } from '~/services/api'
 import { toast } from '~/services/toast'
 import { createSyncStatusReader, mergeSyncDraft, syncHealthLabel, syncStatusLabel } from '~/services/syncStatusReader.mjs'
 import SyncActivityPanel from './SyncActivityPanel'
-import SyncConflictReview from './SyncConflictReview'
+import SyncConflictQueue from './SyncConflictQueue'
 import SyncPlanPanel from './SyncPlanPanel'
 import { readSyncPlan } from '~/services/syncPlanRead.mjs'
 import { captureSyncPlan, invalidateSyncPlan, syncPlanObservation } from '~/services/syncPlanView.mjs'
@@ -372,12 +372,9 @@ export default function SyncCenterPanel() {
       </div>
       <SyncPlanPanel snapshot={plan} disabled={!!busy || draftChanged} onPreview={() => void preview()}/>
       {status?.last_error && <p className="sync-center-error" role="alert">{status.last_error}</p>}
-      {conflicts.length > 0 && <div className="sync-conflict-list">
-        <div className="sync-conflict-heading"><strong>冲突中心</strong><span>不会自动覆盖，必须明确选择</span></div>
-        {conflicts.map(conflict => <SyncConflictReview key={conflict.id} conflict={conflict}
-          scope={conflictScope(settings, status)} disabled={!!busy || !!health.error || draftChanged}
-          onResolve={resolve} onRefresh={refresh}/>)}
-      </div>}
+      {conflicts.length > 0 && <SyncConflictQueue conflicts={conflicts} busy={!!busy}
+        scope={conflictScope(settings, status)} disabled={!!busy || !!health.error || draftChanged}
+        onResolve={resolve} onRefresh={refresh}/>}
     </>}
   </section>
 }
