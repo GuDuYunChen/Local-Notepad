@@ -119,3 +119,66 @@ test('overview has no network, persistence, credentials, clipboard or synchroniz
     assert.doesNotMatch(text, /\bfetch\s*\(|\bapi\s*\(|\.click\s*\(|onResolve|onRefresh|localStorage|sessionStorage|electronAPI|clipboard|dangerouslySetInnerHTML/)
   }
 })
+
+// 2F.15.1: an exclusive headline must not discard independent snapshot facts.
+const maskedContexts = [
+  ['busy', x => { x.busy = true }, 'waiting', /已读取的状态快照/],
+  ['stale', x => { x.health.error = 'PRIVATE_READ_ERROR'; x.health.failures = 1 }, 'stale', /上次读取结果/],
+  ['refreshing', x => { x.health.loading = true }, 'stale', /正在刷新；仍是上次读取结果/],
+]
+for (const [last, mode, warning] of [
+  ['recovery_blocked', 'blocked', /恢复保护阻断/], ['retry_wait', 'backoff', /预检暂缓/],
+]) for (const source of ['both', 'status-only', 'mode-only']) {
+  for (const [context, change, state, readSource] of maskedContexts) test(`${last} ${source} stays visible during ${context}`, () => {
+    const x = overviewFixture(); change(x)
+    x.status.last_status = source === 'mode-only' ? 'ok' : last
+    x.status.recovery = source === 'status-only' ? null : { mode }
+    const before = structuredClone(x), v = buildSyncOverview(x)
+    assert.equal(v.state, state); assert.equal(v.target, 'health')
+    assert.match(v.recoveryNotice, warning); assert.match(v.recoveryNotice, /已读取的快照/)
+    assert.match(v.readSource, readSource); assert.deepEqual(x, before)
+    assert.doesNotMatch(JSON.stringify(v), /PRIVATE_READ_ERROR/)
+  })
+}
+for (const [label, change, source] of [
+  ['captured', () => {}, /已读取的状态快照（非实时保证）/],
+  ['stale', x => { x.health.failures = 1 }, /上次读取结果；刷新失败或状态待核实/],
+  ['refreshing', x => { x.health.loading = true }, /正在刷新；仍是上次读取结果/],
+]) test(`uncertain-write headline retains ${label} provenance independently`, () => {
+  const x = overviewFixture(); x.status.last_status = 'review_required'; x.status.recovery.mode = 'review_required'; change(x)
+  const v = buildSyncOverview(x)
+  assert.equal(v.state, 'uncertain'); assert.match(v.readSource, source)
+  assert.equal(v.readAt, new Date(x.health.lastReadAt).toISOString())
+  assert.equal(v.lastSuccess, new Date(x.status.recovery.last_success_at * 1000).toISOString())
+})
+test('waiting also retains stale provenance independently of its headline', () => {
+  const x = overviewFixture(); x.busy = true; x.health.loading = true; x.health.failures = 1
+  const v = buildSyncOverview(x); assert.equal(v.state, 'waiting'); assert.match(v.readSource, /刷新失败或状态待核实/)
+})
+for (const [last, mode, words] of [
+  ['recovery_blocked', 'backoff', [/恢复保护阻断/, /预检暂缓/]],
+  ['review_required', 'blocked', [/恢复保护阻断/, /不一致/]],
+  ['review_required', 'backoff', [/预检暂缓/, /不一致/]],
+]) test(`${last}/${mode} retains independent warnings under a stronger headline`, () => {
+  const x = overviewFixture(); x.status.last_status = last; x.status.recovery.mode = mode
+  x.health.error = 'PRIVATE'; x.busy = true
+  const v = buildSyncOverview(x)
+  for (const wordsToKeep of words) assert.match(v.recoveryNotice, wordsToKeep)
+  assert.match(v.readSource, /上次读取结果/); assert.equal(v.target, 'health')
+})
+test('unread or hostile states cannot fabricate recovery warnings or copy private strings', () => {
+  const x = overviewFixture(); x.health.lastReadAt = 0; x.status.last_status = 'recovery_blocked'; x.status.recovery.mode = 'backoff'
+  const unread = buildSyncOverview(x)
+  assert.equal(unread.recoveryNotice, ''); assert.match(unread.readSource, /尚无可核实/); assert.equal(unread.reportedConflicts, '未知')
+  x.health.lastReadAt = 1790500000000
+  for (const value of ['constructor', '__proto__', 'PRIVATE_<script>alert(1)</script>']) {
+    x.status.last_status = value; x.status.recovery.mode = value; x.health.error = value
+    const v = buildSyncOverview(x); assert.equal(v.recoveryNotice, ''); assert.doesNotMatch(JSON.stringify(v), /PRIVATE_|<script>|constructor|__proto__/)
+  }
+})
+test('A-B-A snapshots recompute warning and provenance without inventing a resolution', () => {
+  const x = overviewFixture(); x.status.last_status = 'recovery_blocked'; x.status.recovery.mode = 'blocked'; x.busy = true
+  const a = buildSyncOverview(x), b = buildSyncOverview(overviewFixture()), again = buildSyncOverview(x)
+  assert.match(a.recoveryNotice, /不证明保护已解除/); assert.equal(b.recoveryNotice, '')
+  assert.deepEqual(again, a); assert.doesNotMatch(b.detail, /全部同步完成|两端已一致/)
+})

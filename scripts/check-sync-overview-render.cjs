@@ -5,6 +5,7 @@ const { build } = require('esbuild')
 const fs = require('node:fs'), path = require('node:path'), os = require('node:os')
 const { createHash } = require('node:crypto')
 const { pathToFileURL } = require('node:url')
+const { verifyOverviewSceneText } = require('./sync-overview-evidence.cjs')
 const root = path.resolve(__dirname, '..'), out = path.join(root, 'test-results', 'sync-overview')
 app.setPath('userData', fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-overview-')))
 app.on('window-all-closed', () => {}) // Every scene must finish before explicit exit.
@@ -35,7 +36,9 @@ function inspect() {
     overflow: document.documentElement.scrollWidth - innerWidth,
     writes: window.__manualActions, activeMarkup: panel.querySelectorAll('img,script,iframe,a').length,
     navCount: panel.querySelectorAll('nav button').length,
-    title: panel.querySelector('[role="status"]').textContent }
+    title: panel.querySelector('[role="status"]').textContent,
+    readProvenance: [...panel.querySelectorAll('.sync-overview-note')].find(node => node.textContent.startsWith('状态依据：'))?.textContent || '',
+    recoveryNotice: panel.querySelector('.sync-overview-status>.sync-overview-warning')?.textContent || '' }
 }
 app.whenReady().then(async () => {
   fs.mkdirSync(out, { recursive: true })
@@ -48,11 +51,15 @@ app.whenReady().then(async () => {
       import {overviewFixture} from './scripts/fixtures/sync-overview.mjs';
       import './src/components/SyncCenterPanel.css';
       const mode = new URLSearchParams(location.search).get('scene');
-      document.documentElement.dataset.theme = ['dark','narrow','uncertain'].includes(mode) ? 'dark' : 'light';
+      document.documentElement.dataset.theme = ['dark','narrow','uncertain','backoff-busy','uncertain-refreshing'].includes(mode) ? 'dark' : 'light';
       const input=overviewFixture();
       if(mode==='uncertain'){input.status.last_status='review_required';input.status.recovery={mode:'review_required'}}
       if(mode==='unavailable'){input.settings=null;input.status=null;input.health.lastReadAt=0}
       if(mode==='disabled')input.settings.sync_enabled=false;
+      if(mode==='blocked-stale'){input.status.last_status='recovery_blocked';input.status.recovery.mode='blocked';input.health.failures=1;input.health.error='SYNTHETIC_PRIVATE_ERROR'}
+      if(mode==='backoff-busy'){input.status.last_status='retry_wait';input.status.recovery.mode='backoff';input.busy=true}
+      if(mode==='uncertain-refreshing'){input.status.last_status='review_required';input.status.recovery.mode='review_required';input.health.loading=true}
+      if(mode==='contradictory-busy'){input.status.last_status='recovery_blocked';input.status.recovery.mode='backoff';input.busy=true;input.health.failures=1}
       window.__manualActions=0;
       const navigate=key=>focusSyncOverviewRegion(document.getElementById('center'),key);
       createRoot(document.getElementById('root')).render(<section id="center" data-sync-center className="settings-card consumer-settings-section sync-center-card">
@@ -69,7 +76,7 @@ app.whenReady().then(async () => {
     syntheticRecords: true, backendExercised: false, nativeFocus: false, writes: 0, scenes: [] }
   const save = () => fs.writeFileSync(path.join(out, 'checks.json'), JSON.stringify(report, null, 2))
   save()
-  for (const name of ['light', 'dark', 'narrow', 'uncertain', 'unavailable', 'disabled']) {
+  for (const name of ['light', 'dark', 'narrow', 'uncertain', 'unavailable', 'disabled', 'blocked-stale', 'backoff-busy', 'uncertain-refreshing', 'contradictory-busy']) {
     const win = new BrowserWindow({ show: false, width: name === 'narrow' ? 560 : 1000, height: 900, useContentSize: true,
       webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } })
     try {
@@ -87,6 +94,7 @@ app.whenReady().then(async () => {
       report.scenes.push({ name, ...sample, stableSamples: stable, png: name + '.png', sha256: hash(image), bytes: image.length })
       save()
       if (stable < 3) throw new Error('Invalid overview rendering: ' + name + ': ' + JSON.stringify(sample))
+      verifyOverviewSceneText({ name, ...sample })
       const navigation = await win.webContents.executeJavaScript(`(()=>{
         document.querySelector('[aria-label="定位连接配置"]').click();
         const focused=document.activeElement===document.querySelector('[data-sync-section="connection"]');

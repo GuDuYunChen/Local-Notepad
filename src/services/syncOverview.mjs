@@ -12,6 +12,10 @@ const targets = new Set(['overview', ...SYNC_OVERVIEW_DESTINATIONS.map(item => i
 const providerLabel = { webdav: 'WebDAV', 'local-lab': '本地实验室', unknown: '尚未核实' }
 const numberLabel = value => value === null ? '未知' : String(value)
 const dateLabel = value => value === null ? '尚无记录' : new Date(value).toISOString()
+const readSources = Object.freeze({
+  unavailable: '尚无可核实的读取结果', stale: '上次读取结果；刷新失败或状态待核实',
+  refreshing: '正在刷新；仍是上次读取结果', captured: '已读取的状态快照（非实时保证）',
+})
 const specialModes = { applying: 'review_required', review_required: 'review_required', backoff: 'retry_wait', blocked: 'recovery_blocked' }
 
 export function buildSyncOverview(input) {
@@ -57,11 +61,23 @@ export function buildSyncOverview(input) {
   }
   const expected = Object.hasOwn(specialModes, facts.recovery) ? specialModes[facts.recovery] : null
   const special = ['review_required', 'retry_wait', 'recovery_blocked'].includes(facts.lastState)
-  const recoveryNotice = special && facts.recovery === 'unknown'
+  const detailNotice = special && facts.recovery === 'unknown'
     ? '恢复详情缺失或不受支持；保留已有警示，不推断任务已经结束。'
     : (special && expected !== facts.lastState) || (expected && facts.lastState !== 'unknown' && expected !== facts.lastState)
       ? '最近状态与恢复详情不一致；请查看原始状态区域，两项均不能证明写入已完成。' : ''
-  return Object.freeze({ state, title, detail, target, recoveryNotice, destinations,
+  // One headline cannot represent every independent fact. A busy/stale banner
+  // must not erase a known guard, and uncertainty must not erase read provenance.
+  // Retain snapshot-qualified warnings without claiming they are current or cleared.
+  const notices = []
+  if (state !== 'blocked' && (facts.lastState === 'recovery_blocked' || facts.recovery === 'blocked')) {
+    notices.push('已读取的快照包含恢复保护阻断提示；等待或刷新不证明保护已解除，不要通过清除数据或重新绑定跳过保护。')
+  }
+  if (state !== 'backoff' && (facts.lastState === 'retry_wait' || facts.recovery === 'backoff')) {
+    notices.push('已读取的快照包含预检暂缓提示；查看状态区域中的最早重试时间，定位或刷新不会提前重跑同步。')
+  }
+  if (detailNotice) notices.push(detailNotice)
+  const recoveryNotice = notices.join(' ')
+  return Object.freeze({ state, title, detail, target, recoveryNotice, destinations, readSource: readSources[facts.readState],
     provider: providerLabel[facts.provider],
     automation: facts.automatic === true ? '自动同步已开启' : facts.automatic === false ? '自动同步已关闭' : '自动同步状态未知',
     reportedConflicts: numberLabel(facts.openConflicts), listedConflicts: numberLabel(facts.listedConflicts),

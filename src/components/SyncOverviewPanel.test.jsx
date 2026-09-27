@@ -57,3 +57,45 @@ it('busy operation still allows read-only navigation, not a stop or retry button
   expect(container.textContent).toContain('不会停止等待'); expect(navigate).toHaveBeenCalledTimes(1); expect(navigate).toHaveBeenCalledWith('diagnostic')
   expect(container.querySelector('input,textarea')).toBeNull()
 })
+
+for (const [last, mode, warning] of [
+  ['recovery_blocked', 'blocked', '恢复保护阻断'], ['retry_wait', 'backoff', '预检暂缓'],
+]) for (const context of ['busy', 'stale', 'refreshing']) it(`keeps ${mode} visible in the actual ${context} panel`, async () => {
+  props.status.last_status = last; props.status.recovery.mode = mode
+  if (context === 'busy') props.busy = true
+  if (context === 'stale') { props.health.error = 'PRIVATE_READ_ERROR'; props.health.failures = 1 }
+  if (context === 'refreshing') props.health.loading = true
+  await render(true)
+  expect(container.querySelector('.sync-overview-warning').textContent).toContain(warning)
+  expect(container.textContent).toContain('状态依据：' + (context === 'busy' ? '已读取的状态快照' : context === 'stale' ? '上次读取结果' : '正在刷新；仍是上次读取结果'))
+  expect(container.textContent).not.toContain('PRIVATE_READ_ERROR'); expect(navigate).not.toHaveBeenCalled()
+  await click(button('状态与恢复')); expect(navigate).toHaveBeenCalledTimes(1); expect(navigate).toHaveBeenCalledWith('health')
+})
+it('uncertain-write title does not conceal the refreshing provenance', async () => {
+  props.status.last_status = 'review_required'; props.status.recovery.mode = 'review_required'; props.health.loading = true
+  await render(); expect(container.textContent).toContain('先核查写入结果')
+  expect(container.textContent).toContain('状态依据：正在刷新；仍是上次读取结果')
+  expect(container.querySelectorAll('dd')[2].textContent).toBe(new Date(1790499900000).toISOString())
+  expect(navigate).not.toHaveBeenCalled()
+})
+it('contradictory blocked and backoff evidence both survive the waiting banner', async () => {
+  props.status.last_status = 'recovery_blocked'; props.status.recovery.mode = 'backoff'; props.busy = true; props.health.failures = 1
+  await render(); const notice = container.querySelector('.sync-overview-warning').textContent
+  expect(notice).toContain('恢复保护阻断'); expect(notice).toContain('预检暂缓'); expect(notice).toContain('不一致')
+  expect(container.textContent).toContain('正在等待操作结果'); expect(container.textContent).toContain('刷新失败或状态待核实')
+  expect(navigate).not.toHaveBeenCalled()
+})
+it('A-B-A read provenance and guards update without remounting controls or moving focus', async () => {
+  props.status.last_status = 'recovery_blocked'; props.status.recovery.mode = 'blocked'; props.busy = true; props.health.failures = 1
+  const original = structuredClone(props); await render(); const connection = button('连接配置'); connection.focus()
+  props = overviewFixture(); await render(); expect(container.querySelector('.sync-overview-warning')).toBeNull()
+  props = original; await render(); expect(container.textContent).toContain('不证明保护已解除')
+  expect(container.textContent).toContain('状态依据：上次读取结果'); expect(button('连接配置')).toBe(connection)
+  expect(document.activeElement).toBe(connection); expect(navigate).not.toHaveBeenCalled()
+})
+it('unread data cannot render a fabricated guard or a captured-state label', async () => {
+  props.status.last_status = 'recovery_blocked'; props.status.recovery.mode = 'backoff'; props.health.lastReadAt = 0
+  await render(); expect(container.querySelector('.sync-overview-warning')).toBeNull()
+  expect(container.textContent).toContain('状态依据：尚无可核实的读取结果')
+  expect(container.querySelector('dd').textContent).toBe('未知'); expect(navigate).not.toHaveBeenCalled()
+})

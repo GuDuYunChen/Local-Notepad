@@ -28,7 +28,7 @@ export default function SyncOverviewPanel({ onNavigate, ...input }) {
       <div><dt>已读取列表数量</dt><dd>{view.listedConflicts}</dd></div>
       <div className="sync-overview-time"><dt>最近确认成功 · UTC</dt><dd>{view.lastSuccess}</dd></div>
     </dl>
-    <p className="sync-overview-note">读取时间 UTC：{view.readAt}。总览随已读取字段更新，不保证远端实时状态。</p>
+    <p className="sync-overview-note">状态依据：{view.readSource}。读取时间 UTC：{view.readAt}。总览随已读取字段更新，不保证远端实时状态。</p>
     <nav className="sync-overview-nav" aria-label="同步中心分区导航">
       {view.destinations.map(item => <button key={item.key} type="button" className="sync-overview-link"
         aria-label={'定位' + item.label} disabled={!item.available || typeof onNavigate !== 'function'}

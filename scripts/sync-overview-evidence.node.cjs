@@ -6,8 +6,18 @@ function fixture(fn) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'overview-evidence-test-'))
   const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aT5kAAAAASUVORK5CYII=', 'base64')
   const report = { commit: sha, platform: 'win32', complete: true, realComponents: true, syntheticRecords: true, backendExercised: false, nativeFocus: true, writes: 0,
-    scenes: ['light','dark','narrow','uncertain','unavailable','disabled'].map(name => ({name, png:name+'.png', sha256:createHash('sha256').update(png).digest('hex'), bytes:png.length,
+    scenes: ['light','dark','narrow','uncertain','unavailable','disabled','blocked-stale','backoff-busy','uncertain-refreshing','contradictory-busy'].map(name => ({name, png:name+'.png', sha256:createHash('sha256').update(png).digest('hex'), bytes:png.length,
       viewport:{width:1,height:1}, colors:Array.from({length:12},()=>({final:true,ratio:8})), stableSamples:3, writes:0, activeMarkup:0, navCount:5, overflow:0})) }
+  for (const scene of report.scenes) {
+    const extra = {
+      'unavailable': ['尚无可核实的读取结果', '尚无可核实的状态', ''],
+      'blocked-stale': ['上次读取结果；刷新失败或状态待核实', '当前保留的是上次读取结果', '恢复保护阻断；不证明保护已解除'],
+      'backoff-busy': ['已读取的状态快照（非实时保证）', '正在等待操作结果', '预检暂缓；不会提前重跑同步'],
+      'uncertain-refreshing': ['正在刷新；仍是上次读取结果', '先核查写入结果', ''],
+      'contradictory-busy': ['上次读取结果；刷新失败或状态待核实', '正在等待操作结果', '恢复保护阻断；预检暂缓；不一致'],
+    }[scene.name] || ['已读取的状态快照（非实时保证）', '合成测试标题', '']
+    scene.readProvenance = '状态依据：' + extra[0]; scene.title = extra[1]; scene.recoveryNotice = extra[2]
+  }
   const save = () => fs.writeFileSync(path.join(dir, 'checks.json'), JSON.stringify(report))
   for (const scene of report.scenes) fs.writeFileSync(path.join(dir, scene.png), png)
   save(); try { fn(dir, report, save) } finally { fs.rmSync(dir, { recursive:true, force:true }) }
@@ -23,4 +33,15 @@ test('rejects missing, tampered or dimension-mismatched image files', () => {
   fixture(dir=>{fs.rmSync(path.join(dir,'narrow.png'));assert.throws(()=>verifyOverviewEvidence(dir,sha))})
   fixture((dir,r,save)=>{r.scenes[0].viewport.width=2;save();assert.throws(()=>verifyOverviewEvidence(dir,sha))})
   fixture(dir=>{fs.appendFileSync(path.join(dir,'dark.png'),'tampered');assert.throws(()=>verifyOverviewEvidence(dir,sha))})
+})
+
+test('rejects swallowed recovery warnings despite successful layout and image checks', () => {
+  for (const name of ['blocked-stale', 'backoff-busy', 'contradictory-busy']) fixture((dir,r,save) => {
+    r.scenes.find(scene => scene.name === name).recoveryNotice = ''; save(); assert.throws(() => verifyOverviewEvidence(dir,sha))
+  })
+})
+test('rejects absent or falsely fresh provenance under an uncertain-write headline', () => {
+  for (const source of ['', '状态依据：已读取的状态快照（非实时保证）']) fixture((dir,r,save) => {
+    r.scenes.find(scene => scene.name === 'uncertain-refreshing').readProvenance = source; save(); assert.throws(() => verifyOverviewEvidence(dir,sha))
+  })
 })
