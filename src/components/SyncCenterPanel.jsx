@@ -5,6 +5,7 @@ import { createSyncStatusReader, mergeSyncDraft, syncHealthLabel, syncStatusLabe
 import SyncActivityPanel from './SyncActivityPanel'
 import SyncConflictQueue from './SyncConflictQueue'
 import SyncPlanPanel from './SyncPlanPanel'
+import SyncDiagnosticPanel from './SyncDiagnosticPanel'
 import { readSyncPlan } from '~/services/syncPlanRead.mjs'
 import { captureSyncPlan, invalidateSyncPlan, syncPlanObservation } from '~/services/syncPlanView.mjs'
 import { conflictScope, applyReviewedConflict } from '~/services/syncConflictReview.mjs'
@@ -319,6 +320,8 @@ export default function SyncCenterPanel() {
         <strong>{connectionCheck.detail}</strong><span>检查时间：{timeLabel(connectionCheck.at)}；这是只读检查，不代表写入权限或持续在线。</span>
       </div>}
     </div>
+    <SyncDiagnosticPanel settings={settings} status={status} health={health} conflictCount={conflicts.length}
+      busy={!!busy} draftChanged={draftChanged} actionFailed={!!actionError}/>
     <div className="sync-center-explainer">
       <strong>WebDAV 只替换传输层，不改变冲突规则。</strong>
       <span>笔记、文件夹、标签、标签关联和附件继续使用同一套 manifest、SHA-256 与三方合并。正文和附件都不会按时间戳静默覆盖；冲突仍需明确选择。</span>

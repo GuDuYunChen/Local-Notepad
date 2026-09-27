@@ -1,0 +1,9 @@
+.sync-diagnostic-panel{margin-top:16px;min-width:0;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--surface,var(--paper));color:var(--ink)}
+.sync-diagnostic-heading,.sync-diagnostic-actions{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px}
+.sync-diagnostic-heading h4{margin:0;font-size:14px;color:var(--ink)}
+.sync-diagnostic-panel .sync-diagnostic-caption{margin:10px 0;font-size:12px;line-height:1.7;color:var(--ink-soft);overflow-wrap:anywhere}
+.sync-diagnostic-panel textarea{display:block;box-sizing:border-box;width:100%;min-width:0;height:320px;min-height:140px;max-height:600px;resize:vertical;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink);font:13px/1.7 ui-monospace,monospace}
+.sync-diagnostic-actions{justify-content:flex-end;margin-top:12px}
+.sync-diagnostic-panel .sync-diagnostic-notice{padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink);font-size:12px;line-height:1.7;overflow-wrap:anywhere}
+.sync-diagnostic-panel :is(button,textarea):focus-visible{outline:2px solid var(--clay);outline-offset:3px}
+@media(max-width:620px){.sync-diagnostic-panel{padding:12px}.sync-diagnostic-actions{justify-content:flex-start}}
