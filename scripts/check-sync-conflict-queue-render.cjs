@@ -11,6 +11,10 @@ const output = path.join(root, 'test-results', 'sync-conflict-queue')
 app.setPath('userData', fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-queue-render-')))
 const watchdog = setTimeout(() => { console.error('Queue renderer timed out'); app.exit(1) }, 60000)
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms))
+// Every scenario closes its test window. Do not let Electron's default
+// last-window behavior exit successfully before the remaining scenes run.
+app.on('window-all-closed', () => {})
+const commit = process.env.GITHUB_SHA || null
 
 function inspectQueue() {
   const queue = document.querySelector('.sync-conflict-queue')
@@ -43,7 +47,7 @@ function inspectQueue() {
   }
   const rect = queue.getBoundingClientRect()
   return { ready: true, colors, count: queue.querySelectorAll('[data-conflict-id]').length,
-    bounds: [rect.left, rect.width, rect.height], overflow: document.documentElement.scrollWidth - innerWidth,
+    bounds: [rect.left, rect.width, rect.height], viewport: [innerWidth, innerHeight], overflow: document.documentElement.scrollWidth - innerWidth,
     writes: window.__queueWrites, activeMarkup: queue.querySelectorAll('img,script,iframe,a').length,
     label: queue.querySelector('.sync-queue-count').textContent }
 }
@@ -78,9 +82,10 @@ app.whenReady().then(async () => {
       samples = valid ? (signature === previous ? samples + 1 : 1) : 0; previous = signature
       if (samples >= 3) break
     }
-    reports.push({ name, stableSamples: samples, ...data })
-    fs.writeFileSync(path.join(output, name + '.png'), (await win.capturePage()).toPNG())
-    fs.writeFileSync(path.join(output, 'checks.json'), JSON.stringify({ platform: process.platform, syntheticRecords: true, backendExercised: false, complete: false, reports }, null, 2))
+    const png = (await win.capturePage()).toPNG()
+    reports.push({ name, stableSamples: samples, ...data, imageSize: [png.readUInt32BE(16), png.readUInt32BE(20)] })
+    fs.writeFileSync(path.join(output, name + '.png'), png)
+    fs.writeFileSync(path.join(output, 'checks.json'), JSON.stringify({ platform: process.platform, syntheticRecords: true, backendExercised: false, commit, complete: false, reports }, null, 2))
     if (samples < 3) throw new Error('Queue render failed: ' + JSON.stringify(data))
   }
   const click = async (win, label) => {
@@ -108,7 +113,7 @@ app.whenReady().then(async () => {
     }
     win.destroy()
   }
-  const summary = { platform: process.platform, syntheticRecords: true, realComponents: true, backendExercised: false, complete: true,
+  const summary = { platform: process.platform, syntheticRecords: true, realComponents: true, backendExercised: false, commit, complete: true,
     navigationFocus: true, nativeSearch: true, writes: 0, reports }
   fs.writeFileSync(path.join(output, 'checks.json'), JSON.stringify(summary, null, 2)); console.log(JSON.stringify(summary))
   clearTimeout(watchdog); app.exit(0)

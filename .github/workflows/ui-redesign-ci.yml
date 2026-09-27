@@ -68,7 +68,7 @@ jobs:
 
       - name: Verify searchable conflict queue
         run: |
-          node --test scripts/sync-conflict-queue.node.mjs
+          node --test scripts/sync-conflict-queue.node.mjs scripts/sync-queue-render-evidence.node.cjs
           npx vitest run --root=. src/components/SyncConflictQueue.test.jsx
 
       - name: Verify conflict lifecycle recovery
@@ -211,7 +211,7 @@ jobs:
       - name: Verify searchable conflict queue on Windows
         shell: pwsh
         run: |
-          node --test scripts/sync-conflict-queue.node.mjs
+          node --test scripts/sync-conflict-queue.node.mjs scripts/sync-queue-render-evidence.node.cjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npx vitest run --root=. src/components/SyncConflictQueue.test.jsx
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -254,7 +254,7 @@ jobs:
           retention-days: 7
 
       - name: Verify native conflict queue rendering
-        run: npx electron scripts/check-sync-conflict-queue-render.cjs
+        run: node scripts/run-sync-conflict-queue-render.cjs
 
       - name: Upload conflict queue render checks
         if: always()
