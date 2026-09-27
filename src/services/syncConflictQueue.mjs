@@ -7,6 +7,16 @@ export const CONFLICT_QUEUE_FILTERS = Object.freeze([
   ['all', '全部类型'], ['file', '笔记 / 文件夹'], ['tag', '标签'],
   ['file-tag', '标签关联'], ['attachment', '附件'], ['other', '未识别类型'],
 ].map(Object.freeze))
+// Display order only: never a recommendation of which version to keep.
+export const CONFLICT_QUEUE_ORDERS = Object.freeze([
+  ['server', '服务端顺序'], ['attention', '关注项优先'],
+  ['newest', '最近产生优先'], ['oldest', '最早产生优先'],
+].map(Object.freeze))
+const creationTime = value => Number.isSafeInteger(value) && value > 0 && value <= 8640000000000 ? value : null
+export function formatConflictCreatedAt(value) {
+  const seconds = creationTime(value)
+  return seconds === null ? '时间未提供或无效' : new Date(seconds * 1000).toISOString().replace('T', ' ').replace('.000Z', ' UTC')
+}
 const MAX_FIELD = 4096
 const MAX_INDEX_UNITS = 8 * 1024 * 1024
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -54,7 +64,7 @@ export function indexConflictQueue(conflicts) {
     if (risk.attention) riskCounts.attention++
     for (const flag of risk.flags) riskCounts[flag]++
     entries.push(Object.freeze({ id: c.id, itemID: c.item_id, index, kind, localLabel, remoteLabel,
-      search: fold(search), open: c.status === 'open', risk }))
+      search: fold(search), open: c.status === 'open', risk, createdAt: creationTime(c.created_at) }))
   }
   // Preserve server order and original array indices; never sort or retain body
   // snapshots in this secondary index. Repeated item IDs can be distinct lives.
@@ -62,17 +72,27 @@ export function indexConflictQueue(conflicts) {
     entries: Object.freeze(entries), counts: Object.freeze(counts), riskCounts: Object.freeze(riskCounts) })
 }
 
-export function conflictQueuePage(model, { query = '', kind = 'all', risk = 'all', page = 1 } = {}) {
+export function conflictQueuePage(model, { query = '', kind = 'all', risk = 'all', order = 'server', page = 1 } = {}) {
   const filter = CONFLICT_QUEUE_FILTERS.some(([value]) => value === kind) ? kind : 'all'
   const riskFilter = CONFLICT_RISK_FILTERS.some(([value]) => value === risk) ? risk : 'all'
+  const ordering = CONFLICT_QUEUE_ORDERS.some(([value]) => value === order) ? order : 'server'
   const needle = fold(text(query).slice(0, 256).trim())
   const matches = (model?.valid ? model.entries : []).filter(entry =>
     (filter === 'all' || entry.kind === filter) &&
     (riskFilter === 'all' || (riskFilter === 'attention' ? entry.risk.attention : entry.risk.flags.includes(riskFilter))) && (!needle || entry.search.includes(needle)))
+  // Filter produces a new array: neither source records nor the captured index
+  // are sorted in place. Ties retain their original service-provided position.
+  if (ordering !== 'server') matches.sort((a, b) => {
+    if (ordering === 'attention') return Number(b.risk.attention) - Number(a.risk.attention) || a.index - b.index
+    if (a.createdAt === null || b.createdAt === null) {
+      return Number(a.createdAt === null) - Number(b.createdAt === null) || a.index - b.index
+    }
+    return (ordering === 'newest' ? b.createdAt - a.createdAt : a.createdAt - b.createdAt) || a.index - b.index
+  })
   const pages = Math.max(1, Math.ceil(matches.length / CONFLICT_QUEUE_PAGE_SIZE))
   const current = Math.min(pages, Math.max(1, Number.isSafeInteger(page) ? page : 1))
   const start = (current - 1) * CONFLICT_QUEUE_PAGE_SIZE
   return Object.freeze({ rows: Object.freeze(matches.slice(start, start + CONFLICT_QUEUE_PAGE_SIZE)),
-    matched: matches.length, total: model?.total ?? null, page: current, pages, kind: filter, risk: riskFilter,
+    matched: matches.length, total: model?.total ?? null, page: current, pages, kind: filter, risk: riskFilter, order: ordering,
     from: matches.length ? start + 1 : 0, to: Math.min(start + CONFLICT_QUEUE_PAGE_SIZE, matches.length) })
 }

@@ -71,6 +71,11 @@ jobs:
           node --test scripts/sync-conflict-queue.node.mjs scripts/sync-queue-render-evidence.node.cjs scripts/sync-conflict-risk.node.mjs
           npx vitest run --root=. src/components/SyncConflictQueue.test.jsx src/components/SyncConflictRisk.test.jsx
 
+      - name: Verify conflict queue order and edge navigation
+        run: |
+          node --test scripts/sync-conflict-order.node.mjs
+          npx vitest run --root=. src/components/SyncConflictOrder.test.jsx
+
       - name: Verify conflict lifecycle recovery
         run: go -C server test -race ./internal/syncengine -run '^TestConflictLifecycle' -count=3 -v
 
@@ -214,6 +219,14 @@ jobs:
           node --test scripts/sync-conflict-queue.node.mjs scripts/sync-queue-render-evidence.node.cjs scripts/sync-conflict-risk.node.mjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npx vitest run --root=. src/components/SyncConflictQueue.test.jsx src/components/SyncConflictRisk.test.jsx
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify conflict queue order and edge navigation on Windows
+        shell: pwsh
+        run: |
+          node --test scripts/sync-conflict-order.node.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npx vitest run --root=. src/components/SyncConflictOrder.test.jsx
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build unsigned Windows NSIS package
