@@ -2,7 +2,7 @@ import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { beforeEach, afterEach, expect, it, vi } from 'vitest'
 import Queue from './SyncConflictQueue'
-import { queueFixture, queueSettings, queueStatus } from '../../scripts/fixtures/sync-conflict-queue.mjs'
+import { queueFixture, queueAttachment, queueSettings, queueStatus } from '../../scripts/fixtures/sync-conflict-queue.mjs'
 import { riskFixture, tombstone } from '../../scripts/fixtures/sync-conflict-risk.mjs'
 import { conflictScope } from '~/services/syncConflictReview.mjs'
 let root, container, conflicts, resolve, refresh, props, actEnvironment
@@ -107,4 +107,76 @@ it('risk browsing cannot change the object or direction passed to the existing e
   expect(resolve).not.toHaveBeenCalled(); await click(container.querySelector('input[type="checkbox"]')); await click(button('确认处理此冲突'))
   expect(resolve).toHaveBeenCalledTimes(1); expect(resolve.mock.calls[0][0].id).toBe('conflict-002')
   expect(resolve.mock.calls[0][1]).toBe('remote'); expect(JSON.stringify(conflicts)).toBe(original)
+})
+
+// Real Queue + Review: only their external callbacks are mocked.
+const attachmentIdentityFixture = (id = 'identity-attachment', name = '资料😀.pdf') => {
+  const c = queueAttachment(id, name)
+  c.remote_record = structuredClone(c.local_record)
+  return c
+}
+it('inconsistent tombstone kinds enter unverified concerns rather than permanent-deletion counts', async () => {
+  conflicts = queueFixture(1)
+  conflicts[0].remote_record = { ...tombstone(conflicts[0].remote_record), kind: 'tag' }
+  await render()
+  expect(field('冲突关注项').textContent).toContain('状态待核实（1）')
+  expect(field('冲突关注项').textContent).toContain('含永久删除（0）')
+  expect(container.querySelector('[aria-label="删除与缺失提示"]').textContent).toBe('远端：状态待核实')
+  await change('冲突关注项', 'permanent'); expect(cards()).toHaveLength(0)
+  await change('冲突关注项', 'unknown'); expect(cards()).toEqual(['conflict-001'])
+  expect(resolve).not.toHaveBeenCalled(); expect(refresh).not.toHaveBeenCalled()
+})
+it('a mismatched attachment name is discoverable by unverified concern and cannot bypass the original review validator', async () => {
+  conflicts = [attachmentIdentityFixture()]; conflicts[0].local_record.attachment.name = 'wrong.pdf'
+  await render(); await change('冲突关注项', 'unknown'); await change('冲突对象类型', 'attachment'); await change('搜索冲突', 'wrong.pdf')
+  expect(cards()).toEqual(['identity-attachment'])
+  expect(container.querySelector('[aria-label="删除与缺失提示"]').textContent).toBe('本机：状态待核实')
+  await click(button('保留本机'))
+  expect(container.querySelector('[aria-label="冲突版本对照"]')).toBeNull()
+  expect(container.textContent).toContain('冲突版本信息不完整或格式不受支持')
+  expect(resolve).not.toHaveBeenCalled(); expect(refresh).not.toHaveBeenCalled()
+})
+it('valid exact Unicode attachment identity preserves the explicit resolver flow', async () => {
+  conflicts = [attachmentIdentityFixture('unicode-attachment', '\ufeff资料😀.pdf')]
+  await render(); expect(field('冲突关注项').textContent).toContain('状态待核实（0）')
+  await click(button('保留本机')); expect(resolve).not.toHaveBeenCalled()
+  await click(container.querySelector('input[type="checkbox"]')); await click(button('确认处理此冲突'))
+  expect(resolve).toHaveBeenCalledTimes(1)
+  expect(resolve.mock.calls[0][0].local_record.attachment.name).toBe('\ufeff资料😀.pdf')
+  expect(resolve.mock.calls[0][1]).toBe('local')
+})
+it('a corrected reread updates the concern filter without selecting or resolving the record', async () => {
+  conflicts = [attachmentIdentityFixture()]; const good = structuredClone(conflicts)
+  conflicts[0].local_record.attachment.name = 'wrong.pdf'
+  await render(); await change('冲突关注项', 'unknown'); expect(cards()).toHaveLength(1)
+  conflicts = good; await render(); expect(cards()).toHaveLength(0)
+  expect(field('冲突关注项').textContent).toContain('状态待核实（0）')
+  await change('冲突关注项', 'all'); expect(cards()).toHaveLength(1)
+  expect(container.querySelector('[aria-label="冲突版本对照"]')).toBeNull()
+  expect(resolve).not.toHaveBeenCalled(); expect(refresh).not.toHaveBeenCalled()
+})
+it('an observed identity mismatch revokes an existing confirmation even when the exact valid version returns', async () => {
+  conflicts = [attachmentIdentityFixture()]; const good = structuredClone(conflicts)
+  await render(); await click(button('保留本机')); await click(container.querySelector('input[type="checkbox"]'))
+  expect(button('确认处理此冲突').disabled).toBe(false)
+  conflicts = structuredClone(good); conflicts[0].local_record.attachment.name = 'wrong.pdf'; await render()
+  expect(field('冲突关注项').textContent).toContain('状态待核实（1）')
+  expect(button('确认处理此冲突').disabled).toBe(true)
+  conflicts = structuredClone(good); await render()
+  expect(field('冲突关注项').textContent).toContain('状态待核实（0）')
+  expect(button('确认处理此冲突').disabled).toBe(true)
+  expect(container.querySelector('input[type="checkbox"]').checked).toBe(false)
+  expect(resolve).not.toHaveBeenCalled()
+})
+it('all invalid-identity records remain reachable in the unverified filter without automatic requests', async () => {
+  conflicts = Array.from({ length: 25 }, (_, i) => {
+    const c = attachmentIdentityFixture('identity-' + i, 'original-' + i + '.txt')
+    c.local_record.attachment.name = 'wrong-' + i + '.txt'
+    return c
+  })
+  await render(); await change('冲突关注项', 'unknown')
+  expect(field('冲突关注项').textContent).toContain('状态待核实（25）')
+  await click(button('下一页冲突')); await click(button('下一页冲突'))
+  expect(cards()).toEqual(['identity-20', 'identity-21', 'identity-22', 'identity-23', 'identity-24'])
+  expect(resolve).not.toHaveBeenCalled(); expect(refresh).not.toHaveBeenCalled()
 })

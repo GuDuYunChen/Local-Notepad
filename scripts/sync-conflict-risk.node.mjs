@@ -124,3 +124,90 @@ test('risk presentation has no write, full-content, persistence or network capab
   const source = fs.readFileSync(new URL('../src/services/syncConflictRisk.mjs', import.meta.url), 'utf8')
   assert.doesNotMatch(source, /\.content\b|localStorage|sessionStorage|electronAPI|\bapi\s*\(|\bfetch\s*\(|onResolve|applyReviewedConflict/)
 })
+
+// Identity regressions: classification checks metadata, not body/blob validity.
+const identityRecord = (kind, id, payload = {}) => ({ format: 'local-notepad-sync-record', version: 1, kind, id, state: 'present', ...payload })
+const identityConflict = record => ({ ...queueFixture(1)[0], item_id: record.id, local_record: record, remote_record: structuredClone(record) })
+const attachmentKey = name => 'attachment:' + Buffer.from(name, 'utf8').toString('hex')
+const presentAttachment = name => identityRecord('attachment', attachmentKey(name), { attachment: { name, size: 0, blob_hash: 'a'.repeat(64) } })
+
+test('IDENTITY_TOMBSTONE: a deletion declaration with a conflicting kind and key stays unverified', () => {
+  const ids = { file: 'note-001', tag: 'tag:a:b', 'file-tag': 'filetag:a:b:c:d', attachment: attachmentKey('资料.pdf') }
+  for (const [correctKind, id] of Object.entries(ids)) for (const kind of Object.keys(ids)) {
+    if (kind === correctKind) continue
+    const c = identityConflict({ format: 'local-notepad-sync-record', version: 1, state: 'purged', kind, id })
+    assert.deepEqual(conflictRiskSummary(c).flags, ['unknown'], `${kind} must not declare deletion of ${id}`)
+  }
+})
+test('valid tombstones keep legacy colon-bearing IDs and type-specific deletion labels', () => {
+  for (const [kind, id] of [['file', 'ordinary:legacy:id'], ['tag', 'tag:a:b'], ['file-tag', 'filetag:a:b:c:d'], ['attachment', attachmentKey('资料😀.pdf')]]) {
+    const c = identityConflict({ format: 'local-notepad-sync-record', version: 1, state: 'purged', kind, id })
+    assert.deepEqual(conflictRiskSummary(c).flags, ['permanent'])
+  }
+})
+test('IDENTITY_ATTACHMENT: a filename that does not encode to the record key stays unverified', () => {
+  const c = identityConflict(presentAttachment('original.txt'))
+  c.local_record.attachment.name = 'different.txt'
+  let summary = conflictRiskSummary(c)
+  assert.deepEqual(summary.flags, ['unknown']); assert.equal(summary.notices[0].side, 'local')
+  c.remote_record.attachment.name = 'also-different.txt'
+  summary = conflictRiskSummary(c)
+  assert.deepEqual(summary.flags, ['unknown']); assert.equal(summary.notices.length, 2)
+})
+test('attachment identity uses exact UTF-8, including Unicode, leading BOM and literal percent signs', () => {
+  for (const name of ['资料😀.pdf', 'e\u0301.txt', 'é.txt', '\ufeffname.txt', 'report%2Fraw.txt', 'tag:name.txt', '__proto__']) {
+    assert.deepEqual(conflictRiskSummary(identityConflict(presentAttachment(name))).flags, [], name)
+  }
+})
+test('unsafe, ill-formed or oversized attachment names cannot evade the unverified filter', () => {
+  for (const name of ['', '.', '..', '../secret', 'folder/file', 'folder\\file', 'bad\0name', '\ud800.txt', '\udfff', 'x'.repeat(4097)]) {
+    const c = identityConflict(presentAttachment(name))
+    assert.deepEqual(conflictRiskSummary(c).flags, ['unknown'])
+  }
+})
+test('filename case, Unicode normalization and coercion cannot change an attachment identity', () => {
+  const c = identityConflict(presentAttachment('é.txt'))
+  for (const name of ['e\u0301.txt', 'É.txt', 1, { toString() { throw new Error('coercion') } }]) {
+    c.local_record.attachment.name = name
+    assert.deepEqual(conflictRiskSummary(c).flags, ['unknown'])
+  }
+})
+test('identity checks read neither attachment bytes nor body, credential or hash getters', () => {
+  const c = identityConflict(presentAttachment('\ufeff资料.pdf'))
+  for (const r of [c.local_record, c.remote_record]) {
+    for (const key of ['size', 'blob_hash', 'content']) Object.defineProperty(r.attachment, key, { get() { throw new Error('private ' + key) } })
+  }
+  for (const key of ['local_hash', 'remote_hash', 'base_hash', 'password']) Object.defineProperty(c, key, { get() { throw new Error('private ' + key) } })
+  assert.deepEqual(conflictRiskSummary(c).flags, [])
+  c.local_record.attachment.name = 'wrong.pdf'
+  const result = conflictRiskSummary(c)
+  assert.deepEqual(result.flags, ['unknown']); assert.doesNotMatch(JSON.stringify(result), /wrong.pdf|blob_hash|password/)
+})
+test('identity concerns compose with metadata search, type filtering and complete pagination', () => {
+  const raw = Array.from({ length: 25 }, (_, i) => {
+    const c = identityConflict(presentAttachment('object-' + i + '.txt'))
+    c.id = 'identity-' + i; c.local_record.attachment.name = 'mismatch-' + i + '.txt'
+    return c
+  })
+  const model = indexConflictQueue(raw), ids = []
+  assert.equal(model.riskCounts.unknown, 25); assert.equal(model.riskCounts.permanent, 0)
+  for (let page = 1; page <= 3; page++) ids.push(...conflictQueuePage(model, { risk: 'unknown', kind: 'attachment', page }).rows.map(c => c.id))
+  assert.deepEqual(ids, raw.map(c => c.id))
+  assert.equal(conflictQueuePage(model, { risk: 'unknown', query: 'mismatch-24.txt' }).rows[0].id, 'identity-24')
+})
+test('an invalid side does not hide a valid deletion on the other side or double-count the concern', () => {
+  const c = identityConflict(presentAttachment('right.txt'))
+  c.local_record.attachment.name = 'wrong.txt'; c.remote_record = tombstone(c.remote_record)
+  const model = indexConflictQueue([c])
+  assert.deepEqual(model.riskCounts, { attention: 1, permanent: 1, recycled: 0, missing: 0, unknown: 1 })
+  assert.deepEqual(model.entries[0].risk.notices.map(n => n.side), ['local', 'remote'])
+})
+test('a corrected reread updates identity concerns without rewriting the earlier snapshot', () => {
+  const c = identityConflict(presentAttachment('right.txt'))
+  c.local_record.attachment.name = 'wrong.txt'
+  const previous = indexConflictQueue([c])
+  c.local_record.attachment.name = 'right.txt'
+  const current = indexConflictQueue([c])
+  assert.equal(previous.riskCounts.unknown, 1); assert.equal(current.riskCounts.unknown, 0)
+  assert.deepEqual(previous.entries[0].risk.flags, ['unknown'])
+})
