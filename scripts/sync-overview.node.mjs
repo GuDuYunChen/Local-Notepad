@@ -182,3 +182,31 @@ test('A-B-A snapshots recompute warning and provenance without inventing a resol
   assert.match(a.recoveryNotice, /不证明保护已解除/); assert.equal(b.recoveryNotice, '')
   assert.deepEqual(again, a); assert.doesNotMatch(b.detail, /全部同步完成|两端已一致/)
 })
+
+// Phase 2F.16: fixed help content is not another status reader or controller.
+test('local help has four fixed deeply immutable topics and no user-data slots', async () => {
+  const { SYNC_HELP_TOPICS: topics } = await import('../src/services/syncHelp.mjs')
+  assert.deepEqual(topics.map(t => t.key), ['first-use', 'operations', 'conflicts', 'recovery'])
+  assert.equal(Object.isFrozen(topics), true)
+  for (const topic of topics) {
+    assert.ok(Object.isFrozen(topic)); assert.ok(Object.isFrozen(topic.steps)); assert.ok(topic.steps.length >= 3)
+    assert.ok(topic.steps.every(step => Object.isFrozen(step) && typeof step.title === 'string' && typeof step.detail === 'string'))
+  }
+  assert.doesNotMatch(JSON.stringify(topics), /https?:|<script|password=|endpoint=/)
+})
+test('help describes read-only operations and preserves uncertain-write boundaries', async () => {
+  const { SYNC_HELP_TOPICS: topics } = await import('../src/services/syncHelp.mjs')
+  const operations = JSON.stringify(topics.find(t => t.key === 'operations'))
+  const recovery = JSON.stringify(topics.find(t => t.key === 'recovery'))
+  assert.match(operations, /不写入探针/); assert.match(operations, /不证明有写入权限/)
+  assert.match(operations, /预演结果不是执行完成/); assert.match(operations, /可能修改本机与远端数据/)
+  assert.match(recovery, /刷新不是回滚/); assert.match(recovery, /不能单独证明保护已解除/)
+  assert.match(recovery, /不要反复执行、清除数据或重新绑定/)
+})
+test('help has no runtime inputs, effects, storage, requests or action controls', () => {
+  const ui = readFileSync(new URL('../src/components/SyncHelpPanel.jsx', import.meta.url), 'utf8')
+  const data = readFileSync(new URL('../src/services/syncHelp.mjs', import.meta.url), 'utf8')
+  assert.match(ui, /function SyncHelpPanel\(\)/)
+  assert.doesNotMatch(ui + data, /\bfetch\s*\(|\bapi\s*\(|useEffect|useLayoutEffect|localStorage|sessionStorage|electronAPI|clipboard|dangerouslySetInnerHTML|<button|<a[\s>]|<input|<textarea|onClick=|onToggle=|onKeyDown=/)
+  assert.doesNotMatch(ui, /\bopen=|\bname=|autoFocus/)
+})

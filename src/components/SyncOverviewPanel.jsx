@@ -1,6 +1,7 @@
 import React, { useId, useState } from 'react'
 import { buildSyncOverview } from '~/services/syncOverview.mjs'
 import './SyncOverviewPanel.css'
+import SyncHelpPanel from './SyncHelpPanel'
 
 export default function SyncOverviewPanel({ onNavigate, ...input }) {
   const view = buildSyncOverview(input)
@@ -38,6 +39,7 @@ export default function SyncOverviewPanel({ onNavigate, ...input }) {
       </button>)}
     </nav>
     <p className="sync-overview-note">导航只定位区域，不读取、不保存、不启用或执行同步；也不会清除草稿或代替冲突确认。</p>
+    <SyncHelpPanel/>
     {failed && <p className="sync-overview-warning" role="status">该区域已变化或暂不可定位，请查看当前页面。没有执行其他操作。</p>}
   </section>
 }

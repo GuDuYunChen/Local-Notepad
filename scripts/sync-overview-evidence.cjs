@@ -1,10 +1,15 @@
 const assert = require('node:assert/strict')
 const fs = require('node:fs'), path = require('node:path'), { createHash } = require('node:crypto')
-const names = ['light', 'dark', 'narrow', 'uncertain', 'unavailable', 'disabled', 'blocked-stale', 'backoff-busy', 'uncertain-refreshing', 'contradictory-busy']
+const names = ['light', 'dark', 'narrow', 'uncertain', 'unavailable', 'disabled', 'blocked-stale', 'backoff-busy', 'uncertain-refreshing', 'contradictory-busy', 'help-first-use', 'help-operations-dark', 'help-conflicts', 'help-recovery-narrow']
 // Independent visible-text expectations: never use the implementation's model
 // to decide what evidence should contain.
 function verifyOverviewSceneText(scene) {
   assert.ok(names.includes(scene.name))
+  // Presence and native disclosure evidence are independent of screenshot hashes.
+  assert.equal(scene.help?.present, true); assert.equal(scene.help.topicCount, 4); assert.equal(scene.help.readOnly, true)
+  const opened = { 'help-first-use': 'first-use', 'help-operations-dark': 'operations', 'help-conflicts': 'conflicts', 'help-recovery-narrow': 'recovery' }[scene.name]
+  assert.equal(scene.help.open, !!opened); assert.equal(scene.help.disclosureVerified, !!opened)
+  assert.deepEqual(scene.help.openTopics, opened ? [opened] : [])
   const source = scene.name === 'unavailable' ? '尚无可核实的读取结果'
     : ['blocked-stale', 'contradictory-busy'].includes(scene.name) ? '上次读取结果；刷新失败或状态待核实'
       : scene.name === 'uncertain-refreshing' ? '正在刷新；仍是上次读取结果' : '已读取的状态快照（非实时保证）'

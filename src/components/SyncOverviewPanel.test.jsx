@@ -99,3 +99,59 @@ it('unread data cannot render a fabricated guard or a captured-state label', asy
   expect(container.textContent).toContain('状态依据：尚无可核实的读取结果')
   expect(container.querySelector('dd').textContent).toBe('未知'); expect(navigate).not.toHaveBeenCalled()
 })
+
+// happy-dom does not stand in for a browser's summary activation behavior.
+// These tests supply native DOM disclosure state and check React/state isolation;
+// the Windows Electron scenarios separately exercise actual summary.click().
+async function disclose(node, open = true) {
+  await act(async () => { node.open = open; node.dispatchEvent(new Event('toggle')) })
+}
+it('shows four native help topics, all initially collapsed, without navigation', async () => {
+  await render(true)
+  const help = container.querySelector('[data-sync-help]')
+  expect(help.open).toBe(false); expect(help.querySelectorAll('[data-sync-help-topic]')).toHaveLength(4)
+  expect([...help.querySelectorAll('details')].every(topic => !topic.open)).toBe(true)
+  expect(help.querySelector('button,input,textarea,a,script,iframe')).toBeNull()
+  expect(navigate).not.toHaveBeenCalled()
+})
+it('opening native help and topics never navigates or changes the status', async () => {
+  props.status.last_status = 'review_required'; props.status.recovery.mode = 'blocked'; props.busy = true
+  await render(); const title = container.querySelector('[role="status"]').textContent
+  const warning = container.querySelector('.sync-overview-warning').textContent
+  const help = container.querySelector('[data-sync-help]')
+  await disclose(help)
+  await disclose(help.querySelector('[data-sync-help-topic="recovery"]'))
+  expect(help.open).toBe(true); expect(help.querySelector('[data-sync-help-topic="recovery"]').open).toBe(true)
+  expect(container.querySelector('[role="status"]').textContent).toBe(title)
+  expect(container.querySelector('.sync-overview-warning').textContent).toBe(warning)
+  expect(navigate).not.toHaveBeenCalled()
+})
+it('help open state and summary focus survive new snapshots without remounting', async () => {
+  await render(); const help = container.querySelector('[data-sync-help]'), topic = help.querySelector('[data-sync-help-topic="operations"]')
+  await disclose(help); await disclose(topic); topic.querySelector('summary').focus()
+  props.health.failures = 1; props.busy = true; await render()
+  expect(container.querySelector('[data-sync-help]')).toBe(help); expect(help.open).toBe(true); expect(topic.open).toBe(true)
+  expect(document.activeElement).toBe(topic.querySelector('summary')); expect(navigate).not.toHaveBeenCalled()
+})
+it('help is independent of private settings, markup and missing status', async () => {
+  props.settings.sync_endpoint = 'PRIVATE_HELP_ENDPOINT'; props.settings.sync_password = '<script>PRIVATE_HELP_PASSWORD</script>'
+  props.status = null; await render()
+  const help = container.querySelector('[data-sync-help]')
+  expect(help.textContent).not.toMatch(/PRIVATE_HELP_|<script>/)
+  expect(help.textContent).toContain('不检测当前连接'); expect(help.textContent).toContain('预演结果不是执行完成')
+  expect(help.querySelector('script,img,a')).toBeNull(); expect(navigate).not.toHaveBeenCalled()
+})
+it('help remains available while disabled or waiting and does not unlock execution', async () => {
+  props.settings.sync_enabled = false; props.busy = true; await render()
+  await disclose(container.querySelector('[data-sync-help]'))
+  expect(button('预演与执行').disabled).toBe(true); expect(container.textContent).toContain('正在等待操作结果')
+  expect(navigate).not.toHaveBeenCalled()
+})
+it('multiple help panels do not share a disclosure group or duplicate identifiers', async () => {
+  await act(async () => root.render(<><Panel {...props}/><Panel {...props}/></>))
+  const panels = container.querySelectorAll('[data-sync-help]')
+  await disclose(panels[0]); await disclose(panels[0].querySelector('[data-sync-help-topic="conflicts"]'))
+  expect(panels[0].open).toBe(true); expect(panels[1].open).toBe(false)
+  expect(panels[1].querySelector('[data-sync-help-topic="conflicts"]').open).toBe(false)
+  expect(panels[0].querySelector('[id],[name]')).toBeNull()
+})

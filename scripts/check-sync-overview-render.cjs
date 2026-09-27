@@ -21,18 +21,23 @@ function inspect() {
   const pixel = () => [...ctx.getImageData(0, 0, 1, 1).data].slice(0, 3)
   const lum = rgb => rgb.map(n => { n /= 255; return n <= .04045 ? n / 12.92 : ((n + .055) / 1.055) ** 2.4 }).reduce((a, b, i) => a + b * [.2126, .7152, .0722][i], 0)
   const probes = [...panel.querySelectorAll('h4,.sync-overview-status>strong,.sync-overview-status>p,dt,dd,.sync-overview-note,.sync-overview-link:not(:disabled)>strong,.sync-overview-link:not(:disabled)>span')]
+  probes.push(...[...panel.querySelectorAll('.sync-help summary,.sync-help-caption,.sync-help-intro,.sync-help-topic li strong,.sync-help-topic li span')].filter(node => node.getClientRects().length > 0))
   const colors = probes.map(element => {
     const style = getComputedStyle(element), ancestors = []
     for (let node = element; node; node = node.parentElement) ancestors.unshift(node)
     ctx.clearRect(0, 0, 1, 1); paint('#ffffff')
     for (const node of ancestors) paint(getComputedStyle(node).backgroundColor)
     const background = pixel(); paint(style.color); const foreground = pixel()
-    const token = element.matches('dt,.sync-overview-note,.sync-overview-link>span') ? '--ink-soft' : '--ink'
+    const token = element.matches('dt,.sync-overview-note,.sync-overview-link>span,.sync-help-intro,.sync-help-caption') ? '--ink-soft' : '--ink'
     ctx.clearRect(0, 0, 1, 1); paint(style.getPropertyValue(token).trim()); const expected = pixel()
     const a = lum(foreground), b = lum(background)
     return { text: element.textContent, foreground, background, ratio: (Math.max(a, b) + .05) / (Math.min(a, b) + .05), final: foreground.every((v, i) => v === expected[i]) }
   })
-  return { colors, viewport: { width: innerWidth, height: innerHeight },
+  const help = panel.querySelector('[data-sync-help]')
+  return { help: { present: !!help, open: help?.open === true, topicCount: help?.querySelectorAll('[data-sync-help-topic]').length ?? 0,
+      openTopics: [...(help?.querySelectorAll('[data-sync-help-topic][open]') || [])].map(node => node.dataset.syncHelpTopic),
+      readOnly: help?.textContent.includes('不检测当前连接，也不会执行同步') === true, disclosureVerified: window.__helpDisclosureVerified === true },
+    colors, viewport: { width: innerWidth, height: innerHeight },
     overflow: document.documentElement.scrollWidth - innerWidth,
     writes: window.__manualActions, activeMarkup: panel.querySelectorAll('img,script,iframe,a').length,
     navCount: panel.querySelectorAll('nav button').length,
@@ -51,7 +56,7 @@ app.whenReady().then(async () => {
       import {overviewFixture} from './scripts/fixtures/sync-overview.mjs';
       import './src/components/SyncCenterPanel.css';
       const mode = new URLSearchParams(location.search).get('scene');
-      document.documentElement.dataset.theme = ['dark','narrow','uncertain','backoff-busy','uncertain-refreshing'].includes(mode) ? 'dark' : 'light';
+      document.documentElement.dataset.theme = ['dark','narrow','uncertain','backoff-busy','uncertain-refreshing','help-operations-dark','help-recovery-narrow'].includes(mode) ? 'dark' : 'light';
       const input=overviewFixture();
       if(mode==='uncertain'){input.status.last_status='review_required';input.status.recovery={mode:'review_required'}}
       if(mode==='unavailable'){input.settings=null;input.status=null;input.health.lastReadAt=0}
@@ -76,12 +81,36 @@ app.whenReady().then(async () => {
     syntheticRecords: true, backendExercised: false, nativeFocus: false, writes: 0, scenes: [] }
   const save = () => fs.writeFileSync(path.join(out, 'checks.json'), JSON.stringify(report, null, 2))
   save()
-  for (const name of ['light', 'dark', 'narrow', 'uncertain', 'unavailable', 'disabled', 'blocked-stale', 'backoff-busy', 'uncertain-refreshing', 'contradictory-busy']) {
-    const win = new BrowserWindow({ show: false, width: name === 'narrow' ? 560 : 1000, height: 900, useContentSize: true,
+  for (const name of ['light', 'dark', 'narrow', 'uncertain', 'unavailable', 'disabled', 'blocked-stale', 'backoff-busy', 'uncertain-refreshing', 'contradictory-busy', 'help-first-use', 'help-operations-dark', 'help-conflicts', 'help-recovery-narrow']) {
+    const win = new BrowserWindow({ show: false, width: name.includes('narrow') ? 560 : 1000, height: 900, useContentSize: true,
       webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } })
     try {
       await win.loadFile(path.join(out, 'fixture.html'), { query: { scene: name } })
       await win.webContents.executeJavaScript('document.fonts.ready.then(()=>true)')
+      if (name.startsWith('help-')) {
+        let mounted = false
+        for (let attempt = 0; attempt < 50; attempt++) {
+          mounted = await win.webContents.executeJavaScript('!!document.querySelector("[data-sync-help]")')
+          if (mounted) break
+          await delay(100)
+        }
+        if (!mounted) throw new Error('Help component did not mount')
+        const topic = { 'help-first-use': 'first-use', 'help-operations-dark': 'operations', 'help-conflicts': 'conflicts', 'help-recovery-narrow': 'recovery' }[name]
+        const disclosure = await win.webContents.executeJavaScript(`(()=>{
+          const help=document.querySelector('[data-sync-help]'), outer=help.querySelector('summary');
+          const topic=help.querySelector('[data-sync-help-topic="${topic}"]'), summary=topic.querySelector('summary');
+          if(help.open||topic.open)return false;
+          outer.click(); summary.focus({preventScroll:true}); summary.click();
+          if(!help.open||!topic.open)return false;
+          summary.click(); if(topic.open)return false;
+          summary.click(); outer.click(); outer.click();
+          const valid=help.open&&topic.open&&document.activeElement===summary&&window.__manualActions===0;
+          window.__helpDisclosureVerified=valid;
+          help.scrollIntoView({block:'start',behavior:'instant'});
+          return valid;
+        })()`)
+        if (!disclosure) throw new Error('Native help disclosure failed: ' + name)
+      }
       let sample, previous = '', stable = 0
       for (let i = 0; i < 70; i++) {
         await delay(100); sample = await win.webContents.executeJavaScript('(' + inspect.toString() + ')()')
