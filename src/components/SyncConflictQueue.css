@@ -17,3 +17,7 @@
 .sync-queue-pagination{display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:flex-end;margin-top:12px;font-size:12px}
 .sync-conflict-queue :is(input,select,button):focus-visible,.sync-conflict-queue .sync-conflict-heading>strong:focus{outline:2px solid var(--clay);outline-offset:3px}
 @media(max-width:620px){.sync-queue-tools>label{flex:1 1 100%}.sync-queue-pagination{justify-content:flex-start}.sync-queue-identifiers{flex-direction:column}}
+.sync-queue-risk{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.sync-conflict-queue .sync-queue-risk-label{color:var(--ink);background:var(--surface,var(--paper));border:1px solid var(--line);border-left:3px solid var(--clay);border-radius:6px;padding:5px 9px;font-size:12px;line-height:1.6;overflow-wrap:anywhere}
+.sync-conflict-queue .sync-queue-risk-label.is-permanent{border-left-color:var(--danger,var(--clay))}
+.sync-conflict-queue .sync-queue-risk-label.is-recycled{border-left-color:var(--warning,var(--clay))}
