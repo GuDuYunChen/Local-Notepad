@@ -100,3 +100,66 @@ it('unmount prevents late success from updating an abandoned view', async () => 
   await act(async () => { root.unmount(); root = null; finish(); await flush() })
   expect(container.textContent).toBe(''); expect(write).toHaveBeenCalledTimes(1)
 })
+
+for (const [state, mode, label] of [
+  ['review_required', 'review_required', '写入结果待确认'],
+  ['retry_wait', 'backoff', '预检暂缓，等待重试'],
+  ['recovery_blocked', 'blocked', '恢复保护阻断，需处理'],
+]) it(`exports the real backend state ${state} exactly as visibly labeled`, async () => {
+  props.status = { ...props.status, last_status: state, recovery: { mode } }
+  await render(); await click(button('生成诊断摘要'))
+  const visible = area().value
+  expect(visible).toContain('最近状态：' + label)
+  expect(visible).not.toContain('最近状态：未知')
+  expect(write).not.toHaveBeenCalled()
+  await click(button('复制诊断摘要'))
+  expect(write).toHaveBeenCalledTimes(1); expect(write).toHaveBeenCalledWith(visible)
+})
+it('preserves explicit uncertain-write guidance when recovery details are unavailable', async () => {
+  props.status = { ...props.status, last_status: 'review_required', recovery: undefined }
+  props.health = { ...props.health, error: 'PRIVATE_READ_ERROR', failures: 2 }
+  props.busy = true; props.draftChanged = true; props.conflictCount = 3
+  await render(); await click(button('生成诊断摘要'))
+  expect(area().value).toContain('恢复状态：未知 / 未提供')
+  expect(area().value).toContain('恢复详情缺失或不受支持')
+  expect(area().value).toContain('不要反复执行或重新绑定')
+  expect(area().value).not.toContain('PRIVATE_READ_ERROR')
+  expect(area().value).not.toContain('下一步参考：可先预演')
+  expect(write).not.toHaveBeenCalled()
+})
+it('keeps contradictory state fields visible without replacing either of them', async () => {
+  props.status = { ...props.status, last_status: 'review_required', recovery: { mode: 'idle' } }
+  await render(); await click(button('生成诊断摘要'))
+  expect(area().value).toContain('最近状态：写入结果待确认')
+  expect(area().value).toContain('恢复状态：空闲')
+  expect(area().value).toContain('最近状态与恢复详情不一致')
+  await click(button('复制诊断摘要'))
+  expect(write.mock.calls[0][0]).toBe(area().value)
+})
+it('a change between supported recovery status codes marks the old summary until explicit regeneration', async () => {
+  props.status = { ...props.status, last_status: 'retry_wait', recovery: undefined }
+  await render(); await click(button('生成诊断摘要')); const before = area().value
+  props.status = { ...props.status, last_status: 'review_required' }; await render()
+  expect(area().value).toBe(before); expect(container.textContent).toContain('可见诊断字段已变化')
+  expect(write).not.toHaveBeenCalled()
+  await click(button('重新生成摘要'))
+  expect(area().value).toContain('最近状态：写入结果待确认')
+  expect(area().value).toContain('不要反复执行或重新绑定')
+  expect(container.textContent).not.toContain('可见诊断字段已变化')
+})
+it('A-B-A recovery status changes cannot revive an old summary even with missing detail', async () => {
+  props.status = { ...props.status, last_status: 'retry_wait', recovery: undefined }
+  await render(); await click(button('生成诊断摘要')); const before = area().value
+  props.status = { ...props.status, last_status: 'review_required' }; await render()
+  props.status = { ...props.status, last_status: 'retry_wait' }; await render()
+  expect(area().value).toBe(before); expect(container.textContent).toContain('可见诊断字段已变化')
+  expect(write).not.toHaveBeenCalled()
+})
+it('unrecognized status text cannot become exported diagnostic content', async () => {
+  props.status = { ...props.status, last_status: 'PRIVATE_STATUS_<script>bad()</script>', recovery: { mode: '__proto__' } }
+  await render(); await click(button('生成诊断摘要')); await click(button('复制诊断摘要'))
+  expect(area().value).toContain('最近状态：未知 / 未提供')
+  expect(area().value).toContain('恢复状态：未知 / 未提供')
+  expect(write.mock.calls[0][0]).not.toContain('PRIVATE_STATUS')
+  expect(container.querySelector('script')).toBeNull()
+})

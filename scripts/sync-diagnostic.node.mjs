@@ -132,3 +132,88 @@ test('presentation has no API, persistence, file access or synchronization callb
     assert.doesNotMatch(text, /\bfetch\s*\(|\bapi\s*\(|localStorage|sessionStorage|electronAPI|onResolve|onRefresh|dangerouslySetInnerHTML/)
   }
 })
+
+// These fixed strings are emitted by RecoveryRunner.Status, not free-text errors.
+const recoveryCases = [
+  ['review_required', 'review_required', '写入结果待确认', /不要反复执行或重新绑定/],
+  ['retry_wait', 'backoff', '预检暂缓，等待重试', /处于暂缓状态/],
+  ['recovery_blocked', 'blocked', '恢复保护阻断，需处理', /跳过恢复保护/],
+]
+for (const [lastState, mode, label] of recoveryCases) test(`RECOVERY_STATUS: preserve backend status ${lastState}`, () => {
+  const x = input(); x.status.last_status = lastState; x.status.recovery.mode = mode
+  const r = report(x)
+  assert.equal(r.facts.lastState, lastState, 'RECOVERY_STATUS: supported backend state was lost')
+  assert.ok(r.text.includes('最近状态：' + label))
+  assert.doesNotMatch(r.text, /恢复信息提示：/)
+})
+for (const [lastState, , label, advice] of recoveryCases) test(`RECOVERY_DETAIL: ${lastState} survives missing detail without inventing recovery`, () => {
+  const x = input(); x.status.last_status = lastState; delete x.status.recovery
+  const r = report(x)
+  assert.equal(r.facts.recovery, 'unknown')
+  assert.equal(r.facts.lastSuccessAt, null); assert.equal(r.facts.nextAttemptAt, null)
+  assert.ok(r.text.includes('最近状态：' + label))
+  assert.match(r.text, /恢复详情缺失或不受支持/)
+  assert.match(r.text, advice, 'RECOVERY_DETAIL: explicit recovery warning fell through to generic advice')
+  assert.doesNotMatch(r.text, /下一步参考：可先预演/)
+})
+test('known status and contradictory recovery detail stay separate, not silently reconciled', () => {
+  for (const [lastState, mode] of [['review_required', 'idle'], ['retry_wait', 'blocked'], ['recovery_blocked', 'backoff'], ['ok', 'review_required']]) {
+    const x = input(); x.status.last_status = lastState; x.status.recovery.mode = mode
+    const r = report(x)
+    assert.equal(r.facts.lastState, lastState); assert.equal(r.facts.recovery, mode)
+    assert.match(r.text, /最近状态与恢复详情不一致/)
+    assert.doesNotMatch(r.text, /下一步参考：可先预演/)
+  }
+})
+test('uncertain last status wins even when detail is missing and every other signal competes', () => {
+  for (const detail of [undefined, null, {}, { mode: 'idle' }, { mode: 'backoff' }]) {
+    const x = input(); x.status.last_status = 'review_required'; x.status.recovery = detail
+    x.health.error = 'PRIVATE_ERROR'; x.health.failures = 3; x.draftChanged = true; x.busy = true; x.conflictCount = 5
+    const r = report(x)
+    assert.match(r.text, /不要反复执行或重新绑定/)
+    assert.doesNotMatch(r.text, /PRIVATE_ERROR/)
+  }
+})
+test('uncertain recovery mode still takes priority over a different last status', () => {
+  for (const lastState of ['ok', 'retry_wait', 'recovery_blocked', 'error']) {
+    const x = input(); x.status.last_status = lastState; x.status.recovery.mode = 'applying'
+    assert.match(report(x).text, /不要反复执行或重新绑定/)
+  }
+})
+test('blocked recovery evidence is not weakened to backoff or conflict handling', () => {
+  for (const [lastState, mode] of [['recovery_blocked', 'backoff'], ['retry_wait', 'blocked']]) {
+    const x = input(); x.status.last_status = lastState; x.status.recovery.mode = mode
+    x.status.open_conflicts = 2; x.conflictCount = 2
+    const r = report(x)
+    assert.match(r.text, /下一步参考：.*跳过恢复保护/)
+    assert.doesNotMatch(r.text, /下一步参考：到冲突中心/)
+  }
+})
+test('actual last-state changes now produce distinct observation keys even without detail', () => {
+  const x = input(); delete x.status.recovery
+  const keys = recoveryCases.map(([state]) => { x.status.last_status = state; return report(x).key })
+  assert.equal(new Set(keys).size, 3)
+})
+test('unknown or hostile recovery status strings remain unknown and cannot leak into copied text', () => {
+  for (const value of ['constructor', '__proto__', 'REVIEW_REQUIRED', 'review_required ', 'PRIVATE_SECRET', null, {}, 1]) {
+    const x = input(); x.status.last_status = value; x.status.recovery.mode = value
+    const r = report(x)
+    assert.equal(r.facts.lastState, 'unknown'); assert.equal(r.facts.recovery, 'unknown')
+    assert.doesNotMatch(r.text, /PRIVATE_SECRET|constructor|__proto__|REVIEW_REQUIRED/)
+  }
+})
+test('newly recognized codes do not fabricate successful reads or success timestamps', () => {
+  for (const [lastState, mode] of recoveryCases) {
+    const x = input(); x.status.last_status = lastState; x.status.recovery = { mode }; x.health.lastReadAt = 0
+    const r = report(x)
+    assert.equal(r.facts.lastState, 'unknown'); assert.equal(r.facts.recovery, 'unknown')
+    assert.equal(r.facts.lastSuccessAt, null); assert.match(r.text, /尚无可核实的读取结果/)
+  }
+})
+test('matching applying status is valid and earlier successful time is retained as earlier evidence only', () => {
+  const x = input(); x.status.last_status = 'review_required'; x.status.recovery.mode = 'applying'
+  const before = structuredClone(x), r = report(x)
+  assert.deepEqual(x, before); assert.equal(r.facts.lastSuccessAt, x.status.recovery.last_success_at * 1000)
+  assert.doesNotMatch(r.text, /恢复信息提示：/); assert.match(r.text, /不要反复执行或重新绑定/)
+  assert.ok(Object.isFrozen(r.facts) && r.text.length < 8192)
+})
