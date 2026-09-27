@@ -8,6 +8,7 @@ export default function SyncConflictQueue({ conflicts, scope, busy = false, disa
   const [browse, setBrowse] = useState({ query: '', kind: 'all', risk: 'all', order: 'server', page: 1, epoch: 0 })
   const [submitting, setSubmitting] = useState(false)
   const alive = useRef(false), pending = useRef(false), heading = useRef(null), focusRequested = useRef(false)
+  const browseEpoch = useRef(0)
   const model = useMemo(() => indexConflictQueue(conflicts), [conflicts])
   const view = useMemo(() => conflictQueuePage(model, browse), [model, browse])
   const locked = busy || submitting
@@ -23,14 +24,18 @@ export default function SyncConflictQueue({ conflicts, scope, busy = false, disa
     heading.current?.scrollIntoView?.({ block: 'nearest' })
   }, [browse.epoch])
   const change = (patch, focus = false) => {
-    if (busy || pending.current) return
+    if (!alive.current || busy || pending.current) return
     focusRequested.current = focus
     // Explicit browsing always closes old reviews, even when an ID remains on
     // both pages/filters. Returning to the same filter never revives consent.
-    setBrowse(old => ({ ...old, ...patch, epoch: old.epoch + 1 }))
+    // Revoke old callbacks now, not only after React commits the new row keys.
+    // A queued state update cannot guard a second event in the same batch.
+    const epoch = ++browseEpoch.current
+    setBrowse(old => ({ ...old, ...patch, epoch }))
   }
   const resolve = async (...args) => {
-    if (pending.current || busy || disabled || !model.valid || typeof onResolve !== 'function') return false
+    if (!alive.current || browse.epoch !== browseEpoch.current || pending.current || busy || disabled ||
+        !model.valid || typeof onResolve !== 'function') return false
     pending.current = true
     setSubmitting(true)
     try { return await onResolve(...args) } finally {
