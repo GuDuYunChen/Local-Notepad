@@ -6,6 +6,8 @@ import SyncActivityPanel from './SyncActivityPanel'
 import SyncConflictQueue from './SyncConflictQueue'
 import SyncPlanPanel from './SyncPlanPanel'
 import SyncDiagnosticPanel from './SyncDiagnosticPanel'
+import SyncOverviewPanel from './SyncOverviewPanel'
+import { focusSyncOverviewRegion } from '~/services/syncOverview.mjs'
 import { readSyncPlan } from '~/services/syncPlanRead.mjs'
 import { captureSyncPlan, invalidateSyncPlan, syncPlanObservation } from '~/services/syncPlanView.mjs'
 import { conflictScope, applyReviewedConflict } from '~/services/syncConflictReview.mjs'
@@ -21,6 +23,8 @@ const timeLabel = value => {
 const emptySecret = () => ({ available: false, stored: false, managed: false, backend: '' })
 
 export default function SyncCenterPanel() {
+  const center = useRef(null)
+  const navigateSection = useCallback(key => focusSyncOverviewRegion(center.current, key), [])
   const alive = useRef(false)
   const operation = useRef(false)
   const reader = useRef(null)
@@ -290,13 +294,15 @@ export default function SyncCenterPanel() {
   const hasAnySecret = hasSecureSecret || hasLegacySecret
   const draftChanged = dirty.current.endpoint || dirty.current.username || webdav.password !== ''
 
-  return <section className="settings-card consumer-settings-section sync-center-card">
+  return <section ref={center} data-sync-center className="settings-card consumer-settings-section sync-center-card">
     <div className="settings-card-header">
       <div><h3>同步中心</h3><p>同步健康状态 · 验证后启用 WebDAV</p></div>
       <span className={'settings-status-pill ' + (enabled ? 'ok' : 'neutral')}>{enabled ? ('已启用 · ' + providerName(provider)) : '未启用'}</span>
     </div>
+    <SyncOverviewPanel settings={settings} status={status} health={health} conflictCount={conflicts.length}
+      busy={!!busy} draftChanged={draftChanged} actionFailed={!!actionError} onNavigate={navigateSection}/>
     <SyncActivityPanel wakeKey={busy} onSettled={refreshAfterTask}/>
-    <div className="sync-health" aria-label="同步健康状态">
+    <div className="sync-health" aria-label="同步健康状态" data-sync-section="health" tabIndex={-1} role="group">
       <div className="sync-health-heading">
         <strong role="status">{syncHealthLabel(settings, status, health.error)}</strong>
         <button className="btn small" disabled={!!busy || health.loading} onClick={() => void refresh()}>{health.loading ? '刷新中…' : '刷新状态'}</button>
@@ -320,13 +326,15 @@ export default function SyncCenterPanel() {
         <strong>{connectionCheck.detail}</strong><span>检查时间：{timeLabel(connectionCheck.at)}；这是只读检查，不代表写入权限或持续在线。</span>
       </div>}
     </div>
+    <div data-sync-section="diagnostic" tabIndex={-1} role="group" aria-label="诊断摘要区域">
     <SyncDiagnosticPanel settings={settings} status={status} health={health} conflictCount={conflicts.length}
       busy={!!busy} draftChanged={draftChanged} actionFailed={!!actionError}/>
+    </div>
     <div className="sync-center-explainer">
       <strong>WebDAV 只替换传输层，不改变冲突规则。</strong>
       <span>笔记、文件夹、标签、标签关联和附件继续使用同一套 manifest、SHA-256 与三方合并。正文和附件都不会按时间戳静默覆盖；冲突仍需明确选择。</span>
     </div>
-    <div className="sync-provider-grid">
+    <div className="sync-provider-grid" data-sync-section="connection" tabIndex={-1} role="group" aria-label="同步连接配置">
       <div className={'sync-provider-card ' + (enabled && isLab ? 'active' : '')}>
         <strong>本地实验室</strong><span>用于离线验证同步协议，不连接云端。</span>
         <button className="btn" disabled={!!busy || !settings} onClick={() => void enableLab()}>{busy === 'settings' ? '更新中…' : (enabled && isLab ? '已启用' : '启用本地实验室')}</button>
@@ -367,7 +375,7 @@ export default function SyncCenterPanel() {
         <div><strong>{status?.open_conflicts ?? conflicts.length}</strong><span>待处理冲突</span></div>
         <div><strong>{syncStatusLabel(status?.last_status)}</strong><span>最近状态</span></div>
       </div>
-      <div className="settings-action-row consumer-settings-actions">
+      <div className="settings-action-row consumer-settings-actions" data-sync-section="execution" tabIndex={-1} role="group" aria-label="预演与执行区域">
         <button className="btn" disabled={!!busy || draftChanged} onClick={() => void preview()}>{busy === 'plan' ? '预演中…' : '预演同步'}</button>
         {busy === 'plan' && <button type="button" className="btn" onClick={() => planRead.current?.abort()}>停止等待预演</button>}
         <button className="btn primary" disabled={!!busy} onClick={() => void synchronize()}>{busy === 'run' ? '同步中…' : '执行同步'}</button>
@@ -375,9 +383,10 @@ export default function SyncCenterPanel() {
       </div>
       <SyncPlanPanel snapshot={plan} disabled={!!busy || draftChanged} onPreview={() => void preview()}/>
       {status?.last_error && <p className="sync-center-error" role="alert">{status.last_error}</p>}
-      {conflicts.length > 0 && <SyncConflictQueue conflicts={conflicts} busy={!!busy}
+      {conflicts.length > 0 && <div data-sync-section="conflicts" tabIndex={-1} role="group" aria-label="冲突队列区域"><SyncConflictQueue conflicts={conflicts} busy={!!busy}
         scope={conflictScope(settings, status)} disabled={!!busy || !!health.error || draftChanged}
-        onResolve={resolve} onRefresh={refresh}/>}
+        onResolve={resolve} onRefresh={refresh}/></div>}
     </>}
+    <div className="sync-overview-return"><button type="button" className="btn small" onClick={() => navigateSection('overview')}>返回同步总览</button></div>
   </section>
 }

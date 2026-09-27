@@ -1,0 +1,121 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { buildSyncOverview, focusSyncOverviewRegion, SYNC_OVERVIEW_DESTINATIONS } from '../src/services/syncOverview.mjs'
+import { overviewFixture } from './fixtures/sync-overview.mjs'
+
+test('normal snapshot suggests preview, never declares devices equal', () => {
+  const view = buildSyncOverview(overviewFixture())
+  assert.equal(view.state, 'preview'); assert.equal(view.target, 'execution')
+  assert.match(view.detail, /不代表两端现在完全一致/); assert.equal(view.reportedConflicts, '0')
+  assert.equal(view.lastSuccess, new Date(1790499900000).toISOString())
+})
+for (const input of [null, undefined, false, 3, [], {}, 'private']) test(`unread input ${String(input)} remains unknown`, () => {
+  const view = buildSyncOverview(input)
+  assert.equal(view.state, 'unavailable'); assert.equal(view.reportedConflicts, '未知')
+  assert.equal(view.listedConflicts, '未知'); assert.equal(view.lastSuccess, '尚无记录')
+})
+for (const [label, change, state, target] of [
+  ['busy', x => { x.busy = true }, 'waiting', 'health'],
+  ['stale', x => { x.health.error = 'private'; x.health.failures = 1 }, 'stale', 'health'],
+  ['refreshing', x => { x.health.loading = true }, 'stale', 'health'],
+  ['draft', x => { x.draftChanged = true }, 'draft', 'connection'],
+  ['disabled', x => { x.settings.sync_enabled = false }, 'disabled', 'connection'],
+  ['conflicts', x => { x.status.open_conflicts = x.conflictCount = 4 }, 'conflicts', 'conflicts'],
+  ['mismatch', x => { x.status.open_conflicts = 4; x.conflictCount = 2 }, 'mismatch', 'health'],
+  ['error', x => { x.status.last_status = 'error' }, 'error', 'health'],
+  ['action-failed', x => { x.actionFailed = true }, 'error', 'health'],
+  ['unknown-mode', x => { x.status.recovery = null }, 'unknown', 'health'],
+  ['unknown-counter', x => { x.status.open_conflicts = '0' }, 'unknown', 'health'],
+  ['inconsistent-last-status', x => { x.status.last_status = 'conflicts' }, 'unknown', 'health'],
+]) test(`${label} routes to a read-only region`, () => {
+  const x = overviewFixture(); change(x); const view = buildSyncOverview(x)
+  assert.equal(view.state, state); assert.equal(view.target, target)
+})
+for (const [last, mode, state] of [
+  ['review_required', null, 'uncertain'], ['ok', 'applying', 'uncertain'],
+  ['retry_wait', null, 'backoff'], ['ok', 'backoff', 'backoff'],
+  ['recovery_blocked', null, 'blocked'], ['ok', 'blocked', 'blocked'],
+]) test(`${last}/${mode} preserves recovery evidence`, () => {
+  const x = overviewFixture(); x.status.last_status = last; x.status.recovery = mode ? { mode } : null
+  const v = buildSyncOverview(x); assert.equal(v.state, state); assert.equal(v.target, 'health')
+  assert.ok(v.recoveryNotice); assert.equal(v.lastSuccess, '尚无记录')
+})
+test('uncertainty survives stale data, drafts, conflicts, disabled config and conflicting fields', () => {
+  const x = overviewFixture(); x.status.last_status = 'review_required'; x.status.recovery.mode = 'backoff'
+  x.busy = true; x.draftChanged = true; x.health.error = 'stale'; x.settings.sync_enabled = false; x.conflictCount = 4
+  const v = buildSyncOverview(x)
+  assert.equal(v.state, 'uncertain'); assert.match(v.detail, /不要反复执行或重新绑定/); assert.match(v.recoveryNotice, /不一致/)
+})
+test('counters remain separate and cannot create an invisible conflict destination', () => {
+  const x = overviewFixture(); x.status.open_conflicts = 5; x.conflictCount = 0
+  const v = buildSyncOverview(x)
+  assert.equal(v.reportedConflicts, '5'); assert.equal(v.listedConflicts, '0')
+  assert.equal(v.destinations.find(d => d.key === 'conflicts').available, false)
+})
+test('destination visibility follows rendered region conditions, independent of stale labels', () => {
+  const x = overviewFixture(); x.health.lastReadAt = 0; x.conflictCount = 3
+  const v = buildSyncOverview(x)
+  assert.equal(v.reportedConflicts, '未知')
+  assert.equal(v.destinations.find(d => d.key === 'execution').available, true)
+  assert.equal(v.destinations.find(d => d.key === 'conflicts').available, true)
+  x.settings.sync_enabled = false
+  assert.equal(buildSyncOverview(x).destinations.find(d => d.key === 'conflicts').available, false)
+})
+test('only five fixed destinations, with immutable view and no input mutation', () => {
+  const x = overviewFixture(), before = structuredClone(x), view = buildSyncOverview(x)
+  assert.deepEqual(x, before); assert.equal(view.destinations.length, 5)
+  assert.equal(Object.isFrozen(view), true); assert.ok(view.destinations.every(Object.isFrozen))
+  assert.deepEqual(view.destinations.map(d => d.key), SYNC_OVERVIEW_DESTINATIONS.map(d => d.key))
+})
+test('private strings and prototype enum names do not appear in the overview', () => {
+  const x = overviewFixture(), privateValue = 'PRIVATE_SENTINEL_<script>😀'
+  Object.assign(x.settings, { sync_endpoint: privateValue, sync_username: privateValue, sync_password: privateValue })
+  Object.assign(x.status, { title: privateValue, content: privateValue, device_id: privateValue, last_error: privateValue })
+  assert.ok(!JSON.stringify(buildSyncOverview(x)).includes(privateValue))
+  for (const value of ['constructor', '__proto__', privateValue]) {
+    x.settings.sync_provider = value; x.status.last_status = value; x.status.recovery.mode = value
+    assert.equal(buildSyncOverview(x).state, 'unknown')
+  }
+})
+function focusFixture() {
+  const calls = [], doc = { activeElement: null }
+  const root = { isConnected: true, matches: value => value === '[data-sync-center]', querySelector: value => { calls.push(['query', value]); return target } }
+  const target = { isConnected: true, ownerDocument: doc, getAttribute: () => '-1',
+    closest: selector => selector === '[data-sync-center]' ? root : null,
+    focus: options => { calls.push(['focus', options]); doc.activeElement = target },
+    scrollIntoView: options => calls.push(['scroll', options]) }
+  return { calls, root, target, doc }
+}
+test('focus changes only region focus and scroll, not clicks or input values', () => {
+  const f = focusFixture(); assert.equal(focusSyncOverviewRegion(f.root, 'connection'), true)
+  assert.deepEqual(f.calls.map(call => call[0]), ['query', 'focus', 'scroll'])
+  assert.deepEqual(f.calls[2][1], { block: 'start', behavior: 'instant' })
+})
+test('invalid keys cannot select arbitrary DOM nodes or selectors', () => {
+  for (const key of ['constructor', '__proto__', 'body', 'health"] button', null, 0, {}]) {
+    const f = focusFixture(); assert.equal(focusSyncOverviewRegion(f.root, key), false); assert.equal(f.calls.length, 0)
+  }
+})
+test('detached, nested, hidden and missing targets are refused', () => {
+  for (const change of [
+    f => { f.root.isConnected = false }, f => { f.target.isConnected = false },
+    f => { f.target.closest = () => ({}) }, f => { f.target.getAttribute = () => '0' },
+    f => { f.root.querySelector = () => null }, f => { f.root.matches = () => false },
+  ]) {
+    const f = focusFixture(); change(f); assert.equal(focusSyncOverviewRegion(f.root, 'health'), false)
+    assert.equal(f.calls.some(c => c[0] === 'scroll'), false)
+  }
+})
+test('failed focus never redirects to another center or activates a fallback action', () => {
+  const f = focusFixture(); f.target.focus = () => {}
+  assert.equal(focusSyncOverviewRegion(f.root, 'health'), false); assert.equal(f.calls.length, 1)
+  f.target.focus = () => { throw new Error('detached') }
+  assert.equal(focusSyncOverviewRegion(f.root, 'health'), false)
+})
+test('overview has no network, persistence, credentials, clipboard or synchronization callback capability', () => {
+  for (const file of ['../src/services/syncOverview.mjs', '../src/components/SyncOverviewPanel.jsx']) {
+    const text = readFileSync(new URL(file, import.meta.url), 'utf8')
+    assert.doesNotMatch(text, /\bfetch\s*\(|\bapi\s*\(|\.click\s*\(|onResolve|onRefresh|localStorage|sessionStorage|electronAPI|clipboard|dangerouslySetInnerHTML/)
+  }
+})

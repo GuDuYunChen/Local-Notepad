@@ -1,0 +1,44 @@
+name: Sync Overview CI
+on:
+  push:
+    branches: [feature/knowledge-os-phase2]
+  pull_request:
+    branches: [master]
+concurrency:
+  group: sync-overview-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  overview:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Verify overview policy, navigation and evidence
+        run: node --test scripts/sync-overview.node.mjs scripts/sync-overview-evidence.node.cjs
+      - name: Verify real overview and sync-center integration
+        run: npx vitest run --root=. src/components/SyncOverviewPanel.test.jsx src/components/SyncOverviewIntegration.test.jsx
+      - name: Build production renderer
+        if: runner.os == 'Windows'
+        run: npm run build:renderer
+      - name: Verify native overview and complete evidence
+        if: runner.os == 'Windows'
+        run: node scripts/run-sync-overview-render.cjs
+      - name: Upload overview render evidence
+        if: always() && runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-notepad-sync-overview-${{ github.sha }}
+          path: |
+            test-results/sync-overview/*.png
+            test-results/sync-overview/checks.json
+          if-no-files-found: error
+          retention-days: 7
