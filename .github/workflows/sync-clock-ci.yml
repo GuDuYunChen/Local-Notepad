@@ -25,9 +25,9 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
       - name: Verify timestamp conversion and complete-evidence policy
-        run: node --test scripts/sync-clock.node.mjs scripts/sync-clock-evidence.node.cjs scripts/sync-clock-preference.node.mjs scripts/sync-clock-preference-evidence.node.cjs scripts/sync-clock-preference-view.node.mjs scripts/sync-clock-restore-evidence.node.cjs
+        run: node --test scripts/sync-clock.node.mjs scripts/sync-clock-evidence.node.cjs scripts/sync-clock-preference.node.mjs scripts/sync-clock-preference-evidence.node.cjs scripts/sync-clock-preference-view.node.mjs scripts/sync-clock-restore-evidence.node.cjs scripts/sync-clock-keyboard-evidence.node.cjs
       - name: Verify real overview and sync-center state isolation
-        run: npx vitest run --root=. src/components/SyncOverviewTimes.test.jsx src/components/SyncClockPreference.test.jsx src/components/SyncClockPreferenceRestore.test.jsx
+        run: npx vitest run --root=. src/components/SyncOverviewTimes.test.jsx src/components/SyncClockPreference.test.jsx src/components/SyncClockPreferenceRestore.test.jsx src/components/SyncClockFeedback.test.jsx
       - name: Build production renderer
         if: runner.os == 'Windows'
         run: npm run build:renderer
@@ -40,6 +40,19 @@ jobs:
       - name: Verify read-only preference restore
         if: runner.os == 'Windows'
         run: node scripts/check-sync-clock-restore.cjs
+      - name: Verify native keyboard input and preference feedback
+        if: runner.os == 'Windows'
+        run: node scripts/check-sync-clock-keyboard.cjs
+      - name: Upload native keyboard evidence
+        if: always() && runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-notepad-sync-clock-keyboard-${{ github.sha }}
+          path: |
+            test-results/sync-clock-keyboard/*.png
+            test-results/sync-clock-keyboard/checks.json
+          if-no-files-found: error
+          retention-days: 7
       - name: Upload native preference restore evidence
         if: always() && runner.os == 'Windows'
         uses: actions/upload-artifact@v4

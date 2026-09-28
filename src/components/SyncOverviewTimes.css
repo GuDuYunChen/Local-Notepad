@@ -19,3 +19,8 @@
 
 .sync-clock-preference-actions>p{margin:0 0 4px}
 .sync-clock-preference-receipt{margin:0 0 12px;color:var(--ink);font-size:13px;line-height:1.7;overflow-wrap:anywhere}
+
+/* Keep keyboard focus on the operated control, not on the advisory live region. */
+.sync-overview .sync-clock-button:focus-visible,
+.sync-overview .sync-clock-preference-button:focus-visible{outline:2px solid var(--clay);outline-offset:2px}
+@media(forced-colors:active){.sync-overview .sync-clock-button:focus-visible,.sync-overview .sync-clock-preference-button:focus-visible{outline-color:Highlight}}

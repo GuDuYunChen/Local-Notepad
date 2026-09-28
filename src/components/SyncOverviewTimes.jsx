@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useId, useState } from 'react'
 import { deviceSyncTimeZone, syncClockDisplay } from '~/services/syncClock.mjs'
 import './SyncOverviewTimes.css'
 import { syncClockPreferenceView } from '~/services/syncClockPreferenceView.mjs'
@@ -15,25 +15,39 @@ export default function SyncOverviewTimes({ view }) {
   const [savedMode, setSavedMode] = useState(initial.mode)
   const [preferenceError, setPreferenceError] = useState(initial.status === 'unavailable' ? 'read' : initial.status === 'invalid' ? 'invalid' : '')
   const [preferenceReceipt, setPreferenceReceipt] = useState('')
+  const [feedbackRevision, setFeedbackRevision] = useState(0)
+  const feedbackID = useId()
+  // Keep the live region mounted. Only explicit operations replace its message;
+  // incoming sync snapshots never announce another preference action.
+  const beginFeedback = () => {
+    setPreferenceReceipt('')
+    setFeedbackRevision(value => value + 1)
+  }
   const mode = zone === null ? 'utc' : 'local'
   const clock = syncClockDisplay(view.lastSuccess, view.readAt, zone)
   const label = clock.mode === 'local' ? '本机时区' : 'UTC'
   const remember = () => {
     if (clock.fallback) return
-    setPreferenceReceipt('')
-    if (saveSyncClockPreference(mode)) { setSavedMode(mode); setPreferenceError('') }
+    beginFeedback()
+    if (saveSyncClockPreference(mode)) {
+      setSavedMode(mode); setPreferenceError('')
+      setPreferenceReceipt('本次已回读确认：已记住' + (mode === 'local' ? '本机时区' : 'UTC') + '。仅保存时间显示方式，未修改同步设置。')
+    }
     else setPreferenceError('save')
   }
   const forget = () => {
-    setPreferenceReceipt('')
-    if (clearSyncClockPreference()) { setSavedMode(null); setPreferenceError('') }
+    beginFeedback()
+    if (clearSyncClockPreference()) {
+      setSavedMode(null); setPreferenceError('')
+      setPreferenceReceipt('本次已回读确认：时间偏好已清除。当前显示保持不变；此后未再保存时，下次打开默认 UTC。')
+    }
     else setPreferenceError('clear')
   }
   const restore = () => {
     // Re-read at this explicit action: another instance may have saved or cleared.
     // Never trust cached savedMode to select a mode, and never write on restore.
     const preference = readSyncClockPreference()
-    setPreferenceReceipt('')
+    beginFeedback()
     setSavedMode(preference.mode)
     if (preference.status === 'saved') {
       setZone(preference.mode === 'local' ? deviceSyncTimeZone() : null)
@@ -70,17 +84,21 @@ export default function SyncOverviewTimes({ view }) {
       <summary>时间显示偏好<span>{preferenceView.summary}</span></summary>
       <div className="sync-clock-preference-actions" role="group" aria-label="记住时间显示方式">
       <p className="sync-clock-preference-summary" data-sync-clock-comparison>{preferenceView.detail}</p>
-      <button type="button" className="btn small sync-clock-preference-button" data-sync-clock-restore
+      <button type="button" className="btn small sync-clock-preference-button" data-sync-clock-restore aria-controls={feedbackID}
         onClick={restore}>读取并使用已保存方式</button>
-      <button type="button" className="btn small sync-clock-preference-button" data-sync-clock-save
+      <button type="button" className="btn small sync-clock-preference-button" data-sync-clock-save aria-controls={feedbackID}
         disabled={clock.fallback} onClick={remember}>记住当前选择</button>
-      <button type="button" className="btn small sync-clock-preference-button" data-sync-clock-clear
+      <button type="button" className="btn small sync-clock-preference-button" data-sync-clock-clear aria-controls={feedbackID}
         onClick={forget}>清除时间偏好</button>
       <span className="sync-clock-preference-summary">保存状态是上次核对结果，不保证其他页面未修改。读取只使用此设备当前保存的方式，不写入偏好、不刷新或执行同步。</span>
       </div>
     </details>
-    {preferenceReceipt && <p className="sync-clock-preference-receipt" role="status">{preferenceReceipt}</p>}
-    {preferenceMessage && <p className="sync-clock-preference-error" role="status">{preferenceMessage}</p>}
+    <div id={feedbackID} data-sync-clock-feedback role="status" aria-live="polite" aria-atomic="true">
+      {(preferenceMessage || preferenceReceipt) && <p key={feedbackRevision}
+        className={preferenceMessage ? 'sync-clock-preference-error' : 'sync-clock-preference-receipt'}>
+        {preferenceMessage || preferenceReceipt}
+      </p>}
+    </div>
     <dl className="sync-overview-metrics">
       <div><dt>状态报告待处理</dt><dd>{view.reportedConflicts}</dd></div>
       <div><dt>已读取列表数量</dt><dd>{view.listedConflicts}</dd></div>
