@@ -6,6 +6,7 @@ import { syncHelpRecommendation, focusSyncHelpTopic } from '~/services/syncHelpN
 import './SyncHelpNavigation.css'
 import { focusSyncCurrentGuidance } from '~/services/syncHelpReturn.mjs'
 import './SyncHelpReturn.css'
+import SyncOverviewTimes from './SyncOverviewTimes'
 
 export default function SyncOverviewPanel({ onNavigate, ...input }) {
   const root = useRef(null)
@@ -36,12 +37,7 @@ export default function SyncOverviewPanel({ onNavigate, ...input }) {
         onClick={() => setHelpFailed(!focusSyncHelpTopic(root.current, help.key))}>查看相关帮助：{help.label}</button>
       {helpFailed && <p role="status">暂时无法定位帮助，请手动展开下方“操作帮助”；没有执行同步操作。</p>}
     </div>
-    <dl className="sync-overview-metrics">
-      <div><dt>状态报告待处理</dt><dd>{view.reportedConflicts}</dd></div>
-      <div><dt>已读取列表数量</dt><dd>{view.listedConflicts}</dd></div>
-      <div className="sync-overview-time"><dt>最近确认成功 · UTC</dt><dd>{view.lastSuccess}</dd></div>
-    </dl>
-    <p className="sync-overview-note">状态依据：{view.readSource}。读取时间 UTC：{view.readAt}。总览随已读取字段更新，不保证远端实时状态。</p>
+    <SyncOverviewTimes view={view}/>
     <nav className="sync-overview-nav" aria-label="同步中心分区导航">
       {view.destinations.map(item => <button key={item.key} type="button" className="sync-overview-link"
         aria-label={'定位' + item.label} disabled={!item.available || typeof onNavigate !== 'function'}

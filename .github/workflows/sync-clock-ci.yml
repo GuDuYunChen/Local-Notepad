@@ -1,0 +1,46 @@
+name: Sync Clock CI
+on:
+  push:
+    branches: [feature/knowledge-os-phase2]
+  pull_request:
+    branches: [master]
+permissions:
+  contents: read
+concurrency:
+  group: sync-clock-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  clock:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Verify timestamp conversion and complete-evidence policy
+        run: node --test scripts/sync-clock.node.mjs scripts/sync-clock-evidence.node.cjs
+      - name: Verify real overview and sync-center state isolation
+        run: npx vitest run --root=. src/components/SyncOverviewTimes.test.jsx
+      - name: Build production renderer
+        if: runner.os == 'Windows'
+        run: npm run build:renderer
+      - name: Verify native timezone switching and current-commit evidence
+        if: runner.os == 'Windows'
+        run: node scripts/check-sync-clock.cjs
+      - name: Upload native timestamp evidence
+        if: always() && runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-notepad-sync-clock-${{ github.sha }}
+          path: |
+            test-results/sync-clock/*.png
+            test-results/sync-clock/checks.json
+          if-no-files-found: error
+          retention-days: 7
