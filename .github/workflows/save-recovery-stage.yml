@@ -1,0 +1,82 @@
+name: Save Recovery Source Validation
+on:
+  push:
+    branches: [feature/knowledge-os-phase2]
+    paths: [.github/workflows/save-recovery-stage.yml]
+permissions:
+  contents: write
+concurrency:
+  group: save-source-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.24.11'
+          cache-dependency-path: server/go.sum
+      - name: Materialize exact reviewed Git objects without changing branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import os,json,base64,hashlib,urllib.request,subprocess,pathlib
+          root='https://api.github.com/repos/'+os.environ['GITHUB_REPOSITORY']
+          headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','User-Agent':'save-recovery-source-check'}
+          def blob(sha):
+              r=json.load(urllib.request.urlopen(urllib.request.Request(root+'/git/blobs/'+sha,headers=headers)))
+              b=base64.b64decode(r['content']);assert hashlib.sha1(b'blob '+str(len(b)).encode()+b'\0'+b).hexdigest()==sha
+              return b
+          patch=blob('9fe2e04978a38dfc3ca36e65ba897819a445f2ed')
+          subprocess.run(['git','apply','--check','-'],input=patch,check=True)
+          subprocess.run(['git','apply','-'],input=patch,check=True)
+          additions={
+            'server/internal/model/editor_save.go':'b487e3d0789befe07f830797ffaf30bbcf7810ba',
+            'server/internal/dao/editor_save.go':'be4cff3fd9d02938cb6ddef9e0f28d7db3474c10',
+            'server/internal/logic/editor_save.go':'bd36221dc77cbba5a488cf3f296eaaccaf182292',
+            'server/internal/controller/editor_save.go':'846dbbf5c21ef6375e1299eb958b52556e808837',
+            'server/internal/logic/editor_save_test.go':'d71690eb4c1d479fa5f38b4a2425351183988790'}
+          expected={**additions,
+            'electron/data-safety.js':'efa0830f8dcdbc5e1968f48b5591f511f58f22f2',
+            'package.json':'fa89988e2524781f8b6799e7f44c43a7753ae1ec',
+            'server/cmd/notepad-server/main.go':'1750ef87ae28f84ec5e96e229b0c8b27b75d5f37',
+            'server/cmd/notepad-server/main_test.go':'edf6599baae3a3cdad2b779746e7e3695682ecf9',
+            'server/internal/backup/backup.go':'553d62eab89199d2547cec1ae588868b4e4a3b7b',
+            'server/internal/controller/file.go':'b2b509a6ad0e471b9a50a19ffc695cabebae1d9c'}
+          for file,sha in additions.items():pathlib.Path(file).write_bytes(blob(sha))
+          for file,sha in expected.items():assert subprocess.check_output(['git','hash-object',file]).decode().strip()==sha,file
+          pathlib.Path('test-results/save-stage').mkdir(parents=True,exist_ok=True)
+          pathlib.Path('test-results/save-stage/expected.json').write_text(json.dumps(expected,indent=2))
+          PY
+      - name: Real Go transactions and complete backend regression
+        run: |
+          set -o pipefail
+          go -C server test ./... -count=1 2>&1 | tee test-results/save-stage/go-tests.log
+      - name: Build real Linux server
+        run: go -C server build -o ../test-results/save-stage/save-test-server ./cmd/notepad-server
+      - name: Retain tested content-addressed files only; do not commit or move refs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import os,json,base64,urllib.request,subprocess,pathlib
+          expected=json.loads(pathlib.Path('test-results/save-stage/expected.json').read_text())
+          root='https://api.github.com/repos/'+os.environ['GITHUB_REPOSITORY']
+          headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','User-Agent':'save-recovery-source-check','Content-Type':'application/json'}
+          for file,sha in expected.items():
+              assert subprocess.check_output(['git','hash-object',file]).decode().strip()==sha,file
+              data=json.dumps({'encoding':'base64','content':base64.b64encode(pathlib.Path(file).read_bytes()).decode()}).encode()
+              r=json.load(urllib.request.urlopen(urllib.request.Request(root+'/git/blobs',data=data,headers=headers)))
+              assert r['sha']==sha
+          pathlib.Path('test-results/save-stage/tested-blobs.json').write_text(json.dumps(expected,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: save-stage-${{ github.sha }}
+          path: test-results/save-stage/*
+          retention-days: 1
+          if-no-files-found: error
