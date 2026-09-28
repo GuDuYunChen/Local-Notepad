@@ -29,7 +29,8 @@ export default function SyncConflictHistoryPanel() {
   const read = async (selected = filter, append = false) => {
     const previous = append ? snapshot : null
     if (append && (!previous?.hasMore || previous.filter !== selected)) return
-    returnListFocus.current = append && moreButton.current === moreButton.current?.ownerDocument.activeElement
+    const focusOrigin = append ? moreButton.current : null
+    returnListFocus.current = false
     const id = ++sequence.current
     current.current?.abort()
     const controller = new AbortController(); current.current = controller
@@ -38,7 +39,13 @@ export default function SyncConflictHistoryPanel() {
     try {
       const page = await readConflictHistory(api, { filter: selected, cursor: previous?.nextCursor || '', signal: controller.signal })
       if (!live.current || sequence.current !== id || controller.signal.aborted) return
-      setSnapshot(previous ? appendConflictHistory(previous, page) : page)
+      const next = previous ? appendConflictHistory(previous, page) : page
+      // Decide at completion, not request start: the user may have moved to
+      // another control while waiting. Never pull focus back from that choice.
+      returnListFocus.current = !!focusOrigin && !next.hasMore &&
+        focusOrigin === focusOrigin.ownerDocument.activeElement &&
+        focusOrigin.closest('[data-sync-conflict-history]')?.open === true
+      setSnapshot(next)
       setPhase('ready')
     } catch {
       if (live.current && sequence.current === id && !controller.signal.aborted) setPhase('error')

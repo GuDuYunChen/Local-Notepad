@@ -87,3 +87,38 @@ it('explicit stop returns focus to read without invoking it again', async()=>{
   await click(button('read'));button('stop').focus();await click(button('stop'))
   expect(document.activeElement).toBe(button('read'));expect(api).toHaveBeenCalledTimes(1)
 })
+
+it('finishing an older-page read preserves a different control selected while waiting', async()=>{
+  let finish
+  api.mockResolvedValueOnce(historyPage([historyRow('a')],'all','next'))
+    .mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve}))
+  await render();await act(async()=>{host.querySelector('details').open=true});await click(button('read'))
+  button('more').focus();await click(button('more'));select().focus()
+  await act(async()=>finish(historyPage([historyRow('b','resolved','remote',1790586000)])))
+  expect(rows()).toHaveLength(2);expect(button('more')).toBeNull()
+  expect(document.activeElement).toBe(select());expect(api).toHaveBeenCalledTimes(2)
+})
+it('late last-page completion cannot steal focus from outside the history panel', async()=>{
+  let finish
+  api.mockResolvedValueOnce(historyPage([historyRow('a')],'all','next'))
+    .mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve}))
+  const elsewhere=document.createElement('button');elsewhere.textContent='Other control';document.body.append(elsewhere)
+  try {
+    await render();await act(async()=>{host.querySelector('details').open=true});await click(button('read'))
+    button('more').focus();await click(button('more'));elsewhere.focus()
+    await act(async()=>finish(historyPage([historyRow('b','resolved','remote',1790586000)])))
+    expect(rows()).toHaveLength(2);expect(document.activeElement).toBe(elsewhere)
+  } finally { elsewhere.remove() }
+})
+it('a collapsed history cannot receive automatic list focus on late completion', async()=>{
+  let finish
+  api.mockResolvedValueOnce(historyPage([historyRow('a')],'all','next'))
+    .mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve}))
+  await render();const disclosure=host.querySelector('details')
+  await act(async()=>{disclosure.open=true});await click(button('read'))
+  button('more').focus();await click(button('more'))
+  await act(async()=>{disclosure.open=false;disclosure.dispatchEvent(new Event('toggle'))})
+  await act(async()=>finish(historyPage([historyRow('b','resolved','remote',1790586000)])))
+  expect(rows()).toHaveLength(2);expect(disclosure.open).toBe(false)
+  expect(document.activeElement).not.toBe(host.querySelector('.sync-conflict-history-scroll'))
+})
