@@ -13,7 +13,7 @@ vi.mock('./components/FileList', () => ({ default: ({ onSelect }) => { mocks.sel
 vi.mock('./components/WorkspaceSidebar', () => ({ default: ({ onOpenSearch, children }) => <aside><button onClick={onOpenSearch}>打开全局检索入口</button>{children}</aside> }))
 vi.mock('./components/TextEditor', () => ({ default: React.forwardRef(function Draft({ activeId, onLoaded, onChange, onStatusChange }, ref) {
  React.useEffect(() => { if (activeId) { onLoaded?.('已存正文'); onStatusChange?.({ dirty: false }) } }, [activeId])
- React.useImperativeHandle(ref, () => ({ clearCache: mocks.clear, save: () => null }))
+ React.useImperativeHandle(ref, () => ({ clearCache: mocks.clear, save: () => null, getReferenceRefactorState: () => ({ savedContent: '已存正文' }) }))
  return activeId ? <button onClick={() => { onChange('未保存的草稿'); onStatusChange?.({ dirty: true }) }}>编辑测试正文</button> : null
 }) }))
 let container, root
@@ -25,7 +25,7 @@ const settle = async () => {
  await act(async () => { await vi.advanceTimersByTimeAsync(250) })
 }
 beforeEach(async () => {
- vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true); vi.useFakeTimers(); localStorage.clear(); api.mockReset(); mocks.clear.mockClear(); evidenceNavigation.cancel()
+ vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true); vi.useFakeTimers(); localStorage.clear(); api.mockReset(); mocks.clear.mockReset().mockReturnValue(true); evidenceNavigation.cancel()
  api.mockImplementation(async path => {
   if (!path.startsWith('/api/search?')) return { id: 'b', title: '第二章.md', content: '已存正文' }
   const anchor = new URLSearchParams(path.split('?')[1]).get('anchor_id')
@@ -219,4 +219,15 @@ it('only explicit discard opens the created note and clears the old navigation c
  expect(container.querySelector('[aria-label="全局检索结果"]')).toBeNull()
  expect(container.querySelector('.workspace-title-button').textContent).toContain('阅读研究笔记')
  expect(mocks.clear).toHaveBeenCalledOnce(); expect(container.querySelector('[aria-label="检索返回导航"]')).toBeNull()
+})
+
+it('a refused editor discard keeps both search and the unsaved source open', async () => {
+ mocks.clear.mockReturnValue(false)
+ await click('编辑测试正文'); await click('打开全局检索入口'); await settle()
+ await click('打开笔记'); await click('不保存'); await settle()
+ expect(container.querySelector('[role="dialog"]')).not.toBeNull()
+ expect(container.querySelector('[aria-label="全局检索结果"]')).toBeTruthy()
+ expect(container.querySelector('.workspace-save-chip').textContent).toBe('未保存')
+ expect(container.querySelector('.workspace-title-button').textContent).toBe('第一章.md')
+ expect(evidenceNavigation.peek()).toBeNull()
 })
