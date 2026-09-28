@@ -7,6 +7,7 @@ import './SyncHelpNavigation.css'
 import { focusSyncCurrentGuidance } from '~/services/syncHelpReturn.mjs'
 import './SyncHelpReturn.css'
 import SyncOverviewTimes from './SyncOverviewTimes'
+import SyncConflictHistoryPanel from './SyncConflictHistoryPanel'
 
 export default function SyncOverviewPanel({ onNavigate, ...input }) {
   const root = useRef(null)
@@ -54,6 +55,7 @@ export default function SyncOverviewPanel({ onNavigate, ...input }) {
       <span className="sync-help-return-note">只定位，不刷新、不执行同步；保留已展开的帮助。</span>
       {returnFailed && <p className="sync-help-return-error" role="status">暂时无法返回状态提示，请向上查看当前页面；没有刷新或执行同步。</p>}
     </div>
+    <SyncConflictHistoryPanel/>
     {failed && <p className="sync-overview-warning" role="status">该区域已变化或暂不可定位，请查看当前页面。没有执行其他操作。</p>}
   </section>
 }

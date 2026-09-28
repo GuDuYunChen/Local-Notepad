@@ -23,6 +23,7 @@ func (c *SyncController) Register(group *ghttp.RouterGroup) {
 	group.POST("/sync/run", c.Run)
 	group.POST("/sync/rebind", c.Rebind)
 	group.GET("/sync/conflicts", c.Conflicts)
+	group.GET("/sync/conflicts/history", c.ConflictHistory)
 	group.POST("/sync/conflicts/{id}/resolve", c.Resolve)
 }
 func (c *SyncController) Status(r *ghttp.Request) {
