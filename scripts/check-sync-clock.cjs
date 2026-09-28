@@ -89,7 +89,12 @@ if (!process.versions.electron) {
           return {...sample,stableSamples:stable,png,bytes:b.length,sha256:createHash('sha256').update(b).digest('hex')}
         }
         const before=await capture('before')
-        if(name==='timezone-unavailable')await win.webContents.executeJavaScript(`window.__originalDTF=Intl.DateTimeFormat;Intl.DateTimeFormat=function(){throw new Error('CLOCK_PRIVATE_TIMEZONE')}`)
+        if(name==='timezone-unavailable'){
+          // A function assignment is not a cloneable IPC result. Return a
+          // primitive receipt; the scenario still has to prove visible fallback.
+          const injected=await win.webContents.executeJavaScript(`(()=>{window.__originalDTF=Intl.DateTimeFormat;Intl.DateTimeFormat=function(){throw new Error('CLOCK_PRIVATE_TIMEZONE')};return true})()`)
+          if(injected!==true)throw new Error('Timezone fault injection not acknowledged')
+        }
         await win.webContents.executeJavaScript(`document.querySelector('#first [data-sync-help-shortcut]').click();document.querySelector('#first [data-sync-help-return]').click();window.__help=document.querySelector('#first [data-sync-help]');window.__topic=window.__help.querySelector('[data-sync-help-topic][open]');window.__localButton=document.querySelectorAll('#first .sync-clock-button')[1];window.__localButton.focus({preventScroll:true});window.__localButton.click();document.querySelector('#first [data-sync-guidance]').scrollIntoView({block:'start',behavior:'instant'})`)
         const local=await capture('local')
         await win.webContents.executeJavaScript('window.__changeSnapshot()')
