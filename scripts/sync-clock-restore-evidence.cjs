@@ -1,4 +1,5 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{createHash}=require('node:crypto')
+const {verifyRasterWitness}=require('./sync-clock-raster-evidence.cjs')
 const names=['restore-light','restore-dark','restore-narrow']
 const phases=['temporary','restored','external','empty','invalid','unavailable','recovered']
 function verifyRestoreScene(scene){
@@ -6,6 +7,7 @@ function verifyRestoreScene(scene){
   const expected=[['local','utc',''],['utc','utc',''],['local','local',''],['local',null,''],['local','invalid','invalid'],['local','invalid','read'],['utc','utc','']]
   for(const [i,f] of scene.frames.entries()){
     assert.equal(f.mode,expected[i][0]);assert.equal(f.stored,expected[i][1]);assert.equal(f.error,expected[i][2])
+    assert.equal(f.rasterCode,1+names.indexOf(scene.name)*7+i);assert.ok(f.rasterSamples>=2)
     assert.equal(f.open,true);assert.equal(f.restoreVisible,true);assert.equal(f.actionsVisible,true)
     assert.deepEqual(f.mutations,[]);assert.equal(f.requests,0);assert.equal(f.navigationCalls,0)
     assert.equal(f.otherKeyPreserved,true);assert.equal(f.otherUTC,true);assert.equal(f.privateText,false)
@@ -30,6 +32,7 @@ function verifyRestoreReport(dir,commit){
   assert.deepEqual(r.scenes.map(s=>s.name),names)
   for(const s of r.scenes){verifyRestoreScene(s);for(const f of s.frames){
     assert.equal(f.png,s.name+'-'+f.phase+'.png');const b=fs.readFileSync(path.join(dir,f.png))
+    verifyRasterWitness(b,f.rasterCode)
     assert.equal(b.length,f.bytes);assert.equal(createHash('sha256').update(b).digest('hex'),f.sha256)
     assert.equal(b.subarray(0,8).toString('hex'),'89504e470d0a1a0a')
     assert.equal(b.readUInt32BE(16),f.viewport.width);assert.equal(b.readUInt32BE(20),f.viewport.height)

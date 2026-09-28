@@ -3,6 +3,7 @@
 const fs = require('node:fs'), path = require('node:path'), os = require('node:os')
 const { createHash } = require('node:crypto')
 const { verifyRestoreScene, verifyRestoreReport } = require('./sync-clock-restore-evidence.cjs')
+const { verifyRasterWitness } = require('./sync-clock-raster-evidence.cjs')
 const root = path.resolve(__dirname, '..'), out = path.join(root, 'test-results', 'sync-clock-restore')
 if (!process.versions.electron) {
   fs.rmSync(out, { recursive: true, force: true })
@@ -93,9 +94,33 @@ if (!process.versions.electron) {
           const valid = f && f.restoreVisible && f.actionsVisible && f.colors.length >= 5 && f.colors.every(c => c.final && c.ratio >= 4.5) && f.overflow <= 1 && f.controlsVisible && f.summaryVisible
           const sig = JSON.stringify(f); stable = valid ? (sig === last ? stable + 1 : 1) : 0; last = sig; if (stable >= 3) break
         }
-        const b = (await win.capturePage()).toPNG(), png = name + '-' + phase + '.png'; fs.writeFileSync(path.join(out, png), b)
         if (stable < 3) throw Error('Invalid preference frame: ' + name + ' ' + phase + ' ' + JSON.stringify(f))
-        return { ...f, stableSamples: stable, png, bytes: b.length, sha256: createHash('sha256').update(b).digest('hex') }
+        const rasterCode=1+['restore-light','restore-dark','restore-narrow'].indexOf(name)*7+
+          ['temporary','restored','external','empty','invalid','unavailable','recovered'].indexOf(phase)
+        // A hidden window can expose an older compositor surface on capture.
+        // Stamp outside application content only AFTER observed DOM stability.
+        // Do not accept elapsed time or DOM values as proof of fresh PNG pixels.
+        await exec(`(()=>{
+          let strip=document.getElementById('clock-raster-witness');
+          if(!strip){strip=document.createElement('div');strip.id='clock-raster-witness';strip.setAttribute('aria-hidden','true');document.body.append(strip)}
+          strip.style.cssText='position:fixed;left:0;top:0;width:32px;height:4px;display:flex;z-index:2147483647;pointer-events:none;contain:strict';
+          strip.replaceChildren();
+          for(let bit=0;bit<8;bit++){const cell=document.createElement('span');cell.style.cssText='display:block;flex:none;width:4px;height:4px;background:'+((( ${rasterCode} >>>bit)&1)?'rgb(221,238,255)':'rgb(17,34,51)');strip.append(cell)}
+          return true;
+        })()`)
+        await exec('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(true))))')
+        let b, rasterSamples=0, lastHash=''
+        for(let i=0;i<40;i++){
+          const candidate=(await win.capturePage()).toPNG(), sha=createHash('sha256').update(candidate).digest('hex')
+          let matches=false;try{matches=verifyRasterWitness(candidate,rasterCode)}catch{}
+          const now=await exec('('+inspect.toString()+')()')
+          if(JSON.stringify(now)!==JSON.stringify(f))throw Error('DOM changed during raster capture: '+name+' '+phase)
+          rasterSamples=matches?(sha===lastHash?rasterSamples+1:1):0;lastHash=sha
+          if(rasterSamples>=2){b=candidate;break}await delay(100)
+        }
+        if(!b)throw Error('No stable matching raster frame: '+name+' '+phase)
+        const png=name+'-'+phase+'.png';fs.writeFileSync(path.join(out,png),b)
+        return { ...f, stableSamples: stable, rasterCode, rasterSamples, png, bytes: b.length, sha256: createHash('sha256').update(b).digest('hex') }
       }
       try {
         await load();await exec(`(()=>{window.__seed('utc');localStorage.setItem('clock-pref-fixture-sentinel','keep');return true})()`)
