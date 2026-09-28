@@ -46,7 +46,7 @@ if (!process.versions.electron) {
       const a=lum(fg),b=lum(bg)
       return { ratio:(Math.max(a,b)+.05)/(Math.min(a,b)+.05), final:fg.every((v,i)=>v===expected[i]) }
     })
-    return { colors, overflow: document.documentElement.scrollWidth-innerWidth,
+    return { colors, viewport: { width: innerWidth, height: innerHeight }, overflow: document.documentElement.scrollWidth-innerWidth,
       requests: window.__requests, navigationCalls: window.__navigationCalls, otherOverviewOpen: other.open,
       activeMarkup: panel.querySelectorAll('img,script,iframe,a').length, helpOpen: help.open,
       openTopics: [...help.querySelectorAll('[data-sync-help-topic][open]')].map(n=>n.dataset.syncHelpTopic),

@@ -10,12 +10,15 @@ function verifyHelpNavigationScene(scene) {
     assert.equal(sample.otherOverviewOpen, false); assert.equal(sample.activeMarkup, 0)
     assert.ok(sample.stableSamples >= 3); assert.ok(Number.isFinite(sample.overflow) && sample.overflow <= 1)
     assert.ok(sample.colors.length >= 10 && sample.colors.every(c => c.final === true && Number.isFinite(c.ratio) && c.ratio >= 4.5))
+    assert.equal(sample.viewport?.width, scene.name === 'recovery-narrow' ? 560 : 1000)
+    assert.ok(Number.isSafeInteger(sample.viewport?.height) && sample.viewport.height >= 600 && sample.viewport.height <= 900)
     assert.equal(sample.helpOpen, phase === 'after')
     assert.deepEqual(sample.openTopics, phase === 'after' ? [scenes[scene.name]] : [])
     if (phase === 'after') assert.equal(sample.focusedTopic, scenes[scene.name])
     assert.equal(sample.readOnlyHelp, true)
     assert.doesNotMatch(JSON.stringify(sample), /NAV_PRIVATE/)
   }
+  assert.deepEqual(scene.before.viewport, scene.after.viewport)
 }
 function verifyHelpNavigationReport(directory, commit) {
   assert.match(commit, /^[a-f0-9]{40}$/)
@@ -31,8 +34,8 @@ function verifyHelpNavigationReport(directory, commit) {
       const b = fs.readFileSync(path.join(directory, sample.png))
       assert.equal(b.length, sample.bytes); assert.equal(createHash('sha256').update(b).digest('hex'), sample.sha256)
       assert.equal(b.subarray(0, 8).toString('hex'), '89504e470d0a1a0a')
-      assert.equal(b.readUInt32BE(16), scene.name === 'recovery-narrow' ? 560 : 1000)
-      assert.equal(b.readUInt32BE(20), 900)
+      assert.equal(b.readUInt32BE(16), sample.viewport.width)
+      assert.equal(b.readUInt32BE(20), sample.viewport.height)
     }
   }
   return report
