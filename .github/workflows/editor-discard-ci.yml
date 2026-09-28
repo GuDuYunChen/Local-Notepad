@@ -20,7 +20,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          fetch-depth: 4
+          fetch-depth: 8
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
@@ -31,3 +31,18 @@ jobs:
         run: node --test scripts/editor-discard.node.mjs scripts/editor-quit.node.mjs scripts/editor-cache-regression.node.mjs
       - name: Verify real App discard dialogs, editor cache, saves and quit bridge
         run: npx vitest run --root=. src/AppExitDiscard.test.jsx src/components/EditorQuit.test.jsx src/components/EditorQuitSource.test.jsx src/components/TextEditor.test.jsx src/components/TextEditorLoad.test.jsx
+      - name: Record full UI regression results
+        run: npx vitest run --root=. --reporter=json --outputFile=test-results/editor-discard/full-ui.json
+      - name: Retain exact tracked test sources for failure review
+        if: always()
+        run: |
+          node -e "require('node:fs').mkdirSync('test-results/editor-discard',{recursive:true})"
+          git archive --format=zip --output=test-results/editor-discard/tracked-source.zip HEAD src scripts package.json vitest.config.js vitest.setup.js
+      - name: Upload regression evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: editor-discard-evidence-${{ runner.os }}-${{ github.sha }}
+          path: test-results/editor-discard/*
+          retention-days: 3
+          if-no-files-found: error
