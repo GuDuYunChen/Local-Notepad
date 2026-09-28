@@ -1,10 +1,15 @@
-import React, { useId, useState } from 'react'
+import React, { useId, useRef, useState } from 'react'
 import { buildSyncOverview } from '~/services/syncOverview.mjs'
 import './SyncOverviewPanel.css'
 import SyncHelpPanel from './SyncHelpPanel'
+import { syncHelpRecommendation, focusSyncHelpTopic } from '~/services/syncHelpNavigation.mjs'
+import './SyncHelpNavigation.css'
 
 export default function SyncOverviewPanel({ onNavigate, ...input }) {
+  const root = useRef(null)
   const view = buildSyncOverview(input)
+  const help = syncHelpRecommendation(view.state)
+  const [helpFailed, setHelpFailed] = useState(false)
   const [failed, setFailed] = useState(false)
   const titleID = useId()
   const recommended = view.destinations.find(item => item.key === view.target)
@@ -13,7 +18,7 @@ export default function SyncOverviewPanel({ onNavigate, ...input }) {
     if (!destination?.available || typeof onNavigate !== 'function') return
     setFailed(onNavigate(key) !== true)
   }
-  return <section className="sync-overview" data-sync-section="overview" tabIndex={-1} aria-labelledby={titleID}>
+  return <section ref={root} className="sync-overview" data-sync-section="overview" tabIndex={-1} aria-labelledby={titleID}>
     <div className="sync-overview-heading">
       <div><p className="sync-overview-eyebrow">先看状态，再找操作</p><h4 id={titleID}>同步总览</h4></div>
       <span className="sync-overview-provider">{view.provider} · {view.automation}</span>
@@ -23,6 +28,9 @@ export default function SyncOverviewPanel({ onNavigate, ...input }) {
       {view.recoveryNotice && <p className="sync-overview-warning">{view.recoveryNotice}</p>}
       <button type="button" className="btn small" disabled={!recommended?.available || typeof onNavigate !== 'function'}
         onClick={() => navigate(view.target)}>定位建议区域：{recommended?.label}</button>
+      <button type="button" className="btn small sync-help-shortcut" data-sync-help-shortcut
+        onClick={() => setHelpFailed(!focusSyncHelpTopic(root.current, help.key))}>查看相关帮助：{help.label}</button>
+      {helpFailed && <p role="status">暂时无法定位帮助，请手动展开下方“操作帮助”；没有执行同步操作。</p>}
     </div>
     <dl className="sync-overview-metrics">
       <div><dt>状态报告待处理</dt><dd>{view.reportedConflicts}</dd></div>
