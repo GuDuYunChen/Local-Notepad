@@ -54,3 +54,23 @@ test('rejects earlier-phase pixels even when byte counts and image hashes are re
  const f=r.scenes[0].frames[1],b=png(1);f.bytes=b.length;f.sha256=createHash('sha256').update(b).digest('hex')
  fs.writeFileSync(path.join(d,f.png),b);save();assert.throws(()=>verifyKeyboardReport(d,c),/raster phase marker/)
 }))
+
+const { clockKeyboardEvents } = require('./sync-clock-keyboard-input.cjs')
+test('Enter sends a carriage-return char between keyDown and keyUp',()=>{
+ assert.deepEqual(clockKeyboardEvents('Return'),[
+  {type:'keyDown',keyCode:'Return',modifiers:[]},
+  {type:'char',keyCode:'\r',modifiers:[]},
+  {type:'keyUp',keyCode:'Return',modifiers:[]},
+ ])
+})
+test('Space completes its char sequence while Tab and Shift-Tab remain navigation-only',()=>{
+ assert.deepEqual(clockKeyboardEvents('Space').map(e=>[e.type,e.keyCode]),[['keyDown','Space'],['char',' '],['keyUp','Space']])
+ assert.deepEqual(clockKeyboardEvents('Tab',true),[{type:'keyDown',keyCode:'Tab',modifiers:['shift']},{type:'keyUp',keyCode:'Tab',modifiers:['shift']}])
+ assert.deepEqual(clockKeyboardEvents('Tab').map(e=>e.type),['keyDown','keyUp'])
+})
+test('input helper rejects unsupported keys and cannot navigate or mutate the DOM',()=>{
+ for(const key of ['Enter','A','',null,{},'constructor'])assert.throws(()=>clockKeyboardEvents(key))
+ assert.throws(()=>clockKeyboardEvents('Tab','shift'))
+ const source=fs.readFileSync(require.resolve('./sync-clock-keyboard-input.cjs'),'utf8')
+ assert.doesNotMatch(source,/\.click\(|document\.|window\.|fetch\(|setTimeout/)
+})

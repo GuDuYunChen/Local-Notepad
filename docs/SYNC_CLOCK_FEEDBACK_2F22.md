@@ -28,3 +28,7 @@
 ## 验收边界
 
 容器GitHub克隆仍因DNS失败，本地只有经核对的源码子集；本地Node及JSX/CSS/脚本语法不能代替真实React、Electron或Windows。新HEAD的专项CI、原生21图、旧57图回归和完整Linux/Windows打包须完成后才验收；不能沿用基线成功。原生注入键盘不是物理设备或屏幕阅读器实测；合成数据、隔离profile不是用户WebDAV往返验证。本阶段验收前不推进2F.23，不合入master。
+
+## 首轮原生输入修正
+
+`28c977f` 的Clock CI `36401594653`在Linux/Windows均通过84项Node和48项React；Windows原时间/偏好/恢复专项也通过，但新键盘专项在Enter展开原生summary时失败，未生成任何验收PNG。初版只注入keyDown/keyUp，缺少Enter激活需要的char阶段。改为明确的keyDown→char（回车字符）→keyUp序列；Space同样发送空格char，Tab仍只导航。不使用DOM点击替代，不改生产组件或降低原21帧、精确trusted按键序列、写入轨迹和完整性断言。增加三项事件序列/能力边界用例；本地总140项Node通过。最终接受仍须新HEAD实际原生和完整流水线通过。

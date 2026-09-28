@@ -4,6 +4,7 @@ const fs = require('node:fs'), path = require('node:path'), os = require('node:o
 const { createHash } = require('node:crypto')
 const { verifyKeyboardScene, verifyKeyboardReport } = require('./sync-clock-keyboard-evidence.cjs')
 const { verifyRasterWitness } = require('./sync-clock-raster-evidence.cjs')
+const { clockKeyboardEvents } = require('./sync-clock-keyboard-input.cjs')
 const root = path.resolve(__dirname, '..'), out = path.join(root, 'test-results', 'sync-clock-keyboard')
 if (!process.versions.electron) {
   fs.rmSync(out, { recursive: true, force: true })
@@ -94,7 +95,7 @@ if (!process.versions.electron) {
     for (const name of ['keyboard-light', 'keyboard-dark', 'keyboard-narrow']) {
       const win = new BrowserWindow({ show: true, width: name === 'keyboard-narrow' ? 560 : 1000, height: 900, useContentSize: true, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } })
       const exec = code => win.webContents.executeJavaScript(code)
-      const wait = async code => { for (let i = 0; i < 60; i++) { if (await exec(code)) return true; await delay(100) } throw Error('Missing observed state: ' + name) }
+      const wait = async code => { for (let i = 0; i < 60; i++) { if (await exec(code)) return true; await delay(100) } throw Error('Missing observed state: ' + name + ': ' + code + ': ' + JSON.stringify(await exec(`({keys:window.__keys,active:document.activeElement?.outerHTML,open:document.querySelector('#first [data-sync-clock-preference]')?.open})`))) }
       const load = async () => { await win.loadFile(file, { query: { scene: name } }); await wait('!!document.querySelector("#first [data-sync-clock-save]")'); await exec('document.fonts.ready.then(()=>true)') }
       const capture = async phase => {
         await exec(`document.querySelector('#first .sync-clock-controls').scrollIntoView({block:'start',behavior:'instant'})`)
@@ -140,9 +141,7 @@ if (!process.versions.electron) {
         await load();win.focus();win.webContents.focus()
         await exec(`(()=>{window.__liveRegion=document.querySelector('#first [data-sync-clock-feedback]');document.querySelector('#first .sync-clock-button').focus();return true})()`)
         const press=async(key,shift=false)=>{
-          const modifiers=shift?['shift']:[]
-          win.webContents.sendInputEvent({type:'keyDown',keyCode:key,modifiers})
-          win.webContents.sendInputEvent({type:'keyUp',keyCode:key,modifiers})
+          for (const event of clockKeyboardEvents(key, shift)) win.webContents.sendInputEvent(event)
           await delay(80)
         }
         const expectFocus=selector=>wait(`document.activeElement===document.querySelector(${JSON.stringify('#first '+selector)})`)
