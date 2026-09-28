@@ -23,15 +23,28 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
       - name: Verify fixed recommendations, scoped navigation and evidence
-        run: node --test scripts/sync-help-navigation.node.mjs scripts/sync-help-navigation-evidence.node.cjs
+        run: node --test scripts/sync-help-navigation.node.mjs scripts/sync-help-navigation-evidence.node.cjs scripts/sync-help-return.node.mjs scripts/sync-help-return-evidence.node.cjs
       - name: Verify real overview and center interaction isolation
-        run: npx vitest run --root=. src/components/SyncHelpNavigation.test.jsx
+        run: npx vitest run --root=. src/components/SyncHelpNavigation.test.jsx src/components/SyncHelpReturn.test.jsx
       - name: Build production renderer
         if: runner.os == 'Windows'
         run: npm run build:renderer
       - name: Verify native help navigation and complete evidence
         if: runner.os == 'Windows'
         run: node scripts/check-sync-help-navigation.cjs
+      - name: Verify native help return and complete evidence
+        if: runner.os == 'Windows'
+        run: node scripts/check-sync-help-return.cjs
+      - name: Upload native help return evidence
+        if: always() && runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-notepad-sync-help-return-${{ github.sha }}
+          path: |
+            test-results/sync-help-return/*.png
+            test-results/sync-help-return/checks.json
+          if-no-files-found: error
+          retention-days: 7
       - name: Upload native help navigation evidence
         if: always() && runner.os == 'Windows'
         uses: actions/upload-artifact@v4
