@@ -7,3 +7,12 @@
 .sync-clock-fallback{color:var(--ink);font-size:13px;line-height:1.7;overflow-wrap:anywhere}
 .sync-overview-time time{overflow-wrap:anywhere}
 @media(forced-colors:active){.sync-clock-controls .sync-clock-button[aria-pressed="true"]{outline:2px solid Highlight;outline-offset:2px}}
+
+.sync-clock-preference{margin:0 0 12px;min-width:0;color:var(--ink);font-size:12px;line-height:1.7}
+.sync-clock-preference>summary{padding:8px 0;cursor:pointer;min-height:36px;box-sizing:border-box;overflow-wrap:anywhere}
+.sync-clock-preference>summary>span{margin-left:10px;color:var(--ink-soft)}
+.sync-clock-preference>summary:focus-visible{outline:2px solid var(--clay);outline-offset:2px}
+.sync-clock-preference-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:4px 0}
+.sync-overview .sync-clock-preference .btn.sync-clock-preference-button:not(.primary):not(.danger){color:var(--ink);min-height:44px;white-space:normal}
+.sync-clock-preference-summary{flex-basis:100%;color:var(--ink-soft);overflow-wrap:anywhere}
+.sync-clock-preference-error{margin:0 0 12px;color:var(--ink);font-size:13px;line-height:1.7;overflow-wrap:anywhere}
