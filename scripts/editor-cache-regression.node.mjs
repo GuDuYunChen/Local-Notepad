@@ -7,7 +7,9 @@ import { createEditorQuitRegistry } from '../src/services/editorQuit.mjs'
 
 // Run the real callbacks, not a second implementation of the cache/save policy.
 // React mounting and Lexical loading remain covered by the existing Vitest gates.
-const source = fs.readFileSync(process.env.TEXT_EDITOR_SOURCE || new URL('../src/components/TextEditor.jsx', import.meta.url), 'utf8')
+// Git's Windows checkout may use CRLF. Normalize separators only before slicing
+// callbacks; retain every source anchor, assertion and actual callback body.
+const source = fs.readFileSync(process.env.TEXT_EDITOR_SOURCE || new URL('../src/components/TextEditor.jsx', import.meta.url), 'utf8').replace(/\r\n/g, '\n')
 function between(start, end, from = 0) {
   const a = source.indexOf(start, from)
   assert.notEqual(a, -1, `Missing source anchor: ${start}`)
