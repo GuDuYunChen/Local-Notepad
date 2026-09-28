@@ -11,6 +11,7 @@ import {
 } from '~/services/editorDraftCache'
 
 import { editorQuit, createEditorQuitParticipant } from '~/services/editorQuit.mjs'
+import { discardEditorDraft, observeEditorDraft } from '~/services/editorDraftDiscard.mjs'
 
 const Editor = React.lazy(() => import('./Editor/Editor'))
 
@@ -209,9 +210,26 @@ function TextEditorInternal({
 
   useImperativeHandle(ref, () => ({
     save: () => saveNow('external'),
-    clearCache: () => {
-      if (currentIdRef.current) removeEditorDraft(currentIdRef.current)
-    },
+    // Called only by the explicit "不保存" action. Refuse outstanding writes;
+    // clearing a cache is not confirmation that an in-flight save was cancelled.
+    clearCache: () => discardEditorDraft({
+      id: currentIdRef.current,
+      ready: loadedDocumentRef.current === currentIdRef.current,
+      content: contentRef.current,
+      saved: lastSavedContentRef.current,
+      pending: [...inFlightSavesRef.current.values()],
+    }, editorQuit, text => {
+      window.clearTimeout(saveTimerRef.current)
+      saveTimerRef.current = null
+      contentRef.current = text
+      pendingStructureMappingsRef.current = []
+      removeEditorDraft(currentIdRef.current)
+      setEditorContent(text)
+      setWordCount(countLexicalCharacters(text))
+      setStructureDirty(false)
+      setSaveError(false)
+      onChangeRef.current?.(text)
+    }),
     getReferenceRefactorState: () => ({
       currentContent: contentRef.current,
       savedContent: lastSavedContentRef.current,
@@ -441,10 +459,17 @@ function TextEditorInternal({
   }
 
   const handleEditorChange = React.useCallback((newContent) => {
+    const id = currentIdRef.current
+    if (!id || loadedDocumentRef.current !== id) return
     contentRef.current = newContent
-    editorQuit.remember(currentIdRef.current, newContent)
+    const pending = inFlightSavesRef.current.has(id)
+    observeEditorDraft(editorQuit, id, newContent, lastSavedContentRef.current, pending)
     setSaveError(false)
-    scheduleCache()
+    if (!pending && newContent === lastSavedContentRef.current) {
+      window.clearTimeout(saveTimerRef.current)
+      saveTimerRef.current = null
+      removeEditorDraft(id)
+    } else scheduleCache()
     onChangeRef.current?.(newContent)
 
     setWordCount(countLexicalCharacters(newContent))

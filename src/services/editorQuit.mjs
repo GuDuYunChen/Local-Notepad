@@ -17,6 +17,13 @@ export function createEditorQuitRegistry() {
     remember(id, content) { if (id) drafts.set(id, content) },
     saved(id, content) { if (drafts.get(id) === content) drafts.delete(id) },
     forget(id) { drafts.delete(id) }, // Only for an explicitly deleted document.
+    // Explicit discard is not a save receipt. It may release only the exact
+    // draft approved by the user, never another document or a newer edit.
+    discard(id, content) {
+      if (!id || (drafts.has(id) && drafts.get(id) !== content)) return false
+      drafts.delete(id)
+      return true
+    },
     pending() { return drafts.size },
     register(flush) { participants.add(flush); return () => participants.delete(flush) },
     async flush(signal) {

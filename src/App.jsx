@@ -1243,7 +1243,9 @@ export default function App() {
                       onChange={setContent}
                       onLoaded={(text) => {
                         if (current) {
-                          setCurrent(prev => ({ ...prev, content: text }))
+                          // A restored cache is a draft, not a database save receipt.
+                          const savedText = editorRef.current?.getReferenceRefactorState?.().savedContent
+                          setCurrent(prev => ({ ...prev, content: typeof savedText === 'string' ? savedText : text }))
                           setContent(text)
 
                           const pendingFocus = pendingFocusSessionRef.current
@@ -1441,10 +1443,15 @@ export default function App() {
                   toast.warning('目标或来源已变化，已取消跳转，当前草稿保留')
                   return
                 }
-                editorRef.current?.clearCache()
+                if (editorRef.current?.clearCache() !== true) {
+                  toast.warning('正文仍在保存或已变化，尚未放弃草稿。请等待保存结束后重试。')
+                  return
+                }
                 // Discard the in-memory dirty flag as well as the draft cache.
                 // Otherwise returning via Projects asks about the discarded draft again.
-                setContent(current?.content || '')
+                const savedText = editorRef.current.getReferenceRefactorState().savedContent
+                setContent(savedText)
+                setCurrent(previous => previous ? { ...previous, content: savedText } : previous)
                 setEditorStatus(previous => ({ ...previous, dirty: false, structureDirty: false, saveError: false }))
                 setDialog(null)
                 dialog.next()

@@ -1,0 +1,33 @@
+name: Editor Discard Regression CI
+on:
+  push:
+    branches: [feature/knowledge-os-phase2]
+  pull_request:
+    branches: [master]
+permissions:
+  contents: read
+concurrency:
+  group: editor-discard-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  discard:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 4
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - run: npm install --no-audit --no-fund
+      - name: Reproduce the reported exit block on the exact old code
+        run: node scripts/check-editor-discard-baseline.mjs
+      - name: Verify exact discard and unchanged quit protocol
+        run: node --test scripts/editor-discard.node.mjs scripts/editor-quit.node.mjs scripts/editor-cache-regression.node.mjs
+      - name: Verify real App discard dialogs, editor cache, saves and quit bridge
+        run: npx vitest run --root=. src/AppExitDiscard.test.jsx src/components/EditorQuit.test.jsx src/components/EditorQuitSource.test.jsx src/components/TextEditor.test.jsx src/components/TextEditorLoad.test.jsx
