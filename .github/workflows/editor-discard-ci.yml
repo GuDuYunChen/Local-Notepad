@@ -19,8 +19,8 @@ jobs:
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v7
-        with:
-          fetch-depth: 8
+      - name: Fetch the exact regression baseline independent of branch depth
+        run: git fetch --no-tags --depth=1 origin 40c1d2f0620f7424670532975fb10e76746940d9
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
