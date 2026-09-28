@@ -221,13 +221,22 @@ it('only explicit discard opens the created note and clears the old navigation c
  expect(mocks.clear).toHaveBeenCalledOnce(); expect(container.querySelector('[aria-label="检索返回导航"]')).toBeNull()
 })
 
-it('a refused editor discard keeps both search and the unsaved source open', async () => {
+it('a refused editor discard keeps the save decision pending and cancel restores search', async () => {
  mocks.clear.mockReturnValue(false)
  await click('编辑测试正文'); await click('打开全局检索入口'); await settle()
  await click('打开笔记'); await click('不保存'); await settle()
- expect(container.querySelector('[role="dialog"]')).not.toBeNull()
- expect(container.querySelector('[aria-label="全局检索结果"]')).toBeTruthy()
+ expect(container.querySelector('[role="dialog"]')?.textContent).toContain('当前笔记未保存')
+ // Search intentionally suspends its own focus trap while App's decision is pending.
+ // Refusing discard must not finish that decision or activate the target note.
+ expect(container.querySelector('.global-search-opening')?.textContent).toContain('请先处理保存确认')
+ expect(mocks.clear).toHaveBeenCalledOnce()
  expect(container.querySelector('.workspace-save-chip').textContent).toBe('未保存')
  expect(container.querySelector('.workspace-title-button').textContent).toBe('第一章.md')
  expect(evidenceNavigation.peek()).toBeNull()
+ await click('取消'); await settle()
+ expect(container.querySelector('.consumer-confirm-modal')).toBeNull()
+ expect(container.querySelector('[aria-label="全局检索结果"]')).toBeTruthy()
+ expect(container.querySelector('.workspace-save-chip').textContent).toBe('未保存')
+ expect(container.querySelector('.workspace-title-button').textContent).toBe('第一章.md')
+ expect(mocks.clear).toHaveBeenCalledOnce()
 })
