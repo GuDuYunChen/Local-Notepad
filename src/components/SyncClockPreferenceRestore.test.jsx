@@ -105,7 +105,13 @@ it('failed readonly restore preserves selection and retries only after another e
 it('restoring local resolves the device timezone again but does not rewrite the mode',async()=>{
   localStorage.setItem(KEY,'local');await render();await click(utcButton());clock.deviceSyncTimeZone.mockReturnValue('Asia/Kathmandu')
   const write=vi.spyOn(localStorage,'setItem');await click(restoreButton())
-  expect(container.querySelector('.sync-clock-zone').textContent).toBe('Asia/Kathmandu');expect(write).not.toHaveBeenCalled()
+  // Intl may expose an alias or its canonical identifier. Verify its resolved
+  // zone contract AND independent numeric output, not one ICU spelling.
+  const resolved=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Kathmandu'}).resolvedOptions().timeZone
+  expect(container.querySelector('.sync-clock-zone').textContent).toBe(resolved)
+  expect(times().map(t=>t.textContent)).toEqual(['2026-09-27 14:50:00.000 GMT+05:45','2026-09-27 14:51:40.000 GMT+05:45'])
+  expect(times().map(t=>t.dateTime)).toEqual(['2026-09-27T09:05:00.000Z','2026-09-27T09:06:40.000Z'])
+  expect(write).not.toHaveBeenCalled()
 })
 it('restored local with unavailable timezone explicitly falls back instead of claiming local success',async()=>{
   await render();localStorage.setItem(KEY,'local');clock.deviceSyncTimeZone.mockReturnValue('');await click(restoreButton())
