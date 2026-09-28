@@ -1,0 +1,32 @@
+name: Save Recovery CI
+on:
+  push:
+    branches: [feature/knowledge-os-phase2]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: save-recovery-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  validation-inputs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - run: npm install --no-audit --no-fund
+      - name: Archive exact tracked source and test dependencies only
+        run: |
+          mkdir -p test-results/save-recovery
+          git archive --format=zip HEAD > test-results/save-recovery/source.zip
+          git rev-parse HEAD > test-results/save-recovery/commit.txt
+          tar --exclude=node_modules/electron/dist --exclude=node_modules/electron-builder --exclude=node_modules/app-builder-bin -czf test-results/save-recovery/linux-test-runtime.tgz node_modules
+      - uses: actions/upload-artifact@v4
+        with:
+          name: save-recovery-inputs-${{ github.sha }}
+          path: test-results/save-recovery/*
+          retention-days: 1
+          if-no-files-found: error
