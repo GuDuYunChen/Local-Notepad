@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createEditorSaveAttempt, commitEditorSave } from '../src/services/editorSaveTransaction.mjs'
-const ack = a => ({ id: a.id, content: a.content, save_receipt: { request_id: a.requestID, reference_pending: false } })
+const ack = a => ({ id: a.id, content: a.content, save_receipt: { outcome: 'applied', request_id: a.requestID, reference_pending: false } })
 test('each deliberate body write owns an immutable random identity', () => {
  const a=createEditorSaveAttempt('a','old','new',[{from:['一'],to:['二']}]); const b=createEditorSaveAttempt('a','old','new')
  assert.ok(Object.isFrozen(a)); assert.match(a.requestID,/^[a-f0-9]{32}$/);assert.notEqual(a.requestID,b.requestID)
@@ -32,4 +32,14 @@ test('abort before microtask cannot start an unexpected PUT',async()=>{
 test('later transport completion cannot approve a timed-out call',async()=>{
  const a=createEditorSaveAttempt('a','old','new');let resolve
  await assert.rejects(commitEditorSave(()=>new Promise(r=>resolve=r),a,undefined,5));resolve(ack(a));await Promise.resolve()
+})
+
+for (const outcome of ['conflict','superseded']) test('structured '+outcome+' cannot masquerade as current save success',async()=>{
+ const a=createEditorSaveAttempt('a','before','draft'),r=ack(a)
+ r.content='different database body';r.save_receipt.outcome=outcome
+ await assert.rejects(commitEditorSave(()=>r,a),e=>e.code==='save-conflict'&&e.currentFile.content===r.content)
+})
+test('legacy and unknown receipt outcomes stay unconfirmed',async()=>{
+ const a=createEditorSaveAttempt('a','before','draft')
+ for(const outcome of [undefined,'unknown',null]){const r=ack(a);r.save_receipt.outcome=outcome;await assert.rejects(commitEditorSave(()=>r,a),e=>e.code!=='save-conflict')}
 })

@@ -12,7 +12,9 @@ import {
 
 import { editorQuit, createEditorQuitParticipant } from '~/services/editorQuit.mjs'
 import { discardEditorDraft, observeEditorDraft } from '~/services/editorDraftDiscard.mjs'
-import { createEditorSaveAttempt, commitEditorSave } from '~/services/editorSaveTransaction.mjs'
+import { createEditorSaveAttempt, commitEditorSave, boundedEditorRequest } from '~/services/editorSaveTransaction.mjs'
+
+import EditorSaveConflictDialog from './EditorSaveConflictDialog'
 
 const Editor = React.lazy(() => import('./Editor/Editor'))
 
@@ -33,6 +35,11 @@ function TextEditorInternal({
   const lastSavedContentRef = useRef('')
   const rawSavedBodiesRef = useRef(new Map())
   const saveAttemptsRef = useRef(new Map())
+  const saveConflictsRef = useRef(new Map())
+  const [conflictDialog, setConflictDialog] = useState(null)
+  const [conflictBusy, setConflictBusy] = useState(false)
+  const conflictBusyRef = useRef(false)
+  const loadGenerationRef = useRef(0)
   const [saveProblem, setSaveProblem] = useState('')
   const [editRevision, setEditRevision] = useState(0)
   const saveTimerRef = useRef(null)
@@ -71,7 +78,11 @@ function TextEditorInternal({
   useEffect(() => { onStatusChangeRef.current = onStatusChange }, [onStatusChange])
   useEffect(() => {
     deletedIdsRef.current = deletedIds
-    for (const id of deletedIds || []) editorQuit.forget(id)
+    for (const id of deletedIds || []) {
+      editorQuit.forget(id)
+      saveConflictsRef.current.delete(id)
+      saveAttemptsRef.current.delete(id)
+    }
   }, [deletedIds])
 
   const syncCurrentSavingState = React.useCallback((id = currentIdRef.current) => {
@@ -106,6 +117,7 @@ function TextEditorInternal({
 
     if (deletedIdsRef.current?.has(id)) return
 
+    if (saveConflictsRef.current.has(id)) throw new Error('数据库正文已变化，请先处理保存冲突；当前草稿保留。')
     const text = contentOverride ?? contentRef.current
     const inFlight = inFlightSavesRef.current.get(id)
     if (inFlight) {
@@ -152,8 +164,12 @@ function TextEditorInternal({
             setStructureDirty(hasHeadingStructureChanged(updated.content, contentRef.current))
             if (contentRef.current === updated.content) pendingStructureMappingsRef.current = []
             setLastSavedAt(now); setSaveProblem('')
-            writeEditorDraft(id, contentRef.current, now)
+            window.clearTimeout(saveTimerRef.current); saveTimerRef.current = null
+            if (contentRef.current === updated.content) removeEditorDraft(id)
+            else writeEditorDraft(id, contentRef.current)
             onSavedRef.current?.(updated)
+          } else if (readEditorDraft(id)?.content === updated.content) {
+            removeEditorDraft(id)
           }
           // Maintenance has already been journalled atomically with the body.
           // Its worker and any network failure are not awaited by this save.
@@ -164,6 +180,15 @@ function TextEditorInternal({
         return updated
       } catch (e) {
         if (e.name === 'AbortError') return
+        if (e.code === 'save-conflict' && e.currentFile?.id === id) {
+          saveAttemptsRef.current.delete(id) // terminal database receipt, NOT a timeout
+          saveConflictsRef.current.set(id, e.currentFile)
+          if (id === currentIdRef.current) {
+            rawSavedBodiesRef.current.set(id, e.currentFile.content)
+            lastSavedContentRef.current = normalizeLegacyTableBreakMarkup(e.currentFile.content)
+            editorQuit.remember(id, contentRef.current)
+          }
+        }
         if (e.message?.includes('更新失败') && deletedIdsRef.current?.has(id)) return
         if (id === currentIdRef.current) { setSaveError(true); setSaveProblem(e.message || '正文保存失败，草稿保留') }
         if (id === currentIdRef.current) cachePendingBodyForRetry(id, contentRef.current)
@@ -201,7 +226,7 @@ function TextEditorInternal({
       content: contentRef.current,
       saved: lastSavedContentRef.current,
       structural: false, // structure maintenance is now durably captured by SaveEditor
-      uncertain: saveAttemptsRef.current.size > 0,
+      uncertain: saveAttemptsRef.current.size > 0 || saveConflictsRef.current.size > 0,
       pending: [...inFlightSavesRef.current.values()].map(item => item.promise),
     }),
     cache: () => {
@@ -229,6 +254,7 @@ function TextEditorInternal({
       contentRef.current = text
       pendingStructureMappingsRef.current = []
       removeEditorDraft(currentIdRef.current)
+      saveConflictsRef.current.delete(currentIdRef.current)
       setEditorContent(text)
       setWordCount(countLexicalCharacters(text))
       setStructureDirty(false)
@@ -293,7 +319,8 @@ function TextEditorInternal({
       pendingStructureMappingsRef.current = []
 
       if (currentIdRef.current) {
-        writeEditorDraft(currentIdRef.current, text, savedAt)
+        window.clearTimeout(saveTimerRef.current); saveTimerRef.current = null
+        removeEditorDraft(currentIdRef.current)
       }
 
       onChangeRef.current?.(text)
@@ -303,6 +330,8 @@ function TextEditorInternal({
   useEffect(() => {
     // Mount the editor only after this exact load has produced its content.
     // A matching ID alone is not enough during A → B → A or StrictMode replay.
+    loadGenerationRef.current += 1
+    setConflictDialog(null)
     setSwitching(true)
     setLoadError(false)
     setLoadedDocumentId(null)
@@ -312,8 +341,10 @@ function TextEditorInternal({
     if (prevId && prevId !== activeId && loadedDocumentRef.current === prevId) {
       const isDeleted = deletedIds?.has(prevId)
       if (!isDeleted && autoSaveOnSwitch) {
-        writeEditorDraft(prevId, contentRef.current)
-        void saveNow('manual', prevId).catch(() => {})
+        cachePendingDraft()
+        if (contentRef.current !== lastSavedContentRef.current || saveAttemptsRef.current.has(prevId)) {
+          void saveNow('manual', prevId).catch(() => {})
+        }
       }
     }
 
@@ -356,6 +387,10 @@ function TextEditorInternal({
           ? normalizeLegacyTableBreakMarkup(cached.content || '')
           : ''
         const text = useCache ? cachedText : serverText
+        // A reload is a fresh comparison, not permission to clear an unknown
+        // write. A terminal conflict may be dismissed only when no draft remains.
+        if (text === serverText && !saveAttemptsRef.current.has(id)) saveConflictsRef.current.delete(id)
+        if (saveConflictsRef.current.has(id)) setSaveError(true)
 
         editorQuit.saved(id, serverText)
         if (text !== serverText) editorQuit.remember(id, text)
@@ -461,7 +496,7 @@ function TextEditorInternal({
   const scheduleCache = () => {
     if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current)
     saveTimerRef.current = window.setTimeout(() => {
-      if (currentIdRef.current) writeEditorDraft(currentIdRef.current, contentRef.current)
+      cachePendingDraft()
     }, 250)
   }
 
@@ -470,9 +505,9 @@ function TextEditorInternal({
     if (!id || loadedDocumentRef.current !== id) return
     contentRef.current = newContent
     setEditRevision(value => value + 1)
-    const pending = inFlightSavesRef.current.has(id) || saveAttemptsRef.current.has(id)
+    const pending = inFlightSavesRef.current.has(id) || saveAttemptsRef.current.has(id) || saveConflictsRef.current.has(id)
     observeEditorDraft(editorQuit, id, newContent, lastSavedContentRef.current, pending)
-    setSaveError(false)
+    setSaveError(saveConflictsRef.current.has(id))
     if (!pending && newContent === lastSavedContentRef.current) {
       window.clearTimeout(saveTimerRef.current)
       saveTimerRef.current = null
@@ -487,6 +522,54 @@ function TextEditorInternal({
     ))
   }, [])
 
+  const openSaveConflict = () => {
+    const id = currentIdRef.current, file = saveConflictsRef.current.get(id)
+    if (file) setConflictDialog({ id, file, draft: contentRef.current, generation: loadGenerationRef.current })
+  }
+  const resolveSaveConflict = async choice => {
+    const reviewed = conflictDialog
+    if (!reviewed || conflictBusyRef.current) return
+    if (reviewed.id !== currentIdRef.current || reviewed.generation !== loadGenerationRef.current || reviewed.draft !== contentRef.current) {
+      setConflictDialog(null); setSaveProblem('正文已变化，请重新打开冲突处理。'); return
+    }
+    conflictBusyRef.current = true
+    setConflictBusy(true)
+    try {
+      if (choice === 'keep') {
+        // The user reviewed this exact database version. A fresh CAS must still
+        // reject another intervening write; never silently refresh Expected.
+        rawSavedBodiesRef.current.set(reviewed.id, reviewed.file.content)
+        pendingStructureMappingsRef.current = []
+        saveConflictsRef.current.delete(reviewed.id)
+        setConflictDialog(null)
+        await saveNow('confirmed-conflict')
+      } else {
+        const file = await boundedEditorRequest(api, '/api/files/' + encodeURIComponent(reviewed.id))
+        if (file?.id !== reviewed.id || typeof file.content !== 'string') throw new Error('数据库正文未获确认，草稿保留')
+        if (reviewed.id !== currentIdRef.current || reviewed.generation !== loadGenerationRef.current || reviewed.draft !== contentRef.current || inFlightSavesRef.current.has(reviewed.id) || saveAttemptsRef.current.has(reviewed.id)) {
+          throw new Error('核对期间正文或笔记已变化，未替换草稿，请重新处理')
+        }
+        if (deletedIdsRef.current?.has(reviewed.id) || editorQuit.discard(reviewed.id, reviewed.draft) !== true) throw new Error('草稿登记已变化，未替换正文')
+        const text = normalizeLegacyTableBreakMarkup(file.content)
+        rawSavedBodiesRef.current.set(reviewed.id, file.content)
+        contentRef.current = text; lastSavedContentRef.current = text
+        saveConflictsRef.current.delete(reviewed.id)
+        window.clearTimeout(saveTimerRef.current); saveTimerRef.current = null
+        removeEditorDraft(reviewed.id)
+        pendingStructureMappingsRef.current = []
+        setEditorContent(text); setWordCount(countLexicalCharacters(text)); setStructureDirty(false)
+        setSaveError(false); setSaveProblem(''); setConflictDialog(null)
+        setLastSavedAt(file.updated_at ? file.updated_at * 1000 : null)
+        setEditRevision(value => value + 1)
+        onChangeRef.current?.(text); onLoadedRef.current?.(text)
+      }
+    } catch (error) {
+      if (reviewed.id === currentIdRef.current && reviewed.generation === loadGenerationRef.current) {
+        setSaveError(true); setSaveProblem(error.message || '冲突处理未完成，草稿保留')
+      }
+    } finally { conflictBusyRef.current = false; setConflictBusy(false) }
+  }
+
   return (
     <div
       className={switching ? 'content switching' : 'content'}
@@ -495,6 +578,9 @@ function TextEditorInternal({
       onDragLeave={() => setDragOver(false)}
       onDrop={() => setDragOver(false)}
     >
+      {conflictDialog && <EditorSaveConflictDialog
+        draft={conflictDialog.draft} database={conflictDialog.file.content} busy={conflictBusy}
+        onClose={() => { if (!conflictBusy) setConflictDialog(null) }} onResolve={resolveSaveConflict}/> }
       {dragOver && (
         <div className="drag-overlay">
           <div className="drag-overlay-content">
@@ -541,7 +627,9 @@ function TextEditorInternal({
               <span className={`save-state${saveError ? ' error' : ''}`}>
                 {saveError ? '保存未确认' : '保存中…'}
                 {saveError && <span role="status">{saveProblem}</span>}
-                {saveError && (
+                {saveError && saveConflictsRef.current.has(activeId) ? (
+                  <button type="button" className="status-retry-btn" onClick={openSaveConflict} disabled={saving}>处理保存冲突</button>
+                ) : saveError && (
                   <button
                     className="status-retry-btn"
                     onClick={() => { void saveNow('retry').catch(() => {}) }}

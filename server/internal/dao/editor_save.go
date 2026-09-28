@@ -66,15 +66,34 @@ func (d *FileDAO) SaveEditor(ctx context.Context, id string, in model.EditorSave
 		if err = tx.QueryRowContext(ctx, `SELECT file_id,payload_hash,receipt_json,state FROM editor_save_ops WHERE request_id=?`, in.RequestID).Scan(&priorID, &priorHash, &receipt, &state); err != nil {
 			return nil, err
 		}
-		if priorID != id || priorHash != hash || receipt == "" || state == "obsolete" {
+		if priorID != id || priorHash != hash || receipt == "" {
 			return nil, fmt.Errorf("保存请求已对应其他内容或笔记已删除，未重复写入")
 		}
-		var f model.File
-		if err = json.Unmarshal([]byte(receipt), &f); err != nil {
+		// A stored receipt proves an earlier commit, not the CURRENT body.
+		// Read under the same write reservation so the returned outcome and
+		// body describe one database observation. Replays never write files.
+		var recorded struct {
+			Rejected bool `json:"editor_save_rejected"`
+		}
+		if err = json.Unmarshal([]byte(receipt), &recorded); err != nil {
 			return nil, err
 		}
-		f.Content = in.Content
-		return &model.EditorSaveResult{File: &f, SaveReceipt: model.EditorSaveReceipt{RequestID: in.RequestID, ReferencePending: state == "pending" || state == "manual"}}, nil
+		if state == "obsolete" && !recorded.Rejected {
+			return nil, fmt.Errorf("保存请求已失效，未重复写入")
+		}
+		current, err := editorFile(ctx, tx, id)
+		if err != nil {
+			return nil, err
+		}
+		outcome := "applied"
+		if recorded.Rejected {
+			outcome = "conflict"
+		} else if current.Content != in.Content {
+			outcome = "superseded"
+		}
+		return &model.EditorSaveResult{File: current, SaveReceipt: model.EditorSaveReceipt{
+			RequestID: in.RequestID, Outcome: outcome, ReferencePending: state == "pending" || state == "manual",
+		}}, nil
 	}
 	f, err := editorFile(ctx, tx, id)
 	if err != nil {
@@ -84,7 +103,25 @@ func (d *FileDAO) SaveEditor(ctx context.Context, id string, in model.EditorSave
 		return nil, fmt.Errorf("目标不是笔记，未写入")
 	}
 	if f.Content != in.Expected {
-		return nil, fmt.Errorf("数据库正文已变化，未覆盖较新的内容；当前草稿已保留")
+		// Persist a terminal non-writing decision. Dropping the reservation
+		// here would let a delayed duplicate apply if the body later reverted
+		// to Expected, even after the user had resolved the conflict.
+		metadata := *f
+		metadata.Content = ""
+		encoded, e := json.Marshal(struct {
+			*model.File
+			Rejected bool `json:"editor_save_rejected"`
+		}{&metadata, true})
+		if e != nil {
+			return nil, e
+		}
+		if _, err = tx.ExecContext(ctx, `UPDATE editor_save_ops SET receipt_json=?,state='obsolete' WHERE request_id=?`, string(encoded), in.RequestID); err != nil {
+			return nil, err
+		}
+		if err = tx.Commit(); err != nil {
+			return nil, err
+		}
+		return &model.EditorSaveResult{File: f, SaveReceipt: model.EditorSaveReceipt{RequestID: in.RequestID, Outcome: "conflict"}}, nil
 	}
 	changed := structureChanged(f.Content, in.Content)
 	before := f.Content
@@ -124,7 +161,7 @@ func (d *FileDAO) SaveEditor(ctx context.Context, id string, in model.EditorSave
 	if err = tx.Commit(); err != nil {
 		return nil, err
 	}
-	return &model.EditorSaveResult{File: f, SaveReceipt: model.EditorSaveReceipt{RequestID: in.RequestID, ReferencePending: changed}}, nil
+	return &model.EditorSaveResult{File: f, SaveReceipt: model.EditorSaveReceipt{RequestID: in.RequestID, Outcome: "applied", ReferencePending: changed}}, nil
 }
 
 func (d *FileDAO) EditorReferenceJobs(ctx context.Context) ([]model.EditorReferenceJob, error) {

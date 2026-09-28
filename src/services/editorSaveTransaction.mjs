@@ -31,9 +31,17 @@ export async function commitEditorSave(load, attempt, signal, timeoutMs) {
     body: JSON.stringify({ content: attempt.content, expected_content: attempt.expected,
       save_request_id: attempt.requestID, section_mappings: attempt.mappings }),
   }, timeoutMs)
-  if (result?.id !== attempt.id || result.content !== attempt.content ||
-      result.save_receipt?.request_id !== attempt.requestID || typeof result.save_receipt.reference_pending !== 'boolean') {
+  const receipt = result?.save_receipt
+  if (result?.id !== attempt.id || typeof result.content !== 'string' ||
+      receipt?.request_id !== attempt.requestID || typeof receipt.reference_pending !== 'boolean' ||
+      !['applied', 'conflict', 'superseded'].includes(receipt.outcome)) {
     throw new Error('正文保存响应未确认，请检查前后端是否一起更新；当前草稿保留。')
   }
+  if (receipt.outcome !== 'applied') {
+    throw Object.assign(new Error('数据库中已有不同正文，当前草稿未被覆盖。请处理保存冲突后再保存。'), {
+      code: 'save-conflict', currentFile: result,
+    })
+  }
+  if (result.content !== attempt.content) throw new Error('正文保存回执与提交内容不一致，草稿保留。')
   return result
 }

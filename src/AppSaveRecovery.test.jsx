@@ -79,7 +79,7 @@ beforeEach(async () => {
     if (!fixture.notes[id]) throw new Error('Unexpected fixture request ' + url)
     if (init?.method === 'PUT') {
       const next = { ...fixture.notes[id], ...JSON.parse(init.body), updated_at: 101 }
-      fixture.notes[id] = next; return { ...next, save_receipt: { request_id: JSON.parse(init.body).save_request_id, reference_pending: true } }
+      fixture.notes[id] = next; return { ...next, save_receipt: { outcome: 'applied', request_id: JSON.parse(init.body).save_request_id, reference_pending: true } }
     }
     return { ...fixture.notes[id] }
   })
@@ -129,7 +129,7 @@ it('a lost save response can be retried with the same token and then saves the n
     if(init?.method==='PUT'){
       const p=JSON.parse(init.body)
       if(!oldToken){oldToken=p.save_request_id;oldContent=p.content;fixture.notes.a.content=p.content;return new Promise(()=>{})}
-      if(p.save_request_id===oldToken)return {...fixture.notes.a,content:oldContent,save_receipt:{request_id:oldToken,reference_pending:false}}
+      if(p.save_request_id===oldToken)return {...fixture.notes.a,content:oldContent,save_receipt:{outcome:'applied',request_id:oldToken,reference_pending:false}}
     }
     return impl(url,init)
   })
@@ -146,7 +146,7 @@ it('pressing save with a newer edit during the receipt wait never closes that ne
   await openA();await type('submitted');let resolve,request
   api.mockImplementationOnce((_url,init)=>{request=JSON.parse(init.body);return new Promise(r=>resolve=r)})
   await ctrlS();await type('not yet submitted')
-  await act(async()=>resolve({...fixture.notes.a,content:'submitted',save_receipt:{request_id:request.save_request_id,reference_pending:false}}))
+  await act(async()=>resolve({...fixture.notes.a,content:'submitted',save_receipt:{outcome:'applied',request_id:request.save_request_id,reference_pending:false}}))
   expect(field().value).toBe('not yet submitted');expect(editorQuit.pending()).toBe(1)
   expect(toast.warning).toHaveBeenCalledWith(expect.stringContaining('还有更新的编辑'))
 })

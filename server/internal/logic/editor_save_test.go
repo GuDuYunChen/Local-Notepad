@@ -61,7 +61,7 @@ func TestEditorSaveReplayNeverOverwritesLaterBody(t *testing.T) {
 		t.Fatal(err)
 	}
 	receipt, err := l.SaveEditorContent(ctx, f.ID, in)
-	if err != nil || receipt.Content != "first" {
+	if err != nil || receipt.Content != "newer" || receipt.SaveReceipt.Outcome != "superseded" {
 		t.Fatal(receipt, err)
 	}
 	latest, _ := l.Get(ctx, f.ID)
@@ -86,8 +86,8 @@ func TestEditorSaveRefusesTokenReuseAndChangedDatabase(t *testing.T) {
 		t.Fatal("accepted token reuse")
 	}
 	bad.RequestID = strings.Repeat("d", 32)
-	if _, err := l.SaveEditorContent(ctx, f.ID, bad); err == nil {
-		t.Fatal("overwrote concurrent database edit")
+	if result, err := l.SaveEditorContent(ctx, f.ID, bad); err != nil || result.SaveReceipt.Outcome != "conflict" {
+		t.Fatal("missing terminal conflict result", result, err)
 	}
 }
 func TestEditorSaveAtomicRollbackOnJournalFailure(t *testing.T) {
@@ -175,5 +175,79 @@ func TestEditorSaveDeletesContentFromReceiptsWhenTargetIsPermanentlyDeleted(t *t
 	}
 	if _, err := l.SaveEditorContent(ctx, f.ID, in); err == nil {
 		t.Fatal("replayed deleted file")
+	}
+}
+
+func TestEditorRejectedSaveRemainsTerminalAfterDatabaseRevert(t *testing.T) {
+	l := saveTestLogic(t)
+	ctx := context.Background()
+	f, err := l.Create(ctx, "terminal.md", "new database", false, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	in := model.EditorSaveInput{RequestID: strings.Repeat("8", 32), Expected: "old database", Content: "draft"}
+	result, err := l.SaveEditorContent(ctx, f.ID, in)
+	if err != nil || result.SaveReceipt.Outcome != "conflict" || result.Content != "new database" {
+		t.Fatal(result, err)
+	}
+	// An earlier rejected request must not become a write later, even when its
+	// expected text returns. This is a stored decision, not merely an HTTP error.
+	if _, err = l.FileDAO.DB.Exec(`UPDATE files SET content='old database' WHERE id=?`, f.ID); err != nil {
+		t.Fatal(err)
+	}
+	result, err = l.SaveEditorContent(ctx, f.ID, in)
+	if err != nil || result.SaveReceipt.Outcome != "conflict" || result.Content != "old database" {
+		t.Fatal(result, err)
+	}
+	current, err := l.Get(ctx, f.ID)
+	if err != nil || current.Content != "old database" {
+		t.Fatal(current, err)
+	}
+	var n int
+	if err = l.FileDAO.DB.QueryRow(`SELECT COUNT(*) FROM file_versions`).Scan(&n); err != nil || n != 0 {
+		t.Fatal("rejection wrote a version", n, err)
+	}
+	// A fresh deliberate request using the reviewed current text is allowed.
+	in.RequestID = strings.Repeat("9", 32)
+	result, err = l.SaveEditorContent(ctx, f.ID, in)
+	if err != nil || result.SaveReceipt.Outcome != "applied" || result.Content != "draft" {
+		t.Fatal(result, err)
+	}
+	result, err = l.SaveEditorContent(ctx, f.ID, model.EditorSaveInput{RequestID: strings.Repeat("8", 32), Expected: "old database", Content: "draft"})
+	if err != nil || result.SaveReceipt.Outcome != "conflict" {
+		t.Fatal("terminal outcome changed", result, err)
+	}
+}
+
+func TestEditorRejectedReceiptRollbackAndLegacyCompatibility(t *testing.T) {
+	l := saveTestLogic(t)
+	ctx := context.Background()
+	f, err := l.Create(ctx, "rollback.md", "current", false, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = l.FileDAO.DB.Exec(`CREATE TRIGGER fail_rejection BEFORE UPDATE OF receipt_json ON editor_save_ops BEGIN SELECT RAISE(ABORT,'forced');END`); err != nil {
+		t.Fatal(err)
+	}
+	in := model.EditorSaveInput{RequestID: strings.Repeat("5", 32), Expected: "stale", Content: "draft"}
+	if _, err = l.SaveEditorContent(ctx, f.ID, in); err == nil {
+		t.Fatal("reported a terminal decision that did not persist")
+	}
+	var count int
+	l.FileDAO.DB.QueryRow(`SELECT COUNT(*) FROM editor_save_ops`).Scan(&count)
+	if count != 0 {
+		t.Fatal(count)
+	}
+	l.FileDAO.DB.Exec(`DROP TRIGGER fail_rejection`)
+	if _, err = l.SaveEditorContent(ctx, f.ID, in); err != nil {
+		t.Fatal(err)
+	}
+	var state, raw string
+	l.FileDAO.DB.QueryRow(`SELECT state,receipt_json FROM editor_save_ops`).Scan(&state, &raw)
+	if state != "obsolete" || !strings.Contains(raw, `"editor_save_rejected":true`) {
+		t.Fatal("older server must conservatively refuse replay", state, raw)
+	}
+	if strings.Contains(raw, "stale") || strings.Contains(raw, "draft") {
+		t.Fatal("rejection retained full body")
 	}
 }

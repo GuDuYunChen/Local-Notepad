@@ -157,13 +157,14 @@ const editorSource=fs.readFileSync(new URL('../src/components/TextEditor.jsx',im
 function actualSave(){
   const ref=current=>({current}),writes=[],cache=[],responses=[]
   const c={createEditorSaveAttempt,commitEditorSave,
-    rawSavedBodiesRef:ref(new Map([['n1','old']])),saveAttemptsRef:ref(new Map()),setSaveProblem(){},cachePendingBodyForRetry(){},window:{dispatchEvent(){}},Event,
+    saveConflictsRef:ref(new Map()),saveTimerRef:ref(null),readEditorDraft:()=>null,removeEditorDraft(){},normalizeLegacyTableBreakMarkup:s=>s,
+    rawSavedBodiesRef:ref(new Map([['n1','old']])),saveAttemptsRef:ref(new Map()),setSaveProblem(){},cachePendingBodyForRetry(){},window:{dispatchEvent(){},clearTimeout(){}},Event,
     React:{useCallback:fn=>fn},currentIdRef:ref('n1'),loadedDocumentRef:ref('n1'),deletedIdsRef:ref(new Set()),
     contentRef:ref('draft'),lastSavedContentRef:ref('old'),inFlightSavesRef:ref(new Map()),saveControllersRef:ref(new Set()),
     pendingStructureMappingsRef:ref([]),onSavedRef:ref(()=>{}),editorQuit:createEditorQuitRegistry(),
     hasHeadingStructureChanged:()=>false,beginSaving(){},endSaving(){},setSaving(){},setSaveError(){},setStructureDirty(){},setLastSavedAt(){},
     writeEditorDraft(...args){cache.push(args)},AbortController,Date,console:{error(){}},
-    api(_url,init){writes.push(JSON.parse(init.body).content);const d=deferred();responses.push(d);return d.promise.then(r=>r&&r.id==='n1'&&r.content===JSON.parse(init.body).content?{...r,save_receipt:{request_id:JSON.parse(init.body).save_request_id,reference_pending:false}}:r)}}
+    api(_url,init){writes.push(JSON.parse(init.body).content);const d=deferred();responses.push(d);return d.promise.then(r=>r&&r.id==='n1'&&r.content===JSON.parse(init.body).content?{...r,save_receipt:{outcome:'applied',request_id:JSON.parse(init.body).save_request_id,reference_pending:false}}:r)}}
   c.editorQuit.remember('n1','draft')
   const a=editorSource.indexOf('  const saveNow = React.useCallback('),b=editorSource.indexOf('  }, [beginSaving, endSaving])',a)
   assert.ok(a>=0&&b>a);vm.createContext(c);vm.runInContext(editorSource.slice(a,b+'  }, [beginSaving, endSaving])'.length)+'\nglobalThis.saveNow=saveNow',c)

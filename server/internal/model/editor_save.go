@@ -9,6 +9,7 @@ type EditorSaveInput struct {
 	Mappings  string `json:"section_mappings"`
 }
 type EditorSaveReceipt struct {
+	Outcome          string `json:"outcome"` // applied, conflict (terminal rejection), or superseded
 	RequestID        string `json:"request_id"`
 	ReferencePending bool   `json:"reference_pending"`
 }

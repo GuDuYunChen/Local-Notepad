@@ -29,6 +29,9 @@ jobs:
           cache-dependency-path: server/go.sum
       - run: npm install --no-audit --no-fund
       - run: git fetch --no-tags --depth=1 origin 0b66c7e6a902129cd2ead4da75f5d1bf96a9d9de
+      - run: git fetch --no-tags --depth=1 origin 8480c91d293fbdb1f565da2d710536b1edefd4dd
+      - name: Reproduce acknowledged-cache defect on exact 4.189.1
+        run: node scripts/check-save-conflict-baseline.mjs
       - name: Reproduce actual old structural save failures
         run: node scripts/check-save-recovery-baseline.mjs
       - name: Verify receipts, retries, old quit guards and draft cache

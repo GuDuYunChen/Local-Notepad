@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import vm from 'node:vm'
-import { readEditorDraft, writeEditorDraft } from '../src/services/editorDraftCache.js'
+import { readEditorDraft, writeEditorDraft, removeEditorDraft } from '../src/services/editorDraftCache.js'
 import { createEditorSaveAttempt, commitEditorSave } from '../src/services/editorSaveTransaction.mjs'
 import { createEditorQuitRegistry } from '../src/services/editorQuit.mjs'
 
@@ -36,7 +36,8 @@ function fixture(content = 'baseline') {
   const id = `cache-regression-${++sequence}`
   const receipts = [], errors = []
   const c = {
-    createEditorSaveAttempt, commitEditorSave,
+    createEditorSaveAttempt, commitEditorSave, removeEditorDraft, readEditorDraft,
+    saveConflictsRef: {current: new Map()}, normalizeLegacyTableBreakMarkup: s => s,
     rawSavedBodiesRef: { current: new Map([[id,'baseline']]) }, saveAttemptsRef: { current: new Map() },
     setSaveProblem() {}, cachePendingBodyForRetry: writeEditorDraft,
     currentIdRef: { current: id }, loadedDocumentRef: { current: id },
@@ -49,7 +50,7 @@ function fixture(content = 'baseline') {
     hasHeadingStructureChanged: () => false, beginSaving() {}, endSaving() {},
     setSaveError(value) { errors.push(value) }, setStructureDirty() {}, setLastSavedAt() {},
     window: { clearTimeout() {}, dispatchEvent() {} }, Event, console: { error() {} },
-    api: async (_path, options) => ({ id, content: JSON.parse(options.body).content, save_receipt: {request_id: JSON.parse(options.body).save_request_id, reference_pending:false} }),
+    api: async (_path, options) => ({ id, content: JSON.parse(options.body).content, save_receipt: { outcome: 'applied',request_id: JSON.parse(options.body).save_request_id, reference_pending:false} }),
   }
   vm.createContext(c)
   if (helperCode) c.cachePendingDraft = vm.runInContext(`(${helperCode})`, c)
@@ -123,7 +124,7 @@ test('delayed save acknowledgement preserves a newer cached draft', async () => 
   c.api = (_p,i) => new Promise(resolve => { requestID=JSON.parse(i.body).save_request_id; finish = resolve })
   const pending = c.saveNow('external')
   c.contentRef.current = 'second'; c.editorQuit.remember(id, 'second'); c.cache()
-  finish({ id, content: 'first', save_receipt:{request_id:requestID,reference_pending:false} }); await pending
+  finish({ id, content: 'first', save_receipt:{outcome:'applied',request_id:requestID,reference_pending:false} }); await pending
   assert.equal(readEditorDraft(id).content, 'second')
   assert.equal(c.lastSavedContentRef.current, 'first'); assert.equal(c.editorQuit.pending(), 1)
 })
@@ -133,8 +134,8 @@ test('reverting during a pending write waits and submits the correct second writ
   c.editorQuit.remember(id, 'changed'); const first = c.saveNow('external')
   c.contentRef.current = 'baseline'; c.editorQuit.remember(id, 'baseline')
   const second = c.saveNow('quit'); assert.equal(calls.length, 1)
-  calls[0].resolve({ id, content: 'changed', save_receipt:{request_id:calls[0].requestID,reference_pending:false} }); await first; await flush()
+  calls[0].resolve({ id, content: 'changed', save_receipt:{outcome:'applied',request_id:calls[0].requestID,reference_pending:false} }); await first; await flush()
   assert.equal(calls.length, 2); assert.equal(calls[1].content, 'baseline')
-  calls[1].resolve({ id, content: 'baseline', save_receipt:{request_id:calls[1].requestID,reference_pending:false} }); await second
+  calls[1].resolve({ id, content: 'baseline', save_receipt:{outcome:'applied',request_id:calls[1].requestID,reference_pending:false} }); await second
   assert.equal(c.lastSavedContentRef.current, 'baseline'); assert.equal(c.editorQuit.pending(), 0)
 })

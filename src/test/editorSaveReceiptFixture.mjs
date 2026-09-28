@@ -12,7 +12,7 @@ export function editorSaveReceiptFixture(mock) {
       if (!request.save_request_id) return value
       return Promise.resolve(value).then(result => {
         if (!result || result.id !== decodeURIComponent(path.split('/').pop()) || result.content !== request.content) return result
-        return { ...result, save_receipt: result.save_receipt || { request_id: request.save_request_id, reference_pending: false } }
+        return { ...result, save_receipt: result.save_receipt || { outcome: 'applied', request_id: request.save_request_id, reference_pending: false } }
       })
     },
   })

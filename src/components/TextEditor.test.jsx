@@ -790,10 +790,7 @@ describe('TextEditor save coordination', () => {
     })
 
     expect(globalThis.__textEditorMockInitialContent).toBe(repaired)
-    expect(JSON.parse(localStorage.getItem('editor:cache:file-1'))).toMatchObject({
-      content: repaired,
-      savedAt: 7000,
-    })
+    expect(localStorage.getItem('editor:cache:file-1')).toBeNull()
     expect(statuses.at(-1)).toMatchObject({
       activeId: 'file-1',
       dirty: false,
