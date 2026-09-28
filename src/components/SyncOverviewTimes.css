@@ -16,3 +16,6 @@
 .sync-overview .sync-clock-preference .btn.sync-clock-preference-button:not(.primary):not(.danger){color:var(--ink);min-height:44px;white-space:normal}
 .sync-clock-preference-summary{flex-basis:100%;color:var(--ink-soft);overflow-wrap:anywhere}
 .sync-clock-preference-error{margin:0 0 12px;color:var(--ink);font-size:13px;line-height:1.7;overflow-wrap:anywhere}
+
+.sync-clock-preference-actions>p{margin:0 0 4px}
+.sync-clock-preference-receipt{margin:0 0 12px;color:var(--ink);font-size:13px;line-height:1.7;overflow-wrap:anywhere}

@@ -25,9 +25,9 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
       - name: Verify timestamp conversion and complete-evidence policy
-        run: node --test scripts/sync-clock.node.mjs scripts/sync-clock-evidence.node.cjs scripts/sync-clock-preference.node.mjs scripts/sync-clock-preference-evidence.node.cjs
+        run: node --test scripts/sync-clock.node.mjs scripts/sync-clock-evidence.node.cjs scripts/sync-clock-preference.node.mjs scripts/sync-clock-preference-evidence.node.cjs scripts/sync-clock-preference-view.node.mjs scripts/sync-clock-restore-evidence.node.cjs
       - name: Verify real overview and sync-center state isolation
-        run: npx vitest run --root=. src/components/SyncOverviewTimes.test.jsx src/components/SyncClockPreference.test.jsx
+        run: npx vitest run --root=. src/components/SyncOverviewTimes.test.jsx src/components/SyncClockPreference.test.jsx src/components/SyncClockPreferenceRestore.test.jsx
       - name: Build production renderer
         if: runner.os == 'Windows'
         run: npm run build:renderer
@@ -37,6 +37,19 @@ jobs:
       - name: Verify native preference persistence and failure handling
         if: runner.os == 'Windows'
         run: node scripts/check-sync-clock-preference.cjs
+      - name: Verify read-only preference restore
+        if: runner.os == 'Windows'
+        run: node scripts/check-sync-clock-restore.cjs
+      - name: Upload native preference restore evidence
+        if: always() && runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-notepad-sync-clock-restore-${{ github.sha }}
+          path: |
+            test-results/sync-clock-restore/*.png
+            test-results/sync-clock-restore/checks.json
+          if-no-files-found: error
+          retention-days: 7
       - name: Upload native preference evidence
         if: always() && runner.os == 'Windows'
         uses: actions/upload-artifact@v4
