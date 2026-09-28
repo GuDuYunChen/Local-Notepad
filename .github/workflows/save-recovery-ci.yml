@@ -2,6 +2,8 @@ name: Save Recovery CI
 on:
   push:
     branches: [feature/knowledge-os-phase2]
+  pull_request:
+    branches: [master]
   workflow_dispatch:
 permissions:
   contents: read
@@ -9,24 +11,49 @@ concurrency:
   group: save-recovery-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  validation-inputs:
-    runs-on: ubuntu-latest
-    timeout-minutes: 12
+  recovery:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.24.11'
+          cache-dependency-path: server/go.sum
       - run: npm install --no-audit --no-fund
-      - name: Archive exact tracked source and test dependencies only
+      - run: git fetch --no-tags --depth=1 origin 0b66c7e6a902129cd2ead4da75f5d1bf96a9d9de
+      - name: Reproduce actual old structural save failures
+        run: node scripts/check-save-recovery-baseline.mjs
+      - name: Verify receipts, retries, old quit guards and draft cache
+        run: node --test scripts/editor-save-transaction.node.mjs scripts/editor-discard.node.mjs scripts/editor-quit.node.mjs scripts/editor-cache-regression.node.mjs
+      - name: Verify all real UI regression tests
+        run: npx vitest run --root=. --maxWorkers=4 --minWorkers=1 --reporter=json --outputFile=test-results/save-recovery/full-ui.json
+      - name: Verify SQLite transactions, migrations and backup compatibility
+        working-directory: server
+        run: go test ./... -count=1
+      - name: Build actual Go server for editor integration
+        run: go -C server build -o ../bin/save-test-server.exe ./cmd/notepad-server
+      - name: Actual App, actual HTTP, quit handshake and server restart
+        env:
+          NOTEPAD_SAVE_TEST_SERVER: bin/save-test-server.exe
+        run: npx vitest run --config=scripts/save-recovery.vitest.config.mjs --reporter=json --outputFile=test-results/save-recovery/live-editor.json
+      - name: Retain exact commit identity
+        if: always()
+        shell: bash
         run: |
           mkdir -p test-results/save-recovery
-          git archive --format=zip HEAD > test-results/save-recovery/source.zip
           git rev-parse HEAD > test-results/save-recovery/commit.txt
-          tar --exclude=node_modules/electron/dist --exclude=node_modules/electron-builder --exclude=node_modules/app-builder-bin -czf test-results/save-recovery/linux-test-runtime.tgz node_modules
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: save-recovery-inputs-${{ github.sha }}
+          name: save-recovery-${{ runner.os }}-${{ github.sha }}
           path: test-results/save-recovery/*
-          retention-days: 1
           if-no-files-found: error
+          retention-days: 7

@@ -12,6 +12,7 @@ import {
 
 import { editorQuit, createEditorQuitParticipant } from '~/services/editorQuit.mjs'
 import { discardEditorDraft, observeEditorDraft } from '~/services/editorDraftDiscard.mjs'
+import { createEditorSaveAttempt, commitEditorSave } from '~/services/editorSaveTransaction.mjs'
 
 const Editor = React.lazy(() => import('./Editor/Editor'))
 
@@ -30,6 +31,10 @@ function TextEditorInternal({
 }, ref) {
   const contentRef = useRef('')
   const lastSavedContentRef = useRef('')
+  const rawSavedBodiesRef = useRef(new Map())
+  const saveAttemptsRef = useRef(new Map())
+  const [saveProblem, setSaveProblem] = useState('')
+  const [editRevision, setEditRevision] = useState(0)
   const saveTimerRef = useRef(null)
   const intervalRef = useRef(null)
   const saveControllersRef = useRef(new Set())
@@ -93,6 +98,8 @@ function TextEditorInternal({
     }
   }, [])
 
+  const cachePendingBodyForRetry = (id, text) => { try { writeEditorDraft(id, text) } catch {} }
+
   const saveNow = React.useCallback(async (reason, specificId = null, contentOverride = null) => {
     const id = specificId || currentIdRef.current
     if (!id || (!specificId && loadedDocumentRef.current !== id)) return
@@ -100,21 +107,6 @@ function TextEditorInternal({
     if (deletedIdsRef.current?.has(id)) return
 
     const text = contentOverride ?? contentRef.current
-    const hasStructuralChanges = id === currentIdRef.current && hasHeadingStructureChanged(
-      lastSavedContentRef.current,
-      text,
-    )
-
-    if (reason === 'interval' && hasStructuralChanges) {
-      setStructureDirty(true)
-      return {
-        id,
-        content: text,
-        skipped: true,
-        structural: true,
-      }
-    }
-
     const inFlight = inFlightSavesRef.current.get(id)
     if (inFlight) {
       if (inFlight.content === text) {
@@ -126,7 +118,7 @@ function TextEditorInternal({
 
     // A pending older write can change the saved baseline. Do not skip a revert
     // until that write has settled, otherwise exit could approve the wrong text.
-    if (id === currentIdRef.current && text === lastSavedContentRef.current) {
+    if (id === currentIdRef.current && text === lastSavedContentRef.current && !saveAttemptsRef.current.has(id)) {
       editorQuit.saved(id, text)
       setSaveError(false)
       return { id, content: text, skipped: true }
@@ -139,31 +131,42 @@ function TextEditorInternal({
         if (id === currentIdRef.current) setSaveError(false)
         saveControllersRef.current.add(ctl)
 
-        const updated = await api(`/api/files/${id}`, {
-          method: 'PUT',
-          body: JSON.stringify({ content: text }),
-          signal: ctl.signal,
-        })
-
-        if (!updated || updated.id !== id || updated.content !== text) {
-          throw new Error('正文保存响应未确认，请重新检查保存状态')
-        }
-        editorQuit.saved(id, text)
-        const now = Date.now()
-        if (id === currentIdRef.current) {
-          lastSavedContentRef.current = text
-          setStructureDirty(hasHeadingStructureChanged(text, contentRef.current))
-          if (contentRef.current === text) pendingStructureMappingsRef.current = []
-          setLastSavedAt(now)
-          // A delayed acknowledgement must not overwrite a newer cached draft.
-          writeEditorDraft(id, contentRef.current, now)
-          onSavedRef.current?.(updated)
+        // An unknown earlier result must be reconciled with its SAME token
+        // before a newer body can be submitted. Never blindly create a retry.
+        let updated
+        let attempt = saveAttemptsRef.current.get(id)
+        for (let round = 0; round < 2; round += 1) {
+          if (!attempt) {
+            const expected = rawSavedBodiesRef.current.get(id)
+            attempt = createEditorSaveAttempt(id, expected, text,
+              id === currentIdRef.current ? pendingStructureMappingsRef.current : [])
+            saveAttemptsRef.current.set(id, attempt)
+          }
+          updated = await commitEditorSave(api, attempt, ctl.signal)
+          rawSavedBodiesRef.current.set(id, updated.content)
+          saveAttemptsRef.current.delete(id)
+          editorQuit.saved(id, updated.content)
+          const now = Date.now()
+          if (id === currentIdRef.current) {
+            lastSavedContentRef.current = updated.content
+            setStructureDirty(hasHeadingStructureChanged(updated.content, contentRef.current))
+            if (contentRef.current === updated.content) pendingStructureMappingsRef.current = []
+            setLastSavedAt(now); setSaveProblem('')
+            writeEditorDraft(id, contentRef.current, now)
+            onSavedRef.current?.(updated)
+          }
+          // Maintenance has already been journalled atomically with the body.
+          // Its worker and any network failure are not awaited by this save.
+          if (updated.save_receipt.reference_pending) window.dispatchEvent(new Event('editor:durable-save'))
+          if (attempt.content === text) return updated
+          attempt = null
         }
         return updated
       } catch (e) {
         if (e.name === 'AbortError') return
         if (e.message?.includes('更新失败') && deletedIdsRef.current?.has(id)) return
-        if (id === currentIdRef.current) setSaveError(true)
+        if (id === currentIdRef.current) { setSaveError(true); setSaveProblem(e.message || '正文保存失败，草稿保留') }
+        if (id === currentIdRef.current) cachePendingBodyForRetry(id, contentRef.current)
         console.error('保存失败', reason, e)
         throw e
       } finally {
@@ -186,7 +189,7 @@ function TextEditorInternal({
   const cachePendingDraft = React.useCallback(() => {
     const id = currentIdRef.current
     if (!id || loadedDocumentRef.current !== id || deletedIdsRef.current?.has(id)) return
-    if (contentRef.current === lastSavedContentRef.current && !inFlightSavesRef.current.has(id)) return
+    if (contentRef.current === lastSavedContentRef.current && !inFlightSavesRef.current.has(id) && !saveAttemptsRef.current.has(id)) return
     writeEditorDraft(id, contentRef.current)
   }, [])
 
@@ -197,7 +200,8 @@ function TextEditorInternal({
       deleted: deletedIdsRef.current?.has(currentIdRef.current),
       content: contentRef.current,
       saved: lastSavedContentRef.current,
-      structural: hasHeadingStructureChanged(lastSavedContentRef.current, contentRef.current),
+      structural: false, // structure maintenance is now durably captured by SaveEditor
+      uncertain: saveAttemptsRef.current.size > 0,
       pending: [...inFlightSavesRef.current.values()].map(item => item.promise),
     }),
     cache: () => {
@@ -210,6 +214,7 @@ function TextEditorInternal({
 
   useImperativeHandle(ref, () => ({
     save: () => saveNow('external'),
+    getDocumentId: () => currentIdRef.current,
     // Called only by the explicit "不保存" action. Refuse outstanding writes;
     // clearing a cache is not confirmation that an in-flight save was cancelled.
     clearCache: () => discardEditorDraft({
@@ -217,7 +222,7 @@ function TextEditorInternal({
       ready: loadedDocumentRef.current === currentIdRef.current,
       content: contentRef.current,
       saved: lastSavedContentRef.current,
-      pending: [...inFlightSavesRef.current.values()],
+      pending: [...inFlightSavesRef.current.values(), ...saveAttemptsRef.current.values()],
     }, editorQuit, text => {
       window.clearTimeout(saveTimerRef.current)
       saveTimerRef.current = null
@@ -279,6 +284,7 @@ function TextEditorInternal({
       editorQuit.remember(currentIdRef.current, text)
       editorQuit.saved(currentIdRef.current, text)
       lastSavedContentRef.current = text
+      rawSavedBodiesRef.current.set(currentIdRef.current, text)
       setEditorContent(text)
       setWordCount(countLexicalCharacters(text))
       setLastSavedAt(savedAt)
@@ -345,6 +351,7 @@ function TextEditorInternal({
         const cached = readEditorDraft(id)
         const useCache = isFreshEditorDraft(cached) && cached.editedAt && (!f.updated_at || cached.editedAt > f.updated_at * 1000)
         const serverText = normalizeLegacyTableBreakMarkup(f.content || '')
+        rawSavedBodiesRef.current.set(id, f.content || '')
         const cachedText = useCache
           ? normalizeLegacyTableBreakMarkup(cached.content || '')
           : ''
@@ -425,7 +432,7 @@ function TextEditorInternal({
       wordCount,
       structureDirty,
     })
-  }, [activeId, saving, saveError, lastSavedAt, wordCount, structureDirty])
+  }, [activeId, saving, saveError, lastSavedAt, wordCount, structureDirty, editRevision])
 
   useEffect(() => {
     const apply = () => {
@@ -462,7 +469,8 @@ function TextEditorInternal({
     const id = currentIdRef.current
     if (!id || loadedDocumentRef.current !== id) return
     contentRef.current = newContent
-    const pending = inFlightSavesRef.current.has(id)
+    setEditRevision(value => value + 1)
+    const pending = inFlightSavesRef.current.has(id) || saveAttemptsRef.current.has(id)
     observeEditorDraft(editorQuit, id, newContent, lastSavedContentRef.current, pending)
     setSaveError(false)
     if (!pending && newContent === lastSavedContentRef.current) {
@@ -531,7 +539,8 @@ function TextEditorInternal({
           <div ref={statusRef} className="editor-status-bar">
             {(saveError || saving) && (
               <span className={`save-state${saveError ? ' error' : ''}`}>
-                {saveError ? '保存失败' : '保存中…'}
+                {saveError ? '保存未确认' : '保存中…'}
+                {saveError && <span role="status">{saveProblem}</span>}
                 {saveError && (
                   <button
                     className="status-retry-btn"
@@ -547,9 +556,9 @@ function TextEditorInternal({
               {structureDirty && (
                 <span
                   className="selection-mode-pill structure-dirty-pill"
-                  title="章节标题或层级已变化，Ctrl+S 时会先检查跨笔记引用影响"
+                  title="正文照常保存；引用维护另行处理，不阻塞保存或退出"
                 >
-                  章节结构待确认
+                  章节结构已修改
                 </span>
               )}
               {selMode && <span className="selection-mode-pill">表格选择</span>}

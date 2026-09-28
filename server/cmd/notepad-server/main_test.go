@@ -305,7 +305,7 @@ func TestResearchMigrationIsAdditiveAndPreservesCreationReceipt(t *testing.T) {
 		t.Fatal(err)
 	}
 	var latest int
-	if err := db.QueryRow(`SELECT MAX(version) FROM schema_migrations`).Scan(&latest); err != nil || latest != 13 {
+	if err := db.QueryRow(`SELECT MAX(version) FROM schema_migrations`).Scan(&latest); err != nil || latest != 14 {
 		t.Fatal(latest, err)
 	}
 	var syncTables int
@@ -335,7 +335,7 @@ func TestSyncMigrationToleratesPreexistingProviderColumn(t *testing.T) {
 	// sync_provider remains from ensureCompatibleSchema / the first migration pass.
 	if err := migrate(ctx, db); err != nil { t.Fatal(err) }
 	var latest, tables int
-	if err := db.QueryRow(`SELECT MAX(version) FROM schema_migrations`).Scan(&latest); err != nil || latest != 13 { t.Fatal(latest, err) }
+	if err := db.QueryRow(`SELECT MAX(version) FROM schema_migrations`).Scan(&latest); err != nil || latest != 14 { t.Fatal(latest, err) }
 	if err := db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('sync_state','sync_base','sync_conflicts')`).Scan(&tables); err != nil || tables != 3 {
 		t.Fatal("sync tables were not rebuilt", tables, err)
 	}

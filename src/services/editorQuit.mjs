@@ -25,6 +25,7 @@ export function createEditorQuitRegistry() {
       return true
     },
     pending() { return drafts.size },
+    hasDraft(id) { return drafts.has(id) },
     register(flush) { participants.add(flush); return () => participants.delete(flush) },
     async flush(signal) {
       for (const flush of [...participants]) await waitForQuit(flush(signal), signal)
@@ -51,10 +52,10 @@ export function createEditorQuitParticipant({ snapshot, cache, save, registry = 
     if (state.structural) throw new EditorQuitError('structure')
     if (!state.id || state.deleted) return
     const expected = { id: state.id, content: state.content }
-    if (state.content !== state.saved) await waitForQuit(save(), signal)
+    if (state.content !== state.saved || state.uncertain) await waitForQuit(save(), signal)
     state = snapshot()
     if (!state.ready || state.id !== expected.id || state.content !== expected.content ||
-        state.content !== state.saved || state.pending.length) throw new EditorQuitError('changed')
+        state.content !== state.saved || state.pending.length || state.uncertain) throw new EditorQuitError('changed')
     registry.saved(state.id, state.content)
   }
 }

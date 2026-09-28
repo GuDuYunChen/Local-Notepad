@@ -9,7 +9,7 @@ import { installDocumentQuitBridge } from '~/services/editorQuitBridge.mjs'
 import { readEditorDraft, writeEditorDraft, removeEditorDraft } from '~/services/editorDraftCache'
 
 const fixture = vi.hoisted(() => ({ notes: {}, editorChange: null }))
-vi.mock('~/services/api', () => ({ api: vi.fn(), createFileVersionSnapshot: vi.fn(), listAllFilesWithContent: vi.fn(async () => []) }))
+vi.mock('~/services/api', async () => { const { editorSaveReceiptFixture } = await import('./test/editorSaveReceiptFixture.mjs'); return ({ api: editorSaveReceiptFixture(vi.fn()), createFileVersionSnapshot: vi.fn(), listAllFilesWithContent: vi.fn(async () => []) }) })
 vi.mock('~/services/toast', () => ({ toast: { warning: vi.fn(), error: vi.fn(), success: vi.fn() } }))
 // Real App, real unsaved dialog, real TextEditor, real draft cache and exit bridge.
 // Only unrelated navigation panels and the rich-text input are fixtures.
@@ -22,6 +22,7 @@ vi.mock('./components/WorkspaceSidebar', () => ({ default: ({ children, onChange
   <button onClick={() => onChangeWorkspace('notes')}>回到笔记</button>{children}
 </aside> }))
 vi.mock('./components/SettingsPanel', () => ({ default: () => <div data-test-settings>设置工作区</div> }))
+vi.mock('./components/ReferenceMaintenanceStatus', () => ({default: () => null}))
 vi.mock('./components/ToastViewport', () => ({ default: () => null }))
 vi.mock('./components/ReferenceRefactorDialog', () => ({ default: () => null }))
 vi.mock('./components/FocusSessionBar', () => ({ default: () => null }))

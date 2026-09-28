@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react'
 import TextEditor from './components/TextEditor'
+import ReferenceMaintenanceStatus from './components/ReferenceMaintenanceStatus'
 import FileList from './components/FileList'
 import WorkspaceSidebar from './components/WorkspaceSidebar'
 import {
@@ -338,70 +339,26 @@ export default function App() {
 
   const saveCurrent = React.useCallback(async () => {
     if (!current || !editorRef.current) return false
-
+    const activeEditor = editorRef.current
     try {
-      const refactorState = editorRef.current.getReferenceRefactorState?.()
-      let review = null
-
-      if (refactorState?.structureChanged) {
-        const files = await listAllFilesWithContent()
-        const plan = planTargetReferenceRefactor(files, current.id, {
-          title: current.title,
-          content: refactorState.currentContent,
-          sectionPathMappings: refactorState.sectionPathMappings || [],
-        })
-
-        const affectedReferences =
-          (Number(plan.summary?.repairable) || 0) +
-          (Number(plan.summary?.broken) || 0)
-
-        if (affectedReferences > 0) {
-          review = await requestReferenceRefactor({
-            mode: 'structure',
-            targetTitle: current.title || '当前笔记',
-            plan,
-          })
-
-          if (!review?.proceed) return null
-          review = { ...review, plan }
-        }
+      // Ctrl+S has one responsibility: confirm the current body. Cross-note
+      // scans, user review and version-network calls no longer precede it.
+      const updated = await activeEditor.save()
+      if (!updated || updated.id !== current.id || !editorRef.current ||
+          (editorRef.current.getDocumentId && editorRef.current.getDocumentId() !== current.id)) return false
+      const latest = editorRef.current.getReferenceRefactorState?.()
+      if (latest && latest.currentContent !== updated.content) {
+        toast.warning('已有内容已保存，但还有更新的编辑，请再次保存。')
+        return false
       }
-
-      if (refactorState?.structureChanged) {
-        await createFileVersionSnapshot(current.id)
-      }
-
-      const updated = await editorRef.current.save()
-      if (!updated) return false
-
-      if (review?.sync && review.plan) {
-        const result = await applyReferenceRepairPlan(review.plan, {
-          allowCurrentSource: true,
-        })
-
-        if (result.skipped.length) {
-          toast.warning(
-            '正文已保存；' +
-            result.repairedReferences +
-            ' 处引用已同步，' +
-            result.skipped.length +
-            ' 篇来源因内容变化被跳过'
-          )
-        } else if (result.repairedReferences) {
-          toast.success('正文已保存，并同步 ' + result.repairedReferences + ' 处引用')
-        }
-      }
-
+      toast.success('正文已保存')
       return true
-    } catch (e) {
-      console.error(e)
+    } catch (error) {
+      console.error('正文保存未确认', error)
+      toast.error(error.message || '正文保存未确认，草稿已保留，请重试')
       return false
     }
-  }, [
-    applyReferenceRepairPlan,
-    current,
-    requestReferenceRefactor,
-  ])
+  }, [current])
 
   const handleExtractStructureSection = React.useCallback(async (section) => {
     if (!current?.id || !section?.path?.length || !editorRef.current) return
@@ -1379,6 +1336,7 @@ export default function App() {
         </main>
       </div>
 
+      <ReferenceMaintenanceStatus/>
       <ToastViewport />
 
       {referenceRefactor && (

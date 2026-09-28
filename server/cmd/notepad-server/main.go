@@ -548,6 +548,7 @@ func migrate(ctx context.Context, db *sql.DB) error {
 				"ALTER TABLE settings ADD COLUMN sync_interval_minutes INTEGER DEFAULT 5",
 			},
 		},
+		{version: 14, stmts: []string{dao.EditorSavesSchema, dao.EditorSavesIndex, dao.EditorSavesDelete}},
 	}
 
 	var currentVersion int

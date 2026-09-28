@@ -7,9 +7,9 @@ import { api } from '~/services/api'
 import { readEditorDraft, removeEditorDraft, writeEditorDraft } from '~/services/editorDraftCache'
 import { editorQuit } from '~/services/editorQuit.mjs'
 
-vi.mock('~/services/api', () => ({
-  api: vi.fn(),
-}))
+vi.mock('~/services/api', async () => { const { editorSaveReceiptFixture } = await import('../test/editorSaveReceiptFixture.mjs'); return ({
+  api: editorSaveReceiptFixture(vi.fn()),
+}) })
 
 vi.mock('~/services/tagApi', () => ({
   tagApi: {
@@ -191,7 +191,7 @@ describe('TextEditor save coordination', () => {
     expect(globalThis.__textEditorMockInitialContent).toBe(transformed)
   })
 
-  it('holds structural edits out of interval autosave until explicit review', async () => {
+  it('autosaves structural edits and persists reference work without manual preflight', async () => {
     const original = JSON.stringify({
       root: {
         children: [{
@@ -268,8 +268,8 @@ describe('TextEditor save coordination', () => {
       await Promise.resolve()
     })
 
-    expect(api).toHaveBeenCalledTimes(1)
-    expect(container.textContent).toContain('章节结构待确认')
+    expect(api).toHaveBeenCalledTimes(2)
+    expect(container.textContent).not.toContain('章节结构待确认')
 
     let result
     await act(async () => {
@@ -875,6 +875,7 @@ describe('TextEditor save coordination', () => {
       await Promise.resolve()
     })
 
+    await act(async () => { vi.advanceTimersByTime(29000); await Promise.resolve() })
     let savePromise
     await act(async () => {
       savePromise = editorRef.current.save()
@@ -883,7 +884,7 @@ describe('TextEditor save coordination', () => {
     expect(putRequests).toHaveLength(1)
 
     await act(async () => {
-      vi.advanceTimersByTime(30000)
+      vi.advanceTimersByTime(1000)
       await Promise.resolve()
     })
 
@@ -988,7 +989,7 @@ describe('TextEditor save coordination', () => {
       expect(ref.current.getReferenceRefactorState().savedContent).toBe(baseline)
       expect(onSaved).not.toHaveBeenCalled()
       expect(editorQuit.pending()).toBe(1)
-      expect(container.textContent).toContain('保存失败')
+      expect(container.textContent).toContain('保存未确认')
     })
   })
 })

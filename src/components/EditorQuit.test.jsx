@@ -6,7 +6,7 @@ import { api } from '~/services/api'
 import { editorQuit } from '~/services/editorQuit.mjs'
 import { installDocumentQuitBridge } from '~/services/editorQuitBridge.mjs'
 
-vi.mock('~/services/api', () => ({ api: vi.fn() }))
+vi.mock('~/services/api', async () => { const { editorSaveReceiptFixture } = await import('../test/editorSaveReceiptFixture.mjs'); return ({ api: editorSaveReceiptFixture(vi.fn()) }) })
 vi.mock('./Editor/utils/referenceUtils', () => ({
   hasHeadingStructureChanged: (_before, after) => String(after).startsWith('heading:'),
 }))
@@ -145,10 +145,10 @@ describe('editor exit save integration', () => {
     expect(host.querySelector('[aria-label="test-editor"]').value).toBe('new body')
   })
 
-  it('does not bypass an unconfirmed heading/refactor change', async () => {
+  it('saves a heading change through the journalled body write before exit', async () => {
     await render(); await draft('heading:new section'); await quit()
-    await expectReceipt({ id: challengeId, ready: false, code: 'structure' })
-    expect(puts()).toHaveLength(0)
+    await expectReceipt({ id: challengeId, ready: true })
+    expect(puts()).toHaveLength(1)
   })
 
   it('does not approve while a real TextEditor save is still pending', async () => {

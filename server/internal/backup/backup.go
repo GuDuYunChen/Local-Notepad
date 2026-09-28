@@ -21,7 +21,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-const SupportedSchemaVersion = 13
+const SupportedSchemaVersion = 14
 
 var autoName = regexp.MustCompile(`^backup-(\d{8}-\d{6})(?:-[a-f0-9]{12})?\.db$`)
 var safeName = regexp.MustCompile(`^backup-(?:manual-)?[a-zA-Z0-9-]+\.db$`)
@@ -183,6 +183,13 @@ func Inspect(ctx context.Context, filename string) (Info, error) {
 	if info.SchemaVersion >= 13 {
 		rows, schemaErr := db.QueryContext(ctx, `SELECT sync_auto_enabled,sync_interval_minutes FROM settings LIMIT 0`)
 		if schemaErr != nil { return info, fmt.Errorf("自动同步字段结构不兼容: %w", schemaErr) }
+		rows.Close()
+	}
+	if info.SchemaVersion >= 14 {
+		rows, schemaErr := db.QueryContext(ctx, `SELECT request_id,file_id,payload_hash,receipt_json,before_content,after_content,section_mappings,state,created_at FROM editor_save_ops LIMIT 0`)
+		if schemaErr != nil {
+			return info, fmt.Errorf("编辑器保存回执表结构不兼容: %w", schemaErr)
+		}
 		rows.Close()
 	}
 	if err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM files").Scan(&info.Files); err != nil {
