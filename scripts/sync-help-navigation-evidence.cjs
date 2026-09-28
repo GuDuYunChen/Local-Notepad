@@ -3,6 +3,7 @@ const fs = require('node:fs'), path = require('node:path'), { createHash } = req
 const scenes = Object.freeze({ 'first-use': 'first-use', operations: 'operations', conflicts: 'conflicts', 'recovery-narrow': 'recovery' })
 function verifyHelpNavigationScene(scene) {
   assert.ok(Object.hasOwn(scenes, scene.name))
+  assert.equal(scene.updateObserved, true)
   assert.equal(scene.retainedAfterUpdate, true)
   for (const [phase, sample] of [['before', scene.before], ['after', scene.after]]) {
     assert.equal(sample.requests, 0); assert.equal(sample.navigationCalls, 0)

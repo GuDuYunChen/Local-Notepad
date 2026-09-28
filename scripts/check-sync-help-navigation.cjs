@@ -31,7 +31,13 @@ if (!process.versions.electron) {
     const paint = c => { ctx.fillStyle = c; ctx.fillRect(0, 0, 1, 1) }
     const rgb = () => [...ctx.getImageData(0, 0, 1, 1).data].slice(0, 3)
     const lum = rgb => rgb.map(v => { v /= 255; return v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4 }).reduce((a,b,i)=>a+b*[.2126,.7152,.0722][i],0)
-    const probes = [...panel.querySelectorAll('h4,dt,dd,.sync-overview-status>strong,.sync-overview-status>p,.sync-overview-note,[data-sync-help-shortcut],.sync-help summary,.sync-help-intro,.sync-help-topic li strong,.sync-help-topic li span')].filter(n=>n.getClientRects().length)
+    const probes = [...panel.querySelectorAll('h4,dt,dd,.sync-overview-status>strong,.sync-overview-status>p,.sync-overview-note,[data-sync-help-shortcut],.sync-help summary,.sync-help-intro,.sync-help-topic li strong,.sync-help-topic li span')].filter(n=>{
+      if (!n.getClientRects().length) return false
+      for (let a=n.parentElement; a&&a!==panel; a=a.parentElement) {
+        if (a.tagName==='DETAILS'&&!a.open&&!a.firstElementChild?.contains(n)) return false
+      }
+      return true
+    })
     const colors = probes.map(n => {
       const chain = []; for (let a = n; a; a = a.parentElement) chain.unshift(a)
       ctx.clearRect(0,0,1,1); paint('#ffffff'); for (const a of chain) paint(getComputedStyle(a).backgroundColor)
@@ -58,15 +64,15 @@ if (!process.versions.electron) {
         import './src/components/SyncCenterPanel.css';
         const scene=new URLSearchParams(location.search).get('scene');
         document.documentElement.dataset.theme=['operations','recovery-narrow'].includes(scene)?'dark':'light';
-        let input=overviewFixture();
+        let input=overviewFixture(),revision=0;
         if(scene==='first-use')input.settings.sync_enabled=false;
         if(scene==='conflicts')input.status.open_conflicts=input.conflictCount=2;
         if(scene==='recovery-narrow'){input.status.last_status='review_required';input.status.recovery.mode='blocked';input.health.failures=1;input.health.error='NAV_PRIVATE'}
         window.__requests=0;window.__navigationCalls=0;
         window.fetch=()=>{window.__requests++;return Promise.reject(new Error('Forbidden fixture request'))};
         const root=createRoot(document.getElementById('root')), other=overviewFixture();
-        const draw=()=>root.render(<><div id="first"><Overview {...input} onNavigate={()=>{window.__navigationCalls++;return true}}/></div><div id="other"><Overview {...other}/></div></>);
-        window.__changeSnapshot=()=>{input={...input,health:{...input.health,loading:true}};draw()};draw();
+        const draw=()=>root.render(<><div id="first" data-revision={revision}><Overview {...input} onNavigate={()=>{window.__navigationCalls++;return true}}/></div><div id="other"><Overview {...other}/></div></>);
+        window.__changeSnapshot=()=>{revision++;input={...input,health:{...input.health,loading:true}};draw()};draw();
       ` } })
     const index=fs.readFileSync(path.join(root,'dist/index.html'),'utf8')
     const styles=[...index.matchAll(/<link\b[^>]*href="([^"]+\.css)"[^>]*>/g)].map(m=>pathToFileURL(path.resolve(root,'dist',m[1].replace(/^\//,''))).href)
@@ -96,9 +102,14 @@ if (!process.versions.electron) {
         await win.webContents.executeJavaScript(`document.querySelector('#first [data-sync-help-shortcut]').click()`)
         const after=await capture('after')
         await win.webContents.executeJavaScript(`window.__focusedSummary=document.activeElement;window.__openedTopic=document.activeElement.parentElement;window.__changeSnapshot()`)
-        await delay(150)
+        let updateObserved=false
+        for(let attempt=0;attempt<50;attempt++){
+          await delay(100)
+          updateObserved=await win.webContents.executeJavaScript(`document.querySelector('#first').dataset.revision==='1'`)
+          if(updateObserved)break
+        }
         const retainedAfterUpdate=await win.webContents.executeJavaScript(`document.activeElement===window.__focusedSummary&&window.__openedTopic.isConnected&&window.__openedTopic.open&&document.querySelector('#first [data-sync-help]').open&&window.__requests===0&&window.__navigationCalls===0&&!document.querySelector('#other [data-sync-help]').open`)
-        const scene={name,before,after,retainedAfterUpdate};report.scenes.push(scene);save();verifyHelpNavigationScene(scene)
+        const scene={name,before,after,updateObserved,retainedAfterUpdate};report.scenes.push(scene);save();verifyHelpNavigationScene(scene)
       } finally {win.destroy()}
     }
     report.complete=true;save();clearTimeout(watchdog);app.exit(0)
