@@ -26,7 +26,11 @@ function localRecord(record, formatter) {
   const h = part('hour'), min = part('minute'), s = part('second'), ms = part('fractionalSecond'), offset = part('timeZoneName')
   if (!/^\d{4}$/.test(y) || ![m, d, h, min, s].every(v => typeof v === 'string' && /^\d{2}$/.test(v)) ||
       !/^\d{3}$/.test(ms) || !/^(?:GMT|UTC)(?:[+-]\d{2}:\d{2}(?::\d{2})?)?$/.test(offset)) throw new Error('Unsupported date parts')
-  return freeze({ text: `${y}-${m}-${d} ${h}:${min}:${s}.${ms} ${offset}`, iso: record.iso })
+  // ICU versions use GMT, UTC or an explicit zero offset for the same zone.
+  // Canonicalize the label only; do not round or alter either instant.
+  const displayOffset = /^(?:GMT|UTC)(?:[+-]00:00(?::00)?)?$/.test(offset)
+    ? 'GMT+00:00' : offset.replace(/^UTC/, 'GMT')
+  return freeze({ text: `${y}-${m}-${d} ${h}:${min}:${s}.${ms} ${displayOffset}`, iso: record.iso })
 }
 export function syncClockDisplay(lastSuccess, readAt, timeZone = null) {
   const last = utcRecord(lastSuccess), read = utcRecord(readAt)

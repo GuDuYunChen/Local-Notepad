@@ -17,7 +17,7 @@ for(const [zone,iso,expected] of [
   ['Pacific/Honolulu','2024-01-01T01:02:03.004Z','2023-12-31 15:02:03.004 GMT-10:00'],
   ['Asia/Kathmandu',a,'2024-11-03 14:15:00.123 GMT+05:45'],
   ['Australia/Adelaide','2024-01-01T01:02:03.004Z','2024-01-01 11:32:03.004 GMT+10:30'],
-  ['UTC','2024-02-29T00:00:00.000Z','2024-02-29 00:00:00.000 GMT'],
+  ['UTC','2024-02-29T00:00:00.000Z','2024-02-29 00:00:00.000 GMT+00:00'],
   ['America/New_York','2024-03-10T06:59:59.000Z','2024-03-10 01:59:59.000 GMT-05:00'],
   ['America/New_York','2024-03-10T07:00:00.000Z','2024-03-10 03:00:00.000 GMT-04:00'],
 ]) test(`converts ${zone} ${iso} without rounding the instant`,()=>{
@@ -93,4 +93,29 @@ test('extended canonical UTC dates remain exact even when local conversion is un
     assert.equal(syncClockDisplay(iso,iso).lastSuccess.text,iso)
     const v=syncClockDisplay(iso,b,'UTC');assert.equal(v.mode,'utc');assert.equal(v.fallback,true);assert.equal(v.lastSuccess.iso,iso)
   }
+})
+
+// Independent ICU-output fixtures cover both locally observed and CI labels.
+test('normalizes zero-offset variants without relaxing exact timestamp expectations',()=>{
+  const original=Intl.DateTimeFormat
+  const formatter=new original('en-GB',{timeZone:'UTC',calendar:'iso8601',numberingSystem:'latn',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',fractionalSecondDigits:3,timeZoneName:'longOffset',hourCycle:'h23'})
+  try{
+    for(const offset of ['GMT','UTC','GMT+00:00','UTC+00:00','GMT-00:00','UTC-00:00','GMT+00:00:00']){
+      Intl.DateTimeFormat=function(){return {resolvedOptions:()=>({timeZone:'UTC'}),formatToParts:date=>formatter.formatToParts(date).map(p=>p.type==='timeZoneName'?{...p,value:offset}:p)}}
+      const v=syncClockDisplay(a,b,'UTC')
+      assert.equal(v.mode,'local');assert.equal(v.fallback,false)
+      assert.equal(v.lastSuccess.text,'2024-11-03 08:30:00.123 GMT+00:00')
+      assert.equal(v.readAt.text,'2024-11-03 09:30:00.456 GMT+00:00')
+      assert.equal(v.lastSuccess.iso,a);assert.equal(v.readAt.iso,b)
+    }
+  }finally{Intl.DateTimeFormat=original}
+})
+test('UTC-prefixed nonzero offsets remain explicit and unchanged numerically',()=>{
+  const original=Intl.DateTimeFormat
+  const formatter=new original('en-GB',{timeZone:'Asia/Kathmandu',calendar:'iso8601',numberingSystem:'latn',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',fractionalSecondDigits:3,timeZoneName:'longOffset',hourCycle:'h23'})
+  try{
+    Intl.DateTimeFormat=function(){return {resolvedOptions:()=>({timeZone:'Asia/Kathmandu'}),formatToParts:date=>formatter.formatToParts(date).map(p=>p.type==='timeZoneName'?{...p,value:'UTC+05:45'}:p)}}
+    const v=syncClockDisplay(a,b,'Asia/Kathmandu');assert.equal(v.fallback,false)
+    assert.equal(v.lastSuccess.text,'2024-11-03 14:15:00.123 GMT+05:45');assert.equal(v.lastSuccess.iso,a)
+  }finally{Intl.DateTimeFormat=original}
 })
