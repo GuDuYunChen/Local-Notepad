@@ -9,16 +9,15 @@ concurrency:
   group: save-source-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  backend:
+  source-validation:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-node@v7
         with:
-          go-version: '1.24.11'
-          cache-dependency-path: server/go.sum
-      - name: Materialize exact reviewed Git objects without changing branch
+          node-version: '24'
+      - name: Materialize reviewed immutable source and verify every resulting file
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -30,34 +29,55 @@ jobs:
               r=json.load(urllib.request.urlopen(urllib.request.Request(root+'/git/blobs/'+sha,headers=headers)))
               b=base64.b64decode(r['content']);assert hashlib.sha1(b'blob '+str(len(b)).encode()+b'\0'+b).hexdigest()==sha
               return b
-          patch=blob('9fe2e04978a38dfc3ca36e65ba897819a445f2ed')
-          subprocess.run(['git','apply','--check','-'],input=patch,check=True)
-          subprocess.run(['git','apply','-'],input=patch,check=True)
+          for sha in ['9fe2e04978a38dfc3ca36e65ba897819a445f2ed','6e8aab138375c65f4e36dfde82c8cbe4758f8fa1','3add880fff7c2094b0a05add4b586674b7c884e4']:
+              p=blob(sha);subprocess.run(['git','apply','--check','-'],input=p,check=True);subprocess.run(['git','apply','-'],input=p,check=True)
           additions={
-            'server/internal/model/editor_save.go':'b487e3d0789befe07f830797ffaf30bbcf7810ba',
+            '.github/workflows/save-recovery-ci.yml':'aaf702b969d0c964d8b277c7df64bfda6e15984d',
+            'docs/EDITOR_SAVE_RECOVERY_HOTFIX.md':'2c8dbb2653cd340f314686cda54d72118d48d000',
+            'scripts/check-save-recovery-baseline.mjs':'fc9dde17b2cb85c538a656c3a30e3727b8bf3d79',
+            'scripts/editor-save-transaction.node.mjs':'d0ab2c13cbd8952efe2a0941245db6404e8d3d2b',
+            'scripts/integration/AppSaveRecovery.live.jsx':'4230243b97fed9cac460f1ff275ff756b10663b7',
+            'scripts/save-recovery-server.mjs':'3da5b86ef7814e34db4d1b696d7f844153a09b82',
+            'scripts/save-recovery.vitest.config.mjs':'b693d9bc024a32c0687dc8b1dcb674ef2706d50d',
+            'server/internal/controller/editor_save.go':'846dbbf5c21ef6375e1299eb958b52556e808837',
             'server/internal/dao/editor_save.go':'be4cff3fd9d02938cb6ddef9e0f28d7db3474c10',
             'server/internal/logic/editor_save.go':'bd36221dc77cbba5a488cf3f296eaaccaf182292',
-            'server/internal/controller/editor_save.go':'846dbbf5c21ef6375e1299eb958b52556e808837',
-            'server/internal/logic/editor_save_test.go':'d71690eb4c1d479fa5f38b4a2425351183988790'}
+            'server/internal/logic/editor_save_test.go':'d71690eb4c1d479fa5f38b4a2425351183988790',
+            'server/internal/model/editor_save.go':'b487e3d0789befe07f830797ffaf30bbcf7810ba',
+            'src/AppSaveRecovery.test.jsx':'09f89ae1eaa8211c48e621a46892e3de1ebc8c02',
+            'src/components/ReferenceMaintenanceStatus.css':'8d7a10fbe839469901d621ecae3e548a459a618b',
+            'src/components/ReferenceMaintenanceStatus.jsx':'d9b34bbdcf56b2791b7b9f5d4fe1e62ec9906936',
+            'src/services/editorSaveTransaction.mjs':'000cb9c634a67dda510aa182f305eb8451be96e2',
+            'src/services/referenceMaintenance.mjs':'75026a88a16141eace3077d5df113631ebc5c841',
+            'src/services/referenceMaintenance.test.js':'91ff0c062fa19aaeff8804953cea4c9f5c3072cb',
+            'src/test/editorSaveReceiptFixture.mjs':'b533534b08cea94180bad089f751885722d58c86'}
           expected={**additions,
             'electron/data-safety.js':'efa0830f8dcdbc5e1968f48b5591f511f58f22f2',
             'package.json':'fa89988e2524781f8b6799e7f44c43a7753ae1ec',
+            'scripts/editor-cache-regression.node.mjs':'f95a795e46bd5b67b489d8fa7d8aa81a56d86757',
+            'scripts/editor-quit.node.mjs':'01d85d6770a2fb348f5d0c8abfdbbc2970df2f97',
             'server/cmd/notepad-server/main.go':'1750ef87ae28f84ec5e96e229b0c8b27b75d5f37',
             'server/cmd/notepad-server/main_test.go':'edf6599baae3a3cdad2b779746e7e3695682ecf9',
             'server/internal/backup/backup.go':'553d62eab89199d2547cec1ae588868b4e4a3b7b',
-            'server/internal/controller/file.go':'b2b509a6ad0e471b9a50a19ffc695cabebae1d9c'}
-          for file,sha in additions.items():pathlib.Path(file).write_bytes(blob(sha))
+            'server/internal/controller/file.go':'b2b509a6ad0e471b9a50a19ffc695cabebae1d9c',
+            'src/App.jsx':'7f036225cdca1d4ae91fce520c0aaf58f20bbc1e',
+            'src/AppExitDiscard.test.jsx':'b27ae6dc992bccffa1b2fa221d560d41a91b442d',
+            'src/components/EditorQuit.test.jsx':'ae2860e5674b7e007d6b5f1708942be3aed57bdf',
+            'src/components/TextEditor.jsx':'910d9a7f6a6d907b02f089ad4da48bd5d4ac0007',
+            'src/components/TextEditor.test.jsx':'fbfe0c0c0dca998788552997c82d7172ab833943',
+            'src/services/editorQuit.mjs':'59f38fd48c05b5a68e37e872fb85b696c6ca4fc1'}
+          for file,sha in additions.items():
+              p=pathlib.Path(file);p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(blob(sha))
           for file,sha in expected.items():assert subprocess.check_output(['git','hash-object',file]).decode().strip()==sha,file
           pathlib.Path('test-results/save-stage').mkdir(parents=True,exist_ok=True)
           pathlib.Path('test-results/save-stage/expected.json').write_text(json.dumps(expected,indent=2))
           PY
-      - name: Real Go transactions and complete backend regression
-        run: |
-          set -o pipefail
-          go -C server test ./... -count=1 2>&1 | tee test-results/save-stage/go-tests.log
-      - name: Build real Linux server
-        run: go -C server build -o ../test-results/save-stage/save-test-server ./cmd/notepad-server
-      - name: Retain tested content-addressed files only; do not commit or move refs
+      - run: npm install --no-audit --no-fund
+      - name: Verify actual save and existing quit protocol
+        run: node --test scripts/editor-save-transaction.node.mjs scripts/editor-discard.node.mjs scripts/editor-quit.node.mjs scripts/editor-cache-regression.node.mjs
+      - name: Verify actual App and independent reference planner
+        run: npx vitest run --root=. src/AppSaveRecovery.test.jsx src/services/referenceMaintenance.test.js --reporter=json --outputFile=test-results/save-stage/components.json
+      - name: Store only exact tested file blobs, without commits or branch updates
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -69,8 +89,7 @@ jobs:
           for file,sha in expected.items():
               assert subprocess.check_output(['git','hash-object',file]).decode().strip()==sha,file
               data=json.dumps({'encoding':'base64','content':base64.b64encode(pathlib.Path(file).read_bytes()).decode()}).encode()
-              r=json.load(urllib.request.urlopen(urllib.request.Request(root+'/git/blobs',data=data,headers=headers)))
-              assert r['sha']==sha
+              r=json.load(urllib.request.urlopen(urllib.request.Request(root+'/git/blobs',data=data,headers=headers)));assert r['sha']==sha
           pathlib.Path('test-results/save-stage/tested-blobs.json').write_text(json.dumps(expected,indent=2))
           PY
       - uses: actions/upload-artifact@v4
