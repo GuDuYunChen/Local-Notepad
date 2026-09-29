@@ -66,7 +66,7 @@ async function connect(url) {
   ws.addEventListener('close', failAll); ws.addEventListener('error', failAll)
   ws.addEventListener('message', event => {
     const message = JSON.parse(String(event.data))
-    if (message.method === 'Runtime.exceptionThrown') trace += JSON.stringify(message) + '\n'
+    if (['Runtime.exceptionThrown', 'Runtime.consoleAPICalled'].includes(message.method)) trace += JSON.stringify(message) + '\n'
     const task = pending.get(message.id)
     if (!task) return
     pending.delete(message.id); clearTimeout(task.timer)
@@ -120,6 +120,12 @@ async function launch() {
   await cdp.send('Runtime.enable'); await cdp.send('Page.enable'); await cdp.send('Network.enable')
   await until(async () => !!(await api('/api/health')), 'Packaged backend not available')
   assert.equal(await evaluate("typeof window.electronAPI?.reportQuitResult"), 'function')
+  await evaluate(`(()=>{
+    window.__desktopObservedQuit=[];
+    window.electronAPI.onQuitPrepare(v=>window.__desktopObservedQuit.push({event:'prepare',id:v.id}));
+    window.electronAPI.onQuitRelease(v=>window.__desktopObservedQuit.push({event:'release',id:v.id}));
+    return true;
+  })()`)
   report.checks.push('production preload connected for process ' + child.pid)
   saveReport()
 }
@@ -171,8 +177,42 @@ async function screenshot(name) {
     text: await evaluate("document.querySelector('.editor-input')?.innerText || document.body.innerText") })
   saveReport()
 }
+function nativeWindows() {
+  const script = `$ErrorActionPreference='Stop';Add-Type -TypeDefinition @'
+using System;using System.Text;using System.Collections.Generic;using System.Runtime.InteropServices;
+public class DesktopWindow { public long handle;public uint pid;public string title;public string cls;public bool visible;public List<string> childText=new List<string>();}
+public static class DesktopInspect {
+public delegate bool Callback(IntPtr h,IntPtr p);
+[DllImport("user32.dll")]static extern bool EnumWindows(Callback cb,IntPtr p);
+[DllImport("user32.dll")]static extern bool EnumChildWindows(IntPtr h,Callback cb,IntPtr p);
+[DllImport("user32.dll")]static extern uint GetWindowThreadProcessId(IntPtr h,out uint p);
+[DllImport("user32.dll",CharSet=CharSet.Unicode)]static extern int GetWindowText(IntPtr h,StringBuilder s,int n);
+[DllImport("user32.dll",CharSet=CharSet.Unicode)]static extern int GetClassName(IntPtr h,StringBuilder s,int n);
+[DllImport("user32.dll")]static extern bool IsWindowVisible(IntPtr h);
+static string Text(IntPtr h){var s=new StringBuilder(2048);GetWindowText(h,s,2048);return s.ToString();}
+public static List<DesktopWindow> Read(uint pid){var a=new List<DesktopWindow>();EnumWindows((h,p)=>{uint id;GetWindowThreadProcessId(h,out id);if(id!=pid)return true;var s=new StringBuilder(256);GetClassName(h,s,256);var x=new DesktopWindow{handle=h.ToInt64(),pid=id,title=Text(h),cls=s.ToString(),visible=IsWindowVisible(h)};EnumChildWindows(h,(c,q)=>{var t=Text(c);if(t.Length>0)x.childText.Add(t);return true;},IntPtr.Zero);a.Add(x);return true;},IntPtr.Zero);return a;}
+}
+'@;[DesktopInspect]::Read(${child.pid})|ConvertTo-Json -Depth 5 -Compress`
+  const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand',
+    Buffer.from(script, 'utf16le').toString('base64')], { encoding: 'utf8', timeout: 10000 })
+  return { code: r.status, output: r.stdout, error: r.stderr }
+}
+async function closeSnapshot(phase) {
+  const native = nativeWindows()
+  const renderer = await evaluate(`(()=>({
+    url:location.href, title:document.title,
+    body:document.body.innerText, active:document.activeElement?.outerHTML,
+    quit:window.__desktopObservedQuit || [],
+    drafts:Object.fromEntries(Object.keys(localStorage).filter(k=>/editor.*cache|draft/.test(k)).map(k=>[k,localStorage.getItem(k)]))
+  }))()`)
+  report.closeDiagnostics ||= []
+  report.closeDiagnostics.push({ phase, pid: child.pid, native, renderer })
+  saveReport()
+}
+
 async function closeWindow() {
   assert.ok(Number.isInteger(child.pid))
+  await closeSnapshot('before-close')
   // WM_CLOSE addresses only the main window of this spawned test process.
   // No app.quit(), forged ready receipt, taskkill or renderer mock on success.
   const command = `$ErrorActionPreference='Stop'; Add-Type -TypeDefinition 'using System;using System.Runtime.InteropServices;public static class CloseTestWindow{[DllImport("user32.dll",SetLastError=true)]public static extern bool PostMessage(IntPtr h,uint m,IntPtr w,IntPtr l);}';$p=Get-Process -Id ${child.pid};$p.Refresh();if($p.MainWindowHandle -eq 0){throw 'Test window missing'};if(-not [CloseTestWindow]::PostMessage($p.MainWindowHandle,0x0010,[IntPtr]::Zero,[IntPtr]::Zero)){throw 'WM_CLOSE failed'}`
@@ -245,7 +285,7 @@ try {
   verifyDesktopSaveReport(out, process.env.GITHUB_SHA)
 } catch (error) {
   report.complete = false; report.error = String(error?.stack || error); saveReport()
-  if (cdp) { try { await screenshot('failed-state') } catch {} }
+  if (cdp) { try { await closeSnapshot('failure'); await screenshot('failed-state') } catch {} }
   throw error
 } finally {
   cdp?.close()
