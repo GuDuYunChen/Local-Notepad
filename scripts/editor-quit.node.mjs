@@ -158,7 +158,7 @@ function actualSave(){
   const ref=current=>({current}),writes=[],cache=[],responses=[]
   const c={createEditorSaveAttempt,commitEditorSave,
     saveConflictsRef:ref(new Map()),saveTimerRef:ref(null),readEditorDraft:()=>null,removeEditorDraft(){},normalizeLegacyTableBreakMarkup:s=>s,
-    rawSavedBodiesRef:ref(new Map([['n1','old']])),saveAttemptsRef:ref(new Map()),setSaveProblem(){},cachePendingBodyForRetry(){},window:{dispatchEvent(){},clearTimeout(){}},Event,
+    rawSavedBodiesRef:ref(new Map([['n1','old']])),saveAttemptsRef:ref(new Map()),setSaveProblem(){},cachePendingBodyForRetry(...args){cache.push(args)},window:{dispatchEvent(){},clearTimeout(){}},Event,
     React:{useCallback:fn=>fn},currentIdRef:ref('n1'),loadedDocumentRef:ref('n1'),deletedIdsRef:ref(new Set()),
     contentRef:ref('draft'),lastSavedContentRef:ref('old'),inFlightSavesRef:ref(new Map()),saveControllersRef:ref(new Set()),
     pendingStructureMappingsRef:ref([]),onSavedRef:ref(()=>{}),editorQuit:createEditorQuitRegistry(),
@@ -184,7 +184,7 @@ test('actual saveNow does not skip a revert while an older different write is pe
 test('actual saveNow rejects missing or wrong content acknowledgements',async()=>{
   for(const result of [null,{id:'wrong',content:'draft'},{id:'n1',content:'different'}]){
     const f=actualSave(),p=f.c.saveNow('quit'),rejected=assert.rejects(p,/未确认/);f.responses[0].resolve(result);await rejected
-    assert.equal(f.c.lastSavedContentRef.current,'old');assert.equal(f.c.editorQuit.pending(),1);assert.equal(f.cache.length,0)
+    assert.equal(f.c.lastSavedContentRef.current,'old');assert.equal(f.c.editorQuit.pending(),1);assert.ok(f.cache.length>0);assert.ok(f.cache.every(entry=>entry[1]==='draft'&&entry[2]===undefined))
   }
 })
 const mainSource=fs.readFileSync(new URL('../electron/main.js',import.meta.url),'utf8')

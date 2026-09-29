@@ -250,11 +250,81 @@ it('an actual adoption response delayed past unmount cannot clear the retained d
   api.mockImplementation(normalLoad)
   await mount(); await openA()
   await until(() => expect(field().value).toBe('retained draft after unmount'))
+  // Remounting is not a decision to overwrite the conflicting database body.
+  expect(host.textContent).toContain('处理保存冲突')
+  expect((await server.call('/api/files/' + id)).content).toBe('database before adoption')
+  await click('处理保存冲突')
   await act(async () => {
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 's', ctrlKey: true, bubbles: true })); await tick()
+    [...document.querySelectorAll('.editor-save-conflict-dialog button')].find(button => button.textContent === '保留我的正文').click()
+    await tick()
   })
   await until(() => expect(editorQuit.pending()).toBe(0))
   expect(await quit()).toEqual({ id: 'a'.repeat(32), ready: true })
   await unmount(); await server.stop(); await server.start(); localStorage.clear()
   expect((await server.call('/api/files/' + id)).content).toBe('retained draft after unmount')
+})
+
+it('an expired serialized draft reopens without a memory ledger, saves via actual HTTP and survives restart', async () => {
+  const id = fixture.notes.a.id
+  await openA(); await type('unsaved across a long break'); await unmount()
+  const retained = JSON.parse(localStorage.getItem('editor:cache:' + id))
+  expect(retained.recovery.expectedContent).toBe(fixture.notes.a.content)
+  retained.editedAt = Date.now() - 10 * 60 * 1000
+  // Simulate a new renderer process: only serialized storage remains.
+  removeEditorDraft(id); editorQuit.forget(id)
+  localStorage.setItem('editor:cache:' + id, JSON.stringify(retained))
+  await mount(); await openA()
+  await until(() => expect(field().value).toBe('unsaved across a long break'))
+  await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', {key:'s',ctrlKey:true,bubbles:true})); await tick() })
+  await until(() => expect(editorQuit.pending()).toBe(0))
+  expect(await quit()).toEqual({id:'a'.repeat(32),ready:true})
+  await unmount(); await server.stop(); await server.start(); localStorage.clear()
+  expect((await server.call('/api/files/' + id)).content).toBe('unsaved across a long break')
+})
+it('reopening a draft whose actual database base changed preserves both versions until explicit review', async () => {
+  const id = fixture.notes.a.id
+  await openA(); await type('my recovered version'); await unmount()
+  await server.call('/api/files/' + id, {method:'PUT',body:JSON.stringify({content:'database version while editor closed'})})
+  await mount(); await openA(); await until(() => expect(field().value).toBe('my recovered version'))
+  expect(host.textContent).toContain('处理保存冲突')
+  expect((await quit()).ready).toBe(false)
+  expect((await server.call('/api/files/' + id)).content).toBe('database version while editor closed')
+  await act(async () => release({id:'a'.repeat(32)})); results=[]
+  await click('处理保存冲突')
+  await act(async () => {
+    [...document.querySelectorAll('.editor-save-conflict-dialog button')].find(button => button.textContent === '保留我的正文').click(); await tick()
+  })
+  await until(() => expect(editorQuit.pending()).toBe(0))
+  expect((await server.call('/api/files/' + id + '/versions')).some(v=>v.content==='database version while editor closed')).toBe(true)
+  expect(await quit()).toEqual({id:'a'.repeat(32),ready:true})
+  await unmount(); await server.stop(); await server.start(); localStorage.clear()
+  expect((await server.call('/api/files/' + id)).content).toBe('my recovered version')
+})
+it('a committed response withheld across remount is reconciled by the original token before the newest body', async () => {
+  const id = fixture.notes.a.id, normal = api.getMockImplementation()
+  let firstRequest, releaseResponse
+  api.mockImplementation(async (route, init) => {
+    if (route === '/api/files/' + id && init?.method === 'PUT' && !firstRequest) {
+      firstRequest=JSON.parse(init.body)
+      const committed = await server.call(route, init)
+      return new Promise(resolve => { releaseResponse = () => resolve(committed) })
+    }
+    return normal(route, init)
+  })
+  await openA(); await type('first persisted request')
+  await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', {key:'s',ctrlKey:true,bubbles:true})); await tick() })
+  await until(() => expect(releaseResponse).toBeTypeOf('function'))
+  await type('latest after held response'); await unmount()
+  expect(readEditorDraft(id).recovery.attempt.requestID).toBe(firstRequest.save_request_id)
+  await act(async () => { releaseResponse(); await tick() })
+  api.mockImplementation(normal)
+  await mount(); await openA(); await until(() => expect(field().value).toBe('latest after held response'))
+  await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', {key:'s',ctrlKey:true,bubbles:true})); await tick() })
+  await until(() => expect(editorQuit.pending()).toBe(0))
+  const saved=puts().map(([,init])=>JSON.parse(init.body))
+  expect(saved).toHaveLength(3); expect(saved[1]).toEqual(saved[0]); expect(saved[2].expected_content).toBe('first persisted request')
+  expect((await server.call('/api/files/' + id + '/versions')).filter(v=>v.content==='first persisted request')).toHaveLength(1)
+  expect(await quit()).toEqual({id:'a'.repeat(32),ready:true})
+  await unmount(); await server.stop(); await server.start(); localStorage.clear()
+  expect((await server.call('/api/files/' + id)).content).toBe('latest after held response')
 })

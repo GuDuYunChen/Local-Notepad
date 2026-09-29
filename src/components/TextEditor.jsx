@@ -4,7 +4,6 @@ import { countLexicalCharacters } from '~/utils/lexicalText'
 import { normalizeLegacyTableBreakMarkup } from '~/services/legacyContentCompatibility'
 import { hasHeadingStructureChanged } from './Editor/utils/referenceUtils'
 import {
-  isFreshEditorDraft,
   readEditorDraft,
   removeEditorDraft,
   writeEditorDraft,
@@ -14,6 +13,7 @@ import { editorQuit, createEditorQuitParticipant } from '~/services/editorQuit.m
 import { discardEditorDraft, observeEditorDraft } from '~/services/editorDraftDiscard.mjs'
 import { createEditorSaveAttempt, commitEditorSave, boundedEditorRequest } from '~/services/editorSaveTransaction.mjs'
 
+import { captureEditorDraftRecovery, recoverEditorDraft } from '~/services/editorDraftRecovery.mjs'
 import EditorSaveConflictDialog from './EditorSaveConflictDialog'
 
 const Editor = React.lazy(() => import('./Editor/Editor'))
@@ -111,7 +111,12 @@ function TextEditorInternal({
     }
   }, [])
 
-  const cachePendingBodyForRetry = (id, text) => { try { writeEditorDraft(id, text) } catch {} }
+  const cachePendingBodyForRetry = (id, text) => {
+    try {
+      writeEditorDraft(id, text, undefined, captureEditorDraftRecovery(id,
+        rawSavedBodiesRef.current.get(id), saveAttemptsRef.current.get(id), saveConflictsRef.current.has(id)))
+    } catch { /* The existing cache service keeps its in-memory fallback. */ }
+  }
 
   const saveNow = React.useCallback(async (reason, specificId = null, contentOverride = null) => {
     const id = specificId || currentIdRef.current
@@ -158,6 +163,9 @@ function TextEditorInternal({
               id === currentIdRef.current ? pendingStructureMappingsRef.current : [])
             saveAttemptsRef.current.set(id, attempt)
           }
+          // Persist the immutable request with the newest draft before sending.
+          // Reopening must reconcile this token, not invent another write.
+          cachePendingBodyForRetry(id, id === currentIdRef.current ? contentRef.current : (readEditorDraft(id)?.content ?? text))
           updated = await commitEditorSave(api, attempt, ctl.signal)
           rawSavedBodiesRef.current.set(id, updated.content)
           saveAttemptsRef.current.delete(id)
@@ -170,7 +178,7 @@ function TextEditorInternal({
             setLastSavedAt(now); setSaveProblem('')
             window.clearTimeout(saveTimerRef.current); saveTimerRef.current = null
             if (contentRef.current === updated.content) removeEditorDraft(id)
-            else writeEditorDraft(id, contentRef.current)
+            else cachePendingBodyForRetry(id, contentRef.current)
             onSavedRef.current?.(updated)
           } else if (readEditorDraft(id)?.content === updated.content) {
             removeEditorDraft(id)
@@ -218,8 +226,8 @@ function TextEditorInternal({
   const cachePendingDraft = React.useCallback(() => {
     const id = currentIdRef.current
     if (!id || loadedDocumentRef.current !== id || deletedIdsRef.current?.has(id)) return
-    if (contentRef.current === lastSavedContentRef.current && !inFlightSavesRef.current.has(id) && !saveAttemptsRef.current.has(id)) return
-    writeEditorDraft(id, contentRef.current)
+    if (contentRef.current === lastSavedContentRef.current && !inFlightSavesRef.current.has(id) && !saveAttemptsRef.current.has(id) && !saveConflictsRef.current.has(id)) return
+    cachePendingBodyForRetry(id, contentRef.current)
   }, [])
 
   useEffect(() => editorQuit.register(createEditorQuitParticipant({
@@ -294,11 +302,7 @@ function TextEditorInternal({
       ))
 
       if (currentIdRef.current) {
-        writeEditorDraft(
-          currentIdRef.current,
-          text,
-          lastSavedAt,
-        )
+        cachePendingBodyForRetry(currentIdRef.current, text)
       }
 
       onChangeRef.current?.(text)
@@ -349,9 +353,10 @@ function TextEditorInternal({
     const prevId = currentIdRef.current
     if (prevId && prevId !== activeId && loadedDocumentRef.current === prevId) {
       const isDeleted = deletedIds?.has(prevId)
-      if (!isDeleted && autoSaveOnSwitch) {
+      if (!isDeleted) {
+        // Disabling autosave-on-switch is not permission to erase its draft.
         cachePendingDraft()
-        if (contentRef.current !== lastSavedContentRef.current || saveAttemptsRef.current.has(prevId)) {
+        if (autoSaveOnSwitch && (contentRef.current !== lastSavedContentRef.current || saveAttemptsRef.current.has(prevId))) {
           void saveNow('manual', prevId).catch(() => {})
         }
       }
@@ -389,20 +394,29 @@ function TextEditorInternal({
         if (loadCtl.signal.aborted || loadAbortRef.current !== loadCtl || id !== currentIdRef.current) return
 
         const cached = readEditorDraft(id)
-        const useCache = isFreshEditorDraft(cached) && cached.editedAt && (!f.updated_at || cached.editedAt > f.updated_at * 1000)
-        const serverText = normalizeLegacyTableBreakMarkup(f.content || '')
-        rawSavedBodiesRef.current.set(id, f.content || '')
-        const cachedText = useCache
-          ? normalizeLegacyTableBreakMarkup(cached.content || '')
-          : ''
-        const text = useCache ? cachedText : serverText
-        // A reload is a fresh comparison, not permission to clear an unknown
-        // write. A terminal conflict may be dismissed only when no draft remains.
-        if (text === serverText && !saveAttemptsRef.current.has(id)) saveConflictsRef.current.delete(id)
-        if (saveConflictsRef.current.has(id)) setSaveError(true)
-
-        editorQuit.saved(id, serverText)
-        if (text !== serverText) editorQuit.remember(id, text)
+        const rawServer = f.content || ''
+        const serverText = normalizeLegacyTableBreakMarkup(rawServer)
+        const recovery = recoverEditorDraft(id, cached, rawServer)
+        rawSavedBodiesRef.current.set(id, recovery.expectedContent)
+        if (recovery.attempt && !saveAttemptsRef.current.has(id)) saveAttemptsRef.current.set(id, recovery.attempt)
+        const text = normalizeLegacyTableBreakMarkup(recovery.content)
+        if (recovery.review && !saveAttemptsRef.current.has(id)) {
+          saveConflictsRef.current.set(id, f)
+          setSaveProblem('未确认草稿已恢复；其保存基线与当前数据库未获一致确认，请处理保存冲突。')
+        }
+        // Matching a fresh read can clear a clean draft, but never an unknown
+        // request that still has to be reconciled with its original identity.
+        const unconfirmed = saveAttemptsRef.current.has(id)
+        if (text === serverText && !unconfirmed && !recovery.review) {
+          saveConflictsRef.current.delete(id)
+          if (cached?.recovery) removeEditorDraft(id)
+        }
+        if (saveConflictsRef.current.has(id) || unconfirmed) {
+          setSaveError(true)
+          if (unconfirmed) setSaveProblem('已恢复尚未确认的保存请求。重试会先核对原请求，当前草稿保留。')
+        }
+        if (text !== serverText || unconfirmed || recovery.review) editorQuit.remember(id, text)
+        else editorQuit.saved(id, serverText)
         lastSavedContentRef.current = serverText
         pendingStructureMappingsRef.current = []
         setStructureDirty(hasHeadingStructureChanged(serverText, text || ''))

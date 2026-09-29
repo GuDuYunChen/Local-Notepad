@@ -13,6 +13,9 @@ function supportsLocalStorage() {
 
 export function readEditorDraft(id) {
   if (!id) return null
+  // A quota-limited or large edit may exist only in memory. It is newer than
+  // the disk entry this renderer could not replace; never shadow it with disk.
+  if (MEMORY_CACHE.has(id)) return MEMORY_CACHE.get(id)
   try {
     if (!supportsLocalStorage()) return MEMORY_CACHE.get(id) || null
     const raw = localStorage.getItem(`editor:cache:${id}`)
@@ -23,13 +26,14 @@ export function readEditorDraft(id) {
   }
 }
 
-export function writeEditorDraft(id, content, savedAt) {
+export function writeEditorDraft(id, content, savedAt, recovery = null) {
   if (!id) return
   const text = String(content ?? '')
   const payload = {
     content: text,
     editedAt: Date.now(),
     savedAt,
+    ...(recovery ? { recovery } : {}),
   }
 
   MEMORY_CACHE.set(id, payload)

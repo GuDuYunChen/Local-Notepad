@@ -633,7 +633,7 @@ describe('TextEditor save coordination', () => {
     })
   })
 
-  it('recovers a fresher local draft while keeping it dirty against the server version', async () => {
+  it('recovers a draft with a matching saved base while keeping it dirty against the server version', async () => {
     const server = '{"root":{"children":[{"type":"paragraph","children":[{"type":"text","text":"server"}]}]}}'
     const draft = '{"root":{"children":[{"type":"paragraph","children":[{"type":"text","text":"draft newer"}]}]}}'
     const statuses = []
@@ -642,6 +642,7 @@ describe('TextEditor save coordination', () => {
       content: draft,
       editedAt: Date.now(),
       savedAt: null,
+      recovery: { version: 1, id: 'file-1', expectedContent: server, conflicted: false, attempt: null },
     }))
 
     api.mockResolvedValue({

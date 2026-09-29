@@ -31,6 +31,9 @@ jobs:
       - run: git fetch --no-tags --depth=1 origin 0b66c7e6a902129cd2ead4da75f5d1bf96a9d9de
       - run: git fetch --no-tags --depth=1 origin 8480c91d293fbdb1f565da2d710536b1edefd4dd
       - run: git fetch --no-tags --depth=1 origin ca9259c21ae0518b6d4f44d21bd7d48a232fedd7
+      - run: git fetch --no-tags --depth=1 origin 5cf6619336554b4e8af6320ba41e03344f4db0dd
+      - name: Reproduce exact 4.189.3 unconfirmed draft recovery failures
+        run: node scripts/check-draft-recovery-baseline.mjs
       - name: Reproduce 4.189.2 conflict decision and adoption lifecycle omissions
         run: node scripts/check-save-decision-baseline.mjs
       - name: Reproduce acknowledged-cache defect on exact 4.189.1
@@ -38,7 +41,7 @@ jobs:
       - name: Reproduce actual old structural save failures
         run: node scripts/check-save-recovery-baseline.mjs
       - name: Verify receipts, retries, old quit guards and draft cache
-        run: node --test scripts/editor-save-transaction.node.mjs scripts/editor-discard.node.mjs scripts/editor-quit.node.mjs scripts/editor-cache-regression.node.mjs
+        run: node --test scripts/editor-draft-recovery.node.mjs scripts/editor-save-transaction.node.mjs scripts/editor-discard.node.mjs scripts/editor-quit.node.mjs scripts/editor-cache-regression.node.mjs
       - name: Verify all real UI regression tests
         run: npx vitest run --root=. --maxWorkers=4 --minWorkers=1 --reporter=json --outputFile=test-results/save-recovery/full-ui.json
       - name: Verify SQLite transactions, migrations and backup compatibility
