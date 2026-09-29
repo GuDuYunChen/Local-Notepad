@@ -8,3 +8,5 @@
 .editor-save-conflict-note{font-size:12px}
 .editor-save-conflict-dialog .modal-actions{flex-wrap:wrap}
 @media(max-width:600px){.editor-save-conflict-previews{grid-template-columns:1fr}.editor-save-conflict-previews pre{max-height:140px}}
+
+.editor-save-conflict-problem{padding:10px 12px;border:1px solid var(--line);border-radius:8px;color:var(--ink);background:var(--paper);font-size:13px}

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { extractLexicalText } from '~/utils/lexicalText'
 import './EditorSaveConflictDialog.css'
 
-export default function EditorSaveConflictDialog({ draft, database, busy, onClose, onResolve }) {
+export default function EditorSaveConflictDialog({ draft, database, busy, problem, onClose, onResolve }) {
   const titleID = useId(), messageID = useId(), panel = useRef(null)
   const state = useRef({ busy, onClose }); state.current = { busy, onClose }
   useEffect(() => {
@@ -31,6 +31,7 @@ export default function EditorSaveConflictDialog({ draft, database, busy, onClos
         <section aria-label="数据库正文预览"><h3>数据库正文</h3><pre tabIndex={0}>{preview(database)}</pre></section>
       </div>
       <p className="editor-save-conflict-note">仅预览各版本前 1600 个字符；不会把格式、图片或附件转换为预览文字后保存。</p>
+      {problem && <p className="editor-save-conflict-problem" role="alert">{problem}</p>}
       <div className="modal-actions consumer-modal-actions">
         <button type="button" className="btn" data-conflict-cancel disabled={busy} onClick={onClose}>暂不处理</button>
         <button type="button" className="btn" disabled={busy} onClick={() => { void onResolve('database') }}>采用数据库正文</button>

@@ -103,3 +103,115 @@ it('cancel and Escape do not save, adopt or clear the draft; preview text is esc
  expect(document.querySelector('[role="dialog"]')).toBeNull();expect(editorQuit.pending()).toBe(1)
  expect(api.mock.calls.filter(([,i])=>i?.method==='PUT')).toHaveLength(1)
 })
+
+it('keeping a matching conflicted draft still compares the reviewed database body before approving exit', async () => {
+  api.mockImplementation(async (_path, init) => {
+    if (init?.method === 'PUT') {
+      const request = JSON.parse(init.body); ticks.push(request)
+      return ack(request, ticks.length === 1 ? 'reviewed body' : 'changed since review', 'conflict')
+    }
+    return { id: 'save-conflict', content: body, updated_at: 100 }
+  })
+  await edit('my draft'); await save(); await edit('reviewed body')
+  await click('处理保存冲突'); await click('保留我的正文')
+  expect(ticks).toHaveLength(2)
+  expect(ticks[1].expected_content).toBe('reviewed body')
+  expect(ticks[1].content).toBe('reviewed body')
+  expect(ticks[1].save_request_id).not.toBe(ticks[0].save_request_id)
+  expect(ref.current.getReferenceRefactorState().currentContent).toBe('reviewed body')
+  expect(editorQuit.pending()).toBe(1)
+  await expect(editorQuit.flush(new AbortController().signal)).rejects.toThrow()
+})
+it('matching conflicted content becomes saved only after an actual applied receipt', async () => {
+  api.mockImplementation(async (_path, init) => {
+    if (init?.method === 'PUT') {
+      const request = JSON.parse(init.body); ticks.push(request)
+      return ticks.length === 1 ? ack(request, 'reviewed body', 'conflict') : ack(request)
+    }
+    return { id: 'save-conflict', content: body, updated_at: 100 }
+  })
+  await edit('my draft'); await save(); await edit('reviewed body')
+  await click('处理保存冲突'); await click('保留我的正文')
+  expect(ticks).toHaveLength(2)
+  expect(editorQuit.pending()).toBe(0)
+  expect(readEditorDraft('save-conflict')).toBeNull()
+  await save(); expect(ticks).toHaveLength(2) // ordinary clean saves remain no-ops
+})
+it('unmounting during database adoption preserves the draft and ignores a late response', async () => {
+  let finish
+  api.mockImplementation(async (_path, init) => {
+    if (init?.method === 'PUT') return ack(JSON.parse(init.body), 'database', 'conflict')
+    return new Promise(resolve => { finish = resolve })
+  })
+  await edit('my unconfirmed draft'); await save()
+  await click('处理保存冲突'); await click('采用数据库正文')
+  await act(async () => root.unmount())
+  root = createRoot(host)
+  expect(editorQuit.pending()).toBe(1)
+  await act(async () => finish({ id: 'save-conflict', content: 'database', updated_at: 101 }))
+  expect(editorQuit.pending()).toBe(1)
+  expect(readEditorDraft('save-conflict')?.content).toBe('my unconfirmed draft')
+})
+it('a failed database adoption explains the failure inside the still-open dialog', async () => {
+  api.mockImplementation(async (_path, init) => {
+    if (init?.method === 'PUT') return ack(JSON.parse(init.body), 'database', 'conflict')
+    throw new Error('PRIVATE_TRANSPORT_DETAILS')
+  })
+  await edit('my draft'); await save()
+  await click('处理保存冲突'); await click('采用数据库正文')
+  const dialog = document.querySelector('[role="dialog"]')
+  expect(dialog).not.toBeNull()
+  expect(dialog.querySelector('[role="alert"]')).not.toBeNull()
+  expect(dialog.querySelector('[role="alert"]').textContent).toContain('草稿仍保留')
+  expect(dialog.textContent).not.toContain('PRIVATE_TRANSPORT_DETAILS')
+  expect(editorQuit.pending()).toBe(1)
+})
+it('adoption timeout stays visible and retry can finish without another body write', async () => {
+  let finish, signal, tries = 0
+  api.mockImplementation(async (_path, init) => {
+    if (init?.method === 'PUT') { ticks.push(JSON.parse(init.body)); return ack(JSON.parse(init.body), 'database', 'conflict') }
+    if (++tries === 1) { signal = init.signal; return new Promise(resolve => { finish = resolve }) }
+    return { id: 'save-conflict', content: 'database retry', updated_at: 101 }
+  })
+  await edit('my draft'); await save(); await click('处理保存冲突'); await click('采用数据库正文')
+  await act(async () => vi.advanceTimersByTimeAsync(8100))
+  expect(signal.aborted).toBe(true)
+  expect(document.querySelector('[role="dialog"] [role="alert"]').textContent).toContain('草稿仍保留')
+  expect(editorQuit.pending()).toBe(1)
+  await click('采用数据库正文')
+  expect(document.querySelector('[role="dialog"]')).toBeNull()
+  expect(ref.current.getReferenceRefactorState().currentContent).toBe('database retry')
+  expect(editorQuit.pending()).toBe(0); expect(ticks).toHaveLength(1)
+  await act(async () => finish({ id: 'save-conflict', content: 'late first read', updated_at: 100 }))
+  expect(ref.current.getReferenceRefactorState().currentContent).toBe('database retry')
+})
+it('switching documents aborts only the adoption read and its late completion cannot clear the original draft', async () => {
+  let finish, signal
+  api.mockImplementation(async (path, init) => {
+    if (init?.method === 'PUT') return ack(JSON.parse(init.body), 'database', 'conflict')
+    if (path.endsWith('other-note')) return { id: 'other-note', content: 'other document', updated_at: 101 }
+    signal = init.signal
+    return new Promise(resolve => { finish = resolve })
+  })
+  await edit('my draft'); await save(); await click('处理保存冲突'); await click('采用数据库正文')
+  await render('other-note')
+  expect(signal.aborted).toBe(true)
+  await act(async () => finish({ id: 'save-conflict', content: 'database', updated_at: 101 }))
+  expect(ref.current.getDocumentId()).toBe('other-note')
+  expect(ref.current.getReferenceRefactorState().currentContent).toBe('other document')
+  expect(editorQuit.hasDraft('save-conflict')).toBe(true)
+  expect(document.querySelector('[role="dialog"]')).toBeNull()
+})
+it('cancelling after an adoption failure keeps the draft and clears stale feedback when reopened', async () => {
+  api.mockImplementation(async (_path, init) => {
+    if (init?.method === 'PUT') return ack(JSON.parse(init.body), 'database', 'conflict')
+    throw new Error('PRIVATE_FAILURE')
+  })
+  await edit('my draft'); await save(); await click('处理保存冲突'); await click('采用数据库正文')
+  expect(document.querySelector('[role="dialog"] [role="alert"]')).not.toBeNull()
+  await click('暂不处理'); expect(editorQuit.pending()).toBe(1)
+  await click('处理保存冲突')
+  expect(document.querySelector('[role="dialog"] [role="alert"]')).toBeNull()
+  expect(document.activeElement.textContent).toBe('暂不处理')
+  expect(ref.current.getReferenceRefactorState().currentContent).toBe('my draft')
+})

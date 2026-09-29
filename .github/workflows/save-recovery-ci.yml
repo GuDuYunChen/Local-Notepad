@@ -30,6 +30,9 @@ jobs:
       - run: npm install --no-audit --no-fund
       - run: git fetch --no-tags --depth=1 origin 0b66c7e6a902129cd2ead4da75f5d1bf96a9d9de
       - run: git fetch --no-tags --depth=1 origin 8480c91d293fbdb1f565da2d710536b1edefd4dd
+      - run: git fetch --no-tags --depth=1 origin ca9259c21ae0518b6d4f44d21bd7d48a232fedd7
+      - name: Reproduce 4.189.2 conflict decision and adoption lifecycle omissions
+        run: node scripts/check-save-decision-baseline.mjs
       - name: Reproduce acknowledged-cache defect on exact 4.189.1
         run: node scripts/check-save-conflict-baseline.mjs
       - name: Reproduce actual old structural save failures

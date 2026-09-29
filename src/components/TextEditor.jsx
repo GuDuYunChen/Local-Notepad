@@ -39,6 +39,8 @@ function TextEditorInternal({
   const [conflictDialog, setConflictDialog] = useState(null)
   const [conflictBusy, setConflictBusy] = useState(false)
   const conflictBusyRef = useRef(false)
+  const conflictResolutionRef = useRef(null)
+  const [conflictProblem, setConflictProblem] = useState('')
   const loadGenerationRef = useRef(0)
   const [saveProblem, setSaveProblem] = useState('')
   const [editRevision, setEditRevision] = useState(0)
@@ -130,7 +132,9 @@ function TextEditorInternal({
 
     // A pending older write can change the saved baseline. Do not skip a revert
     // until that write has settled, otherwise exit could approve the wrong text.
-    if (id === currentIdRef.current && text === lastSavedContentRef.current && !saveAttemptsRef.current.has(id)) {
+    // A conflict decision always rechecks the reviewed database version, even
+    // when the draft happens to match our last observation of that version.
+    if (reason !== 'confirmed-conflict' && id === currentIdRef.current && text === lastSavedContentRef.current && !saveAttemptsRef.current.has(id)) {
       editorQuit.saved(id, text)
       setSaveError(false)
       return { id, content: text, skipped: true }
@@ -331,6 +335,11 @@ function TextEditorInternal({
     // Mount the editor only after this exact load has produced its content.
     // A matching ID alone is not enough during A → B → A or StrictMode replay.
     loadGenerationRef.current += 1
+    conflictResolutionRef.current?.abort()
+    conflictResolutionRef.current = null
+    conflictBusyRef.current = false
+    setConflictBusy(false)
+    setConflictProblem('')
     setConflictDialog(null)
     setSwitching(true)
     setLoadError(false)
@@ -428,6 +437,13 @@ function TextEditorInternal({
   }, [activeId, loadAttempt, saveNow, syncCurrentSavingState])
 
   useEffect(() => () => {
+    // A database adoption is a read, not an editor-save controller. Invalidate
+    // its authority before caching or detaching this editor. An ignored abort
+    // or late response must never clear this document's unsaved registration.
+    loadGenerationRef.current += 1
+    conflictResolutionRef.current?.abort()
+    conflictResolutionRef.current = null
+    conflictBusyRef.current = false
     cachePendingDraft()
     if (saveTimerRef.current) {
       window.clearTimeout(saveTimerRef.current)
@@ -524,7 +540,10 @@ function TextEditorInternal({
 
   const openSaveConflict = () => {
     const id = currentIdRef.current, file = saveConflictsRef.current.get(id)
-    if (file) setConflictDialog({ id, file, draft: contentRef.current, generation: loadGenerationRef.current })
+    if (file) {
+      setConflictProblem('')
+      setConflictDialog({ id, file, draft: contentRef.current, generation: loadGenerationRef.current })
+    }
   }
   const resolveSaveConflict = async choice => {
     const reviewed = conflictDialog
@@ -532,8 +551,11 @@ function TextEditorInternal({
     if (reviewed.id !== currentIdRef.current || reviewed.generation !== loadGenerationRef.current || reviewed.draft !== contentRef.current) {
       setConflictDialog(null); setSaveProblem('正文已变化，请重新打开冲突处理。'); return
     }
+    const operation = new AbortController()
+    conflictResolutionRef.current = operation
     conflictBusyRef.current = true
     setConflictBusy(true)
+    setConflictProblem('')
     try {
       if (choice === 'keep') {
         // The user reviewed this exact database version. A fresh CAS must still
@@ -544,10 +566,10 @@ function TextEditorInternal({
         setConflictDialog(null)
         await saveNow('confirmed-conflict')
       } else {
-        const file = await boundedEditorRequest(api, '/api/files/' + encodeURIComponent(reviewed.id))
+        const file = await boundedEditorRequest(api, '/api/files/' + encodeURIComponent(reviewed.id), { signal: operation.signal })
         if (file?.id !== reviewed.id || typeof file.content !== 'string') throw new Error('数据库正文未获确认，草稿保留')
-        if (reviewed.id !== currentIdRef.current || reviewed.generation !== loadGenerationRef.current || reviewed.draft !== contentRef.current || inFlightSavesRef.current.has(reviewed.id) || saveAttemptsRef.current.has(reviewed.id)) {
-          throw new Error('核对期间正文或笔记已变化，未替换草稿，请重新处理')
+        if (operation.signal.aborted || reviewed.id !== currentIdRef.current || reviewed.generation !== loadGenerationRef.current || reviewed.draft !== contentRef.current || inFlightSavesRef.current.has(reviewed.id) || saveAttemptsRef.current.has(reviewed.id)) {
+          throw Object.assign(new Error('核对期间正文或笔记已变化，草稿仍保留，请重新处理。'), { code: 'adoption-changed' })
         }
         if (deletedIdsRef.current?.has(reviewed.id) || editorQuit.discard(reviewed.id, reviewed.draft) !== true) throw new Error('草稿登记已变化，未替换正文')
         const text = normalizeLegacyTableBreakMarkup(file.content)
@@ -564,10 +586,20 @@ function TextEditorInternal({
         onChangeRef.current?.(text); onLoadedRef.current?.(text)
       }
     } catch (error) {
-      if (reviewed.id === currentIdRef.current && reviewed.generation === loadGenerationRef.current) {
-        setSaveError(true); setSaveProblem(error.message || '冲突处理未完成，草稿保留')
+      if (!operation.signal.aborted && reviewed.id === currentIdRef.current && reviewed.generation === loadGenerationRef.current) {
+        const message = choice === 'keep' ? (error.message || '冲突处理未完成，草稿保留')
+          : error.code === 'adoption-changed' ? error.message
+            : '未能采用数据库正文，草稿仍保留。请重试或暂不处理。'
+        setSaveError(true); setSaveProblem(message)
+        if (choice !== 'keep') setConflictProblem(message)
       }
-    } finally { conflictBusyRef.current = false; setConflictBusy(false) }
+    } finally {
+      // A superseded/unmounted request cannot release a newer operation's UI.
+      if (conflictResolutionRef.current === operation) {
+        conflictResolutionRef.current = null
+        conflictBusyRef.current = false; setConflictBusy(false)
+      }
+    }
   }
 
   return (
@@ -579,7 +611,7 @@ function TextEditorInternal({
       onDrop={() => setDragOver(false)}
     >
       {conflictDialog && <EditorSaveConflictDialog
-        draft={conflictDialog.draft} database={conflictDialog.file.content} busy={conflictBusy}
+        draft={conflictDialog.draft} database={conflictDialog.file.content} busy={conflictBusy} problem={conflictProblem}
         onClose={() => { if (!conflictBusy) setConflictDialog(null) }} onResolve={resolveSaveConflict}/> }
       {dragOver && (
         <div className="drag-overlay">

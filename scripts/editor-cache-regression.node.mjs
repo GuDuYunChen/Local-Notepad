@@ -38,6 +38,7 @@ function fixture(content = 'baseline') {
   const c = {
     createEditorSaveAttempt, commitEditorSave, removeEditorDraft, readEditorDraft,
     saveConflictsRef: {current: new Map()}, normalizeLegacyTableBreakMarkup: s => s,
+    loadGenerationRef: {current: 1}, conflictResolutionRef: {current: null}, conflictBusyRef: {current: false},
     rawSavedBodiesRef: { current: new Map([[id,'baseline']]) }, saveAttemptsRef: { current: new Map() },
     setSaveProblem() {}, cachePendingBodyForRetry: writeEditorDraft,
     currentIdRef: { current: id }, loadedDocumentRef: { current: id },

@@ -188,3 +188,73 @@ it('a terminal rejected request cannot become a delayed write after restart and 
   expect(replay.content).toBe('expected older body')
   expect((await server.call('/api/files/'+id)).content).toBe('expected older body')
 })
+
+it('a same-content conflict decision rechecks real SQLite and cannot approve a stale body before quit', async () => {
+  const id = fixture.notes.a.id
+  await openA(); await type('my draft')
+  await server.call('/api/files/' + id, { method: 'PUT', body: JSON.stringify({ content: 'reviewed database body' }) })
+  await act(async () => {
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 's', ctrlKey: true, bubbles: true })); await tick()
+  })
+  await until(() => expect(host.textContent).toContain('处理保存冲突'))
+  await type('reviewed database body')
+  await click('处理保存冲突')
+  await server.call('/api/files/' + id, { method: 'PUT', body: JSON.stringify({ content: 'changed again after review' }) })
+  const choice = label => [...document.querySelectorAll('.editor-save-conflict-dialog button')].find(button => button.textContent === label)
+  await act(async () => { choice('保留我的正文').click(); await tick() })
+  await until(() => expect(puts()).toHaveLength(2))
+  await until(() => expect(host.textContent).toContain('处理保存冲突'))
+  expect(editorQuit.pending()).toBe(1)
+  expect(field().value).toBe('reviewed database body')
+  expect((await server.call('/api/files/' + id)).content).toBe('changed again after review')
+  expect((await quit()).ready).toBe(false)
+  await act(async () => release({ id: 'a'.repeat(32) }))
+  results = []
+  await click('处理保存冲突')
+  await act(async () => { choice('采用数据库正文').click(); await tick() })
+  await until(() => expect(editorQuit.pending()).toBe(0))
+  expect(field().value).toBe('changed again after review')
+  expect(await quit()).toEqual({ id: 'a'.repeat(32), ready: true })
+  await unmount(); await server.stop(); await server.start(); localStorage.clear()
+  expect((await server.call('/api/files/' + id)).content).toBe('changed again after review')
+})
+it('an actual adoption response delayed past unmount cannot clear the retained draft; reopening can save and quit', async () => {
+  const id = fixture.notes.a.id
+  await openA(); await type('retained draft after unmount')
+  await server.call('/api/files/' + id, { method: 'PUT', body: JSON.stringify({ content: 'database before adoption' }) })
+  await act(async () => {
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 's', ctrlKey: true, bubbles: true })); await tick()
+  })
+  await until(() => expect(host.textContent).toContain('处理保存冲突'))
+  const normalLoad = api.getMockImplementation()
+  let releaseResponse, adoptionSignal
+  api.mockImplementation(async (route, init) => {
+    if (route === '/api/files/' + id && (!init?.method || init.method === 'GET')) {
+      adoptionSignal = init.signal
+      const response = await server.call(route, init) // actual response, no manufactured receipt/body
+      return new Promise(resolve => { releaseResponse = () => resolve(response) })
+    }
+    return normalLoad(route, init)
+  })
+  await click('处理保存冲突')
+  await act(async () => {
+    [...document.querySelectorAll('.editor-save-conflict-dialog button')].find(button => button.textContent === '采用数据库正文').click()
+    await tick()
+  })
+  await until(() => expect(releaseResponse).toBeTypeOf('function'))
+  await unmount()
+  await act(async () => { releaseResponse(); await tick() })
+  expect(editorQuit.pending()).toBe(1)
+  expect(readEditorDraft(id)?.content).toBe('retained draft after unmount')
+  expect(adoptionSignal.aborted).toBe(true)
+  api.mockImplementation(normalLoad)
+  await mount(); await openA()
+  await until(() => expect(field().value).toBe('retained draft after unmount'))
+  await act(async () => {
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 's', ctrlKey: true, bubbles: true })); await tick()
+  })
+  await until(() => expect(editorQuit.pending()).toBe(0))
+  expect(await quit()).toEqual({ id: 'a'.repeat(32), ready: true })
+  await unmount(); await server.stop(); await server.start(); localStorage.clear()
+  expect((await server.call('/api/files/' + id)).content).toBe('retained draft after unmount')
+})
