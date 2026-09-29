@@ -129,3 +129,49 @@ it('an unacknowledged queued real write keeps the exit guard, and reopening reco
   expect(submitted[3].content).toBe('version A');expect(submitted[3].expected_content).toBe('version B')
   await quitRestartAndCheck('version A')
 })
+
+it('switching away preserves an unrequested visible revert after the older queued body commits, then saves it after reopening', async () => {
+  const first = deferred(); let held = false
+  api.mockImplementation(async (route,init) => {
+    const response = await server.call(route,init)
+    if (init?.method === 'PUT' && !held) { held = true; await first.promise }
+    return response
+  })
+  await edit('version A'); const p1 = await startSave(); await until(()=>expect(held).toBe(true))
+  await edit('version B'); const p2 = await startSave()
+  await edit('version A'); await render(b)
+  await until(()=>expect(ref.current.getReferenceRefactorState().currentContent).toBe('other'))
+  await act(async()=>{first.resolve(); await Promise.all([p1.promise,p2.promise]); await tick()})
+  expect((await server.call('/api/files/'+a)).content).toBe('version B')
+  expect(readEditorDraft(a)?.content).toBe('version A'); expect(editorQuit.hasDraft(a)).toBe(true)
+  await render(a); await until(()=>expect(ref.current.getReferenceRefactorState().currentContent).toBe('version A'))
+  const final = await startSave(); await act(async()=>final.promise)
+  expect(puts().map(([,init])=>JSON.parse(init.body).content)).toEqual(['version A','version B','version A'])
+  await quitRestartAndCheck('version A')
+})
+it('a failed intermediate write on a hidden note preserves the latest draft and original retry identity through reopening', async () => {
+  const first = deferred(); let held = false, failed = false, interruptedRequest
+  api.mockImplementation(async (route,init) => {
+    const body = init?.body && JSON.parse(init.body)
+    if (init?.method === 'PUT' && body.content === 'version B' && !failed) {
+      failed = true; interruptedRequest = body; throw new Error('Injected transport failure before delivery')
+    }
+    const response = await server.call(route,init)
+    if (init?.method === 'PUT' && !held) { held = true; await first.promise }
+    return response
+  })
+  await edit('version A'); const p1 = await startSave(); await until(()=>expect(held).toBe(true))
+  await edit('version B'); const p2 = await startSave()
+  await edit('version A'); const p3 = await startSave(); await render(b)
+  await until(()=>expect(ref.current.getReferenceRefactorState().currentContent).toBe('other'))
+  let outcomes
+  await act(async()=>{first.resolve(); outcomes = await Promise.allSettled([p1.promise,p2.promise,p3.promise]); await tick()})
+  expect(outcomes.map(r=>r.status)).toEqual(['fulfilled','rejected','rejected'])
+  expect(readEditorDraft(a)?.content).toBe('version A'); expect(editorQuit.hasDraft(a)).toBe(true)
+  await render(a); await until(()=>expect(ref.current.getReferenceRefactorState().currentContent).toBe('version A'))
+  const final = await startSave(); await act(async()=>final.promise)
+  const submitted = puts().map(([,init])=>JSON.parse(init.body))
+  expect(submitted).toHaveLength(4); expect(submitted[2]).toEqual(interruptedRequest)
+  expect(submitted[3].content).toBe('version A'); expect(submitted[3].expected_content).toBe('version B')
+  await quitRestartAndCheck('version A')
+})

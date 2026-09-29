@@ -145,7 +145,17 @@ function TextEditorInternal({
       queuedSavesRef.current.set(id, { content: text, promise })
       try { return await promise }
       finally {
-        if (queuedSavesRef.current.get(id)?.promise === promise) queuedSavesRef.current.delete(id)
+        if (queuedSavesRef.current.get(id)?.promise === promise) {
+          queuedSavesRef.current.delete(id)
+          // Earlier acknowledgements cannot retire a draft while a later
+          // queued write may change its database body again. Only the drained
+          // tail may release a matching, actually confirmed cached body.
+          if (saveLifetimeRef.current.active && saveLifetimeRef.current.generation === lifetime &&
+              !inFlightSavesRef.current.has(id) && !saveAttemptsRef.current.has(id) && !saveConflictsRef.current.has(id)) {
+            const cached = readEditorDraft(id)
+            if (cached?.content === rawSavedBodiesRef.current.get(id)) removeEditorDraft(id)
+          }
+        }
       }
     }
 
@@ -197,7 +207,7 @@ function TextEditorInternal({
             if (contentRef.current === updated.content) pendingStructureMappingsRef.current = []
             setLastSavedAt(now); setSaveProblem('')
             window.clearTimeout(saveTimerRef.current); saveTimerRef.current = null
-            if (contentRef.current === updated.content) removeEditorDraft(id)
+            if (contentRef.current === updated.content && !queuedSavesRef.current.has(id)) removeEditorDraft(id)
             else cachePendingBodyForRetry(id, contentRef.current)
             onSavedRef.current?.(updated)
           } else {
@@ -205,7 +215,7 @@ function TextEditorInternal({
             // Update the owned recovery entry, never that empty loading buffer.
             const cached = readEditorDraft(id)
             if (cached?.recovery?.attempt?.requestID === attempt.requestID) {
-              if (cached.content === updated.content) removeEditorDraft(id)
+              if (cached.content === updated.content && !queuedSavesRef.current.has(id)) removeEditorDraft(id)
               else cachePendingBodyForRetry(id, cached.content)
             }
           }

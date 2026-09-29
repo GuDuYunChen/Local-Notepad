@@ -17,8 +17,11 @@ const failedNames = [
   'repeated nonadjacent snapshots keep their requested order across four queued saves',
   'a queued write re-establishes the exit guard before unmount even when the visible text was just acknowledged',
   'Ctrl+S does not announce completion while a different saved snapshot is still queued',
+  'a hidden note preserves its unrequested visible revert while an older queued snapshot is saved',
+  'a hidden A-B-A queue clears only the final confirmed draft, not an intermediate snapshot',
+  'a hidden A-B-A queue retains the latest A draft if its intermediate write fails',
 ]
-const filter = 'saving A then|a final save|an automatic save|adjacent identical|closing the editor|repeated nonadjacent|newer text without|a rejected predecessor|a queued write|Ctrl\\+S does not announce'
+const filter = 'saving A then|a final save|an automatic save|adjacent identical|closing the editor|repeated nonadjacent|newer text without|a rejected predecessor|a queued write|Ctrl\\+S does not announce|a hidden'
 mkdirSync('test-results/save-recovery', { recursive: true })
 try {
   for (const [file, hash] of Object.entries(files)) {
@@ -43,7 +46,7 @@ try {
     assert.doesNotMatch(message, /timed out|Failed to resolve|SyntaxError|ReferenceError|TypeError/)
     assert.match(message, /expected .* (to be|to equal|to deeply equal)/s)
   }
-  console.log('Six exact 4.189.5 queue-order/early-success/exit-guard assertions fail; four existing behaviors remain passing controls.')
+  console.log('Nine exact 4.189.5 queue-order/early-success/exit-guard assertions fail; four existing behaviors remain passing controls.')
 } finally {
   for (const [file, bytes] of original) { writeFileSync(file, bytes); assert.ok(readFileSync(file).equals(bytes)) }
 }
