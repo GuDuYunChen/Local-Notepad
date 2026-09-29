@@ -351,6 +351,10 @@ export default function App() {
         toast.warning('已有内容已保存，但还有更新的编辑，请再次保存。')
         return false
       }
+      if (latest?.savePending) {
+        toast.warning('仍有正文保存正在排队，请等待完成后再继续。')
+        return false
+      }
       toast.success('正文已保存')
       return true
     } catch (error) {

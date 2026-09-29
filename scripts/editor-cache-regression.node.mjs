@@ -47,7 +47,7 @@ function fixture(content = 'baseline') {
     setSaveProblem() {}, cachePendingBodyForRetry: writeEditorDraft,
     currentIdRef: { current: id }, loadedDocumentRef: { current: id },
     contentRef: { current: content }, lastSavedContentRef: { current: 'baseline' },
-    deletedIdsRef: { current: new Set() }, inFlightSavesRef: { current: new Map() },
+    deletedIdsRef: { current: new Set() }, inFlightSavesRef: { current: new Map() }, queuedSavesRef: { current: new Map() },
     saveControllersRef: { current: new Set() }, saveTimerRef: { current: null },
     loadAbortRef: { current: null }, pendingStructureMappingsRef: { current: [] },
     onSavedRef: { current: value => receipts.push(value) },

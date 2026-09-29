@@ -51,6 +51,7 @@ function TextEditorInternal({
   const saveControllersRef = useRef(new Set())
   const loadAbortRef = useRef(null)
   const inFlightSavesRef = useRef(new Map())
+  const queuedSavesRef = useRef(new Map())
   const savingCountsRef = useRef(new Map())
   const currentIdRef = useRef(null)
   const loadedDocumentRef = useRef(null)
@@ -120,7 +121,7 @@ function TextEditorInternal({
     } catch { /* The existing cache service keeps its in-memory fallback. */ }
   }
 
-  const saveNow = React.useCallback(async (reason, specificId = null, contentOverride = null) => {
+  const saveNow = React.useCallback(async (reason, specificId = null, contentOverride = null, fromQueue = false) => {
     const lifetime = saveLifetimeRef.current.generation
     if (!saveLifetimeRef.current.active) return
     const id = specificId || currentIdRef.current
@@ -130,17 +131,22 @@ function TextEditorInternal({
 
     if (saveConflictsRef.current.has(id)) throw new Error('数据库正文已变化，请先处理保存冲突；当前草稿保留。')
     const text = contentOverride ?? contentRef.current
-    const inFlight = inFlightSavesRef.current.get(id)
-    if (inFlight) {
-      if (inFlight.content === text) {
-        return inFlight.promise
-      }
+    // Coalesce only with the last requested snapshot, not an older running
+    // write. In A -> B -> A, the last A must wait for B and then restore A;
+    // returning the first A receipt would approve a still-changing database.
+    const predecessor = fromQueue ? null : (queuedSavesRef.current.get(id) || inFlightSavesRef.current.get(id))
+    if (predecessor) {
+      if (predecessor.content === text && reason !== 'confirmed-conflict') return predecessor.promise
       const queuedText = text
-      return inFlight.promise.then(() => {
-        // An aborted predecessor is not permission to start a detached write.
+      const promise = predecessor.promise.then(() => {
         if (!saveLifetimeRef.current.active || saveLifetimeRef.current.generation !== lifetime) return
-        return saveNow(reason, id, queuedText)
+        return saveNow(reason, id, queuedText, true)
       })
+      queuedSavesRef.current.set(id, { content: text, promise })
+      try { return await promise }
+      finally {
+        if (queuedSavesRef.current.get(id)?.promise === promise) queuedSavesRef.current.delete(id)
+      }
     }
 
     // A pending older write can change the saved baseline. Do not skip a revert
@@ -173,7 +179,11 @@ function TextEditorInternal({
           }
           // Persist the immutable request with the newest draft before sending.
           // Reopening must reconcile this token, not invent another write.
-          cachePendingBodyForRetry(id, id === currentIdRef.current && loadedDocumentRef.current === id ? contentRef.current : (readEditorDraft(id)?.content ?? text))
+          const pendingBody = id === currentIdRef.current && loadedDocumentRef.current === id ? contentRef.current : (readEditorDraft(id)?.content ?? text)
+          // A queued write can make an already acknowledged visible body
+          // uncertain again. Retain its exit guard before issuing that PUT.
+          editorQuit.remember(id, pendingBody)
+          cachePendingBodyForRetry(id, pendingBody)
           updated = await commitEditorSave(api, attempt, ctl.signal)
           if (ctl.signal.aborted || !saveLifetimeRef.current.active || saveLifetimeRef.current.generation !== lifetime) return
           databaseRevisionRef.current.set(id, (databaseRevisionRef.current.get(id) || 0) + 1)
@@ -252,7 +262,7 @@ function TextEditorInternal({
   const cachePendingDraft = React.useCallback(() => {
     const id = currentIdRef.current
     if (!id || loadedDocumentRef.current !== id || deletedIdsRef.current?.has(id)) return
-    if (contentRef.current === lastSavedContentRef.current && !inFlightSavesRef.current.has(id) && !saveAttemptsRef.current.has(id) && !saveConflictsRef.current.has(id)) return
+    if (contentRef.current === lastSavedContentRef.current && !inFlightSavesRef.current.has(id) && !queuedSavesRef.current.has(id) && !saveAttemptsRef.current.has(id) && !saveConflictsRef.current.has(id)) return
     cachePendingBodyForRetry(id, contentRef.current)
   }, [])
 
@@ -265,7 +275,7 @@ function TextEditorInternal({
       saved: lastSavedContentRef.current,
       structural: false, // structure maintenance is now durably captured by SaveEditor
       uncertain: saveAttemptsRef.current.size > 0 || saveConflictsRef.current.size > 0,
-      pending: [...inFlightSavesRef.current.values()].map(item => item.promise),
+      pending: [...inFlightSavesRef.current.values(), ...queuedSavesRef.current.values()].map(item => item.promise),
     }),
     cache: () => {
       window.clearTimeout(saveTimerRef.current)
@@ -285,7 +295,7 @@ function TextEditorInternal({
       ready: loadedDocumentRef.current === currentIdRef.current,
       content: contentRef.current,
       saved: lastSavedContentRef.current,
-      pending: [...inFlightSavesRef.current.values(), ...saveAttemptsRef.current.values()],
+      pending: [...inFlightSavesRef.current.values(), ...queuedSavesRef.current.values(), ...saveAttemptsRef.current.values()],
     }, editorQuit, text => {
       window.clearTimeout(saveTimerRef.current)
       saveTimerRef.current = null
@@ -302,6 +312,7 @@ function TextEditorInternal({
     getReferenceRefactorState: () => ({
       currentContent: contentRef.current,
       savedContent: lastSavedContentRef.current,
+      savePending: inFlightSavesRef.current.has(currentIdRef.current) || queuedSavesRef.current.has(currentIdRef.current),
       structureChanged: hasHeadingStructureChanged(
         lastSavedContentRef.current,
         contentRef.current,
@@ -511,6 +522,7 @@ function TextEditorInternal({
       }
       saveControllersRef.current.clear()
       inFlightSavesRef.current.clear()
+      queuedSavesRef.current.clear()
     }
   }, [cachePendingDraft])
 
@@ -575,7 +587,7 @@ function TextEditorInternal({
     if (!id || loadedDocumentRef.current !== id) return
     contentRef.current = newContent
     setEditRevision(value => value + 1)
-    const pending = inFlightSavesRef.current.has(id) || saveAttemptsRef.current.has(id) || saveConflictsRef.current.has(id)
+    const pending = inFlightSavesRef.current.has(id) || queuedSavesRef.current.has(id) || saveAttemptsRef.current.has(id) || saveConflictsRef.current.has(id)
     observeEditorDraft(editorQuit, id, newContent, lastSavedContentRef.current, pending)
     setSaveError(saveConflictsRef.current.has(id))
     if (!pending && newContent === lastSavedContentRef.current) {

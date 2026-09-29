@@ -150,3 +150,29 @@ it('pressing save with a newer edit during the receipt wait never closes that ne
   expect(field().value).toBe('not yet submitted');expect(editorQuit.pending()).toBe(1)
   expect(toast.warning).toHaveBeenCalledWith(expect.stringContaining('还有更新的编辑'))
 })
+
+it('Ctrl+S does not announce completion while a different saved snapshot is still queued', async () => {
+  await openA()
+  const ordinary = api.getMockImplementation()
+  let releaseFirst, releaseSecond, started = 0
+  api.mockImplementation(async (url, init) => {
+    if (init?.method === 'PUT') {
+      const ordinal = ++started
+      if (ordinal === 1) await new Promise(resolve=>{releaseFirst=resolve})
+      if (ordinal === 2) await new Promise(resolve=>{releaseSecond=resolve})
+    }
+    return ordinary(url, init)
+  })
+  await type('version A'); await ctrlS()
+  await type('version B'); await ctrlS()
+  await type('version A'); await ctrlS()
+  await act(async()=>{releaseFirst(); await tick()})
+  await until(()=>expect(started).toBe(2))
+  const earlySuccess = toast.success.mock.calls.some(([text])=>text==='正文已保存')
+  await act(async()=>{releaseSecond(); await tick()})
+  expect(earlySuccess).toBe(false)
+  await until(()=>expect(fixture.notes.a.content).toBe('version A'))
+  expect(toast.warning).toHaveBeenCalledWith('仍有正文保存正在排队，请等待完成后再继续。')
+  expect(toast.success).toHaveBeenCalledWith('正文已保存')
+  expect(await quit()).toEqual({id:'a'.repeat(32),ready:true})
+})

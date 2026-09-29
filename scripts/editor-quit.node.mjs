@@ -161,7 +161,7 @@ function actualSave(){
     saveConflictsRef:ref(new Map()),saveTimerRef:ref(null),readEditorDraft:()=>null,removeEditorDraft(){},normalizeLegacyTableBreakMarkup:s=>s,
     rawSavedBodiesRef:ref(new Map([['n1','old']])),saveAttemptsRef:ref(new Map()),setSaveProblem(){},cachePendingBodyForRetry(...args){cache.push(args)},window:{dispatchEvent(){},clearTimeout(){}},Event,
     React:{useCallback:fn=>fn},currentIdRef:ref('n1'),loadedDocumentRef:ref('n1'),deletedIdsRef:ref(new Set()),
-    contentRef:ref('draft'),lastSavedContentRef:ref('old'),inFlightSavesRef:ref(new Map()),saveControllersRef:ref(new Set()),
+    contentRef:ref('draft'),lastSavedContentRef:ref('old'),inFlightSavesRef:ref(new Map()),queuedSavesRef:ref(new Map()),saveControllersRef:ref(new Set()),
     pendingStructureMappingsRef:ref([]),onSavedRef:ref(()=>{}),editorQuit:createEditorQuitRegistry(),
     hasHeadingStructureChanged:()=>false,beginSaving(){},endSaving(){},setSaving(){},setSaveError(){},setStructureDirty(){},setLastSavedAt(){},
     writeEditorDraft(...args){cache.push(args)},AbortController,Date,console:{error(){}},
