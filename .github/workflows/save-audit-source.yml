@@ -1,0 +1,27 @@
+name: Save Audit Source
+on:
+  push:
+    branches: [feature/knowledge-os-phase2]
+    paths: [.github/workflows/save-audit-source.yml]
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: 62d69f8158ee39c7c407ecac73ee2f1bdc61e999
+      - name: Archive exact baseline source
+        run: |
+          mkdir -p /tmp/save-audit
+          git archive --format=zip HEAD > /tmp/save-audit/source.zip
+          git rev-parse HEAD > /tmp/save-audit/commit.txt
+          git rev-parse HEAD^{tree} > /tmp/save-audit/tree.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: save-audit-source-62d69f8
+          path: /tmp/save-audit/*
+          if-no-files-found: error
+          retention-days: 1
