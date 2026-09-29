@@ -35,6 +35,8 @@ function TextEditorInternal({
   const lastSavedContentRef = useRef('')
   const rawSavedBodiesRef = useRef(new Map())
   const saveAttemptsRef = useRef(new Map())
+  const saveLifetimeRef = useRef({ active: true, generation: 0 })
+  const databaseRevisionRef = useRef(new Map())
   const saveConflictsRef = useRef(new Map())
   const [conflictDialog, setConflictDialog] = useState(null)
   const [conflictBusy, setConflictBusy] = useState(false)
@@ -119,6 +121,8 @@ function TextEditorInternal({
   }
 
   const saveNow = React.useCallback(async (reason, specificId = null, contentOverride = null) => {
+    const lifetime = saveLifetimeRef.current.generation
+    if (!saveLifetimeRef.current.active) return
     const id = specificId || currentIdRef.current
     if (!id || (!specificId && loadedDocumentRef.current !== id)) return
 
@@ -132,14 +136,18 @@ function TextEditorInternal({
         return inFlight.promise
       }
       const queuedText = text
-      return inFlight.promise.then(() => saveNow(reason, id, queuedText))
+      return inFlight.promise.then(() => {
+        // An aborted predecessor is not permission to start a detached write.
+        if (!saveLifetimeRef.current.active || saveLifetimeRef.current.generation !== lifetime) return
+        return saveNow(reason, id, queuedText)
+      })
     }
 
     // A pending older write can change the saved baseline. Do not skip a revert
     // until that write has settled, otherwise exit could approve the wrong text.
     // A conflict decision always rechecks the reviewed database version, even
     // when the draft happens to match our last observation of that version.
-    if (reason !== 'confirmed-conflict' && id === currentIdRef.current && text === lastSavedContentRef.current && !saveAttemptsRef.current.has(id)) {
+    if (reason !== 'confirmed-conflict' && id === currentIdRef.current && loadedDocumentRef.current === id && text === lastSavedContentRef.current && !saveAttemptsRef.current.has(id)) {
       editorQuit.saved(id, text)
       setSaveError(false)
       return { id, content: text, skipped: true }
@@ -160,18 +168,20 @@ function TextEditorInternal({
           if (!attempt) {
             const expected = rawSavedBodiesRef.current.get(id)
             attempt = createEditorSaveAttempt(id, expected, text,
-              id === currentIdRef.current ? pendingStructureMappingsRef.current : [])
+              id === currentIdRef.current && loadedDocumentRef.current === id ? pendingStructureMappingsRef.current : [])
             saveAttemptsRef.current.set(id, attempt)
           }
           // Persist the immutable request with the newest draft before sending.
           // Reopening must reconcile this token, not invent another write.
-          cachePendingBodyForRetry(id, id === currentIdRef.current ? contentRef.current : (readEditorDraft(id)?.content ?? text))
+          cachePendingBodyForRetry(id, id === currentIdRef.current && loadedDocumentRef.current === id ? contentRef.current : (readEditorDraft(id)?.content ?? text))
           updated = await commitEditorSave(api, attempt, ctl.signal)
+          if (ctl.signal.aborted || !saveLifetimeRef.current.active || saveLifetimeRef.current.generation !== lifetime) return
+          databaseRevisionRef.current.set(id, (databaseRevisionRef.current.get(id) || 0) + 1)
           rawSavedBodiesRef.current.set(id, updated.content)
           saveAttemptsRef.current.delete(id)
           editorQuit.saved(id, updated.content)
           const now = Date.now()
-          if (id === currentIdRef.current) {
+          if (id === currentIdRef.current && loadedDocumentRef.current === id) {
             lastSavedContentRef.current = updated.content
             setStructureDirty(hasHeadingStructureChanged(updated.content, contentRef.current))
             if (contentRef.current === updated.content) pendingStructureMappingsRef.current = []
@@ -180,8 +190,14 @@ function TextEditorInternal({
             if (contentRef.current === updated.content) removeEditorDraft(id)
             else cachePendingBodyForRetry(id, contentRef.current)
             onSavedRef.current?.(updated)
-          } else if (readEditorDraft(id)?.content === updated.content) {
-            removeEditorDraft(id)
+          } else {
+            // During A → B → A loading, contentRef is only a placeholder.
+            // Update the owned recovery entry, never that empty loading buffer.
+            const cached = readEditorDraft(id)
+            if (cached?.recovery?.attempt?.requestID === attempt.requestID) {
+              if (cached.content === updated.content) removeEditorDraft(id)
+              else cachePendingBodyForRetry(id, cached.content)
+            }
           }
           // Maintenance has already been journalled atomically with the body.
           // Its worker and any network failure are not awaited by this save.
@@ -191,19 +207,29 @@ function TextEditorInternal({
         }
         return updated
       } catch (e) {
-        if (e.name === 'AbortError') return
+        if (ctl.signal.aborted || !saveLifetimeRef.current.active || saveLifetimeRef.current.generation !== lifetime || e.name === 'AbortError') return
+        const ownsVisibleBody = id === currentIdRef.current && loadedDocumentRef.current === id
         if (e.code === 'save-conflict' && e.currentFile?.id === id) {
+          const rejected = saveAttemptsRef.current.get(id)
+          databaseRevisionRef.current.set(id, (databaseRevisionRef.current.get(id) || 0) + 1)
+          rawSavedBodiesRef.current.set(id, e.currentFile.content)
           saveAttemptsRef.current.delete(id) // terminal database receipt, NOT a timeout
           saveConflictsRef.current.set(id, e.currentFile)
-          if (id === currentIdRef.current) {
-            rawSavedBodiesRef.current.set(id, e.currentFile.content)
+          if (ownsVisibleBody) {
             lastSavedContentRef.current = normalizeLegacyTableBreakMarkup(e.currentFile.content)
             editorQuit.remember(id, contentRef.current)
+          } else {
+            const cached = readEditorDraft(id)
+            if (rejected && cached?.recovery?.attempt?.requestID === rejected.requestID) {
+              cachePendingBodyForRetry(id, cached.content)
+            }
           }
         }
         if (e.message?.includes('更新失败') && deletedIdsRef.current?.has(id)) return
-        if (id === currentIdRef.current) { setSaveError(true); setSaveProblem(e.message || '正文保存失败，草稿保留') }
-        if (id === currentIdRef.current) cachePendingBodyForRetry(id, contentRef.current)
+        if (ownsVisibleBody) {
+          setSaveError(true); setSaveProblem(e.message || '正文保存失败，草稿保留')
+          cachePendingBodyForRetry(id, contentRef.current)
+        }
         console.error('保存失败', reason, e)
         throw e
       } finally {
@@ -390,8 +416,17 @@ function TextEditorInternal({
     const load = async (id) => {
       setLoading(true)
       try {
-        const f = await api(`/api/files/${id}`, { signal: loadCtl.signal })
-        if (loadCtl.signal.aborted || loadAbortRef.current !== loadCtl || id !== currentIdRef.current) return
+        let f = null
+        for (let readAttempt = 0; readAttempt < 3; readAttempt += 1) {
+          const revision = databaseRevisionRef.current.get(id) || 0
+          const result = await boundedEditorRequest(api, `/api/files/${encodeURIComponent(id)}`, { signal: loadCtl.signal })
+          if (loadCtl.signal.aborted || loadAbortRef.current !== loadCtl || id !== currentIdRef.current) return
+          if (result?.id !== id || typeof result.content !== 'string') throw new Error('正文读取响应不匹配，未打开编辑器或替换草稿')
+          // A receipt/conflict received during this GET makes its snapshot old.
+          // Re-read instead of restoring a draft against a pre-save database body.
+          if ((databaseRevisionRef.current.get(id) || 0) === revision) { f = result; break }
+        }
+        if (!f) throw new Error('读取期间正文持续变化，请重试加载；草稿保留')
 
         const cached = readEditorDraft(id)
         const rawServer = f.content || ''
@@ -450,28 +485,33 @@ function TextEditorInternal({
   // autoSaveOnSwitch is consulted on a document switch, not a reason to reload an active draft.
   }, [activeId, loadAttempt, saveNow, syncCurrentSavingState])
 
-  useEffect(() => () => {
-    // A database adoption is a read, not an editor-save controller. Invalidate
-    // its authority before caching or detaching this editor. An ignored abort
-    // or late response must never clear this document's unsaved registration.
-    loadGenerationRef.current += 1
-    conflictResolutionRef.current?.abort()
-    conflictResolutionRef.current = null
-    conflictBusyRef.current = false
-    cachePendingDraft()
-    if (saveTimerRef.current) {
-      window.clearTimeout(saveTimerRef.current)
-      saveTimerRef.current = null
-    }
+  useEffect(() => {
+    saveLifetimeRef.current.active = true
+    return () => {
+      saveLifetimeRef.current.active = false
+      saveLifetimeRef.current.generation += 1
+      // A database adoption is a read, not an editor-save controller. Invalidate
+      // its authority before caching or detaching this editor. An ignored abort
+      // or late response must never clear this document's unsaved registration.
+      loadGenerationRef.current += 1
+      conflictResolutionRef.current?.abort()
+      conflictResolutionRef.current = null
+      conflictBusyRef.current = false
+      cachePendingDraft()
+      if (saveTimerRef.current) {
+        window.clearTimeout(saveTimerRef.current)
+        saveTimerRef.current = null
+      }
 
-    loadAbortRef.current?.abort()
-    loadAbortRef.current = null
+      loadAbortRef.current?.abort()
+      loadAbortRef.current = null
 
-    for (const controller of saveControllersRef.current) {
-      controller.abort()
+      for (const controller of saveControllersRef.current) {
+        controller.abort()
+      }
+      saveControllersRef.current.clear()
+      inFlightSavesRef.current.clear()
     }
-    saveControllersRef.current.clear()
-    inFlightSavesRef.current.clear()
   }, [cachePendingDraft])
 
   useEffect(() => {

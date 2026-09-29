@@ -157,6 +157,7 @@ const editorSource=fs.readFileSync(new URL('../src/components/TextEditor.jsx',im
 function actualSave(){
   const ref=current=>({current}),writes=[],cache=[],responses=[]
   const c={createEditorSaveAttempt,commitEditorSave,
+    saveLifetimeRef:ref({active:true,generation:0}),databaseRevisionRef:ref(new Map()),
     saveConflictsRef:ref(new Map()),saveTimerRef:ref(null),readEditorDraft:()=>null,removeEditorDraft(){},normalizeLegacyTableBreakMarkup:s=>s,
     rawSavedBodiesRef:ref(new Map([['n1','old']])),saveAttemptsRef:ref(new Map()),setSaveProblem(){},cachePendingBodyForRetry(...args){cache.push(args)},window:{dispatchEvent(){},clearTimeout(){}},Event,
     React:{useCallback:fn=>fn},currentIdRef:ref('n1'),loadedDocumentRef:ref('n1'),deletedIdsRef:ref(new Set()),
@@ -191,7 +192,7 @@ const mainSource=fs.readFileSync(new URL('../electron/main.js',import.meta.url),
 function actualQuit(prepare,stop){
   const c={backend:{},mainWindow:{},backendStartPromise:null,allowQuit:false,quitting:false,quitPromise:null,handler:null,quitCalls:0,errors:0,releases:0,console,
     rendererQuit:{prepare,release(){c.releases++}},stopChildProcess:stop}
-  c.app={on(_e,fn){c.handler=fn},quit(){c.quitCalls++}};c.dialog={showErrorBox(){c.errors++}}
+  c.app={on(_e,fn){c.handler=fn;return undefined},quit(){c.quitCalls++}};c.dialog={showErrorBox(){c.errors++}}
   vm.createContext(c);vm.runInContext(mainSource.slice(mainSource.indexOf("app.on('before-quit',"),mainSource.indexOf('// 启动后端进程')),c);return c
 }
 test('actual quit waits for renderer save before sending backend shutdown and handles duplicate quits',async()=>{

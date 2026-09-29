@@ -20,7 +20,10 @@ function between(start, end, from = 0) {
 }
 const saveCode = between('const saveNow = React.useCallback(', '\n  }, [beginSaving, endSaving])') + '\n  }'
 const cacheCode = between('    cache: ', '\n    },\n    save:') + '\n    }'
-const unmountCode = between('  useEffect(() => ', '\n  }, [', source.indexOf('  useEffect(() => () => {')) + '\n  }'
+const lifetimeEffect = '  useEffect(() => {\n    saveLifetimeRef.current.active = true\n    return '
+const unmountCode = source.includes(lifetimeEffect)
+  ? between(lifetimeEffect, '\n  }, [cachePendingDraft])')
+  : between('  useEffect(() => ', '\n  }, [', source.indexOf('  useEffect(() => () => {')) + '\n  }'
 const helperCode = source.includes('const cachePendingDraft = React.useCallback(')
   ? between('const cachePendingDraft = React.useCallback(', '\n  }, [])') + '\n  }'
   : null // Allows the same regression tests to reproduce the prior defect.
@@ -37,6 +40,7 @@ function fixture(content = 'baseline') {
   const receipts = [], errors = []
   const c = {
     createEditorSaveAttempt, commitEditorSave, removeEditorDraft, readEditorDraft,
+    saveLifetimeRef: {current: {active: true, generation: 0}}, databaseRevisionRef: {current: new Map()},
     saveConflictsRef: {current: new Map()}, normalizeLegacyTableBreakMarkup: s => s,
     loadGenerationRef: {current: 1}, conflictResolutionRef: {current: null}, conflictBusyRef: {current: false},
     rawSavedBodiesRef: { current: new Map([[id,'baseline']]) }, saveAttemptsRef: { current: new Map() },
