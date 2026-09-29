@@ -1,6 +1,7 @@
-import React, { useEffect, useId, useRef, useState } from 'react'
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { api } from '~/services/api'
 import { appendConflictHistory, historyOutcome, historyTime, readConflictHistory } from '~/services/syncConflictHistory.mjs'
+import { limitHistoryQuery, selectHistoryRecords } from '~/services/syncHistorySearch.mjs'
 import './SyncConflictHistoryPanel.css'
 
 const kinds = { file: '笔记或文件夹', tag: '标签', 'file-tag': '标签关联', attachment: '附件' }
@@ -12,9 +13,11 @@ export default function SyncConflictHistoryPanel() {
   const [filter, setFilter] = useState('all')
   const [snapshot, setSnapshot] = useState(null)
   const [phase, setPhase] = useState('unread')
+  const [query, setQuery] = useState(''), [kind, setKind] = useState('all'), [outcome, setOutcome] = useState('all')
+  const searchInput = useRef(null)
   const current = useRef(null), sequence = useRef(0), live = useRef(false)
   const readButton = useRef(null), returnFocus = useRef(false), moreButton = useRef(null), list = useRef(null), returnListFocus = useRef(false)
-  const titleID = useId(), feedbackID = useId()
+  const titleID = useId(), feedbackID = useId(), searchHintID = useId(), searchResultID = useId()
   useEffect(() => {
     live.current = true
     return () => { live.current = false; sequence.current += 1; current.current?.abort() }
@@ -57,12 +60,19 @@ export default function SyncConflictHistoryPanel() {
     returnFocus.current = event.currentTarget === event.currentTarget.ownerDocument.activeElement
     sequence.current += 1; current.current?.abort(); current.current = null; setPhase('stopped')
   }
-  const rows = snapshot?.filter === filter ? snapshot.items : []
+  const loadedRows = snapshot?.filter === filter ? snapshot.items : []
+  const selection = useMemo(() => selectHistoryRecords(loadedRows, { query, kind, outcome }), [loadedRows, query, kind, outcome])
+  const rows = selection.items
+  const searchMessage = !snapshot ? '尚未读取记录；查找和本地筛选不会发起请求。'
+    : `当前显示 ${selection.matched} 条 / 已读取 ${selection.loaded} 条。` +
+      (!rows.length && selection.narrowed ? (snapshot.hasMore
+        ? '已读取记录中没有匹配项；更早记录尚未读取，可继续读取更早记录。'
+        : '本次已读取记录中没有匹配项，可调整或清除本地筛选。') : '仅针对本次已读取内容，不是全部历史的搜索结果。')
   const result = phase === 'loading' ? '正在读取本机记录；不会执行同步。'
     : phase === 'error' ? '未能读取记录。' + (snapshot ? '下方保留上次读取结果，不代表当前状态。' : '尚无可核实的记录，不把读取失败当作没有记录。')
       : phase === 'stopped' ? '已停止等待记录读取；没有取消同步任务。' + (snapshot ? '下方仍为上次读取记录。' : '')
         : phase === 'unread' ? '尚未读取。展开本面板不会发起请求，请点击“读取记录”。'
-          : rows.length ? `已读取 ${rows.length} 条记录；仅统计本次已加载内容，不代表全部历史。`
+          : loadedRows.length ? `已读取 ${loadedRows.length} 条记录；仅统计本次已加载内容，不代表全部历史。`
             : '本次读取没有符合筛选条件的记录；不代表当前没有未决冲突。'
   return <details className="sync-conflict-history" data-sync-conflict-history>
     <summary id={titleID}>冲突处理记录<span>查看已选边或已失效的记录</span></summary>
@@ -79,7 +89,33 @@ export default function SyncConflictHistoryPanel() {
         {phase === 'loading' && <button type="button" className="btn small" data-history-stop onClick={stop}>停止读取</button>}
       </div>
       <p className="sync-conflict-history-feedback" id={feedbackID} role="status" aria-live="polite">{result}</p>
-      {rows.length > 0 && <div ref={list} className="sync-conflict-history-scroll" tabIndex={0} role="region" aria-label="已读取冲突记录列表">
+      <fieldset className="sync-history-search" aria-describedby={searchHintID}>
+        <legend>筛选已读取记录</legend>
+        <p id={searchHintID}>按当前标题、对象或记录标识查找；不搜索正文，也不会自动读取更早记录。最多 128 个字符。</p>
+        <div className="sync-history-search-fields">
+          <label className="sync-history-search-query">查找文字
+            <input ref={searchInput} type="search" value={query} data-history-query aria-label="在已读取记录中查找"
+              aria-controls={searchResultID} placeholder="输入标题或标识" autoComplete="off" spellCheck={false}
+              onChange={event => setQuery(limitHistoryQuery(event.target.value))}/>
+          </label>
+          <label>对象类型<select value={kind} data-history-kind aria-label="筛选记录对象类型" onChange={event => setKind(event.target.value)}>
+            <option value="all">全部对象</option><option value="file">笔记或文件夹</option><option value="tag">标签</option>
+            <option value="file-tag">标签关联</option><option value="attachment">附件</option>
+          </select></label>
+          <label>当时的处理结果<select value={outcome} data-history-outcome aria-label="筛选记录处理结果" onChange={event => setOutcome(event.target.value)}>
+            <option value="all">全部结果</option><option value="local">保留本机</option><option value="remote">采用远端</option>
+            <option value="superseded">已失效</option><option value="unknown">处理方式未核实</option>
+          </select></label>
+          {(query || kind !== 'all' || outcome !== 'all') && <button type="button" className="btn small" data-history-clear onClick={event => {
+            const ownsFocus = event.currentTarget === event.currentTarget.ownerDocument.activeElement
+            setQuery(''); setKind('all'); setOutcome('all')
+            if (ownsFocus) searchInput.current?.focus({ preventScroll: true })
+          }}>清除本地筛选</button>}
+        </div>
+      </fieldset>
+      <p className="sync-conflict-history-feedback" id={searchResultID} data-history-search-feedback role="status" aria-live="polite">{searchMessage}</p>
+      {snapshot && <div ref={list} className="sync-conflict-history-scroll" tabIndex={0} role="region" aria-label="已读取冲突记录列表">
+        {rows.length === 0 && <p className="sync-conflict-history-note">{selection.narrowed ? '当前筛选没有匹配的已读取记录。' : '本次读取没有历史记录。'}</p>}
         <ol className="sync-conflict-history-list">
           {rows.map(row => <li key={row.id} data-history-row>
             <div className="sync-conflict-history-row-heading"><strong><bdi>{row.title || kinds[row.kind]}</bdi></strong>

@@ -53,9 +53,19 @@ it('unknown values show unknown labels and never execute supplied markup', async
   expect(container.querySelector('dd').textContent).toBe('未知'); expect(container.textContent).not.toContain('PRIVATE')
 })
 it('busy operation still allows read-only navigation, not a stop or retry button', async () => {
+  const network = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Unexpected network request'))
   props.busy = true; await render(); await click(button('诊断摘要'))
   expect(container.textContent).toContain('不会停止等待'); expect(navigate).toHaveBeenCalledTimes(1); expect(navigate).toHaveBeenCalledWith('diagnostic')
-  expect(container.querySelector('input,textarea')).toBeNull()
+  // The history extension adds one local-only search box, not an editable
+  // document, sync configuration, stop or retry control in the overview.
+  const query = container.querySelector('[data-sync-conflict-history] input[data-history-query][type="search"]')
+  expect(query).toBeTruthy()
+  expect([...container.querySelectorAll('input,textarea')]).toEqual([query])
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(query, 'local-only')
+    query.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  expect(query.value).toBe('local-only'); expect(network).not.toHaveBeenCalled(); expect(navigate).toHaveBeenCalledTimes(1)
 })
 
 for (const [last, mode, warning] of [

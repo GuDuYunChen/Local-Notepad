@@ -19,7 +19,18 @@
 .sync-conflict-history-list details{font-size:12px;line-height:1.8;color:var(--ink)}.sync-conflict-history-list details summary{padding:6px 0;cursor:pointer;color:var(--ink)}
 .sync-conflict-history-list details p{margin:4px 0}.sync-conflict-history-list code{font:inherit;overflow-wrap:anywhere;white-space:normal}
 .sync-overview .sync-conflict-history .btn{color:var(--ink)!important}
-.sync-conflict-history :is(button,select,summary,.sync-conflict-history-scroll):focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.sync-conflict-history :is(button,input,select,summary,.sync-conflict-history-scroll):focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 @media(max-width:600px){.sync-conflict-history-list dl{grid-template-columns:1fr}.sync-conflict-history>summary>span{display:block;margin-left:0}.sync-conflict-history-scroll{max-height:400px}}
 
 .sync-conflict-history [aria-disabled="true"]{opacity:.65;cursor:wait}
+
+.sync-history-search{min-width:0;margin:14px 0 8px;padding:10px 12px 12px;border:1px solid var(--line);border-radius:8px}
+.sync-history-search legend{padding:0 6px;font-size:12px;font-weight:600;color:var(--ink)}
+.sync-history-search>p{margin:0 0 10px;font-size:12px;line-height:1.8;color:var(--ink-soft);overflow-wrap:anywhere}
+.sync-history-search-fields{display:flex;flex-wrap:wrap;align-items:end;gap:10px}
+.sync-history-search-fields label{display:flex;flex:1 1 140px;min-width:0;flex-direction:column;gap:5px;font-size:12px;color:var(--ink)}
+.sync-history-search-fields .sync-history-search-query{flex:2 1 220px}
+.sync-history-search-fields :is(input,select){box-sizing:border-box;width:100%;min-width:0;min-height:38px;padding:7px 10px;border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--ink);font:inherit}
+.sync-history-search-fields input::placeholder{color:var(--ink-soft);opacity:1}
+.sync-history-search-fields button{min-height:38px;white-space:normal}
+@media(max-width:600px){.sync-history-search-fields .sync-history-search-query{flex-basis:100%}.sync-history-search-fields label{flex-basis:calc(50% - 10px)}}
