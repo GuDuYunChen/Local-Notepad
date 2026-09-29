@@ -5,6 +5,9 @@ import path from 'node:path'
 import { tmpdir } from 'node:os'
 import { createHash } from 'node:crypto'
 import { deflateSync } from 'node:zlib'
+import { desktopNote } from './desktop-save-fixture.mjs'
+import { createEditor } from 'lexical'
+import { HeadingNode } from '@lexical/rich-text'
 import { verifyDesktopSaveReport } from './desktop-save-evidence.mjs'
 const sha = 'a'.repeat(40)
 const crc = b => { let n = 0xffffffff; for (const x of b) { n ^= x; for(let i=0;i<8;i++)n=(n>>>1)^((n&1)?0xedb88320:0) } return (n^0xffffffff)>>>0 }
@@ -19,7 +22,7 @@ function png() {
 function fixture(fn) {
  const dir=mkdtempSync(path.join(tmpdir(),'desktop-evidence-')),bytes=png()
  const report={commit:sha,platform:'win32',complete:true,realPackagedApp:true,realLexical:true,realPreloadAndQuit:true,
-  realBackend:true,syntheticData:true,timerAccelerated:false,processIDs:[100,200],
+  realBackend:true,syntheticData:true,timerAccelerated:false,dirtyBeforeClose:true,noForcedBackendWarning:true,processIDs:[100,200],
   exits:[100,200].map(pid=>({pid,code:0,signal:null,nativeClose:true})),
   appSHA256:'b'.repeat(64),asarSHA256:'c'.repeat(64),backendSHA256:'d'.repeat(64),finalBodySHA256:'e'.repeat(64),
   checks:[
@@ -42,10 +45,17 @@ test('accepts complete current-commit report with all native checks and PNGs',()
 for(const [label,change] of [
  ['wrong commit',r=>r.commit='f'.repeat(40)],['incomplete run',r=>r.complete=false],
  ['replaced Lexical input',r=>r.realLexical=false],['accelerated autosave',r=>r.timerAccelerated=true],
+ ['already saved before close',r=>r.dirtyBeforeClose=false],['forced backend warning',r=>r.noForcedBackendWarning=false],
  ['missing actual restart',r=>r.processIDs.pop()],['forced process termination',r=>r.exits[0].signal='SIGKILL'],
  ['missing quit check',r=>r.checks.splice(5,1)],['wrong visible marker',r=>r.screenshots[4].text='old body'],
 ])test('rejects '+label,()=>fixture((dir,r,save)=>{change(r);save();assert.throws(()=>verifyDesktopSaveReport(dir,sha))}))
 test('rejects missing or modified screenshot even when run reports success',()=>{
  fixture((dir,r)=>{unlinkSync(path.join(dir,r.screenshots[0].filename));assert.throws(()=>verifyDesktopSaveReport(dir,sha))})
  fixture((dir,r)=>{writeFileSync(path.join(dir,r.screenshots[0].filename),'bad');assert.throws(()=>verifyDesktopSaveReport(dir,sha))})
+})
+
+test('synthetic seed uses actual canonical Lexical serialization without a load-time edit',()=>{
+ const text=desktopNote('原始标题','original body'),editor=createEditor({nodes:[HeadingNode],onError(e){throw e}})
+ const roundtrip=editor.parseEditorState(text)
+ assert.equal(JSON.stringify(roundtrip.toJSON()),text)
 })

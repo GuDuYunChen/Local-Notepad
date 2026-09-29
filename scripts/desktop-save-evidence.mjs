@@ -11,6 +11,7 @@ export function verifyDesktopSaveReport(directory, commit) {
   assert.equal(report.complete, true); assert.equal(report.error, undefined)
   for (const field of ['realPackagedApp', 'realLexical', 'realPreloadAndQuit', 'realBackend', 'syntheticData']) assert.equal(report[field], true)
   assert.equal(report.timerAccelerated, false)
+  assert.equal(report.dirtyBeforeClose, true); assert.equal(report.noForcedBackendWarning, true)
   assert.equal(report.processIDs.length, 2); assert.ok(report.processIDs.every(pid => Number.isInteger(pid) && pid > 0))
   assert.deepEqual(report.exits, report.processIDs.map(pid => ({ pid, code: 0, signal: null, nativeClose: true })))
   assert.deepEqual(report.checks, [

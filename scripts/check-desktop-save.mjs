@@ -12,6 +12,7 @@ import { createHash } from 'node:crypto'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { createSaveTestServer } from './save-recovery-server.mjs'
 import { verifyDesktopSaveReport } from './desktop-save-evidence.mjs'
+import { desktopNote as note } from './desktop-save-fixture.mjs'
 
 assert.equal(process.platform, 'win32', 'This check requires the actual Windows package')
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -34,13 +35,6 @@ const saveReport = () => writeFileSync(path.join(out, 'checks.json'), JSON.strin
 saveReport()
 let server, child, exited, cdp, trace = ''
 const apiBase = 'http://127.0.0.1:27121'
-const note = (heading, text) => JSON.stringify({ root: { type: 'root', version: 1, direction: null,
-  format: '', indent: 0, children: [
-    { type: 'heading', version: 1, tag: 'h1', format: '', indent: 0, direction: null,
-      children: [{ type: 'text', version: 1, text: heading, format: 0, mode: 'normal', style: '', detail: 0 }] },
-    { type: 'paragraph', version: 1, format: '', indent: 0, direction: null,
-      children: [{ type: 'text', version: 1, text, format: 0, mode: 'normal', style: '', detail: 0 }] },
-  ] } })
 const textOf = node => typeof node?.text === 'string' ? node.text : (node?.children || []).map(textOf).join('\n')
 async function until(check, label, budget = 15000) {
   const end = Date.now() + budget
@@ -190,6 +184,8 @@ async function closeWindow() {
   try { end = await Promise.race([exited, sleep(15000, null, { signal: timeout.signal }).then(() => { throw new Error('Native window close was blocked') })]) }
   finally { timeout.abort() }
   assert.equal(end.code, 0); assert.equal(end.signal, null)
+  assert.doesNotMatch(trace, /后端异常结束；同步恢复记录保留/)
+  report.noForcedBackendWarning = true
   report.exits.push({ pid: ownedPID, code: end.code, signal: end.signal, nativeClose: true })
   cdp.close(); cdp = null; child = null
   await until(async () => {
@@ -230,6 +226,8 @@ try {
   // Leave a new, not explicitly saved edit. Closing must use the real main
   // process / IPC freeze-and-save gate before terminating its own backend.
   await append(' native-close-latest')
+  assert.ok(!textOf(JSON.parse((await api('/api/files/' + a.id)).content).root).includes('native-close-latest'), 'The close case must begin with a genuinely unsaved body')
+  report.dirtyBeforeClose = true
   await closeWindow()
   report.checks.push('WM_CLOSE with dirty Lexical body completed real quit gate and backend shutdown')
   await server.start()
