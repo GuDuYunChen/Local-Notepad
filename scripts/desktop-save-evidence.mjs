@@ -14,6 +14,17 @@ export function verifyDesktopSaveReport(directory, commit) {
   assert.equal(report.dirtyBeforeClose, true); assert.equal(report.noForcedBackendWarning, true)
   assert.equal(report.processIDs.length, 2); assert.ok(report.processIDs.every(pid => Number.isInteger(pid) && pid > 0))
   assert.deepEqual(report.exits, report.processIDs.map(pid => ({ pid, code: 0, signal: null, nativeClose: true })))
+  const snapshots = report.closeDiagnostics.filter(d => d.phase === 'before-close')
+  assert.equal(snapshots.length, 2); assert.equal(report.closeTargets.length, 2)
+  for (let i = 0; i < 2; i++) {
+    const target = report.closeTargets[i], snapshot = snapshots[i]
+    assert.equal(target.pid, report.processIDs[i]); assert.equal(snapshot.pid, target.pid)
+    assert.ok(Number.isSafeInteger(target.handle) && target.handle > 0)
+    assert.equal(target.title, snapshot.renderer.title); assert.ok(target.title.trim())
+    assert.equal(target.cls, 'Chrome_WidgetWin_1'); assert.equal(target.visible, true)
+    assert.ok(target.childText.includes('Chrome Legacy Window'))
+    assert.equal(snapshot.native.filter(w => w.handle === target.handle && w.pid === target.pid && w.title === target.title).length, 1)
+  }
   assert.deepEqual(report.checks, [
     'production preload connected for process ' + report.processIDs[0],
     'native Ctrl+S saved actual heading and body without reference confirmation',

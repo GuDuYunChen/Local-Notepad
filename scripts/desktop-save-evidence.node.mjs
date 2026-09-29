@@ -5,6 +5,7 @@ import path from 'node:path'
 import { tmpdir } from 'node:os'
 import { createHash } from 'node:crypto'
 import { deflateSync } from 'node:zlib'
+import { selectDesktopMainWindow } from './desktop-window-target.mjs'
 import { desktopNote } from './desktop-save-fixture.mjs'
 import { createEditor } from 'lexical'
 import { HeadingNode } from '@lexical/rich-text'
@@ -37,12 +38,15 @@ function fixture(fn) {
   screenshots:[['manual-saved','manual-native-4189'],['automatic-saved','automatic-native-4189'],
    ['failure-retains-draft','recovered-after-block'],['retry-saved','recovered-after-block'],
    ['restarted-fresh-profile','native-close-latest']].map(([n,text])=>({filename:n+'.png',text,bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')}))}
+ report.closeTargets=[100,200].map((pid,i)=>({pid,handle:i+300,visible:true,title:'记事本 · Local-Notepad',cls:'Chrome_WidgetWin_1',childText:['Chrome Legacy Window']}))
+ report.closeDiagnostics=report.closeTargets.map(t=>({phase:'before-close',pid:t.pid,native:[t],renderer:{title:t.title}}))
  for(const s of report.screenshots)writeFileSync(path.join(dir,s.filename),bytes)
  const save=()=>writeFileSync(path.join(dir,'checks.json'),JSON.stringify(report));save()
  try{fn(dir,report,save)}finally{rmSync(dir,{recursive:true,force:true})}
 }
 test('accepts complete current-commit report with all native checks and PNGs',()=>fixture(dir=>assert.equal(verifyDesktopSaveReport(dir,sha).complete,true)))
 for(const [label,change] of [
+ ['wrong native window',r=>r.closeTargets[1]={...r.closeTargets[1],handle:999}],
  ['wrong commit',r=>r.commit='f'.repeat(40)],['incomplete run',r=>r.complete=false],
  ['replaced Lexical input',r=>r.realLexical=false],['accelerated autosave',r=>r.timerAccelerated=true],
  ['already saved before close',r=>r.dirtyBeforeClose=false],['forced backend warning',r=>r.noForcedBackendWarning=false],
@@ -58,4 +62,20 @@ test('synthetic seed uses actual canonical Lexical serialization without a load-
  const text=desktopNote('原始标题','original body'),editor=createEditor({nodes:[HeadingNode],onError(e){throw e}})
  const roundtrip=editor.parseEditorState(text)
  assert.equal(JSON.stringify(roundtrip.toJSON()),text)
+})
+
+const main={pid:100,handle:400,title:'记事本 · Local-Notepad',cls:'Chrome_WidgetWin_1',visible:true,childText:['Chrome Legacy Window']}
+test('selects the actual renderer window rather than an earlier visible untitled helper',()=>{
+ const helper={...main,handle:300,title:'',childText:[]}
+ assert.equal(selectDesktopMainWindow([helper,main],100,main.title),main)
+})
+test('refuses another process, missing title, absent renderer child and ambiguous windows',()=>{
+ for(const windows of [[{...main,pid:200}],[{...main,title:''}],[{...main,childText:[]}],[main,{...main,handle:500}],[]]){
+  assert.throws(()=>selectDesktopMainWindow(windows,100,main.title))
+ }
+})
+test('refuses hidden or malformed native window identities without posting a close',()=>{
+ for(const change of [{visible:false},{handle:0},{handle:'400'},{cls:'Other'}]){
+  assert.throws(()=>selectDesktopMainWindow([{...main,...change}],100,main.title))
+ }
 })

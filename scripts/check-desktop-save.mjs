@@ -13,6 +13,7 @@ import { setTimeout as sleep } from 'node:timers/promises'
 import { createSaveTestServer } from './save-recovery-server.mjs'
 import { verifyDesktopSaveReport } from './desktop-save-evidence.mjs'
 import { desktopNote as note } from './desktop-save-fixture.mjs'
+import { inspectDesktopWindows, selectDesktopMainWindow, postDesktopClose } from './desktop-window-target.mjs'
 
 assert.equal(process.platform, 'win32', 'This check requires the actual Windows package')
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -177,28 +178,8 @@ async function screenshot(name) {
     text: await evaluate("document.querySelector('.editor-input')?.innerText || document.body.innerText") })
   saveReport()
 }
-function nativeWindows() {
-  const script = `$ErrorActionPreference='Stop';Add-Type -TypeDefinition @'
-using System;using System.Text;using System.Collections.Generic;using System.Runtime.InteropServices;
-public class DesktopWindow { public long handle;public uint pid;public string title;public string cls;public bool visible;public List<string> childText=new List<string>();}
-public static class DesktopInspect {
-public delegate bool Callback(IntPtr h,IntPtr p);
-[DllImport("user32.dll")]static extern bool EnumWindows(Callback cb,IntPtr p);
-[DllImport("user32.dll")]static extern bool EnumChildWindows(IntPtr h,Callback cb,IntPtr p);
-[DllImport("user32.dll")]static extern uint GetWindowThreadProcessId(IntPtr h,out uint p);
-[DllImport("user32.dll",CharSet=CharSet.Unicode)]static extern int GetWindowText(IntPtr h,StringBuilder s,int n);
-[DllImport("user32.dll",CharSet=CharSet.Unicode)]static extern int GetClassName(IntPtr h,StringBuilder s,int n);
-[DllImport("user32.dll")]static extern bool IsWindowVisible(IntPtr h);
-static string Text(IntPtr h){var s=new StringBuilder(2048);GetWindowText(h,s,2048);return s.ToString();}
-public static List<DesktopWindow> Read(uint pid){var a=new List<DesktopWindow>();EnumWindows((h,p)=>{uint id;GetWindowThreadProcessId(h,out id);if(id!=pid)return true;var s=new StringBuilder(256);GetClassName(h,s,256);var x=new DesktopWindow{handle=h.ToInt64(),pid=id,title=Text(h),cls=s.ToString(),visible=IsWindowVisible(h)};EnumChildWindows(h,(c,q)=>{var t=Text(c);if(t.Length>0)x.childText.Add(t);return true;},IntPtr.Zero);a.Add(x);return true;},IntPtr.Zero);return a;}
-}
-'@;[DesktopInspect]::Read(${child.pid})|ConvertTo-Json -Depth 5 -Compress`
-  const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand',
-    Buffer.from(script, 'utf16le').toString('base64')], { encoding: 'utf8', timeout: 10000 })
-  return { code: r.status, output: r.stdout, error: r.stderr }
-}
 async function closeSnapshot(phase) {
-  const native = nativeWindows()
+  const native = inspectDesktopWindows(child.pid)
   const renderer = await evaluate(`(()=>({
     url:location.href, title:document.title,
     body:document.body.innerText, active:document.activeElement?.outerHTML,
@@ -206,18 +187,22 @@ async function closeSnapshot(phase) {
     drafts:Object.fromEntries(Object.keys(localStorage).filter(k=>/editor.*cache|draft/.test(k)).map(k=>[k,localStorage.getItem(k)]))
   }))()`)
   report.closeDiagnostics ||= []
-  report.closeDiagnostics.push({ phase, pid: child.pid, native, renderer })
+  const snapshot = { phase, pid: child.pid, native, renderer }
+  report.closeDiagnostics.push(snapshot)
   saveReport()
+  return snapshot
 }
 
 async function closeWindow() {
   assert.ok(Number.isInteger(child.pid))
-  await closeSnapshot('before-close')
-  // WM_CLOSE addresses only the main window of this spawned test process.
-  // No app.quit(), forged ready receipt, taskkill or renderer mock on success.
-  const command = `$ErrorActionPreference='Stop'; Add-Type -TypeDefinition 'using System;using System.Runtime.InteropServices;public static class CloseTestWindow{[DllImport("user32.dll",SetLastError=true)]public static extern bool PostMessage(IntPtr h,uint m,IntPtr w,IntPtr l);}';$p=Get-Process -Id ${child.pid};$p.Refresh();if($p.MainWindowHandle -eq 0){throw 'Test window missing'};if(-not [CloseTestWindow]::PostMessage($p.MainWindowHandle,0x0010,[IntPtr]::Zero,[IntPtr]::Zero)){throw 'WM_CLOSE failed'}`
-  const result = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(command, 'utf16le').toString('base64')], { encoding: 'utf8', timeout: 10000 })
-  assert.equal(result.status, 0, result.stderr)
+  const snapshot = await closeSnapshot('before-close')
+  const target = selectDesktopMainWindow(snapshot.native, child.pid, snapshot.renderer.title)
+  report.closeTargets ||= []
+  report.closeTargets.push(target)
+  saveReport()
+  // Address the unique owned BrowserWindow, not a visible auxiliary Chromium
+  // HWND returned by Process.MainWindowHandle. This still invokes real WM_CLOSE.
+  postDesktopClose(target)
   const ownedPID = child.pid
   const timeout = new AbortController()
   let end
