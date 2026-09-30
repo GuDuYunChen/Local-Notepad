@@ -56,11 +56,13 @@ it('busy operation still allows read-only navigation, not a stop or retry button
   const network = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Unexpected network request'))
   props.busy = true; await render(); await click(button('诊断摘要'))
   expect(container.textContent).toContain('不会停止等待'); expect(navigate).toHaveBeenCalledTimes(1); expect(navigate).toHaveBeenCalledWith('diagnostic')
-  // The history extension adds one local-only search box, not an editable
-  // document, sync configuration, stop or retry control in the overview.
+  // Permit only the local history search and the hidden explicit file picker,
+  // not an editable document, sync configuration or automatic write control.
   const query = container.querySelector('[data-sync-conflict-history] input[data-history-query][type="search"]')
   expect(query).toBeTruthy()
-  expect([...container.querySelectorAll('input,textarea')]).toEqual([query])
+  const fileInput = container.querySelector('[data-history-file-viewer] input[type="file"][data-history-file-input]')
+  expect(fileInput?.hidden).toBe(true)
+  expect([...container.querySelectorAll('input,textarea')]).toEqual([query, fileInput])
   await act(async () => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(query, 'local-only')
     query.dispatchEvent(new Event('input', { bubbles: true }))
