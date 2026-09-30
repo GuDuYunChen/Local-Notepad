@@ -37,9 +37,9 @@ jobs:
       - name: Reproduce original composition defects without accepting test timeouts
         run: node scripts/check-history-composition-baseline.mjs
       - name: Verify parsing, read lifecycle and evidence refusal
-        run: node --test scripts/sync-conflict-history.node.mjs scripts/sync-conflict-history-evidence.node.cjs scripts/sync-history-search.node.mjs scripts/sync-history-search-evidence.node.cjs scripts/sync-history-export.node.mjs scripts/sync-history-export-evidence.node.cjs
+        run: node --test scripts/sync-conflict-history.node.mjs scripts/sync-conflict-history-evidence.node.cjs scripts/sync-history-search.node.mjs scripts/sync-history-search-evidence.node.cjs scripts/sync-history-export.node.mjs scripts/sync-history-export-evidence.node.cjs scripts/sync-history-summary.node.mjs scripts/sync-history-summary-evidence.node.cjs
       - name: Verify real history and unchanged overview interactions
-        run: npx vitest run --root=. src/components/SyncConflictHistoryPanel.test.jsx src/components/SyncHistorySearch.test.jsx src/components/SyncHistoryComposition.test.jsx src/components/SyncHistoryExport.test.jsx src/components/SyncHistoryExportFeedback.test.jsx src/services/syncHistoryDownload.test.js src/components/SyncOverviewPanel.test.jsx src/components/SyncOverviewIntegration.test.jsx
+        run: npx vitest run --root=. src/components/SyncConflictHistoryPanel.test.jsx src/components/SyncHistorySearch.test.jsx src/components/SyncHistoryComposition.test.jsx src/components/SyncHistoryExport.test.jsx src/components/SyncHistoryExportFeedback.test.jsx src/components/SyncHistorySummary.test.jsx src/services/syncHistoryDownload.test.js src/components/SyncOverviewPanel.test.jsx src/components/SyncOverviewIntegration.test.jsx
       - name: Verify real SQLite read-only history
         working-directory: server
         run: go test ./internal/syncengine -run '^TestConflictHistory' -count=1
@@ -57,6 +57,17 @@ jobs:
       - name: Verify actual local JSON downloads from the production history panel
         if: runner.os == 'Windows'
         run: node scripts/check-sync-history-export.cjs
+      - name: Verify native current-selection history summary
+        if: runner.os == 'Windows'
+        run: node scripts/check-sync-history-summary.cjs
+      - name: Upload native history summary evidence
+        if: always() && runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-notepad-history-summary-${{ github.sha }}
+          path: test-results/sync-history-summary/*
+          if-no-files-found: error
+          retention-days: 7
       - name: Upload actual history export files and native evidence
         if: always() && runner.os == 'Windows'
         uses: actions/upload-artifact@v4

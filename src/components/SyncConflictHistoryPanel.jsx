@@ -4,6 +4,7 @@ import { appendConflictHistory, historyOutcome, historyTime, readConflictHistory
 import { limitHistoryQuery, selectHistoryRecords } from '~/services/syncHistorySearch.mjs'
 import './SyncConflictHistoryPanel.css'
 import SyncHistoryExport from './SyncHistoryExport'
+import SyncHistorySummary from './SyncHistorySummary'
 
 const kinds = { file: '笔记或文件夹', tag: '标签', 'file-tag': '标签关联', attachment: '附件' }
 function Stamp({ value }) {
@@ -136,6 +137,7 @@ export default function SyncConflictHistoryPanel() {
         </div>
       </fieldset>
       <p className="sync-conflict-history-feedback" id={searchResultID} data-history-search-feedback role="status" aria-live="polite">{searchMessage}</p>
+      {snapshot && <SyncHistorySummary rows={rows} phase={phase} hasMore={snapshot.hasMore} composing={isComposing}/>}
       {snapshot && <div ref={list} className="sync-conflict-history-scroll" tabIndex={0} role="region" aria-label="已读取冲突记录列表">
         {rows.length === 0 && <p className="sync-conflict-history-note">{selection.narrowed ? '当前筛选没有匹配的已读取记录。' : '本次读取没有历史记录。'}</p>}
         <ol className="sync-conflict-history-list">
