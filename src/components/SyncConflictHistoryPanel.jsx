@@ -5,6 +5,8 @@ import { limitHistoryQuery, selectHistoryRecords } from '~/services/syncHistoryS
 import './SyncConflictHistoryPanel.css'
 import SyncHistoryExport from './SyncHistoryExport'
 import SyncHistorySummary from './SyncHistorySummary'
+import SyncHistoryTimeFilter from './SyncHistoryTimeFilter'
+import { HISTORY_TIME_ALL, sameHistoryTimeFilter } from '~/services/syncHistoryTime.mjs'
 
 const kinds = { file: '笔记或文件夹', tag: '标签', 'file-tag': '标签关联', attachment: '附件' }
 function Stamp({ value }) {
@@ -13,6 +15,8 @@ function Stamp({ value }) {
 }
 export default function SyncConflictHistoryPanel() {
   const [filter, setFilter] = useState('all')
+  const [timeFilter, setTimeFilter] = useState(HISTORY_TIME_ALL)
+  const [timeReset, setTimeReset] = useState(0), [hasTimeDraft, setHasTimeDraft] = useState(false)
   const [snapshot, setSnapshot] = useState(null)
   const [phase, setPhase] = useState('unread')
   const [query, setQuery] = useState(''), [kind, setKind] = useState('all'), [outcome, setOutcome] = useState('all')
@@ -76,7 +80,7 @@ export default function SyncConflictHistoryPanel() {
     sequence.current += 1; current.current?.abort(); current.current = null; setPhase('stopped')
   }
   const loadedRows = snapshot?.filter === filter ? snapshot.items : []
-  const selection = useMemo(() => selectHistoryRecords(loadedRows, { query, kind, outcome }), [loadedRows, query, kind, outcome])
+  const selection = useMemo(() => selectHistoryRecords(loadedRows, { query, kind, outcome, timeFilter }), [loadedRows, query, kind, outcome, timeFilter])
   const rows = selection.items
   const searchMessage = (isComposing ? '输入法文字尚未确认，暂按原查找条件显示。' : '') + (!snapshot ? '尚未读取记录；查找和本地筛选不会发起请求。'
     : `当前显示 ${selection.matched} 条 / 已读取 ${selection.loaded} 条。` +
@@ -128,13 +132,16 @@ export default function SyncConflictHistoryPanel() {
             <option value="all">全部结果</option><option value="local">保留本机</option><option value="remote">采用远端</option>
             <option value="superseded">已失效</option><option value="unknown">处理方式未核实</option>
           </select></label>
-          {(queryDraft || query || kind !== 'all' || outcome !== 'all') && <button type="button" className="btn small" data-history-clear onClick={event => {
+          {(queryDraft || query || kind !== 'all' || outcome !== 'all' || timeFilter.mode !== 'all' || hasTimeDraft) && <button type="button" className="btn small" data-history-clear onClick={event => {
             const ownsFocus = event.currentTarget === event.currentTarget.ownerDocument.activeElement
             compositionActive.current = false; setIsComposing(false)
             applyQuery(''); setKind('all'); setOutcome('all')
+            setTimeFilter(HISTORY_TIME_ALL); setTimeReset(n => n + 1); setHasTimeDraft(false)
             if (ownsFocus) searchInput.current?.focus({ preventScroll: true })
           }}>清除本地筛选</button>}
         </div>
+        <SyncHistoryTimeFilter value={timeFilter} resetVersion={timeReset} onDraftChange={setHasTimeDraft}
+          onApply={next => setTimeFilter(previous => sameHistoryTimeFilter(previous, next) ? previous : next)}/>
       </fieldset>
       <p className="sync-conflict-history-feedback" id={searchResultID} data-history-search-feedback role="status" aria-live="polite">{searchMessage}</p>
       {snapshot && <SyncHistorySummary rows={rows} phase={phase} hasMore={snapshot.hasMore} composing={isComposing}/>}
@@ -156,7 +163,7 @@ export default function SyncConflictHistoryPanel() {
         onClick={() => { if (phase !== 'loading') void read(filter, true) }}>读取更早记录</button>}
       {snapshot && <p className="sync-conflict-history-note">按处理或失效时间从新到旧排列；新产生的记录需重新读取。已失效不等于已解决，历史选边不保证现在仍是该版本。</p>}
       <SyncHistoryExport snapshot={snapshot} query={query} kind={kind} outcome={outcome}
-        phase={phase} composing={isComposing} matched={selection.matched}/>
+        phase={phase} composing={isComposing} matched={selection.matched} timeFilter={timeFilter}/>
     </section>
   </details>
 }

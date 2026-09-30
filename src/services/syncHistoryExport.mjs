@@ -1,3 +1,4 @@
+import { normalizeHistoryTimeFilter } from './syncHistoryTime.mjs'
 import { historyOutcome, historyTime } from './syncConflictHistory.mjs'
 import { selectHistoryRecords } from './syncHistorySearch.mjs'
 
@@ -8,12 +9,14 @@ const time = value => Number.isSafeInteger(value) && value >= 0 && value <= 2534
 
 // Capture one already-loaded selection. No new reads, stored queries, raw
 // responses, historical bodies, cursors or credentials enter the report.
-export function prepareHistoryExport({ snapshot, query = '', kind = 'all', outcome = 'all', phase, composing = false }, now = new Date()) {
+export function prepareHistoryExport({ snapshot, query = '', kind = 'all', outcome = 'all', phase, composing = false, timeFilter }, now = new Date()) {
   if (composing) throw new Error('请先完成输入法选字，再导出已确认的筛选结果。')
   if (phase === 'loading') throw new Error('正在读取记录，请等待读取完成或停止读取后再导出。')
   if (!snapshot || !['ready', 'error', 'stopped'].includes(phase)) throw new Error('请先读取历史记录。')
   if (!['all', 'resolved', 'superseded'].includes(snapshot.filter) || typeof snapshot.hasMore !== 'boolean') throw new Error('历史记录范围无效，未生成文件。')
-  const selected = selectHistoryRecords(snapshot.items, { query, kind, outcome })
+  const completedDateUTC = normalizeHistoryTimeFilter(timeFilter)
+  const dated = completedDateUTC.mode !== 'all'
+  const selected = selectHistoryRecords(snapshot.items, { query, kind, outcome, timeFilter: completedDateUTC })
   if (!selected.matched) throw new Error('当前没有可导出的匹配记录。')
   if (selected.matched > HISTORY_EXPORT_LIMIT) throw new Error(`单次最多导出 ${HISTORY_EXPORT_LIMIT} 条，请缩小筛选范围；不会截断记录。`)
   if (!(now instanceof Date) || !Number.isFinite(now.getTime())) throw new Error('导出时间无效。')
@@ -33,12 +36,13 @@ export function prepareHistoryExport({ snapshot, query = '', kind = 'all', outco
   })
   const exportedAtUTC = now.toISOString()
   const report = {
-    format: 'local-notepad-conflict-history', version: 1, exportedAtUTC,
+    format: 'local-notepad-conflict-history', version: dated ? 2 : 1, exportedAtUTC,
     scope: { type: 'loaded-filtered-history', loadedCount: selected.loaded, exportedCount: records.length,
       hasUnreadOlderRecords: snapshot.hasMore, sourceState: phase, currentRemoteStateVerified: false },
     filters: { recordStatus: snapshot.filter, objectType: kind, outcome,
-      textFilterApplied: Boolean(query.trim()) },
+      textFilterApplied: Boolean(query.trim()), ...(dated ? { completedDateUTC } : {}) },
     notices: [
+      ...(dated ? [completedDateUTC.mode === 'missing' ? '仅导出处理或失效时间缺失的记录；时间缺失不代表未处理。' : '处理日期筛选按 UTC 日历日，包含结束当日；日期范围不含时间缺失记录。'] : []),
       '仅导出点击时已经读取、符合当前筛选的记录；不是全部历史或笔记备份。',
       '当前标题仅供辨认，不是历史标题或历史正文；已失效不等于已解决。',
       '可能包含旧同步目标记录；历史选边不保证当前仍是该版本，不证明两端一致。',

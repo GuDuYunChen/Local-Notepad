@@ -1,7 +1,9 @@
+import { HISTORY_TIME_ALL } from '~/services/syncHistoryTime.mjs'
 import React, { useId, useLayoutEffect, useState } from 'react'
 import { HISTORY_EXPORT_LIMIT, prepareHistoryExport, requestHistoryDownload } from '~/services/syncHistoryExport.mjs'
 
-export default function SyncHistoryExport({ snapshot, query, kind, outcome, phase, composing, matched }) {
+export default function SyncHistoryExport({ snapshot, query, kind, outcome, phase, composing, matched, timeFilter = HISTORY_TIME_ALL }) {
+  const timeKey = `${timeFilter.mode}:${timeFilter.from}:${timeFilter.to}`
   const hintID = useId(), reasonID = useId()
   const [feedback, setFeedback] = useState(null)
   const reason = !snapshot ? '请先读取历史记录。'
@@ -15,14 +17,14 @@ export default function SyncHistoryExport({ snapshot, query, kind, outcome, phas
   // announced again. Ordinary parent rerenders leave the same action intact.
   useLayoutEffect(() => {
     setFeedback(null)
-  }, [snapshot, query, kind, outcome, phase, composing])
+  }, [snapshot, query, kind, outcome, phase, composing, timeKey])
   const message = feedback && feedback.snapshot === snapshot && feedback.query === query &&
     feedback.kind === kind && feedback.outcome === outcome && feedback.phase === phase &&
-    feedback.composing === composing ? feedback.text : ''
+    feedback.composing === composing && feedback.timeKey === timeKey ? feedback.text : ''
   const download = () => {
     if (reason) return
     let prepared, text
-    try { prepared = prepareHistoryExport({ snapshot, query, kind, outcome, phase, composing }) }
+    try { prepared = prepareHistoryExport({ snapshot, query, kind, outcome, phase, composing, timeFilter }) }
     catch (error) { text = error.message }
     if (prepared) {
       try {
@@ -30,7 +32,7 @@ export default function SyncHistoryExport({ snapshot, query, kind, outcome, phas
         text = `已请求下载 ${prepared.count} 条记录；请在下载位置核对文件，尚未确认落盘。`
       } catch { text = '未能发起下载，记录和筛选未改变，请重试。' }
     }
-    setFeedback({ snapshot, query, kind, outcome, phase, composing, text })
+    setFeedback({ snapshot, query, kind, outcome, phase, composing, timeKey, text })
   }
   return <div className="sync-history-export" data-history-export>
     <p id={hintID} className="sync-conflict-history-note">导出 JSON 只含当前显示记录的标题、对象与记录标识、时间和处理结果，不含正文或查找词。可能包含私人标题，分享前请检查；不是笔记备份。</p>

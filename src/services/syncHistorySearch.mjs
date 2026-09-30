@@ -1,3 +1,4 @@
+import { compileHistoryTimeFilter } from './syncHistoryTime.mjs'
 // Local-only selection over the already validated history projection. Never
 // query the server, inspect historical bodies, mutate rows or persist queries.
 export const HISTORY_QUERY_LIMIT = 128
@@ -15,10 +16,12 @@ export function historyOutcomeKey(row) {
   if (row.status === 'resolved' && ['local', 'remote'].includes(row.resolution)) return row.resolution
   return 'unknown'
 }
-export function selectHistoryRecords(items, { query = '', kind = 'all', outcome = 'all' } = {}) {
+export function selectHistoryRecords(items, { query = '', kind = 'all', outcome = 'all', timeFilter } = {}) {
   if (!Array.isArray(items) || !KINDS.has(kind) || !OUTCOMES.has(outcome)) throw new TypeError('本地筛选条件无效')
+  const dates = compileHistoryTimeFilter(timeFilter)
   const needle = fold(limitHistoryQuery(query).trim())
   const selected = items.filter(row => {
+    if (!dates.includes(row)) return false
     if (kind !== 'all' && row.kind !== kind) return false
     if (outcome !== 'all' && historyOutcomeKey(row) !== outcome) return false
     // Search fields independently: never match across field boundaries or
@@ -26,5 +29,5 @@ export function selectHistoryRecords(items, { query = '', kind = 'all', outcome 
     return !needle || [row.title, row.itemID, row.id].some(value => typeof value === 'string' && fold(value).includes(needle))
   })
   return Object.freeze({ items: Object.freeze(selected), loaded: items.length,
-    matched: selected.length, narrowed: Boolean(needle || kind !== 'all' || outcome !== 'all') })
+    matched: selected.length, narrowed: Boolean(dates.narrowed || needle || kind !== 'all' || outcome !== 'all') })
 }
