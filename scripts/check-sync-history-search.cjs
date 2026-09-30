@@ -26,7 +26,7 @@ if(!process.versions.electron){
    return{ratio:(Math.max(a,b)+.05)/(Math.min(a,b)+.05)}
   })
   const rows=[...panel.querySelectorAll('[data-history-row]')]
-  return{imeEvents:window.__imeEvents||[],query:panel.querySelector('[data-history-query]').value,kind:panel.querySelector('[data-history-kind]').value,outcome:panel.querySelector('[data-history-outcome]').value,
+  return{scriptedCompositionEvents:window.__scriptedCompositionEvents||0,imeEvents:window.__imeEvents||[],query:panel.querySelector('[data-history-query]').value,kind:panel.querySelector('[data-history-kind]').value,outcome:panel.querySelector('[data-history-outcome]').value,
    serverFilter:panel.querySelector('select').value,ids:rows.map(n=>n.querySelectorAll('code')[1].textContent),outcomes:rows.map(n=>n.querySelector('.sync-conflict-history-outcome').textContent).join(' / '),
    searchFeedback:panel.querySelector('[data-history-search-feedback]').textContent,readFeedback:panel.querySelector('.sync-conflict-history-feedback').textContent,
    requests:window.__requests,mutations:window.__mutations,networkRequests:window.__networkRequests,navigationCalls:window.__navigationCalls,
@@ -64,6 +64,11 @@ if(!process.versions.electron){
   for(const name of scenes){
    const win=new BrowserWindow({show:true,width:name==='search-narrow'?560:1000,height:1000,useContentSize:true,webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false,backgroundThrottling:false}})
    const exec=code=>win.webContents.executeJavaScript(code),scene={name,frames:[]};report.scenes.push(scene)
+   const cdpCommands=[]
+   const compose=async(method,params)=>{
+    await win.webContents.debugger.sendCommand(method,params)
+    cdpCommands.push({method,params:{...params},completed:true})
+   }
    const wait=async code=>{for(let i=0;i<70;i++){if(await exec(code))return;await delay(70)}throw Error('History search wait failed '+name+' '+code)}
    const click=attr=>exec(`(()=>{const n=document.querySelector('[data-history-${attr}]');n.focus({preventScroll:true});n.click();return true})()`)
    const choose=(attr,value)=>exec(`(()=>{const n=document.querySelector('[data-history-${attr}]');n.focus({preventScroll:true});n.value=${JSON.stringify(value)};n.dispatchEvent(new Event('change',{bubbles:true}));return true})()`)
@@ -83,12 +88,12 @@ if(!process.versions.electron){
      if(rasterSamples>=2){bytes=b;break}await delay(80)
     }
     if(!bytes)throw Error('Missing current phase raster');if(JSON.stringify(await exec('('+inspect.toString()+')()'))!==JSON.stringify(frame))throw Error('DOM changed during capture')
-    const png=name+'-'+phase+'.png';fs.writeFileSync(path.join(out,png),bytes);scene.frames.push({phase,...frame,stableSamples:stable,rasterSamples,rasterCode:code,png,bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')});save()
+    const png=name+'-'+phase+'.png';fs.writeFileSync(path.join(out,png),bytes);scene.frames.push({phase,...frame,cdpCommands:cdpCommands.map(item=>({...item,params:{...item.params}})),stableSamples:stable,rasterSamples,rasterCode:code,png,bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')});save()
    }
    try{
     win.setMenu(null);await win.loadFile(file,{query:{scene:name}});await wait('!!document.querySelector("[data-history-query]")');await exec('document.fonts.ready.then(()=>true)')
     win.webContents.debugger.attach('1.3')
-    await exec(`(()=>{window.__imeEvents=[];const n=document.querySelector('[data-history-query]');for(const type of ['compositionstart','compositionupdate','compositionend'])n.addEventListener(type,e=>window.__imeEvents.push({type:e.type,data:e.data,trusted:e.isTrusted}));return true})()`)
+    await exec(`(()=>{window.__imeEvents=[];window.__scriptedCompositionEvents=0;const dispatch=EventTarget.prototype.dispatchEvent;EventTarget.prototype.dispatchEvent=function(event){if(/^composition(?:start|update|end)$/.test(event.type))window.__scriptedCompositionEvents++;return dispatch.call(this,event)};const n=document.querySelector('[data-history-query]');for(const type of ['compositionstart','compositionupdate','compositionend'])n.addEventListener(type,e=>window.__imeEvents.push({type:e.type,data:e.data,trusted:e.isTrusted}));return true})()`)
     await exec(`(()=>{window.__guidance=document.querySelector('[data-sync-guidance]').textContent;document.querySelector('[data-sync-conflict-history]').open=true;return true})()`)
     await type('abc');await choose('kind','file');await choose('outcome','local');await capture('unread-local')
     await click('read');await wait('document.querySelectorAll("[data-history-row]").length===1');await capture('title-match')
@@ -101,18 +106,18 @@ if(!process.versions.electron){
     // composition events or call React's handlers to claim IME coverage.
     await type('abc')
     await exec(`(()=>{const n=document.querySelector('[data-history-query]');n.focus({preventScroll:true});n.setSelectionRange(0,3);return true})()`)
-    await win.webContents.debugger.sendCommand('Input.imeSetComposition',{text:'xingtu',selectionStart:6,selectionEnd:6,replacementStart:0,replacementEnd:3})
+    await compose('Input.imeSetComposition',{text:'xingtu',selectionStart:6,selectionEnd:6,replacementStart:0,replacementEnd:3})
     await wait(`document.querySelector('[data-history-query]').value==='xingtu'`)
     await capture('ime-candidate')
-    await win.webContents.debugger.sendCommand('Input.insertText',{text:'星图'})
+    await compose('Input.insertText',{text:'星图'})
     await wait(`document.querySelector('[data-history-query]').value==='星图'`)
     await capture('ime-committed')
     await type('文'.repeat(127))
     await exec(`(()=>{const n=document.querySelector('[data-history-query]');n.focus({preventScroll:true});n.setSelectionRange(127,127);return true})()`)
-    await win.webContents.debugger.sendCommand('Input.imeSetComposition',{text:'zhong',selectionStart:5,selectionEnd:5,replacementStart:127,replacementEnd:127})
+    await compose('Input.imeSetComposition',{text:'zhong',selectionStart:5,selectionEnd:5,replacementStart:127,replacementEnd:127})
     await wait(`document.querySelector('[data-history-query]').value===${JSON.stringify('文'.repeat(127)+'zhong')}`)
     await capture('ime-boundary')
-    await win.webContents.debugger.sendCommand('Input.insertText',{text:'中'})
+    await compose('Input.insertText',{text:'中'})
     await wait(`document.querySelector('[data-history-query]').value===${JSON.stringify('文'.repeat(127)+'中')}`)
     await capture('ime-boundary-committed')
     verifyHistorySearchScene(scene)

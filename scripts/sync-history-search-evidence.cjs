@@ -19,7 +19,24 @@ function verifyHistorySearchScene(scene) {
       ['xingtu','all','all'],['星图','all','all'],['文'.repeat(127)+'zhong','all','all'],['文'.repeat(127)+'中','all','all']][i]
     assert.deepEqual([f.query,f.kind,f.outcome],wants)
     f.requests.forEach((r,n)=>{assert.equal(r.method,'GET');assert.equal(r.path,'/api/sync/conflicts/history?filter=all&limit=25'+(n===1?'&before=older-page':''))})
-    assert.ok(Array.isArray(f.imeEvents));assert.ok(f.imeEvents.every(e=>e.trusted===true))
+    assert.equal(f.scriptedCompositionEvents,0)
+    assert.ok(Array.isArray(f.imeEvents))
+    // Chromium's queued compositionend is observed with isTrusted=false in
+    // Electron31; require trusted starts/updates, not a fabricated end flag.
+    // Pair exact events with completed host-side CDP commands and reject all
+    // JavaScript-dispatched composition events in the fixture.
+    assert.ok(f.imeEvents.every(e=>e.type==='compositionend'?typeof e.trusted==='boolean':e.trusted===true))
+    const commands=[
+      {method:'Input.imeSetComposition',params:{text:'xingtu',selectionStart:6,selectionEnd:6,replacementStart:0,replacementEnd:3},completed:true},
+      {method:'Input.insertText',params:{text:'星图'},completed:true},
+      {method:'Input.imeSetComposition',params:{text:'zhong',selectionStart:5,selectionEnd:5,replacementStart:127,replacementEnd:127},completed:true},
+      {method:'Input.insertText',params:{text:'中'},completed:true},
+    ]
+    assert.deepEqual(f.cdpCommands,commands.slice(0,i<7?0:i-6))
+    const events=[['compositionstart','abc'],['compositionupdate','xingtu'],
+      ['compositionupdate','星图'],['compositionend','星图'],['compositionstart',''],
+      ['compositionupdate','zhong'],['compositionupdate','中'],['compositionend','中']]
+    assert.deepEqual(f.imeEvents.map(e=>[e.type,e.data]),events.slice(0,i<7?0:i===7?2:i===8?4:i===9?6:8))
     if(i<7)assert.equal(f.imeEvents.length,0)
     else {
       assert.equal(f.focusQuery,true)
