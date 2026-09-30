@@ -12,3 +12,6 @@
 .sync-history-summary-times dt,.sync-history-summary-times dd{margin:0;font-size:12px;line-height:1.8;overflow-wrap:anywhere;color:var(--ink)}
 .sync-history-summary>summary:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 @media(max-width:600px){.sync-history-summary-counts{grid-template-columns:repeat(2,minmax(0,1fr))}.sync-history-summary-times{grid-template-columns:1fr}.sync-history-summary>summary>span{display:block;margin-left:0}}
+
+/* Keep every count and provenance note readable in a short narrow window. */
+@media(max-width:600px){.sync-history-summary-counts>div{display:flex;align-items:center;justify-content:space-between;gap:8px}.sync-history-summary-counts dt{flex:1;min-width:0}.sync-history-summary-counts dd{flex:none;margin:0}}
