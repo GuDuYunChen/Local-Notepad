@@ -46,9 +46,13 @@ if(!process.versions.electron){
     const fixture=path.join(root,'test-results','sync-history-search','fixture.html');if(!fs.existsSync(fixture))throw Error('Build the production search fixture first')
     for(const name of names){
       const win=new BrowserWindow({show:true,width:name==='file-search-narrow'?560:1000,height:900,useContentSize:true,webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false,backgroundThrottling:false}})
-      const scene={name,frames:[]};report.scenes.push(scene);let downloads=0
+      const scene={name,frames:[]};report.scenes.push(scene);let downloads=0;const cdpCommands=[]
       const downloadListener=()=>downloads++;win.webContents.session.on('will-download',downloadListener)
       const exec=code=>win.webContents.executeJavaScript(code),cdp=(method,params)=>win.webContents.debugger.sendCommand(method,params)
+      const compose=async(method,params)=>{
+        const entry={method,params,completed:false};cdpCommands.push(entry)
+        await cdp(method,params);entry.completed=true
+      }
       const wait=async code=>{for(let i=0;i<80;i++){if(await exec(code))return;await delay(60)}throw Error('File selection wait failed: '+code)}
       const click=key=>exec(`(()=>{const n=document.querySelector('[data-history-file-${key}]');n.focus({preventScroll:true});n.click();return true})()`)
       const type=value=>exec(`(()=>{const n=document.querySelector('[data-history-file-query]');n.focus({preventScroll:true});Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(n,${JSON.stringify(value)});n.dispatchEvent(new Event('input',{bubbles:true}));return true})()`)
@@ -70,7 +74,7 @@ if(!process.versions.electron){
         for(let i=0;i<40;i++){await delay(65);const b=(await win.capturePage()).toPNG(),hash=createHash('sha256').update(b).digest('hex');let valid=false;try{valid=verifyRasterWitness(b,code)}catch{}
           rasterSamples=valid?(prior===hash?rasterSamples+1:1):0;prior=hash;if(rasterSamples>=2){bytes=b;break}}
         if(!bytes||JSON.stringify(await exec('('+inspect.toString()+')()'))!==JSON.stringify(frame))throw Error('File-search capture does not match DOM')
-        const png=name+'-'+phase+'.png';fs.writeFileSync(path.join(out,png),bytes);scene.frames.push({phase,...frame,downloads,stable,rasterSamples,rasterCode:code,png,bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')});save()
+        const png=name+'-'+phase+'.png';fs.writeFileSync(path.join(out,png),bytes);scene.frames.push({phase,...frame,cdpCommands:JSON.parse(JSON.stringify(cdpCommands)),downloads,stable,rasterSamples,rasterCode:code,png,bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')});save()
       }
       try{
         win.setMenu(null);win.webContents.debugger.attach('1.3');await win.loadFile(fixture,{query:{scene:name==='file-search-light'?'search-light':'search-dark'}})
@@ -82,8 +86,8 @@ if(!process.versions.electron){
         await type('');await choose('kind','tag');await choose('outcome','local');await capture('combined')
         await choose('kind','all');await choose('outcome','all');await type('笔记');await click('next')
         await exec("document.querySelector('[data-history-file-query]').focus({preventScroll:true});document.querySelector('[data-history-file-query]').setSelectionRange(0,2);true")
-        await cdp('Input.imeSetComposition',{text:'xingtu',selectionStart:6,selectionEnd:6,replacementStart:0,replacementEnd:2});await wait("document.querySelector('[data-history-file-query]').value==='xingtu'");await capture('candidate')
-        await cdp('Input.insertText',{text:'星图'});await wait("document.querySelector('[data-history-file-query]').value==='星图'");await capture('committed')
+        await compose('Input.imeSetComposition',{text:'xingtu',selectionStart:6,selectionEnd:6,replacementStart:0,replacementEnd:2});await wait("document.querySelector('[data-history-file-query]').value==='xingtu'");await capture('candidate')
+        await compose('Input.insertText',{text:'星图'});await wait("document.querySelector('[data-history-file-query]').value==='星图'");await capture('committed')
         await type('missing');await capture('empty');await type('abc');await selectFile('invalid.json');await wait('!!document.querySelector("[data-history-file-stale]")');await capture('stale')
         await click('filter-clear');await capture('cleared');await type('abc');await selectFile('replacement.json');await wait("document.querySelector('[data-history-file-name]').textContent==='replacement.json'");await capture('replaced')
         verifyFileSelectionScene(scene)

@@ -14,7 +14,7 @@ function verifyFileSelectionScene(scene) {
     assert.equal(f.filename, i===8 ? 'replacement.json' : 'history.json')
     assert.match(f.matches, new RegExp(`当前匹配 ${matched[i]} 条 / 文件内共 ${i===8?1:61} 条`))
     assert.match(f.scope, new RegExp(`文件内有 ${i===8?1:61} 条记录`))
-    assert.equal(f.stale, i===6); assert.equal(f.composing, i===3)
+    assert.equal(f.stale, i===6||i===7); assert.equal(f.composing, i===3)
     assert.equal(f.fileReads, i<6?1:i<8?2:3)
     assert.equal(f.requests,0); assert.equal(f.networkRequests,0); assert.equal(f.mutations,0); assert.equal(f.navigationCalls,0); assert.equal(f.downloads,0)
     assert.equal(f.liveHistoryUnchanged,true); assert.equal(f.guidanceUnchanged,true); assert.equal(f.activeMarkup,0)
@@ -22,13 +22,25 @@ function verifyFileSelectionScene(scene) {
     assert.ok(f.colors.length>=3 && f.colors.every(n=>Number.isFinite(n)&&n>=4.5))
     assert.equal(f.rasterCode,names.indexOf(scene.name)*phases.length+i+1); assert.ok(f.stable>=2 && f.rasterSamples>=2)
     assert.equal(f.scriptedCompositionEvents,0)
+    // Keep the observed end-event flag, which can be false in this Chromium
+    // path. Require trusted starts/updates, exact event order, completed host
+    // commands and zero manually dispatched composition events instead.
+    assert.ok(Array.isArray(f.imeEvents))
+    assert.ok(f.imeEvents.every(e=>e.type==='compositionend'?typeof e.trusted==='boolean':e.trusted===true))
+    const commands=[
+      {method:'Input.imeSetComposition',params:{text:'xingtu',selectionStart:6,selectionEnd:6,replacementStart:0,replacementEnd:2},completed:true},
+      {method:'Input.insertText',params:{text:'星图'},completed:true},
+    ]
+    assert.deepEqual(f.cdpCommands,commands.slice(0,i<3?0:i===3?1:2))
+    const events=[['compositionstart','笔记'],['compositionupdate','xingtu'],['compositionupdate','星图'],['compositionend','星图']]
+    assert.deepEqual(f.imeEvents.map(e=>[e.type,e.data]),events.slice(0,i<3?0:i===3?2:4))
     if(i===5) { assert.ok(f.prevDisabled&&f.nextDisabled); assert.match(f.page,/暂无可翻页/); assert.ok(!f.page.includes('1 / 0')) }
     else assert.match(f.page,new RegExp(`第 ${i===3?2:1} / ${i===0||i===3||i===7?3:1} 页`))
     if(i===7) assert.ok(f.focusQuery)
   })
   const events=scene.frames[4].imeEvents
   assert.ok(events.some(e=>e.type==='compositionstart'&&e.trusted))
-  assert.ok(events.some(e=>e.type==='compositionend'&&e.data==='星图'&&e.trusted))
+  assert.ok(events.some(e=>e.type==='compositionend'&&e.data==='星图'))
   return true
 }
 function verifyFileSelectionReport(dir, commit) {
