@@ -17,8 +17,14 @@ const control=name=>host.querySelector('[data-history-file-'+name+']')
 const notice=()=>control('notice').textContent
 const until=fn=>vi.waitFor(async()=>{await act(async()=>{await Promise.resolve()});fn()},{timeout:2000,interval:10})
 async function mount(){await act(async()=>root.render(<Viewer/>));host.querySelector('details').open=true}
-async function choose(file){await act(async()=>{Object.defineProperty(control('input'),'files',{configurable:true,value:file?[file]:[]});control('input').dispatchEvent(new Event('change',{bubbles:true}));await Promise.resolve()})}
-async function openFile(text=raw(),name='history.json'){await choose(new File([text],name,{type:'application/json'}));await until(()=>expect(notice()).not.toContain('正在读取'))}
+async function choose(file, waitForRead = false){await act(async()=>{
+ Object.defineProperty(control('input'),'files',{configurable:true,value:file?[file]:[]})
+ control('input').dispatchEvent(new Event('change',{bubbles:true}));await Promise.resolve()
+ // Real FileReader completion is asynchronous. Keep that actual completion
+ // within act, without replacing the reader or suppressing React warnings.
+ if (file && waitForRead) await readHistoryFile.mock.results.at(-1).value.catch(()=>{})
+})}
+async function openFile(text=raw(),name='history.json'){await choose(new File([text],name,{type:'application/json'}),true);await until(()=>expect(notice()).not.toContain('正在读取'))}
 async function click(name){await act(async()=>{control(name).click();await Promise.resolve()})}
 beforeEach(async()=>{
  actMode=globalThis.IS_REACT_ACT_ENVIRONMENT;globalThis.IS_REACT_ACT_ENVIRONMENT=true

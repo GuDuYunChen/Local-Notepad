@@ -31,7 +31,7 @@ if(!process.versions.electron){
    requests:window.__requests.length,mutations:window.__mutations,networkRequests:window.__networkRequests,navigationCalls:window.__navigationCalls,
    currentGuidanceUnchanged:document.querySelector('[data-sync-guidance]').textContent===window.__guidance,liveRows:document.querySelectorAll('[data-history-row]').length,
    activeMarkup:p.querySelectorAll('script,img,a,iframe').length,focusInside:p.contains(document.activeElement),focusChoose:document.activeElement===p.querySelector('[data-history-file-choose]'),
-   colors,targetVisible:r.top>=0&&r.bottom<=innerHeight&&r.left>=0&&r.right<=innerWidth,overflow:document.documentElement.scrollWidth-innerWidth,width:innerWidth,height:innerHeight}
+   colors,targetRect:{top:r.top,bottom:r.bottom,left:r.left,right:r.right},targetVisible:r.top>=0&&r.bottom<=innerHeight&&r.left>=0&&r.right<=innerWidth,overflow:document.documentElement.scrollWidth-innerWidth,width:innerWidth,height:innerHeight}
  }
  app.whenReady().then(async()=>{
   fs.mkdirSync(out,{recursive:true});save()
@@ -67,7 +67,7 @@ if(!process.versions.electron){
     await win.webContents.debugger.sendCommand('DOM.setFileInputFiles',{nodeId,files:[path.join(data,file)]})
    }
    const capture=async phase=>{
-    await exec(`window.__framePhase=${JSON.stringify(phase)};document.querySelector(${JSON.stringify(phase==='page2'?'.sync-history-file-list':'[data-history-file-viewer]')}).scrollIntoView({block:'start',behavior:'instant'});true`)
+    await exec(`window.__framePhase=${JSON.stringify(phase)};document.querySelector(${JSON.stringify(phase==='page2'?'.sync-history-file-list':'[data-history-file-viewer]')}).scrollIntoView({block:${JSON.stringify(phase==='page2'?'center':'start')},behavior:'instant'});true`)
     let f,last='',stable=0
     for(let i=0;i<50;i++){await delay(60);f=await exec('('+inspect.toString()+')()');const s=JSON.stringify(f);stable=last===s?stable+1:0;last=s;if(stable>=2)break}
     if(stable<2)throw Error('Unstable offline view')
