@@ -30,12 +30,16 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Fetch exact previous history-search source
         run: git fetch --no-tags --depth=1 origin c701bb70cd07f9b4d0f5a17d6a7b5ea4c4c59432
+      - name: Fetch exact previous export source
+        run: git fetch --no-tags --depth=1 origin 35ec5cb2b0297fba10019c2edf7a62f6a0445087
+      - name: Reproduce old export feedback lifecycle before testing the repair
+        run: node scripts/check-history-export-feedback-baseline.mjs
       - name: Reproduce original composition defects without accepting test timeouts
         run: node scripts/check-history-composition-baseline.mjs
       - name: Verify parsing, read lifecycle and evidence refusal
         run: node --test scripts/sync-conflict-history.node.mjs scripts/sync-conflict-history-evidence.node.cjs scripts/sync-history-search.node.mjs scripts/sync-history-search-evidence.node.cjs scripts/sync-history-export.node.mjs scripts/sync-history-export-evidence.node.cjs
       - name: Verify real history and unchanged overview interactions
-        run: npx vitest run --root=. src/components/SyncConflictHistoryPanel.test.jsx src/components/SyncHistorySearch.test.jsx src/components/SyncHistoryComposition.test.jsx src/components/SyncHistoryExport.test.jsx src/services/syncHistoryDownload.test.js src/components/SyncOverviewPanel.test.jsx src/components/SyncOverviewIntegration.test.jsx
+        run: npx vitest run --root=. src/components/SyncConflictHistoryPanel.test.jsx src/components/SyncHistorySearch.test.jsx src/components/SyncHistoryComposition.test.jsx src/components/SyncHistoryExport.test.jsx src/components/SyncHistoryExportFeedback.test.jsx src/services/syncHistoryDownload.test.js src/components/SyncOverviewPanel.test.jsx src/components/SyncOverviewIntegration.test.jsx
       - name: Verify real SQLite read-only history
         working-directory: server
         run: go test ./internal/syncengine -run '^TestConflictHistory' -count=1
@@ -69,6 +73,14 @@ jobs:
           path: |
             test-results/sync-history-search/checks.json
             test-results/sync-history-search/*.png
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload exact old export feedback reproduction
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: history-export-feedback-${{ runner.os }}-${{ github.sha }}
+          path: test-results/history-export-feedback/*
           if-no-files-found: error
           retention-days: 7
       - name: Upload exact original-defect reproduction

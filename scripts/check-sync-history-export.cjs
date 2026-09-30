@@ -83,12 +83,15 @@ if(!process.versions.electron){
         await click('export-button');await capture('unread')
         await type('abc');await click('read');await wait('document.querySelectorAll("[data-history-row]").length===1')
         await download();await capture('filtered')
+        // Return to exactly the original condition without a new export action.
+        await type('temporary-no-match');await type('abc');await capture('query-restored')
         await type('PRIVATE_QUERY');await click('export-button');await capture('empty')
         await type('abc');await click('more');await wait('!document.querySelector("[data-history-more]")')
         await click('read');await wait('document.querySelector(".sync-conflict-history-feedback").textContent.includes("未能读取")')
         await download();await capture('stale')
         await exec(`(()=>{window.__originalURL=URL.createObjectURL;URL.createObjectURL=()=>{throw Error('PRIVATE_DISK')};return true})()`)
         await click('export-button');await capture('failed')
+        await type('temporary-no-match');await type('abc');await capture('failure-restored')
         await exec('URL.createObjectURL=window.__originalURL;true');await download();await capture('retry')
         verifyExportScene(scene)
       }finally{win.destroy()}

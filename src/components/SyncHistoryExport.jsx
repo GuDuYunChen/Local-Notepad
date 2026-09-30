@@ -1,4 +1,4 @@
-import React, { useId, useState } from 'react'
+import React, { useId, useLayoutEffect, useState } from 'react'
 import { HISTORY_EXPORT_LIMIT, prepareHistoryExport, requestHistoryDownload } from '~/services/syncHistoryExport.mjs'
 
 export default function SyncHistoryExport({ snapshot, query, kind, outcome, phase, composing, matched }) {
@@ -9,8 +9,13 @@ export default function SyncHistoryExport({ snapshot, query, kind, outcome, phas
       : composing ? '请先完成输入法选字。'
         : !matched ? '当前没有匹配记录。'
           : matched > HISTORY_EXPORT_LIMIT ? `单次最多 ${HISTORY_EXPORT_LIMIT} 条，请缩小筛选范围。` : ''
-  // An old action message must not describe a changed selection. No effect or
-  // persistence is needed, and parent status refreshes do not repeat it.
+  // An acknowledgement belongs to one action in one uninterrupted scope.
+  // Merely hiding it when values differ resurrects it after A -> B -> A.
+  // Discard it on any committed scope transition, before it can be painted or
+  // announced again. Ordinary parent rerenders leave the same action intact.
+  useLayoutEffect(() => {
+    setFeedback(null)
+  }, [snapshot, query, kind, outcome, phase, composing])
   const message = feedback && feedback.snapshot === snapshot && feedback.query === query &&
     feedback.kind === kind && feedback.outcome === outcome && feedback.phase === phase &&
     feedback.composing === composing ? feedback.text : ''

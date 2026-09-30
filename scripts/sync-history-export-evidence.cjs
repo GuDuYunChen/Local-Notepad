@@ -1,20 +1,21 @@
 const assert = require('node:assert/strict')
 const fs = require('node:fs'), path = require('node:path'), { createHash } = require('node:crypto')
 const { verifyRasterWitness } = require('./sync-clock-raster-evidence.cjs')
-const phases = ['unread','filtered','empty','stale','failed','retry']
+const phases = ['unread','filtered','query-restored','empty','stale','failed','failure-restored','retry']
 const names = ['export-light','export-dark','export-narrow']
 function verifyExportScene(scene) {
   assert.ok(names.includes(scene.name)); assert.deepEqual(scene.frames.map(f=>f.phase),phases)
   scene.frames.forEach((f,i)=>{
-    assert.equal(f.requests,[0,1,1,3,3,3][i]); assert.equal(f.downloads,[0,1,1,2,2,3][i])
-    assert.equal(f.query,i===0?'':i===2?'PRIVATE_QUERY':'abc')
-    assert.deepEqual(f.ids,i===0||i===2?[]:['h5']); assert.equal(f.disabled,i===0||i===2)
+    assert.equal(f.requests,[0,1,1,1,3,3,3,3][i]); assert.equal(f.downloads,[0,1,1,1,2,2,2,3][i])
+    assert.equal(f.query,i===0?'':i===3?'PRIVATE_QUERY':'abc')
+    assert.deepEqual(f.ids,i===0||i===3?[]:['h5']); assert.equal(f.disabled,i===0||i===3)
     assert.equal(f.mutations,0);assert.equal(f.networkRequests,0);assert.equal(f.navigationCalls,0)
     assert.equal(f.controlsVisible,true);assert.equal(f.overflow<=1,true);assert.equal(f.guidanceUnchanged,true)
     assert.equal(f.rasterCode,names.indexOf(scene.name)*phases.length+i+1);assert.ok(f.stable>=2)
     assert.equal(f.rawErrorVisible,false);assert.equal(f.domDownloadLinks,0)
-    if([1,3,5].includes(i))assert.match(f.feedback,/已请求下载 1 条.*尚未确认落盘/)
-    if(i===4)assert.match(f.feedback,/未能发起下载/)
+    if([1,4,7].includes(i))assert.match(f.feedback,/已请求下载 1 条.*尚未确认落盘/)
+    else if(i===5)assert.match(f.feedback,/未能发起下载/)
+    else assert.equal(f.feedback,'', 'No new action: prior export feedback must stay cleared')
   })
   assert.equal(scene.downloads.length,3)
   scene.downloads.forEach((d,i)=>{
