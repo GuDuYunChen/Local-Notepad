@@ -26,7 +26,7 @@ if(!process.versions.electron){
    return{ratio:(Math.max(a,b)+.05)/(Math.min(a,b)+.05)}
   })
   const rows=[...panel.querySelectorAll('[data-history-row]')]
-  return{query:panel.querySelector('[data-history-query]').value,kind:panel.querySelector('[data-history-kind]').value,outcome:panel.querySelector('[data-history-outcome]').value,
+  return{imeEvents:window.__imeEvents||[],query:panel.querySelector('[data-history-query]').value,kind:panel.querySelector('[data-history-kind]').value,outcome:panel.querySelector('[data-history-outcome]').value,
    serverFilter:panel.querySelector('select').value,ids:rows.map(n=>n.querySelectorAll('code')[1].textContent),outcomes:rows.map(n=>n.querySelector('.sync-conflict-history-outcome').textContent).join(' / '),
    searchFeedback:panel.querySelector('[data-history-search-feedback]').textContent,readFeedback:panel.querySelector('.sync-conflict-history-feedback').textContent,
    requests:window.__requests,mutations:window.__mutations,networkRequests:window.__networkRequests,navigationCalls:window.__navigationCalls,
@@ -59,7 +59,7 @@ if(!process.versions.electron){
   if(!styles.length)throw Error('Missing production CSS')
   const file=path.join(out,'fixture.html')
   fs.writeFileSync(file,`<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self'; img-src 'self' data:">${styles.map(h=>`<link rel="stylesheet" href="${h}">`).join('')}<link rel="stylesheet" href="fixture.css"><style>html,body{height:auto!important;overflow:auto!important;scroll-behavior:auto!important}body{margin:0;padding:16px;background:var(--paper);color:var(--ink)}#root{height:auto;min-width:0;padding-bottom:900px}</style></head><body><div id="root"></div><script src="fixture.js"></script></body></html>`)
-  const report={commit:process.env.GITHUB_SHA||'',platform:process.platform,complete:false,realOverview:true,syntheticRecords:true,backendExercised:false,scenes:[]}
+  const report={commit:process.env.GITHUB_SHA||'',platform:process.platform,compositionDriver:'CDP Input.imeSetComposition/Input.insertText',complete:false,realOverview:true,syntheticRecords:true,backendExercised:false,scenes:[]}
   const save=()=>fs.writeFileSync(path.join(out,'checks.json'),JSON.stringify(report,null,2));save()
   for(const name of scenes){
    const win=new BrowserWindow({show:true,width:name==='search-narrow'?560:1000,height:1000,useContentSize:true,webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false,backgroundThrottling:false}})
@@ -76,13 +76,19 @@ if(!process.versions.electron){
     const code=scenes.indexOf(name)*phases.length+phases.indexOf(phase)+1
     await exec(`(()=>{let s=document.getElementById('search-raster');if(!s){s=document.createElement('div');s.id='search-raster';s.setAttribute('aria-hidden','true');document.body.append(s)}s.style.cssText='position:fixed;left:0;top:0;width:32px;height:4px;display:flex;z-index:2147483647;pointer-events:none;contain:strict';s.replaceChildren();for(let i=0;i<8;i++){const c=document.createElement('span');c.style.cssText='display:block;flex:none;width:4px;height:4px;background:'+(((${code}>>>i)&1)?'rgb(221,238,255)':'rgb(17,34,51)');s.append(c)}return true})()`)
     await exec('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>r(true))))')
-    let bytes
-    for(let i=0;i<40;i++){const b=(await win.capturePage()).toPNG();try{if(verifyRasterWitness(b,code)){bytes=b;break}}catch{}await delay(80)}
+    let bytes,lastHash='',rasterSamples=0
+    for(let i=0;i<40;i++){const b=(await win.capturePage()).toPNG(),sha=createHash('sha256').update(b).digest('hex');let matches=false
+     try{matches=verifyRasterWitness(b,code)}catch{}
+     rasterSamples=matches?(sha===lastHash?rasterSamples+1:1):0;lastHash=sha
+     if(rasterSamples>=2){bytes=b;break}await delay(80)
+    }
     if(!bytes)throw Error('Missing current phase raster');if(JSON.stringify(await exec('('+inspect.toString()+')()'))!==JSON.stringify(frame))throw Error('DOM changed during capture')
-    const png=name+'-'+phase+'.png';fs.writeFileSync(path.join(out,png),bytes);scene.frames.push({phase,...frame,rasterCode:code,png,bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')});save()
+    const png=name+'-'+phase+'.png';fs.writeFileSync(path.join(out,png),bytes);scene.frames.push({phase,...frame,stableSamples:stable,rasterSamples,rasterCode:code,png,bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')});save()
    }
    try{
     win.setMenu(null);await win.loadFile(file,{query:{scene:name}});await wait('!!document.querySelector("[data-history-query]")');await exec('document.fonts.ready.then(()=>true)')
+    win.webContents.debugger.attach('1.3')
+    await exec(`(()=>{window.__imeEvents=[];const n=document.querySelector('[data-history-query]');for(const type of ['compositionstart','compositionupdate','compositionend'])n.addEventListener(type,e=>window.__imeEvents.push({type:e.type,data:e.data,trusted:e.isTrusted}));return true})()`)
     await exec(`(()=>{window.__guidance=document.querySelector('[data-sync-guidance]').textContent;document.querySelector('[data-sync-conflict-history]').open=true;return true})()`)
     await type('abc');await choose('kind','file');await choose('outcome','local');await capture('unread-local')
     await click('read');await wait('document.querySelectorAll("[data-history-row]").length===1');await capture('title-match')
@@ -90,7 +96,26 @@ if(!process.versions.electron){
     await type('晚章');await choose('kind','all');await choose('outcome','all');await capture('unread-pages')
     await click('more');await wait('document.querySelectorAll("[data-history-row]").length===1&&!document.querySelector("[data-history-more]")');await capture('appended-match')
     await type('abc');await choose('kind','file');await choose('outcome','local');await click('read');await wait('document.querySelector(".sync-conflict-history-feedback").textContent.includes("未能读取")');await capture('refresh-failed')
-    await click('clear');await capture('cleared');verifyHistorySearchScene(scene)
+    await click('clear');await capture('cleared')
+    // Drive Chromium's native composition path. Do not manufacture DOM
+    // composition events or call React's handlers to claim IME coverage.
+    await type('abc')
+    await exec(`(()=>{const n=document.querySelector('[data-history-query]');n.focus({preventScroll:true});n.setSelectionRange(0,3);return true})()`)
+    await win.webContents.debugger.sendCommand('Input.imeSetComposition',{text:'xingtu',selectionStart:6,selectionEnd:6,replacementStart:0,replacementEnd:3})
+    await wait(`document.querySelector('[data-history-query]').value==='xingtu'`)
+    await capture('ime-candidate')
+    await win.webContents.debugger.sendCommand('Input.insertText',{text:'星图'})
+    await wait(`document.querySelector('[data-history-query]').value==='星图'`)
+    await capture('ime-committed')
+    await type('文'.repeat(127))
+    await exec(`(()=>{const n=document.querySelector('[data-history-query]');n.focus({preventScroll:true});n.setSelectionRange(127,127);return true})()`)
+    await win.webContents.debugger.sendCommand('Input.imeSetComposition',{text:'zhong',selectionStart:5,selectionEnd:5,replacementStart:127,replacementEnd:127})
+    await wait(`document.querySelector('[data-history-query]').value===${JSON.stringify('文'.repeat(127)+'zhong')}`)
+    await capture('ime-boundary')
+    await win.webContents.debugger.sendCommand('Input.insertText',{text:'中'})
+    await wait(`document.querySelector('[data-history-query]').value===${JSON.stringify('文'.repeat(127)+'中')}`)
+    await capture('ime-boundary-committed')
+    verifyHistorySearchScene(scene)
    }finally{win.destroy()}
   }
   report.complete=true;save();clearTimeout(watchdog);app.exit(0)

@@ -14,7 +14,20 @@ export default function SyncConflictHistoryPanel() {
   const [snapshot, setSnapshot] = useState(null)
   const [phase, setPhase] = useState('unread')
   const [query, setQuery] = useState(''), [kind, setKind] = useState('all'), [outcome, setOutcome] = useState('all')
+  // Candidate text belongs to the input method until composition finishes.
+  // Keep it intact and separate from the bounded, committed search condition.
+  const [queryDraft, setQueryDraft] = useState(''), [isComposing, setIsComposing] = useState(false)
+  const compositionActive = useRef(false)
   const searchInput = useRef(null)
+  const applyQuery = value => {
+    const next = limitHistoryQuery(value)
+    setQueryDraft(next); setQuery(next)
+  }
+  const finishComposition = event => {
+    if (!compositionActive.current) return // ignore a late end after explicit clear
+    compositionActive.current = false; setIsComposing(false)
+    applyQuery(event.currentTarget.value)
+  }
   const current = useRef(null), sequence = useRef(0), live = useRef(false)
   const readButton = useRef(null), returnFocus = useRef(false), moreButton = useRef(null), list = useRef(null), returnListFocus = useRef(false)
   const titleID = useId(), feedbackID = useId(), searchHintID = useId(), searchResultID = useId()
@@ -63,11 +76,11 @@ export default function SyncConflictHistoryPanel() {
   const loadedRows = snapshot?.filter === filter ? snapshot.items : []
   const selection = useMemo(() => selectHistoryRecords(loadedRows, { query, kind, outcome }), [loadedRows, query, kind, outcome])
   const rows = selection.items
-  const searchMessage = !snapshot ? '尚未读取记录；查找和本地筛选不会发起请求。'
+  const searchMessage = (isComposing ? '输入法文字尚未确认，暂按原查找条件显示。' : '') + (!snapshot ? '尚未读取记录；查找和本地筛选不会发起请求。'
     : `当前显示 ${selection.matched} 条 / 已读取 ${selection.loaded} 条。` +
       (!rows.length && selection.narrowed ? (snapshot.hasMore
         ? '已读取记录中没有匹配项；更早记录尚未读取，可继续读取更早记录。'
-        : '本次已读取记录中没有匹配项，可调整或清除本地筛选。') : '仅针对本次已读取内容，不是全部历史的搜索结果。')
+        : '本次已读取记录中没有匹配项，可调整或清除本地筛选。') : '仅针对本次已读取内容，不是全部历史的搜索结果。'))
   const result = phase === 'loading' ? '正在读取本机记录；不会执行同步。'
     : phase === 'error' ? '未能读取记录。' + (snapshot ? '下方保留上次读取结果，不代表当前状态。' : '尚无可核实的记录，不把读取失败当作没有记录。')
       : phase === 'stopped' ? '已停止等待记录读取；没有取消同步任务。' + (snapshot ? '下方仍为上次读取记录。' : '')
@@ -91,12 +104,19 @@ export default function SyncConflictHistoryPanel() {
       <p className="sync-conflict-history-feedback" id={feedbackID} role="status" aria-live="polite">{result}</p>
       <fieldset className="sync-history-search" aria-describedby={searchHintID}>
         <legend>筛选已读取记录</legend>
-        <p id={searchHintID}>按当前标题、对象或记录标识查找；不搜索正文，也不会自动读取更早记录。最多 128 个字符。</p>
+        <p id={searchHintID}>按当前标题、对象或记录标识查找；不搜索正文，也不会自动读取更早记录。输入法确认后最多 128 个字符。</p>
         <div className="sync-history-search-fields">
           <label className="sync-history-search-query">查找文字
-            <input ref={searchInput} type="search" value={query} data-history-query aria-label="在已读取记录中查找"
+            <input ref={searchInput} type="search" value={queryDraft} data-history-query aria-label="在已读取记录中查找"
               aria-controls={searchResultID} placeholder="输入标题或标识" autoComplete="off" spellCheck={false}
-              onChange={event => setQuery(limitHistoryQuery(event.target.value))}/>
+              onCompositionStart={() => { compositionActive.current = true; setIsComposing(true) }}
+              onCompositionEnd={finishComposition} onBlur={finishComposition}
+              onChange={event => {
+                if (compositionActive.current || event.nativeEvent.isComposing) {
+                  compositionActive.current = true; setIsComposing(true)
+                  setQueryDraft(event.target.value)
+                } else applyQuery(event.target.value)
+              }}/>
           </label>
           <label>对象类型<select value={kind} data-history-kind aria-label="筛选记录对象类型" onChange={event => setKind(event.target.value)}>
             <option value="all">全部对象</option><option value="file">笔记或文件夹</option><option value="tag">标签</option>
@@ -106,9 +126,10 @@ export default function SyncConflictHistoryPanel() {
             <option value="all">全部结果</option><option value="local">保留本机</option><option value="remote">采用远端</option>
             <option value="superseded">已失效</option><option value="unknown">处理方式未核实</option>
           </select></label>
-          {(query || kind !== 'all' || outcome !== 'all') && <button type="button" className="btn small" data-history-clear onClick={event => {
+          {(queryDraft || query || kind !== 'all' || outcome !== 'all') && <button type="button" className="btn small" data-history-clear onClick={event => {
             const ownsFocus = event.currentTarget === event.currentTarget.ownerDocument.activeElement
-            setQuery(''); setKind('all'); setOutcome('all')
+            compositionActive.current = false; setIsComposing(false)
+            applyQuery(''); setKind('all'); setOutcome('all')
             if (ownsFocus) searchInput.current?.focus({ preventScroll: true })
           }}>清除本地筛选</button>}
         </div>
