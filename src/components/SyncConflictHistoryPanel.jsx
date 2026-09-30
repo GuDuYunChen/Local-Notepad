@@ -3,6 +3,7 @@ import { api } from '~/services/api'
 import { appendConflictHistory, historyOutcome, historyTime, readConflictHistory } from '~/services/syncConflictHistory.mjs'
 import { limitHistoryQuery, selectHistoryRecords } from '~/services/syncHistorySearch.mjs'
 import './SyncConflictHistoryPanel.css'
+import SyncHistoryExport from './SyncHistoryExport'
 
 const kinds = { file: '笔记或文件夹', tag: '标签', 'file-tag': '标签关联', attachment: '附件' }
 function Stamp({ value }) {
@@ -152,6 +153,8 @@ export default function SyncConflictHistoryPanel() {
       {snapshot?.hasMore && <button type="button" className="btn small" data-history-more ref={moreButton} aria-disabled={phase === 'loading'}
         onClick={() => { if (phase !== 'loading') void read(filter, true) }}>读取更早记录</button>}
       {snapshot && <p className="sync-conflict-history-note">按处理或失效时间从新到旧排列；新产生的记录需重新读取。已失效不等于已解决，历史选边不保证现在仍是该版本。</p>}
+      <SyncHistoryExport snapshot={snapshot} query={query} kind={kind} outcome={outcome}
+        phase={phase} composing={isComposing} matched={selection.matched}/>
     </section>
   </details>
 }

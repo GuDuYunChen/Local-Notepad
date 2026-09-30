@@ -34,3 +34,6 @@
 .sync-history-search-fields input::placeholder{color:var(--ink-soft);opacity:1}
 .sync-history-search-fields button{min-height:38px;white-space:normal}
 @media(max-width:600px){.sync-history-search-fields .sync-history-search-query{flex-basis:100%}.sync-history-search-fields label{flex-basis:calc(50% - 10px)}}
+
+.sync-history-export{border-top:1px solid var(--line);margin-top:14px;padding-top:12px;min-width:0}
+.sync-history-export-reason{display:inline-block;margin:6px 0 6px 10px;color:var(--ink-soft);font-size:12px;line-height:1.8;overflow-wrap:anywhere}
