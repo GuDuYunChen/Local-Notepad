@@ -20,5 +20,16 @@
 .sync-history-file-list details{font-size:12px}
 .sync-history-file-list code{font:inherit;white-space:normal;overflow-wrap:anywhere}
 .sync-history-file-pages span{font-size:12px;line-height:1.8}
-.sync-history-file :is(summary,button,.sync-history-file-list):focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.sync-history-file :is(summary,button,input,select,.sync-history-file-list):focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 @media(max-width:600px){.sync-history-file>summary>span{display:block;margin-left:0}.sync-history-file-list dl{grid-template-columns:1fr}.sync-history-file-list{max-height:280px}}
+
+.sync-history-file-search{min-width:0;border:1px solid var(--line);border-radius:8px;margin:12px 0;padding:10px 12px}
+.sync-history-file-search legend{padding:0 6px;font-size:12px;font-weight:600}
+.sync-history-file-search>p{margin:0 0 10px}
+.sync-history-file-search-fields{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
+.sync-history-file-search-fields label{display:flex;flex:1 1 140px;min-width:0;flex-direction:column;gap:5px;font-size:12px;line-height:1.8}
+.sync-history-file-search-fields .sync-history-file-search-query{flex:2 1 220px}
+.sync-history-file-search-fields :is(input,select){box-sizing:border-box;width:100%;min-width:0;min-height:38px;padding:7px 10px;border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--ink);font:inherit}
+.sync-history-file-search-fields input::placeholder{color:var(--ink-soft);opacity:1}
+.sync-history-file-search-fields button{white-space:normal}
+@media(max-width:600px){.sync-history-file-search-fields .sync-history-file-search-query{flex-basis:100%}.sync-history-file-search-fields label{flex-basis:calc(50% - 10px)}}
