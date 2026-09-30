@@ -26,7 +26,9 @@ if(!process.versions.electron){
       const ancestors=[];for(let a=n;a;a=a.parentElement)ancestors.unshift(a)
       c.clearRect(0,0,1,1);paint('#ffffff');for(const a of ancestors)paint(getComputedStyle(a).backgroundColor)
       const bg=rgb(),style=getComputedStyle(n);paint(style.color);const fg=rgb()
-      c.clearRect(0,0,1,1);paint(style.getPropertyValue(n.matches('.sync-conflict-history-note,small')?'--ink-soft':'--ink').trim());const expected=rgb(),a=lum(fg),b=lum(bg)
+      // The new count labels intentionally use the secondary text token.
+      // Keep exact token equality AND the existing 4.5 contrast requirement.
+      c.clearRect(0,0,1,1);paint(style.getPropertyValue(n.matches('.sync-conflict-history-note,small,.sync-history-summary-counts dt')?'--ink-soft':'--ink').trim());const expected=rgb(),a=lum(fg),b=lum(bg)
       return{final:fg.every((v,i)=>v===expected[i]),ratio:(Math.max(a,b)+.05)/(Math.min(a,b)+.05)}
     })
     const rows=[...panel.querySelectorAll('[data-history-row]')]
