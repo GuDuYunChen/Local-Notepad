@@ -32,7 +32,7 @@ jobs:
       - name: Validate evidence refusal cases and state-model interleavings
         shell: pwsh
         run: |
-          node --test scripts/desktop-save-evidence.node.mjs
+          node --test scripts/desktop-save-evidence.node.mjs scripts/desktop-window-session.node.mjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npx vitest run --root=. src/components/EditorStateModel.test.jsx
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

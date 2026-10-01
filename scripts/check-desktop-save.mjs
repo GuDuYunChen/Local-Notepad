@@ -13,7 +13,8 @@ import { setTimeout as sleep } from 'node:timers/promises'
 import { createSaveTestServer } from './save-recovery-server.mjs'
 import { verifyDesktopSaveReport } from './desktop-save-evidence.mjs'
 import { desktopNote as note } from './desktop-save-fixture.mjs'
-import { inspectDesktopWindows, selectDesktopMainWindow, postDesktopClose } from './desktop-window-target.mjs'
+import { selectDesktopMainWindow } from './desktop-window-target.mjs'
+import { createDesktopWindowSession } from './desktop-window-session.mjs'
 
 assert.equal(process.platform, 'win32', 'This check requires the actual Windows package')
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -34,7 +35,7 @@ const report = { startedAt: new Date().toISOString(), exits: [], commit: process
   backendSHA256: hash(readFileSync(backend)) }
 const saveReport = () => writeFileSync(path.join(out, 'checks.json'), JSON.stringify(report, null, 2))
 saveReport()
-let server, child, exited, cdp, trace = ''
+let server, child, exited, cdp, windowSession, trace = ''
 const apiBase = 'http://127.0.0.1:27121'
 const textOf = node => typeof node?.text === 'string' ? node.text : (node?.children || []).map(textOf).join('\n')
 async function until(check, label, budget = 15000) {
@@ -179,7 +180,7 @@ async function screenshot(name) {
   saveReport()
 }
 async function closeSnapshot(phase) {
-  const native = inspectDesktopWindows(child.pid)
+  const native = await windowSession.inspect(child.pid)
   const renderer = await evaluate(`(()=>({
     url:location.href, title:document.title,
     body:document.body.innerText, active:document.activeElement?.outerHTML,
@@ -202,7 +203,7 @@ async function closeWindow() {
   saveReport()
   // Address the unique owned BrowserWindow, not a visible auxiliary Chromium
   // HWND returned by Process.MainWindowHandle. This still invokes real WM_CLOSE.
-  postDesktopClose(target)
+  await windowSession.close(target)
   const ownedPID = child.pid
   const timeout = new AbortController()
   let end
@@ -218,6 +219,12 @@ async function closeWindow() {
   }, 'Packaged backend remained alive after normal close', 5000)
 }
 try {
+  // Prepare one native helper before launch/editing, not inside the quit gate.
+  report.windowHelper = { events: [], stoppedCleanly: false }
+  windowSession = createDesktopWindowSession({ onEvent: event => {
+    report.windowHelper.events.push(event); saveReport()
+  } })
+  await windowSession.ready
   await availablePort(27121)
   server = await createSaveTestServer(backend)
   const a = await server.call('/api/files', { method: 'POST', body: JSON.stringify({ title: 'Desktop save A.md', content: note('原始标题', 'original body') }) })
@@ -266,6 +273,8 @@ try {
   await screenshot('restarted-fresh-profile')
   await closeWindow()
   report.checks.push('fresh-profile packaged restart reads latest body from real database and closes cleanly')
+  report.windowHelper.stoppedCleanly = await windowSession.dispose()
+  assert.equal(report.windowHelper.stoppedCleanly, true, 'Native helper did not exit cleanly')
   report.finalBodySHA256 = hash(Buffer.from(persisted)); report.complete = true; report.finishedAt = new Date().toISOString(); saveReport()
   verifyDesktopSaveReport(out, process.env.GITHUB_SHA)
 } catch (error) {
@@ -273,6 +282,7 @@ try {
   if (cdp) { try { await closeSnapshot('failure'); await screenshot('failed-state') } catch {} }
   throw error
 } finally {
+  await windowSession?.dispose()
   cdp?.close()
   if (child && child.exitCode === null) {
     // Failure-only cleanup, limited to the process tree created above.

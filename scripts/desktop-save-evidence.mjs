@@ -14,6 +14,18 @@ export function verifyDesktopSaveReport(directory, commit) {
   assert.equal(report.dirtyBeforeClose, true); assert.equal(report.noForcedBackendWarning, true)
   assert.equal(report.processIDs.length, 2); assert.ok(report.processIDs.every(pid => Number.isInteger(pid) && pid > 0))
   assert.deepEqual(report.exits, report.processIDs.map(pid => ({ pid, code: 0, signal: null, nativeClose: true })))
+  assert.equal(report.windowHelper.stoppedCleanly, true)
+  const helper = report.windowHelper.events
+  assert.deepEqual(helper.map(e => e.type), ['spawn', 'ready', 'inspect', 'close', 'inspect', 'close', 'disposed'])
+  assert.ok(Number.isInteger(helper[0].pid) && helper[0].pid > 0)
+  assert.equal(helper[1].pid, helper[0].pid)
+  assert.equal(helper[6].clean, true)
+  assert.ok(helper.every(e => Number.isFinite(e.elapsedMs) && e.elapsedMs >= 0))
+  for (let i = 0; i < 4; i++) {
+    assert.equal(helper[i + 2].completed, true)
+    assert.equal(helper[i + 2].id, i + 1)
+    assert.equal(helper[i + 2].pid, report.processIDs[Math.floor(i / 2)])
+  }
   const snapshots = report.closeDiagnostics.filter(d => d.phase === 'before-close')
   assert.equal(snapshots.length, 2); assert.equal(report.closeTargets.length, 2)
   for (let i = 0; i < 2; i++) {

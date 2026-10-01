@@ -38,6 +38,11 @@ function fixture(fn) {
   screenshots:[['manual-saved','manual-native-4189'],['automatic-saved','automatic-native-4189'],
    ['failure-retains-draft','recovered-after-block'],['retry-saved','recovered-after-block'],
    ['restarted-fresh-profile','native-close-latest']].map(([n,text])=>({filename:n+'.png',text,bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')}))}
+ report.windowHelper={stoppedCleanly:true,events:[
+  {type:'spawn',pid:800,elapsedMs:0},{type:'ready',pid:800,elapsedMs:100},
+  ...['inspect','close','inspect','close'].map((type,i)=>({type,id:i+1,pid:i<2?100:200,completed:true,elapsedMs:200+i*100})),
+  {type:'disposed',clean:true,elapsedMs:900},
+ ]}
  report.closeTargets=[100,200].map((pid,i)=>({pid,handle:i+300,visible:true,title:'记事本 · Local-Notepad',cls:'Chrome_WidgetWin_1',childText:['Chrome Legacy Window']}))
  report.closeDiagnostics=report.closeTargets.map(t=>({phase:'before-close',pid:t.pid,native:[t],renderer:{title:t.title}}))
  for(const s of report.screenshots)writeFileSync(path.join(dir,s.filename),bytes)
@@ -79,3 +84,12 @@ test('refuses hidden or malformed native window identities without posting a clo
   assert.throws(()=>selectDesktopMainWindow([{...main,...change}],100,main.title))
  }
 })
+
+for (const [label, change] of [
+ ['helper startup repeated', r => r.windowHelper.events.splice(3, 0, r.windowHelper.events[0])],
+ ['native close not acknowledged', r => r.windowHelper.events[3].completed = false],
+ ['helper receipt belongs to another app', r => r.windowHelper.events[3].pid = 999],
+ ['helper not stopped', r => r.windowHelper.stoppedCleanly = false],
+]) test('rejects ' + label, () => fixture((dir, report, save) => {
+ change(report); save(); assert.throws(() => verifyDesktopSaveReport(dir, sha))
+}))
