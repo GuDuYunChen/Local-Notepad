@@ -18,7 +18,7 @@ export function createDesktopWindowSession({
   }
   const script = readFileSync(new URL('./desktop-window-worker.ps1', import.meta.url), 'utf8')
   let child, state = 'starting', buffer = '', pending = null, sequence = 0, startupTimer
-  let resolveReady, rejectReady, resolveExit, disposed = false, disposal
+  let resolveReady, rejectReady, resolveExit, disposed = false, disposal, streamFailed = false
   const ready = new Promise((resolve, reject) => { resolveReady = resolve; rejectReady = reject })
   // Avoid an unhandled rejection if startup fails before the caller awaits it.
   ready.catch(() => {})
@@ -34,6 +34,13 @@ export function createDesktopWindowSession({
     event({ type: 'failed', code })
     // Terminate only the owned helper. Never retry a potentially posted close.
     try { child?.kill() } catch {}
+  }
+  // Pipe errors are EventEmitter errors, not promise rejections. Keep listeners
+  // attached through teardown so a late error cannot terminate the test runner.
+  const pipeError = () => {
+    if (state === 'closed') return
+    streamFailed = true
+    if (!disposed) fail('PIPE_ERROR')
   }
   const receive = line => {
     let message
@@ -69,9 +76,12 @@ export function createDesktopWindowSession({
       stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true,
     })
     event({ type: 'spawn', pid: child.pid })
+    child.stdin.on('error', pipeError)
+    child.stdout.on('error', pipeError)
+    child.stderr.on('error', pipeError)
     child.stdout.setEncoding('utf8')
     child.stdout.on('data', chunk => {
-      if (state === 'failed' || state === 'closed') return
+      if (disposed || state === 'failed' || state === 'closed') return
       buffer += chunk
       if (Buffer.byteLength(buffer, 'utf8') > MAX_REPLY) { fail('REPLY_LIMIT'); return }
       let index
@@ -83,7 +93,6 @@ export function createDesktopWindowSession({
     })
     // Drain stderr to avoid pipe deadlock; never dump an encoded command/stack.
     child.stderr.on('data', () => {})
-    child.stdin.on('error', () => { if (!disposed) fail('PIPE_ERROR') })
     child.on('error', () => { fail('SPAWN_ERROR'); resolveExit({ code: null, signal: null }) })
     child.on('exit', (code, signal) => {
       resolveExit({ code, signal })
@@ -131,7 +140,7 @@ export function createDesktopWindowSession({
           timer = setTimeout(() => { try { child?.kill() } catch {} ; resolve(null) }, 3000)
         })])
         clearTimeout(timer); state = 'closed'
-        const clean = end?.code === 0 && end?.signal === null
+        const clean = !streamFailed && end?.code === 0 && end?.signal === null
         event({ type: 'disposed', clean })
         return clean
       })()

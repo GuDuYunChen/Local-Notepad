@@ -1,6 +1,8 @@
 # 开发接续点
 
 ## 当前工作
+- 当前修补：复核a6675cf时用故障注入发现stdout/stderr未处理的error会终止测试进程，并发现主动清理时迟到输出误判；先修窗口助手异常管道，见`DESKTOP_WINDOW_PIPE_ERRORS.md`。仍不改产品或进入2F.30。下列a6675cf正常路径已经验收，不能重复当成未执行。
+
 - 本轮：先修复1e734eb遗留的Desktop Save失败（运行36814764840，窗口查询PowerShell超时），见`DESKTOP_WINDOW_HELPER_RECOVERY.md`。上一轮八PR/完整打包成功不等于桌面验收通过。
 - 已替换为编辑前预热、异步复用的窗口助手；不改产品4.195.1/schema14或推进2F.30。以新HEAD的独立桌面和原有CI结果验收，不通过修改状态文档再触发额外源码提交。
 - 本轮接续修补：历史问题索引与短CI状态核验（见 `KNOWN_ISSUES.md`、`STAGE_REVIEW_PROTOCOL.md`）。产品仍为4.195.1，不叠加新界面功能。
@@ -41,4 +43,4 @@ PR 检查与 push 检查分开核对。至少检查八条 PR 流程、push 的 U
 
 ## 助手自身执行问题（与产品缺陷分开）
 
-见 `ASSISTANT_EXECUTION_INCIDENTS.md`：现记录11类助手操作失误，执行有限轮询、单次有依据重试和分段交代。1e734eb已修补stage-review的PR范围检查；本轮处理其独立桌面验收中复发的同步PowerShell查询问题，不重复修改核验器或开发2F.30。产品仍4.195.1，最新HEAD以远程为准，验收以该HEAD的PR检查点和实际产物为准。
+见 `ASSISTANT_EXECUTION_INCIDENTS.md`：现记录12类助手操作失误，执行有限轮询、单次有依据重试和分段交代。1e734eb已修补stage-review的PR范围检查；本轮处理其独立桌面验收中复发的同步PowerShell查询问题，不重复修改核验器或开发2F.30。产品仍4.195.1，最新HEAD以远程为准，验收以该HEAD的PR检查点和实际产物为准。

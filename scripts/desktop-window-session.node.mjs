@@ -7,7 +7,7 @@ import { createDesktopWindowSession } from './desktop-window-session.mjs'
 
 const window = { pid: 100, handle: 300, title: '记事本', cls: 'Chrome_WidgetWin_1',
   visible: true, childText: ['Chrome Legacy Window'] }
-function mock({ ready = true, response, replyDelay = 0 } = {}) {
+function mock({ ready = true, response, replyDelay = 0, holdExit = false } = {}) {
   const child = new EventEmitter(), calls = [], commands = [], events = []
   let ended = false, killed = 0
   const exit = (code, signal = null) => {
@@ -26,7 +26,7 @@ function mock({ ready = true, response, replyDelay = 0 } = {}) {
         else queueMicrotask(() => send(value))
       }
     },
-    final(callback) { callback(); queueMicrotask(() => exit(0)) },
+    final(callback) { callback(); if (!holdExit) queueMicrotask(() => exit(0)) },
   })
   child.kill = () => { killed++; queueMicrotask(() => exit(null, 'SIGTERM')); return true }
   const spawnWorker = (...args) => {
@@ -174,4 +174,78 @@ test('startup/request budgets must be bounded before creating any helper', () =>
     assert.throws(()=>createDesktopWindowSession({startupMs:value}))
     assert.throws(()=>createDesktopWindowSession({requestMs:value}))
   }
+})
+
+
+// A stream error used to escape the session as an uncaught EventEmitter error.
+// Exercise real streams, preserve the raw exception only in the synthetic input.
+for (const stream of ['stdout', 'stderr']) {
+  test(stream + ' failure before readiness is a bounded rejection, not a runner crash', async t => {
+    const {m,s}=session(t,{ready:false})
+    const rejected=assert.rejects(s.ready,e=>e.code==='PIPE_ERROR'&&!e.message.includes('PRIVATE'))
+    m.child[stream].destroy(new Error('PRIVATE_PIPE_DETAIL'))
+    await rejected
+    assert.equal(await s.dispose(),false); assert.equal(m.commands.length,0)
+    assert.equal(m.killed,1); assert.equal(m.calls.length,1)
+    assert.equal(JSON.stringify(m.events).includes('PRIVATE'),false)
+  })
+  test(stream + ' failure during inspection rejects the request and prevents reuse', async t => {
+    const {m,s}=session(t,{response:()=>undefined}); await s.ready
+    const pending=s.inspect(100), rejected=assert.rejects(pending,e=>e.code==='PIPE_ERROR')
+    await delay(1); m.child[stream].destroy(new Error('PRIVATE_PIPE_DETAIL')); await rejected
+    await assert.rejects(s.inspect(100),e=>e.code==='SESSION_UNAVAILABLE')
+    assert.equal(m.commands.length,1); assert.equal(m.events.some(e=>e.completed),false)
+    assert.equal(await s.dispose(),false)
+  })
+  test(stream + ' failure while idle invalidates the session without sending a command', async t => {
+    const {m,s}=session(t); await s.ready
+    m.child[stream].destroy(new Error('PRIVATE_PIPE_DETAIL')); await delay(1)
+    await assert.rejects(s.inspect(100),e=>e.code==='SESSION_UNAVAILABLE')
+    assert.equal(m.commands.length,0); assert.equal(m.events.filter(e=>e.type==='failed').length,1)
+  })
+  test(stream + ' errors after completed disposal are consumed without reopening the session', async t => {
+    const {m,s}=session(t); await s.ready; assert.equal(await s.dispose(),true)
+    const before=JSON.stringify(m.events)
+    m.child[stream].destroy(new Error('PRIVATE_LATE_PIPE')); await delay(1)
+    assert.equal(JSON.stringify(m.events),before); assert.equal(m.killed,0)
+    await assert.rejects(s.inspect(100),e=>e.code==='DISPOSED')
+  })
+}
+for (const stream of ['stdin','stdout','stderr']) {
+  test(stream + ' failure during shutdown cannot be reported as a clean disposal', async t => {
+    const {m,s}=session(t,{holdExit:true}); await s.ready
+    const done=s.dispose()
+    m.child[stream].emit('error',new Error('PRIVATE_SHUTDOWN_PIPE'))
+    m.exit(0)
+    assert.equal(await done,false); assert.equal(m.events.at(-1).clean,false)
+    assert.equal(m.commands.length,0); assert.equal(m.killed,0)
+  })
+}
+test('output failure after sending close never replays WM_CLOSE or accepts a late reply', async t => {
+  const {m,s}=session(t,{response:()=>undefined}); await s.ready
+  const pending=s.close(window), rejected=assert.rejects(pending,e=>e.code==='PIPE_ERROR')
+  await delay(1); m.child.stdout.destroy(new Error('PRIVATE_CLOSE_PIPE')); await rejected
+  m.child.stderr.emit('error',new Error('SECOND_PIPE'))
+  await assert.rejects(s.close(window),e=>e.code==='SESSION_UNAVAILABLE')
+  assert.equal(m.commands.length,1); assert.equal(m.commands[0].op,'close')
+  assert.equal(m.events.some(e=>e.type==='close'&&e.completed),false)
+  assert.equal(m.events.filter(e=>e.type==='failed').length,1); assert.equal(m.killed,1)
+})
+test('late protocol data during disposal is drained without killing the helper again', async t => {
+  const {m,s}=session(t,{response:()=>undefined,holdExit:true}); await s.ready
+  const pending=s.inspect(100), rejected=assert.rejects(pending,e=>e.code==='DISPOSED')
+  await delay(1); const done=s.dispose()
+  m.send({id:1,ok:true,windows:[window]}); m.child.stdout.write('PRIVATE_INVALID_REPLY\n')
+  m.child.stdout.write('x'.repeat(256*1024+1)); m.exit(0)
+  await rejected; assert.equal(await done,true); assert.equal(m.killed,0)
+  assert.equal(m.events.some(e=>e.type==='failed'||e.completed),false)
+})
+test('simultaneous output errors fail once and terminate only the owned helper', async t => {
+  const {m,s}=session(t,{ready:false})
+  const rejected=assert.rejects(s.ready,e=>e.code==='PIPE_ERROR')
+  m.child.stdout.emit('error',new Error('PRIVATE_STDOUT'))
+  m.child.stderr.emit('error',new Error('PRIVATE_STDERR'))
+  m.child.stdin.emit('error',new Error('PRIVATE_STDIN'))
+  await rejected; assert.equal(m.killed,1); assert.equal(m.calls.length,1)
+  assert.equal(m.events.filter(e=>e.type==='failed').length,1)
 })
