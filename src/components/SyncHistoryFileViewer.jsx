@@ -7,6 +7,7 @@ import { HISTORY_FILE_FILTER_ALL, selectHistoryFilePage } from '~/services/syncH
 import './SyncHistoryFileViewer.css'
 import SyncHistoryFileSummary from './SyncHistoryFileSummary'
 import SyncHistoryTimeFilter from './SyncHistoryTimeFilter'
+import SyncHistoryFilePagination from './SyncHistoryFilePagination'
 
 const kinds = { file: '笔记或文件夹', tag: '标签', 'file-tag': '标签关联', attachment: '附件' }
 const statuses = { all: '全部历史类型', resolved: '已选边处理', superseded: '已失效' }
@@ -147,11 +148,7 @@ export default function SyncHistoryFileViewer() {
             </li>)}
           </ol>
         </div>
-        <div className="sync-history-file-pages" role="group" aria-label="离线文件分页">
-          <button type="button" className="btn small" data-history-file-prev aria-disabled={selection.page === 0} onClick={() => { if (selection.page > 0) setPage(selection.page - 1) }}>上一页</button>
-          <span data-history-file-page role="status">{selection.matched ? <>第 {selection.page + 1} / {selection.pages} 页，本页第 {selection.from}–{selection.to} 条</> : '没有匹配记录，暂无可翻页内容'}</span>
-          <button type="button" className="btn small" data-history-file-next aria-disabled={selection.page + 1 >= selection.pages} onClick={() => { if (selection.page + 1 < selection.pages) setPage(selection.page + 1) }}>下一页</button>
-        </div>
+        <SyncHistoryFilePagination selection={selection} report={report} filters={filters} onNavigate={setPage}/>
       </section>}
     </div>
   </details>

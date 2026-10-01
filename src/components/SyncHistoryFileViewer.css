@@ -33,3 +33,9 @@
 .sync-history-file-search-fields input::placeholder{color:var(--ink-soft);opacity:1}
 .sync-history-file-search-fields button{white-space:normal}
 @media(max-width:600px){.sync-history-file-search-fields .sync-history-file-search-query{flex-basis:100%}.sync-history-file-search-fields label{flex-basis:calc(50% - 10px)}}
+
+.sync-history-file-page-jump{display:flex;flex:1 1 100%;flex-wrap:wrap;align-items:center;gap:8px;min-width:0}
+.sync-history-file-page-jump label{display:inline-flex;align-items:center;gap:6px;font-size:12px;line-height:1.8;color:var(--ink)}
+.sync-history-file-page-jump input{box-sizing:border-box;width:5.5em;min-height:36px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--ink);font:inherit;font-variant-numeric:tabular-nums}
+.sync-history-file-page-jump>span{color:var(--ink-soft);overflow-wrap:anywhere}
+.sync-history-file .sync-history-file-page-error{flex-basis:100%;margin:0;color:var(--ink)}
