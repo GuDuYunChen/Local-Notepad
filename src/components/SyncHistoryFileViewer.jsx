@@ -1,11 +1,12 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { readHistoryFile } from '~/services/syncHistoryFile.mjs'
-import { describeHistoryTimeFilter } from '~/services/syncHistoryTime.mjs'
+import { describeHistoryTimeFilter, sameHistoryTimeFilter } from '~/services/syncHistoryTime.mjs'
 import { historyOutcome, historyTime } from '~/services/syncConflictHistory.mjs'
 import { limitHistoryQuery } from '~/services/syncHistorySearch.mjs'
 import { HISTORY_FILE_FILTER_ALL, selectHistoryFilePage } from '~/services/syncHistoryFileSelection.mjs'
 import './SyncHistoryFileViewer.css'
 import SyncHistoryFileSummary from './SyncHistoryFileSummary'
+import SyncHistoryTimeFilter from './SyncHistoryTimeFilter'
 
 const kinds = { file: '笔记或文件夹', tag: '标签', 'file-tag': '标签关联', attachment: '附件' }
 const statuses = { all: '全部历史类型', resolved: '已选边处理', superseded: '已失效' }
@@ -21,9 +22,10 @@ export default function SyncHistoryFileViewer() {
   const chooseButton = useRef(null), input = useRef(null), generation = useRef(0), current = useRef(null), live = useRef(false)
   const [view, setView] = useState(null), [phase, setPhase] = useState('unread'), [notice, setNotice] = useState(''), [page, setPage] = useState(0)
   const [filters, setFilters] = useState(HISTORY_FILE_FILTER_ALL)
+  const [dateReset, setDateReset] = useState(0), [dateDraftActive, setDateDraftActive] = useState(false)
   const [queryDraft, setQueryDraft] = useState(''), [composing, setComposing] = useState(false)
   const applyFilters = next => {
-    if (next.query === filters.query && next.kind === filters.kind && next.outcome === filters.outcome) return
+    if (next.query === filters.query && next.kind === filters.kind && next.outcome === filters.outcome && sameHistoryTimeFilter(next.timeFilter, filters.timeFilter)) return
     setFilters(next); setPage(0)
   }
   const applyQuery = value => {
@@ -37,6 +39,7 @@ export default function SyncHistoryFileViewer() {
   const resetSelection = () => {
     compositionActive.current = false; setComposing(false); setQueryDraft('')
     setFilters(HISTORY_FILE_FILTER_ALL); setPage(0)
+    setDateReset(n => n + 1); setDateDraftActive(false)
   }
   useEffect(() => {
     live.current = true
@@ -116,13 +119,17 @@ export default function SyncHistoryFileViewer() {
               onChange={event => applyFilters({ ...filters, outcome: event.target.value })}>
               {Object.entries(choices).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
             </select></label>
-            {(queryDraft || filters.query || filters.kind !== 'all' || filters.outcome !== 'all') &&
+            {(queryDraft || filters.query || filters.kind !== 'all' || filters.outcome !== 'all' || filters.timeFilter.mode !== 'all' || dateDraftActive) &&
               <button type="button" className="btn small" data-history-file-filter-clear onClick={event => {
                 const ownsFocus = event.currentTarget === event.currentTarget.ownerDocument.activeElement
                 resetSelection(); if (ownsFocus) queryInput.current?.focus({ preventScroll: true })
               }}>清除文件内筛选</button>}
           </div>
         </fieldset>
+        <div data-history-file-date-filter>
+          <SyncHistoryTimeFilter scope="file" value={filters.timeFilter} resetVersion={dateReset}
+            onDraftChange={setDateDraftActive} onApply={timeFilter => applyFilters({ ...filters, timeFilter })}/>
+        </div>
         <p id={matchesID} data-history-file-matches role="status" aria-live="polite">
           {composing && <span data-history-file-composing>输入法文字尚未确认，仍按原文件内查找条件显示。</span>}
           当前匹配 {selection.matched} 条 / 文件内共 {selection.total} 条；只改变查看结果，不改变文件声明的导出范围。

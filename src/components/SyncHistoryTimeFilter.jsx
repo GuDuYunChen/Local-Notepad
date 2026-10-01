@@ -2,7 +2,8 @@ import React, { useEffect, useId, useRef, useState } from 'react'
 import { HISTORY_TIME_ALL, describeHistoryTimeFilter, normalizeHistoryTimeFilter, sameHistoryTimeFilter } from '~/services/syncHistoryTime.mjs'
 import './SyncHistoryTimeFilter.css'
 
-export default function SyncHistoryTimeFilter({ value = HISTORY_TIME_ALL, onApply, resetVersion = 0, onDraftChange }) {
+export default function SyncHistoryTimeFilter({ value = HISTORY_TIME_ALL, onApply, resetVersion = 0, onDraftChange, scope = 'loaded' }) {
+  const offline = scope === 'file'
   const [draft, setDraft] = useState(value), [error, setError] = useState('')
   const start = useRef(null), end = useRef(null)
   const hintID = useId(), errorID = useId()
@@ -29,24 +30,24 @@ export default function SyncHistoryTimeFilter({ value = HISTORY_TIME_ALL, onAppl
   }
   return <div className="sync-history-time-filter" data-history-time-filter>
     <details data-history-time-controls>
-      <summary>按处理日期筛选（UTC）</summary>
-      <p id={hintID}>按处理或失效日期筛选，包含结束当日；单边日期可留空。仅作用于已读取记录，不使用创建时间代替。</p>
+      <summary>{offline ? '按文件内处理日期筛选（UTC）' : '按处理日期筛选（UTC）'}</summary>
+      <p id={hintID}>按处理或失效日期筛选，包含结束当日；单边日期可留空。{offline ? '仅作用于本文件全部记录，不读取本机历史，也不改写文件声明的日期范围。' : '仅作用于已读取记录，不使用创建时间代替。'}</p>
       <div className="sync-history-time-fields">
-        <label>处理日期<select data-history-time-mode aria-label="处理日期筛选方式" value={draft.mode}
+        <label>处理日期<select data-history-time-mode aria-label={offline ? '离线文件处理日期筛选方式' : '处理日期筛选方式'} value={draft.mode}
           onChange={event => edit({ mode: event.target.value, from: '', to: '' })}>
           <option value="all">全部处理日期</option><option value="range">指定日期范围</option><option value="missing">仅时间缺失</option>
         </select></label>
         {draft.mode === 'range' && <>
-          <label>起始日期（UTC）<input ref={start} type="date" data-history-time-from aria-label="起始处理日期（UTC）"
+          <label>起始日期（UTC）<input ref={start} type="date" data-history-time-from aria-label={offline ? '离线文件起始处理日期（UTC）' : '起始处理日期（UTC）'}
             min="1970-01-01" max="9999-12-31" defaultValue={draft.from} aria-describedby={hintID + (error ? ' ' + errorID : '')}
             onChange={event => edit({ from: event.target.value })} onKeyDown={enter}/></label>
-          <label>结束日期（UTC）<input ref={end} type="date" data-history-time-to aria-label="结束处理日期（UTC）"
+          <label>结束日期（UTC）<input ref={end} type="date" data-history-time-to aria-label={offline ? '离线文件结束处理日期（UTC）' : '结束处理日期（UTC）'}
             min="1970-01-01" max="9999-12-31" defaultValue={draft.to} aria-describedby={hintID + (error ? ' ' + errorID : '')}
             onChange={event => edit({ to: event.target.value })} onKeyDown={enter}/></label>
         </>}
         <button type="button" className="btn small" data-history-time-apply onClick={apply}>应用日期筛选</button>
       </div>
-      {pending && <p data-history-time-pending>日期条件尚未应用；列表、概览和导出仍使用当前已应用条件。</p>}
+      {pending && <p data-history-time-pending>{offline ? '文件内日期条件尚未应用；列表和匹配概览仍使用已应用条件，原文件声明不变。' : '日期条件尚未应用；列表、概览和导出仍使用当前已应用条件。'}</p>}
       {error && <p id={errorID} role="alert" data-history-time-error>{error}</p>}
     </details>
     {value.mode !== 'all' && <p data-history-time-applied role="status" aria-live="polite">{describeHistoryTimeFilter(value)}</p>}

@@ -4,9 +4,9 @@
 
 仓库 GuDuYunChen/Local-Notepad，分支 `feature/knowledge-os-phase2`，Draft PR #2。日常开发不合入 master。
 
-本轮新增 **Phase 2F.30：离线文件匹配结果概览**，详情见 `SYNC_HISTORY_FILE_SUMMARY_2F30.md`。此前2F.28离线查看、2F.29全文件搜索已存在，不重复开发。开发版本仍4.195.1、schema14；新功能用提交标识，尚未单独发布新的版本号。版本以package.json、最新代码以远程HEAD为准，本文不是CI通过证明。
+本轮新增 **Phase 2F.31：离线文件处理日期筛选**，详情见 `SYNC_HISTORY_FILE_DATES_2F31.md`。Phase2F.30的全文件匹配概览已存在，复用而不重复开发。此前2F.28离线查看、2F.29全文件搜索已存在，不重复开发。开发版本仍4.195.1、schema14；新功能用提交标识，尚未单独发布新的版本号。版本以package.json、最新代码以远程HEAD为准，本文不是CI通过证明。
 
-基线 `8b6d5c0c51687011e149cfe31eef590e1fb0573f` 的Overview和完整Windows剩余检查已成功，窗口助手管道修补不再作为未完成事项重跑。新功能须使用新HEAD验收，不用基线结果代替。验收结果和待办写PR评论/交付记录，不为更新状态另造源码提交触发全部CI。
+基线 `24a1005a58af1ee8ec1ba53d57c80e5ac4d33739` 的完整Windows任务110245838904已成功，安装包11145205660已下载核对摘要；上一阶段不再作为未完成事项重跑。新功能须使用新HEAD验收，不用基线结果代替。验收结果和待办写PR评论/交付记录，不为更新状态另造源码提交触发全部CI。
 
 ## 中断恢复
 
@@ -16,7 +16,7 @@
 
 ## 已知问题和助手执行失误
 
-`KNOWN_ISSUES.md`及机器索引保留42条产品/环境问题；`ASSISTANT_EXECUTION_INCIDENTS.md`单独保留12类助手执行错误，不混作聊天故障根因。本轮实际前置依赖/工具预算问题补记在 `EXECUTION_NOTE_2F30.md`，不能把失败调用写成通过。
+`KNOWN_ISSUES.md`及机器索引保留42条产品/环境问题；`ASSISTANT_EXECUTION_INCIDENTS.md`单独保留12类助手执行错误，不混作聊天故障根因。各轮具体操作失误保留于 `EXECUTION_NOTE_2F30.md`、`EXECUTION_NOTE_2F31.md`，不能把失败调用写成通过。
 
 遵守 `STAGE_REVIEW_PROTOCOL.md`：同run检查至少间隔90秒，30次连接器调用前检查预算；长日志留文件，关键节点短交代。每个故障链最多一次有新证据的手工重试；工具安全拒绝不绕过。这些措施减少重复工作，不保证ChatGPT平台不中断。
 
