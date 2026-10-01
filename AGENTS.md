@@ -9,3 +9,11 @@ Preserve existing save/receipt/queue/reference/quit invariants. Do not require e
 Fix reproduced problems before starting another functional stage; preserve original failing evidence and regenerate current-HEAD evidence.
 Keep test fixtures isolated from user data. Never report synthetic Windows tests as on-site testing of the user's workspace.
 Write a concise PR checkpoint after pushing and a separate final acceptance record. Missing final chat output does not mean prior successful repository writes were lost.
+
+Before touching code, read `docs/KNOWN_ISSUES.md` and `docs/STAGE_REVIEW_PROTOCOL.md`.
+Run `node scripts/stage-review.mjs catalog` to check the incident/regression links; it is NOT a test run.
+Use current-HEAD workflow path+event checks, not old PR titles or display names. All-green CI still requires artifact verification.
+Keep progress concise and put full logs in files. Do not repeatedly fetch whole-PR diffs or unchanged reports.
+Do not blindly retry unchanged failures. One evidence-justified transient retry per affected job is the limit before recording a blocked checkpoint.
+When a tool write is blocked, stop that write; preserve a local handoff and report the failure. Do not bypass a safety rejection or fabricate a successful comment.
+These process limits do not diagnose or guarantee prevention of ChatGPT stream failures.

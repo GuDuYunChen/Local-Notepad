@@ -26,6 +26,10 @@ jobs:
         with:
           go-version: '1.24.11'
           cache-dependency-path: server/go.sum
+      - name: Verify historical regression links and bounded review gates
+        run: node --test scripts/stage-review.node.mjs
+      - name: Check historical issue catalog integrity
+        run: node scripts/stage-review.mjs catalog
       - name: Verify committed dependency lock
         run: node scripts/verify-dependency-lock.mjs
       - name: Install locked dependencies

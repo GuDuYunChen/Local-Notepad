@@ -1,6 +1,7 @@
 # 开发接续点
 
 ## 当前工作
+- 本轮接续修补：历史问题索引与短CI状态核验（见 `KNOWN_ISSUES.md`、`STAGE_REVIEW_PROTOCOL.md`）。产品仍为4.195.1，不叠加新界面功能。
 - 仓库：GuDuYunChen/Local-Notepad。
 - 开发分支：feature/knowledge-os-phase2；沿用 Draft PR #2，不合入 master。
 - 已实现功能：Phase 2F.29，离线历史 JSON 全文件查找、类型/处理结果交集及分页。
@@ -27,3 +28,11 @@ PR 检查与 push 检查分开核对。至少检查八条 PR 流程、push 的 U
 聊天端“无法思考”的内部原因未取得错误码/服务日志，不能被本仓库的修补宣称修复。
 源码归档可恢复代码，但不是 Git 历史；没有完成 clone 就不要报告克隆成功。
 原生 UI 使用隔离合成数据，不能冒充用户本机现场验收。升级前备份工作区及未确认正文，不用旧 4.189.0 打开 schema 14。
+
+## 最近已确证的不同失败类别
+
+4.195.1前npm tarball 404发生在安装阶段；桌面运行36807975236首轮PowerShell窗口查询ETIMEDOUT，同提交第二轮通过；上轮PR评论被工具安全状态检查拦截，未写成功，远程标题仍旧。聊天“无法思考”的内部根因未知。这些不是已证明的同一因果。每次恢复先读取远端，不根据本段推断最新状态。
+
+## 索引与短快照
+
+`node scripts/stage-review.mjs catalog` 核验历史问题关联路径，不运行回归。`node scripts/stage-review.mjs ci <runs.json> <fresh-branch-head>` 整理Actions原始快照，不发请求或重试。CI完整仍输出artifact-verification-required，不等于阶段通过。按STAGE_REVIEW_PROTOCOL分三个检查点，长日志写文件，写入拦截时保留本地接续而不绕过。
