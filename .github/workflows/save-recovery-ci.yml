@@ -27,7 +27,12 @@ jobs:
         with:
           go-version: '1.24.11'
           cache-dependency-path: server/go.sum
-      - run: npm install --no-audit --no-fund
+      - name: Verify committed dependency lock
+        run: node scripts/verify-dependency-lock.mjs
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Verify install preserved manifest and lock
+        run: git diff --exit-code -- package.json package-lock.json
       - run: git fetch --no-tags --depth=1 origin 0b66c7e6a902129cd2ead4da75f5d1bf96a9d9de
       - run: git fetch --no-tags --depth=1 origin 8480c91d293fbdb1f565da2d710536b1edefd4dd
       - run: git fetch --no-tags --depth=1 origin ca9259c21ae0518b6d4f44d21bd7d48a232fedd7
@@ -65,6 +70,7 @@ jobs:
         run: |
           mkdir -p test-results/save-recovery
           git rev-parse HEAD > test-results/save-recovery/commit.txt
+          node scripts/verify-dependency-lock.mjs > test-results/save-recovery/dependency-lock.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:

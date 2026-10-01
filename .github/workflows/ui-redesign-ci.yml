@@ -33,8 +33,12 @@ jobs:
           go-version: '1.24.11'
           cache-dependency-path: server/go.sum
 
-      - name: Install dependencies
-        run: npm install --no-audit --no-fund
+      - name: Verify committed dependency lock
+        run: node scripts/verify-dependency-lock.mjs
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Verify install preserved manifest and lock
+        run: git diff --exit-code -- package.json package-lock.json
 
       - name: Build Electron main/preload
         run: npm run build:main
@@ -177,8 +181,12 @@ jobs:
           go-version: '1.24.11'
           cache-dependency-path: server/go.sum
 
-      - name: Install dependencies
-        run: npm install --no-audit --no-fund
+      - name: Verify committed dependency lock
+        run: node scripts/verify-dependency-lock.mjs
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Verify install preserved manifest and lock
+        run: git diff --exit-code -- package.json package-lock.json
 
       - name: Verify portable workspace transactions on Windows
         run: npx vitest run --root=. electron/workspace-package.test.js electron/workspace-restore.test.js

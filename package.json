@@ -1,11 +1,11 @@
 {
   "name": "notepad-desktop",
-  "version": "4.195.0",
+  "version": "4.195.1",
   "private": true,
   "type": "module",
   "main": "out/electron/main.cjs",
   "scripts": {
-    "dev": "concurrently \"vite\" \"wait-on http://localhost:5000 && npx -y electron@31 out/electron/main.cjs\" \"npm:build:main:watch\"",
+    "dev": "concurrently \"vite\" \"wait-on http://localhost:5000 && electron out/electron/main.cjs\" \"npm:build:main:watch\"",
     "build:renderer": "vite build",
     "ci:build-backend-win": "go -C server build -o bin/notepad-server.exe ./cmd/notepad-server",
     "build": "npm run ci:build-backend-win && npm run build:main && vite build && npm run prepare:installer && electron-builder --publish never",
@@ -16,7 +16,7 @@
     "test:editor": "vitest run --root=. src/components/Editor/",
     "test:electron": "vitest run --root=. electron/*.test.js",
     "dev:backend": "go -C server run ./cmd/notepad-server",
-    "dev:all": "concurrently -k -n backend,main,vite,electron \"npm:dev:backend\" \"npm:build:main:watch\" \"vite\" \"wait-on http://localhost:5000 http://127.0.0.1:27121/api/health && npx -y electron@31 out/electron/main.cjs\"",
+    "dev:all": "concurrently -k -n backend,main,vite,electron \"npm:dev:backend\" \"npm:build:main:watch\" \"vite\" \"wait-on http://localhost:5000 http://127.0.0.1:27121/api/health && electron out/electron/main.cjs\"",
     "build:backend": "go -C server build -o bin/ ./cmd/notepad-server",
     "prepare:installer": "node scripts/prepare-nsis-template.mjs",
     "test:installer": "node --test scripts/check-installer-template.mjs",

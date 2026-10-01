@@ -23,7 +23,12 @@ jobs:
         with:
           go-version: '1.24.11'
           cache-dependency-path: server/go.sum
-      - run: npm install --no-audit --no-fund
+      - name: Verify committed dependency lock
+        run: node scripts/verify-dependency-lock.mjs
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Verify install preserved manifest and lock
+        run: git diff --exit-code -- package.json package-lock.json
       - name: Validate evidence refusal cases and state-model interleavings
         shell: pwsh
         run: |

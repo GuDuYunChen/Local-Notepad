@@ -20,8 +20,12 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
-      - name: Install dependencies
-        run: npm install --no-audit --no-fund
+      - name: Verify committed dependency lock
+        run: node scripts/verify-dependency-lock.mjs
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Verify install preserved manifest and lock
+        run: git diff --exit-code -- package.json package-lock.json
       - name: Verify fixed recommendations, scoped navigation and evidence
         run: node --test scripts/sync-help-navigation.node.mjs scripts/sync-help-navigation-evidence.node.cjs scripts/sync-help-return.node.mjs scripts/sync-help-return-evidence.node.cjs
       - name: Verify real overview and center interaction isolation

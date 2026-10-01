@@ -22,8 +22,12 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
-      - name: Install dependencies
-        run: npm install --no-audit --no-fund
+      - name: Verify committed dependency lock
+        run: node scripts/verify-dependency-lock.mjs
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Verify install preserved manifest and lock
+        run: git diff --exit-code -- package.json package-lock.json
       - name: Verify timestamp conversion and complete-evidence policy
         run: node --test scripts/sync-clock.node.mjs scripts/sync-clock-evidence.node.cjs scripts/sync-clock-preference.node.mjs scripts/sync-clock-preference-evidence.node.cjs scripts/sync-clock-preference-view.node.mjs scripts/sync-clock-restore-evidence.node.cjs scripts/sync-clock-keyboard-evidence.node.cjs
       - name: Verify real overview and sync-center state isolation

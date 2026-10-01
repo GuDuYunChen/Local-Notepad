@@ -22,8 +22,12 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
-      - name: Install dependencies
-        run: npm install --no-audit --no-fund
+      - name: Verify committed dependency lock
+        run: node scripts/verify-dependency-lock.mjs
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Verify install preserved manifest and lock
+        run: git diff --exit-code -- package.json package-lock.json
       - name: Verify privacy and clipboard wait logic
         run: node --test scripts/sync-diagnostic.node.mjs scripts/sync-diagnostic-evidence.node.cjs
       - name: Verify real panel and sync-center integration
