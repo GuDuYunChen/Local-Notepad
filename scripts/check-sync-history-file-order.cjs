@@ -3,6 +3,7 @@
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),{createHash}=require('node:crypto'),{pathToFileURL}=require('node:url')
 const {names,phases,verifyOrderScene,verifyOrderReport}=require('./sync-history-file-order-evidence.cjs')
 const {verifyRasterWitness}=require('./sync-clock-raster-evidence.cjs')
+const {establishNativeViewport}=require('./native-test-viewport.cjs')
 const root=path.resolve(__dirname,'..'),out=path.join(root,'test-results','sync-history-file-order')
 if(!process.versions.electron){
  fs.rmSync(out,{recursive:true,force:true});const env={...process.env};delete env.ELECTRON_RUN_AS_NODE
@@ -43,7 +44,8 @@ if(!process.versions.electron){
   const files={'history.json':raw}
   fs.writeFileSync(path.join(data,'history.json'),raw)
   for(const name of names){
-   const win=new BrowserWindow({show:true,width:name==='order-narrow'?560:1000,height:900,useContentSize:true,webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false,backgroundThrottling:false}})
+   const width=name==='order-narrow'?560:1000
+   const win=new BrowserWindow({show:true,width,height:900,useContentSize:true,webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false,backgroundThrottling:false}})
    const scene={name,frames:[]};report.scenes.push(scene);let downloads=0
    const onDownload=()=>downloads++;win.webContents.session.on('will-download',onDownload)
    const exec=code=>win.webContents.executeJavaScript(code),cdp=(method,params)=>win.webContents.debugger.sendCommand(method,params)
@@ -73,6 +75,7 @@ if(!process.versions.electron){
     win.setMenu(null);win.webContents.debugger.attach('1.3')
     await win.loadFile(path.join(root,'test-results','sync-history-search','fixture.html'),{query:{scene:name==='order-light'?'search-light':'search-dark'}})
     await wait(`!!document.querySelector('[data-history-file-input]')`);await exec('document.fonts.ready.then(()=>true)')
+    scene.viewport=await establishNativeViewport(win,width,900);save()
     await exec(`(()=>{window.__liveHistory=document.querySelector('[data-sync-conflict-history]').textContent;window.__fileReads=0;const read=FileReader.prototype.readAsArrayBuffer;FileReader.prototype.readAsArrayBuffer=function(...a){window.__fileReads++;return read.apply(this,a)};document.querySelector('[data-history-file-viewer]').open=true;return true})()`)
     await choose('history.json');await wait(`!!document.querySelector('[data-history-file-jump-input]')`)
     await exec(`window.__fileScope=document.querySelector('[data-history-file-scope]').textContent;true`)

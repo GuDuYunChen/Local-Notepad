@@ -2,6 +2,8 @@
 
 ## 当前阶段
 
+**当前修补：2F.33.1**。2F.33的 `f108e2a` 原生排序验收失败（Windows job110411078139，实际681高≠要求900高），不能视为已验收。本轮只修测试窗口尺寸建立与有界观测，详情见 `SYNC_HISTORY_FILE_ORDER_VIEWPORT_2F33_1.md`。新提交验收状态以PR/交付记录为准，未进入2F.34。
+
 仓库 GuDuYunChen/Local-Notepad，分支 `feature/knowledge-os-phase2`，Draft PR #2。日常开发不合入 master。
 
 当前候选 **Phase 2F.33：离线历史文件时间排序**，详情见 `SYNC_HISTORY_FILE_ORDER_2F33.md`。2F.28–2F.32的查看、查找、概览、UTC日期及直接跳页已存在，不重复开发。开发版本仍4.195.1、schema14；新功能按提交识别。本文记录源码接续，不是新HEAD的CI或产物验收证明。
