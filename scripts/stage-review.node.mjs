@@ -10,6 +10,9 @@ const root = fileURLToPath(new URL('../', import.meta.url)), HEAD = 'a'.repeat(4
 const fixture = () => ({ total_count: 10, workflow_runs: REQUIRED_CHECKS.map((c, i) => ({ ...c,
   id: i + 1, run_number: 12, run_attempt: 1, head_sha: HEAD, head_branch: BRANCH,
   repository: { full_name: REPOSITORY }, status: 'completed', conclusion: 'success',
+  pull_requests: c.event === 'pull_request' ? [{ number: 2,
+    head: { ref: BRANCH, sha: HEAD, repo: { id: 1105107817 } },
+    base: { ref: 'master', repo: { id: 1105107817 } } }] : [],
 })) })
 const catalog = () => JSON.parse(fs.readFileSync(path.join(root, 'docs/quality/known-issues.json'), 'utf8'))
 
@@ -129,3 +132,46 @@ for (const total_count of [11, 9, undefined, '10']) {
     assert.equal(r.acceptance, 'not-ready'); assert.equal(r.automaticRetries, 0)
   })
 }
+
+// The run's branch/SHA alone cannot identify which PR/base was tested.
+for (const [name, change] of [
+  ['another PR', r => r.pull_requests[0].number = 3],
+  ['another target branch', r => r.pull_requests[0].base.ref = 'main'],
+  ['another PR head', r => r.pull_requests[0].head.sha = OLD],
+  ['another source branch', r => r.pull_requests[0].head.ref = 'other'],
+  ['fork source', r => r.pull_requests[0].head.repo.id = 123],
+  ['foreign target', r => r.pull_requests[0].base.repo.id = 123],
+  ['missing association', r => delete r.pull_requests],
+  ['empty association', r => r.pull_requests = []],
+  ['malformed association', r => r.pull_requests = {number: 2}],
+  ['null association', r => r.pull_requests = [null]],
+  ['missing source identity', r => delete r.pull_requests[0].head.repo],
+  ['ambiguous repeated PR', r => r.pull_requests.push(structuredClone(r.pull_requests[0]))],
+]) test('cannot accept PR2 from ' + name, () => {
+  const input = fixture(); change(input.workflow_runs[0])
+  const r = summarizeWorkflowRuns(input, HEAD)
+  assert.equal(r.ciComplete, false); assert.equal(r.acceptance, 'not-ready')
+  assert.equal(r.checks[0].state, 'unverified'); assert.equal(r.checks[0].scopeVerified, false)
+  assert.equal(r.automaticRetries, 0)
+})
+test('new unverified PR run cannot be discarded to expose an older green run', () => {
+  const input = fixture(), newer = structuredClone(input.workflow_runs[0])
+  Object.assign(newer, { id: 100, run_number: 13, pull_requests: [] })
+  input.workflow_runs.push(newer); input.total_count++
+  const r = summarizeWorkflowRuns(input, HEAD)
+  assert.equal(r.ciComplete, false); assert.equal(r.checks[0].runID, 100)
+  assert.equal(r.checks[0].state, 'unverified')
+})
+test('one exact PR2 binding among other associations is sufficient, but not acceptance', () => {
+  const input = fixture()
+  input.workflow_runs[0].pull_requests.unshift({ number: 3 })
+  const r = summarizeWorkflowRuns(input, HEAD)
+  assert.equal(r.ciComplete, true); assert.equal(r.acceptance, 'artifact-verification-required')
+  assert.equal(r.pullRequest, 2); assert.equal(r.baseBranch, 'master')
+})
+test('push gates do not require PR bindings', () => {
+  const input = fixture()
+  input.workflow_runs.filter(r => r.event === 'push').forEach(r => delete r.pull_requests)
+  const r = summarizeWorkflowRuns(input, HEAD)
+  assert.equal(r.ciComplete, true); assert.equal(r.checks.every(c => c.scopeVerified), true)
+})

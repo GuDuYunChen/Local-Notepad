@@ -36,3 +36,7 @@ PR 检查与 push 检查分开核对。至少检查八条 PR 流程、push 的 U
 ## 索引与短快照
 
 `node scripts/stage-review.mjs catalog` 核验历史问题关联路径，不运行回归。`node scripts/stage-review.mjs ci <runs.json> <fresh-branch-head>` 整理Actions原始快照，不发请求或重试。CI完整仍输出artifact-verification-required，不等于阶段通过。按STAGE_REVIEW_PROTOCOL分三个检查点，长日志写文件，写入拦截时保留本地接续而不绕过。
+
+## 助手自身执行问题（与产品缺陷分开）
+
+见 `ASSISTANT_EXECUTION_INCIDENTS.md`：记录本对话内10类助手操作失误，执行有限轮询、单次有依据重试和分段交代。上一轮ebe73cd的完整Windows job110210406991及安装包11140356641已补核对；不是新提交通过证明。本轮先修复stage-review对PR编号/目标分支关联的漏检，未开始2F.30，产品仍4.195.1。最新HEAD以远程为准，验收以该HEAD的PR检查点为准。

@@ -17,3 +17,8 @@ Keep progress concise and put full logs in files. Do not repeatedly fetch whole-
 Do not blindly retry unchanged failures. One evidence-justified transient retry per affected job is the limit before recording a blocked checkpoint.
 When a tool write is blocked, stop that write; preserve a local handoff and report the failure. Do not bypass a safety rejection or fabricate a successful comment.
 These process limits do not diagnose or guarantee prevention of ChatGPT stream failures.
+
+Read `docs/ASSISTANT_EXECUTION_INCIDENTS.md` for assistant-caused execution risks; do not substitute the product defect catalog for that request.
+Before pushing, test negative evidence/scope cases locally. Do not chain a new feature onto an unaccepted fix.
+Observe the same workflow at least 90 seconds apart. At 30 external connector calls, checkpoint and reassess the remaining work instead of unbounded polling/downloads.
+Record final acceptance in a PR comment/local report, not a new source commit just to update status and restart every workflow.

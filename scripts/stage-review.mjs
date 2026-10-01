@@ -4,6 +4,9 @@ import { fileURLToPath } from 'node:url'
 
 export const REPOSITORY = 'GuDuYunChen/Local-Notepad'
 export const BRANCH = 'feature/knowledge-os-phase2'
+export const PULL_REQUEST = 2
+export const BASE_BRANCH = 'master'
+const REPOSITORY_ID = 1105107817
 const ROOT = fileURLToPath(new URL('../', import.meta.url))
 const MAX_BYTES = 2 * 1024 * 1024
 const sha = value => typeof value === 'string' && /^[a-f0-9]{40}$/.test(value)
@@ -19,6 +22,19 @@ const CHECKS = [
   ['push', 'ui-redesign-ci.yml'], ['push', 'desktop-save-ci.yml'],
 ]
 export const REQUIRED_CHECKS = Object.freeze(CHECKS.map(([event, name]) => Object.freeze({ event, path: '.github/workflows/' + name })))
+
+// PR runs from the same source branch can target a different base or PR.
+// Missing/ambiguous association is unknown, not permission to reuse old greens.
+function belongsToReview(run, head) {
+  if (run.event !== 'pull_request') return true
+  if (!Array.isArray(run.pull_requests)) return false
+  const bindings = run.pull_requests.filter(pr => pr?.number === PULL_REQUEST)
+  if (bindings.length !== 1) return false
+  const pr = bindings[0]
+  return pr.head?.ref === BRANCH && pr.head?.sha === head &&
+    pr.head?.repo?.id === REPOSITORY_ID && pr.base?.ref === BASE_BRANCH &&
+    pr.base?.repo?.id === REPOSITORY_ID
+}
 
 /** Summarize a captured GitHub Actions runs API response; never fetch or retry.
  * Even all-green CI is NOT artifact acceptance, source review or merge approval.
@@ -48,9 +64,11 @@ export function summarizeWorkflowRuns(snapshot, expectedHead) {
     const matching = runs.filter(r => r.path === required.path && r.event === required.event)
       .sort((a, b) => b.run_number - a.run_number || b.id - a.id)
     const latest = matching[0]
-    const state = !latest ? 'missing' : latest.status !== 'completed' ? 'pending'
-      : latest.conclusion === 'success' ? 'success' : 'blocked'
-    return Object.freeze({ ...required, state, runID: latest?.id ?? null,
+    const scopeVerified = !!latest && belongsToReview(latest, expectedHead)
+    const state = !latest ? 'missing' : !scopeVerified ? 'unverified'
+      : latest.status !== 'completed' ? 'pending'
+        : latest.conclusion === 'success' ? 'success' : 'blocked'
+    return Object.freeze({ ...required, state, scopeVerified, runID: latest?.id ?? null,
       attempt: latest?.run_attempt ?? null, conclusion: latest?.conclusion ?? null,
       earlierFailedRuns: Object.freeze(matching.slice(1).filter(r => r.status === 'completed' && r.conclusion !== 'success').map(r => r.id)) })
   })
@@ -59,6 +77,7 @@ export function summarizeWorkflowRuns(snapshot, expectedHead) {
     snapshot.total_count >= 0 && snapshot.total_count === snapshot.workflow_runs.length
   const ciComplete = coverageComplete && checks.every(c => c.state === 'success')
   return Object.freeze({ repository: REPOSITORY, branch: BRANCH, head: expectedHead,
+    pullRequest: PULL_REQUEST, baseBranch: BASE_BRANCH,
     evidence: 'supplied-api-snapshot-only', coverageComplete, ciComplete,
     acceptance: ciComplete ? 'artifact-verification-required' : 'not-ready',
     checks: Object.freeze(checks), ignoredOtherHeads: otherHead, ignoredOtherBranches: otherBranch,
