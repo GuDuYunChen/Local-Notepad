@@ -4,9 +4,9 @@
 
 仓库 GuDuYunChen/Local-Notepad，分支 `feature/knowledge-os-phase2`，Draft PR #2。日常开发不合入 master。
 
-本轮新增 **Phase 2F.32：离线文件首页、末页和直接跳页**，详情见 `SYNC_HISTORY_FILE_PAGINATION_2F32.md`。此前2F.28–2F.31的离线查看、全文件查找、概览和日期筛选均已存在，不重复开发。开发版本仍4.195.1、schema14；新功能按提交识别，旧同版本安装包不包含新提交。本文不是CI通过证明。
+当前候选 **Phase 2F.33：离线历史文件时间排序**，详情见 `SYNC_HISTORY_FILE_ORDER_2F33.md`。2F.28–2F.32的查看、查找、概览、UTC日期及直接跳页已存在，不重复开发。开发版本仍4.195.1、schema14；新功能按提交识别。本文记录源码接续，不是新HEAD的CI或产物验收证明。
 
-基线 `f8aae5d6f28e3344b815f0f9724bc41764de41c3` 的完整Windows job110357359008已成功，上轮原始报告和安装包已验收，没有遗留构建；本轮读取确认后不重跑。新HEAD必须独立验收，结果写PR或交付记录，不为验收状态再提交源码触发整套CI。
+基线 `b23d0b5547f76c741e879f4e99cef54af1b39f3e` / tree `7fce59573128985431ab236acc9a80e524644566` 的2F.32已在PR中最终验收，没有遗留构建。本轮复查八条PR检查、完整Windows打包job与精确源码树，并在修改前运行100项限定旧回归后推进。旧绿灯和旧安装包不替代新提交。2F.33需单独完成当前HEAD的UI/原生/真实桌面/完整Windows打包和产物核验，结果写PR/交付记录，不再用状态-only源码提交触发整套CI；未验收前不进入2F.34。
 
 ## 中断恢复
 
@@ -16,7 +16,7 @@
 
 ## 已知问题和助手执行失误
 
-`KNOWN_ISSUES.md`及机器索引保留42条产品/环境问题；`ASSISTANT_EXECUTION_INCIDENTS.md`单独保留12类助手执行错误，不混作聊天故障根因。各轮具体操作失误保留于 `EXECUTION_NOTE_2F30.md`、`EXECUTION_NOTE_2F31.md`、`EXECUTION_NOTE_2F32.md`，不能把失败调用写成通过。
+`KNOWN_ISSUES.md`及机器索引保留42条产品/环境问题；`ASSISTANT_EXECUTION_INCIDENTS.md`单独保留12类助手执行错误，不混作聊天故障根因。各轮具体操作失误保留于 `EXECUTION_NOTE_2F30.md`、`EXECUTION_NOTE_2F31.md`、`EXECUTION_NOTE_2F32.md`、`EXECUTION_NOTE_2F33.md`，不能把失败调用写成通过。
 
 遵守 `STAGE_REVIEW_PROTOCOL.md`：同run检查至少间隔90秒，30次连接器调用前检查预算；长日志留文件，关键节点短交代。每个故障链最多一次有新证据的手工重试；工具安全拒绝不绕过。这些措施减少重复工作，不保证ChatGPT平台不中断。
 

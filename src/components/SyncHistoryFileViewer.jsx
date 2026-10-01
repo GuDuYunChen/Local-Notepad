@@ -4,6 +4,7 @@ import { describeHistoryTimeFilter, sameHistoryTimeFilter } from '~/services/syn
 import { historyOutcome, historyTime } from '~/services/syncConflictHistory.mjs'
 import { limitHistoryQuery } from '~/services/syncHistorySearch.mjs'
 import { HISTORY_FILE_FILTER_ALL, selectHistoryFilePage } from '~/services/syncHistoryFileSelection.mjs'
+import { HISTORY_FILE_ORDER_DEFAULT, HISTORY_FILE_ORDER_OPTIONS, isHistoryFileOrder } from '~/services/syncHistoryFileOrder.mjs'
 import './SyncHistoryFileViewer.css'
 import SyncHistoryFileSummary from './SyncHistoryFileSummary'
 import SyncHistoryTimeFilter from './SyncHistoryTimeFilter'
@@ -18,11 +19,16 @@ function Stamp({ value }) {
   return iso ? <time dateTime={iso}>{iso}</time> : '时间缺失'
 }
 export default function SyncHistoryFileViewer() {
-  const hintID = useId(), resultID = useId(), searchHintID = useId(), matchesID = useId()
+  const hintID = useId(), resultID = useId(), searchHintID = useId(), matchesID = useId(), orderHintID = useId()
   const list = useRef(null), queryInput = useRef(null), compositionActive = useRef(false)
   const chooseButton = useRef(null), input = useRef(null), generation = useRef(0), current = useRef(null), live = useRef(false)
   const [view, setView] = useState(null), [phase, setPhase] = useState('unread'), [notice, setNotice] = useState(''), [page, setPage] = useState(0)
   const [filters, setFilters] = useState(HISTORY_FILE_FILTER_ALL)
+  const [order, setOrder] = useState(HISTORY_FILE_ORDER_DEFAULT)
+  const applyOrder = next => {
+    if (!isHistoryFileOrder(next) || next === order) return
+    setOrder(next); setPage(0)
+  }
   const [dateReset, setDateReset] = useState(0), [dateDraftActive, setDateDraftActive] = useState(false)
   const [queryDraft, setQueryDraft] = useState(''), [composing, setComposing] = useState(false)
   const applyFilters = next => {
@@ -46,7 +52,7 @@ export default function SyncHistoryFileViewer() {
     live.current = true
     return () => { live.current = false; generation.current++; current.current?.abort(); current.current = null }
   }, [])
-  useEffect(() => { if (list.current) list.current.scrollTop = 0 }, [page, view, filters])
+  useEffect(() => { if (list.current) list.current.scrollTop = 0 }, [page, view, filters, order])
   const select = async file => {
     if (!file) return // cancelling the picker does not discard a previous result
     const id = ++generation.current
@@ -56,7 +62,7 @@ export default function SyncHistoryFileViewer() {
     try {
       const report = await readHistoryFile(file, { signal: controller.signal })
       if (!live.current || id !== generation.current || controller.signal.aborted) return
-      setView({ name: fileLabel(file), report }); resetSelection(); setPhase('ready')
+      setView({ name: fileLabel(file), report }); resetSelection(); setOrder(HISTORY_FILE_ORDER_DEFAULT); setPhase('ready')
       setNotice(`文件格式检查通过，共 ${report.records.length} 条；仅供离线查看，未验证来源或当前状态。`)
     } catch (error) {
       if (!live.current || id !== generation.current || controller.signal.aborted) return
@@ -66,12 +72,12 @@ export default function SyncHistoryFileViewer() {
   const stop = (event, clear = false) => {
     const ownsFocus = event.currentTarget === event.currentTarget.ownerDocument.activeElement
     generation.current++; current.current?.abort(); current.current = null
-    if (clear) { setView(null); resetSelection(); setPhase('unread'); setNotice('已清除查看结果；没有删除原文件或工作区数据。') }
+    if (clear) { setView(null); resetSelection(); setOrder(HISTORY_FILE_ORDER_DEFAULT); setPhase('unread'); setNotice('已清除查看结果；没有删除原文件或工作区数据。') }
     else { setPhase('stopped'); setNotice('已停止文件读取；没有取消同步或保存任务。') }
     if (ownsFocus) chooseButton.current?.focus({ preventScroll: true })
   }
   const report = view?.report
-  const selection = useMemo(() => report ? selectHistoryFilePage(report.records, filters, page) : null, [report, filters, page])
+  const selection = useMemo(() => report ? selectHistoryFilePage(report.records, filters, page, order) : null, [report, filters, page, order])
   return <details className="sync-history-file" data-history-file-viewer>
     <summary>离线查看历史文件<span>只读 JSON · 不导入工作区</span></summary>
     <div className="sync-history-file-body">
@@ -136,6 +142,15 @@ export default function SyncHistoryFileViewer() {
           当前匹配 {selection.matched} 条 / 文件内共 {selection.total} 条；只改变查看结果，不改变文件声明的导出范围。
         </p>
         <SyncHistoryFileSummary report={report} filters={filters} phase={phase} composing={composing}/>
+        <div className="sync-history-file-order" data-history-file-order-panel>
+          <label>文件内显示顺序
+            <select data-history-file-order aria-label="离线文件记录排序" aria-describedby={orderHintID}
+              value={order} onChange={event => applyOrder(event.target.value)}>
+              {HISTORY_FILE_ORDER_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </label>
+          <p id={orderHintID}>先筛选全部匹配记录，再排序和分页；按时间排序时，时间缺失的记录放在最后，同一时间保留文件原顺序。只改变显示，不重读或修改文件。</p>
+        </div>
         <div ref={list} className="sync-history-file-list" tabIndex={0} role="region" aria-label="离线文件记录列表">
           {!selection.matched && <p data-history-file-empty>本文件中没有符合当前条件的记录；不是本机或全部历史没有记录。可清除文件内筛选。</p>}
           <ol start={selection.from || 1}>
@@ -148,7 +163,7 @@ export default function SyncHistoryFileViewer() {
             </li>)}
           </ol>
         </div>
-        <SyncHistoryFilePagination selection={selection} report={report} filters={filters} onNavigate={setPage}/>
+        <SyncHistoryFilePagination selection={selection} report={report} filters={filters} order={order} onNavigate={setPage}/>
       </section>}
     </div>
   </details>

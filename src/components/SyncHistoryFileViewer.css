@@ -39,3 +39,9 @@
 .sync-history-file-page-jump input{box-sizing:border-box;width:5.5em;min-height:36px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--ink);font:inherit;font-variant-numeric:tabular-nums}
 .sync-history-file-page-jump>span{color:var(--ink-soft);overflow-wrap:anywhere}
 .sync-history-file .sync-history-file-page-error{flex-basis:100%;margin:0;color:var(--ink)}
+
+.sync-history-file-order{min-width:0;margin:12px 0;padding:10px 12px;border:1px solid var(--line);border-radius:8px}
+.sync-history-file-order label{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:12px;line-height:1.8;color:var(--ink)}
+.sync-history-file-order select{box-sizing:border-box;max-width:100%;min-width:0;min-height:38px;padding:7px 10px;border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--ink);font:inherit}
+.sync-history-file-order p{margin:8px 0 0}
+@media(max-width:600px){.sync-history-file-order select{width:100%}}

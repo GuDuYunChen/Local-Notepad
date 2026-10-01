@@ -1,7 +1,7 @@
 import React, { useEffect, useId, useRef, useState } from 'react'
 import { parseHistoryFilePageJump } from '~/services/syncHistoryFilePageJump.mjs'
 
-export default function SyncHistoryFilePagination({ selection, report, filters, onNavigate }) {
+export default function SyncHistoryFilePagination({ selection, report, filters, order, onNavigate }) {
   const { page, pages, matched, from, to } = selection
   const [draft, setDraft] = useState(pages ? String(page + 1) : '')
   const [error, setError] = useState('')
@@ -11,7 +11,7 @@ export default function SyncHistoryFilePagination({ selection, report, filters, 
   // DOM/focus, but discard any jump draft or error belonging to the old one.
   useEffect(() => {
     setDraft(pages ? String(page + 1) : ''); setError(''); composing.current = false
-  }, [page, pages, report, filters])
+  }, [page, pages, report, filters, order])
   const go = target => {
     if (!matched || !Number.isSafeInteger(target) || target < 0 || target >= pages) return
     setDraft(String(target + 1)); setError('')
