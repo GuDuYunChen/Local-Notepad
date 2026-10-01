@@ -5,6 +5,7 @@ import { historyOutcome, historyTime } from '~/services/syncConflictHistory.mjs'
 import { limitHistoryQuery } from '~/services/syncHistorySearch.mjs'
 import { HISTORY_FILE_FILTER_ALL, selectHistoryFilePage } from '~/services/syncHistoryFileSelection.mjs'
 import './SyncHistoryFileViewer.css'
+import SyncHistoryFileSummary from './SyncHistoryFileSummary'
 
 const kinds = { file: '笔记或文件夹', tag: '标签', 'file-tag': '标签关联', attachment: '附件' }
 const statuses = { all: '全部历史类型', resolved: '已选边处理', superseded: '已失效' }
@@ -126,6 +127,7 @@ export default function SyncHistoryFileViewer() {
           {composing && <span data-history-file-composing>输入法文字尚未确认，仍按原文件内查找条件显示。</span>}
           当前匹配 {selection.matched} 条 / 文件内共 {selection.total} 条；只改变查看结果，不改变文件声明的导出范围。
         </p>
+        <SyncHistoryFileSummary report={report} filters={filters} phase={phase} composing={composing}/>
         <div ref={list} className="sync-history-file-list" tabIndex={0} role="region" aria-label="离线文件记录列表">
           {!selection.matched && <p data-history-file-empty>本文件中没有符合当前条件的记录；不是本机或全部历史没有记录。可清除文件内筛选。</p>}
           <ol start={selection.from || 1}>

@@ -1,46 +1,29 @@
 # 开发接续点
 
-## 当前工作
-- 当前修补：复核a6675cf时用故障注入发现stdout/stderr未处理的error会终止测试进程，并发现主动清理时迟到输出误判；先修窗口助手异常管道，见`DESKTOP_WINDOW_PIPE_ERRORS.md`。仍不改产品或进入2F.30。下列a6675cf正常路径已经验收，不能重复当成未执行。
+## 当前阶段
 
-- 本轮：先修复1e734eb遗留的Desktop Save失败（运行36814764840，窗口查询PowerShell超时），见`DESKTOP_WINDOW_HELPER_RECOVERY.md`。上一轮八PR/完整打包成功不等于桌面验收通过。
-- 已替换为编辑前预热、异步复用的窗口助手；不改产品4.195.1/schema14或推进2F.30。以新HEAD的独立桌面和原有CI结果验收，不通过修改状态文档再触发额外源码提交。
-- 本轮接续修补：历史问题索引与短CI状态核验（见 `KNOWN_ISSUES.md`、`STAGE_REVIEW_PROTOCOL.md`）。产品仍为4.195.1，不叠加新界面功能。
-- 仓库：GuDuYunChen/Local-Notepad。
-- 开发分支：feature/knowledge-os-phase2；沿用 Draft PR #2，不合入 master。
-- 已实现功能：Phase 2F.29，离线历史 JSON 全文件查找、类型/处理结果交集及分页。
-- 本次稳定性修补：4.195.1，提交完整依赖锁、CI 改用 npm ci、增加锁校验；不启动 Phase 2F.30。
-- 数据库仍为 schema 14；不调整自动保存、Ctrl+S、引用维护或退出确认协议。
-- 版本以根 package.json 为准；最新提交以远程分支为准；本文件不是 CI 通过证明。
+仓库 GuDuYunChen/Local-Notepad，分支 `feature/knowledge-os-phase2`，Draft PR #2。日常开发不合入 master。
 
-## 中断后如何接续
-先读取远程分支 HEAD、PR #2 和该 HEAD 对应的检查。不能把聊天没有最终回复当作 Git 提交失败，也不能按过期 PR 标题重新开发已经存在的功能。
+本轮新增 **Phase 2F.30：离线文件匹配结果概览**，详情见 `SYNC_HISTORY_FILE_SUMMARY_2F30.md`。此前2F.28离线查看、2F.29全文件搜索已存在，不重复开发。开发版本仍4.195.1、schema14；新功能用提交标识，尚未单独发布新的版本号。版本以package.json、最新代码以远程HEAD为准，本文不是CI通过证明。
 
-PR 检查与 push 检查分开核对。至少检查八条 PR 流程、push 的 UI Redesign CI 完整 Windows 打包、Desktop Save End-to-End CI。PR 测试合并的树应与实际分支树一致。下载报告时按提交、平台和成功重试选择，不能把同名的 175 字节身份文件当作完整 UI 报告。
+基线 `8b6d5c0c51687011e149cfe31eef590e1fb0573f` 的Overview和完整Windows剩余检查已成功，窗口助手管道修补不再作为未完成事项重跑。新功能须使用新HEAD验收，不用基线结果代替。验收结果和待办写PR评论/交付记录，不为更新状态另造源码提交触发全部CI。
 
-检查点在推送后、验收后分别写进 PR 评论；记录 HEAD、版本、已完成、剩余检查、失败类别和产物 ID。不把所有状态压到一条长回复的最后。最终答复必须区分：已推送、CI 已通过、产物已下载核验，三者不是同一件事。
+## 中断恢复
 
-## 构建与依赖
-标准安装：`npm ci --no-audit --no-fund`。
-预检：`node scripts/verify-dependency-lock.mjs`。
-校验器回归：`node --test scripts/dependency-lock.node.mjs`。
+先读远程HEAD及PR，区分源码完成、当前提交CI通过、产物独立核验三个检查点。聊天没有最终输出不等于Git写入失败；写入没有回执先读取目标，不重复推送。不得按过期标题或历史文档重做已有阶段。
 
-依赖更新必须同时评审 package.json 与 package-lock.json，再用干净的 Linux 和 Windows 安装/测试。不要删除锁文件，不要让 CI 降级为 npm install，不用忽略测试、强制退出或伪造保存回执来取得绿色状态。
+至少核对八条PR流程、push完整UI/Windows打包及独立桌面流程；PR测试合并的文件树要与实际分支核对。产物按ID、提交、平台和摘要选择，完整原始UI报告不能用身份小文件代替。只查询待完成项，不连续展开大响应或下载旧产物。
 
-## 尚需独立处理的限制
-依赖锁固定版本和完整性，不保证 npm 服务永远可用；注册表 404 应保留原始失败日志，区分下载失败与产品断言失败。
-聊天端“无法思考”的内部原因未取得错误码/服务日志，不能被本仓库的修补宣称修复。
-源码归档可恢复代码，但不是 Git 历史；没有完成 clone 就不要报告克隆成功。
-原生 UI 使用隔离合成数据，不能冒充用户本机现场验收。升级前备份工作区及未确认正文，不用旧 4.189.0 打开 schema 14。
+## 已知问题和助手执行失误
 
-## 最近已确证的不同失败类别
+`KNOWN_ISSUES.md`及机器索引保留42条产品/环境问题；`ASSISTANT_EXECUTION_INCIDENTS.md`单独保留12类助手执行错误，不混作聊天故障根因。本轮实际前置依赖/工具预算问题补记在 `EXECUTION_NOTE_2F30.md`，不能把失败调用写成通过。
 
-4.195.1前npm tarball 404发生在安装阶段；桌面运行36807975236首轮PowerShell窗口查询ETIMEDOUT，同提交第二轮通过；上轮PR评论被工具安全状态检查拦截，未写成功，远程标题仍旧。聊天“无法思考”的内部根因未知。这些不是已证明的同一因果。每次恢复先读取远端，不根据本段推断最新状态。
+遵守 `STAGE_REVIEW_PROTOCOL.md`：同run检查至少间隔90秒，30次连接器调用前检查预算；长日志留文件，关键节点短交代。每个故障链最多一次有新证据的手工重试；工具安全拒绝不绕过。这些措施减少重复工作，不保证ChatGPT平台不中断。
 
-## 索引与短快照
+## 构建与产品边界
 
-`node scripts/stage-review.mjs catalog` 核验历史问题关联路径，不运行回归。`node scripts/stage-review.mjs ci <runs.json> <fresh-branch-head>` 整理Actions原始快照，不发请求或重试。CI完整仍输出artifact-verification-required，不等于阶段通过。按STAGE_REVIEW_PROTOCOL分三个检查点，长日志写文件，写入拦截时保留本地接续而不绕过。
+使用 `npm ci --no-audit --no-fund`，保留完整package-lock。先执行 `node scripts/verify-dependency-lock.mjs`，依赖更新同时评审manifest和lock，不用npm install回退。`node scripts/stage-review.mjs catalog`只验证索引关系，不运行回归；CI快照全部绿色也仍需产物核验。
 
-## 助手自身执行问题（与产品缺陷分开）
+不擅自修改自动保存、Ctrl+S、保存回执/队列、引用维护或退出保护；章节结构变化暂停自动保存的旧规则已废止。测试使用隔离数据，不冒充用户现场。原生脚本和应用保存错误、npm下载故障、工具拒绝、聊天流中断分开判断。
 
-见 `ASSISTANT_EXECUTION_INCIDENTS.md`：现记录12类助手操作失误，执行有限轮询、单次有依据重试和分段交代。1e734eb已修补stage-review的PR范围检查；本轮处理其独立桌面验收中复发的同步PowerShell查询问题，不重复修改核验器或开发2F.30。产品仍4.195.1，最新HEAD以远程为准，验收以该HEAD的PR检查点和实际产物为准。
+升级前备份工作区和未确认正文；不要用4.189.0打开schema14。源码归档恢复不是clone成功；本地保留的测试依赖不是新执行npm ci。最终Windows/Go和完整UI结果以当前提交的实际CI与原始报告为准。
