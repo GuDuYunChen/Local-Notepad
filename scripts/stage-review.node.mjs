@@ -61,6 +61,7 @@ test('latest failed run overrides an earlier successful run of the same path/eve
 test('a new run success preserves the earlier failure identity rather than erasing it', () => {
   const input = fixture(); input.workflow_runs[0].conclusion = 'failure'
   input.workflow_runs.push({ ...input.workflow_runs[0], id: 20, run_number: 13, conclusion: 'success', run_attempt: 2 })
+  input.total_count = input.workflow_runs.length
   const r = summarizeWorkflowRuns(input, HEAD)
   assert.equal(r.ciComplete, true); assert.deepEqual(r.checks[0].earlierFailedRuns, [1]); assert.equal(r.checks[0].attempt, 2)
 })
@@ -118,3 +119,13 @@ test('CLI gives bounded failure output and never modifies supplied snapshots', (
     assert.deepEqual(fs.readdirSync(tmp), ['snapshot.json'])
   } finally { fs.rmSync(tmp, { recursive: true, force: true }) }
 })
+
+for (const total_count of [11, 9, undefined, '10']) {
+  test('refuses complete CI when API page coverage is unknown or incomplete: ' + total_count, () => {
+    const input = fixture(); input.total_count = total_count
+    const r = summarizeWorkflowRuns(input, HEAD)
+    assert.equal(r.checks.every(c => c.state === 'success'), true)
+    assert.equal(r.coverageComplete, false); assert.equal(r.ciComplete, false)
+    assert.equal(r.acceptance, 'not-ready'); assert.equal(r.automaticRetries, 0)
+  })
+}

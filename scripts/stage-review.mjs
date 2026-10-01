@@ -54,9 +54,12 @@ export function summarizeWorkflowRuns(snapshot, expectedHead) {
       attempt: latest?.run_attempt ?? null, conclusion: latest?.conclusion ?? null,
       earlierFailedRuns: Object.freeze(matching.slice(1).filter(r => r.status === 'completed' && r.conclusion !== 'success').map(r => r.id)) })
   })
-  const ciComplete = checks.every(c => c.state === 'success')
+  // Ten visible greens do not prove coverage of an incomplete API page.
+  const coverageComplete = Number.isSafeInteger(snapshot.total_count) &&
+    snapshot.total_count >= 0 && snapshot.total_count === snapshot.workflow_runs.length
+  const ciComplete = coverageComplete && checks.every(c => c.state === 'success')
   return Object.freeze({ repository: REPOSITORY, branch: BRANCH, head: expectedHead,
-    evidence: 'supplied-api-snapshot-only', ciComplete,
+    evidence: 'supplied-api-snapshot-only', coverageComplete, ciComplete,
     acceptance: ciComplete ? 'artifact-verification-required' : 'not-ready',
     checks: Object.freeze(checks), ignoredOtherHeads: otherHead, ignoredOtherBranches: otherBranch,
     automaticRetries: 0, repositoryWrites: 0 })
