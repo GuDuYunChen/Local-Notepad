@@ -4,7 +4,8 @@ const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),{cre
 const {names,phases,verifyOrderScene,verifyOrderReport}=require('./sync-history-file-order-evidence.cjs')
 const {verifyFileDetailsScene,verifyFileDetailsReport}=require('./sync-history-file-details-evidence.cjs')
 const {verifyIdentifierSelectionScene}=require('./sync-history-file-identifier-selection-evidence.cjs')
-const {verifyObjectFilterScene,verifyObjectFilterReport}=require('./sync-history-file-object-filter-evidence.cjs')
+const {verifyObjectFilterScene}=require('./sync-history-file-object-filter-evidence.cjs')
+const {verifyRecordFilterScene,verifyRecordFilterReport}=require('./sync-history-file-record-filter-evidence.cjs')
 const {verifyRasterWitness}=require('./sync-clock-raster-evidence.cjs')
 const {establishNativeViewport}=require('./native-test-viewport.cjs')
 const root=path.resolve(__dirname,'..'),out=path.join(root,'test-results','sync-history-file-order')
@@ -13,7 +14,7 @@ if(!process.versions.electron){
  const r=require('node:child_process').spawnSync(require('electron'),[__filename],{cwd:root,env,encoding:'utf8',timeout:110000,maxBuffer:4*1024*1024})
  if(r.stdout)process.stdout.write(r.stdout);if(r.stderr)process.stderr.write(r.stderr)
  if(r.error||r.status!==0)throw r.error||Error('Native file-order check failed')
- verifyObjectFilterReport(out,process.env.GITHUB_SHA||'');console.log('File-order native evidence verified.')
+ verifyRecordFilterReport(out,process.env.GITHUB_SHA||'');console.log('File-order native evidence verified.')
 }else{
  const {app,BrowserWindow}=require('electron'),delay=ms=>new Promise(r=>setTimeout(r,ms))
  app.setPath('userData',fs.mkdtempSync(path.join(os.tmpdir(),'notepad-file-order-')));app.on('window-all-closed',()=>{})
@@ -25,7 +26,7 @@ if(!process.versions.electron){
   const r=nav.getBoundingClientRect(),tools=p.querySelector('[data-history-file-record-tools]'),tr=tools.getBoundingClientRect(),canvas=document.createElement('canvas');canvas.width=canvas.height=1
   const ctx=canvas.getContext('2d',{willReadFrequently:true}),paint=c=>{ctx.fillStyle=c;ctx.fillRect(0,0,1,1)},rgb=()=>[...ctx.getImageData(0,0,1,1).data].slice(0,3)
   const lum=rgb=>rgb.map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4}).reduce((a,v,i)=>a+v*[.2126,.7152,.0722][i],0)
-  const colors=[...nav.querySelectorAll('label,select,p'),...tools.querySelectorAll('button,p'),...p.querySelectorAll('[data-history-file-identifiers][open] button,[data-history-file-filter-object],[data-history-file-object-filter-clear]')].map(n=>{
+  const colors=[...nav.querySelectorAll('label,select,p'),...tools.querySelectorAll('button,p'),...p.querySelectorAll('[data-history-file-identifiers][open] button,[data-history-file-filter-object],[data-history-file-object-filter-clear],[data-history-file-filter-record],[data-history-file-record-filter-clear]')].map(n=>{
    const ancestors=[];for(let a=n;a;a=a.parentElement)ancestors.unshift(a)
    ctx.clearRect(0,0,1,1);paint('#fff');for(const a of ancestors)paint(getComputedStyle(a).backgroundColor)
    const bg=rgb();paint(getComputedStyle(n).color);const a=lum(bg),b=lum(rgb());return(Math.max(a,b)+.05)/(Math.min(a,b)+.05)
@@ -49,7 +50,7 @@ if(!process.versions.electron){
   for(const name of names){
    const width=name==='order-narrow'?560:1000
    const win=new BrowserWindow({show:true,width,height:900,useContentSize:true,webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false,backgroundThrottling:false}})
-   const scene={name,frames:[],detailsActions:[],identifierSelections:[],objectFilterActions:[]};report.scenes.push(scene);let downloads=0
+   const scene={name,frames:[],detailsActions:[],identifierSelections:[],objectFilterActions:[],recordFilterActions:[]};report.scenes.push(scene);let downloads=0
    const onDownload=()=>downloads++;win.webContents.session.on('will-download',onDownload)
    const exec=code=>win.webContents.executeJavaScript(code),cdp=(method,params)=>win.webContents.debugger.sendCommand(method,params)
    const wait=async code=>{for(let i=0;i<80;i++){if(await exec(code))return;await delay(60)}throw Error('Order view not ready: '+code)}
@@ -94,6 +95,19 @@ if(!process.versions.electron){
         reads:window.__fileReads,network:window.__networkRequests,mutations:window.__mutations,requests:window.__requests.length,navigation:window.__navigationCalls}
     })()`)
     scene.objectFilterActions.push({action,...a,contrast:Math.min(...f.colors)});save()
+   }
+   const recordRecordFilter=async action=>{
+    const f=await exec('('+inspect.toString()+')()')
+    const a=await exec(`(()=>{
+      const p=document.querySelector('[data-history-file-viewer]'),q=k=>p.querySelector('[data-history-file-'+k+']')
+      return {ids:[...p.querySelectorAll('[data-history-file-row]')].map(n=>n.querySelectorAll('code')[1].textContent),
+        matches:q('matches').textContent,page:q('page').textContent,order:q('order').value,query:q('query').value,
+        itemID:q('object-filter-value')?.textContent||'',recordID:q('record-filter-value')?.textContent||'',filterVisible:!!q('record-filter'),
+        focusRecord:document.activeElement?.matches?.('[data-history-file-filter-record]')===true,
+        focusQuery:document.activeElement===q('query'),outcomes:[...p.querySelectorAll('[data-file-summary-outcome]')].map(n=>Number(n.textContent)),
+        reads:window.__fileReads,network:window.__networkRequests,mutations:window.__mutations,requests:window.__requests.length,navigation:window.__navigationCalls}
+    })()`)
+    scene.recordFilterActions.push({action,...a,contrast:Math.min(...f.colors)});save()
    }
    const choose=async file=>{
     await exec(`document.querySelector('[data-history-file-choose]').focus({preventScroll:true});true`)
@@ -161,7 +175,11 @@ if(!process.versions.electron){
     await change(fileControl('query'),'笔记 1');await delay(70);await recordObjectFilter('combined')
     await click(fileControl('object-filter-clear'));await delay(70);await recordObjectFilter('clear-object')
     await click(fileControl('filter-clear'));await delay(70);await recordObjectFilter('clear-all')
-    verifyOrderScene(scene);verifyFileDetailsScene(scene);verifyIdentifierSelectionScene(scene);verifyObjectFilterScene(scene)
+    await click('[data-history-file-filter-record]');await delay(70);await recordRecordFilter('apply')
+    await change(fileControl('query'),'笔记 1');await delay(70);await recordRecordFilter('combined-empty')
+    await click(fileControl('record-filter-clear'));await delay(70);await recordRecordFilter('clear-record')
+    await click(fileControl('filter-clear'));await delay(70);await recordRecordFilter('clear-all')
+    verifyOrderScene(scene);verifyFileDetailsScene(scene);verifyIdentifierSelectionScene(scene);verifyObjectFilterScene(scene);verifyRecordFilterScene(scene)
    }finally{win.webContents.session.removeListener('will-download',onDownload);win.destroy()}
   }
   for(const [name,raw]of Object.entries(files))if(fs.readFileSync(path.join(data,name),'utf8')!==raw)throw Error('Source file changed')

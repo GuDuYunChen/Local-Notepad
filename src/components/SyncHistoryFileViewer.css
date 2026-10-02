@@ -61,3 +61,9 @@
 .sync-history-file-object-filter .btn{flex:none;white-space:normal}
 .sync-history-file-row-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .sync-history-file-row-actions .btn{max-width:100%;white-space:normal}
+
+
+.sync-history-file-record-filter{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:10px 0 0;padding-top:10px;border-top:1px solid var(--line);min-width:0}
+.sync-history-file-record-filter span{flex:1 1 260px;min-width:0;font-size:12px;line-height:1.8;color:var(--ink)}
+.sync-history-file-record-filter code{font:inherit;overflow-wrap:anywhere}
+.sync-history-file-record-filter .btn{flex:none;white-space:normal}

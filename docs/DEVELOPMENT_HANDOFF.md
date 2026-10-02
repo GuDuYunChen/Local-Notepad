@@ -2,9 +2,9 @@
 
 ## 当前阶段
 
-当前候选 **Phase 2F.36：离线历史文件按对象精确限定**，见 `SYNC_HISTORY_FILE_OBJECT_FILTER_2F36.md`。仍在 GuDuYunChen/Local-Notepad 的 `feature/knowledge-os-phase2` / Draft PR #2，不合 master；产品4.195.1/schema14不变。
+当前候选 **Phase 2F.37：离线历史文件按记录精确限定**，见 `SYNC_HISTORY_FILE_RECORD_FILTER_2F37.md`。仍在 GuDuYunChen/Local-Notepad 的 `feature/knowledge-os-phase2` / Draft PR #2，不合 master；产品4.195.1/schema14不变。
 
-基线66740eb3678a6d075f42ce054cd4e5188d227629/tree 7eb6ca1dbfbf9a5c384e62702936a51285da9eeb 的2F.35已完成独立验收。其远程PR描述因为工具安全写入拒绝仍错误显示“待验收”；拒绝没有绕过，也没有状态-only提交。2F.28–2F.35既有查看、筛选、概览、日期、跳页、排序、本页展开/收起及单条标识选择不重复开发。2F.36新HEAD仍须独立验收，源码文档不是绿灯证明，最终记录写PR/交付资料；验收前不进入2F.37。
+基线5ed5b5219bb73f9d3739062df3733b6a65773665/tree 242a85f902c9844ef596c50ed8209344ac7821d6 的2F.36已完成独立验收：八条PR流程、push完整UI/Windows打包、独立桌面、PR测试树、双平台1963/1963完整UI与19/19实际服务、原生3布局21帧及每布局4项对象限定观察、桌面8检查/5PNG和Windows安装包均已按提交/产物/摘要核对。最终PR评论再次被工具安全策略拒绝，未绕过；远程PR描述因此仍停留在2F.35。2F.28–2F.36既有能力不重复开发。2F.37新HEAD仍须独立验收，源码文档不是绿灯证明，验收前不进入2F.38。
 
 ## 中断恢复
 

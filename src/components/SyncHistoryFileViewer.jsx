@@ -35,7 +35,7 @@ export default function SyncHistoryFileViewer() {
   const [queryDraft, setQueryDraft] = useState(''), [composing, setComposing] = useState(false)
   const applyFilters = next => {
     if (next.query === filters.query && next.kind === filters.kind && next.outcome === filters.outcome &&
-        next.itemID === filters.itemID && sameHistoryTimeFilter(next.timeFilter, filters.timeFilter)) return
+        next.itemID === filters.itemID && next.recordID === filters.recordID && sameHistoryTimeFilter(next.timeFilter, filters.timeFilter)) return
     setFilters(next); setPage(0)
   }
   const applyQuery = value => {
@@ -135,7 +135,7 @@ export default function SyncHistoryFileViewer() {
               onChange={event => applyFilters({ ...filters, outcome: event.target.value })}>
               {Object.entries(choices).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
             </select></label>
-            {(queryDraft || filters.query || filters.kind !== 'all' || filters.outcome !== 'all' || filters.itemID || filters.timeFilter.mode !== 'all' || dateDraftActive) &&
+            {(queryDraft || filters.query || filters.kind !== 'all' || filters.outcome !== 'all' || filters.itemID || filters.recordID || filters.timeFilter.mode !== 'all' || dateDraftActive) &&
               <button type="button" className="btn small" data-history-file-filter-clear onClick={event => {
                 const ownsFocus = event.currentTarget === event.currentTarget.ownerDocument.activeElement
                 resetSelection(); if (ownsFocus) queryInput.current?.focus({ preventScroll: true })
@@ -147,6 +147,13 @@ export default function SyncHistoryFileViewer() {
               const ownsFocus = event.currentTarget === event.currentTarget.ownerDocument.activeElement
               applyFilters({ ...filters, itemID: '' }); if (ownsFocus) queryInput.current?.focus({ preventScroll: true })
             }}>取消对象限定</button>
+          </div>}
+          {filters.recordID && <div className="sync-history-file-record-filter" data-history-file-record-filter>
+            <span>当前精确限定记录：<bdi><code data-history-file-record-filter-value>{filters.recordID}</code></bdi>。按完整记录标识比较，不做大小写、宽度或 Unicode 归一化。</span>
+            <button type="button" className="btn small" data-history-file-record-filter-clear onClick={event => {
+              const ownsFocus = event.currentTarget === event.currentTarget.ownerDocument.activeElement
+              applyFilters({ ...filters, recordID: '' }); if (ownsFocus) queryInput.current?.focus({ preventScroll: true })
+            }}>取消记录限定</button>
           </div>}
         </fieldset>
         <div data-history-file-date-filter>
@@ -184,6 +191,10 @@ export default function SyncHistoryFileViewer() {
                 data-history-file-filter-object aria-describedby={searchHintID} aria-pressed={filters.itemID === row.itemID}
                 onClick={() => applyFilters({ ...filters, itemID: row.itemID })}>
                 {filters.itemID === row.itemID ? '已限定此对象' : '只看此对象记录'}
+              </button><button type="button" className="btn small"
+                data-history-file-filter-record aria-describedby={searchHintID} aria-pressed={filters.recordID === row.id}
+                onClick={() => applyFilters({ ...filters, recordID: row.id })}>
+                {filters.recordID === row.id ? '已限定此记录' : '只看此条记录'}
               </button></p>
               <dl><div><dt>建立时间（UTC）</dt><dd><Stamp value={row.createdAt}/></dd></div>
                 <div><dt>处理或失效时间（UTC）</dt><dd><Stamp value={row.resolvedAt}/></dd></div></dl>

@@ -3,7 +3,7 @@ import { HISTORY_TIME_ALL } from './syncHistoryTime.mjs'
 import { HISTORY_FILE_ORDER_DEFAULT, orderHistoryFileRecords } from './syncHistoryFileOrder.mjs'
 
 export const HISTORY_FILE_PAGE_SIZE = 25
-export const HISTORY_FILE_FILTER_ALL = Object.freeze({ query: '', kind: 'all', outcome: 'all', timeFilter: HISTORY_TIME_ALL, itemID: '' })
+export const HISTORY_FILE_FILTER_ALL = Object.freeze({ query: '', kind: 'all', outcome: 'all', timeFilter: HISTORY_TIME_ALL, itemID: '', recordID: '' })
 
 // Search the entire already validated file BEFORE paging. Neither the original
 // file metadata nor the live workspace history becomes part of this selection.
