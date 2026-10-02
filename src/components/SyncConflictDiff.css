@@ -1,0 +1,21 @@
+.sync-conflict-diff{color:var(--ink);min-width:0;border:1px solid var(--line);border-radius:10px;padding:14px;background:var(--surface,var(--paper))}
+.sync-diff-heading,.sync-diff-navigation{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px}
+.sync-diff-heading>strong,.sync-diff-navigation>strong,.sync-diff-table th{color:var(--ink)}
+.sync-diff-details{display:grid;gap:12px;margin-top:12px;min-width:0}
+.sync-diff-summary{font-weight:600;color:var(--ink)}
+.sync-diff-notice{padding:10px 12px;border-left:3px solid var(--warning,var(--line));background:var(--warning-light,var(--paper));color:var(--ink);border-radius:6px;overflow-wrap:anywhere}
+.sync-diff-table-wrap{max-height:420px;overflow:auto;border:1px solid var(--line);border-radius:8px;min-width:0}
+.sync-diff-table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:12px;line-height:1.6;color:var(--ink);background:var(--paper)}
+.sync-diff-table th,.sync-diff-table td{border-bottom:1px solid var(--line);padding:8px;vertical-align:top;text-align:left}
+.sync-diff-table th{position:sticky;top:0;background:var(--surface,var(--paper));z-index:1}
+.sync-diff-table th:nth-child(-n+2),.sync-diff-table td:nth-child(-n+2){width:54px;text-align:center;font-variant-numeric:tabular-nums;color:var(--ink-soft)}
+.sync-diff-line-meta{color:var(--ink);display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 12px;font-size:11px}
+.sync-diff-line-meta strong{color:var(--ink)}
+.sync-diff-table .sync-diff-line-meta span{color:var(--ink)}
+.sync-diff-table pre{color:var(--ink);background:transparent;white-space:pre-wrap;overflow-wrap:anywhere;tab-size:4;margin:4px 0 0;font:inherit;min-height:1.6em}
+.sync-diff-local td:last-child{background:var(--danger-light,var(--paper));border-left:3px solid var(--danger,var(--line))}
+.sync-diff-remote td:last-child{background:var(--success-light,var(--paper));border-left:3px solid var(--success,var(--line))}
+.sync-diff-same td:last-child{background:var(--surface,var(--paper));border-left:3px solid var(--line)}
+.sync-diff-table .sync-diff-empty{color:var(--ink)}
+.sync-conflict-diff :focus-visible,.sync-diff-navigation strong:focus{outline:2px solid var(--clay);outline-offset:3px}
+@media(max-width:580px){.sync-conflict-diff{padding:10px}.sync-diff-table th:nth-child(-n+2),.sync-diff-table td:nth-child(-n+2){width:40px;padding:6px 3px}.sync-diff-navigation{justify-content:flex-start}}

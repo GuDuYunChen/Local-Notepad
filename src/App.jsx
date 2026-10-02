@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react'
 import TextEditor from './components/TextEditor'
+import ReferenceMaintenanceStatus from './components/ReferenceMaintenanceStatus'
 import FileList from './components/FileList'
 import WorkspaceSidebar from './components/WorkspaceSidebar'
 import {
@@ -338,70 +339,30 @@ export default function App() {
 
   const saveCurrent = React.useCallback(async () => {
     if (!current || !editorRef.current) return false
-
+    const activeEditor = editorRef.current
     try {
-      const refactorState = editorRef.current.getReferenceRefactorState?.()
-      let review = null
-
-      if (refactorState?.structureChanged) {
-        const files = await listAllFilesWithContent()
-        const plan = planTargetReferenceRefactor(files, current.id, {
-          title: current.title,
-          content: refactorState.currentContent,
-          sectionPathMappings: refactorState.sectionPathMappings || [],
-        })
-
-        const affectedReferences =
-          (Number(plan.summary?.repairable) || 0) +
-          (Number(plan.summary?.broken) || 0)
-
-        if (affectedReferences > 0) {
-          review = await requestReferenceRefactor({
-            mode: 'structure',
-            targetTitle: current.title || '当前笔记',
-            plan,
-          })
-
-          if (!review?.proceed) return null
-          review = { ...review, plan }
-        }
+      // Ctrl+S has one responsibility: confirm the current body. Cross-note
+      // scans, user review and version-network calls no longer precede it.
+      const updated = await activeEditor.save()
+      if (!updated || updated.id !== current.id || !editorRef.current ||
+          (editorRef.current.getDocumentId && editorRef.current.getDocumentId() !== current.id)) return false
+      const latest = editorRef.current.getReferenceRefactorState?.()
+      if (latest && latest.currentContent !== updated.content) {
+        toast.warning('已有内容已保存，但还有更新的编辑，请再次保存。')
+        return false
       }
-
-      if (refactorState?.structureChanged) {
-        await createFileVersionSnapshot(current.id)
+      if (latest?.savePending) {
+        toast.warning('仍有正文保存正在排队，请等待完成后再继续。')
+        return false
       }
-
-      const updated = await editorRef.current.save()
-      if (!updated) return false
-
-      if (review?.sync && review.plan) {
-        const result = await applyReferenceRepairPlan(review.plan, {
-          allowCurrentSource: true,
-        })
-
-        if (result.skipped.length) {
-          toast.warning(
-            '正文已保存；' +
-            result.repairedReferences +
-            ' 处引用已同步，' +
-            result.skipped.length +
-            ' 篇来源因内容变化被跳过'
-          )
-        } else if (result.repairedReferences) {
-          toast.success('正文已保存，并同步 ' + result.repairedReferences + ' 处引用')
-        }
-      }
-
+      toast.success('正文已保存')
       return true
-    } catch (e) {
-      console.error(e)
+    } catch (error) {
+      console.error('正文保存未确认', error)
+      toast.error(error.message || '正文保存未确认，草稿已保留，请重试')
       return false
     }
-  }, [
-    applyReferenceRepairPlan,
-    current,
-    requestReferenceRefactor,
-  ])
+  }, [current])
 
   const handleExtractStructureSection = React.useCallback(async (section) => {
     if (!current?.id || !section?.path?.length || !editorRef.current) return
@@ -1243,7 +1204,9 @@ export default function App() {
                       onChange={setContent}
                       onLoaded={(text) => {
                         if (current) {
-                          setCurrent(prev => ({ ...prev, content: text }))
+                          // A restored cache is a draft, not a database save receipt.
+                          const savedText = editorRef.current?.getReferenceRefactorState?.().savedContent
+                          setCurrent(prev => ({ ...prev, content: typeof savedText === 'string' ? savedText : text }))
                           setContent(text)
 
                           const pendingFocus = pendingFocusSessionRef.current
@@ -1377,6 +1340,7 @@ export default function App() {
         </main>
       </div>
 
+      <ReferenceMaintenanceStatus/>
       <ToastViewport />
 
       {referenceRefactor && (
@@ -1441,10 +1405,15 @@ export default function App() {
                   toast.warning('目标或来源已变化，已取消跳转，当前草稿保留')
                   return
                 }
-                editorRef.current?.clearCache()
+                if (editorRef.current?.clearCache() !== true) {
+                  toast.warning('正文仍在保存或已变化，尚未放弃草稿。请等待保存结束后重试。')
+                  return
+                }
                 // Discard the in-memory dirty flag as well as the draft cache.
                 // Otherwise returning via Projects asks about the discarded draft again.
-                setContent(current?.content || '')
+                const savedText = editorRef.current.getReferenceRefactorState().savedContent
+                setContent(savedText)
+                setCurrent(previous => previous ? { ...previous, content: savedText } : previous)
                 setEditorStatus(previous => ({ ...previous, dirty: false, structureDirty: false, saveError: false }))
                 setDialog(null)
                 dialog.next()

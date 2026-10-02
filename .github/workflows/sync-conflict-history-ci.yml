@@ -1,0 +1,211 @@
+name: Sync Conflict History CI
+on:
+  push:
+    branches: [feature/knowledge-os-phase2]
+  pull_request:
+    branches: [master]
+permissions:
+  contents: read
+concurrency:
+  group: sync-conflict-history-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  history:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.24.11'
+          cache-dependency-path: server/go.sum
+      - name: Verify historical regression links and bounded review gates
+        run: node --test scripts/stage-review.node.mjs
+      - name: Check historical issue catalog integrity
+        run: node scripts/stage-review.mjs catalog
+      - name: Verify committed dependency lock
+        run: node scripts/verify-dependency-lock.mjs
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Verify install preserved manifest and lock
+        run: git diff --exit-code -- package.json package-lock.json
+      - name: Fetch exact previous history-search source
+        run: git fetch --no-tags --depth=1 origin c701bb70cd07f9b4d0f5a17d6a7b5ea4c4c59432
+      - name: Fetch exact previous export source
+        run: git fetch --no-tags --depth=1 origin 35ec5cb2b0297fba10019c2edf7a62f6a0445087
+      - name: Reproduce old export feedback lifecycle before testing the repair
+        run: node scripts/check-history-export-feedback-baseline.mjs
+      - name: Reproduce original composition defects without accepting test timeouts
+        run: node scripts/check-history-composition-baseline.mjs
+      - name: Verify parsing, read lifecycle and evidence refusal
+        run: node --test scripts/sync-conflict-history.node.mjs scripts/sync-conflict-history-evidence.node.cjs scripts/sync-history-search.node.mjs scripts/sync-history-search-evidence.node.cjs scripts/sync-history-export.node.mjs scripts/sync-history-export-evidence.node.cjs scripts/sync-history-summary.node.mjs scripts/sync-history-summary-evidence.node.cjs scripts/sync-history-time.node.mjs scripts/sync-history-time-evidence.node.cjs scripts/sync-history-file.node.mjs scripts/sync-history-file-evidence.node.cjs scripts/sync-history-file-selection.node.mjs scripts/sync-history-file-selection-evidence.node.cjs scripts/dependency-lock.node.mjs scripts/sync-history-file-summary-evidence.node.cjs scripts/sync-history-file-dates.node.mjs scripts/sync-history-file-dates-evidence.node.cjs scripts/sync-history-file-page-jump.node.mjs scripts/sync-history-file-order.node.mjs scripts/sync-history-file-details.node.mjs scripts/sync-history-file-identifier-selection.node.mjs scripts/sync-history-file-object-filter.node.mjs scripts/sync-history-file-record-filter.node.mjs scripts/sync-history-file-order-evidence.node.cjs scripts/sync-history-file-pagination-evidence.node.cjs
+      - name: Verify real history and unchanged overview interactions
+        run: npx vitest run --root=. src/components/SyncConflictHistoryPanel.test.jsx src/components/SyncHistorySearch.test.jsx src/components/SyncHistoryComposition.test.jsx src/components/SyncHistoryExport.test.jsx src/components/SyncHistoryExportFeedback.test.jsx src/components/SyncHistorySummary.test.jsx src/components/SyncHistoryTimeFilter.test.jsx src/components/SyncHistoryFileViewer.test.jsx src/components/SyncHistoryFileSearch.test.jsx src/components/SyncHistoryFileSummary.test.jsx src/components/SyncHistoryFileDates.test.jsx src/components/SyncHistoryFilePagination.test.jsx src/components/SyncHistoryFileOrder.test.jsx src/components/SyncHistoryFileDetails.test.jsx src/components/SyncHistoryFileIdentifiers.test.jsx src/components/SyncHistoryFileObjectFilter.test.jsx src/components/SyncHistoryFileRecordFilter.test.jsx src/services/syncHistoryDownload.test.js src/components/SyncOverviewPanel.test.jsx src/components/SyncOverviewIntegration.test.jsx
+      - name: Verify real SQLite read-only history
+        working-directory: server
+        run: go test ./internal/syncengine -run '^TestConflictHistory' -count=1
+      - name: Verify real server HTTP and migrated database
+        run: node scripts/sync-conflict-history.http.mjs
+      - name: Build production renderer
+        if: runner.os == 'Windows'
+        run: npm run build:renderer
+      - name: Verify native read-only history scenes
+        if: runner.os == 'Windows'
+        run: node scripts/check-sync-conflict-history.cjs
+      - name: Verify native local history search and unchanged read-only scope
+        if: runner.os == 'Windows'
+        run: node scripts/check-sync-history-search.cjs
+      - name: Verify actual local JSON downloads from the production history panel
+        if: runner.os == 'Windows'
+        run: node scripts/check-sync-history-export.cjs
+      - name: Verify native current-selection history summary
+        if: runner.os == 'Windows'
+        run: node scripts/check-sync-history-summary.cjs
+      - name: Verify native applied-date filtering and actual v2 downloads
+        if: runner.os == 'Windows'
+        run: node scripts/check-sync-history-time.cjs
+      - name: Verify actual FileReader and isolated offline history viewing
+        if: runner.os == 'Windows'
+        run: node scripts/check-sync-history-file.cjs
+      - name: Verify offline whole-file selection and native composition
+        if: runner.os == 'Windows'
+        run: node scripts/check-sync-history-file-selection.cjs
+      - name: Verify offline file dates and whole-file summary agreement
+        if: runner.os == 'Windows'
+        run: node scripts/check-sync-history-file-dates.cjs
+      - name: Verify explicit first, last and direct file-page navigation
+        if: runner.os == 'Windows'
+        run: node scripts/check-sync-history-file-pagination.cjs
+      - name: Verify native stable offline file ordering
+        if: runner.os == 'Windows'
+        run: node scripts/check-sync-history-file-order.cjs
+      - name: Upload offline ordering evidence
+        if: always() && runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-notepad-history-file-order-${{ github.sha }}
+          path: test-results/sync-history-file-order/*
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload offline pagination evidence
+        if: always() && runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-notepad-history-file-pagination-${{ github.sha }}
+          path: test-results/sync-history-file-pagination/*
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload offline date evidence
+        if: always() && runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-notepad-history-file-dates-${{ github.sha }}
+          path: test-results/sync-history-file-dates/*
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload offline file selection evidence
+        if: always() && runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-notepad-history-file-selection-${{ github.sha }}
+          path: test-results/sync-history-file-selection/*
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload offline file viewing evidence
+        if: always() && runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-notepad-history-file-${{ github.sha }}
+          path: test-results/sync-history-file/*
+          if-no-files-found: error
+          retention-days: 7
+      - name: Archive exact tested tracked sources for reproducible review
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p test-results/history-source
+          git archive --format=zip HEAD > test-results/history-source/source.zip
+          git rev-parse HEAD > test-results/history-source/commit.txt
+          git rev-parse HEAD^{tree} > test-results/history-source/tree.txt
+      - name: Upload exact tested source snapshot
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-notepad-history-source-${{ github.sha }}
+          path: test-results/history-source/*
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload date-filter evidence and actual JSON files
+        if: always() && runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-notepad-history-time-${{ github.sha }}
+          path: test-results/sync-history-time/*
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload native history summary evidence
+        if: always() && runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-notepad-history-summary-${{ github.sha }}
+          path: test-results/sync-history-summary/*
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload actual history export files and native evidence
+        if: always() && runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-notepad-history-export-${{ github.sha }}
+          path: test-results/sync-history-export/*
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload native history search evidence
+        if: always() && runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-notepad-history-search-${{ github.sha }}
+          path: |
+            test-results/sync-history-search/checks.json
+            test-results/sync-history-search/*.png
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload exact old export feedback reproduction
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: history-export-feedback-${{ runner.os }}-${{ github.sha }}
+          path: test-results/history-export-feedback/*
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload exact original-defect reproduction
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: history-composition-${{ runner.os }}-${{ github.sha }}
+          path: test-results/history-composition/*
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload actual HTTP verification
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-notepad-history-http-${{ runner.os }}-${{ github.sha }}
+          path: test-results/sync-conflict-history-http/*
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload native history evidence
+        if: always() && runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-notepad-conflict-history-${{ github.sha }}
+          path: |
+            test-results/sync-conflict-history/checks.json
+            test-results/sync-conflict-history/*.png
+          if-no-files-found: error
+          retention-days: 7

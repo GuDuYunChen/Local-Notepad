@@ -4,6 +4,7 @@ import { reviewArchives, REVIEW_ARCHIVE_PREFIX } from '~/services/evidenceReview
 import { downloadEvidenceReviewReport } from '~/services/evidenceReviewReport'
 import useBackupDialogFocus from '~/hooks/useBackupDialogFocus'
 import EvidenceReviewArchives from './EvidenceReviewArchives'
+import WorkspacePackagePanel from './WorkspacePackagePanel'
 import { formatBackupDate, formatBackupSize, readDatabaseBackupList, reviewBackupCoverage } from './backupCenterUtils'
 import './BackupPanel.css'
 
@@ -66,7 +67,7 @@ function DatabaseBackups() {
       if (result?.success !== true) throw new Error(result?.message || '数据库操作未完成')
       const info = result.backup
       if (!info || !/^[a-f0-9]{64}$/.test(info.sha256) || !Number.isSafeInteger(info.files) || info.files < 0 ||
-        !Number.isInteger(info.schemaVersion) || info.schemaVersion < 1 || info.schemaVersion > 9 ||
+        !Number.isInteger(info.schemaVersion) || info.schemaVersion < 1 || info.schemaVersion > 11 ||
         (name && info.name !== name) || (method === 'backupExport' && !result.path)) {
         throw new Error('校验回执不完整，未将本次操作标记为成功')
       }
@@ -86,6 +87,7 @@ function DatabaseBackups() {
     } finally { operation.current = false }
   }
   return <section className="backup-center-database" aria-label="正文数据库备份">
+    <WorkspacePackagePanel />
     <div className="backup-center-section-heading">
       <h3>正文数据库备份</h3>
       <span>手动与自动快照 · 校验后另存</span>
@@ -176,7 +178,7 @@ function BackupCenter({ onClose }) {
       role="dialog" aria-modal="true" aria-labelledby="backup-dialog-title">
       <header className="selector-modal-header">
         <div><h2 className="modal-title" id="backup-dialog-title" ref={heading} tabIndex={-1}>备份与恢复</h2>
-          <div className="modal-message">两类数据，分别备份。这里统一管理，不会自动合并为一个完整应用备份。</div></div>
+          <div className="modal-message">工作区便携包负责已保存正文与附件；数据库快照和核对存档仍可独立管理与校验，不会自动合并未保存草稿或核对存档。</div></div>
         <button type="button" className="icon-btn" onClick={onClose} aria-label="关闭备份中心" title="关闭">×</button>
       </header>
       <div className="backup-center-tabs" role="tablist" aria-label="备份数据类型">

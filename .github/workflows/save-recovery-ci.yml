@@ -1,0 +1,80 @@
+name: Save Recovery CI
+on:
+  push:
+    branches: [feature/knowledge-os-phase2]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: save-recovery-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  recovery:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.24.11'
+          cache-dependency-path: server/go.sum
+      - name: Verify committed dependency lock
+        run: node scripts/verify-dependency-lock.mjs
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Verify install preserved manifest and lock
+        run: git diff --exit-code -- package.json package-lock.json
+      - run: git fetch --no-tags --depth=1 origin 0b66c7e6a902129cd2ead4da75f5d1bf96a9d9de
+      - run: git fetch --no-tags --depth=1 origin 8480c91d293fbdb1f565da2d710536b1edefd4dd
+      - run: git fetch --no-tags --depth=1 origin ca9259c21ae0518b6d4f44d21bd7d48a232fedd7
+      - run: git fetch --no-tags --depth=1 origin 5cf6619336554b4e8af6320ba41e03344f4db0dd
+      - run: git fetch --no-tags --depth=1 origin 73c7a680160a1ad1901efb03990b6a03e523577f
+      - run: git fetch --no-tags --depth=1 origin 3c66a5e36189c5876fb8c1e21fd66c7d1d09f19a
+      - name: Reproduce exact 4.189.5 save ordering and early completion
+        run: node scripts/check-save-queue-baseline.mjs
+      - name: Reproduce exact 4.189.4 loading and queued-save races
+        run: node scripts/check-editor-load-race-baseline.mjs
+      - name: Reproduce exact 4.189.3 unconfirmed draft recovery failures
+        run: node scripts/check-draft-recovery-baseline.mjs
+      - name: Reproduce 4.189.2 conflict decision and adoption lifecycle omissions
+        run: node scripts/check-save-decision-baseline.mjs
+      - name: Reproduce acknowledged-cache defect on exact 4.189.1
+        run: node scripts/check-save-conflict-baseline.mjs
+      - name: Reproduce actual old structural save failures
+        run: node scripts/check-save-recovery-baseline.mjs
+      - name: Verify receipts, retries, old quit guards and draft cache
+        run: node --test scripts/editor-draft-recovery.node.mjs scripts/editor-save-transaction.node.mjs scripts/editor-discard.node.mjs scripts/editor-quit.node.mjs scripts/editor-cache-regression.node.mjs
+      - name: Verify all real UI regression tests
+        run: npx vitest run --root=. --maxWorkers=4 --minWorkers=1 --reporter=json --outputFile=test-results/save-recovery/full-ui.json
+      - name: Verify SQLite transactions, migrations and backup compatibility
+        working-directory: server
+        run: go test ./... -count=1
+      - name: Build actual Go server for editor integration
+        run: go -C server build -o ../bin/save-test-server.exe ./cmd/notepad-server
+      - name: Actual App, actual HTTP, quit handshake and server restart
+        env:
+          NOTEPAD_SAVE_TEST_SERVER: bin/save-test-server.exe
+        run: npx vitest run --config=scripts/save-recovery.vitest.config.mjs --reporter=json --outputFile=test-results/save-recovery/live-editor.json
+      - name: Retain exact commit identity
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p test-results/save-recovery
+          git rev-parse HEAD > test-results/save-recovery/commit.txt
+          node scripts/verify-dependency-lock.mjs > test-results/save-recovery/dependency-lock.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: save-recovery-${{ runner.os }}-${{ github.sha }}
+          path: test-results/save-recovery/*
+          if-no-files-found: error
+          retention-days: 7

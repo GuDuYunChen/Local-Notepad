@@ -2,8 +2,9 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
+// Git line-ending conversion is not stylesheet growth; normalize separators only.
 function readRedesignCss() {
-  return readFileSync(join(process.cwd(), 'src', 'styles', 'redesign.css'), 'utf8')
+  return readFileSync(join(process.cwd(), 'src', 'styles', 'redesign.css'), 'utf8').replace(/\r\n/g, '\n')
 }
 
 function duplicateSelectorCount(css) {
