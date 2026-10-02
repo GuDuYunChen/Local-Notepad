@@ -5,6 +5,7 @@ import { historyOutcome, historyTime } from '~/services/syncConflictHistory.mjs'
 import { limitHistoryQuery } from '~/services/syncHistorySearch.mjs'
 import { HISTORY_FILE_FILTER_ALL, selectHistoryFilePage } from '~/services/syncHistoryFileSelection.mjs'
 import { HISTORY_FILE_ORDER_DEFAULT, HISTORY_FILE_ORDER_OPTIONS, isHistoryFileOrder } from '~/services/syncHistoryFileOrder.mjs'
+import { setHistoryFileDetailsOpen } from '~/services/syncHistoryFileDetails.mjs'
 import './SyncHistoryFileViewer.css'
 import SyncHistoryFileSummary from './SyncHistoryFileSummary'
 import SyncHistoryTimeFilter from './SyncHistoryTimeFilter'
@@ -19,7 +20,7 @@ function Stamp({ value }) {
   return iso ? <time dateTime={iso}>{iso}</time> : '时间缺失'
 }
 export default function SyncHistoryFileViewer() {
-  const hintID = useId(), resultID = useId(), searchHintID = useId(), matchesID = useId(), orderHintID = useId()
+  const hintID = useId(), resultID = useId(), searchHintID = useId(), matchesID = useId(), orderHintID = useId(), recordsID = useId(), detailsHintID = useId()
   const list = useRef(null), queryInput = useRef(null), compositionActive = useRef(false)
   const chooseButton = useRef(null), input = useRef(null), generation = useRef(0), current = useRef(null), live = useRef(false)
   const [view, setView] = useState(null), [phase, setPhase] = useState('unread'), [notice, setNotice] = useState(''), [page, setPage] = useState(0)
@@ -52,7 +53,12 @@ export default function SyncHistoryFileViewer() {
     live.current = true
     return () => { live.current = false; generation.current++; current.current?.abort(); current.current = null }
   }, [])
-  useEffect(() => { if (list.current) list.current.scrollTop = 0 }, [page, view, filters, order])
+  useEffect(() => {
+    if (list.current) list.current.scrollTop = 0
+    // A new page/filter/order/successful file is a new display context. Failed,
+    // cancelled and pending replacements keep the existing page untouched.
+    setHistoryFileDetailsOpen(list.current, false)
+  }, [page, view, filters, order])
   const select = async file => {
     if (!file) return // cancelling the picker does not discard a previous result
     const id = ++generation.current
@@ -151,7 +157,14 @@ export default function SyncHistoryFileViewer() {
           </label>
           <p id={orderHintID}>先筛选全部匹配记录，再排序和分页；按时间排序时，时间缺失的记录放在最后，同一时间保留文件原顺序。只改变显示，不重读或修改文件。</p>
         </div>
-        <div ref={list} className="sync-history-file-list" tabIndex={0} role="region" aria-label="离线文件记录列表">
+        <div className="sync-history-file-record-tools" data-history-file-record-tools role="group" aria-label="本页记录标识显示" aria-describedby={detailsHintID}>
+          <button type="button" className="btn small" data-history-file-expand-identifiers aria-controls={recordsID}
+            aria-disabled={!selection.rows.length} onClick={() => setHistoryFileDetailsOpen(list.current, true)}>展开本页全部标识</button>
+          <button type="button" className="btn small" data-history-file-collapse-identifiers aria-controls={recordsID}
+            aria-disabled={!selection.rows.length} onClick={() => setHistoryFileDetailsOpen(list.current, false)}>收起本页全部标识</button>
+          <p id={detailsHintID}>只展开或收起本页 {selection.rows.length} 条记录的对象及记录标识，不改变筛选、排序或文件；也可逐条展开。</p>
+        </div>
+        <div id={recordsID} ref={list} className="sync-history-file-list" tabIndex={0} role="region" aria-label="离线文件记录列表">
           {!selection.matched && <p data-history-file-empty>本文件中没有符合当前条件的记录；不是本机或全部历史没有记录。可清除文件内筛选。</p>}
           <ol start={selection.from || 1}>
             {selection.rows.map(row => <li key={row.id} data-history-file-row>
@@ -159,7 +172,7 @@ export default function SyncHistoryFileViewer() {
               <p>{historyOutcome(row)}</p>
               <dl><div><dt>建立时间（UTC）</dt><dd><Stamp value={row.createdAt}/></dd></div>
                 <div><dt>处理或失效时间（UTC）</dt><dd><Stamp value={row.resolvedAt}/></dd></div></dl>
-              <details><summary>查看文件内标识</summary><p>对象：<bdi><code>{row.itemID}</code></bdi></p><p>记录：<bdi><code>{row.id}</code></bdi></p></details>
+              <details data-history-file-identifiers><summary>查看文件内标识</summary><p>对象：<bdi><code>{row.itemID}</code></bdi></p><p>记录：<bdi><code>{row.id}</code></bdi></p></details>
             </li>)}
           </ol>
         </div>

@@ -1,6 +1,6 @@
 # 已发现问题与防复发索引
 
-本轮收录42条有仓库文档或本会话依据的问题/风险：历史已修复34条、已有缓解3条、外部/持续未解决5条。这不是42个新缺陷，也不是整个项目的穷尽清单。
+本轮收录43条有仓库文档或本会话依据的问题/风险：历史已修复35条、已有缓解3条、外部/持续未解决5条。这不是43个新缺陷，也不是整个项目的穷尽清单。
 
 基线：`a9a56ba` / 4.195.1。每项的详细防复发规则、来源和回归文件见 `quality/known-issues.json`。历史修复状态来自对应阶段记录，不冒充本轮重新执行；测试路径存在不等于测试通过。
 
@@ -46,6 +46,7 @@
 | TEST-04 · 4.190–4.194 | [旧测试把所有dt视作主色或禁止全部input](SYNC_HISTORY_SUMMARY_2F26.md) |
 | TEST-05 · 4.194.0 | [截图边缘对齐/异步FileReader测试时序造成校验失败](SYNC_HISTORY_FILE_VIEWER_2F28.md) |
 | TEST-06 · 4.195.0 | [错误期望清除筛选抹掉旧文件失败来源，误判组合结束事件](SYNC_HISTORY_FILE_SELECTION_2F29.md) |
+| TEST-07 · 2F.33.1 | [原生排序测试未建立实际900高窗口，只有7帧而非21帧](SYNC_HISTORY_FILE_ORDER_VIEWPORT_2F33_1.md) |
 | BUILD-01 · 4.195.1 | [npm electron-to-chromium@1.5.443下载404，测试尚未开始](DEVELOPMENT_HANDOFF.md) |
 | ENV-01 · 环境相关 | [当前会话容器曾无法解析GitHub/npm，gh缺失](DEVELOPMENT_HANDOFF.md) |
 | ENV-02 · 桌面首轮记录 | [PowerShell窗口查询曾ETIMEDOUT，同提交重试通过](DEVELOPMENT_HANDOFF.md) |
@@ -60,3 +61,5 @@
 执行 `node scripts/stage-review.mjs catalog` 检查索引关联完整性；它不运行回归，明确返回 `testsExecuted:false`。恢复和有限重试规则见 `STAGE_REVIEW_PROTOCOL.md`，开发入口为 `AGENTS.md` 与 `DEVELOPMENT_HANDOFF.md`。
 
 npm404、工具写入拦截、PowerShell窗口查询超时和聊天“无法思考”分开记录。没有内部错误码，不声称已找到或修复聊天中断根因。有限输出、分段检查点只降低重复工作和单次失败影响，不保证平台不中断。
+
+TEST-07为本次补入统一索引的既有问题：bcdfe9d的原始Windows报告已独立通过21帧/尺寸/摘要核验。43条由原42条加此1条组成，不重复计数；助手12类执行失误仍单列。

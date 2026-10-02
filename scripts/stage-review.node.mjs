@@ -91,7 +91,7 @@ test('empty/partial snapshots are not successful; wrappers and bad heads are rej
 })
 test('catalog has actual source/regression links and does not claim those tests were executed', () => {
   const input = catalog(), before = JSON.stringify(input), r = verifyIssueCatalog(input, root)
-  assert.equal(r.issues, 42); assert.ok(r.regressionFiles > 20); assert.ok(r.classifications.unresolved >= 5)
+  assert.equal(r.issues, 43); assert.ok(r.regressionFiles > 20); assert.ok(r.classifications.unresolved >= 5)
   assert.equal(r.testsExecuted, false); assert.equal(JSON.stringify(input), before)
 })
 for (const [name, change] of [

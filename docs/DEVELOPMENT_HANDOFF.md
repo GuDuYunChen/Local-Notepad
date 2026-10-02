@@ -2,13 +2,9 @@
 
 ## 当前阶段
 
-**当前修补：2F.33.1**。2F.33的 `f108e2a` 原生排序验收失败（Windows job110411078139，实际681高≠要求900高），不能视为已验收。本轮只修测试窗口尺寸建立与有界观测，详情见 `SYNC_HISTORY_FILE_ORDER_VIEWPORT_2F33_1.md`。新提交验收状态以PR/交付记录为准，未进入2F.34。
+当前候选 **Phase 2F.34：本页记录标识统一展开与收起**，见`SYNC_HISTORY_FILE_DETAILS_2F34.md`。仍在GuDuYunChen/Local-Notepad的`feature/knowledge-os-phase2` / Draft PR #2，不合master；产品4.195.1/schema14不变。
 
-仓库 GuDuYunChen/Local-Notepad，分支 `feature/knowledge-os-phase2`，Draft PR #2。日常开发不合入 master。
-
-当前候选 **Phase 2F.33：离线历史文件时间排序**，详情见 `SYNC_HISTORY_FILE_ORDER_2F33.md`。2F.28–2F.32的查看、查找、概览、UTC日期及直接跳页已存在，不重复开发。开发版本仍4.195.1、schema14；新功能按提交识别。本文记录源码接续，不是新HEAD的CI或产物验收证明。
-
-基线 `b23d0b5547f76c741e879f4e99cef54af1b39f3e` / tree `7fce59573128985431ab236acc9a80e524644566` 的2F.32已在PR中最终验收，没有遗留构建。本轮复查八条PR检查、完整Windows打包job与精确源码树，并在修改前运行100项限定旧回归后推进。旧绿灯和旧安装包不替代新提交。2F.33需单独完成当前HEAD的UI/原生/真实桌面/完整Windows打包和产物核验，结果写PR/交付记录，不再用状态-only源码提交触发整套CI；未验收前不进入2F.34。
+基线bcdfe9dee65c819e7b0bdb53cbb30ade26e8ba0a的2F.33.1已补齐八条PR、完整Windows打包、真实桌面及原始产物核验，旧681高失败保留，三布局21帧新报告通过。不要重做排序或窗口修补。2F.34的新HEAD仍须独立验收，源码文档不是绿灯证明，最终记录写PR/交付资料；验收前不进入2F.35。
 
 ## 中断恢复
 
@@ -18,7 +14,7 @@
 
 ## 已知问题和助手执行失误
 
-`KNOWN_ISSUES.md`及机器索引保留42条产品/环境问题；`ASSISTANT_EXECUTION_INCIDENTS.md`单独保留12类助手执行错误，不混作聊天故障根因。各轮具体操作失误保留于 `EXECUTION_NOTE_2F30.md`、`EXECUTION_NOTE_2F31.md`、`EXECUTION_NOTE_2F32.md`、`EXECUTION_NOTE_2F33.md`，不能把失败调用写成通过。
+`KNOWN_ISSUES.md`及机器索引保留43条产品/环境/测试问题（原42条及已记录的TEST-07）；`ASSISTANT_EXECUTION_INCIDENTS.md`单独保留12类助手执行错误，不混作聊天故障根因。各轮具体操作失误保留于 `EXECUTION_NOTE_2F30.md`、`EXECUTION_NOTE_2F31.md`、`EXECUTION_NOTE_2F32.md`、`EXECUTION_NOTE_2F33.md`、`EXECUTION_NOTE_2F34.md`，不能把失败调用写成通过。
 
 遵守 `STAGE_REVIEW_PROTOCOL.md`：同run检查至少间隔90秒，30次连接器调用前检查预算；长日志留文件，关键节点短交代。每个故障链最多一次有新证据的手工重试；工具安全拒绝不绕过。这些措施减少重复工作，不保证ChatGPT平台不中断。
 
