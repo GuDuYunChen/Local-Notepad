@@ -2,13 +2,13 @@
 
 ## 当前阶段
 
-当前候选 **Phase 2F.38.2：S3客户端值及嵌套格式化凭据脱敏修补**，见 `SYNC_S3_FORMAT_REDACTION_2F38_2.md`。沿用GuDuYunChen/Local-Notepad的feature/knowledge-os-phase2 / Draft PR #2，不合master、不发布生产，产品4.195.1/schema14不变。
+当前候选 **Phase 2F.39：显式S3只读对象预检**，见 `SYNC_S3_READ_PROBE_2F39.md`。沿用GuDuYunChen/Local-Notepad的feature/knowledge-os-phase2 / Draft PR #2，不合master、不发布生产，产品4.195.1/schema14不变。
 
-基线7f6787575b9e370aed38fdec6768d83e45cd18c8 / tree b020299745198d81b1ba1cb724c597cc90dcde80的八PR虽已成功，专项复查仍复现SREAD-02：ReadClient只有指针Formatter，复制值打印会输出合成凭据；私有包装字段还会跳过内嵌方法。先保留原实现及中间失败候选，再修补值方法集和不可变凭据快照，28项顶层/223含子测试事件及race、vet本地通过。没有开始2F.39，没有把基线绿灯当作新缺陷不存在。
+基线0b93e7ac14c6f07321724dc81217505570e0fdb8 / tree262ac6eba0f677355a450fd9af452cef270b62a5已独立验收，SREAD-01/02修补保留。验收评论5954433635的错误模块日志证明由评论5954554287更正：排除不一致的push日志/路径文件返回，按Git树与blob确认真实module notepad-server、go1.22、toolchain go1.24.11；同树PR job110865092273实际go test ./...通过syncs3。八PR、push完整UI/Windows、Desktop以及双平台1971UI/19服务、原生21帧、桌面8检查5PNG和安装包均有独立核验。差异原因未知，不将错误片段继续作为证明。
 
-SREAD-01重复编码修补及其原20项Go测试保留；本次旧测试仅一处内部凭据取值改为快照访问器，URL脱敏断言不变。2F.38和2F.38.1仍未宣称独立验收通过；当前候选要完成8PR、push完整UI/Windows、独立Desktop、测试合并树身份、完整UI/服务/原生/桌面/安装包与新增syncs3实际运行证据。完成前不进入2F.39。
+新增ProbeRead是显式调用的只读基础API：只对调用者选定键执行一次现有有界签名GET，返回不含正文/ETag/键/端点/凭据的分类摘要。失败不当成连接成功；403/404不推断密钥正确或错误；没有探测对象写入、HEAD/List替代、重定向、重试或自动同步。尚未增加设置UI/HTTP路由、注册provider或保存凭据，不能声称完整S3同步可用。本候选仍须新HEAD的全部CI和原始产物验收，完成前不进入2F.40。
 
-2F.37/TEST-08在4580f5c已验收，评论5952627874保留，不重做旧修补。S3包仍为未注册基础，无UI/新路由、凭据持久化、List、写入删除或自动同步，未连接真实用户桶；现有WebDAV/保存退出未改。格式化修补不是凭据加密、内存擦除或任意反射工具的安全保证。GitHub专属full_access依用户明确授权正常设置；实际写入以回执和远端为准。
+原2F.35–2F.37及TEST-08验收保留，不重复开发或下载旧证据。GitHub专属full_access按用户授权正常设置；手动与原小时任务关键节点同步prompt，不改变调度/启用状态。时间展示仅洛杉矶。
 
 ## 中断恢复
 
@@ -18,7 +18,7 @@ SREAD-01重复编码修补及其原20项Go测试保留；本次旧测试仅一�
 
 ## 已知问题和助手执行失误
 
-`KNOWN_ISSUES.md`及机器索引保留46条产品/环境/测试问题（36历史修复、3缓解、7持续或待验收）；`ASSISTANT_EXECUTION_INCIDENTS.md`单独保留12类助手执行错误，不混作聊天故障根因。各轮具体操作失误保留于 `EXECUTION_NOTE_2F30.md` 至 `EXECUTION_NOTE_2F38_2.md`，不能把失败调用写成通过。
+`KNOWN_ISSUES.md`及机器索引保留46条产品/环境/测试问题（38历史修复、3缓解、5持续或外部）；`ASSISTANT_EXECUTION_INCIDENTS.md`单独保留12类助手执行错误，不混作聊天故障根因。各轮具体操作失误保留于 `EXECUTION_NOTE_2F30.md` 至 `EXECUTION_NOTE_2F39.md`，不能把失败调用写成通过。
 
 遵守 `STAGE_REVIEW_PROTOCOL.md`：同run检查至少间隔90秒，30次连接器调用前检查预算；长日志留文件，关键节点短交代。每个故障链最多一次有新证据的手工重试；工具安全拒绝不绕过。这些措施减少重复工作，不保证ChatGPT平台不中断。
 
