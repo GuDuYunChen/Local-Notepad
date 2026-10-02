@@ -125,7 +125,7 @@ func TestKeyEncodingAndPrefixAreNotNormalized(t *testing.T) {
 				if r.Method != "GET" || r.URL.RawQuery != "" || r.Body != nil || r.URL.EscapedPath() != want || r.URL.Host != "s3.example.test:9443" {
 					t.Fatalf("wrong read request: %s %s", r.Method, r.URL)
 				}
-				if strings.Contains(r.URL.String(), c.credentials.AccessKeyID) || !strings.Contains(r.Header.Get("Authorization"), "/us-east-1/s3/aws4_request") {
+				if strings.Contains(r.URL.String(), c.credentials().AccessKeyID) || !strings.Contains(r.Header.Get("Authorization"), "/us-east-1/s3/aws4_request") {
 					t.Fatal("invalid auth placement")
 				}
 				return response(200, "ok"), nil

@@ -54,12 +54,18 @@ func (Credentials) Format(s fmt.State, _ rune) { _, _ = io.WriteString(s, "[S3 c
 type ReadClient struct {
 	endpoint               url.URL
 	bucket, region, prefix string
-	credentials            Credentials
-	client                 *http.Client
-	now                    func() time.Time
+	// Keep the immutable constructor snapshot behind a private closure: fmt
+	// bypasses methods on unexported containing fields, and some verbs expand
+	// pointers in error diagnostics. It cannot walk a function's captured data.
+	// This is formatting containment, not encryption or secure memory erasure.
+	credentials func() Credentials
+	client      *http.Client
+	now         func() time.Time
 }
 
-func (*ReadClient) Format(s fmt.State, _ rune) { _, _ = io.WriteString(s, "[S3 read client redacted]") }
+// A value receiver covers both ReadClient values and *ReadClient pointers.
+// A pointer-only method leaves copied values outside fmt.Formatter's method set.
+func (ReadClient) Format(s fmt.State, _ rune) { _, _ = io.WriteString(s, "[S3 read client redacted]") }
 
 type Object struct {
 	Bytes []byte
@@ -109,7 +115,7 @@ func NewReadClient(cfg Config, credentials Credentials) (*ReadClient, error) {
 	// Fresh connections avoid transparent stale-connection retries of signed GETs.
 	transport := &http.Transport{Proxy: nil, DialContext: (&net.Dialer{Timeout: 10 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
 		TLSHandshakeTimeout: 10 * time.Second, ResponseHeaderTimeout: 10 * time.Second, IdleConnTimeout: 30 * time.Second, DisableCompression: true, DisableKeepAlives: true, MaxResponseHeaderBytes: 64 * 1024}
-	return &ReadClient{endpoint: *u, bucket: cfg.Bucket, region: cfg.Region, prefix: cfg.Prefix, credentials: credentials, now: time.Now,
+	return &ReadClient{endpoint: *u, bucket: cfg.Bucket, region: cfg.Region, prefix: cfg.Prefix, credentials: func() Credentials { return credentials }, now: time.Now,
 		client: &http.Client{Transport: transport, Timeout: requestTimeout, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}, nil
 }
 
@@ -203,7 +209,7 @@ func signRead(req *http.Request, credentials Credentials, region string, at time
 // performs one request only; redirects, missing objects and 429/5xx do not cause
 // retries or writes. ETag is opaque metadata, not proof of a content hash.
 func (r *ReadClient) GetObject(ctx context.Context, key string, limit int64) (Object, error) {
-	if r == nil || r.client == nil || r.now == nil || ctx == nil || limit < 1 || limit > MaxObjectBytes {
+	if r == nil || r.client == nil || r.credentials == nil || r.now == nil || ctx == nil || limit < 1 || limit > MaxObjectBytes {
 		return Object{}, ErrConfig
 	}
 	if err := ctx.Err(); err != nil {
@@ -228,7 +234,7 @@ func (r *ReadClient) GetObject(ctx context.Context, key string, limit int64) (Ob
 	if err != nil {
 		return Object{}, ErrConfig
 	}
-	signRead(req, r.credentials, r.region, r.now())
+	signRead(req, r.credentials(), r.region, r.now())
 	resp, err := r.client.Do(req)
 	if err != nil {
 		if call.Err() != nil {
