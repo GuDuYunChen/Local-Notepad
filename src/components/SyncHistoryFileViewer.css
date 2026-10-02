@@ -53,3 +53,11 @@
 .sync-history-file-identifier-line{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px;min-width:0}
 .sync-history-file-identifier-line bdi{min-width:0;overflow-wrap:anywhere}
 .sync-history-file-identifier-line .btn{flex:none;white-space:normal}
+
+
+.sync-history-file-object-filter{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:10px 0 0;padding-top:10px;border-top:1px solid var(--line);min-width:0}
+.sync-history-file-object-filter span{flex:1 1 260px;min-width:0;font-size:12px;line-height:1.8;color:var(--ink)}
+.sync-history-file-object-filter code{font:inherit;overflow-wrap:anywhere}
+.sync-history-file-object-filter .btn{flex:none;white-space:normal}
+.sync-history-file-row-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.sync-history-file-row-actions .btn{max-width:100%;white-space:normal}

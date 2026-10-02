@@ -3,7 +3,8 @@
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),{createHash}=require('node:crypto'),{pathToFileURL}=require('node:url')
 const {names,phases,verifyOrderScene,verifyOrderReport}=require('./sync-history-file-order-evidence.cjs')
 const {verifyFileDetailsScene,verifyFileDetailsReport}=require('./sync-history-file-details-evidence.cjs')
-const {verifyIdentifierSelectionScene,verifyIdentifierSelectionReport}=require('./sync-history-file-identifier-selection-evidence.cjs')
+const {verifyIdentifierSelectionScene}=require('./sync-history-file-identifier-selection-evidence.cjs')
+const {verifyObjectFilterScene,verifyObjectFilterReport}=require('./sync-history-file-object-filter-evidence.cjs')
 const {verifyRasterWitness}=require('./sync-clock-raster-evidence.cjs')
 const {establishNativeViewport}=require('./native-test-viewport.cjs')
 const root=path.resolve(__dirname,'..'),out=path.join(root,'test-results','sync-history-file-order')
@@ -12,7 +13,7 @@ if(!process.versions.electron){
  const r=require('node:child_process').spawnSync(require('electron'),[__filename],{cwd:root,env,encoding:'utf8',timeout:110000,maxBuffer:4*1024*1024})
  if(r.stdout)process.stdout.write(r.stdout);if(r.stderr)process.stderr.write(r.stderr)
  if(r.error||r.status!==0)throw r.error||Error('Native file-order check failed')
- verifyIdentifierSelectionReport(out,process.env.GITHUB_SHA||'');console.log('File-order native evidence verified.')
+ verifyObjectFilterReport(out,process.env.GITHUB_SHA||'');console.log('File-order native evidence verified.')
 }else{
  const {app,BrowserWindow}=require('electron'),delay=ms=>new Promise(r=>setTimeout(r,ms))
  app.setPath('userData',fs.mkdtempSync(path.join(os.tmpdir(),'notepad-file-order-')));app.on('window-all-closed',()=>{})
@@ -24,12 +25,12 @@ if(!process.versions.electron){
   const r=nav.getBoundingClientRect(),tools=p.querySelector('[data-history-file-record-tools]'),tr=tools.getBoundingClientRect(),canvas=document.createElement('canvas');canvas.width=canvas.height=1
   const ctx=canvas.getContext('2d',{willReadFrequently:true}),paint=c=>{ctx.fillStyle=c;ctx.fillRect(0,0,1,1)},rgb=()=>[...ctx.getImageData(0,0,1,1).data].slice(0,3)
   const lum=rgb=>rgb.map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4}).reduce((a,v,i)=>a+v*[.2126,.7152,.0722][i],0)
-  const colors=[...nav.querySelectorAll('label,select,p'),...tools.querySelectorAll('button,p'),...p.querySelectorAll('[data-history-file-identifiers][open] button')].map(n=>{
+  const colors=[...nav.querySelectorAll('label,select,p'),...tools.querySelectorAll('button,p'),...p.querySelectorAll('[data-history-file-identifiers][open] button,[data-history-file-filter-object],[data-history-file-object-filter-clear]')].map(n=>{
    const ancestors=[];for(let a=n;a;a=a.parentElement)ancestors.unshift(a)
    ctx.clearRect(0,0,1,1);paint('#fff');for(const a of ancestors)paint(getComputedStyle(a).backgroundColor)
    const bg=rgb();paint(getComputedStyle(n).color);const a=lum(bg),b=lum(rgb());return(Math.max(a,b)+.05)/(Math.min(a,b)+.05)
   })
-  return {identifiersCount:p.querySelectorAll('[data-history-file-identifiers]').length,identifiersOpen:p.querySelectorAll('[data-history-file-identifiers][open]').length,detailsToolsVisible:tr.top>=0&&tr.bottom<=innerHeight&&tr.left>=0&&tr.right<=innerWidth,detailsDisabled:{expand:q('expand-identifiers').getAttribute('aria-disabled')==='true',collapse:q('collapse-identifiers').getAttribute('aria-disabled')==='true'},detailsScope:tools.querySelector('p').textContent,ids:[...p.querySelectorAll('[data-history-file-row]')].map(n=>n.querySelectorAll('code')[1].textContent),order:q('order').value,draft:q('jump-input').value,error:q('jump-error')?.textContent||'',invalid:!!q('jump-error'),
+  return {identifiersCount:p.querySelectorAll('[data-history-file-identifiers]').length,identifiersOpen:p.querySelectorAll('[data-history-file-identifiers][open]').length,detailsToolsVisible:tr.top>=0&&tr.bottom<=innerHeight&&tr.left>=0&&tr.right<=innerWidth,detailsDisabled:{expand:q('expand-identifiers').getAttribute('aria-disabled')==='true',collapse:q('collapse-identifiers').getAttribute('aria-disabled')==='true'},detailsScope:tools.querySelector('p').textContent,ids:[...p.querySelectorAll('[data-history-file-row]')].map(n=>n.querySelectorAll('code')[1].textContent),order:q('order').value,draft:q('jump-input').value,error:q('jump-error')?.textContent||'',invalid:!!q('jump-error'),objectFilter:q('object-filter-value')?.textContent||'',objectFilterVisible:!!q('object-filter'),query:q('query').value,
    outcomes:[...p.querySelectorAll('[data-file-summary-outcome]')].map(n=>Number(n.textContent)),matches:q('matches').textContent,page:q('page').textContent,readOnly:q('jump-input').readOnly,
    disabled:Object.fromEntries(['first','prev','next','last','jump'].map(k=>[k,q(k).getAttribute('aria-disabled')==='true'])),
    reads:window.__fileReads,requests:window.__requests.length,mutations:window.__mutations,network:window.__networkRequests,navigation:window.__navigationCalls,
@@ -40,7 +41,7 @@ if(!process.versions.electron){
  app.whenReady().then(async()=>{
   fs.mkdirSync(out,{recursive:true});save()
   const {prepareHistoryExport}=await import(pathToFileURL(path.join(root,'src/services/syncHistoryExport.mjs')).href)
-  const rows=Array.from({length:61},(_,i)=>({id:'r'+i,itemID:'same',title:i===60?'尾页':'笔记 '+i,kind:'file',status:'resolved',resolution:'local',createdAt:i===60?0:i+1,resolvedAt:i===60?0:1790812800+61-i}))
+  const rows=Array.from({length:61},(_,i)=>({id:'r'+i,itemID:i<3?'same':'object-'+i,title:i===60?'尾页':'笔记 '+i,kind:'file',status:'resolved',resolution:'local',createdAt:i===60?0:i+1,resolvedAt:i===60?0:1790812800+61-i}))
   const raw=prepareHistoryExport({snapshot:{items:rows,filter:'all',hasMore:true},phase:'ready'},new Date('2026-10-01T10:00:00Z')).raw
   const data=fs.mkdtempSync(path.join(os.tmpdir(),'file-order-fixtures-'))
   const files={'history.json':raw}
@@ -48,7 +49,7 @@ if(!process.versions.electron){
   for(const name of names){
    const width=name==='order-narrow'?560:1000
    const win=new BrowserWindow({show:true,width,height:900,useContentSize:true,webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false,backgroundThrottling:false}})
-   const scene={name,frames:[],detailsActions:[],identifierSelections:[]};report.scenes.push(scene);let downloads=0
+   const scene={name,frames:[],detailsActions:[],identifierSelections:[],objectFilterActions:[]};report.scenes.push(scene);let downloads=0
    const onDownload=()=>downloads++;win.webContents.session.on('will-download',onDownload)
    const exec=code=>win.webContents.executeJavaScript(code),cdp=(method,params)=>win.webContents.debugger.sendCommand(method,params)
    const wait=async code=>{for(let i=0;i<80;i++){if(await exec(code))return;await delay(60)}throw Error('Order view not ready: '+code)}
@@ -80,6 +81,19 @@ if(!process.versions.electron){
       page:p.querySelector('[data-history-file-page]').textContent,pageUnchanged:p.querySelector('[data-history-file-page]').textContent===${JSON.stringify(before.page)},orderUnchanged:p.querySelector('[data-history-file-order]').value===${JSON.stringify(before.order)}}
     })()`)
     scene.identifierSelections.push({action,...a,contrast:Math.min(...f.colors)});save()
+   }
+   const recordObjectFilter=async action=>{
+    const f=await exec('('+inspect.toString()+')()')
+    const a=await exec(`(()=>{
+      const p=document.querySelector('[data-history-file-viewer]'),q=k=>p.querySelector('[data-history-file-'+k+']')
+      return {ids:[...p.querySelectorAll('[data-history-file-row]')].map(n=>n.querySelectorAll('code')[1].textContent),
+        matches:q('matches').textContent,page:q('page').textContent,order:q('order').value,query:q('query').value,
+        itemID:q('object-filter-value')?.textContent||'',filterVisible:!!q('object-filter'),
+        focusObject:document.activeElement?.matches?.('[data-history-file-filter-object]')===true,
+        focusQuery:document.activeElement===q('query'),outcomes:[...p.querySelectorAll('[data-file-summary-outcome]')].map(n=>Number(n.textContent)),
+        reads:window.__fileReads,network:window.__networkRequests,mutations:window.__mutations,requests:window.__requests.length,navigation:window.__navigationCalls}
+    })()`)
+    scene.objectFilterActions.push({action,...a,contrast:Math.min(...f.colors)});save()
    }
    const choose=async file=>{
     await exec(`document.querySelector('[data-history-file-choose]').focus({preventScroll:true});true`)
@@ -143,7 +157,11 @@ if(!process.versions.electron){
     await change(fileControl('order'),'file')
     await detailAction('restored-expand',fileControl('expand-identifiers'));await detailAction('restored-collapse',fileControl('collapse-identifiers'))
     await exec(`document.querySelector('[data-history-file-order]').focus({preventScroll:true});true`);await capture('restored')
-    verifyOrderScene(scene);verifyFileDetailsScene(scene);verifyIdentifierSelectionScene(scene)
+    await click('[data-history-file-filter-object]');await delay(70);await recordObjectFilter('apply')
+    await change(fileControl('query'),'笔记 1');await delay(70);await recordObjectFilter('combined')
+    await click(fileControl('object-filter-clear'));await delay(70);await recordObjectFilter('clear-object')
+    await click(fileControl('filter-clear'));await delay(70);await recordObjectFilter('clear-all')
+    verifyOrderScene(scene);verifyFileDetailsScene(scene);verifyIdentifierSelectionScene(scene);verifyObjectFilterScene(scene)
    }finally{win.webContents.session.removeListener('will-download',onDownload);win.destroy()}
   }
   for(const [name,raw]of Object.entries(files))if(fs.readFileSync(path.join(data,name),'utf8')!==raw)throw Error('Source file changed')

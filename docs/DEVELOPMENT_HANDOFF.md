@@ -2,9 +2,9 @@
 
 ## 当前阶段
 
-当前候选 **Phase 2F.35：离线文件单条标识精确选择**，见`SYNC_HISTORY_FILE_IDENTIFIER_SELECTION_2F35.md`。仍在GuDuYunChen/Local-Notepad的`feature/knowledge-os-phase2` / Draft PR #2，不合master；产品4.195.1/schema14不变。
+当前候选 **Phase 2F.36：离线历史文件按对象精确限定**，见 `SYNC_HISTORY_FILE_OBJECT_FILTER_2F36.md`。仍在 GuDuYunChen/Local-Notepad 的 `feature/knowledge-os-phase2` / Draft PR #2，不合 master；产品4.195.1/schema14不变。
 
-基线a5eca354c15d3cba09ad45ff51d9a85b8446c870/tree 2c8c5e06e54bb22da2b6c56a2bf85b0d6b036302的2F.34已完成八条PR、完整Windows打包、真实桌面及原始产物核验，详见PR评论5944906169。2F.28–2F.34既有查看、筛选、排序、跳页、统一展开/收起不重复开发。2F.35新HEAD仍须独立验收，源码文档不是绿灯证明，最终记录写PR/交付资料；验收前不进入2F.36。
+基线66740eb3678a6d075f42ce054cd4e5188d227629/tree 7eb6ca1dbfbf9a5c384e62702936a51285da9eeb 的2F.35已完成独立验收。其远程PR描述因为工具安全写入拒绝仍错误显示“待验收”；拒绝没有绕过，也没有状态-only提交。2F.28–2F.35既有查看、筛选、概览、日期、跳页、排序、本页展开/收起及单条标识选择不重复开发。2F.36新HEAD仍须独立验收，源码文档不是绿灯证明，最终记录写PR/交付资料；验收前不进入2F.37。
 
 ## 中断恢复
 
@@ -14,7 +14,7 @@
 
 ## 已知问题和助手执行失误
 
-`KNOWN_ISSUES.md`及机器索引保留43条产品/环境/测试问题（原42条及已记录的TEST-07）；`ASSISTANT_EXECUTION_INCIDENTS.md`单独保留12类助手执行错误，不混作聊天故障根因。各轮具体操作失误保留于 `EXECUTION_NOTE_2F30.md`、`EXECUTION_NOTE_2F31.md`、`EXECUTION_NOTE_2F32.md`、`EXECUTION_NOTE_2F33.md`、`EXECUTION_NOTE_2F34.md`、`EXECUTION_NOTE_2F35.md`，不能把失败调用写成通过。
+`KNOWN_ISSUES.md`及机器索引保留43条产品/环境/测试问题；`ASSISTANT_EXECUTION_INCIDENTS.md`单独保留12类助手执行错误，不混作聊天故障根因。各轮具体操作失误保留于 `EXECUTION_NOTE_2F30.md` 至 `EXECUTION_NOTE_2F36.md`，不能把失败调用写成通过。
 
 遵守 `STAGE_REVIEW_PROTOCOL.md`：同run检查至少间隔90秒，30次连接器调用前检查预算；长日志留文件，关键节点短交代。每个故障链最多一次有新证据的手工重试；工具安全拒绝不绕过。这些措施减少重复工作，不保证ChatGPT平台不中断。
 

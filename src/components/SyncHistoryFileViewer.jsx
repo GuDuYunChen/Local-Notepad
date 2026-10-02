@@ -34,7 +34,8 @@ export default function SyncHistoryFileViewer() {
   const [dateReset, setDateReset] = useState(0), [dateDraftActive, setDateDraftActive] = useState(false)
   const [queryDraft, setQueryDraft] = useState(''), [composing, setComposing] = useState(false)
   const applyFilters = next => {
-    if (next.query === filters.query && next.kind === filters.kind && next.outcome === filters.outcome && sameHistoryTimeFilter(next.timeFilter, filters.timeFilter)) return
+    if (next.query === filters.query && next.kind === filters.kind && next.outcome === filters.outcome &&
+        next.itemID === filters.itemID && sameHistoryTimeFilter(next.timeFilter, filters.timeFilter)) return
     setFilters(next); setPage(0)
   }
   const applyQuery = value => {
@@ -134,12 +135,19 @@ export default function SyncHistoryFileViewer() {
               onChange={event => applyFilters({ ...filters, outcome: event.target.value })}>
               {Object.entries(choices).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
             </select></label>
-            {(queryDraft || filters.query || filters.kind !== 'all' || filters.outcome !== 'all' || filters.timeFilter.mode !== 'all' || dateDraftActive) &&
+            {(queryDraft || filters.query || filters.kind !== 'all' || filters.outcome !== 'all' || filters.itemID || filters.timeFilter.mode !== 'all' || dateDraftActive) &&
               <button type="button" className="btn small" data-history-file-filter-clear onClick={event => {
                 const ownsFocus = event.currentTarget === event.currentTarget.ownerDocument.activeElement
                 resetSelection(); if (ownsFocus) queryInput.current?.focus({ preventScroll: true })
               }}>清除文件内筛选</button>}
           </div>
+          {filters.itemID && <div className="sync-history-file-object-filter" data-history-file-object-filter>
+            <span>当前精确限定对象：<bdi><code data-history-file-object-filter-value>{filters.itemID}</code></bdi>。按完整对象标识比较，不做大小写、宽度或 Unicode 归一化。</span>
+            <button type="button" className="btn small" data-history-file-object-filter-clear onClick={event => {
+              const ownsFocus = event.currentTarget === event.currentTarget.ownerDocument.activeElement
+              applyFilters({ ...filters, itemID: '' }); if (ownsFocus) queryInput.current?.focus({ preventScroll: true })
+            }}>取消对象限定</button>
+          </div>}
         </fieldset>
         <div data-history-file-date-filter>
           <SyncHistoryTimeFilter scope="file" value={filters.timeFilter} resetVersion={dateReset}
@@ -172,6 +180,11 @@ export default function SyncHistoryFileViewer() {
             {selection.rows.map(row => <li key={row.id} data-history-file-row>
               <strong><bdi>{row.title || kinds[row.kind]}</bdi></strong><small> {kinds[row.kind]} · 文件内的当前标题，仅供辨认</small>
               <p>{historyOutcome(row)}</p>
+              <p className="sync-history-file-row-actions"><button type="button" className="btn small"
+                data-history-file-filter-object aria-describedby={searchHintID} aria-pressed={filters.itemID === row.itemID}
+                onClick={() => applyFilters({ ...filters, itemID: row.itemID })}>
+                {filters.itemID === row.itemID ? '已限定此对象' : '只看此对象记录'}
+              </button></p>
               <dl><div><dt>建立时间（UTC）</dt><dd><Stamp value={row.createdAt}/></dd></div>
                 <div><dt>处理或失效时间（UTC）</dt><dd><Stamp value={row.resolvedAt}/></dd></div></dl>
               <SyncHistoryFileIdentifiers row={row} context={identifierContext} hintID={detailsHintID}/>
