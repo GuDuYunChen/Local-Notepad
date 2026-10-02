@@ -2,13 +2,13 @@
 
 ## 当前阶段
 
-当前候选 **Phase 2F.38：S3兼容只读访问基础**，见 `SYNC_S3_READ_FOUNDATION_2F38.md`。仍在 GuDuYunChen/Local-Notepad 的 `feature/knowledge-os-phase2` / Draft PR #2，不合 master；产品4.195.1/schema14不变。
+当前候选 **Phase 2F.38.1：S3响应编码重复字段漏检修补**，见 `SYNC_S3_ENCODING_GUARD_2F38_1.md`。仍在 GuDuYunChen/Local-Notepad 的 `feature/knowledge-os-phase2` / Draft PR #2，不合master、不发布生产；产品4.195.1/schema14不变。
 
-基线4580f5c6bc58b76e6cc858f9a70f1883431d4274 / tree626b7f9217190ba8ee282900fa1a046ec24d06f6的2F.37及TEST-08已独立验收；完整记录为PR #2评论5952627874。八PR成功，push完整UI/Windows及Desktop成功，原生3布局21帧及12项记录筛选动作、双平台各1971/1971完整UI与19/19实际服务、桌面8检查5PNG和Windows安装包均已按当前提交核对。此前权限限制已通过用户明确的GitHub full_access设置变更，之后修补发布及PR更新实际成功；不继续按过期2F.35标题或“本地未发布”历史段落重复实施。
+基线4e3cebae1b99a80f48c5c30306b286b0bb8034ba / tree6ce3a2f21f27789aebdcb4f5e8bf6e3b8745b864的2F.38未完成独立验收。复查用原生产transport和loopback服务器发现SREAD-01：首行identity或空值遮住后续gzip声明，错误返回编码字节。先修补全部同名字段检查并保留红绿回归，未开始2F.39；不能把基线CI绿灯当作新缺陷不存在。当前候选20顶层Go测试（含子测试92通过事件）、race及vet通过不替代新HEAD全后端/Windows/原始产物验收。
 
-2F.38回到此前确认的多端同步路线中的S3兼容支持。当前只增加独立后端只读基础包：未注册同步provider，未新增设置界面、凭据持久化、写入、List、manifest解释或自动同步。它为后续显式连接预检和安全接入提供可测试底层，不是用户现在可启用的完整S3同步。所有原UI/保存规则不变。
+2F.37/TEST-08已在4580f5c完成独立验收，见PR评论5952627874，不再重做旧修补。2F.38仍是未注册的独立S3只读基础，无设置UI、新路由、凭据持久化、List、写入删除或自动同步；既有WebDAV/正文保存/退出保护未修改。GitHub full_access由用户通过正式权限设置明确授权，实际是否写入以回执和远端HEAD为准。
 
-新HEAD仍须独立完成原8PR、push完整UI/Windows、Desktop及原始产物核验，并确认新syncs3包被完整后端go test ./...实际执行。当前源码/本地专项通过不替代新CI；验收前不进入2F.39。2F.28–2F.37已有能力不重复开发。
+新HEAD必须完成8PR、push完整UI/Windows打包、独立Desktop、PR测试树身份和原始UI/服务/原生/桌面/安装包核验，并确认完整后端go test ./...执行新增syncs3回归；上一阶段修补完整验收前不进入2F.39。
 
 ## 中断恢复
 
@@ -18,7 +18,7 @@
 
 ## 已知问题和助手执行失误
 
-`KNOWN_ISSUES.md`及机器索引保留44条产品/环境/测试问题（36历史修复、3缓解、5持续或外部）；`ASSISTANT_EXECUTION_INCIDENTS.md`单独保留12类助手执行错误，不混作聊天故障根因。各轮具体操作失误保留于 `EXECUTION_NOTE_2F30.md` 至 `EXECUTION_NOTE_2F38.md`，不能把失败调用写成通过。
+`KNOWN_ISSUES.md`及机器索引保留45条产品/环境/测试问题（36历史修复、3缓解、6持续或待验收）；`ASSISTANT_EXECUTION_INCIDENTS.md`单独保留12类助手执行错误，不混作聊天故障根因。各轮具体操作失误保留于 `EXECUTION_NOTE_2F30.md` 至 `EXECUTION_NOTE_2F38_1.md`，不能把失败调用写成通过。
 
 遵守 `STAGE_REVIEW_PROTOCOL.md`：同run检查至少间隔90秒，30次连接器调用前检查预算；长日志留文件，关键节点短交代。每个故障链最多一次有新证据的手工重试；工具安全拒绝不绕过。这些措施减少重复工作，不保证ChatGPT平台不中断。
 

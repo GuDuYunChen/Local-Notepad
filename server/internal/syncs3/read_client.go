@@ -240,8 +240,13 @@ func (r *ReadClient) GetObject(ctx context.Context, key string, limit int64) (Ob
 	if resp.StatusCode != http.StatusOK {
 		return Object{}, &HTTPError{StatusCode: resp.StatusCode}
 	}
-	if resp.Header.Get("Content-Encoding") != "" && resp.Header.Get("Content-Encoding") != "identity" {
-		return Object{}, ErrBody
+	// Header.Get returns only the first field value. Check every field line so
+	// an earlier identity/empty value cannot hide a later encoding. Preserve the
+	// existing narrow compatibility policy; do not decode or accept coding lists.
+	for _, encoding := range resp.Header.Values("Content-Encoding") {
+		if encoding != "" && encoding != "identity" {
+			return Object{}, ErrBody
+		}
 	}
 	if resp.ContentLength > limit {
 		return Object{}, ErrTooLarge
