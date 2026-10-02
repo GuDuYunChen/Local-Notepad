@@ -31,7 +31,7 @@ for(const value of [null,1,{},'x'.repeat(2049)])test('invalid exact record filte
 })
 function scene(){return {recordFilterActions:[
  {action:'apply',ids:['r0'],matches:'当前匹配 1 条 / 文件内共 61 条',page:'第 1 / 1 页',order:'file',query:'',itemID:'',recordID:'r0',filterVisible:true,focusRecord:true,focusQuery:false,outcomes:[1,0,0,0],reads:1,network:0,mutations:0,requests:0,navigation:0,contrast:4.8},
- {action:'combined-empty',ids:[],matches:'当前匹配 0 条 / 文件内共 61 条',page:'第 0 / 0 页',order:'file',query:'笔记 1',itemID:'',recordID:'r0',filterVisible:true,focusRecord:false,focusQuery:true,outcomes:[0,0,0,0],reads:1,network:0,mutations:0,requests:0,navigation:0,contrast:4.8},
+ {action:'combined-empty',ids:[],matches:'当前匹配 0 条 / 文件内共 61 条',page:'没有匹配记录，暂无可翻页内容',order:'file',query:'笔记 1',itemID:'',recordID:'r0',filterVisible:true,focusRecord:false,focusQuery:true,outcomes:[0,0,0,0],reads:1,network:0,mutations:0,requests:0,navigation:0,contrast:4.8},
  {action:'clear-record',ids:['r1','r10','r11','r12','r13','r14','r15','r16','r17','r18','r19'],matches:'当前匹配 11 条 / 文件内共 61 条',page:'第 1 / 1 页',order:'file',query:'笔记 1',itemID:'',recordID:'',filterVisible:false,focusRecord:false,focusQuery:true,outcomes:[11,0,0,0],reads:1,network:0,mutations:0,requests:0,navigation:0,contrast:4.8},
  {action:'clear-all',ids:Array.from({length:25},(_,i)=>'r'+i),matches:'当前匹配 61 条 / 文件内共 61 条',page:'第 1 / 3 页',order:'file',query:'',itemID:'',recordID:'',filterVisible:false,focusRecord:false,focusQuery:true,outcomes:[61,0,0,0],reads:1,network:0,mutations:0,requests:0,navigation:0,contrast:4.8},
 ]}}
@@ -43,3 +43,28 @@ for(const [name,change]of[
  ['lost focus',s=>s.recordFilterActions[0].focusRecord=false],['low contrast',s=>s.recordFilterActions[0].contrast=4.49],
  ['missing action',s=>s.recordFilterActions.pop()],
 ])test('reject record-filter evidence: '+name,()=>{const s=scene();change(s);assert.throws(()=>verifyRecordFilterScene(s))})
+
+
+// Zero results have no navigable page. These cases are intentionally independent
+// from the evidence verifier: accepting a fabricated page must remain a failure.
+test('exact record and text intersection has zero pages without changing the source',()=>{
+  const records=[row('r0'),row('r1')], before=JSON.stringify(records)
+  const selected=selectHistoryFilePage(records,{...HISTORY_FILE_FILTER_ALL,recordID:'r0',query:'r1'},2)
+  assert.equal(selected.total,2);assert.equal(selected.matched,0);assert.equal(selected.pages,0)
+  assert.equal(selected.page,0);assert.equal(selected.from,0);assert.equal(selected.to,0)
+  assert.deepEqual(selected.rows,[]);assert.equal(JSON.stringify(records),before)
+})
+for(const page of [
+  '第 0 / 0 页','第 1 / 1 页','第 1 / 0 页','第 0 / 1 页','第 2 / 3 页',
+  '第 1 / 1 页，本页第 1–1 条','',
+  '没有匹配记录，暂无可翻页内容；第 0 / 0 页',
+  '第 1 / 1 页；没有匹配记录，暂无可翻页内容',
+  '没有匹配记录，暂无可翻页内容\n',
+])test('reject fabricated or ambiguous empty page: '+JSON.stringify(page),()=>{
+  const s=scene();s.recordFilterActions[1].page=page
+  assert.throws(()=>verifyRecordFilterScene(s))
+})
+for(const index of [0,2,3])test('nonempty action '+index+' cannot masquerade as empty pagination',()=>{
+  const s=scene();s.recordFilterActions[index].page='没有匹配记录，暂无可翻页内容'
+  assert.throws(()=>verifyRecordFilterScene(s))
+})
