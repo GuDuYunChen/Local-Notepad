@@ -11,6 +11,7 @@ type SyncController struct {
 }
 
 func (c *SyncController) Register(group *ghttp.RouterGroup) {
+	registerS3ReadProbe(group)
 	if c.Recovery == nil {
 		c.Recovery = syncengine.NewRecoveryRunner(c.Engine)
 	}
