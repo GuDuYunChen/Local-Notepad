@@ -118,9 +118,20 @@ jobs:
           node --test scripts/editor-quit.node.mjs
           npx vitest run --root=. src/components/EditorQuit.test.jsx src/components/EditorQuitSource.test.jsx
 
+      - name: Verify backend evidence refusal and isolated runner fixtures
+        run: node --test scripts/backend-test-evidence.node.mjs
+
       - name: Run backend tests
-        working-directory: server
-        run: go test ./...
+        run: node scripts/backend-test-evidence.mjs
+
+      - name: Upload source-bound backend test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-notepad-backend-tests-${{ github.sha }}
+          path: test-results/backend-tests/*
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Verify managed backend shutdown
         env:
