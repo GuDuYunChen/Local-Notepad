@@ -10,6 +10,7 @@ import './SyncHistoryFileViewer.css'
 import SyncHistoryFileSummary from './SyncHistoryFileSummary'
 import SyncHistoryTimeFilter from './SyncHistoryTimeFilter'
 import SyncHistoryFilePagination from './SyncHistoryFilePagination'
+import SyncHistoryFileIdentifiers from './SyncHistoryFileIdentifiers'
 
 const kinds = { file: '笔记或文件夹', tag: '标签', 'file-tag': '标签关联', attachment: '附件' }
 const statuses = { all: '全部历史类型', resolved: '已选边处理', superseded: '已失效' }
@@ -84,6 +85,7 @@ export default function SyncHistoryFileViewer() {
   }
   const report = view?.report
   const selection = useMemo(() => report ? selectHistoryFilePage(report.records, filters, page, order) : null, [report, filters, page, order])
+  const identifierContext = useMemo(() => ({}), [report, filters, page, order])
   return <details className="sync-history-file" data-history-file-viewer>
     <summary>离线查看历史文件<span>只读 JSON · 不导入工作区</span></summary>
     <div className="sync-history-file-body">
@@ -162,7 +164,7 @@ export default function SyncHistoryFileViewer() {
             aria-disabled={!selection.rows.length} onClick={() => setHistoryFileDetailsOpen(list.current, true)}>展开本页全部标识</button>
           <button type="button" className="btn small" data-history-file-collapse-identifiers aria-controls={recordsID}
             aria-disabled={!selection.rows.length} onClick={() => setHistoryFileDetailsOpen(list.current, false)}>收起本页全部标识</button>
-          <p id={detailsHintID}>只展开或收起本页 {selection.rows.length} 条记录的对象及记录标识，不改变筛选、排序或文件；也可逐条展开。</p>
+          <p id={detailsHintID}>只展开或收起本页 {selection.rows.length} 条记录的对象及记录标识，不改变筛选、排序或文件；也可逐条展开。选择单条标识后可手动复制，不自动写入剪贴板。</p>
         </div>
         <div id={recordsID} ref={list} className="sync-history-file-list" tabIndex={0} role="region" aria-label="离线文件记录列表">
           {!selection.matched && <p data-history-file-empty>本文件中没有符合当前条件的记录；不是本机或全部历史没有记录。可清除文件内筛选。</p>}
@@ -172,7 +174,7 @@ export default function SyncHistoryFileViewer() {
               <p>{historyOutcome(row)}</p>
               <dl><div><dt>建立时间（UTC）</dt><dd><Stamp value={row.createdAt}/></dd></div>
                 <div><dt>处理或失效时间（UTC）</dt><dd><Stamp value={row.resolvedAt}/></dd></div></dl>
-              <details data-history-file-identifiers><summary>查看文件内标识</summary><p>对象：<bdi><code>{row.itemID}</code></bdi></p><p>记录：<bdi><code>{row.id}</code></bdi></p></details>
+              <SyncHistoryFileIdentifiers row={row} context={identifierContext} hintID={detailsHintID}/>
             </li>)}
           </ol>
         </div>

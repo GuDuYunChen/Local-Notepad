@@ -2,9 +2,9 @@
 
 ## 当前阶段
 
-当前候选 **Phase 2F.34：本页记录标识统一展开与收起**，见`SYNC_HISTORY_FILE_DETAILS_2F34.md`。仍在GuDuYunChen/Local-Notepad的`feature/knowledge-os-phase2` / Draft PR #2，不合master；产品4.195.1/schema14不变。
+当前候选 **Phase 2F.35：离线文件单条标识精确选择**，见`SYNC_HISTORY_FILE_IDENTIFIER_SELECTION_2F35.md`。仍在GuDuYunChen/Local-Notepad的`feature/knowledge-os-phase2` / Draft PR #2，不合master；产品4.195.1/schema14不变。
 
-基线bcdfe9dee65c819e7b0bdb53cbb30ade26e8ba0a的2F.33.1已补齐八条PR、完整Windows打包、真实桌面及原始产物核验，旧681高失败保留，三布局21帧新报告通过。不要重做排序或窗口修补。2F.34的新HEAD仍须独立验收，源码文档不是绿灯证明，最终记录写PR/交付资料；验收前不进入2F.35。
+基线a5eca354c15d3cba09ad45ff51d9a85b8446c870/tree 2c8c5e06e54bb22da2b6c56a2bf85b0d6b036302的2F.34已完成八条PR、完整Windows打包、真实桌面及原始产物核验，详见PR评论5944906169。2F.28–2F.34既有查看、筛选、排序、跳页、统一展开/收起不重复开发。2F.35新HEAD仍须独立验收，源码文档不是绿灯证明，最终记录写PR/交付资料；验收前不进入2F.36。
 
 ## 中断恢复
 
@@ -14,7 +14,7 @@
 
 ## 已知问题和助手执行失误
 
-`KNOWN_ISSUES.md`及机器索引保留43条产品/环境/测试问题（原42条及已记录的TEST-07）；`ASSISTANT_EXECUTION_INCIDENTS.md`单独保留12类助手执行错误，不混作聊天故障根因。各轮具体操作失误保留于 `EXECUTION_NOTE_2F30.md`、`EXECUTION_NOTE_2F31.md`、`EXECUTION_NOTE_2F32.md`、`EXECUTION_NOTE_2F33.md`、`EXECUTION_NOTE_2F34.md`，不能把失败调用写成通过。
+`KNOWN_ISSUES.md`及机器索引保留43条产品/环境/测试问题（原42条及已记录的TEST-07）；`ASSISTANT_EXECUTION_INCIDENTS.md`单独保留12类助手执行错误，不混作聊天故障根因。各轮具体操作失误保留于 `EXECUTION_NOTE_2F30.md`、`EXECUTION_NOTE_2F31.md`、`EXECUTION_NOTE_2F32.md`、`EXECUTION_NOTE_2F33.md`、`EXECUTION_NOTE_2F34.md`、`EXECUTION_NOTE_2F35.md`，不能把失败调用写成通过。
 
 遵守 `STAGE_REVIEW_PROTOCOL.md`：同run检查至少间隔90秒，30次连接器调用前检查预算；长日志留文件，关键节点短交代。每个故障链最多一次有新证据的手工重试；工具安全拒绝不绕过。这些措施减少重复工作，不保证ChatGPT平台不中断。
 
