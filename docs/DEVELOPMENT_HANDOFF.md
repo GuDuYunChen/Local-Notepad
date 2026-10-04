@@ -2,13 +2,15 @@
 
 ## 当前阶段
 
-当前候选 **Phase 2F.42：显式S3只读预检renderer调用层**，见 `SYNC_S3_RENDERER_PROBE_2F42.md`。沿用 feature/knowledge-os-phase2 / Draft PR #2，不合master、不发布生产，产品4.195.1/schema14不变。
+当前候选 **Phase 2F.43：S3只读预检React生命周期绑定**，见`SYNC_S3_REACT_LIFETIME_2F43.md`。沿用feature/knowledge-os-phase2 / Draft PR #2，产品4.195.1/schema14不变，不合master或发布生产。
 
-已验收基线 `1cfb12bf2899e5eff6864c4ea5347ee2171d2f88` / tree `746b0aa7694ed1517dd46e6264d2411257ab6f90`，2F.41完整验收评论5981057926。此前3c01ffe已发布原桥，3189ee5补Electron原始报告，1cfb12b修复夹具自有连接收尾；八PR、push完整UI/Windows、Desktop、双平台2149完整UI及19实际服务、源码绑定后端、原生和NSIS已独立核验。旧日志不可读不是当前阻塞，不用旧失败推翻新HEAD验收。2F.40验收5978940337继续有效。
+已验收基线`da46e76cef821273d50807f114513bcf9de83e11` / tree`59a44f3d263c124844b2a9d6c7f38b5263ab7f76`，2F.42验收评论5981504611。前阶段2247双平台完整UI、19实际服务、258独立Electron及原生/桌面/后端/NSIS已完成；不重跑旧CI、不因候选文档旧措辞推翻其验收。2F.41验收5981057926、2F.40验收5978940337继续有效。
 
-本候选在现有services/api.js提供惰性的createS3ReadProbeSession，显式read才通过既有原生桥发起一次只读检查；请求快照、严格脱敏响应和固定提示，invalidate/dispose抑制迟到结果。renderer停止等待不等于原生取消，原生Promise结束前不开放会话新调用。没有设置UI、配置或凭据持久化、provider/List/上传删除/自动同步及真实桶访问。
+本候选新增useS3ReadProbe及可观察绑定，原renderer会话不变。React已提交挂载建立会话，StrictMode重放不复用disposed会话；非敏感输入revision变化/显式invalidate使旧结果失效，卸载关闭所属会话。只在read才调用原生桥，不自动探测、不持久化凭据，不新增设置UI/provider/List/写删/自动同步。
 
-发布前新98项及原保存退出80项通过，原S3 Node171项通过；保留首轮Proxy重入反例97/98与修补后的原断言。新阶段源码完成、当前HEAD的CI和产物独立验收仍分开，以最新PR及实际HEAD为准，不能沿用1cfb12b绿灯。原46问题及12类助手事故完整保留。
+新候选复查发现3个原生settle后、绑定消费前失效仍回传成功的反例，21/24失败证据保留；本轮已修补通知前后所属生命周期/epoch核对，原断言不改。新绑定24+原renderer98+原保存退出80合跑202/202，原S3 Node171/171通过。12项实际React挂载测试发布前仅语法核对，须新HEAD完整Vitest实际执行；不拿Node结果冒充React/Windows/真实GUI。
+
+源码完成、当前HEAD完整CI和原始产物独立验收分别记录；未全过不得进入2F.44。原46问题/12助手事故、保存/回执/草稿/引用/退出及schema保护均保留。最终状态以最新PR及实际HEAD为准，不为验收文字再造源码提交。
 
 ## 中断恢复
 
