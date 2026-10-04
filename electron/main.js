@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, safeStorage, sh
 import { spawn } from 'node:child_process'
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 
 import {
   processExport,
@@ -14,6 +15,8 @@ import { ensureBackupDir, getDefaultBackupDir, getDefaultDataDir, listBackups } 
 import { spawnManagedBackend, stopChildProcess, waitForHttpService } from './backend-process.js'
 import { createQuitSaveGate } from './quit-save.mjs'
 import { createWebDAVSecretStore } from './webdav-secret.js'
+import { createS3ProbeService, registerS3ProbeHandler } from './s3-probe-bridge.js'
+import { createS3ProbeScope } from './s3-probe-scope.js'
 import { createDataSafetyService, runBackupCommand, registerDataSafetyHandlers } from './data-safety.js'
 import { createWorkspacePackageService, registerWorkspacePackageHandlers } from './workspace-package.js'
 import {
@@ -36,6 +39,14 @@ const rendererQuit = createQuitSaveGate({ ipcMain })
 const approvedWindowCloses = new WeakSet()
 let windowClosePromise = null
 const webdavSecrets = createWebDAVSecretStore({ dataDir: getDefaultDataDir(), safeStorage })
+const s3Probe = createS3ProbeService()
+const s3ProbeScope = createS3ProbeScope({
+  getWindow: () => mainWindow,
+  getExpectedURL: () => app.isPackaged
+    ? pathToFileURL(path.join(app.getAppPath(), 'dist/index.html')).href
+    : 'http://localhost:5000/',
+  isClosing: () => quitting || allowQuit || Boolean(windowClosePromise),
+})
 
 async function createWindow(startupRestore = { status: 'none' }) {
   const isDev = !app.isPackaged
@@ -526,6 +537,9 @@ ipcMain.handle('sync:webdav-secret:clear', async event => {
   const restart = await restartBackendForWebDAVSecret()
   return { success: true, stored: false, ...restart }
 })
+registerS3ProbeHandler(ipcMain, s3Probe, s3ProbeScope)
+// Only cancel the optional read probe; the existing save/quit gate is untouched.
+app.on('before-quit', () => s3ProbeScope.abortAll())
 
 const runDataSafety = args => {
   const filename = process.platform === 'win32' ? 'notepad-server.exe' : 'notepad-server'
