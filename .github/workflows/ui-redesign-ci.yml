@@ -161,8 +161,21 @@ jobs:
           NOTEPAD_SMOKE_PORT: '27129'
         run: bash .github/scripts/backend-smoke.sh
 
+      - name: Verify Electron evidence capture
+        run: node --test scripts/electron-test-evidence.node.mjs
+
       - name: Run Electron tests
-        run: npm run test:electron
+        id: electron_tests
+        run: bash .github/scripts/electron-test-evidence.sh
+
+      - name: Upload Electron test evidence
+        if: always() && steps.electron_tests.outcome != 'skipped'
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-notepad-electron-tests-${{ github.sha }}
+          path: test-results/electron-tests/*
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Run editor tests
         run: npm run test:editor
