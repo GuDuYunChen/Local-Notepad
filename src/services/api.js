@@ -114,3 +114,6 @@ export async function createFileVersionSnapshot(fileId) {
     method: 'POST',
   })
 }
+
+// Explicit native-only S3 preflight; never use api()/fetch as a fallback.
+export { createS3ReadProbeSession } from './s3ReadProbe.mjs'
