@@ -4,12 +4,14 @@ import { EventEmitter } from 'node:events'
 import { createS3ProbeService, registerS3ProbeHandler, S3_PROBE_CHANNEL } from '../electron/s3-probe-bridge.js'
 import { createS3ProbeScope } from '../electron/s3-probe-scope.js'
 import { probePayload } from './s3-probe-bridge-cases.mjs'
+import { trackProbeFixture } from './s3-probe-fixture-close.mjs'
 
 // Fixed port is intentional: the production service cannot be redirected. A
 // bind error fails this isolated test; never kill or contact an existing server.
 async function withLoopback(handler, action) {
   const timers = new Set()
   const server = http.createServer((req, res) => handler(req, res, timers))
+  const closeOwnedFixture = trackProbeFixture(server)
   await new Promise((resolve, reject) => {
     server.once('error', reject)
     server.listen({ host: '127.0.0.1', port: 27121, exclusive: true }, resolve)
@@ -17,12 +19,30 @@ async function withLoopback(handler, action) {
   try { await action() }
   finally {
     for (const timer of timers) { clearTimeout(timer); clearInterval(timer) }
-    server.closeAllConnections()
-    await new Promise(resolve => server.close(resolve))
+    await closeOwnedFixture()
   }
 }
 const ok = {code:0,message:'OK',data:{outcome:'readable',httpStatus:200,acceptedBytes:5}}
 export function registerS3ProbeHTTPTests(test) {
+  test('fixture teardown waits for owned socket close before allowing port reuse', async () => {
+    let socketClosed = false, arrive
+    const arrived = new Promise(resolve => { arrive = resolve })
+    await withLoopback((req, res) => {
+      req.socket.once('close', () => { socketClosed = true })
+      req.resume()
+      res.writeHead(200, { 'content-type': 'application/json' })
+      res.flushHeaders()
+      arrive()
+    }, async () => {
+      const controller = new AbortController()
+      const request = createS3ProbeService({ timeoutMs: 2000 }).probe(probePayload(), { signal: controller.signal })
+      try {
+        await Promise.race([arrived, request.then(() => { throw new Error('fixture request ended before arrival') })])
+      } finally { controller.abort() }
+      assert.equal((await request).code, 'native-probe-cancelled')
+    })
+    assert.equal(socketClosed, true, 'fixture returned before its own TCP socket closed')
+  })
   test('real loopback fixed POST: credentials only in body, no browser headers', async () => {
     let received
     await withLoopback((req,res)=>{

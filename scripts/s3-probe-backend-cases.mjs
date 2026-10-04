@@ -9,6 +9,7 @@ import { EventEmitter } from 'node:events'
 import { fileURLToPath } from 'node:url'
 import { createS3ProbeService, registerS3ProbeHandler, S3_PROBE_CHANNEL } from '../electron/s3-probe-bridge.js'
 import { createS3ProbeScope } from '../electron/s3-probe-scope.js'
+import { trackProbeFixture } from './s3-probe-fixture-close.mjs'
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url))
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms))
@@ -64,12 +65,13 @@ async function startFixture(binary, directory) {
 
 async function withObjectServer(handler, action, port = 0) {
   const server = http.createServer(handler)
+  const closeOwnedFixture = trackProbeFixture(server)
   await new Promise((resolve, reject) => {
     server.once('error', reject)
     server.listen({ host: '127.0.0.1', port, exclusive: true }, resolve)
   })
   try { return await action(`http://127.0.0.1:${server.address().port}`) }
-  finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)) }
+  finally { await closeOwnedFixture() }
 }
 const payload = (endpoint, overrides = {}) => ({ endpoint, bucket: 'synthetic-bucket', region: 'us-east-1',
   prefix: 'safe', accessKeyId: 'AKIASYNTHETIC', secretAccessKey: 'synthetic-secret', sessionToken: 'synthetic-token',

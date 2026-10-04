@@ -13,3 +13,13 @@ Electron步骤尝试后always上传独立产物；npm失败退出码原样保留
 未改生产JS/Go、原测试及断言、package/lock、schema、原验收器或其它工作流。仅原feature分支/Draft PR #2；先完成新HEAD全部CI与独立验收，再判断下一阶段。2F.41未ACCEPTED，不进入2F.42。
 
 执行恢复：本容器旧工作目录不在，source旧文件ID无法解析后，从原artifact11304431497恢复一次；ZIP摘要c4f2ba2c1f8b149124e4a335e273e474eef82c5da8282666eaf1790bb447f73a，964文件独立索引重建7c10436。不是clone；不重复旧安全拒绝/失败日志路由。46历史问题、12助手事故保持原索引，不把报告留存修补称聊天平台超时根因修复。
+
+## 本轮取得真实反例后的连接收尾修补
+
+3189ee5 的 PR/push Electron 原报告各257/257通过，但Save Recovery Linux完整报告11304806929出现2147/2148：`real truncated HTTP body is never interpreted as success` 报 `listen EADDRINUSE: address already in use 127.0.0.1:27121`，因此实际App步骤未执行。Windows完整2148/2148和19服务通过也不能覆盖它。
+
+针对同一固定端口夹具做有界诊断：原六用例顺序30轮未重现EADDRINUSE，不能伪称本地重现了同一个系统错误。进一步观察发现原辅助函数返回时，取消/截断场景的自有accepted socket仍未触发close。以请求到达为同步点的新回归在精确旧辅助函数上明确失败：`fixture returned before its own TCP socket closed`。不是依赖100ms睡眠或绑端口重试的测试。
+
+现只为Node合成服务器添加连接归属跟踪：先停止接受连接，再关闭自有连接，等待server及这些socket的close都结束；2秒有界清理超时仍失败。HTTP回环及Go夹具的合成S3/占用哨兵共用该收尾。无端口改写、绑定重试、全局kill、取消/放宽既有断言。Go真正handler、生产桥、保存机制均未改；原占用者零请求/不终止占用者契约保留。
+
+本地实际171/171 S3 Node顶层用例（原170+1连接收尾回归）、80/80保存退出通过；HTTP第8项内15个真实Go标准库契约已包含于171，不重复相加。修改后7个HTTP用例顺序30轮也通过，这只是定界压力检查，不新增为210个独立功能用例。仍须新提交的完整CI和Windows/Linux实际报告，不能拿本地结果或3189ee5的局部绿灯提前验收。旧3c01ffe PR作业的不可读断言仍未知，不将本次EADDRINUSE推断为那个旧错误。
