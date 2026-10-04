@@ -34,7 +34,9 @@ func TestS3ProbeRouteUsesNativeGuardAndBufferedJSON(t *testing.T) {
 	server := ghttp.GetServer(fmt.Sprintf("s3-local-probe-%d", time.Now().UnixNano()))
 	server.SetAddr("127.0.0.1:0")
 	server.SetDumpRouterMap(false)
-	server.SetLogPath(t.TempDir())
+	server.SetAccessLogEnabled(false)
+	server.SetErrorLogEnabled(false)
+	server.SetLogStdout(false)
 	server.Use(func(r *ghttp.Request) {
 		if r.Header.Get("X-Probe-Test-Cancel") == "yes" {
 			ctx, cancel := context.WithCancel(r.GetCtx())
