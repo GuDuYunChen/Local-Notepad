@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url'
 import { createS3ProbeService, registerS3ProbeHandler, S3_PROBE_CHANNEL } from '../electron/s3-probe-bridge.js'
 import { createS3ProbeScope } from '../electron/s3-probe-scope.js'
 import { trackProbeFixture } from './s3-probe-fixture-close.mjs'
+import { verifyS3RendererBackendContract } from './s3-probe-renderer-contract-cases.mjs'
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url))
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms))
@@ -210,12 +211,13 @@ export async function verifyS3ProbeBackendContract() {
         } finally { f.scope.dispose() }
       })
     })
+    const rendererBindingContract = await verifyS3RendererBackendContract({ check, withObjectServer, scopeFor, payload })
     for (const entry of identities) {
       const original = await fs.readFile(path.join(ROOT, entry.path)); const copy = await fs.readFile(path.join(dir, 'syncs3', path.basename(entry.path)))
       assert.equal(digest(original), entry.sha256); assert.deepEqual(copy, original)
     }
     return { scope: 'node-ipc-and-exact-standard-library-go-handler', go: v.output.trim(), sourceFiles: identities,
-      checks: passed, passed: passed.length, framework: 'net/http (not GoFrame)', electronRuntimeExecuted: false, realBucketAccess: false }
+      checks: passed, passed: passed.length, rendererBindingContract, framework: 'net/http (not GoFrame)', electronRuntimeExecuted: false, realBucketAccess: false }
   } finally {
     try {
       if (running) {
