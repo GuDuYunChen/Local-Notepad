@@ -32,3 +32,17 @@
 - https://docs.aws.amazon.com/AmazonS3/latest/userguide/checking-object-integrity.html
 - https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetObject.html
 - https://pkg.go.dev/crypto/sha256
+
+## 同阶段 CI 阻塞与监听器所有权修补
+
+第一提交 `4abac8682760beadf81153a64a15e50687960f80` 的Go1.24.11完整后端原报告已验证105份源码、884通过事件，新增12项确实执行；但PR Linux原包11323936249完整UI为2292/2294，`real truncated HTTP body is never interpreted as success` 和 `integrated IPC navigation aborts actual HTTP and cannot deliver a late reply` 两项在listen时报EADDRINUSE127.0.0.1:27121，后续实际服务检查未执行。原报告与失败用例保留；后端成功不能覆盖此阻塞，也没有取消或重跑该CI。
+
+复查确认旧HTTP测试helper对每个兄弟用例都释放并重新申请固定监听端口，客户端/服务端连接close等待并不能消除这一重复绑定路径。新增真实网络回归在原helper上明确因“同组用例重新申请了固定监听器”失败。这证明旧生命周期不满足单一所有权，不声称本地重现了CI内核同一次占用，也不猜所有历史EADDRINUSE同因；旧CI结束后无法追溯占用者。
+
+同阶段增加测试专用 `s3-probe-loopback-fixture.mjs`：同组HTTP用例只建立一个127.0.0.1:27121监听器，逐用例销毁并等待自身ClientRequest和accepted socket、清空自己的timer，但不在兄弟断言之间释放端口。每个请求还须匹配当前case创建的客户端socket；迟到连接、上一个case保存的service或旧handler不能进入新case。case尚未排空时拒绝重入，清理仍2秒有界并真实报错。初次bind失败即失败，不重试、不改端口、不触碰已有外部服务。
+
+Node与Vitest入口在原Go集成测试之前明确close一次，并注册after/afterAll安全收尾；Go仍独占同一个固定端口、执行原27项内部契约。没有并行第二个固定端口夹具或新测试超时参数。原HTTP八个case函数体和所有断言逐字节保留，仅调整helper及两个入口的收尾衔接。
+
+新增两项顶层真实网络回归：同组连续用例必须使用同一仍在监听的Server；上一个case保存的service不能请求新case。修后HTTP+Go11/11通过。隔离占用哨兵检查验证两次调用均拒绝、向占用者请求0、action0、占用者保持运行至本测试自己收尾；初始监听不重试。10组×10用例的有限压力检查完成，不把100次执行算作100个新增独立用例，也不承诺平台永不出现新故障。
+
+修补后预期本HEAD完整UI2296（新增2）、Electron261（新增2）、原S3 Node174，报告文件数量不变；内部27项仍包含于单个顶层用例。原Go12/54及完整后端884不变，必须重新核最终HEAD的所有原CI和产物，不能沿用4abac86或c6df的绿灯。除上述测试helper/入口和文档外，新增SHA-256生产实现字节不变，全部保存/退出/React/原生桥/schema14/锁/工作流/验收器不改。

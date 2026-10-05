@@ -5,32 +5,39 @@ import { createS3ProbeService, registerS3ProbeHandler, S3_PROBE_CHANNEL } from '
 import { createS3ProbeScope } from '../electron/s3-probe-scope.js'
 import { probePayload } from './s3-probe-bridge-cases.mjs'
 import { trackProbeFixture } from './s3-probe-fixture-close.mjs'
+import { createProbeLoopbackFixture } from './s3-probe-loopback-fixture.mjs'
 
-// Fixed port is intentional: the production service cannot be redirected. A
-// bind error fails this isolated test; never kill or contact an existing server.
-async function withLoopback(handler, action) {
-  const timers = new Set(), clients = new Set()
-  const server = http.createServer((req, res) => handler(req, res, timers))
-  const closeOwnedFixture = trackProbeFixture(server, clients)
-  await new Promise((resolve, reject) => {
-    server.once('error', reject)
-    server.listen({ host: '127.0.0.1', port: 27121, exclusive: true }, resolve)
-  })
-  const makeService = (options = {}) => createS3ProbeService({ ...options, requestImpl: (...args) => {
-    if (!server.listening) throw new Error('probe fixture is closed')
-    const request = http.request(...args)
-    clients.add(request)
-    request.once('close', () => clients.delete(request))
-    return request
-  } })
-  try { await action(makeService) }
-  finally {
-    for (const timer of timers) { clearTimeout(timer); clearInterval(timer) }
-    await closeOwnedFixture()
-  }
-}
 const ok = {code:0,message:'OK',data:{outcome:'readable',httpStatus:200,acceptedBytes:5}}
 export function registerS3ProbeHTTPTests(test) {
+  const fixture = createProbeLoopbackFixture()
+  const withLoopback = fixture.run
+  test('loopback fixture retains one owned listener across consecutive cases', async () => {
+    const listeners = []
+    for (let index = 0; index < 2; index++) {
+      await withLoopback((req, res) => {
+        listeners.push(req.socket.server)
+        req.resume(); res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(ok))
+      }, async makeService => {
+        assert.equal((await makeService().probe(probePayload())).success, true)
+      })
+    }
+    assert.equal(listeners.length, 2)
+    assert.ok(listeners[0], 'real accepted socket must belong to this fixture server')
+    assert.equal(listeners[1], listeners[0], 'sibling cases reacquired the fixed port instead of retaining ownership')
+    assert.equal(listeners[0].listening, true, 'the fixed listener must remain owned between HTTP cases')
+  })
+  test('loopback fixture old service cannot reach a newer case handler', async () => {
+    let oldService, reached = 0
+    await withLoopback((req, res) => { req.resume(); res.end() }, async makeService => { oldService = makeService() })
+    await withLoopback((req, res) => {
+      reached++; req.resume(); res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(ok))
+    }, async makeService => {
+      assert.equal((await oldService.probe(probePayload())).code, 'native-probe-unavailable')
+      assert.equal(reached, 0, 'previous fixture capability invoked a new case')
+      assert.equal((await makeService().probe(probePayload())).success, true)
+      assert.equal(reached, 1)
+    })
+  })
   test('fixture teardown also waits for its owned client request close', async () => {
     const clients = new Set()
     const server = http.createServer((req, res) => { req.resume(); res.end('owned synthetic response') })
@@ -144,4 +151,5 @@ export function registerS3ProbeHTTPTests(test) {
       assert.equal(sender.listenerCount('destroyed'),0)
     })
   })
+  return fixture
 }
