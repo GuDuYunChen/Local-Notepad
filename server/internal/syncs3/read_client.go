@@ -25,15 +25,17 @@ const MaxObjectBytes int64 = 32 * 1024 * 1024
 const requestTimeout = 15 * time.Second
 
 var (
-	ErrConfig      = errors.New("S3 只读连接配置无效")
-	ErrCredentials = errors.New("S3 访问凭据无效")
-	ErrKey         = errors.New("S3 对象键无效或超出支持范围")
-	ErrTransport   = errors.New("S3 只读请求失败，未执行写入")
-	ErrTooLarge    = errors.New("S3 对象超过读取大小限制")
-	ErrBody        = errors.New("S3 响应读取失败，未接受部分数据")
-	bucketPattern  = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$`)
-	regionPattern  = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
-	keyIDPattern   = regexp.MustCompile(`^[A-Za-z0-9]{1,128}$`)
+	ErrConfig         = errors.New("S3 只读连接配置无效")
+	ErrCredentials    = errors.New("S3 访问凭据无效")
+	ErrKey            = errors.New("S3 对象键无效或超出支持范围")
+	ErrTransport      = errors.New("S3 只读请求失败，未执行写入")
+	ErrTooLarge       = errors.New("S3 对象超过读取大小限制")
+	ErrBody           = errors.New("S3 响应读取失败，未接受部分数据")
+	ErrExpectedDigest = errors.New("S3 预期 SHA-256 格式无效，未执行读取")
+	ErrDigestMismatch = errors.New("S3 对象内容与预期 SHA-256 不一致，未接受对象")
+	bucketPattern     = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$`)
+	regionPattern     = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
+	keyIDPattern      = regexp.MustCompile(`^[A-Za-z0-9]{1,128}$`)
 )
 
 // Config supports explicit-region, path-style endpoints. Endpoint must have a
@@ -276,4 +278,53 @@ func (r *ReadClient) CloseIdleConnections() {
 	if r != nil && r.client != nil {
 		r.client.CloseIdleConnections()
 	}
+}
+
+// GetVerifiedObject accepts a complete object only if SHA-256 of its exact bytes
+// matches the caller's expected 64-character lowercase hexadecimal digest.
+// The expected value must come from an independently trusted source: a match
+// does not authenticate a manifest, credentials, bucket ownership or freshness.
+// ETag and remote checksum headers are NOT used as the expected digest.
+//
+// This method reuses GetObject's single signed GET, limits and refusal policy.
+// It never retries or falls back to unverified data, HEAD, List or another key.
+// The original byte-only ProbeRead/HTTP/IPC contract remains unchanged. Returned
+// Object bytes are internal caller data, not a renderer-safe summary. Every
+// failure returns the zero Object (no bytes or ETag); GC is not secure erasure.
+func (r *ReadClient) GetVerifiedObject(ctx context.Context, key string, limit int64, expectedSHA256 string) (Object, error) {
+	if ctx == nil || limit < 1 || limit > MaxObjectBytes {
+		return Object{}, ErrConfig
+	}
+	if len(expectedSHA256) != sha256.Size*2 {
+		return Object{}, ErrExpectedDigest
+	}
+	for _, c := range expectedSHA256 {
+		if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f') {
+			return Object{}, ErrExpectedDigest
+		}
+	}
+	expected, err := hex.DecodeString(expectedSHA256)
+	if err != nil {
+		return Object{}, ErrExpectedDigest
+	}
+	// One budget covers the read and verification. GetObject's nested timeout
+	// cannot extend this deadline. Hashing is bounded by MaxObjectBytes; a
+	// cancellation noticed after the read/hash must not deliver old success.
+	call, cancel := context.WithTimeout(ctx, requestTimeout)
+	defer cancel()
+	object, err := r.GetObject(call, key, limit)
+	if err != nil {
+		return Object{}, err
+	}
+	if err := call.Err(); err != nil {
+		return Object{}, err
+	}
+	actual := sha256.Sum256(object.Bytes)
+	if err := call.Err(); err != nil {
+		return Object{}, err
+	}
+	if !hmac.Equal(actual[:], expected) {
+		return Object{}, ErrDigestMismatch
+	}
+	return object, nil
 }
