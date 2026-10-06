@@ -1,6 +1,14 @@
 # 开发接续点
 
-## 当前候选：2F.54 本机意图约束的只读预览HTTP入口
+## 当前候选：2F.55 主窗口生命周期约束的原生预览桥
+
+已验收基线316060674c72315a2fbc59b515c7a7b8e6622de0/tree1e723f72bbd0caadbd054e7015a949207dee514e，2F54最终验收6020109507。原HTTP定向11/131完整复查无新阻塞。新增electronAPI.s3PreviewRead及独立主frame scope，固定本机POST/严格codec/单slot/7.5秒截止/请求close收尾，main、preload仅追加入口，原probe/quit门禁不改。详见SYNC_S3_PREVIEW_BRIDGE_2F55.md。
+
+新共享Node/Vitest125及同一原固定HTTP监听器8用例通过，原HTTP含Go组合19/19，旧用例不删不改，原scope63/bridge100/保存保护202/stage62通过。两隔离错误实现被原断言拒绝。首次基线组合外层超时未算通过，后续单独完整回执及首部分日志均保留。当前HEAD完整CI和原产物验收仍须另证，预计UI2441/19、Electron406、后端1528，以真实原报告为准。
+
+无可见S3界面/输入表单、renderer预览状态绑定、凭据配置保存/provider/apply/数据库操作/blob/上传删除/自动同步或真实桶。公开意图不是认证，统计不是同步完成或删除许可。源码candidate/pending仅发布前快照，最终以当前HEAD的PR验收及交付为准。
+
+## 历史发布快照：2F.54 本机意图约束的只读预览HTTP入口
 
 基线4c7159d6ba4260e1281b0aeb9fa6f922c15c5bc3/treefdd75882f8ae9ef425a40f40ebbffb0d192179c8，2F.53验收6012433603保持。原记录依据定向-race11/63复查无新阻塞。现有SyncController增加POST /api/sync/s3/preview，复用完整本地记录依据与脱敏Overview，只返回固定候选统计。原probe共用的门禁等价提取，新路由不同意图s3-preview、2MiB正文、明确记录/字节上限、单slot、共享6秒context及既有服务器10秒入站截止。详见SYNC_S3_PREVIEW_HTTP_2F54.md。
 

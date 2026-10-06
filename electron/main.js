@@ -17,6 +17,7 @@ import { createQuitSaveGate } from './quit-save.mjs'
 import { createWebDAVSecretStore } from './webdav-secret.js'
 import { createS3ProbeService, registerS3ProbeHandler } from './s3-probe-bridge.js'
 import { createS3ProbeScope } from './s3-probe-scope.js'
+import { createS3PreviewService, registerS3PreviewHandler } from './s3-preview-bridge.js'
 import { createDataSafetyService, runBackupCommand, registerDataSafetyHandlers } from './data-safety.js'
 import { createWorkspacePackageService, registerWorkspacePackageHandlers } from './workspace-package.js'
 import {
@@ -540,6 +541,19 @@ ipcMain.handle('sync:webdav-secret:clear', async event => {
 registerS3ProbeHandler(ipcMain, s3Probe, s3ProbeScope)
 // Only cancel the optional read probe; the existing save/quit gate is untouched.
 app.on('before-quit', () => s3ProbeScope.abortAll())
+
+// Independent preview lifetime; do not alter the probe slot or quit/save gate.
+const s3Preview = createS3PreviewService()
+const s3PreviewScope = createS3ProbeScope({
+  getWindow: () => mainWindow,
+  getExpectedURL: () => app.isPackaged
+    ? pathToFileURL(path.join(app.getAppPath(), 'dist/index.html')).href
+    : 'http://localhost:5000/',
+  isClosing: () => quitting || allowQuit || Boolean(windowClosePromise),
+})
+registerS3PreviewHandler(ipcMain, s3Preview, s3PreviewScope)
+app.on('before-quit', () => s3PreviewScope.abortAll())
+
 
 const runDataSafety = args => {
   const filename = process.platform === 'win32' ? 'notepad-server.exe' : 'notepad-server'

@@ -49,7 +49,7 @@ export function createProbeLoopbackFixture() {
       })])
     } finally { clearTimeout(timer) }
   }
-  async function run(handler, action) {
+  async function run(handler, action, serviceFactory = createS3ProbeService) {
     if (closed) throw new Error('probe fixture is closed')
     if (fatal) throw fatal
     if (active) throw new Error('probe fixture case is still active')
@@ -62,7 +62,7 @@ export function createProbeLoopbackFixture() {
     try {
       await start()
       if (closed || fatal || !server.listening) throw fatal || new Error('probe fixture is closed')
-      const makeService = (options = {}) => createS3ProbeService({ ...options, requestImpl: (...args) => {
+      const makeService = (options = {}) => serviceFactory({ ...options, requestImpl: (...args) => {
         if (closed || fatal || active !== owner || !owner.accepting || !server.listening) throw new Error('probe fixture case is closed')
         const request = http.request(...args)
         allClients.add(request)
