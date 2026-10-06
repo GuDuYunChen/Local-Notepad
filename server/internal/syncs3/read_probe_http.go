@@ -72,6 +72,16 @@ func probeHeader(h http.Header, name string) []string {
 	return values
 }
 func nativeProbeRequest(r *http.Request) bool {
+	return NativeReadOnlyRequest(r, ReadProbeIntent)
+}
+
+// NativeReadOnlyRequest shares the original loopback/browser admission policy.
+// The nonempty intent is an exact public operation label, NOT authentication.
+// Callers must separately validate method, target, content and operation limits.
+func NativeReadOnlyRequest(r *http.Request, expectedIntent string) bool {
+	if r == nil || expectedIntent == "" {
+		return false
+	}
 	host, port, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil || port == "" {
 		return false
@@ -98,7 +108,7 @@ func nativeProbeRequest(r *http.Request) bool {
 		}
 	}
 	intent := probeHeader(r.Header, ReadProbeIntentHeader)
-	return len(intent) == 1 && intent[0] == ReadProbeIntent
+	return len(intent) == 1 && intent[0] == expectedIntent
 }
 
 func (h *ReadProbeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
