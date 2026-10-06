@@ -41,3 +41,36 @@ pin必须来自独立可信来源，摘要/关系/大小校验不等于来源认
 官方协议依据（本轮查阅，不引入新依赖）：
 - https://pkg.go.dev/context#WithTimeout
 - https://docs.aws.amazon.com/AmazonS3/latest/userguide/checking-object-integrity.html
+
+
+## 同阶段 Windows 原生品牌夹具修补
+
+中断接续后，真实HEAD cfd6105的push UI run37341829499 / Windows job111872626937
+在品牌主题渲染检查45秒超时。原可读job日志确认：loadFile尚未完成时watchdog退出，
+随后ERR_FAILED；两张PNG都没有生成，后续原生/packagedApp/NSIS上传被跳过。
+后端1245通过事件和PR成功不能覆盖此失败。保留选定原日志逐行转录与步骤回执，
+没有将转录称为完整原日志文件，也没有无依据手工重跑该job。
+
+复查确认该夹具原先没有隔离Electron默认userData/sessionData，且超时时无可恢复的
+阶段报告。使用真实脚本顶层、模拟Electron生命周期的两个反例，原实现0/2，修后2/2；
+这只是同步控制契约，不是复现Windows内部启动卡顿。此次**不能证明**原超时由哪个
+Chromium内部等待、缓存或操作系统事件造成，也没有将日志中的Windows路径展示形式
+擅自认定为原因。
+
+修补只为这份测试创建独立临时userData/sessionData，在whenReady之前设置；不读取、
+迁移、清除调用者默认用户目录。临时profile仅为测试所有，退出后由runner临时目录
+清理，不承诺安全擦除。原loadFile、show:false、sandbox/contextIsolation/nodeIntegration、
+全部20个原深色断言、hover/focus/light三项检查、两份原PNG捕获保持；未关闭沙盒、
+改产品样式或把45秒预算放宽。完整成功仍须23项检查、两张实际PNG及其摘要/尺寸。
+
+新增有限阶段报告checks.json，记录ready/资源/窗口/页面加载/字体/两次捕获/回切；
+主frame加载失败、renderer退出、超时、报告写失败均失败退出，一次失败不可被迟到
+成功覆盖。没有重试页面加载或重放检查。原always上传步骤仅增加checks.json路径，
+不改变后续步骤条件、原测试选择、并发或超时。实际新Windows运行若仍失败，必须
+依据新阶段报告继续修补，不能因为增加了诊断代码便判定原阻塞已通过。
+
+独立新增12项Node/Vitest生命周期回归，真实默认目录隔离使用自有临时路径，
+其余为明确模拟进程/计时器的契约检查，不冒充GUI。预期完整UI2308、Electron273
+（旧2296/261各加12），Go1245保持；这些只是验收目标，必须最终HEAD原报告证明。
+本次修补不改已发布S3快照生产实现、任何保存/回执/队列/引用/退出/schema14/依赖。
+本阶段仍须完整新HEAD CI及原始产物接受；不进入2F.51。

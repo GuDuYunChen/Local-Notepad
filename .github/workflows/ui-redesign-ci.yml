@@ -294,7 +294,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: local-notepad-theme-${{ github.sha }}
-          path: test-results/brand-theme/*.png
+          path: |
+            test-results/brand-theme/*.png
+            test-results/brand-theme/checks.json
           if-no-files-found: ignore
           retention-days: 7
 
