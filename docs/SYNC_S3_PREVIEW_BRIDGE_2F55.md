@@ -37,3 +37,11 @@
 仅feature/knowledge-os-phase2 / Draft PR2，不改合master/强推/生产发布或操作真实数据。产品4.195.1/schema14、原保存/Ctrl+S/队列回执/草稿/引用/退出、依赖及所有原测试/断言/CI/验收器保持。原main/preload只加新入口，不重写旧桥或共享trustedMainFrame；不恢复结构变化暂停保存。最终状态写PR和交付，不造状态-only源码提交。
 
 本轮查阅Electron官方IPC sender校验/隔离建议：https://www.electronjs.org/docs/latest/tutorial/security#17-validate-the-sender-of-all-ipc-messages 。Node22 HTTP文档本轮web路由不可访问，不声称已查阅该页或据此升级依赖；ClientRequest行为用本轮真实Node测试核对。历史46问题/12助手事故及具体执行失误单列留存，不把产品修补称为ChatGPT投递超时根因已修。
+
+## 同阶段 Windows 测试夹具修补
+
+第一提交b8240e0688ca95fd91a8c00795a61744eee0f234的push Discard run37497822890/Windows job112386806563在完整UI中2440/2441，新增preload VM用例报“Cannot use import statement outside a module”。原弃稿、真实App保存/退出专项已通过，不能用这些绿灯覆盖完整UI失败。原包11429185554和原失败报告保留，没有取消或重跑该CI。
+
+原新测试使用`/^import .*\n/`删除开头import再送VM，不能匹配CRLF行尾。用当前同一生产preload源码只替换换行生成CRLF输入，原同名断言复现相同SyntaxError；这不是取回CI生产preload的原字节（失败归档只保留测试源，未包含该生产文件）。现只修本阶段新增测试的准备步骤，按`[^\r\n]*\r?\n`删除首行，并在同一原用例中显式执行LF与CRLF两种文本。原所有invoke/无隐式请求/无通用IPC断言保留，额外确认import已去除；不改生产preload、桥、Go、工作流或Git换行设置。原同名CRLF反例修后通过，新增共享125全部通过。两种换行属于同一个顶层测试，不虚增数量。
+
+当前阶段仍需修补HEAD全部CI/原产物重新验收，不用第一提交绿灯替代。新共享仍125、真实HTTP新增8，完整UI目标2441/Electron406/后端1528不变；尚未进入2F56。

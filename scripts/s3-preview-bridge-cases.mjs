@@ -265,11 +265,17 @@ export function registerS3PreviewBridgeTests(test) {
     assert.deepEqual(events.map(x=>x[0]),['before-quit']);events[0][1]();assert.equal(aborted,1)
   })
   test('preview preload exposes only one explicit payload invoke without eager network or generic ipc', async () => {
-    const file=fs.readFileSync(new URL('../electron/preload.js',import.meta.url),'utf8').replace(/^import .*\n/,'')
-    const worlds={},calls=[];vm.runInNewContext(file,{process:{env:{}},contextBridge:{exposeInMainWorld:(name,value)=>worlds[name]=value},
-      ipcRenderer:{invoke:(...args)=>{calls.push(args);return Promise.resolve('ok')}},webUtils:{}})
-    assert.equal(calls.length,0);const p=previewPayload();await worlds.electronAPI.s3PreviewRead(p)
-    assert.equal(calls.length,1);assert.equal(calls[0][0],S3_PREVIEW_CHANNEL);assert.equal(calls[0][1],p)
-    assert.equal(worlds.electronAPI.invoke,undefined);assert.equal(typeof worlds.electronAPI.s3ProbeRead,'function')
+    const raw=fs.readFileSync(new URL('../electron/preload.js',import.meta.url),'utf8')
+    // Git's Windows checkout may use CRLF. Exercise both byte conventions;
+    // strip only the leading Electron import, never rewrite the production file.
+    for (const source of [raw.replace(/\r\n/g,'\n'), raw.replace(/\r?\n/g,'\r\n')]) {
+      const file=source.replace(/^import [^\r\n]*\r?\n/,'')
+      assert.doesNotMatch(file,/^import /)
+      const worlds={},calls=[];vm.runInNewContext(file,{process:{env:{}},contextBridge:{exposeInMainWorld:(name,value)=>worlds[name]=value},
+        ipcRenderer:{invoke:(...args)=>{calls.push(args);return Promise.resolve('ok')}},webUtils:{}})
+      assert.equal(calls.length,0);const p=previewPayload();await worlds.electronAPI.s3PreviewRead(p)
+      assert.equal(calls.length,1);assert.equal(calls[0][0],S3_PREVIEW_CHANNEL);assert.equal(calls[0][1],p)
+      assert.equal(worlds.electronAPI.invoke,undefined);assert.equal(typeof worlds.electronAPI.s3ProbeRead,'function')
+    }
   })
 }
