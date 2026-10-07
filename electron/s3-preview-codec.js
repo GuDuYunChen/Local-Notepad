@@ -1,4 +1,4 @@
-// Native preview wire contract. The Go handler remains the authority for
+// Shared native/renderer preview wire contract. The Go handler remains the authority for
 // canonical records, their relationships, connection policy and remote pins.
 // Never call getters/toJSON, normalize strings, or return caller-owned objects.
 export const S3_PREVIEW_REQUEST_LIMIT = 2 * 1024 * 1024
@@ -8,6 +8,9 @@ export const S3_PREVIEW_LIMITS = Object.freeze({
   manifestBytes: 1024 * 1024, recordBytes: 256 * 1024, totalRecordBytes: 4 * 1024 * 1024,
   maxRecords: 128, maxItems: 384,
 })
+// UTF-8 byte counting is shared by main and the isolated renderer.
+// No Buffer shim or Node import is needed by renderer consumers.
+const utf8Length = s => new TextEncoder().encode(s).length
 const own = (value, key) => Object.prototype.hasOwnProperty.call(value, key)
 const HASH = /^[a-f0-9]{64}$/
 const KINDS = Object.freeze(['file', 'tag', 'file-tag', 'attachment'])
@@ -32,7 +35,7 @@ function wellFormed(s) {
   return true
 }
 function text(s, max) {
-  if (typeof s !== 'string' || s.length > max || !wellFormed(s) || Buffer.byteLength(s, 'utf8') > max) throw new Error('invalid preview')
+  if (typeof s !== 'string' || s.length > max || !wellFormed(s) || utf8Length(s) > max) throw new Error('invalid preview')
   return s
 }
 function identity(s) {
@@ -77,7 +80,7 @@ export function encodeS3PreviewRequest(value) {
     let bytes = 0
     for (const key of Object.keys(local)) {
       identity(key); text(local[key], limits.localRecordBytes)
-      bytes += Buffer.byteLength(local[key], 'utf8')
+      bytes += utf8Length(local[key])
       if (bytes > limits.totalLocalRecordBytes) return null
     }
     for (const key of Object.keys(base)) {
@@ -87,7 +90,7 @@ export function encodeS3PreviewRequest(value) {
     basis.localRecords = local; basis.baseItems = base
     root.connection = connection; root.pin = pin; root.basis = basis; root.limits = limits
     const body = JSON.stringify(root)
-    return Buffer.byteLength(body, 'utf8') <= S3_PREVIEW_REQUEST_LIMIT
+    return utf8Length(body) <= S3_PREVIEW_REQUEST_LIMIT
       ? Object.freeze({ body, maxItems: limits.maxItems }) : null
   } catch { return null }
 }
@@ -123,7 +126,7 @@ function counts(value, maxItems) {
 // deliberately does not infer authentication or completed sync from counts.
 export function decodeS3PreviewResponse(status, raw, maxItems) {
   try {
-    if (typeof raw !== 'string' || Buffer.byteLength(raw, 'utf8') > S3_PREVIEW_RESPONSE_LIMIT ||
+    if (typeof raw !== 'string' || utf8Length(raw) > S3_PREVIEW_RESPONSE_LIMIT ||
         !Number.isSafeInteger(maxItems) || maxItems < 1 || maxItems > 384) throw new Error('invalid preview')
     const envelope = dataObject(unambiguousJSON(raw), ['code', 'message', 'data'])
     if (status !== 200) {

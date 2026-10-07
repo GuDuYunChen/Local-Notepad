@@ -1,6 +1,14 @@
 # 开发接续点
 
-## 当前候选：2F.55 主窗口生命周期约束的原生预览桥
+## 当前候选：2F.56 前端只读预览会话
+
+基线ddb322b0e0bf3c98ef86deede5abaeace3ebe9f8/treeff6ea4e0bd6d888311a9cb2ee11a8126a6df84db，2F55完整验收6029118874有效，原preview125复查无新阻塞。新增createS3PreviewSession由services/api.js导出，仅显式read调用现有s3PreviewRead；复用原codec，字节计数去Node Buffer依赖，不放宽契约。独立快照、严格脱敏回复、代际失效/永久dispose、10秒绝对等待、原生Promise结束前保持会话slot，无自动重试或HTTP回退。详见SYNC_S3_PREVIEW_SESSION_2F56.md。
+
+新Node/Vitest共享83首轮通过；原preview125、保护202、scope63、bridge100、组合HTTP19及stage62通过，两个故意错误实现被原新增断言拒绝。没有新React hook/订阅/设置UI或数据库写入，调用者须同步invalidate与离开时dispose。不能用旧确认闭包启动新read，停止前端等待不代表原生I/O结束。
+
+当前HEAD17CI及原产物仍须独立核验，新83必须实际执行；UI2524/Electron406/Go1528仅待核目标。原保存/Ctrl+S/队列回执/草稿/引用/退出/schema14/锁/测试断言/工作流/验收器不变。源码candidate/pending是发布前记录，最终以最新PR和交付为准，不为状态再造提交。
+
+## 历史发布快照：2F.55 主窗口生命周期约束的原生预览桥
 
 已验收基线316060674c72315a2fbc59b515c7a7b8e6622de0/tree1e723f72bbd0caadbd054e7015a949207dee514e，2F54最终验收6020109507。原HTTP定向11/131完整复查无新阻塞。新增electronAPI.s3PreviewRead及独立主frame scope，固定本机POST/严格codec/单slot/7.5秒截止/请求close收尾，main、preload仅追加入口，原probe/quit门禁不改。详见SYNC_S3_PREVIEW_BRIDGE_2F55.md。
 

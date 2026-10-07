@@ -117,3 +117,6 @@ export async function createFileVersionSnapshot(fileId) {
 
 // Explicit native-only S3 preflight; never use api()/fetch as a fallback.
 export { createS3ReadProbeSession } from './s3ReadProbe.mjs'
+
+// Explicit native-only count preview; importing/creating does not issue I/O.
+export { createS3PreviewSession } from './s3PreviewSession.mjs'
