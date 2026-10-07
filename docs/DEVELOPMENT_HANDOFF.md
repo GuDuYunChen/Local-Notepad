@@ -1,6 +1,15 @@
 # 开发接续点
 
-## 当前候选：2F.56 前端只读预览会话
+## 当前候选：2F.57 React 预览生命周期与命令版本约束
+
+基线13e9a0de077eae3cfeeb7696c99c3e2e88a11312/tree185ee18047c1a12625771bdc625015556b2b4c9a，2F56完整验收6030696180有效；原session83复查无新阻塞。新增createS3PreviewBinding与useS3Preview(revision)，离线订阅/连接、稳定冻结快照、独立清理租约及已提交revision命令token。旧read零参数反射/零原生调用，旧invalidate不影响新结果；StrictMode、卸载和未提交Suspense明确分开。详见SYNC_S3_PREVIEW_REACT_LIFETIME_2F57.md。
+
+新共享binding24本地通过；新真实React18已编写，必须当前HEAD四完整应用原报告实际执行，不拿隔离同步hook模型3/3冒充React。两个外部错误实现被同一断言拒绝，原session83/preview125/保护202/scope63/bridge100/HTTP19/stage62通过。全部旧生产/测试/断言/CI/验收器/依赖锁及保存/schema14不改。
+
+没有接入生产设置表单、数据库或同步写入；调用方须在上下文变化时更新revision，需要即时失效时同步invalidate。前端超时/失效不证明原生I/O取消。同revision主动重查保留。源码/当前HEAD17CI/原产物验收分开，UI2566/Electron406/Go1528只是待核目标；最终以最新PR为准，不为状态造提交。
+
+## 历史发布快照：2F.56 前端只读预览会话
+
 
 基线ddb322b0e0bf3c98ef86deede5abaeace3ebe9f8/treeff6ea4e0bd6d888311a9cb2ee11a8126a6df84db，2F55完整验收6029118874有效，原preview125复查无新阻塞。新增createS3PreviewSession由services/api.js导出，仅显式read调用现有s3PreviewRead；复用原codec，字节计数去Node Buffer依赖，不放宽契约。独立快照、严格脱敏回复、代际失效/永久dispose、10秒绝对等待、原生Promise结束前保持会话slot，无自动重试或HTTP回退。详见SYNC_S3_PREVIEW_SESSION_2F56.md。
 
