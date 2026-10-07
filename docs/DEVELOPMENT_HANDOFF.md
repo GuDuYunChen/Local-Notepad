@@ -1,6 +1,14 @@
 # 开发接续点
 
-## 当前修补候选：2F.58.1 预览拒绝响应契约
+## 当前候选：2F.59 SQLite 一致只读数据库快照
+
+基线9898e9955256a1511b92cf338bdeee65234e4fc5/tree08cf177f0c7592500eb0ed7a5786bb2080854498，2F58.1验收6034328733有效，原5项拒绝回归复查通过。新增ReadS3LocalDatabaseSnapshot以一个自有只读事务采集数据库三类记录和共同基线身份，schema14/隔离/预算/关系及所有清理失败均严格拒绝，零部分结果。详见SYNC_S3_LOCAL_DATABASE_2F59.md。
+
+它不是完整S3预览依据：没有附件清单或独立可信pin，CompleteForPreview始终false，既有sync_base归属不能自动转成S3。没有路由、生产设置接入、附件/真实库读取、写入或凭据保存。只对自有测试数据库执行；原保存/退出/schema14/锁/全部旧断言不改。
+
+本地新标准库事务契约9顶层/61事件-race通过，两个独立错误实现被同一断言拒绝；另外5顶层/11子场景真实SQLite测试需当前HEAD完整后端执行。UI2595/Electron406/Go1605仅待核目标，17CI及原产物完整验收后才完成，不沿用9898绿灯、不进入2F60、不为状态造源码提交。
+
+## 历史发布快照：2F.58.1 预览拒绝响应契约
 
 基线39a33075d9136a74d84e0025be4eb542eca5f9f4/treeb4e553f5813140092e56326153a91e70d7d254b8。2F58验收6033462258保留。复查真实Go handler发现415/encoded-or-trailer-request-refused未列入原JS白名单，被误分类为native-preview-invalid-response；原代码反例失败，固定白名单修补后新增5项共享回归通过，其中一项含18份真实Go拒绝响应。详见SYNC_S3_PREVIEW_REFUSAL_2F58_1.md。
 
