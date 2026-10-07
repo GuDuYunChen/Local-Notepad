@@ -19,7 +19,9 @@ const MESSAGES = new Map([
   [400, ['invalid-request', 'invalid-request-target', 'invalid-connection']],
   [403, ['native-loopback-required']], [405, ['method-not-allowed']],
   [408, ['preview-cancelled']], [413, ['request-too-large']],
-  [415, ['json-required', 'encoded-request-refused']], [422, ['preview-not-available']],
+  // Go's current refusal includes trailers. Keep the previously accepted fixed
+  // alias for compatibility; neither spelling can carry data or another status.
+  [415, ['json-required', 'encoded-request-refused', 'encoded-or-trailer-request-refused']], [422, ['preview-not-available']],
   [429, ['preview-busy']], [503, ['preview-unavailable']], [504, ['preview-timeout']],
 ])
 export const previewFailure = code => Object.freeze({ success: false, status: 0, code, data: null })
