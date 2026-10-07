@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"errors"
-	"net/url"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -70,10 +69,7 @@ func TestS3LocalDatabaseSQLiteReadOnlyAndCanonical(t *testing.T) {
 	// A real attachment exists, but the snapshot API has no DataDir/path parameter
 	// and cannot scan or hash it. Database-only remains false for full preview.
 	writeAttachment(t, root, "untouched.bin", "not database data")
-	u := url.URL{Scheme: "file", Path: filepath.ToSlash(filepath.Join(root, "data.db"))}
-	params := url.Values{"mode": {"ro"}}
-	u.RawQuery = params.Encode()
-	ro, err := sql.Open("sqlite", u.String())
+	ro, err := sql.Open("sqlite", s3SQLiteReadOnlyURL(filepath.ToSlash(filepath.Join(root, "data.db"))))
 	if err != nil {
 		t.Fatal(err)
 	}

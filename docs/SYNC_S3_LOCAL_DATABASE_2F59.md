@@ -31,3 +31,11 @@
 仅feature/knowledge-os-phase2 / Draft PR2，master不改不合、不强推、不生产发布。历史归档和当轮独立反例分开，平台投递问题不与产品测试混同，不承诺永不中断。
 
 参考：本轮查阅Go database/sql的BeginTx/Rollback（https://pkg.go.dev/database/sql）和SQLite事务隔离说明（https://www.sqlite.org/isolation.html）。采用项目固定工具链，不以线上文档较新版本引入依赖升级；实际驱动行为仍需原CI测试。
+
+## 同阶段 Windows 只读 URI 夹具修补
+
+eb4496a首提交的PR Windows保存回归在完整UI2595/2595之后，于完整Go测试失败，后续实际服务步骤没有执行。原失败ZIP11473495522及新失败job112723503461的原始输出已实际取得；唯一本阶段失败名为TestS3LocalDatabaseSQLiteReadOnlyAndCanonical，公开固定错误出现在第83行。Linux完整1605通过不能覆盖Windows失败。
+
+独立复现原URL.String构造：Windows盘符路径D:/...成为file://D:/...，D:被解析成authority，而非本地盘符路径。SQLite要求盘符前置/。只修测试的URI构造，新增跨平台形状用例在所有runner验证空authority、精确路径、特殊字符转义和唯一mode=ro；旧构造被同一断言拒绝，修后本地通过。真实只读连接的原全部断言保留，仍须在Windows重新执行实际SQLite及禁止UPDATE验证。产品读取器、原SQL/安全错误、WAL断言、全部旧用例、工作流和门槛不变，未删除或跳过失败测试。
+
+新增URI检查1顶层（内部5种路径不另累计），修补后完整后端待核1606通过事件/128份Go与锁文件；新本地数据库范围合计15顶层/78事件。现有9顶层61事件+5真实SQLite顶层16事件保留，不重复累计。必须修补HEAD完整17CI及原产物通过再验收，不能用首提交绿灯。SQLite URI依据https://www.sqlite.org/uri.html#the_uri_path。
