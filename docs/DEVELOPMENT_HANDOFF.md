@@ -8,6 +8,8 @@
 
 组件尚未接入生产SettingsPanel，不能拿不完整本地快照或不可信pin制造可用预览。无数据库扫描写入、凭据表单/持久化、blob/provider/apply/上传删除/自动同步/真实桶。源码、当前CI及原产物独立验收分开，最终以最新PR为准，未全通过不进入2F59，不为状态造源码提交。
 
+首提交93c0d5d的PR Linux原报告2589/2590，唯一失败为新CSS检查的Vite资源URL不能作为Node文件URL。已同阶段只修测试源码定位为原仓库根相对路径，原CSS断言/同名用例/生产源码/工作流不变。原失败包11465626591保留，修补HEAD四UI/17CI及原产物仍须完整验收，详见本阶段协议末段。
+
 ## 历史发布快照：2F.57 React 预览生命周期与命令版本约束
 
 基线13e9a0de077eae3cfeeb7696c99c3e2e88a11312/tree185ee18047c1a12625771bdc625015556b2b4c9a，2F56完整验收6030696180有效；原session83复查无新阻塞。新增createS3PreviewBinding与useS3Preview(revision)，离线订阅/连接、稳定冻结快照、独立清理租约及已提交revision命令token。旧read零参数反射/零原生调用，旧invalidate不影响新结果；StrictMode、卸载和未提交Suspense明确分开。详见SYNC_S3_PREVIEW_REACT_LIFETIME_2F57.md。

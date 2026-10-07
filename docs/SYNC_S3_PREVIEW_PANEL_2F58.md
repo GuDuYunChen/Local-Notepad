@@ -27,3 +27,9 @@ request是可信调用者提供的不可变完整输入；不写到DOM、标题�
 完成仍要求新HEAD17CI、八PR及完整push UI/Windows/Desktop/额外pushSave、四完整UI及19实际服务、双Electron、源码绑定Go1.24.11后端、品牌/原生/桌面/NSIS独立核验。预计UI2590（原2566+24）、Electron406、后端1528仅是待核目标。新组件的React测试使用合成原生返回；原桌面/原生截图不是新S3面板截图，不拼成没有执行的S3 GUI全链路。最终只认当前报告，未通过不进入2F59；状态写PR与交付，不造状态-only提交。
 
 参考：本轮实际查阅React官方useId文档 https://react.dev/reference/react/useId 。具体生命周期行为由本项目测试证明，文档不是验收替代。历史46问题/12助手事故和原失败证据保留，不声称ChatGPT投递超时根因已修或永不中断。
+
+## 同阶段首提交CSS测试定位修补
+
+首提交93c0d5db558108a4cfc45d1a6403b51efeb6169f的PR Linux原包11465626591实际2589/2590：唯一失败为新增CSS源码检查，错误为“The URL must be of scheme file”。Vite处理静态CSS资源URL后，不再是Node文件URL；其余23项新增组件测试和全部2566旧用例均通过，但完整阶段不能因此通过。实际服务步骤尚未执行，原报告保留，不用其它绿灯覆盖。
+
+仅把新增测试的readFileSync输入改为相对于原Vitest仓库根工作目录的src/components/S3PreviewPanel.css；原工作流本来就在仓库根运行，未改cwd、配置、生产CSS或组件。全部CSS断言和同名用例保留，未添加skip/重试/降低门槛。修补需在新HEAD四份完整UI中再核同名24用例及全部原门槛，不能沿用93c0报告。

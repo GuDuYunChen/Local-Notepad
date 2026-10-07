@@ -167,7 +167,7 @@ it('S3 preview panel table is captioned with column and row headers and keyboard
   expect(host.querySelector('[role=status]').getAttribute('aria-live')).toBe('polite')
 })
 it('S3 preview panel CSS contains narrow-layout scrolling and focus treatment without fixed light-only text', () => {
-  const css = readFileSync(new URL('./S3PreviewPanel.css', import.meta.url), 'utf8')
+  const css = readFileSync('src/components/S3PreviewPanel.css', 'utf8')
   expect(css).toContain('overflow-x: auto'); expect(css).toContain('@media (max-width: 620px)')
   expect(css).toContain(':focus-visible'); expect(css).toContain('color: var(--ink, var(--fg))')
   expect(css).not.toMatch(/color:\s*(?:white|black|#[\da-f]+)/i)
