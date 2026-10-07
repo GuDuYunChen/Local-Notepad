@@ -1,6 +1,14 @@
 # 开发接续点
 
-## 当前候选：2F.61 数据库与附件只读交叉复核
+## 当前候选：2F.62 本地只读候选概览
+
+基线0f20eaf5e7f41e61ecb1ad2ee3b89763dbcbff5e/tree0588e478e55bb7aeec71b5e699eb9bf50957e426，2F61完整验收6041276622有效。先恢复真实源码/归档和历史46问题/12助手事故，无新复现阶段产品阻塞，不重复旧CI。
+
+ReadS3LocalOverview调用原D1/A1/D2/A2读取器，内部重新校验规范记录/关系/原预算与附件字节总和后，仅返回固定四种类数量/规范字节和总量。公开入口不接外部candidate，任何失败零统计/固定错误，不保留私密map或返回正文、名称、hash、远端身份。不是远端计划、授权或原子快照；CompleteForPreview始终false，未接设置页/HTTP/IPC，不操作真实用户数据。详见SYNC_S3_LOCAL_OVERVIEW_2F62.md。
+
+本地Go标准库-race38顶层188事件（原143+新45）通过，两个独立错误副本被原断言拒绝；真实SQLite+os.Root额外集成用例仍须当前HEAD完整Go1.24.11执行。原保护202及binding24/session83/preview125/scope63/bridge100/HTTP19/refusal5/stage62通过。预计后端1738/141源码、四UI2595/19和双Electron406只是待核目标。17CI和全部原始产物完成才验收，未进入2F63，不为状态单独造提交。
+
+## 历史发布快照：2F.61 数据库与附件只读交叉复核
 
 基线958a98ec38d9612a09b8f30ffafd188c05cafda7/treed0e72a58bb51fccacc4d5bcebbafa68f2360643f；2F60完整验收6037747526有效，首次模型超时未知原因单列保留。无新复现阶段产品阻塞，不重跑其已通过CI或Desktop复验。
 
