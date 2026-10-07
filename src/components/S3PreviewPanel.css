@@ -1,0 +1,21 @@
+.s3-preview-panel { box-sizing: border-box; min-width: 0; max-width: 100%; margin-top: 16px; padding: 20px; border: 1px solid var(--line); border-radius: 12px; color: var(--ink, var(--fg)); background: var(--surface, var(--panel)); }
+.s3-preview-panel-heading { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.s3-preview-panel h3 { margin: 0; color: inherit; font-size: 17px; line-height: 1.5; }
+.s3-preview-panel-subtitle, .s3-preview-panel-boundary, .s3-preview-panel-note { margin: 8px 0 0; color: var(--ink-muted, var(--muted)); font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+.s3-preview-panel-badge { flex: 0 0 auto; padding: 4px 8px; border: 1px solid var(--line); border-radius: 6px; font-size: 12px; line-height: 1.5; }
+.s3-preview-panel-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 16px 0; }
+.s3-preview-panel-actions button { max-width: 100%; min-height: 36px; white-space: normal; line-height: 1.5; }
+.s3-preview-panel-status { padding: 12px; border-left: 3px solid var(--line-strong, var(--line)); border-radius: 4px; background: var(--surface-hover, var(--panel)); font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
+.s3-preview-panel-status.has-conflicts { border-left-color: var(--warning, var(--accent)); }
+.s3-preview-panel-status p { margin: 4px 0 0; }
+.s3-preview-panel-counts { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 12px; margin: 18px 0; }
+.s3-preview-panel-counts > div { min-width: 0; padding: 12px; border: 1px solid var(--line); border-radius: 8px; }
+.s3-preview-panel-counts dt { font-size: 13px; line-height: 1.6; color: var(--ink-muted, var(--muted)); }
+.s3-preview-panel-counts dd { margin: 4px 0 0; font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.s3-preview-panel-table { max-width: 100%; margin-top: 16px; overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
+.s3-preview-panel table { width: 100%; min-width: 540px; border-collapse: collapse; font-size: 13px; line-height: 1.6; }
+.s3-preview-panel caption { padding: 10px 12px; text-align: left; font-weight: 600; }
+.s3-preview-panel :is(th, td) { padding: 10px 12px; border-top: 1px solid var(--line); text-align: right; font-variant-numeric: tabular-nums; }
+.s3-preview-panel tr > :first-child { text-align: left; }
+.s3-preview-panel :is(button, [tabindex]):focus-visible { outline: 2px solid var(--clay, var(--accent)); outline-offset: 3px; }
+@media (max-width: 620px) { .s3-preview-panel { padding: 12px; } .s3-preview-panel-counts { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; } }

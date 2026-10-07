@@ -1,6 +1,14 @@
 # 开发接续点
 
-## 当前候选：2F.57 React 预览生命周期与命令版本约束
+## 当前候选：2F.58 只读预览展示组件
+
+基线25a77f60233846bbd050abb7df35ba6135089ebd/tree3dabda99eea627c9da2379925d2928adbd375c35，2F57完整验收6031391401有效，原binding24/session83/保护202复查无新阻塞。新增S3PreviewPanel复用原useS3Preview，显式点击才读取；状态、失败、空统计、候选冲突和四类型表格明确呈现，不提供任何同步写入操作。输入身份/版本/disabled变化失效，旧点击token不能发请求。详见SYNC_S3_PREVIEW_PANEL_2F58.md。
+
+本地同步组件模型5/5及过期命令反例通过，均非React/DOM；新增24真实React组件测试须新HEAD四完整UI实际执行。预计UI2590/Electron406/Go1528只是待核目标。原preview125/scope63/bridge100/HTTP19/stage62通过，旧测试/断言/工作流/验收器及保存/schema14/依赖不变。
+
+组件尚未接入生产SettingsPanel，不能拿不完整本地快照或不可信pin制造可用预览。无数据库扫描写入、凭据表单/持久化、blob/provider/apply/上传删除/自动同步/真实桶。源码、当前CI及原产物独立验收分开，最终以最新PR为准，未全通过不进入2F59，不为状态造源码提交。
+
+## 历史发布快照：2F.57 React 预览生命周期与命令版本约束
 
 基线13e9a0de077eae3cfeeb7696c99c3e2e88a11312/tree185ee18047c1a12625771bdc625015556b2b4c9a，2F56完整验收6030696180有效；原session83复查无新阻塞。新增createS3PreviewBinding与useS3Preview(revision)，离线订阅/连接、稳定冻结快照、独立清理租约及已提交revision命令token。旧read零参数反射/零原生调用，旧invalidate不影响新结果；StrictMode、卸载和未提交Suspense明确分开。详见SYNC_S3_PREVIEW_REACT_LIFETIME_2F57.md。
 
