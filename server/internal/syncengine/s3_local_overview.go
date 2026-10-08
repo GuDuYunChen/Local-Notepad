@@ -92,6 +92,7 @@ func s3LocalOverview(ctx context.Context, c S3LocalCandidate, limits S3LocalCand
 	hashes := make(map[string]string, len(c.LocalRecords))
 	var databaseBytes, attachmentRecordBytes int64
 	databaseRecords := 0
+	var attachmentNames []string
 	for id, raw := range c.LocalRecords {
 		if ctx.Err() != nil || !s3ManifestID(id) {
 			return fail()
@@ -128,6 +129,12 @@ func s3LocalOverview(ctx context.Context, c S3LocalCandidate, limits S3LocalCand
 			return fail()
 		}
 		if kind == "attachment" {
+			// Recheck the reader's portable name-set invariant; canonical Record
+			// encoding alone permits local names that are unsafe across platforms.
+			if !s3LocalAttachmentNameAvailable(record.Attachment.Name, attachmentNames) {
+				return fail()
+			}
+			attachmentNames = append(attachmentNames, record.Attachment.Name)
 			size := record.Attachment.Size
 			if size < 0 || size > limits.Attachments.FileBytes || size > limits.Attachments.TotalFileBytes-out.AttachmentBytes {
 				return fail()

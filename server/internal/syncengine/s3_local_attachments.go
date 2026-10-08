@@ -58,8 +58,9 @@ type S3LocalAttachmentSnapshot struct {
 // ReadS3LocalAttachmentSnapshot inventories one level of an authorized root.
 // No recursive traversal, creation of a missing directory, path-string fallback,
 // cache, retry, network or database operation. It refuses ALL non-regular entries
-// and nonportable names. Unix opens use NOFOLLOW|NONBLOCK to refuse a last-moment
-// symlink or FIFO without following/blocking on it; Windows names are restricted
+// and nonportable names, including simple Unicode case-fold aliases within
+// one inventory. No names are renamed, normalized or deduplicated. Unix opens
+// use NOFOLLOW|NONBLOCK to refuse a last-moment symlink or FIFO without following/blocking on it; Windows names are restricted
 // and the root capability must enforce containment. Only Linux/macOS/FreeBSD and
 // Windows are supported; other platforms fail before directory I/O.
 //
@@ -169,6 +170,23 @@ func s3LocalAttachmentName(name string) bool {
 	return true
 }
 
+// Local-only conservative name-set policy. Simple Unicode folding also catches
+// aliases (for example K/kelvin-sign and sigma/final-sigma) that strings.ToLower
+// equality misses. Callers cap seen at 128 and check context around each record.
+// This is NOT filesystem collation/normalization, short-name or hard-link proof;
+// a future writer still needs independent target-filesystem collision checks.
+func s3LocalAttachmentNameAvailable(name string, seen []string) bool {
+	if !s3LocalAttachmentName(name) {
+		return false
+	}
+	for _, previous := range seen {
+		if strings.EqualFold(name, previous) {
+			return false
+		}
+	}
+	return true
+}
+
 func s3AttachmentError(ctx context.Context, fallback error) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
@@ -211,16 +229,14 @@ func s3AttachmentNames(ctx context.Context, root S3LocalAttachmentRoot, max int)
 		return nil, nil, ErrS3LocalAttachmentLimit
 	}
 	names = make([]string, 0, len(entries))
-	seen := make(map[string]bool, len(entries))
 	for _, entry := range entries {
 		if ctx.Err() != nil {
 			return nil, nil, ctx.Err()
 		}
 		name := entry.Name()
-		if !s3LocalAttachmentName(name) || entry.Type()&os.ModeType != 0 || seen[name] {
+		if !s3LocalAttachmentNameAvailable(name, names) || entry.Type()&os.ModeType != 0 {
 			return nil, nil, ErrS3LocalAttachmentEntry
 		}
-		seen[name] = true
 		names = append(names, name)
 	}
 	sort.Strings(names)
