@@ -1,2 +1,0 @@
-.reference-maintenance-status{position:fixed;bottom:40px;right:16px;z-index:45;max-width:min(460px,calc(100vw - 32px));display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink);font-size:12px;line-height:1.6}
-.reference-maintenance-status button{flex-shrink:0}
