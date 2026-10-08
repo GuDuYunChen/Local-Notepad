@@ -22,3 +22,5 @@ Read `docs/ASSISTANT_EXECUTION_INCIDENTS.md` for assistant-caused execution risk
 Before pushing, test negative evidence/scope cases locally. Do not chain a new feature onto an unaccepted fix.
 Observe the same workflow at least 90 seconds apart. At 30 external connector calls, checkpoint and reassess the remaining work instead of unbounded polling/downloads.
 Record final acceptance in a PR comment/local report, not a new source commit just to update status and restart every workflow.
+
+Application versions are not phase numbers. For a code-bearing user delivery, explicitly increment the patch version for fixes or minor version for features; keep schema14 and dependency nodes unchanged. Use `npm run version:patch` or `npm run version:minor`, then run `node scripts/check-app-version.mjs --previous-version=<last-accepted-app-version>` before pushing. Check the new installer, not a renamed old binary. Do not increment versions automatically during builds, create release tags, or make status-only version commits. See `docs/APP_VERSION_2F62_1.md`.
