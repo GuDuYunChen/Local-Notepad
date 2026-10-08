@@ -1,5 +1,7 @@
 # Local-Notepad development
 
+Current code-bearing delivery: 2F.63 / 4.196.0 local overview HTTP adapter. Read `docs/SYNC_S3_LOCAL_OVERVIEW_HTTP_2F63.md` alongside the older handoff snapshots; current acceptance still comes from the actual branch and PR #2. The 4.195.2 maintenance was accepted in comment 6062234444; do not republish old candidates.
+
 Read `docs/DEVELOPMENT_HANDOFF.md` before resuming an interrupted task.
 Work on `feature/knowledge-os-phase2` / Draft PR #2 unless the user explicitly changes that direction. Do not merge master as part of ordinary stage development.
 
