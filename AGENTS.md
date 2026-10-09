@@ -1,6 +1,6 @@
 # Local-Notepad development
 
-Current code-bearing delivery: 2F.66 / 4.199.0 packaged local inventory entry. Read `docs/LOCAL_INVENTORY_2F66.md` first. Base dc681d9f5e59a6acfa01cac0ac0086b30ae35313 / 4.198.1 was accepted in PR #2 comment 6078004708. The new entry is manually triggered in Settings, uses a main/backend-only ephemeral capability, and returns bounded local counts, not cloud sync. Current-HEAD tests and installer acceptance remain separate checkpoints in PR #2.
+Current code-bearing delivery candidate: 2F.67 / 4.200.0 local inventory reports. Read `docs/LOCAL_INVENTORY_REPORT_2F67.md` first. Base 2ea5122163b67df806b40ad916a464a499815aff / 4.199.0 was accepted in PR #2 comment 6079550692; its completed work must not be replayed after a chat interruption. This stage adds explicit copy/export of already-validated local statistics, not another scan, backup or cloud sync. Check the latest PR checkpoint for current-HEAD CI and installer acceptance.
 
 Read `docs/DEVELOPMENT_HANDOFF.md` before resuming an interrupted task.
 Work on `feature/knowledge-os-phase2` / Draft PR #2 unless the user explicitly changes that direction. Do not merge master as part of ordinary stage development.

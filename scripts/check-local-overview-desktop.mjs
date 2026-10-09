@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { verifyLocalOverviewReportDesktop } from './check-local-overview-report-desktop.mjs'
 import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { createHash } from 'node:crypto'
@@ -37,5 +38,6 @@ export async function verifyLocalOverviewDesktop({ evaluate, click, cdp, until, 
     checks: ['unauthenticated-http-refused', 'no-implicit-panel-result', 'real-click-through-ipc-and-go', 'four-real-categories', 'invalid-path-refused', 'source-notes-unchanged', 'no-renderer-token'],
     screenshot: { filename: 'local-overview.png', bytes: png.length, sha256: createHash('sha256').update(png).digest('hex') },
   }, null, 2))
+  await verifyLocalOverviewReportDesktop({ evaluate, click, cdp, until, api, out, noteIDs, rows: snapshot.rows })
   await click('[aria-label="返回笔记"]')
 }

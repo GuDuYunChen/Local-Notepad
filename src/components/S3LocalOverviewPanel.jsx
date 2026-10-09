@@ -1,5 +1,6 @@
 import React, { useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import useS3LocalOverview from '../hooks/useS3LocalOverview.js'
+import S3LocalOverviewReport from './S3LocalOverviewReport.jsx'
 import './S3LocalOverviewPanel.css'
 
 const labels = { file: '笔记与文件夹（含回收站）', tag: '标签', 'file-tag': '笔记与标签关联', attachment: '附件' }
@@ -52,6 +53,7 @@ export default function S3LocalOverviewPanel({ revision = 0, disabled = false })
         </table>
       </div>
       <p className="local-inventory-note">已有共同基线条目：{summary.base_items}。容量为同步规范记录或附件正文大小，不是数据库文件大小；读取后继续编辑会改变数据。</p>
+      <S3LocalOverviewReport summary={summary} />
     </>}
     <details className="local-inventory-note"><summary>读取范围与上限</summary>
       <p>每次最多读取 128 条数据库记录（笔记、文件夹、标签及关联合计）、128 个附件与 128 个共同基线条目；单条规范记录最多 256 KiB，规范记录合计最多 2 MiB，单附件最多 32 MiB、附件合计最多 64 MiB。超限会整次拒绝，不截取部分结果。</p>
