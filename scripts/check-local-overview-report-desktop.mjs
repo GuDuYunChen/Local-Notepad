@@ -1,3 +1,4 @@
+import { verifyLocalOverviewFileDesktop } from './check-local-overview-file-desktop.mjs'
 import assert from 'node:assert/strict'
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
@@ -61,4 +62,5 @@ export async function verifyLocalOverviewReportDesktop({ evaluate, click, cdp, u
     checks: ['actual-system-clipboard', 'actual-downloaded-json', 'source-category-counts-match', 'no-private-note-data', 'generation-not-observation-time', 'no-false-saved-receipt', 'notes-unchanged'],
     export: { filename, bytes: bytes.length, sha256: hash(bytes) }, clipboard: { bytes: Buffer.byteLength(text), sha256: hash(Buffer.from(text)) },
     screenshot: { filename: 'local-report.png', bytes: png.length, sha256: hash(png) } }, null, 2))
+  await verifyLocalOverviewFileDesktop({ evaluate, click, cdp, until, api, out, noteIDs, filename: path.join(destination, filename), expected: report })
 }

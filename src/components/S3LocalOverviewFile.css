@@ -1,0 +1,4 @@
+[data-local-report-file] { margin-top: 16px; }
+[data-local-report-file] label { display: block; min-width: 0; max-width: 100%; }
+[data-local-report-file] input[type="file"] { display: block; box-sizing: border-box; max-width: 100%; margin-top: 6px; color: inherit; font: inherit; }
+[data-local-file-result] { color: var(--ink, var(--fg)); }
