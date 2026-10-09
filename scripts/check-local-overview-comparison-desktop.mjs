@@ -1,3 +1,4 @@
+import { verifyLocalOverviewDifferencesDesktop } from './check-local-overview-differences-desktop.mjs'
 import assert from 'node:assert/strict'
 import { writeFileSync } from 'node:fs'
 import path from 'node:path'
@@ -41,4 +42,5 @@ export async function verifyLocalOverviewComparisonDesktop({ evaluate, click, cd
     realPackagedApp:true,realFileReader:true,syntheticData:true,
     checks:['explicit-comparison-required','same-export-zero-deltas','replacement-revokes-consent','signed-count-and-byte-deltas','unverified-provenance-visible','hide-preserves-file-view','original-reselection-no-stale-comparison','notes-unchanged'],
     same,changed,text,screenshot:{filename:'local-comparison.png',bytes:png.length,sha256:createHash('sha256').update(png).digest('hex')}},null,2))
+  await verifyLocalOverviewDifferencesDesktop({ evaluate, click, cdp, until, api, out, noteIDs, filename, reference, choose })
 }

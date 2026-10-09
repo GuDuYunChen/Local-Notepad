@@ -1,6 +1,6 @@
 # Local-Notepad development
 
-Current code-bearing delivery candidate: 2F.69 / 4.202.0 explicit local/file statistics comparison. Read `docs/LOCAL_INVENTORY_COMPARISON_2F69.md` first. Base 30889a62deb67a1c4aa07bab1aebc9c24f5841d0 / 4.201.0 was accepted in PR #2 comment 6083361370. Compare only two already-available observations, never infer shared workspace, content equality or sync actions from totals. Current-HEAD CI and packaged-app evidence remain separate acceptance checkpoints.
+Current code-bearing delivery candidate: 2F.70 / 4.203.0 comparison difference filtering. Read `docs/LOCAL_INVENTORY_DIFFERENCES_2F70.md` first. Base ca44591740104c4d16f128a883ef09042e554a59 / 4.202.0 was accepted in PR #2 comment 6084376264. Filtering only changes visible already-validated metrics; it must not scan, mutate data or renew comparison consent. Current-HEAD CI and packaged evidence require separate acceptance.
 
 Read `docs/DEVELOPMENT_HANDOFF.md` before resuming an interrupted task.
 Work on `feature/knowledge-os-phase2` / Draft PR #2 unless the user explicitly changes that direction. Do not merge master as part of ordinary stage development.
