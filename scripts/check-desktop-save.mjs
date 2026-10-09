@@ -15,6 +15,7 @@ import { verifyDesktopSaveReport } from './desktop-save-evidence.mjs'
 import { desktopNote as note } from './desktop-save-fixture.mjs'
 import { selectDesktopMainWindow } from './desktop-window-target.mjs'
 import { createDesktopWindowSession } from './desktop-window-session.mjs'
+import { verifyLocalOverviewDesktop } from './check-local-overview-desktop.mjs'
 
 assert.equal(process.platform, 'win32', 'This check requires the actual Windows package')
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -271,6 +272,8 @@ try {
   await launch(); await open(a.id, 'native-close-latest')
   assert.equal((await api('/api/files/' + a.id)).content, persisted)
   await screenshot('restarted-fresh-profile')
+  await verifyLocalOverviewDesktop({ evaluate, click, cdp, until, api, out, noteIDs: [a.id, b.id] })
+  await open(a.id, 'native-close-latest')
   await closeWindow()
   report.checks.push('fresh-profile packaged restart reads latest body from real database and closes cleanly')
   report.windowHelper.stoppedCleanly = await windowSession.dispose()

@@ -18,6 +18,7 @@ import { createWebDAVSecretStore } from './webdav-secret.js'
 import { createS3ProbeService, registerS3ProbeHandler } from './s3-probe-bridge.js'
 import { createS3ProbeScope } from './s3-probe-scope.js'
 import { createS3PreviewService, registerS3PreviewHandler } from './s3-preview-bridge.js'
+import { createS3LocalOverviewRuntime } from './s3-local-overview-runtime.js'
 import { createDataSafetyService, runBackupCommand, registerDataSafetyHandlers } from './data-safety.js'
 import { createWorkspacePackageService, registerWorkspacePackageHandlers } from './workspace-package.js'
 import {
@@ -307,7 +308,7 @@ async function startBackend() {
     try {
       const backendBin = process.platform === 'win32' ? 'notepad-server.exe' : 'notepad-server'
       const exe = path.join(process.resourcesPath, 'bin', backendBin)
-      const env = { ...process.env }
+      const env = localOverviewRuntime.childEnvironment(process.env)
       try {
         const secret = await webdavSecrets.load()
         if (secret) env.NOTEPAD_WEBDAV_PASSWORD = secret
@@ -553,6 +554,15 @@ const s3PreviewScope = createS3ProbeScope({
 })
 registerS3PreviewHandler(ipcMain, s3Preview, s3PreviewScope)
 app.on('before-quit', () => s3PreviewScope.abortAll())
+
+const localOverviewRuntime = createS3LocalOverviewRuntime({
+  ipcMain, getWindow: () => mainWindow,
+  getExpectedURL: () => app.isPackaged
+    ? pathToFileURL(path.join(app.getAppPath(), 'dist/index.html')).href : 'http://localhost:5000/',
+  isClosing: () => quitting || allowQuit || Boolean(windowClosePromise),
+  isAvailable: () => app.isPackaged && backend !== null && backend.exitCode === null,
+})
+app.on('before-quit', () => localOverviewRuntime.abort())
 
 
 const runDataSafety = args => {

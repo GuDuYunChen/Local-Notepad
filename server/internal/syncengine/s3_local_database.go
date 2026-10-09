@@ -87,8 +87,18 @@ func ReadS3LocalDatabaseSnapshot(ctx context.Context, db *sql.DB, limits S3Local
 		}
 	}()
 	var schema, uncommitted int
-	if tx.QueryRowContext(call, "PRAGMA user_version").Scan(&schema) != nil || schema != 14 ||
-		tx.QueryRowContext(call, "PRAGMA read_uncommitted").Scan(&uncommitted) != nil || uncommitted != 0 {
+	if tx.QueryRowContext(call, "PRAGMA user_version").Scan(&schema) != nil {
+		return out, ErrS3LocalDatabaseRead
+	}
+	// Production migrations use schema_migrations and leave user_version at 0.
+	// Preserve explicit nonzero version refusal and verify within this same
+	// read-only transaction. Never migrate or set a PRAGMA from a read request.
+	if schema == 0 {
+		if tx.QueryRowContext(call, "SELECT COALESCE(MAX(version), 0) FROM schema_migrations").Scan(&schema) != nil {
+			return out, ErrS3LocalDatabaseRead
+		}
+	}
+	if schema != 14 || tx.QueryRowContext(call, "PRAGMA read_uncommitted").Scan(&uncommitted) != nil || uncommitted != 0 {
 		return out, ErrS3LocalDatabaseRead
 	}
 	var store, revision sql.NullString

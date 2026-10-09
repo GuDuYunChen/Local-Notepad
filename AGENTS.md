@@ -1,6 +1,6 @@
 # Local-Notepad development
 
-Current code-bearing repair: 2F.65.1 / 4.198.1 local-overview failure deadline. Read `docs/SYNC_S3_LOCAL_OVERVIEW_FAILURE_DEADLINE_2F65_1.md` first. Base 0e6ed01094db4f8e76e088655b60dceda87482e4 / 4.198.0 was accepted in PR #2 comment 6076119077. This resumes the previously unpushed repair, not 2F.66. Source publication, current-HEAD CI and installer acceptance are separate checkpoints in PR #2; do not replay older candidates.
+Current code-bearing delivery: 2F.66 / 4.199.0 packaged local inventory entry. Read `docs/LOCAL_INVENTORY_2F66.md` first. Base dc681d9f5e59a6acfa01cac0ac0086b30ae35313 / 4.198.1 was accepted in PR #2 comment 6078004708. The new entry is manually triggered in Settings, uses a main/backend-only ephemeral capability, and returns bounded local counts, not cloud sync. Current-HEAD tests and installer acceptance remain separate checkpoints in PR #2.
 
 Read `docs/DEVELOPMENT_HANDOFF.md` before resuming an interrupted task.
 Work on `feature/knowledge-os-phase2` / Draft PR #2 unless the user explicitly changes that direction. Do not merge master as part of ordinary stage development.

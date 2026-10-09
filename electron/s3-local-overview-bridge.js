@@ -35,13 +35,14 @@ function responseLength(res) {
   return length
 }
 
-// Explicit opt-in module; not registered in main/preload or production routing.
-// The trusted host must authorize and bind the backend resources separately.
+// The packaged runtime supplies a private process-session capability.
+// A standalone instance without getToken cannot access the authenticated host.
 // Main-process transport configuration only. No renderer-controlled URL,
 // headers, timers, filesystem, database, cache, retry or browser HTTP fallback.
 export function createS3LocalOverviewService({ requestImpl = nodeHttpRequest, target = S3_LOCAL_OVERVIEW_URL,
-  timeoutMs = S3_LOCAL_OVERVIEW_TIMEOUT_MS } = {}) {
+  timeoutMs = S3_LOCAL_OVERVIEW_TIMEOUT_MS, getToken = null } = {}) {
   if (target !== S3_LOCAL_OVERVIEW_URL || typeof requestImpl !== 'function' ||
+      (getToken !== null && typeof getToken !== 'function') ||
       !Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > S3_LOCAL_OVERVIEW_TIMEOUT_MS) throw new Error('invalid native local overview configuration')
   let active = null
   return Object.freeze({
@@ -51,7 +52,7 @@ export function createS3LocalOverviewService({ requestImpl = nodeHttpRequest, ta
       if (active) return localOverviewFailure('native-local-overview-busy')
       const slot = {}; active = slot
       const deadline = performance.now() + timeoutMs
-      let encoded, signal
+      let encoded, signal, token
       const release = () => { if (active === slot) active = null }
       try {
         signal = options.signal
@@ -59,6 +60,10 @@ export function createS3LocalOverviewService({ requestImpl = nodeHttpRequest, ta
         if (signal?.aborted) { release(); return localOverviewFailure('native-local-overview-cancelled') }
         encoded = encodeS3LocalOverviewRequest(value)
         if (!encoded) { release(); return localOverviewFailure('invalid-local-overview-request') }
+        if (getToken !== null) {
+          token = getToken()
+          if (typeof token !== 'string' || !/^[a-f0-9]{64}$/.test(token)) { release(); return localOverviewFailure('native-local-overview-unavailable') }
+        }
         if (signal?.aborted) { release(); return localOverviewFailure('native-local-overview-cancelled') }
         if (performance.now() >= deadline) { release(); return localOverviewFailure('native-local-overview-timeout') }
       } catch { release(); return localOverviewFailure('invalid-local-overview-request') }
@@ -93,7 +98,8 @@ export function createS3LocalOverviewService({ requestImpl = nodeHttpRequest, ta
             method: 'POST', agent: false, maxHeaderSize: 16 * 1024,
             headers: { 'Content-Type': 'application/json; charset=utf-8',
               'Content-Length': String(Buffer.byteLength(body, 'utf8')),
-              'X-Notepad-Read-Only': 's3-local-overview', 'Cache-Control': 'no-store', 'Connection': 'close' },
+              'X-Notepad-Read-Only': 's3-local-overview', 'Cache-Control': 'no-store', 'Connection': 'close',
+              ...(token ? { 'X-Notepad-Local-Overview': token } : {}) },
           }, incoming => {
             res = incoming
             res.on('error', () => fail('native-local-overview-unavailable'))

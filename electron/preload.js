@@ -35,6 +35,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   webdavSecretClear: () => ipcRenderer.invoke('sync:webdav-secret:clear'),
   s3ProbeRead: payload => ipcRenderer.invoke('sync:s3-probe:read', payload),
   s3PreviewRead: payload => ipcRenderer.invoke('sync:s3-preview:read', payload),
+  s3LocalOverviewRead: payload => ipcRenderer.invoke('sync:s3-local-overview:read', payload),
   onQuitPrepare: callback => {
     const handler = (_event, value) => callback({ id: value?.id })
     ipcRenderer.on('editor:quit:prepare', handler)
