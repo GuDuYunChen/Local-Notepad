@@ -11,6 +11,8 @@ import (
 	"github.com/gogf/gf/v2/net/ghttp"
 	"notepad-server/internal/middleware"
 	"notepad-server/internal/syncengine"
+
+	_ "modernc.org/sqlite" // Match the production executable's driver registration.
 )
 
 // Actual pinned GoFrame routing and production CORS. No credentials or user

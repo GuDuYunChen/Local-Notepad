@@ -29,3 +29,9 @@
 应用功能版本4.198.1→4.199.0，使用version:minor和previous-version校验；三个字段一致，679依赖节点/resolved/integrity、schema14不变。最终验收应核当前HEAD所有原流程、四UI和真实服务、双Electron、完整后端、新Windows盘点与旧保存、品牌/原生及4.199.0真实内部安装版本。最终状态写PR和交付，不再造状态-only提交。只在原feature/DraftPR2，不合master、不强推、不发布tag，不操作真实用户数据或桶；不启用Work/Codex/自动任务。普通Git一次DNS失败后停止，走本对话现有连接器，不绕过任何工具拒绝。聊天断流根因未知。
 
 参考：SQLite URI mode=ro（https://www.sqlite.org/uri.html）；Go os.Root（https://pkg.go.dev/os）；Electron IPC安全（https://www.electronjs.org/docs/latest/tutorial/security/）。
+
+## 首次 CI 发现与同阶段修正
+
+首提交03e891d的原始后端报告11609433450实际只有控制器invalid-body叶场景失败：预期400却返回422。该测试可执行程序缺少SQLite驱动注册，在请求解码之前sql.Open已失败；生产main已有相同驱动的blank import。现给新控制器测试补齐生产驱动注册，保留全部原状态码/无CORS/null统计断言，不修改生产错误码或读取器。
+
+首次完整UI为2761通过/1失败/0跳过（原报告11608724245），14新面板测试均通过。唯一失败是2F.64时期“禁止生产接线”的源码断言，与本阶段明确启用入口相冲突。该项更新为验证主进程能力、固定preload方法、授权Host、只读URI及关闭先于返回，并绑定6份未改保存/退出实现摘要；原57项桥接行为与所有保存测试保持。测试名称随语义更新，不冒称所有旧名称逐字不变，也不把这次范围转换解释为隐藏产品失败。原两份失败ZIP保留，无手动重跑；本阶段版本仍4.199.0，须以修正后的新HEAD完成全部验收。

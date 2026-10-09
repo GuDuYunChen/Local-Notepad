@@ -309,10 +309,36 @@ export function registerS3LocalOverviewTests(test) {
       } finally { f.scope.dispose() }
     }
   })
-  test('local overview keeps production routing main preload and saving untouched', () => {
-    for (const file of ['electron/main.js', 'electron/preload.js', 'server/internal/controller/sync_s3_probe.go']) {
-      assert.doesNotMatch(fs.readFileSync(path.join(ROOT, file), 'utf8'), /s3-local-overview|S3LocalOverview/)
-    }
+  // 2F.66 intentionally replaces the earlier opt-in-only boundary. Assert the
+  // narrow authenticated wiring instead of prohibiting the requested feature;
+  // all preceding transport/scope/codec assertions remain unchanged.
+  test('local overview production wiring stays authenticated and saving stays unchanged', () => {
+    const source = file => fs.readFileSync(path.join(ROOT, file), 'utf8')
+    const main = source('electron/main.js'), preload = source('electron/preload.js')
+    const runtime = source('electron/s3-local-overview-runtime.js')
+    const route = source('server/internal/controller/sync_s3_probe.go')
+    const host = source('server/internal/syncengine/s3_local_overview_host.go')
+    assert.match(main, /createS3LocalOverviewRuntime\(\{/)
+    assert.match(main, /localOverviewRuntime\.childEnvironment\(process\.env\)/)
+    assert.match(runtime, /randomBytes\(32\)/)
+    assert.match(runtime, /getToken: \(\) => isAvailable\(\) \? token : null/)
+    assert.match(preload, /s3LocalOverviewRead: payload => ipcRenderer\.invoke\('sync:s3-local-overview:read', payload\)/)
+    assert.doesNotMatch(preload, /NOTEPAD_LOCAL_OVERVIEW_TOKEN|childEnvironment|X-Notepad-Local-Overview/)
+    assert.match(route, /NewS3LocalOverviewHost\(directory, os\.Getenv\("NOTEPAD_LOCAL_OVERVIEW_TOKEN"\)\)/)
+    assert.match(host, /NativeReadOnlyRequest\(r, S3LocalOverviewIntent\)/)
+    assert.match(host, /subtle\.ConstantTimeCompare\(received\[:\], h\.tokenHash\[:\]\) != 1/)
+    assert.match(host, /RawQuery: "mode=ro"/)
+    assert.match(host, /rootErr, dbErr := root\.close\(\), db\.Close\(\)/)
+    // Capture only the untouched save/quit implementation, not unrelated main
+    // imports. These digests bind this wiring check to its accepted base.
+    for (const [file, expected] of [
+      ['src/components/TextEditor.jsx', 'f6b10294e8ec07ebd40da1a840207138b3d3e455ce50539d4d35f673ff238f54'],
+      ['src/services/editorDraftCache.js', '7d461ff7a46271d8e8d64707559ac872878f3d2786d770bc0a09434df1474e89'],
+      ['src/services/editorSaveTransaction.mjs', 'b449dad16834a936fbd5fad318352c961e160e11723cb6627d6a47714d4d36e2'],
+      ['src/services/editorQuit.mjs', 'abc21ea59352fede521e6ce6f6904f67af8f3d00b2378efae6a5e6b45c48c205'],
+      ['src/services/editorQuitBridge.mjs', '76e0d15c2dbe53548df2aa3c332bd2860047f855cbef45f0f2043031a8d35302'],
+      ['electron/quit-save.mjs', '230c779cf1be912a7cfdc0a649eccf53e0a5f79fa4b1c3c94d9013f3372c3a49'],
+    ]) assert.equal(createHash('sha256').update(source(file).replace(/\r\n/g, '\n')).digest('hex'), expected, file)
   })
   test('local overview accepts actual Go handler success and every fixed refusal', () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-local-wire-')), hashes = []
