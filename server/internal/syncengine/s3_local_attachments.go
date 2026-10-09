@@ -162,7 +162,9 @@ func s3LocalAttachmentName(name string) bool {
 		return false
 	}
 	if len(stem) >= 4 && (strings.HasPrefix(stem, "COM") || strings.HasPrefix(stem, "LPT")) {
-		suffix := strings.TrimPrefix(strings.TrimPrefix(stem, "COM"), "LPT")
+		// COM and LPT are alternative prefixes. Strip exactly one; COMLPT1
+		// is an ordinary filename, not the reserved device name COM1 or LPT1.
+		suffix := stem[3:]
 		if strings.Contains("123456789¹²³", suffix) && len([]rune(suffix)) == 1 {
 			return false
 		}

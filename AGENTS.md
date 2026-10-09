@@ -1,6 +1,6 @@
 # Local-Notepad development
 
-Current code-bearing delivery: 2F.63 / 4.196.0 local overview HTTP adapter. Read `docs/SYNC_S3_LOCAL_OVERVIEW_HTTP_2F63.md` alongside the older handoff snapshots; current acceptance still comes from the actual branch and PR #2. The 4.195.2 maintenance was accepted in comment 6062234444; do not republish old candidates.
+Current code-bearing repair: 2F.63.1 / 4.196.1 device-name prefix boundary. Read `docs/SYNC_S3_DEVICE_NAME_BOUNDARY_2F63_1.md` first and retain `docs/SYNC_S3_LOCAL_OVERVIEW_HTTP_2F63.md`. This repair is based on 812726400bc12fcef0aa67760d0e6fb3becaf3da and preserves its HTTP adapter. The older unpushed 4.195.3 candidate is superseded; do not republish it. Final acceptance comes from the actual branch and PR #2.
 
 Read `docs/DEVELOPMENT_HANDOFF.md` before resuming an interrupted task.
 Work on `feature/knowledge-os-phase2` / Draft PR #2 unless the user explicitly changes that direction. Do not merge master as part of ordinary stage development.
