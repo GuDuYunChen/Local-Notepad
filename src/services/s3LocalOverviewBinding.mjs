@@ -76,6 +76,12 @@ export function createS3LocalOverviewBinding({ getBridge = () => globalThis.wind
     } catch { finish(task, UNAVAILABLE); return true }
     return task.finished
   }
+  function unavailable(task) {
+    // Rejections and synchronous exceptions obey the same absolute cutoff as
+    // successful replies. A failed initial clock has no initialized deadline.
+    if (task.deadline > 0 && stopped(task)) return
+    finish(task, UNAVAILABLE)
+  }
   function connect() {
     if (owner) throw new TypeError('Local overview binding is already connected')
     const lease = { epoch: { refusal: null }, closed: false }
@@ -139,10 +145,10 @@ export function createS3LocalOverviewBinding({ getBridge = () => globalThis.wind
             ? view('failed', 'invalid-reply')
             : view(safe.success ? 'ready' : 'failed', safe.success ? 'ready' : safe.code, safe.status, safe.data)
           finish(task, next)
-        } catch { finish(task, UNAVAILABLE) }
+        } catch { unavailable(task) }
         finally { release(task) }
-      }, () => { finish(task, UNAVAILABLE); release(task) })
-    } catch { finish(task, UNAVAILABLE); release(task) }
+      }, () => { unavailable(task); release(task) })
+    } catch { unavailable(task); release(task) }
     return result
   }
   function subscribe(listener) {

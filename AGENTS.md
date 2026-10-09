@@ -1,6 +1,6 @@
 # Local-Notepad development
 
-Current code-bearing delivery: 2F.65 / 4.198.0 renderer local-overview lifetime binding and React hook. Read `docs/SYNC_S3_LOCAL_OVERVIEW_BINDING_2F65.md` first. Base 071d88f48da4d3dda2f0c6ee2ad1d02a363932f2 / 4.197.0 was accepted in PR #2 comment 6075140759. Do not replay older candidates. Production route/preload/settings wiring is not enabled by this module; current-HEAD CI and deliverables are verified separately in PR #2.
+Current code-bearing repair: 2F.65.1 / 4.198.1 local-overview failure deadline. Read `docs/SYNC_S3_LOCAL_OVERVIEW_FAILURE_DEADLINE_2F65_1.md` first. Base 0e6ed01094db4f8e76e088655b60dceda87482e4 / 4.198.0 was accepted in PR #2 comment 6076119077. This resumes the previously unpushed repair, not 2F.66. Source publication, current-HEAD CI and installer acceptance are separate checkpoints in PR #2; do not replay older candidates.
 
 Read `docs/DEVELOPMENT_HANDOFF.md` before resuming an interrupted task.
 Work on `feature/knowledge-os-phase2` / Draft PR #2 unless the user explicitly changes that direction. Do not merge master as part of ordinary stage development.
