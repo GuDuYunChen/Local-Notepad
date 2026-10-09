@@ -1,6 +1,6 @@
 # Local-Notepad development
 
-Current code-bearing delivery: 2F.64 / 4.197.0 native local-overview bridge. Read `docs/SYNC_S3_LOCAL_OVERVIEW_BRIDGE_2F64.md` first. Base b73cb1ec282605fde7e0719a8c25d4d525a06d8b / 4.196.1 was accepted in PR #2 comment 6073987225. Older handoff snapshots and unpushed 4.195.3/732733f candidates must not be replayed. Current-HEAD CI and deliverable acceptance remain separate checkpoints in PR #2.
+Current code-bearing delivery: 2F.65 / 4.198.0 renderer local-overview lifetime binding and React hook. Read `docs/SYNC_S3_LOCAL_OVERVIEW_BINDING_2F65.md` first. Base 071d88f48da4d3dda2f0c6ee2ad1d02a363932f2 / 4.197.0 was accepted in PR #2 comment 6075140759. Do not replay older candidates. Production route/preload/settings wiring is not enabled by this module; current-HEAD CI and deliverables are verified separately in PR #2.
 
 Read `docs/DEVELOPMENT_HANDOFF.md` before resuming an interrupted task.
 Work on `feature/knowledge-os-phase2` / Draft PR #2 unless the user explicitly changes that direction. Do not merge master as part of ordinary stage development.
