@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { EventEmitter } from 'node:events'
 import { createBackendProcessControl, BACKEND_SHUTDOWN_COMMAND } from '../electron/backend-shutdown.mjs'
+import { createS3LocalOverviewRuntime } from '../electron/s3-local-overview-runtime.js'
 
 function fixture(managed = true) {
   const timers = new Map(); let next = 0
@@ -105,13 +106,47 @@ test('actual before-quit failure retains child and does not approve exit', async
   c.handler({ preventDefault() {} }); await flush()
   assert.equal(c.backend, child); assert.equal(c.allowQuit, false); assert.equal(c.quitCalls, 0); assert.equal(c.errors, 1)
 })
+// startBackend now depends on this real main-only runtime to derive its child
+// environment. Supply the same dependency in the VM instead of short-circuiting
+// before the original asynchronous quit guard is reached. No IPC is invoked.
+function localOverviewRuntimeFixture() {
+  return createS3LocalOverviewRuntime({ ipcMain: { handle() {} },
+    getWindow: () => null, getExpectedURL: () => '', isClosing: () => false, isAvailable: () => false })
+}
 test('actual startBackend does not spawn after quitting during secret load', async () => {
   const source = mainSource.slice(mainSource.indexOf('async function startBackend()'), mainSource.indexOf('async function restartBackendForWebDAVSecret()'))
   let resolve, spawns = 0
   const c = { backend: null, backendStartPromise: null, quitting: false, process: { platform: 'win32', resourcesPath: '/app', env: {} },
     path: { join: (...v) => v.join('/') }, webdavSecrets: { load: () => new Promise(r => { resolve = r }) },
+    localOverviewRuntime: localOverviewRuntimeFixture(),
     spawn() {}, spawnManagedBackend() { spawns++; return new EventEmitter() }, dialog: { showErrorBox() {} }, console }
   vm.createContext(c); vm.runInContext(source, c)
-  const pending = c.startBackend(); c.quitting = true; resolve('secret'); await pending
+  const pending = c.startBackend(); assert.equal(typeof resolve, 'function', 'secret load must be reached')
+  c.quitting = true; resolve('secret'); await pending
   assert.equal(spawns, 0); assert.equal(c.backend, null)
+})
+
+test('actual startBackend passes a private inventory capability only to the owned child environment', async () => {
+  const source = mainSource.slice(mainSource.indexOf('async function startBackend()'), mainSource.indexOf('async function restartBackendForWebDAVSecret()'))
+  const parent = { KEEP: 'original' }, child = new EventEmitter(), calls = []
+  let errors = 0
+  const runtime = localOverviewRuntimeFixture()
+  const c = { backend: null, backendStartPromise: null, quitting: false,
+    process: { platform: 'win32', resourcesPath: '/app', env: parent },
+    path: { join: (...v) => v.join('/') }, localOverviewRuntime: runtime,
+    webdavSecrets: { load: async () => 'synthetic-secret' }, spawn() {},
+    spawnManagedBackend(_spawn, exe, options) { calls.push({ exe, options }); return child },
+    dialog: { showErrorBox() { errors++ } }, console }
+  vm.createContext(c); vm.runInContext(source, c)
+  await c.startBackend()
+  assert.equal(errors, 0); assert.equal(calls.length, 1)
+  assert.equal(c.backend, child); assert.equal(c.backendStartPromise, null)
+  assert.equal(calls[0].exe, '/app/bin/notepad-server.exe')
+  assert.notEqual(calls[0].options.env, parent)
+  assert.deepEqual(parent, { KEEP: 'original' })
+  assert.equal(calls[0].options.env.KEEP, 'original')
+  assert.equal(calls[0].options.env.NOTEPAD_WEBDAV_PASSWORD, 'synthetic-secret')
+  assert.match(calls[0].options.env.NOTEPAD_LOCAL_OVERVIEW_TOKEN, /^[a-f0-9]{64}$/)
+  assert.equal(calls[0].options.env.NOTEPAD_LOCAL_OVERVIEW_TOKEN, runtime.childEnvironment({}).NOTEPAD_LOCAL_OVERVIEW_TOKEN)
+  await c.startBackend(); assert.equal(calls.length, 1)
 })
