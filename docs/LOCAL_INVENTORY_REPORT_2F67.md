@@ -29,3 +29,9 @@ JSON使用受控Blob下载；链接清除并延迟撤销自有URL。界面只提
 须核新HEAD完整原CI、四UI/实际服务、双Electron、完整后端、Windows旧保存与盘点加本次真实复制/下载、品牌/原生及4.200.0安装包。最终状态只写PR和交付报告，不为状态再造提交。预计新UI为2804（原2762+28+14），只是预期数量，不是通过证据。读最新PR验收后继续，不因本文提交前记录重做已成功的工作。
 
 API依据：Clipboard.writeText的Promise表示系统剪贴板已更新，可能因权限拒绝（https://developer.mozilla.org/en-US/docs/Web/API/Clipboard/writeText）；CDP下载目录控制仅用于自有测试进程（https://chromedevtools.github.io/devtools-protocol/tot/Browser/#method-setDownloadBehavior）。聊天断流根因仍未知，本轮措施是减少重复调用、保存可恢复检查点，不保证平台永不中断。
+
+## 首次 Windows 原始失败与同阶段修正
+
+68fd8b3的真实打包桌面已经完成实际剪贴板复制及JSON下载，原始artifact11614714951中的checks.json仍记录complete:false：新核验脚本只接受LF行尾，系统读回的CRLF使正确的“记录合计：2”被误判。原失败ZIP摘要076327cf32c731ce52e7d1ab9e2b7542867b06f0ee240fc9f4b0c02aecb17167，下载JSON和失败截图保留；不能把已走到的局部步骤冒称完整桌面通过。
+
+修正仅在证据比较时将CRLF归一为LF，并要求恰好一行完整匹配精确数量；重复行、额外数字、尾部空格、裸CR和错误类型继续拒绝。原始剪贴板字节与摘要不改，生产复制/下载逻辑及所有旧保存/退出断言不动。新增3项共享测试；报告用例31项与原binding/截止53项本地合计84/84通过。新HEAD的全量UI预期2807只是待核数量，须重新取得当前HEAD实际结果和安装包，不手动重跑旧失败。不修改本阶段4.200.0版本、工作流或超时，不叠加下一功能。

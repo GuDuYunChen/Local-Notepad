@@ -3,6 +3,15 @@ import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { createHash } from 'node:crypto'
 
+// Clipboard transports may normalize LF to CRLF. Normalize that pair only;
+// still require one complete, exact total line (never a substring or duplicate).
+export function verifyReportClipboardTotal(text, records) {
+  assert.equal(typeof text, 'string')
+  assert.ok(Number.isSafeInteger(records) && records >= 0)
+  const totals = text.replace(/\r\n/g, '\n').split('\n').filter(line => line.startsWith('记录合计：'))
+  assert.deepEqual(totals, [`记录合计：${records}`])
+}
+
 // Extend the original packaged-app check, not a replacement renderer/clipboard
 // implementation. Only CDP download destination and read-side user gesture are
 // configured in this isolated test process. No actual user workspace is used.
@@ -35,7 +44,7 @@ export async function verifyLocalOverviewReportDesktop({ evaluate, click, cdp, u
   assert.deepEqual(report.kinds.map(r => r.records), rows.map(row => Number(row[1])))
   assert.equal(report.records, report.kinds.reduce((n,r) => n+r.records, 0))
   assert.equal(report.recordBytes, report.kinds.reduce((n,r) => n+r.recordBytes, 0))
-  assert.match(text, new RegExp(`记录合计：${report.records}(?:\\n|$)`))
+  verifyReportClipboardTotal(text, report.records)
   for (const privateValue of [...noteIDs, 'Desktop save A.md', 'Desktop save B.md', 'native-close-latest']) {
     assert.ok(!text.includes(privateValue)); assert.ok(!bytes.toString().includes(privateValue))
   }

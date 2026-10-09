@@ -1,3 +1,4 @@
+import { verifyReportClipboardTotal } from './check-local-overview-report-desktop.mjs'
 import assert from 'node:assert/strict'
 import { prepareLocalOverviewReport as prepare, requestLocalOverviewDownload as download,
   createLocalOverviewClipboard as clipboard, LOCAL_REPORT_COPY_WAIT_MS } from '../src/services/s3LocalOverviewReport.mjs'
@@ -14,6 +15,22 @@ function fixture(write = async () => {}) {
     at: value => { at = value }, timeout: () => { at = LOCAL_REPORT_COPY_WAIT_MS; timer() } }
 }
 export function registerLocalOverviewReportTests(test) {
+  test('inventory clipboard evidence accepts exact LF and Windows CRLF totals', () => {
+    for (const newline of ['\n', '\r\n']) {
+      verifyReportClipboardTotal(['report', '记录合计：2', 'scope', ''].join(newline), 2)
+      verifyReportClipboardTotal('report' + newline + '记录合计：2', 2)
+    }
+  })
+  test('inventory clipboard evidence still rejects wrong, duplicate and partial total lines', () => {
+    for (const text of ['记录合计：20\r\n', '记录合计：2 extra\n', '记录合计：2 \r\n',
+      'prefix记录合计：2\n', '记录合计：2\r', '记录合计：2\r\n记录合计：2\r\n', 'no total']) {
+      assert.throws(() => verifyReportClipboardTotal(text, 2))
+    }
+  })
+  test('inventory clipboard evidence rejects missing text and invalid expected counts', () => {
+    for (const text of [null, undefined, 2, {}]) assert.throws(() => verifyReportClipboardTotal(text, 2))
+    for (const count of [-1, 2.5, '2', NaN]) assert.throws(() => verifyReportClipboardTotal('记录合计：2\n', count))
+  })
   test('inventory report outputs exact counts, four categories and explicit limited scope', () => {
     const s = summary(), out = prepare(s, when), json = JSON.parse(out.raw)
     assert.deepEqual(Object.keys(json), ['format','version','generatedAtUTC','scope','readOnly','completeForPreview','notice','generationTimeIsObservationTime','records','recordBytes','attachmentBytes','baseItems','kinds'])
