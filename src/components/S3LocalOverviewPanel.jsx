@@ -60,6 +60,6 @@ export default function S3LocalOverviewPanel({ revision = 0, disabled = false })
       <p>每次最多读取 128 条数据库记录（笔记、文件夹、标签及关联合计）、128 个附件与 128 个共同基线条目；单条规范记录最多 256 KiB，规范记录合计最多 2 MiB，单附件最多 32 MiB、附件合计最多 64 MiB。超限会整次拒绝，不截取部分结果。</p>
       <p>只在明确点击后读取当前桌面工作区。停止采用结果不代表磁盘读取已经结束；这里不会比较远端、执行同步或替你选择冲突版本。开发环境或未由桌面管理的后端不会获得读取授权。</p>
     </details>
-    <S3LocalOverviewFile />
+    <S3LocalOverviewFile currentSummary={summary} />
   </section>
 }

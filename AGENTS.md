@@ -1,6 +1,6 @@
 # Local-Notepad development
 
-Current code-bearing delivery candidate: 2F.68 / 4.201.0 offline inventory report viewer. Read `docs/LOCAL_INVENTORY_FILE_2F68.md` first. Base 653bcf99d178bf853217f3b3c8e2f6ddef48172f / 4.200.0 was accepted in PR #2 comment 6082163887. Only a user-selected small JSON file is read; file statistics are untrusted and never imported into the workspace. Current-HEAD CI and packaged-app acceptance must be recorded separately in PR #2.
+Current code-bearing delivery candidate: 2F.69 / 4.202.0 explicit local/file statistics comparison. Read `docs/LOCAL_INVENTORY_COMPARISON_2F69.md` first. Base 30889a62deb67a1c4aa07bab1aebc9c24f5841d0 / 4.201.0 was accepted in PR #2 comment 6083361370. Compare only two already-available observations, never infer shared workspace, content equality or sync actions from totals. Current-HEAD CI and packaged-app evidence remain separate acceptance checkpoints.
 
 Read `docs/DEVELOPMENT_HANDOFF.md` before resuming an interrupted task.
 Work on `feature/knowledge-os-phase2` / Draft PR #2 unless the user explicitly changes that direction. Do not merge master as part of ordinary stage development.

@@ -1,3 +1,4 @@
+import { verifyLocalOverviewComparisonDesktop } from './check-local-overview-comparison-desktop.mjs'
 import assert from 'node:assert/strict'
 import { writeFileSync } from 'node:fs'
 import path from 'node:path'
@@ -26,6 +27,7 @@ export async function verifyLocalOverviewFileDesktop({ evaluate, click, cdp, unt
   await evaluate("document.querySelector('[data-local-file-result]').scrollIntoView({block:'center'}); new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))")
   const png = Buffer.from((await cdp.send('Page.captureScreenshot', { format: 'png' })).data, 'base64')
   writeFileSync(path.join(out, 'local-file.png'), png)
+  await verifyLocalOverviewComparisonDesktop({ evaluate, click, cdp, until, api, out, noteIDs, filename, expected, choose })
   await click('[data-local-report-file] button')
   assert.equal(await evaluate("document.querySelector('[data-local-file-result]')===null"), true)
   const bad = path.join(out, 'invalid-offline-report.json'); writeFileSync(bad, '{')

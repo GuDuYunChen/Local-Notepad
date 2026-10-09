@@ -1,10 +1,11 @@
 import React, { useEffect, useId, useRef, useState } from 'react'
 import './S3LocalOverviewFile.css'
+import S3LocalOverviewComparison from './S3LocalOverviewComparison.jsx'
 import { LOCAL_REPORT_FILE_NOTICE, readLocalOverviewFile } from '../services/s3LocalOverviewFile.mjs'
 
 const labels = { file: '笔记与文件夹（含回收站）', tag: '标签', 'file-tag': '笔记与标签关联', attachment: '附件' }
 const initial = { state: 'idle', report: null, message: '选择已导出的统计 JSON 文件即可查看；不需要先读取当前工作区。' }
-export default function S3LocalOverviewFile() {
+export default function S3LocalOverviewFile({ currentSummary = null }) {
   const id = useId(), active = useRef(null), input = useRef(null)
   const [view, setView] = useState(initial)
   const revoke = () => { const old = active.current; active.current = null; old?.abort() }
@@ -41,6 +42,7 @@ export default function S3LocalOverviewFile() {
           <tbody>{data.kinds.map(row => <tr key={row.kind}><th scope="row">{labels[row.kind]}</th><td>{row.records}</td><td>{row.record_bytes} B</td></tr>)}</tbody>
         </table>
       </div>
+      <S3LocalOverviewComparison report={view.report} localSummary={currentSummary} />
     </div>}
   </details>
 }
