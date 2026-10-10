@@ -1,8 +1,10 @@
 import React, { useId, useLayoutEffect, useRef, useState } from 'react'
 import { readLocalOverviewFile } from '../services/s3LocalOverviewFile.mjs'
-import { compareOfflineReportPair, OFFLINE_PAIR_NOTICE } from '../services/s3OfflineReportPair.mjs'
+import { OFFLINE_PAIR_NOTICE } from '../services/s3OfflineReportPair.mjs'
 import { comparisonDelta } from '../services/s3LocalOverviewComparison.mjs'
 import './S3OfflineReportPair.css'
+import { createOfflinePairExport } from '../services/s3OfflinePairExport.mjs'
+import S3OfflinePairExport from './S3OfflinePairExport.jsx'
 
 const idle = () => ({ state: 'idle', report: null, message: '尚未选择报告。' })
 const initial = () => ({ a: idle(), b: idle(), comparison: null, error: '' })
@@ -50,7 +52,7 @@ export default function S3OfflineReportPair() {
   const compare = () => {
     const current = model.current
     if (!owner.current || current.a.state !== 'ready' || current.b.state !== 'ready') return
-    try { publish({ ...current, comparison: compareOfflineReportPair(current.a.report, current.b.report), error: '' }) }
+    try { publish({ ...current, comparison: createOfflinePairExport(current.a.report, current.b.report), error: '' }) }
     catch { publish({ ...current, comparison: null, error: '报告依据无效，未显示部分比较。' }) }
   }
   const swap = () => {
@@ -60,7 +62,7 @@ export default function S3OfflineReportPair() {
   }
   const containDrag = event => { event.preventDefault(); event.stopPropagation() }
   const refuseDrop = event => { containDrag(event); if (owner.current) publish({ ...model.current, error: '请使用各侧的文件选择按钮；本区域不接收拖放，现有选择未改变。' }) }
-  const result = view.comparison
+  const result = view.comparison?.comparison
   return <details className="local-inventory-note offline-report-pair" data-offline-pair onDragEnter={containDrag} onDragOver={containDrag} onDrop={refuseDrop} onToggle={event => { if (!event.currentTarget.open) reset() }}>
     <summary>比较两份离线统计报告</summary>
     <p id={`${id}-notice`}>{OFFLINE_PAIR_NOTICE} 无需读取本地统计。关闭此面板会清空本次选择。</p>
@@ -90,5 +92,6 @@ export default function S3OfflineReportPair() {
         </tr>)}</tbody>
       </table>
     </div>}
+    {result && <S3OfflinePairExport output={view.comparison} />}
   </details>
 }

@@ -1,3 +1,4 @@
+import { verifyOfflinePairExportDesktop } from './check-offline-pair-export-desktop.mjs'
 import assert from 'node:assert/strict'
 import { writeFileSync } from 'node:fs'
 import path from 'node:path'
@@ -41,6 +42,7 @@ export async function verifyOfflineReportPairDesktop({ evaluate, click, cdp, unt
   await evaluate("document.querySelector('[data-offline-result]').scrollIntoView({block:'center'});new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))")
   const png = Buffer.from((await cdp.send('Page.captureScreenshot', { format: 'png' })).data, 'base64')
   writeFileSync(path.join(out, 'offline-report-pair.png'), png)
+  await verifyOfflinePairExportDesktop({ evaluate, click, cdp, until, api, out, noteIDs, reverse })
   await select('a', invalid); await until(async () => (await state('a')) === 'failed', 'Invalid replacement was not refused')
   assert.equal(await hasResult(), false); assert.equal(await state('b'), 'ready')
   assert.equal(await evaluate("document.querySelector('[data-offline-compare]').disabled"), true)
