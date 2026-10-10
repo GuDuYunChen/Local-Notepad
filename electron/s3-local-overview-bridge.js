@@ -54,25 +54,40 @@ export function createS3LocalOverviewService({ requestImpl = nodeHttpRequest, ta
       const deadline = performance.now() + timeoutMs
       let encoded, signal, token
       const release = () => { if (active === slot) active = null }
+      // Use one terminal policy for preflight, success, errors and close.
+      // Timer callbacks can run late; cancellation keeps its existing priority.
+      const interruption = () => {
+        try {
+          if (signal instanceof AbortSignal && signal.aborted) return 'native-local-overview-cancelled'
+        } catch { /* Invalid direct-call signals cannot supply cancellation state. */ }
+        return performance.now() >= deadline ? 'native-local-overview-timeout' : null
+      }
+      const refuse = code => {
+        const result = localOverviewFailure(interruption() || code)
+        release()
+        return result
+      }
       try {
         signal = options.signal
-        if (signal !== undefined && !(signal instanceof AbortSignal)) { release(); return localOverviewFailure('invalid-local-overview-request') }
-        if (signal?.aborted) { release(); return localOverviewFailure('native-local-overview-cancelled') }
+        if (signal !== undefined && !(signal instanceof AbortSignal)) { return refuse('invalid-local-overview-request') }
+        if (signal?.aborted) { return refuse('native-local-overview-cancelled') }
         encoded = encodeS3LocalOverviewRequest(value)
-        if (!encoded) { release(); return localOverviewFailure('invalid-local-overview-request') }
+        if (!encoded) { return refuse('invalid-local-overview-request') }
         if (getToken !== null) {
           token = getToken()
-          if (typeof token !== 'string' || !/^[a-f0-9]{64}$/.test(token)) { release(); return localOverviewFailure('native-local-overview-unavailable') }
+          if (typeof token !== 'string' || !/^[a-f0-9]{64}$/.test(token)) { return refuse('native-local-overview-unavailable') }
         }
-        if (signal?.aborted) { release(); return localOverviewFailure('native-local-overview-cancelled') }
-        if (performance.now() >= deadline) { release(); return localOverviewFailure('native-local-overview-timeout') }
-      } catch { release(); return localOverviewFailure('invalid-local-overview-request') }
+        if (signal?.aborted) { return refuse('native-local-overview-cancelled') }
+        if (performance.now() >= deadline) { return refuse('native-local-overview-timeout') }
+      } catch { return refuse('invalid-local-overview-request') }
       let body = encoded; encoded = null
       return new Promise(resolve => {
         let req, res, timer, settled = false, requestClosed = false, creating = false
         const chunks = []; let bytes = 0
         const finish = result => {
           if (settled) return
+          const reason = interruption()
+          if (reason) result = localOverviewFailure(reason)
           settled = true; clearTimeout(timer); signal?.removeEventListener('abort', abort)
           chunks.length = 0; body = ''
           resolve(result)

@@ -1,6 +1,6 @@
 # Local-Notepad development
 
-Current code-bearing delivery candidate: 2F.70 / 4.203.0 comparison difference filtering. Read `docs/LOCAL_INVENTORY_DIFFERENCES_2F70.md` first. Base ca44591740104c4d16f128a883ef09042e554a59 / 4.202.0 was accepted in PR #2 comment 6084376264. Filtering only changes visible already-validated metrics; it must not scan, mutate data or renew comparison consent. Current-HEAD CI and packaged evidence require separate acceptance.
+Current code-bearing delivery candidate: 2F.70.1 / 4.203.1 native local-overview terminal deadline repair. Read `docs/LOCAL_NATIVE_DEADLINE_2F70_1.md` first. Base 513558855d90dda25a192cb7516f8127ed06508d / 4.203.0 was accepted in PR #2 comment 6091357551. Preserve prior completed work. Cancellation, timeout and pre-deadline errors use one terminal policy without releasing pending requests early. Current-HEAD CI and packaged evidence require separate acceptance.
 
 Read `docs/DEVELOPMENT_HANDOFF.md` before resuming an interrupted task.
 Work on `feature/knowledge-os-phase2` / Draft PR #2 unless the user explicitly changes that direction. Do not merge master as part of ordinary stage development.
