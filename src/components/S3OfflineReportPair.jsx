@@ -5,6 +5,7 @@ import { comparisonDelta } from '../services/s3LocalOverviewComparison.mjs'
 import './S3OfflineReportPair.css'
 import { createOfflinePairExport } from '../services/s3OfflinePairExport.mjs'
 import S3OfflinePairExport from './S3OfflinePairExport.jsx'
+import S3OfflineReportDrop from './S3OfflineReportDrop.jsx'
 import { offlinePairVisibleRows } from '../services/s3OfflinePairView.mjs'
 
 const idle = () => ({ state: 'idle', report: null, message: '尚未选择报告。' })
@@ -34,12 +35,9 @@ export default function S3OfflineReportPair() {
     for (const input of Object.values(inputs.current)) if (input) input.value = ''
     publish(initial())
   }
-  const choose = (side, event) => {
-    const files = event.target.files
-    if (!owner.current || !files?.length) return // Picker cancellation keeps the view.
-    const count = files.length, file = count === 1 ? files[0] : null
-    event.target.value = '' // Capture the file before clearing the native input.
-    if (count !== 1) { publish({ ...model.current, error: '每侧只能选择一份报告；现有选择未改变。' }); return }
+  const openFile = (side, file) => {
+    if (!owner.current) return
+    if (inputs.current[side]) inputs.current[side].value = ''
     revoke(side)
     const task = { controller: new AbortController(), owner: owner.current }; tasks.current[side] = task
     publish({ ...model.current, [side]: { state: 'reading', report: null, message: '正在读取并完整校验…' }, comparison: null, error: '' })
@@ -52,6 +50,14 @@ export default function S3OfflineReportPair() {
       report => finish({ state: 'ready', report, message: '文件统计已校验；来源未经验证。' }),
       () => finish({ state: 'failed', report: null, message: '读取未完成或报告无效。仅接受不超过 4 KiB 的 UTF-8 JSON v1；没有采用部分数据，请重新选择。' }),
     )
+  }
+  const choose = (side, event) => {
+    const files = event.target.files
+    if (!owner.current || !files?.length) return // Picker cancellation keeps the view.
+    const count = files.length, file = count === 1 ? files[0] : null
+    event.target.value = '' // Capture the file before clearing the native input.
+    if (count !== 1) { publish({ ...model.current, error: '每侧只能选择一份报告；现有选择未改变。' }); return }
+    openFile(side, file)
   }
   const ready = view.a.state === 'ready' && view.b.state === 'ready'
   const compare = () => {
@@ -66,7 +72,7 @@ export default function S3OfflineReportPair() {
     publish({ a: current.b, b: current.a, comparison: null, error: '' })
   }
   const containDrag = event => { event.preventDefault(); event.stopPropagation() }
-  const refuseDrop = event => { containDrag(event); if (owner.current) publish({ ...model.current, error: '请使用各侧的文件选择按钮；本区域不接收拖放，现有选择未改变。' }) }
+  const refuseDrop = event => { containDrag(event); if (owner.current) publish({ ...model.current, error: '请拖入报告 A 或 B 的专用区域，或使用文件选择按钮；现有选择未改变。' }) }
   const result = view.comparison?.comparison
   const onlyDifferences = Boolean(result && differenceSource === view.comparison)
   const visibleRows = result ? offlinePairVisibleRows(result, onlyDifferences) : []
@@ -76,6 +82,7 @@ export default function S3OfflineReportPair() {
     <div className="offline-pair-inputs">
       {['a', 'b'].map(side => <fieldset key={side} data-offline-side={side}>
         <legend>报告 {side.toUpperCase()}</legend>
+        <S3OfflineReportDrop side={side} revision={view[side]} onFile={file => openFile(side, file)}>
         <label htmlFor={`${id}-${side}`}>选择报告 {side.toUpperCase()}（JSON，最多 4 KiB）</label>
         <input id={`${id}-${side}`} ref={node => { inputs.current[side] = node }} type="file" accept=".json,application/json"
           aria-describedby={`${id}-notice ${id}-${side}-state`} onChange={event => choose(side, event)} />
@@ -83,6 +90,7 @@ export default function S3OfflineReportPair() {
         {view[side].report && <p>文件声明生成时间（UTC）：<time>{view[side].report.generatedAtUTC}</time>，不是读取完成时间。</p>}
         <button type="button" className="btn small" disabled={view[side].state === 'idle'} onClick={() => clear(side)}>
           {view[side].state === 'reading' ? '停止读取' : '清除'}报告 {side.toUpperCase()}</button>
+        </S3OfflineReportDrop>
       </fieldset>)}
     </div>
     <div className="local-inventory-actions">

@@ -1,3 +1,4 @@
+import { verifyOfflinePairDropDesktop } from './check-offline-pair-drop-desktop.mjs'
 import { verifyOfflinePairExportDesktop } from './check-offline-pair-export-desktop.mjs'
 import assert from 'node:assert/strict'
 import { writeFileSync } from 'node:fs'
@@ -57,4 +58,5 @@ export async function verifyOfflineReportPairDesktop({ evaluate, click, cdp, unt
       'swap-revokes-and-reverses', 'invalid-replacement-clears-result', 'other-side-preserved', 'close-clears-both', 'no-navigation-or-note-write'],
     screenshot: { filename: 'offline-report-pair.png', bytes: png.length, sha256: createHash('sha256').update(png).digest('hex') },
   }, null, 2))
+  await verifyOfflinePairDropDesktop({ evaluate, click, cdp, until, api, out, noteIDs, filename, second })
 }

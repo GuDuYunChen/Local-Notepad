@@ -1,0 +1,5 @@
+.offline-pair-drop { min-width: 0; padding: 10px; border: 1px dashed var(--line); border-radius: 6px; overflow-wrap: anywhere; }
+.offline-pair-drop[data-offline-drag="true"] { border-color: var(--accent); background: var(--surface-hover, var(--panel)); }
+.offline-pair-drop:focus-within { border-color: var(--accent); }
+.offline-pair-drop > p { margin: 0 0 8px; line-height: 1.6; }
+.offline-pair-drop [data-offline-drop-status]:empty { display: none; }

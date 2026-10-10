@@ -1,6 +1,6 @@
 # Local-Notepad development
 
-Current code-bearing delivery candidate: 2F.76 / 4.209.0 offline pair difference filtering. Read `docs/OFFLINE_PAIR_FILTER_2F76.md` first. Base 220008339b288d5f0ff0840c499759a4804c597e / 4.208.0 is accepted in PR #2 comment 6097344249. Filtering only changes visible metrics; the complete immutable comparison remains the sole source for all JSON/CSV/HTML exports. Preserve B-minus-A, signed/category differences, source revocation and existing save/quit protections. Current-HEAD CI and actual Windows filter/download evidence require separate acceptance.
+Current code-bearing delivery candidate: 2F.77 / 4.210.0 per-side offline report drag and drop. Read `docs/OFFLINE_PAIR_DROP_2F77.md` first. Base 1e04f644ec09eef68df29ade7ea19a9db08226d2 / 4.209.0 is accepted in PR #2 comment 6097845019; do not repeat its completed fixture repairs or acceptance. Each side reuses the existing bounded reader and explicit comparison model. Rejected drops preserve both selections; accepted replacements revoke only their own read and all previous comparison/export consent. Preserve fixed B-minus-A, all twelve export metrics, save/quit protection and all deadlines. Current-HEAD CI and actual Windows drag evidence require separate acceptance.
 
 Read `docs/DEVELOPMENT_HANDOFF.md` before resuming an interrupted task.
 Work on `feature/knowledge-os-phase2` / Draft PR #2 unless the user explicitly changes that direction. Do not merge master as part of ordinary stage development.
