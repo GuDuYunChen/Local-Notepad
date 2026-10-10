@@ -26,7 +26,7 @@ afterEach(async () => {
 })
 it('comparison export UI requires explicit successful comparison and never downloads on mount',async()=>{
   await render(comparisonFile(),comparisonLocal());expect(host.querySelector('[data-local-compare-export]')).toBeNull()
-  expect(clicked).not.toHaveBeenCalled();await start();expect(host.querySelectorAll('[data-local-compare-export]')).toHaveLength(2)
+  expect(clicked).not.toHaveBeenCalled();await start();expect([...host.querySelectorAll('[data-local-compare-export]')].map(button=>button.dataset.localCompareExport)).toEqual(['json','csv','html'])
   expect(clicked).not.toHaveBeenCalled();expect(status()).toBe('')
 })
 it('comparison export UI downloads JSON with original values but does not claim persistence or rescan',async()=>{
