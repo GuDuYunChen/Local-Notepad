@@ -1,3 +1,4 @@
+import { verifyLocalReportDropDesktop } from './check-local-report-drop-desktop.mjs'
 import { verifyLocalOverviewComparisonDesktop } from './check-local-overview-comparison-desktop.mjs'
 import assert from 'node:assert/strict'
 import { writeFileSync } from 'node:fs'
@@ -40,4 +41,5 @@ export async function verifyLocalOverviewFileDesktop({ evaluate, click, cdp, unt
     checks: ['actual-exported-file-selected', 'all-four-counts-and-bytes-match', 'declared-time-matches', 'untrusted-file-scope-visible', 'clear-removes-result', 'malformed-file-refused', 'notes-unchanged'],
     screenshot: { filename: 'local-file.png', bytes: png.length, sha256: createHash('sha256').update(png).digest('hex') }, view }, null, 2))
   await click('[data-local-report-file] button')
+  await verifyLocalReportDropDesktop({ evaluate, click, cdp, until, api, out, noteIDs, filename, expected })
 }
