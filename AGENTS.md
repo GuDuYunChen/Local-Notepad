@@ -1,6 +1,6 @@
 # Local-Notepad development
 
-Current code-bearing delivery candidate: 2F.73 / 4.206.0 offline report file drop. Read `docs/LOCAL_REPORT_DROP_2F73.md` first. Base d12b106c4d2671081161eb1132ba4f12c7dab263 / 4.205.0 is accepted in PR #2 comment 6095954991. Preserve the original bounded FileReader, explicit comparison/export, clipboard/native deadlines and save/quit rules. Dragging one report is a read-only alternative to the existing picker, never note import. Current-HEAD CI, actual Windows drag/drop and installer evidence require separate acceptance.
+Current code-bearing delivery candidate: 2F.74 / 4.207.0 offline report pair comparison. Read `docs/OFFLINE_REPORT_PAIR_2F74.md` first. Base 0475ba0c0a12fc8943b3a7237b233c05f298a8fe / 4.206.0 is accepted in PR #2 comment 6096543335. Compare two explicitly selected, validated report files without scanning the workspace. Keep B minus A direction, full twelve metrics, source disclaimers and revocation on replacement/clear/close. Preserve all existing save/quit, native and clipboard deadlines. Current-HEAD CI and real Windows evidence require separate acceptance.
 
 Read `docs/DEVELOPMENT_HANDOFF.md` before resuming an interrupted task.
 Work on `feature/knowledge-os-phase2` / Draft PR #2 unless the user explicitly changes that direction. Do not merge master as part of ordinary stage development.

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { verifyOfflineReportPairDesktop } from './check-offline-report-pair-desktop.mjs'
 import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { createHash } from 'node:crypto'
@@ -44,4 +45,5 @@ export async function verifyLocalReportDropDesktop({ evaluate, click, cdp, until
     screenshot: { filename: 'local-report-drop.png', bytes: png.length, sha256: createHash('sha256').update(png).digest('hex') },
   }, null, 2))
   await click('[data-local-report-drop] button')
+  await verifyOfflineReportPairDesktop({ evaluate, click, cdp, until, api, out, noteIDs, filename, expected })
 }

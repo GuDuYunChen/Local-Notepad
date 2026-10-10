@@ -2,6 +2,7 @@ import React, { useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import useS3LocalOverview from '../hooks/useS3LocalOverview.js'
 import S3LocalOverviewReport from './S3LocalOverviewReport.jsx'
 import S3LocalOverviewFile from './S3LocalOverviewFile.jsx'
+import S3OfflineReportPair from './S3OfflineReportPair.jsx'
 import './S3LocalOverviewPanel.css'
 
 const labels = { file: '笔记与文件夹（含回收站）', tag: '标签', 'file-tag': '笔记与标签关联', attachment: '附件' }
@@ -61,5 +62,6 @@ export default function S3LocalOverviewPanel({ revision = 0, disabled = false })
       <p>只在明确点击后读取当前桌面工作区。停止采用结果不代表磁盘读取已经结束；这里不会比较远端、执行同步或替你选择冲突版本。开发环境或未由桌面管理的后端不会获得读取授权。</p>
     </details>
     <S3LocalOverviewFile currentSummary={summary} />
+    <S3OfflineReportPair />
   </section>
 }
