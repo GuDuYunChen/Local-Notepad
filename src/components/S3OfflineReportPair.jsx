@@ -6,6 +6,7 @@ import './S3OfflineReportPair.css'
 import { createOfflinePairExport } from '../services/s3OfflinePairExport.mjs'
 import S3OfflinePairExport from './S3OfflinePairExport.jsx'
 import S3OfflineReportDrop from './S3OfflineReportDrop.jsx'
+import S3OfflineBatchDrop from './S3OfflineBatchDrop.jsx'
 import { OFFLINE_BATCH_NOTICE, readOfflinePairFiles, selectOfflinePairFiles } from '../services/s3OfflinePairBatch.mjs'
 import { offlinePairVisibleRows } from '../services/s3OfflinePairView.mjs'
 
@@ -74,6 +75,10 @@ export default function S3OfflineReportPair() {
     if (!owner.current) return
     const selected = selectOfflinePairFiles(event.target.files)
     event.target.value = ''
+    openBatch(selected)
+  }
+  const openBatch = selected => {
+    if (!owner.current) return
     if (selected.code === 'pair-cancelled') return
     if (!selected.files) {
       setBatchMessage(selected.code === 'pair-count' ? '请恰好选择两份报告；现有选择未改变。' : '每份必须非空且不超过 4 KiB；现有选择未改变。')
@@ -126,6 +131,7 @@ export default function S3OfflineReportPair() {
         }}>{batchOpen ? '收起双文件选择' : '一次选择两份报告'}</button>
     </div>
     {batchOpen && <section id={`${id}-batch`} data-offline-batch aria-label="一次选择两份离线报告">
+      <S3OfflineBatchDrop revision={view} onFiles={files => openBatch(selectOfflinePairFiles(files))} />
       <p id={`${id}-batch-hint`}>{OFFLINE_BATCH_NOTICE}</p>
       <label htmlFor={`${id}-batch-input`}>选择两份统计 JSON（每份最多 4 KiB）</label>
       <input id={`${id}-batch-input`} ref={batchInput} type="file" multiple accept=".json,application/json"

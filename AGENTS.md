@@ -1,6 +1,6 @@
 # Local-Notepad development
 
-Current code-bearing delivery candidate: 2F.78 / 4.211.0 atomic two-file report selection. Read `docs/OFFLINE_PAIR_BATCH_2F78.md` first. Base e2f2388855b24d7501257d0fac2647cf49019ed7 / 4.210.0 is accepted in PR #2 comment 6098196433. Batch selection adopts both validated files together, preserves previous complete choices on failure, cancels superseded readers, and never automatically confirms a comparison. Current-HEAD CI and Windows acceptance remain separate checkpoints.
+Current code-bearing delivery candidate: 2F.79 / 4.212.0 two-report batch drag and drop. Read `docs/OFFLINE_BATCH_DROP_2F79.md` first. Base 7d3131005763a975e167792000e216ff298697d2 / 4.211.0 is accepted in PR #2 comment 6098808336. Reuse its existing all-or-nothing batch reader for the new dedicated two-file drop zone; do not loosen per-side drops or file validation. Rejected drags preserve prior selections and pending work. Current-HEAD CI, real Windows drag evidence and installer verification remain separate acceptance checkpoints.
 
 Read `docs/DEVELOPMENT_HANDOFF.md` before resuming an interrupted task.
 Work on `feature/knowledge-os-phase2` / Draft PR #2 unless the user explicitly changes that direction. Do not merge master as part of ordinary stage development.
