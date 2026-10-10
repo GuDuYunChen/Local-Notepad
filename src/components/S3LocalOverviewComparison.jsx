@@ -1,21 +1,26 @@
 import React, { useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { comparisonDelta, LOCAL_COMPARISON_NOTICE } from '../services/s3LocalOverviewComparison.mjs'
 
-import { prepareLocalComparisonDisplay } from '../services/s3LocalOverviewDisplay.mjs'
+import { createLocalComparisonExport, COMPARISON_EXPORT_NOTICE } from '../services/s3LocalComparisonExport.mjs'
 export default function S3LocalOverviewComparison({ report, localSummary }) {
   const id = useId(), token = useMemo(() => ({}), [report, localSummary]), committed = useRef(null)
   const [selected, setSelected] = useState(null)
+  const activeOutput = useRef(null)
   useLayoutEffect(() => {
-    committed.current = token; setSelected(null)
-    return () => { if (committed.current === token) committed.current = null }
+    committed.current = token; activeOutput.current = null; setSelected(null)
+    return () => { if (committed.current === token) { committed.current = null; activeOutput.current = null } }
   }, [token])
   const view = selected?.token === token ? selected : null
   const compare = () => {
     if (committed.current !== token || !report || !localSummary) return
-    try { setSelected({ token, display: prepareLocalComparisonDisplay(report, localSummary), differencesOnly: false }) }
-    catch { setSelected({ token, error: '比较依据无效，未显示部分差值。' }) }
+    try {
+      const output = createLocalComparisonExport(report, localSummary)
+      activeOutput.current = output
+      setSelected({ token, display: output.display, output, differencesOnly: false })
+    }
+    catch { activeOutput.current = null; setSelected({ token, error: '比较依据无效，未显示部分差值。' }) }
   }
-  const clear = () => { if (committed.current === token) setSelected(null) }
+  const clear = () => { if (committed.current === token) { activeOutput.current = null; setSelected(null) } }
   const display = view?.display, data = display?.comparison
   const differencesOnly = view?.differencesOnly === true
   const rows = display ? (differencesOnly ? display.changedTotals : display.totals) : []
@@ -24,6 +29,15 @@ export default function S3LocalOverviewComparison({ report, localSummary }) {
     if (committed.current !== token) return
     setSelected(current => current?.token === token && current.display
       ? { ...current, differencesOnly: !current.differencesOnly } : current)
+  }
+  const exportComparison = format => {
+    if (committed.current !== token || !view?.output || activeOutput.current !== view.output) return
+    const output = view.output
+    let feedback
+    try { output.download(format); feedback = '已请求下载完整比较报告，请核对下载位置；尚未确认落盘。' }
+    catch { feedback = '未能发起比较报告下载，当前比较结果没有改变。' }
+    setSelected(current => current?.token === token && current.output === output
+      ? { ...current, exportFeedback: feedback } : current)
   }
   return <section data-local-comparison aria-labelledby={`${id}-title`}>
     <h4 id={`${id}-title`}>与本次本地盘点比较</h4>
@@ -60,6 +74,14 @@ export default function S3LocalOverviewComparison({ report, localSummary }) {
             <tr key={key}><th scope="row">{label}</th><td>{values.reference} {unit}</td><td>{values.local} {unit}</td><td>{comparisonDelta(values.delta)} {unit}</td></tr>)}</tbody>
         </table>
       </div>}
+      <div data-local-compare-export-panel>
+        <p id={`${id}-export-scope`} className="local-inventory-note">{COMPARISON_EXPORT_NOTICE} 导出始终包含全部 12 项指标及双方原值，不受“仅看有差异的指标”影响。</p>
+        <div className="local-inventory-actions">
+          <button type="button" className="btn small" data-local-compare-export="json" aria-describedby={`${id}-export-scope`} onClick={() => exportComparison('json')}>导出完整比较（JSON）</button>
+          <button type="button" className="btn small" data-local-compare-export="csv" aria-describedby={`${id}-export-scope`} onClick={() => exportComparison('csv')}>导出完整比较（CSV）</button>
+        </div>
+        <p role="status" aria-live="polite" aria-atomic="true" className="local-inventory-note" data-local-compare-export-status>{view.exportFeedback || ''}</p>
+      </div>
     </div>}
   </section>
 }

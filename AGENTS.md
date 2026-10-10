@@ -1,6 +1,6 @@
 # Local-Notepad development
 
-Current code-bearing delivery candidate: 2F.70.2 / 4.203.2 clipboard admission deadline repair. Read `docs/LOCAL_CLIPBOARD_ADMISSION_2F70_2.md` first. Base ea142256bb782157c15ca78122172dd9c687fb18 / 4.203.1 is accepted in PR #2 comment 6094580390; do not replay its completed repair or final status write. Refuse an expired or invalid-clock clipboard operation before issuing its OS write; already-issued writes retain their original lifetime. Current-HEAD CI and installer verification remain separate acceptance checkpoints.
+Current code-bearing delivery candidate: 2F.71 / 4.204.0 complete comparison export. Read `docs/LOCAL_COMPARISON_EXPORT_2F71.md` first. Base ff5eef7d0ae3f77715ee64dc815acec301191ff0 / 4.203.2 is accepted in PR #2 comment 6095006165. Preserve completed clipboard and native deadline fixes. Only explicit confirmed comparisons can export all twelve metrics as JSON or CSV; filtering never changes exported scope. Current-HEAD CI and the real packaged download evidence require separate acceptance.
 
 Read `docs/DEVELOPMENT_HANDOFF.md` before resuming an interrupted task.
 Work on `feature/knowledge-os-phase2` / Draft PR #2 unless the user explicitly changes that direction. Do not merge master as part of ordinary stage development.
