@@ -1,3 +1,4 @@
+import { verifyOfflinePairFilterDesktop } from './check-offline-pair-filter-desktop.mjs'
 import assert from 'node:assert/strict'
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
@@ -58,4 +59,5 @@ export async function verifyOfflinePairExportDesktop({ evaluate, click, cdp, unt
     realPackagedApp:true,realDownload:true,syntheticData:true,files:hashes,metrics:json.metrics,
     checks:['three-actual-download-formats','all-twelve-screen-values-match','B-minus-A-and-zero-rows','both-sources-are-untrusted-files','no-note-data-or-false-local-provenance','no-active-html','truthful-download-feedback','notes-unchanged'],
     screenshot:{filename:'offline-pair-export.png',bytes:png.length,sha256:createHash('sha256').update(png).digest('hex')}},null,2))
+  await verifyOfflinePairFilterDesktop({ evaluate, click, cdp, until, api, out, noteIDs, reverse })
 }

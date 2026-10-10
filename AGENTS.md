@@ -1,6 +1,6 @@
 # Local-Notepad development
 
-Current code-bearing delivery candidate: 2F.75 / 4.208.0 complete offline pair exports. Read `docs/OFFLINE_PAIR_EXPORT_2F75.md` first. Base aeeeeb1e252a9bc803d5ebb334beb6399ad0978d / 4.207.0 is accepted in PR #2 comment 6097029536. Capture one validated immutable file-pair comparison for the screen and all JSON/CSV/HTML exports. Preserve full twelve metrics, B-minus-A direction, untrusted-file provenance and invalidation on source change. Current-HEAD full CI, real Windows downloads and installer verification remain independent acceptance checkpoints.
+Current code-bearing delivery candidate: 2F.76 / 4.209.0 offline pair difference filtering. Read `docs/OFFLINE_PAIR_FILTER_2F76.md` first. Base 220008339b288d5f0ff0840c499759a4804c597e / 4.208.0 is accepted in PR #2 comment 6097344249. Filtering only changes visible metrics; the complete immutable comparison remains the sole source for all JSON/CSV/HTML exports. Preserve B-minus-A, signed/category differences, source revocation and existing save/quit protections. Current-HEAD CI and actual Windows filter/download evidence require separate acceptance.
 
 Read `docs/DEVELOPMENT_HANDOFF.md` before resuming an interrupted task.
 Work on `feature/knowledge-os-phase2` / Draft PR #2 unless the user explicitly changes that direction. Do not merge master as part of ordinary stage development.

@@ -5,6 +5,7 @@ import { comparisonDelta } from '../services/s3LocalOverviewComparison.mjs'
 import './S3OfflineReportPair.css'
 import { createOfflinePairExport } from '../services/s3OfflinePairExport.mjs'
 import S3OfflinePairExport from './S3OfflinePairExport.jsx'
+import { offlinePairVisibleRows } from '../services/s3OfflinePairView.mjs'
 
 const idle = () => ({ state: 'idle', report: null, message: '尚未选择报告。' })
 const initial = () => ({ a: idle(), b: idle(), comparison: null, error: '' })
@@ -12,7 +13,11 @@ export default function S3OfflineReportPair() {
   const id = useId(), [view, setView] = useState(initial)
   const model = useRef(view), owner = useRef(null), tasks = useRef({ a: null, b: null })
   const inputs = useRef({ a: null, b: null })
-  const publish = next => { model.current = next; setView(next) }
+  const [differenceSource, setDifferenceSource] = useState(null)
+  const publish = next => {
+    if (next.comparison !== model.current.comparison) setDifferenceSource(null)
+    model.current = next; setView(next)
+  }
   const revoke = side => { const old = tasks.current[side]; tasks.current[side] = null; old?.controller.abort() }
   useLayoutEffect(() => {
     const lease = {}; owner.current = lease
@@ -63,6 +68,8 @@ export default function S3OfflineReportPair() {
   const containDrag = event => { event.preventDefault(); event.stopPropagation() }
   const refuseDrop = event => { containDrag(event); if (owner.current) publish({ ...model.current, error: '请使用各侧的文件选择按钮；本区域不接收拖放，现有选择未改变。' }) }
   const result = view.comparison?.comparison
+  const onlyDifferences = Boolean(result && differenceSource === view.comparison)
+  const visibleRows = result ? offlinePairVisibleRows(result, onlyDifferences) : []
   return <details className="local-inventory-note offline-report-pair" data-offline-pair onDragEnter={containDrag} onDragOver={containDrag} onDrop={refuseDrop} onToggle={event => { if (!event.currentTarget.open) reset() }}>
     <summary>比较两份离线统计报告</summary>
     <p id={`${id}-notice`}>{OFFLINE_PAIR_NOTICE} 无需读取本地统计。关闭此面板会清空本次选择。</p>
@@ -84,10 +91,25 @@ export default function S3OfflineReportPair() {
       <button type="button" className="btn small" data-offline-reset onClick={reset}>清空两份报告</button>
     </div>
     <p role="status" aria-live="polite" data-offline-feedback>{view.error || (result ? `${result.changed} / 12 项指标有差异；这不是变化的笔记数。` : '两份文件都校验通过后，点击比较；不会自动比较或扫描。')}</p>
-    {result && <div className="local-inventory-table" role="region" aria-label="两份离线报告比较" tabIndex={0} data-offline-result>
-      <table><caption>完整统计比较 · 报告 B − 报告 A</caption>
+    {result && <div className="local-inventory-actions" data-offline-filter>
+      <label><input type="checkbox" checked={onlyDifferences} data-offline-differences
+        aria-controls={`${id}-metrics`} aria-describedby={`${id}-filter-status`}
+        onChange={event => {
+          if (owner.current && model.current.comparison === view.comparison) {
+            setDifferenceSource(event.target.checked ? view.comparison : null)
+          }
+        }} /> 仅看有差异的指标</label>
+      <span id={`${id}-filter-status`} role="status" aria-live="polite" aria-atomic="true">
+        显示 {visibleRows.length} / 12 项指标；导出仍保留全部 12 项。
+      </span>
+    </div>}
+    {result && onlyDifferences && visibleRows.length === 0 && <p data-offline-no-differences>
+      两份报告的 12 项统计数值相同，不代表内容相同。关闭筛选可查看双方原值。
+    </p>}
+    {result && <div id={`${id}-metrics`} className="local-inventory-table" role="region" aria-label="两份离线报告比较" tabIndex={0} data-offline-result>
+      <table><caption>{onlyDifferences ? '差异指标 · 报告 B − 报告 A' : '完整统计比较 · 报告 B − 报告 A'}</caption>
         <thead><tr><th scope="col">指标</th><th scope="col">报告 A</th><th scope="col">报告 B</th><th scope="col">差值 B − A</th><th scope="col">单位</th></tr></thead>
-        <tbody>{result.rows.map(row => <tr key={row.key} data-offline-metric={row.key}>
+        <tbody>{visibleRows.map(row => <tr key={row.key} data-offline-metric={row.key}>
           <th scope="row">{row.label}</th><td>{row.a}</td><td>{row.b}</td><td>{comparisonDelta(row.delta)}</td><td>{row.unit}</td>
         </tr>)}</tbody>
       </table>
