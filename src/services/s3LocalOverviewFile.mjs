@@ -106,11 +106,13 @@ export function readLocalOverviewFile(file, { signal, timeoutMs = LOCAL_REPORT_F
       reader.onload = () => {
         if (stopped()) return
         try {
+          // A pause while acquiring/decoding bytes can cross the deadline.
+          // Recheck every rejection path, not only a successfully parsed file.
           const bytes = reader.result
-          if (!(bytes instanceof ArrayBuffer) || bytes.byteLength !== size) { finish(fail('read')); return }
+          if (!(bytes instanceof ArrayBuffer) || bytes.byteLength !== size) { if (!stopped()) finish(fail('read')); return }
           let raw
           try { raw = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes) }
-          catch { finish(fail('encoding')); return }
+          catch { if (!stopped()) finish(fail('encoding')); return }
           const data = parseLocalOverviewFile(raw)
           if (!stopped()) finish(null, data)
         } catch { if (!stopped()) finish(fail()) }

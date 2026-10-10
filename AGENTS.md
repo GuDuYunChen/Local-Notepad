@@ -1,6 +1,6 @@
 # Local-Notepad development
 
-Current code-bearing delivery candidate: 2F.79 / 4.212.0 two-report batch drag and drop. Read `docs/OFFLINE_BATCH_DROP_2F79.md` first. Base 7d3131005763a975e167792000e216ff298697d2 / 4.211.0 is accepted in PR #2 comment 6098808336. Reuse its existing all-or-nothing batch reader for the new dedicated two-file drop zone; do not loosen per-side drops or file validation. Rejected drags preserve prior selections and pending work. Current-HEAD CI, real Windows drag evidence and installer verification remain separate acceptance checkpoints.
+Current code-bearing delivery candidate: 2F.79.1 / 4.212.1 offline file failure deadline repair. Read `docs/LOCAL_FILE_FAILURE_DEADLINE_2F79_1.md` first. Base 231da61c56ba97251f08e561c9dec4fbdc6a31c4 / 4.212.0 is accepted in PR #2 comment 6099207740. Recheck cancellation and the existing absolute deadline before rejecting invalid result buffers or UTF-8; do not weaken parsing, change budgets, or repeat accepted work. Current-HEAD CI and installer acceptance are separate checkpoints.
 
 Read `docs/DEVELOPMENT_HANDOFF.md` before resuming an interrupted task.
 Work on `feature/knowledge-os-phase2` / Draft PR #2 unless the user explicitly changes that direction. Do not merge master as part of ordinary stage development.
