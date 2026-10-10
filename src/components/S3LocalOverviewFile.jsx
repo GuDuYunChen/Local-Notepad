@@ -34,13 +34,19 @@ export default function S3LocalOverviewFile({ currentSummary = null }) {
   // Stop bubbling BEFORE inspecting the payload so a rejected drop cannot
   // accidentally reach the application's ordinary note import handlers.
   const contain = event => { event.preventDefault(); event.stopPropagation() }
+  // A forbidden native drop may never dispatch `drop`. Give metadata-only
+  // refusal feedback during hover; never read data or revoke the current view.
+  const rejectHover = () => { resetDrag(); setDropCode('drop-file-required') }
   const dragEnter = event => {
     contain(event)
     if (hasLocalReportFileDrag(event.dataTransfer)) { dragDepth.current++; setDragging(true) }
+    else rejectHover()
   }
   const dragOver = event => {
     contain(event)
-    try { event.dataTransfer.dropEffect = hasLocalReportFileDrag(event.dataTransfer) ? 'copy' : 'none' } catch {}
+    const fileDrag = hasLocalReportFileDrag(event.dataTransfer)
+    if (!fileDrag) rejectHover()
+    try { event.dataTransfer.dropEffect = fileDrag ? 'copy' : 'none' } catch {}
   }
   const dragLeave = event => {
     contain(event)
