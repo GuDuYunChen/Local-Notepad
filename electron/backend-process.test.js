@@ -28,11 +28,11 @@ describe('stopChildProcess', () => {
     child.exitCode = 0
     child.emit('exit', 0, null)
 
-    await expect(stopping).resolves.toBeUndefined()
+    await expect(stopping).resolves.toMatchObject({ exited: true, forced: false })
     expect(child.kill).toHaveBeenCalledTimes(1)
   })
 
-  it('forces termination after the graceful timeout', async () => {
+  it('forces termination after the graceful timeout and waits for exit', async () => {
     vi.useFakeTimers()
     try {
       const child = new FakeChild()
@@ -42,8 +42,9 @@ describe('stopChildProcess', () => {
       expect(child.kill).toHaveBeenNthCalledWith(1, 'SIGTERM')
       expect(child.kill).toHaveBeenNthCalledWith(2, 'SIGKILL')
 
-      await vi.advanceTimersByTimeAsync(500)
-      await expect(stopping).resolves.toBeUndefined()
+      child.signalCode = 'SIGKILL'
+      child.emit('exit', null, 'SIGKILL')
+      await expect(stopping).resolves.toMatchObject({ exited: true, forced: true })
     } finally {
       vi.useRealTimers()
     }
@@ -51,8 +52,22 @@ describe('stopChildProcess', () => {
 
   it('does nothing for an already exited process', async () => {
     const child = new FakeChild({ exitCode: 0 })
-    await expect(stopChildProcess(child)).resolves.toBeUndefined()
+    await expect(stopChildProcess(child)).resolves.toMatchObject({ exited: true })
     expect(child.kill).not.toHaveBeenCalled()
+  })
+
+  it('rejects unconfirmed termination instead of treating killed as exited', async () => {
+    vi.useFakeTimers()
+    try {
+      const child = new FakeChild({ killed: true })
+      const stopping = stopChildProcess(child, 100)
+      const rejected = expect(stopping).rejects.toThrow('无法确认旧后端已退出')
+      await vi.advanceTimersByTimeAsync(1100)
+      await rejected
+      expect(child.kill).toHaveBeenCalledWith('SIGKILL')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 

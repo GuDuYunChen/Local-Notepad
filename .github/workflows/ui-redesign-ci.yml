@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - feature/ui-redesign-v1
+      - feature/knowledge-os-phase1
+      - feature/knowledge-os-phase2
   pull_request:
     branches:
       - master
@@ -31,8 +33,12 @@ jobs:
           go-version: '1.24.11'
           cache-dependency-path: server/go.sum
 
-      - name: Install dependencies
-        run: npm install --no-audit --no-fund
+      - name: Verify committed dependency lock
+        run: node scripts/verify-dependency-lock.mjs
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Verify install preserved manifest and lock
+        run: git diff --exit-code -- package.json package-lock.json
 
       - name: Build Electron main/preload
         run: npm run build:main
@@ -40,12 +46,101 @@ jobs:
       - name: Build renderer
         run: npm run build:renderer
 
+      - name: Verify editor cache and save receipt regressions
+        run: |
+          node --test scripts/editor-cache-regression.node.mjs
+          npx vitest run --root=. src/components/TextEditor.test.jsx src/components/TextEditorLoad.test.jsx
+
       - name: Run redesign smoke tests
         run: npm run test:ui
 
+      - name: Verify sync activity and cancellation UI
+        run: |
+          node --test scripts/sync-activity.node.mjs
+          npx vitest run --root=. src/components/SyncActivityPanel.test.jsx
+          go -C server test -race ./internal/syncjob -count=1
+
+      - name: Verify explicit conflict review
+        run: |
+          node --test scripts/sync-conflict-review.node.mjs
+          npx vitest run --root=. src/components/SyncConflictReview.test.jsx src/components/SyncCenterPanel.test.jsx
+
+      - name: Verify conflict text difference navigation
+        run: |
+          node --test scripts/sync-conflict-diff.node.mjs
+          npx vitest run --root=. src/components/SyncConflictDiff.test.jsx
+
+      - name: Verify searchable conflict queue
+        run: |
+          node --test scripts/sync-conflict-queue.node.mjs scripts/sync-queue-render-evidence.node.cjs scripts/sync-conflict-risk.node.mjs
+          npx vitest run --root=. src/components/SyncConflictQueue.test.jsx src/components/SyncConflictRisk.test.jsx
+
+      - name: Verify conflict queue order and edge navigation
+        run: |
+          node --test scripts/sync-conflict-order.node.mjs
+          npx vitest run --root=. src/components/SyncConflictOrder.test.jsx
+
+      - name: Verify synchronous conflict browsing consent
+        run: |
+          node scripts/check-sync-queue-browse-baseline.mjs
+          node --test scripts/sync-queue-browse-guard.node.mjs
+          npx vitest run --root=. src/components/SyncConflictBrowseGuard.test.jsx
+
+      - name: Verify conflict lifecycle recovery
+        run: go -C server test -race ./internal/syncengine -run '^TestConflictLifecycle' -count=3 -v
+
+      - name: Verify conflict destination integrity
+        run: go -C server test -race ./internal/syncengine -run '^TestResolutionGuard' -count=3 -v
+
+      - name: Verify sync history and resolution atomicity
+        run: |
+          node scripts/check-sync-resolution-baseline.mjs
+          go -C server test -race ./internal/syncengine -run '^TestResolutionAtomic' -count=3 -v
+
+      - name: Verify conflict commit witnesses
+        run: |
+          node scripts/check-sync-write-witness-baseline.mjs
+          go -C server test -race ./internal/syncengine -run '^TestResolutionWitness' -count=3 -v
+
+      - name: Verify read-only sync plan explorer
+        run: |
+          node --test scripts/sync-plan-view.node.mjs
+          npx vitest run --root=. src/components/SyncPlanPanel.test.jsx src/components/SyncPlanIntegration.test.jsx
+
+      - name: Verify sync plan read lifecycle
+        run: |
+          node scripts/check-sync-plan-lifecycle-baseline.mjs
+          node --test scripts/sync-plan-read.node.mjs
+          npx vitest run --root=. src/components/SyncPlanLifecycle.test.jsx
+
+      - name: Verify editor exit save handshake
+        run: |
+          node --test scripts/editor-quit.node.mjs
+          npx vitest run --root=. src/components/EditorQuit.test.jsx src/components/EditorQuitSource.test.jsx
+
+      - name: Verify backend evidence refusal and isolated runner fixtures
+        run: node --test scripts/backend-test-evidence.node.mjs
+
       - name: Run backend tests
-        working-directory: server
-        run: go test ./...
+        run: node scripts/backend-test-evidence.mjs
+
+      - name: Upload source-bound backend test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-notepad-backend-tests-${{ github.sha }}
+          path: test-results/backend-tests/*
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Verify managed backend shutdown
+        env:
+          NOTEPAD_TEST_BACKEND: server/bin/notepad-shutdown-smoke
+        run: |
+          node --test scripts/backend-shutdown.node.mjs
+          go -C server test -race ./internal/appshutdown -count=1
+          go -C server build -o bin/notepad-shutdown-smoke ./cmd/notepad-server
+          node --test scripts/backend-lifecycle.integration.mjs
 
       - name: Search cache race and parser benchmark
         working-directory: server
@@ -66,8 +161,21 @@ jobs:
           NOTEPAD_SMOKE_PORT: '27129'
         run: bash .github/scripts/backend-smoke.sh
 
+      - name: Verify Electron evidence capture
+        run: node --test scripts/electron-test-evidence.node.mjs
+
       - name: Run Electron tests
-        run: npm run test:electron
+        id: electron_tests
+        run: bash .github/scripts/electron-test-evidence.sh
+
+      - name: Upload Electron test evidence
+        if: always() && steps.electron_tests.outcome != 'skipped'
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-notepad-electron-tests-${{ github.sha }}
+          path: test-results/electron-tests/*
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Run editor tests
         run: npm run test:editor
@@ -78,6 +186,10 @@ jobs:
     needs: renderer-build
     runs-on: windows-latest
     timeout-minutes: 30
+    # Keep developers' local mirror preference; CI uses the upstream tool host.
+    # The NPM_CONFIG key takes precedence over .npmrc in electron-builder 24.13.3.
+    env:
+      NPM_CONFIG_ELECTRON_BUILDER_BINARIES_MIRROR: https://github.com/electron-userland/electron-builder-binaries/releases/download/
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -93,14 +205,86 @@ jobs:
           go-version: '1.24.11'
           cache-dependency-path: server/go.sum
 
-      - name: Install dependencies
-        run: npm install --no-audit --no-fund
+      - name: Verify committed dependency lock
+        run: node scripts/verify-dependency-lock.mjs
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Verify install preserved manifest and lock
+        run: git diff --exit-code -- package.json package-lock.json
+
+      - name: Verify portable workspace transactions on Windows
+        run: npx vitest run --root=. electron/workspace-package.test.js electron/workspace-restore.test.js
+
+      - name: Verify conflict lifecycle on Windows
+        run: go -C server test ./internal/syncengine -run '^TestConflictLifecycle' -count=1 -v
+
+      - name: Verify conflict destination integrity on Windows
+        run: go -C server test ./internal/syncengine -run '^TestResolutionGuard' -count=1 -v
+
+      - name: Verify resolution atomicity on Windows
+        run: go -C server test ./internal/syncengine -run '^TestResolutionAtomic' -count=1 -v
+
+      - name: Verify conflict commit witnesses on Windows
+        run: go -C server test ./internal/syncengine -run '^TestResolutionWitness' -count=1 -v
+
+      - name: Verify read-only sync plan explorer on Windows
+        shell: pwsh
+        run: |
+          node --test scripts/sync-plan-view.node.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npx vitest run --root=. src/components/SyncPlanPanel.test.jsx src/components/SyncPlanIntegration.test.jsx
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify sync plan read lifecycle on Windows
+        shell: pwsh
+        run: |
+          node --test scripts/sync-plan-read.node.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npx vitest run --root=. src/components/SyncPlanLifecycle.test.jsx
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify conflict text differences on Windows
+        shell: pwsh
+        run: |
+          node --test scripts/sync-conflict-diff.node.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npx vitest run --root=. src/components/SyncConflictDiff.test.jsx src/components/SyncConflictReview.test.jsx
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify searchable conflict queue on Windows
+        shell: pwsh
+        run: |
+          node --test scripts/sync-conflict-queue.node.mjs scripts/sync-queue-render-evidence.node.cjs scripts/sync-conflict-risk.node.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npx vitest run --root=. src/components/SyncConflictQueue.test.jsx src/components/SyncConflictRisk.test.jsx
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify conflict queue order and edge navigation on Windows
+        shell: pwsh
+        run: |
+          node --test scripts/sync-conflict-order.node.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npx vitest run --root=. src/components/SyncConflictOrder.test.jsx
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify synchronous conflict browsing consent on Windows
+        shell: pwsh
+        run: |
+          node --test scripts/sync-queue-browse-guard.node.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npx vitest run --root=. src/components/SyncConflictBrowseGuard.test.jsx
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build unsigned Windows NSIS package
         shell: pwsh
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: npm run build
+
+      - name: Verify parent-pipe shutdown on Windows
+        env:
+          NOTEPAD_TEST_BACKEND: server/bin/notepad-server.exe
+        run: node --test scripts/backend-lifecycle.integration.mjs
 
       - name: Verify brand and dark-theme rendering
         run: npm run test:brand-render
@@ -110,7 +294,37 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: local-notepad-theme-${{ github.sha }}
-          path: test-results/brand-theme/*.png
+          path: |
+            test-results/brand-theme/*.png
+            test-results/brand-theme/checks.json
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Verify native conflict difference rendering
+        run: npx electron scripts/check-sync-conflict-diff-render.cjs
+
+      - name: Upload conflict difference render checks
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-notepad-conflict-diff-${{ github.sha }}
+          path: |
+            test-results/sync-conflict-diff/*.png
+            test-results/sync-conflict-diff/checks.json
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Verify native conflict queue rendering
+        run: node scripts/run-sync-conflict-queue-render.cjs
+
+      - name: Upload conflict queue render checks
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-notepad-conflict-queue-${{ github.sha }}
+          path: |
+            test-results/sync-conflict-queue/*.png
+            test-results/sync-conflict-queue/checks.json
           if-no-files-found: ignore
           retention-days: 7
 

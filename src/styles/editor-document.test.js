@@ -2,8 +2,9 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
+// Git may check files out with CRLF on Windows; compare canonical source text.
 function read(path) {
-  return readFileSync(join(process.cwd(), ...path), 'utf8')
+  return readFileSync(join(process.cwd(), ...path), 'utf8').replace(/\r\n/g, '\n')
 }
 
 describe('editor document presentation', () => {

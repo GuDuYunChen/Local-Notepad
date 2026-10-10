@@ -12,13 +12,13 @@ vi.mock('./components/WorkspaceSidebar', () => ({ default: ({ onChangeWorkspace,
 vi.mock('./components/ProjectWorkspacePanel', () => ({ default: ({ onOpenFile }) => <button onClick={() => onOpenFile('b')}>打开下一章</button> }))
 vi.mock('./components/TextEditor', () => ({ default: React.forwardRef(function Draft({ activeId, onLoaded, onChange, onStatusChange }, ref) {
   React.useEffect(() => { if (activeId) { onLoaded?.('已存正文'); onStatusChange?.({ dirty: false }) } }, [activeId])
-  React.useImperativeHandle(ref, () => ({ clearCache: mocks.clear, save: () => null }))
+  React.useImperativeHandle(ref, () => ({ clearCache: mocks.clear, save: () => null, getReferenceRefactorState: () => ({ savedContent: '已存正文' }) }))
   return activeId ? <button onClick={() => { onChange('草稿修改'); onStatusChange?.({ dirty: true }) }}>编辑正文</button> : null
 }) }))
 let root, container
 beforeEach(async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
-  vi.useFakeTimers(); api.mockReset(); mocks.clear.mockClear(); localStorage.clear(); evidenceReview.end()
+  vi.useFakeTimers(); api.mockReset(); mocks.clear.mockReset().mockReturnValue(true); localStorage.clear(); evidenceReview.end()
   api.mockResolvedValue({ id: 'b', title: '第二章.md', content: '已存正文' })
   container = document.createElement('div'); document.body.append(container); root = createRoot(container)
   await act(async () => { root.render(<App />) })
@@ -49,4 +49,13 @@ it('cancelled evidence return leaves both the draft and the return request uncon
   await click('返回证据列表'); await click('不保存')
   expect(evidenceReview.getReturn()?.id).toBe(session.id)
   expect(button('打开下一章')).toBeTruthy()
+})
+
+it('a refused editor discard preserves the draft and does not leave notes', async () => {
+  mocks.clear.mockReturnValue(false)
+  await click('编辑正文'); await click('进入项目'); await click('不保存')
+  expect(container.querySelector('[role="dialog"]')).not.toBeNull()
+  expect(container.querySelector('.workspace-save-chip').textContent).toBe('未保存')
+  expect(container.querySelector('.workspace-title-button').textContent).toBe('第一章.md')
+  expect(button('打开下一章')).toBeUndefined()
 })

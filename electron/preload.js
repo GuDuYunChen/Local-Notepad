@@ -23,7 +23,31 @@ contextBridge.exposeInMainWorld('electronAPI', {
   backupExport: name => ipcRenderer.invoke('backup:export', name),
   backupList: () => ipcRenderer.invoke('backup:list'),
   backupOpenFolder: () => ipcRenderer.invoke('backup:openFolder'),
+  workspaceExport: () => ipcRenderer.invoke('workspace:export'),
+  workspaceInspect: () => ipcRenderer.invoke('workspace:inspect'),
+  workspacePrepareRestore: () => ipcRenderer.invoke('workspace:restore:prepare'),
+  workspaceConfirmRestore: id => ipcRenderer.invoke('workspace:restore:confirm', id),
+  workspaceCancelRestore: id => ipcRenderer.invoke('workspace:restore:cancel', id),
   appDiagnostics: () => ipcRenderer.invoke('app:diagnostics'),
   openAppFolder: (kind) => ipcRenderer.invoke('app:openFolder', { kind }),
+  webdavSecretStatus: () => ipcRenderer.invoke('sync:webdav-secret:status'),
+  webdavSecretSave: password => ipcRenderer.invoke('sync:webdav-secret:save', password),
+  webdavSecretClear: () => ipcRenderer.invoke('sync:webdav-secret:clear'),
+  s3ProbeRead: payload => ipcRenderer.invoke('sync:s3-probe:read', payload),
+  s3PreviewRead: payload => ipcRenderer.invoke('sync:s3-preview:read', payload),
+  s3LocalOverviewRead: payload => ipcRenderer.invoke('sync:s3-local-overview:read', payload),
+  onQuitPrepare: callback => {
+    const handler = (_event, value) => callback({ id: value?.id })
+    ipcRenderer.on('editor:quit:prepare', handler)
+    return () => ipcRenderer.removeListener('editor:quit:prepare', handler)
+  },
+  onQuitRelease: callback => {
+    const handler = (_event, value) => callback({ id: value?.id })
+    ipcRenderer.on('editor:quit:release', handler)
+    return () => ipcRenderer.removeListener('editor:quit:release', handler)
+  },
+  reportQuitResult: value => ipcRenderer.send('editor:quit:result', {
+    id: value?.id, ready: value?.ready === true, code: value?.code,
+  }),
   onReload: (callback) => ipcRenderer.on('app:reload', callback),
 })

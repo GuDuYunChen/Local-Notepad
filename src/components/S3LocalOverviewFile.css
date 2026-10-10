@@ -1,0 +1,11 @@
+[data-local-report-file] { margin-top: 16px; }
+[data-local-report-file] label { display: block; min-width: 0; max-width: 100%; }
+[data-local-report-file] input[type="file"] { display: block; box-sizing: border-box; max-width: 100%; margin-top: 6px; color: inherit; font: inherit; }
+[data-local-file-result] { color: var(--ink, var(--fg)); }
+
+.local-report-drop-zone { border: 1px dashed var(--line-strong, var(--line)); border-radius: 8px; padding: 12px; min-width: 0; }
+.local-report-drop-zone p { margin: 0 0 8px; overflow-wrap: anywhere; }
+.local-report-drop-zone .local-inventory-actions { margin-bottom: 0; }
+.local-report-drop-zone[data-file-drag="true"] { border: 2px solid var(--accent); padding: 11px; background: var(--surface-hover, var(--panel)); }
+.local-report-drop-zone:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+[data-local-report-drop-status]:empty { display: none; }

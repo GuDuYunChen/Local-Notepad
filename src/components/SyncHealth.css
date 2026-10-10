@@ -1,0 +1,24 @@
+.sync-health {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  margin: 4px 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.sync-health-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.sync-health-heading > strong { font-size: 13px; line-height: 1.6; }
+.sync-health-heading .btn { flex: 0 0 auto; }
+.sync-health > span, .sync-health-warning, .sync-health-check, .sync-draft-notice {
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--ink-soft);
+}
+.sync-health-warning, .sync-health-check { display: grid; gap: 4px; padding-top: 8px; border-top: 1px solid var(--line); }
+.sync-health .btn:focus-visible { outline: 2px solid var(--clay); outline-offset: 3px; }
+@media (max-width: 640px) {
+  .sync-health-heading { align-items: flex-start; flex-direction: column; }
+}

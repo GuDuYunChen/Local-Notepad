@@ -19,6 +19,8 @@ type FileController struct {
 }
 
 func (c *FileController) Register(group *ghttp.RouterGroup) {
+	group.GET("/editor-reference-jobs", c.EditorReferenceJobs)
+	group.POST("/editor-reference-jobs/{requestId}", c.CompleteEditorReferences)
 	group.GET("/search", c.GlobalSearch)
 	group.GET("/research-notes/{requestId}", c.ResearchReceipt)
 	group.POST("/research-notes/{requestId}", c.CreateResearch)
@@ -80,18 +82,29 @@ func (c *FileController) Get(r *ghttp.Request) {
 func (c *FileController) Update(r *ghttp.Request) {
 	id := r.Get("id").String()
 	var in struct {
-		Title     *string `json:"title"`
-		Content   *string `json:"content"`
-		ParentID  *string `json:"parent_id"`
-		SortOrder *int64  `json:"sort_order"`
-		IsDeleted *bool   `json:"is_deleted"`
-		IsPinned  *bool   `json:"is_pinned"`
+		SaveRequestID   string  `json:"save_request_id"`
+		ExpectedContent *string `json:"expected_content"`
+		SectionMappings string  `json:"section_mappings"`
+		Title           *string `json:"title"`
+		Content         *string `json:"content"`
+		ParentID        *string `json:"parent_id"`
+		SortOrder       *int64  `json:"sort_order"`
+		IsDeleted       *bool   `json:"is_deleted"`
+		IsPinned        *bool   `json:"is_pinned"`
 	}
 	if err := r.Parse(&in); err != nil {
 		writeErr(r, 1005, "参数错误", err)
 		return
 	}
 
+	if in.SaveRequestID != "" {
+		if in.Content == nil || in.ExpectedContent == nil || in.Title != nil || in.ParentID != nil || in.SortOrder != nil || in.IsDeleted != nil || in.IsPinned != nil {
+			writeErr(r, 1005, "正文保存不能混合其他修改", nil)
+			return
+		}
+		c.SaveEditor(r, model.EditorSaveInput{RequestID: in.SaveRequestID, Expected: *in.ExpectedContent, Content: *in.Content, Mappings: in.SectionMappings})
+		return
+	}
 	f, err := c.FileLogic.Update(r.GetCtx(), id, in.Title, in.Content, in.ParentID, in.SortOrder, in.IsDeleted, in.IsPinned)
 	if err != nil {
 		log.Printf("保存文件失败 id=%s: %v", id, err)

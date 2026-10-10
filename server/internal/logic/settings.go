@@ -3,6 +3,8 @@ package logic
 import (
 	"context"
 	"fmt"
+	"net"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -38,9 +40,58 @@ func (l *SettingsLogic) Update(ctx context.Context, patch *model.SettingsPatch) 
 	}
 	if patch.SyncEnabled != nil {
 		current.SyncEnabled = *patch.SyncEnabled
+		if !current.SyncEnabled { current.SyncAutoEnabled = false }
 	}
+	previousProvider := current.SyncProvider
+	previousEndpoint := current.SyncEndpoint
 	if patch.SyncEndpoint != nil {
-		current.SyncEndpoint = *patch.SyncEndpoint
+		if len(*patch.SyncEndpoint) > 2048 { return nil, fmt.Errorf("同步端点长度超过限制") }
+		current.SyncEndpoint = strings.TrimSpace(*patch.SyncEndpoint)
+	}
+	if patch.SyncProvider != nil {
+		provider := strings.TrimSpace(*patch.SyncProvider)
+		if provider != "" && provider != "local-lab" && provider != "webdav" {
+			return nil, fmt.Errorf("当前不支持的同步 provider: %s", provider)
+		}
+		current.SyncProvider = provider
+	}
+	if patch.SyncUsername != nil {
+		username := strings.TrimSpace(*patch.SyncUsername)
+		if len(username) > 512 { return nil, fmt.Errorf("WebDAV 用户名长度超过限制") }
+		current.SyncUsername = username
+	}
+	if patch.SyncPassword != nil {
+		if len(*patch.SyncPassword) > 4096 { return nil, fmt.Errorf("WebDAV 密码长度超过限制") }
+		current.SyncPassword = *patch.SyncPassword
+		current.SyncPasswordSet = current.SyncPassword != ""
+	}
+	if patch.SyncIntervalMinutes != nil {
+		if *patch.SyncIntervalMinutes < 1 || *patch.SyncIntervalMinutes > 1440 {
+			return nil, fmt.Errorf("自动同步间隔必须在 1 到 1440 分钟之间")
+		}
+		current.SyncIntervalMinutes = *patch.SyncIntervalMinutes
+	}
+	if patch.SyncAutoEnabled != nil {
+		if *patch.SyncAutoEnabled {
+			return nil, fmt.Errorf("开启自动同步前必须通过同步中心连接验证")
+		}
+		current.SyncAutoEnabled = false
+	}
+	if current.SyncIntervalMinutes <= 0 { current.SyncIntervalMinutes = 5 }
+	if current.SyncProvider != previousProvider || current.SyncEndpoint != previousEndpoint {
+		current.SyncAutoEnabled = false
+	}
+	if current.SyncProvider != "webdav" {
+		current.SyncAutoEnabled = false
+	}
+	if current.SyncAutoEnabled && (!current.SyncEnabled || current.SyncProvider != "webdav") {
+		return nil, fmt.Errorf("自动同步仅可在已启用的 WebDAV provider 上使用")
+	}
+	if current.SyncEnabled && current.SyncProvider == "" {
+		return nil, fmt.Errorf("启用同步前需要选择同步 provider")
+	}
+	if current.SyncEnabled && current.SyncProvider == "webdav" {
+		if err := validateWebDAVEndpoint(current.SyncEndpoint); err != nil { return nil, err }
 	}
 
 	if current.EditorOpts == nil {
@@ -53,6 +104,26 @@ func (l *SettingsLogic) Update(ctx context.Context, patch *model.SettingsPatch) 
 	return current, nil
 }
 
+
+func validateWebDAVEndpoint(raw string) error {
+	value := strings.TrimSpace(raw)
+	if value == "" { return fmt.Errorf("启用 WebDAV 前需要填写同步端点") }
+	parsed, err := url.ParseRequestURI(value)
+	if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		return fmt.Errorf("WebDAV 端点必须是有效的 http/https URL")
+	}
+	if parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return fmt.Errorf("WebDAV 端点不能包含账号、查询参数或片段")
+	}
+	if parsed.Scheme == "http" {
+		host := strings.Trim(parsed.Hostname(), "[]")
+		ip := net.ParseIP(host)
+		if !strings.EqualFold(host, "localhost") && (ip == nil || !ip.IsLoopback()) {
+			return fmt.Errorf("非本机 WebDAV 必须使用 HTTPS")
+		}
+	}
+	return nil
+}
 
 func (l *SettingsLogic) Diagnostics(ctx context.Context) (*model.Diagnostics, error) {
 	diag, err := l.SettingsDAO.Diagnostics(ctx)
