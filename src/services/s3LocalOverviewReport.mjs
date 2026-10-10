@@ -64,12 +64,15 @@ export function createLocalOverviewClipboard({ write = text => navigator.clipboa
         resolve(receipt(code))
       }
       const release = () => { if (active === task) active = null }
-      const done = ok => {
+      const interruption = () => {
         try {
           const at = clock()
-          finish(!Number.isFinite(at) || at < started ? 'copy-unconfirmed'
-            : at >= deadline ? 'copy-timeout' : ok ? 'copied' : 'copy-unconfirmed')
-        } catch { finish('copy-unconfirmed') }
+          return !Number.isFinite(at) || at < started ? 'copy-unconfirmed'
+            : at >= deadline ? 'copy-timeout' : null
+        } catch { return 'copy-unconfirmed' }
+      }
+      const done = ok => {
+        try { finish(interruption() || (ok ? 'copied' : 'copy-unconfirmed')) }
         finally { release() }
       }
       let prepared
@@ -82,6 +85,11 @@ export function createLocalOverviewClipboard({ write = text => navigator.clipboa
         timer = schedule(() => finish('copy-timeout'), LOCAL_REPORT_COPY_WAIT_MS)
         timerReady = true
         if (finished) { try { cancel(timer) } catch {}; release(); return pending }
+        // A delayed timer has not necessarily revoked this operation yet.
+        // Recheck before the OS side effect, using the same receipt policy.
+        // No write was issued on refusal, so only this unused slot is released.
+        const reason = interruption()
+        if (reason) { finish(reason); release(); return pending }
         const result = write(prepared.text)
         // A real Clipboard.writeText returns a Promise. An absent/non-thenable
         // receipt cannot establish that the system clipboard changed.

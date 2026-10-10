@@ -1,6 +1,6 @@
 # Local-Notepad development
 
-Current code-bearing delivery candidate: 2F.70.1 / 4.203.1 native local-overview terminal deadline repair. Read `docs/LOCAL_NATIVE_DEADLINE_2F70_1.md` first. Base 513558855d90dda25a192cb7516f8127ed06508d / 4.203.0 was accepted in PR #2 comment 6091357551. Preserve prior completed work. Cancellation, timeout and pre-deadline errors use one terminal policy without releasing pending requests early. Current-HEAD CI and packaged evidence require separate acceptance.
+Current code-bearing delivery candidate: 2F.70.2 / 4.203.2 clipboard admission deadline repair. Read `docs/LOCAL_CLIPBOARD_ADMISSION_2F70_2.md` first. Base ea142256bb782157c15ca78122172dd9c687fb18 / 4.203.1 is accepted in PR #2 comment 6094580390; do not replay its completed repair or final status write. Refuse an expired or invalid-clock clipboard operation before issuing its OS write; already-issued writes retain their original lifetime. Current-HEAD CI and installer verification remain separate acceptance checkpoints.
 
 Read `docs/DEVELOPMENT_HANDOFF.md` before resuming an interrupted task.
 Work on `feature/knowledge-os-phase2` / Draft PR #2 unless the user explicitly changes that direction. Do not merge master as part of ordinary stage development.
