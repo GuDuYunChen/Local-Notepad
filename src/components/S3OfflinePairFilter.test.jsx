@@ -9,7 +9,7 @@ const flush = async () => { for (let i = 0; i < 10; i++) await Promise.resolve()
 const rows = () => [...host.querySelectorAll('[data-offline-result] tbody tr')]
 const filter = () => host.querySelector('[data-offline-differences]')
 const click = selector => act(async () => { host.querySelector(selector).click(); await flush() })
-const select = (side, values = [new File(['{}'], 'report.json')]) => act(async () => {
+const select = (side, values = [new File([JSON.stringify(reportFixture())], 'report.json')]) => act(async () => {
   const input = host.querySelector(`[data-offline-side=${side}] input`)
   Object.defineProperty(input, 'files', { configurable: true, value: values })
   input.dispatchEvent(new Event('change', { bubbles: true })); await flush()
@@ -24,8 +24,9 @@ const changed = () => {
   return report
 }
 async function ready(equal = false) {
+  await act(async () => { root.render(<StrictMode><Pair/></StrictMode>); await flush() })
+  // Access the committed DOM only after the render act has completed.
   await act(async () => {
-    root.render(<StrictMode><Pair/></StrictMode>); await flush()
     const details = host.querySelector('details'); details.open = true; details.dispatchEvent(new Event('toggle')); await flush()
   })
   await select('a'); await select('b'); await load(0, reportFixture()); await load(1, equal ? reportFixture() : changed())
