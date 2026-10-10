@@ -1,6 +1,6 @@
 # Local-Notepad development
 
-Current code-bearing delivery candidate: 2F.71 / 4.204.0 complete comparison export. Read `docs/LOCAL_COMPARISON_EXPORT_2F71.md` first. Base ff5eef7d0ae3f77715ee64dc815acec301191ff0 / 4.203.2 is accepted in PR #2 comment 6095006165. Preserve completed clipboard and native deadline fixes. Only explicit confirmed comparisons can export all twelve metrics as JSON or CSV; filtering never changes exported scope. Current-HEAD CI and the real packaged download evidence require separate acceptance.
+Current code-bearing delivery candidate: 2F.72 / 4.205.0 offline printable HTML comparison export. Read `docs/LOCAL_COMPARISON_HTML_2F72.md` first. Base c105f4dcb5d799f5993f60ac61426f04177c29d0 / 4.204.0 is accepted in PR #2 comment 6095393010. Preserve JSON/CSV, all twelve confirmed metrics, clipboard/native deadlines and original save/quit rules. Current-HEAD CI, the actual Windows HTML download and installer verification remain separate acceptance checkpoints.
 
 Read `docs/DEVELOPMENT_HANDOFF.md` before resuming an interrupted task.
 Work on `feature/knowledge-os-phase2` / Draft PR #2 unless the user explicitly changes that direction. Do not merge master as part of ordinary stage development.

@@ -1,3 +1,4 @@
+import { verifyComparisonHTMLDesktop } from './check-local-comparison-html-desktop.mjs'
 import assert from 'node:assert/strict'
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
@@ -50,6 +51,7 @@ export async function verifyComparisonExportDesktop({ evaluate, click, cdp, unti
   const png=Buffer.from((await cdp.send('Page.captureScreenshot',{format:'png'})).data,'base64')
   const hash=bytes=>createHash('sha256').update(bytes).digest('hex')
   writeFileSync(path.join(out,'local-comparison-export.png'),png)
+  await verifyComparisonHTMLDesktop({ evaluate, click, cdp, until, out, destination, metrics: json.metrics })
   await click('[data-local-compare-clear]'); assert.equal(await evaluate("document.querySelector('[data-local-compare-export]')===null"),true)
   await choose(filename)
   await until(() => evaluate("document.querySelector('[data-local-file-state]')?.dataset.localFileState==='ready'"), 'Export original report not restored')

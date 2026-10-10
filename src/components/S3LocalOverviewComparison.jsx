@@ -75,10 +75,11 @@ export default function S3LocalOverviewComparison({ report, localSummary }) {
         </table>
       </div>}
       <div data-local-compare-export-panel>
-        <p id={`${id}-export-scope`} className="local-inventory-note">{COMPARISON_EXPORT_NOTICE} 导出始终包含全部 12 项指标及双方原值，不受“仅看有差异的指标”影响。</p>
+        <p id={`${id}-export-scope`} className="local-inventory-note">{COMPARISON_EXPORT_NOTICE} 导出始终包含全部 12 项指标及双方原值，不受“仅看有差异的指标”影响。HTML 文件可离线阅读，并使用浏览器打印。</p>
         <div className="local-inventory-actions">
           <button type="button" className="btn small" data-local-compare-export="json" aria-describedby={`${id}-export-scope`} onClick={() => exportComparison('json')}>导出完整比较（JSON）</button>
           <button type="button" className="btn small" data-local-compare-export="csv" aria-describedby={`${id}-export-scope`} onClick={() => exportComparison('csv')}>导出完整比较（CSV）</button>
+          <button type="button" className="btn small" data-local-compare-export="html" aria-describedby={`${id}-export-scope`} onClick={() => exportComparison('html')}>导出完整比较（HTML）</button>
         </div>
         <p role="status" aria-live="polite" aria-atomic="true" className="local-inventory-note" data-local-compare-export-status>{view.exportFeedback || ''}</p>
       </div>
