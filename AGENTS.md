@@ -1,6 +1,6 @@
 # Local-Notepad development
 
-Current code-bearing delivery candidate: 2F.77 / 4.210.0 per-side offline report drag and drop. Read `docs/OFFLINE_PAIR_DROP_2F77.md` first. Base 1e04f644ec09eef68df29ade7ea19a9db08226d2 / 4.209.0 is accepted in PR #2 comment 6097845019; do not repeat its completed fixture repairs or acceptance. Each side reuses the existing bounded reader and explicit comparison model. Rejected drops preserve both selections; accepted replacements revoke only their own read and all previous comparison/export consent. Preserve fixed B-minus-A, all twelve export metrics, save/quit protection and all deadlines. Current-HEAD CI and actual Windows drag evidence require separate acceptance.
+Current code-bearing delivery candidate: 2F.78 / 4.211.0 atomic two-file report selection. Read `docs/OFFLINE_PAIR_BATCH_2F78.md` first. Base e2f2388855b24d7501257d0fac2647cf49019ed7 / 4.210.0 is accepted in PR #2 comment 6098196433. Batch selection adopts both validated files together, preserves previous complete choices on failure, cancels superseded readers, and never automatically confirms a comparison. Current-HEAD CI and Windows acceptance remain separate checkpoints.
 
 Read `docs/DEVELOPMENT_HANDOFF.md` before resuming an interrupted task.
 Work on `feature/knowledge-os-phase2` / Draft PR #2 unless the user explicitly changes that direction. Do not merge master as part of ordinary stage development.

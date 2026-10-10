@@ -1,3 +1,4 @@
+import { verifyOfflinePairBatchDesktop } from './check-offline-pair-batch-desktop.mjs'
 import { verifyOfflinePairDropDesktop } from './check-offline-pair-drop-desktop.mjs'
 import { verifyOfflinePairExportDesktop } from './check-offline-pair-export-desktop.mjs'
 import assert from 'node:assert/strict'
@@ -59,4 +60,5 @@ export async function verifyOfflineReportPairDesktop({ evaluate, click, cdp, unt
     screenshot: { filename: 'offline-report-pair.png', bytes: png.length, sha256: createHash('sha256').update(png).digest('hex') },
   }, null, 2))
   await verifyOfflinePairDropDesktop({ evaluate, click, cdp, until, api, out, noteIDs, filename, second })
+  await verifyOfflinePairBatchDesktop({ evaluate, click, cdp, until, api, out, noteIDs, filename, second })
 }

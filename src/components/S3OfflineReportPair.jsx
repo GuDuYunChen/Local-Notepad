@@ -6,6 +6,7 @@ import './S3OfflineReportPair.css'
 import { createOfflinePairExport } from '../services/s3OfflinePairExport.mjs'
 import S3OfflinePairExport from './S3OfflinePairExport.jsx'
 import S3OfflineReportDrop from './S3OfflineReportDrop.jsx'
+import { OFFLINE_BATCH_NOTICE, readOfflinePairFiles, selectOfflinePairFiles } from '../services/s3OfflinePairBatch.mjs'
 import { offlinePairVisibleRows } from '../services/s3OfflinePairView.mjs'
 
 const idle = () => ({ state: 'idle', report: null, message: '尚未选择报告。' })
@@ -15,6 +16,13 @@ export default function S3OfflineReportPair() {
   const model = useRef(view), owner = useRef(null), tasks = useRef({ a: null, b: null })
   const inputs = useRef({ a: null, b: null })
   const [differenceSource, setDifferenceSource] = useState(null)
+  const batchTask = useRef(null), batchInput = useRef(null)
+  const [batchOpen, setBatchOpen] = useState(false), [batchReading, setBatchReading] = useState(false)
+  const [batchMessage, setBatchMessage] = useState('')
+  const cancelBatch = () => {
+    const previous = batchTask.current; batchTask.current = null
+    previous?.controller.abort(); setBatchReading(false)
+  }
   const publish = next => {
     if (next.comparison !== model.current.comparison) setDifferenceSource(null)
     model.current = next; setView(next)
@@ -22,21 +30,24 @@ export default function S3OfflineReportPair() {
   const revoke = side => { const old = tasks.current[side]; tasks.current[side] = null; old?.controller.abort() }
   useLayoutEffect(() => {
     const lease = {}; owner.current = lease
-    return () => { owner.current = null; revoke('a'); revoke('b') }
+    return () => { owner.current = null; const pending = batchTask.current; batchTask.current = null; pending?.controller.abort(); revoke('a'); revoke('b') }
   }, [])
   const clear = side => {
     if (!owner.current) return
+    cancelBatch(); setBatchMessage('')
     revoke(side); if (inputs.current[side]) inputs.current[side].value = ''
     publish({ ...model.current, [side]: idle(), comparison: null, error: '' })
   }
   const reset = () => {
     if (!owner.current) return
+    cancelBatch(); setBatchMessage(''); setBatchOpen(false)
     revoke('a'); revoke('b')
     for (const input of Object.values(inputs.current)) if (input) input.value = ''
     publish(initial())
   }
   const openFile = (side, file) => {
     if (!owner.current) return
+    cancelBatch(); setBatchMessage('')
     if (inputs.current[side]) inputs.current[side].value = ''
     revoke(side)
     const task = { controller: new AbortController(), owner: owner.current }; tasks.current[side] = task
@@ -59,16 +70,44 @@ export default function S3OfflineReportPair() {
     if (count !== 1) { publish({ ...model.current, error: '每侧只能选择一份报告；现有选择未改变。' }); return }
     openFile(side, file)
   }
-  const ready = view.a.state === 'ready' && view.b.state === 'ready'
+  const chooseBatch = event => {
+    if (!owner.current) return
+    const selected = selectOfflinePairFiles(event.target.files)
+    event.target.value = ''
+    if (selected.code === 'pair-cancelled') return
+    if (!selected.files) {
+      setBatchMessage(selected.code === 'pair-count' ? '请恰好选择两份报告；现有选择未改变。' : '每份必须非空且不超过 4 KiB；现有选择未改变。')
+      return
+    }
+    cancelBatch(); revoke('a'); revoke('b')
+    const current = model.current
+    const retained = side => current[side].state === 'reading' ? idle() : current[side]
+    publish({ a: retained('a'), b: retained('b'), comparison: null, error: '' })
+    const task = { controller: new AbortController(), owner: owner.current }; batchTask.current = task
+    setBatchReading(true); setBatchMessage('正在校验两份文件；下方已有选择暂时保留，完成前不能比较。')
+    void readOfflinePairFiles(selected.files, { signal: task.controller.signal }).then(pair => {
+      if (owner.current !== task.owner || batchTask.current !== task) return
+      batchTask.current = null; setBatchReading(false)
+      for (const input of Object.values(inputs.current)) if (input) input.value = ''
+      const readyReport = report => ({ state: 'ready', report, message: '文件统计已校验；来源未经验证。' })
+      publish({ a: readyReport(pair.a), b: readyReport(pair.b), comparison: null, error: '' })
+      setBatchMessage('两份报告已一起替换；请检查 A / B 方向，再手动点击比较。')
+    }, () => {
+      if (owner.current !== task.owner || batchTask.current !== task) return
+      batchTask.current = null; setBatchReading(false)
+      setBatchMessage('两份报告未能全部校验通过，本次未采用任何新报告；此前已完成的选择保留。')
+    })
+  }
+  const ready = !batchReading && view.a.state === 'ready' && view.b.state === 'ready'
   const compare = () => {
     const current = model.current
-    if (!owner.current || current.a.state !== 'ready' || current.b.state !== 'ready') return
+    if (!owner.current || batchTask.current || current.a.state !== 'ready' || current.b.state !== 'ready') return
     try { publish({ ...current, comparison: createOfflinePairExport(current.a.report, current.b.report), error: '' }) }
     catch { publish({ ...current, comparison: null, error: '报告依据无效，未显示部分比较。' }) }
   }
   const swap = () => {
     const current = model.current
-    if (!owner.current || current.a.state !== 'ready' || current.b.state !== 'ready') return
+    if (!owner.current || batchTask.current || current.a.state !== 'ready' || current.b.state !== 'ready') return
     publish({ a: current.b, b: current.a, comparison: null, error: '' })
   }
   const containDrag = event => { event.preventDefault(); event.stopPropagation() }
@@ -79,6 +118,23 @@ export default function S3OfflineReportPair() {
   return <details className="local-inventory-note offline-report-pair" data-offline-pair onDragEnter={containDrag} onDragOver={containDrag} onDrop={refuseDrop} onToggle={event => { if (!event.currentTarget.open) reset() }}>
     <summary>比较两份离线统计报告</summary>
     <p id={`${id}-notice`}>{OFFLINE_PAIR_NOTICE} 无需读取本地统计。关闭此面板会清空本次选择。</p>
+    <div className="local-inventory-actions">
+      <button type="button" className="btn small" data-offline-batch-toggle aria-expanded={batchOpen}
+        aria-controls={`${id}-batch`} onClick={() => {
+          if (batchOpen) { cancelBatch(); setBatchMessage('') }
+          setBatchOpen(!batchOpen)
+        }}>{batchOpen ? '收起双文件选择' : '一次选择两份报告'}</button>
+    </div>
+    {batchOpen && <section id={`${id}-batch`} data-offline-batch aria-label="一次选择两份离线报告">
+      <p id={`${id}-batch-hint`}>{OFFLINE_BATCH_NOTICE}</p>
+      <label htmlFor={`${id}-batch-input`}>选择两份统计 JSON（每份最多 4 KiB）</label>
+      <input id={`${id}-batch-input`} ref={batchInput} type="file" multiple accept=".json,application/json"
+        data-offline-batch-input aria-describedby={`${id}-batch-hint ${id}-batch-status`} onChange={chooseBatch} />
+      {batchReading && <button type="button" className="btn small" data-offline-batch-stop onClick={() => {
+        cancelBatch(); setBatchMessage('已停止本次双文件读取；此前已完成的选择保留。')
+      }}>停止双文件读取</button>}
+      <p id={`${id}-batch-status`} role="status" aria-live="polite" data-offline-batch-reading={batchReading ? 'true' : 'false'}>{batchMessage}</p>
+    </section>}
     <div className="offline-pair-inputs">
       {['a', 'b'].map(side => <fieldset key={side} data-offline-side={side}>
         <legend>报告 {side.toUpperCase()}</legend>
