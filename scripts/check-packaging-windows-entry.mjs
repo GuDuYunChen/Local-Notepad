@@ -16,6 +16,12 @@ const invoke = (file, cwd, env = process.env, args = []) => spawnSync(ps,
   ['-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', file, ...args],
   { cwd, env, encoding: 'utf8', timeout: 30000, windowsHide: true })
 try {
+  const nodeProbe = path.join(temp, 'node-candidates.ps1')
+  writeFileSync(nodeProbe, "@((Get-Command node.exe -CommandType Application -ErrorAction Stop).Source) | ConvertTo-Json -Compress\n")
+  const nodeResult = invoke(nodeProbe, temp)
+  assert.equal(nodeResult.error, undefined); assert.equal(nodeResult.status, 0)
+  const nodeCandidates = [JSON.parse(nodeResult.stdout.trim())].flat()
+  assert.ok(nodeCandidates.length >= 1 && nodeCandidates.every(item => typeof item === 'string' && /node\.exe$/i.test(item)))
   const legacy = path.join(temp, 'legacy'), fixed = path.join(temp, 'fixed'), bin = path.join(temp, 'stub-bin')
   for (const folder of [legacy, fixed, bin]) mkdirSync(folder)
   mkdirSync(path.join(legacy, 'node_modules')); mkdirSync(path.join(legacy, 'release'))
@@ -50,8 +56,8 @@ try {
   assert.match(newResult.stdout + newResult.stderr, /Manifest and lock versions do not match/)
   assert.equal(readFileSync(path.join(fixed, 'release', 'old.exe'), 'utf8'), 'keep me')
   const result = { complete: true, commit: process.env.GITHUB_SHA, realWindowsPowerShell: true, isolatedData: true,
-    legacySourceBlob: sourceBlob, legacyExitCode: oldResult.status, fixedExitCode: newResult.status,
-    checks: ['legacy-failed-npm-still-opens-stale-exe', 'fixed-native-failure-propagates', 'arbitrary-cwd-and-unicode-path', 'stale-file-preserved-not-delivered'] }
+    nodeCandidates, selectedNode: nodeCandidates[0], legacySourceBlob: sourceBlob, legacyExitCode: oldResult.status, fixedExitCode: newResult.status,
+    checks: ['legacy-failed-npm-still-opens-stale-exe', 'fixed-native-failure-propagates', 'arbitrary-cwd-and-unicode-path', 'stale-file-preserved-not-delivered', 'single-node-selected-from-resolved-candidates'] }
   writeFileSync(path.join(output, 'entry-contract.json'), JSON.stringify(result, null, 2) + '\n')
   console.log(JSON.stringify(result))
 } finally { rmSync(temp, { recursive: true, force: true }) }

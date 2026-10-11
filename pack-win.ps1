@@ -3,7 +3,7 @@ param([switch]$NoOpen)
 $ErrorActionPreference = 'Stop'
 $code = 1
 try {
-  $node = (Get-Command node.exe -CommandType Application -ErrorAction Stop).Source
+  $node = (Get-Command node.exe -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
   & $node (Join-Path $PSScriptRoot 'scripts\package-windows.mjs')
   $code = $LASTEXITCODE
   if ($code -eq 0 -and -not $NoOpen) {

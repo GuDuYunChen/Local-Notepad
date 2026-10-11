@@ -162,6 +162,10 @@ export function registerWindowsPackageTests(test) {
   test('package native runner enforces timeout without reporting successful completion',async()=>{
     await assert.rejects(runNative(process.execPath,['-e','setInterval(()=>{},1000)'],{quiet:true,timeout:200}),/timeout/)
   })
+  test('package PowerShell selects one executable when multiple Node paths resolve',()=>{
+    const ps=readFileSync(fileURLToPath(new URL('../pack-win.ps1',import.meta.url)),'utf8')
+    assert.match(ps,/Get-Command node\.exe -CommandType Application -ErrorAction Stop \| Select-Object -First 1\)\.Source/)
+  })
   test('package entry wrappers propagate native failure and do not search arbitrary executables',()=>{
     const root=fileURLToPath(new URL('../',import.meta.url)),ps=readFileSync(path.join(root,'pack-win.ps1'),'utf8'),bat=readFileSync(path.join(root,'pack-win.bat'),'utf8')
     assert.match(ps,/\$code = \$LASTEXITCODE/);assert.match(ps,/exit \$code/);assert.match(ps,/\$PSScriptRoot/)

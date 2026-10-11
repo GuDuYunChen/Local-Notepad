@@ -33,3 +33,9 @@ Ctrl+C 会请求停止本轮子进程，命令超时或终止都不能形成成�
 只在 feature/knowledge-os-phase2 / Draft PR #2 开发，不合 master、不强推、不打标签或正式发布，不启动 Work/Codex/自动任务。最终验收写入 PR 和交付文件，不为状态再造源码提交。ChatGPT 断流原因仍未定位。
 
 实现参考：Node.js 官方 child_process 文档中 Windows .cmd 必须经 cmd.exe 执行；本入口只传固定 npm 参数，不插值文件路径或外部命令文本。https://nodejs.org/api/child_process.html
+
+## 同阶段 Windows 实测修正：多个 Node.exe 候选
+
+首候选617c8ef的真实Windows旧脚本反例成功复现：npm退出19后仍尝试打开遗留EXE。新入口则发现另一处真实问题：Get-Command在runner同时解析出工具缓存和Program Files中的两个node.exe，直接取.Source得到数组，被当成拼接路径执行，失败于启动Node而非实际构建。原始产物11707299650及四份日志保留，不将此误报为npm、应用测试或平台断流故障。
+
+入口现在按PATH解析顺序明确取第一个可执行程序（Select-Object -First 1），不会将多个候选拼接；未匹配仍走原失败提示。保留原30共享回归并新增1项多候选选择约束，Windows检查记录实际候选与所选路径，并继续执行原旧包反例、特殊路径和退出码检查。完整UI预期3406只是新提交验收目标。依赖与应用逻辑不变，仍是未验收4.217.1，不为本阶段修正另加版本；新HEAD须重新完整验收。
