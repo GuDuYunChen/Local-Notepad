@@ -1,3 +1,4 @@
+import { verifyOfflinePairDirectionDesktop } from './check-offline-pair-direction-desktop.mjs'
 import { verifyOfflineBatchDropDesktop } from './check-offline-batch-drop-desktop.mjs'
 import { verifyOfflinePairBatchDesktop } from './check-offline-pair-batch-desktop.mjs'
 import { verifyOfflinePairDropDesktop } from './check-offline-pair-drop-desktop.mjs'
@@ -63,4 +64,5 @@ export async function verifyOfflineReportPairDesktop({ evaluate, click, cdp, unt
   await verifyOfflinePairDropDesktop({ evaluate, click, cdp, until, api, out, noteIDs, filename, second })
   await verifyOfflinePairBatchDesktop({ evaluate, click, cdp, until, api, out, noteIDs, filename, second })
   await verifyOfflineBatchDropDesktop({ evaluate, click, cdp, until, api, out, noteIDs, filename, second })
+  await verifyOfflinePairDirectionDesktop({ evaluate, click, cdp, until, api, out, noteIDs, filename })
 }

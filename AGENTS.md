@@ -1,6 +1,6 @@
 # Local-Notepad development
 
-Current code-bearing delivery candidate: 2F.79.1 / 4.212.1 offline file failure deadline repair. Read `docs/LOCAL_FILE_FAILURE_DEADLINE_2F79_1.md` first. Base 231da61c56ba97251f08e561c9dec4fbdc6a31c4 / 4.212.0 is accepted in PR #2 comment 6099207740. Recheck cancellation and the existing absolute deadline before rejecting invalid result buffers or UTF-8; do not weaken parsing, change budgets, or repeat accepted work. Current-HEAD CI and installer acceptance are separate checkpoints.
+Current code-bearing delivery candidate: 2F.80 / 4.213.0 signed direction filters for two offline reports. Read `docs/OFFLINE_PAIR_DIRECTION_2F80.md` first. Base 2141ce6a317d40de42d5f639e31d63a44994c1f4 / 4.212.1 is accepted in PR #2 comment 6103017887; do not replay its repair. Direction filters change presentation only; preserve the full confirmed comparison for all exports, reject stale filter state, and keep existing readers and save/quit invariants. Current-HEAD CI and real Windows acceptance remain separate checkpoints.
 
 Read `docs/DEVELOPMENT_HANDOFF.md` before resuming an interrupted task.
 Work on `feature/knowledge-os-phase2` / Draft PR #2 unless the user explicitly changes that direction. Do not merge master as part of ordinary stage development.
