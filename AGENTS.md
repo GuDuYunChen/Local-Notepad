@@ -1,6 +1,6 @@
 # Local-Notepad development
 
-Current code-bearing delivery candidate: 2F.81 / 4.214.0 complete offline comparison summary. Read `docs/OFFLINE_PAIR_SUMMARY_2F81.md` first. Base 937892565dc23551259460b6ef2583c9b2ab9939 / 4.213.0 is accepted in PR #2 comment 6107777336; do not replay its development or acceptance. Summary counts always use all twelve confirmed metrics, separately reporting quantity and byte metrics, regardless of active direction filters. Preserve existing exports, readers, save/quit rules and all prior tests. Current-HEAD CI and actual Windows artifacts require separate acceptance.
+Current code-bearing delivery candidate: 2F.82 / 4.215.0 quantity and capacity difference scopes. Read `docs/OFFLINE_PAIR_SCOPE_2F82.md` first. Base 0cdbdc079a2fe5cd9bd4190810bb5364518530b9 / 4.214.0 is accepted in PR #2 comment 6108108488; do not replay its development or acceptance. Type and direction filters affect presentation only; keep the full twelve-metric summary and all exports unchanged. Preserve existing readers, save/quit rules and prior tests. Current-HEAD CI and actual Windows artifacts require separate acceptance.
 
 Read `docs/DEVELOPMENT_HANDOFF.md` before resuming an interrupted task.
 Work on `feature/knowledge-os-phase2` / Draft PR #2 unless the user explicitly changes that direction. Do not merge master as part of ordinary stage development.

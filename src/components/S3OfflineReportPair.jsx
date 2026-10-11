@@ -9,7 +9,7 @@ import S3OfflinePairExport from './S3OfflinePairExport.jsx'
 import S3OfflineReportDrop from './S3OfflineReportDrop.jsx'
 import S3OfflineBatchDrop from './S3OfflineBatchDrop.jsx'
 import { OFFLINE_BATCH_NOTICE, readOfflinePairFiles, selectOfflinePairFiles } from '../services/s3OfflinePairBatch.mjs'
-import { offlinePairDirectionalRows } from '../services/s3OfflinePairDirection.mjs'
+import { offlinePairScopedRows } from '../services/s3OfflinePairScope.mjs'
 
 const idle = () => ({ state: 'idle', report: null, message: '尚未选择报告。' })
 const initial = () => ({ a: idle(), b: idle(), comparison: null, error: '' })
@@ -19,6 +19,7 @@ export default function S3OfflineReportPair() {
   const inputs = useRef({ a: null, b: null })
   const [differenceSource, setDifferenceSource] = useState(null)
   const [directionSource, setDirectionSource] = useState(null)
+  const [scopeSource, setScopeSource] = useState(null)
   const batchTask = useRef(null), batchInput = useRef(null)
   const [batchOpen, setBatchOpen] = useState(false), [batchReading, setBatchReading] = useState(false)
   const [batchMessage, setBatchMessage] = useState('')
@@ -27,7 +28,7 @@ export default function S3OfflineReportPair() {
     previous?.controller.abort(); setBatchReading(false)
   }
   const publish = next => {
-    if (next.comparison !== model.current.comparison) { setDifferenceSource(null); setDirectionSource(null) }
+    if (next.comparison !== model.current.comparison) { setDifferenceSource(null); setDirectionSource(null); setScopeSource(null) }
     model.current = next; setView(next)
   }
   const revoke = side => { const old = tasks.current[side]; tasks.current[side] = null; old?.controller.abort() }
@@ -122,7 +123,8 @@ export default function S3OfflineReportPair() {
   const result = view.comparison?.comparison
   const onlyDifferences = Boolean(result && differenceSource === view.comparison)
   const direction = onlyDifferences && directionSource?.comparison === view.comparison ? directionSource.value : 'all'
-  const visibleRows = result ? offlinePairDirectionalRows(result, onlyDifferences, direction) : []
+  const scope = onlyDifferences && scopeSource?.comparison === view.comparison ? scopeSource.value : 'all'
+  const visibleRows = result ? offlinePairScopedRows(result, onlyDifferences, direction, scope) : []
   return <details className="local-inventory-note offline-report-pair" data-offline-pair onDragEnter={containDrag} onDragOver={containDrag} onDrop={refuseDrop} onToggle={event => { if (!event.currentTarget.open) reset() }}>
     <summary>比较两份离线统计报告</summary>
     <p id={`${id}-notice`}>{OFFLINE_PAIR_NOTICE} 无需读取本地统计。关闭此面板会清空本次选择。</p>
@@ -171,6 +173,7 @@ export default function S3OfflineReportPair() {
           if (owner.current && model.current.comparison === view.comparison) {
             setDifferenceSource(event.target.checked ? view.comparison : null)
             setDirectionSource(null)
+            setScopeSource(null)
           }
         }} /> 仅看有差异的指标</label>
       {onlyDifferences && <label className="offline-direction">差异方向（B − A）
@@ -186,16 +189,30 @@ export default function S3OfflineReportPair() {
           <option value="decrease">仅减少（负差值）</option>
         </select>
       </label>}
+      {onlyDifferences && <label className="offline-direction">差异指标类型
+        <select data-offline-scope value={scope} aria-controls={`${id}-metrics`} aria-describedby={`${id}-filter-status`}
+          onChange={event => {
+            const value = event.target.value
+            if (owner.current && model.current.comparison === view.comparison && ['all', 'counts', 'bytes'].includes(value)) {
+              setScopeSource({ comparison: view.comparison, value })
+            }
+          }}>
+          <option value="all">全部指标</option>
+          <option value="counts">仅数量（项）</option>
+          <option value="bytes">仅容量（B）</option>
+        </select>
+      </label>}
       <span id={`${id}-filter-status`} role="status" aria-live="polite" aria-atomic="true">
         显示 {visibleRows.length} / 12 项指标；导出仍保留全部 12 项。
       </span>
     </div>}
     {result && onlyDifferences && visibleRows.length === 0 && <p data-offline-no-differences>
-      {direction === 'all' ? '两份报告的 12 项统计数值相同，不代表内容相同。关闭筛选可查看双方原值。'
+      {scope !== 'all' ? '当前指标类型与方向没有匹配项，不代表两份报告相同。选择全部指标和全部差异，或关闭筛选可查看双方原值。'
+        : direction === 'all' ? '两份报告的 12 项统计数值相同，不代表内容相同。关闭筛选可查看双方原值。'
         : `没有${direction === 'increase' ? '增加' : '减少'}的指标，不代表两份报告相同。选择全部差异或关闭筛选可查看其他指标。`}
     </p>}
     {result && <div id={`${id}-metrics`} className="local-inventory-table" role="region" aria-label="两份离线报告比较" tabIndex={0} data-offline-result>
-      <table><caption>{!onlyDifferences ? '完整统计比较 · 报告 B − 报告 A' : direction === 'all' ? '差异指标 · 报告 B − 报告 A' : `${direction === 'increase' ? '增加' : '减少'}指标 · 报告 B − 报告 A`}</caption>
+      <table><caption>{scope !== 'all' && `${scope === 'counts' ? '数量' : '容量'} · `}{!onlyDifferences ? '完整统计比较 · 报告 B − 报告 A' : direction === 'all' ? '差异指标 · 报告 B − 报告 A' : `${direction === 'increase' ? '增加' : '减少'}指标 · 报告 B − 报告 A`}</caption>
         <thead><tr><th scope="col">指标</th><th scope="col">报告 A</th><th scope="col">报告 B</th><th scope="col">差值 B − A</th><th scope="col">单位</th></tr></thead>
         <tbody>{visibleRows.map(row => <tr key={row.key} data-offline-metric={row.key}>
           <th scope="row">{row.label}</th><td>{row.a}</td><td>{row.b}</td><td>{comparisonDelta(row.delta)}</td><td>{row.unit}</td>

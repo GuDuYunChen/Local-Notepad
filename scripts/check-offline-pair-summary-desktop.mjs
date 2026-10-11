@@ -1,3 +1,4 @@
+import { verifyOfflinePairScopeDesktop } from './check-offline-pair-scope-desktop.mjs'
 import assert from 'node:assert/strict'
 import { writeFileSync } from 'node:fs'
 import path from 'node:path'
@@ -40,4 +41,5 @@ export async function verifyOfflinePairSummaryDesktop({ evaluate, click, cdp, un
     checks: ['twelve-metric-distribution', 'separate-count-and-byte-groups', 'filter-keeps-complete-summary',
       'restore-all-table-rows', 'swap-revokes-old-summary', 'reconfirm-reverses-distribution', 'notes-unchanged'],
     screenshot: { filename: 'offline-summary.png', bytes: png.length, sha256: createHash('sha256').update(png).digest('hex') } }, null, 2))
+  await verifyOfflinePairScopeDesktop({ evaluate, click, cdp, until, api, out, noteIDs, metrics })
 }
