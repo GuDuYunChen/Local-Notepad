@@ -30,14 +30,14 @@ WebDAV 现在支持可选自动同步。后台调度不会与手动同步重入�
 
 ### 环境要求
 
-- Node.js ≥ 18
-- Go ≥ 1.20
-- npm 或 pnpm
+- Node.js ≥ 22.12（CI 使用 24）
+- Go ≥ 1.24.11
+- npm（使用提交的 package-lock.json）
 
 ### 安装依赖
 
 ```bash
-npm install
+npm ci --no-audit --no-fund
 ```
 
 ### 一键启动完整开发环境（推荐）
@@ -105,8 +105,10 @@ NOTEPAD_DATA=/path/to/data go run ./cmd/notepad-server/main.go
 双击项目根目录下的 `pack-win.bat` 脚本（或者右键 `pack-win.ps1` 选择“使用 PowerShell 运行”）。
 
 - **注意**：Windows 默认会将 `.ps1` 文件关联到记事本打开，直接双击可能无法运行。请使用新提供的 `pack-win.bat` 批处理文件，或者右键点击 `.ps1` 文件选择运行。
-- 脚本会自动检查环境（Node.js, Go）、安装依赖、构建前后端并生成安装包。
-- **产物位置**：`release/Notepad-<version>-Setup.exe`
+- 脚本会自动检查环境、三个应用版本和依赖锁，执行锁定安装，再构建前后端与安装包。任何命令失败都会立即停止，不会把旧 EXE 当作新产物。
+- **产物位置**：`release/Notepad-<version>-Setup.exe`，同时生成 `.sha256` 文件。内部 PE 版本必须与 package.json 相符。
+- **日志与失败恢复**：`test-results/local-package/<本次运行>/` 保存命令日志和 JSON 回执。已有同版本安装包会先保留到该目录；构建失败不回退旧包充当成功。详见 [完整打包说明](docs/WINDOWS_PACKAGE_PIPELINE_2F84_1.md)。
+- **从任意目录调用**：脚本以自身位置定位仓库；`pack-win.ps1 -NoOpen` 可关闭完成后打开资源管理器的行为。
 - **使用方式**：直接双击生成的 `.exe` 文件进行安装，安装后即可在桌面启动应用。
 
 ### 方式二：命令行手动打包
@@ -116,7 +118,7 @@ NOTEPAD_DATA=/path/to/data go run ./cmd/notepad-server/main.go
 1. **安装依赖**
 
    ```bash
-   npm install
+   npm ci --no-audit --no-fund
    ```
 2. **执行构建**
 
@@ -135,7 +137,7 @@ NOTEPAD_DATA=/path/to/data go run ./cmd/notepad-server/main.go
 
 ### 注意事项
 
-- **环境要求**：打包需在 Windows 环境下进行，且需预先安装 Go (≥1.20) 和 Node.js。
+- **环境要求**：打包需在 Windows 环境下进行，且需预先安装 Go ≥ 1.24.11、Node.js ≥ 22.12 和 npm。
 - **后端集成**：打包过程会自动将编译好的 `notepad-server.exe` 复制到安装包中，用户安装后应用会自动管理后端服务的启动与关闭。
 
 ## 部署
@@ -147,9 +149,9 @@ NOTEPAD_DATA=/path/to/data go run ./cmd/notepad-server/main.go
 
 - 打包失败：
   - 请检查是否已安装 Go（命令 `go version`）、Node.js 与 npm。
-  - 如依赖安装失败，尝试删除 `node_modules` 后重新执行 `npm install`。
+  - 如依赖安装失败，先查看本次日志的首个失败步骤；修正网络或工具链后重新执行，不删除依赖锁、不反复盲目重试。
 - 安装包未生成：
-  - 确认 `dist` 目录下是否存在 `.exe`；若不存在，请查看命令行输出错误信息并重试。
+  - 确认 `release/Notepad-<package.json 版本>-Setup.exe` 与本次成功回执对应；不要使用 dist 或 win-unpacked 中的任意 EXE 代替安装包。
 
 ## 数据存储说明
 
@@ -234,4 +236,4 @@ WebDAV 支持 Basic Auth；公网端点必须使用 HTTPS，localhost/loopback �
 ## 版本与产物
 
 - Electron Builder 配置见 `package.json` 中 `build` 字段（NSIS 安装包，artifactName 为 `Notepad-${version}-Setup.exe`）。
-- 安装包与解压产物默认输出到 `dist` 目录。
+- 安装包与解压产物默认输出到 `release` 目录；`dist` 只存放构建后的渲染页面，不是安装包目录。

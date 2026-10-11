@@ -1,6 +1,6 @@
 # Local-Notepad development
 
-Current code-bearing delivery candidate: 2F.84 / 4.217.0 complete comparison view recovery. Read `docs/OFFLINE_PAIR_VIEW_RECOVERY_2F84.md` first. Base 2dcecabc4e39285a2bd93f66c67c7b93f66533c8 / 4.216.0 is accepted in PR #2 comment 6109214346; do not repeat its development or acceptance. Restore only the presentation filters and order, retain both files and confirmed export identity, and focus the existing result region. Preserve stale-handler guards, readers, save/quit protections and all previous tests. Current-HEAD CI and actual Windows artifacts remain separate acceptance checkpoints.
+Current code-bearing delivery candidate: 2F.84.1 / 4.217.1 Windows one-click packaging repair. Read `docs/WINDOWS_PACKAGE_PIPELINE_2F84_1.md` first. Base 082c9b95de312049354a165e30968dc69f5440ee / 4.217.0 is accepted in PR #2 comment 6110100448; do not repeat its report features or acceptance. The report feature line is closed. Fix the complete local packaging path: entry, preflight, locked install, failure propagation, fresh exact-version artifact, checksum and diagnostics. Current-HEAD CI and the real Windows entry require separate acceptance.
 
 Read `docs/DEVELOPMENT_HANDOFF.md` before resuming an interrupted task.
 Work on `feature/knowledge-os-phase2` / Draft PR #2 unless the user explicitly changes that direction. Do not merge master as part of ordinary stage development.
@@ -26,3 +26,5 @@ Observe the same workflow at least 90 seconds apart. At 30 external connector ca
 Record final acceptance in a PR comment/local report, not a new source commit just to update status and restart every workflow.
 
 Application versions are not phase numbers. For a code-bearing user delivery, explicitly increment the patch version for fixes or minor version for features; keep schema14 and dependency nodes unchanged. Use `npm run version:patch` or `npm run version:minor`, then run `node scripts/check-app-version.mjs --previous-version=<last-accepted-app-version>` before pushing. Check the new installer, not a renamed old binary. Do not increment versions automatically during builds, create release tags, or make status-only version commits. See `docs/APP_VERSION_2F62_1.md`.
+
+User delivery requirement: one complete functional workflow per delivery, including entry, normal operation, result, cancellation/failure handling and verification. Internal commits are not separate user-facing stages. Do not extend the completed offline-report feature with more tiny controls. Fix reproduced blockers before selecting a new full feature; do not make the user repeatedly request missing portions.
