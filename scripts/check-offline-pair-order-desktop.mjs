@@ -1,3 +1,4 @@
+import { verifyOfflinePairViewResetDesktop } from './check-offline-pair-view-reset-desktop.mjs'
 import assert from 'node:assert/strict'
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
@@ -79,4 +80,5 @@ export async function verifyOfflinePairOrderDesktop({ evaluate, click, cdp, unti
     checks:['native-magnitude-order-with-real-files','both-directions-and-sizes','single-unit-only-and-scope-reset','direction-retains-order',
       'overview-and-three-complete-downloads-unchanged','disable-restores-canonical-twelve','swap-revokes-old-sort','restore-prior-pair-and-notes-unchanged'],
     screenshot:{filename:'offline-order.png',bytes:png.length,sha256:hash(png)}},null,2))
+  await verifyOfflinePairViewResetDesktop({ evaluate, click, cdp, until, api, out, noteIDs })
 }

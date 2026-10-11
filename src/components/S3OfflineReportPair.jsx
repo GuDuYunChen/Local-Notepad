@@ -10,13 +10,14 @@ import S3OfflineReportDrop from './S3OfflineReportDrop.jsx'
 import S3OfflineBatchDrop from './S3OfflineBatchDrop.jsx'
 import { OFFLINE_BATCH_NOTICE, readOfflinePairFiles, selectOfflinePairFiles } from '../services/s3OfflinePairBatch.mjs'
 import { offlinePairOrderedRows } from '../services/s3OfflinePairOrder.mjs'
+import { offlinePairViewDescription } from '../services/s3OfflinePairViewDescription.mjs'
 
 const idle = () => ({ state: 'idle', report: null, message: '尚未选择报告。' })
 const initial = () => ({ a: idle(), b: idle(), comparison: null, error: '' })
 export default function S3OfflineReportPair() {
   const id = useId(), [view, setView] = useState(initial)
   const model = useRef(view), owner = useRef(null), tasks = useRef({ a: null, b: null })
-  const inputs = useRef({ a: null, b: null })
+  const inputs = useRef({ a: null, b: null }), metricsRegion = useRef(null)
   const [differenceSource, setDifferenceSource] = useState(null)
   const [directionSource, setDirectionSource] = useState(null)
   const [scopeSource, setScopeSource] = useState(null)
@@ -119,6 +120,12 @@ export default function S3OfflineReportPair() {
     if (!owner.current || batchTask.current || current.a.state !== 'ready' || current.b.state !== 'ready') return
     publish({ a: current.b, b: current.a, comparison: null, error: '' })
   }
+  const restoreView = () => {
+    // Do not call reset/compare: keep files, confirmation and export identity.
+    if (!owner.current || !view.comparison || model.current.comparison !== view.comparison) return
+    setDifferenceSource(null); setDirectionSource(null); setScopeSource(null); setOrderSource(null)
+    metricsRegion.current?.focus({ preventScroll: true })
+  }
   const containDrag = event => { event.preventDefault(); event.stopPropagation() }
   const refuseDrop = event => { containDrag(event); if (owner.current) publish({ ...model.current, error: '请拖入报告 A 或 B 的专用区域，或使用文件选择按钮；现有选择未改变。' }) }
   const result = view.comparison?.comparison
@@ -220,16 +227,23 @@ export default function S3OfflineReportPair() {
         </select>
         <span id={`${id}-order-hint`}>按差值绝对值排序，同幅度保留原序；数量和容量不混排，概览与导出不变。</span>
       </label>}
+      <button type="button" className="btn small" data-offline-view-reset disabled={!onlyDifferences}
+        aria-controls={`${id}-metrics`} aria-describedby={`${id}-view-hint`} onClick={restoreView}>恢复完整视图</button>
       <span id={`${id}-filter-status`} role="status" aria-live="polite" aria-atomic="true">
         显示 {visibleRows.length} / 12 项指标；导出仍保留全部 12 项。{order !== 'original' && ` 当前按差异幅度${order === 'largest' ? '从大到小' : '从小到大'}排列。`}
       </span>
+    </div>}
+    {result && <div data-offline-view-description>
+      <p role="status" aria-live="polite" aria-atomic="true">当前视图：{offlinePairViewDescription(onlyDifferences, direction, scope, order)}</p>
+      <p id={`${id}-view-hint`}>恢复完整视图只清除筛选和排序，保留两份报告、比较确认与完整导出，不重新读取文件。</p>
     </div>}
     {result && onlyDifferences && visibleRows.length === 0 && <p data-offline-no-differences>
       {scope !== 'all' ? '当前指标类型与方向没有匹配项，不代表两份报告相同。选择全部指标和全部差异，或关闭筛选可查看双方原值。'
         : direction === 'all' ? '两份报告的 12 项统计数值相同，不代表内容相同。关闭筛选可查看双方原值。'
         : `没有${direction === 'increase' ? '增加' : '减少'}的指标，不代表两份报告相同。选择全部差异或关闭筛选可查看其他指标。`}
+      <span> 使用“恢复完整视图”可直接查看全部 12 项。</span>
     </p>}
-    {result && <div id={`${id}-metrics`} className="local-inventory-table" role="region" aria-label="两份离线报告比较" tabIndex={0} data-offline-result>
+    {result && <div ref={metricsRegion} id={`${id}-metrics`} className="local-inventory-table" role="region" aria-label="两份离线报告比较" tabIndex={0} data-offline-result>
       <table><caption>{order !== 'original' && `幅度${order === 'largest' ? '从大到小' : '从小到大'} · `}{scope !== 'all' && `${scope === 'counts' ? '数量' : '容量'} · `}{!onlyDifferences ? '完整统计比较 · 报告 B − 报告 A' : direction === 'all' ? '差异指标 · 报告 B − 报告 A' : `${direction === 'increase' ? '增加' : '减少'}指标 · 报告 B − 报告 A`}</caption>
         <thead><tr><th scope="col">指标</th><th scope="col">报告 A</th><th scope="col">报告 B</th><th scope="col">差值 B − A</th><th scope="col">单位</th></tr></thead>
         <tbody>{visibleRows.map(row => <tr key={row.key} data-offline-metric={row.key}>
