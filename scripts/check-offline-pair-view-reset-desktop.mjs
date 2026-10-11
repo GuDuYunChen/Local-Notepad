@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { createHash } from 'node:crypto'
+import { verifyOfflinePairDownloadInvariance } from './offline-pair-download-evidence.mjs'
 
 // Exercise the existing packaged application, native keyboard and real downloads.
 // No replacement of readers, comparison functions, click handlers or note APIs.
@@ -30,10 +31,11 @@ export async function verifyOfflinePairViewResetDesktop({ evaluate, click, cdp, 
     await cdp.send('Browser.setDownloadBehavior',{behavior:'allow',downloadPath:directory})
     const files=[]
     for(const format of ['json','csv','html']) {
+      const startedAt=Date.now()
       await click(`[data-offline-export-format="${format}"]`)
       const filename=await until(()=>{const ns=readdirSync(directory).filter(n=>n.startsWith('Local-Notepad-offline-pair-')&&n.endsWith('.'+format));return ns.length===1?ns[0]:null},'View recovery download missing: '+format)
       const raw=readFileSync(path.join(directory,filename));assert.ok(raw.length>0&&raw.length<=16384)
-      files.push({filename:path.join('offline-view-reset-'+suffix,filename),format,bytes:raw.length,sha256:hash(raw)})
+      files.push({filename:path.join('offline-view-reset-'+suffix,filename),format,bytes:raw.length,sha256:hash(raw),startedAt,completedAt:Date.now()})
     }
     return files
   }
@@ -51,7 +53,8 @@ export async function verifyOfflinePairViewResetDesktop({ evaluate, click, cdp, 
   assert.equal(await evaluate("document.querySelector('[data-offline-export-status]').textContent"),feedback)
   assert.equal(await evaluate("document.querySelector('[data-offline-view-reset]').disabled"),true)
   const restoredFiles=await downloads('after')
-  assert.deepEqual(restoredFiles.map(f=>[f.format,f.bytes,f.sha256]),filteredFiles.map(f=>[f.format,f.bytes,f.sha256]))
+  const withBytes=files=>files.map(file=>({...file,raw:readFileSync(path.join(out,file.filename))}))
+  const downloadInvariance=verifyOfflinePairDownloadInvariance(withBytes(filteredFiles),withBytes(restoredFiles),original)
   const exported=JSON.parse(readFileSync(path.join(out,restoredFiles[0].filename),'utf8'))
   assert.deepEqual(exported.metrics,original)
   await click('[data-offline-differences]');assert.equal(await evaluate("document.querySelector('[data-offline-scope]').value"),'all')
@@ -66,8 +69,8 @@ export async function verifyOfflinePairViewResetDesktop({ evaluate, click, cdp, 
   const png=Buffer.from((await cdp.send('Page.captureScreenshot',{format:'png'})).data,'base64');writeFileSync(path.join(out,'offline-view-reset.png'),png)
   assert.deepEqual(await Promise.all(noteIDs.map(id=>api('/api/files/'+id))),before)
   writeFileSync(path.join(out,'offline-view-reset-checks.json'),JSON.stringify({complete:true,commit:process.env.GITHUB_SHA,
-    realPackagedApp:true,realDownload:true,syntheticData:true,metrics:original,filtered,files:[...filteredFiles,...restoredFiles],
+    realPackagedApp:true,realDownload:true,syntheticData:true,metrics:original,filtered,downloadInvariance,files:[...filteredFiles,...restoredFiles],
     checks:['effective-view-description','one-keyboard-action-clears-combined-filters','focus-returns-to-result-region','files-and-confirmation-preserved',
-      'summary-and-export-feedback-unchanged','three-downloads-byte-identical-before-and-after','no-old-sort-revival-and-empty-view-recovery','notes-unchanged'],
+      'summary-and-export-feedback-unchanged','three-downloads-identical-except-validated-export-generation-time','no-old-sort-revival-and-empty-view-recovery','notes-unchanged'],
     screenshot:{filename:'offline-view-reset.png',bytes:png.length,sha256:hash(png)}},null,2))
 }
