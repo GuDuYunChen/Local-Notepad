@@ -40,7 +40,11 @@ export async function verifyOfflinePairViewResetDesktop({ evaluate, click, cdp, 
   const filteredFiles=await downloads('before')
   const feedback=await evaluate("document.querySelector('[data-offline-export-status]').textContent")
   await evaluate("document.querySelector('[data-offline-view-reset]').focus()")
-  for(const type of ['keyDown','keyUp'])await cdp.send('Input.dispatchKeyEvent',{type,key:'Enter',code:'Enter',windowsVirtualKeyCode:13})
+  assert.equal(await evaluate("document.activeElement===document.querySelector('[data-offline-view-reset]')&&!document.activeElement.disabled"),true)
+  // A full Enter keypress includes its character. Without text Chromium emits
+  // keydown/up only, which does not activate even an isolated native button.
+  for(const type of ['keyDown','keyUp'])await cdp.send('Input.dispatchKeyEvent',{type,key:'Enter',code:'Enter',windowsVirtualKeyCode:13,
+    ...(type==='keyDown'?{text:'\r',unmodifiedText:'\r'}:{})})
   await until(()=>evaluate("document.querySelector('[data-offline-result] tbody').rows.length===12&&!document.querySelector('[data-offline-differences]').checked"),'Keyboard view recovery did not complete')
   assert.equal(await evaluate("document.activeElement===document.querySelector('[data-offline-result]')"),true)
   assert.deepEqual(await snapshot(),original);assert.deepEqual(await sides(),originalSides);assert.equal(await overview(),originalOverview)
