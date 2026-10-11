@@ -1,4 +1,5 @@
 import React, { useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import S3OfflinePairSummary from './S3OfflinePairSummary.jsx'
 
 export default function S3OfflinePairExport({ output }) {
   const hint = useId(), token = useMemo(() => ({}), [output]), committed = useRef(null)
@@ -14,6 +15,7 @@ export default function S3OfflinePairExport({ output }) {
   }
   const code = feedback?.token === token ? feedback.code : ''
   return <div data-offline-export>
+    <S3OfflinePairSummary comparison={output?.comparison} />
     <p id={hint}>导出保留全部 12 项指标和双方原值，不重新读取文件。两侧均为文件声明统计，不是当前工作区；数值相同不代表内容相同。</p>
     <div className="local-inventory-actions">
       {['json', 'csv', 'html'].map(format => <button key={format} type="button" className="btn small" disabled={!output}

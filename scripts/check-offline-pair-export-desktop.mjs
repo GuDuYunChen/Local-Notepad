@@ -1,3 +1,4 @@
+import { verifyOfflinePairSummaryDesktop } from './check-offline-pair-summary-desktop.mjs'
 import { verifyOfflinePairFilterDesktop } from './check-offline-pair-filter-desktop.mjs'
 import assert from 'node:assert/strict'
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -8,6 +9,7 @@ import { createHash } from 'node:crypto'
 // comparison, FileReader, Blob, click handler or backend responses.
 export async function verifyOfflinePairExportDesktop({ evaluate, click, cdp, until, api, out, noteIDs, reverse }) {
   const before = await Promise.all(noteIDs.map(id => api('/api/files/' + id)))
+  await verifyOfflinePairSummaryDesktop({ evaluate, click, cdp, until, api, out, noteIDs, metrics: reverse.map(row => ({ ...row, delta: Number(row.delta) })) })
   const directory = path.join(out, 'offline-pair-exports'); mkdirSync(directory, { recursive: true })
   assert.equal(readdirSync(directory).length, 0)
   await cdp.send('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: directory })
