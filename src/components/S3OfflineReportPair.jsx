@@ -9,7 +9,7 @@ import S3OfflinePairExport from './S3OfflinePairExport.jsx'
 import S3OfflineReportDrop from './S3OfflineReportDrop.jsx'
 import S3OfflineBatchDrop from './S3OfflineBatchDrop.jsx'
 import { OFFLINE_BATCH_NOTICE, readOfflinePairFiles, selectOfflinePairFiles } from '../services/s3OfflinePairBatch.mjs'
-import { offlinePairScopedRows } from '../services/s3OfflinePairScope.mjs'
+import { offlinePairOrderedRows } from '../services/s3OfflinePairOrder.mjs'
 
 const idle = () => ({ state: 'idle', report: null, message: '尚未选择报告。' })
 const initial = () => ({ a: idle(), b: idle(), comparison: null, error: '' })
@@ -20,6 +20,7 @@ export default function S3OfflineReportPair() {
   const [differenceSource, setDifferenceSource] = useState(null)
   const [directionSource, setDirectionSource] = useState(null)
   const [scopeSource, setScopeSource] = useState(null)
+  const [orderSource, setOrderSource] = useState(null)
   const batchTask = useRef(null), batchInput = useRef(null)
   const [batchOpen, setBatchOpen] = useState(false), [batchReading, setBatchReading] = useState(false)
   const [batchMessage, setBatchMessage] = useState('')
@@ -28,7 +29,7 @@ export default function S3OfflineReportPair() {
     previous?.controller.abort(); setBatchReading(false)
   }
   const publish = next => {
-    if (next.comparison !== model.current.comparison) { setDifferenceSource(null); setDirectionSource(null); setScopeSource(null) }
+    if (next.comparison !== model.current.comparison) { setDifferenceSource(null); setDirectionSource(null); setScopeSource(null); setOrderSource(null) }
     model.current = next; setView(next)
   }
   const revoke = side => { const old = tasks.current[side]; tasks.current[side] = null; old?.controller.abort() }
@@ -124,7 +125,8 @@ export default function S3OfflineReportPair() {
   const onlyDifferences = Boolean(result && differenceSource === view.comparison)
   const direction = onlyDifferences && directionSource?.comparison === view.comparison ? directionSource.value : 'all'
   const scope = onlyDifferences && scopeSource?.comparison === view.comparison ? scopeSource.value : 'all'
-  const visibleRows = result ? offlinePairScopedRows(result, onlyDifferences, direction, scope) : []
+  const order = onlyDifferences && scope !== 'all' && orderSource?.comparison === view.comparison && orderSource.scope === scope ? orderSource.value : 'original'
+  const visibleRows = result ? offlinePairOrderedRows(result, onlyDifferences, direction, scope, order) : []
   return <details className="local-inventory-note offline-report-pair" data-offline-pair onDragEnter={containDrag} onDragOver={containDrag} onDrop={refuseDrop} onToggle={event => { if (!event.currentTarget.open) reset() }}>
     <summary>比较两份离线统计报告</summary>
     <p id={`${id}-notice`}>{OFFLINE_PAIR_NOTICE} 无需读取本地统计。关闭此面板会清空本次选择。</p>
@@ -174,6 +176,7 @@ export default function S3OfflineReportPair() {
             setDifferenceSource(event.target.checked ? view.comparison : null)
             setDirectionSource(null)
             setScopeSource(null)
+            setOrderSource(null)
           }
         }} /> 仅看有差异的指标</label>
       {onlyDifferences && <label className="offline-direction">差异方向（B − A）
@@ -195,6 +198,7 @@ export default function S3OfflineReportPair() {
             const value = event.target.value
             if (owner.current && model.current.comparison === view.comparison && ['all', 'counts', 'bytes'].includes(value)) {
               setScopeSource({ comparison: view.comparison, value })
+              setOrderSource(null)
             }
           }}>
           <option value="all">全部指标</option>
@@ -202,8 +206,22 @@ export default function S3OfflineReportPair() {
           <option value="bytes">仅容量（B）</option>
         </select>
       </label>}
+      {onlyDifferences && scope !== 'all' && <label className="offline-direction">同单位差异排序
+        <select data-offline-order value={order} aria-controls={`${id}-metrics`} aria-describedby={`${id}-order-hint ${id}-filter-status`}
+          onChange={event => {
+            const value = event.target.value
+            if (owner.current && model.current.comparison === view.comparison && ['original', 'largest', 'smallest'].includes(value)) {
+              setOrderSource({ comparison: view.comparison, scope, value })
+            }
+          }}>
+          <option value="original">原始指标顺序</option>
+          <option value="largest">差异幅度从大到小</option>
+          <option value="smallest">差异幅度从小到大</option>
+        </select>
+        <span id={`${id}-order-hint`}>按差值绝对值排序，同幅度保留原序；数量和容量不混排，概览与导出不变。</span>
+      </label>}
       <span id={`${id}-filter-status`} role="status" aria-live="polite" aria-atomic="true">
-        显示 {visibleRows.length} / 12 项指标；导出仍保留全部 12 项。
+        显示 {visibleRows.length} / 12 项指标；导出仍保留全部 12 项。{order !== 'original' && ` 当前按差异幅度${order === 'largest' ? '从大到小' : '从小到大'}排列。`}
       </span>
     </div>}
     {result && onlyDifferences && visibleRows.length === 0 && <p data-offline-no-differences>
@@ -212,7 +230,7 @@ export default function S3OfflineReportPair() {
         : `没有${direction === 'increase' ? '增加' : '减少'}的指标，不代表两份报告相同。选择全部差异或关闭筛选可查看其他指标。`}
     </p>}
     {result && <div id={`${id}-metrics`} className="local-inventory-table" role="region" aria-label="两份离线报告比较" tabIndex={0} data-offline-result>
-      <table><caption>{scope !== 'all' && `${scope === 'counts' ? '数量' : '容量'} · `}{!onlyDifferences ? '完整统计比较 · 报告 B − 报告 A' : direction === 'all' ? '差异指标 · 报告 B − 报告 A' : `${direction === 'increase' ? '增加' : '减少'}指标 · 报告 B − 报告 A`}</caption>
+      <table><caption>{order !== 'original' && `幅度${order === 'largest' ? '从大到小' : '从小到大'} · `}{scope !== 'all' && `${scope === 'counts' ? '数量' : '容量'} · `}{!onlyDifferences ? '完整统计比较 · 报告 B − 报告 A' : direction === 'all' ? '差异指标 · 报告 B − 报告 A' : `${direction === 'increase' ? '增加' : '减少'}指标 · 报告 B − 报告 A`}</caption>
         <thead><tr><th scope="col">指标</th><th scope="col">报告 A</th><th scope="col">报告 B</th><th scope="col">差值 B − A</th><th scope="col">单位</th></tr></thead>
         <tbody>{visibleRows.map(row => <tr key={row.key} data-offline-metric={row.key}>
           <th scope="row">{row.label}</th><td>{row.a}</td><td>{row.b}</td><td>{comparisonDelta(row.delta)}</td><td>{row.unit}</td>

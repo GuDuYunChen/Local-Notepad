@@ -1,3 +1,4 @@
+import { verifyOfflinePairOrderDesktop } from './check-offline-pair-order-desktop.mjs'
 import assert from 'node:assert/strict'
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
@@ -69,4 +70,5 @@ export async function verifyOfflinePairScopeDesktop({ evaluate, click, cdp, unti
       'overview-keeps-twelve-metrics', 'three-actual-complete-downloads', 'disable-restores-all-and-resets-scope',
       'swap-revokes-and-reconfirm-restores', 'notes-unchanged'],
     screenshot: { filename: 'offline-scope.png', bytes: png.length, sha256: hash(png) } }, null, 2))
+  await verifyOfflinePairOrderDesktop({ evaluate, click, cdp, until, api, out, noteIDs, metrics })
 }

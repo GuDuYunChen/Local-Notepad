@@ -1,6 +1,6 @@
 # Local-Notepad development
 
-Current code-bearing delivery candidate: 2F.82 / 4.215.0 quantity and capacity difference scopes. Read `docs/OFFLINE_PAIR_SCOPE_2F82.md` first. Base 0cdbdc079a2fe5cd9bd4190810bb5364518530b9 / 4.214.0 is accepted in PR #2 comment 6108108488; do not replay its development or acceptance. Type and direction filters affect presentation only; keep the full twelve-metric summary and all exports unchanged. Preserve existing readers, save/quit rules and prior tests. Current-HEAD CI and actual Windows artifacts require separate acceptance.
+Current code-bearing delivery candidate: 2F.83 / 4.216.0 same-unit difference magnitude ordering. Read `docs/OFFLINE_PAIR_ORDER_2F83.md` first. Base 410d7f1fb2447e0a84e96edd306fc2cc89aaa445 / 4.215.0 is accepted in PR #2 comment 6108870586; do not replay its development or acceptance. Sort copied filtered rows by absolute delta only within quantities or bytes. Keep canonical ties, original full exports and summary, stale-state revocation, readers and save/quit protections. Current-HEAD CI and actual Windows artifacts require separate acceptance.
 
 Read `docs/DEVELOPMENT_HANDOFF.md` before resuming an interrupted task.
 Work on `feature/knowledge-os-phase2` / Draft PR #2 unless the user explicitly changes that direction. Do not merge master as part of ordinary stage development.
