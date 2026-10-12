@@ -15,6 +15,7 @@ function signed(host = '127.0.0.1:12345') {
   return { method: 'GET', url: FIXTURE_PATH, headers }
 }
 export function registerInspectionFixtureTests(test) {
+registerInspectionSeparatorTests(test)
 test('fixture independently verifies signed UTF-8 prefix/key including literal percent', () => {
   assert.ok(FIXTURE_PATH.includes('%252F'))
   verifyFixtureRequest(signed(), Buffer.alloc(0), '127.0.0.1:12345')
@@ -46,4 +47,41 @@ test('real local HTTP fixture handles empty/success/failure and closes owned con
   } finally { await fixture.close() }
 })
 
+}
+
+// Keep the original spaced-header cases. Production Go signRead emits commas
+// without a following space; separators are not part of the signed message.
+export function registerInspectionSeparatorTests(test) {
+  for (const [label, separator] of [['compact', ','], ['tab', ',\t'], ['OWS', ' \t, \t']]) {
+    test('fixture verifies unchanged signature with ' + label + ' authorization separators', () => {
+      const request = signed()
+      request.headers.authorization = request.headers.authorization.replaceAll(', ', separator)
+      verifyFixtureRequest(request, Buffer.alloc(0), '127.0.0.1:12345')
+    })
+  }
+  test('compact authorization still rejects a changed signature, scope, fields and CRLF', () => {
+    const original = signed().headers.authorization.replaceAll(', ', ',')
+    for (const authorization of [
+      original.replace(/.$/, original.endsWith('0') ? '1' : '0'),
+      original.replace('/us-east-1/', '/us-west-2/'),
+      original.replace(',SignedHeaders=', ',Credential=duplicate,SignedHeaders='),
+      original + ',Signature=' + '0'.repeat(64),
+      original.replace(',SignedHeaders=', ',\r\nSignedHeaders='),
+      original.replace('host;', 'host;host;'),
+    ]) {
+      const request = signed(); request.headers.authorization = authorization
+      assert.throws(() => verifyFixtureRequest(request, Buffer.alloc(0), '127.0.0.1:12345'))
+    }
+  })
+  test('real HTTP fixture accepts production compact separators without bypassing HMAC', async () => {
+    const fixture = await createInspectionFixture()
+    try {
+      const request = signed(new URL(fixture.endpoint).host)
+      request.headers.authorization = request.headers.authorization.replaceAll(', ', ',')
+      const response = await fetch(fixture.endpoint + FIXTURE_PATH, { headers: request.headers, redirect: 'manual', signal: AbortSignal.timeout(1000) })
+      assert.equal(response.status, 200)
+      assert.equal((await response.arrayBuffer()).byteLength, 0)
+      fixture.verify(); assert.equal(fixture.counts().requests, 1)
+    } finally { await fixture.close() }
+  })
 }

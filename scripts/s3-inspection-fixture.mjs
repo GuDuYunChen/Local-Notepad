@@ -22,7 +22,9 @@ export function verifyFixtureRequest(req, body, expectedHost) {
   assert.equal(digest, hash(''), 'Unexpected payload hash')
   assert.match(date || '', /^\d{8}T\d{6}Z$/)
   assert.equal(req.headers['x-amz-security-token'], FIXTURE_TOKEN)
-  const authorization = /^AWS4-HMAC-SHA256 Credential=([^,]+), SignedHeaders=([^,]+), Signature=([a-f0-9]{64})$/.exec(req.headers.authorization || '')
+  // HTTP list separators allow optional SP/HTAB. Do not alter the signed
+  // values or accept CR/LF, duplicate fields, missing headers or a bad HMAC.
+  const authorization = /^AWS4-HMAC-SHA256 Credential=([^,\s]+)[ \t]*,[ \t]*SignedHeaders=([^,\s]+)[ \t]*,[ \t]*Signature=([a-f0-9]{64})$/.exec(req.headers.authorization || '')
   assert.ok(authorization, 'Missing signature')
   const scope = date.slice(0, 8) + '/' + FIXTURE_REGION + '/s3/aws4_request'
   assert.equal(authorization[1], FIXTURE_ID + '/' + scope)
