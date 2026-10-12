@@ -1,9 +1,0 @@
-/* The return affordance follows the existing native disclosure, not JS state. */
-.sync-overview > .sync-help-return{display:none}
-.sync-overview > [data-sync-help][open] + .sync-help-return{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line);min-width:0}
-.sync-help-return-note{color:var(--ink-soft);font-size:12px;line-height:1.7;overflow-wrap:anywhere}
-.sync-overview .sync-help-return .btn.sync-help-return-button:not(.primary):not(.danger){color:var(--ink);min-height:44px;white-space:normal;text-align:left;overflow-wrap:anywhere}
-.sync-help-return-error{flex-basis:100%;margin:0;color:var(--ink);font-size:13px;line-height:1.7;overflow-wrap:anywhere}
-.sync-overview > [data-sync-guidance]:focus{outline:2px solid var(--clay);outline-offset:3px}
-.sync-overview > [data-sync-guidance]{scroll-margin-block-start:16px}
-@media(max-width:420px){.sync-help-return-note{flex-basis:100%}}

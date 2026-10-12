@@ -1,4 +1,0 @@
-.sync-overview .sync-help-shortcut{display:block;margin-top:10px;max-width:100%;white-space:normal;text-align:left;line-height:1.7;overflow-wrap:anywhere;color:var(--ink);background:var(--paper);border:1px solid var(--line)}
-.sync-help-topic>summary{scroll-margin-block-start:16px}
-/* Outrank the final dark-theme secondary-button rule, within this control only. */
-.sync-overview .sync-overview-status button.btn.small.sync-help-shortcut{color:var(--ink)}
