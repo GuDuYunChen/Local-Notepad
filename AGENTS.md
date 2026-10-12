@@ -1,6 +1,6 @@
 # Local-Notepad development
 
-Current code-bearing delivery candidate: 2F.84.1 / 4.217.1 Windows one-click packaging repair. Read `docs/WINDOWS_PACKAGE_PIPELINE_2F84_1.md` first. Base 082c9b95de312049354a165e30968dc69f5440ee / 4.217.0 is accepted in PR #2 comment 6110100448; do not repeat its report features or acceptance. The report feature line is closed. Fix the complete local packaging path: entry, preflight, locked install, failure propagation, fresh exact-version artifact, checksum and diagnostics. Current-HEAD CI and the real Windows entry require separate acceptance.
+Current code-bearing delivery candidate: 2F.84.2 / 4.217.2 bounded packaging termination. Read `docs/WINDOWS_PACKAGE_TERMINATION_2F84_2.md` first. Base 357aeaf36906de6a781a542cdc39c7a95285905b / 4.217.1 is accepted in PR #2 comment 6116641464. Fix the reproduced exit-versus-close cancellation/timeout gap, retain the packaging lock when process cleanup is unconfirmed, and preserve the entire normal packaging workflow. Do not extend the closed offline-report feature. Current-HEAD full CI, native Windows cases, packaging receipts and the actual installer require final acceptance.
 
 Read `docs/DEVELOPMENT_HANDOFF.md` before resuming an interrupted task.
 Work on `feature/knowledge-os-phase2` / Draft PR #2 unless the user explicitly changes that direction. Do not merge master as part of ordinary stage development.

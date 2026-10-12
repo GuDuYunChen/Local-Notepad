@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { closeSync, existsSync, lstatSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { closeSync, existsSync, ftruncateSync, lstatSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, writeFileSync, writeSync } from 'node:fs'
 import path from 'node:path'
 
 export const digest = bytes => createHash('sha256').update(bytes).digest('hex')
@@ -106,7 +106,7 @@ export async function packageWindows({ root, run, log = () => {}, signal, platfo
   }
   const id = new Date().toISOString().replace(/[:.]/g, '-') + '-' + randomUUID()
   const directory = path.join(results, id)
-  let stage = 'prepare', complete = false, quarantine = null
+  let stage = 'prepare', complete = false, quarantine = null, retainLock = false
   const receipt = { format: 'local-notepad-local-package', schemaVersion: 1, complete: false, ...identity,
     commit: process.env.GITHUB_SHA || null, startedAt: new Date().toISOString(), stages: [] }
   try {
@@ -152,10 +152,22 @@ export async function packageWindows({ root, run, log = () => {}, signal, platfo
     return { ...receipt, directory, target }
   } catch (error) {
     receipt.error = { stage, message: String(error.message || error) }
+    if (error.cleanupUnconfirmed === true) {
+      retainLock = true
+      receipt.recoveryRequired = true
+      receipt.error.cleanupUnconfirmed = true
+      receipt.error.reason = error.reason || 'cleanup-unconfirmed'
+      receipt.error.childPid = error.childPid ?? null
+      const recovery = { pid: process.pid, childPid: error.childPid ?? null, directory,
+        startedAt: receipt.startedAt, state: 'cleanup-unconfirmed', reason: receipt.error.reason }
+      ftruncateSync(lock, 0)
+      writeSync(lock, JSON.stringify(recovery), 0, 'utf8')
+      error.message += `; packaging lock retained at ${lockPath}. Confirm no build processes remain before removing it.`
+    }
     throw error
   } finally {
     receipt.complete = complete; receipt.finishedAt = new Date().toISOString()
     try { if (existsSync(directory)) writeFileSync(path.join(directory, 'receipt.json'), JSON.stringify(receipt, null, 2) + '\n') }
-    finally { closeSync(lock); rmSync(lockPath) }
+    finally { closeSync(lock); if (!retainLock) rmSync(lockPath) }
   }
 }

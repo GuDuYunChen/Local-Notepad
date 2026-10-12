@@ -12,40 +12,98 @@ export function commandSpec(command, args, platform = process.platform) {
   if (!allowed.includes(args.join(' '))) throw new Error('Unsupported npm command')
   return { command: 'cmd.exe', args: ['/d', '/s', '/c', 'npm.cmd ' + args.join(' ')] }
 }
-export function runNative(command, args, { cwd, timeout = 900000, signal, logFile, quiet = false } = {}) {
+export function runNative(command, args, { cwd, timeout = 900000, cleanupTimeout = 5000, signal, logFile, quiet = false } = {}) {
   signal?.throwIfAborted()
-  const spec = commandSpec(command, args)
+  for (const value of [timeout, cleanupTimeout]) {
+    if (!Number.isSafeInteger(value) || value < 1 || value > 2147483647) throw new Error('Invalid command time budget')
+  }
+  const spec = commandSpec(command, args), deadline = performance.now() + timeout
   return new Promise((resolve, reject) => {
-    let stdout = '', error = null, stopping = false, stopReason = null, killer = null
-    const child = spawn(spec.command, spec.args, { cwd, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'], env: process.env })
+    let stdout = '', error = null, reason = null, settled = false, closed = false
+    let cleanupUnconfirmed = false, helper = null, helperPending = false, cleanupTimer = null, escalation = null
+    let exitCode = null, exitSignal = null
+    const windows = process.platform === 'win32'
+    // A POSIX process group remains addressable when the immediate child exits.
+    // Windows uses only this live child's tree, never a reused/exited parent PID.
+    const child = spawn(spec.command, spec.args, { cwd, windowsHide: true, detached: !windows,
+      stdio: ['ignore', 'pipe', 'pipe'], env: process.env })
+    const finish = () => {
+      if (settled || !closed || helperPending) return
+      settled = true; clearTimeout(timer); clearTimeout(cleanupTimer); clearTimeout(escalation)
+      signal?.removeEventListener('abort', abort)
+      if (reason) {
+        const failure = new Error(`Command ${reason}; packaging did not complete${cleanupUnconfirmed ? '; process cleanup unconfirmed' : ''}`)
+        Object.assign(failure, { reason, cleanupUnconfirmed, childPid: child.pid ?? null })
+        reject(failure)
+      } else resolve({ code: exitCode, signal: exitSignal, error, stdout })
+    }
+    const signalGroup = kind => {
+      if (!child.pid) return
+      try { process.kill(-child.pid, kind) }
+      catch (failure) { if (failure.code !== 'ESRCH') { cleanupUnconfirmed = true; error = failure } }
+    }
+    const detach = () => {
+      // Destroy only our pipe endpoints. This is NOT proof that descendants died.
+      child.stdout.destroy(); child.stderr.destroy(); child.unref()
+    }
+    const stop = why => {
+      if (settled || reason) return
+      reason = why
+      cleanupTimer = setTimeout(() => {
+        if (settled) return
+        cleanupUnconfirmed = true
+        if (helper) { helper.kill(); helper.unref() }
+        if (windows) { if (child.exitCode === null && child.signalCode === null) child.kill() }
+        else signalGroup('SIGKILL')
+        detach(); closed = true; helperPending = false; finish()
+      }, cleanupTimeout)
+      if (!windows) {
+        signalGroup('SIGTERM')
+        escalation = setTimeout(() => signalGroup('SIGKILL'), Math.min(500, Math.max(1, Math.floor(cleanupTimeout / 2))))
+      } else if (child.pid && child.exitCode === null && child.signalCode === null) {
+        helperPending = true
+        const taskkill = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'taskkill.exe')
+        try {
+          helper = spawn(taskkill, ['/pid', String(child.pid), '/t', '/f'], { windowsHide: true, stdio: 'ignore' })
+          const helperDone = failed => {
+            if (settled || !helperPending) return
+            helperPending = false
+            if (failed) { cleanupUnconfirmed = true; if (child.exitCode === null) child.kill() }
+            finish()
+          }
+          helper.on('error', () => helperDone(true))
+          helper.once('close', code => helperDone(code !== 0))
+        } catch (failure) { error = failure; cleanupUnconfirmed = true; helperPending = false; child.kill() }
+      } else if (!closed) {
+        // exit != close: inherited pipes may outlive their parent. taskkill of
+        // an exited PID is unsafe and cannot establish descendant ownership.
+        cleanupUnconfirmed = true; detach()
+      }
+      finish()
+    }
     const output = (data, stream) => {
+      if (settled || reason) return
       try { if (logFile) appendFileSync(logFile, data); if (!quiet) stream.write(data) }
       catch (failure) { error = failure; stop('output-error') }
-    }
-    const stop = reason => {
-      if (stopping || child.exitCode !== null || child.signalCode !== null) return
-      stopping = true; stopReason = reason
-      if (process.platform === 'win32' && child.pid) {
-        killer = new Promise(done => {
-          const processTree = spawn('taskkill.exe', ['/pid', String(child.pid), '/t', '/f'], { windowsHide: true, stdio: 'ignore' })
-          processTree.once('error', failure => { error = failure; child.kill(); done() })
-          processTree.once('close', code => { if (code !== 0 && child.exitCode === null) { error = new Error('Could not terminate packaging process tree'); child.kill() }; done() })
-        })
-      } else child.kill('SIGTERM')
     }
     const abort = () => stop('cancelled'), timer = setTimeout(() => stop('timeout'), timeout)
     signal?.addEventListener('abort', abort, { once: true })
     if (signal?.aborted) abort()
-    child.stdout.on('data', data => { if (stdout.length < 65536) stdout += data.toString('utf8'); output(data, process.stdout) })
+    child.stdout.on('data', data => {
+      if (settled || reason) return
+      stdout += data.toString('utf8').slice(0, Math.max(0, 65536 - stdout.length))
+      output(data, process.stdout)
+    })
     child.stderr.on('data', data => output(data, process.stderr))
     child.stdout.on('error', failure => { error = failure; stop('stdout-error') })
     child.stderr.on('error', failure => { error = failure; stop('stderr-error') })
     child.on('error', failure => { error = failure })
-    child.once('close', async (code, childSignal) => {
-      clearTimeout(timer); signal?.removeEventListener('abort', abort)
-      if (killer) await killer
-      if (stopReason) reject(new Error(`Command ${stopReason}; packaging did not complete`))
-      else resolve({ code, signal: childSignal, error, stdout })
+    child.once('close', (code, childSignal) => {
+      closed = true; exitCode = code; exitSignal = childSignal
+      // A delayed timer must not turn an over-budget completion into success.
+      if (!reason && signal?.aborted) reason = 'cancelled'
+      if (!reason && performance.now() >= deadline) reason = 'timeout'
+      finish()
     })
   })
 }
