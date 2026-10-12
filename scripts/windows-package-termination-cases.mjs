@@ -20,11 +20,22 @@ async function waitForExit(file) {
   throw new Error('Isolated parent did not exit')
 }
 function inherited(stream, marker) {
-  const grandchild = `process.stdout.on('error',()=>{});process.stderr.on('error',()=>{});setTimeout(()=>{},3000)`
-  return `const {spawn}=require('node:child_process');
+  // On Windows the descendant must be detached to survive its creator's exit.
+  // A readiness file is written only after a real inherited-pipe write completes;
+  // this prevents testing a dead/not-yet-started descendant as a timeout case.
+  const ready = marker + '.ready'
+  const grandchild = `const fs=require('node:fs');
+    process.stdout.on('error',()=>process.exit(4));process.stderr.on('error',()=>process.exit(4));
+    setTimeout(()=>{},3000);
+    process[${JSON.stringify(stream)}].write('PIPE_HOLDER_READY\\n',()=>fs.writeFileSync(${JSON.stringify(ready)},String(process.pid)))`
+  return `const {spawn}=require('node:child_process'),fs=require('node:fs');
     const stdio=['ignore',${stream === 'stdout' ? '1' : "'ignore'"},${stream === 'stderr' ? '2' : "'ignore'"}];
-    const child=spawn(process.execPath,['-e',${JSON.stringify(grandchild)}],{stdio});
-    require('node:fs').writeFileSync(${JSON.stringify(marker)},String(process.pid));child.unref()`
+    const child=spawn(process.execPath,['-e',${JSON.stringify(grandchild)}],{stdio,detached:process.platform==='win32',windowsHide:true});
+    const watchdog=setTimeout(()=>{child.kill();process.exit(5)},2000);
+    const poll=setInterval(()=>{if(fs.existsSync(${JSON.stringify(ready)})){
+      clearTimeout(watchdog);clearInterval(poll);
+      fs.writeFileSync(${JSON.stringify(marker)},String(process.pid));child.unref()
+    }},10)`
 }
 function packageFixture(root) {
   const version = '4.217.2', name = 'notepad-desktop'
@@ -48,6 +59,7 @@ export function registerPackageTerminationTests(test) {
       const result = runNative(process.execPath, ['-e', inherited(stream, marker)], { timeout: 1200, cleanupTimeout: 400, quiet: true })
       const outcome = result.then(value => ({ value }), error => ({ error }))
       await waitForExit(marker)
+      assert.ok(alive(Number(readFileSync(marker + '.ready', 'utf8'))), 'Inherited-pipe fixture requires a live descendant')
       const out = await outcome
       assert.ok(out.error, 'An elapsed command must not resolve as successful')
       assert.equal(out.error.reason, 'timeout')
@@ -59,6 +71,7 @@ export function registerPackageTerminationTests(test) {
       const result = runNative(process.execPath, ['-e', inherited(stream, marker)], { timeout: 4500, cleanupTimeout: 400, signal: controller.signal, quiet: true })
       const outcome = result.then(value => ({ value }), error => ({ error }))
       await waitForExit(marker)
+      assert.ok(alive(Number(readFileSync(marker + '.ready', 'utf8'))), 'Inherited-pipe fixture requires a live descendant')
       const started = performance.now(); controller.abort()
       const out = await outcome
       assert.ok(out.error, 'Cancellation cannot resolve with the old zero exit code')
