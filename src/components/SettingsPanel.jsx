@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import ThemeToggle from './ThemeToggle'
 import LibraryReferenceHealthPanel from './LibraryReferenceHealthPanel'
 import SyncCenterPanel from './SyncCenterPanel'
+import S3ReadInspectionPanel from './S3ReadInspectionPanel'
+import './S3ReadInspectionPanel.css'
 import S3LocalOverviewPanel from './S3LocalOverviewPanel'
 import { api } from '~/services/api'
 import { toast } from '~/services/toast'
@@ -207,6 +209,7 @@ export default function SettingsPanel({
         </section>
 
         <SyncCenterPanel />
+        <S3ReadInspectionPanel />
         <S3LocalOverviewPanel />
 
         <section className="settings-card consumer-settings-section">

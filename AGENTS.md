@@ -1,6 +1,6 @@
 # Local-Notepad development
 
-Current code-bearing delivery candidate: 2F.84.2 / 4.217.2 bounded packaging termination. Read `docs/WINDOWS_PACKAGE_TERMINATION_2F84_2.md` first. Base 357aeaf36906de6a781a542cdc39c7a95285905b / 4.217.1 is accepted in PR #2 comment 6116641464. Fix the reproduced exit-versus-close cancellation/timeout gap, retain the packaging lock when process cleanup is unconfirmed, and preserve the entire normal packaging workflow. Do not extend the closed offline-report feature. Current-HEAD full CI, native Windows cases, packaging receipts and the actual installer require final acceptance.
+Current code-bearing delivery candidate: 2F.85 / 4.218.0 complete S3 single-object read-only inspection module. Read `docs/S3_READ_INSPECTION_2F85.md` first. Base 77e7a669d403db6fabf36f056df3ea04f25362c4 / 4.217.2 is accepted in PR #2 comment 6118419287; do not rerun its successful packaging closure. This module includes Settings entry, exact input admission, explicit read, result, error/stop/retry, secret clearing and native Windows acceptance through the existing production bridge/backend. It is not full S3 synchronization. No new tiny offline-report controls. Candidate source and local tests are not current-HEAD CI or installer acceptance; use the latest PR checkpoint.
 
 Read `docs/DEVELOPMENT_HANDOFF.md` before resuming an interrupted task.
 Work on `feature/knowledge-os-phase2` / Draft PR #2 unless the user explicitly changes that direction. Do not merge master as part of ordinary stage development.
