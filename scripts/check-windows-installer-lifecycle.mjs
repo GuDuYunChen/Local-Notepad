@@ -9,7 +9,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createHash } from 'node:crypto'
 import { setTimeout as sleep } from 'node:timers/promises'
-import { RELEASES, PRODUCT_COMMIT, assertHostedWindows, requireOwnedPath, nsisArgs, verifyInstaller, validateLifecycleReport } from './installer-lifecycle-core.mjs'
+import { RELEASES, LEGACY_DEFECT, PRODUCT_COMMIT, assertHostedWindows, requireOwnedPath, nsisArgs, verifyInstaller, validateLifecycleReport } from './installer-lifecycle-core.mjs'
 import { desktopNote } from './desktop-save-fixture.mjs'
 import { createDesktopWindowSession } from './desktop-window-session.mjs'
 import { selectDesktopMainWindow } from './desktop-window-target.mjs'
@@ -53,7 +53,7 @@ async function command(file,args,options={}) {
   const done=new Promise((yes,no)=>{child.once('error',no);child.once('close',(code,signal)=>yes({code,signal}))})
   try {
     const result=await Promise.race([done,new Promise((_,no)=>{timer=setTimeout(()=>{timedOut=true;no(Error('Owned command deadline exceeded'))},options.timeout||90000)})])
-    if(options.record) { report.commands.push({label:options.record,pid:child.pid,...result,timedOut,elapsedMs:Math.round(performance.now()-started)});save() }
+    if(options.record || options.probeRecord) { const item={label:options.record || options.probeRecord,pid:child.pid,...result,timedOut,elapsedMs:Math.round(performance.now()-started)};if(options.record)report.commands.push(item);else(report.legacyProbeCommands ||= []).push(item);save() }
     assert.equal(result.signal,null);assert.equal(result.code,0,options.record||'Command failed: '+errors)
     return output.trim()
   } finally {
@@ -76,7 +76,9 @@ async function shellLinks() {
   return JSON.parse(raw)
 }
 async function checkInstalled(version) {
-  for(const file of [appExe,path.join(installDir,'resources','app.asar'),path.join(installDir,'resources','bin','notepad-server.exe')])assert.ok(existsSync(file),'Missing installed payload')
+  const required=[appExe,path.join(installDir,'resources','app.asar'),path.join(installDir,'resources','bin','notepad-server.exe')];
+  if(required.some(file=>!existsSync(file))) { report.installFailureDiagnostic={installDir,required:required.map(file=>({file,exists:existsSync(file)})),ownedChildren:readdirSync(scratch),registrations:await registrations(),links:await shellLinks()};save() }
+  for(const file of required)assert.ok(existsSync(file),'Missing installed payload: '+file)
   const pe=JSON.parse(await ps(`$v=(Get-Item -LiteralPath $env:NP_TEST_EXE).VersionInfo;@{file=$v.FileVersion;product=$v.ProductVersion}|ConvertTo-Json -Compress`,{NP_TEST_EXE:appExe}))
   for(const value of [pe.product,pe.file]) { assert.match(value,/^\d+\.\d+\.\d+(?:\.0)?$/);assert.equal(value.split('.').slice(0,3).join('.'),version) }
   const reg=await registrations();assert.equal(reg.length,1);assert.equal(reg[0].scope,'HKCU');assert.equal(reg[0].version,version)
@@ -87,18 +89,18 @@ async function checkInstalled(version) {
 }
 async function install(which,label) {
   assert.ok(!appChild,'Must close application before installer operation')
-  await command(path.join(root,'.installer-input',which,`Notepad-${RELEASES[which].version}-Setup.exe`),nsisArgs(scratch,installDir),{verbatim:true,record:label})
+  await command(path.join(root,'.installer-input',which,`Notepad-${RELEASES[which].version}-Setup.exe`),nsisArgs(scratch,installDir,false,which==='previous'),{verbatim:true,record:label})
   await checkInstalled(RELEASES[which].version)
 }
-async function uninstall(label) {
+async function uninstall(label,directory=installDir) {
   assert.ok(!appChild,'Must close application before uninstall')
-  const original=path.join(installDir,'Uninstall 记事本.exe');assert.ok(existsSync(original),'Uninstaller missing')
+  const original=path.join(directory,'Uninstall 记事本.exe');assert.ok(existsSync(original),'Uninstaller missing')
   const owned=path.join(scratch,`owned-uninstaller-${++sequence}.exe`)
   copyFileSync(original,owned);assert.equal(sha(readFileSync(owned)),sha(readFileSync(original)))
   // Run an exact copy outside INSTDIR with _?= to wait for the actual uninstaller,
   // not the temporary bootstrap parent. No --delete-app-data option is used.
-  await command(owned,nsisArgs(scratch,installDir,true),{verbatim:true,record:label})
-  assert.equal(existsSync(appExe),false);assert.equal(existsSync(path.join(installDir,'resources','app.asar')),false)
+  await command(owned,nsisArgs(scratch,directory,true),{verbatim:true,record:label,probeRecord:label?null:'legacy-probe-uninstall'})
+  assert.equal(existsSync(path.join(directory,'记事本.exe')),false);assert.equal(existsSync(path.join(directory,'resources','app.asar')),false)
   assert.deepEqual(await registrations(),[]);assert.deepEqual(await shellLinks(),[])
 }
 function snapshotData() {
@@ -167,8 +169,24 @@ try {
   assert.deepEqual(await shellLinks(),[],'Refusing preexisting application shortcuts')
   report.installers={}
   for(const [which,expected] of Object.entries(RELEASES))report.installers[which]=verifyInstaller(readFileSync(path.join(root,'.installer-input',which,`Notepad-${expected.version}-Setup.exe`)),expected)
+  report.legacyInstaller=verifyInstaller(readFileSync(path.join(root,'.installer-input','legacy',`Notepad-${LEGACY_DEFECT.version}-Setup.exe`)),LEGACY_DEFECT)
   mark('pinned-installers-verified')
   windowSession=createDesktopWindowSession();await windowSession.ready
+
+  // Preserve an actual old-binary counterexample; do not change the new test's
+  // Unicode/space path or standard unquoted /D= contract to obtain a green result.
+  const legacyTarget=requireOwnedPath(scratch,path.join(scratch,'旧版 路径对照'))
+  await command(path.join(root,'.installer-input','legacy',`Notepad-${LEGACY_DEFECT.version}-Setup.exe`),nsisArgs(scratch,legacyTarget),{verbatim:true,probeRecord:'legacy-probe-install'})
+  const oldRegistration=await registrations();assert.equal(oldRegistration.length,1)
+  const oldUninstall=/^"(.+\\Uninstall 记事本\.exe)" \/currentuser$/i.exec(oldRegistration[0].uninstall)
+  assert.ok(oldUninstall,'Unexpected old uninstaller registration')
+  const observedDirectory=requireOwnedPath(scratch,path.dirname(oldUninstall[1]))
+  assert.equal(observedDirectory,legacyTarget.split(' ')[0],'Old directory truncation was not reproduced')
+  assert.equal(existsSync(path.join(legacyTarget,'记事本.exe')),false)
+  assert.equal(existsSync(path.join(observedDirectory,'记事本.exe')),true)
+  assert.equal(existsSync(dataDir),false,'Silent probe unexpectedly started the app')
+  await uninstall(null,observedDirectory)
+  report.legacyPathProbe={version:LEGACY_DEFECT.version,requested:legacyTarget,observed:observedDirectory,observedTruncation:true,cleaned:true};save()
 
   await install('current','fresh-install-current');mark('fresh-current-install')
   await launch(RELEASES.current.version)

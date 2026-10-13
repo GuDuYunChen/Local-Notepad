@@ -2,14 +2,15 @@ import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import path from 'node:path'
 
-export const PRODUCT_COMMIT = '191439e04ddbf6b4423194d2978ae72da926df3c'
+export const PRODUCT_COMMIT = '048a9ca0f70b32fed1afc0f162e297789c781747'
 export const CI_BRANCH = 'ci/local-installation-2f86'
 export const RELEASES = Object.freeze({
   previous: Object.freeze({ version: '4.218.0', bytes: 104182839,
     sha256: '0e585aad28c4569666d7ed29c927b6b3bd207571fd0e7b9400fb0fdc93c10909' }),
-  current: Object.freeze({ version: '4.219.0', bytes: 104197801,
-    sha256: 'b3fab086b8f34f2dd7025223e8322a80b2e0634bfbc88631b25ad2d0d727b43a' }),
+  current: Object.freeze({ version: '4.219.1', bytes: 104200796,
+    sha256: 'cc7fdda96c42ab8993c5ada71a0e1462ef5c894035609d0216cb624995fb5e5e' }),
 })
+export const LEGACY_DEFECT = Object.freeze({ version: '4.219.0', bytes: 104197801, sha256: 'b3fab086b8f34f2dd7025223e8322a80b2e0634bfbc88631b25ad2d0d727b43a' })
 export const REQUIRED_CHECKS = Object.freeze([
   'pinned-installers-verified', 'fresh-current-install', 'installed-app-trash-workflow',
   'fresh-uninstall-preserves-default-data', 'previous-version-installed-and-seeded',
@@ -38,11 +39,13 @@ export function requireOwnedPath(root, candidate) {
   assert.ok(relative && !relative.startsWith('..') && !path.win32.isAbsolute(relative), 'Path outside owned directory')
   return candidate
 }
-export function nsisArgs(root, directory, uninstall = false) {
+export function nsisArgs(root, directory, uninstall = false, legacyInstaller = false) {
   requireOwnedPath(root, directory)
   // NSIS requires /D= and _?= LAST, with no quotes even with spaces.
   // Caller uses windowsVerbatimArguments:true; this is NOT a shell command.
-  return ['/S', '/currentuser', (uninstall ? '_?=' : '/D=') + directory]
+  assert.ok(!uninstall || !legacyInstaller, 'Legacy quoting applies only to old installers')
+  const argument=(uninstall ? '_?=' : '/D=') + directory
+  return ['/S', '/currentuser', legacyInstaller ? '"'+argument+'"' : argument]
 }
 export function verifyInstaller(bytes, expected) {
   assert.equal(bytes.length, expected.bytes, 'Installer byte length mismatch')
@@ -63,6 +66,11 @@ export function validateLifecycleReport(report) {
   assert.equal(report.cleanupComplete, true)
   assert.deepEqual(report.checks, REQUIRED_CHECKS)
   assert.deepEqual(report.installers, RELEASES)
+  assert.deepEqual(report.legacyInstaller, LEGACY_DEFECT)
+  assert.equal(report.legacyPathProbe.observedTruncation, true)
+  assert.equal(report.legacyPathProbe.cleaned, true)
+  assert.equal(report.legacyProbeCommands.length, 2)
+  for (const c of report.legacyProbeCommands) { assert.equal(c.code, 0); assert.equal(c.signal, null); assert.equal(c.timedOut, false) }
   assert.equal(report.commands.length, 8)
   for (const c of report.commands) {
     assert.equal(c.code, 0); assert.equal(c.signal, null); assert.equal(c.timedOut, false)

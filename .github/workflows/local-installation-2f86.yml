@@ -28,19 +28,26 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Ensure dependency files were not modified
         run: git diff --exit-code -- package.json package-lock.json
-      - name: Download accepted previous installer
+      - name: Download accepted previous installer for upgrade seeding
         uses: actions/download-artifact@v4
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           run-id: 38220180185
           name: local-notepad-windows-0509350ad43557771713e07f5dcd7f75dcd162e2
           path: .installer-input/previous
-      - name: Download exact current installer already delivered
+      - name: Download original failing installer for exact path counterexample
         uses: actions/download-artifact@v4
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           run-id: 38337004784
           name: local-notepad-windows-191439e04ddbf6b4423194d2978ae72da926df3c
+          path: .installer-input/legacy
+      - name: Download the new source-bound repaired installer
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 38352227395
+          name: local-notepad-windows-048a9ca0f70b32fed1afc0f162e297789c781747
           path: .installer-input/current
       - name: Verify refusal cases before any installation
         run: node --test scripts/installer-lifecycle-core.node.mjs
