@@ -42,6 +42,7 @@ function fixture(content = 'baseline') {
     createEditorSaveAttempt, commitEditorSave, removeEditorDraft, readEditorDraft,
     saveLifetimeRef: {current: {active: true, generation: 0}}, databaseRevisionRef: {current: new Map()},
     saveConflictsRef: {current: new Map()}, normalizeLegacyTableBreakMarkup: s => s,
+    historyBoundaryRef: {current: 0},
     loadGenerationRef: {current: 1}, conflictResolutionRef: {current: null}, conflictBusyRef: {current: false},
     rawSavedBodiesRef: { current: new Map([[id,'baseline']]) }, saveAttemptsRef: { current: new Map() },
     setSaveProblem() {}, cachePendingBodyForRetry: writeEditorDraft,

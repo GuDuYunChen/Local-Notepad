@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
-import { randomUUID, createHash } from 'node:crypto'
+import { createHash } from 'node:crypto'
+import { createEditorSaveAttempt, commitEditorSave } from '../src/services/editorSaveTransaction.mjs'
 import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { desktopNote } from './desktop-save-fixture.mjs'
@@ -14,7 +15,7 @@ export async function verifyVersionHistoryDesktop({ evaluate, click, cdp, until,
  const first=desktopNote('历史第一版','first-history-body'),second=desktopNote('历史第二版','second-history-body'),latest=desktopNote('当前正文','latest-history-body')
  const file=await api('/api/files',{method:'POST',body:JSON.stringify({title:'History closure.md',content:first})})
  const route='/api/files/'+file.id,versionsRoute=route+'/versions',base='http://127.0.0.1:27121'
- const write=async(expected,content)=>api(route,{method:'PUT',body:JSON.stringify({save_request_id:randomUUID(),expected_content:expected,content})})
+ const write=(expected,content)=>commitEditorSave(api,createEditorSaveAttempt(file.id,expected,content))
  const button=async(label,scope='.version-history')=>{
   assert.equal(await evaluate(`(()=>{const a=[...document.querySelectorAll(${JSON.stringify(scope+' button')})].filter(n=>n.textContent.trim()===${JSON.stringify(label)});if(a.length!==1||a[0].disabled)return false;a[0].setAttribute('data-history-click','');return true})()`),true,'Missing enabled action '+label)
   try{await click('[data-history-click]')}finally{await evaluate("document.querySelector('[data-history-click]')?.removeAttribute('data-history-click')")}
