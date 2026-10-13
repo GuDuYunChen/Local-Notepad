@@ -1,13 +1,11 @@
 package controller
 
 import (
-	"database/sql"
 	"log"
 	"notepad-server/internal/dao"
 	"notepad-server/internal/logic"
 	"notepad-server/internal/model"
 	"strings"
-	"time"
 
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
@@ -44,6 +42,7 @@ func (c *FileController) Register(group *ghttp.RouterGroup) {
 	group.POST("/files/{id}/save-as", c.SaveAs)
 	group.GET("/graph", c.Graph)
 	group.GET("/files/daily/{date}", c.DailyNote)
+	group.POST("/files/daily/{date}", c.DailyNote)
 	group.GET("/templates", c.ListTemplates)
 	group.POST("/templates", c.CreateTemplate)
 	group.DELETE("/templates/{id}", c.DeleteTemplate)
@@ -391,30 +390,18 @@ func (c *FileController) Graph(r *ghttp.Request) {
 }
 
 func (c *FileController) DailyNote(r *ghttp.Request) {
+	r.Response.Header().Set("Cache-Control", "no-store")
 	date := r.Get("date").String()
-	if date == "" {
-		date = time.Now().Format("2006-01-02")
-	}
-
-	title := date
-
-	if existing, err := c.FileLogic.FindByTitle(r.GetCtx(), "", title); err == nil {
-		if !existing.IsFolder {
-			writeOK(r, g.Map{"file": existing, "created": false})
-			return
-		}
-	} else if err != sql.ErrNoRows {
-		writeErrWithDetail(r, 1001, "查询每日笔记失败", err)
+	if !dao.ValidDailyDate(date) {
+		writeErr(r, 1005, "每日笔记日期无效，需使用真实的 YYYY-MM-DD 日期", nil)
 		return
 	}
-
-	f, err := c.FileLogic.Create(r.GetCtx(), title, "", false, "")
+	file, created, err := c.FileLogic.FileDAO.OpenDaily(r.GetCtx(), date, r.Get("read_only").Bool())
 	if err != nil {
-		writeErr(r, 1006, "创建每日笔记失败", err)
+		writeErrWithDetail(r, 1006, "打开每日笔记失败", err)
 		return
 	}
-
-	writeOK(r, g.Map{"file": f, "created": true})
+	writeOK(r, g.Map{"file": file, "created": created})
 }
 
 func (c *FileController) ListTemplates(r *ghttp.Request) {
