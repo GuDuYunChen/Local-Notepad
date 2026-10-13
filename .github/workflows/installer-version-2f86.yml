@@ -1,0 +1,24 @@
+name: Prepare exact installer repair version objects
+on:
+  push:
+    branches: [ci/installer-version-2f86]
+permissions:
+  contents: write
+jobs:
+  version-objects-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Create only hash-checked version blobs, not commits or refs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/prepare-installer-version-objects.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer-repair-version-objects
+          path: test-results/installer-version/
+          if-no-files-found: error
