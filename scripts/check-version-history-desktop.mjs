@@ -1,12 +1,41 @@
 import assert from 'node:assert/strict'
-import { randomUUID, createHash } from 'node:crypto'
+import { createHash } from 'node:crypto'
+import { createEditorSaveAttempt, commitEditorSave } from '../src/services/editorSaveTransaction.mjs'
 import { writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { desktopNote } from './desktop-save-fixture.mjs'
 
 // Part of the ORIGINAL packaged Windows application run. Only owned fixture
 // notes and browser request blocking are used; App/preload/Go/SQLite stay real.
+export async function beginHistoryWriteFailure(cdp, target) {
+ const parsed = new URL(target)
+ assert.equal(parsed.origin, 'http://127.0.0.1:27121')
+ assert.match(parsed.pathname, /^\/api\/files\/[A-Za-z0-9-]+$/)
+ assert.equal(parsed.search, ''); assert.equal(parsed.hash, '')
+ assert.equal(typeof cdp.onEvent, 'function')
+ const observed = [], pending = new Set()
+ let active = true, closed = false, failure = null
+ const detach = cdp.onEvent(message => {
+  if (message.method !== 'Fetch.requestPaused') return
+  const {requestId, request} = message.params
+  const blocked = active && request.method === 'PUT' && request.url === target
+  observed.push({method: request.method, url: request.url, blocked})
+  const task = Promise.resolve().then(() => cdp.send(blocked ? 'Fetch.failRequest' : 'Fetch.continueRequest',
+   blocked ? {requestId, errorReason: 'Failed'} : {requestId})).catch(error => { failure ||= error }).finally(() => pending.delete(task))
+  pending.add(task)
+ })
+ try { await cdp.send('Fetch.enable', {patterns: [{urlPattern: target + '*', requestStage: 'Request'}]}) }
+ catch (error) { active = false; detach(); throw error }
+ return {observed, async close() {
+  if (closed) return
+  closed = true; active = false
+  try { await cdp.send('Fetch.disable'); await Promise.all([...pending]); if (failure) throw failure }
+  finally { detach() }
+ }}
+}
+
 export async function verifyVersionHistoryDesktop({ evaluate, click, cdp, until, api, out, noteIDs }) {
+ let writeFailure = null
  const report={complete:false,commit:process.env.GITHUB_SHA,realPackagedApp:true,realBackend:true,syntheticData:true,checks:[],screenshots:[]}
  const save=()=>writeFileSync(path.join(out,'version-history.json'),JSON.stringify(report,null,2)+'\n')
  const mark=name=>{report.checks.push(name);save()};save()
@@ -14,9 +43,9 @@ export async function verifyVersionHistoryDesktop({ evaluate, click, cdp, until,
  const first=desktopNote('历史第一版','first-history-body'),second=desktopNote('历史第二版','second-history-body'),latest=desktopNote('当前正文','latest-history-body')
  const file=await api('/api/files',{method:'POST',body:JSON.stringify({title:'History closure.md',content:first})})
  const route='/api/files/'+file.id,versionsRoute=route+'/versions',base='http://127.0.0.1:27121'
- const write=async(expected,content)=>api(route,{method:'PUT',body:JSON.stringify({save_request_id:randomUUID(),expected_content:expected,content})})
+ const write=(expected,content)=>commitEditorSave(api,createEditorSaveAttempt(file.id,expected,content))
  const button=async(label,scope='.version-history')=>{
-  assert.equal(await evaluate(`(()=>{const a=[...document.querySelectorAll(${JSON.stringify(scope+' button')})].filter(n=>n.textContent.trim()===${JSON.stringify(label)});if(a.length!==1||a[0].disabled)return false;a[0].setAttribute('data-history-click','');return true})()`),true,'Missing enabled action '+label)
+  assert.equal(await evaluate(`(()=>{const a=[...document.querySelectorAll(${JSON.stringify(scope+' button')})].filter(n=>n.textContent.trim()===${JSON.stringify(label)});if(a.length!==1||a[0].disabled)return false;a[0].scrollIntoView({block:'center'});const r=a[0].getBoundingClientRect();const hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);if(!hit||!a[0].contains(hit))return false;a[0].setAttribute('data-history-click','');return true})()`),true,'Missing enabled action '+label)
   try{await click('[data-history-click]')}finally{await evaluate("document.querySelector('[data-history-click]')?.removeAttribute('data-history-click')")}
  }
  const text=()=>evaluate("document.querySelector('.version-history')?.innerText||''")
@@ -53,10 +82,14 @@ export async function verifyVersionHistoryDesktop({ evaluate, click, cdp, until,
   await button('先保存当前笔记');await until(async()=>(await api(route)).content.includes('current-unsaved-history-guard'),'Explicit save failed')
   await until(()=>evaluate("document.querySelector('.version-restore-action')?.disabled===false"),'History remained blocked after save');mark('explicit-original-editor-save-unblocks-history')
   await click(`.version-select-action[data-version-id="${seeded[1].id}"]`)
-  await cdp.send('Network.setBlockedURLs',{urls:[base+route]});await restore();await waitText('保存尚未确认')
+  writeFailure=await beginHistoryWriteFailure(cdp,base+route);await restore();await waitText('保存尚未确认')
   assert.ok((await api(route)).content.includes('current-unsaved-history-guard'))
   assert.equal(await evaluate("document.querySelector('.editor-input')?.innerText.includes('first-history-body')"),true)
   assert.equal(await evaluate("!!document.querySelector('.save-state.error')"),true);mark('failed-save-keeps-restored-draft-and-original-database')
+  assert.equal(writeFailure.observed.filter(r=>r.blocked).length,1,'Expected exactly one failed write')
+  assert.ok(writeFailure.observed.some(r=>r.method==='GET' && r.url===base+versionsRoute && !r.blocked),'Version preflight was not allowed through')
+  report.failureInjection={mode:'exact-PUT-only',requests:writeFailure.observed};save()
+  await writeFailure.close();writeFailure=null
   await cdp.send('Network.setBlockedURLs',{urls:[]});await click('.status-retry-btn')
   await until(async()=>(await api(route)).content===first,'Original saved-receipt retry failed')
   await until(()=>evaluate("!document.querySelector('.save-state')"),'Original retry remained pending');mark('original-save-retry-recovers-without-second-restore')
@@ -69,5 +102,5 @@ export async function verifyVersionHistoryDesktop({ evaluate, click, cdp, until,
   assert.deepEqual(await Promise.all(noteIDs.map(id=>api('/api/files/'+id))),original);mark('unrelated-fixture-notes-unchanged')
   report.complete=true;save()
  }catch(error){report.error=String(error.stack||error);save();throw error}
- finally{await cdp.send('Network.setBlockedURLs',{urls:[]})}
+ finally{try{await writeFailure?.close()}finally{await cdp.send('Network.setBlockedURLs',{urls:[]})}}
 }

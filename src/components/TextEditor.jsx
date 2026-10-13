@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useImperativeHandle } from 'react'
 import { api } from '~/services/api'
+import { restoreEditorHistory } from '~/services/versionHistory.mjs'
 import { countLexicalCharacters } from '~/utils/lexicalText'
 import { normalizeLegacyTableBreakMarkup } from '~/services/legacyContentCompatibility'
 import { hasHeadingStructureChanged } from './Editor/utils/referenceUtils'
@@ -32,6 +33,7 @@ function TextEditorInternal({
   autoSaveOnSwitch = true,
 }, ref) {
   const contentRef = useRef('')
+  const historyBoundaryRef = useRef(0)
   const lastSavedContentRef = useRef('')
   const rawSavedBodiesRef = useRef(new Map())
   const saveAttemptsRef = useRef(new Map())
@@ -288,12 +290,52 @@ function TextEditorInternal({
       pending: [...inFlightSavesRef.current.values(), ...queuedSavesRef.current.values()].map(item => item.promise),
     }),
     cache: () => {
+      historyBoundaryRef.current += 1
       window.clearTimeout(saveTimerRef.current)
       saveTimerRef.current = null
       cachePendingDraft()
     },
     save: () => saveNow('quit'),
   })), [saveNow, cachePendingDraft])
+
+  const replaceDraftContent = (nextContent, options = {}) => {
+      const text = String(nextContent ?? '')
+      const mappings = Array.isArray(options.sectionPathMappings)
+        ? options.sectionPathMappings
+        : []
+
+      historyBoundaryRef.current += 1
+
+      contentRef.current = text
+      editorQuit.remember(currentIdRef.current, text)
+      pendingStructureMappingsRef.current = [
+        ...pendingStructureMappingsRef.current,
+        ...mappings,
+      ]
+      setEditorContent(text)
+      setWordCount(countLexicalCharacters(text))
+      setStructureDirty(hasHeadingStructureChanged(
+        lastSavedContentRef.current,
+        text,
+      ))
+
+      if (currentIdRef.current) {
+        cachePendingBodyForRetry(currentIdRef.current, text)
+      }
+
+      onChangeRef.current?.(text)
+  }
+
+  const captureHistoryState = () => Object.freeze({
+    id: currentIdRef.current,
+    ready: saveLifetimeRef.current.active && !!currentIdRef.current && loadedDocumentRef.current === currentIdRef.current && !deletedIdsRef.current?.has(currentIdRef.current),
+    generation: loadGenerationRef.current,
+    boundary: historyBoundaryRef.current,
+    revision: databaseRevisionRef.current.get(currentIdRef.current) || 0,
+    content: contentRef.current, saved: lastSavedContentRef.current,
+    pending: inFlightSavesRef.current.has(currentIdRef.current) || queuedSavesRef.current.has(currentIdRef.current) || conflictBusyRef.current,
+    uncertain: saveAttemptsRef.current.has(currentIdRef.current) || saveConflictsRef.current.has(currentIdRef.current),
+  })
 
   useImperativeHandle(ref, () => ({
     save: () => saveNow('external'),
@@ -309,6 +351,7 @@ function TextEditorInternal({
     }, editorQuit, text => {
       window.clearTimeout(saveTimerRef.current)
       saveTimerRef.current = null
+      historyBoundaryRef.current += 1
       contentRef.current = text
       pendingStructureMappingsRef.current = []
       removeEditorDraft(currentIdRef.current)
@@ -329,30 +372,16 @@ function TextEditorInternal({
       ),
       sectionPathMappings: [...pendingStructureMappingsRef.current],
     }),
-    replaceDraftContent: (nextContent, options = {}) => {
-      const text = String(nextContent ?? '')
-      const mappings = Array.isArray(options.sectionPathMappings)
-        ? options.sectionPathMappings
-        : []
-
-      contentRef.current = text
-      editorQuit.remember(currentIdRef.current, text)
-      pendingStructureMappingsRef.current = [
-        ...pendingStructureMappingsRef.current,
-        ...mappings,
-      ]
-      setEditorContent(text)
-      setWordCount(countLexicalCharacters(text))
-      setStructureDirty(hasHeadingStructureChanged(
-        lastSavedContentRef.current,
-        text,
-      ))
-
-      if (currentIdRef.current) {
-        cachePendingBodyForRetry(currentIdRef.current, text)
-      }
-
-      onChangeRef.current?.(text)
+    replaceDraftContent,
+    captureHistoryState,
+    restoreHistoryVersion: (version, reviewed, signal) => restoreEditorHistory({
+      snapshot: captureHistoryState, replace: replaceDraftContent, save: () => saveNow('history-restore'),
+    }, version, reviewed, signal),
+    saveHistoryCurrent: (reviewed) => {
+      const current = captureHistoryState()
+      if (!reviewed || !current.ready || current.id !== reviewed.id || current.generation !== reviewed.generation || current.boundary !== reviewed.boundary)
+        return Promise.reject(new Error('笔记已经变化，未发起保存'))
+      return saveNow('history-save-current')
     },
     replaceSavedContent: (nextContent, updatedAt) => {
       const text = String(nextContent ?? '')
@@ -360,6 +389,8 @@ function TextEditorInternal({
       const savedAt = rawUpdatedAt
         ? (rawUpdatedAt < 1_000_000_000_000 ? rawUpdatedAt * 1000 : rawUpdatedAt)
         : Date.now()
+
+      historyBoundaryRef.current += 1
 
       contentRef.current = text
       editorQuit.remember(currentIdRef.current, text)
@@ -418,6 +449,7 @@ function TextEditorInternal({
     const loadCtl = new AbortController()
     loadAbortRef.current = loadCtl
     currentIdRef.current = activeId || null
+    historyBoundaryRef.current += 1
     contentRef.current = ''
     lastSavedContentRef.current = ''
     syncCurrentSavingState(activeId || null)
@@ -427,6 +459,7 @@ function TextEditorInternal({
       setLoading(false)
       setLastSavedAt(null)
       lastSavedContentRef.current = ''
+      historyBoundaryRef.current += 1
       contentRef.current = ''
       setEditorContent('')
       setStructureDirty(false)
@@ -477,6 +510,7 @@ function TextEditorInternal({
         pendingStructureMappingsRef.current = []
         setStructureDirty(hasHeadingStructureChanged(serverText, text || ''))
         setLastSavedAt(f.updated_at ? f.updated_at * 1000 : null)
+        historyBoundaryRef.current += 1
         contentRef.current = text || ''
         setWordCount(countLexicalCharacters(text || ''))
         setEditorContent(text || '')
@@ -595,6 +629,7 @@ function TextEditorInternal({
   const handleEditorChange = React.useCallback((newContent) => {
     const id = currentIdRef.current
     if (!id || loadedDocumentRef.current !== id) return
+    historyBoundaryRef.current += 1
     contentRef.current = newContent
     setEditRevision(value => value + 1)
     const pending = inFlightSavesRef.current.has(id) || queuedSavesRef.current.has(id) || saveAttemptsRef.current.has(id) || saveConflictsRef.current.has(id)
@@ -650,6 +685,7 @@ function TextEditorInternal({
         if (deletedIdsRef.current?.has(reviewed.id) || editorQuit.discard(reviewed.id, reviewed.draft) !== true) throw new Error('草稿登记已变化，未替换正文')
         const text = normalizeLegacyTableBreakMarkup(file.content)
         rawSavedBodiesRef.current.set(reviewed.id, file.content)
+        historyBoundaryRef.current += 1
         contentRef.current = text; lastSavedContentRef.current = text
         saveConflictsRef.current.delete(reviewed.id)
         window.clearTimeout(saveTimerRef.current); saveTimerRef.current = null

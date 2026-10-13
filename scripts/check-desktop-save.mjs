@@ -1,3 +1,4 @@
+import { verifyVersionHistoryDesktop } from './check-version-history-desktop.mjs'
 // Windows packaged-app acceptance: actual main/preload/App/Lexical/backend.
 // No renderer modules, request responses, timers or quit receipts are replaced.
 // CDP is enabled only on this isolated test process and bound to loopback.
@@ -59,7 +60,7 @@ async function connect(url) {
   const parsed = new URL(url)
   assert.equal(parsed.protocol, 'ws:')
   assert.equal(parsed.hostname, '127.0.0.1')
-  const ws = new WebSocket(url), pending = new Map()
+  const ws = new WebSocket(url), pending = new Map(), eventListeners = new Set()
   let next = 0
   await new Promise((yes, no) => { ws.addEventListener('open', yes, { once: true }); ws.addEventListener('error', no, { once: true }) })
   const failAll = () => {
@@ -70,13 +71,15 @@ async function connect(url) {
   ws.addEventListener('message', event => {
     const message = JSON.parse(String(event.data))
     if (['Runtime.exceptionThrown', 'Runtime.consoleAPICalled'].includes(message.method)) trace += JSON.stringify(message) + '\n'
+    if (message.method) for (const listener of [...eventListeners]) listener(message)
     const task = pending.get(message.id)
     if (!task) return
     pending.delete(message.id); clearTimeout(task.timer)
     if (message.error) task.reject(new Error(JSON.stringify(message.error))); else task.resolve(message.result)
   })
   return {
-    close: () => ws.close(),
+    close: () => { eventListeners.clear(); ws.close() },
+    onEvent(listener) { eventListeners.add(listener); return () => eventListeners.delete(listener) },
     send(method, params = {}) {
       return new Promise((resolve, reject) => {
         const id = ++next
@@ -273,6 +276,7 @@ try {
   assert.equal((await api('/api/files/' + a.id)).content, persisted)
   await screenshot('restarted-fresh-profile')
   await verifyLocalOverviewDesktop({ evaluate, click, cdp, until, api, out, noteIDs: [a.id, b.id] })
+  await verifyVersionHistoryDesktop({ evaluate, click, cdp, until, api, out, noteIDs: [a.id, b.id] })
   await open(a.id, 'native-close-latest')
   await closeWindow()
   report.checks.push('fresh-profile packaged restart reads latest body from real database and closes cleanly')

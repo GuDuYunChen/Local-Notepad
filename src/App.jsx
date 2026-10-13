@@ -693,10 +693,19 @@ export default function App() {
     return updated
   }, [current?.id])
 
-  const restoreCurrent = React.useCallback(() => {
-    if (!current) return
-    api(`/api/files/${current.id}`).then(select)
-  }, [current, select])
+  const historyEditor = React.useMemo(() => ({
+    snapshot: () => editorRef.current?.captureHistoryState?.(),
+    restore: (version, reviewed, signal) => {
+      const active = editorRef.current
+      if (!active?.restoreHistoryVersion) return Promise.reject(new Error('编辑器未就绪'))
+      return active.restoreHistoryVersion(version, reviewed, signal)
+    },
+    saveCurrent: reviewed => {
+      const active = editorRef.current
+      if (!active?.saveHistoryCurrent) return Promise.reject(new Error('编辑器未就绪'))
+      return active.saveHistoryCurrent(reviewed)
+    },
+  }), [])
 
   useEffect(() => {
     const t = setTimeout(() => setReady(true), 100)
@@ -1319,7 +1328,7 @@ export default function App() {
                     onTabChange={setInspectorTab}
                     onClose={() => setInspectorOpen(false)}
                     onSelectFile={handleInspectorSelectFile}
-                    onRestore={restoreCurrent}
+                    historyEditor={historyEditor}
                     editorStatus={editorStatus}
                     unsaved={unsaved}
                     onUpdateFile={updateCurrentFile}

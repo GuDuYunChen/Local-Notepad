@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../services/api'
 import { extractLexicalText } from '~/utils/lexicalText'
 import ConfirmDialog from './ConfirmDialog'
@@ -12,6 +12,33 @@ export default function VersionHistory({ fileId, editor }) {
   const [search, setSearch] = useState(''), [query, setQuery] = useState(''), composing = useRef(false)
   const [previewPage, setPreviewPage] = useState(0), [showCurrent, setShowCurrent] = useState(false)
   const [review, setReview] = useState(null), [busy, setBusy] = useState(false), [result, setResult] = useState(null)
+  const clearance = useRef(null)
+  useLayoutEffect(() => {
+    const panel = clearance.current
+    if (!panel) return
+    let frame = 0, banner = null
+    const schedule = () => { if (!frame) frame = window.requestAnimationFrame(measure) }
+    const resize = typeof ResizeObserver === 'function' ? new ResizeObserver(schedule) : null
+    function measure() {
+      frame = 0
+      const current = document.querySelector('.reference-maintenance-status')
+      if (current !== banner) {
+        if (banner) resize?.unobserve(banner)
+        banner = current
+        if (banner) resize?.observe(banner)
+      }
+      const bounds = panel.getBoundingClientRect(), overlay = banner?.getBoundingClientRect()
+      const overlaps = overlay && overlay.bottom > 0 && overlay.top < window.innerHeight &&
+        overlay.right > bounds.left && overlay.left < bounds.right
+      const inset = overlaps ? Math.ceil(window.innerHeight - Math.max(0, overlay.top)) + 16 : 16
+      panel.style.setProperty('--history-bottom-clearance', inset + 'px')
+    }
+    const mutations = new MutationObserver(schedule)
+    mutations.observe(document.body, { childList: true, subtree: true })
+    window.addEventListener('resize', schedule)
+    measure()
+    return () => { mutations.disconnect(); resize?.disconnect(); window.removeEventListener('resize', schedule); window.cancelAnimationFrame(frame) }
+  }, [fileId])
   const alive = useRef(false), readOwner = useRef(null), operation = useRef(null), focusAfter = useRef(null)
   const latestEditor = useRef(editor); latestEditor.current = editor
   const state = editor?.snapshot?.() || null
@@ -101,7 +128,7 @@ export default function VersionHistory({ fileId, editor }) {
     } finally { if (operation.current === ctl) { operation.current = null; if (alive.current) setBusy(false) } }
   }
   if (!fileId) return null
-  return <section className="version-history" aria-label="版本历史与恢复">
+  return <section ref={clearance} className="version-history" aria-label="版本历史与恢复">
     <header className="version-header inspector-section-header"><div><div className="inspector-section-eyebrow">本地快照</div><h3>版本历史</h3></div>
       <button type="button" className="btn small" disabled={busy || status === 'loading'} onClick={() => void load({ preserve: true })}>刷新历史</button></header>
     <p className="version-explanation">历史快照不等于当前正文。恢复只替换正文，经过现有保存和冲突保护；不改标题、标签或位置。</p>

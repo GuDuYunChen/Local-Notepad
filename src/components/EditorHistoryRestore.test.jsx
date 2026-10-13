@@ -42,3 +42,11 @@ test('failed original editor save retains restored draft, original baseline and 
  await act(async()=>{await expect(ref.current.restoreHistoryVersion(version,review)).rejects.toBeTruthy()})
  expect(ref.current.captureHistoryState().content).toBe('历史正文');expect(ref.current.captureHistoryState().saved).toBe('当前正文');expect(readEditorDraft('history-a').content).toBe('历史正文');expect(editorQuit.hasDraft('history-a')).toBe(true)
 })
+
+test('a quit inspection invalidates pending history consent without dirtying clean content',async()=>{
+ await open();const review=captureHistoryReview(ref.current.captureHistoryState(),version)
+ await act(async()=>{await editorQuit.flush()})
+ await expect(ref.current.restoreHistoryVersion(version,review)).rejects.toMatchObject({code:'review-changed'})
+ expect(ref.current.captureHistoryState().content).toBe('当前正文');expect(editorQuit.hasDraft('history-a')).toBe(false)
+ expect(api.mock.calls.filter(([,i])=>i?.method==='PUT')).toHaveLength(0)
+})
