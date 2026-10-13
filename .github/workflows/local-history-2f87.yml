@@ -24,6 +24,8 @@ jobs:
         run: node scripts/prepare-history-cache-fixture.mjs apply
       - name: Repair real notification obstruction and bump patch version
         run: node scripts/prepare-history-layout.mjs apply
+      - name: Complete measured clearance against the legacy global cascade
+        run: node scripts/prepare-history-cascade.mjs
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
       - name: Verify version and lock
