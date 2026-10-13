@@ -1,0 +1,19 @@
+# Complete local installation acceptance for 2F.86
+
+This verifier completes the explicitly untested NSIS installation lifecycle for the accepted local recycle-bin module. It is NOT another product feature or a rebuilt/renamed installer. Product commit remains 191439e04ddbf6b4423194d2978ae72da926df3c / 4.219.0, accepted in PR #2 comment 6137440906. Runtime source, schema14, dependencies, original workflows and package settings are unchanged.
+
+Run only on disposable GitHub-hosted Windows, via branch ci/local-installation-2f86. Refuse existing default Notepad data, registrations and shortcuts before any side effect. Do not run on user or self-hosted computers. Download the exact previously accepted 4.218.0 and 4.219.0 artifacts, verify bytes and SHA-256 before execution, then run real NSIS binaries. The current EXE is b3fab086b8f34f2dd7025223e8322a80b2e0634bfbc88631b25ad2d0d727b43a /104197801 bytes. These installers are unsigned; hashes identify bytes, not signatures.
+
+One complete scenario covers clean installation in a Unicode/space path, actual installed App/preload/Go/SQLite recycle-bin flow, uninstall retaining default user data, clean old-version installation, upgrade to current retaining notes/attachments/backups, native editing and saving, same-version reinstallation, uninstall removing program/registration/shortcuts, reinstallation finding the retained note, and final clean native shutdown/uninstall. No cloud account or real user data is involved. Chromium profiles are isolated; notes use the actual default data path on the empty runner. Data file snapshots are compared only while the app/backend are stopped.
+
+The verifier uses the original native window session and original 12-check recycle-bin desktop routine, not replaced runtime or fabricated replies. Existing flags for manual save, exit protection and rollback are untouched. NSIS /D= and _?= paths are passed last without quotes using direct process execution; _?= makes the actual uninstaller waitable. The original uninstaller is copied byte-for-byte to the owned temporary directory before execution to avoid its self-copy bootstrap and self-lock. Only current-user installation is in scope. Interactive installer screens, machine-wide/UAC installation, all Windows versions and every user's machine are NOT claimed tested.
+
+Before publishing the verifier, 37 local Node refusal/evidence tests passed. Source review corrected version-string interpretation, the pinned builder's actual DisplayName/UninstallString contract and cross-volume data preservation BEFORE triggering Windows. The runtime integration result must come from the actual job; the 37 tests are not Windows acceptance. Failure preserves complete:false; forced process cleanup cannot pass acceptance. No changed budgets or removed old assertions. Final report includes exact product/verifier commits and installer identities.
+
+Sources consulted for the installed builder version:
+- https://raw.githubusercontent.com/electron-userland/electron-builder/v24.13.3/packages/app-builder-lib/templates/nsis/include/installer.nsh
+- https://raw.githubusercontent.com/electron-userland/electron-builder/v24.13.3/packages/app-builder-lib/src/targets/nsis/NsisTarget.ts
+- https://nsis.sourceforge.io/Which_command_line_parameters_can_be_used_to_configure_installers
+- https://nsis.sourceforge.io/When_I_use_ExecWait_uninstaller.exe_it_doesn%27t_wait_for_the_uninstaller%3F
+
+Retain the 46 historical product/environment entries and 12 assistant-execution incident classes. Do not repeat the accepted recycle-bin feature commit or old CI. This verification branch must not be merged into the product branch just to update status. Write final acceptance to PR #2 and the user deliverable. There is no new application version, release, deployment, Work/Codex task, recurring task or claim to fix ChatGPT transport failures.

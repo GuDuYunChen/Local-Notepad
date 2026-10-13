@@ -1,0 +1,56 @@
+name: Actual local installation lifecycle 2F86
+on:
+  push:
+    branches: [ci/local-installation-2f86]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: local-installation-2f86
+  cancel-in-progress: false
+jobs:
+  install-upgrade-uninstall:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Verify catalog and immutable dependency lock
+        shell: pwsh
+        run: |
+          node scripts/stage-review.mjs catalog
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/verify-dependency-lock.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Install exact test dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Ensure dependency files were not modified
+        run: git diff --exit-code -- package.json package-lock.json
+      - name: Download accepted previous installer
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 38220180185
+          name: local-notepad-windows-0509350ad43557771713e07f5dcd7f75dcd162e2
+          path: .installer-input/previous
+      - name: Download exact current installer already delivered
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 38337004784
+          name: local-notepad-windows-191439e04ddbf6b4423194d2978ae72da926df3c
+          path: .installer-input/current
+      - name: Verify refusal cases before any installation
+        run: node --test scripts/installer-lifecycle-core.node.mjs
+      - name: Actual NSIS installation upgrade reinstall uninstall and retained data
+        run: node scripts/check-windows-installer-lifecycle.mjs
+      - name: Upload complete or failed original evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-notepad-install-lifecycle-${{ github.sha }}
+          path: test-results/installer-lifecycle/
+          if-no-files-found: error
+          retention-days: 14
