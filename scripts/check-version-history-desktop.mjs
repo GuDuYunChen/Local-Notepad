@@ -7,7 +7,35 @@ import { desktopNote } from './desktop-save-fixture.mjs'
 
 // Part of the ORIGINAL packaged Windows application run. Only owned fixture
 // notes and browser request blocking are used; App/preload/Go/SQLite stay real.
+export async function beginHistoryWriteFailure(cdp, target) {
+ const parsed = new URL(target)
+ assert.equal(parsed.origin, 'http://127.0.0.1:27121')
+ assert.match(parsed.pathname, /^\/api\/files\/[A-Za-z0-9-]+$/)
+ assert.equal(parsed.search, ''); assert.equal(parsed.hash, '')
+ assert.equal(typeof cdp.onEvent, 'function')
+ const observed = [], pending = new Set()
+ let active = true, closed = false, failure = null
+ const detach = cdp.onEvent(message => {
+  if (message.method !== 'Fetch.requestPaused') return
+  const {requestId, request} = message.params
+  const blocked = active && request.method === 'PUT' && request.url === target
+  observed.push({method: request.method, url: request.url, blocked})
+  const task = Promise.resolve().then(() => cdp.send(blocked ? 'Fetch.failRequest' : 'Fetch.continueRequest',
+   blocked ? {requestId, errorReason: 'Failed'} : {requestId})).catch(error => { failure ||= error }).finally(() => pending.delete(task))
+  pending.add(task)
+ })
+ try { await cdp.send('Fetch.enable', {patterns: [{urlPattern: target + '*', requestStage: 'Request'}]}) }
+ catch (error) { active = false; detach(); throw error }
+ return {observed, async close() {
+  if (closed) return
+  closed = true; active = false
+  try { await cdp.send('Fetch.disable'); await Promise.all([...pending]); if (failure) throw failure }
+  finally { detach() }
+ }}
+}
+
 export async function verifyVersionHistoryDesktop({ evaluate, click, cdp, until, api, out, noteIDs }) {
+ let writeFailure = null
  const report={complete:false,commit:process.env.GITHUB_SHA,realPackagedApp:true,realBackend:true,syntheticData:true,checks:[],screenshots:[]}
  const save=()=>writeFileSync(path.join(out,'version-history.json'),JSON.stringify(report,null,2)+'\n')
  const mark=name=>{report.checks.push(name);save()};save()
@@ -54,10 +82,14 @@ export async function verifyVersionHistoryDesktop({ evaluate, click, cdp, until,
   await button('先保存当前笔记');await until(async()=>(await api(route)).content.includes('current-unsaved-history-guard'),'Explicit save failed')
   await until(()=>evaluate("document.querySelector('.version-restore-action')?.disabled===false"),'History remained blocked after save');mark('explicit-original-editor-save-unblocks-history')
   await click(`.version-select-action[data-version-id="${seeded[1].id}"]`)
-  await cdp.send('Network.setBlockedURLs',{urls:[base+route]});await restore();await waitText('保存尚未确认')
+  writeFailure=await beginHistoryWriteFailure(cdp,base+route);await restore();await waitText('保存尚未确认')
   assert.ok((await api(route)).content.includes('current-unsaved-history-guard'))
   assert.equal(await evaluate("document.querySelector('.editor-input')?.innerText.includes('first-history-body')"),true)
   assert.equal(await evaluate("!!document.querySelector('.save-state.error')"),true);mark('failed-save-keeps-restored-draft-and-original-database')
+  assert.equal(writeFailure.observed.filter(r=>r.blocked).length,1,'Expected exactly one failed write')
+  assert.ok(writeFailure.observed.some(r=>r.method==='GET' && r.url===base+versionsRoute && !r.blocked),'Version preflight was not allowed through')
+  report.failureInjection={mode:'exact-PUT-only',requests:writeFailure.observed};save()
+  await writeFailure.close();writeFailure=null
   await cdp.send('Network.setBlockedURLs',{urls:[]});await click('.status-retry-btn')
   await until(async()=>(await api(route)).content===first,'Original saved-receipt retry failed')
   await until(()=>evaluate("!document.querySelector('.save-state')"),'Original retry remained pending');mark('original-save-retry-recovers-without-second-restore')
@@ -70,5 +102,5 @@ export async function verifyVersionHistoryDesktop({ evaluate, click, cdp, until,
   assert.deepEqual(await Promise.all(noteIDs.map(id=>api('/api/files/'+id))),original);mark('unrelated-fixture-notes-unchanged')
   report.complete=true;save()
  }catch(error){report.error=String(error.stack||error);save();throw error}
- finally{await cdp.send('Network.setBlockedURLs',{urls:[]})}
+ finally{try{await writeFailure?.close()}finally{await cdp.send('Network.setBlockedURLs',{urls:[]})}}
 }
