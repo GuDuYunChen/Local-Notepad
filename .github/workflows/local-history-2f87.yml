@@ -1,54 +1,80 @@
-name: Verify complete local daily notes module
+name: Verify existing daily repair evidence without rebuilding
 on:
   push:
     branches: [ci/local-history-2f87]
 permissions:
-  contents: write
+  contents: read
+  actions: read
 concurrency:
   group: local-history-2f87
   cancel-in-progress: false
 jobs:
-  verify-module:
+  verify-existing-artifacts:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - name: Download completed repair evidence
+        uses: actions/download-artifact@v4
         with:
-          node-version: '24'
-      - uses: actions/setup-go@v7
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: GuDuYunChen/Local-Notepad
+          run-id: 38428047612
+          name: daily-module-verification-e61a8c4886bbf9eebbc05835054652c53368c186
+          path: repair
+      - name: Download prior feature evidence for an exact comparison
+        uses: actions/download-artifact@v4
         with:
-          go-version: '1.24.11'
-          cache-dependency-path: server/go.sum
-      - name: Verify accepted inputs and integrate daily module with standard minor version
-        run: node scripts/prepare-daily-module.mjs apply
-      - name: Repair canonical blank daily initialization without changing editor protections
-        run: node scripts/prepare-daily-empty.mjs apply
-      - name: Verify historical issue catalog
-        run: node scripts/stage-review.mjs catalog
-      - name: Install committed dependency lock
-        run: npm ci --no-audit --no-fund
-      - name: Verify version and unchanged dependency graph
-        run: node scripts/check-app-version.mjs --previous-version=4.220.2 && node scripts/verify-dependency-lock.mjs
-      - name: Run daily service and original save protection tests
-        run: node --test scripts/daily-notes.node.mjs scripts/editor-draft-recovery.node.mjs scripts/editor-save-transaction.node.mjs scripts/editor-discard.node.mjs scripts/editor-quit.node.mjs scripts/editor-cache-regression.node.mjs
-      - name: Full UI regression including the daily module
-        run: npx vitest run --root=. --maxWorkers=4 --minWorkers=1 --reporter=default --reporter=json --outputFile=daily-evidence/full-ui.json
-      - name: Full production Go and disk SQLite regression
-        working-directory: server
-        run: go test ./... -count=1
-      - name: Build original main preload and complete renderer
-        run: npm run build:main && npm run build:renderer
-      - name: Publish tested code objects without changing product refs
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: GuDuYunChen/Local-Notepad
+          run-id: 38425826825
+          name: daily-module-verification-15694546c9d39a7fec5c4f148a77ec99a6afe5e5
+          path: original
+      - name: Independently verify file identities, unchanged dependencies and test preservation
+        shell: python
         run: |
-          node scripts/prepare-daily-module.mjs publish
-          node scripts/prepare-daily-empty.mjs publish
+          import json, pathlib, hashlib, collections
+          def verify(directory, verifier, count):
+              root=pathlib.Path(directory)
+              index=json.loads((root/'objects.json').read_text())
+              assert index['base']=='7b133bf6c717536c81b6a74e8afd8ed992dfb9ce'
+              assert index['verifier']==verifier and index['productRefUpdated'] is False
+              assert len(index['records'])==count
+              assert len({r['path'] for r in index['records']})==count
+              for record in index['records']:
+                  p=pathlib.PurePosixPath(record['path'])
+                  assert not p.is_absolute() and '..' not in p.parts
+                  data=(root/'source'/p).read_bytes()
+                  assert len(data)==record['bytes']
+                  assert hashlib.sha256(data).hexdigest()==record['sha256']
+                  assert hashlib.sha1(('blob '+str(len(data))+'\0').encode()+data).hexdigest()==record['sha']
+              tests=json.loads((root/'full-ui.json').read_text())
+              assert tests['success'] and tests['numFailedTests']==0 and tests['numPendingTests']==0
+              names=collections.Counter(a['fullName'] for t in tests['testResults'] for a in t['assertionResults'])
+              assert len(list(names.elements()))==tests['numTotalTests']
+              return index,tests,names
+          before,oldtests,oldnames=verify('original','15694546c9d39a7fec5c4f148a77ec99a6afe5e5',16)
+          after,newtests,newnames=verify('repair','e61a8c4886bbf9eebbc05835054652c53368c186',17)
+          assert oldtests['numTotalTests']==3724 and newtests['numTotalTests']==3726
+          assert not (oldnames-newnames)
+          old={r['path']:r for r in before['records']}
+          changed=[r for r in after['records'] if r['path'] not in old or r['sha']!=old[r['path']]['sha']]
+          expected={'AGENTS.md','package.json','package-lock.json','server/internal/dao/daily.go','server/internal/dao/daily_test.go','scripts/check-daily-notes-desktop.mjs','docs/LOCAL_DAILY_NOTES_2F88.md','src/services/dailyInitialContent.test.js'}
+          assert {r['path'] for r in changed}==expected
+          previous=json.loads(pathlib.Path('original/source/package-lock.json').read_text())
+          current=json.loads(pathlib.Path('repair/source/package-lock.json').read_text())
+          assert previous['version']=='4.221.0' and current['version']=='4.221.1'
+          assert len(current['packages'])-1==679
+          current['version']=previous['version'];current['packages']['']['version']=previous['packages']['']['version']
+          assert current==previous
+          native=next(r for r in changed if r['path']=='scripts/check-daily-notes-desktop.mjs')
+          assert native['sha']=='d45b387fbc13feeb7ca34f7d28dfc101af9ecbd0'
+          report={'complete':True,'sourceVerifier':after['verifier'],'recordsVerified':17,'changed':changed,'unchangedFiles':9,'allUI':3726,'originalNamesPreserved':3724,'dependencyNodes':679,'version':'4.221.1','productRefUpdated':False}
+          pathlib.Path('artifact-verification.json').write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n')
+          print('DAILY_REPAIR_OBJECTS '+json.dumps(report,ensure_ascii=False,separators=(',',':')))
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: daily-module-verification-${{ github.sha }}
-          path: daily-evidence/
-          retention-days: 7
+          name: daily-repair-artifact-verification-${{ github.sha }}
+          path: artifact-verification.json
           if-no-files-found: error
+          retention-days: 7
