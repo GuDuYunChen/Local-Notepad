@@ -20,20 +20,26 @@ jobs:
         run: node scripts/stage-review.mjs catalog
       - name: Apply exact editor integration and standard minor version
         run: node scripts/prepare-local-history-2f87.mjs apply
+      - name: Align legacy VM fixture and native seed with production contracts
+        run: node scripts/prepare-history-cache-fixture.mjs apply
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
       - name: Verify version and lock
         run: node scripts/check-app-version.mjs --previous-version=4.219.1 && node scripts/verify-dependency-lock.mjs
       - name: Test core, real React DOM and original TextEditor save integration
         run: |
-          node --test scripts/version-history.node.mjs
+          node --test scripts/version-history.node.mjs scripts/editor-draft-recovery.node.mjs scripts/editor-save-transaction.node.mjs scripts/editor-discard.node.mjs scripts/editor-quit.node.mjs scripts/editor-cache-regression.node.mjs
           npx vitest run --root=. src/services/versionHistory.test.js src/components/VersionHistory.test.jsx src/components/EditorHistoryRestore.test.jsx --reporter=default --reporter=json --outputFile=source-objects/module-tests.json
+      - name: Run every original UI regression before emitting blobs
+        run: npx vitest run --root=. --maxWorkers=4 --minWorkers=1 --reporter=default --reporter=json --outputFile=source-objects/full-ui.json
       - name: Build original main preload and complete renderer
         run: npm run build:main && npm run build:renderer
       - name: Publish exact full integration blobs without commits or ref changes
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node scripts/prepare-local-history-2f87.mjs publish
+        run: |
+          node scripts/prepare-local-history-2f87.mjs publish
+          node scripts/prepare-history-cache-fixture.mjs publish
       - uses: actions/upload-artifact@v4
         if: always()
         with:
