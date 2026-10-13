@@ -24,3 +24,9 @@
 .version-block { padding: 10px; border-inline-start: 3px solid var(--warning, #986620); }
 .version-history button:focus-visible, .version-history input:focus-visible, .version-history pre:focus-visible { outline: 2px solid var(--clay, #9a6a4b); outline-offset: 3px; }
 .version-history button:disabled { opacity: .55; cursor: default; }
+
+/* This module replaces the old compact history layout; leave the inspector
+   body as the scroll owner and preserve room for the real reference notice. */
+.inspector-panel .inspector-body > .version-history { display: block; min-height: 0; max-height: none; overflow: visible; padding: 12px 14px var(--history-bottom-clearance, 16px) !important; }
+.inspector-panel .version-history .version-list { max-height: 260px !important; }
+.inspector-panel .version-history .version-preview pre { max-height: 360px !important; font-size: 13px !important; }

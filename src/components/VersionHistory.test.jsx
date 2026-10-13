@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { URL as NodeURL } from 'node:url'
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { beforeEach, afterEach, test, expect, vi } from 'vitest'
@@ -57,4 +59,16 @@ test('notifications outside the panel do not add an unnecessary large scroll gap
  const banner=document.createElement('aside');banner.className='reference-maintenance-status';document.body.append(banner)
  vi.spyOn(Element.prototype,'getBoundingClientRect').mockImplementation(function(){return this===banner?{left:400,right:700,top:10,bottom:100}:{left:0,right:320,top:0,bottom:600}})
  try{await mount();expect(host.querySelector('.version-history').style.getPropertyValue('--history-bottom-clearance')).toBe('16px')}finally{banner.remove()}
+})
+
+test('history root defeats legacy important padding and nested height constraints',()=>{
+ const css=readFileSync(new NodeURL('./VersionHistory.css',import.meta.url),'utf8')
+ const root=css.split('.inspector-panel .inspector-body > .version-history {')[1]?.split('}')[0]
+ expect(root).toBeTruthy()
+ for(const rule of ['display: block','min-height: 0','max-height: none','overflow: visible','padding: 12px 14px var(--history-bottom-clearance, 16px) !important'])expect(root).toContain(rule)
+})
+test('history retains bounded list and readable preview despite old inspector overrides',()=>{
+ const css=readFileSync(new NodeURL('./VersionHistory.css',import.meta.url),'utf8')
+ expect(css).toContain('.inspector-panel .version-history .version-list { max-height: 260px !important; }')
+ expect(css).toContain('.inspector-panel .version-history .version-preview pre { max-height: 360px !important; font-size: 13px !important; }')
 })
