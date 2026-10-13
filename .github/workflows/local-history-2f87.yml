@@ -1,0 +1,43 @@
+name: Prepare and verify local version history 2F87
+on:
+  push:
+    branches: [ci/local-history-2f87]
+permissions:
+  contents: write
+concurrency:
+  group: local-history-2f87
+  cancel-in-progress: false
+jobs:
+  verify-module:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Verify history catalog and immutable base
+        run: node scripts/stage-review.mjs catalog
+      - name: Apply exact editor integration and standard minor version
+        run: node scripts/prepare-local-history-2f87.mjs apply
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Verify version and lock
+        run: node scripts/check-app-version.mjs --previous-version=4.219.1 && node scripts/verify-dependency-lock.mjs
+      - name: Test core, real React DOM and original TextEditor save integration
+        run: |
+          node --test scripts/version-history.node.mjs
+          npx vitest run --root=. src/services/versionHistory.test.js src/components/VersionHistory.test.jsx src/components/EditorHistoryRestore.test.jsx --reporter=default --reporter=json --outputFile=source-objects/module-tests.json
+      - name: Build original main preload and complete renderer
+        run: npm run build:main && npm run build:renderer
+      - name: Publish exact full integration blobs without commits or ref changes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/prepare-local-history-2f87.mjs publish
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: local-history-source-objects-${{ github.sha }}
+          path: source-objects/
+          retention-days: 7
+          if-no-files-found: error
