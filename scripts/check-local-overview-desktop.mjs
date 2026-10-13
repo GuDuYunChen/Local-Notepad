@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { verifyTrashWorkspaceDesktop } from './check-trash-workspace-desktop.mjs'
 import { verifyLocalOverviewReportDesktop } from './check-local-overview-report-desktop.mjs'
 import { verifyS3InspectionDesktop } from './check-s3-inspection-desktop.mjs'
 import { writeFileSync } from 'node:fs'
@@ -42,4 +43,5 @@ export async function verifyLocalOverviewDesktop({ evaluate, click, cdp, until, 
   await verifyLocalOverviewReportDesktop({ evaluate, click, cdp, until, api, out, noteIDs, rows: snapshot.rows })
   await verifyS3InspectionDesktop({ evaluate, click, cdp, until, api, out, noteIDs })
   await click('[aria-label="返回笔记"]')
+  await verifyTrashWorkspaceDesktop({ evaluate, click, cdp, until, api, out, noteIDs })
 }
