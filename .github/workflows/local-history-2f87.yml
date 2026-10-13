@@ -22,6 +22,8 @@ jobs:
           cache-dependency-path: server/go.sum
       - name: Verify accepted inputs and integrate daily module with standard minor version
         run: node scripts/prepare-daily-module.mjs apply
+      - name: Repair canonical blank daily initialization without changing editor protections
+        run: node scripts/prepare-daily-empty.mjs apply
       - name: Verify historical issue catalog
         run: node scripts/stage-review.mjs catalog
       - name: Install committed dependency lock
@@ -40,7 +42,9 @@ jobs:
       - name: Publish tested code objects without changing product refs
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node scripts/prepare-daily-module.mjs publish
+        run: |
+          node scripts/prepare-daily-module.mjs publish
+          node scripts/prepare-daily-empty.mjs publish
       - uses: actions/upload-artifact@v4
         if: always()
         with:
