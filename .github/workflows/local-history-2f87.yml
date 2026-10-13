@@ -26,10 +26,14 @@ jobs:
         run: node scripts/prepare-history-layout.mjs apply
       - name: Complete measured clearance against the legacy global cascade
         run: node scripts/prepare-history-cascade.mjs
+      - name: Isolate intended save failure without blocking version preflight
+        run: node scripts/prepare-history-request-scope.mjs apply
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
       - name: Verify version and lock
         run: node scripts/check-app-version.mjs --previous-version=4.219.1 && node scripts/verify-dependency-lock.mjs
+      - name: Verify exact write-only failure helper and cleanup
+        run: node scripts/prepare-history-request-scope.mjs test
       - name: Test core, real React DOM and original TextEditor save integration
         run: |
           node --test scripts/version-history.node.mjs scripts/editor-draft-recovery.node.mjs scripts/editor-save-transaction.node.mjs scripts/editor-discard.node.mjs scripts/editor-quit.node.mjs scripts/editor-cache-regression.node.mjs
