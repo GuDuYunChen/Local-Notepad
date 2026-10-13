@@ -1,138 +1,149 @@
-import React, { useEffect, useMemo, useState, useRef } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../services/api'
 import { extractLexicalText } from '~/utils/lexicalText'
+import ConfirmDialog from './ConfirmDialog'
+import { readVersionHistory, sameHistoryVersion, formatHistoryTime, historyPreview,
+  historyRestoreBlock, captureHistoryReview } from '../services/versionHistory.mjs'
 import './VersionHistory.css'
 
-function formatVersionTime(ts) {
-  if (!ts) return '时间未知'
-  return new Date(ts * 1000).toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  })
-}
-
-export default function VersionHistory({ fileId, onRestore }) {
-  const [versions, setVersions] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [restoringId, setRestoringId] = useState(null)
-  const [selectedVersion, setSelectedVersion] = useState(null)
-  const abortRef = useRef(null)
-
-  useEffect(() => {
-    if (!fileId) {
-      setVersions([])
-      setSelectedVersion(null)
-      return undefined
-    }
-
-    abortRef.current?.abort()
-    const controller = new AbortController()
-    abortRef.current = controller
-
-    const load = async () => {
-      setLoading(true)
-      try {
-        const list = await api(`/api/files/${fileId}/versions`)
-        if (controller.signal.aborted) return
-        const next = Array.isArray(list) ? list : []
-        setVersions(next)
-        setSelectedVersion(next[0] || null)
-      } catch (e) {
-        if (e.name !== 'AbortError') console.error('加载版本历史失败', e)
-      } finally {
-        if (!controller.signal.aborted) setLoading(false)
-      }
-    }
-
-    void load()
-    return () => controller.abort()
-  }, [fileId])
-
-  const preview = useMemo(
-    () => (extractLexicalText(selectedVersion?.content) || '（空内容）').slice(0, 1800),
-    [selectedVersion]
-  )
-
-  const handleRestore = async (version) => {
-    if (!version?.id) return
-    const confirmed = window.confirm(`恢复到 ${formatVersionTime(version.created_at)} 的版本？\n\n恢复前系统仍会保留当前版本记录。`)
-    if (!confirmed) return
-
-    setRestoringId(version.id)
+export default function VersionHistory({ fileId, editor }) {
+  const [rows, setRows] = useState([]), [status, setStatus] = useState('loading')
+  const [problem, setProblem] = useState(''), [selectedId, setSelectedId] = useState(null)
+  const [search, setSearch] = useState(''), [query, setQuery] = useState(''), composing = useRef(false)
+  const [previewPage, setPreviewPage] = useState(0), [showCurrent, setShowCurrent] = useState(false)
+  const [review, setReview] = useState(null), [busy, setBusy] = useState(false), [result, setResult] = useState(null)
+  const alive = useRef(false), readOwner = useRef(null), operation = useRef(null), focusAfter = useRef(null)
+  const latestEditor = useRef(editor); latestEditor.current = editor
+  const state = editor?.snapshot?.() || null
+  const block = historyRestoreBlock(state, fileId)
+  const selected = rows.find(row => row.id === selectedId) || null
+  const visible = useMemo(() => {
+    const q = query.trim().toLocaleLowerCase()
+    return rows.filter(row => !q || (row.title + '\n' + extractLexicalText(row.content) + '\n' + formatHistoryTime(row.created_at)).toLocaleLowerCase().includes(q))
+  }, [rows, query])
+  const text = useMemo(() => extractLexicalText(showCurrent ? state?.content : selected?.content) || '', [showCurrent, state?.content, selected])
+  const preview = useMemo(() => historyPreview(text, previewPage), [text, previewPage])
+  const load = async ({ preserve = false } = {}) => {
+    readOwner.current?.abort()
+    const ctl = new AbortController(); readOwner.current = ctl
+    setStatus('loading'); setProblem('')
     try {
-      await api(`/api/files/${fileId}/versions/${version.id}/restore`, {
-        method: 'POST'
-      })
-      onRestore?.()
+      const list = await readVersionHistory(api, fileId, ctl.signal)
+      if (!alive.current || ctl.signal.aborted || readOwner.current !== ctl) return
+      setRows(list); setSelectedId(id => preserve && list.some(row => row.id === id) ? id : list[0]?.id ?? null)
+      setStatus('ready'); setPreviewPage(0)
     } catch (e) {
-      console.error('恢复版本失败', e)
-      alert('恢复失败: ' + (e.message || '未知错误'))
-    } finally {
-      setRestoringId(null)
+      if (!alive.current || ctl.signal.aborted || readOwner.current !== ctl) return
+      setRows([]); setSelectedId(null); setStatus('error'); setProblem(e.message)
     }
   }
-
+  useEffect(() => {
+    alive.current = true; setRows([]); setSelectedId(null); setResult(null); setReview(null)
+    void load()
+    return () => { alive.current = false; readOwner.current?.abort(); operation.current?.abort() }
+  }, [fileId])
+  useEffect(() => {
+    if (!review && focusAfter.current) {
+      const n = focusAfter.current; focusAfter.current = null
+      if (n.isConnected && !n.disabled) n.focus()
+    }
+  }, [review, busy])
+  const requestRestore = event => {
+    if (!selected || busy || operation.current || status !== 'ready') return
+    try {
+      const expected = captureHistoryReview(latestEditor.current?.snapshot?.(), selected)
+      setResult(null); focusAfter.current = event.currentTarget; setReview({ version: selected, expected })
+    } catch (e) { setResult({ kind: 'error', text: e.message }) }
+  }
+  const restore = async () => {
+    if (!review || operation.current) return
+    const requested = review, ctl = new AbortController(); operation.current = ctl
+    setBusy(true); setResult(null)
+    let adopted = false
+    try {
+      const latest = await readVersionHistory(api, fileId, ctl.signal)
+      if (!alive.current || ctl.signal.aborted) return
+      if (!sameHistoryVersion(latest.find(row => row.id === requested.version.id), requested.version))
+        throw new Error('所选快照已变化或已被清理，未恢复正文。请刷新历史。')
+      if (typeof latestEditor.current?.restore !== 'function') throw new Error('编辑器恢复通道不可用，未改动正文。')
+      // The editor performs its own synchronous ID/lifetime/content/pending check.
+      const receipt = await latestEditor.current.restore(requested.version, requested.expected, ctl.signal)
+      adopted = true
+      if (!alive.current || ctl.signal.aborted) return
+      if (!receipt || receipt.id !== fileId || receipt.content !== requested.version.content)
+        throw new Error('恢复回执不匹配，请在编辑器核对保存状态。')
+      setResult({ kind: 'success', text: receipt.unchanged ? '所选快照与当前正文一致，没有写入或新增版本。' : '历史正文已恢复并保存；恢复前的正文已保留为历史快照。标题、标签与位置未改变。' })
+      setReview(null); setShowCurrent(false)
+      await load({ preserve: true })
+    } catch (e) {
+      if (alive.current && !ctl.signal.aborted) {
+        const blocked = e?.code === 'editor-blocked' || e?.code === 'review-changed' || e?.code === 'cancelled'
+        setResult({ kind: 'error', text: blocked || !adopted && /快照已变化|恢复通道不可用/.test(e.message) ? e.message
+          : '恢复未完成或保存尚未确认。请检查编辑器中的草稿、保存提示与冲突；不会自动重复恢复。' })
+        setReview(null)
+      }
+    } finally {
+      if (operation.current === ctl) { operation.current = null; if (alive.current) setBusy(false) }
+    }
+  }
+  const saveCurrent = async () => {
+    if (operation.current || !editor?.saveCurrent) return
+    const ctl = new AbortController(); operation.current = ctl; setBusy(true)
+    try {
+      const captured = latestEditor.current.snapshot()
+      await latestEditor.current.saveCurrent(captured)
+      if (alive.current && !ctl.signal.aborted) {
+        setResult({ kind: 'info', text: '保存操作已返回，请以编辑器当前状态为准；新的修改不会被历史内容覆盖。' })
+        await load({ preserve: true })
+      }
+    } catch {
+      if (alive.current && !ctl.signal.aborted) setResult({ kind: 'error', text: '当前笔记保存未确认，请在编辑器处理；尚未发起历史恢复。' })
+    } finally { if (operation.current === ctl) { operation.current = null; if (alive.current) setBusy(false) } }
+  }
   if (!fileId) return null
-
-  return (
-    <div className="version-history">
-      <div className="version-header inspector-section-header">
-        <div>
-          <div className="inspector-section-eyebrow">Versions</div>
-          <h3>版本历史</h3>
+  return <section className="version-history" aria-label="版本历史与恢复">
+    <header className="version-header inspector-section-header"><div><div className="inspector-section-eyebrow">本地快照</div><h3>版本历史</h3></div>
+      <button type="button" className="btn small" disabled={busy || status === 'loading'} onClick={() => void load({ preserve: true })}>刷新历史</button></header>
+    <p className="version-explanation">历史快照不等于当前正文。恢复只替换正文，经过现有保存和冲突保护；不改标题、标签或位置。</p>
+    {result && <div className={'version-feedback ' + result.kind} role={result.kind === 'error' ? 'alert' : 'status'}>{result.text}</div>}
+    {status === 'error' ? <div className="version-error" role="alert"><p>{problem}</p><button type="button" className="btn" onClick={() => void load()}>重试读取历史</button></div>
+      : status === 'loading' ? <p role="status">正在读取历史版本…</p>
+      : rows.length === 0 ? <div className="version-empty"><strong>暂无版本历史</strong><p>保存有变动的正文后，原正文会保留为历史快照。这里没有可恢复的记录。</p></div>
+      : <>
+        <label className="version-search">查找快照<input aria-label="查找历史快照" value={search} disabled={busy}
+          onCompositionStart={() => { composing.current = true }}
+          onCompositionEnd={e => { composing.current = false; setQuery(e.currentTarget.value) }}
+          onChange={e => { setSearch(e.target.value); if (!composing.current) setQuery(e.target.value) }} placeholder="标题、正文或时间" /></label>
+        <p className="version-meta">显示 {visible.length} / {rows.length} 份快照</p>
+        <div className="version-list" role="list" aria-label="历史快照">
+          {visible.length === 0 && <p className="version-empty">没有匹配的快照，清除查找条件可查看全部记录。</p>}
+          {visible.map(row => <div key={row.id} role="listitem" className={'version-item' + (row.id === selectedId ? ' selected' : '')}>
+            <button type="button" className="version-select-action" data-version-id={row.id} aria-pressed={row.id === selectedId} disabled={busy}
+              onClick={() => { setSelectedId(row.id); setPreviewPage(0); setShowCurrent(false); setResult(null) }}>
+              <strong>历史快照 #{row.id}</strong><small>{formatHistoryTime(row.created_at)}</small><span>{row.title || '未命名'}</span>
+            </button></div>)}
         </div>
-        <span>{versions.length}</span>
-      </div>
-
-      <div className="version-list">
-        {loading ? (
-          <div className="version-loading">正在读取历史版本…</div>
-        ) : versions.length === 0 ? (
-          <div className="version-empty">暂无版本历史</div>
-        ) : (
-          versions.map((version, index) => (
-            <div
-              key={version.id}
-              className={`version-item ${selectedVersion?.id === version.id ? 'selected' : ''}`}
-            >
-              <button
-                type="button"
-                className="version-select-action"
-                onClick={() => setSelectedVersion(version)}
-              >
-                <span className="version-item-main">
-                  <strong>{index === 0 ? '当前版本' : `历史版本 ${versions.length - index}`}</strong>
-                  <small>{formatVersionTime(version.created_at)}</small>
-                </span>
-              </button>
-              {index > 0 && (
-                <button
-                  type="button"
-                  className="version-restore-action"
-                  onClick={() => void handleRestore(version)}
-                  disabled={restoringId === version.id}
-                >
-                  {restoringId === version.id ? '恢复中…' : '恢复'}
-                </button>
-              )}
-            </div>
-          ))
-        )}
-      </div>
-
-      {selectedVersion && (
-        <div className="version-preview">
-          <div className="version-preview-header">
-            <strong>内容预览</strong>
-            <span>{preview.length.toLocaleString()} 字符</span>
-          </div>
-          <pre>{preview}</pre>
-        </div>
-      )}
-    </div>
-  )
+        {selected && <div className="version-preview">
+          {!visible.some(row => row.id === selected.id) && <p className="version-meta">当前预览的快照不在查找结果中。</p>}
+          <div className="version-preview-header"><strong>正文对照</strong><span>{preview.total.toLocaleString()} 字符</span></div>
+          <div className="version-preview-switch"><button type="button" aria-pressed={!showCurrent} onClick={() => { setShowCurrent(false); setPreviewPage(0) }}>所选历史</button>
+            <button type="button" aria-pressed={showCurrent} onClick={() => { setShowCurrent(true); setPreviewPage(0) }}>当前编辑器</button></div>
+          <p className="version-meta">纯文本预览，不显示图片等嵌入内容；恢复使用完整原始正文，不使用预览文本。</p>
+          <pre tabIndex={0} aria-label={showCurrent ? '当前正文预览' : '历史正文预览'}>{preview.text || '（空内容）'}</pre>
+          {preview.pages > 1 && <div className="version-pagination"><button type="button" disabled={preview.page === 0} onClick={() => setPreviewPage(preview.page - 1)}>上一段</button>
+            <span>{preview.page + 1} / {preview.pages}</span><button type="button" disabled={preview.page + 1 === preview.pages} onClick={() => setPreviewPage(preview.page + 1)}>下一段</button></div>}
+          {block && <p className="version-block" role="status">{block}</p>}
+          {state?.ready && state.id === fileId && state.content !== state.saved && !state.pending && !state.uncertain &&
+            <button type="button" className="btn" disabled={busy} onClick={() => void saveCurrent()}>先保存当前笔记</button>}
+          <button type="button" className="btn primary version-restore-action" disabled={busy || !!block} onClick={requestRestore}>恢复此快照正文</button>
+        </div>}
+      </>}
+    {review && <ConfirmDialog title="恢复所选历史正文？" message={<>
+      <p>快照 #{review.version.id} · {formatHistoryTime(review.version.created_at)}</p>
+      <p>恢复前正文会由同一个保存事务保留为快照。若当前笔记变化或保存失败，不会显示为已恢复。</p>
+      <p>仅恢复正文；标题、标签和位置保持不变。</p></>} onClose={() => { if (!busy) setReview(null) }} actions={[
+        { label: '取消', disabled: busy, onClick: () => setReview(null) },
+        { label: '确认恢复正文', kind: 'primary', loading: busy, onClick: () => void restore() },
+      ]} />}
+  </section>
 }

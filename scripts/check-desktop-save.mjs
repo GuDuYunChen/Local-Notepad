@@ -1,3 +1,4 @@
+import { verifyVersionHistoryDesktop } from './check-version-history-desktop.mjs'
 // Windows packaged-app acceptance: actual main/preload/App/Lexical/backend.
 // No renderer modules, request responses, timers or quit receipts are replaced.
 // CDP is enabled only on this isolated test process and bound to loopback.
@@ -273,6 +274,7 @@ try {
   assert.equal((await api('/api/files/' + a.id)).content, persisted)
   await screenshot('restarted-fresh-profile')
   await verifyLocalOverviewDesktop({ evaluate, click, cdp, until, api, out, noteIDs: [a.id, b.id] })
+  await verifyVersionHistoryDesktop({ evaluate, click, cdp, until, api, out, noteIDs: [a.id, b.id] })
   await open(a.id, 'native-close-latest')
   await closeWindow()
   report.checks.push('fresh-profile packaged restart reads latest body from real database and closes cleanly')

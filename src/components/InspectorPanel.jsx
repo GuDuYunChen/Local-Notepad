@@ -55,7 +55,7 @@ export default function InspectorPanel({
   onTabChange,
   onClose,
   onSelectFile,
-  onRestore,
+  historyEditor,
   editorStatus,
   unsaved,
   onUpdateFile,
@@ -256,7 +256,7 @@ export default function InspectorPanel({
         )}
 
         {activeTab === 'history' && (
-          <VersionHistory fileId={file.id} onRestore={onRestore} />
+          <VersionHistory key={file.id} fileId={file.id} editor={historyEditor} />
         )}
       </div>
     </aside>
