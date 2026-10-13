@@ -17,7 +17,7 @@ export async function verifyVersionHistoryDesktop({ evaluate, click, cdp, until,
  const route='/api/files/'+file.id,versionsRoute=route+'/versions',base='http://127.0.0.1:27121'
  const write=(expected,content)=>commitEditorSave(api,createEditorSaveAttempt(file.id,expected,content))
  const button=async(label,scope='.version-history')=>{
-  assert.equal(await evaluate(`(()=>{const a=[...document.querySelectorAll(${JSON.stringify(scope+' button')})].filter(n=>n.textContent.trim()===${JSON.stringify(label)});if(a.length!==1||a[0].disabled)return false;a[0].setAttribute('data-history-click','');return true})()`),true,'Missing enabled action '+label)
+  assert.equal(await evaluate(`(()=>{const a=[...document.querySelectorAll(${JSON.stringify(scope+' button')})].filter(n=>n.textContent.trim()===${JSON.stringify(label)});if(a.length!==1||a[0].disabled)return false;a[0].scrollIntoView({block:'center'});const r=a[0].getBoundingClientRect();const hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);if(!hit||!a[0].contains(hit))return false;a[0].setAttribute('data-history-click','');return true})()`),true,'Missing enabled action '+label)
   try{await click('[data-history-click]')}finally{await evaluate("document.querySelector('[data-history-click]')?.removeAttribute('data-history-click')")}
  }
  const text=()=>evaluate("document.querySelector('.version-history')?.innerText||''")

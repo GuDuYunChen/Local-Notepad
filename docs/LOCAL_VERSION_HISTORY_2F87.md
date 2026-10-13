@@ -1,4 +1,4 @@
-# 2F.87 / 4.220.0 本地版本历史与安全恢复
+# 2F.87 / 4.220.1 本地版本历史与安全恢复
 
 基线048a9ca /4.219.1，上一回收站与真实安装生命周期验收6140762411保持；不重做已完成工作、不发展云或多端功能。
 
@@ -11,3 +11,7 @@
 历史风险：旧VersionHistory把读取失败/非法数据默认为空；第一条旧快照被误称当前版本；原直写恢复绕开草稿保护与保存回执。新服务/真实React/原TextEditor及真实Windows桌面测试覆盖这些路径。原46问题和12执行事故仍分别保留；本轮读取和执行错误放本地交付，不把它们当产品功能数量或聊天断流根因。
 
 所有原生产Go/Electron、schema14、679依赖节点和原工作流保持。版本由真实npm version:minor升4.220.0。辅助ci/local-history-2f87只应用固定基线范围、执行模块测试/构建并生成大文件Git blobs；不更新产品ref，其测试不是产品提交后的最终验收。最终产品必须当前HEAD全量回归、原Windows保存退出与新增历史链路、打包及产物核验通过。源码脚本存在不算运行通过；验收另写PR和交付，不制造状态专用提交。
+
+## Windows operation-area repair / 4.220.1
+
+Current-source c79d8a0 Windows artifact11802740854 passed real history read, first-snapshot restore and dirty-draft admission, then its explicit-save click was intercepted by the fixed reference-maintenance banner. Preserve the original failure screenshot and original native click, not a JavaScript click bypass. The panel now reserves measured bottom scroll clearance for that visible, horizontally overlapping banner, updates it on appearance/resize/removal and cleans up observers on unmount. The reference notice and its retry remain fully functional. Added two DOM layout contracts; the native helper now also checks actual hit testing before dispatching the original mouse input. Same module, normal patch version4.220.1, unchanged save/Go/Electron/installer/schema and679 dependency nodes. Complete current-source regression, actual desktop and installation gates remain mandatory.

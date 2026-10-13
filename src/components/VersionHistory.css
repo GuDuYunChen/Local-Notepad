@@ -1,4 +1,4 @@
-.version-history { min-width: 0; color: var(--ink, #202630); }
+.version-history { padding-bottom: var(--history-bottom-clearance, 16px); min-width: 0; color: var(--ink, #202630); }
 .version-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .version-header h3 { margin: 3px 0; }
 .version-explanation, .version-meta, .version-block { font-size: 12px; line-height: 1.7; color: var(--ink-soft, #626b78); overflow-wrap: anywhere; }

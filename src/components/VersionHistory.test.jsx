@@ -41,3 +41,20 @@ test('composition does not apply a query until composition ends',async()=>{await
 test('late note-A history response cannot populate note-B panel',async()=>{let release;const pending=new Promise(r=>{release=r});api.mockReturnValue(pending);await mount();current.id='note-b';api.mockResolvedValue([version({id:2,file_id:'note-b',content:'B正文'})]);await mount('note-b');await act(async()=>release([version()]));expect(host.textContent).toContain('历史快照 #2');expect(host.textContent).not.toContain('历史快照 #1')})
 test('closing while confirmation recheck waits prevents any restore',async()=>{await mount();await click('恢复此快照正文');let release;api.mockReturnValue(new Promise(r=>{release=r}));await act(async()=>button('确认恢复正文').click());await act(async()=>root.render(null));await act(async()=>release([version()]));expect(bridge.restore).not.toHaveBeenCalled()})
 test('failed post-success refresh does not turn an acknowledged restoration into a failure',async()=>{await mount();bridge.restore.mockImplementation(async v=>{api.mockRejectedValue(Error('refresh failed'));return{id:v.file_id,content:v.content}});await confirm();expect(host.textContent).toContain('已恢复并保存');expect(host.textContent).toContain('读取历史失败');expect(bridge.restore).toHaveBeenCalledTimes(1)})
+
+test('visible reference notification reserves measured scroll space and releases it when removed',async()=>{
+ const banner=document.createElement('aside');banner.className='reference-maintenance-status';document.body.append(banner)
+ const top=window.innerHeight-144
+ vi.spyOn(Element.prototype,'getBoundingClientRect').mockImplementation(function(){return this===banner?{left:0,right:300,top,bottom:top+60}:{left:0,right:320,top:0,bottom:600}})
+ try{
+  await mount();expect(host.querySelector('.version-history').style.getPropertyValue('--history-bottom-clearance')).toBe('160px')
+  banner.remove();await act(async()=>{await Promise.resolve();await new Promise(r=>window.requestAnimationFrame(r))})
+  expect(host.querySelector('.version-history').style.getPropertyValue('--history-bottom-clearance')).toBe('16px')
+  expect(bridge.restore).not.toHaveBeenCalled()
+ }finally{banner.remove()}
+})
+test('notifications outside the panel do not add an unnecessary large scroll gap',async()=>{
+ const banner=document.createElement('aside');banner.className='reference-maintenance-status';document.body.append(banner)
+ vi.spyOn(Element.prototype,'getBoundingClientRect').mockImplementation(function(){return this===banner?{left:400,right:700,top:10,bottom:100}:{left:0,right:320,top:0,bottom:600}})
+ try{await mount();expect(host.querySelector('.version-history').style.getPropertyValue('--history-bottom-clearance')).toBe('16px')}finally{banner.remove()}
+})
