@@ -52,7 +52,7 @@ jobs:
       - name: Verify refusal cases before any installation
         run: node --test scripts/installer-lifecycle-core.node.mjs
       - name: Actual NSIS installation upgrade reinstall uninstall and retained data
-        run: node scripts/check-windows-installer-lifecycle.mjs
+        run: node scripts/run-installer-lifecycle.mjs
       - name: Upload complete or failed original evidence
         if: always()
         uses: actions/upload-artifact@v4
