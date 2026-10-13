@@ -1,0 +1,44 @@
+name: Isolated 4.219.0 installer acceptance
+on:
+  push:
+    branches: [ci/installer-check-4219]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  installed-desktop:
+    if: github.repository == 'GuDuYunChen/Local-Notepad' && github.ref == 'refs/heads/ci/installer-check-4219'
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Validate locked test dependencies
+        run: node scripts/verify-dependency-lock.mjs
+      - name: Install exact locked dependencies for original desktop test
+        run: npm ci --no-audit --no-fund
+      - name: Confirm metadata was not changed
+        run: git diff --exit-code -- package.json package-lock.json
+      - uses: actions/download-artifact@v4
+        with:
+          name: local-notepad-windows-191439e04ddbf6b4423194d2978ae72da926df3c
+          run-id: 38337004784
+          repository: GuDuYunChen/Local-Notepad
+          github-token: ${{ github.token }}
+          path: test-results/installer-input
+      - name: Install the exact NSIS artifact, run full installed-app test, then uninstall
+        run: node scripts/ci-installer-smoke-4219.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: installer-smoke-4219-${{ github.sha }}
+          path: |
+            test-results/installer-smoke/*
+            test-results/desktop-save/*
+          if-no-files-found: error
+          retention-days: 7
