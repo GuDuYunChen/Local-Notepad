@@ -1,0 +1,31 @@
+name: Local module source workspace
+on:
+  push:
+    branches: [ci/local-module-workspace]
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: 191439e04ddbf6b4423194d2978ae72da926df3c
+          persist-credentials: false
+      - name: Export exact tracked source only
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 191439e04ddbf6b4423194d2978ae72da926df3c
+          test "$(git rev-parse HEAD^{tree})" = 184123e99411e37ec112a79ee5f32681766cf95c
+          mkdir -p /tmp/notepad-source
+          git archive --format=tar HEAD > /tmp/notepad-source/source.tar
+          git rev-parse HEAD HEAD^{tree} > /tmp/notepad-source/identity.txt
+          sha256sum /tmp/notepad-source/source.tar > /tmp/notepad-source/source.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: local-module-source-191439e
+          path: /tmp/notepad-source/*
+          if-no-files-found: error
+          retention-days: 7
