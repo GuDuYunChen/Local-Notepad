@@ -1,3 +1,5 @@
+import {readFileSync} from 'node:fs'
+import {URL as NodeURL} from 'node:url'
 import React,{act} from 'react'
 import {createRoot} from 'react-dom/client'
 import {beforeEach,afterEach,test,expect,vi} from 'vitest'
@@ -29,8 +31,16 @@ test('same note adopts the latest parent callback rather than a stale closure',a
 test('unmount before a read settles never delivers its callback',async()=>{let release;api.mockReturnValue(new Promise(r=>release=r));await mount();await act(async()=>root.render(null));await act(async()=>release(current));expect(callback).not.toHaveBeenCalled()})
 test('persistent unconfirmed record survives close and remount',async()=>{await open();api.mockRejectedValue(Error());await choose();await act(async()=>root.render(null));api.mockResolvedValue(current);await mount();expect(host.textContent).toContain('待核对');await click('管理标签');expect(host.textContent).toContain('标签操作待核对');expect(host.querySelector('.note-tag-option').disabled).toBe(true)})
 test('corrupt journal requires explicit confirmation before deletion',async()=>{localStorage.setItem(NOTE_TAG_PREFIX+'note-a','broken');await open();expect(host.textContent).toContain('操作记录损坏');expect(host.querySelector('.note-tag-option').disabled).toBe(true);await click('清除损坏记录');await click('取消');expect(localStorage.length).toBe(1);await click('清除损坏记录');await click('确认');expect(localStorage.length).toBe(0)})
-test('quota failure prevents sending any mutation',async()=>{await open();vi.spyOn(Storage.prototype,'setItem').mockImplementation(()=>{throw Error('quota')});await choose();expect(api.mock.calls.filter(([,i])=>i.method)).toHaveLength(0)})
+test('quota failure prevents sending any mutation',async()=>{
+ await open();const storage=globalThis.localStorage
+ const write=vi.fn(()=>{throw new DOMException('Quota exceeded','QuotaExceededError')})
+ vi.stubGlobal('localStorage',{getItem:storage.getItem.bind(storage),setItem:write,removeItem:storage.removeItem.bind(storage)})
+ try{await choose();expect(write).toHaveBeenCalledTimes(1);expect(api.mock.calls.filter(([,i])=>i.method)).toHaveLength(0);expect(host.textContent).toContain('Quota exceeded')}
+ finally{vi.unstubAllGlobals()}
+})
 test('Chinese composition does not filter or submit an unfinished name',async()=>{await open();const input=host.querySelector('input[aria-label="查找标签"]');await act(async()=>input.dispatchEvent(new CompositionEvent('compositionstart',{bubbles:true})));await field('查找标签','无匹配');expect(host.querySelectorAll('.note-tag-option')).toHaveLength(1);await act(async()=>input.dispatchEvent(new CompositionEvent('compositionend',{bubbles:true})));expect(host.querySelectorAll('.note-tag-option')).toHaveLength(0)})
 test('unsubmitted label text needs an explicit close decision',async()=>{await open();await field('新标签名称','未提交');await click('管理标签');expect(host.querySelector('[role=dialog]')).toBeTruthy();await click('取消');expect(host.querySelector('input[aria-label="新标签名称"]').value).toBe('未提交');await click('管理标签');await click('确认');expect(host.querySelector('.note-tag-panel')).toBeNull();expect(api.mock.calls.filter(([,i])=>i.method)).toHaveLength(0)})
 test('timeout leaves error and does not report an empty successful load',async()=>{api.mockReturnValue(new Promise(()=>{}));await open();await act(async()=>vi.advanceTimersByTimeAsync(10001));expect(host.textContent).toContain('超时');expect(host.textContent).not.toContain('暂无标签')})
 test('malformed or foreign-note snapshot cannot update the parent',async()=>{api.mockResolvedValue(snap({file_id:'other'}));await open();expect(callback).not.toHaveBeenCalled();expect(host.textContent).toContain('所属笔记不符')})
+
+test('full note-tag editor replaces the old inline trigger layout',()=>{const css=readFileSync(new NodeURL('./TagSelector.css',import.meta.url),'utf8');expect(css).toContain('.inspector-panel .tag-selector.note-tags { display:block; width:100%; margin-right:0; }')})

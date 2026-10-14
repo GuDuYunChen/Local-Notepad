@@ -1,10 +1,9 @@
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import BacklinksPanel from './BacklinksPanel'
 import ReferenceHealthPanel from './ReferenceHealthPanel'
 import LongFormStructurePanel from './LongFormStructurePanel'
 import VersionHistory from './VersionHistory'
 import TagSelector from './TagSelector'
-import { tagApi } from '~/services/tagApi'
 import { toast } from '~/services/toast'
 import { rememberReference } from './Editor/utils/referenceUtils'
 
@@ -63,26 +62,9 @@ export default function InspectorPanel({
   onApplyDraftContent,
   onExtractSection,
 }) {
-  const [tags, setTags] = useState([])
   const [pinBusy, setPinBusy] = useState(false)
 
-  useEffect(() => {
-    let alive = true
-    if (!file?.id) {
-      setTags([])
-      return undefined
-    }
 
-    tagApi.getFileTags(file.id)
-      .then(data => {
-        if (alive) setTags(data || [])
-      })
-      .catch(() => {
-        if (alive) setTags([])
-      })
-
-    return () => { alive = false }
-  }, [file?.id])
 
   if (!file) return null
 
@@ -211,7 +193,7 @@ export default function InspectorPanel({
 
             <div className="property-group">
               <div className="property-label">标签</div>
-              <TagSelector fileId={file.id} tags={tags} onChange={setTags} />
+              <TagSelector key={file.id} fileId={file.id} />
             </div>
 
             <div className="property-row">

@@ -1,4 +1,4 @@
-name: Verify complete local note tag organization
+name: Complete note tag cross-module native readiness
 on:
   push:
     branches: [ci/local-history-2f87]
@@ -13,8 +13,6 @@ jobs:
     timeout-minutes: 18
     steps:
       - uses: actions/checkout@v7
-      - name: Fetch exact accepted component for negative controls
-        run: git fetch --no-tags --depth=1 origin 89b99b57bf021315752e6809ec684a5d8d0dc3b0
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
@@ -22,36 +20,28 @@ jobs:
         with:
           go-version: '1.24.11'
           cache-dependency-path: server/go.sum
-      - name: Review inherited issue catalog
-        run: node scripts/stage-review.mjs catalog
-      - name: Apply exact full integration and normal minor version
-        run: node scripts/prepare-note-tags-2f91.mjs apply
-      - name: Inject quota failure into actual component storage
-        run: node scripts/repair-note-tags-quota-fixture.mjs
-      - name: Keep the full tag editor out of the legacy inline layout
-        run: node scripts/repair-note-tags-layout.mjs
+      - name: Preserve source identity and original assertions
+        run: node scripts/repair-template-row-wait.mjs apply
+      - name: Review historical issue catalog and lock
+        run: node scripts/stage-review.mjs catalog && node scripts/verify-dependency-lock.mjs
       - name: Install exact committed dependencies
         run: npm ci --no-audit --no-fund
-      - name: Reproduce original tag read reentry and late-callback failures
-        run: node scripts/prepare-note-tags-2f91.mjs baseline
-      - name: New tag core and original save protection
+      - name: Prove receipt-before-row in the original React component
+        run: npx vitest run --root=. src/components/TemplateLibrary.test.jsx --reporter=json --outputFile=tag-module-evidence/template-readiness.json
+      - name: Full original UI and local tags
+        run: npx vitest run --root=. --maxWorkers=4 --minWorkers=1 --reporter=json --outputFile=tag-module-evidence/full-ui.json
+      - name: Original tag and save protections
         run: node --test scripts/note-tags.node.mjs scripts/editor-cache-regression.node.mjs scripts/editor-save-transaction.node.mjs scripts/editor-quit.node.mjs
-      - name: Complete original UI regression plus current-note tag lifecycle
-        run: npx vitest run --root=. --maxWorkers=4 --minWorkers=1 --reporter=default --reporter=json --outputFile=tag-module-evidence/full-ui.json
-      - name: Actual production Go SQLite regression and tag concurrency
-        run: |
-          go -C server test -json ./... > tag-module-evidence/go-tests.jsonl
-          go -C server test -race ./internal/dao -run NoteTag -count=1
-      - name: Build full original main preload and renderer
+      - name: Original main preload and renderer build
         run: npm run build:main && npm run build:renderer
-      - name: Publish only tested changed code objects
+      - name: Emit two verified test code objects only
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node scripts/prepare-note-tags-2f91.mjs publish
+        run: node scripts/repair-template-row-wait.mjs publish
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: note-tags-verification-${{ github.sha }}
+          name: note-tags-native-readiness-${{ github.sha }}
           path: tag-module-evidence/
           retention-days: 7
           if-no-files-found: error

@@ -1,6 +1,6 @@
 # Local-Notepad development
 
-Current local module: 2F.90 / 4.223.0 complete local quick search and guarded note opening. Read docs/LOCAL_QUICK_SWITCHER_2F90.md. Base6100a35 /4.222.3 template module is accepted in PR2 comment6165531005; do not repeat it. Complete Ctrl+K entry, recent/query reads, IME, keyboard navigation, current-target verification, original App save/discard/cancel decision, failure/stop/retry/close and full-search handoff, then current-source regression, Windows and installation gates. No save or quit policy changes, cloud/multidevice, rejected source/dependency export or fake acceptance.
+Current local module: 2F.91 / 4.224.0 complete local note tag organization. Read docs/LOCAL_NOTE_TAGS_2F91.md. Base89b99b5 /4.223.0 is accepted in PR2 comment6171834319; do not repeat it. Complete properties entry, current-note scoped reads, literal/IME search, atomic create-or-reuse and attach, confirmed one-note removal, persisted unconfirmed-operation recovery and current-state-only reconciliation, original editor save, and current-source Windows/package/installation acceptance. Do not silently turn errors into empty tags, replay timed-out writes, apply late callbacks to another note, delete shared tags or change note bodies/save/quit policies. No cloud/multidevice or rejected source/dependency export.
 
 Read `docs/DEVELOPMENT_HANDOFF.md` before resuming an interrupted task.
 Work on `feature/knowledge-os-phase2` / Draft PR #2 unless the user explicitly changes that direction. Do not merge master as part of ordinary stage development.

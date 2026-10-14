@@ -20,3 +20,6 @@
 .note-tag-create > button { width:100%; }
 .note-tags button:disabled { opacity:.55; cursor:default; }
 .note-tags button:focus-visible,.note-tags input:focus-visible { outline:2px solid var(--clay,#9a6a4b); outline-offset:2px; }
+
+/* Replace the old inline tag trigger layout only for the current note editor. */
+.inspector-panel .tag-selector.note-tags { display:block; width:100%; margin-right:0; }
