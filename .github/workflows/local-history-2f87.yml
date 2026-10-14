@@ -28,6 +28,8 @@ jobs:
         run: node scripts/prepare-note-tags-2f91.mjs apply
       - name: Inject quota failure into actual component storage
         run: node scripts/repair-note-tags-quota-fixture.mjs
+      - name: Keep the full tag editor out of the legacy inline layout
+        run: node scripts/repair-note-tags-layout.mjs
       - name: Install exact committed dependencies
         run: npm ci --no-audit --no-fund
       - name: Reproduce original tag read reentry and late-callback failures
