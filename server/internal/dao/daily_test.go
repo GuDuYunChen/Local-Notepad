@@ -33,7 +33,7 @@ func TestDailyReadOnlyCreateAndPreserve(t *testing.T) {
 		t.Fatalf("read-only missing: %v %v %v", f, created, err)
 	}
 	first, created, err := d.OpenDaily(ctx, "2026-10-13", false)
-	if err != nil || !created || first.Content != "" || first.ParentID != "" {
+	if err != nil || !created || first.Content != dailyInitialContent || first.ParentID != "" {
 		t.Fatalf("create: %v %v %v", first, created, err)
 	}
 	first.Content = "unchanged existing body"
@@ -158,5 +158,20 @@ func TestDailyConcurrentDiskConnectionsHaveOneIdentity(t *testing.T) {
 	f, _, err := d.OpenDaily(context.Background(), "2026-10-14", true)
 	if err != nil || f != nil {
 		t.Fatal("cancelled date was created")
+	}
+}
+
+func TestDailyLegacyEmptyBodyIsNeverRewritten(t *testing.T) {
+	d := newSearchTestDAO(t)
+	d.DB.SetMaxOpenConns(1)
+	ctx := context.Background()
+	if err := d.Create(ctx, &model.File{ID: "legacy-empty", Title: "2026-10-13", Content: ""}); err != nil {
+		t.Fatal(err)
+	}
+	for _, readOnly := range []bool{true, false} {
+		f, created, err := d.OpenDaily(ctx, "2026-10-13", readOnly)
+		if err != nil || created || f.ID != "legacy-empty" || f.Content != "" {
+			t.Fatalf("legacy body rewritten: %v %v %v", f, created, err)
+		}
 	}
 }

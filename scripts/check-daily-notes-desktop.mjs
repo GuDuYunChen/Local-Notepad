@@ -55,6 +55,7 @@ export async function verifyDailyNotesDesktop({ evaluate, click, cdp, until, api
     const committed = (await current(faultDate)).file; assert.ok(committed?.id); assert.equal(faults.length, 1); mark('real-committed-create-with-lost-response-is-uncertain')
     await cdp.send('Fetch.disable'); interception = false; await Promise.all([...pending]); detach(); detach = null; if (interceptionError) throw interceptionError
     await action('核对并打开记录'); await until(() => evaluate("!!document.querySelector('.editor-input') && !document.querySelector('.daily-notes-panel')"), 'Read-only reconciliation did not open record')
+    await until(() => evaluate("!document.querySelector('.save-state')"), 'Opening a pristine daily note incorrectly dirtied the editor')
     assert.equal((await current(faultDate)).file.id, committed.id); report.failureInjection = { exactPostResponseOnly: true, faults }; mark('read-only-reconciliation-finds-same-committed-note')
     await openWorkspace(); await screenshot('daily-notes-installed.png'); await click('.daily-notes-panel button[aria-label="返回笔记"]'); mark('workspace-can-close-and-reopen')
     assert.deepEqual(await Promise.all(noteIDs.map(id => api('/api/files/' + id))), original); mark('original-fixture-notes-unchanged')

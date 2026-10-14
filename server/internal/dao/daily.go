@@ -18,9 +18,13 @@ func ValidDailyDate(date string) bool {
 	return err == nil && d.Year() > 0 && d.Format("2006-01-02") == date
 }
 
+// Matches the installed Lexical empty paragraph serializer; the paired JS test
+// rejects any change in this contract. Existing bodies are never rewritten.
+const dailyInitialContent = `{"root":{"children":[{"children":[],"direction":null,"format":"","indent":0,"textFormat":0,"textStyle":"","type":"paragraph","version":1}],"direction":null,"format":"","indent":0,"type":"root","version":1}}`
+
 const dailyInsertSQL = `INSERT INTO files
  (id, title, content, created_at, updated_at, is_folder, parent_id, sort_order, is_deleted, deleted_at, is_pinned)
- SELECT ?, ?, '', ?, ?, 0, '', COALESCE((SELECT MAX(sort_order) FROM files WHERE parent_id = '' AND is_deleted = 0), 0) + 1000, 0, 0, 0
+ SELECT ?, ?, ?, ?, ?, 0, '', COALESCE((SELECT MAX(sort_order) FROM files WHERE parent_id = '' AND is_deleted = 0), 0) + 1000, 0, 0, 0
  WHERE NOT EXISTS (SELECT 1 FROM files WHERE parent_id = '' AND title = ? AND is_deleted = 0)`
 
 const dailySelectSQL = `SELECT id, title, content, created_at, updated_at, is_folder, parent_id, sort_order, is_deleted, deleted_at, is_pinned
@@ -70,7 +74,7 @@ func (d *FileDAO) OpenDaily(ctx context.Context, date string, readOnly bool) (*m
 	}
 	defer tx.Rollback()
 	now := time.Now().Unix()
-	result, err := tx.ExecContext(ctx, dailyInsertSQL, uuid.NewString(), date, now, now, date)
+	result, err := tx.ExecContext(ctx, dailyInsertSQL, uuid.NewString(), date, dailyInitialContent, now, now, date)
 	if err != nil {
 		return nil, false, err
 	}
