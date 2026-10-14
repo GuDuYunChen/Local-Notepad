@@ -28,6 +28,10 @@ jobs:
         run: node scripts/stage-review.mjs catalog
       - name: Install the committed dependency lock
         run: npm ci --no-audit --no-fund
+      - name: Reproduce the real list handoff defect before applying the repair
+        run: node scripts/repair-template-handoff.mjs baseline
+      - name: Repair ordered list publication before original guarded selection
+        run: node scripts/repair-template-handoff.mjs apply
       - name: Verify version and unchanged dependency graph
         run: node scripts/check-app-version.mjs --previous-version=4.221.1 && node scripts/verify-dependency-lock.mjs
       - name: Template core and original save protection
@@ -43,7 +47,9 @@ jobs:
       - name: Publish tested source objects without changing product refs
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node scripts/prepare-template-library-2f89.mjs publish
+        run: |
+          node scripts/prepare-template-library-2f89.mjs publish
+          node scripts/repair-template-handoff.mjs publish
       - uses: actions/upload-artifact@v4
         if: always()
         with:
