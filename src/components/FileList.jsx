@@ -195,6 +195,11 @@ export default function FileList({
   const [selectedIds, setSelectedIds] = useState(new Set()) // Multi-select state
   const [keyboardFocusId, setKeyboardFocusId] = useState(selectedId || '')
   const treeListRef = useRef(null)
+  // Reads may finish after another module selected a note. Deliver metadata to
+  // the current parent, never the callback captured when the read started.
+  const listContextRef = useRef(null)
+  listContextRef.current = { q, selectedId, onItemsChanged, onSelect }
+  const listReadRef = useRef({ active: false, epoch: 0 })
 
   // Sync selectedId (prop) with selectedIds
   useEffect(() => {
@@ -482,6 +487,7 @@ export default function FileList({
   }, [selectedId, items])
 
   useEffect(() => {
+    listReadRef.current.active = true
     void load()
     
     function handleClickOutside(e) {
@@ -497,6 +503,8 @@ export default function FileList({
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => {
+      listReadRef.current.active = false
+      listReadRef.current.epoch += 1
       document.removeEventListener('mousedown', handleClickOutside)
       if (retryTimerRef.current) {
         clearTimeout(retryTimerRef.current)
@@ -559,29 +567,47 @@ export default function FileList({
   const findFirstFileInFolder = findFirstFileInFolderUtil
 
   async function load(retryCount = 0) {
+    const lifetime = listReadRef.current
+    if (!lifetime.active) return
+    const epoch = ++lifetime.epoch
+    const query = listContextRef.current.q
+    const selectedAtStart = listContextRef.current.selectedId
+    const ownsRead = () => lifetime.active && lifetime.epoch === epoch && listContextRef.current.q === query
+    if (retryTimerRef.current) {
+      clearTimeout(retryTimerRef.current)
+      retryTimerRef.current = null
+    }
     setLoading(true)
     try {
-      const normalizedList = await listAllFiles(q)
-      setItems(normalizedList)
-      onItemsChanged?.(normalizedList)
-      
-      // Ensure selection
-      if (!selectedId && normalizedList.length > 0) {
-          const tree = buildTree(normalizedList)
-          const first = findFirstFileInTree(tree)
-          if (first) onSelect(first)
+      const normalizedList = await listAllFiles(query)
+      if (!ownsRead()) return
+      const current = listContextRef.current
+      // A pre-navigation snapshot cannot prove the new selection was deleted.
+      // Read again once under its own identity; never navigate using old data.
+      if (current.selectedId && current.selectedId !== selectedAtStart &&
+          !normalizedList.some(item => item.id === current.selectedId)) {
+        void load()
+        return
       }
-    } catch (e) {
-      console.error(e)
+      setItems(normalizedList)
+      current.onItemsChanged?.(normalizedList)
+      if (!current.selectedId && normalizedList.length > 0) {
+        const tree = buildTree(normalizedList)
+        const first = findFirstFileInTree(tree)
+        if (first) current.onSelect?.(first)
+      }
+    } catch (error) {
+      if (!ownsRead()) return
+      console.error(error)
       if (retryCount < 3) {
-          console.log(`Load failed, retrying (${retryCount + 1}/3)...`)
-          if (retryTimerRef.current) clearTimeout(retryTimerRef.current)
-          retryTimerRef.current = setTimeout(() => load(retryCount + 1), 1000)
+        retryTimerRef.current = setTimeout(() => {
+          if (ownsRead()) void load(retryCount + 1)
+        }, 1000)
       } else {
-          toast.error('加载文件列表失败，请手动刷新')
+        toast.error('加载文件列表失败，请手动刷新')
       }
     } finally {
-      setLoading(false)
+      if (ownsRead()) setLoading(false)
     }
   }
 

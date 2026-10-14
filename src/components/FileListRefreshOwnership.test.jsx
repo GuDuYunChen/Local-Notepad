@@ -73,3 +73,15 @@ test('current refresh still updates the selected note metadata without replacing
  expect(host.querySelector('[data-title]').textContent).toBe('Renamed.md')
  expect(host.querySelector('[data-dirty]').textContent).toBe('false')
 })
+
+test('pre-navigation list missing the new note triggers a fresh read instead of deletion fallback',async()=>{
+ const read=deferred();listAllFiles.mockReturnValueOnce(read.promise);await render(null)
+ await act(async()=>host.querySelector('[data-select-daily]').click());await flush()
+ const calls=listAllFiles.mock.calls.length
+ await act(async()=>read.resolve([oldNote]));await flush()
+ expect(listAllFiles.mock.calls.length).toBe(calls+1)
+ expect(host.querySelector('[data-current]').textContent).toBe(daily.id)
+ expect(host.querySelector('[data-title]').textContent).toBe(daily.title)
+ expect(host.querySelector('[data-file-id="daily-note"]')).toBeTruthy()
+ expect(host.querySelector('[data-dirty]').textContent).toBe('false')
+})

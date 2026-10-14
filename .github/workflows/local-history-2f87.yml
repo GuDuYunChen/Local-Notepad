@@ -1,4 +1,4 @@
-name: Close cross-module list ownership regression
+name: Verify complete local quick navigation
 on:
   push:
     branches: [ci/local-history-2f87]
@@ -13,6 +13,8 @@ jobs:
     timeout-minutes: 18
     steps:
       - uses: actions/checkout@v7
+      - name: Fetch exact accepted baseline for negative controls
+        run: git fetch --no-tags --depth=1 origin 6100a3522e875bf4247bcc48a6742f4f2c97a3a9
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
@@ -20,33 +22,30 @@ jobs:
         with:
           go-version: '1.24.11'
           cache-dependency-path: server/go.sum
-      - name: Verify historical issues and locked dependencies
-        run: node scripts/stage-review.mjs catalog && node scripts/verify-dependency-lock.mjs
-      - name: Cover pre-navigation snapshots missing a newly selected note
-        run: node scripts/extend-list-snapshot.mjs
-      - name: Install committed lock
+      - name: Review historical issue catalog
+        run: node scripts/stage-review.mjs catalog
+      - name: Apply guarded integration and standard minor version
+        run: node scripts/prepare-quick-switcher-2f90.mjs apply
+      - name: Install exact committed lock
         run: npm ci --no-audit --no-fund
-      - name: Reproduce original asynchronous list selection defects
-        run: node scripts/repair-list-refresh.mjs baseline
-      - name: Repair request and callback ownership with normal patch increment
-        run: node scripts/repair-list-refresh.mjs apply
-      - name: All original UI regression tests
-        run: npx vitest run --root=. --maxWorkers=4 --minWorkers=1 --reporter=json --outputFile=refresh-evidence/full-ui.json
-      - name: Original save protections and production Go SQLite regression
-        run: |
-          node --test scripts/editor-cache-regression.node.mjs scripts/editor-save-transaction.node.mjs scripts/editor-quit.node.mjs scripts/template-library.node.mjs scripts/daily-notes.node.mjs
-          go -C server test -json ./... > refresh-evidence/go-tests.jsonl
-          go -C server test -race ./internal/dao -run 'Template|Daily' -count=1
-      - name: Complete main preload and renderer build
+      - name: Reproduce original quick search navigation defects
+        run: node scripts/prepare-quick-switcher-2f90.mjs baseline
+      - name: Original and new local navigation contracts
+        run: node --test scripts/quick-switcher.node.mjs scripts/editor-cache-regression.node.mjs scripts/editor-save-transaction.node.mjs scripts/editor-quit.node.mjs
+      - name: Full UI regression including real App decisions
+        run: npx vitest run --root=. --maxWorkers=4 --minWorkers=1 --reporter=default --reporter=json --outputFile=quick-module-evidence/full-ui.json
+      - name: Complete production Go SQLite regression
+        run: go -C server test -json ./... > quick-module-evidence/go-tests.jsonl
+      - name: Full original main preload renderer build
         run: npm run build:main && npm run build:renderer
-      - name: Publish verified code objects without changing product refs
+      - name: Publish tested changed code objects only
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node scripts/repair-list-refresh.mjs publish
+        run: node scripts/prepare-quick-switcher-2f90.mjs publish
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: list-refresh-verification-${{ github.sha }}
-          path: refresh-evidence/
-          if-no-files-found: error
+          name: quick-module-verification-${{ github.sha }}
+          path: quick-module-evidence/
           retention-days: 7
+          if-no-files-found: error

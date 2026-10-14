@@ -1,20 +1,21 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { api, searchFiles } from '~/services/api'
 import { extractLexicalText } from '~/utils/lexicalText'
+import { readQuickResults, readQuickTarget, QUICK_RESULT_LIMIT } from '../services/quickSwitcher.mjs'
+import './QuickSwitcher.css'
 
 export function buildHighlightSegments(text, query) {
   const source = String(text || '')
   const normalizedQuery = String(query || '').trim()
   if (!normalizedQuery) return [{ text: source, match: false }]
 
-  const lowerSource = source.toLowerCase()
-  const lowerQuery = normalizedQuery.toLowerCase()
-  const index = lowerSource.indexOf(lowerQuery)
-  if (index < 0) return [{ text: source, match: false }]
+  const hit = new RegExp(normalizedQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'iu').exec(source)
+  if (!hit) return [{ text: source, match: false }]
+  const index = hit.index
 
   const before = source.slice(0, index)
-  const matched = source.slice(index, index + normalizedQuery.length)
-  const after = source.slice(index + normalizedQuery.length)
+  const matched = source.slice(index, index + hit[0].length)
+  const after = source.slice(index + hit[0].length)
 
   return [
     ...(before ? [{ text: before, match: false }] : []),
@@ -77,232 +78,143 @@ function formatRelativeTime(ts) {
   })
 }
 
-function normalizeFiles(list) {
-  return (Array.isArray(list) ? list : [])
-    .filter(file => !file.is_folder && !file.is_deleted && !file.title?.startsWith('__tpl__'))
-}
-
-function normalizeRecentFiles(list) {
-  return normalizeFiles(list).sort((a, b) => {
-    const pinnedDiff = Number(Boolean(b.is_pinned)) - Number(Boolean(a.is_pinned))
-    if (pinnedDiff !== 0) return pinnedDiff
-    return (b.updated_at || 0) - (a.updated_at || 0)
-  })
-}
-
 export default function QuickSwitcher({ open, onClose, onSelectFile, onOpenSearchWorkspace }) {
-  const [query, setQuery] = useState('')
-  const [results, setResults] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [retry, setRetry] = useState(0)
-  const [activeIndex, setActiveIndex] = useState(0)
-  const inputRef = useRef(null)
-  const resultsRef = useRef(null)
-  const requestRef = useRef(0)
-
+  const [query, setQuery] = useState(''), [applied, setApplied] = useState('')
+  const [results, setResults] = useState([]), [status, setStatus] = useState('loading')
+  const [error, setError] = useState(''), [notice, setNotice] = useState('')
+  const [retry, setRetry] = useState(0), [activeIndex, setActiveIndex] = useState(0)
+  const [opening, setOpening] = useState('')
+  const inputRef = useRef(null), resultsRef = useRef(null), panelRef = useRef(null)
+  const alive = useRef(false), reading = useRef(null), choosing = useRef(null)
+  const queryRef = useRef(''), composing = useRef(false), entryFocus = useRef(null), accepted = useRef(false)
+  const latest = useRef({ open, onClose, onSelectFile, onOpenSearchWorkspace }); latest.current = { open, onClose, onSelectFile, onOpenSearchWorkspace }
+  const cancelReading = () => { reading.current?.abort(); reading.current = null }
+  const cancelOpening = () => { choosing.current?.abort(); choosing.current = null }
+  const close = () => { cancelReading(); cancelOpening(); latest.current.onClose?.() }
   useEffect(() => {
     if (!open) return undefined
-
-    setQuery('')
-    setResults([])
-    setActiveIndex(0)
-    setLoading(true)
-
-    const focusTimer = window.setTimeout(() => inputRef.current?.focus(), 0)
-    return () => window.clearTimeout(focusTimer)
+    alive.current = true; accepted.current = false; composing.current = false
+    entryFocus.current = document.activeElement
+    queryRef.current = ''; setQuery(''); setApplied(''); setResults([]); setActiveIndex(0); setOpening(''); setNotice(''); setError('')
+    const timer = window.setTimeout(() => inputRef.current?.focus(), 0)
+    return () => {
+      alive.current = false; cancelReading(); cancelOpening(); window.clearTimeout(timer)
+      if (!accepted.current && entryFocus.current?.isConnected) entryFocus.current.focus?.()
+    }
   }, [open])
-
   useEffect(() => {
-    if (!open) {
-      requestRef.current += 1
-      return undefined
-    }
-
-    const hasQuery = Boolean(query.trim())
-    const requestId = ++requestRef.current
-    setLoading(true)
-    setError('')
-
-    const runSearch = async () => {
+    if (!open || composing.current) return undefined
+    cancelReading()
+    const controller = new AbortController(); reading.current = controller
+    const captured = applied
+    setStatus('loading'); setResults([]); setActiveIndex(0); setError('')
+    const owns = () => alive.current && latest.current.open && reading.current === controller && !controller.signal.aborted && !composing.current && captured === queryRef.current
+    const timer = window.setTimeout(async () => {
+      if (!owns()) return
       try {
-        const list = hasQuery
-          ? await searchFiles(query.trim())
-          : await api('/api/files?size=200')
-
-        if (requestRef.current !== requestId) return
-        if (!Array.isArray(list)) throw new Error('搜索回执不完整，请更新后端后重试')
-        setResults(hasQuery ? normalizeFiles(list) : normalizeRecentFiles(list))
-        setActiveIndex(0)
-      } catch (error) {
-        if (requestRef.current === requestId) {
-          console.error('快速搜索失败', error)
-          setError(error.message || '读取失败，请重试')
-          setResults([])
-        }
-      } finally {
-        if (requestRef.current === requestId) setLoading(false)
+        const rows = await readQuickResults(api, searchFiles, captured, controller.signal)
+        if (!owns()) return
+        setResults(rows); setStatus('ready')
+      } catch (e) {
+        if (!owns()) return
+        setError(e.message); setStatus('error')
+      }
+    }, captured.trim() ? 180 : 0)
+    return () => { controller.abort(); window.clearTimeout(timer) }
+  }, [open, applied, retry])
+  const visibleResults = results.slice(0, QUICK_RESULT_LIMIT)
+  useEffect(() => {
+    resultsRef.current?.querySelector(`[data-result-index="${activeIndex}"]`)?.scrollIntoView?.({ block: 'nearest' })
+  }, [activeIndex, results])
+  useEffect(() => {
+    if (!open || opening === 'decision') return undefined
+    const keyboard = event => {
+      if (event.isComposing || event.keyCode === 229 || composing.current) return
+      // An App save/discard dialog owns its own keyboard interaction.
+      if ([...document.querySelectorAll('[role="dialog"][aria-modal="true"]')].some(n => n !== panelRef.current)) return
+      if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close() }
+      if (event.key === 'Tab' && panelRef.current?.contains(event.target)) {
+        const nodes = [...panelRef.current.querySelectorAll('input:not(:disabled),button:not(:disabled):not([tabindex="-1"])')]
+        if (!nodes.length) return
+        const first = nodes[0], last = nodes[nodes.length - 1]
+        if (event.shiftKey && event.target === first) { event.preventDefault(); last.focus() }
+        else if (!event.shiftKey && event.target === last) { event.preventDefault(); first.focus() }
       }
     }
-
-    if (!hasQuery) {
-      void runSearch()
-      return undefined
+    document.addEventListener('keydown', keyboard)
+    return () => document.removeEventListener('keydown', keyboard)
+  }, [open, opening])
+  const edit = (text, commit = !composing.current) => {
+    queryRef.current = text; cancelReading(); cancelOpening(); setOpening(''); setQuery(text); setNotice(''); setError(''); setStatus('loading'); setResults([])
+    if (commit) { setApplied(text); setRetry(v => v + 1) }
+  }
+  const choose = async file => {
+    if (!file || status !== 'ready' || choosing.current || composing.current || queryRef.current !== applied) return
+    const controller = new AbortController(); choosing.current = controller
+    const owns = () => alive.current && latest.current.open && choosing.current === controller && !controller.signal.aborted
+    setOpening('reading'); setError(''); setNotice('正在核对目标笔记…')
+    const cancelled = () => {
+      if (!owns()) return
+      choosing.current = null; setOpening(''); setNotice('未切换笔记，当前草稿保持不变。')
+      window.setTimeout(() => { if (alive.current && !choosing.current) inputRef.current?.focus() }, 0)
     }
-
-    const timer = window.setTimeout(() => {
-      void runSearch()
-    }, 180)
-
-    return () => window.clearTimeout(timer)
-  }, [open, query, retry])
-
-  const visibleResults = useMemo(() => results.slice(0, 20), [results])
-
-  useEffect(() => {
-    if (activeIndex >= visibleResults.length) {
-      setActiveIndex(Math.max(0, visibleResults.length - 1))
+    try {
+      const fresh = await readQuickTarget(api, file.id, controller.signal)
+      if (!owns()) return
+      if (typeof latest.current.onSelectFile !== 'function') throw new Error('笔记打开通道不可用。')
+      setOpening('decision'); setNotice('请在编辑器的保存确认框中决定是否切换。')
+      latest.current.onSelectFile(fresh, {
+        shouldSelect: owns,
+        onCancel: cancelled,
+        afterSelect: () => {
+          if (!owns()) return
+          accepted.current = true; choosing.current = null; setOpening(''); latest.current.onClose?.()
+        },
+      })
+    } catch (e) {
+      if (!owns()) return
+      choosing.current = null; setOpening(''); setNotice('')
+      setError(e?.code ? e.message : '目标笔记暂时无法打开，请刷新结果后重试。')
     }
-  }, [activeIndex, visibleResults.length])
-
-  useEffect(() => {
-    const active = resultsRef.current?.querySelector(
-      `[data-result-index="${activeIndex}"]`
-    )
-    active?.scrollIntoView?.({ block: 'nearest' })
-  }, [activeIndex, visibleResults.length])
-
+  }
+  const keys = event => {
+    if (event.nativeEvent?.isComposing || event.keyCode === 229 || composing.current || opening) return
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault()
+      if (visibleResults.length) setActiveIndex(n => (n + (event.key === 'ArrowDown' ? 1 : -1) + visibleResults.length) % visibleResults.length)
+    }
+    if (event.key === 'Enter') { event.preventDefault(); void choose(visibleResults[activeIndex]) }
+  }
   if (!open) return null
-
-  const choose = (file) => {
-    if (!file || loading) return
-    onSelectFile?.(file)
-    onClose?.()
-  }
-
-  const handleKeyDown = (event) => {
-    if (event.nativeEvent?.isComposing || event.keyCode === 229) return
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      onClose?.()
-      return
-    }
-
-    if (event.key === 'ArrowDown') {
-      event.preventDefault()
-      if (visibleResults.length) {
-        setActiveIndex(index => (index + 1) % visibleResults.length)
-      }
-      return
-    }
-
-    if (event.key === 'ArrowUp') {
-      event.preventDefault()
-      if (visibleResults.length) {
-        setActiveIndex(index => (index - 1 + visibleResults.length) % visibleResults.length)
-      }
-      return
-    }
-
-    if (event.key === 'Enter') {
-      event.preventDefault()
-      choose(visibleResults[activeIndex])
-    }
-  }
-
-  return (
-    <div
-      className="quick-switcher-overlay"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose?.()
-      }}
-    >
-      <section className="quick-switcher" role="dialog" aria-modal="true" aria-label="快速搜索笔记">
-        <div className="quick-switcher-search">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <circle cx="11" cy="11" r="7" />
-            <path d="m20 20-4-4" />
-          </svg>
-          <input
-            ref={inputRef}
-            value={query}
-            onChange={event => setQuery(event.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="搜索标题或正文…"
-            aria-label="搜索标题或正文"
-            aria-controls="quick-switcher-results"
-            aria-activedescendant={visibleResults[activeIndex] ? `quick-result-${visibleResults[activeIndex].id}` : undefined}
-            aria-autocomplete="list"
-          />
-          <kbd>Ctrl K</kbd>
-        </div>
-
-        <div className="quick-switcher-meta" role="status" aria-live="polite">
-          <span>{query.trim() ? '搜索结果' : '最近笔记'}</span>
-          <span>{loading ? '搜索中…' : error ? '读取失败' : `${visibleResults.length} 项`}</span>
-        </div>
-
-        <div
-          id="quick-switcher-results"
-          ref={resultsRef}
-          className="quick-switcher-results"
-          role="listbox"
-          aria-label="搜索结果"
-        >
-          {error ? (<div className="quick-switcher-empty" role="alert"><strong>快速搜索未完成</strong><span>{error}</span><button type="button" className="btn small" onClick={() => setRetry(value => value + 1)}>重试快速搜索</button></div>) : !loading && visibleResults.length === 0 ? (
-            <div className="quick-switcher-empty">
-              <strong>{query.trim() ? '没有找到匹配的笔记' : '还没有可打开的笔记'}</strong>
-              <span>{query.trim() ? '换一个关键词试试。' : '先创建一篇笔记，然后就能在这里快速打开。'}</span>
-            </div>
-          ) : (
-            visibleResults.map((file, index) => {
-              const scope = getSearchMatchScope(file, query)
-              const scopeLabel = {
-                title: '标题命中',
-                content: '正文命中',
-                pinned: '已置顶',
-                recent: '最近',
-              }[scope]
-
-              return (
-                <button
-                  type="button"
-                  disabled={loading}
-                  id={`quick-result-${file.id}`}
-                  data-result-index={index}
-                  key={file.id}
-                  className={`quick-switcher-result${index === activeIndex ? ' active' : ''}`}
-                  onMouseEnter={() => setActiveIndex(index)}
-                  onClick={() => choose(file)}
-                  role="option"
-                  aria-selected={index === activeIndex}
-                >
-                  <span className="quick-switcher-result-main">
-                    <span className="quick-switcher-result-title-row">
-                      <span className="quick-switcher-result-title">
-                        {file.is_pinned && <span aria-label="已置顶">★</span>}
-                        <HighlightMatch text={file.title} query={query} />
-                      </span>
-                      {scopeLabel && <span className={`quick-switcher-match-badge ${scope}`}>{scopeLabel}</span>}
-                    </span>
-                    <span className="quick-switcher-result-preview">
-                      <HighlightMatch text={buildPreview(file.content, query)} query={query} />
-                    </span>
-                  </span>
-                  <span className="quick-switcher-result-time">{formatRelativeTime(file.updated_at)}</span>
-                </button>
-              )
-            })
-          )}
-        </div>
-
-        {onOpenSearchWorkspace && <div className="quick-switcher-meta"><button type="button" className="btn small" onClick={() => onOpenSearchWorkspace(query)}>完整检索与筛选</button><span>快速结果最多展示 20 项</span></div>}
-        <footer className="quick-switcher-footer">
-          <span><kbd>↑</kbd><kbd>↓</kbd> 选择</span>
-          <span><kbd>Enter</kbd> 打开</span>
-          <span><kbd>Esc</kbd> 关闭</span>
-        </footer>
-      </section>
-    </div>
-  )
+  return <div className="quick-switcher-overlay" style={opening === 'decision' ? { visibility: 'hidden' } : undefined}
+    onMouseDown={e => { if (e.target === e.currentTarget) close() }}>
+    <section ref={panelRef} className="quick-switcher" role="dialog" aria-modal="true" aria-label="快速搜索笔记">
+      <div className="quick-switcher-search">
+        <input ref={inputRef} value={query} disabled={!!opening} placeholder="搜索标题或正文…" aria-label="搜索标题或正文" role="combobox"
+          aria-controls="quick-switcher-results" aria-expanded={status === 'ready' && visibleResults.length > 0} aria-autocomplete="list"
+          aria-activedescendant={status === 'ready' && visibleResults[activeIndex] ? `quick-result-${visibleResults[activeIndex].id}` : undefined}
+          onChange={e => edit(e.target.value)} onKeyDown={keys}
+          onCompositionStart={() => { composing.current = true; cancelReading(); setResults([]); setStatus('loading') }}
+          onCompositionEnd={e => { composing.current = false; edit(e.currentTarget.value, true) }} />
+        <kbd>Ctrl K</kbd><button type="button" className="btn small" aria-label="关闭快速搜索" onClick={close}>关闭</button>
+      </div>
+      <div className="quick-switcher-meta" role="status"><span>{applied.trim() ? '搜索结果' : '最近修改 · 置顶优先'}</span><span>{status === 'loading' ? '搜索中…' : status === 'error' ? '读取失败' : `${visibleResults.length} 项`}</span></div>
+      {notice && <div className="quick-switcher-notice" role="status">{notice}</div>}
+      {error && <div className="quick-switcher-notice" role="alert"><strong>{status === 'error' ? '快速搜索未完成' : '笔记未打开'}</strong><p>{error}</p>
+        <button type="button" className="btn small" disabled={!!opening} onClick={() => { cancelReading(); setRetry(v => v + 1); setNotice('') }}>{status === 'error' ? '重试快速搜索' : '刷新快速结果'}</button></div>}
+      {opening === 'reading' && <button className="btn small quick-switcher-stop" type="button" onClick={() => { cancelOpening(); setOpening(''); setNotice('已停止打开，未切换笔记。'); inputRef.current?.focus() }}>停止打开</button>}
+      <div id="quick-switcher-results" ref={resultsRef} className="quick-switcher-results" role="listbox" aria-label="搜索结果" aria-busy={status === 'loading'}>
+        {status === 'ready' && !visibleResults.length && <div className="quick-switcher-empty"><strong>{applied.trim() ? '没有找到匹配的笔记' : '还没有可打开的笔记'}</strong><span>{applied.trim() ? '换一个关键词，或进入完整检索。' : '创建笔记后可在这里查找和打开。'}</span></div>}
+        {visibleResults.map((file, index) => <button type="button" tabIndex={-1} disabled={status !== 'ready' || !!opening} id={`quick-result-${file.id}`} data-result-index={index} key={file.id}
+          className={`quick-switcher-result${index === activeIndex ? ' active' : ''}`} onMouseEnter={() => setActiveIndex(index)} onClick={() => void choose(file)} role="option" aria-selected={index === activeIndex}>
+          <span className="quick-switcher-result-main"><span className="quick-switcher-result-title-row"><span className="quick-switcher-result-title">{file.is_pinned ? <span aria-label="已置顶">★</span> : null}<HighlightMatch text={file.title} query={applied} /></span>
+            <span className="quick-switcher-match-badge">{{title:'标题命中',content:'正文命中',pinned:'已置顶',recent:'最近修改'}[getSearchMatchScope(file, applied)] || '匹配结果'}</span></span>
+            <span className="quick-switcher-result-preview"><HighlightMatch text={buildPreview(file.content, applied)} query={applied} /></span></span>
+          <span className="quick-switcher-result-time">{formatRelativeTime(file.updated_at)}</span>
+        </button>)}
+      </div>
+      <div className="quick-switcher-meta">{onOpenSearchWorkspace && <button type="button" className="btn small" disabled={!!opening || composing.current} onClick={() => { accepted.current = true; cancelReading(); latest.current.onOpenSearchWorkspace(query) }}>完整检索与筛选</button>}<span>快速结果最多展示 20 项{!applied.trim() ? '，最近候选最多 200 条' : ''}</span></div>
+      <footer className="quick-switcher-footer"><span><kbd>↑</kbd><kbd>↓</kbd> 选择</span><span><kbd>Enter</kbd> 打开</span><span><kbd>Esc</kbd> 关闭</span></footer>
+    </section>
+  </div>
 }

@@ -1,4 +1,4 @@
-# 2F.89 / 4.222.2 本地文本模板库与安全创建
+# 2F.89 / 4.222.3 本地文本模板库与安全创建
 
 基线 d002c8870af32eee85c4730e2db1d240a93f118a /4.221.1，每日笔记及实际安装验收6158925298保持历史有效，不重做。当前仅本地模板模块，不开发云、多端或其它模块。
 
@@ -31,3 +31,7 @@ Windows b1dc870 passed template create/edit but the copied note was not kept sel
 ## Passive notification obstruction / 4.222.2
 
 Actual Windows53d3657 artifact11869770639 completed the first10 template checks, then a visible saved toast intercepted the final return button. ToastViewport renders text-only status/alert notifications, with no interactive controls. Change only their CSS pointer-events from auto to none; retain text, roles, timers and closing behavior, do not hide notifications or bypass the real mouse test. Eight React/style contracts preserve the original behavior and reject the old CSS. The native workflow now keeps a real persistent success notification visible while the original hit-tested mouse returns to the selector, then cleans up the owned notification. All prior template, editor, daily, history, trash and installer checks remain required. Standard patch4.222.2; original Go/Electron/schema14 and679 dependency nodes unchanged.
+
+## Async list ownership / 4.222.3
+
+Installed1f83a11 failed returning from daily read-only reconciliation. Code review found that library:refresh retained its first parent callback and selectedId; late list completion could combine a newly selected body with a previously selected note ID. A real FileList/React-parent test reproduces that cross-module handoff before repair. List loads now deliver to current props, invalidate out-of-order and unmounted reads, and allow retries only while the originating read still owns the current query. Original note selection, dirty guards, saved receipts and template handoff stay unchanged. Six actual React tests cover daily handoff, initial delayed selection, reversed completions, unmount and normal metadata updates. Full original tests, production Go/build and current Windows/installation gates remain required. Same template module closure, not a new feature.
