@@ -26,6 +26,8 @@ jobs:
         run: node scripts/stage-review.mjs catalog
       - name: Apply exact full integration and normal minor version
         run: node scripts/prepare-note-tags-2f91.mjs apply
+      - name: Inject quota failure into actual component storage
+        run: node scripts/repair-note-tags-quota-fixture.mjs
       - name: Install exact committed dependencies
         run: npm ci --no-audit --no-fund
       - name: Reproduce original tag read reentry and late-callback failures
