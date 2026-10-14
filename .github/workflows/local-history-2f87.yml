@@ -1,4 +1,4 @@
-name: Verify complete local template library
+name: Close cross-module list ownership regression
 on:
   push:
     branches: [ci/local-history-2f87]
@@ -16,49 +16,35 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
-      - uses: actions/setup-go@v7
+      - uses: actions/setup-go@v6
         with:
           go-version: '1.24.11'
           cache-dependency-path: server/go.sum
-      - name: Apply exact accepted baseline integration and normal version increment
-        run: node scripts/prepare-template-library-2f89.mjs apply
-      - name: Preserve exact text whitespace and legacy literal JSON when copying
-        run: node scripts/repair-template-text-copy.mjs
-      - name: Verify historical issue index
-        run: node scripts/stage-review.mjs catalog
-      - name: Install the committed dependency lock
+      - name: Verify historical issues and locked dependencies
+        run: node scripts/stage-review.mjs catalog && node scripts/verify-dependency-lock.mjs
+      - name: Install committed lock
         run: npm ci --no-audit --no-fund
-      - name: Reproduce the real list handoff defect before applying the repair
-        run: node scripts/repair-template-handoff.mjs baseline
-      - name: Repair ordered list publication before original guarded selection
-        run: node scripts/repair-template-handoff.mjs apply
-      - name: Reproduce passive notification input obstruction
-        run: node scripts/repair-template-toast.mjs baseline
-      - name: Preserve announcements without intercepting template controls
-        run: node scripts/repair-template-toast.mjs apply
-      - name: Verify version and unchanged dependency graph
-        run: node scripts/check-app-version.mjs --previous-version=4.221.1 && node scripts/verify-dependency-lock.mjs
-      - name: Template core and original save protection
-        run: node --test scripts/template-library.node.mjs scripts/editor-cache-regression.node.mjs scripts/editor-save-transaction.node.mjs scripts/editor-quit.node.mjs
-      - name: Full original UI regression and template lifecycle
-        run: npx vitest run --root=. --maxWorkers=4 --minWorkers=1 --reporter=default --reporter=json --outputFile=template-module-evidence/full-ui.json
-      - name: Complete production Go SQLite regression
+      - name: Reproduce original asynchronous list selection defects
+        run: node scripts/repair-list-refresh.mjs baseline
+      - name: Repair request and callback ownership with normal patch increment
+        run: node scripts/repair-list-refresh.mjs apply
+      - name: All original UI regression tests
+        run: npx vitest run --root=. --maxWorkers=4 --minWorkers=1 --reporter=json --outputFile=refresh-evidence/full-ui.json
+      - name: Original save protections and production Go SQLite regression
         run: |
-          go -C server test -json ./... > template-module-evidence/go-tests.jsonl
-          go -C server test -race ./internal/dao -run Template -count=1
-      - name: Build complete original main preload and renderer
+          node --test scripts/editor-cache-regression.node.mjs scripts/editor-save-transaction.node.mjs scripts/editor-quit.node.mjs scripts/template-library.node.mjs scripts/daily-notes.node.mjs
+          go -C server test -json ./... > refresh-evidence/go-tests.jsonl
+          go -C server test -race ./internal/dao -run 'Template|Daily' -count=1
+      - name: Complete main preload and renderer build
         run: npm run build:main && npm run build:renderer
-      - name: Publish tested source objects without changing product refs
+      - name: Publish verified code objects without changing product refs
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          node scripts/prepare-template-library-2f89.mjs publish
-          node scripts/repair-template-handoff.mjs publish
-          node scripts/repair-template-toast.mjs publish
+        run: node scripts/repair-list-refresh.mjs publish
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: template-module-verification-${{ github.sha }}
-          path: template-module-evidence/
-          retention-days: 7
+          name: list-refresh-verification-${{ github.sha }}
+          path: refresh-evidence/
           if-no-files-found: error
+          retention-days: 7

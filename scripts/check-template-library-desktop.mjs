@@ -47,9 +47,16 @@ export async function verifyTemplateLibraryDesktop({evaluate,click,cdp,until,api
   assert.equal(await evaluate("(()=>{const n=[...document.querySelectorAll('.template-library-records article')].find(n=>n.textContent.includes('模板回执丢失.md'));if(!n)return false;n.setAttribute('data-lost-template-record','');return true})()"),true)
   await action('核对操作结果','[data-lost-template-record]');await hasText('创建回执已确认');await action('打开已创建的笔记');await until(()=>evaluate("!document.querySelector('.template-library') && document.querySelector('.editor-input')?.innerText.includes('template-revised-body')"),'Lost copy not recovered')
   assert.equal((await api('/api/files?q='+encodeURIComponent('模板回执丢失.md')+'&page=1&size=200')).filter(x=>x.title==='模板回执丢失.md').length,1);report.failureInjection={exactCommittedNotePostOnly:true,faults};mark('read-only-reconciliation-opens-same-copy-without-reposting')
-  await open();await hasText('本地模板验收');await screenshot();await action('返回模板选择');await click('.template-selector-header button[aria-label="关闭"]');mark('library-can-close-and-reopen')
+  await open();await hasText('本地模板验收')
+  await evaluate("window.dispatchEvent(new CustomEvent('local-notepad:toast',{detail:{action:'show',toast:{id:'template-passive-hit-test',type:'success',content:'模板通知保持可见',duration:0}}}))")
+  await until(()=>evaluate("[...document.querySelectorAll('.app-toast-content')].some(n=>n.textContent==='模板通知保持可见')"),'Real passive notification missing')
+  assert.equal(await evaluate("[...document.querySelectorAll('.app-toast')].every(n=>getComputedStyle(n).pointerEvents==='none')"),true,'Passive toast must not intercept input')
+  await screenshot();await action('返回模板选择')
+  assert.equal(await evaluate("!!document.querySelector('.template-selector') && [...document.querySelectorAll('.app-toast-content')].some(n=>n.textContent==='模板通知保持可见')"),true,'Return must complete without hiding notification')
+  report.passiveToast={realViewport:true,remainedVisible:true,originalMouseHitTest:true};mark('visible-passive-toast-does-not-block-template-return')
+  await click('.template-selector-header button[aria-label="关闭"]');mark('library-can-close-and-reopen')
   assert.deepEqual(await Promise.all(noteIDs.map(id=>api('/api/files/'+id))),before);mark('original-notes-unchanged')
   report.complete=true;save()
  }catch(e){report.error=String(e.stack||e);save();throw e}
- finally{if(intercept)await cdp.send('Fetch.disable');await Promise.all([...pending]);detach?.();await cdp.send('Network.setBlockedURLs',{urls:[]})}
+ finally{await evaluate("window.dispatchEvent(new CustomEvent('local-notepad:toast',{detail:{action:'close',id:'template-passive-hit-test'}}))");if(intercept)await cdp.send('Fetch.disable');await Promise.all([...pending]);detach?.();await cdp.send('Network.setBlockedURLs',{urls:[]})}
 }

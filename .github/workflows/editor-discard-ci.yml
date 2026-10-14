@@ -24,6 +24,10 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.24.11'
+          cache-dependency-path: server/go.sum
       - name: Verify committed dependency lock
         run: node scripts/verify-dependency-lock.mjs
       - name: Install locked dependencies
@@ -37,7 +41,7 @@ jobs:
       - name: Verify real App discard dialogs, editor cache, saves and quit bridge
         run: npx vitest run --root=. src/AppExitDiscard.test.jsx src/components/EditorQuit.test.jsx src/components/EditorQuitSource.test.jsx src/components/TextEditor.test.jsx src/components/TextEditorLoad.test.jsx
       - name: Record full UI regression results
-        run: npx vitest run --root=. --reporter=json --outputFile=test-results/editor-discard/full-ui.json
+        run: npx vitest run --root=. --maxWorkers=4 --minWorkers=1 --reporter=json --outputFile=test-results/editor-discard/full-ui.json
       - name: Retain exact tracked test sources for failure review
         if: always()
         run: |

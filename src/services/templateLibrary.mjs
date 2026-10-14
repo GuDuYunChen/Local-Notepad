@@ -27,7 +27,7 @@ export function editableTemplateText(content) {
   templateBody(content)
   let doc
   try { doc = JSON.parse(content) } catch { return content }
-  if (!object(doc?.root) || !Array.isArray(doc.root.children)) return null
+  if (!object(doc?.root) || !Array.isArray(doc.root.children)) return content
   const lines = []
   for (const p of doc.root.children) {
     if (p.type !== 'paragraph' || !Array.isArray(p.children) || p.format || p.indent) return null

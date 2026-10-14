@@ -1846,7 +1846,16 @@ export default function FileList({
       )}
       {showExport && <FileSelectorDialog open={showExport} onClose={() => setShowExport(false)} items={items} onConfirm={onExportConfirm} title="导出笔记" confirmText="下一步" />}
       {showBatchDelete && <FileSelectorDialog open={showBatchDelete} onClose={() => setShowBatchDelete(false)} items={items} onConfirm={onBatchDeleteConfirm} title="移到回收站" confirmText="移到回收站" processingText="处理中…" showDeleteWarning={true} selectedFileId={selectedId} initialSelectedIds={Array.from(selectedIds)} />}
-      {showTemplate && <TemplateSelector open={showTemplate} onClose={() => setShowTemplate(false)} onSelect={handleTemplateSelect} />}
+      {showTemplate && <TemplateSelector open={showTemplate} onClose={() => setShowTemplate(false)} onSelect={handleTemplateSelect}
+        parentId={targetParentId} parentLabel={getPathLabel(targetParentId)} beforeCreate={onBeforeNew}
+        onCreated={async item => {
+          // Publish metadata before selection. A deferred updater or an old
+          // load callback must not replace the newly selected note's identity.
+          const next = [item, ...items.filter(x => x.id !== item.id)]
+          setItems(next); onItemsChanged?.(next)
+          if (item.parent_id) setExpanded(previous => new Set([...previous, item.parent_id]))
+          setShowTemplate(false); onSelect(item)
+        }} />}
       {pendingExport && (
         <ConfirmDialog
           title="选择导出格式"

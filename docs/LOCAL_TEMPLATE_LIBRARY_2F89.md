@@ -1,4 +1,4 @@
-# 2F.89 / 4.222.0 本地文本模板库与安全创建
+# 2F.89 / 4.222.2 本地文本模板库与安全创建
 
 基线 d002c8870af32eee85c4730e2db1d240a93f118a /4.221.1，每日笔记及实际安装验收6158925298保持历史有效，不重做。当前仅本地模板模块，不开发云、多端或其它模块。
 
@@ -19,3 +19,15 @@
 - TEMPLATE-03：未知创建回执导致重试重复、旧核对覆盖新草稿。使用持久请求ID、原后端回执及独立草稿生命周期，核心和React负例覆盖。
 
 原46条产品/环境索引、12类助手执行事故继承；上述是当前模块补充，非断流根因证明。源代码与提交前测试不等于当前HEAD验收。必须原全量UI/Go/Electron、真实Windows完整模块和保存退出、新安装包、安装升级卸载重装及原始产物全部核验后完成。原工作流、依赖679节点、schema14、保存/历史/每日/回收站/引用/退出保护保持。不为最终状态再造源码提交。
+
+## Text fidelity repair / 4.222.1
+
+Reproduced the existing general text extractor trimming leading/trailing spaces and collapsing empty paragraphs when creating a template copy. Canonical text templates now use lossless paragraph decoding for both preview and the exact new-note payload. Legacy non-Lexical JSON stays literal editable text. Rich-template text-only extraction remains explicitly labeled and never rewrites the original rich body. Added actual React creation and legacy-edit regressions, preserving byte-equality serializer and original editor/receipt assertions. Same module, no cloud features or schema changes.
+
+## Original list-to-editor handoff
+
+Windows b1dc870 passed template create/edit but the copied note was not kept selected. The old asynchronous list refresh called an App metadata callback captured for the prior note after selecting the copy, restoring the old identity. The new handoff synchronously publishes the updated list before selecting the validated copy, with no trailing stale load. Original App/save/navigation guards remain unchanged. A real FileList/React-parent regression reproduces old-note selection before the fix and verifies the new identity after all callbacks settle; Windows still uses actual clicks and original editor.
+
+## Passive notification obstruction / 4.222.2
+
+Actual Windows53d3657 artifact11869770639 completed the first10 template checks, then a visible saved toast intercepted the final return button. ToastViewport renders text-only status/alert notifications, with no interactive controls. Change only their CSS pointer-events from auto to none; retain text, roles, timers and closing behavior, do not hide notifications or bypass the real mouse test. Eight React/style contracts preserve the original behavior and reject the old CSS. The native workflow now keeps a real persistent success notification visible while the original hit-tested mouse returns to the selector, then cleans up the owned notification. All prior template, editor, daily, history, trash and installer checks remain required. Standard patch4.222.2; original Go/Electron/schema14 and679 dependency nodes unchanged.

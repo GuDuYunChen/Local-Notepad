@@ -42,3 +42,20 @@ test('stale existing template change is refused before PUT',async()=>{await moun
 test('dirty template close asks whether to keep or discard its local draft',async()=>{await mount();await click('新建模板');await fill('模板名称','未完成');await click('返回模板选择');expect(host.textContent).toContain('保留草稿并关闭');await click('取消');expect(host.querySelector('[aria-label="模板名称"]').value).toBe('未完成');expect(writes()).toHaveLength(0)})
 test('archived view and pagination retain exact selection',async()=>{templates=Array.from({length:14},(_,i)=>row({id:'tpl'+i,title:'模板'+i}));await mount();expect(host.querySelectorAll('.template-library-row')).toHaveLength(12);await click('下一页');expect(host.querySelectorAll('.template-library-row')).toHaveLength(2);expect(host.textContent).toContain('模板13')})
 test('clear operation requires explicit confirmation and does not remove its created note',async()=>{await mount({id:'meeting',title:'会议',content:'正文'});await click('从预览创建文本笔记');await click('清除这条记录');await click('取消');expect(files.size).toBe(1);await click('清除这条记录');await click('确认清除记录');expect(Object.keys(localStorage).filter(k=>k.startsWith(TEMPLATE_INTENT_PREFIX))).toHaveLength(0);expect(files.size).toBe(1)})
+
+test('independent text copy preserves every blank line and boundary space',async()=>{
+ const text='  \n\n保留空行🙂\n\n末尾  \n'
+ await mount({id:'preserve',title:'保真模板',content:text})
+ expect(host.querySelector('[aria-label="模板正文预览"]').textContent).toBe(text)
+ await click('从预览创建文本笔记')
+ expect(JSON.parse(writes()[0][1].body).content).toBe(textTemplateDocument(text))
+ expect(onCreated).not.toHaveBeenCalled()
+})
+test('legacy literal JSON remains editable text instead of a blank rich preview',async()=>{
+ const text='{"topic":"周报","done":false}'
+ templates=[row({title:'JSON文本',content:text})]
+ await mount();await click('编辑')
+ expect(host.querySelector('[aria-label="模板正文"]').value).toBe(text)
+ expect(host.querySelector('[aria-label="模板正文"]').disabled).toBe(false)
+ await click('保存模板');expect(templates[0].content).toBe(textTemplateDocument(text))
+})

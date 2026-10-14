@@ -34,7 +34,8 @@ export default function TemplateLibrary({ onClose, onCreated, beforeCreate, pare
   const [searchInput, setSearchInput] = useState('')
   const journal = useMemo(() => createTemplateJournal({ get length() { return localStorage.length }, key: i => localStorage.key(i), getItem: k => localStorage.getItem(k), setItem: (k,v) => localStorage.setItem(k,v), removeItem: k => localStorage.removeItem(k) }), [])
   const operations = useMemo(() => createTemplateOperations(api, journal), [journal])
-  const selectedText = selected ? extractLexicalText(selected.content) : ''
+  const selectedPlain = selected ? editableTemplateText(selected.content) : ''
+  const selectedText = selectedPlain === null ? extractLexicalText(selected.content) : selectedPlain
   const visible = rows.filter(r => r.archived === archived && (!query || (r.title + '\n' + extractLexicalText(r.content)).toLocaleLowerCase().includes(query.toLocaleLowerCase())))
   const maxPage = Math.max(0, Math.ceil(visible.length / 12) - 1), currentPage = Math.min(page, maxPage)
   const refreshEntries = () => { try { setEntries(journal.list()) } catch { setMessage('操作记录无法读取，未自动删除。') } }
