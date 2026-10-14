@@ -2075,7 +2075,7 @@ body {
   box-shadow: var(--shadow-raised);
   font-size: 11px;
   line-height: 1.45;
-  pointer-events: auto;
+  pointer-events: none;
   animation: app-toast-in 150ms ease-out;
 }
 

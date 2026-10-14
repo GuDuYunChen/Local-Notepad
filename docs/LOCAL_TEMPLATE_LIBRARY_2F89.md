@@ -1,4 +1,4 @@
-# 2F.89 / 4.222.1 本地文本模板库与安全创建
+# 2F.89 / 4.222.2 本地文本模板库与安全创建
 
 基线 d002c8870af32eee85c4730e2db1d240a93f118a /4.221.1，每日笔记及实际安装验收6158925298保持历史有效，不重做。当前仅本地模板模块，不开发云、多端或其它模块。
 
@@ -27,3 +27,7 @@ Reproduced the existing general text extractor trimming leading/trailing spaces 
 ## Original list-to-editor handoff
 
 Windows b1dc870 passed template create/edit but the copied note was not kept selected. The old asynchronous list refresh called an App metadata callback captured for the prior note after selecting the copy, restoring the old identity. The new handoff synchronously publishes the updated list before selecting the validated copy, with no trailing stale load. Original App/save/navigation guards remain unchanged. A real FileList/React-parent regression reproduces old-note selection before the fix and verifies the new identity after all callbacks settle; Windows still uses actual clicks and original editor.
+
+## Passive notification obstruction / 4.222.2
+
+Actual Windows53d3657 artifact11869770639 completed the first10 template checks, then a visible saved toast intercepted the final return button. ToastViewport renders text-only status/alert notifications, with no interactive controls. Change only their CSS pointer-events from auto to none; retain text, roles, timers and closing behavior, do not hide notifications or bypass the real mouse test. Eight React/style contracts preserve the original behavior and reject the old CSS. The native workflow now keeps a real persistent success notification visible while the original hit-tested mouse returns to the selector, then cleans up the owned notification. All prior template, editor, daily, history, trash and installer checks remain required. Standard patch4.222.2; original Go/Electron/schema14 and679 dependency nodes unchanged.
