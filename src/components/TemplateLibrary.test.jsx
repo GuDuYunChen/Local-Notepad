@@ -59,3 +59,24 @@ test('legacy literal JSON remains editable text instead of a blank rich preview'
  expect(host.querySelector('[aria-label="模板正文"]').disabled).toBe(false)
  await click('保存模板');expect(templates[0].content).toBe(textTemplateDocument(text))
 })
+
+// A confirmed write and the following catalog read are separate events.
+// Native navigation must await the actual enabled row, not the receipt text.
+test('confirmed creation remains valid while its catalog row is still loading',async()=>{
+ await mount();await click('新建模板');await fill('模板名称','迟到列表');await fill('模板正文','正文')
+ const original=api.getMockImplementation();let afterWrite=false,release
+ api.mockImplementation(async(p,i={})=>{
+  if(p==='/api/template-library'&&afterWrite)return new Promise(resolve=>{release=()=>resolve({complete:true,items:templates.map(t=>({...t}))})})
+  const value=await original(p,i);if(i.method==='POST')afterWrite=true;return value
+ })
+ await act(async()=>button('保存模板').click())
+ try{
+  for(let i=0;i<100&&(!release||!host.textContent.includes('创建回执已确认'));i++)await act(async()=>{await new Promise(r=>setTimeout(r,5))})
+  expect(release).toBeTypeOf('function');expect(host.textContent).toContain('创建回执已确认')
+  const currentRow=()=>[...host.querySelectorAll('.template-library-index li')].find(n=>n.querySelector('strong')?.textContent==='迟到列表')
+  expect(currentRow()).toBeUndefined();expect(writes()).toHaveLength(1)
+  await act(async()=>release());await tick()
+  expect(currentRow()).toBeTruthy();expect([...currentRow().querySelectorAll('button')].every(n=>!n.disabled)).toBe(true)
+  await click('编辑',currentRow());expect(host.querySelector('[aria-label="模板正文"]').value).toBe('正文');expect(writes()).toHaveLength(1)
+ }finally{release?.()}
+})
