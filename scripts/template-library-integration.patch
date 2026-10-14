@@ -1,0 +1,97 @@
+--- a/src/components/TemplateSelector.jsx
++++ b/src/components/TemplateSelector.jsx
+@@ -1,4 +1,5 @@
+-import React, { useEffect } from 'react'
++import TemplateLibrary from './TemplateLibrary'
++import React, { useEffect, useState } from 'react'
+ 
+ const TEMPLATES = [
+   {
+@@ -119,9 +120,10 @@
+   return <svg {...common}><path d="M6 3h9l3 3v15H6z" /><path d="M15 3v4h4" /></svg>
+ }
+ 
+-export default function TemplateSelector({ open, onClose, onSelect }) {
++export default function TemplateSelector({ open, onClose, onSelect, onCreated, beforeCreate, parentId, parentLabel }) {
++  const [libraryOpen, setLibraryOpen] = useState(false), [seed, setSeed] = useState(null)
+   useEffect(() => {
+-    if (!open) return undefined
++    if (!open || libraryOpen) return undefined
+ 
+     const onKeyDown = (event) => {
+       if (event.key === 'Escape') onClose?.()
+@@ -129,11 +131,14 @@
+ 
+     window.addEventListener('keydown', onKeyDown)
+     return () => window.removeEventListener('keydown', onKeyDown)
+-  }, [open, onClose])
++  }, [open, onClose, libraryOpen])
+ 
+   if (!open) return null
+ 
++  if (libraryOpen) return <TemplateLibrary seed={seed} onClose={() => { setLibraryOpen(false); setSeed(null) }} onCreated={onCreated} beforeCreate={beforeCreate} parentId={parentId} parentLabel={parentLabel} />
++
+   const choose = (template) => {
++    if (template.id !== 'blank' && onCreated) { setSeed(template); setLibraryOpen(true); return }
+     if (template.id === 'blank') onSelect?.(null)
+     else onSelect?.({ id: template.id, title: template.title, content: template.content })
+   }
+@@ -155,6 +160,7 @@
+           <button type="button" className="icon-btn" onClick={onClose} aria-label="关闭" title="关闭">×</button>
+         </header>
+ 
++        <button type="button" className="btn" onClick={() => { setSeed(null); setLibraryOpen(true) }}>管理我的模板</button>
+         <div className="template-grid">
+           {TEMPLATES.map((template, index) => (
+             <button
+--- a/src/components/FileList.jsx
++++ b/src/components/FileList.jsx
+@@ -1846,7 +1846,13 @@
+       )}
+       {showExport && <FileSelectorDialog open={showExport} onClose={() => setShowExport(false)} items={items} onConfirm={onExportConfirm} title="导出笔记" confirmText="下一步" />}
+       {showBatchDelete && <FileSelectorDialog open={showBatchDelete} onClose={() => setShowBatchDelete(false)} items={items} onConfirm={onBatchDeleteConfirm} title="移到回收站" confirmText="移到回收站" processingText="处理中…" showDeleteWarning={true} selectedFileId={selectedId} initialSelectedIds={Array.from(selectedIds)} />}
+-      {showTemplate && <TemplateSelector open={showTemplate} onClose={() => setShowTemplate(false)} onSelect={handleTemplateSelect} />}
++      {showTemplate && <TemplateSelector open={showTemplate} onClose={() => setShowTemplate(false)} onSelect={handleTemplateSelect}
++        parentId={targetParentId} parentLabel={getPathLabel(targetParentId)} beforeCreate={onBeforeNew}
++        onCreated={async item => {
++          setItems(previous => { const next = [item, ...previous.filter(x => x.id !== item.id)]; onItemsChanged?.(next); return next })
++          if (item.parent_id) setExpanded(previous => new Set([...previous, item.parent_id]))
++          setShowTemplate(false); onSelect(item); void load()
++        }} />}
+       {pendingExport && (
+         <ConfirmDialog
+           title="选择导出格式"
+--- a/scripts/check-desktop-save.mjs
++++ b/scripts/check-desktop-save.mjs
+@@ -1,3 +1,4 @@
++import { verifyTemplateLibraryDesktop } from './check-template-library-desktop.mjs'
+ import { verifyDailyNotesDesktop } from './check-daily-notes-desktop.mjs'
+ import { verifyVersionHistoryDesktop } from './check-version-history-desktop.mjs'
+ // Windows packaged-app acceptance: actual main/preload/App/Lexical/backend.
+@@ -279,6 +280,7 @@
+   await verifyLocalOverviewDesktop({ evaluate, click, cdp, until, api, out, noteIDs: [a.id, b.id] })
+   await verifyVersionHistoryDesktop({ evaluate, click, cdp, until, api, out, noteIDs: [a.id, b.id] })
+   await verifyDailyNotesDesktop({ evaluate, click, cdp, until, api, out, noteIDs: [a.id, b.id] })
++  await verifyTemplateLibraryDesktop({ evaluate, click, cdp, until, api, out, noteIDs: [a.id, b.id] })
+   await open(a.id, 'native-close-latest')
+   await closeWindow()
+   report.checks.push('fresh-profile packaged restart reads latest body from real database and closes cleanly')
+--- a/server/internal/controller/file.go
++++ b/server/internal/controller/file.go
+@@ -17,6 +17,7 @@
+ }
+ 
+ func (c *FileController) Register(group *ghttp.RouterGroup) {
++	c.RegisterTemplateLibrary(group)
+ 	group.GET("/editor-reference-jobs", c.EditorReferenceJobs)
+ 	group.POST("/editor-reference-jobs/{requestId}", c.CompleteEditorReferences)
+ 	group.GET("/search", c.GlobalSearch)
+@@ -446,7 +447,7 @@
+ 
+ func (c *FileController) DeleteTemplate(r *ghttp.Request) {
+ 	id := r.Get("id").String()
+-	if err := c.FileLogic.Delete(r.GetCtx(), id); err != nil {
++	if err := c.FileLogic.FileDAO.ArchiveLibraryTemplate(r.GetCtx(), id); err != nil {
+ 		writeErr(r, 1007, "删除模板失败", err)
+ 		return
+ 	}
