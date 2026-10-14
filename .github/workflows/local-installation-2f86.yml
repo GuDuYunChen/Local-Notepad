@@ -42,13 +42,15 @@ jobs:
           run-id: 38337004784
           name: local-notepad-windows-191439e04ddbf6b4423194d2978ae72da926df3c
           path: .installer-input/legacy
-      - name: Download source-bound 4.222.2 installer
+      - name: Download source-bound 4.222.3 installer
         uses: actions/download-artifact@v4
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: 38527563028
-          name: local-notepad-windows-29c140a989984e981d6e99a6078145f1d05323dc
+          run-id: 38542237280
+          name: local-notepad-windows-6100a3522e875bf4247bcc48a6742f4f2c97a3a9
           path: .installer-input/current
+      - name: Pin verified final product without changing any test assertions
+        run: node scripts/pin-template-final-installer.mjs
       - name: Prepare original installer harness with unchanged native modules
         run: node scripts/run-template-installer.mjs prepare
       - name: Retain all existing refusal tests and new daily evidence checks
