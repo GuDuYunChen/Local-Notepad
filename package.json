@@ -1,6 +1,6 @@
 {
   "name": "notepad-desktop",
-  "version": "4.222.2",
+  "version": "4.222.3",
   "private": true,
   "type": "module",
   "main": "out/electron/main.cjs",
