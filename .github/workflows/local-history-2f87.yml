@@ -22,6 +22,8 @@ jobs:
           cache-dependency-path: server/go.sum
       - name: Verify historical issues and locked dependencies
         run: node scripts/stage-review.mjs catalog && node scripts/verify-dependency-lock.mjs
+      - name: Cover pre-navigation snapshots missing a newly selected note
+        run: node scripts/extend-list-snapshot.mjs
       - name: Install committed lock
         run: npm ci --no-audit --no-fund
       - name: Reproduce original asynchronous list selection defects
