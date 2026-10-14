@@ -41,7 +41,7 @@ export async function verifyQuickSwitcherDesktop({evaluate,click,cdp,until,api,o
   await until(async()=>(await api('/api/files/'+b.id)).content.includes('quick-unsaved-guard'),'Original editor save failed');await until(()=>evaluate("!document.querySelector('.save-state')"),'Save remains pending');mark('escape-and-original-editor-save-remain-functional')
   await open();await find('Quick 原始笔记');await cdp.send('Network.setBlockedURLs',{urls:[base+'/api/files/'+a.id]});await key('Enter',13);await has('笔记未打开')
   assert.equal(await evaluate("document.querySelector('.editor-input')?.innerText.includes('quick-unsaved-guard')"),true);mark('failed-live-target-does-not-leave-current-note')
-  await cdp.send('Network.setBlockedURLs',{urls:[]});await action('刷新快速结果');await until(()=>evaluate("!!document.querySelector('.quick-switcher [role=option]:enabled')"),'Target retry unavailable');await key('Enter',13)
+  await cdp.send('Network.setBlockedURLs',{urls:[]});await action('刷新快速结果');await until(()=>evaluate("!!document.querySelector('.quick-switcher [role=option]:enabled')"),'Target retry unavailable');await click('.quick-switcher [role=option]:enabled')
   await until(()=>evaluate("!document.querySelector('.quick-switcher') && document.querySelector('.editor-input')?.innerText.includes('quick-source-body')"),'Retry did not open source');mark('target-failure-manual-refresh-and-open')
   await open();await query('QUICK-NO-MATCH-872a');await has('没有找到匹配的笔记');mark('genuine-empty-search-remains-distinct')
   await find('Quick 特定目标');await action('完整检索与筛选');await until(()=>evaluate("!!document.querySelector('[aria-label=\"全局检索结果\"]') && !document.querySelector('.quick-switcher')"),'Full search handoff failed')

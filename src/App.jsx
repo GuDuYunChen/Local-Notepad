@@ -1454,6 +1454,7 @@ export default function App() {
           <BackupPanel open={backupOpen} onClose={() => setBackupOpen(false)} />
           <QuickSwitcher
             open={quickSearchOpen}
+            navigationEpoch={navigationEpoch}
             onClose={() => setQuickSearchOpen(false)}
             onSelectFile={handleSelectFile}
             onOpenSearchWorkspace={query => openGlobalSearch(query)}

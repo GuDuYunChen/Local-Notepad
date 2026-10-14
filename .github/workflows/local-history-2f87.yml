@@ -1,4 +1,4 @@
-name: Verify complete local quick navigation
+name: Verify complete local note tag organization
 on:
   push:
     branches: [ci/local-history-2f87]
@@ -13,8 +13,8 @@ jobs:
     timeout-minutes: 18
     steps:
       - uses: actions/checkout@v7
-      - name: Fetch exact accepted baseline for negative controls
-        run: git fetch --no-tags --depth=1 origin 6100a3522e875bf4247bcc48a6742f4f2c97a3a9
+      - name: Fetch exact accepted component for negative controls
+        run: git fetch --no-tags --depth=1 origin 89b99b57bf021315752e6809ec684a5d8d0dc3b0
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
@@ -22,32 +22,32 @@ jobs:
         with:
           go-version: '1.24.11'
           cache-dependency-path: server/go.sum
-      - name: Review historical issue catalog
+      - name: Review inherited issue catalog
         run: node scripts/stage-review.mjs catalog
-      - name: Apply guarded integration and standard minor version
-        run: node scripts/prepare-quick-switcher-2f90.mjs apply
-      - name: Complete navigation ownership and real retry focus coverage
-        run: node scripts/complete-quick-lifecycle.mjs
-      - name: Install exact committed lock
+      - name: Apply exact full integration and normal minor version
+        run: node scripts/prepare-note-tags-2f91.mjs apply
+      - name: Install exact committed dependencies
         run: npm ci --no-audit --no-fund
-      - name: Reproduce original quick search navigation defects
-        run: node scripts/prepare-quick-switcher-2f90.mjs baseline
-      - name: Original and new local navigation contracts
-        run: node --test scripts/quick-switcher.node.mjs scripts/editor-cache-regression.node.mjs scripts/editor-save-transaction.node.mjs scripts/editor-quit.node.mjs
-      - name: Full UI regression including real App decisions
-        run: npx vitest run --root=. --maxWorkers=4 --minWorkers=1 --reporter=default --reporter=json --outputFile=quick-module-evidence/full-ui.json
-      - name: Complete production Go SQLite regression
-        run: go -C server test -json ./... > quick-module-evidence/go-tests.jsonl
-      - name: Full original main preload renderer build
+      - name: Reproduce original tag read reentry and late-callback failures
+        run: node scripts/prepare-note-tags-2f91.mjs baseline
+      - name: New tag core and original save protection
+        run: node --test scripts/note-tags.node.mjs scripts/editor-cache-regression.node.mjs scripts/editor-save-transaction.node.mjs scripts/editor-quit.node.mjs
+      - name: Complete original UI regression plus current-note tag lifecycle
+        run: npx vitest run --root=. --maxWorkers=4 --minWorkers=1 --reporter=default --reporter=json --outputFile=tag-module-evidence/full-ui.json
+      - name: Actual production Go SQLite regression and tag concurrency
+        run: |
+          go -C server test -json ./... > tag-module-evidence/go-tests.jsonl
+          go -C server test -race ./internal/dao -run NoteTag -count=1
+      - name: Build full original main preload and renderer
         run: npm run build:main && npm run build:renderer
-      - name: Publish tested changed code objects only
+      - name: Publish only tested changed code objects
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node scripts/prepare-quick-switcher-2f90.mjs publish
+        run: node scripts/prepare-note-tags-2f91.mjs publish
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: quick-module-verification-${{ github.sha }}
-          path: quick-module-evidence/
+          name: note-tags-verification-${{ github.sha }}
+          path: tag-module-evidence/
           retention-days: 7
           if-no-files-found: error

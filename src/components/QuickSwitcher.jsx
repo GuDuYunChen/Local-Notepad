@@ -78,7 +78,7 @@ function formatRelativeTime(ts) {
   })
 }
 
-export default function QuickSwitcher({ open, onClose, onSelectFile, onOpenSearchWorkspace }) {
+export default function QuickSwitcher({ open, onClose, onSelectFile, onOpenSearchWorkspace, navigationEpoch }) {
   const [query, setQuery] = useState(''), [applied, setApplied] = useState('')
   const [results, setResults] = useState([]), [status, setStatus] = useState('loading')
   const [error, setError] = useState(''), [notice, setNotice] = useState('')
@@ -109,7 +109,7 @@ export default function QuickSwitcher({ open, onClose, onSelectFile, onOpenSearc
     const captured = applied
     setStatus('loading'); setResults([]); setActiveIndex(0); setError('')
     const owns = () => alive.current && latest.current.open && reading.current === controller && !controller.signal.aborted && !composing.current && captured === queryRef.current
-    const timer = window.setTimeout(async () => {
+    const run = async () => {
       if (!owns()) return
       try {
         const rows = await readQuickResults(api, searchFiles, captured, controller.signal)
@@ -119,9 +119,16 @@ export default function QuickSwitcher({ open, onClose, onSelectFile, onOpenSearc
         if (!owns()) return
         setError(e.message); setStatus('error')
       }
-    }, captured.trim() ? 180 : 0)
+    }
+    const timer = captured.trim() ? window.setTimeout(run, 180) : null
+    if (!captured.trim()) void run()
     return () => { controller.abort(); window.clearTimeout(timer) }
   }, [open, applied, retry])
+  useEffect(() => {
+    if (choosing.current && choosing.current.epoch !== navigationEpoch?.current) {
+      cancelOpening(); setOpening(''); setNotice('页面已切换，原打开操作已取消。')
+    }
+  }, [navigationEpoch?.current])
   const visibleResults = results.slice(0, QUICK_RESULT_LIMIT)
   useEffect(() => {
     resultsRef.current?.querySelector(`[data-result-index="${activeIndex}"]`)?.scrollIntoView?.({ block: 'nearest' })
@@ -150,7 +157,7 @@ export default function QuickSwitcher({ open, onClose, onSelectFile, onOpenSearc
   }
   const choose = async file => {
     if (!file || status !== 'ready' || choosing.current || composing.current || queryRef.current !== applied) return
-    const controller = new AbortController(); choosing.current = controller
+    const controller = new AbortController(); controller.epoch = navigationEpoch?.current; choosing.current = controller
     const owns = () => alive.current && latest.current.open && choosing.current === controller && !controller.signal.aborted
     setOpening('reading'); setError(''); setNotice('正在核对目标笔记…')
     const cancelled = () => {
@@ -161,10 +168,11 @@ export default function QuickSwitcher({ open, onClose, onSelectFile, onOpenSearc
     try {
       const fresh = await readQuickTarget(api, file.id, controller.signal)
       if (!owns()) return
+      if (controller.epoch !== navigationEpoch?.current) { cancelled(); return }
       if (typeof latest.current.onSelectFile !== 'function') throw new Error('笔记打开通道不可用。')
       setOpening('decision'); setNotice('请在编辑器的保存确认框中决定是否切换。')
       latest.current.onSelectFile(fresh, {
-        shouldSelect: owns,
+        shouldSelect: () => owns() && controller.epoch === navigationEpoch?.current,
         onCancel: cancelled,
         afterSelect: () => {
           if (!owns()) return
@@ -202,7 +210,7 @@ export default function QuickSwitcher({ open, onClose, onSelectFile, onOpenSearc
       {notice && <div className="quick-switcher-notice" role="status">{notice}</div>}
       {error && <div className="quick-switcher-notice" role="alert"><strong>{status === 'error' ? '快速搜索未完成' : '笔记未打开'}</strong><p>{error}</p>
         <button type="button" className="btn small" disabled={!!opening} onClick={() => { cancelReading(); setRetry(v => v + 1); setNotice('') }}>{status === 'error' ? '重试快速搜索' : '刷新快速结果'}</button></div>}
-      {opening === 'reading' && <button className="btn small quick-switcher-stop" type="button" onClick={() => { cancelOpening(); setOpening(''); setNotice('已停止打开，未切换笔记。'); inputRef.current?.focus() }}>停止打开</button>}
+      {opening === 'reading' && <button className="btn small quick-switcher-stop" type="button" onClick={() => { cancelOpening(); setOpening(''); setNotice('已停止打开，未切换笔记。'); window.setTimeout(() => { if (alive.current && !choosing.current) inputRef.current?.focus() }, 0) }}>停止打开</button>}
       <div id="quick-switcher-results" ref={resultsRef} className="quick-switcher-results" role="listbox" aria-label="搜索结果" aria-busy={status === 'loading'}>
         {status === 'ready' && !visibleResults.length && <div className="quick-switcher-empty"><strong>{applied.trim() ? '没有找到匹配的笔记' : '还没有可打开的笔记'}</strong><span>{applied.trim() ? '换一个关键词，或进入完整检索。' : '创建笔记后可在这里查找和打开。'}</span></div>}
         {visibleResults.map((file, index) => <button type="button" tabIndex={-1} disabled={status !== 'ready' || !!opening} id={`quick-result-${file.id}`} data-result-index={index} key={file.id}
