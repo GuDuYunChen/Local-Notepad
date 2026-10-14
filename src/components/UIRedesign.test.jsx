@@ -226,10 +226,10 @@ describe('UI redesign smoke tests', () => {
   })
 
   it('opens recent notes and supports keyboard selection in quick search', async () => {
-    const onSelectFile = vi.fn()
+    const onSelectFile = vi.fn((file, options) => options.afterSelect(file))
     const onClose = vi.fn()
 
-    api.mockResolvedValue([
+    const quickRows = [
       {
         id: 'file-1',
         title: '第一篇笔记',
@@ -246,7 +246,8 @@ describe('UI redesign smoke tests', () => {
         is_folder: false,
         is_deleted: false,
       },
-    ])
+    ]
+    api.mockImplementation(async path => path.startsWith('/api/files?') ? quickRows : quickRows.find(file => path.endsWith('/' + file.id)))
     searchFiles.mockResolvedValue([])
 
     await act(async () => {
@@ -275,7 +276,8 @@ describe('UI redesign smoke tests', () => {
       await Promise.resolve()
     })
 
-    expect(onSelectFile).toHaveBeenCalledWith(expect.objectContaining({ id: 'file-1' }))
+    expect(onSelectFile).toHaveBeenCalledWith(expect.objectContaining({ id: 'file-1' }), expect.objectContaining({ shouldSelect: expect.any(Function), afterSelect: expect.any(Function), onCancel: expect.any(Function) }))
+    expect(api).toHaveBeenCalledTimes(2)
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
