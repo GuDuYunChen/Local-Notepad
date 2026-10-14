@@ -22,6 +22,8 @@ jobs:
           cache-dependency-path: server/go.sum
       - name: Apply exact accepted baseline integration and normal version increment
         run: node scripts/prepare-template-library-2f89.mjs apply
+      - name: Preserve exact text whitespace and legacy literal JSON when copying
+        run: node scripts/repair-template-text-copy.mjs
       - name: Verify historical issue index
         run: node scripts/stage-review.mjs catalog
       - name: Install the committed dependency lock
