@@ -26,6 +26,8 @@ jobs:
         run: node scripts/stage-review.mjs catalog
       - name: Apply guarded integration and standard minor version
         run: node scripts/prepare-quick-switcher-2f90.mjs apply
+      - name: Complete navigation ownership and real retry focus coverage
+        run: node scripts/complete-quick-lifecycle.mjs
       - name: Install exact committed lock
         run: npm ci --no-audit --no-fund
       - name: Reproduce original quick search navigation defects
