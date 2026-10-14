@@ -1849,9 +1849,12 @@ export default function FileList({
       {showTemplate && <TemplateSelector open={showTemplate} onClose={() => setShowTemplate(false)} onSelect={handleTemplateSelect}
         parentId={targetParentId} parentLabel={getPathLabel(targetParentId)} beforeCreate={onBeforeNew}
         onCreated={async item => {
-          setItems(previous => { const next = [item, ...previous.filter(x => x.id !== item.id)]; onItemsChanged?.(next); return next })
+          // Publish metadata before selection. A deferred updater or an old
+          // load callback must not replace the newly selected note's identity.
+          const next = [item, ...items.filter(x => x.id !== item.id)]
+          setItems(next); onItemsChanged?.(next)
           if (item.parent_id) setExpanded(previous => new Set([...previous, item.parent_id]))
-          setShowTemplate(false); onSelect(item); void load()
+          setShowTemplate(false); onSelect(item)
         }} />}
       {pendingExport && (
         <ConfirmDialog
