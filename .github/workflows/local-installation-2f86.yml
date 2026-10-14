@@ -1,4 +1,4 @@
-name: Actual local history installation lifecycle 2F87
+name: Actual local daily installation lifecycle 2F88
 on:
   push:
     branches: [ci/local-installation-2f86]
@@ -17,45 +17,45 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
-      - name: Verify historical issue catalog and immutable dependency lock
+      - name: Verify historical issue catalog and locked dependencies
         shell: pwsh
         run: |
           node scripts/stage-review.mjs catalog
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node scripts/verify-dependency-lock.mjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Install exact test dependencies
+      - name: Install exact verifier dependencies
         run: npm ci --no-audit --no-fund
-      - name: Ensure dependency files were not modified
+      - name: Ensure lock was not modified
         run: git diff --exit-code -- package.json package-lock.json
-      - name: Download accepted 4.219.1 installer for upgrade seeding
+      - name: Download accepted 4.220.2 upgrade seed
         uses: actions/download-artifact@v4
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: 38352227395
-          name: local-notepad-windows-048a9ca0f70b32fed1afc0f162e297789c781747
+          run-id: 38384483057
+          name: local-notepad-windows-7b133bf6c717536c81b6a74e8afd8ed992dfb9ce
           path: .installer-input/previous
-      - name: Download original failing installer for path counterexample
+      - name: Download unchanged old path-failure counterexample
         uses: actions/download-artifact@v4
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           run-id: 38337004784
           name: local-notepad-windows-191439e04ddbf6b4423194d2978ae72da926df3c
           path: .installer-input/legacy
-      - name: Download source-bound 4.220.2 installer
+      - name: Download source-bound 4.221.1 installer
         uses: actions/download-artifact@v4
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: 38384483057
-          name: local-notepad-windows-7b133bf6c717536c81b6a74e8afd8ed992dfb9ce
+          run-id: 38494623807
+          name: local-notepad-windows-d002c8870af32eee85c4730e2db1d240a93f118a
           path: .installer-input/current
-      - name: Prepare exact existing installation verifier plus original history workflow
-        run: node scripts/run-history-installer.mjs prepare
-      - name: Verify all previous refusal cases and source-bound history evidence
-        run: node --test scripts/installer-lifecycle-core.node.mjs scripts/installer-shell-core.node.mjs scripts/history-installation-evidence.node.mjs
-      - name: Actual installation history restoration upgrade reinstall uninstall and retained data
-        run: node scripts/run-history-installer.mjs run
-      - name: Upload complete or failed original evidence
+      - name: Prepare original installer harness with unchanged native modules
+        run: node scripts/run-daily-installer.mjs prepare
+      - name: Retain all existing refusal tests and new daily evidence checks
+        run: node --test scripts/installer-lifecycle-core.node.mjs scripts/installer-shell-core.node.mjs scripts/history-installation-evidence.node.mjs scripts/daily-installed-evidence.node.mjs
+      - name: Actual install daily history trash upgrade reinstall uninstall and data retention
+        run: node scripts/run-daily-installer.mjs run
+      - name: Retain complete or failed original evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
