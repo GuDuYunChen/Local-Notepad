@@ -17,6 +17,7 @@ type FileController struct {
 }
 
 func (c *FileController) Register(group *ghttp.RouterGroup) {
+	c.RegisterTemplateLibrary(group)
 	group.GET("/editor-reference-jobs", c.EditorReferenceJobs)
 	group.POST("/editor-reference-jobs/{requestId}", c.CompleteEditorReferences)
 	group.GET("/search", c.GlobalSearch)
@@ -446,7 +447,7 @@ func (c *FileController) CreateTemplate(r *ghttp.Request) {
 
 func (c *FileController) DeleteTemplate(r *ghttp.Request) {
 	id := r.Get("id").String()
-	if err := c.FileLogic.Delete(r.GetCtx(), id); err != nil {
+	if err := c.FileLogic.FileDAO.ArchiveLibraryTemplate(r.GetCtx(), id); err != nil {
 		writeErr(r, 1007, "删除模板失败", err)
 		return
 	}

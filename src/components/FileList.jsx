@@ -1846,7 +1846,13 @@ export default function FileList({
       )}
       {showExport && <FileSelectorDialog open={showExport} onClose={() => setShowExport(false)} items={items} onConfirm={onExportConfirm} title="导出笔记" confirmText="下一步" />}
       {showBatchDelete && <FileSelectorDialog open={showBatchDelete} onClose={() => setShowBatchDelete(false)} items={items} onConfirm={onBatchDeleteConfirm} title="移到回收站" confirmText="移到回收站" processingText="处理中…" showDeleteWarning={true} selectedFileId={selectedId} initialSelectedIds={Array.from(selectedIds)} />}
-      {showTemplate && <TemplateSelector open={showTemplate} onClose={() => setShowTemplate(false)} onSelect={handleTemplateSelect} />}
+      {showTemplate && <TemplateSelector open={showTemplate} onClose={() => setShowTemplate(false)} onSelect={handleTemplateSelect}
+        parentId={targetParentId} parentLabel={getPathLabel(targetParentId)} beforeCreate={onBeforeNew}
+        onCreated={async item => {
+          setItems(previous => { const next = [item, ...previous.filter(x => x.id !== item.id)]; onItemsChanged?.(next); return next })
+          if (item.parent_id) setExpanded(previous => new Set([...previous, item.parent_id]))
+          setShowTemplate(false); onSelect(item); void load()
+        }} />}
       {pendingExport && (
         <ConfirmDialog
           title="选择导出格式"
