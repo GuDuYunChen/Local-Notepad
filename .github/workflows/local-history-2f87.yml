@@ -32,6 +32,10 @@ jobs:
         run: node scripts/repair-template-handoff.mjs baseline
       - name: Repair ordered list publication before original guarded selection
         run: node scripts/repair-template-handoff.mjs apply
+      - name: Reproduce passive notification input obstruction
+        run: node scripts/repair-template-toast.mjs baseline
+      - name: Preserve announcements without intercepting template controls
+        run: node scripts/repair-template-toast.mjs apply
       - name: Verify version and unchanged dependency graph
         run: node scripts/check-app-version.mjs --previous-version=4.221.1 && node scripts/verify-dependency-lock.mjs
       - name: Template core and original save protection
@@ -50,6 +54,7 @@ jobs:
         run: |
           node scripts/prepare-template-library-2f89.mjs publish
           node scripts/repair-template-handoff.mjs publish
+          node scripts/repair-template-toast.mjs publish
       - uses: actions/upload-artifact@v4
         if: always()
         with:
