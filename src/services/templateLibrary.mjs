@@ -16,10 +16,11 @@ export function templateBody(value) {
   if (typeof value !== 'string' || bytes(value) > TEMPLATE_BODY_LIMIT || /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u.test(value)) fail('模板正文无效或超过256 KiB，未截断。')
   return value
 }
-// Matched against the installed Lexical serializer by a separate integration test.
+// Property insertion order matches the locked Lexical serializer, including
+// paragraph textFormat/textStyle before type/version. Exact bytes are tested.
 export function textTemplateDocument(text) {
   templateBody(text)
-  const children = text.split('\n').map(line => ({ children: line ? [{ detail: 0, format: 0, mode: 'normal', style: '', text: line, type: 'text', version: 1 }] : [], direction: null, format: '', indent: 0, type: 'paragraph', version: 1, textFormat: 0, textStyle: '' }))
+  const children = text.split('\n').map(line => ({ children: line ? [{ detail: 0, format: 0, mode: 'normal', style: '', text: line, type: 'text', version: 1 }] : [], direction: null, format: '', indent: 0, textFormat: 0, textStyle: '', type: 'paragraph', version: 1 }))
   return templateBody(JSON.stringify({ root: { children, direction: null, format: '', indent: 0, type: 'root', version: 1 } }))
 }
 export function editableTemplateText(content) {
