@@ -1,4 +1,4 @@
-name: Verify complete local document outline
+name: Verify outline and search foreground integration
 on:
   push:
     branches: [ci/local-history-2f87]
@@ -13,8 +13,6 @@ jobs:
     timeout-minutes: 18
     steps:
       - uses: actions/checkout@v7
-      - name: Fetch exact accepted component for negative controls
-        run: git fetch --no-tags --depth=1 origin 921cb2553a8783b882618f7ba90c125d99ce3c42
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
@@ -22,32 +20,30 @@ jobs:
         with:
           go-version: '1.24.11'
           cache-dependency-path: server/go.sum
-      - name: Review historical issue catalog
-        run: node scripts/stage-review.mjs catalog
-      - name: Apply exact integration and standard minor version
-        run: node scripts/prepare-document-outline-2f94.mjs apply
-      - name: Install exact committed dependency graph
+      - name: Review historical issue catalog and lock
+        run: node scripts/stage-review.mjs catalog && node scripts/verify-dependency-lock.mjs
+      - name: Install exact committed dependencies
         run: npm ci --no-audit --no-fund
-      - name: Reproduce old empty entry ambiguity and clipboard failures
-        run: node scripts/prepare-document-outline-2f94.mjs baseline
-      - name: Outline model and original save guards
-        run: node --test scripts/document-outline.node.mjs scripts/editor-cache-regression.node.mjs scripts/editor-save-transaction.node.mjs scripts/editor-quit.node.mjs
-      - name: Actual Lexical outline lifecycle and original helpers
-        run: npx vitest run --root=. src/services/documentOutline.test.js src/components/Editor/plugins/DocumentOutlinePlugin.test.js src/components/Editor/plugins/DocumentOutline.lifecycle.test.jsx src/components/Editor/plugins/DocumentOutline.legacy-safety.test.jsx --reporter=json --outputFile=outline-module-evidence/module-tests.json
-      - name: Full original UI regression
-        run: npx vitest run --root=. --maxWorkers=4 --minWorkers=1 --reporter=json --outputFile=outline-module-evidence/full-ui.json
-      - name: Full production Go regression
-        run: go -C server test -json ./... > outline-module-evidence/go-tests.jsonl
-      - name: Complete main preload and renderer build
+      - name: Reproduce current outline foreground regression
+        run: node scripts/repair-outline-foreground.mjs baseline
+      - name: Apply source-guarded foreground fix and normal patch version
+        run: node scripts/repair-outline-foreground.mjs apply
+      - name: Actual outline search integration and original lifecycle contracts
+        run: npx vitest run --root=. src/components/Editor/plugins/OutlineSearch.integration.test.jsx src/components/Editor/plugins/DocumentOutline.lifecycle.test.jsx src/components/Editor/plugins/SearchPlugin.lifecycle.test.jsx --reporter=json --outputFile=outline-foreground-evidence/targeted.json
+      - name: All original UI regression tests
+        run: npx vitest run --root=. --maxWorkers=4 --minWorkers=1 --reporter=json --outputFile=outline-foreground-evidence/full-ui.json
+      - name: Preserve original outline search save and quit protections
+        run: node --test scripts/document-outline.node.mjs scripts/document-search.node.mjs scripts/editor-cache-regression.node.mjs scripts/editor-save-transaction.node.mjs scripts/editor-quit.node.mjs
+      - name: Build original full main preload and renderer
         run: npm run build:main && npm run build:renderer
-      - name: Emit only tested changed source objects
+      - name: Publish only tested changed code objects
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node scripts/prepare-document-outline-2f94.mjs publish
+        run: node scripts/repair-outline-foreground.mjs publish
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: outline-verification-${{ github.sha }}
-          path: outline-module-evidence/
+          name: outline-foreground-${{ github.sha }}
+          path: outline-foreground-evidence/
           retention-days: 7
           if-no-files-found: error

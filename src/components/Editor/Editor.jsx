@@ -200,7 +200,7 @@ export default function Editor({ documentId, documentTitle, initialContent, onCh
         <MarkdownSourcePlugin readOnly={readOnly} />
         <ResourceManagerPlugin readOnly={readOnly} />
         {!readOnly && <FloatingTextToolbarPlugin />}
-        <DocumentOutlinePlugin documentId={documentId} documentTitle={documentTitle} />
+        <DocumentOutlinePlugin documentId={documentId} documentTitle={documentTitle} initialContent={initialContent} requireLoaded />
         {!readOnly && <PasteImagePlugin />}
         <div className="editor-container">
           <RichTextPlugin
