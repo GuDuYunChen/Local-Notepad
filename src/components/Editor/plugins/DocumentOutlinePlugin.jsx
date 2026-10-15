@@ -1,770 +1,201 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
-import { $getRoot, $getSelection, $isRangeSelection } from 'lexical'
-import { $isHeadingNode } from '@lexical/rich-text'
-import { buildHeadingAnchor } from '../utils/linkUtils'
-import {
-  formatWikiReferenceText,
-  rememberReference,
-} from '../utils/referenceUtils'
-import { toast } from '~/services/toast'
+import React,{useEffect,useMemo,useRef,useState} from 'react'
+import {useLexicalComposerContext} from '@lexical/react/LexicalComposerContext'
+import {$getRoot,$getNodeByKey,$getSelection,$isRangeSelection} from 'lexical'
+import {$isHeadingNode} from '@lexical/rich-text'
+import {buildHeadingAnchor} from '../utils/linkUtils'
+import {formatWikiReferenceText,rememberReference} from '../utils/referenceUtils'
+import {isEvidenceContentReady,subscribeEvidenceContentReady} from '~/services/evidenceNavigation'
+import {OUTLINE_LIMITS,outlineSnapshot,filterOutline,expandedOutlineKeys,copyOutlineText,resolveOutlinePath,
+  calculateReadingProgress,getOutlineBreadcrumb,getCollapsedOutlineKeys,findOutlineHeadingForKey} from '~/services/documentOutline.mjs'
+import './DocumentOutline.css'
+export {calculateReadingProgress,getOutlineBreadcrumb,getCollapsedOutlineKeys,findOutlineHeadingForKey,findHeadingByPath} from '~/services/documentOutline.mjs'
 
-const levelLabel = {
-  h1: 1,
-  h2: 2,
-  h3: 3,
-  h4: 4,
-  h5: 5,
-  h6: 6,
-}
-
-export function calculateReadingProgress(scrollTop, scrollHeight, clientHeight) {
-  const top = Math.max(0, Number(scrollTop) || 0)
-  const total = Math.max(0, Number(scrollHeight) || 0)
-  const viewport = Math.max(0, Number(clientHeight) || 0)
-  const maxScroll = Math.max(0, total - viewport)
-
-  if (maxScroll <= 0) return 100
-
-  return Math.max(
-    0,
-    Math.min(100, Math.round((top / maxScroll) * 100))
-  )
-}
-
-export function getOutlineBreadcrumb(nodes, activeKey) {
-  const headings = (Array.isArray(nodes) ? nodes : []).filter(node => node?.isHeading)
-  const targetIndex = headings.findIndex(node => node.key === activeKey)
-  if (targetIndex < 0) return []
-
-  const target = headings[targetIndex]
-  const path = [target]
-  let currentLevel = target.level
-
-  for (let index = targetIndex - 1; index >= 0 && currentLevel > 1; index--) {
-    const candidate = headings[index]
-    if (candidate.level < currentLevel) {
-      path.unshift(candidate)
-      currentLevel = candidate.level
-    }
+export default function DocumentOutlinePlugin(props) {return <CurrentOutline key={props.documentId||''} {...props}/>}
+function CurrentOutline({documentId='',documentTitle='',initialContent,requireLoaded=false}) {
+  const [editor]=useLexicalComposerContext()
+  const [snapshot,setSnapshot]=useState({nodes:[],headings:[]}),[status,setStatus]=useState('loading')
+  const [open,setOpen]=useState(false),[search,setSearch]=useState(''),[query,setQuery]=useState('')
+  const [collapsed,setCollapsed]=useState(new Set()),[active,setActive]=useState(''),[caret,setCaret]=useState('')
+  const [bodyToggle,setBodyToggle]=useState(null)
+  const [progress,setProgress]=useState(0),[origin,setOrigin]=useState(null),[feedback,setFeedback]=useState(''),[error,setError]=useState(''),[copying,setCopying]=useState(false)
+  const state=useRef({}),alive=useRef(false),epoch=useRef(0),frames=useRef(new Set()),copy=useRef(null),flash=useRef(null),flashTimer=useRef(null)
+  const entry=useRef(null),queryInput=useRef(null),list=useRef(null),composing=useRef(false),display=useRef(new Map())
+  const ready=()=>!requireLoaded||isEvidenceContentReady(editor,documentId,initialContent)
+  const scroller=()=>editor.getRootElement()?.closest('.editor-container')
+  state.current={snapshot,status,open,collapsed,active,caret,query,documentTitle}
+  const clearFlash=()=>{clearTimeout(flashTimer.current);flash.current?.classList.remove('outline-target-flash');flash.current=null}
+  const invalidate=()=>{epoch.current++;for(const f of frames.current)cancelAnimationFrame(f);frames.current.clear();copy.current?.abort();clearFlash()}
+  const frame=fn=>{const id=requestAnimationFrame(()=>{frames.current.delete(id);fn()});frames.current.add(id)}
+  const resetDisplays=()=>{for(const [el,prior]of display.current){el.style.display=prior;el.classList.remove('outline-section-collapsed')}display.current.clear()}
+  const applyFolds=(nodes,keys)=>{
+    resetDisplays();const hidden=getCollapsedOutlineKeys(nodes,keys),root=editor.getRootElement()
+    for(const node of nodes){const el=editor.getElementByKey(node.key);if(!el||!root?.contains(el))continue;display.current.set(el,el.style.display);if(hidden.has(node.key))el.style.display='none';el.classList.toggle('outline-section-collapsed',node.isHeading&&keys.has(node.key))}
   }
-
-  return path
-}
-
-export function findHeadingByPath(nodes, path) {
-  const targetPath = (Array.isArray(path) ? path : [])
-    .map(value => String(value || '').trim().replace(/\s+/g, ' '))
-    .filter(Boolean)
-
-  if (!targetPath.length) return null
-
-  const headings = (Array.isArray(nodes) ? nodes : []).filter(node => node?.isHeading)
-
-  for (const heading of headings) {
-    const breadcrumb = getOutlineBreadcrumb(headings, heading.key)
-      .map(item => String(item.text || '').trim().replace(/\s+/g, ' '))
-
-    if (
-      breadcrumb.length === targetPath.length &&
-      breadcrumb.every((value, index) => value === targetPath[index])
-    ) {
-      return heading
-    }
+  const collect=()=>{
+    invalidate()
+    if(!ready()){setSnapshot({nodes:[],headings:[]});setStatus('loading');return}
+    try{
+      let next
+      editor.getEditorState().read(()=>{
+        const nodes=$getRoot().getChildren()
+        if(nodes.length>OUTLINE_LIMITS.blocks)throw Error('正文块超过大纲完整读取上限，未采用部分目录。')
+        next=outlineSnapshot(nodes.map(n=>{
+          const heading=$isHeadingNode(n)
+          if(heading&&n.getTextContentSize()>OUTLINE_LIMITS.title)throw Error('标题过长，未采用部分目录。')
+          return {key:n.getKey(),isHeading:heading,level:heading?Number(n.getTag().slice(1)):null,text:heading?n.getTextContent():''}
+        }))
+      })
+      setSnapshot(next);setStatus('ready');setError('')
+      setCollapsed(previous=>new Set([...previous].filter(key=>next.headings.some(h=>h.key===key))))
+      setActive(key=>next.headings.some(h=>h.key===key)?key:next.headings[0]?.key||'')
+    }catch(e){resetDisplays();setSnapshot({nodes:[],headings:[]});setCollapsed(new Set());setStatus('error');setError(e.message)}
   }
-
-  return null
-}
-
-export function getCollapsedOutlineKeys(nodes, collapsedKeys) {
-  const collapsed = collapsedKeys instanceof Set
-    ? collapsedKeys
-    : new Set(collapsedKeys || [])
-
-  const hidden = new Set()
-
-  for (let index = 0; index < nodes.length; index++) {
-    const node = nodes[index]
-    if (!node?.isHeading || !collapsed.has(node.key)) continue
-
-    for (let nextIndex = index + 1; nextIndex < nodes.length; nextIndex++) {
-      const next = nodes[nextIndex]
-      if (next?.isHeading && next.level <= node.level) break
-      hidden.add(next.key)
-    }
+  useEffect(()=>{
+    alive.current=true;collect()
+    const unsubscribe=subscribeEvidenceContentReady(()=>{if(alive.current)collect()})
+    const update=editor.registerUpdateListener(({editorState,dirtyElements,dirtyLeaves})=>{
+      if((dirtyElements?.size||0)+(dirtyLeaves?.size||0)>0)collect()
+      let key=''
+      editorState.read(()=>{const selection=$getSelection();if($isRangeSelection(selection))key=selection.anchor.getNode().getTopLevelElement()?.getKey()||''})
+      if(key)setCaret(key)
+    })
+    return()=>{alive.current=false;invalidate();unsubscribe();update();resetDisplays()}
+  },[editor,documentId,initialContent,requireLoaded])
+  useEffect(()=>{applyFolds(snapshot.nodes,collapsed);return resetDisplays},[editor,snapshot,collapsed])
+  const reveal=key=>{
+    const current=state.current,next=expandedOutlineKeys(current.snapshot.nodes,current.collapsed,key)
+    applyFolds(current.snapshot.nodes,next);setCollapsed(next)
   }
-
-  return hidden
-}
-
-export function findOutlineHeadingForKey(nodes, topLevelKey) {
-  const targetIndex = (Array.isArray(nodes) ? nodes : []).findIndex(node => node.key === topLevelKey)
-  if (targetIndex < 0) return null
-
-  for (let index = targetIndex; index >= 0; index--) {
-    if (nodes[index]?.isHeading) return nodes[index]
-  }
-
-  return null
-}
-
-async function copyText(value) {
-  if (navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(value)
-    return
-  }
-
-  const textarea = document.createElement('textarea')
-  textarea.value = value
-  textarea.setAttribute('readonly', '')
-  textarea.style.position = 'fixed'
-  textarea.style.opacity = '0'
-  document.body.appendChild(textarea)
-  textarea.select()
-  document.execCommand('copy')
-  textarea.remove()
-}
-
-function hasCollapsibleContent(nodes, headingKey) {
-  const index = nodes.findIndex(node => node.key === headingKey)
-  const heading = nodes[index]
-  if (index < 0 || !heading?.isHeading) return false
-
-  const next = nodes[index + 1]
-  if (!next) return false
-  return !(next.isHeading && next.level <= heading.level)
-}
-
-export default function DocumentOutlinePlugin({ documentId = '', documentTitle = '' }) {
-  const [editor] = useLexicalComposerContext()
-  const [headings, setHeadings] = useState([])
-  const [outlineNodes, setOutlineNodes] = useState([])
-  const [collapsedKeys, setCollapsedKeys] = useState(() => new Set())
-  const [activeKey, setActiveKey] = useState('')
-  const [caretTopLevelKey, setCaretTopLevelKey] = useState('')
-  const [readingProgress, setReadingProgress] = useState(0)
-  const [bodyToggle, setBodyToggle] = useState(null)
-  const [open, setOpen] = useState(false)
-  const [canReturn, setCanReturn] = useState(false)
-  const [copiedAnchorKey, setCopiedAnchorKey] = useState('')
-  const outlineListRef = useRef(null)
-  const navigationOriginRef = useRef(null)
-  const anchorCopyTimerRef = useRef(null)
-
-  useEffect(() => {
-    const collect = editorState => {
-      let nextHeadings = []
-      let nextNodes = []
-
-      editorState.read(() => {
-        nextNodes = $getRoot().getChildren().map(node => {
-          const isHeading = $isHeadingNode(node)
-          const level = isHeading ? (levelLabel[node.getTag()] || 1) : null
-          return {
-            key: node.getKey(),
-            isHeading,
-            level,
-            text: isHeading ? (node.getTextContent().trim() || '未命名标题') : '',
-          }
+  useEffect(()=>{
+    let scrollFrame=0,observer=null,unbind=()=>{}
+    const unregister=editor.registerRootListener(root=>{
+      unbind();observer?.disconnect();if(scrollFrame)cancelAnimationFrame(scrollFrame)
+      const box=root?.closest('.editor-container');if(!root||!box)return
+      const update=()=>{
+        if(scrollFrame)cancelAnimationFrame(scrollFrame)
+        scrollFrame=requestAnimationFrame(()=>{
+          scrollFrame=0;if(!alive.current)return
+          setProgress(calculateReadingProgress(box.scrollTop,box.scrollHeight,box.clientHeight))
+          const current=state.current,hidden=getCollapsedOutlineKeys(current.snapshot.nodes,current.collapsed)
+          const top=box.getBoundingClientRect().top+48
+          let key=current.snapshot.headings.find(h=>!hidden.has(h.key))?.key||''
+          for(const heading of current.snapshot.headings){if(hidden.has(heading.key))continue;const el=editor.getElementByKey(heading.key);if(el&&el.getBoundingClientRect().top<=top)key=heading.key}
+          setActive(key)
         })
-
-        nextHeadings = nextNodes.filter(node => node.isHeading)
-      })
-
-      setOutlineNodes(nextNodes)
-      setHeadings(nextHeadings)
-
-      const validHeadingKeys = new Set(nextHeadings.map(item => item.key))
-      setCollapsedKeys(previous => {
-        const next = new Set([...previous].filter(key => validHeadingKeys.has(key)))
-        if (next.size === previous.size && [...next].every(key => previous.has(key))) return previous
-        return next
-      })
-
-      if (nextHeadings.length < 2) setOpen(false)
-    }
-
-    collect(editor.getEditorState())
-    return editor.registerUpdateListener(({ editorState, dirtyElements, dirtyLeaves }) => {
-      const hasContentChanges = (dirtyElements?.size || 0) > 0 || (dirtyLeaves?.size || 0) > 0
-      if (!hasContentChanges) return
-      collect(editorState)
+      }
+      const revealCaret=()=>{invalidate();let key;editor.getEditorState().read(()=>{const s=$getSelection();if($isRangeSelection(s))key=s.anchor.getNode().getTopLevelElement()?.getKey()});if(key)reveal(key)}
+      const wheel=()=>invalidate()
+      box.addEventListener('scroll',update,{passive:true});box.addEventListener('wheel',wheel,{passive:true})
+      root.addEventListener('focus',revealCaret,true);root.addEventListener('keydown',revealCaret,true);window.addEventListener('resize',update)
+      if(typeof ResizeObserver==='function'){observer=new ResizeObserver(update);observer.observe(root);observer.observe(box)}
+      unbind=()=>{box.removeEventListener('scroll',update);box.removeEventListener('wheel',wheel);root.removeEventListener('focus',revealCaret,true);root.removeEventListener('keydown',revealCaret,true);window.removeEventListener('resize',update)}
+      update()
     })
-  }, [editor])
-
-  useEffect(() => editor.registerUpdateListener(({ editorState }) => {
-    let nextTopLevelKey = ''
-
-    editorState.read(() => {
-      const selection = $getSelection()
-      if (!$isRangeSelection(selection)) return
-      const anchorNode = selection.anchor.getNode()
-      const topLevel = anchorNode.getTopLevelElement?.()
-      nextTopLevelKey = topLevel?.getKey?.() || ''
-    })
-
-    if (nextTopLevelKey) {
-      setCaretTopLevelKey(previous => (
-        previous === nextTopLevelKey ? previous : nextTopLevelKey
-      ))
-    }
-  }), [editor])
-
-  const hiddenKeys = useMemo(
-    () => getCollapsedOutlineKeys(outlineNodes, collapsedKeys),
-    [outlineNodes, collapsedKeys]
-  )
-
-  const activeBreadcrumb = useMemo(
-    () => getOutlineBreadcrumb(headings, activeKey),
-    [headings, activeKey]
-  )
-
-  const currentReferenceBreadcrumb = useMemo(() => {
-    const caretHeading = findOutlineHeadingForKey(outlineNodes, caretTopLevelKey)
-    return caretHeading
-      ? getOutlineBreadcrumb(headings, caretHeading.key)
-      : activeBreadcrumb
-  }, [activeBreadcrumb, caretTopLevelKey, headings, outlineNodes])
-
-  useEffect(() => {
-    const onCopyCurrentReference = async () => {
-      if (!documentId || !documentTitle) {
-        toast.warning('当前没有可复制的笔记引用')
-        return
-      }
-
-      const sectionPath = currentReferenceBreadcrumb.map(item => item.text)
-      const referenceText = formatWikiReferenceText(documentTitle, sectionPath)
-
-      try {
-        await copyText(referenceText)
-        rememberReference({
-          id: documentId,
-          title: documentTitle,
-          sectionPath,
-        })
-        toast.success(sectionPath.length ? '当前章节引用已复制' : '当前笔记引用已复制')
-      } catch (error) {
-        console.error('复制当前引用失败', error)
-        toast.error('复制引用失败')
-      }
-    }
-
-    window.addEventListener('editor:copy-current-reference', onCopyCurrentReference)
-    return () => window.removeEventListener('editor:copy-current-reference', onCopyCurrentReference)
-  }, [currentReferenceBreadcrumb, documentId, documentTitle])
-
-  useEffect(() => {
-    if (!outlineNodes.length) return undefined
-
-    for (const node of outlineNodes) {
-      const element = editor.getElementByKey(node.key)
-      if (!element) continue
-      element.style.display = hiddenKeys.has(node.key) ? 'none' : ''
-      element.classList.toggle(
-        'outline-section-collapsed',
-        Boolean(node.isHeading && collapsedKeys.has(node.key))
-      )
-    }
-
-    return () => {
-      for (const node of outlineNodes) {
-        const element = editor.getElementByKey(node.key)
-        if (!element) continue
-        element.style.display = ''
-        element.classList.remove('outline-section-collapsed')
-      }
-    }
-  }, [editor, outlineNodes, hiddenKeys, collapsedKeys])
-
-  useEffect(() => {
-    const rootElement = editor.getRootElement()
-    const scroller = rootElement?.closest('.editor-container')
-    if (!rootElement || !scroller) return undefined
-
-    let frame = 0
-
-    const updateScrollState = () => {
-      if (frame) window.cancelAnimationFrame(frame)
-      frame = window.requestAnimationFrame(() => {
-        setReadingProgress(calculateReadingProgress(
-          scroller.scrollTop,
-          scroller.scrollHeight,
-          scroller.clientHeight,
-        ))
-
-        if (!headings.length) {
-          setActiveKey('')
-          return
-        }
-
-        const scrollerRect = scroller.getBoundingClientRect()
-        const anchorY = scrollerRect.top + Math.min(150, scrollerRect.height * 0.22)
-        let nextKey = headings.find(heading => !hiddenKeys.has(heading.key))?.key || ''
-
-        for (const heading of headings) {
-          if (hiddenKeys.has(heading.key)) continue
-          const element = editor.getElementByKey(heading.key)
-          if (!element) continue
-          const rect = element.getBoundingClientRect()
-          if (rect.top <= anchorY) nextKey = heading.key
-          else break
-        }
-
-        setActiveKey(previous => previous === nextKey ? previous : nextKey)
-      })
-    }
-
-    updateScrollState()
-    scroller.addEventListener('scroll', updateScrollState, { passive: true })
-    window.addEventListener('resize', updateScrollState)
-
-    const resizeObserver = typeof ResizeObserver === 'function'
-      ? new ResizeObserver(updateScrollState)
-      : null
-    resizeObserver?.observe(rootElement)
-    resizeObserver?.observe(scroller)
-
-    return () => {
-      if (frame) window.cancelAnimationFrame(frame)
-      resizeObserver?.disconnect()
-      scroller.removeEventListener('scroll', updateScrollState)
-      window.removeEventListener('resize', updateScrollState)
-    }
-  }, [editor, headings, hiddenKeys])
-
-  useEffect(() => {
-    if (!open || !activeKey || !outlineListRef.current) return
-
-    const list = outlineListRef.current
-    const row = Array.from(list.querySelectorAll('[data-outline-key]'))
-      .find(element => element.dataset.outlineKey === activeKey)
-
-    if (!row) return
-
-    const listRect = list.getBoundingClientRect()
-    const rowRect = row.getBoundingClientRect()
-    if (rowRect.top >= listRect.top && rowRect.bottom <= listRect.bottom) return
-
-    const nextTop = list.scrollTop + rowRect.top - listRect.top - listRect.height * 0.35
-    list.scrollTo({
-      top: Math.max(0, nextTop),
-      behavior: 'smooth',
-    })
-  }, [activeKey, open])
-
-  useEffect(() => {
-    const toggleOutline = () => {
-      if (headings.length < 2) return
-      setOpen(value => !value)
-    }
-
-    const onKeyDown = event => {
-      if (
-        (event.ctrlKey || event.metaKey) &&
-        event.shiftKey &&
-        event.key.toLowerCase() === 'o'
-      ) {
-        event.preventDefault()
-        toggleOutline()
-      }
-    }
-
-    window.addEventListener('keydown', onKeyDown)
-    window.addEventListener('editor:toggle-outline', toggleOutline)
-    return () => {
-      window.removeEventListener('keydown', onKeyDown)
-      window.removeEventListener('editor:toggle-outline', toggleOutline)
-    }
-  }, [headings.length])
-
-  useEffect(() => {
-    const rootElement = editor.getRootElement()
-    const scroller = rootElement?.closest('.editor-container')
-    if (!rootElement || !scroller) return undefined
-
-    const onMouseMove = event => {
-      const headingElement = event.target?.closest?.('h1, h2, h3, h4, h5, h6')
-      if (!headingElement || !rootElement.contains(headingElement)) {
-        setBodyToggle(null)
-        return
-      }
-
-      const heading = headings.find(item => editor.getElementByKey(item.key) === headingElement)
-      if (!heading || !hasCollapsibleContent(outlineNodes, heading.key)) {
-        setBodyToggle(null)
-        return
-      }
-
-      const rect = headingElement.getBoundingClientRect()
-      setBodyToggle({
-        key: heading.key,
-        collapsed: collapsedKeys.has(heading.key),
-        top: rect.top + Math.max(0, (rect.height - 24) / 2),
-        left: Math.max(6, rect.left - 32),
-      })
-    }
-
-    const hide = () => setBodyToggle(null)
-
-    rootElement.addEventListener('mousemove', onMouseMove)
-    scroller.addEventListener('scroll', hide, { passive: true })
-    window.addEventListener('resize', hide)
-
-    return () => {
-      rootElement.removeEventListener('mousemove', onMouseMove)
-      scroller.removeEventListener('scroll', hide)
-      window.removeEventListener('resize', hide)
-    }
-  }, [editor, headings, outlineNodes, collapsedKeys])
-
-  const expandForTopLevelKey = topLevelKey => {
-    if (!topLevelKey || !outlineNodes.length) return null
-
-    const heading = findOutlineHeadingForKey(outlineNodes, topLevelKey)
-    if (!heading) return null
-
-    setCollapsedKeys(previous => {
-      if (!previous.size) return previous
-
-      let changed = false
-      const next = new Set(previous)
-
-      for (const collapsedKey of previous) {
-        const hiddenByHeading = getCollapsedOutlineKeys(outlineNodes, new Set([collapsedKey]))
-        if (hiddenByHeading.has(topLevelKey) || hiddenByHeading.has(heading.key)) {
-          next.delete(collapsedKey)
-          changed = true
-        }
-      }
-
-      return changed ? next : previous
-    })
-
-    return heading
+    return()=>{unregister();unbind();observer?.disconnect();if(scrollFrame)cancelAnimationFrame(scrollFrame)}
+  },[editor])
+  const close=()=>{invalidate();setOpen(false);setFeedback('');entry.current?.focus({preventScroll:true})}
+  const scrollToKey=(key,{heading=true,remember=true}={})=>{
+    invalidate();setError('');setFeedback('')
+    const current=state.current,reviewed=current.snapshot.nodes.find(n=>n.key===key)
+    if(current.status!=='ready'||!ready()||!reviewed||(heading&&!reviewed.isHeading)){setError('章节已变化或正文尚未就绪，请重新读取大纲。');return}
+    const ticket=epoch.current,box=scroller();if(!box){setError('正文滚动区域尚未就绪，请重试。');return}
+    if(remember)setOrigin(box.scrollTop)
+    reveal(key)
+    frame(()=>frame(()=>{
+      if(!alive.current||ticket!==epoch.current||!ready())return
+      let valid=false
+      editor.getEditorState().read(()=>{const n=$getNodeByKey(key);valid=!!n&&n.getParent()?.getType()==='root'&&(!heading||$isHeadingNode(n)&&n.getTextContent().trim().replace(/\s+/g,' ')===reviewed.rawText)})
+      const el=editor.getElementByKey(key),root=editor.getRootElement()
+      if(!valid||!el||!root?.contains(el)||!el.isConnected){setError('章节已变化或不可定位，请重新读取；正文未改动。');return}
+      const target=Math.max(0,box.scrollTop+el.getBoundingClientRect().top-box.getBoundingClientRect().top-24)
+      box.scrollTo({top:target,behavior:'auto'})
+      const owner=findOutlineHeadingForKey(current.snapshot.nodes,key)
+      setActive(owner?.key||'');clearFlash();flash.current=el;el.classList.add('outline-target-flash');flashTimer.current=setTimeout(clearFlash,900)
+      setFeedback('已定位：'+(owner?.text||'最后输入位置'))
+    }))
   }
-
-  useEffect(() => {
-    const onSearchMatch = event => {
-      const topLevelKey = event.detail?.topLevelKey
-      const heading = expandForTopLevelKey(topLevelKey)
-      if (!heading) return
-
-      setActiveKey(heading.key)
-      if (headings.length >= 2) setOpen(true)
+  const copyPath=async(heading,wholeNote=false)=>{
+    if(copy.current)return
+    const current=state.current
+    if(!ready()||current.status!=='ready'){setError('正文尚未就绪，不能复制旧大纲。');return}
+    const path=heading?getOutlineBreadcrumb(current.snapshot.nodes,heading.key).map(n=>n.rawText):[]
+    if(heading&&resolveOutlinePath(current.snapshot.nodes,path).status!=='found'){setError('章节路径为空或存在同名歧义，未复制；请通过目录条目直接定位。');return}
+    const title=state.current.documentTitle
+    const value=wholeNote?formatWikiReferenceText(title,path):buildHeadingAnchor(path)
+    const ctl=new AbortController(),ticket=epoch.current;copy.current=ctl;setCopying(true);setError('')
+    try{
+      await copyOutlineText(value,{signal:ctl.signal})
+      if(!alive.current||ticket!==epoch.current||ctl.signal.aborted)return
+      if(wholeNote&&title===state.current.documentTitle){try{rememberReference({id:documentId,title,sectionPath:path})}catch{setFeedback('引用已复制；本机最近引用记录未保存。');return}}
+      setFeedback(wholeNote?'引用已复制':'章节锚点已复制')
+    }catch(e){if(alive.current&&!ctl.signal.aborted)setError(e.message)}
+    finally{if(copy.current===ctl)copy.current=null;if(alive.current)setCopying(false)}
+  }
+  useEffect(()=>{
+    const toggle=()=>{if(state.current.open)close();else {setOpen(true);frame(()=>{if(alive.current)queryInput.current?.focus({preventScroll:true})})}}
+    const keyboard=e=>{if(e.isComposing||e.keyCode===229||composing.current)return;if((e.ctrlKey||e.metaKey)&&e.shiftKey&&e.key.toLowerCase()==='o'){e.preventDefault();toggle()}}
+    const anchor=e=>{
+      if(e.detail?.documentId&&e.detail.documentId!==documentId)return
+      const result=resolveOutlinePath(state.current.snapshot.nodes,e.detail?.path);setOpen(true)
+      if(result.status!=='found'){setError(result.status==='ambiguous'?'存在同名章节路径，请在目录中直接选择；未自动跳转。':'未找到该章节，可能已改名或移除；未自动跳转。');return}
+      scrollToKey(result.heading.key)
     }
-
-    window.addEventListener('editor:search-match', onSearchMatch)
-    return () => window.removeEventListener('editor:search-match', onSearchMatch)
-  }, [outlineNodes, headings.length])
-
-  const getScroller = () => (
-    editor.getRootElement()?.closest('.editor-container') || null
-  )
-
-  const scrollToElement = (element, behavior = 'smooth') => {
-    const scroller = getScroller()
-    if (!scroller || !element) return
-
-    const scrollerRect = scroller.getBoundingClientRect()
-    const elementRect = element.getBoundingClientRect()
-    const targetTop = Math.max(
-      0,
-      scroller.scrollTop + elementRect.top - scrollerRect.top - 24
-    )
-
-    scroller.scrollTo({
-      top: targetTop,
-      behavior,
-    })
-  }
-
-  const rememberNavigationOrigin = () => {
-    const scroller = getScroller()
-    if (!scroller) return
-    navigationOriginRef.current = scroller.scrollTop
-    setCanReturn(true)
-  }
-
-  const flashElement = element => {
-    window.setTimeout(() => {
-      element.classList.add('outline-target-flash')
-      window.setTimeout(() => element.classList.remove('outline-target-flash'), 900)
-    }, 180)
-  }
-
-  const goToHeading = (key, rememberOrigin = true) => {
-    const element = editor.getElementByKey(key)
-    if (!element) return
-
-    if (rememberOrigin) rememberNavigationOrigin()
-    setActiveKey(key)
-    scrollToElement(element)
-    flashElement(element)
-  }
-
-  const goToCaret = () => {
-    if (!caretTopLevelKey) return
-
-    const heading = expandForTopLevelKey(caretTopLevelKey)
-    const element = editor.getElementByKey(caretTopLevelKey)
-    if (!element) return
-
-    rememberNavigationOrigin()
-    if (heading) setActiveKey(heading.key)
-
-    window.requestAnimationFrame(() => {
-      scrollToElement(element)
-      flashElement(element)
-    })
-  }
-
-  const returnToOrigin = () => {
-    const scroller = getScroller()
-    const origin = navigationOriginRef.current
-    if (!scroller || typeof origin !== 'number') return
-
-    scroller.scrollTo({
-      top: origin,
-      behavior: 'smooth',
-    })
-    navigationOriginRef.current = null
-    setCanReturn(false)
-  }
-
-  const toggleCollapsed = key => {
-    setCollapsedKeys(previous => {
-      const next = new Set(previous)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      return next
-    })
-  }
-
-  const copyHeadingAnchor = async heading => {
-    const breadcrumb = getOutlineBreadcrumb(headings, heading.key)
-    const href = buildHeadingAnchor(breadcrumb.map(item => item.text))
-    if (!href) return
-
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(href)
-      } else {
-        const textarea = document.createElement('textarea')
-        textarea.value = href
-        textarea.setAttribute('readonly', '')
-        textarea.style.position = 'fixed'
-        textarea.style.opacity = '0'
-        document.body.appendChild(textarea)
-        textarea.select()
-        document.execCommand('copy')
-        textarea.remove()
-      }
-
-      if (anchorCopyTimerRef.current) {
-        window.clearTimeout(anchorCopyTimerRef.current)
-      }
-      setCopiedAnchorKey(heading.key)
-      anchorCopyTimerRef.current = window.setTimeout(() => {
-        setCopiedAnchorKey('')
-        anchorCopyTimerRef.current = null
-      }, 1200)
-    } catch {
-      // Copying an anchor is optional; navigation remains usable.
+    const searchMatch=e=>{if(e.detail?.documentId&&e.detail.documentId!==documentId)return;const key=e.detail?.topLevelKey;if(!state.current.snapshot.nodes.some(n=>n.key===key))return;reveal(key);const h=findOutlineHeadingForKey(state.current.snapshot.nodes,key);if(h)setActive(h.key)}
+    const currentReference=()=>{setOpen(true);if(!documentId||!state.current.documentTitle){setError('当前没有可复制的笔记引用。');return};const now=state.current;const h=findOutlineHeadingForKey(now.snapshot.nodes,now.caret)||now.snapshot.headings.find(h=>h.key===now.active);void copyPath(h,true)}
+    window.addEventListener('keydown',keyboard);window.addEventListener('editor:toggle-outline',toggle);window.addEventListener('editor:open-heading-anchor',anchor);window.addEventListener('editor:search-match',searchMatch);window.addEventListener('editor:copy-current-reference',currentReference)
+    return()=>{window.removeEventListener('keydown',keyboard);window.removeEventListener('editor:toggle-outline',toggle);window.removeEventListener('editor:open-heading-anchor',anchor);window.removeEventListener('editor:search-match',searchMatch);window.removeEventListener('editor:copy-current-reference',currentReference)}
+  },[editor,documentId,initialContent,requireLoaded])
+  const view=useMemo(()=>{try{return {rows:filterOutline(snapshot.nodes,query,collapsed),error:''}}catch(e){return{rows:[],error:e.message}}},[snapshot,query,collapsed])
+  const path=getOutlineBreadcrumb(snapshot.nodes,active)
+  const fold=key=>{invalidate();setCollapsed(previous=>{const next=new Set(previous);next.has(key)?next.delete(key):next.add(key);return next})}
+  const next=direction=>{if(composing.current||!view.rows.length)return;const index=view.rows.findIndex(h=>h.key===active);scrollToKey(view.rows[index<0?(direction>0?0:view.rows.length-1):(index+direction+view.rows.length)%view.rows.length].key)}
+  useEffect(()=>{
+    const root=editor.getRootElement(),box=scroller();if(!root||!box)return
+    const hide=()=>setBodyToggle(null)
+    const move=e=>{
+      const el=e.target?.closest?.('h1,h2,h3,h4,h5,h6')
+      const h=el&&root.contains(el)&&snapshot.headings.find(n=>editor.getElementByKey(n.key)===el)
+      const index=h?snapshot.nodes.findIndex(n=>n.key===h.key):-1,after=snapshot.nodes[index+1]
+      if(!h||!after||after.isHeading&&after.level<=h.level){hide();return}
+      const r=el.getBoundingClientRect();setBodyToggle({key:h.key,left:Math.max(6,r.left-32),top:r.top+Math.max(0,(r.height-24)/2)})
     }
-  }
-
-  useEffect(() => {
-    const onOpenHeadingAnchor = event => {
-      const target = findHeadingByPath(headings, event.detail?.path)
-      if (!target) return
-
-      const breadcrumb = getOutlineBreadcrumb(headings, target.key)
-      const ancestorKeys = new Set(breadcrumb.map(item => item.key))
-
-      rememberNavigationOrigin()
-      setOpen(true)
-      setCollapsedKeys(previous => {
-        let changed = false
-        const next = new Set(previous)
-        for (const key of ancestorKeys) {
-          if (next.delete(key)) changed = true
-        }
-        return changed ? next : previous
-      })
-
-      window.requestAnimationFrame(() => {
-        window.requestAnimationFrame(() => goToHeading(target.key, false))
-      })
-    }
-
-    window.addEventListener('editor:open-heading-anchor', onOpenHeadingAnchor)
-    return () => window.removeEventListener('editor:open-heading-anchor', onOpenHeadingAnchor)
-  }, [headings])
-
-  useEffect(() => () => {
-    if (anchorCopyTimerRef.current) {
-      window.clearTimeout(anchorCopyTimerRef.current)
-      anchorCopyTimerRef.current = null
-    }
-  }, [])
-
-  const visibleHeadings = headings.filter(heading => !hiddenKeys.has(heading.key))
-
-  return (
-    <>
-      <div
-        className="document-reading-progress"
-        aria-hidden="true"
-        title={'阅读进度 ' + readingProgress + '%'}
-      >
-        <span style={{ width: String(readingProgress) + '%' }} />
-      </div>
-
-      {bodyToggle && (
-        <button
-          type="button"
-          className={'heading-body-collapse' + (bodyToggle.collapsed ? ' collapsed' : '')}
-          style={{ top: bodyToggle.top, left: bodyToggle.left }}
-          onMouseDown={event => event.preventDefault()}
-          onClick={() => {
-            toggleCollapsed(bodyToggle.key)
-            setBodyToggle(previous => previous ? { ...previous, collapsed: !previous.collapsed } : previous)
-          }}
-          aria-label={bodyToggle.collapsed ? '展开当前章节' : '折叠当前章节'}
-          title={bodyToggle.collapsed ? '展开章节' : '折叠章节'}
-        >
-          ›
-        </button>
-      )}
-
-      {headings.length >= 2 && (
-        <div className={'document-outline' + (open ? ' open' : '')}>
-          <button
-            type="button"
-            className="document-outline-toggle"
-            onClick={() => setOpen(prev => !prev)}
-            aria-expanded={open}
-            aria-label="文档目录"
-            title="文档目录 (Ctrl+Shift+O)"
-          >
-            <span aria-hidden="true">☰</span>
-            <span>{headings.length}</span>
-          </button>
-
-          {open && (
-            <div className="document-outline-panel">
-              <div
-                className="document-outline-progress-track"
-                aria-label={'阅读进度 ' + readingProgress + '%'}
-              >
-                <span style={{ width: String(readingProgress) + '%' }} />
-              </div>
-
-              <div className="document-outline-header">
-                <div>
-                  <strong>文档目录</strong>
-                  <small>滚动自动跟随 · # 可复制章节锚点</small>
-                </div>
-                <div className="document-outline-header-actions">
-                  <span>{readingProgress}%</span>
-                  <button
-                    type="button"
-                    onClick={() => window.dispatchEvent(new Event('editor:open-structure-manager'))}
-                    title="打开长篇结构管理"
-                  >
-                    结构
-                  </button>
-                  <button
-                    type="button"
-                    onClick={goToCaret}
-                    disabled={!caretTopLevelKey}
-                    title="回到最后输入位置"
-                  >
-                    光标
-                  </button>
-                  {canReturn && (
-                    <button
-                      type="button"
-                      onClick={returnToOrigin}
-                      title="返回目录跳转前的位置"
-                    >
-                      返回
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {activeBreadcrumb.length > 0 && (
-                <div className="document-outline-context" aria-label="当前章节路径">
-                  <span>当前位置</span>
-                  <div>
-                    {activeBreadcrumb.map((heading, index) => (
-                      <React.Fragment key={heading.key}>
-                        {index > 0 && <i aria-hidden="true">›</i>}
-                        <button
-                          type="button"
-                          onClick={() => goToHeading(heading.key)}
-                          title={heading.text}
-                        >
-                          {heading.text}
-                        </button>
-                      </React.Fragment>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="document-outline-list" ref={outlineListRef}>
-                {visibleHeadings.map(heading => {
-                  const collapsible = hasCollapsibleContent(outlineNodes, heading.key)
-                  const collapsed = collapsedKeys.has(heading.key)
-
-                  return (
-                    <div
-                      key={heading.key}
-                      data-outline-key={heading.key}
-                      className={'document-outline-row level-' + Math.min(heading.level, 4) + (activeKey === heading.key ? ' active' : '')}
-                    >
-                      <button
-                        type="button"
-                        className="document-outline-collapse"
-                        onClick={() => collapsible && toggleCollapsed(heading.key)}
-                        disabled={!collapsible}
-                        aria-label={collapsed ? '展开章节' : '折叠章节'}
-                        title={collapsible ? (collapsed ? '展开章节' : '折叠章节') : ''}
-                      >
-                        <span className={collapsed ? '' : 'open'}>›</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        className="document-outline-item"
-                        onClick={() => goToHeading(heading.key)}
-                        title={heading.text}
-                        aria-current={activeKey === heading.key ? 'location' : undefined}
-                      >
-                        {heading.text}
-                      </button>
-
-                      <button
-                        type="button"
-                        className={'document-outline-anchor' + (copiedAnchorKey === heading.key ? ' copied' : '')}
-                        onClick={() => void copyHeadingAnchor(heading)}
-                        aria-label={'复制章节锚点：' + heading.text}
-                        title="复制章节锚点"
-                      >
-                        {copiedAnchorKey === heading.key ? '✓' : '#'}
-                      </button>
-                    </div>
-                  )
-                })}
-              </div>
+    root.addEventListener('mousemove',move);box.addEventListener('scroll',hide,{passive:true});window.addEventListener('resize',hide)
+    return()=>{root.removeEventListener('mousemove',move);box.removeEventListener('scroll',hide);window.removeEventListener('resize',hide)}
+  },[editor,snapshot])
+  useEffect(()=>{
+    if(!open||!active||!list.current)return
+    const row=[...list.current.querySelectorAll('[data-outline-key]')].find(el=>el.dataset.outlineKey===active)
+    if(!row)return;const a=row.getBoundingClientRect(),b=list.current.getBoundingClientRect()
+    if(a.top<b.top||a.bottom>b.bottom)list.current.scrollTo?.({top:Math.max(0,list.current.scrollTop+a.top-b.top-24),behavior:'auto'})
+  },[open,active])
+  return <>
+    {bodyToggle&&<button type="button" className={'heading-body-collapse'+(collapsed.has(bodyToggle.key)?' collapsed':'')} style={{top:bodyToggle.top,left:bodyToggle.left}} onMouseDown={e=>e.preventDefault()} onClick={()=>fold(bodyToggle.key)} aria-label={collapsed.has(bodyToggle.key)?'展开当前章节':'折叠当前章节'}>›</button>}
+    <div className="document-reading-progress" aria-hidden="true"><span style={{width:progress+'%'}}/></div>
+    <div className={'document-outline local-outline'+(open?' open':'')} onKeyDown={e=>{if(e.key==='Escape'&&!e.isComposing&&!composing.current&&open){e.preventDefault();e.stopPropagation();close()}}}>
+      <button ref={entry} type="button" className="document-outline-toggle" aria-label="文档目录" aria-expanded={open} title="文档目录 (Ctrl+Shift+O)" onClick={()=>open?close():setOpen(true)}><span aria-hidden="true">☰</span><span>{snapshot.headings.length}</span></button>
+      {open&&<section className="document-outline-panel" aria-label="当前文档大纲">
+        <div className="document-outline-header"><div><strong>文档目录</strong><small>当前正文 · 只读导航</small></div><button type="button" aria-label="关闭文档目录" onClick={close}>×</button></div>
+        <div className="outline-tools"><button type="button" onClick={()=>{invalidate();collect()}}>重新读取大纲</button><button type="button" disabled={!collapsed.size} onClick={()=>{invalidate();setCollapsed(new Set())}}>展开全部</button><button type="button" onClick={()=>window.dispatchEvent(new Event('editor:open-structure-manager'))}>结构</button></div>
+        {status==='loading'&&<p role="status">正文正在加载，暂不显示旧目录。</p>}
+        {(error||view.error)&&<p className="outline-error" role="alert">{error||view.error}</p>}
+        {feedback&&<p className="outline-feedback" role="status">{feedback}</p>}
+        {status==='ready'&&<>
+          {!snapshot.headings.length?<p className="outline-empty" role="status">当前正文没有标题。使用编辑器的标题样式后，这里会自动生成目录。</p>:<>
+            <label className="outline-query">查找章节<input ref={queryInput} aria-label="查找章节" value={search} onCompositionStart={()=>{composing.current=true}} onCompositionEnd={e=>{composing.current=false;setQuery(e.currentTarget.value)}} onChange={e=>{setSearch(e.target.value);if(!composing.current)setQuery(e.target.value)}} onKeyDown={e=>{if(e.key==='Enter'&&!e.isComposing&&!composing.current){e.preventDefault();next(e.shiftKey?-1:1)}}} placeholder="标题或上级章节名称"/></label>
+            <p className="outline-count">显示 {view.rows.length} / {snapshot.headings.length} 个标题 · 阅读 {progress}%</p>
+            {path.length>0&&<p className="outline-breadcrumb" aria-label="当前章节路径">{path.map(p=>p.text).join(' › ')}</p>}
+            <div className="outline-tools"><button type="button" disabled={!view.rows.length} onClick={()=>next(-1)}>上一章节</button><button type="button" disabled={!view.rows.length} onClick={()=>next(1)}>下一章节</button><button type="button" disabled={!caret} onClick={()=>scrollToKey(caret,{heading:false})}>光标</button><button type="button" disabled={origin===null} onClick={()=>{invalidate();const box=scroller();if(box&&ready()){box.scrollTo({top:origin,behavior:'auto'});setOrigin(null);setFeedback('已返回跳转前的位置')}}}>返回</button></div>
+            <div className="document-outline-list" ref={list}>
+              {!view.rows.length&&!view.error&&<p role="status">没有匹配的章节，清除查找条件可查看完整目录。</p>}
+              {view.rows.map(h=>{const index=snapshot.nodes.findIndex(n=>n.key===h.key),after=snapshot.nodes[index+1],collapsible=after&&(!after.isHeading||after.level>h.level);return <div key={h.key} data-outline-key={h.key} className={'document-outline-row level-'+Math.min(4,h.level)+(active===h.key?' active':'')}>
+                <button type="button" className="document-outline-collapse" disabled={!collapsible} aria-label={(collapsed.has(h.key)?'展开章节：':'折叠章节：')+h.text} aria-expanded={!collapsed.has(h.key)} onClick={()=>fold(h.key)}><span className={collapsed.has(h.key)?'':'open'}>›</span></button>
+                <button type="button" className="document-outline-item" onClick={()=>scrollToKey(h.key)} aria-current={active===h.key?'location':undefined} title={getOutlineBreadcrumb(snapshot.nodes,h.key).map(p=>p.text).join(' › ')}>{h.text}</button>
+                <button type="button" className="document-outline-anchor" disabled={copying} aria-label={'复制章节锚点：'+h.text} onClick={()=>void copyPath(h)}>#</button>
+              </div>})}
             </div>
-          )}
-        </div>
-      )}
-    </>
-  )
+          </>}
+        </>}
+      </section>}
+    </div>
+  </>
 }

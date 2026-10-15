@@ -1,0 +1,30 @@
+import assert from 'node:assert/strict'
+import {outlineSnapshot,resolveOutlinePath,filterOutline,expandedOutlineKeys,getCollapsedOutlineKeys,copyOutlineText,calculateReadingProgress} from '../src/services/documentOutline.mjs'
+const heading=(key,text,level=1)=>({key,text,level,isHeading:true})
+const nodes=[heading('a','卷一'),heading('b','章节',2),{key:'p',isHeading:false},heading('c','另一节',2),heading('d','卷二')]
+export function registerDocumentOutlineTests(test) {
+  test('complete immutable outline preserves hierarchy and does not mutate input',()=>{const out=outlineSnapshot(nodes);assert.equal(out.headings.length,4);assert.ok(Object.isFrozen(out.nodes));assert.equal(nodes[1].text,'章节')})
+  test('empty document is a valid empty outline',()=>assert.equal(outlineSnapshot([]).headings.length,0))
+  test('single heading remains usable',()=>assert.equal(filterOutline(outlineSnapshot([heading('a','唯一')]).nodes,'').length,1))
+  test('hierarchical paths resolve exact single targets',()=>assert.equal(resolveOutlinePath(nodes,['卷一','章节']).heading.key,'b'))
+  test('ambiguous sibling heading path never chooses the first match',()=>assert.equal(resolveOutlinePath([...nodes.slice(0,3),heading('x','章节',2)],['卷一','章节']).status,'ambiguous'))
+  test('same name beneath different parents remains distinguishable',()=>assert.equal(resolveOutlinePath([...nodes,heading('e','章节',2)],['卷二','章节']).heading.key,'e'))
+  test('empty path parts cannot become an unintended shorter path',()=>assert.equal(resolveOutlinePath(nodes,['','卷一']).status,'missing'))
+  test('whitespace-normalized duplicate paths remain ambiguous',()=>assert.equal(resolveOutlinePath([heading('a','A  B'),heading('b','A B')],[' A B ']).status,'ambiguous'))
+  test('empty heading remains visible but does not mint a placeholder anchor',()=>{const out=outlineSnapshot([heading('x',' ')]);assert.equal(out.headings[0].text,'未命名标题');assert.equal(resolveOutlinePath(out.nodes,['未命名标题']).status,'missing')})
+  test('search is literal and includes ancestor names',()=>{assert.deepEqual(filterOutline(nodes,'卷一').map(n=>n.key),['a','b','c']);assert.equal(filterOutline(nodes,'[').length,0)})
+  test('collapsed descendants remain searchable and expand for navigation',()=>{const keys=new Set(['a','b']);assert.deepEqual(filterOutline(nodes,'',keys).map(n=>n.key),['a','d']);assert.deepEqual(filterOutline(nodes,'章节',keys).map(n=>n.key),['b']);assert.deepEqual([...expandedOutlineKeys(nodes,keys,'p')],[]);assert.equal(keys.size,2)})
+  test('folds stop at the next sibling and never hide their own heading',()=>assert.deepEqual([...getCollapsedOutlineKeys(nodes,new Set(['b']))],['p']))
+  test('missing navigation keys do not expand unrelated folds',()=>assert.deepEqual([...expandedOutlineKeys(nodes,new Set(['a']),'missing')],['a']))
+  for(const [label,value]of [['not-array',{}],['duplicate',[heading('a','X'),heading('a','Y')]],['bad-level',[heading('a','X',7)]],['bad-text',[heading('a',null)]],['too-many-headings',Array.from({length:501},(_,i)=>heading(String(i),'X'))],['large-title',[heading('a','x'.repeat(4001))]],['many-blocks',Array.from({length:10001},(_,i)=>({key:String(i)}))],['aggregate-size',Array.from({length:40},(_,i)=>heading(String(i),'x'.repeat(3000)))]])test('refuses '+label+' rather than publishing a partial outline',()=>assert.throws(()=>outlineSnapshot(value)))
+  test('oversize query produces explicit failure rather than silently truncating',()=>assert.throws(()=>filterOutline(nodes,'x'.repeat(201))))
+  test('nonfinite scroll values do not emit invalid percentages',()=>{assert.equal(calculateReadingProgress(Infinity,100,10),0);assert.equal(calculateReadingProgress(500,100,10),100);assert.equal(calculateReadingProgress(0,0,100),100)})
+  test('clipboard success requires actual resolved write',async()=>{let value;await copyOutlineText('anchor',{navigator:{clipboard:{writeText:async text=>{value=text}}}});assert.equal(value,'anchor')})
+  test('clipboard rejection is not a successful copy',async()=>await assert.rejects(copyOutlineText('anchor',{navigator:{clipboard:{writeText:()=>Promise.reject(Error('private-path'))}}}),e=>!e.message.includes('private-path')))
+  test('fallback false result fails and always removes its temporary field',async()=>{let removed=0;const doc={body:{append(){}},activeElement:null,createElement:()=>({style:{},select(){},remove(){removed++}}),execCommand:()=>false};await assert.rejects(copyOutlineText('anchor',{navigator:{},document:doc}));assert.equal(removed,1)})
+  test('fallback success preserves focus and reports success',async()=>{let focused=0;const doc={body:{append(){}},activeElement:{isConnected:true,focus(){focused++}},createElement:()=>({style:{},select(){},remove(){}}),execCommand:()=>true};await copyOutlineText('anchor',{navigator:{},document:doc});assert.equal(focused,1)})
+  test('unsupported clipboard cannot pretend to succeed',async()=>await assert.rejects(copyOutlineText('anchor',{navigator:{},document:{}})))
+  test('timeout consumes a late clipboard rejection without success',async()=>{let reject;await assert.rejects(copyOutlineText('anchor',{navigator:{clipboard:{writeText:()=>new Promise((_,r)=>reject=r)}},timeout:8}));reject(Error('late'));await Promise.resolve()})
+  test('cancellation before dispatch sends no clipboard write',async()=>{const ctl=new AbortController();let calls=0;const p=copyOutlineText('anchor',{navigator:{clipboard:{writeText:()=>calls++}},signal:ctl.signal});ctl.abort();await assert.rejects(p);assert.equal(calls,0)})
+  test('aborted pending clipboard does not yield late success',async()=>{const ctl=new AbortController();let resolve;const p=copyOutlineText('anchor',{navigator:{clipboard:{writeText:()=>new Promise(r=>resolve=r)}},signal:ctl.signal});await Promise.resolve();ctl.abort();await assert.rejects(p);resolve();await Promise.resolve()})
+}
