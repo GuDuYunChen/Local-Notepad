@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict'
 import {readFileSync} from 'node:fs'
+import {URL as NodeURL} from 'node:url'
 
 // Test the exact predicates executed by the native runner. A DOM query stand-in
 // only supplies element presence; the real Windows workflow must still run.
 export function registerNoteTagNativeStateTests(test) {
- const native=readFileSync(new URL('./check-note-tags-desktop.mjs',import.meta.url),'utf8')
+ const native=readFileSync(new NodeURL('./check-note-tags-desktop.mjs',import.meta.url),'utf8')
  const predicate = label => {
   const escaped=label.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')
   const match=native.match(new RegExp('evaluate\\("([^"\\n]+)"\\),\\\''+escaped+'\\\''))
@@ -35,8 +36,8 @@ export function registerNoteTagNativeStateTests(test) {
   assert.equal(prior(documentFor(['.save-state'])),true)
  })
  test('predicates remain bound to original production indicator conditions',()=>{
-  const app=readFileSync(new URL('../src/App.jsx',import.meta.url),'utf8')
-  const editor=readFileSync(new URL('../src/components/TextEditor.jsx',import.meta.url),'utf8')
+  const app=readFileSync(new NodeURL('../src/App.jsx',import.meta.url),'utf8')
+  const editor=readFileSync(new NodeURL('../src/components/TextEditor.jsx',import.meta.url),'utf8')
   assert.ok(app.includes("editorStatus.saving ? ' saving' : ' dirty'"))
   assert.ok(editor.includes('(saveError || saving) && ('))
   assert.ok(native.includes(".content,file.content);assert.ok(await evaluate"),'Preserve database and actual editor checks')
