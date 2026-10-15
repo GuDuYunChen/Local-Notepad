@@ -1,0 +1,16 @@
+/* Scope every override: other search workspaces keep their original layout. */
+.editor-shell > .document-search { width:min(560px,calc(100% - 24px)); min-width:0 !important; max-width:calc(100% - 24px); max-height:calc(100% - 64px); overflow:auto; padding:12px; box-sizing:border-box; font-size:13px; line-height:1.6; }
+.document-search .search-row { flex-wrap:wrap; gap:6px; }
+.document-search .search-input { flex:1 1 150px; min-width:90px; }
+.document-search .search-options { display:flex; gap:6px; flex-wrap:wrap; }
+.document-search .search-option-chip[aria-pressed=true] { font-weight:700; border-color:var(--clay,#9a6a4b); }
+.document-search .document-search-preview { border:1px solid var(--line,#ddd); padding:7px 9px; border-radius:5px; overflow-wrap:anywhere; white-space:pre-wrap; max-height:90px; overflow:auto; }
+.document-search .document-search-scope { font-size:12px; color:var(--ink-soft,#657080); margin:8px 0 0; }
+.document-search-error { border-inline-start:3px solid var(--danger,#b43f35); padding:7px; overflow-wrap:anywhere; }
+.document-search-feedback { border-inline-start:3px solid var(--success,#287449); padding:7px; overflow-wrap:anywhere; }
+.document-search-confirm-text { overflow-wrap:anywhere; white-space:pre-wrap; max-height:120px; overflow:auto; }
+.document-search button:focus-visible,.document-search input:focus-visible { outline:2px solid var(--clay,#9a6a4b); outline-offset:2px; }
+::highlight(notepad-document-find) { background-color:#ffe08a; color:#222; }
+
+.editor-shell > .document-search .search-input,.editor-shell > .document-search .search-btn { font-size:13px !important; }
+.editor-shell > .document-search .search-count { font-size:12px !important; }

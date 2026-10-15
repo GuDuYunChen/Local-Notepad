@@ -194,7 +194,7 @@ export default function Editor({ documentId, documentTitle, initialContent, onCh
     <LexicalComposer initialConfig={initialConfig}>
       <div className="editor-shell">
         {!readOnly && <ToolbarPlugin />}
-        <SearchPlugin />
+        <SearchPlugin key={documentId} documentId={documentId} />
         {!readOnly && <CommandPalettePlugin />}
         <EditorViewSettingsPlugin readOnly={readOnly} />
         <MarkdownSourcePlugin readOnly={readOnly} />
