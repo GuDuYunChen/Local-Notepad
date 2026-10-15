@@ -1,3 +1,4 @@
+import { verifyBacklinksDesktop } from './check-backlinks-desktop.mjs'
 import { verifyNoteTagsDesktop } from './check-note-tags-desktop.mjs'
 import { verifyQuickSwitcherDesktop } from './check-quick-switcher-desktop.mjs'
 import { verifyTemplateLibraryDesktop } from './check-template-library-desktop.mjs'
@@ -285,6 +286,7 @@ try {
   await verifyTemplateLibraryDesktop({ evaluate, click, cdp, until, api, out, noteIDs: [a.id, b.id] })
   await verifyQuickSwitcherDesktop({ evaluate, click, cdp, until, api, out, noteIDs: [a.id, b.id] })
   await verifyNoteTagsDesktop({ evaluate, click, cdp, until, api, out, noteIDs: [a.id, b.id] })
+  await verifyBacklinksDesktop({ evaluate, click, cdp, until, api, out, noteIDs: [a.id, b.id] })
   await open(a.id, 'native-close-latest')
   await closeWindow()
   report.checks.push('fresh-profile packaged restart reads latest body from real database and closes cleanly')

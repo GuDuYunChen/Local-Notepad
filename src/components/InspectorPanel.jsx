@@ -234,7 +234,7 @@ export default function InspectorPanel({
         )}
 
         {activeTab === 'backlinks' && (
-          <BacklinksPanel fileId={file.id} onSelectFile={onSelectFile} />
+          <BacklinksPanel key={file.id} fileId={file.id} onSelectFile={onSelectFile} />
         )}
 
         {activeTab === 'history' && (

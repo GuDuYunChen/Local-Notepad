@@ -1,4 +1,4 @@
-name: Verify complete local backlinks and source navigation
+name: Verify complete local document search and replacement
 on:
   push:
     branches: [ci/local-history-2f87]
@@ -13,8 +13,8 @@ jobs:
     timeout-minutes: 18
     steps:
       - uses: actions/checkout@v7
-      - name: Fetch exact accepted component for negative controls
-        run: git fetch --no-tags --depth=1 origin 8925c2097e74ce6720dc29b3c2ddd1b5038c3fc5
+      - name: Fetch exact accepted search implementation for negative controls
+        run: git fetch --no-tags --depth=1 origin 30ba71615682ef9ee06cacca18620ca9efea0576
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
@@ -22,30 +22,30 @@ jobs:
         with:
           go-version: '1.24.11'
           cache-dependency-path: server/go.sum
-      - name: Review inherited incidents and normal minor version
-        run: node scripts/stage-review.mjs catalog && node scripts/prepare-backlinks-2f92.mjs prepare
-      - name: Install locked dependencies
+      - name: Review historical issues and exact source integration
+        run: node scripts/stage-review.mjs catalog && node scripts/prepare-document-search-2f93.mjs apply
+      - name: Install committed dependency lock
         run: npm ci --no-audit --no-fund
-      - name: Reproduce original silent error and invalid source navigation
-        run: node scripts/prepare-backlinks-2f92.mjs baseline
-      - name: Backlinks core and original save protection
-        run: node --test scripts/backlink-sources.node.mjs scripts/editor-cache-regression.node.mjs scripts/editor-save-transaction.node.mjs scripts/editor-quit.node.mjs
-      - name: Full original UI plus backlinks and original navigation guard
-        run: npx vitest run --root=. --maxWorkers=4 --minWorkers=1 --reporter=default --reporter=json --outputFile=backlink-module-evidence/full-ui.json
-      - name: Complete production Go SQLite tests and bounded source reads
-        run: |
-          go -C server test -json ./... > backlink-module-evidence/go-tests.jsonl
-          go -C server test -race ./internal/dao -run BacklinkSnapshot -count=1
-      - name: Complete original main preload and renderer build
+      - name: Reproduce Unicode offset boundary and formatted-text failures
+        run: node scripts/prepare-document-search-2f93.mjs baseline
+      - name: Verify real Lexical search replacements and React lifecycle
+        run: npx vitest run --root=. src/services/documentSearch.test.js src/components/Editor/plugins/SearchPlugin.test.js src/components/Editor/plugins/SearchPlugin.legacy-safety.test.jsx src/components/Editor/plugins/documentSearchLexical.test.jsx src/components/Editor/plugins/SearchPlugin.lifecycle.test.jsx --reporter=default --reporter=json --outputFile=document-search-evidence/module-tests.json
+      - name: Full original UI regression
+        run: npx vitest run --root=. --maxWorkers=4 --minWorkers=1 --reporter=json --outputFile=document-search-evidence/full-ui.json
+      - name: Original save draft and exit regression
+        run: node --test scripts/document-search.node.mjs scripts/editor-cache-regression.node.mjs scripts/editor-save-transaction.node.mjs scripts/editor-quit.node.mjs
+      - name: Production Go regression
+        run: go -C server test -json ./... > document-search-evidence/go-tests.jsonl
+      - name: Complete main preload and renderer build
         run: npm run build:main && npm run build:renderer
-      - name: Publish tested changed code objects only
+      - name: Publish verified changed code objects only
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node scripts/prepare-backlinks-2f92.mjs publish
+        run: node scripts/prepare-document-search-2f93.mjs publish
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: backlinks-verification-${{ github.sha }}
-          path: backlink-module-evidence/
+          name: document-search-verification-${{ github.sha }}
+          path: document-search-evidence/
           retention-days: 7
           if-no-files-found: error
