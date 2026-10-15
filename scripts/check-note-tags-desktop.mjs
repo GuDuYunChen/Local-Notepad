@@ -21,7 +21,12 @@ export async function verifyNoteTagsDesktop({evaluate,click,cdp,until,api,out,no
   await evaluate("window.dispatchEvent(new Event('library:refresh'))");await until(()=>evaluate(`!!document.querySelector('[data-file-id="${file.id}"]')`),'New tag fixture missing');await click(`[data-file-id="${file.id}"]`)
   await until(()=>evaluate("document.querySelector('.editor-input')?.innerText.includes('note-tags-original-body')"),'Tag note not loaded')
   if(!await evaluate("!!document.querySelector('.inspector-panel')"))await click('button[aria-label="笔记详情"]')
-  await click('#inspector-tab-properties');await until(()=>evaluate("!!document.querySelector('.note-tags')"),'Tag entry missing');await action('管理标签');await has('已分配')
+  await click('#inspector-tab-properties');await until(()=>evaluate("!!document.querySelector('.note-tags')"),'Tag entry missing')
+  // Loading text and the empty-summary text have different widths. Wait for
+  // the actual owned note's initial read before measuring real click coordinates.
+  await until(()=>evaluate("document.querySelector('.note-tags-summary .note-tag-muted')?.textContent==='暂无标签' && !document.querySelector('.note-tags-summary [role=status]') && document.querySelector('.note-tags button[aria-label=\"管理标签\"]')?.getAttribute('aria-expanded')==='false'"),'Owned note initial tag read not ready')
+  report.entryReadCompleteBeforeClick=true;save()
+  await action('管理标签');await has('已分配')
   assert.equal(await evaluate("getComputedStyle(document.querySelector('.note-tags')).display"),'block','Tag editor must not use legacy inline trigger layout')
   mark('properties-entry-reads-current-note-tags')
   await cdp.send('Network.setBlockedURLs',{urls:[base+route]});await action('重新读取标签');await has('本机服务请求失败');assert.ok(!(await text()).includes('暂无标签'));mark('failed-read-is-not-empty-success')

@@ -44,3 +44,18 @@ test('timeout leaves error and does not report an empty successful load',async()
 test('malformed or foreign-note snapshot cannot update the parent',async()=>{api.mockResolvedValue(snap({file_id:'other'}));await open();expect(callback).not.toHaveBeenCalled();expect(host.textContent).toContain('所属笔记不符')})
 
 test('full note-tag editor replaces the old inline trigger layout',()=>{const css=readFileSync(new NodeURL('./TagSelector.css',import.meta.url),'utf8');expect(css).toContain('.inspector-panel .tag-selector.note-tags { display:block; width:100%; margin-right:0; }')})
+
+test('initial loading must finish before native entry coordinates are measured',async()=>{
+ let release;api.mockReturnValue(new Promise(resolve=>{release=resolve}))
+ await mount()
+ expect(host.querySelector('.note-tags-summary [role=status]').textContent).toContain('正在读取')
+ expect(host.querySelector('.note-tags-summary .note-tag-muted')).toBeNull()
+ expect(buttons('管理标签')[0].getAttribute('aria-expanded')).toBe('false')
+ await act(async()=>release(current));await flush()
+ expect(host.querySelector('.note-tags-summary [role=status]')).toBeNull()
+ expect(host.querySelector('.note-tags-summary .note-tag-muted').textContent).toBe('暂无标签')
+ await click('管理标签')
+ expect(host.querySelector('.note-tag-panel')).toBeTruthy()
+ expect(buttons('管理标签')[0].getAttribute('aria-expanded')).toBe('true')
+ expect(api.mock.calls.filter(([,init])=>init.method)).toHaveLength(0)
+})
