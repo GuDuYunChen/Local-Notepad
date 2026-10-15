@@ -17,7 +17,11 @@ export async function verifyTemplateLibraryDesktop({evaluate,click,cdp,until,api
  const hasText=text=>until(()=>evaluate(`document.querySelector('.template-library')?.innerText.includes(${JSON.stringify(text)})`),'Template result missing: '+text,15000)
  const open=async()=>{await key('n',78);await until(()=>evaluate("!!document.querySelector('.template-selector')"),'Template entry missing');await action('管理我的模板','.template-selector');await until(()=>evaluate("!!document.querySelector('.template-library')"),'Template library missing');await hasText('本机操作记录')}
  const library=()=>api('/api/template-library')
- const row=async title=>{assert.equal(await evaluate(`(()=>{const n=[...document.querySelectorAll('.template-library-index li')].find(n=>n.querySelector('strong')?.textContent===${JSON.stringify(title)});if(!n)return false;n.setAttribute('data-owned-template','');return true})()`),true);return '[data-owned-template]'}
+ const row=async title=>{
+  await until(()=>evaluate(`(()=>{const n=[...document.querySelectorAll('.template-library-index li')].find(n=>n.querySelector('strong')?.textContent===${JSON.stringify(title)});return !!n?.querySelector('.template-library-row:not(:disabled)')})()`),'Template row not ready: '+title)
+  assert.equal(await evaluate(`(()=>{const n=[...document.querySelectorAll('.template-library-index li')].find(n=>n.querySelector('strong')?.textContent===${JSON.stringify(title)});if(!n?.querySelector('.template-library-row:not(:disabled)'))return false;n.setAttribute('data-owned-template','');return true})()`),true)
+  return '[data-owned-template]'
+ }
  const releaseRow=()=>evaluate("document.querySelector('[data-owned-template]')?.removeAttribute('data-owned-template')")
  const screenshot=async()=>{const b=Buffer.from((await cdp.send('Page.captureScreenshot',{format:'png'})).data,'base64');writeFileSync(path.join(out,'template-library-installed.png'),b);report.screenshots.push({filename:'template-library-installed.png',bytes:b.length,sha256:createHash('sha256').update(b).digest('hex')});save()}
  try{
