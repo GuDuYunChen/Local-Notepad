@@ -133,7 +133,17 @@ function CurrentOutline({documentId='',documentTitle='',initialContent,requireLo
   }
   useEffect(()=>{
     const toggle=()=>{if(state.current.open)close();else {setOpen(true);frame(()=>{if(alive.current)queryInput.current?.focus({preventScroll:true})})}}
-    const keyboard=e=>{if(e.isComposing||e.keyCode===229||composing.current)return;if((e.ctrlKey||e.metaKey)&&e.shiftKey&&e.key.toLowerCase()==='o'){e.preventDefault();toggle()}}
+    // The current search has foreground ownership. Leave the permanent outline
+    // entry available underneath it and cancel old outline navigation/clipboard work.
+    const yieldToSearch=e=>{
+      if(e.detail?.documentId&&e.detail.documentId!==documentId)return
+      if(ready()&&state.current.open)close()
+    }
+    const keyboard=e=>{
+      if(e.isComposing||e.keyCode===229||composing.current)return
+      if((e.ctrlKey||e.metaKey)&&!e.altKey&&['f','h'].includes(e.key.toLowerCase())&&!e.target?.closest?.('[role="dialog"]'))yieldToSearch(e)
+      if((e.ctrlKey||e.metaKey)&&e.shiftKey&&e.key.toLowerCase()==='o'){e.preventDefault();toggle()}
+    }
     const anchor=e=>{
       if(e.detail?.documentId&&e.detail.documentId!==documentId)return
       const result=resolveOutlinePath(state.current.snapshot.nodes,e.detail?.path);setOpen(true)
@@ -142,8 +152,8 @@ function CurrentOutline({documentId='',documentTitle='',initialContent,requireLo
     }
     const searchMatch=e=>{if(e.detail?.documentId&&e.detail.documentId!==documentId)return;const key=e.detail?.topLevelKey;if(!state.current.snapshot.nodes.some(n=>n.key===key))return;reveal(key);const h=findOutlineHeadingForKey(state.current.snapshot.nodes,key);if(h)setActive(h.key)}
     const currentReference=()=>{setOpen(true);if(!documentId||!state.current.documentTitle){setError('当前没有可复制的笔记引用。');return};const now=state.current;const h=findOutlineHeadingForKey(now.snapshot.nodes,now.caret)||now.snapshot.headings.find(h=>h.key===now.active);void copyPath(h,true)}
-    window.addEventListener('keydown',keyboard);window.addEventListener('editor:toggle-outline',toggle);window.addEventListener('editor:open-heading-anchor',anchor);window.addEventListener('editor:search-match',searchMatch);window.addEventListener('editor:copy-current-reference',currentReference)
-    return()=>{window.removeEventListener('keydown',keyboard);window.removeEventListener('editor:toggle-outline',toggle);window.removeEventListener('editor:open-heading-anchor',anchor);window.removeEventListener('editor:search-match',searchMatch);window.removeEventListener('editor:copy-current-reference',currentReference)}
+    window.addEventListener('keydown',keyboard);window.addEventListener('editor:toggle-outline',toggle);window.addEventListener('editor:open-search',yieldToSearch);window.addEventListener('editor:open-heading-anchor',anchor);window.addEventListener('editor:search-match',searchMatch);window.addEventListener('editor:copy-current-reference',currentReference)
+    return()=>{window.removeEventListener('keydown',keyboard);window.removeEventListener('editor:toggle-outline',toggle);window.removeEventListener('editor:open-search',yieldToSearch);window.removeEventListener('editor:open-heading-anchor',anchor);window.removeEventListener('editor:search-match',searchMatch);window.removeEventListener('editor:copy-current-reference',currentReference)}
   },[editor,documentId,initialContent,requireLoaded])
   const view=useMemo(()=>{try{return {rows:filterOutline(snapshot.nodes,query,collapsed),error:''}}catch(e){return{rows:[],error:e.message}}},[snapshot,query,collapsed])
   const path=getOutlineBreadcrumb(snapshot.nodes,active)

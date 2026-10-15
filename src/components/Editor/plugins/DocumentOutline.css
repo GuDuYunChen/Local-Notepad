@@ -17,3 +17,7 @@
 .editor-shell .local-outline .document-outline-item { font-size:13px; white-space:normal; overflow-wrap:anywhere; }
 .editor-shell .local-outline button:disabled { opacity:.5; cursor:default; }
 .editor-shell .local-outline button:focus-visible,.editor-shell .local-outline input:focus-visible { outline:2px solid var(--clay); outline-offset:2px; }
+
+/* A closed navigation trigger must never cover the active find/replace controls.
+   Explicitly opened outline retains its original higher layer. */
+.editor-shell > .local-outline:not(.open) { z-index:49; }

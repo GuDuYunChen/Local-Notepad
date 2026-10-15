@@ -33,6 +33,12 @@ export async function verifyDocumentOutlineDesktop({evaluate,click,cdp,until,api
  try {
   await openNote(empty,'outline94-empty-body');await action('文档目录');await has('当前正文没有标题');mark('empty-document-keeps-entry-and-explains-no-headings')
   await action('关闭文档目录');await openNote(single,'outline94-single-body');await key('O',79,10);await has('唯一标题94');await action('唯一标题94','.document-outline-list');await has('已定位：唯一标题94');assert.equal((await api('/api/files/'+single.id)).content,single.content);mark('single-heading-shortcut-and-navigation-preserve-body')
+  await key('f',70,2)
+  await until(()=>evaluate("!!document.querySelector('.document-search') && !document.querySelector('.local-outline.open')"),'Search must own foreground without outline covering it')
+  assert.equal(await evaluate("Number(getComputedStyle(document.querySelector('.local-outline')).zIndex)<Number(getComputedStyle(document.querySelector('.document-search')).zIndex)"),true)
+  assert.equal((await api('/api/files/'+single.id)).content,single.content)
+  await action('关闭文内查找','.document-search');await action('文档目录');await has('唯一标题94')
+  mark('search-foreground-handoff-preserves-outline-and-body')
   await action('关闭文档目录');await openNote(multi,'outline94-original-body');await action('文档目录');await has('5 个标题')
   const origin=await evaluate("document.querySelector('.editor-container').scrollTop")
   await query('目标章节94');await has('显示 1 / 5');await action('目标章节94','.document-outline-list');await has('已定位：目标章节94')
