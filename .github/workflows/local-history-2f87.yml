@@ -1,4 +1,4 @@
-name: Verify outline and search foreground integration
+name: Verify outline cross-module search focus readiness
 on:
   push:
     branches: [ci/local-history-2f87]
@@ -20,30 +20,28 @@ jobs:
         with:
           go-version: '1.24.11'
           cache-dependency-path: server/go.sum
-      - name: Review historical issue catalog and lock
+      - name: Review original issue catalog and lock
         run: node scripts/stage-review.mjs catalog && node scripts/verify-dependency-lock.mjs
+      - name: Apply exact test-only focus observation repair
+        run: node scripts/repair-outline-search-focus.mjs apply
       - name: Install exact committed dependencies
         run: npm ci --no-audit --no-fund
-      - name: Reproduce current outline foreground regression
-        run: node scripts/repair-outline-foreground.mjs baseline
-      - name: Apply source-guarded foreground fix and normal patch version
-        run: node scripts/repair-outline-foreground.mjs apply
-      - name: Actual outline search integration and original lifecycle contracts
-        run: npx vitest run --root=. src/components/Editor/plugins/OutlineSearch.integration.test.jsx src/components/Editor/plugins/DocumentOutline.lifecycle.test.jsx src/components/Editor/plugins/SearchPlugin.lifecycle.test.jsx --reporter=json --outputFile=outline-foreground-evidence/targeted.json
-      - name: All original UI regression tests
-        run: npx vitest run --root=. --maxWorkers=4 --minWorkers=1 --reporter=json --outputFile=outline-foreground-evidence/full-ui.json
-      - name: Preserve original outline search save and quit protections
+      - name: Prove original shortcut focus timing and safe target selection
+        run: npx vitest run --root=. src/components/Editor/plugins/SearchPlugin.lifecycle.test.jsx src/components/Editor/plugins/OutlineSearch.integration.test.jsx --reporter=json --outputFile=outline-focus-evidence/targeted.json
+      - name: Retain every original UI test
+        run: npx vitest run --root=. --maxWorkers=4 --minWorkers=1 --reporter=json --outputFile=outline-focus-evidence/full-ui.json
+      - name: Retain original search outline save and quit protections
         run: node --test scripts/document-outline.node.mjs scripts/document-search.node.mjs scripts/editor-cache-regression.node.mjs scripts/editor-save-transaction.node.mjs scripts/editor-quit.node.mjs
-      - name: Build original full main preload and renderer
+      - name: Build full original main preload and renderer
         run: npm run build:main && npm run build:renderer
-      - name: Publish only tested changed code objects
+      - name: Publish only two tested changed code objects
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node scripts/repair-outline-foreground.mjs publish
+        run: node scripts/repair-outline-search-focus.mjs publish
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: outline-foreground-${{ github.sha }}
-          path: outline-foreground-evidence/
+          name: outline-focus-${{ github.sha }}
+          path: outline-focus-evidence/
           retention-days: 7
           if-no-files-found: error
