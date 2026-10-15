@@ -1,0 +1,160 @@
+package dao
+
+import (
+	"context"
+	"fmt"
+	"strings"
+	"testing"
+)
+
+func backlinksDB(t *testing.T) *LinkDAO {
+	t.Helper()
+	d := templateDB(t)
+	if _, err := d.DB.Exec(`CREATE TABLE links(id INTEGER PRIMARY KEY,source_id TEXT NOT NULL,target_id TEXT NOT NULL,created_at INTEGER NOT NULL,UNIQUE(source_id,target_id))`); err != nil {
+		t.Fatal(err)
+	}
+	templateSeed(t, d, "target", "目标", "目标正文")
+	templateSeed(t, d, "source", "来源", "来源正文")
+	return &LinkDAO{DB: d.DB}
+}
+func TestBacklinkSnapshotCompleteEmpty(t *testing.T) {
+	d := backlinksDB(t)
+	v, e := d.BacklinkSources(context.Background(), "target")
+	if e != nil || v == nil || !v.Complete || v.Sources == nil || v.IndexedCount != 0 {
+		t.Fatal(v, e)
+	}
+}
+func TestBacklinkSnapshotUsesSavedBodyAndStableSourceIdentity(t *testing.T) {
+	d := backlinksDB(t)
+	d.DB.Exec(`INSERT INTO links VALUES(1,'source','target',3)`)
+	v, e := d.BacklinkSources(context.Background(), "target")
+	if e != nil || len(v.Sources) != 1 {
+		t.Fatal(v, e)
+	}
+	s := v.Sources[0]
+	if !s.Available || s.File.ID != "source" || s.File.Content != "来源正文" || s.IndexedAt != 3 {
+		t.Fatal(s)
+	}
+	var b string
+	var n int
+	d.DB.QueryRow(`SELECT content FROM files WHERE id='target'`).Scan(&b)
+	d.DB.QueryRow(`SELECT count(*) FROM links`).Scan(&n)
+	if b != "目标正文" || n != 1 {
+		t.Fatal("read changed records")
+	}
+}
+func TestBacklinkSnapshotUnavailableSourcesNeverReturnBodies(t *testing.T) {
+	for _, kind := range []string{"missing", "deleted", "folder", "template"} {
+		t.Run(kind, func(t *testing.T) {
+			d := backlinksDB(t)
+			switch kind {
+			case "missing":
+				d.DB.Exec(`DELETE FROM files WHERE id='source'`)
+			case "deleted":
+				d.DB.Exec(`UPDATE files SET is_deleted=1 WHERE id='source'`)
+			case "folder":
+				d.DB.Exec(`UPDATE files SET is_folder=1 WHERE id='source'`)
+			case "template":
+				d.DB.Exec(`UPDATE files SET title='__tpl__hidden' WHERE id='source'`)
+			}
+			d.DB.Exec(`INSERT INTO links VALUES(1,'source','target',3)`)
+			v, e := d.BacklinkSources(context.Background(), "target")
+			if e != nil || v.IndexedCount != 1 || len(v.Sources) != 1 || v.Sources[0].Available || v.Sources[0].File != nil {
+				t.Fatal(v, e)
+			}
+		})
+	}
+}
+func TestBacklinkSnapshotInvalidTargetsRefused(t *testing.T) {
+	for _, kind := range []string{"missing", "deleted", "folder", "template"} {
+		t.Run(kind, func(t *testing.T) {
+			d := backlinksDB(t)
+			switch kind {
+			case "missing":
+				d.DB.Exec(`DELETE FROM files WHERE id='target'`)
+			case "deleted":
+				d.DB.Exec(`UPDATE files SET is_deleted=1 WHERE id='target'`)
+			case "folder":
+				d.DB.Exec(`UPDATE files SET is_folder=1 WHERE id='target'`)
+			case "template":
+				d.DB.Exec(`UPDATE files SET title='__tpl__hidden' WHERE id='target'`)
+			}
+			if v, e := d.BacklinkSources(context.Background(), "target"); e == nil || v != nil {
+				t.Fatal(v, e)
+			}
+		})
+	}
+}
+func TestBacklinkSnapshotBoundedCountNotPartial(t *testing.T) {
+	d := backlinksDB(t)
+	tx, _ := d.DB.Begin()
+	for i := 0; i < 201; i++ {
+		if _, e := tx.Exec(`INSERT INTO links VALUES(?,?,?,1)`, i+1, fmt.Sprint(i), "target"); e != nil {
+			t.Fatal(e)
+		}
+	}
+	if e := tx.Commit(); e != nil {
+		t.Fatal(e)
+	}
+	if v, e := d.BacklinkSources(context.Background(), "target"); v != nil || e == nil {
+		t.Fatal("truncated result", v, e)
+	}
+}
+func TestBacklinkSnapshotUTF8ByteBudget(t *testing.T) {
+	d := backlinksDB(t)
+	d.DB.Exec(`INSERT INTO links VALUES(1,'source','target',1)`)
+	d.DB.Exec(`UPDATE files SET content=? WHERE id='source'`, strings.Repeat("文", BacklinkBodyLimit/3+1))
+	if v, e := d.BacklinkSources(context.Background(), "target"); v != nil || e == nil {
+		t.Fatal(v, e)
+	}
+}
+func TestBacklinkSnapshotTotalBudget(t *testing.T) {
+	d := backlinksDB(t)
+	tx, _ := d.DB.Begin()
+	for i := 0; i < 5; i++ {
+		id := fmt.Sprint(i)
+		tx.Exec(`INSERT INTO files(id,title,content) VALUES(?,?,?)`, id, "来源", strings.Repeat("x", BacklinkBodyLimit))
+		tx.Exec(`INSERT INTO links VALUES(?,?,?,1)`, i+1, id, "target")
+	}
+	tx.Commit()
+	if v, e := d.BacklinkSources(context.Background(), "target"); v != nil || e == nil {
+		t.Fatal(v, e)
+	}
+}
+func TestBacklinkSnapshotDoesNotReadUnavailableLargeBody(t *testing.T) {
+	d := backlinksDB(t)
+	d.DB.Exec(`INSERT INTO links VALUES(1,'source','target',1)`)
+	d.DB.Exec(`UPDATE files SET is_deleted=1,content=? WHERE id='source'`, strings.Repeat("x", BacklinkBodyLimit+1))
+	v, e := d.BacklinkSources(context.Background(), "target")
+	if e != nil || v.Sources[0].File != nil {
+		t.Fatal(v, e)
+	}
+}
+func TestBacklinkSnapshotClosedDatabaseAndCancelledContextRefused(t *testing.T) {
+	d := backlinksDB(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, e := d.BacklinkSources(ctx, "target"); e == nil {
+		t.Fatal("cancel ignored")
+	}
+	d.DB.Close()
+	if _, e := d.BacklinkSources(context.Background(), "target"); e == nil {
+		t.Fatal("closed accepted")
+	}
+}
+func TestBacklinkSnapshotOrderAndRepeatReadNeverWrites(t *testing.T) {
+	d := backlinksDB(t)
+	d.DB.Exec(`INSERT INTO files(id,title,content) VALUES('other','Other','Other body')`)
+	d.DB.Exec(`INSERT INTO links VALUES(1,'source','target',1),(2,'other','target',2)`)
+	for i := 0; i < 3; i++ {
+		v, e := d.BacklinkSources(context.Background(), "target")
+		if e != nil || len(v.Sources) != 2 || v.Sources[0].SourceID != "other" {
+			t.Fatal(v, e)
+		}
+	}
+	var updated int
+	d.DB.QueryRow(`SELECT updated_at FROM files WHERE id='source'`).Scan(&updated)
+	if updated != 1 {
+		t.Fatal("timestamp changed")
+	}
+}

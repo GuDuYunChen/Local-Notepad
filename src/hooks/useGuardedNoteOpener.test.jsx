@@ -106,3 +106,21 @@ it('removes external abort listeners after success and cancellation', async () =
   await render({ onSelectFile: (_file, options) => options.afterSelect() })
   expect(await open('c2', { signal: controller.signal })).toBe(true); expect(remove).toHaveBeenCalledWith('abort', expect.any(Function))
 })
+
+it('uses an explicit source-verified read adapter but preserves the original selection guard',async()=>{
+ const reader=vi.fn(async()=>({id:'source'}));let guard
+ await render({onSelectFile:(_file,o)=>{guard=o}})
+ const result=open('source',{readFile:reader});await drain()
+ expect(reader).toHaveBeenCalledWith('source',{signal:expect.any(AbortSignal)});expect(api).not.toHaveBeenCalled()
+ guard.onCancel();expect(await result).toBe(false)
+})
+it('invalid adapter identity cannot cross the original note selection boundary',async()=>{
+ const selected=vi.fn();await render({onSelectFile:selected})
+ expect(await open('source',{readFile:async()=>({id:'wrong'})})).toBe(false);expect(selected).not.toHaveBeenCalled()
+})
+it('external cancellation prevents a late verified reader from opening a source',async()=>{
+ let release;const c=new AbortController(),selected=vi.fn()
+ await render({onSelectFile:selected})
+ const result=open('source',{signal:c.signal,readFile:()=>new Promise(r=>release=r)});await drain();c.abort()
+ expect(await result).toBe(false);release({id:'source'});await drain();expect(selected).not.toHaveBeenCalled()
+})

@@ -32,6 +32,7 @@ func (c *FileController) Register(group *ghttp.RouterGroup) {
 	group.DELETE("/files/{id}/permanent", c.PermanentDelete)
 	group.POST("/files/{id}/restore", c.Restore)
 	group.GET("/files/{id}/backlinks", c.Backlinks)
+	group.GET("/files/{id}/backlink-sources", c.BacklinkSources)
 	group.GET("/files/{id}/versions", c.Versions)
 	group.POST("/files/{id}/versions/snapshot", c.SnapshotVersion)
 	group.POST("/files/{id}/versions/{versionId}/restore", c.RestoreVersion)
