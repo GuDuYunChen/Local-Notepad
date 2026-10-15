@@ -1,4 +1,4 @@
-name: Verify document search and original tag entry readiness
+name: Verify complete local document outline
 on:
   push:
     branches: [ci/local-history-2f87]
@@ -13,6 +13,8 @@ jobs:
     timeout-minutes: 18
     steps:
       - uses: actions/checkout@v7
+      - name: Fetch exact accepted component for negative controls
+        run: git fetch --no-tags --depth=1 origin 921cb2553a8783b882618f7ba90c125d99ce3c42
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
@@ -20,28 +22,32 @@ jobs:
         with:
           go-version: '1.24.11'
           cache-dependency-path: server/go.sum
-      - name: Preserve original tag source and wait for read completion before click
-        run: node scripts/repair-search-tag-entry.mjs apply
-      - name: Review inherited issues and committed dependency lock
-        run: node scripts/stage-review.mjs catalog && node scripts/verify-dependency-lock.mjs
-      - name: Install exact committed dependencies
+      - name: Review historical issue catalog
+        run: node scripts/stage-review.mjs catalog
+      - name: Apply exact integration and standard minor version
+        run: node scripts/prepare-document-outline-2f94.mjs apply
+      - name: Install exact committed dependency graph
         run: npm ci --no-audit --no-fund
-      - name: Verify actual tag loading lifecycle and complete document search
-        run: npx vitest run --root=. src/components/TagSelector.test.jsx src/components/Editor/plugins/SearchPlugin.lifecycle.test.jsx --reporter=json --outputFile=document-search-evidence/readiness.json
+      - name: Reproduce old empty entry ambiguity and clipboard failures
+        run: node scripts/prepare-document-outline-2f94.mjs baseline
+      - name: Outline model and original save guards
+        run: node --test scripts/document-outline.node.mjs scripts/editor-cache-regression.node.mjs scripts/editor-save-transaction.node.mjs scripts/editor-quit.node.mjs
+      - name: Actual Lexical outline lifecycle and original helpers
+        run: npx vitest run --root=. src/services/documentOutline.test.js src/components/Editor/plugins/DocumentOutlinePlugin.test.js src/components/Editor/plugins/DocumentOutline.lifecycle.test.jsx src/components/Editor/plugins/DocumentOutline.legacy-safety.test.jsx --reporter=json --outputFile=outline-module-evidence/module-tests.json
       - name: Full original UI regression
-        run: npx vitest run --root=. --maxWorkers=4 --minWorkers=1 --reporter=json --outputFile=document-search-evidence/full-ui.json
-      - name: Original search save cache and quit protections
-        run: node --test scripts/document-search.node.mjs scripts/editor-cache-regression.node.mjs scripts/editor-save-transaction.node.mjs scripts/editor-quit.node.mjs
-      - name: Complete original main preload and renderer build
+        run: npx vitest run --root=. --maxWorkers=4 --minWorkers=1 --reporter=json --outputFile=outline-module-evidence/full-ui.json
+      - name: Full production Go regression
+        run: go -C server test -json ./... > outline-module-evidence/go-tests.jsonl
+      - name: Complete main preload and renderer build
         run: npm run build:main && npm run build:renderer
-      - name: Emit only two verified test objects
+      - name: Emit only tested changed source objects
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node scripts/repair-search-tag-entry.mjs publish
+        run: node scripts/prepare-document-outline-2f94.mjs publish
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: document-search-entry-${{ github.sha }}
-          path: document-search-evidence/
+          name: outline-verification-${{ github.sha }}
+          path: outline-module-evidence/
           retention-days: 7
           if-no-files-found: error
