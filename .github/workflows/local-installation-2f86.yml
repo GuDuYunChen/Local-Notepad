@@ -1,4 +1,4 @@
-name: Actual local document search installation lifecycle 2F93
+name: Actual local outline installation lifecycle 2F94
 on:
   push:
     branches: [ci/local-installation-2f86]
@@ -28,12 +28,12 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Ensure lock was not modified
         run: git diff --exit-code -- package.json package-lock.json
-      - name: Download accepted 4.225.0 upgrade seed
+      - name: Download accepted 4.226.0 upgrade seed
         uses: actions/download-artifact@v4
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: 38677130286
-          name: local-notepad-windows-30ba71615682ef9ee06cacca18620ca9efea0576
+          run-id: 38698435840
+          name: local-notepad-windows-921cb2553a8783b882618f7ba90c125d99ce3c42
           path: .installer-input/previous
       - name: Download unchanged old path-failure counterexample
         uses: actions/download-artifact@v4
@@ -42,21 +42,21 @@ jobs:
           run-id: 38337004784
           name: local-notepad-windows-191439e04ddbf6b4423194d2978ae72da926df3c
           path: .installer-input/legacy
-      - name: Download source-bound 4.226.0 installer
+      - name: Download source-bound 4.227.1 installer
         uses: actions/download-artifact@v4
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: 38698435840
-          name: local-notepad-windows-921cb2553a8783b882618f7ba90c125d99ce3c42
+          run-id: 38743220442
+          name: local-notepad-windows-996cb1cf330530292a8baa1723585e0990d94265
           path: .installer-input/current
       - name: Verify exact current and upgrade binary identities
-        run: node scripts/pin-document-search-installer.mjs
-      - name: Preserve original lifecycle and add exact native document search workflow
-        run: node scripts/run-document-search-installer.mjs prepare
-      - name: Retain all original refusal checks and document search evidence contracts
-        run: node --test scripts/installer-lifecycle-core.node.mjs scripts/installer-shell-core.node.mjs scripts/history-installation-evidence.node.mjs scripts/daily-installed-evidence.node.mjs scripts/template-installed-evidence.node.mjs scripts/quick-installed-evidence.node.mjs scripts/note-tags-installed-evidence.node.mjs scripts/backlinks-installed-evidence.node.mjs scripts/document-search-installed-evidence.node.mjs
+        run: node scripts/pin-document-outline-installer.mjs
+      - name: Preserve original lifecycle and add exact native outline workflow
+        run: node scripts/run-document-outline-installer.mjs prepare
+      - name: Retain all original refusal checks and outline evidence contracts
+        run: node --test scripts/installer-lifecycle-core.node.mjs scripts/installer-shell-core.node.mjs scripts/history-installation-evidence.node.mjs scripts/daily-installed-evidence.node.mjs scripts/template-installed-evidence.node.mjs scripts/quick-installed-evidence.node.mjs scripts/note-tags-installed-evidence.node.mjs scripts/backlinks-installed-evidence.node.mjs scripts/document-search-installed-evidence.node.mjs scripts/document-outline-installed-evidence.node.mjs
       - name: Actual installed modules upgrade overwrite uninstall reinstall and data retention
-        run: node scripts/run-document-search-installer.mjs run
+        run: node scripts/run-document-outline-installer.mjs run
       - name: Retain complete or failed original evidence
         if: always()
         uses: actions/upload-artifact@v4
