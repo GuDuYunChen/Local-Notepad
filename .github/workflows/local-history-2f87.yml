@@ -1,4 +1,4 @@
-name: Verify outline cross-module search focus readiness
+name: Verify complete local knowledge graph
 on:
   push:
     branches: [ci/local-history-2f87]
@@ -13,6 +13,8 @@ jobs:
     timeout-minutes: 18
     steps:
       - uses: actions/checkout@v7
+      - name: Fetch exact accepted component for negative controls
+        run: git fetch --no-tags --depth=1 origin 996cb1cf330530292a8baa1723585e0990d94265
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
@@ -20,28 +22,34 @@ jobs:
         with:
           go-version: '1.24.11'
           cache-dependency-path: server/go.sum
-      - name: Review original issue catalog and lock
-        run: node scripts/stage-review.mjs catalog && node scripts/verify-dependency-lock.mjs
-      - name: Apply exact test-only focus observation repair
-        run: node scripts/repair-outline-search-focus.mjs apply
+      - name: Review inherited issue catalog
+        run: node scripts/stage-review.mjs catalog
+      - name: Apply exact complete graph integration and normal minor version
+        run: node scripts/prepare-local-graph-2f95.mjs apply
       - name: Install exact committed dependencies
         run: npm ci --no-audit --no-fund
-      - name: Prove original shortcut focus timing and safe target selection
-        run: npx vitest run --root=. src/components/Editor/plugins/SearchPlugin.lifecycle.test.jsx src/components/Editor/plugins/OutlineSearch.integration.test.jsx --reporter=json --outputFile=outline-focus-evidence/targeted.json
-      - name: Retain every original UI test
-        run: npx vitest run --root=. --maxWorkers=4 --minWorkers=1 --reporter=json --outputFile=outline-focus-evidence/full-ui.json
-      - name: Retain original search outline save and quit protections
-        run: node --test scripts/document-outline.node.mjs scripts/document-search.node.mjs scripts/editor-cache-regression.node.mjs scripts/editor-save-transaction.node.mjs scripts/editor-quit.node.mjs
-      - name: Build full original main preload and renderer
+      - name: Reproduce original graph read and composition failures
+        run: node scripts/prepare-local-graph-2f95.mjs baseline
+      - name: Graph core and original save protection
+        run: node --test scripts/local-graph.node.mjs scripts/editor-cache-regression.node.mjs scripts/editor-save-transaction.node.mjs scripts/editor-quit.node.mjs
+      - name: Real graph controls lifecycle and D3 canvas
+        run: npx vitest run --root=. src/components/GraphPanel.test.jsx src/components/GraphPanel.legacy-safety.test.jsx src/components/LocalGraphCanvas.test.jsx src/services/localGraph.test.js --reporter=json --outputFile=graph-module-evidence/graph-tests.json
+      - name: Full original UI regression and graph workflow
+        run: npx vitest run --root=. --maxWorkers=4 --minWorkers=1 --reporter=json --outputFile=graph-module-evidence/full-ui.json
+      - name: Production Go SQLite graph and full backend regression
+        run: |
+          go -C server test -json ./... > graph-module-evidence/go-tests.jsonl
+          go -C server test -race ./internal/dao -run LocalGraph -count=1
+      - name: Build complete original main preload and renderer
         run: npm run build:main && npm run build:renderer
-      - name: Publish only two tested changed code objects
+      - name: Publish tested changed code objects without product ref updates
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node scripts/repair-outline-search-focus.mjs publish
+        run: node scripts/prepare-local-graph-2f95.mjs publish
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: outline-focus-${{ github.sha }}
-          path: outline-focus-evidence/
+          name: local-graph-verification-${{ github.sha }}
+          path: graph-module-evidence/
           retention-days: 7
           if-no-files-found: error

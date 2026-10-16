@@ -41,3 +41,27 @@ test('query change resets the selected match rather than reusing old index',asyn
 test('closing cancels confirmation and does not modify pending input',async()=>{await prepare();await click('全部替换…');await click('关闭文内查找');expect(document.querySelector('[role=dialog]')).toBeNull();expect(text()).toBe('alpha alpha tail')})
 test('oversize query clearly refuses replacement instead of truncating',async()=>{await prepare();await field('查找内容','x'.repeat(1025));expect(host.querySelector('[role=alert]')).toBeTruthy();expect(button('替换当前').disabled).toBe(true);expect(text()).toBe('alpha alpha tail')})
 test('events intended for another note cannot open this note search',async()=>{await mount();await act(async()=>window.dispatchEvent(new CustomEvent('editor:open-search',{detail:{documentId:'B',replace:true}})));expect(host.querySelector('.document-search')).toBeNull()})
+
+// Control presence is not the autofocus completion boundary. The native input
+// protocol must observe the scheduled query focus before typing into replacement.
+for (const waitForFocus of [false,true]) test('shortcut autofocus '+(waitForFocus?'completed before choosing replacement preserves the query':'can still be pending after replacement input mounts'),async()=>{
+ const frames=new Map();let seq=0
+ vi.stubGlobal('requestAnimationFrame',fn=>{const id=++seq;frames.set(id,fn);return id})
+ vi.stubGlobal('cancelAnimationFrame',id=>frames.delete(id))
+ const renderFrames=async()=>{await act(async()=>{for(let n=0;n<3;n++){const queued=[...frames.values()];frames.clear();for(const fn of queued)fn();await Promise.resolve()}});await flush()}
+ try{
+  await mount();await open(false);await renderFrames();await field('查找内容','alpha');await renderFrames()
+  editor.getRootElement().focus()
+  await act(async()=>window.dispatchEvent(new KeyboardEvent('keydown',{key:'h',ctrlKey:true,bubbles:true,cancelable:true})));await flush()
+  expect(input('替换内容')).toBeTruthy();expect(frames.size).toBeGreaterThan(0)
+  if(waitForFocus)await renderFrames()
+  input('替换内容').focus()
+  if(!waitForFocus)await renderFrames()
+  expect(document.activeElement).toBe(input(waitForFocus?'替换内容':'查找内容'))
+  const selected=document.activeElement
+  await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(selected,'beta');selected.dispatchEvent(new Event('input',{bubbles:true}))});await flush()
+  expect(input('查找内容').value).toBe(waitForFocus?'alpha':'beta')
+  expect(input('替换内容').value).toBe(waitForFocus?'beta':'')
+  expect(text()).toBe('alpha alpha tail');expect(errors).toEqual([])
+ }finally{frames.clear();vi.unstubAllGlobals()}
+})
