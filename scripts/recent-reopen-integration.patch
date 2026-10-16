@@ -1,0 +1,97 @@
+--- a/AGENTS.md
++++ b/AGENTS.md
+@@ -1,6 +1,6 @@
+ # Local-Notepad development
+ 
+-Current local module: 2F.97 /4.230.0 complete local recent-note history and safe reopening. Read docs/LOCAL_RECENT_NOTES_2F97.md. Accepted base2eaf958 /4.229.0 is PR2 comment6218034949. Complete confirmed note-entry tracking, metadata-only local history, literal/IME search and pagination, latest identity read through original save/discard/cancel, explicit history removal/clear/pause/resume, storage failure/corrupt-record recovery and real renderer reload. History actions never modify note bodies or delete notes, treat failed reads as empty success, overwrite later history from stale confirmation or navigate after cancellation. Preserve all prior native modules/save/quit/schema14/679 dependency nodes. No cloud/multidevice or rejected source/dependency export.
++Current local module: 2F.97 /4.230.1 complete local recent-note history and safe reopening. Read docs/LOCAL_RECENT_NOTES_2F97.md. Accepted base2eaf958 /4.229.0 is PR2 comment6218034949. Complete confirmed note-entry tracking, metadata-only local history, literal/IME search and pagination, latest identity read through original save/discard/cancel, explicit history removal/clear/pause/resume, storage failure/corrupt-record recovery and real renderer reload. History actions never modify note bodies or delete notes, treat failed reads as empty success, overwrite later history from stale confirmation or navigate after cancellation. Preserve all prior native modules/save/quit/schema14/679 dependency nodes. No cloud/multidevice or rejected source/dependency export.
+ 
+ Read `docs/DEVELOPMENT_HANDOFF.md` before resuming an interrupted task.
+ Work on `feature/knowledge-os-phase2` / Draft PR #2 unless the user explicitly changes that direction. Do not merge master as part of ordinary stage development.
+--- a/docs/LOCAL_RECENT_NOTES_2F97.md
++++ b/docs/LOCAL_RECENT_NOTES_2F97.md
+@@ -1,4 +1,4 @@
+-# 2F.97 /4.230.0 本地最近访问与安全重开
++# 2F.97 /4.230.1 本地最近访问与安全重开
+ 
+ 已验收基线2eaf958 /4.229.0（PR2评论6218034949），不重做置顶模块。本轮完整流程：原笔记选择获确认并进入笔记视图→本机记录→最近访问入口→标题查找/中文输入/分页→选择→读取最新目标及原保存放弃取消→重开或保留查询→移除/清空/暂停/开启→错误重试、明确重置、关闭重开。
+ 
+@@ -21,3 +21,9 @@
+ 保留原4253界面基线、原HTTP/Go/Electron及全部原生本地模块。新增服务边界、挂载React、实际tracking hook回归；原生链路新增15检查点，包括真实记录、去重排序、草稿取消入口、原保存、实际Page.reload、查找选择、后端读错重试、更名重开、暂停恢复、移除清空与损坏恢复，以及无关数据不变。原始API成功响应不替换，无强制保存、重复点击或放宽旧断言。
+ 
+ 已读46产品/环境与12助手执行记录；保留字段语义、访问记录预算、读取失败不等于空、中文组合、过期确认/迟到请求、存储写后核对、目录/模板排除。新功能正常minor到4.230.0；schema14、原679依赖节点与保存退出不变。该文是源码范围，不提前宣布新HEAD全回归、Windows、新NSIS和安装升级覆盖卸载重装通过；通过后只写PR/交付，不为状态造提交。
++
++## 4.230.1：重开当前笔记的最新元数据
++
++首轮Windows b3f492d已完成前7项最近访问检查，实际重开当前笔记时标题仍旧，原始失败artifact12060783676保留。App的同ID捷径只返回笔记页，没有采用readQuickTarget刚读取的文件。最近访问现在显式请求refreshCurrent，经原useGuardedNoteOpener转交；App仅在不在笔记工作区、没有未保存内容时采用最新文件。当前已经打开的编辑器或任何未保存草稿仍保留原捷径，不重载、不隐式保存、不丢弃草稿。其它来源没有显式请求时行为不变；不同笔记仍走完整原保存放弃取消，迟到和身份保护不变。
++
++新增8项实际App回调契约（不是React），旧代码1失败/7通过，修补后8/8；新增6项真实App挂载、2项真实hook及1项Panel选项回归须完整项目执行。原原生15项断言和时间预算不修改，仍要求更名后的最新标题和正文。版本标准patch到4.230.1，schema14/679依赖节点保持。
+--- a/src/App.jsx
++++ b/src/App.jsx
+@@ -840,6 +840,12 @@
+     }
+ 
+     if (current && f && f.id === current.id) {
++      // Only an explicit clean return from another workspace adopts fresh data.
++      // The same open editor or any current draft retains its original shortcut.
++      if (options.refreshCurrent === true && workspace !== 'notes' && !unsaved) {
++        performSelect()
++        return
++      }
+       setWorkspace('notes')
+       options.afterSelect?.(f)
+       return
+--- a/src/hooks/useGuardedNoteOpener.js
++++ b/src/hooks/useGuardedNoteOpener.js
+@@ -56,6 +56,7 @@
+           }
+           const headingPath = Array.isArray(options?.headingPath) ? options.headingPath.filter(Boolean) : []
+           latest.current.onSelectFile(file, {
++            ...(options.refreshCurrent === true ? { refreshCurrent: true } : {}),
+             shouldSelect: valid,
+             onCancel: () => finish(false),
+             afterSelect: () => {
+--- a/src/components/RecentNotesPanel.jsx
++++ b/src/components/RecentNotesPanel.jsx
+@@ -43,7 +43,7 @@
+     let problem=''
+     try{
+       if(typeof latest.current.onSelectFile!=='function')throw Error('笔记打开通道暂不可用。')
+-      const accepted=await latest.current.onSelectFile(target.id,{signal:ctl.signal,shouldSelect:owns,readFile:async(id,{signal})=>{
++      const accepted=await latest.current.onSelectFile(target.id,{refreshCurrent:true,signal:ctl.signal,shouldSelect:owns,readFile:async(id,{signal})=>{
+         try{if(id!==target.id)throw Error('打开目标身份不符。');return await readRecentTarget(api,target,signal)}catch(e){problem=e.message;throw e}
+       }})
+       if(owns()){if(problem)setError(problem+' 可以重试或仅移除这条访问记录。');else setFeedback(accepted===true?'笔记已打开。':'未切换笔记，查找条件、历史和当前草稿保留。')}
+--- a/src/hooks/useGuardedNoteOpener.test.jsx
++++ b/src/hooks/useGuardedNoteOpener.test.jsx
+@@ -124,3 +124,17 @@
+  const result=open('source',{signal:c.signal,readFile:()=>new Promise(r=>release=r)});await drain();c.abort()
+  expect(await result).toBe(false);release({id:'source'});await drain();expect(selected).not.toHaveBeenCalled()
+ })
++
++it('explicit current-file refresh reaches the original guard but still waits for its decision',async()=>{
++ api.mockResolvedValue({id:'c1',title:'fresh'});let guard
++ await render({onSelectFile:(_file,o)=>{guard=o}})
++ const result=open('c1',{refreshCurrent:true});await drain()
++ expect(guard.refreshCurrent).toBe(true);expect(guard.shouldSelect()).toBe(true)
++ guard.onCancel();expect(await result).toBe(false)
++})
++it('nonboolean current refresh does not change the ordinary guard options',async()=>{
++ api.mockResolvedValue({id:'c1'});let guard
++ await render({onSelectFile:(_file,o)=>{guard=o;o.afterSelect()}})
++ expect(await open('c1',{refreshCurrent:'true'})).toBe(true)
++ expect(Object.prototype.hasOwnProperty.call(guard,'refreshCurrent')).toBe(false)
++})
+--- a/src/components/RecentNotesPanel.test.jsx
++++ b/src/components/RecentNotesPanel.test.jsx
+@@ -33,3 +33,10 @@
+ test('unavailable storage fails in the panel, can recover, and does not touch the backend',async()=>{const prior=Object.getOwnPropertyDescriptor(globalThis,'localStorage');try{Object.defineProperty(globalThis,'localStorage',{configurable:true,get(){throw Error('disabled')}});await mount();expect(host.querySelector('.recent-workspace')).toBeTruthy();expect(host.textContent).toContain('不可读取')}finally{Object.defineProperty(globalThis,'localStorage',prior)}await click('重新读取历史');expect(host.textContent).toContain('还没有访问记录');expect(api).not.toHaveBeenCalled()})
+ test('quota failure during clear reports failure instead of an empty successful history',async()=>{recordRecentVisit(note(),{now:1});await mount();await click('清空访问历史…');const original=globalThis.localStorage,write=vi.fn(()=>{throw Error('quota')});vi.stubGlobal('localStorage',{getItem:original.getItem.bind(original),setItem:write});try{await click('确认');expect(write).toHaveBeenCalledTimes(1);expect(host.textContent).toContain('写入失败');expect(original.getItem(RECENT_KEY)).toContain('笔记a')}finally{vi.unstubAllGlobals();globalThis.IS_REACT_ACT_ENVIRONMENT=true}})
+ test('double open activation sends just one read',async()=>{recordRecentVisit(note(),{now:1});api.mockReturnValue(new Promise(()=>{}));await mount();await choose();const b=button('重新打开笔记');await act(async()=>{b.click();b.click()});await flush();expect(api).toHaveBeenCalledTimes(1)})
++
++test('recent reopening explicitly requests fresh clean current-note adoption without a save bypass',async()=>{
++ recordRecentVisit(note(),{now:1});await mount();await choose();await click('重新打开笔记')
++ const options=select.mock.calls[0][1]
++ expect(options.refreshCurrent).toBe(true);expect(options.skipSave).toBeUndefined()
++ expect(typeof options.shouldSelect).toBe('function');expect(typeof options.readFile).toBe('function')
++})

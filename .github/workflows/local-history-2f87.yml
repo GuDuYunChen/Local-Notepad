@@ -1,4 +1,4 @@
-name: Complete local recent-note history verification
+name: Verify complete recent-note current-file reopening
 on:
   push:
     branches: [ci/local-history-2f87]
@@ -13,6 +13,8 @@ jobs:
     timeout-minutes: 18
     steps:
       - uses: actions/checkout@v7
+      - name: Fetch exact original current-file behavior for negative controls
+        run: git fetch --no-tags --depth=1 origin b3f492da006933a17e735dce49240edfdaf63e2d
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
@@ -20,33 +22,33 @@ jobs:
         with:
           go-version: '1.24.11'
           cache-dependency-path: server/go.sum
-      - name: Review inherited issue and regression index
+      - name: Preserve inherited problem index
         run: node scripts/stage-review.mjs catalog
-      - name: Integrate complete source-bound module and explicit minor version
-        run: node scripts/prepare-recent-notes-2f97.mjs apply
-      - name: Install only committed locked dependencies
+      - name: Apply exact complete recent-note repair and normal patch version
+        run: node scripts/prepare-recent-reopen.mjs apply
+      - name: Install committed dependency lock
         run: npm ci --no-audit --no-fund
-      - name: Recent history and all prior pin draft save quit guards
-        run: node --test scripts/recent-notes.node.mjs scripts/local-pins.node.mjs scripts/pin-journal-boundaries.node.mjs scripts/pin-recovery-ownership.node.mjs scripts/editor-cache-regression.node.mjs scripts/editor-save-transaction.node.mjs scripts/editor-quit.node.mjs > recent-module-evidence/node-contracts.tap
-      - name: Mounted recent panel tracking hook and storage boundaries
-        run: npx vitest run --root=. src/components/RecentNotesPanel.test.jsx src/hooks/useRecentNoteTracking.test.jsx src/services/recentNotes.test.js --reporter=json --outputFile=recent-module-evidence/targeted.json
-      - name: Full original UI regression including latest recent history
-        run: npx vitest run --root=. --maxWorkers=4 --minWorkers=1 --reporter=json --outputFile=recent-module-evidence/full-ui.json
+      - name: Reproduce actual App same-note shortcut before repair
+        run: node scripts/prepare-recent-reopen.mjs baseline
+      - name: Current-note contracts and every original recent pin save quit guard
+        run: node --test scripts/recent-reopen.node.mjs scripts/recent-notes.node.mjs scripts/local-pins.node.mjs scripts/pin-journal-boundaries.node.mjs scripts/pin-recovery-ownership.node.mjs scripts/editor-cache-regression.node.mjs scripts/editor-save-transaction.node.mjs scripts/editor-quit.node.mjs > recent-reopen-evidence/node-contracts.tap
+      - name: Real App recent panel and guarded opener regression
+        run: npx vitest run --root=. src/App.recentNotes.test.jsx src/hooks/useGuardedNoteOpener.test.jsx src/components/RecentNotesPanel.test.jsx src/services/recentReopen.test.js --reporter=json --outputFile=recent-reopen-evidence/targeted.json
+      - name: Complete unchanged baseline and repaired UI regression
+        run: npx vitest run --root=. --maxWorkers=4 --minWorkers=1 --reporter=json --outputFile=recent-reopen-evidence/full-ui.json
       - name: Unchanged production Go regression
-        run: go -C server test -json ./... > recent-module-evidence/go-tests.jsonl
-      - name: Full original main preload and renderer build
+        run: go -C server test -json ./... > recent-reopen-evidence/go-tests.jsonl
+      - name: Complete original main preload and renderer build
         run: npm run build:main && npm run build:renderer
-      - name: Recheck all candidate identities after build
-        run: node scripts/prepare-recent-notes-2f97.mjs verify
-      - name: Publish only the tested changed code objects
+      - name: Publish only exact verified repair objects
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node scripts/prepare-recent-notes-2f97.mjs publish
+        run: node scripts/prepare-recent-reopen.mjs publish
       - name: Retain complete or failed original evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: recent-notes-verification-${{ github.sha }}
-          path: recent-module-evidence/
+          name: recent-reopen-verification-${{ github.sha }}
+          path: recent-reopen-evidence/
           retention-days: 7
           if-no-files-found: error

@@ -17,6 +17,7 @@ import SearchReturnBar from './components/SearchReturnBar'
 import CollectionReadingBar from './components/CollectionReadingBar'
 import { evidenceReview } from '~/services/evidenceReviewSession'
 import useGuardedNoteOpener from './hooks/useGuardedNoteOpener'
+import useRecentNoteTracking from './hooks/useRecentNoteTracking'
 import { toast } from '~/services/toast'
 import {
   appendFocusSession,
@@ -37,6 +38,7 @@ import {
 
 const GraphPanel = React.lazy(() => import('./components/GraphPanel'))
 const PinnedNotesPanel = React.lazy(() => import('./components/PinnedNotesPanel'))
+const RecentNotesPanel = React.lazy(() => import('./components/RecentNotesPanel'))
 const ProjectWorkspacePanel = React.lazy(() => import('./components/ProjectWorkspacePanel'))
 const DailyNotesPanel = React.lazy(() => import('./components/DailyNotesPanel'))
 const InspectorPanel = React.lazy(() => import('./components/InspectorPanel'))
@@ -95,6 +97,7 @@ export default function App() {
   })
   const [dragging, setDragging] = useState(false)
   const [current, setCurrent] = useState(null)
+  useRecentNoteTracking(current, workspace)
   const [content, setContent] = useState('')
   const [switching, setSwitching] = useState(false)
   const [deletedIds, setDeletedIds] = useState(new Set())
@@ -989,6 +992,8 @@ export default function App() {
     ? '项目工作台'
     : workspace === 'daily'
       ? '每日笔记'
+      : workspace === 'recent'
+        ? '最近访问'
       : workspace === 'pinned'
         ? '置顶笔记'
       : workspace === 'graph'
@@ -1283,6 +1288,12 @@ export default function App() {
                         else select(f)
                       }}
                     />
+                  </React.Suspense>
+                )}
+
+                {workspace === 'recent' && (
+                  <React.Suspense fallback={<div className="workspace-loading">正在打开最近访问…</div>}>
+                    <RecentNotesPanel onClose={() => setWorkspace('notes')} onSelectFile={handleInspectorSelectFile} />
                   </React.Suspense>
                 )}
 
