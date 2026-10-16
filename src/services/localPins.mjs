@@ -2,6 +2,9 @@ import {dailyRequest} from './dailyNotes.mjs'
 import {readQuickTarget} from './quickSwitcher.mjs'
 
 export const PIN_JOURNAL_KEY = 'local-notepad.pending-pin.v1'
+// A valid 16 KiB title can expand six-fold when JSON escapes control characters.
+// The journal must accept every intent that its own writer can persist.
+export const PIN_JOURNAL_MAX_CHARS = 128 * 1024
 export const PIN_PAGE_SIZE = 20
 export const PIN_LIMIT = 2000
 const bytes = text => new TextEncoder().encode(text).length
@@ -50,26 +53,32 @@ export function validatePinIntent(value) {
   if (item.is_pinned === value.pinned) bad('journal','置顶操作目标没有变化。')
   return Object.freeze({version:1,started_at:value.started_at,item,pinned:value.pinned})
 }
-export function pinJournal(storage = globalThis.localStorage) {
+export function pinJournal(storage) {
+  // Resolve browser storage inside an action, not while React constructs a page.
+  // SecurityError is handled by the workspace's existing read/retry boundary.
+  const access = () => storage === undefined ? globalThis.localStorage : storage
   return {
     read() {
-      const raw = storage.getItem(PIN_JOURNAL_KEY)
+      const raw = access().getItem(PIN_JOURNAL_KEY)
       if (raw === null) return null
-      try { if (typeof raw !== 'string' || raw.length > 65536) throw Error(); return validatePinIntent(JSON.parse(raw)) }
+      try { if (typeof raw !== 'string' || raw.length > PIN_JOURNAL_MAX_CHARS) throw Error(); return validatePinIntent(JSON.parse(raw)) }
       catch { bad('journal','本机置顶操作记录损坏，原记录保留。') }
     },
     save(intent) {
-      if (storage.getItem(PIN_JOURNAL_KEY) !== null) bad('pending','已有置顶操作待核对，请打开“置顶笔记”处理，不会重复提交。')
+      const target = access()
+      if (target.getItem(PIN_JOURNAL_KEY) !== null) bad('pending','已有置顶操作待核对，请打开“置顶笔记”处理，不会重复提交。')
       const raw = JSON.stringify(validatePinIntent(intent))
-      storage.setItem(PIN_JOURNAL_KEY,raw)
-      if (storage.getItem(PIN_JOURNAL_KEY) !== raw) bad('storage','操作记录未保存成功，尚未发送置顶修改。')
+      if (raw.length > PIN_JOURNAL_MAX_CHARS) bad('journal','置顶操作记录超过本机保存上限，尚未发送修改。')
+      target.setItem(PIN_JOURNAL_KEY,raw)
+      if (target.getItem(PIN_JOURNAL_KEY) !== raw) bad('storage','操作记录未保存成功，尚未发送置顶修改。')
     },
     clear(expectedRaw) {
-      if (storage.getItem(PIN_JOURNAL_KEY) !== expectedRaw) bad('changed','操作记录已变化，未清除，请重新核对。')
-      storage.removeItem(PIN_JOURNAL_KEY)
-      if (storage.getItem(PIN_JOURNAL_KEY) !== null) bad('storage','操作记录未清除，请重新核对。')
+      const target = access()
+      if (target.getItem(PIN_JOURNAL_KEY) !== expectedRaw) bad('changed','操作记录已变化，未清除，请重新核对。')
+      target.removeItem(PIN_JOURNAL_KEY)
+      if (target.getItem(PIN_JOURNAL_KEY) !== null) bad('storage','操作记录未清除，请重新核对。')
     },
-    raw: () => storage.getItem(PIN_JOURNAL_KEY),
+    raw: () => access().getItem(PIN_JOURNAL_KEY),
   }
 }
 export async function changePin(api, value, pinned, {signal,storage=globalThis.localStorage,timeout} = {}) {

@@ -1,9 +1,9 @@
-name: Verify complete local pinned-note organization
+name: Complete pinned-note final candidate verification
 on:
   push:
     branches: [ci/local-history-2f87]
 permissions:
-  contents: write
+  contents: read
 concurrency:
   group: local-history-2f87
   cancel-in-progress: false
@@ -13,7 +13,7 @@ jobs:
     timeout-minutes: 18
     steps:
       - uses: actions/checkout@v7
-      - name: Fetch the exact accepted negative-control source
+      - name: Fetch the exact accepted baseline for identity checks
         run: git fetch --no-tags --depth=1 origin 6a74bc0ab69314b4c032003bbcb29ea7acb4b45a
       - uses: actions/setup-node@v7
         with:
@@ -22,36 +22,33 @@ jobs:
         with:
           go-version: '1.24.11'
           cache-dependency-path: server/go.sum
-      - name: Review inherited problem index
-        run: node scripts/stage-review.mjs catalog
-      - name: Apply source-bound complete integration and normal minor version
-        run: node scripts/prepare-local-pins-2f96.mjs apply
-      - name: Preserve changed-operation feedback after record refresh
-        run: node scripts/repair-pin-record-feedback.mjs
-      - name: Install exact locked dependencies
+      - name: Verify complete candidate identity and unchanged dependencies
+        run: node scripts/check-pins-closeout.mjs
+      - name: Review inherited incidents and current version
+        run: node scripts/stage-review.mjs catalog && node scripts/check-app-version.mjs --previous-version=4.228.0 && node scripts/verify-dependency-lock.mjs
+      - name: Install only committed dependency lock
         run: npm ci --no-audit --no-fund
-      - name: Reproduce original pin refresh and unrelated-column write failures
-        run: node scripts/prepare-local-pins-2f96.mjs baseline
-      - name: Pin core and unchanged save protections
-        run: node --test scripts/local-pins.node.mjs scripts/editor-cache-regression.node.mjs scripts/editor-save-transaction.node.mjs scripts/editor-quit.node.mjs
-      - name: Real pinned workspace and original list menu tests
-        run: npx vitest run --root=. src/components/PinnedNotesPanel.test.jsx src/components/FileListPin.legacy-safety.test.jsx src/services/localPins.test.js --reporter=json --outputFile=pin-module-evidence/targeted.json
-      - name: All original UI regression and pinned-note workflow
-        run: npx vitest run --root=. --maxWorkers=4 --minWorkers=1 --reporter=json --outputFile=pin-module-evidence/full-ui.json
-      - name: Real production SQLite regression and pin concurrency
+      - name: Ensure install preserved committed manifest and lock
+        run: git diff --exit-code -- package.json package-lock.json
+      - name: All pin recovery boundaries and original save guards
+        run: node --test scripts/local-pins.node.mjs scripts/pin-journal-boundaries.node.mjs scripts/pin-recovery-ownership.node.mjs scripts/editor-cache-regression.node.mjs scripts/editor-save-transaction.node.mjs scripts/editor-quit.node.mjs > pin-closeout-evidence/node-contracts.tap
+      - name: Actual mounted pinned workspace and original file menu
+        run: npx vitest run --root=. src/components/PinnedNotesPanel.test.jsx src/components/FileListPin.legacy-safety.test.jsx src/services/localPins.test.js src/services/localPins.boundaries.test.js src/services/localPins.recovery-ownership.test.js --reporter=json --outputFile=pin-closeout-evidence/targeted.json
+      - name: Full original UI regression with final pin changes
+        run: npx vitest run --root=. --maxWorkers=4 --minWorkers=1 --reporter=json --outputFile=pin-closeout-evidence/full-ui.json
+      - name: Production Go SQLite and concurrent pin writes
         run: |
-          go -C server test -json ./... > pin-module-evidence/go-tests.jsonl
-          go -C server test -race ./internal/dao -run LocalPin -count=1
-      - name: Full original main preload and renderer builds
+          go -C server test -json ./... > pin-closeout-evidence/go-tests.jsonl
+          go -C server test -race ./internal/dao -run LocalPin -count=1 > pin-closeout-evidence/go-race.txt
+      - name: Build original main preload and renderer
         run: npm run build:main && npm run build:renderer
-      - name: Publish only verified changed code objects
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node scripts/prepare-local-pins-2f96.mjs publish
-      - uses: actions/upload-artifact@v4
+      - name: Verify no source changes during tests or builds
+        run: git diff --exit-code
+      - name: Retain original complete or failed evidence
         if: always()
+        uses: actions/upload-artifact@v4
         with:
-          name: local-pins-verification-${{ github.sha }}
-          path: pin-module-evidence/
+          name: pin-closeout-${{ github.sha }}
+          path: pin-closeout-evidence/
           retention-days: 7
           if-no-files-found: error

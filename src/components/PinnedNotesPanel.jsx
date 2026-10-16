@@ -12,14 +12,14 @@ export default function PinnedNotesPanel({onSelectFile,onClose}) {
   latest.current={onSelectFile,onClose}
   const journal=useMemo(()=>pinJournal(),[])
   const refreshPending=()=>{
-    try { const raw=journal.raw();pendingRaw.current=raw;const p=journal.read();setPending(p);setCorrupt(false);return p }
-    catch { setCorrupt(true);setPending(null);setError('本机置顶记录无法读取；不会发起新修改。可以核对或明确清除记录。');return null }
+    try { const raw=journal.raw();if(raw!==pendingRaw.current)setReviewed(false);pendingRaw.current=raw;const p=journal.read();setPending(p);setCorrupt(false);return p }
+    catch { setReviewed(false);setCorrupt(true);setPending(null);setError('本机置顶记录无法读取；不会发起新修改。可以核对或明确清除记录。');return null }
   }
   const cancelOperation=()=>{operation.current?.abort();operation.current=null;setBusy('')}
   const load=async()=>{
     if(operation.current)return
     reader.current?.abort();const ctl=new AbortController();reader.current=ctl
-    setSnapshot(null);setSelectedId('');setPage(0);setStatus('loading');setError('');refreshPending()
+    setSnapshot(null);setSelectedId('');setPage(0);setStatus('loading');setError('');setNotice('');setReviewed(false);refreshPending()
     try { const value=await readPins(api,ctl.signal);if(alive.current&&reader.current===ctl&&!ctl.signal.aborted){setSnapshot(value);setStatus('ready')} }
     catch(e){if(alive.current&&reader.current===ctl&&!ctl.signal.aborted){setError(e.message);setStatus('error')}}
   }
@@ -63,7 +63,7 @@ export default function PinnedNotesPanel({onSelectFile,onClose}) {
   }
   const endRecord=raw=>{
     try{journal.clear(raw);refreshPending();setReviewed(false);setNotice('已结束本机置顶记录，没有再次修改笔记。');setError('')}
-    catch(e){setError(e.message);refreshPending();setReviewed(false)}
+    catch(e){refreshPending();setError(e.message);setReviewed(false)}
   }
   const open=async()=>{
     if(!selected||operation.current||composing.current)return

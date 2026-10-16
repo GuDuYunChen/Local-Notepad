@@ -36,3 +36,36 @@ test('changed title or pin is not passed through guarded selection',async()=>{it
 test('close cancels delayed open and suppresses late navigation',async()=>{items[0].is_pinned=true;await mount();await choose();const d=deferred();api.mockReturnValue(d.promise);await click('打开选中笔记');await click('返回笔记');await act(async()=>root.render(null));await act(async()=>d.resolve({...note('a',{is_pinned:true}),content:'late',is_deleted:false}));expect(adopt).not.toHaveBeenCalled();expect(close).toHaveBeenCalledTimes(1)})
 test('initial read timeout provides retry and does not report success',async()=>{api.mockReturnValue(new Promise(()=>{}));await mount();await act(async()=>vi.advanceTimersByTimeAsync(10001));expect(host.textContent).toContain('超时');expect(button('重新读取置顶笔记')).toBeTruthy()})
 test('refresh cannot resurrect old asynchronous catalog',async()=>{const d=deferred();api.mockReturnValue(d.promise);await mount();await click('停止等待');api.mockResolvedValue({scope:'active-note-pins-v1',complete:true,items:[note('new',{is_pinned:true})]});await click('重新读取置顶笔记');await act(async()=>d.resolve({scope:'active-note-pins-v1',complete:true,items:[]}));expect(host.querySelector('[data-pinned-note-id="new"]')).toBeTruthy()})
+
+// Shared node contracts execute the storage boundary; these mounted-React
+// assertions remain part of the required full-project CI acceptance.
+test('disabled browser storage does not crash the workspace and can be retried',async()=>{
+ const original=Object.getOwnPropertyDescriptor(globalThis,'localStorage')
+ try{
+  Object.defineProperty(globalThis,'localStorage',{configurable:true,get(){throw Error('Storage disabled')}})
+  await mount();expect(host.querySelector('.pinned-workspace')).toBeTruthy()
+  expect(host.textContent).toContain('本机置顶记录无法读取');expect(writes()).toHaveLength(0)
+ }finally{if(original)Object.defineProperty(globalThis,'localStorage',original);else delete globalThis.localStorage}
+ await click('刷新列表');expect(host.textContent).not.toContain('记录损坏')
+ await all();await choose();await click('置顶这篇笔记');expect(writes()).toHaveLength(1)
+})
+test('replacing a reviewed operation requires reading back that new operation',async()=>{
+ pinJournal().save({version:1,started_at:1,item:note(),pinned:true})
+ await mount();await click('核对当前置顶状态')
+ expect(button('结束这条操作记录').disabled).toBe(false)
+ localStorage.setItem(PIN_JOURNAL_KEY,JSON.stringify({version:1,started_at:2,item:note('b'),pinned:true}))
+ await click('刷新列表')
+ expect(button('结束这条操作记录').disabled).toBe(true)
+ expect(host.textContent).not.toContain('不是原请求的历史回执')
+ expect(writes()).toHaveLength(0)
+})
+test('escaped long-title response loss remains a readable pending operation',async()=>{
+ items=[note('a',{title:'\u0001'.repeat(16384)})];await mount();await all();await choose()
+ const original=api.getMockImplementation()
+ api.mockImplementation(async(p,i)=>{const result=await original(p,i);if(i?.method==='PUT')throw Error('lost response');return result})
+ await click('置顶这篇笔记')
+ expect(host.textContent).toContain('置顶操作待核对')
+ expect(host.textContent).not.toContain('记录损坏')
+ expect(pinJournal().read().item.title).toBe(items[0].title)
+ expect(writes()).toHaveLength(1)
+})
