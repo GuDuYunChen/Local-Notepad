@@ -1,0 +1,30 @@
+{
+  "base": "2eaf958905f64259e33deffc2ecb46d381177fb8",
+  "original": {
+    "AGENTS.md": "f5ea96d15ea9962f37bf0ede0fc7c748a3222ce7",
+    "src/App.jsx": "a2c3b9e3819945f40331bda2a51d4dd4599bec3e",
+    "src/components/WorkspaceSidebar.jsx": "7ba12c88e7ea5658f973d795e62551395d9d1d59",
+    "scripts/check-desktop-save.mjs": "dab058bd11a2e76276be63a52f610dc2f9f20f15",
+    "package.json": "eb4f7ed2139eb51115119cc420b12bf800137c81",
+    "package-lock.json": "5b9d529f0c4e55f2a4b7ff59724aadad35c35576"
+  },
+  "expected": {
+    "AGENTS.md": "14286cc0992d20c9901c1e1a49532ac8c7e75b17",
+    "src/App.jsx": "bff119d520150e933022ae1f985d59d4817f24d1",
+    "src/components/WorkspaceSidebar.jsx": "8b6ae5104644e151f724f4a8c2dd9301f57e7461",
+    "scripts/check-desktop-save.mjs": "e62936caf386f9e8ef24d96dc8fdf917beb39851",
+    "package.json": "4e02bf22e04da2e1a5effe19ac57b519935001c7",
+    "package-lock.json": "8eb814f6fc34f64468214a7060b386d0572dffb8",
+    "src/services/recentNotes.mjs": "5a61d781c4129b3c92fab7822de9a87df9d08ae6",
+    "src/services/recentNotes.test.js": "4dbda9a92408693cb78550a8bec888b397889290",
+    "src/hooks/useRecentNoteTracking.js": "859406a7a075d9b0b1975085287949a7f592f23a",
+    "src/hooks/useRecentNoteTracking.test.jsx": "5cdfff4905f26fdd654d966a4740b1d9d6443bd2",
+    "src/components/RecentNotesPanel.jsx": "eb4bc78b1b6731b9bb4117f276266b5f8761a4f5",
+    "src/components/RecentNotesPanel.css": "514bd3ebec0acce68fff64fc335ecfc2f74406aa",
+    "src/components/RecentNotesPanel.test.jsx": "01d9f21f6abc8bbae31d624edd4e8f271462f8b4",
+    "scripts/recent-notes-cases.mjs": "7dbfc8a49d3ed900b34f94764a7dd44c72f6f461",
+    "scripts/recent-notes.node.mjs": "cd23f6107155228c9fae255dce58ec124b19f88d",
+    "scripts/check-recent-notes-desktop.mjs": "cbe5a8897c082210363357fd33f2cb0f3d7bd1cc",
+    "docs/LOCAL_RECENT_NOTES_2F97.md": "a46c3a32f404c2461a4ac40c108ffea169973493"
+  }
+}

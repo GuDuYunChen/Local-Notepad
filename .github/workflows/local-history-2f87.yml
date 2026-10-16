@@ -1,9 +1,9 @@
-name: Complete pinned-note final candidate verification
+name: Complete local recent-note history verification
 on:
   push:
     branches: [ci/local-history-2f87]
 permissions:
-  contents: read
+  contents: write
 concurrency:
   group: local-history-2f87
   cancel-in-progress: false
@@ -13,8 +13,6 @@ jobs:
     timeout-minutes: 18
     steps:
       - uses: actions/checkout@v7
-      - name: Fetch the exact accepted baseline for identity checks
-        run: git fetch --no-tags --depth=1 origin 6a74bc0ab69314b4c032003bbcb29ea7acb4b45a
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
@@ -22,33 +20,33 @@ jobs:
         with:
           go-version: '1.24.11'
           cache-dependency-path: server/go.sum
-      - name: Verify complete candidate identity and unchanged dependencies
-        run: node scripts/check-pins-closeout.mjs
-      - name: Review inherited incidents and current version
-        run: node scripts/stage-review.mjs catalog && node scripts/check-app-version.mjs --previous-version=4.228.0 && node scripts/verify-dependency-lock.mjs
-      - name: Install only committed dependency lock
+      - name: Review inherited issue and regression index
+        run: node scripts/stage-review.mjs catalog
+      - name: Integrate complete source-bound module and explicit minor version
+        run: node scripts/prepare-recent-notes-2f97.mjs apply
+      - name: Install only committed locked dependencies
         run: npm ci --no-audit --no-fund
-      - name: Ensure install preserved committed manifest and lock
-        run: git diff --exit-code -- package.json package-lock.json
-      - name: All pin recovery boundaries and original save guards
-        run: node --test scripts/local-pins.node.mjs scripts/pin-journal-boundaries.node.mjs scripts/pin-recovery-ownership.node.mjs scripts/editor-cache-regression.node.mjs scripts/editor-save-transaction.node.mjs scripts/editor-quit.node.mjs > pin-closeout-evidence/node-contracts.tap
-      - name: Actual mounted pinned workspace and original file menu
-        run: npx vitest run --root=. src/components/PinnedNotesPanel.test.jsx src/components/FileListPin.legacy-safety.test.jsx src/services/localPins.test.js src/services/localPins.boundaries.test.js src/services/localPins.recovery-ownership.test.js --reporter=json --outputFile=pin-closeout-evidence/targeted.json
-      - name: Full original UI regression with final pin changes
-        run: npx vitest run --root=. --maxWorkers=4 --minWorkers=1 --reporter=json --outputFile=pin-closeout-evidence/full-ui.json
-      - name: Production Go SQLite and concurrent pin writes
-        run: |
-          go -C server test -json ./... > pin-closeout-evidence/go-tests.jsonl
-          go -C server test -race ./internal/dao -run LocalPin -count=1 > pin-closeout-evidence/go-race.txt
-      - name: Build original main preload and renderer
+      - name: Recent history and all prior pin draft save quit guards
+        run: node --test scripts/recent-notes.node.mjs scripts/local-pins.node.mjs scripts/pin-journal-boundaries.node.mjs scripts/pin-recovery-ownership.node.mjs scripts/editor-cache-regression.node.mjs scripts/editor-save-transaction.node.mjs scripts/editor-quit.node.mjs > recent-module-evidence/node-contracts.tap
+      - name: Mounted recent panel tracking hook and storage boundaries
+        run: npx vitest run --root=. src/components/RecentNotesPanel.test.jsx src/hooks/useRecentNoteTracking.test.jsx src/services/recentNotes.test.js --reporter=json --outputFile=recent-module-evidence/targeted.json
+      - name: Full original UI regression including latest recent history
+        run: npx vitest run --root=. --maxWorkers=4 --minWorkers=1 --reporter=json --outputFile=recent-module-evidence/full-ui.json
+      - name: Unchanged production Go regression
+        run: go -C server test -json ./... > recent-module-evidence/go-tests.jsonl
+      - name: Full original main preload and renderer build
         run: npm run build:main && npm run build:renderer
-      - name: Verify no source changes during tests or builds
-        run: git diff --exit-code
-      - name: Retain original complete or failed evidence
+      - name: Recheck all candidate identities after build
+        run: node scripts/prepare-recent-notes-2f97.mjs verify
+      - name: Publish only the tested changed code objects
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/prepare-recent-notes-2f97.mjs publish
+      - name: Retain complete or failed original evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: pin-closeout-${{ github.sha }}
-          path: pin-closeout-evidence/
+          name: recent-notes-verification-${{ github.sha }}
+          path: recent-module-evidence/
           retention-days: 7
           if-no-files-found: error

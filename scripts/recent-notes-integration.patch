@@ -1,0 +1,87 @@
+--- a/AGENTS.md
++++ b/AGENTS.md
+@@ -1,6 +1,6 @@
+ # Local-Notepad development
+ 
+-Current local module: 2F.96 /4.229.0 complete local pinned-note organization and safe opening. Read docs/LOCAL_PINNED_NOTES_2F96.md. Accepted base6a74bc0 /4.228.0 is PR2 comment6207840904. Complete original context pin/unpin confirmation, pinned workspace entry, complete metadata read/filter/sort/page, latest guarded note opening, atomic pin-only writes, persisted uncertain-operation record and GET-only reconciliation, original draft/save/quit and installed lifecycle. Never call undefined list reloads, rewrite stale bodies for pin-only changes, replay uncertain writes, delete later recovery records or navigate from stale pin metadata. Preserve schema14 and locked dependency graph. No cloud/multidevice or rejected dependency export.
++Current local module: 2F.97 /4.230.0 complete local recent-note history and safe reopening. Read docs/LOCAL_RECENT_NOTES_2F97.md. Accepted base2eaf958 /4.229.0 is PR2 comment6218034949. Complete confirmed note-entry tracking, metadata-only local history, literal/IME search and pagination, latest identity read through original save/discard/cancel, explicit history removal/clear/pause/resume, storage failure/corrupt-record recovery and real renderer reload. History actions never modify note bodies or delete notes, treat failed reads as empty success, overwrite later history from stale confirmation or navigate after cancellation. Preserve all prior native modules/save/quit/schema14/679 dependency nodes. No cloud/multidevice or rejected source/dependency export.
+ 
+ Read `docs/DEVELOPMENT_HANDOFF.md` before resuming an interrupted task.
+ Work on `feature/knowledge-os-phase2` / Draft PR #2 unless the user explicitly changes that direction. Do not merge master as part of ordinary stage development.
+--- a/src/App.jsx
++++ b/src/App.jsx
+@@ -17,6 +17,7 @@
+ import CollectionReadingBar from './components/CollectionReadingBar'
+ import { evidenceReview } from '~/services/evidenceReviewSession'
+ import useGuardedNoteOpener from './hooks/useGuardedNoteOpener'
++import useRecentNoteTracking from './hooks/useRecentNoteTracking'
+ import { toast } from '~/services/toast'
+ import {
+   appendFocusSession,
+@@ -37,6 +38,7 @@
+ 
+ const GraphPanel = React.lazy(() => import('./components/GraphPanel'))
+ const PinnedNotesPanel = React.lazy(() => import('./components/PinnedNotesPanel'))
++const RecentNotesPanel = React.lazy(() => import('./components/RecentNotesPanel'))
+ const ProjectWorkspacePanel = React.lazy(() => import('./components/ProjectWorkspacePanel'))
+ const DailyNotesPanel = React.lazy(() => import('./components/DailyNotesPanel'))
+ const InspectorPanel = React.lazy(() => import('./components/InspectorPanel'))
+@@ -95,6 +97,7 @@
+   })
+   const [dragging, setDragging] = useState(false)
+   const [current, setCurrent] = useState(null)
++  useRecentNoteTracking(current, workspace)
+   const [content, setContent] = useState('')
+   const [switching, setSwitching] = useState(false)
+   const [deletedIds, setDeletedIds] = useState(new Set())
+@@ -989,6 +992,8 @@
+     ? '项目工作台'
+     : workspace === 'daily'
+       ? '每日笔记'
++      : workspace === 'recent'
++        ? '最近访问'
+       : workspace === 'pinned'
+         ? '置顶笔记'
+       : workspace === 'graph'
+@@ -1286,6 +1291,12 @@
+                   </React.Suspense>
+                 )}
+ 
++                {workspace === 'recent' && (
++                  <React.Suspense fallback={<div className="workspace-loading">正在打开最近访问…</div>}>
++                    <RecentNotesPanel onClose={() => setWorkspace('notes')} onSelectFile={handleInspectorSelectFile} />
++                  </React.Suspense>
++                )}
++
+                 {workspace === 'pinned' && (
+                   <React.Suspense fallback={<div className="workspace-loading">正在打开置顶笔记…</div>}>
+                     <PinnedNotesPanel onClose={() => setWorkspace('notes')} onSelectFile={handleInspectorSelectFile} />
+--- a/src/components/WorkspaceSidebar.jsx
++++ b/src/components/WorkspaceSidebar.jsx
+@@ -69,6 +69,11 @@
+       id: 'daily',
+       label: '每日笔记',
+       icon: <Icon><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 10h18" /></Icon>,
++    },
++    {
++      id: 'recent',
++      label: '最近访问',
++      icon: <Icon><circle cx="12" cy="12" r="9" /><path d="M12 7v5l4 2" /></Icon>,
+     },
+     {
+       id: 'pinned',
+--- a/scripts/check-desktop-save.mjs
++++ b/scripts/check-desktop-save.mjs
+@@ -1,3 +1,4 @@
++import { verifyRecentNotesDesktop } from './check-recent-notes-desktop.mjs'
+ import { verifyLocalPinsDesktop } from './check-local-pins-desktop.mjs'
+ import { verifyLocalGraphDesktop } from './check-local-graph-desktop.mjs'
+ import { verifyDocumentOutlineDesktop } from './check-document-outline-desktop.mjs'
+@@ -295,6 +296,7 @@
+   await verifyDocumentOutlineDesktop({ evaluate, click, cdp, until, api, out, noteIDs: [a.id, b.id] })
+   await verifyLocalGraphDesktop({ evaluate, click, cdp, until, api, out, noteIDs: [a.id, b.id] })
+   await verifyLocalPinsDesktop({ evaluate, click, cdp, until, api, out, noteIDs: [a.id, b.id] })
++  await verifyRecentNotesDesktop({ evaluate, click, cdp, until, api, out, noteIDs: [a.id, b.id] })
+   await open(a.id, 'native-close-latest')
+   await closeWindow()
+   report.checks.push('fresh-profile packaged restart reads latest body from real database and closes cleanly')
