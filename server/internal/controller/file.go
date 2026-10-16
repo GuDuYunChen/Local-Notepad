@@ -43,6 +43,7 @@ func (c *FileController) Register(group *ghttp.RouterGroup) {
 	group.POST("/files/{id}/export", c.Export)
 	group.POST("/files/{id}/save-as", c.SaveAs)
 	group.GET("/graph", c.Graph)
+	group.GET("/local-graph", c.LocalGraph)
 	group.GET("/files/daily/{date}", c.DailyNote)
 	group.POST("/files/daily/{date}", c.DailyNote)
 	group.GET("/templates", c.ListTemplates)

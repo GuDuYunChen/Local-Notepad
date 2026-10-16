@@ -1,0 +1,180 @@
+diff --git a/AGENTS.md b/AGENTS.md
+index 6220e3d..f5ea96d 100644
+--- a/AGENTS.md
++++ b/AGENTS.md
+@@ -1,6 +1,6 @@
+ # Local-Notepad development
+ 
+-Current local module: 2F.95 /4.228.0 complete local knowledge graph exploration and safe note opening. Read docs/LOCAL_KNOWLEDGE_GRAPH_2F95.md. Accepted base996cb1c /4.227.1 is PR2 comment6194308839. Complete original graph entry, consistent bounded metadata/link snapshot, real errors/empty/stop/retry, literal/IME filters, isolated and linked notes, accessible selection/relations and one-hop focus, real zoom/reset, latest target identity and original save/discard/cancel guard, close/reopen and current-source Windows/package/installation. Graph views never save bodies, rewrite indexes, drop partial results into success or open from stale metadata. Preserve all previous local modules/save/receipt/draft/quit, schema14 and locked dependencies. No cloud/multidevice or rejected source/dependency export.
++Current local module: 2F.96 /4.229.0 complete local pinned-note organization and safe opening. Read docs/LOCAL_PINNED_NOTES_2F96.md. Accepted base6a74bc0 /4.228.0 is PR2 comment6207840904. Complete original context pin/unpin confirmation, pinned workspace entry, complete metadata read/filter/sort/page, latest guarded note opening, atomic pin-only writes, persisted uncertain-operation record and GET-only reconciliation, original draft/save/quit and installed lifecycle. Never call undefined list reloads, rewrite stale bodies for pin-only changes, replay uncertain writes, delete later recovery records or navigate from stale pin metadata. Preserve schema14 and locked dependency graph. No cloud/multidevice or rejected dependency export.
+ 
+ Read `docs/DEVELOPMENT_HANDOFF.md` before resuming an interrupted task.
+ Work on `feature/knowledge-os-phase2` / Draft PR #2 unless the user explicitly changes that direction. Do not merge master as part of ordinary stage development.
+diff --git a/scripts/check-desktop-save.mjs b/scripts/check-desktop-save.mjs
+index 9bee357..dab058b 100644
+--- a/scripts/check-desktop-save.mjs
++++ b/scripts/check-desktop-save.mjs
+@@ -1,3 +1,4 @@
++import { verifyLocalPinsDesktop } from './check-local-pins-desktop.mjs'
+ import { verifyLocalGraphDesktop } from './check-local-graph-desktop.mjs'
+ import { verifyDocumentOutlineDesktop } from './check-document-outline-desktop.mjs'
+ import { verifyDocumentSearchDesktop } from './check-document-search-desktop.mjs'
+@@ -293,6 +294,7 @@ try {
+   await verifyDocumentSearchDesktop({ evaluate, click, cdp, until, api, out, noteIDs: [a.id, b.id] })
+   await verifyDocumentOutlineDesktop({ evaluate, click, cdp, until, api, out, noteIDs: [a.id, b.id] })
+   await verifyLocalGraphDesktop({ evaluate, click, cdp, until, api, out, noteIDs: [a.id, b.id] })
++  await verifyLocalPinsDesktop({ evaluate, click, cdp, until, api, out, noteIDs: [a.id, b.id] })
+   await open(a.id, 'native-close-latest')
+   await closeWindow()
+   report.checks.push('fresh-profile packaged restart reads latest body from real database and closes cleanly')
+diff --git a/server/internal/controller/file.go b/server/internal/controller/file.go
+index 356a69f..c10107b 100644
+--- a/server/internal/controller/file.go
++++ b/server/internal/controller/file.go
+@@ -17,6 +17,7 @@ type FileController struct {
+ }
+ 
+ func (c *FileController) Register(group *ghttp.RouterGroup) {
++	c.RegisterLocalPins(group)
+ 	c.RegisterTemplateLibrary(group)
+ 	group.GET("/editor-reference-jobs", c.EditorReferenceJobs)
+ 	group.POST("/editor-reference-jobs/{requestId}", c.CompleteEditorReferences)
+diff --git a/server/internal/logic/file.go b/server/internal/logic/file.go
+index 19d2e81..ceae169 100644
+--- a/server/internal/logic/file.go
++++ b/server/internal/logic/file.go
+@@ -82,6 +82,9 @@ func (l *FileLogic) Get(ctx context.Context, id string) (*model.File, error) {
+ }
+ 
+ func (l *FileLogic) Update(ctx context.Context, id string, title, content, parentID *string, sortOrder *int64, isDeleted *bool, isPinned *bool) (*model.File, error) {
++	if isPinned != nil && title == nil && content == nil && parentID == nil && sortOrder == nil && isDeleted == nil {
++		return l.FileDAO.SetLegacyPin(ctx, id, *isPinned)
++	}
+ 	f, err := l.FileDAO.GetByID(ctx, id)
+ 	if err != nil {
+ 		return nil, fmt.Errorf("文件不存在: %w", err)
+diff --git a/src/App.jsx b/src/App.jsx
+index 4f054b5..a2c3b9e 100644
+--- a/src/App.jsx
++++ b/src/App.jsx
+@@ -36,6 +36,7 @@ import {
+ } from './components/Editor/utils/structureUtils'
+ 
+ const GraphPanel = React.lazy(() => import('./components/GraphPanel'))
++const PinnedNotesPanel = React.lazy(() => import('./components/PinnedNotesPanel'))
+ const ProjectWorkspacePanel = React.lazy(() => import('./components/ProjectWorkspacePanel'))
+ const DailyNotesPanel = React.lazy(() => import('./components/DailyNotesPanel'))
+ const InspectorPanel = React.lazy(() => import('./components/InspectorPanel'))
+@@ -988,6 +989,8 @@ export default function App() {
+     ? '项目工作台'
+     : workspace === 'daily'
+       ? '每日笔记'
++      : workspace === 'pinned'
++        ? '置顶笔记'
+       : workspace === 'graph'
+         ? '知识图谱'
+       : workspace === 'trash'
+@@ -1283,6 +1286,12 @@ export default function App() {
+                   </React.Suspense>
+                 )}
+ 
++                {workspace === 'pinned' && (
++                  <React.Suspense fallback={<div className="workspace-loading">正在打开置顶笔记…</div>}>
++                    <PinnedNotesPanel onClose={() => setWorkspace('notes')} onSelectFile={handleInspectorSelectFile} />
++                  </React.Suspense>
++                )}
++
+                 {workspace === 'graph' && (
+                   <React.Suspense fallback={<div className="workspace-loading">正在加载知识图谱…</div>}>
+                     <GraphPanel
+diff --git a/src/components/FileList.jsx b/src/components/FileList.jsx
+index 23a365d..5cefdc7 100644
+--- a/src/components/FileList.jsx
++++ b/src/components/FileList.jsx
+@@ -3,6 +3,7 @@ import { useDrag, useDrop } from 'react-dnd'
+ import { NativeTypes } from 'react-dnd-html5-backend'
+ import { api, listAllFiles } from '~/services/api'
+ import { toast } from '~/services/toast'
++import { changePin } from '~/services/localPins.mjs'
+ import { executeFileHistoryAction } from '~/services/fileHistory'
+ import ConfirmDialog from './ConfirmDialog'
+ import { FileContextMenu, FileLibraryMenu, FileNewMenu } from './FileListMenus'
+@@ -173,6 +174,13 @@ export default function FileList({
+   onItemsChanged,
+   updatedItem,
+ }) {
++  const [pinReview, setPinReview] = useState(null)
++  const pinOwner = useRef(null)
++  const pinMounted = useRef(false)
++  useEffect(() => {
++    pinMounted.current = true
++    return () => { pinMounted.current = false; pinOwner.current?.abort() }
++  }, [])
+   const [items, setItems] = useState([])
+   const [loading, setLoading] = useState(false)
+   const [q, setQ] = useState('')
+@@ -1071,13 +1079,19 @@ export default function FileList({
+     }
+   }
+ 
+-  async function togglePin(id, isPinned) {
++  async function togglePin(item) {
++    if (pinOwner.current) return
++    const controller = new AbortController()
++    pinOwner.current = controller
+     try {
+-      await api.updateFile(id, { is_pinned: isPinned })
+-      await loadList()
+-    } catch (e) {
+-      console.error(e)
+-      toast.error('置顶操作失败: ' + (e.message || '未知错误'))
++      await changePin(api, item, !item.is_pinned, { signal: controller.signal })
++      // changePin publishes the existing library:refresh only after confirmation.
++      if (pinMounted.current && !controller.signal.aborted)
++        toast.success(item.is_pinned ? '已取消置顶，笔记仍然保留' : '已置顶')
++    } catch (error) {
++      if (pinMounted.current) toast.error(error.message || '置顶未确认，请在置顶笔记中核对')
++    } finally {
++      if (pinOwner.current === controller) pinOwner.current = null
+     }
+   }
+ 
+@@ -1790,6 +1804,12 @@ export default function FileList({
+         </div>
+       )}
+ 
++      {pinReview && <ConfirmDialog title="取消置顶？"
++        message={`只取消“${pinReview.title}”的置顶，不删除内容或改变位置。`}
++        onClose={() => setPinReview(null)} actions={[
++          { label: '取消', onClick: () => setPinReview(null) },
++          { label: '确认', kind: 'primary', onClick: () => { const item = pinReview; setPinReview(null); void togglePin(item) } },
++        ]} />}
+       {/* 右键菜单 */}
+       <FileContextMenu
+         contextMenu={contextMenu}
+@@ -1803,7 +1823,8 @@ export default function FileList({
+           onNewFolderCheck(item.id)
+         }}
+         onTogglePin={(item) => {
+-          togglePin(item.id, !item.is_pinned)
++          if (item.is_pinned) setPinReview(item)
++          else void togglePin(item)
+           setContextMenu(null)
+         }}
+         onRename={(item) => {
+diff --git a/src/components/WorkspaceSidebar.jsx b/src/components/WorkspaceSidebar.jsx
+index e14854d..7ba12c8 100644
+--- a/src/components/WorkspaceSidebar.jsx
++++ b/src/components/WorkspaceSidebar.jsx
+@@ -70,6 +70,11 @@ export default function WorkspaceSidebar({
+       label: '每日笔记',
+       icon: <Icon><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 10h18" /></Icon>,
+     },
++    {
++      id: 'pinned',
++      label: '置顶笔记',
++      icon: <Icon><path d="m9 3 6 0-1 5 4 4v2H6v-2l4-4zM12 14v7" /></Icon>,
++    },
+     {
+       id: 'graph',
+       label: '知识图谱',

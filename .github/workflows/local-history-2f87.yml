@@ -1,4 +1,4 @@
-name: Verify complete local knowledge graph
+name: Verify complete local pinned-note organization
 on:
   push:
     branches: [ci/local-history-2f87]
@@ -13,8 +13,8 @@ jobs:
     timeout-minutes: 18
     steps:
       - uses: actions/checkout@v7
-      - name: Fetch exact accepted component for negative controls
-        run: git fetch --no-tags --depth=1 origin 996cb1cf330530292a8baa1723585e0990d94265
+      - name: Fetch the exact accepted negative-control source
+        run: git fetch --no-tags --depth=1 origin 6a74bc0ab69314b4c032003bbcb29ea7acb4b45a
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
@@ -22,34 +22,34 @@ jobs:
         with:
           go-version: '1.24.11'
           cache-dependency-path: server/go.sum
-      - name: Review inherited issue catalog
+      - name: Review inherited problem index
         run: node scripts/stage-review.mjs catalog
-      - name: Apply exact complete graph integration and normal minor version
-        run: node scripts/prepare-local-graph-2f95.mjs apply
-      - name: Install exact committed dependencies
+      - name: Apply source-bound complete integration and normal minor version
+        run: node scripts/prepare-local-pins-2f96.mjs apply
+      - name: Install exact locked dependencies
         run: npm ci --no-audit --no-fund
-      - name: Reproduce original graph read and composition failures
-        run: node scripts/prepare-local-graph-2f95.mjs baseline
-      - name: Graph core and original save protection
-        run: node --test scripts/local-graph.node.mjs scripts/editor-cache-regression.node.mjs scripts/editor-save-transaction.node.mjs scripts/editor-quit.node.mjs
-      - name: Real graph controls lifecycle and D3 canvas
-        run: npx vitest run --root=. src/components/GraphPanel.test.jsx src/components/GraphPanel.legacy-safety.test.jsx src/components/LocalGraphCanvas.test.jsx src/services/localGraph.test.js --reporter=json --outputFile=graph-module-evidence/graph-tests.json
-      - name: Full original UI regression and graph workflow
-        run: npx vitest run --root=. --maxWorkers=4 --minWorkers=1 --reporter=json --outputFile=graph-module-evidence/full-ui.json
-      - name: Production Go SQLite graph and full backend regression
+      - name: Reproduce original pin refresh and unrelated-column write failures
+        run: node scripts/prepare-local-pins-2f96.mjs baseline
+      - name: Pin core and unchanged save protections
+        run: node --test scripts/local-pins.node.mjs scripts/editor-cache-regression.node.mjs scripts/editor-save-transaction.node.mjs scripts/editor-quit.node.mjs
+      - name: Real pinned workspace and original list menu tests
+        run: npx vitest run --root=. src/components/PinnedNotesPanel.test.jsx src/components/FileListPin.legacy-safety.test.jsx src/services/localPins.test.js --reporter=json --outputFile=pin-module-evidence/targeted.json
+      - name: All original UI regression and pinned-note workflow
+        run: npx vitest run --root=. --maxWorkers=4 --minWorkers=1 --reporter=json --outputFile=pin-module-evidence/full-ui.json
+      - name: Real production SQLite regression and pin concurrency
         run: |
-          go -C server test -json ./... > graph-module-evidence/go-tests.jsonl
-          go -C server test -race ./internal/dao -run LocalGraph -count=1
-      - name: Build complete original main preload and renderer
+          go -C server test -json ./... > pin-module-evidence/go-tests.jsonl
+          go -C server test -race ./internal/dao -run LocalPin -count=1
+      - name: Full original main preload and renderer builds
         run: npm run build:main && npm run build:renderer
-      - name: Publish tested changed code objects without product ref updates
+      - name: Publish only verified changed code objects
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node scripts/prepare-local-graph-2f95.mjs publish
+        run: node scripts/prepare-local-pins-2f96.mjs publish
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: local-graph-verification-${{ github.sha }}
-          path: graph-module-evidence/
+          name: local-pins-verification-${{ github.sha }}
+          path: pin-module-evidence/
           retention-days: 7
           if-no-files-found: error
