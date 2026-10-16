@@ -26,6 +26,8 @@ jobs:
         run: node scripts/stage-review.mjs catalog
       - name: Apply source-bound complete integration and normal minor version
         run: node scripts/prepare-local-pins-2f96.mjs apply
+      - name: Preserve changed-operation feedback after record refresh
+        run: node scripts/repair-pin-record-feedback.mjs
       - name: Install exact locked dependencies
         run: npm ci --no-audit --no-fund
       - name: Reproduce original pin refresh and unrelated-column write failures
