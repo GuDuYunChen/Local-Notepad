@@ -1,3 +1,4 @@
+import { verifyLocalGraphDesktop } from './check-local-graph-desktop.mjs'
 import { verifyDocumentOutlineDesktop } from './check-document-outline-desktop.mjs'
 import { verifyDocumentSearchDesktop } from './check-document-search-desktop.mjs'
 import { verifyBacklinksDesktop } from './check-backlinks-desktop.mjs'
@@ -291,6 +292,7 @@ try {
   await verifyBacklinksDesktop({ evaluate, click, cdp, until, api, out, noteIDs: [a.id, b.id] })
   await verifyDocumentSearchDesktop({ evaluate, click, cdp, until, api, out, noteIDs: [a.id, b.id] })
   await verifyDocumentOutlineDesktop({ evaluate, click, cdp, until, api, out, noteIDs: [a.id, b.id] })
+  await verifyLocalGraphDesktop({ evaluate, click, cdp, until, api, out, noteIDs: [a.id, b.id] })
   await open(a.id, 'native-close-latest')
   await closeWindow()
   report.checks.push('fresh-profile packaged restart reads latest body from real database and closes cleanly')
