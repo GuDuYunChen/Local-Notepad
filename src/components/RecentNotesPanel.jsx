@@ -43,7 +43,7 @@ export default function RecentNotesPanel({onSelectFile,onClose}) {
     let problem=''
     try{
       if(typeof latest.current.onSelectFile!=='function')throw Error('笔记打开通道暂不可用。')
-      const accepted=await latest.current.onSelectFile(target.id,{signal:ctl.signal,shouldSelect:owns,readFile:async(id,{signal})=>{
+      const accepted=await latest.current.onSelectFile(target.id,{refreshCurrent:true,signal:ctl.signal,shouldSelect:owns,readFile:async(id,{signal})=>{
         try{if(id!==target.id)throw Error('打开目标身份不符。');return await readRecentTarget(api,target,signal)}catch(e){problem=e.message;throw e}
       }})
       if(owns()){if(problem)setError(problem+' 可以重试或仅移除这条访问记录。');else setFeedback(accepted===true?'笔记已打开。':'未切换笔记，查找条件、历史和当前草稿保留。')}

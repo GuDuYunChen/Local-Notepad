@@ -33,3 +33,10 @@ test('corrupt history is retained until a confirmed reset pauses future recordin
 test('unavailable storage fails in the panel, can recover, and does not touch the backend',async()=>{const prior=Object.getOwnPropertyDescriptor(globalThis,'localStorage');try{Object.defineProperty(globalThis,'localStorage',{configurable:true,get(){throw Error('disabled')}});await mount();expect(host.querySelector('.recent-workspace')).toBeTruthy();expect(host.textContent).toContain('不可读取')}finally{Object.defineProperty(globalThis,'localStorage',prior)}await click('重新读取历史');expect(host.textContent).toContain('还没有访问记录');expect(api).not.toHaveBeenCalled()})
 test('quota failure during clear reports failure instead of an empty successful history',async()=>{recordRecentVisit(note(),{now:1});await mount();await click('清空访问历史…');const original=globalThis.localStorage,write=vi.fn(()=>{throw Error('quota')});vi.stubGlobal('localStorage',{getItem:original.getItem.bind(original),setItem:write});try{await click('确认');expect(write).toHaveBeenCalledTimes(1);expect(host.textContent).toContain('写入失败');expect(original.getItem(RECENT_KEY)).toContain('笔记a')}finally{vi.unstubAllGlobals();globalThis.IS_REACT_ACT_ENVIRONMENT=true}})
 test('double open activation sends just one read',async()=>{recordRecentVisit(note(),{now:1});api.mockReturnValue(new Promise(()=>{}));await mount();await choose();const b=button('重新打开笔记');await act(async()=>{b.click();b.click()});await flush();expect(api).toHaveBeenCalledTimes(1)})
+
+test('recent reopening explicitly requests fresh clean current-note adoption without a save bypass',async()=>{
+ recordRecentVisit(note(),{now:1});await mount();await choose();await click('重新打开笔记')
+ const options=select.mock.calls[0][1]
+ expect(options.refreshCurrent).toBe(true);expect(options.skipSave).toBeUndefined()
+ expect(typeof options.shouldSelect).toBe('function');expect(typeof options.readFile).toBe('function')
+})
