@@ -71,6 +71,11 @@ export default function WorkspaceSidebar({
       icon: <Icon><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 10h18" /></Icon>,
     },
     {
+      id: 'recent',
+      label: '最近访问',
+      icon: <Icon><circle cx="12" cy="12" r="9" /><path d="M12 7v5l4 2" /></Icon>,
+    },
+    {
       id: 'pinned',
       label: '置顶笔记',
       icon: <Icon><path d="m9 3 6 0-1 5 4 4v2H6v-2l4-4zM12 14v7" /></Icon>,
