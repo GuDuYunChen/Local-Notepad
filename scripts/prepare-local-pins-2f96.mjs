@@ -25,7 +25,10 @@ if(process.argv[2]==='apply'){
   const ui=spawnSync('npx',['vitest','run','--root=.','src/components/FileListPin.legacy-safety.test.jsx','--reporter=json','--outputFile='+out+'/legacy-ui.json'],{encoding:'utf8',timeout:120000})
   fs.writeFileSync(out+'/legacy-ui.log',String(ui.stdout||'')+String(ui.stderr||''));assert.equal(ui.status,1,'Expected actual old UI assertions to fail')
   const result=JSON.parse(read(out+'/legacy-ui.json'));assert.equal(result.numTotalTests,2);assert.equal(result.numFailedTests,2)
-  for(const r of result.testResults.flatMap(t=>t.assertionResults)){assert.equal(r.status,'failed');assert.ok(!r.failureMessages.join('\n').includes('timed out'));assert.match(r.failureMessages.join('\n'),/AssertionError/)}
+  const failed=result.testResults.flatMap(t=>t.assertionResults);assert.equal(failed.length,2)
+  for(const r of failed){assert.equal(r.status,'failed');assert.ok(!r.failureMessages.join('\n').includes('timed out'))}
+  assert.match(failed.find(r=>r.fullName.includes('refreshes the list')).failureMessages.join('\n'),/expected 1 to be greater than 1/)
+  assert.match(failed.find(r=>r.fullName.includes('requires an explicit decision')).failureMessages.join('\n'),/expected null to be truthy/)
   fs.writeFileSync(file,fixed)
   const oldLogic=execFileSync('git',['show',config.base+':'+logic],{encoding:'utf8'});assert.equal(blob(oldLogic),config.files[logic]);fs.writeFileSync(logic,oldLogic);fs.writeFileSync(out+'/original-file-logic.txt',oldLogic)
   const go=spawnSync('go',['-C','server','test','-json','./internal/logic','-run','^TestPinOnlyUpdateMustNeverWriteBodyOrEditedTime$','-count=1'],{encoding:'utf8',timeout:180000})
