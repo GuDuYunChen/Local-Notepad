@@ -19,7 +19,7 @@ if(process.argv[2]==='apply'){
  const files=['src/App.jsx','src/hooks/useGuardedNoteOpener.js','src/components/RecentNotesPanel.jsx'],fixed=Object.fromEntries(files.map(p=>[p,read(p)]))
  try{
   for(const p of files){const original=execFileSync('git',['show',config.base+':'+p],{encoding:'utf8'});assert.equal(blob(original),config.original[p]);fs.writeFileSync(p,original)}
-  const node=spawnSync('node',['--test','scripts/recent-reopen.node.mjs'],{encoding:'utf8',timeout:30000});fs.writeFileSync(out+'/before-node.tap',String(node.stdout||'')+String(node.stderr||''));assert.equal(node.status,1);assert.match(node.stdout,/# tests 8/);assert.match(node.stdout,/# fail 1/);assert.match(node.stdout,/not ok 1 - explicit clean same-note/)
+  const node=spawnSync('node',['--test','--test-reporter=tap','scripts/recent-reopen.node.mjs'],{encoding:'utf8',timeout:30000});fs.writeFileSync(out+'/before-node.tap',String(node.stdout||'')+String(node.stderr||''));assert.equal(node.status,1);assert.match(node.stdout,/# tests 8/);assert.match(node.stdout,/# fail 1/);assert.match(node.stdout,/not ok 1 - explicit clean same-note/)
   const ui=spawnSync('npx',['vitest','run','--root=.','src/App.recentNotes.test.jsx','--reporter=json','--outputFile='+out+'/before-ui.json'],{encoding:'utf8',timeout:90000});fs.writeFileSync(out+'/before-ui.log',String(ui.stdout||'')+String(ui.stderr||''));assert.equal(ui.status,1)
   const report=JSON.parse(read(out+'/before-ui.json'));assert.equal(report.numTotalTests,6);assert.equal(report.numFailedTests,2);assert.equal(report.numPassedTests,4)
   const failed=report.testResults.flatMap(x=>x.assertionResults).filter(x=>x.status==='failed');assert.equal(failed.length,2)
