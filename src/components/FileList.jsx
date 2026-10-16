@@ -3,6 +3,7 @@ import { useDrag, useDrop } from 'react-dnd'
 import { NativeTypes } from 'react-dnd-html5-backend'
 import { api, listAllFiles } from '~/services/api'
 import { toast } from '~/services/toast'
+import { changePin } from '~/services/localPins.mjs'
 import { executeFileHistoryAction } from '~/services/fileHistory'
 import ConfirmDialog from './ConfirmDialog'
 import { FileContextMenu, FileLibraryMenu, FileNewMenu } from './FileListMenus'
@@ -173,6 +174,13 @@ export default function FileList({
   onItemsChanged,
   updatedItem,
 }) {
+  const [pinReview, setPinReview] = useState(null)
+  const pinOwner = useRef(null)
+  const pinMounted = useRef(false)
+  useEffect(() => {
+    pinMounted.current = true
+    return () => { pinMounted.current = false; pinOwner.current?.abort() }
+  }, [])
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(false)
   const [q, setQ] = useState('')
@@ -1071,13 +1079,19 @@ export default function FileList({
     }
   }
 
-  async function togglePin(id, isPinned) {
+  async function togglePin(item) {
+    if (pinOwner.current) return
+    const controller = new AbortController()
+    pinOwner.current = controller
     try {
-      await api.updateFile(id, { is_pinned: isPinned })
-      await loadList()
-    } catch (e) {
-      console.error(e)
-      toast.error('置顶操作失败: ' + (e.message || '未知错误'))
+      await changePin(api, item, !item.is_pinned, { signal: controller.signal })
+      // changePin publishes the existing library:refresh only after confirmation.
+      if (pinMounted.current && !controller.signal.aborted)
+        toast.success(item.is_pinned ? '已取消置顶，笔记仍然保留' : '已置顶')
+    } catch (error) {
+      if (pinMounted.current) toast.error(error.message || '置顶未确认，请在置顶笔记中核对')
+    } finally {
+      if (pinOwner.current === controller) pinOwner.current = null
     }
   }
 
@@ -1790,6 +1804,12 @@ export default function FileList({
         </div>
       )}
 
+      {pinReview && <ConfirmDialog title="取消置顶？"
+        message={`只取消“${pinReview.title}”的置顶，不删除内容或改变位置。`}
+        onClose={() => setPinReview(null)} actions={[
+          { label: '取消', onClick: () => setPinReview(null) },
+          { label: '确认', kind: 'primary', onClick: () => { const item = pinReview; setPinReview(null); void togglePin(item) } },
+        ]} />}
       {/* 右键菜单 */}
       <FileContextMenu
         contextMenu={contextMenu}
@@ -1803,7 +1823,8 @@ export default function FileList({
           onNewFolderCheck(item.id)
         }}
         onTogglePin={(item) => {
-          togglePin(item.id, !item.is_pinned)
+          if (item.is_pinned) setPinReview(item)
+          else void togglePin(item)
           setContextMenu(null)
         }}
         onRename={(item) => {

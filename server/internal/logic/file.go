@@ -82,6 +82,9 @@ func (l *FileLogic) Get(ctx context.Context, id string) (*model.File, error) {
 }
 
 func (l *FileLogic) Update(ctx context.Context, id string, title, content, parentID *string, sortOrder *int64, isDeleted *bool, isPinned *bool) (*model.File, error) {
+	if isPinned != nil && title == nil && content == nil && parentID == nil && sortOrder == nil && isDeleted == nil {
+		return l.FileDAO.SetLegacyPin(ctx, id, *isPinned)
+	}
 	f, err := l.FileDAO.GetByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("文件不存在: %w", err)

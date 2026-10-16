@@ -36,6 +36,7 @@ import {
 } from './components/Editor/utils/structureUtils'
 
 const GraphPanel = React.lazy(() => import('./components/GraphPanel'))
+const PinnedNotesPanel = React.lazy(() => import('./components/PinnedNotesPanel'))
 const ProjectWorkspacePanel = React.lazy(() => import('./components/ProjectWorkspacePanel'))
 const DailyNotesPanel = React.lazy(() => import('./components/DailyNotesPanel'))
 const InspectorPanel = React.lazy(() => import('./components/InspectorPanel'))
@@ -988,6 +989,8 @@ export default function App() {
     ? '项目工作台'
     : workspace === 'daily'
       ? '每日笔记'
+      : workspace === 'pinned'
+        ? '置顶笔记'
       : workspace === 'graph'
         ? '知识图谱'
       : workspace === 'trash'
@@ -1280,6 +1283,12 @@ export default function App() {
                         else select(f)
                       }}
                     />
+                  </React.Suspense>
+                )}
+
+                {workspace === 'pinned' && (
+                  <React.Suspense fallback={<div className="workspace-loading">正在打开置顶笔记…</div>}>
+                    <PinnedNotesPanel onClose={() => setWorkspace('notes')} onSelectFile={handleInspectorSelectFile} />
                   </React.Suspense>
                 )}
 
