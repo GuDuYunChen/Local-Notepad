@@ -26,6 +26,8 @@ jobs:
         run: node scripts/stage-review.mjs catalog
       - name: Integrate complete source-bound Wiki module and explicit version
         run: node scripts/prepare-wiki-navigation.mjs apply
+      - name: Preserve real reference exports in the original discard fixture
+        run: node scripts/repair-wiki-discard-fixture.mjs
       - name: Install exact committed dependency lock
         run: npm ci --no-audit --no-fund
       - name: Reproduce old App late-navigation and stale-draft failures
