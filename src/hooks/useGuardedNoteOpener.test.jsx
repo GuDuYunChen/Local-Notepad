@@ -124,3 +124,17 @@ it('external cancellation prevents a late verified reader from opening a source'
  const result=open('source',{signal:c.signal,readFile:()=>new Promise(r=>release=r)});await drain();c.abort()
  expect(await result).toBe(false);release({id:'source'});await drain();expect(selected).not.toHaveBeenCalled()
 })
+
+it('explicit current-file refresh reaches the original guard but still waits for its decision',async()=>{
+ api.mockResolvedValue({id:'c1',title:'fresh'});let guard
+ await render({onSelectFile:(_file,o)=>{guard=o}})
+ const result=open('c1',{refreshCurrent:true});await drain()
+ expect(guard.refreshCurrent).toBe(true);expect(guard.shouldSelect()).toBe(true)
+ guard.onCancel();expect(await result).toBe(false)
+})
+it('nonboolean current refresh does not change the ordinary guard options',async()=>{
+ api.mockResolvedValue({id:'c1'});let guard
+ await render({onSelectFile:(_file,o)=>{guard=o;o.afterSelect()}})
+ expect(await open('c1',{refreshCurrent:'true'})).toBe(true)
+ expect(Object.prototype.hasOwnProperty.call(guard,'refreshCurrent')).toBe(false)
+})

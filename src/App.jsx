@@ -840,6 +840,12 @@ export default function App() {
     }
 
     if (current && f && f.id === current.id) {
+      // Only an explicit clean return from another workspace adopts fresh data.
+      // The same open editor or any current draft retains its original shortcut.
+      if (options.refreshCurrent === true && workspace !== 'notes' && !unsaved) {
+        performSelect()
+        return
+      }
       setWorkspace('notes')
       options.afterSelect?.(f)
       return

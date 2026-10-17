@@ -56,6 +56,7 @@ export default function useGuardedNoteOpener({ currentId, workspace, navigationE
           }
           const headingPath = Array.isArray(options?.headingPath) ? options.headingPath.filter(Boolean) : []
           latest.current.onSelectFile(file, {
+            ...(options.refreshCurrent === true ? { refreshCurrent: true } : {}),
             shouldSelect: valid,
             onCancel: () => finish(false),
             afterSelect: () => {

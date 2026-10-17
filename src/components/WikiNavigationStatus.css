@@ -1,0 +1,7 @@
+.wiki-navigation-status { position:fixed; z-index:1100; right:20px; bottom:24px; box-sizing:border-box; width:min(370px,calc(100vw - 32px)); max-height:50vh; overflow:auto; padding:16px; border:1px solid var(--line,#d8d9df); border-radius:10px; background:var(--surface,#fff); color:var(--ink,#262b34); box-shadow:0 6px 24px rgba(0,0,0,.14); font-size:13px; line-height:1.7; }
+.wiki-navigation-status header { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.wiki-navigation-status p { margin:10px 0; overflow-wrap:anywhere; }
+.wiki-navigation-status small { display:block; color:var(--ink-soft,#697180); overflow-wrap:anywhere; }
+.wiki-navigation-status [role=alert] { color:var(--red,#a73530); }
+.wiki-navigation-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+.wiki-navigation-status button:focus-visible { outline:2px solid var(--clay,#7057d9); outline-offset:2px; }

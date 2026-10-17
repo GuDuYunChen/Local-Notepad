@@ -1,4 +1,4 @@
-name: Verify complete recent-note current-file reopening
+name: Complete local Wiki preview and safe navigation
 on:
   push:
     branches: [ci/local-history-2f87]
@@ -13,8 +13,8 @@ jobs:
     timeout-minutes: 18
     steps:
       - uses: actions/checkout@v7
-      - name: Fetch exact original current-file behavior for negative controls
-        run: git fetch --no-tags --depth=1 origin b3f492da006933a17e735dce49240edfdaf63e2d
+      - name: Fetch exact accepted App for negative controls
+        run: git fetch --no-tags --depth=1 origin 7b937756425d3f8a95e33cec86bb8a5760776dcb
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
@@ -22,33 +22,35 @@ jobs:
         with:
           go-version: '1.24.11'
           cache-dependency-path: server/go.sum
-      - name: Preserve inherited problem index
+      - name: Preserve historical issue and execution indexes
         run: node scripts/stage-review.mjs catalog
-      - name: Apply exact complete recent-note repair and normal patch version
-        run: node scripts/prepare-recent-reopen.mjs apply
-      - name: Install committed dependency lock
+      - name: Integrate complete source-bound Wiki module and explicit version
+        run: node scripts/prepare-wiki-navigation.mjs apply
+      - name: Install exact committed dependency lock
         run: npm ci --no-audit --no-fund
-      - name: Reproduce actual App same-note shortcut before repair
-        run: node scripts/prepare-recent-reopen.mjs baseline
-      - name: Current-note contracts and every original recent pin save quit guard
-        run: node --test scripts/recent-reopen.node.mjs scripts/recent-notes.node.mjs scripts/local-pins.node.mjs scripts/pin-journal-boundaries.node.mjs scripts/pin-recovery-ownership.node.mjs scripts/editor-cache-regression.node.mjs scripts/editor-save-transaction.node.mjs scripts/editor-quit.node.mjs > recent-reopen-evidence/node-contracts.tap
-      - name: Real App recent panel and guarded opener regression
-        run: npx vitest run --root=. src/App.recentNotes.test.jsx src/hooks/useGuardedNoteOpener.test.jsx src/components/RecentNotesPanel.test.jsx src/services/recentReopen.test.js --reporter=json --outputFile=recent-reopen-evidence/targeted.json
-      - name: Complete unchanged baseline and repaired UI regression
-        run: npx vitest run --root=. --maxWorkers=4 --minWorkers=1 --reporter=json --outputFile=recent-reopen-evidence/full-ui.json
+      - name: Reproduce old App late-navigation and stale-draft failures
+        run: node scripts/prepare-wiki-navigation.mjs baseline
+      - name: Wiki source lifetime and all original recent pin save quit guards
+        run: node --test --test-reporter=tap scripts/wiki-navigation.node.mjs scripts/recent-notes.node.mjs scripts/recent-reopen.node.mjs scripts/local-pins.node.mjs scripts/pin-journal-boundaries.node.mjs scripts/pin-recovery-ownership.node.mjs scripts/editor-cache-regression.node.mjs scripts/editor-save-transaction.node.mjs scripts/editor-quit.node.mjs > wiki-evidence/node.tap
+      - name: Real App and Wiki preview lifecycle
+        run: npx vitest run --root=. src/App.wikiNavigation.test.jsx src/components/Editor/nodes/WikiLinkView.test.jsx src/services/wikiNavigation.test.js --reporter=json --outputFile=wiki-evidence/targeted.json
+      - name: Full unchanged UI regression and complete Wiki workflow
+        run: npx vitest run --root=. --maxWorkers=4 --minWorkers=1 --reporter=json --outputFile=wiki-evidence/full-ui.json
       - name: Unchanged production Go regression
-        run: go -C server test -json ./... > recent-reopen-evidence/go-tests.jsonl
-      - name: Complete original main preload and renderer build
+        run: go -C server test -json ./... > wiki-evidence/go-tests.jsonl
+      - name: Full original main preload and renderer builds
         run: npm run build:main && npm run build:renderer
-      - name: Publish only exact verified repair objects
+      - name: Recheck all final candidate identities
+        run: node scripts/prepare-wiki-navigation.mjs check
+      - name: Publish only verified changed code objects
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node scripts/prepare-recent-reopen.mjs publish
-      - name: Retain complete or failed original evidence
+        run: node scripts/prepare-wiki-navigation.mjs publish
+      - name: Preserve original complete or failed evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: recent-reopen-verification-${{ github.sha }}
-          path: recent-reopen-evidence/
+          name: wiki-navigation-${{ github.sha }}
+          path: wiki-evidence/
           retention-days: 7
           if-no-files-found: error

@@ -4,15 +4,20 @@ import {readFileSync} from 'node:fs'
 import {URL as NodeURL} from 'node:url'
 import vm from 'node:vm'
 const source=readFileSync(new NodeURL('../src/App.jsx',import.meta.url),'utf8')
-const start='  const handleSelectFile = ',end='\n\n  const handleInspectorSelectFile = '
-const a=source.indexOf(start),b=source.indexOf(end,a);assert.ok(a>=0&&b>a)
-const code=source.slice(a+start.length,b)
+function extractAppCallback(text){
+ const normalized=text.replace(/\r\n/g,'\n')
+ const start='  const handleSelectFile = ',end='\n\n  const handleInspectorSelectFile = '
+ const a=normalized.indexOf(start),b=normalized.indexOf(end,a);assert.ok(a>=0&&b>a)
+ return normalized.slice(a+start.length,b)
+}
+const code=extractAppCallback(source)
 const note={id:'a',title:'old',content:'old body'},fresh={...note,title:'renamed',content:'latest saved body'}
 function fixture({workspace='recent',unsaved=false}={}){
  const calls=[],context={current:note,workspace,unsaved,deletedIds:new Set(),select:f=>calls.push(['select',f]),setWorkspace:w=>calls.push(['workspace',w]),setDialog:d=>calls.push(['dialog',d])}
  vm.createContext(context);return{calls,select:vm.runInContext('('+code+')',context)}
 }
 export function registerRecentReopenTests(test){
+ test('App callback extraction accepts Windows CRLF and LF without changing code',()=>{const lf=source.replace(/\r\n/g,'\n');assert.equal(extractAppCallback(lf.replace(/\n/g,'\r\n')),extractAppCallback(lf));assert.equal(extractAppCallback(lf),code)})
  test('explicit clean same-note workspace return selects the verified fresh file',()=>{const f=fixture();let confirmed;f.select(fresh,{refreshCurrent:true,afterSelect:x=>confirmed=x});assert.deepEqual(f.calls,[['select',fresh]]);assert.equal(confirmed,fresh)})
  test('ordinary same-note return keeps its original shortcut behavior',()=>{const f=fixture();f.select(fresh);assert.deepEqual(f.calls,[['workspace','notes']])})
  test('same-note refresh never replaces an unsaved current draft',()=>{const f=fixture({unsaved:true});f.select(fresh,{refreshCurrent:true});assert.deepEqual(f.calls,[['workspace','notes']])})
