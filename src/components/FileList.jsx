@@ -3,6 +3,7 @@ import { useDrag, useDrop } from 'react-dnd'
 import { NativeTypes } from 'react-dnd-html5-backend'
 import { api, listAllFiles } from '~/services/api'
 import { toast } from '~/services/toast'
+import { changePin } from '~/services/localPins.mjs'
 import { executeFileHistoryAction } from '~/services/fileHistory'
 import ConfirmDialog from './ConfirmDialog'
 import { FileContextMenu, FileLibraryMenu, FileNewMenu } from './FileListMenus'
@@ -173,6 +174,13 @@ export default function FileList({
   onItemsChanged,
   updatedItem,
 }) {
+  const [pinReview, setPinReview] = useState(null)
+  const pinOwner = useRef(null)
+  const pinMounted = useRef(false)
+  useEffect(() => {
+    pinMounted.current = true
+    return () => { pinMounted.current = false; pinOwner.current?.abort() }
+  }, [])
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(false)
   const [q, setQ] = useState('')
@@ -195,6 +203,11 @@ export default function FileList({
   const [selectedIds, setSelectedIds] = useState(new Set()) // Multi-select state
   const [keyboardFocusId, setKeyboardFocusId] = useState(selectedId || '')
   const treeListRef = useRef(null)
+  // Reads may finish after another module selected a note. Deliver metadata to
+  // the current parent, never the callback captured when the read started.
+  const listContextRef = useRef(null)
+  listContextRef.current = { q, selectedId, onItemsChanged, onSelect }
+  const listReadRef = useRef({ active: false, epoch: 0 })
 
   // Sync selectedId (prop) with selectedIds
   useEffect(() => {
@@ -482,6 +495,7 @@ export default function FileList({
   }, [selectedId, items])
 
   useEffect(() => {
+    listReadRef.current.active = true
     void load()
     
     function handleClickOutside(e) {
@@ -497,6 +511,8 @@ export default function FileList({
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => {
+      listReadRef.current.active = false
+      listReadRef.current.epoch += 1
       document.removeEventListener('mousedown', handleClickOutside)
       if (retryTimerRef.current) {
         clearTimeout(retryTimerRef.current)
@@ -559,29 +575,47 @@ export default function FileList({
   const findFirstFileInFolder = findFirstFileInFolderUtil
 
   async function load(retryCount = 0) {
+    const lifetime = listReadRef.current
+    if (!lifetime.active) return
+    const epoch = ++lifetime.epoch
+    const query = listContextRef.current.q
+    const selectedAtStart = listContextRef.current.selectedId
+    const ownsRead = () => lifetime.active && lifetime.epoch === epoch && listContextRef.current.q === query
+    if (retryTimerRef.current) {
+      clearTimeout(retryTimerRef.current)
+      retryTimerRef.current = null
+    }
     setLoading(true)
     try {
-      const normalizedList = await listAllFiles(q)
-      setItems(normalizedList)
-      onItemsChanged?.(normalizedList)
-      
-      // Ensure selection
-      if (!selectedId && normalizedList.length > 0) {
-          const tree = buildTree(normalizedList)
-          const first = findFirstFileInTree(tree)
-          if (first) onSelect(first)
+      const normalizedList = await listAllFiles(query)
+      if (!ownsRead()) return
+      const current = listContextRef.current
+      // A pre-navigation snapshot cannot prove the new selection was deleted.
+      // Read again once under its own identity; never navigate using old data.
+      if (current.selectedId && current.selectedId !== selectedAtStart &&
+          !normalizedList.some(item => item.id === current.selectedId)) {
+        void load()
+        return
       }
-    } catch (e) {
-      console.error(e)
+      setItems(normalizedList)
+      current.onItemsChanged?.(normalizedList)
+      if (!current.selectedId && normalizedList.length > 0) {
+        const tree = buildTree(normalizedList)
+        const first = findFirstFileInTree(tree)
+        if (first) current.onSelect?.(first)
+      }
+    } catch (error) {
+      if (!ownsRead()) return
+      console.error(error)
       if (retryCount < 3) {
-          console.log(`Load failed, retrying (${retryCount + 1}/3)...`)
-          if (retryTimerRef.current) clearTimeout(retryTimerRef.current)
-          retryTimerRef.current = setTimeout(() => load(retryCount + 1), 1000)
+        retryTimerRef.current = setTimeout(() => {
+          if (ownsRead()) void load(retryCount + 1)
+        }, 1000)
       } else {
-          toast.error('加载文件列表失败，请手动刷新')
+        toast.error('加载文件列表失败，请手动刷新')
       }
     } finally {
-      setLoading(false)
+      if (ownsRead()) setLoading(false)
     }
   }
 
@@ -1045,13 +1079,19 @@ export default function FileList({
     }
   }
 
-  async function togglePin(id, isPinned) {
+  async function togglePin(item) {
+    if (pinOwner.current) return
+    const controller = new AbortController()
+    pinOwner.current = controller
     try {
-      await api.updateFile(id, { is_pinned: isPinned })
-      await loadList()
-    } catch (e) {
-      console.error(e)
-      toast.error('置顶操作失败: ' + (e.message || '未知错误'))
+      await changePin(api, item, !item.is_pinned, { signal: controller.signal })
+      // changePin publishes the existing library:refresh only after confirmation.
+      if (pinMounted.current && !controller.signal.aborted)
+        toast.success(item.is_pinned ? '已取消置顶，笔记仍然保留' : '已置顶')
+    } catch (error) {
+      if (pinMounted.current) toast.error(error.message || '置顶未确认，请在置顶笔记中核对')
+    } finally {
+      if (pinOwner.current === controller) pinOwner.current = null
     }
   }
 
@@ -1764,6 +1804,12 @@ export default function FileList({
         </div>
       )}
 
+      {pinReview && <ConfirmDialog title="取消置顶？"
+        message={`只取消“${pinReview.title}”的置顶，不删除内容或改变位置。`}
+        onClose={() => setPinReview(null)} actions={[
+          { label: '取消', onClick: () => setPinReview(null) },
+          { label: '确认', kind: 'primary', onClick: () => { const item = pinReview; setPinReview(null); void togglePin(item) } },
+        ]} />}
       {/* 右键菜单 */}
       <FileContextMenu
         contextMenu={contextMenu}
@@ -1777,7 +1823,8 @@ export default function FileList({
           onNewFolderCheck(item.id)
         }}
         onTogglePin={(item) => {
-          togglePin(item.id, !item.is_pinned)
+          if (item.is_pinned) setPinReview(item)
+          else void togglePin(item)
           setContextMenu(null)
         }}
         onRename={(item) => {
@@ -1846,7 +1893,16 @@ export default function FileList({
       )}
       {showExport && <FileSelectorDialog open={showExport} onClose={() => setShowExport(false)} items={items} onConfirm={onExportConfirm} title="导出笔记" confirmText="下一步" />}
       {showBatchDelete && <FileSelectorDialog open={showBatchDelete} onClose={() => setShowBatchDelete(false)} items={items} onConfirm={onBatchDeleteConfirm} title="移到回收站" confirmText="移到回收站" processingText="处理中…" showDeleteWarning={true} selectedFileId={selectedId} initialSelectedIds={Array.from(selectedIds)} />}
-      {showTemplate && <TemplateSelector open={showTemplate} onClose={() => setShowTemplate(false)} onSelect={handleTemplateSelect} />}
+      {showTemplate && <TemplateSelector open={showTemplate} onClose={() => setShowTemplate(false)} onSelect={handleTemplateSelect}
+        parentId={targetParentId} parentLabel={getPathLabel(targetParentId)} beforeCreate={onBeforeNew}
+        onCreated={async item => {
+          // Publish metadata before selection. A deferred updater or an old
+          // load callback must not replace the newly selected note's identity.
+          const next = [item, ...items.filter(x => x.id !== item.id)]
+          setItems(next); onItemsChanged?.(next)
+          if (item.parent_id) setExpanded(previous => new Set([...previous, item.parent_id]))
+          setShowTemplate(false); onSelect(item)
+        }} />}
       {pendingExport && (
         <ConfirmDialog
           title="选择导出格式"

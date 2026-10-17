@@ -42,7 +42,11 @@ export async function api(path, init) {
   const body = await res.json()
   if (body.code !== 0) {
     const msg = body.detail || body.message || ERROR_MESSAGES[body.code] || '请求失败'
-    throw new Error(msg)
+    const failure = new Error(msg)
+    // Preserve existing Error/message behavior while retaining a safe, non-enumerable
+    // business identity for callers that must distinguish unavailable targets.
+    if (Number.isSafeInteger(body.code)) Object.defineProperty(failure, 'apiCode', { value: body.code })
+    throw failure
   }
   return body.data
 }
@@ -52,8 +56,8 @@ export async function getBacklinks(fileId) {
   return res
 }
 
-export async function searchFiles(query) {
-  const res = await api(`/api/files?q=${encodeURIComponent(query)}`)
+export async function searchFiles(query, init) {
+  const res = await api(`/api/files?q=${encodeURIComponent(query)}`, init)
   return res
 }
 
@@ -114,3 +118,9 @@ export async function createFileVersionSnapshot(fileId) {
     method: 'POST',
   })
 }
+
+// Explicit native-only S3 preflight; never use api()/fetch as a fallback.
+export { createS3ReadProbeSession } from './s3ReadProbe.mjs'
+
+// Explicit native-only count preview; importing/creating does not issue I/O.
+export { createS3PreviewSession } from './s3PreviewSession.mjs'

@@ -17,16 +17,32 @@ func (d *SettingsDAO) Get(ctx context.Context) (*model.Settings, error) {
 	var s model.Settings
 	var editorOpts sql.NullString
 	var syncEndpoint sql.NullString
+	var syncProvider sql.NullString
+	var syncUsername sql.NullString
+	var syncPassword sql.NullString
 	var syncEnabled int
+	var syncAutoEnabled int
+	var syncIntervalMinutes int
 
 	row := d.DB.QueryRowContext(ctx,
-		`SELECT theme, editor_opts, sync_enabled, sync_endpoint FROM settings WHERE id = 1`)
-	if err := row.Scan(&s.Theme, &editorOpts, &syncEnabled, &syncEndpoint); err != nil {
+		`SELECT theme, editor_opts, COALESCE(sync_enabled,0), sync_endpoint, COALESCE(sync_provider,''),
+			COALESCE(sync_username,''), COALESCE(sync_password,''),
+			COALESCE(sync_auto_enabled,0), COALESCE(sync_interval_minutes,5)
+		 FROM settings WHERE id = 1`)
+	if err := row.Scan(&s.Theme, &editorOpts, &syncEnabled, &syncEndpoint, &syncProvider, &syncUsername, &syncPassword,
+		&syncAutoEnabled, &syncIntervalMinutes); err != nil {
 		return nil, err
 	}
 
 	s.SyncEnabled = syncEnabled != 0
 	s.SyncEndpoint = syncEndpoint.String
+	s.SyncProvider = syncProvider.String
+	s.SyncUsername = syncUsername.String
+	s.SyncPassword = syncPassword.String
+	s.SyncPasswordSet = syncPassword.String != ""
+	s.SyncAutoEnabled = syncAutoEnabled != 0
+	s.SyncIntervalMinutes = syncIntervalMinutes
+	if s.SyncIntervalMinutes <= 0 { s.SyncIntervalMinutes = 5 }
 	s.EditorOpts = map[string]interface{}{}
 
 	if editorOpts.Valid && editorOpts.String != "" {
@@ -46,9 +62,11 @@ func (d *SettingsDAO) Update(ctx context.Context, s *model.Settings) error {
 
 	_, err = d.DB.ExecContext(ctx,
 		`UPDATE settings
-		 SET theme = ?, editor_opts = ?, sync_enabled = ?, sync_endpoint = ?
+		 SET theme = ?, editor_opts = ?, sync_enabled = ?, sync_endpoint = ?, sync_provider = ?,
+		     sync_username = ?, sync_password = ?, sync_auto_enabled = ?, sync_interval_minutes = ?
 		 WHERE id = 1`,
-		s.Theme, string(editorJSON), s.SyncEnabled, s.SyncEndpoint)
+		s.Theme, string(editorJSON), s.SyncEnabled, s.SyncEndpoint, s.SyncProvider, s.SyncUsername, s.SyncPassword,
+		s.SyncAutoEnabled, s.SyncIntervalMinutes)
 	return err
 }
 

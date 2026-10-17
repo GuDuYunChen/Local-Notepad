@@ -43,7 +43,12 @@ export default function useGuardedNoteOpener({ currentId, workspace, navigationE
         if (pending.current === operation) pending.current = null
         resolve(accepted)
       }
-      Promise.resolve().then(() => api(`/api/files/${encodeURIComponent(id)}`, { signal: controller.signal }))
+      Promise.resolve().then(() => {
+        if (!valid()) return null
+        return typeof options.readFile === 'function'
+          ? options.readFile(id, { signal: controller.signal })
+          : api(`/api/files/${encodeURIComponent(id)}`, { signal: controller.signal })
+      })
         .then(file => {
           if (!valid()) { finish(false); return }
           if (!file || file.is_deleted || file.is_folder || String(file.id) !== String(id)) {
@@ -51,6 +56,7 @@ export default function useGuardedNoteOpener({ currentId, workspace, navigationE
           }
           const headingPath = Array.isArray(options?.headingPath) ? options.headingPath.filter(Boolean) : []
           latest.current.onSelectFile(file, {
+            ...(options.refreshCurrent === true ? { refreshCurrent: true } : {}),
             shouldSelect: valid,
             onCancel: () => finish(false),
             afterSelect: () => {

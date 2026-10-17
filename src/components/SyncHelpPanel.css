@@ -1,0 +1,16 @@
+/* Inherits the production palette; no fixed light/dark or global overrides. */
+.sync-help{margin-top:16px;border:1px solid var(--line);border-radius:10px;background:var(--paper);color:var(--ink);min-width:0;scroll-margin-block-start:16px}
+.sync-help summary{padding:12px 14px;cursor:pointer;font-size:13px;font-weight:600;line-height:1.7;overflow-wrap:anywhere;color:var(--ink);min-height:44px;box-sizing:border-box}
+.sync-help summary::marker{color:var(--ink)}
+.sync-help summary:focus-visible{outline:2px solid var(--clay);outline-offset:2px;border-radius:6px}
+.sync-help-caption{display:inline-block;margin-left:12px;font-weight:400;color:var(--ink-soft);font-size:12px}
+.sync-help-body{padding:0 14px 14px;min-width:0}
+.sync-help-intro{font-size:12px;line-height:1.8;margin:0 0 12px;color:var(--ink-soft);overflow-wrap:anywhere}
+.sync-help-topic{border-top:1px solid var(--line);min-width:0}
+.sync-help-topic summary{padding:12px 0}
+.sync-help-topic ol{margin:0 0 14px;padding-inline-start:24px;color:var(--ink);font-size:13px;line-height:1.8}
+.sync-help-topic li{padding-inline-start:3px;margin:0 0 12px;overflow-wrap:anywhere}
+.sync-help-topic li:last-child{margin-bottom:0}
+.sync-help-topic li strong,.sync-help-topic li span{display:block;color:var(--ink)}
+.sync-help-topic li strong{margin-bottom:4px}
+@media(max-width:420px){.sync-help-caption{display:block;margin-left:0}.sync-help-body{padding:0 12px 12px}.sync-help>summary{padding:12px}}

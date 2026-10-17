@@ -1,0 +1,23 @@
+/* Scoped specificity wins the old compact outline without changing editor CSS. */
+.editor-shell .local-outline .document-outline-toggle { font-size:12px; opacity:1; }
+.editor-shell .local-outline .document-outline-panel { width:min(320px,calc(100vw - 40px)); max-height:min(70vh,620px); overflow:auto; }
+.editor-shell .local-outline .document-outline-header { display:flex; align-items:center; flex-direction:row; gap:10px; }
+.editor-shell .local-outline .document-outline-header small { display:block; margin-top:4px; }
+.editor-shell .local-outline button { cursor:pointer; }
+.editor-shell .local-outline .outline-tools { display:flex; flex-wrap:wrap; gap:6px; padding:8px 12px; }
+.editor-shell .local-outline .outline-tools button,.editor-shell .local-outline .document-outline-header>button { border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:5px; padding:5px 8px; font:inherit; font-size:12px; }
+.editor-shell .local-outline .outline-query { display:flex; flex-direction:column; gap:6px; padding:8px 12px; font-size:12px; }
+.editor-shell .local-outline .outline-query input { min-width:0; width:100%; box-sizing:border-box; padding:8px; border:1px solid var(--line); border-radius:6px; background:var(--surface); color:var(--ink); font:inherit; font-size:13px; }
+.editor-shell .local-outline p { padding:6px 12px; margin:0; font-size:12px; line-height:1.7; overflow-wrap:anywhere; }
+.editor-shell .local-outline .outline-error { color:var(--danger,#b23b35); border-inline-start:3px solid currentColor; }
+.editor-shell .local-outline .outline-feedback { color:var(--ink); border-inline-start:3px solid var(--success,#277347); }
+.editor-shell .local-outline .outline-count,.editor-shell .local-outline .outline-breadcrumb { color:var(--ink-muted); }
+.editor-shell .local-outline .document-outline-list { max-height:300px; min-height:40px; flex:0 1 auto; overflow:auto; }
+.editor-shell .local-outline .document-outline-anchor { opacity:1; }
+.editor-shell .local-outline .document-outline-item { font-size:13px; white-space:normal; overflow-wrap:anywhere; }
+.editor-shell .local-outline button:disabled { opacity:.5; cursor:default; }
+.editor-shell .local-outline button:focus-visible,.editor-shell .local-outline input:focus-visible { outline:2px solid var(--clay); outline-offset:2px; }
+
+/* A closed navigation trigger must never cover the active find/replace controls.
+   Explicitly opened outline retains its original higher layer. */
+.editor-shell > .local-outline:not(.open) { z-index:49; }

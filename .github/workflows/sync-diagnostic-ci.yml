@@ -1,0 +1,50 @@
+name: Sync Diagnostic CI
+on:
+  push:
+    branches: [feature/knowledge-os-phase2]
+  pull_request:
+    branches: [master]
+permissions:
+  contents: read
+concurrency:
+  group: sync-diagnostic-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  diagnostic:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Verify committed dependency lock
+        run: node scripts/verify-dependency-lock.mjs
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Verify install preserved manifest and lock
+        run: git diff --exit-code -- package.json package-lock.json
+      - name: Verify privacy and clipboard wait logic
+        run: node --test scripts/sync-diagnostic.node.mjs scripts/sync-diagnostic-evidence.node.cjs
+      - name: Verify real panel and sync-center integration
+        run: npx vitest run --root=. src/components/SyncDiagnosticPanel.test.jsx src/components/SyncDiagnosticIntegration.test.jsx
+      - name: Build production renderer
+        if: runner.os == 'Windows'
+        run: npm run build:renderer
+      - name: Verify native diagnostic UI and complete evidence
+        if: runner.os == 'Windows'
+        run: node scripts/run-sync-diagnostic-render.cjs
+      - name: Upload diagnostic render evidence
+        if: always() && runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-notepad-sync-diagnostic-${{ github.sha }}
+          path: |
+            test-results/sync-diagnostic/*.png
+            test-results/sync-diagnostic/checks.json
+          if-no-files-found: ignore
+          retention-days: 7

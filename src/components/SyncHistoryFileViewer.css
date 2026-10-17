@@ -1,0 +1,69 @@
+.sync-history-file{min-width:0;margin-top:16px;border:1px solid var(--line);border-radius:10px;background:var(--paper);color:var(--ink)}
+.sync-history-file>summary{padding:12px 14px;min-height:44px;box-sizing:border-box;cursor:pointer;font-size:13px;font-weight:600;line-height:1.8;overflow-wrap:anywhere}
+.sync-history-file>summary>span{display:inline-block;margin-left:12px;font-size:12px;font-weight:400;color:var(--ink-soft)}
+.sync-history-file-body{min-width:0;padding:0 14px 14px}
+.sync-history-file-body p,.sync-history-file-body small{font-size:12px;line-height:1.8;overflow-wrap:anywhere;color:var(--ink-soft)}
+.sync-history-file-body h5{margin:12px 0 8px;font-size:13px;line-height:1.8;overflow-wrap:anywhere}
+.sync-history-file-controls,.sync-history-file-pages{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:12px 0}
+.sync-overview .sync-history-file button{color:var(--ink)!important;min-height:36px}
+.sync-history-file [aria-disabled="true"]{opacity:.65;cursor:default}
+.sync-history-file .sync-history-file-notice,.sync-history-file .sync-history-file-stale,.sync-history-file .sync-history-file-warning{color:var(--ink)}
+.sync-history-file-stale{border-left:3px solid var(--ink);padding-left:10px}
+.sync-history-file-filters{font-size:12px;line-height:1.8;margin:10px 0}
+.sync-history-file-list{max-height:320px;overflow:auto;overscroll-behavior:contain;border:1px solid var(--line);border-radius:8px;padding:0 12px}
+.sync-history-file-list ol{margin:0;padding:0 0 0 24px}
+.sync-history-file-list li{padding:12px 0;border-bottom:1px solid var(--line);overflow-wrap:anywhere;font-size:13px;line-height:1.8}
+.sync-history-file-list li:last-child{border-bottom:0}
+.sync-history-file-list p{margin:5px 0}
+.sync-history-file-list dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:8px 0}
+.sync-history-file-list dt,.sync-history-file-list dd{margin:0;font-size:12px;line-height:1.8}
+.sync-history-file-list details{font-size:12px}
+.sync-history-file-list code{font:inherit;white-space:normal;overflow-wrap:anywhere}
+.sync-history-file-pages span{font-size:12px;line-height:1.8}
+.sync-history-file :is(summary,button,input,select,.sync-history-file-list):focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+@media(max-width:600px){.sync-history-file>summary>span{display:block;margin-left:0}.sync-history-file-list dl{grid-template-columns:1fr}.sync-history-file-list{max-height:280px}}
+
+.sync-history-file-search{min-width:0;border:1px solid var(--line);border-radius:8px;margin:12px 0;padding:10px 12px}
+.sync-history-file-search legend{padding:0 6px;font-size:12px;font-weight:600}
+.sync-history-file-search>p{margin:0 0 10px}
+.sync-history-file-search-fields{display:flex;flex-wrap:wrap;gap:10px;align-items:end}
+.sync-history-file-search-fields label{display:flex;flex:1 1 140px;min-width:0;flex-direction:column;gap:5px;font-size:12px;line-height:1.8}
+.sync-history-file-search-fields .sync-history-file-search-query{flex:2 1 220px}
+.sync-history-file-search-fields :is(input,select){box-sizing:border-box;width:100%;min-width:0;min-height:38px;padding:7px 10px;border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--ink);font:inherit}
+.sync-history-file-search-fields input::placeholder{color:var(--ink-soft);opacity:1}
+.sync-history-file-search-fields button{white-space:normal}
+@media(max-width:600px){.sync-history-file-search-fields .sync-history-file-search-query{flex-basis:100%}.sync-history-file-search-fields label{flex-basis:calc(50% - 10px)}}
+
+.sync-history-file-page-jump{display:flex;flex:1 1 100%;flex-wrap:wrap;align-items:center;gap:8px;min-width:0}
+.sync-history-file-page-jump label{display:inline-flex;align-items:center;gap:6px;font-size:12px;line-height:1.8;color:var(--ink)}
+.sync-history-file-page-jump input{box-sizing:border-box;width:5.5em;min-height:36px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--ink);font:inherit;font-variant-numeric:tabular-nums}
+.sync-history-file-page-jump>span{color:var(--ink-soft);overflow-wrap:anywhere}
+.sync-history-file .sync-history-file-page-error{flex-basis:100%;margin:0;color:var(--ink)}
+
+.sync-history-file-order{min-width:0;margin:12px 0;padding:10px 12px;border:1px solid var(--line);border-radius:8px}
+.sync-history-file-order label{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:12px;line-height:1.8;color:var(--ink)}
+.sync-history-file-order select{box-sizing:border-box;max-width:100%;min-width:0;min-height:38px;padding:7px 10px;border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--ink);font:inherit}
+.sync-history-file-order p{margin:8px 0 0}
+@media(max-width:600px){.sync-history-file-order select{width:100%}}
+
+.sync-history-file-record-tools{display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-width:0;margin:10px 0}
+.sync-history-file-record-tools button{max-width:100%;white-space:normal}
+.sync-history-file-record-tools p{flex-basis:100%;margin:0}
+
+.sync-history-file-identifier-line{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px;min-width:0}
+.sync-history-file-identifier-line bdi{min-width:0;overflow-wrap:anywhere}
+.sync-history-file-identifier-line .btn{flex:none;white-space:normal}
+
+
+.sync-history-file-object-filter{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:10px 0 0;padding-top:10px;border-top:1px solid var(--line);min-width:0}
+.sync-history-file-object-filter span{flex:1 1 260px;min-width:0;font-size:12px;line-height:1.8;color:var(--ink)}
+.sync-history-file-object-filter code{font:inherit;overflow-wrap:anywhere}
+.sync-history-file-object-filter .btn{flex:none;white-space:normal}
+.sync-history-file-row-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.sync-history-file-row-actions .btn{max-width:100%;white-space:normal}
+
+
+.sync-history-file-record-filter{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:10px 0 0;padding-top:10px;border-top:1px solid var(--line);min-width:0}
+.sync-history-file-record-filter span{flex:1 1 260px;min-width:0;font-size:12px;line-height:1.8;color:var(--ink)}
+.sync-history-file-record-filter code{font:inherit;overflow-wrap:anywhere}
+.sync-history-file-record-filter .btn{flex:none;white-space:normal}

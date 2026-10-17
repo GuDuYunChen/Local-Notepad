@@ -194,13 +194,13 @@ export default function Editor({ documentId, documentTitle, initialContent, onCh
     <LexicalComposer initialConfig={initialConfig}>
       <div className="editor-shell">
         {!readOnly && <ToolbarPlugin />}
-        <SearchPlugin />
+        <SearchPlugin key={documentId} documentId={documentId} />
         {!readOnly && <CommandPalettePlugin />}
         <EditorViewSettingsPlugin readOnly={readOnly} />
         <MarkdownSourcePlugin readOnly={readOnly} />
         <ResourceManagerPlugin readOnly={readOnly} />
         {!readOnly && <FloatingTextToolbarPlugin />}
-        <DocumentOutlinePlugin documentId={documentId} documentTitle={documentTitle} />
+        <DocumentOutlinePlugin documentId={documentId} documentTitle={documentTitle} initialContent={initialContent} requireLoaded />
         {!readOnly && <PasteImagePlugin />}
         <div className="editor-container">
           <RichTextPlugin

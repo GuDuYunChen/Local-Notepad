@@ -1,0 +1,25 @@
+.note-tags { min-width:0; font-size:13px; line-height:1.65; }
+.note-tags-summary { display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+.note-tag-chip { display:inline-flex; align-items:center; gap:5px; max-width:100%; overflow-wrap:anywhere; border:1px solid var(--line,#d8d9df); border-radius:12px; padding:2px 9px; }
+.note-tag-chip i,.note-tag-option i { flex-shrink:0; width:7px; height:7px; border-radius:50%; }
+.note-tag-panel { margin-top:12px; border:1px solid var(--line,#d8d9df); border-radius:8px; padding:12px; min-width:0; color:var(--ink,#202630); background:var(--surface,#fff); }
+.note-tag-panel header { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.note-tag-muted { color:var(--ink-soft,#697180); font-size:12px; overflow-wrap:anywhere; }
+.note-tag-field { display:flex; flex-direction:column; gap:5px; font-size:12px; margin:10px 0; }
+.note-tag-field input { box-sizing:border-box; width:100%; min-width:0; padding:8px 9px; font:inherit; font-size:13px; background:var(--paper,#f7f7f5); color:inherit; border:1px solid var(--line,#d8d9df); border-radius:5px; }
+.note-tag-options { max-height:235px; overflow:auto; display:flex; flex-direction:column; gap:5px; }
+.note-tag-option { display:flex; gap:7px; align-items:center; text-align:left; width:100%; min-width:0; padding:9px; border:1px solid var(--line,#d8d9df); border-radius:6px; font:inherit; color:inherit; background:transparent; cursor:pointer; }
+.note-tag-option span:first-of-type { flex:1; min-width:0; overflow-wrap:anywhere; }
+.note-tag-option[aria-pressed=true] { border-color:var(--clay,#9a6a4b); font-weight:600; }
+.note-tag-warning,.note-tag-feedback { padding:8px 10px; border-inline-start:3px solid var(--warning,#996627); background:var(--paper,#f7f7f5); overflow-wrap:anywhere; }
+.note-tag-feedback { border-inline-start-color:var(--success,#277347); }
+.note-tag-recovery { border:1px solid var(--line,#d8d9df); border-radius:6px; padding:9px; margin:9px 0; }
+.note-tag-toolbar { display:flex; gap:6px; flex-wrap:wrap; }
+.note-tag-recovery button { margin:3px; }
+.note-tag-create { border-top:1px solid var(--line,#d8d9df); margin-top:12px; padding-top:4px; }
+.note-tag-create > button { width:100%; }
+.note-tags button:disabled { opacity:.55; cursor:default; }
+.note-tags button:focus-visible,.note-tags input:focus-visible { outline:2px solid var(--clay,#9a6a4b); outline-offset:2px; }
+
+/* Replace the old inline tag trigger layout only for the current note editor. */
+.inspector-panel .tag-selector.note-tags { display:block; width:100%; margin-right:0; }

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { markdownToLexical } from '~/services/importContent'
 import { analyzeMarkdownSourceCompatibility } from '~/services/markdownSource'
+import { editorQuit, EditorQuitError } from '~/services/editorQuit.mjs'
 
 export default function MarkdownSourcePlugin({ readOnly = false }) {
   const [editor] = useLexicalComposerContext()
@@ -11,6 +12,14 @@ export default function MarkdownSourcePlugin({ readOnly = false }) {
   const [issues, setIssues] = useState([])
   const [editable, setEditable] = useState(false)
   const textareaRef = useRef(null)
+  const quitSource = useRef(null)
+  quitSource.current = { open, editable, source, original }
+  useEffect(() => editorQuit.register(() => {
+    const current = quitSource.current
+    if (current.open && current.editable && current.source !== current.original) {
+      throw new EditorQuitError('source')
+    }
+  }), [])
 
   const refreshFromEditor = () => {
     const serialized = JSON.stringify(editor.getEditorState())

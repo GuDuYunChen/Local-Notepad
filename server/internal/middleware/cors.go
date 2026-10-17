@@ -23,6 +23,10 @@ func isAllowedOrigin(origin string) bool {
 }
 
 func CORS(r *ghttp.Request) {
+    if r.URL.Path == "/api/sync/s3/local-overview" {
+        r.Middleware.Next()
+        return
+    }
     h := r.Response.Header()
     origin := r.Header.Get("Origin")
     if origin == "" || !isAllowedOrigin(origin) {

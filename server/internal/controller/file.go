@@ -1,13 +1,11 @@
 package controller
 
 import (
-	"database/sql"
 	"log"
 	"notepad-server/internal/dao"
 	"notepad-server/internal/logic"
 	"notepad-server/internal/model"
 	"strings"
-	"time"
 
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
@@ -19,6 +17,10 @@ type FileController struct {
 }
 
 func (c *FileController) Register(group *ghttp.RouterGroup) {
+	c.RegisterLocalPins(group)
+	c.RegisterTemplateLibrary(group)
+	group.GET("/editor-reference-jobs", c.EditorReferenceJobs)
+	group.POST("/editor-reference-jobs/{requestId}", c.CompleteEditorReferences)
 	group.GET("/search", c.GlobalSearch)
 	group.GET("/research-notes/{requestId}", c.ResearchReceipt)
 	group.POST("/research-notes/{requestId}", c.CreateResearch)
@@ -31,6 +33,7 @@ func (c *FileController) Register(group *ghttp.RouterGroup) {
 	group.DELETE("/files/{id}/permanent", c.PermanentDelete)
 	group.POST("/files/{id}/restore", c.Restore)
 	group.GET("/files/{id}/backlinks", c.Backlinks)
+	group.GET("/files/{id}/backlink-sources", c.BacklinkSources)
 	group.GET("/files/{id}/versions", c.Versions)
 	group.POST("/files/{id}/versions/snapshot", c.SnapshotVersion)
 	group.POST("/files/{id}/versions/{versionId}/restore", c.RestoreVersion)
@@ -41,7 +44,9 @@ func (c *FileController) Register(group *ghttp.RouterGroup) {
 	group.POST("/files/{id}/export", c.Export)
 	group.POST("/files/{id}/save-as", c.SaveAs)
 	group.GET("/graph", c.Graph)
+	group.GET("/local-graph", c.LocalGraph)
 	group.GET("/files/daily/{date}", c.DailyNote)
+	group.POST("/files/daily/{date}", c.DailyNote)
 	group.GET("/templates", c.ListTemplates)
 	group.POST("/templates", c.CreateTemplate)
 	group.DELETE("/templates/{id}", c.DeleteTemplate)
@@ -80,18 +85,29 @@ func (c *FileController) Get(r *ghttp.Request) {
 func (c *FileController) Update(r *ghttp.Request) {
 	id := r.Get("id").String()
 	var in struct {
-		Title     *string `json:"title"`
-		Content   *string `json:"content"`
-		ParentID  *string `json:"parent_id"`
-		SortOrder *int64  `json:"sort_order"`
-		IsDeleted *bool   `json:"is_deleted"`
-		IsPinned  *bool   `json:"is_pinned"`
+		SaveRequestID   string  `json:"save_request_id"`
+		ExpectedContent *string `json:"expected_content"`
+		SectionMappings string  `json:"section_mappings"`
+		Title           *string `json:"title"`
+		Content         *string `json:"content"`
+		ParentID        *string `json:"parent_id"`
+		SortOrder       *int64  `json:"sort_order"`
+		IsDeleted       *bool   `json:"is_deleted"`
+		IsPinned        *bool   `json:"is_pinned"`
 	}
 	if err := r.Parse(&in); err != nil {
 		writeErr(r, 1005, "参数错误", err)
 		return
 	}
 
+	if in.SaveRequestID != "" {
+		if in.Content == nil || in.ExpectedContent == nil || in.Title != nil || in.ParentID != nil || in.SortOrder != nil || in.IsDeleted != nil || in.IsPinned != nil {
+			writeErr(r, 1005, "正文保存不能混合其他修改", nil)
+			return
+		}
+		c.SaveEditor(r, model.EditorSaveInput{RequestID: in.SaveRequestID, Expected: *in.ExpectedContent, Content: *in.Content, Mappings: in.SectionMappings})
+		return
+	}
 	f, err := c.FileLogic.Update(r.GetCtx(), id, in.Title, in.Content, in.ParentID, in.SortOrder, in.IsDeleted, in.IsPinned)
 	if err != nil {
 		log.Printf("保存文件失败 id=%s: %v", id, err)
@@ -378,30 +394,18 @@ func (c *FileController) Graph(r *ghttp.Request) {
 }
 
 func (c *FileController) DailyNote(r *ghttp.Request) {
+	r.Response.Header().Set("Cache-Control", "no-store")
 	date := r.Get("date").String()
-	if date == "" {
-		date = time.Now().Format("2006-01-02")
-	}
-
-	title := date
-
-	if existing, err := c.FileLogic.FindByTitle(r.GetCtx(), "", title); err == nil {
-		if !existing.IsFolder {
-			writeOK(r, g.Map{"file": existing, "created": false})
-			return
-		}
-	} else if err != sql.ErrNoRows {
-		writeErrWithDetail(r, 1001, "查询每日笔记失败", err)
+	if !dao.ValidDailyDate(date) {
+		writeErr(r, 1005, "每日笔记日期无效，需使用真实的 YYYY-MM-DD 日期", nil)
 		return
 	}
-
-	f, err := c.FileLogic.Create(r.GetCtx(), title, "", false, "")
+	file, created, err := c.FileLogic.FileDAO.OpenDaily(r.GetCtx(), date, r.Get("read_only").Bool())
 	if err != nil {
-		writeErr(r, 1006, "创建每日笔记失败", err)
+		writeErrWithDetail(r, 1006, "打开每日笔记失败", err)
 		return
 	}
-
-	writeOK(r, g.Map{"file": f, "created": true})
+	writeOK(r, g.Map{"file": file, "created": created})
 }
 
 func (c *FileController) ListTemplates(r *ghttp.Request) {
@@ -446,7 +450,7 @@ func (c *FileController) CreateTemplate(r *ghttp.Request) {
 
 func (c *FileController) DeleteTemplate(r *ghttp.Request) {
 	id := r.Get("id").String()
-	if err := c.FileLogic.Delete(r.GetCtx(), id); err != nil {
+	if err := c.FileLogic.FileDAO.ArchiveLibraryTemplate(r.GetCtx(), id); err != nil {
 		writeErr(r, 1007, "删除模板失败", err)
 		return
 	}

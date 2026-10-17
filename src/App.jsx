@@ -1,5 +1,8 @@
+import useWikiLinkNavigation from './hooks/useWikiLinkNavigation'
+import WikiNavigationStatus from './components/WikiNavigationStatus'
 import React, { useEffect, useState, useRef } from 'react'
 import TextEditor from './components/TextEditor'
+import ReferenceMaintenanceStatus from './components/ReferenceMaintenanceStatus'
 import FileList from './components/FileList'
 import WorkspaceSidebar from './components/WorkspaceSidebar'
 import {
@@ -16,6 +19,7 @@ import SearchReturnBar from './components/SearchReturnBar'
 import CollectionReadingBar from './components/CollectionReadingBar'
 import { evidenceReview } from '~/services/evidenceReviewSession'
 import useGuardedNoteOpener from './hooks/useGuardedNoteOpener'
+import useRecentNoteTracking from './hooks/useRecentNoteTracking'
 import { toast } from '~/services/toast'
 import {
   appendFocusSession,
@@ -35,6 +39,8 @@ import {
 } from './components/Editor/utils/structureUtils'
 
 const GraphPanel = React.lazy(() => import('./components/GraphPanel'))
+const PinnedNotesPanel = React.lazy(() => import('./components/PinnedNotesPanel'))
+const RecentNotesPanel = React.lazy(() => import('./components/RecentNotesPanel'))
 const ProjectWorkspacePanel = React.lazy(() => import('./components/ProjectWorkspacePanel'))
 const DailyNotesPanel = React.lazy(() => import('./components/DailyNotesPanel'))
 const InspectorPanel = React.lazy(() => import('./components/InspectorPanel'))
@@ -93,6 +99,7 @@ export default function App() {
   })
   const [dragging, setDragging] = useState(false)
   const [current, setCurrent] = useState(null)
+  useRecentNoteTracking(current, workspace)
   const [content, setContent] = useState('')
   const [switching, setSwitching] = useState(false)
   const [deletedIds, setDeletedIds] = useState(new Set())
@@ -129,6 +136,7 @@ export default function App() {
 
   const select = React.useCallback((f) => {
     navigationEpoch.current += 1
+    pendingEditorNavigationRef.current = null
     if (
       focusSession?.active &&
       (!f?.id || f.id !== focusSession.noteId)
@@ -338,70 +346,30 @@ export default function App() {
 
   const saveCurrent = React.useCallback(async () => {
     if (!current || !editorRef.current) return false
-
+    const activeEditor = editorRef.current
     try {
-      const refactorState = editorRef.current.getReferenceRefactorState?.()
-      let review = null
-
-      if (refactorState?.structureChanged) {
-        const files = await listAllFilesWithContent()
-        const plan = planTargetReferenceRefactor(files, current.id, {
-          title: current.title,
-          content: refactorState.currentContent,
-          sectionPathMappings: refactorState.sectionPathMappings || [],
-        })
-
-        const affectedReferences =
-          (Number(plan.summary?.repairable) || 0) +
-          (Number(plan.summary?.broken) || 0)
-
-        if (affectedReferences > 0) {
-          review = await requestReferenceRefactor({
-            mode: 'structure',
-            targetTitle: current.title || '当前笔记',
-            plan,
-          })
-
-          if (!review?.proceed) return null
-          review = { ...review, plan }
-        }
+      // Ctrl+S has one responsibility: confirm the current body. Cross-note
+      // scans, user review and version-network calls no longer precede it.
+      const updated = await activeEditor.save()
+      if (!updated || updated.id !== current.id || !editorRef.current ||
+          (editorRef.current.getDocumentId && editorRef.current.getDocumentId() !== current.id)) return false
+      const latest = editorRef.current.getReferenceRefactorState?.()
+      if (latest && latest.currentContent !== updated.content) {
+        toast.warning('已有内容已保存，但还有更新的编辑，请再次保存。')
+        return false
       }
-
-      if (refactorState?.structureChanged) {
-        await createFileVersionSnapshot(current.id)
+      if (latest?.savePending) {
+        toast.warning('仍有正文保存正在排队，请等待完成后再继续。')
+        return false
       }
-
-      const updated = await editorRef.current.save()
-      if (!updated) return false
-
-      if (review?.sync && review.plan) {
-        const result = await applyReferenceRepairPlan(review.plan, {
-          allowCurrentSource: true,
-        })
-
-        if (result.skipped.length) {
-          toast.warning(
-            '正文已保存；' +
-            result.repairedReferences +
-            ' 处引用已同步，' +
-            result.skipped.length +
-            ' 篇来源因内容变化被跳过'
-          )
-        } else if (result.repairedReferences) {
-          toast.success('正文已保存，并同步 ' + result.repairedReferences + ' 处引用')
-        }
-      }
-
+      toast.success('正文已保存')
       return true
-    } catch (e) {
-      console.error(e)
+    } catch (error) {
+      console.error('正文保存未确认', error)
+      toast.error(error.message || '正文保存未确认，草稿已保留，请重试')
       return false
     }
-  }, [
-    applyReferenceRepairPlan,
-    current,
-    requestReferenceRefactor,
-  ])
+  }, [current])
 
   const handleExtractStructureSection = React.useCallback(async (section) => {
     if (!current?.id || !section?.path?.length || !editorRef.current) return
@@ -674,33 +642,6 @@ export default function App() {
     titleSaving,
   ])
 
-  const loadAndSelect = React.useCallback((id, options = {}) => {
-    api(`/api/files/${id}`).then(file => {
-      const headingPath = Array.isArray(options?.headingPath)
-        ? options.headingPath.filter(Boolean)
-        : []
-
-      if (headingPath.length) {
-        if (current?.id === id) {
-          select(file)
-          window.requestAnimationFrame(() => {
-            window.dispatchEvent(new CustomEvent('editor:open-heading-anchor', {
-              detail: { path: headingPath },
-            }))
-          })
-          return
-        }
-
-        pendingEditorNavigationRef.current = {
-          id,
-          headingPath,
-        }
-      }
-
-      select(file)
-    })
-  }, [current?.id, select])
-
   const updateCurrentFile = React.useCallback(async (patch) => {
     const id = current?.id
     if (!id) return null
@@ -732,10 +673,19 @@ export default function App() {
     return updated
   }, [current?.id])
 
-  const restoreCurrent = React.useCallback(() => {
-    if (!current) return
-    api(`/api/files/${current.id}`).then(select)
-  }, [current, select])
+  const historyEditor = React.useMemo(() => ({
+    snapshot: () => editorRef.current?.captureHistoryState?.(),
+    restore: (version, reviewed, signal) => {
+      const active = editorRef.current
+      if (!active?.restoreHistoryVersion) return Promise.reject(new Error('编辑器未就绪'))
+      return active.restoreHistoryVersion(version, reviewed, signal)
+    },
+    saveCurrent: reviewed => {
+      const active = editorRef.current
+      if (!active?.saveHistoryCurrent) return Promise.reject(new Error('编辑器未就绪'))
+      return active.saveHistoryCurrent(reviewed)
+    },
+  }), [])
 
   useEffect(() => {
     const t = setTimeout(() => setReady(true), 100)
@@ -823,6 +773,7 @@ export default function App() {
     const proceed = () => {
       if (options.beforeChange?.() === false) return
       navigationEpoch.current += 1
+      pendingEditorNavigationRef.current = null
       setFocusMode(false)
       setWorkspace(nextWorkspace)
     }
@@ -866,6 +817,12 @@ export default function App() {
     }
 
     if (current && f && f.id === current.id) {
+      // Only an explicit clean return from another workspace adopts fresh data.
+      // The same open editor or any current draft retains its original shortcut.
+      if (options.refreshCurrent === true && workspace !== 'notes' && !unsaved) {
+        performSelect()
+        return
+      }
       setWorkspace('notes')
       options.afterSelect?.(f)
       return
@@ -889,61 +846,28 @@ export default function App() {
     onSelectFile: handleSelectFile,
     onHeading: (id, headingPath, isCurrent) => {
       if (isCurrent) {
+        const epoch = navigationEpoch.current
         window.requestAnimationFrame(() => {
+          if (epoch !== navigationEpoch.current) return
           window.dispatchEvent(new CustomEvent('editor:open-heading-anchor', {
-            detail: { path: headingPath },
+            detail: { documentId: id, path: headingPath },
           }))
         })
       } else {
-        pendingEditorNavigationRef.current = { id, headingPath }
+        // Loading the editor is a separate read. This anchor belongs only to
+        // the selection that requested it, even if the same note opens later.
+        pendingEditorNavigationRef.current = { id, headingPath, epoch: navigationEpoch.current }
       }
     },
   })
 
-  useEffect(() => {
-    const openWikiLink = (event) => {
-      const id = event.detail?.id
-      if (!id) return
-
-      const headingPath = Array.isArray(event.detail?.headingPath)
-        ? event.detail.headingPath.filter(Boolean)
-        : []
-
-      api(`/api/files/${id}`)
-        .then(file => handleSelectFile(file, {
-          afterSelect: () => {
-            if (!headingPath.length) return
-
-            pendingEditorNavigationRef.current = {
-              id,
-              headingPath,
-            }
-
-            if (current?.id === id) {
-              const pending = pendingEditorNavigationRef.current
-              pendingEditorNavigationRef.current = null
-              window.requestAnimationFrame(() => {
-                window.dispatchEvent(new CustomEvent('editor:open-heading-anchor', {
-                  detail: { path: pending.headingPath },
-                }))
-              })
-            }
-          },
-          onCancel: () => {
-            if (pendingEditorNavigationRef.current?.id === id) {
-              pendingEditorNavigationRef.current = null
-            }
-          },
-        }))
-        .catch(error => {
-          console.error('打开 WikiLink 失败', error)
-          toast.error('目标笔记不存在或已删除')
-        })
-    }
-
-    window.addEventListener('wikiLink:open', openWikiLink)
-    return () => window.removeEventListener('wikiLink:open', openWikiLink)
-  }, [current, deletedIds, unsaved, select])
+  const wikiNavigation = useWikiLinkNavigation({
+    currentId: current?.id,
+    content,
+    workspace,
+    navigationEpoch,
+    onOpenFile: handleInspectorSelectFile,
+  })
 
   const finishFocusSession = React.useCallback((reason = 'manual') => {
     if (!focusSession?.active) return null
@@ -1018,6 +942,10 @@ export default function App() {
     ? '项目工作台'
     : workspace === 'daily'
       ? '每日笔记'
+      : workspace === 'recent'
+        ? '最近访问'
+      : workspace === 'pinned'
+        ? '置顶笔记'
       : workspace === 'graph'
         ? '知识图谱'
       : workspace === 'trash'
@@ -1243,7 +1171,9 @@ export default function App() {
                       onChange={setContent}
                       onLoaded={(text) => {
                         if (current) {
-                          setCurrent(prev => ({ ...prev, content: text }))
+                          // A restored cache is a draft, not a database save receipt.
+                          const savedText = editorRef.current?.getReferenceRefactorState?.().savedContent
+                          setCurrent(prev => ({ ...prev, content: typeof savedText === 'string' ? savedText : text }))
                           setContent(text)
 
                           const pendingFocus = pendingFocusSessionRef.current
@@ -1263,12 +1193,16 @@ export default function App() {
                           }
 
                           const pending = pendingEditorNavigationRef.current
-                          if (pending?.id === current.id && pending.headingPath?.length) {
+                          if (pending && pending.epoch !== navigationEpoch.current) {
                             pendingEditorNavigationRef.current = null
+                          } else if (pending?.id === current.id && pending.headingPath?.length) {
+                            pendingEditorNavigationRef.current = null
+                            const epoch = pending.epoch
                             window.requestAnimationFrame(() => {
                               window.requestAnimationFrame(() => {
+                                if (epoch !== navigationEpoch.current) return
                                 window.dispatchEvent(new CustomEvent('editor:open-heading-anchor', {
-                                  detail: { path: pending.headingPath },
+                                  detail: { documentId: current.id, path: pending.headingPath },
                                 }))
                               })
                             })
@@ -1308,6 +1242,18 @@ export default function App() {
                         else select(f)
                       }}
                     />
+                  </React.Suspense>
+                )}
+
+                {workspace === 'recent' && (
+                  <React.Suspense fallback={<div className="workspace-loading">正在打开最近访问…</div>}>
+                    <RecentNotesPanel onClose={() => setWorkspace('notes')} onSelectFile={handleInspectorSelectFile} />
+                  </React.Suspense>
+                )}
+
+                {workspace === 'pinned' && (
+                  <React.Suspense fallback={<div className="workspace-loading">正在打开置顶笔记…</div>}>
+                    <PinnedNotesPanel onClose={() => setWorkspace('notes')} onSelectFile={handleInspectorSelectFile} />
                   </React.Suspense>
                 )}
 
@@ -1356,7 +1302,7 @@ export default function App() {
                     onTabChange={setInspectorTab}
                     onClose={() => setInspectorOpen(false)}
                     onSelectFile={handleInspectorSelectFile}
-                    onRestore={restoreCurrent}
+                    historyEditor={historyEditor}
                     editorStatus={editorStatus}
                     unsaved={unsaved}
                     onUpdateFile={updateCurrentFile}
@@ -1377,6 +1323,8 @@ export default function App() {
         </main>
       </div>
 
+      <ReferenceMaintenanceStatus/>
+      <WikiNavigationStatus {...wikiNavigation} />
       <ToastViewport />
 
       {referenceRefactor && (
@@ -1441,10 +1389,15 @@ export default function App() {
                   toast.warning('目标或来源已变化，已取消跳转，当前草稿保留')
                   return
                 }
-                editorRef.current?.clearCache()
+                if (editorRef.current?.clearCache() !== true) {
+                  toast.warning('正文仍在保存或已变化，尚未放弃草稿。请等待保存结束后重试。')
+                  return
+                }
                 // Discard the in-memory dirty flag as well as the draft cache.
                 // Otherwise returning via Projects asks about the discarded draft again.
-                setContent(current?.content || '')
+                const savedText = editorRef.current.getReferenceRefactorState().savedContent
+                setContent(savedText)
+                setCurrent(previous => previous ? { ...previous, content: savedText } : previous)
                 setEditorStatus(previous => ({ ...previous, dirty: false, structureDirty: false, saveError: false }))
                 setDialog(null)
                 dialog.next()
@@ -1476,6 +1429,7 @@ export default function App() {
           <BackupPanel open={backupOpen} onClose={() => setBackupOpen(false)} />
           <QuickSwitcher
             open={quickSearchOpen}
+            navigationEpoch={navigationEpoch}
             onClose={() => setQuickSearchOpen(false)}
             onSelectFile={handleSelectFile}
             onOpenSearchWorkspace={query => openGlobalSearch(query)}

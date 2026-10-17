@@ -3,8 +3,10 @@ package logic
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"notepad-server/internal/dao"
@@ -31,10 +33,15 @@ func newSettingsLogicTest(t *testing.T) (*SettingsLogic, *sql.DB, string) {
 			theme TEXT NOT NULL,
 			editor_opts TEXT,
 			sync_enabled INTEGER,
-			sync_endpoint TEXT
+			sync_endpoint TEXT,
+			sync_provider TEXT,
+			sync_username TEXT,
+			sync_password TEXT,
+			sync_auto_enabled INTEGER DEFAULT 0,
+			sync_interval_minutes INTEGER DEFAULT 5
 		)`,
-		`INSERT INTO settings (id, theme, editor_opts, sync_enabled, sync_endpoint)
-		 VALUES (1, 'light', '{"fontSize":15,"lineHeight":1.8}', 1, 'http://sync.local')`,
+		`INSERT INTO settings (id, theme, editor_opts, sync_enabled, sync_endpoint, sync_provider, sync_username, sync_password, sync_auto_enabled, sync_interval_minutes)
+		 VALUES (1, 'light', '{"fontSize":15,"lineHeight":1.8}', 1, 'http://sync.local', 'local-lab', '', '', 0, 5)`,
 		`CREATE TABLE files (
 			id TEXT PRIMARY KEY,
 			title TEXT NOT NULL,
@@ -84,7 +91,7 @@ func TestSettingsGetAndPartialUpdatePreserveExistingPreferences(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get settings: %v", err)
 	}
-	if settings.Theme != "light" || !settings.SyncEnabled || settings.SyncEndpoint != "http://sync.local" {
+	if settings.Theme != "light" || !settings.SyncEnabled || settings.SyncEndpoint != "http://sync.local" || settings.SyncProvider != "local-lab" {
 		t.Fatalf("unexpected settings: %#v", settings)
 	}
 	if settings.EditorOpts["fontSize"] != float64(15) {
@@ -99,7 +106,7 @@ func TestSettingsGetAndPartialUpdatePreserveExistingPreferences(t *testing.T) {
 	if updated.Theme != "dark" {
 		t.Fatalf("theme = %q, want dark", updated.Theme)
 	}
-	if !updated.SyncEnabled || updated.SyncEndpoint != "http://sync.local" {
+	if !updated.SyncEnabled || updated.SyncEndpoint != "http://sync.local" || updated.SyncProvider != "local-lab" {
 		t.Fatalf("partial update cleared sync settings: %#v", updated)
 	}
 	if updated.EditorOpts["lineHeight"] != 1.8 {
@@ -109,6 +116,42 @@ func TestSettingsGetAndPartialUpdatePreserveExistingPreferences(t *testing.T) {
 	invalid := "sepia"
 	if _, err := logic.Update(ctx, &model.SettingsPatch{Theme: &invalid}); err == nil {
 		t.Fatal("expected invalid theme to fail")
+	}
+	provider := "webdav"
+	endpoint := "https://dav.example.test/notepad"
+	username := "alice"
+	password := "secret-value"
+	webdav, err := logic.Update(ctx, &model.SettingsPatch{
+		SyncProvider: &provider, SyncEndpoint: &endpoint, SyncUsername: &username, SyncPassword: &password,
+	})
+	if err != nil { t.Fatalf("enable webdav settings: %v", err) }
+	if webdav.SyncProvider != "webdav" || webdav.SyncUsername != "alice" || !webdav.SyncPasswordSet {
+		t.Fatalf("unexpected webdav settings: %#v", webdav)
+	}
+	encoded, err := json.Marshal(webdav)
+	if err != nil { t.Fatal(err) }
+	if strings.Contains(string(encoded), password) || strings.Contains(string(encoded), "sync_password\"") {
+		t.Fatalf("password leaked in settings JSON: %s", encoded)
+	}
+	auto := true
+	interval := 15
+	if _, err = logic.Update(ctx, &model.SettingsPatch{SyncAutoEnabled:&auto, SyncIntervalMinutes:&interval}); err == nil {
+		t.Fatal("direct settings update bypassed automatic-sync verification")
+	}
+	webdav, err = logic.Update(ctx, &model.SettingsPatch{SyncIntervalMinutes:&interval})
+	if err != nil { t.Fatalf("update automatic sync interval: %v", err) }
+	if webdav.SyncAutoEnabled || webdav.SyncIntervalMinutes != 15 { t.Fatalf("unexpected auto settings: %#v", webdav) }
+	newEndpoint := "https://dav.example.test/other"
+	webdav, err = logic.Update(ctx, &model.SettingsPatch{SyncEndpoint:&newEndpoint})
+	if err != nil { t.Fatalf("change endpoint: %v", err) }
+	if webdav.SyncAutoEnabled { t.Fatal("endpoint change did not pause automatic sync") }
+	tooShort := 0
+	if _, err := logic.Update(ctx, &model.SettingsPatch{SyncIntervalMinutes:&tooShort}); err == nil {
+		t.Fatal("accepted invalid automatic sync interval")
+	}
+	insecure := "http://dav.example.test/notepad"
+	if _, err := logic.Update(ctx, &model.SettingsPatch{SyncEndpoint: &insecure}); err == nil {
+		t.Fatal("expected insecure non-loopback WebDAV endpoint to fail")
 	}
 }
 
