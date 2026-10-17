@@ -136,6 +136,7 @@ export default function App() {
 
   const select = React.useCallback((f) => {
     navigationEpoch.current += 1
+    pendingEditorNavigationRef.current = null
     if (
       focusSession?.active &&
       (!f?.id || f.id !== focusSession.noteId)
@@ -641,33 +642,6 @@ export default function App() {
     titleSaving,
   ])
 
-  const loadAndSelect = React.useCallback((id, options = {}) => {
-    api(`/api/files/${id}`).then(file => {
-      const headingPath = Array.isArray(options?.headingPath)
-        ? options.headingPath.filter(Boolean)
-        : []
-
-      if (headingPath.length) {
-        if (current?.id === id) {
-          select(file)
-          window.requestAnimationFrame(() => {
-            window.dispatchEvent(new CustomEvent('editor:open-heading-anchor', {
-              detail: { path: headingPath },
-            }))
-          })
-          return
-        }
-
-        pendingEditorNavigationRef.current = {
-          id,
-          headingPath,
-        }
-      }
-
-      select(file)
-    })
-  }, [current?.id, select])
-
   const updateCurrentFile = React.useCallback(async (patch) => {
     const id = current?.id
     if (!id) return null
@@ -799,6 +773,7 @@ export default function App() {
     const proceed = () => {
       if (options.beforeChange?.() === false) return
       navigationEpoch.current += 1
+      pendingEditorNavigationRef.current = null
       setFocusMode(false)
       setWorkspace(nextWorkspace)
     }
@@ -879,7 +854,9 @@ export default function App() {
           }))
         })
       } else {
-        pendingEditorNavigationRef.current = { id, headingPath }
+        // Loading the editor is a separate read. This anchor belongs only to
+        // the selection that requested it, even if the same note opens later.
+        pendingEditorNavigationRef.current = { id, headingPath, epoch: navigationEpoch.current }
       }
     },
   })
@@ -1216,9 +1193,11 @@ export default function App() {
                           }
 
                           const pending = pendingEditorNavigationRef.current
-                          if (pending?.id === current.id && pending.headingPath?.length) {
+                          if (pending && pending.epoch !== navigationEpoch.current) {
                             pendingEditorNavigationRef.current = null
-                            const epoch = navigationEpoch.current
+                          } else if (pending?.id === current.id && pending.headingPath?.length) {
+                            pendingEditorNavigationRef.current = null
+                            const epoch = pending.epoch
                             window.requestAnimationFrame(() => {
                               window.requestAnimationFrame(() => {
                                 if (epoch !== navigationEpoch.current) return

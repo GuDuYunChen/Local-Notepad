@@ -102,6 +102,50 @@ export async function verifyWikiNavigationDesktop({ evaluate, click, cdp, until,
     await action('关闭引用导航提示');await click(link)
     await until(()=>evaluate("document.querySelector('.editor-input')?.innerText.includes('wiki98-fresh-body')"),'Fresh activation after stop failed');await clean()
     mark('new-explicit-activation-recovers-after-a-stopped-read')
+
+    // The Wiki verification GET and the editor's later body GET are distinct.
+    // Release the first real response unchanged, then hold the second until the
+    // user has left the selected target. No body, callback or timer is replaced.
+    await open(source,'wiki98-source-body')
+    await evaluate(`(()=>{const events=[];const listener=event=>events.push({documentId:event.detail?.documentId,path:event.detail?.path});window.__wiki98AnchorProbe={events,listener};window.addEventListener('editor:open-heading-anchor',listener);return true})()`)
+    const bodyReads=[]
+    detach=cdp.onEvent(event=>{
+      if(event.method==='Fetch.requestPaused'){
+        const {requestId,request,responseStatusCode}=event.params
+        bodyReads.push({requestId,url:request.url,method:request.method,responseStatusCode})
+      }
+    })
+    await cdp.send('Fetch.enable',{patterns:[{urlPattern:url,requestStage:'Response'}]});intercept=true
+    await click(link);await until(()=>bodyReads.length===1,'Wiki verification response was not held')
+    assert.equal(bodyReads[0].url,url);assert.equal(bodyReads[0].method,'GET');assert.equal(bodyReads[0].responseStatusCode,200)
+    assert.equal(await titleIs(source.title),true)
+    await cdp.send('Fetch.continueRequest',{requestId:bodyReads[0].requestId})
+    await until(()=>bodyReads.length===2,'The selected target editor did not issue its own body GET')
+    assert.equal(bodyReads[1].url,url);assert.equal(bodyReads[1].method,'GET');assert.equal(bodyReads[1].responseStatusCode,200)
+    assert.notEqual(bodyReads[0].requestId,bodyReads[1].requestId)
+    await until(()=>titleIs('引用导航98更名.md'),'Wiki did not select the target before the delayed editor load')
+    assert.equal(await evaluate("!document.querySelector('.editor-input')&&[...document.querySelectorAll('.placeholder')].some(node=>node.textContent.includes('加载中'))"),true)
+    assert.deepEqual(await evaluate('window.__wiki98AnchorProbe.events'),[])
+    report.delayedBodyRead={verification:{method:bodyReads[0].method,responseStatusCode:bodyReads[0].responseStatusCode,continuedUnchanged:true},editor:{method:bodyReads[1].method,responseStatusCode:bodyReads[1].responseStatusCode},selectedBeforeBodyReady:true,replayed:false}
+    mark('accepted-section-waits-for-the-real-editor-body-read')
+
+    await open(source,'wiki98-source-body')
+    await cdp.send('Fetch.disable');intercept=false;detach();detach=null
+    await evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(true))))')
+    assert.equal(await titleIs(source.title),true)
+    assert.deepEqual(await evaluate('window.__wiki98AnchorProbe.events'),[])
+    await open({...target,title:'引用导航98更名.md'},'wiki98-fresh-body')
+    await evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(true))))')
+    assert.equal(await titleIs('引用导航98更名.md'),true)
+    assert.deepEqual(await evaluate('window.__wiki98AnchorProbe.events'),[])
+    assert.equal(await evaluate("!!document.querySelector('.document-outline-panel')"),false)
+    assert.equal((await api('/api/files/'+source.id)).content,savedSource.content)
+    report.delayedBodyRead.ordinaryReopen={sourceRetained:true,targetLoaded:true,anchorEvents:0,outlineOpened:false}
+    const returnImage=Buffer.from((await cdp.send('Page.captureScreenshot',{format:'png'})).data,'base64'),returnFilename='wiki-navigation-body-return-installed.png'
+    writeFileSync(path.join(out,returnFilename),returnImage);report.screenshots.push({filename:returnFilename,bytes:returnImage.length,sha256:createHash('sha256').update(returnImage).digest('hex')})
+    mark('ordinary-target-reopen-cannot-revive-the-abandoned-section')
+    await evaluate("(()=>{const probe=window.__wiki98AnchorProbe;if(probe)window.removeEventListener('editor:open-heading-anchor',probe.listener);delete window.__wiki98AnchorProbe;return true})()")
+
     await open(source,'wiki98-source-body')
     const removed=await api(route,{method:'PUT',body:JSON.stringify({is_deleted:true})})
     assert.equal(removed.is_deleted,true);await assert.rejects(()=>api(route))
@@ -119,5 +163,12 @@ export async function verifyWikiNavigationDesktop({ evaluate, click, cdp, until,
     mark('unrelated-note-bodies-metadata-and-pins-remain-unchanged')
     report.complete=true;save()
   } catch(error) { report.error=String(error.stack||error);save();throw error }
-  finally { try { if(intercept)await cdp.send('Fetch.disable');detach?.() } finally { await cdp.send('Network.setBlockedURLs',{urls:[]}) } }
+  finally {
+    try { if(intercept)await cdp.send('Fetch.disable') }
+    finally {
+      detach?.()
+      try { await evaluate("(()=>{const probe=window.__wiki98AnchorProbe;if(probe)window.removeEventListener('editor:open-heading-anchor',probe.listener);delete window.__wiki98AnchorProbe;return true})()") }
+      finally { await cdp.send('Network.setBlockedURLs',{urls:[]}) }
+    }
+  }
 }
