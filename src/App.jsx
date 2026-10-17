@@ -1,3 +1,5 @@
+import useWikiLinkNavigation from './hooks/useWikiLinkNavigation'
+import WikiNavigationStatus from './components/WikiNavigationStatus'
 import React, { useEffect, useState, useRef } from 'react'
 import TextEditor from './components/TextEditor'
 import ReferenceMaintenanceStatus from './components/ReferenceMaintenanceStatus'
@@ -869,9 +871,11 @@ export default function App() {
     onSelectFile: handleSelectFile,
     onHeading: (id, headingPath, isCurrent) => {
       if (isCurrent) {
+        const epoch = navigationEpoch.current
         window.requestAnimationFrame(() => {
+          if (epoch !== navigationEpoch.current) return
           window.dispatchEvent(new CustomEvent('editor:open-heading-anchor', {
-            detail: { path: headingPath },
+            detail: { documentId: id, path: headingPath },
           }))
         })
       } else {
@@ -880,50 +884,13 @@ export default function App() {
     },
   })
 
-  useEffect(() => {
-    const openWikiLink = (event) => {
-      const id = event.detail?.id
-      if (!id) return
-
-      const headingPath = Array.isArray(event.detail?.headingPath)
-        ? event.detail.headingPath.filter(Boolean)
-        : []
-
-      api(`/api/files/${id}`)
-        .then(file => handleSelectFile(file, {
-          afterSelect: () => {
-            if (!headingPath.length) return
-
-            pendingEditorNavigationRef.current = {
-              id,
-              headingPath,
-            }
-
-            if (current?.id === id) {
-              const pending = pendingEditorNavigationRef.current
-              pendingEditorNavigationRef.current = null
-              window.requestAnimationFrame(() => {
-                window.dispatchEvent(new CustomEvent('editor:open-heading-anchor', {
-                  detail: { path: pending.headingPath },
-                }))
-              })
-            }
-          },
-          onCancel: () => {
-            if (pendingEditorNavigationRef.current?.id === id) {
-              pendingEditorNavigationRef.current = null
-            }
-          },
-        }))
-        .catch(error => {
-          console.error('打开 WikiLink 失败', error)
-          toast.error('目标笔记不存在或已删除')
-        })
-    }
-
-    window.addEventListener('wikiLink:open', openWikiLink)
-    return () => window.removeEventListener('wikiLink:open', openWikiLink)
-  }, [current, deletedIds, unsaved, select])
+  const wikiNavigation = useWikiLinkNavigation({
+    currentId: current?.id,
+    content,
+    workspace,
+    navigationEpoch,
+    onOpenFile: handleInspectorSelectFile,
+  })
 
   const finishFocusSession = React.useCallback((reason = 'manual') => {
     if (!focusSession?.active) return null
@@ -1251,10 +1218,12 @@ export default function App() {
                           const pending = pendingEditorNavigationRef.current
                           if (pending?.id === current.id && pending.headingPath?.length) {
                             pendingEditorNavigationRef.current = null
+                            const epoch = navigationEpoch.current
                             window.requestAnimationFrame(() => {
                               window.requestAnimationFrame(() => {
+                                if (epoch !== navigationEpoch.current) return
                                 window.dispatchEvent(new CustomEvent('editor:open-heading-anchor', {
-                                  detail: { path: pending.headingPath },
+                                  detail: { documentId: current.id, path: pending.headingPath },
                                 }))
                               })
                             })
@@ -1376,6 +1345,7 @@ export default function App() {
       </div>
 
       <ReferenceMaintenanceStatus/>
+      <WikiNavigationStatus {...wikiNavigation} />
       <ToastViewport />
 
       {referenceRefactor && (
