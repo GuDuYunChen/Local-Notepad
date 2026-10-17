@@ -42,12 +42,12 @@ jobs:
           run-id: 38337004784
           name: local-notepad-windows-191439e04ddbf6b4423194d2978ae72da926df3c
           path: .installer-input/legacy
-      - name: Download source-bound 4.231.1 installer
+      - name: Download source-bound 4.231.2 installer
         uses: actions/download-artifact@v4
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: 39009517834
-          name: local-notepad-windows-bbb137e0897a6edb852844478ec38de74e275110
+          run-id: 39042666537
+          name: local-notepad-windows-b6ad9c63587a7af0625c94a7ebe0b2c23e69ca6f
           path: .installer-input/current
       - name: Verify exact current and upgrade binary identities
         run: node scripts/pin-wiki-installer.mjs

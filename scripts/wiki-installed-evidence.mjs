@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
-export const WIKI_CHECKS=Object.freeze(["original-wiki-picker-inserts-a-real-section-reference","hover-preview-reads-target-without-saving-source-draft","cancelled-link-opening-keeps-source-draft-and-database-body","original-save-persists-the-inserted-wiki-reference","failed-target-read-keeps-source-and-exposes-explicit-retry","retry-opens-latest-target-and-exact-section-through-original-guard","renamed-target-uses-fresh-title-and-body-not-preview-cache","duplicate-heading-path-refuses-to-choose-the-first-section","explicit-body-only-fallback-opens-note-without-guessing-section","stopped-real-response-cannot-navigate-after-it-is-released","new-explicit-activation-recovers-after-a-stopped-read","deleted-reference-refuses-navigation-without-removing-the-link","closing-error-feedback-preserves-the-saved-source-and-reference","unrelated-note-bodies-metadata-and-pins-remain-unchanged"])
+export const WIKI_CHECKS=Object.freeze(["original-wiki-picker-inserts-a-real-section-reference","hover-preview-reads-target-without-saving-source-draft","cancelled-link-opening-keeps-source-draft-and-database-body","original-save-persists-the-inserted-wiki-reference","failed-target-read-keeps-source-and-exposes-explicit-retry","retry-opens-latest-target-and-exact-section-through-original-guard","renamed-target-uses-fresh-title-and-body-not-preview-cache","duplicate-heading-path-refuses-to-choose-the-first-section","explicit-body-only-fallback-opens-note-without-guessing-section","stopped-real-response-cannot-navigate-after-it-is-released","new-explicit-activation-recovers-after-a-stopped-read","accepted-section-waits-for-the-real-editor-body-read","ordinary-target-reopen-cannot-revive-the-abandoned-section","deleted-reference-refuses-navigation-without-removing-the-link","closing-error-feedback-preserves-the-saved-source-and-reference","unrelated-note-bodies-metadata-and-pins-remain-unchanged"])
 const once=(s,a,b)=>{assert.equal(s.split(a).length,2,'Unexpected inherited source anchor');return s.replace(a,b)}
 export function validateWikiPin(pin){
  for(const k of ['product','quickBlob','tagsBlob','templateBlob','backlinksBlob','searchBlob','outlineBlob','graphBlob','pinsBlob','recentBlob','wikiBlob'])assert.match(pin[k],/^[a-f0-9]{40}$/)
- for(const[which,version]of [['current','4.231.1'],['previous','4.230.1']]){
+ for(const[which,version]of [['current','4.231.2'],['previous','4.230.1']]){
   assert.equal(pin[which].version,version);assert.ok(Number.isSafeInteger(pin[which].bytes)&&pin[which].bytes>0);assert.match(pin[which].sha256,/^[a-f0-9]{64}$/)
  }
  return true
@@ -35,8 +35,9 @@ export function validateInstalledWiki(report,wiki,pin,verifier){
  for(const k of ['complete','realPackagedApp','realBackend','syntheticData'])assert.equal(wiki[k],true)
  assert.deepEqual(wiki.checks,WIKI_CHECKS)
  assert.deepEqual(wiki.delayedRead,{realResponse:true,method:'GET',responseStatusCode:200,replayed:false})
+ assert.deepEqual(wiki.delayedBodyRead,{verification:{method:'GET',responseStatusCode:200,continuedUnchanged:true},editor:{method:'GET',responseStatusCode:200},selectedBeforeBodyReady:true,replayed:false,ordinaryReopen:{sourceRetained:true,targetLoaded:true,anchorEvents:0,outlineOpened:false}})
  assert.deepEqual(wiki.unavailableTarget,{deletionConfirmed:true,readRejected:true,navigationRejected:true})
- assert.equal(wiki.screenshots.length,1);const image=wiki.screenshots[0]
- assert.equal(image.filename,'wiki-navigation-installed.png');assert.ok(Number.isSafeInteger(image.bytes)&&image.bytes>0);assert.match(image.sha256,/^[a-f0-9]{64}$/)
+ assert.deepEqual(wiki.screenshots.map(image=>image.filename),['wiki-navigation-body-return-installed.png','wiki-navigation-installed.png'])
+ for(const image of wiki.screenshots){assert.ok(Number.isSafeInteger(image.bytes)&&image.bytes>0);assert.match(image.sha256,/^[a-f0-9]{64}$/)}
  return true
 }

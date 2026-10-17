@@ -29,7 +29,7 @@ for(const spec of [
  {name:'recent',source:'recent-notes-installed-evidence.mjs',output:'wiki-recent-validator.mjs',hash:'26f37bed14c20992d70ae8fe16d20cfb3e7f1118',current:'4.230.1',previous:'4.229.0'},
 ]){
  const original=readFileSync(new URL('./'+spec.source,import.meta.url),'utf8').replace(/\r\n/g,'\n');assert.equal(blob(original),spec.hash)
- const changes=[["['current','"+spec.current+"']","['current','4.231.1']"],["['previous','"+spec.previous+"']","['previous','4.230.1']"]]
+ const changes=[["['current','"+spec.current+"']","['current','"+pin.current.version+"']"],["['previous','"+spec.previous+"']","['previous','"+pin.previous.version+"']"]]
  let pinned=original
  for(const[a,b]of changes){assert.equal(pinned.split(a).length,2);pinned=pinned.replace(a,b)}
  let inverse=pinned
