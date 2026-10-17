@@ -29,7 +29,8 @@ vi.mock('./components/FocusSessionBar', () => ({ default: () => null }))
 vi.mock('./components/EvidenceReviewBar', () => ({ default: () => null }))
 vi.mock('./components/SearchReturnBar', () => ({ default: () => null }))
 vi.mock('./components/CollectionReadingBar', () => ({ default: () => null }))
-vi.mock('./components/Editor/utils/referenceUtils', () => ({
+vi.mock('./components/Editor/utils/referenceUtils', async (importOriginal) => ({
+  ...(await importOriginal()),
   hasHeadingStructureChanged: () => false, expandRefactorTargetIds: () => [],
   planDeleteReferenceImpact: () => ({}), planTargetReferenceRefactor: () => ({}),
 }))

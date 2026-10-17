@@ -1,4 +1,4 @@
-name: Complete local Wiki preview and safe navigation
+name: Complete Wiki target error classification and original workflow
 on:
   push:
     branches: [ci/local-history-2f87]
@@ -13,8 +13,6 @@ jobs:
     timeout-minutes: 18
     steps:
       - uses: actions/checkout@v7
-      - name: Fetch exact accepted App for negative controls
-        run: git fetch --no-tags --depth=1 origin 7b937756425d3f8a95e33cec86bb8a5760776dcb
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
@@ -22,37 +20,35 @@ jobs:
         with:
           go-version: '1.24.11'
           cache-dependency-path: server/go.sum
-      - name: Preserve historical issue and execution indexes
+      - name: Preserve inherited issue and execution catalog
         run: node scripts/stage-review.mjs catalog
-      - name: Integrate complete source-bound Wiki module and explicit version
-        run: node scripts/prepare-wiki-navigation.mjs apply
-      - name: Preserve real reference exports in the original discard fixture
-        run: node scripts/repair-wiki-discard-fixture.mjs
-      - name: Install exact committed dependency lock
+      - name: Reproduce the actual lost business identity before repair
+        run: node scripts/repair-wiki-api-errors.mjs baseline
+      - name: Apply exact runtime repair and normal patch version
+        run: node scripts/repair-wiki-api-errors.mjs apply
+      - name: Install original locked dependencies
         run: npm ci --no-audit --no-fund
-      - name: Reproduce old App late-navigation and stale-draft failures
-        run: node scripts/prepare-wiki-navigation.mjs baseline
-      - name: Wiki source lifetime and all original recent pin save quit guards
-        run: node --test --test-reporter=tap scripts/wiki-navigation.node.mjs scripts/recent-notes.node.mjs scripts/recent-reopen.node.mjs scripts/local-pins.node.mjs scripts/pin-journal-boundaries.node.mjs scripts/pin-recovery-ownership.node.mjs scripts/editor-cache-regression.node.mjs scripts/editor-save-transaction.node.mjs scripts/editor-quit.node.mjs > wiki-evidence/node.tap
-      - name: Real App and Wiki preview lifecycle
-        run: npx vitest run --root=. src/App.wikiNavigation.test.jsx src/components/Editor/nodes/WikiLinkView.test.jsx src/services/wikiNavigation.test.js --reporter=json --outputFile=wiki-evidence/targeted.json
-      - name: Full unchanged UI regression and complete Wiki workflow
-        run: npx vitest run --root=. --maxWorkers=4 --minWorkers=1 --reporter=json --outputFile=wiki-evidence/full-ui.json
+      - name: Real API identity and all original Wiki recent pin save quit contracts
+        run: node --test --test-reporter=tap scripts/wiki-api-errors.node.mjs scripts/wiki-navigation.node.mjs scripts/recent-notes.node.mjs scripts/recent-reopen.node.mjs scripts/local-pins.node.mjs scripts/pin-journal-boundaries.node.mjs scripts/pin-recovery-ownership.node.mjs scripts/editor-cache-regression.node.mjs scripts/editor-save-transaction.node.mjs scripts/editor-quit.node.mjs > wiki-api-evidence/node.tap
+      - name: Real App Wiki preview shared API and original discard regression
+        run: npx vitest run --root=. src/App.wikiNavigation.test.jsx src/components/Editor/nodes/WikiLinkView.test.jsx src/services/wikiNavigation.test.js src/services/wikiApiErrors.test.js src/AppExitDiscard.test.jsx --reporter=json --outputFile=wiki-api-evidence/targeted.json
+      - name: Full original UI regression
+        run: npx vitest run --root=. --maxWorkers=4 --minWorkers=1 --reporter=json --outputFile=wiki-api-evidence/full-ui.json
       - name: Unchanged production Go regression
-        run: go -C server test -json ./... > wiki-evidence/go-tests.jsonl
-      - name: Full original main preload and renderer builds
+        run: go -C server test -json ./... > wiki-api-evidence/go-tests.jsonl
+      - name: Complete original main preload and renderer builds
         run: npm run build:main && npm run build:renderer
-      - name: Recheck all final candidate identities
-        run: node scripts/prepare-wiki-navigation.mjs check
-      - name: Publish only verified changed code objects
+      - name: Verify source identity after all execution
+        run: node scripts/repair-wiki-api-errors.mjs check
+      - name: Publish only verified repaired code objects
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node scripts/prepare-wiki-navigation.mjs publish
-      - name: Preserve original complete or failed evidence
+        run: node scripts/repair-wiki-api-errors.mjs publish
+      - name: Preserve complete or failed raw evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: wiki-navigation-${{ github.sha }}
-          path: wiki-evidence/
+          name: wiki-api-repair-${{ github.sha }}
+          path: wiki-api-evidence/
           retention-days: 7
           if-no-files-found: error

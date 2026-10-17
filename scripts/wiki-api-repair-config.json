@@ -1,0 +1,42 @@
+{
+  "base": "8f7768f24ae06ff0b9c4b328e1f2e3396c17f794",
+  "baseline": {
+    "src/services/api.js": "0ec369be429b06995fa0e545fa3eaa670b7b492f",
+    "src/services/wikiNavigation.mjs": "e46c664c183d5437525edf0340b415ed684af135",
+    "scripts/check-wiki-navigation-desktop.mjs": "75b008add01339847ac18199232c61555fba80c7",
+    "AGENTS.md": "22f378c463a52f11a443854e9fa4abbffae0c988",
+    "docs/LOCAL_WIKI_NAVIGATION_2F98.md": "f3e19e75a35664915afd1c24fa656ae5c72be364",
+    "package.json": "4089c0fdc674a89925427406be5d7bfa861cad1a",
+    "package-lock.json": "0ab6843f55dbf98861afe00ddd943bffdb4f727c"
+  },
+  "changes": {
+    "src/services/api.js": [
+      "    throw new Error(msg)\n",
+      "    const failure = new Error(msg)\n    // Preserve existing Error/message behavior while retaining a safe, non-enumerable\n    // business identity for callers that must distinguish unavailable targets.\n    if (Number.isSafeInteger(body.code)) Object.defineProperty(failure, 'apiCode', { value: body.code })\n    throw failure\n"
+    ],
+    "src/services/wikiNavigation.mjs": [
+      "  const result = wikiFile(await dailyRequest(api, '/api/files/' + encodeURIComponent(target.id), { signal }, budget), target.id)",
+      "  const loadTarget = async (path, options) => {\n    try { return await api(path, options) } catch (error) {\n      // Only the numeric local file-unavailable contract is mapped. Never guess\n      // from private error text, HTTP failures or another business error code.\n      if (error?.apiCode === 1001) return null\n      throw error\n    }\n  }\n  const result = wikiFile(await dailyRequest(loadTarget, '/api/files/' + encodeURIComponent(target.id), { signal }, budget), target.id)"
+    ],
+    "scripts/check-wiki-navigation-desktop.mjs": [
+      "    await api(route,{method:'PUT',body:JSON.stringify({is_deleted:true})});await click(link);await hasStatus('已删除')\n    assert.equal(await titleIs(source.title),true)",
+      "    const removed=await api(route,{method:'PUT',body:JSON.stringify({is_deleted:true})})\n    assert.equal(removed.is_deleted,true);await assert.rejects(()=>api(route))\n    await click(link);await hasStatus('已删除')\n    assert.equal(await titleIs(source.title),true)\n    report.unavailableTarget={deletionConfirmed:true,readRejected:true,navigationRejected:true}"
+    ],
+    "AGENTS.md": ["2F.98 /4.231.0", "2F.98 /4.231.1"],
+    "docs/LOCAL_WIKI_NAVIGATION_2F98.md": ["# 2F.98 / 4.231.0", "# 2F.98 / 4.231.1"]
+  },
+  "notes": "\n## 4.231.1：真实删除响应的分类修补\n\n当前8f7768f原生前11项通过，目标删除后来源和草稿仍保留，但界面误显示本机服务失败。原api丢弃业务错误码，dailyRequest无法区分1001不可用与网络故障。保留原失败artifact12091827102及截图。现在api只附加不可枚举的安全整数apiCode，原Error、message、code和成功数据行为保持；Wiki仅把1001映射为目标不可用，不匹配错误文字，不把HTTP或其他业务失败归为已删除。十二项真实api解码器/导航联合契约在旧代码上4失败8通过；修补后全部通过。原生删除步骤额外验证真实删除回执和GET拒绝，原“已删除”和来源不切换断言保留。原所有保护、schema14与依赖节点不变，正常patch4.231.1；必须重新验收新HEAD及新安装包。\n",
+  "newTests": ["scripts/wiki-api-errors-cases.mjs", "scripts/wiki-api-errors.node.mjs", "src/services/wikiApiErrors.test.js"],
+  "expected": {
+    "src/services/api.js": "09474875c19f50eb898167ea2ef4dda2d93611c8",
+    "src/services/wikiNavigation.mjs": "b2f9ab95a1ebd1dc38f22f9272a472098a41c8b1",
+    "scripts/check-wiki-navigation-desktop.mjs": "765b19f586e533004470943a49b6a14dfe25bdfd",
+    "AGENTS.md": "07b82e6a5edf138c7d2c8c184516b8f5e22473cd",
+    "docs/LOCAL_WIKI_NAVIGATION_2F98.md": "d5db8a9544f09337a2590201450f57156f6ef8a3",
+    "package.json": "72424cbb9718743689ab7e521293301e43a7204e",
+    "package-lock.json": "2c0c26039a713cb85134f750a3d655973b8733a0",
+    "scripts/wiki-api-errors-cases.mjs": "0a7d9649bf57fbffc3e384a41eba184f71a23fc2",
+    "scripts/wiki-api-errors.node.mjs": "b23c83c5eab02c35b4a120aacaae8dd56507bfbf",
+    "src/services/wikiApiErrors.test.js": "10c0a1760ea27b981c01562ebf563fe3dcb2c998"
+  }
+}
