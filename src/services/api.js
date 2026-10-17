@@ -42,7 +42,11 @@ export async function api(path, init) {
   const body = await res.json()
   if (body.code !== 0) {
     const msg = body.detail || body.message || ERROR_MESSAGES[body.code] || '请求失败'
-    throw new Error(msg)
+    const failure = new Error(msg)
+    // Preserve existing Error/message behavior while retaining a safe, non-enumerable
+    // business identity for callers that must distinguish unavailable targets.
+    if (Number.isSafeInteger(body.code)) Object.defineProperty(failure, 'apiCode', { value: body.code })
+    throw failure
   }
   return body.data
 }

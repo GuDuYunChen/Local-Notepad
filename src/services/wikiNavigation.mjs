@@ -63,7 +63,15 @@ export function requireWikiHeading(content, path) {
 }
 export async function readWikiFile(api, request, signal, budget = WIKI_READ_MS) {
   const target = wikiRequest(request), end = performance.now() + budget
-  const result = wikiFile(await dailyRequest(api, '/api/files/' + encodeURIComponent(target.id), { signal }, budget), target.id)
+  const loadTarget = async (path, options) => {
+    try { return await api(path, options) } catch (error) {
+      // Only the numeric local file-unavailable contract is mapped. Never guess
+      // from private error text, HTTP failures or another business error code.
+      if (error?.apiCode === 1001) return null
+      throw error
+    }
+  }
+  const result = wikiFile(await dailyRequest(loadTarget, '/api/files/' + encodeURIComponent(target.id), { signal }, budget), target.id)
   if (signal?.aborted) fail('cancelled', '已停止读取引用。')
   if (performance.now() >= end) fail('timeout', '读取引用超时，请明确重试。')
   return result

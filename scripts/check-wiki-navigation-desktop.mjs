@@ -103,8 +103,11 @@ export async function verifyWikiNavigationDesktop({ evaluate, click, cdp, until,
     await until(()=>evaluate("document.querySelector('.editor-input')?.innerText.includes('wiki98-fresh-body')"),'Fresh activation after stop failed');await clean()
     mark('new-explicit-activation-recovers-after-a-stopped-read')
     await open(source,'wiki98-source-body')
-    await api(route,{method:'PUT',body:JSON.stringify({is_deleted:true})});await click(link);await hasStatus('已删除')
+    const removed=await api(route,{method:'PUT',body:JSON.stringify({is_deleted:true})})
+    assert.equal(removed.is_deleted,true);await assert.rejects(()=>api(route))
+    await click(link);await hasStatus('已删除')
     assert.equal(await titleIs(source.title),true)
+    report.unavailableTarget={deletionConfirmed:true,readRejected:true,navigationRejected:true}
     mark('deleted-reference-refuses-navigation-without-removing-the-link')
 
     const image=Buffer.from((await cdp.send('Page.captureScreenshot',{format:'png'})).data,'base64'),filename='wiki-navigation-installed.png'
