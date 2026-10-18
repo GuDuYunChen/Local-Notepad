@@ -6,6 +6,7 @@ import ImportWorkspace from './ImportWorkspace'
 import { api, listAllFiles } from '../services/api'
 import { normalizeImportedContent } from '../services/importContent'
 import { createImportLedger, importPayloadHash, LOCAL_IMPORT_PREFIX } from '../services/localImport.mjs'
+import { clearLocalImportWorkspace } from '../../scripts/check-local-import-desktop.mjs'
 
 vi.mock('../services/api', () => ({ api: vi.fn(), listAllFiles: vi.fn() }))
 const folderId = '33333333-3333-4333-8333-333333333333'
@@ -48,6 +49,30 @@ async function choose(paths, wait = true) {
 async function seed(patch = {}, attempted = true) {
   const ledger = createImportLedger(localStorage), entry = await ledger.reserve({ title: '恢复.txt', parent_id: '', content: preparedContent('恢复的完整正文'), ...patch }, '恢复.txt')
   return attempted ? ledger.update(entry, { attempted: true }) : entry
+}
+function cleanupDriver(afterAction = () => {}) {
+  const actions = []
+  return {
+    actions,
+    evaluate: async expression => window.eval(expression),
+    rows: async () => currentRows(),
+    action: async selector => {
+      const button = host.querySelector(selector)
+      expect(button, 'cleanup control missing: ' + selector).toBeTruthy()
+      expect(button.disabled, 'cleanup control disabled: ' + selector).toBe(false)
+      actions.push(selector)
+      await act(async () => button.click())
+      afterAction(selector)
+    },
+    until: async (predicate, label) => {
+      for (let index = 0; index < 100; index++) {
+        const result = await predicate()
+        if (result) return result
+        await new Promise(resolve => setTimeout(resolve, 5))
+      }
+      throw Error(label)
+    },
+  }
 }
 beforeEach(() => {
   localStorage.clear(); vi.stubGlobal('crypto', webcrypto); globalThis.IS_REACT_ACT_ENVIRONMENT = true
@@ -230,13 +255,25 @@ test('a stopped guarded open invalidates its shouldSelect callback and ignores a
 test('initial focus and Tab boundary stay in the workspace, IME Escape is ignored, and normal Escape returns focus to the entrance', async () => {
   const entrance = document.createElement('button'); entrance.textContent = '入口'; document.body.append(entrance); entrance.focus()
   try {
-    await mount(); expect(document.activeElement).toBe(control('close'))
+    await mount(); await until(() => document.activeElement === control('close')); expect(document.activeElement).toBe(control('close'))
     const first = control('close'), last = control('ledger-refresh')
     await act(async () => { first.focus(); first.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true })) }); expect(document.activeElement).toBe(last)
     await act(async () => last.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }))); expect(document.activeElement).toBe(first)
     await act(async () => first.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', isComposing: true, bubbles: true }))); expect(onClose).not.toHaveBeenCalled()
     await act(async () => first.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))); expect(onClose).toHaveBeenCalledTimes(1); expect(document.activeElement).toBe(entrance)
   } finally { entrance.remove() }
+})
+test('initial focus has its own scheduled task after the empty ledger and folders are ready', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+  const entrance = document.createElement('button'); entrance.textContent = '入口'; document.body.append(entrance); entrance.focus()
+  try {
+    await act(async () => root.render(<React.StrictMode><ImportWorkspace onClose={onClose} onChanged={onChanged} onOpenNote={onOpenNote} /></React.StrictMode>))
+    expect(control('ledger-refresh').disabled).toBe(false); expect(control('folders-refresh').disabled).toBe(false)
+    expect(control('stop').disabled).toBe(true); expect(control('input').disabled).toBe(false)
+    expect(document.activeElement).toBe(entrance)
+    await act(async () => vi.advanceTimersByTimeAsync(0))
+    expect(document.activeElement).toBe(control('close')); expect(onClose).not.toHaveBeenCalled()
+  } finally { vi.useRealTimers(); entrance.remove() }
 })
 test('Escape belongs to an overlaid original save confirmation while guarded opening is pending', async () => {
   let resolveOpen; onOpenNote.mockImplementation(() => new Promise(resolve => { resolveOpen = resolve }))
@@ -258,6 +295,47 @@ test('clearing completed local records leaves imported files intact and enables 
   await mount(); await choose([source('/tmp/完成.txt')]); await click('confirm'); const ids = [...files.keys()]
   await click('clear'); expect(records()).toHaveLength(0); expect([...files.keys()]).toEqual(ids); expect(control('input').disabled).toBe(false)
   await choose([source('/tmp/下一批.txt')]); await click('confirm'); expect(writes()).toHaveLength(2); expect(files.size).toBe(2)
+})
+test('native cleanup waits for the real reopened ledger to verify three confirmed records before clicking clear', async () => {
+  await mount(); await choose([source('/tmp/一.txt'), source('/tmp/二.txt'), source('/tmp/三.txt')]); await click('confirm')
+  const savedFiles = [...files.entries()], savedRecords = records().map(entry => entry.raw)
+  await click('close')
+  let release
+  const gate = new Promise(resolve => { release = resolve }), digest = webcrypto.subtle.digest.bind(webcrypto.subtle)
+  vi.spyOn(webcrypto.subtle, 'digest').mockImplementation(async (...args) => { await gate; return digest(...args) })
+  await act(async () => root.render(<React.StrictMode><ImportWorkspace onClose={onClose} onChanged={onChanged} onOpenNote={onOpenNote} /></React.StrictMode>))
+  expect(control('ledger-refresh').disabled).toBe(true); expect(control('clear').disabled).toBe(true); expect(currentRows()).toHaveLength(0)
+  const driver = cleanupDriver(), pending = clearLocalImportWorkspace(driver)
+  await Promise.resolve(); expect(driver.actions).toEqual([]); expect(records().map(entry => entry.raw)).toEqual(savedRecords)
+  await act(async () => { release(); await new Promise(resolve => setTimeout(resolve, 10)) })
+  await pending
+  expect(driver.actions).toEqual(['[data-local-import-clear]']); expect(records()).toHaveLength(0); expect(currentRows()).toHaveLength(0)
+  expect(control('input').disabled).toBe(false); expect([...files.entries()]).toEqual(savedFiles); expect(writes()).toHaveLength(3)
+})
+test('native cleanup preserves a bad preview until the explicit original reset action and leaves the committed note intact', async () => {
+  await mount()
+  await choose([source('/tmp/成功.txt'), source('/tmp/损坏.docx', '', { success: false, error: true, code: 'invalid-document', message: '文件格式与扩展名不符' })])
+  await click('confirm'); const savedFiles = [...files.entries()]
+  const driver = cleanupDriver(selector => {
+    if (selector !== '[data-local-import-clear]') return
+    expect(currentRows()).toHaveLength(1); expect(state(findRow('损坏.docx'))).toBe('error')
+    expect(host.textContent).toContain('文件格式与扩展名不符'); expect(control('reset').disabled).toBe(false)
+    expect(control('input').disabled).toBe(true); expect(records()).toHaveLength(0)
+  })
+  await clearLocalImportWorkspace(driver)
+  expect(driver.actions).toEqual(['[data-local-import-clear]', '[data-local-import-reset]'])
+  expect(currentRows()).toHaveLength(0); expect(control('input').disabled).toBe(false)
+  expect([...files.entries()]).toEqual(savedFiles); expect(writes()).toHaveLength(1)
+})
+test('native cleanup refuses a fresh input state while an unknown request remains and never removes or retries that request', async () => {
+  await mount(); await choose([source('/tmp/已完成.txt')]); await click('confirm'); await click('close')
+  const unknown = await seed({ title: '结果未知.txt' }), savedFiles = [...files.entries()]
+  await mount(); const driver = cleanupDriver()
+  await expect(clearLocalImportWorkspace(driver)).rejects.toThrow('Confirmed record cleanup did not retain a fresh input state')
+  expect(driver.actions).toEqual(['[data-local-import-clear]']); expect(records()).toHaveLength(1)
+  expect(records()[0].raw).toBe(unknown.raw); expect(currentRows()).toHaveLength(1); expect(state(currentRows()[0])).toBe('unknown')
+  expect(currentRows()[0].getAttribute('data-local-import-request-id')).toBe(unknown.value.requestId)
+  expect(control('input').disabled).toBe(true); expect([...files.entries()]).toEqual(savedFiles); expect(writes()).toHaveLength(1)
 })
 test('normal persisted records expose a valid backup before damage, and that export restores the same frozen request', async () => {
   const entry = await seed(); let blob, filename

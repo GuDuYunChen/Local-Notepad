@@ -16,6 +16,18 @@ const stateFile = out => path.join(out, 'local-import.json')
 const save = (out, report) => writeFileSync(stateFile(out), JSON.stringify(report, null, 2) + '\n')
 const textOf = node => [node?.text || '', ...(node?.children || []).map(textOf)].join('\n')
 
+export async function clearLocalImportWorkspace({ evaluate, action, rows, until }) {
+  // Reopening mounts an empty view while the real ledger verifies its records.
+  // Readiness must precede deciding which of the original UI actions to use.
+  await until(() => evaluate("!!document.querySelector('[data-local-import-ledger-refresh]:not(:disabled)')"), 'Local import records are not ready for cleanup')
+  if (await evaluate("!!document.querySelector('[data-local-import-clear]:not(:disabled)')")) {
+    await action('[data-local-import-clear]')
+    await until(() => evaluate("!document.querySelector('[data-local-import-clear-row]')"), 'Confirmed import records were not cleared by the original control')
+  }
+  if (await evaluate("!!document.querySelector('[data-local-import-reset]:not(:disabled)')")) await action('[data-local-import-reset]')
+  await until(async () => (await rows()).length === 0 && await evaluate("!!document.querySelector('[data-local-import-input]:not(:disabled)')"), 'Confirmed record cleanup did not retain a fresh input state')
+}
+
 function helpers({ evaluate, click, cdp, until, api, out }, report) {
   const keys = async (key, code, modifiers = 0) => {
     for (const type of ['rawKeyDown', 'keyUp']) await cdp.send('Input.dispatchKeyEvent', { type, key, windowsVirtualKeyCode: code, modifiers })
@@ -70,12 +82,7 @@ function helpers({ evaluate, click, cdp, until, api, out }, report) {
     await cdp.send('DOM.setFileInputFiles', { nodeId, files })
     await until(async () => (await rows()).length === files.length && (await rows()).every(row => ['prepared', 'error'].includes(row.state)), 'Native import parsing did not settle')
   }
-  const clear = async () => {
-    for (const control of ['[data-local-import-clear]', '[data-local-import-reset]']) {
-      if (await evaluate(`!!document.querySelector(${JSON.stringify(control + ':not(:disabled)')})`)) await action(control)
-    }
-    await until(async () => (await rows()).length === 0, 'Confirmed record cleanup did not retain a fresh input state')
-  }
+  const clear = () => clearLocalImportWorkspace({ evaluate, action, rows, until })
   const openNote = async (file, marker) => {
     await evaluate("window.dispatchEvent(new Event('library:refresh'))")
     const parents = []
