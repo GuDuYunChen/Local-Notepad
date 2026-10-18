@@ -271,6 +271,10 @@ try {
   await assertSaved(a.id, '自动保存标题', 'recovered-after-block')
   report.checks.push('real failed browser PUT retains draft, actual retry saves it')
   await screenshot('retry-saved')
+  // The complete overview/report/inspection/trash chain owns the original
+  // two-record inventory and empty-trash baseline. Run it before import adds
+  // durable notes and a deleted destination that must survive the real restart.
+  await verifyLocalOverviewDesktop({ evaluate, click, cdp, until, api, out, noteIDs: [a.id, b.id] })
   const localImport = await verifyLocalImportDesktop({ evaluate, click, cdp, until, api, out, noteIDs: [a.id, b.id], processID: child.pid })
   await open(a.id, 'recovered-after-block')
   // Leave a new, not explicitly saved edit. Closing must use the real main
@@ -291,7 +295,6 @@ try {
   await screenshot('restarted-fresh-profile')
   await verifyLocalImportRestart({ evaluate, click, cdp, until, api, out, processID: child.pid }, localImport)
   await open(a.id, 'native-close-latest')
-  await verifyLocalOverviewDesktop({ evaluate, click, cdp, until, api, out, noteIDs: [a.id, b.id] })
   await verifyVersionHistoryDesktop({ evaluate, click, cdp, until, api, out, noteIDs: [a.id, b.id] })
   await verifyDailyNotesDesktop({ evaluate, click, cdp, until, api, out, noteIDs: [a.id, b.id] })
   await verifyTemplateLibraryDesktop({ evaluate, click, cdp, until, api, out, noteIDs: [a.id, b.id] })
