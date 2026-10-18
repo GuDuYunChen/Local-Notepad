@@ -20,6 +20,7 @@ export { compareLibraryItems } from './fileTreeUtils'
 const NameDialog = React.lazy(() => import('./NameDialog'))
 const FileSelectorDialog = React.lazy(() => import('./FileSelectorDialog'))
 const TemplateSelector = React.lazy(() => import('./TemplateSelector'))
+const ImportWorkspace = React.lazy(() => import('./ImportWorkspace'))
 const ItemType = 'FILE_NODE'
 
 const FileNode = ({ 
@@ -167,6 +168,7 @@ const FileNode = ({
 export default function FileList({
   selectedId,
   onSelect,
+  onOpenImportNote,
   onBeforeNew,
   onBeforeDelete,
   onBeforeRename,
@@ -198,6 +200,7 @@ export default function FileList({
   const [targetParentId, setTargetParentId] = useState('') // 新建时的目标父目录ID
   const [showFolderSelector, setShowFolderSelector] = useState(false) // 路径选择器
   const [showTemplate, setShowTemplate] = useState(false) // 模板选择器
+  const [importWorkspace, setImportWorkspace] = useState(null)
   const [pendingNewFile, setPendingNewFile] = useState(null) // 待新建文件信息
   
   const [selectedIds, setSelectedIds] = useState(new Set()) // Multi-select state
@@ -1000,65 +1003,8 @@ export default function FileList({
       return false
   }
 
-  async function importParsedResults(results) {
-    if (!Array.isArray(results) || results.length === 0) return
-
-    const loadingMsg = toast.loading(`正在导入 ${results.length} 个文件...`, 0)
-    let successCount = 0
-    let failCount = 0
-
-    try {
-      const { normalizeImportedContent } = await import('~/services/importContent')
-      for (const item of results) {
-        if (item.error) {
-          failCount++
-          continue
-        }
-
-        try {
-          const title = item.title || '未命名'
-          const content = normalizeImportedContent(item)
-
-          await api('/api/files', {
-            method: 'POST',
-            body: JSON.stringify({
-              title,
-              content,
-              is_folder: false,
-              parent_id: ''
-            })
-          })
-          successCount++
-        } catch (e) {
-          console.error(`Import create failed for ${item.title}`, e)
-          failCount++
-        }
-      }
-    } finally {
-      loadingMsg()
-    }
-
-    if (successCount > 0) {
-      toast.success(`成功导入 ${successCount} 个文件`)
-      void load()
-    }
-    if (failCount > 0) {
-      toast.warning(`${failCount} 个文件导入失败`)
-    }
-  }
-
-  async function onImport() {
-    try {
-      const res = await window.electronAPI.importFiles()
-      if (!res?.success) {
-        if (res?.message) toast.error('导入出错: ' + res.message)
-        return
-      }
-      await importParsedResults(res.results)
-    } catch (e) {
-      console.error(e)
-      toast.error('导入出错: ' + (e.message || '未知错误'))
-    }
+  function onImport() {
+    setImportWorkspace(previous => previous || { paths: [] })
   }
 
   async function onSaveAs(id) {
@@ -1555,11 +1501,15 @@ export default function FileList({
         return
       }
 
-      const res = await window.electronAPI?.importPaths?.(paths)
-      if (!res?.success) {
-        throw new Error(res?.message || '解析拖入文件失败')
+      if (paths.length !== files.length) {
+        toast.warning('部分文件路径无法读取，请通过导入工作台重新选择')
+        return
       }
-      await importParsedResults(res.results)
+      if (importWorkspace) {
+        toast.warning('请先在已打开的导入工作台处理当前批次')
+        return
+      }
+      setImportWorkspace({ paths })
     } catch (e) {
       console.error(e)
       toast.error('拖放导入失败: ' + (e.message || '未知错误'))
@@ -1663,7 +1613,7 @@ export default function FileList({
   }
 
   return (
-    <div className="file-list" ref={dropContainer}>
+    <div className="file-list" ref={dropContainer} data-local-import-drop>
       <div className="file-library-header">
         <div className="file-library-title-row">
           <div>
@@ -1892,6 +1842,9 @@ export default function FileList({
         />
       )}
       {showExport && <FileSelectorDialog open={showExport} onClose={() => setShowExport(false)} items={items} onConfirm={onExportConfirm} title="导出笔记" confirmText="下一步" />}
+      {importWorkspace && <ImportWorkspace initialPaths={importWorkspace.paths}
+        onClose={() => setImportWorkspace(null)} onChanged={() => void load()}
+        onOpenNote={onOpenImportNote} />}
       {showBatchDelete && <FileSelectorDialog open={showBatchDelete} onClose={() => setShowBatchDelete(false)} items={items} onConfirm={onBatchDeleteConfirm} title="移到回收站" confirmText="移到回收站" processingText="处理中…" showDeleteWarning={true} selectedFileId={selectedId} initialSelectedIds={Array.from(selectedIds)} />}
       {showTemplate && <TemplateSelector open={showTemplate} onClose={() => setShowTemplate(false)} onSelect={handleTemplateSelect}
         parentId={targetParentId} parentLabel={getPathLabel(targetParentId)} beforeCreate={onBeforeNew}

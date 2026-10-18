@@ -1084,6 +1084,7 @@ export default function App() {
                         selectedId={current?.id}
                         updatedItem={current}
                         onSelect={handleSelectFile}
+                        onOpenImportNote={handleInspectorSelectFile}
                         onBeforeRename={({ item, nextTitle }) => (
                           reviewRenameRefactor(item, nextTitle)
                         )}

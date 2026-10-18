@@ -10,7 +10,7 @@ import {
   exportToPDF,
   exportToHTML,
 } from './export.js'
-import { parseImportPaths, selectAndParseFiles } from './import.js'
+import { registerLocalImportHandlers } from './import.js'
 import { ensureBackupDir, getDefaultBackupDir, getDefaultDataDir, listBackups } from './backup.js'
 import { spawnManagedBackend, stopChildProcess, waitForHttpService } from './backend-process.js'
 import { createQuitSaveGate } from './quit-save.mjs'
@@ -438,24 +438,13 @@ ipcMain.handle('export:html', async (event, { file, outputPath }) => {
   }
 })
 
-ipcMain.handle('import:files', async () => {
-    try {
-        const results = await selectAndParseFiles()
-        return { success: true, results }
-    } catch (e) {
-        console.error(e)
-        return { success: false, message: e.message }
-    }
-})
-
-ipcMain.handle('import:paths', async (event, { paths = [] } = {}) => {
-  try {
-    const results = await parseImportPaths(paths)
-    return { success: true, results }
-  } catch (e) {
-    console.error(e)
-    return { success: false, message: e.message }
-  }
+registerLocalImportHandlers({
+  ipcMain, dialog, getWindow: () => mainWindow,
+  getExpectedURL: () => app.isPackaged
+    ? pathToFileURL(path.join(app.getAppPath(), 'dist/index.html')).href
+    : 'http://localhost:5000/',
+  isClosing: () => quitting || allowQuit || Boolean(windowClosePromise),
+  workerPath: path.join(__dirname, 'import-worker.cjs'),
 })
 
 ipcMain.handle('app:diagnostics', async () => ({

@@ -36,7 +36,7 @@ export function FileLibraryMenu({
 }) {
   return (
     <div className="dropdown-menu file-action-menu file-more-menu" role="menu" aria-label="更多笔记操作">
-      <button type="button" className="menu-item" role="menuitem" onClick={onImport}>
+      <button type="button" className="menu-item" role="menuitem" onClick={onImport} data-local-import-entry>
         <span className="menu-item-icon" aria-hidden="true">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 3v12M7 8l5-5 5 5" />

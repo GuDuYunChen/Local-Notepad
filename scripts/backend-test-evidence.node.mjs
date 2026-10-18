@@ -61,6 +61,8 @@ function project(fail=false){
  fs.writeFileSync(path.join(root,'server/internal/syncs3/a.go'),'package syncs3\nfunc Value() int { return 7 }\n')
  fs.writeFileSync(path.join(root,'server/internal/syncs3/a_test.go'),`package syncs3\nimport "testing"\nfunc TestRead(t *testing.T) {t.Run("first", func(t *testing.T) {if Value()!=${fail?8:7} {t.Fatal("fixture failure")}})}\n`)
  fs.writeFileSync(path.join(root,'server/cmd/demo/main.go'),'package main\nfunc main() {}\n')
+ fs.mkdirSync(path.join(root,'server/internal/logic/testdata'),{recursive:true})
+ fs.writeFileSync(path.join(root,'server/internal/logic/testdata/local_import_rich.json'),'{"root":{"type":"root","children":[]}}\n')
  command(root,['init','-q']);command(root,['add','.']);command(root,['-c','user.name=Fixture','-c','user.email=fixture@example.invalid','commit','-qm','isolated fixture'])
  return {root,localFixture:true,dir:path.join(root,'evidence'),commit:command(root,['rev-parse','HEAD']),tree:command(root,['rev-parse','HEAD^{tree}'])}
 }
@@ -70,6 +72,15 @@ test('real collection, re-verification and artifact/source tampering refusals',{
   const r=collectBackendEvidence(f.root,f.dir,{localFixture:true});assert.equal(r.s3TopLevel,1);assert.equal(r.packages.length,2)
   assert.equal(r.testPassEvents,2);assert.equal(r.scope,'backend-tests-only')
   assert.equal(verifyBackendReport(f.dir,f.root,f).commit,f.commit)
+  await t.test('embedded import fixture is part of the exact source identity',()=>{
+   const name='server/internal/logic/testdata/local_import_rich.json'
+   assert.ok(sourceIdentity(f.root,f.tree).files.some(item=>item.path===name))
+   const p=path.join(f.root,name),b=fs.readFileSync(p)
+   fs.appendFileSync(p,' ')
+   try{assert.throws(()=>sourceIdentity(f.root,f.tree))}finally{fs.writeFileSync(p,b)}
+   const undo=rewrite(f.dir,r=>{r.sourceBefore.files=r.sourceBefore.files.filter(item=>item.path!==name);r.sourceAfter.files=r.sourceAfter.files.filter(item=>item.path!==name)})
+   try{assert.throws(()=>verifyBackendReport(f.dir,f.root,f))}finally{undo()}
+  })
   await t.test('local fixture cannot impersonate default CI verification',()=>assert.throws(()=>verifyBackendReport(f.dir,f.root,{commit:f.commit,tree:f.tree})))
   for(const [name,change]of [
    ['wrong commit',r=>r.commit='a'.repeat(40)],['wrong tree',r=>r.tree='a'.repeat(40)],['incomplete',r=>r.complete=false],

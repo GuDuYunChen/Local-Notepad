@@ -12,6 +12,38 @@ function textFromState(serialized) {
 }
 
 describe('import content normalization', () => {
+  it('keeps literal placeholder-looking text beside actual code, tables, formulas and dividers', () => {
+    const literals = ['LOCALNOTEPADCODEBLOCK0PLACEHOLDER', 'LOCALNOTEPADTABLE0PLACEHOLDER',
+      'LOCALNOTEPADBLOCKFORMULA0PLACEHOLDER', 'LOCALNOTEPADINLINEFORMULA0PLACEHOLDER',
+      'LOCALNOTEPADDIVIDER0PLACEHOLDER', 'LOCALNOTEPADIMPORT0TOKENTABLE0PLACEHOLDER']
+    const source = literals.join('\n\n') + '\n\n```js\ncode\n```\n\n| a | b |\n| --- | --- |\n| c | d |\n\n$$\nx+y\n$$\n\ninline $z$\n\n---\n'
+    const result = normalizeImportedContent({ content: source, contentType: 'markdown' })
+    for (const literal of literals) expect(textFromState(result)).toContain(literal)
+    const children = JSON.parse(result).root.children
+    expect(children.filter(node => node.type === 'table')).toHaveLength(1)
+    expect(children.filter(node => node.type === 'code-block')).toHaveLength(1)
+    expect(children.filter(node => node.type === 'divider')).toHaveLength(1)
+  })
+
+  it('rejects oversized or highly expanded imports before building an unbounded editor tree', () => {
+    for (const item of [{ contentType: 'text', content: 'x\n'.repeat(10001) },
+      { contentType: 'text', content: 'x'.repeat(2 * 1024 * 1024 + 1) },
+      { contentType: 'markdown', content: '| a | b |\n| --- | --- |\n' + '| x | y |\n'.repeat(2001) },
+      { contentType: 'markdown', content: '$x$ '.repeat(2001) },
+      { contentType: 'markdown', content: '**x**'.repeat(6000) }]) {
+      expect(() => normalizeImportedContent(item)).toThrow(/超过|过多/)
+    }
+    const result = normalizeImportedContent({ contentType: 'markdown', content: '```txt\n' + '*'.repeat(25000) + '\n```' })
+    expect(JSON.parse(result).root.children[0].code).toBe('*'.repeat(25000))
+  })
+
+  it('keeps an unmatched code-fence suffix without rescanning it for every opening fence', () => {
+    const source = '```js\nfirst\n```python\nsecond'
+    const result = normalizeImportedContent({ contentType: 'markdown', content: source })
+    expect(result).toContain('first')
+    expect(result).toContain('second')
+  })
+
   it('turns plain text lines into valid Lexical paragraphs', () => {
     const serialized = plainTextToLexical('line one\nline two')
     const state = JSON.parse(serialized)

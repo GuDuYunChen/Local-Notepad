@@ -32,7 +32,8 @@ export function sourceIdentity(root, tree) {
   const files = []
   for (const line of entries) {
     const split = line.indexOf('\t'), [mode, type, blob] = line.slice(0, split).split(' '), name = line.slice(split + 1)
-    if (!(name.endsWith('.go') || name === 'server/go.mod' || name === 'server/go.sum')) continue
+    if (!(name.endsWith('.go') || name === 'server/go.mod' || name === 'server/go.sum' ||
+      name === 'server/internal/logic/testdata/local_import_rich.json')) continue
     assert.ok(/^100(644|755)$/.test(mode) && type === 'blob' && name.startsWith('server/') && !name.split('/').includes('..'), 'invalid source entry')
     const bytes = read(path.join(root, name))
     const oid = createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex')

@@ -1,4 +1,5 @@
 import { verifyWikiNavigationDesktop } from './check-wiki-navigation-desktop.mjs'
+import { verifyLocalImportDesktop, verifyLocalImportRestart } from './check-local-import-desktop.mjs'
 import { verifyRecentNotesDesktop } from './check-recent-notes-desktop.mjs'
 import { verifyLocalPinsDesktop } from './check-local-pins-desktop.mjs'
 import { verifyLocalGraphDesktop } from './check-local-graph-desktop.mjs'
@@ -270,6 +271,8 @@ try {
   await assertSaved(a.id, '自动保存标题', 'recovered-after-block')
   report.checks.push('real failed browser PUT retains draft, actual retry saves it')
   await screenshot('retry-saved')
+  const localImport = await verifyLocalImportDesktop({ evaluate, click, cdp, until, api, out, noteIDs: [a.id, b.id], processID: child.pid })
+  await open(a.id, 'recovered-after-block')
   // Leave a new, not explicitly saved edit. Closing must use the real main
   // process / IPC freeze-and-save gate before terminating its own backend.
   await append(' native-close-latest')
@@ -286,6 +289,8 @@ try {
   await launch(); await open(a.id, 'native-close-latest')
   assert.equal((await api('/api/files/' + a.id)).content, persisted)
   await screenshot('restarted-fresh-profile')
+  await verifyLocalImportRestart({ evaluate, click, cdp, until, api, out, processID: child.pid }, localImport)
+  await open(a.id, 'native-close-latest')
   await verifyLocalOverviewDesktop({ evaluate, click, cdp, until, api, out, noteIDs: [a.id, b.id] })
   await verifyVersionHistoryDesktop({ evaluate, click, cdp, until, api, out, noteIDs: [a.id, b.id] })
   await verifyDailyNotesDesktop({ evaluate, click, cdp, until, api, out, noteIDs: [a.id, b.id] })
