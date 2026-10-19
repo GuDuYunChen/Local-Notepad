@@ -327,7 +327,7 @@ try {
   assert.equal((await api('/api/files/' + a.id)).content, modeBodyBefore, 'Read-only interaction changed the stored body')
   await screenshot('reading-mode')
   await click('[aria-label="切换到编辑模式"]')
-  await until(() => evaluate("document.querySelector('.editor-input[contenteditable=true]')"), 'Packaged editor did not return to editing mode')
+  await until(() => evaluate("Boolean(document.querySelector('.editor-input[contenteditable=true]'))"), 'Packaged editor did not return to editing mode')
   assert.ok(await evaluate("document.querySelector('.editor-input')?.innerText.includes('reading-mode-unsaved-draft')"), 'Returning to editing lost the retained draft')
   assert.equal((await api('/api/files/' + a.id)).content, modeBodyBefore, 'Returning to editing must not silently save')
   await key('s', 83, 2)
