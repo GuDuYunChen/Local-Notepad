@@ -10,7 +10,7 @@ test('canonical reading fixture round-trips deterministically with each guarded 
   assert.equal(readingModeDesktopFixture(), content)
   const children = JSON.parse(content).root.children
   assert.deepEqual(children.map(node => node.type), [
-    'heading', 'paragraph', 'todo', 'callout', 'toggle', 'code-block', 'formula', 'image', 'image-grid', 'attachment', 'paragraph',
+    'heading', 'paragraph', 'todo', 'callout', 'toggle', 'code-block', 'formula', 'image', 'image-grid', 'attachment', 'embed', 'paragraph',
   ])
   const node = type => children.find(item => item.type === type)
   assert.equal(node('heading').children[0].text, text.heading)
@@ -28,6 +28,9 @@ test('canonical reading fixture round-trips deterministically with each guarded 
   assert.equal(node('image-grid').columns, 1)
   assert.equal(node('attachment').name, '阅读模式附件.png')
   assert.equal(node('attachment').mime, 'image/png')
+  assert.equal(node('embed').url, text.embedURL)
+  assert.equal(node('embed').title, text.embedTitle)
+  assert.equal(new URL(text.embedURL).hostname, 'example.invalid')
 })
 
 function crc32(bytes) {

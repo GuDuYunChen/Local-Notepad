@@ -23,6 +23,8 @@ export function validateDesktopReadingLink(desktop, reading, commit, file) {
   assert.equal(link.bytes, file.bytes); assert.equal(link.sha256, file.sha256)
   assert.ok(Number.isSafeInteger(file.bytes) && file.bytes > 0); assert.match(file.sha256, /^[a-f0-9]{64}$/)
   assert.equal(link.noteID, reading.noteID)
+  assert.deepEqual(link.nativeQuitHelperEvents, reading.pendingDrafts.quit.helperEvents,
+    'Desktop helper trace does not contain the independently observed reading quit refusal')
   assert.equal(desktop.originalNoteIDs.length, 2)
   assert.equal(new Set(desktop.originalNoteIDs).size, 2)
   for (const id of desktop.originalNoteIDs) { assert.match(id, /^[a-zA-Z0-9-]+$/); assert.notEqual(id, reading.noteID) }

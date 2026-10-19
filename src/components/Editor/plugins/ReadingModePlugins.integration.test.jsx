@@ -16,19 +16,21 @@ import MarkdownSourcePlugin from './MarkdownSourcePlugin'
 import ResourceManagerPlugin from './ResourceManagerPlugin'
 import WikiLinkPlugin from './WikiLinkPlugin'
 import LinkInteractionPlugin from './LinkInteractionPlugin'
+import { createEditorPendingDrafts } from '~/services/editorPendingDrafts.mjs'
+import { EditorPendingDraftContext } from '../hooks/useEditorPendingDraft'
 
 vi.mock('~/services/api', () => ({ api: vi.fn(), searchFiles: vi.fn() }))
 
-let host, root, editor, errors
+let host, root, editor, errors, pendingDrafts
 function Plugins({ readOnly }) {
   const [current] = useLexicalComposerContext()
   useLayoutEffect(() => { editor = current; current.setEditable(!readOnly) }, [current, readOnly])
   return <><MarkdownSourcePlugin readOnly={readOnly} /><ResourceManagerPlugin readOnly={readOnly} /><WikiLinkPlugin /><LinkInteractionPlugin readOnly={readOnly} /></>
 }
 function Harness({ readOnly = false }) {
-  return <LexicalComposer initialConfig={{ namespace: 'reading-mode-plugins', editable: !readOnly, nodes: [VideoNode, WikiLinkNode, LinkNode], theme: { link: 'editor-link' }, onError: error => errors.push(error) }}>
+  return <EditorPendingDraftContext.Provider value={pendingDrafts}><LexicalComposer initialConfig={{ namespace: 'reading-mode-plugins', editable: !readOnly, nodes: [VideoNode, WikiLinkNode, LinkNode], theme: { link: 'editor-link' }, onError: error => errors.push(error) }}>
     <div className="editor-shell"><RichTextPlugin contentEditable={<ContentEditable />} placeholder={null} ErrorBoundary={LexicalErrorBoundary} /><Plugins readOnly={readOnly} /></div>
-  </LexicalComposer>
+  </LexicalComposer></EditorPendingDraftContext.Provider>
 }
 const flush = () => act(async () => { for (let index = 0; index < 6; index++) await Promise.resolve() })
 async function mount(factory) {
@@ -70,6 +72,7 @@ async function wikiQuery() {
 beforeEach(() => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true
   errors = []
+  pendingDrafts = createEditorPendingDrafts()
   host = document.createElement('div')
   document.body.append(host)
   root = createRoot(host)
@@ -109,6 +112,43 @@ test('a source apply event queued before the mode rerender cannot replace readon
   const apply = button('应用更改'), before = snapshot()
   await act(async () => { editor.setEditable(false); apply.click() })
   await flush()
+  expect(snapshot()).toBe(before)
+})
+
+test('real Markdown source drafts join the editor leave guard across reading mode and clear only on apply', async () => {
+  await source()
+  expect(pendingDrafts.capture().drafts.map(item => item.label)).toEqual(['Markdown 源码'])
+  const before = snapshot()
+  await mode(true)
+  expect(pendingDrafts.hasPending()).toBe(true)
+  expect(snapshot()).toBe(before)
+  await mode(false); await click(button('应用更改'))
+  expect(pendingDrafts.hasPending()).toBe(false)
+  expect(snapshot()).toContain('pending source draft')
+})
+
+test('explicit document discard closes an unapplied source and its close review without applying the buffer', async () => {
+  await source(); await mode(true)
+  const before = snapshot()
+  await click(button('关闭'))
+  expect(document.querySelector('[role="dialog"]')).toBeTruthy()
+  let discarded
+  await act(async () => { discarded = pendingDrafts.discard(pendingDrafts.capture()) })
+  await flush()
+  expect(discarded).toBe(true)
+  expect(host.querySelector('.markdown-source-overlay')).toBeNull()
+  expect(document.querySelector('[role="dialog"]')).toBeNull()
+  expect(snapshot()).toBe(before)
+  await expect(editorQuit.flush()).resolves.toBeUndefined()
+})
+
+test('an older source discard review cannot drop newer typing in the real textarea', async () => {
+  await source()
+  const review = pendingDrafts.capture(), before = snapshot()
+  await field(host.querySelector('.markdown-source-textarea'), 'newer source draft')
+  expect(pendingDrafts.discard(review)).toBe(false)
+  expect(host.querySelector('.markdown-source-textarea').value).toBe('newer source draft')
+  expect(pendingDrafts.hasPending()).toBe(true)
   expect(snapshot()).toBe(before)
 })
 

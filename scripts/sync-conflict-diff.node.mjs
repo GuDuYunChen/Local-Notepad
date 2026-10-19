@@ -255,3 +255,6 @@ test('native frame gate resets stability when heading or caption pixels are stil
   const frame = renderFrame(); frame.textChecks[0].foreground[0]--
   assert.deepEqual(gate.observe(frame), { ready: false, samples: 1 })
 })
+
+const { registerDiffCaptureTests } = await import('./sync-diff-render-capture.cases.cjs')
+registerDiffCaptureTests(test, renderFrame)

@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process'
 import { readFileSync } from 'node:fs'
-import { selectDesktopMainWindow } from './desktop-window-target.mjs'
+import { selectDesktopMainWindow, selectDesktopUnappliedDialog } from './desktop-window-target.mjs'
 
 const validPID = value => Number.isInteger(value) && value > 0 && value <= 0xffffffff
 const failure = code => Object.assign(new Error('Desktop window helper: ' + code), { code })
@@ -24,7 +24,12 @@ export function createDesktopWindowSession({
   ready.catch(() => {})
   const exited = new Promise(resolve => { resolveExit = resolve })
   const started = Date.now()
-  const event = value => { try { onEvent({ ...value, elapsedMs: Date.now() - started }) } catch {} }
+  const journal = []
+  const event = value => {
+    const entry = { ...value, elapsedMs: Date.now() - started }
+    journal.push(entry)
+    try { onEvent({ ...entry }) } catch {}
+  }
   const fail = code => {
     if (state === 'failed' || state === 'closed') return
     state = 'failed'; clearTimeout(startupTimer)
@@ -61,11 +66,11 @@ export function createDesktopWindowSession({
       if (!Array.isArray(rows) || rows.length > 128 || rows.some(w => !w ||
         w.pid !== request.pid || !Number.isSafeInteger(w.handle) || w.handle <= 0 ||
         typeof w.title !== 'string' || typeof w.cls !== 'string' ||
-        typeof w.visible !== 'boolean' || !Array.isArray(w.childText) ||
+        typeof w.visible !== 'boolean' || (w.image !== undefined && typeof w.image !== 'string') || !Array.isArray(w.childText) ||
         w.childText.length > 512 || w.childText.some(t => typeof t !== 'string'))) {
         fail('INVALID_WINDOWS'); return
       }
-    } else if (message.posted !== true) { fail('CLOSE_NOT_CONFIRMED'); return }
+    } else if (message.posted !== true) { fail(request.op === 'dismiss-unapplied' ? 'DISMISS_NOT_CONFIRMED' : 'CLOSE_NOT_CONFIRMED'); return }
     pending = null; clearTimeout(request.timer)
     event({ type: request.op, id: request.id, pid: request.pid, completed: true })
     request.resolve(request.op === 'inspect' ? message.windows : true)
@@ -120,11 +125,16 @@ export function createDesktopWindowSession({
   }
   return Object.freeze({
     ready,
+    events() { return journal.map(entry => ({ ...entry })) },
     inspect(pid) { return request('inspect', { pid }) },
     close(window) {
       // Preserve the existing strict main-window selector before sending.
       selectDesktopMainWindow([window], window?.pid, window?.title)
       return request('close', { pid: window.pid, handle: window.handle, title: window.title })
+    },
+    dismissUnappliedDialog(window, executablePath) {
+      selectDesktopUnappliedDialog([window], window?.pid, executablePath)
+      return request('dismiss-unapplied', { pid: window.pid, handle: window.handle, executablePath })
     },
     dispose() {
       if (disposal) return disposal

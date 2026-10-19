@@ -1,0 +1,1375 @@
+{
+  "platform": "win32",
+  "realComponents": true,
+  "syntheticRecords": true,
+  "backendExercised": false,
+  "reports": [
+    {
+      "name": "light-1200",
+      "themeColorsReady": true,
+      "visible": true,
+      "bounds": {
+        "top": 335.9375,
+        "bottom": 611.625,
+        "left": 65,
+        "right": 871
+      },
+      "viewport": {
+        "width": 1200,
+        "height": 900
+      },
+      "rows": 4,
+      "bodyOverflow": -8,
+      "tableOverflow": 0,
+      "colors": [
+        {
+          "kind": "local",
+          "selector": "pre",
+          "foreground": [
+            36,
+            34,
+            42
+          ],
+          "background": [
+            242,
+            230,
+            231
+          ],
+          "ratio": 12.898093548560535,
+          "finalForeground": true,
+          "finalBackground": true
+        },
+        {
+          "kind": "local",
+          "selector": ".sync-diff-line-meta strong",
+          "foreground": [
+            36,
+            34,
+            42
+          ],
+          "background": [
+            242,
+            230,
+            231
+          ],
+          "ratio": 12.898093548560535,
+          "finalForeground": true,
+          "finalBackground": true
+        },
+        {
+          "kind": "local",
+          "selector": ".sync-diff-line-meta span",
+          "foreground": [
+            36,
+            34,
+            42
+          ],
+          "background": [
+            242,
+            230,
+            231
+          ],
+          "ratio": 12.898093548560535,
+          "finalForeground": true,
+          "finalBackground": true
+        },
+        {
+          "kind": "remote",
+          "selector": "pre",
+          "foreground": [
+            36,
+            34,
+            42
+          ],
+          "background": [
+            246,
+            246,
+            248
+          ],
+          "ratio": 14.549424761712238,
+          "finalForeground": true,
+          "finalBackground": true
+        },
+        {
+          "kind": "remote",
+          "selector": ".sync-diff-line-meta strong",
+          "foreground": [
+            36,
+            34,
+            42
+          ],
+          "background": [
+            246,
+            246,
+            248
+          ],
+          "ratio": 14.549424761712238,
+          "finalForeground": true,
+          "finalBackground": true
+        },
+        {
+          "kind": "remote",
+          "selector": ".sync-diff-line-meta span",
+          "foreground": [
+            36,
+            34,
+            42
+          ],
+          "background": [
+            246,
+            246,
+            248
+          ],
+          "ratio": 14.549424761712238,
+          "finalForeground": true,
+          "finalBackground": true
+        }
+      ],
+      "textChecks": [
+        {
+          "id": "heading",
+          "foreground": [
+            36,
+            34,
+            42
+          ],
+          "background": [
+            255,
+            255,
+            255
+          ],
+          "ratio": 15.703775565080118,
+          "finalForeground": true
+        },
+        {
+          "id": "position",
+          "foreground": [
+            36,
+            34,
+            42
+          ],
+          "background": [
+            255,
+            255,
+            255
+          ],
+          "ratio": 15.703775565080118,
+          "finalForeground": true
+        },
+        {
+          "id": "local-column",
+          "foreground": [
+            111,
+            107,
+            120
+          ],
+          "background": [
+            255,
+            255,
+            255
+          ],
+          "ratio": 5.184938502630094,
+          "finalForeground": true
+        },
+        {
+          "id": "remote-column",
+          "foreground": [
+            111,
+            107,
+            120
+          ],
+          "background": [
+            255,
+            255,
+            255
+          ],
+          "ratio": 5.184938502630094,
+          "finalForeground": true
+        },
+        {
+          "id": "text-column",
+          "foreground": [
+            36,
+            34,
+            42
+          ],
+          "background": [
+            255,
+            255,
+            255
+          ],
+          "ratio": 15.703775565080118,
+          "finalForeground": true
+        },
+        {
+          "id": "summary",
+          "foreground": [
+            36,
+            34,
+            42
+          ],
+          "background": [
+            255,
+            255,
+            255
+          ],
+          "ratio": 15.703775565080118,
+          "finalForeground": true
+        },
+        {
+          "id": "description",
+          "foreground": [
+            111,
+            107,
+            120
+          ],
+          "background": [
+            255,
+            255,
+            255
+          ],
+          "ratio": 5.184938502630094,
+          "finalForeground": true
+        },
+        {
+          "id": "range",
+          "foreground": [
+            111,
+            107,
+            120
+          ],
+          "background": [
+            255,
+            255,
+            255
+          ],
+          "ratio": 5.184938502630094,
+          "finalForeground": true
+        },
+        {
+          "id": "source",
+          "foreground": [
+            111,
+            107,
+            120
+          ],
+          "background": [
+            255,
+            255,
+            255
+          ],
+          "ratio": 5.184938502630094,
+          "finalForeground": true
+        }
+      ],
+      "writes": 0,
+      "activeContent": 0,
+      "runningAnimations": [],
+      "runningAnimationCount": 0,
+      "settled": true,
+      "stableSamples": 3
+    },
+    {
+      "name": "dark-1200",
+      "themeColorsReady": true,
+      "visible": true,
+      "bounds": {
+        "top": 335.9375,
+        "bottom": 611.625,
+        "left": 65,
+        "right": 871
+      },
+      "viewport": {
+        "width": 1200,
+        "height": 900
+      },
+      "rows": 4,
+      "bodyOverflow": -8,
+      "tableOverflow": 0,
+      "colors": [
+        {
+          "kind": "local",
+          "selector": "pre",
+          "foreground": [
+            234,
+            242,
+            255
+          ],
+          "background": [
+            59,
+            37,
+            43
+          ],
+          "ratio": 12.550445831660967,
+          "finalForeground": true,
+          "finalBackground": true
+        },
+        {
+          "kind": "local",
+          "selector": ".sync-diff-line-meta strong",
+          "foreground": [
+            234,
+            242,
+            255
+          ],
+          "background": [
+            59,
+            37,
+            43
+          ],
+          "ratio": 12.550445831660967,
+          "finalForeground": true,
+          "finalBackground": true
+        },
+        {
+          "kind": "local",
+          "selector": ".sync-diff-line-meta span",
+          "foreground": [
+            234,
+            242,
+            255
+          ],
+          "background": [
+            59,
+            37,
+            43
+          ],
+          "ratio": 12.550445831660967,
+          "finalForeground": true,
+          "finalBackground": true
+        },
+        {
+          "kind": "remote",
+          "selector": "pre",
+          "foreground": [
+            234,
+            242,
+            255
+          ],
+          "background": [
+            23,
+            56,
+            42
+          ],
+          "ratio": 11.398926485853243,
+          "finalForeground": true,
+          "finalBackground": true
+        },
+        {
+          "kind": "remote",
+          "selector": ".sync-diff-line-meta strong",
+          "foreground": [
+            234,
+            242,
+            255
+          ],
+          "background": [
+            23,
+            56,
+            42
+          ],
+          "ratio": 11.398926485853243,
+          "finalForeground": true,
+          "finalBackground": true
+        },
+        {
+          "kind": "remote",
+          "selector": ".sync-diff-line-meta span",
+          "foreground": [
+            234,
+            242,
+            255
+          ],
+          "background": [
+            23,
+            56,
+            42
+          ],
+          "ratio": 11.398926485853243,
+          "finalForeground": true,
+          "finalBackground": true
+        }
+      ],
+      "textChecks": [
+        {
+          "id": "heading",
+          "foreground": [
+            234,
+            242,
+            255
+          ],
+          "background": [
+            27,
+            35,
+            48
+          ],
+          "ratio": 14.020761170189864,
+          "finalForeground": true
+        },
+        {
+          "id": "position",
+          "foreground": [
+            234,
+            242,
+            255
+          ],
+          "background": [
+            27,
+            35,
+            48
+          ],
+          "ratio": 14.020761170189864,
+          "finalForeground": true
+        },
+        {
+          "id": "local-column",
+          "foreground": [
+            184,
+            199,
+            220
+          ],
+          "background": [
+            27,
+            35,
+            48
+          ],
+          "ratio": 9.205794977353076,
+          "finalForeground": true
+        },
+        {
+          "id": "remote-column",
+          "foreground": [
+            184,
+            199,
+            220
+          ],
+          "background": [
+            27,
+            35,
+            48
+          ],
+          "ratio": 9.205794977353076,
+          "finalForeground": true
+        },
+        {
+          "id": "text-column",
+          "foreground": [
+            234,
+            242,
+            255
+          ],
+          "background": [
+            27,
+            35,
+            48
+          ],
+          "ratio": 14.020761170189864,
+          "finalForeground": true
+        },
+        {
+          "id": "summary",
+          "foreground": [
+            234,
+            242,
+            255
+          ],
+          "background": [
+            27,
+            35,
+            48
+          ],
+          "ratio": 14.020761170189864,
+          "finalForeground": true
+        },
+        {
+          "id": "description",
+          "foreground": [
+            184,
+            199,
+            220
+          ],
+          "background": [
+            27,
+            35,
+            48
+          ],
+          "ratio": 9.205794977353076,
+          "finalForeground": true
+        },
+        {
+          "id": "range",
+          "foreground": [
+            184,
+            199,
+            220
+          ],
+          "background": [
+            27,
+            35,
+            48
+          ],
+          "ratio": 9.205794977353076,
+          "finalForeground": true
+        },
+        {
+          "id": "source",
+          "foreground": [
+            184,
+            199,
+            220
+          ],
+          "background": [
+            27,
+            35,
+            48
+          ],
+          "ratio": 9.205794977353076,
+          "finalForeground": true
+        }
+      ],
+      "writes": 0,
+      "activeContent": 0,
+      "runningAnimations": [
+        {
+          "target": "ARTICLE",
+          "className": "sync-conflict-item sync-conflict-review-item",
+          "property": "color",
+          "currentTime": 0,
+          "progress": 0
+        },
+        {
+          "target": "DIV",
+          "className": "",
+          "property": "color",
+          "currentTime": 0,
+          "progress": 0
+        },
+        {
+          "target": "DIV",
+          "className": "sync-conflict-actions",
+          "property": "color",
+          "currentTime": 0,
+          "progress": 0
+        },
+        {
+          "target": "DIV",
+          "className": "",
+          "property": "color",
+          "currentTime": 0,
+          "progress": 0
+        },
+        {
+          "target": "DIV",
+          "className": "",
+          "property": "color",
+          "currentTime": 0,
+          "progress": 0
+        },
+        {
+          "target": "DIV",
+          "className": "",
+          "property": "color",
+          "currentTime": 0,
+          "progress": 0
+        },
+        {
+          "target": "DIV",
+          "className": "",
+          "property": "color",
+          "currentTime": 0,
+          "progress": 0
+        },
+        {
+          "target": "DIV",
+          "className": "",
+          "property": "color",
+          "currentTime": 0,
+          "progress": 0
+        },
+        {
+          "target": "DIV",
+          "className": "",
+          "property": "color",
+          "currentTime": 0,
+          "progress": 0
+        },
+        {
+          "target": "DIV",
+          "className": "",
+          "property": "color",
+          "currentTime": 0,
+          "progress": 0
+        },
+        {
+          "target": "DIV",
+          "className": "",
+          "property": "color",
+          "currentTime": 0,
+          "progress": 0
+        },
+        {
+          "target": "DIV",
+          "className": "",
+          "property": "color",
+          "currentTime": 0,
+          "progress": 0
+        },
+        {
+          "target": "DIV",
+          "className": "",
+          "property": "color",
+          "currentTime": 0,
+          "progress": 0
+        },
+        {
+          "target": "DIV",
+          "className": "",
+          "property": "color",
+          "currentTime": 0,
+          "progress": 0
+        },
+        {
+          "target": "DIV",
+          "className": "",
+          "property": "color",
+          "currentTime": 0,
+          "progress": 0
+        },
+        {
+          "target": "DIV",
+          "className": "",
+          "property": "color",
+          "currentTime": 0,
+          "progress": 0
+        },
+        {
+          "target": "DIV",
+          "className": "",
+          "property": "color",
+          "currentTime": 0,
+          "progress": 0
+        }
+      ],
+      "runningAnimationCount": 17,
+      "settled": true,
+      "stableSamples": 3
+    },
+    {
+      "name": "dark-560",
+      "themeColorsReady": true,
+      "visible": true,
+      "bounds": {
+        "top": 304.8125,
+        "bottom": 595.6875,
+        "left": 61,
+        "right": 491
+      },
+      "viewport": {
+        "width": 560,
+        "height": 900
+      },
+      "rows": 4,
+      "bodyOverflow": -8,
+      "tableOverflow": 0,
+      "colors": [
+        {
+          "kind": "local",
+          "selector": "pre",
+          "foreground": [
+            234,
+            242,
+            255
+          ],
+          "background": [
+            59,
+            37,
+            43
+          ],
+          "ratio": 12.550445831660967,
+          "finalForeground": true,
+          "finalBackground": true
+        },
+        {
+          "kind": "local",
+          "selector": ".sync-diff-line-meta strong",
+          "foreground": [
+            234,
+            242,
+            255
+          ],
+          "background": [
+            59,
+            37,
+            43
+          ],
+          "ratio": 12.550445831660967,
+          "finalForeground": true,
+          "finalBackground": true
+        },
+        {
+          "kind": "local",
+          "selector": ".sync-diff-line-meta span",
+          "foreground": [
+            234,
+            242,
+            255
+          ],
+          "background": [
+            59,
+            37,
+            43
+          ],
+          "ratio": 12.550445831660967,
+          "finalForeground": true,
+          "finalBackground": true
+        },
+        {
+          "kind": "remote",
+          "selector": "pre",
+          "foreground": [
+            234,
+            242,
+            255
+          ],
+          "background": [
+            23,
+            56,
+            42
+          ],
+          "ratio": 11.398926485853243,
+          "finalForeground": true,
+          "finalBackground": true
+        },
+        {
+          "kind": "remote",
+          "selector": ".sync-diff-line-meta strong",
+          "foreground": [
+            234,
+            242,
+            255
+          ],
+          "background": [
+            23,
+            56,
+            42
+          ],
+          "ratio": 11.398926485853243,
+          "finalForeground": true,
+          "finalBackground": true
+        },
+        {
+          "kind": "remote",
+          "selector": ".sync-diff-line-meta span",
+          "foreground": [
+            234,
+            242,
+            255
+          ],
+          "background": [
+            23,
+            56,
+            42
+          ],
+          "ratio": 11.398926485853243,
+          "finalForeground": true,
+          "finalBackground": true
+        }
+      ],
+      "textChecks": [
+        {
+          "id": "heading",
+          "foreground": [
+            234,
+            242,
+            255
+          ],
+          "background": [
+            27,
+            35,
+            48
+          ],
+          "ratio": 14.020761170189864,
+          "finalForeground": true
+        },
+        {
+          "id": "position",
+          "foreground": [
+            234,
+            242,
+            255
+          ],
+          "background": [
+            27,
+            35,
+            48
+          ],
+          "ratio": 14.020761170189864,
+          "finalForeground": true
+        },
+        {
+          "id": "local-column",
+          "foreground": [
+            184,
+            199,
+            220
+          ],
+          "background": [
+            27,
+            35,
+            48
+          ],
+          "ratio": 9.205794977353076,
+          "finalForeground": true
+        },
+        {
+          "id": "remote-column",
+          "foreground": [
+            184,
+            199,
+            220
+          ],
+          "background": [
+            27,
+            35,
+            48
+          ],
+          "ratio": 9.205794977353076,
+          "finalForeground": true
+        },
+        {
+          "id": "text-column",
+          "foreground": [
+            234,
+            242,
+            255
+          ],
+          "background": [
+            27,
+            35,
+            48
+          ],
+          "ratio": 14.020761170189864,
+          "finalForeground": true
+        },
+        {
+          "id": "summary",
+          "foreground": [
+            234,
+            242,
+            255
+          ],
+          "background": [
+            27,
+            35,
+            48
+          ],
+          "ratio": 14.020761170189864,
+          "finalForeground": true
+        },
+        {
+          "id": "description",
+          "foreground": [
+            184,
+            199,
+            220
+          ],
+          "background": [
+            27,
+            35,
+            48
+          ],
+          "ratio": 9.205794977353076,
+          "finalForeground": true
+        },
+        {
+          "id": "range",
+          "foreground": [
+            184,
+            199,
+            220
+          ],
+          "background": [
+            27,
+            35,
+            48
+          ],
+          "ratio": 9.205794977353076,
+          "finalForeground": true
+        },
+        {
+          "id": "source",
+          "foreground": [
+            184,
+            199,
+            220
+          ],
+          "background": [
+            27,
+            35,
+            48
+          ],
+          "ratio": 9.205794977353076,
+          "finalForeground": true
+        }
+      ],
+      "writes": 0,
+      "activeContent": 0,
+      "runningAnimations": [
+        {
+          "target": "SMALL",
+          "className": "",
+          "property": "color",
+          "currentTime": 0,
+          "progress": 0
+        },
+        {
+          "target": "DIV",
+          "className": "",
+          "property": "color",
+          "currentTime": 0,
+          "progress": 0
+        },
+        {
+          "target": "DIV",
+          "className": "",
+          "property": "color",
+          "currentTime": 0,
+          "progress": 0
+        },
+        {
+          "target": "DIV",
+          "className": "",
+          "property": "color",
+          "currentTime": 0,
+          "progress": 0
+        },
+        {
+          "target": "DIV",
+          "className": "",
+          "property": "color",
+          "currentTime": 0,
+          "progress": 0
+        },
+        {
+          "target": "DIV",
+          "className": "",
+          "property": "color",
+          "currentTime": 0,
+          "progress": 0
+        },
+        {
+          "target": "DIV",
+          "className": "",
+          "property": "color",
+          "currentTime": 0,
+          "progress": 0
+        },
+        {
+          "target": "DIV",
+          "className": "",
+          "property": "color",
+          "currentTime": 0,
+          "progress": 0
+        },
+        {
+          "target": "SMALL",
+          "className": "",
+          "property": "color",
+          "currentTime": 0,
+          "progress": 0
+        },
+        {
+          "target": "DIV",
+          "className": "",
+          "property": "color",
+          "currentTime": 0,
+          "progress": 0
+        },
+        {
+          "target": "DIV",
+          "className": "",
+          "property": "color",
+          "currentTime": 0,
+          "progress": 0
+        },
+        {
+          "target": "DIV",
+          "className": "",
+          "property": "color",
+          "currentTime": 0,
+          "progress": 0
+        },
+        {
+          "target": "DIV",
+          "className": "",
+          "property": "color",
+          "currentTime": 0,
+          "progress": 0
+        },
+        {
+          "target": "DIV",
+          "className": "",
+          "property": "color",
+          "currentTime": 0,
+          "progress": 0
+        },
+        {
+          "target": "DIV",
+          "className": "",
+          "property": "color",
+          "currentTime": 0,
+          "progress": 0
+        },
+        {
+          "target": "DIV",
+          "className": "",
+          "property": "color",
+          "currentTime": 0,
+          "progress": 0
+        },
+        {
+          "target": "STRONG",
+          "className": "",
+          "property": "color",
+          "currentTime": 0,
+          "progress": 0
+        },
+        {
+          "target": "TABLE",
+          "className": "sync-diff-table",
+          "property": "color",
+          "currentTime": 0,
+          "progress": 0
+        }
+      ],
+      "runningAnimationCount": 18,
+      "settled": true,
+      "stableSamples": 3
+    },
+    {
+      "name": "dark-560-next",
+      "themeColorsReady": true,
+      "visible": true,
+      "bounds": {
+        "top": 240.8125,
+        "bottom": 660.8125,
+        "left": 61,
+        "right": 491
+      },
+      "viewport": {
+        "width": 560,
+        "height": 900
+      },
+      "rows": 4,
+      "bodyOverflow": -8,
+      "tableOverflow": 0,
+      "colors": [
+        {
+          "kind": "local",
+          "selector": "pre",
+          "foreground": [
+            234,
+            242,
+            255
+          ],
+          "background": [
+            59,
+            37,
+            43
+          ],
+          "ratio": 12.550445831660967,
+          "finalForeground": true,
+          "finalBackground": true
+        },
+        {
+          "kind": "local",
+          "selector": ".sync-diff-line-meta strong",
+          "foreground": [
+            234,
+            242,
+            255
+          ],
+          "background": [
+            59,
+            37,
+            43
+          ],
+          "ratio": 12.550445831660967,
+          "finalForeground": true,
+          "finalBackground": true
+        },
+        {
+          "kind": "local",
+          "selector": ".sync-diff-line-meta span",
+          "foreground": [
+            234,
+            242,
+            255
+          ],
+          "background": [
+            59,
+            37,
+            43
+          ],
+          "ratio": 12.550445831660967,
+          "finalForeground": true,
+          "finalBackground": true
+        },
+        {
+          "kind": "remote",
+          "selector": "pre",
+          "foreground": [
+            234,
+            242,
+            255
+          ],
+          "background": [
+            23,
+            56,
+            42
+          ],
+          "ratio": 11.398926485853243,
+          "finalForeground": true,
+          "finalBackground": true
+        },
+        {
+          "kind": "remote",
+          "selector": ".sync-diff-line-meta strong",
+          "foreground": [
+            234,
+            242,
+            255
+          ],
+          "background": [
+            23,
+            56,
+            42
+          ],
+          "ratio": 11.398926485853243,
+          "finalForeground": true,
+          "finalBackground": true
+        },
+        {
+          "kind": "remote",
+          "selector": ".sync-diff-line-meta span",
+          "foreground": [
+            234,
+            242,
+            255
+          ],
+          "background": [
+            23,
+            56,
+            42
+          ],
+          "ratio": 11.398926485853243,
+          "finalForeground": true,
+          "finalBackground": true
+        }
+      ],
+      "textChecks": [
+        {
+          "id": "heading",
+          "foreground": [
+            234,
+            242,
+            255
+          ],
+          "background": [
+            27,
+            35,
+            48
+          ],
+          "ratio": 14.020761170189864,
+          "finalForeground": true
+        },
+        {
+          "id": "position",
+          "foreground": [
+            234,
+            242,
+            255
+          ],
+          "background": [
+            27,
+            35,
+            48
+          ],
+          "ratio": 14.020761170189864,
+          "finalForeground": true
+        },
+        {
+          "id": "local-column",
+          "foreground": [
+            184,
+            199,
+            220
+          ],
+          "background": [
+            27,
+            35,
+            48
+          ],
+          "ratio": 9.205794977353076,
+          "finalForeground": true
+        },
+        {
+          "id": "remote-column",
+          "foreground": [
+            184,
+            199,
+            220
+          ],
+          "background": [
+            27,
+            35,
+            48
+          ],
+          "ratio": 9.205794977353076,
+          "finalForeground": true
+        },
+        {
+          "id": "text-column",
+          "foreground": [
+            234,
+            242,
+            255
+          ],
+          "background": [
+            27,
+            35,
+            48
+          ],
+          "ratio": 14.020761170189864,
+          "finalForeground": true
+        },
+        {
+          "id": "summary",
+          "foreground": [
+            234,
+            242,
+            255
+          ],
+          "background": [
+            27,
+            35,
+            48
+          ],
+          "ratio": 14.020761170189864,
+          "finalForeground": true
+        },
+        {
+          "id": "description",
+          "foreground": [
+            184,
+            199,
+            220
+          ],
+          "background": [
+            27,
+            35,
+            48
+          ],
+          "ratio": 9.205794977353076,
+          "finalForeground": true
+        },
+        {
+          "id": "range",
+          "foreground": [
+            184,
+            199,
+            220
+          ],
+          "background": [
+            27,
+            35,
+            48
+          ],
+          "ratio": 9.205794977353076,
+          "finalForeground": true
+        },
+        {
+          "id": "source",
+          "foreground": [
+            184,
+            199,
+            220
+          ],
+          "background": [
+            27,
+            35,
+            48
+          ],
+          "ratio": 9.205794977353076,
+          "finalForeground": true
+        }
+      ],
+      "writes": 0,
+      "activeContent": 0,
+      "runningAnimations": [
+        {
+          "target": "STRONG",
+          "className": "",
+          "property": "color",
+          "currentTime": 0,
+          "progress": 0
+        },
+        {
+          "target": "SPAN",
+          "className": "",
+          "property": "color",
+          "currentTime": 0,
+          "progress": 0
+        },
+        {
+          "target": "STRONG",
+          "className": "",
+          "property": "color",
+          "currentTime": 0,
+          "progress": 0
+        },
+        {
+          "target": "SPAN",
+          "className": "",
+          "property": "color",
+          "currentTime": 0,
+          "progress": 0
+        },
+        {
+          "target": "STRONG",
+          "className": "",
+          "property": "color",
+          "currentTime": 0,
+          "progress": 0
+        },
+        {
+          "target": "SPAN",
+          "className": "",
+          "property": "color",
+          "currentTime": 0,
+          "progress": 0
+        },
+        {
+          "target": "STRONG",
+          "className": "",
+          "property": "color",
+          "currentTime": 0,
+          "progress": 0
+        },
+        {
+          "target": "SPAN",
+          "className": "",
+          "property": "color",
+          "currentTime": 0,
+          "progress": 0
+        }
+      ],
+      "runningAnimationCount": 8,
+      "settled": true,
+      "stableSamples": 3
+    }
+  ],
+  "complete": true,
+  "navigationFocus": true,
+  "writes": 0
+}

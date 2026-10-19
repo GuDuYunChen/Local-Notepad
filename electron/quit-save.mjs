@@ -6,6 +6,7 @@ export const QUIT_RELEASE = 'editor:quit:release'
 const messages = {
   composition: '输入法文字尚未确认。请完成输入后再退出，当前窗口和数据服务保留。',
   source: 'Markdown 源码有尚未应用的更改。请应用到正文并保存，或明确放弃后再退出。',
+  unapplied: '公式、嵌入内容或源码有尚未应用的更改。请返回编辑，完成或取消这些更改后再退出。',
   structure: '章节结构尚未确认。请返回编辑器，使用 Ctrl+S 检查引用影响后再退出。',
   unresolved: '仍有切换前或已关闭笔记的正文未确认保存。请返回相应笔记保存后再退出。',
   loading: '正文仍在加载或切换，尚不能确认保存状态。请返回编辑器检查后再退出。',

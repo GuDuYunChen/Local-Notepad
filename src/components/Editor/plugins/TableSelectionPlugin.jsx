@@ -1,9 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
+import { useLexicalEditable } from '@lexical/react/useLexicalEditable'
 import { $getRoot, $createParagraphNode, $createTextNode, FORMAT_ELEMENT_COMMAND, $getSelection } from 'lexical'
 import { TableNode, TableRowNode, TableCellNode, $createTableCellNode, $createTableRowNode, TableCellHeaderStates } from '@lexical/table'
 import { $getNodeByKey } from 'lexical'
 import { toast } from '~/services/toast'
+import { useEditorWriteScope } from '../hooks/useEditorWriteScope'
 
 export function forEachSelectedTableCell(tables, rects, callback) {
   for (const rect of Array.isArray(rects) ? rects : []) {
@@ -44,8 +46,10 @@ export function parseTableTSV(text) {
   return normalized.split('\n').map(row => row.split('\t'))
 }
 
-export default function TableSelectionPlugin() {
+export default function TableSelectionPlugin({ documentId }) {
   const [editor] = useLexicalComposerContext()
+  const isEditable = useLexicalEditable()
+  const beginWrite = useEditorWriteScope(editor, documentId)
   const [active, setActive] = useState(false)
   const [rects, setRects] = useState([]) // {tableIndex,r1,c1,r2,c2}
   const startRef = useRef(null)
@@ -55,6 +59,12 @@ export default function TableSelectionPlugin() {
   const [hoverTable, setHoverTable] = useState(null)
   const [addBtnPos, setAddBtnPos] = useState(null)
 
+  const updateEditable = useCallback((update, canWrite = beginWrite(), options) => {
+    if (!canWrite()) return
+    const apply = () => { if (canWrite()) update() }
+    editor.update(apply, options)
+  }, [editor, beginWrite])
+
   useEffect(() => {
     const onMode = (e) => { setActive(!!e.detail); if (!e.detail) setRects([]) }
     window.addEventListener('tableSelection:mode', onMode)
@@ -63,6 +73,7 @@ export default function TableSelectionPlugin() {
 
   useEffect(() => {
     const onAction = (e) => {
+      if (!editor.isEditable()) return
       const { type, payload } = e.detail || {}
       if (type === 'mergeCells') { if (!rects[0]) { toast.warning('请先框选多个单元格'); return } doMerge() }
       else if (type === 'splitCells') doSplit()
@@ -225,7 +236,7 @@ export default function TableSelectionPlugin() {
   const doMerge = () => {
     const r = rects[0]
     if (!r) return
-    editor.update(() => {
+    updateEditable(() => {
       const tables = []
       const walk = (node) => { if (!node.getChildren) return; const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
       walk($getRoot())
@@ -253,14 +264,14 @@ export default function TableSelectionPlugin() {
   }
 
   const doDelTable = (payload) => {
-    editor.update(() => {
+    updateEditable(() => {
       const table = getTable(payload)
       if (table) table.remove()
     })
   }
 
   const toggleRowStriping = (payload) => {
-    editor.update(() => {
+    updateEditable(() => {
       const table = getTable(payload)
       if (table) {
         table.setRowStriping(!table.getRowStriping())
@@ -269,7 +280,7 @@ export default function TableSelectionPlugin() {
   }
 
   const toggleFrozenRow = (payload) => {
-    editor.update(() => {
+    updateEditable(() => {
       const table = getTable(payload)
       if (table) {
         table.setFrozenRows(table.getFrozenRows() === 0 ? 1 : 0)
@@ -278,7 +289,7 @@ export default function TableSelectionPlugin() {
   }
 
   const toggleFrozenColumn = (payload) => {
-    editor.update(() => {
+    updateEditable(() => {
       const table = getTable(payload)
       if (table) {
         table.setFrozenColumns(table.getFrozenColumns() === 0 ? 1 : 0)
@@ -287,7 +298,7 @@ export default function TableSelectionPlugin() {
   }
 
   const toggleRowHeader = (payload) => {
-    editor.update(() => {
+    updateEditable(() => {
       const table = getTable(payload)
       if (!table) return
       const rows = table.getChildren()
@@ -303,7 +314,7 @@ export default function TableSelectionPlugin() {
   }
 
   const toggleColumnHeader = (payload) => {
-    editor.update(() => {
+    updateEditable(() => {
       const table = getTable(payload)
       if (!table) return
       const rows = table.getChildren()
@@ -318,7 +329,7 @@ export default function TableSelectionPlugin() {
 
   const doSplit = () => {
     const r = rects[0]
-    editor.update(() => {
+    updateEditable(() => {
       const tables = []
       const walk = (node) => { if (!node.getChildren) return; const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
       walk($getRoot())
@@ -437,7 +448,8 @@ export default function TableSelectionPlugin() {
 
   const pasteSelection = async () => {
     const rect = rects[0]
-    if (!rect) return
+    const canWrite = beginWrite()
+    if (!rect || !canWrite()) return
 
     try {
       if (!navigator.clipboard?.readText) {
@@ -445,13 +457,15 @@ export default function TableSelectionPlugin() {
         return
       }
       const text = await navigator.clipboard.readText()
+      if (!canWrite()) return
       const matrix = parseTableTSV(text)
       if (!matrix.length) {
         toast.warning('剪贴板里没有可粘贴的表格内容')
         return
       }
 
-      editor.update(() => {
+      let applied = false
+      updateEditable(() => {
         const table = getRectTable(rect)
         if (!table) return
         const rows = table.getChildren()
@@ -470,19 +484,21 @@ export default function TableSelectionPlugin() {
             const value = matrix[rowOffset][colOffset]
             if (value) paragraph.append($createTextNode(value))
             cell.append(paragraph)
+            applied = true
           }
         }
+      }, canWrite, {
+        onUpdate: () => { if (applied && canWrite()) toast.success('已粘贴到所选区域') },
       })
-
-      toast.success('已粘贴到所选区域')
     } catch (error) {
+      if (!canWrite()) return
       console.error('粘贴表格内容失败', error)
       toast.error('粘贴失败，请检查剪贴板权限')
     }
   }
 
   const doClear = (payload) => {
-    editor.update(() => {
+    updateEditable(() => {
       const clearCell = cell => {
         if (!(cell instanceof TableCellNode)) return
         for (const child of cell.getChildren()) child.remove()
@@ -528,7 +544,7 @@ export default function TableSelectionPlugin() {
   }
 
   const doAddRow = (payload) => {
-    editor.update(() => {
+    updateEditable(() => {
       const current = getCurrentCellInfo()
       const ri = payload?.ri ?? current?.ri ?? 0
       const mode = payload?.mode || 'below'
@@ -574,7 +590,7 @@ export default function TableSelectionPlugin() {
   }
 
   const doDelRow = (payload) => {
-    editor.update(() => {
+    updateEditable(() => {
       const current = getCurrentCellInfo()
       const ri = payload?.ri ?? current?.ri ?? 0
       const table = getTable(payload) || current?.table
@@ -586,7 +602,7 @@ export default function TableSelectionPlugin() {
   }
 
   const doAddCol = (payload) => {
-    editor.update(() => {
+    updateEditable(() => {
       const current = getCurrentCellInfo()
       const ci = payload?.ci ?? current?.ci ?? 0
       const mode = payload?.mode || 'right'
@@ -627,7 +643,7 @@ export default function TableSelectionPlugin() {
   }
 
   const addColForTable = (tIndex) => {
-    editor.update(() => {
+    updateEditable(() => {
       const tables = []
       const walk = (node) => { if (!node.getChildren) return; const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
       walk($getRoot())
@@ -640,7 +656,7 @@ export default function TableSelectionPlugin() {
   }
 
   const doDelCol = (payload) => {
-    editor.update(() => {
+    updateEditable(() => {
       const current = getCurrentCellInfo()
       const ci = payload?.ci ?? current?.ci ?? 0
       const table = getTable(payload) || current?.table
@@ -651,7 +667,7 @@ export default function TableSelectionPlugin() {
   }
 
   const doMoveRow = (payload, direction) => {
-    editor.update(() => {
+    updateEditable(() => {
       const current = getCurrentCellInfo()
       const ri = payload?.ri ?? current?.ri ?? 0
       const table = getTable(payload) || current?.table
@@ -671,7 +687,7 @@ export default function TableSelectionPlugin() {
   }
 
   const doMoveCol = (payload, direction) => {
-    editor.update(() => {
+    updateEditable(() => {
       const current = getCurrentCellInfo()
       const ci = payload?.ci ?? current?.ci ?? 0
       const table = getTable(payload) || current?.table
@@ -706,7 +722,7 @@ export default function TableSelectionPlugin() {
   }
 
   const sortByFirstCol = (dir) => {
-    editor.update(() => {
+    updateEditable(() => {
       const tables = []
       const walk = (node) => { if (!node.getChildren) return; const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
       walk($getRoot())
@@ -733,7 +749,7 @@ export default function TableSelectionPlugin() {
   const filterRowsContains = (payload) => {
     const q = payload?.value ?? payload
     if (!q) return
-    editor.update(() => {
+    updateEditable(() => {
       const tables = []
       const walk = (node) => { if (!node.getChildren) return; const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
       walk($getRoot())
@@ -753,7 +769,7 @@ export default function TableSelectionPlugin() {
 
   const paginateRows = (payload) => {
     const pageSize = Number(payload?.value ?? payload)
-    editor.update(() => {
+    updateEditable(() => {
       const tables = []
       const walk = (node) => { if (!node.getChildren) return; const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
       walk($getRoot())
@@ -808,7 +824,7 @@ export default function TableSelectionPlugin() {
   const applyAlign = payload => {
     const value = payload?.value ?? payload
 
-    editor.update(() => {
+    updateEditable(() => {
       if (rects.length) {
         const tables = []
         const walk = node => {
@@ -842,7 +858,7 @@ export default function TableSelectionPlugin() {
     const value = payload?.value ?? payload
     const patch = `text-align: ${value};`
 
-    editor.update(() => {
+    updateEditable(() => {
       const applyCell = cell => {
         const previous = cell.getStyle?.() || ''
         cell.setStyle?.(mergeStyle(previous, patch))
@@ -889,7 +905,7 @@ export default function TableSelectionPlugin() {
             ? 'border: 2px dashed #666;'
             : ''
 
-    editor.update(() => {
+    updateEditable(() => {
       const applyCell = cell => {
         const previous = cell.getStyle?.() || ''
         cell.setStyle?.(mergeStyle(previous, style))
@@ -927,7 +943,7 @@ export default function TableSelectionPlugin() {
   const applyBackground = payload => {
     const color = payload?.value ?? payload
 
-    editor.update(() => {
+    updateEditable(() => {
       if (rects.length) {
         const tables = []
         const walk = node => {
@@ -966,7 +982,7 @@ export default function TableSelectionPlugin() {
   }
 
   const autoSize = (mode) => {
-    editor.update(() => {
+    updateEditable(() => {
       const tables = []
       const walk = (node) => { if (!node.getChildren) return; const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
       walk($getRoot())
@@ -1014,6 +1030,8 @@ export default function TableSelectionPlugin() {
     window.dispatchEvent(new CustomEvent('tableSelection:mode', { detail: false }))
     editor.focus()
   }
+
+  if (!isEditable) return null
 
   return (
     <div ref={overlayRef} className="table-selection-overlay" style={{ pointerEvents: 'none' }}>

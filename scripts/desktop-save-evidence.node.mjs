@@ -94,3 +94,35 @@ for (const [label, change] of [
 ]) test('rejects ' + label, () => fixture((dir, report, save) => {
  change(report); save(); assert.throws(() => verifyDesktopSaveReport(dir, sha))
 }))
+
+function insertReadingQuitTrace(report) {
+ const events = ['inspect', 'close', 'inspect', 'dismiss-unapplied', 'inspect']
+  .map(type => ({ type, pid: report.processIDs[1], completed: true }))
+ report.windowHelper.events.splice(4, 0, ...events)
+ for (const [index, event] of report.windowHelper.events.entries()) {
+  event.elapsedMs = index * 100
+  if (index >= 2 && index < report.windowHelper.events.length - 1) event.id = index - 1
+ }
+ report.readingMode = { nativeQuitHelperEvents: structuredClone(events) }
+}
+test('complete reading refusal is an exact contiguous helper trace between both original successful closes', () => fixture((dir, report, save) => {
+ insertReadingQuitTrace(report); save()
+ assert.equal(verifyDesktopSaveReport(dir, sha).complete, true)
+ assert.equal(report.exits.length, 2); assert.equal(report.closeTargets.length, 2); assert.equal(report.checks.length, 9)
+}))
+for (const [name, mutate] of [
+ ['missing reading trace', r => delete r.readingMode.nativeQuitHelperEvents],
+ ['deleted refusal receipt', r => r.windowHelper.events.splice(5, 1)],
+ ['unexplained extra inspection', r => r.windowHelper.events.splice(5, 0, { ...r.windowHelper.events[4] })],
+ ['repeated refusal close', r => r.windowHelper.events[6].type = 'close'],
+ ['wrong linked event order', r => r.readingMode.nativeQuitHelperEvents.reverse()],
+ ['another process in refusal', r => r.windowHelper.events[5].pid = 999],
+ ['noncontiguous global request IDs', r => r.windowHelper.events.at(-2).id++],
+ ['lost first successful close', r => r.windowHelper.events.splice(3, 1)],
+ ['lost final successful close', r => r.windowHelper.events.splice(-2, 1)],
+ ['restarted helper for refusal', r => r.windowHelper.events.splice(4, 0, { type: 'ready', pid: 801, elapsedMs: 400 })],
+ ['clock moved backwards', r => r.windowHelper.events.at(-1).elapsedMs = 0],
+ ['refusal counted as successful process exit', r => r.exits.push({ pid: 200, code: 0, signal: null, nativeClose: true })],
+]) test('refuses combined native trace ' + name, () => fixture((dir, report, save) => {
+ insertReadingQuitTrace(report); mutate(report); save(); assert.throws(() => verifyDesktopSaveReport(dir, sha))
+}))

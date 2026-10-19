@@ -4,9 +4,13 @@ import { EventEmitter } from 'node:events'
 import { PassThrough, Writable } from 'node:stream'
 import { setTimeout as delay } from 'node:timers/promises'
 import { createDesktopWindowSession } from './desktop-window-session.mjs'
+import { selectDesktopUnappliedDialog, UNAPPLIED_QUIT_DIALOG_TITLE, UNAPPLIED_QUIT_DIALOG_MESSAGE } from './desktop-window-target.mjs'
 
 const window = { pid: 100, handle: 300, title: '记事本', cls: 'Chrome_WidgetWin_1',
   visible: true, childText: ['Chrome Legacy Window'] }
+const executablePath = 'C:\\owned-reading-contract\\Notepad.exe'
+const unappliedDialog = { pid: 100, handle: 400, title: UNAPPLIED_QUIT_DIALOG_TITLE,
+  cls: '#32770', visible: true, childText: [UNAPPLIED_QUIT_DIALOG_MESSAGE, 'OK'], image: executablePath }
 function mock({ ready = true, response, replyDelay = 0, holdExit = false } = {}) {
   const child = new EventEmitter(), calls = [], commands = [], events = []
   let ended = false, killed = 0
@@ -41,6 +45,45 @@ function session(t, options = {}, budget = {}) {
   t.after(() => s.dispose())
   return { m, s }
 }
+
+test('the specific unapplied dialog is dismissed once and the event journal cannot be edited by a caller', async t => {
+  const { m, s } = session(t)
+  await s.ready
+  assert.deepEqual(selectDesktopUnappliedDialog([window, unappliedDialog], 100, executablePath), unappliedDialog)
+  assert.equal(await s.dismissUnappliedDialog(unappliedDialog, executablePath), true)
+  assert.deepEqual(m.commands, [{ id: 1, op: 'dismiss-unapplied', pid: 100, handle: 400, executablePath }])
+  const observed = s.events()
+  observed[0].type = 'forged'; observed.push({ type: 'forged' })
+  assert.deepEqual(s.events().map(event => event.type), ['spawn', 'ready', 'dismiss-unapplied'])
+  assert.equal(s.events().at(-1).completed, true)
+})
+
+for (const [name, patch] of [
+  ['different error title', { title: 'another window' }],
+  ['partial unapplied message', { childText: ['未应用'] }],
+  ['renderer instead of native dialog', { cls: 'Chrome_WidgetWin_1' }],
+  ['hidden dialog', { visible: false }],
+  ['missing native handle', { handle: 0 }],
+  ['missing image', { image: undefined }],
+  ['different executable', { image: 'C:\\unrelated\\Other.exe' }],
+]) test('unapplied dismissal refuses ' + name + ' before posting any native request', async t => {
+  const { m, s } = session(t)
+  assert.throws(() => s.dismissUnappliedDialog({ ...unappliedDialog, ...patch }, executablePath))
+  assert.equal(m.commands.length, 0)
+})
+
+test('native unapplied selection refuses another process and ambiguous matching dialogs', () => {
+  assert.throws(() => selectDesktopUnappliedDialog([{ ...unappliedDialog, pid: 999 }], 100, executablePath))
+  assert.throws(() => selectDesktopUnappliedDialog([unappliedDialog, { ...unappliedDialog, handle: 401 }], 100, executablePath))
+})
+
+test('an unconfirmed native dismissal is never replayed or reported as a completed action', async t => {
+  const { m, s } = session(t, { response: request => ({ id: request.id, ok: true, posted: false }) })
+  await assert.rejects(s.dismissUnappliedDialog(unappliedDialog, executablePath), error => error.code === 'DISMISS_NOT_CONFIRMED')
+  await assert.rejects(s.dismissUnappliedDialog(unappliedDialog, executablePath), error => error.code === 'SESSION_UNAVAILABLE')
+  assert.equal(m.commands.length, 1)
+  assert.equal(s.events().some(event => event.type === 'dismiss-unapplied' && event.completed), false)
+})
 
 test('one prewarmed helper handles both processes and four requests with no replay', async t => {
   const {m,s}=session(t)

@@ -2,6 +2,7 @@ import { $getNodeByKey, DecoratorNode } from 'lexical'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { useLexicalEditable } from '@lexical/react/useLexicalEditable'
 import React, { useEffect, useState } from 'react'
+import { useEditorPendingDraft } from '../hooks/useEditorPendingDraft'
 
 export class EmbedNode extends DecoratorNode {
   __url
@@ -80,6 +81,21 @@ function EmbedComponent({ nodeKey, url, title }) {
   useEffect(() => setEditUrl(url || ''), [url])
   useEffect(() => setEditTitle(title || ''), [title])
 
+  const hasPendingDraft = editUrl !== (url || '') || editTitle !== (title || '')
+  const discardDraft = () => {
+    setEditUrl(url || '')
+    setEditTitle(title || '')
+    setIsEditing(false)
+  }
+
+  useEditorPendingDraft({
+    nodeKey,
+    label: '嵌入内容',
+    dirty: hasPendingDraft,
+    value: JSON.stringify([editUrl, editTitle]),
+    discard: discardDraft,
+  })
+
   const persist = () => {
     if (!editor.isEditable()) return
     editor.update(() => {
@@ -94,6 +110,8 @@ function EmbedComponent({ nodeKey, url, title }) {
   const handleSave = () => {
     if (!editor.isEditable() || !editUrl.trim()) return
     persist()
+    setEditUrl(editUrl.trim())
+    setEditTitle(editTitle.trim())
     setIsEditing(false)
   }
 
@@ -133,7 +151,7 @@ function EmbedComponent({ nodeKey, url, title }) {
     }
   }
 
-  const embedUrl = getEmbedUrl(editUrl)
+  const embedUrl = getEmbedUrl(url)
 
   if (isEditing && isEditable) {
     return (
@@ -153,15 +171,9 @@ function EmbedComponent({ nodeKey, url, title }) {
           className="embed-input"
         />
         <div className="embed-edit-actions">
-          {url && (
-            <button type="button" className="btn" onClick={() => {
-              setEditUrl(url || '')
-              setEditTitle(title || '')
-              setIsEditing(false)
-            }}>
-              取消
-            </button>
-          )}
+          <button type="button" className="btn" onClick={discardDraft}>
+            取消
+          </button>
           <button type="button" onClick={handleSave} className="embed-save-btn" disabled={!editUrl.trim()}>
             保存
           </button>
@@ -172,7 +184,7 @@ function EmbedComponent({ nodeKey, url, title }) {
 
   return (
     <div className="embed-block">
-      {editTitle && <div className="embed-title">{editTitle}</div>}
+      {title && <div className="embed-title">{title}</div>}
       {embedUrl ? (
         <iframe
           src={embedUrl}
@@ -180,11 +192,16 @@ function EmbedComponent({ nodeKey, url, title }) {
           frameBorder="0"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           allowFullScreen
-          title={editTitle || '嵌入内容'}
+          title={title || '嵌入内容'}
           sandbox="allow-scripts allow-same-origin allow-popups allow-presentation"
         />
       ) : (
         <div className="embed-placeholder">这个链接暂不支持嵌入显示</div>
+      )}
+      {!isEditable && hasPendingDraft && (
+        <div className="decorator-pending-draft" role="status">
+          有未应用的嵌入修改，返回编辑模式后继续或取消。
+        </div>
       )}
       {isEditable && <button type="button" onClick={() => { if (editor.isEditable()) setIsEditing(true) }} className="embed-edit-btn" aria-label="编辑嵌入内容">
         编辑嵌入

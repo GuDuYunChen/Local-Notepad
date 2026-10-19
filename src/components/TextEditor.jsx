@@ -10,7 +10,9 @@ import {
   writeEditorDraft,
 } from '~/services/editorDraftCache'
 
-import { editorQuit, createEditorQuitParticipant } from '~/services/editorQuit.mjs'
+import { editorQuit, EditorQuitError, createEditorQuitParticipant } from '~/services/editorQuit.mjs'
+import { createEditorPendingDrafts } from '~/services/editorPendingDrafts.mjs'
+import { EditorPendingDraftContext } from './Editor/hooks/useEditorPendingDraft'
 import { discardEditorDraft, observeEditorDraft } from '~/services/editorDraftDiscard.mjs'
 import { createEditorSaveAttempt, commitEditorSave, boundedEditorRequest } from '~/services/editorSaveTransaction.mjs'
 
@@ -75,6 +77,29 @@ function TextEditorInternal({
   const [editorContent, setEditorContent] = useState('')
   const [editorMode, setEditorMode] = useState(loadEditorMode)
   const [modePreferenceWarning, setModePreferenceWarning] = useState(false)
+  const [pendingBlockDrafts] = useState(createEditorPendingDrafts)
+  const [pendingDraftRevision, setPendingDraftRevision] = useState(0)
+  const unappliedDraftLabels = [...new Set(pendingBlockDrafts.capture().drafts.map(item => item.label))]
+
+  useEffect(() => pendingBlockDrafts.subscribe(() => setPendingDraftRevision(value => value + 1)), [pendingBlockDrafts])
+  useEffect(() => editorQuit.register(() => {
+    if (pendingBlockDrafts.hasPending()) throw new EditorQuitError('unapplied')
+  }), [pendingBlockDrafts])
+  useEffect(() => {
+    const beforeUnload = event => {
+      if (!pendingBlockDrafts.hasPending()) return
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', beforeUnload)
+    return () => window.removeEventListener('beforeunload', beforeUnload)
+  }, [pendingBlockDrafts])
+
+  const assertAppliedDrafts = React.useCallback((action = '保存') => {
+    if (!pendingBlockDrafts.hasPending()) return
+    const labels = [...new Set(pendingBlockDrafts.capture().drafts.map(item => item.label))].join('、')
+    throw Object.assign(new Error(`${labels}有未应用更改。请返回编辑，完成或取消这些更改后再${action}。`), { code: 'unapplied' })
+  }, [pendingBlockDrafts])
 
   const onChangeRef = useRef(onChange)
   const onLoadedRef = useRef(onLoaded)
@@ -302,6 +327,7 @@ function TextEditorInternal({
   })), [saveNow, cachePendingDraft])
 
   const replaceDraftContent = (nextContent, options = {}) => {
+      assertAppliedDrafts()
       const text = String(nextContent ?? '')
       const mappings = Array.isArray(options.sectionPathMappings)
         ? options.sectionPathMappings
@@ -336,22 +362,35 @@ function TextEditorInternal({
     boundary: historyBoundaryRef.current,
     revision: databaseRevisionRef.current.get(currentIdRef.current) || 0,
     content: contentRef.current, saved: lastSavedContentRef.current,
-    pending: inFlightSavesRef.current.has(currentIdRef.current) || queuedSavesRef.current.has(currentIdRef.current) || conflictBusyRef.current,
+    pending: inFlightSavesRef.current.has(currentIdRef.current) || queuedSavesRef.current.has(currentIdRef.current) || conflictBusyRef.current || pendingBlockDrafts.hasPending(),
     uncertain: saveAttemptsRef.current.has(currentIdRef.current) || saveConflictsRef.current.has(currentIdRef.current),
   })
 
   useImperativeHandle(ref, () => ({
-    save: () => saveNow('external'),
+    save: async () => {
+      assertAppliedDrafts()
+      const saved = await saveNow('external')
+      assertAppliedDrafts()
+      return saved
+    },
     getDocumentId: () => currentIdRef.current,
+    hasUnappliedDrafts: () => pendingBlockDrafts.hasPending(),
     // Called only by the explicit "不保存" action. Refuse outstanding writes;
     // clearing a cache is not confirmation that an in-flight save was cancelled.
-    clearCache: () => discardEditorDraft({
+    clearCache: () => {
+      const reviewed = pendingBlockDrafts.capture()
+      return discardEditorDraft({
       id: currentIdRef.current,
       ready: loadedDocumentRef.current === currentIdRef.current,
       content: contentRef.current,
       saved: lastSavedContentRef.current,
       pending: [...inFlightSavesRef.current.values(), ...queuedSavesRef.current.values(), ...saveAttemptsRef.current.values()],
-    }, editorQuit, text => {
+    }, { discard: (id, text) => {
+      if (editorQuit.discard(id, text) !== true) return false
+      if (pendingBlockDrafts.discard(reviewed)) return true
+      editorQuit.remember(id, text)
+      return false
+    } }, text => {
       window.clearTimeout(saveTimerRef.current)
       saveTimerRef.current = null
       historyBoundaryRef.current += 1
@@ -364,11 +403,13 @@ function TextEditorInternal({
       setStructureDirty(false)
       setSaveError(false)
       onChangeRef.current?.(text)
-    }),
+      })
+    },
     getReferenceRefactorState: () => ({
       currentContent: contentRef.current,
       savedContent: lastSavedContentRef.current,
-      savePending: inFlightSavesRef.current.has(currentIdRef.current) || queuedSavesRef.current.has(currentIdRef.current),
+      savePending: inFlightSavesRef.current.has(currentIdRef.current) || queuedSavesRef.current.has(currentIdRef.current) || pendingBlockDrafts.hasPending(),
+      unappliedDrafts: pendingBlockDrafts.hasPending(),
       structureChanged: hasHeadingStructureChanged(
         lastSavedContentRef.current,
         contentRef.current,
@@ -381,12 +422,14 @@ function TextEditorInternal({
       snapshot: captureHistoryState, replace: replaceDraftContent, save: () => saveNow('history-restore'),
     }, version, reviewed, signal),
     saveHistoryCurrent: (reviewed) => {
+      assertAppliedDrafts()
       const current = captureHistoryState()
       if (!reviewed || !current.ready || current.id !== reviewed.id || current.generation !== reviewed.generation || current.boundary !== reviewed.boundary)
         return Promise.reject(new Error('笔记已经变化，未发起保存'))
       return saveNow('history-save-current')
     },
     replaceSavedContent: (nextContent, updatedAt) => {
+      assertAppliedDrafts()
       const text = String(nextContent ?? '')
       const rawUpdatedAt = Number(updatedAt) || 0
       const savedAt = rawUpdatedAt
@@ -592,11 +635,12 @@ function TextEditorInternal({
       saving,
       saveError,
       lastSavedAt,
-      dirty: Boolean(activeId && contentRef.current !== lastSavedContentRef.current),
+      dirty: Boolean(activeId && (contentRef.current !== lastSavedContentRef.current || pendingBlockDrafts.hasPending())),
+      unappliedDrafts: Boolean(activeId && pendingBlockDrafts.hasPending()),
       wordCount,
       structureDirty,
     })
-  }, [activeId, saving, saveError, lastSavedAt, wordCount, structureDirty, editRevision])
+  }, [activeId, saving, saveError, lastSavedAt, wordCount, structureDirty, editRevision, pendingDraftRevision, pendingBlockDrafts])
 
   useEffect(() => {
     const apply = () => {
@@ -686,11 +730,13 @@ function TextEditorInternal({
         setConflictDialog(null)
         await saveNow('confirmed-conflict')
       } else {
+        assertAppliedDrafts('采用数据库正文')
         const file = await boundedEditorRequest(api, '/api/files/' + encodeURIComponent(reviewed.id), { signal: operation.signal })
         if (file?.id !== reviewed.id || typeof file.content !== 'string') throw new Error('数据库正文未获确认，草稿保留')
         if (operation.signal.aborted || reviewed.id !== currentIdRef.current || reviewed.generation !== loadGenerationRef.current || reviewed.draft !== contentRef.current || inFlightSavesRef.current.has(reviewed.id) || saveAttemptsRef.current.has(reviewed.id)) {
           throw Object.assign(new Error('核对期间正文或笔记已变化，草稿仍保留，请重新处理。'), { code: 'adoption-changed' })
         }
+        assertAppliedDrafts('采用数据库正文')
         if (deletedIdsRef.current?.has(reviewed.id) || editorQuit.discard(reviewed.id, reviewed.draft) !== true) throw new Error('草稿登记已变化，未替换正文')
         const text = normalizeLegacyTableBreakMarkup(file.content)
         rawSavedBodiesRef.current.set(reviewed.id, file.content)
@@ -709,7 +755,7 @@ function TextEditorInternal({
     } catch (error) {
       if (!operation.signal.aborted && reviewed.id === currentIdRef.current && reviewed.generation === loadGenerationRef.current) {
         const message = choice === 'keep' ? (error.message || '冲突处理未完成，草稿保留')
-          : error.code === 'adoption-changed' ? error.message
+          : error.code === 'adoption-changed' || error.code === 'unapplied' ? error.message
             : '未能采用数据库正文，草稿仍保留。请重试或暂不处理。'
         setSaveError(true); setSaveProblem(message)
         if (choice !== 'keep') setConflictProblem(message)
@@ -768,6 +814,7 @@ function TextEditorInternal({
       ) : (
         <>
           <React.Suspense fallback={<div className="placeholder">正在加载编辑器…</div>}>
+            <EditorPendingDraftContext.Provider value={pendingBlockDrafts}>
             <Editor
               documentId={activeId}
               documentTitle={documentTitle}
@@ -775,6 +822,7 @@ function TextEditorInternal({
               onChange={handleEditorChange}
               readOnly={editorMode === 'reading'}
             />
+            </EditorPendingDraftContext.Provider>
           </React.Suspense>
           <div ref={statusRef} className="editor-status-bar">
             {(saveError || saving) && (
@@ -804,6 +852,11 @@ function TextEditorInternal({
                 </span>
               )}
               {selMode && <span className="selection-mode-pill">表格选择</span>}
+              {unappliedDraftLabels.length > 0 && (
+                <span className="selection-mode-pill editor-unapplied-draft-pill" role="status">
+                  {unappliedDraftLabels.join('、')}更改已保留 · 完成或取消后再保存
+                </span>
+              )}
               {editorMode === 'reading' && contentRef.current !== lastSavedContentRef.current && (
                 <span className="selection-mode-pill editor-reading-draft-pill" role="status">阅读模式 · 未保存草稿已保留</span>
               )}

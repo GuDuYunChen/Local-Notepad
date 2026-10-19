@@ -6,14 +6,15 @@ import { readingEvidenceFixture } from './reading-mode-test-fixture.mjs'
 // Relational oracle fixtures only; actual on-disk reading report, PNG and all
 // original desktop-save checks have their own independent refusal suites.
 function fixture() {
-  const reading = readingEvidenceFixture(), commit = reading.productCommit
-  reading.commit = commit; reading.processID = 200
+  const reading = readingEvidenceFixture({ processID: 200 }), commit = reading.productCommit
+  reading.commit = commit
   const file = { bytes: 1234, sha256: '5'.repeat(64) }
   const desktop = { commit, processIDs: [100, 200], originalNoteIDs: ['original-A', 'original-B'],
     readingMode: { filename: 'reading-mode-desktop.json', ...file, processID: 200, noteID: reading.noteID,
       restoredNoteID: 'original-A', originalNoteRestored: true, restoredEditorText: 'Original body reading-mode-unsaved-draft',
       originalNotes: ['original-A', 'original-B'].map(id => ({ id, beforeBodySHA256: '6'.repeat(64), afterBodySHA256: '6'.repeat(64) })),
       quitObserverReattached: true, quitObserverTimeOrigin: 1000,
+      nativeQuitHelperEvents: structuredClone(reading.pendingDrafts.quit.helperEvents),
     },
     closeDiagnostics: [100, 200].map(pid => ({ phase: 'before-close', pid, renderer: {
       quitObserverReady: true, quitObserverTimeOrigin: 1000, timeOrigin: 1000,
@@ -36,6 +37,10 @@ for (const [name, mutate] of [
   ['changed report bytes', f => f.desktop.readingMode.bytes++],
   ['changed report digest', f => f.desktop.readingMode.sha256 = '7'.repeat(64)],
   ['wrong fixture note', f => f.desktop.readingMode.noteID = 'other'],
+  ['missing native quit event linkage', f => delete f.desktop.readingMode.nativeQuitHelperEvents],
+  ['missing linked refusal event', f => f.desktop.readingMode.nativeQuitHelperEvents.pop()],
+  ['different linked native request', f => f.desktop.readingMode.nativeQuitHelperEvents[1].id++],
+  ['different linked native process', f => f.desktop.readingMode.nativeQuitHelperEvents[1].pid = 100],
   ['lost original note identity', f => f.desktop.originalNoteIDs.pop()],
   ['duplicated original note identity', f => f.desktop.originalNoteIDs[1] = f.desktop.originalNoteIDs[0]],
   ['fixture is an original note', f => f.desktop.originalNoteIDs[0] = f.reading.noteID],

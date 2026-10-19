@@ -132,7 +132,8 @@ export default function App() {
   const [titleDraft, setTitleDraft] = useState('')
   const [titleSaving, setTitleSaving] = useState(false)
 
-  const unsaved = !!(current && content !== (current.content || ''))
+  const unappliedDrafts = Boolean(current && editorStatus.activeId === current.id && editorStatus.unappliedDrafts)
+  const unsaved = !!(current && (content !== (current.content || '') || unappliedDrafts))
 
   const select = React.useCallback((f) => {
     navigationEpoch.current += 1
@@ -365,6 +366,10 @@ export default function App() {
       toast.success('正文已保存')
       return true
     } catch (error) {
+      if (error.code === 'unapplied') {
+        toast.warning(error.message)
+        return null
+      }
       console.error('正文保存未确认', error)
       toast.error(error.message || '正文保存未确认，草稿已保留，请重试')
       return false
@@ -998,7 +1003,9 @@ export default function App() {
                 ? '保存失败'
                 : editorStatus.saving
                   ? '保存中…'
-                  : editorStatus.structureDirty
+                  : unappliedDrafts
+                    ? '未应用更改'
+                    : editorStatus.structureDirty
                     ? '结构待确认'
                     : '未保存'}
             </span>
@@ -1355,7 +1362,9 @@ export default function App() {
       {dialog?.type === 'unsaved' && (
         <ConfirmDialog
           title="当前笔记未保存"
-          message="是否保存更改？"
+          message={unappliedDrafts
+            ? '还有未应用的块或源码更改。取消后返回编辑，完成或取消这些更改；选择“不保存”会明确放弃当前笔记的全部未保存更改。'
+            : '是否保存更改？'}
           actions={[
             {
               label: '保存',
@@ -1399,7 +1408,7 @@ export default function App() {
                 const savedText = editorRef.current.getReferenceRefactorState().savedContent
                 setContent(savedText)
                 setCurrent(previous => previous ? { ...previous, content: savedText } : previous)
-                setEditorStatus(previous => ({ ...previous, dirty: false, structureDirty: false, saveError: false }))
+                setEditorStatus(previous => ({ ...previous, dirty: false, unappliedDrafts: false, structureDirty: false, saveError: false }))
                 setDialog(null)
                 dialog.next()
               }

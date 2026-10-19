@@ -351,7 +351,8 @@ try {
   report.checks.push('real packaged reading mode blocks input, preserves unsaved draft and saves after return')
   saveReport()
   const originalsBeforeReading = await Promise.all([a.id, b.id].map(id => api('/api/files/' + id)))
-  await verifyReadingModeDesktop({ evaluate, click, cdp, until, api, out, processID: child.pid })
+  await verifyReadingModeDesktop({ evaluate, click, cdp, until, api, out, processID: child.pid,
+    windowSession, executablePath: exe })
   // Read and validate the independent file; the driver's return value alone is
   // not accepted as native evidence. Real reloads also remove our observer, so
   // reconnect it through production preload before the original final WM_CLOSE.
@@ -368,6 +369,7 @@ try {
   report.readingMode = { filename: 'reading-mode-desktop.json', bytes: readingBytes.length, sha256: hash(readingBytes),
     processID: reading.processID, noteID: reading.noteID, restoredNoteID: a.id,
     originalNoteRestored: true, restoredEditorText,
+    nativeQuitHelperEvents: reading.pendingDrafts.quit.helperEvents,
     originalNotes: originalsBeforeReading.map((file, index) => ({ id: file.id,
       beforeBodySHA256: hash(file.content), afterBodySHA256: hash(originalsAfterReading[index].content) })),
     quitObserverReattached: observer.attached, quitObserverTimeOrigin: observer.timeOrigin }

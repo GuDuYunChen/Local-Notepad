@@ -190,7 +190,7 @@ export async function verifyLocalImportDesktop(context) {
   }
   try {
     const diagnostics = await evaluate('window.electronAPI.appDiagnostics()')
-    assert.equal(diagnostics.packaged, true); assert.equal(diagnostics.version, '4.233.1')
+    assert.equal(diagnostics.packaged, true); assert.equal(diagnostics.version, '4.233.2')
     report.appVersion = diagnostics.version
     assert.equal(await evaluate("typeof window.electronAPI?.getPathForFile==='function'&&typeof window.electronAPI?.importPaths==='function'"), true)
     detachNetwork = cdp.onEvent(event => {

@@ -6,6 +6,7 @@ import { markdownToLexical } from '~/services/importContent'
 import { analyzeMarkdownSourceCompatibility } from '~/services/markdownSource'
 import { editorQuit, EditorQuitError } from '~/services/editorQuit.mjs'
 import ConfirmDialog from '../../ConfirmDialog'
+import { useEditorPendingDraft } from '../hooks/useEditorPendingDraft'
 
 export default function MarkdownSourcePlugin({ readOnly = false }) {
   const [editor] = useLexicalComposerContext()
@@ -17,6 +18,16 @@ export default function MarkdownSourcePlugin({ readOnly = false }) {
   const [editable, setEditable] = useState(false)
   const [closeReview, setCloseReview] = useState(null)
   const canEdit = editable && editorEditable && !readOnly
+  useEditorPendingDraft({
+    nodeKey: 'markdown-source', label: 'Markdown 源码',
+    dirty: open && editable && source !== original,
+    value: JSON.stringify([source, original]),
+    discard: () => {
+      setSource(original)
+      setCloseReview(null)
+      setOpen(false)
+    },
+  })
   const textareaRef = useRef(null)
   const quitSource = useRef(null)
   quitSource.current = { open, editable, source, original }

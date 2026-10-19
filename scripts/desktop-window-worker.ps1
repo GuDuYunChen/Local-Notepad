@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 public class DesktopWindow {
   public long handle; public uint pid; public string title; public string cls;
+  public string image;
   public bool visible; public List<string> childText = new List<string>();
 }
 public static class DesktopInspect {
@@ -27,12 +28,13 @@ public static class DesktopInspect {
   }
   public static List<DesktopWindow> Read(uint expected) {
     var result = new List<DesktopWindow>();
+    string image = System.Diagnostics.Process.GetProcessById((int)expected).MainModule.FileName;
     EnumWindows((h,p) => {
       uint pid; GetWindowThreadProcessId(h, out pid);
       if (pid != expected) return true;
       var cls = new StringBuilder(256); GetClassName(h, cls, 256);
       var x = new DesktopWindow { handle=h.ToInt64(), pid=pid, title=Text(h),
-        cls=cls.ToString(), visible=IsWindowVisible(h) };
+        cls=cls.ToString(), visible=IsWindowVisible(h), image=image };
       EnumChildWindows(h, (c,q) => {
         var value=Text(c); if(value.Length>0) x.childText.Add(value); return true;
       }, IntPtr.Zero);
@@ -56,6 +58,29 @@ public static class DesktopInspect {
     return owner == pid && IsWindowVisible(hwnd) &&
       PostMessage(hwnd, 0x0010, IntPtr.Zero, IntPtr.Zero);
   }
+  public static bool DismissUnapplied(uint pid, long handle, string executablePath) {
+    const string title = "退出未完成，窗口已保留";
+    const string message = "公式、嵌入内容或源码有尚未应用的更改。请返回编辑，完成或取消这些更改后再退出。";
+    if (String.IsNullOrEmpty(executablePath) || !System.IO.Path.IsPathRooted(executablePath)) return false;
+    DesktopWindow chosen = null;
+    foreach (var item in Read(pid)) {
+      if (!item.visible || item.title != title || item.cls != "#32770") continue;
+      bool matchesMessage = false;
+      foreach (var text in item.childText) if (text.Contains(message)) matchesMessage = true;
+      if (!matchesMessage) continue;
+      if (chosen != null) return false;
+      chosen = item;
+    }
+    if (chosen == null || chosen.handle != handle ||
+        !String.Equals(System.IO.Path.GetFullPath(chosen.image), System.IO.Path.GetFullPath(executablePath), StringComparison.OrdinalIgnoreCase)) return false;
+    uint owner;
+    var hwnd = new IntPtr(handle);
+    GetWindowThreadProcessId(hwnd, out owner);
+    // Only dismiss this revalidated error box. No arbitrary-dialog or process
+    // termination operation is exposed, and no failed request is replayed.
+    return owner == pid && IsWindowVisible(hwnd) &&
+      PostMessage(hwnd, 0x0010, IntPtr.Zero, IntPtr.Zero);
+  }
 }
 '@
 [Console]::WriteLine('{"protocol":1,"ready":true}')
@@ -69,6 +94,9 @@ while ($null -ne ($line = [Console]::ReadLine())) {
       $reply = @{ id=$request.id; ok=$true; windows=@([DesktopInspect]::Read([uint32]$request.pid)) }
     } elseif ($request.op -eq 'close') {
       $posted = [DesktopInspect]::Close([uint32]$request.pid, [long]$request.handle, [string]$request.title)
+      $reply = @{ id=$request.id; ok=$posted; posted=$posted }
+    } elseif ($request.op -eq 'dismiss-unapplied') {
+      $posted = [DesktopInspect]::DismissUnapplied([uint32]$request.pid, [long]$request.handle, [string]$request.executablePath)
       $reply = @{ id=$request.id; ok=$posted; posted=$posted }
     } else { throw 'unknown operation' }
     [Console]::WriteLine((ConvertTo-Json -InputObject $reply -Depth 6 -Compress))

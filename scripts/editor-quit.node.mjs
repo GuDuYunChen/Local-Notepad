@@ -98,6 +98,13 @@ test('a renderer failure reports a fixed safe message, releases and keeps native
   const f=nativeFixture(),p=f.gate.prepare(f.win),rejected=assert.rejects(p,/正文保存未获确认/)
   f.reply({ready:false,code:'secret://untrusted-text'});await rejected;assert.equal(f.wc.sent.at(-1).channel,QUIT_RELEASE)
 })
+test('unapplied block fields reject native quit with a fixed actionable message and release the editor',async()=>{
+  const f=nativeFixture(),p=f.gate.prepare(f.win),rejected=assert.rejects(p,/公式、嵌入内容或源码有尚未应用的更改.*完成或取消这些更改后再退出/)
+  f.reply({ready:false,code:'unapplied'});await rejected
+  assert.equal(f.wc.sent.at(-1).channel,QUIT_RELEASE)
+  assert.equal(f.ipcMain.listenerCount(QUIT_RESULT),0);assert.equal(f.timers.size,0)
+  const retry=f.gate.prepare(f.win);f.reply();await retry;f.gate.release()
+})
 test('native timeout rejects instead of approving a stopped renderer',async()=>{
   const f=nativeFixture(),p=f.gate.prepare(f.win),rejected=assert.rejects(p,/超时/);f.fire(10000);await rejected
   assert.equal(f.ipcMain.listenerCount(QUIT_RESULT),0);assert.equal(f.timers.size,0)

@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { replaceNativeTextInput, READING_CAPTION_SELECTOR } from './reading-mode-native-input.mjs'
+import { replaceNativeTextInput, replaceNativeFormulaInput, replaceNativeUrlInput,
+  READING_CAPTION_SELECTOR, READING_FORMULA_SELECTOR, READING_EMBED_URL_SELECTOR } from './reading-mode-native-input.mjs'
 
 const original = '原始图片说明', replacement = 'reading100-native-caption'
 const snapshot = () => ({ selector: '.editor-image-caption-input', found: true, focused: true,
@@ -98,4 +99,52 @@ test('multi-line expected text is refused before keyboard navigation or insertio
   await assert.rejects(replaceNativeTextInput(h.context, READING_CAPTION_SELECTOR, 'first\nsecond', replacement), /single-line/)
   assert.equal(insertions(h).length, 0)
   assert.equal(h.calls.filter(call => call[0] === 'Input.dispatchKeyEvent').length, 0)
+})
+
+const formulaSnapshot = () => ({ ...snapshot(), selector: READING_FORMULA_SELECTOR,
+  tagName: 'TEXTAREA', type: 'textarea', value: 'x^2', selectionStart: 0, selectionEnd: 3 })
+test('formula replacement uses native selection with textarea focus and complete read-back before insertion', async () => {
+  const h = transport([formulaSnapshot(), formulaSnapshot()])
+  assert.deepEqual(await replaceNativeFormulaInput(h.context, 'x^2', 'y^3'), formulaSnapshot())
+  assert.deepEqual(h.calls.filter(call => call[0] === 'Input.dispatchKeyEvent').map(call => [call[1].key, call[1].modifiers]), [
+    ['End', 0], ['End', 0], ['Home', 8], ['Home', 8],
+  ])
+  assert.deepEqual(insertions(h), [['Input.insertText', { text: 'y^3' }]])
+})
+for (const [name, patch] of [
+  ['lost textarea focus', { focused: false }], ['read-only formula', { readOnly: true }],
+  ['formula prefix omitted', { selectionStart: 1 }], ['formula suffix omitted', { selectionEnd: 2 }],
+]) test('formula replacement refuses ' + name + ' without inserting', async () => {
+  const h = transport([formulaSnapshot(), { ...formulaSnapshot(), ...patch }])
+  await assert.rejects(replaceNativeFormulaInput(h.context, 'x^2', 'y^3'))
+  assert.equal(insertions(h).length, 0)
+})
+
+const previousURL = 'https://example.invalid/original', replacementURL = 'https://example.invalid/replacement'
+const urlSnapshot = value => ({ ...snapshot(), selector: READING_EMBED_URL_SELECTOR,
+  type: 'url', value, selectionStart: null, selectionEnd: null })
+test('URL replacement proves native deletion reached an empty focused input before insertText', async () => {
+  const h = transport([urlSnapshot(previousURL), urlSnapshot(''), urlSnapshot(replacementURL)])
+  const observation = await replaceNativeUrlInput(h.context, previousURL, replacementURL)
+  assert.equal(observation.cleared.value, '')
+  assert.equal(observation.after.value, replacementURL)
+  assert.deepEqual(h.calls.filter(call => call[0] === 'Input.dispatchKeyEvent').map(call => [call[1].key, call[1].modifiers]), [
+    ['End', 0], ['End', 0], ['Home', 8], ['Home', 8], ['Backspace', 0], ['Backspace', 0],
+  ])
+  assert.equal(insertions(h).length, 1)
+})
+for (const [name, patch] of [
+  ['partial URL deletion', { value: 'https://remaining-prefix' }],
+  ['focus moved away from URL', { focused: false }],
+  ['URL became read-only', { readOnly: true }],
+  ['a text input masquerading as URL', { type: 'text' }],
+]) test('URL replacement refuses ' + name + ' before insertion', async () => {
+  const h = transport([urlSnapshot(previousURL), { ...urlSnapshot(''), ...patch }])
+  await assert.rejects(replaceNativeUrlInput(h.context, previousURL, replacementURL))
+  assert.equal(insertions(h).length, 0)
+})
+test('URL replacement cannot report success when the real value after insertion differs', async () => {
+  const h = transport([urlSnapshot(previousURL), urlSnapshot(''), urlSnapshot('unexpected')])
+  await assert.rejects(replaceNativeUrlInput(h.context, previousURL, replacementURL))
+  assert.equal(insertions(h).length, 1)
 })

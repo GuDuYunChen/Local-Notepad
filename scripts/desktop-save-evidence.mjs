@@ -2,6 +2,39 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { createHash } from 'node:crypto'
+import { validateReadingNativeQuitEvents } from './reading-mode-desktop-evidence.mjs'
+
+// The two successful closes retain their original inspect/close pairs. Every
+// additional request must belong to the independently validated reading quit
+// refusal between them; no event is filtered out or silently ignored.
+export function validateDesktopWindowHelperTrace(report) {
+  assert.equal(report.windowHelper.stoppedCleanly, true)
+  const helper = report.windowHelper.events
+  const reading = report.readingMode?.nativeQuitHelperEvents ?? []
+  assert.ok(Array.isArray(reading))
+  if (report.readingMode) validateReadingNativeQuitEvents(reading, report.processIDs[1])
+  assert.deepEqual(helper.map(event => event.type), [
+    'spawn', 'ready', 'inspect', 'close',
+    ...reading.map(event => event.type),
+    'inspect', 'close', 'disposed',
+  ])
+  assert.deepEqual(helper.slice(4, 4 + reading.length), reading)
+  assert.ok(Number.isInteger(helper[0].pid) && helper[0].pid > 0)
+  assert.equal(helper[1].pid, helper[0].pid)
+  assert.equal(helper.at(-1).clean, true)
+  for (let index = 0; index < helper.length; index++) {
+    const event = helper[index]
+    assert.ok(Number.isFinite(event.elapsedMs) && event.elapsedMs >= 0)
+    if (index) assert.ok(event.elapsedMs >= helper[index - 1].elapsedMs)
+  }
+  const requests = helper.slice(2, -1)
+  for (let index = 0; index < requests.length; index++) {
+    assert.equal(requests[index].completed, true)
+    assert.equal(requests[index].id, index + 1)
+    assert.equal(requests[index].pid, report.processIDs[index < 2 ? 0 : 1])
+  }
+  return true
+}
 
 // Expectations are independent of the driver's implementation or UI model.
 export function verifyDesktopSaveReport(directory, commit) {
@@ -14,18 +47,7 @@ export function verifyDesktopSaveReport(directory, commit) {
   assert.equal(report.dirtyBeforeClose, true); assert.equal(report.noForcedBackendWarning, true)
   assert.equal(report.processIDs.length, 2); assert.ok(report.processIDs.every(pid => Number.isInteger(pid) && pid > 0))
   assert.deepEqual(report.exits, report.processIDs.map(pid => ({ pid, code: 0, signal: null, nativeClose: true })))
-  assert.equal(report.windowHelper.stoppedCleanly, true)
-  const helper = report.windowHelper.events
-  assert.deepEqual(helper.map(e => e.type), ['spawn', 'ready', 'inspect', 'close', 'inspect', 'close', 'disposed'])
-  assert.ok(Number.isInteger(helper[0].pid) && helper[0].pid > 0)
-  assert.equal(helper[1].pid, helper[0].pid)
-  assert.equal(helper[6].clean, true)
-  assert.ok(helper.every(e => Number.isFinite(e.elapsedMs) && e.elapsedMs >= 0))
-  for (let i = 0; i < 4; i++) {
-    assert.equal(helper[i + 2].completed, true)
-    assert.equal(helper[i + 2].id, i + 1)
-    assert.equal(helper[i + 2].pid, report.processIDs[Math.floor(i / 2)])
-  }
+  validateDesktopWindowHelperTrace(report)
   const snapshots = report.closeDiagnostics.filter(d => d.phase === 'before-close')
   assert.equal(snapshots.length, 2); assert.equal(report.closeTargets.length, 2)
   for (let i = 0; i < 2; i++) {

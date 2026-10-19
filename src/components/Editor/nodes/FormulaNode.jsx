@@ -3,6 +3,7 @@ import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext
 import { useLexicalEditable } from '@lexical/react/useLexicalEditable'
 import katex from 'katex'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { useEditorPendingDraft } from '../hooks/useEditorPendingDraft'
 import 'katex/dist/katex.min.css'
 
 const FORMULA_HISTORY_KEY = 'localNotepad.formulaHistory.v1'
@@ -155,19 +156,36 @@ function FormulaComponent({ nodeKey, expression, displayMode }) {
   useEffect(() => setDraft(expression || ''), [expression])
   useEffect(() => setBlockMode(Boolean(displayMode)), [displayMode])
 
+  const hasPendingDraft = draft !== (expression || '') || blockMode !== Boolean(displayMode)
+  const discardDraft = () => {
+    setDraft(expression || '')
+    setBlockMode(Boolean(displayMode))
+    setEditing(false)
+  }
+
+  useEditorPendingDraft({
+    nodeKey,
+    label: '公式',
+    dirty: hasPendingDraft,
+    value: JSON.stringify([draft, blockMode]),
+    discard: discardDraft,
+  })
+
+  const previewExpression = editing && isEditable ? draft : (expression || '')
+  const previewBlockMode = editing && isEditable ? blockMode : Boolean(displayMode)
   const html = useMemo(() => {
-    if (!draft.trim()) return ''
+    if (!previewExpression.trim()) return ''
     try {
-      return katex.renderToString(draft, {
+      return katex.renderToString(previewExpression, {
         throwOnError: false,
-        displayMode: blockMode,
+        displayMode: previewBlockMode,
         strict: 'ignore',
         trust: false,
       })
     } catch {
       return ''
     }
-  }, [draft, blockMode])
+  }, [previewExpression, previewBlockMode])
 
   const persist = patch => {
     if (!editor.isEditable()) return
@@ -184,6 +202,7 @@ function FormulaComponent({ nodeKey, expression, displayMode }) {
     if (!editor.isEditable()) return
     const next = draft.trim()
     persist({ expression: next, displayMode: blockMode })
+    setDraft(next)
 
     if (next) {
       const history = rememberFormulaExpression(recentFormulas, next)
@@ -235,8 +254,7 @@ function FormulaComponent({ nodeKey, expression, displayMode }) {
             }
             if (event.key === 'Escape') {
               event.preventDefault()
-              setDraft(expression || '')
-              setEditing(false)
+              discardDraft()
             }
           }}
         />
@@ -318,6 +336,7 @@ function FormulaComponent({ nodeKey, expression, displayMode }) {
           >
             {favoriteFormulas.includes(draft.trim()) ? '取消收藏' : '收藏'}
           </button>
+          <button type="button" onClick={discardDraft}>取消</button>
           <button type="button" onClick={save}>完成</button>
           <button type="button" className="danger" onClick={remove}>删除</button>
         </span>
@@ -327,7 +346,7 @@ function FormulaComponent({ nodeKey, expression, displayMode }) {
 
   return (
     <span
-      className={`formula-rendered${blockMode ? ' block' : ' inline'}`}
+      className={`formula-rendered${previewBlockMode ? ' block' : ' inline'}`}
       onDoubleClick={() => { if (editor.isEditable()) setEditing(true) }}
       title={isEditable ? '双击编辑公式' : undefined}
     >
@@ -336,6 +355,11 @@ function FormulaComponent({ nodeKey, expression, displayMode }) {
       ) : (
         <span className="formula-editor-placeholder" onClick={() => { if (editor.isEditable()) setEditing(true) }}>
           {isEditable ? '添加公式' : '空公式'}
+        </span>
+      )}
+      {!isEditable && hasPendingDraft && (
+        <span className="decorator-pending-draft" role="status">
+          有未应用的公式修改，返回编辑模式后继续或取消。
         </span>
       )}
     </span>

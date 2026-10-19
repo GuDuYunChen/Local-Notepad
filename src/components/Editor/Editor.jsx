@@ -261,7 +261,7 @@ export default function Editor({ documentId, documentTitle, initialContent, onCh
           <LoadContentPlugin content={initialContent} documentId={documentId} />
           <DocumentSessionPlugin documentId={documentId} restoreSelection={!readOnly} />
           <EvidenceNavigationPlugin documentId={documentId} initialContent={initialContent} />
-          {!readOnly && <TableSelectionPlugin />}
+          {!readOnly && <TableSelectionPlugin documentId={documentId} />}
           {!readOnly && <TableActionMenuPlugin />}
           {!readOnly && <TableColumnResizePlugin />}
           {!readOnly && <TableReorderPlugin />}
