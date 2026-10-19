@@ -317,7 +317,7 @@ try {
   await until(() => evaluate("document.querySelector('.editor-input')?.innerText.includes('reading-mode-unsaved-draft')"), 'Unsaved draft did not reach the real editor')
   assert.ok(!textOf(JSON.parse((await api('/api/files/' + a.id)).content).root).includes(modeMarker), 'Reading mode test must start with an uncommitted draft')
   await click('[aria-label="切换到阅读模式"]')
-  await until(() => evaluate("document.querySelector('.editor-shell.editor-reading-mode') && document.querySelector('.editor-input[contenteditable=false]')"), 'Packaged editor did not enter real read-only mode')
+  await until(() => evaluate("Boolean(document.querySelector('.editor-shell.editor-reading-mode') && document.querySelector('.editor-input[contenteditable=false]'))"), 'Packaged editor did not enter real read-only mode')
   assert.ok(await evaluate("document.querySelector('.editor-input')?.innerText.includes('reading-mode-unsaved-draft')"), 'Reading mode discarded the unsaved draft')
   assert.equal((await api('/api/files/' + a.id)).content, modeBodyBefore, 'Switching to reading mode must not save or rewrite the body')
   await click('.editor-input[contenteditable=false]')
