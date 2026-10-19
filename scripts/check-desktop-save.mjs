@@ -29,6 +29,9 @@ import { desktopNote as note } from './desktop-save-fixture.mjs'
 import { selectDesktopMainWindow } from './desktop-window-target.mjs'
 import { createDesktopWindowSession } from './desktop-window-session.mjs'
 import { verifyLocalOverviewDesktop } from './check-local-overview-desktop.mjs'
+import { verifyReadingModeDesktop } from './check-reading-mode-desktop.mjs'
+import { verifyReadingModeDesktopReport } from './reading-mode-desktop-evidence.mjs'
+import { verifyDesktopSaveReadingReport } from './reading-mode-save-evidence.mjs'
 
 assert.equal(process.platform, 'win32', 'This check requires the actual Windows package')
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -115,6 +118,21 @@ async function api(route, init = {}) {
   assert.equal(value.code, 0, JSON.stringify(value))
   return value.data
 }
+async function observeProductionQuit() {
+  assert.equal(await evaluate("typeof window.electronAPI?.reportQuitResult"), 'function')
+  const observation = await evaluate(`(()=>{
+    if (window.__desktopQuitObserverOrigin===performance.timeOrigin) throw Error('Quit observers already attached to this renderer');
+    window.__desktopObservedQuit=[];
+    window.__desktopQuitObserverSubscriptions=[
+      window.electronAPI.onQuitPrepare(v=>window.__desktopObservedQuit.push({event:'prepare',id:v.id})),
+      window.electronAPI.onQuitRelease(v=>window.__desktopObservedQuit.push({event:'release',id:v.id})),
+    ];
+    window.__desktopQuitObserverOrigin=performance.timeOrigin;
+    return {timeOrigin:performance.timeOrigin,attached:window.__desktopQuitObserverSubscriptions.every(dispose=>typeof dispose==='function')};
+  })()`)
+  assert.equal(observation.attached, true, 'Production preload quit observation did not attach')
+  return observation
+}
 async function launch() {
   await availablePort(27121) // Never attach to or write into an existing backend.
   const port = await availablePort()
@@ -137,13 +155,7 @@ async function launch() {
   cdp = await connect(page.webSocketDebuggerUrl)
   await cdp.send('Runtime.enable'); await cdp.send('Page.enable'); await cdp.send('Network.enable')
   await until(async () => !!(await api('/api/health')), 'Packaged backend not available')
-  assert.equal(await evaluate("typeof window.electronAPI?.reportQuitResult"), 'function')
-  await evaluate(`(()=>{
-    window.__desktopObservedQuit=[];
-    window.electronAPI.onQuitPrepare(v=>window.__desktopObservedQuit.push({event:'prepare',id:v.id}));
-    window.electronAPI.onQuitRelease(v=>window.__desktopObservedQuit.push({event:'release',id:v.id}));
-    return true;
-  })()`)
+  await observeProductionQuit()
   report.checks.push('production preload connected for process ' + child.pid)
   saveReport()
 }
@@ -201,6 +213,8 @@ async function closeSnapshot(phase) {
     url:location.href, title:document.title,
     body:document.body.innerText, active:document.activeElement?.outerHTML,
     quit:window.__desktopObservedQuit || [],
+    timeOrigin:performance.timeOrigin,quitObserverTimeOrigin:window.__desktopQuitObserverOrigin,
+    quitObserverReady:window.__desktopQuitObserverOrigin===performance.timeOrigin&&window.__desktopQuitObserverSubscriptions?.length===2&&window.__desktopQuitObserverSubscriptions.every(dispose=>typeof dispose==='function'),
     drafts:Object.fromEntries(Object.keys(localStorage).filter(k=>/editor.*cache|draft/.test(k)).map(k=>[k,localStorage.getItem(k)]))
   }))()`)
   report.closeDiagnostics ||= []
@@ -245,6 +259,7 @@ try {
   server = await createSaveTestServer(backend)
   const a = await server.call('/api/files', { method: 'POST', body: JSON.stringify({ title: 'Desktop save A.md', content: note('原始标题', 'original body') }) })
   const b = await server.call('/api/files', { method: 'POST', body: JSON.stringify({ title: 'Desktop save B.md', content: note('第二篇', 'other note') }) })
+  report.originalNoteIDs = [a.id, b.id]
   await server.stop()
   await launch(); await open(a.id, '原始标题')
   await changeHeading('手动保存标题'); await append(' manual-native-4189')
@@ -335,12 +350,35 @@ try {
   assert.equal(await evaluate("localStorage.getItem('localNotepad.editorMode.v1')"), 'editing')
   report.checks.push('real packaged reading mode blocks input, preserves unsaved draft and saves after return')
   saveReport()
+  const originalsBeforeReading = await Promise.all([a.id, b.id].map(id => api('/api/files/' + id)))
+  await verifyReadingModeDesktop({ evaluate, click, cdp, until, api, out, processID: child.pid })
+  // Read and validate the independent file; the driver's return value alone is
+  // not accepted as native evidence. Real reloads also remove our observer, so
+  // reconnect it through production preload before the original final WM_CLOSE.
+  const reading = verifyReadingModeDesktopReport(out, process.env.GITHUB_SHA)
+  assert.equal(reading.processID, child.pid)
+  const observer = await observeProductionQuit()
+  await open(a.id, modeMarker)
+  const originalsAfterReading = await Promise.all([a.id, b.id].map(id => api('/api/files/' + id)))
+  assert.deepEqual(originalsAfterReading.map(file => file.content), originalsBeforeReading.map(file => file.content), 'Reading verification changed the original saved notes')
+  const restoredEditorText = await evaluate("document.querySelector('.editor-input[contenteditable=true]')?.innerText || ''")
+  assert.ok(restoredEditorText.includes(modeMarker), 'Reading reload did not restore the original saved editor')
+  assert.equal(await evaluate("localStorage.getItem('localNotepad.editorMode.v1')"), 'editing')
+  const readingBytes = readFileSync(path.join(out, 'reading-mode-desktop.json'))
+  report.readingMode = { filename: 'reading-mode-desktop.json', bytes: readingBytes.length, sha256: hash(readingBytes),
+    processID: reading.processID, noteID: reading.noteID, restoredNoteID: a.id,
+    originalNoteRestored: true, restoredEditorText,
+    originalNotes: originalsBeforeReading.map((file, index) => ({ id: file.id,
+      beforeBodySHA256: hash(file.content), afterBodySHA256: hash(originalsAfterReading[index].content) })),
+    quitObserverReattached: observer.attached, quitObserverTimeOrigin: observer.timeOrigin }
+  saveReport()
   await closeWindow()
   report.checks.push('fresh-profile packaged restart reads latest body from real database and closes cleanly')
   report.windowHelper.stoppedCleanly = await windowSession.dispose()
   assert.equal(report.windowHelper.stoppedCleanly, true, 'Native helper did not exit cleanly')
   report.finalBodySHA256 = hash(Buffer.from(persisted)); report.complete = true; report.finishedAt = new Date().toISOString(); saveReport()
   verifyDesktopSaveReport(out, process.env.GITHUB_SHA)
+  verifyDesktopSaveReadingReport(out, process.env.GITHUB_SHA)
 } catch (error) {
   report.complete = false; report.error = String(error?.stack || error); saveReport()
   if (cdp) { try { await closeSnapshot('failure'); await screenshot('failed-state') } catch {} }

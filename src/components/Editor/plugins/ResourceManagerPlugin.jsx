@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
+import { useLexicalEditable } from '@lexical/react/useLexicalEditable'
 import { $getNodeByKey, $getRoot } from 'lexical'
 
 export function describeSerializedResource(serialized, key = '') {
@@ -83,6 +84,7 @@ const FILTERS = [
 
 export default function ResourceManagerPlugin({ readOnly = false }) {
   const [editor] = useLexicalComposerContext()
+  const isEditable = useLexicalEditable()
   const [resources, setResources] = useState([])
   const [open, setOpen] = useState(false)
   const [filter, setFilter] = useState('all')
@@ -135,7 +137,9 @@ export default function ResourceManagerPlugin({ readOnly = false }) {
   }
 
   const remove = resource => {
+    if (readOnly || !editor.isEditable()) return
     editor.update(() => {
+      if (readOnly || !editor.isEditable()) return
       const node = $getNodeByKey(resource.key)
       node?.remove?.()
     })
@@ -213,7 +217,7 @@ export default function ResourceManagerPlugin({ readOnly = false }) {
 
                 <div className="editor-resource-actions">
                   <button type="button" onClick={() => locate(resource)}>定位</button>
-                  {!readOnly && (
+                  {!readOnly && isEditable && (
                     <button type="button" className="danger" onClick={() => remove(resource)}>删除</button>
                   )}
                 </div>

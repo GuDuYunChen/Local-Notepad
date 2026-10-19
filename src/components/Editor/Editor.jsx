@@ -117,6 +117,8 @@ function EditableModePlugin({ readOnly }) {
   return null;
 }
 
+const CONTENT_LOAD_TAG = 'local-notepad:content-load';
+
 function OnChangePlugin({ onChange }) {
   const [editor] = useLexicalComposerContext();
   const onChangeRef = useRef(onChange);
@@ -128,13 +130,16 @@ function OnChangePlugin({ onChange }) {
   useEffect(() => {
     let lastSerialized = ''
 
-    return editor.registerUpdateListener(({ editorState, dirtyElements, dirtyLeaves }) => {
+    return editor.registerUpdateListener(({ editorState, dirtyElements, dirtyLeaves, tags }) => {
       const hasContentChanges = (dirtyElements?.size || 0) > 0 || (dirtyLeaves?.size || 0) > 0
       if (!hasContentChanges) return
 
       const serialized = JSON.stringify(editorState)
       if (serialized === lastSerialized) return
       lastSerialized = serialized
+      // A load may normalize old JSON or represent an empty stored body with
+      // a paragraph. Remember that baseline without inventing a user draft.
+      if (tags.has(CONTENT_LOAD_TAG)) return
       onChangeRef.current?.(serialized)
     });
   }, [editor]);
@@ -148,26 +153,35 @@ export function LoadContentPlugin({ content, documentId }) {
     const loadToken = beginEvidenceContentLoad(editor, documentId, content);
     const run = () => {
       if (cancelled) return;
-      editor.update(() => {
-        if (!content) {
-          const root = $getRoot();
-          root.clear();
-          root.append($createParagraphNode());
-        } else {
-          try {
-            const state = editor.parseEditorState(content);
-            editor.setEditorState(state);
-          } catch (e) {
-            const root = $getRoot();
-            root.clear();
-            const p = $createParagraphNode();
-            p.append($createTextNode(content));
-            root.append(p);
-          }
-        }
-      }, { onUpdate: () => {
+      // Flush already accepted edits before adding the load tag. Otherwise
+      // Lexical can batch an earlier user edit into the ignored load commit.
+      editor.read(() => {});
+      if (cancelled) return;
+
+      const complete = () => {
         if (!cancelled) completeEvidenceContentLoad(editor, loadToken);
-      } });
+      };
+      if (content) {
+        try {
+          const state = editor.parseEditorState(content);
+          editor.setEditorState(state, { tag: CONTENT_LOAD_TAG });
+          // Keep load completion tied to an actual committed state, and keep
+          // the following user update outside this tagged load boundary.
+          editor.read(() => {});
+          complete();
+          return;
+        } catch {
+          // Preserve the existing plain-text fallback for non-Lexical bodies.
+        }
+      }
+
+      editor.update(() => {
+        const root = $getRoot();
+        root.clear();
+        const paragraph = $createParagraphNode();
+        if (content) paragraph.append($createTextNode(content));
+        root.append(paragraph);
+      }, { tag: CONTENT_LOAD_TAG, discrete: true, onUpdate: complete });
     };
     Promise.resolve().then(run);
     return () => { cancelled = true; cancelEvidenceContentLoad(editor, loadToken) };
@@ -203,15 +217,15 @@ export default function Editor({ documentId, documentTitle, initialContent, onCh
     <LexicalComposer initialConfig={initialConfig}>
       <div className={`editor-shell${readOnly ? ' editor-reading-mode' : ''}`}>
         <EditableModePlugin readOnly={readOnly} />
-        {!readOnly && <ToolbarPlugin />}
+        {!readOnly && <ToolbarPlugin documentId={documentId} />}
         <SearchPlugin key={documentId} documentId={documentId} />
-        {!readOnly && <CommandPalettePlugin />}
+        {!readOnly && <CommandPalettePlugin documentId={documentId} />}
         <EditorViewSettingsPlugin readOnly={readOnly} />
         <MarkdownSourcePlugin readOnly={readOnly} />
         <ResourceManagerPlugin readOnly={readOnly} />
         {!readOnly && <FloatingTextToolbarPlugin />}
         <DocumentOutlinePlugin documentId={documentId} documentTitle={documentTitle} initialContent={initialContent} requireLoaded />
-        {!readOnly && <PasteImagePlugin />}
+        {!readOnly && <PasteImagePlugin documentId={documentId} />}
         <div className="editor-container">
           <RichTextPlugin
             contentEditable={(
@@ -235,7 +249,7 @@ export default function Editor({ documentId, documentTitle, initialContent, onCh
           <LinkInteractionPlugin readOnly={readOnly} />
           <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
           {!readOnly && <CodeBlockPlugin />}
-          {!readOnly && <SlashMenuPlugin />}
+          {!readOnly && <SlashMenuPlugin documentId={documentId} />}
           {!readOnly && <BlockHandlePlugin />}
           {!readOnly && <MentionPlugin />}
           <WikiLinkPlugin />
@@ -243,7 +257,7 @@ export default function Editor({ documentId, documentTitle, initialContent, onCh
           {!readOnly && <EditorShortcutPlugin />}
           {!readOnly && <FormulaShortcutPlugin />}
           {!readOnly && <ChecklistKeyboardPlugin />}
-          {!readOnly && <OnChangePlugin onChange={onChange} />}
+          <OnChangePlugin onChange={onChange} />
           <LoadContentPlugin content={initialContent} documentId={documentId} />
           <DocumentSessionPlugin documentId={documentId} restoreSelection={!readOnly} />
           <EvidenceNavigationPlugin documentId={documentId} initialContent={initialContent} />

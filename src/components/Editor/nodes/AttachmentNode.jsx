@@ -1,5 +1,6 @@
 import { $getNodeByKey, DecoratorNode } from 'lexical'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
+import { useLexicalEditable } from '@lexical/react/useLexicalEditable'
 import React, { useEffect, useRef, useState } from 'react'
 import { uploadFile } from '../utils/fileUpload'
 
@@ -138,6 +139,7 @@ export function getAttachmentPreviewType(name, mime) {
 
 function AttachmentComponent({ nodeKey, src, name, size, mime }) {
   const [editor] = useLexicalComposerContext()
+  const isEditable = useLexicalEditable()
   const [downloading, setDownloading] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [textPreview, setTextPreview] = useState('')
@@ -145,7 +147,22 @@ function AttachmentComponent({ nodeKey, src, name, size, mime }) {
   const [previewLoading, setPreviewLoading] = useState(false)
   const [replacing, setReplacing] = useState(false)
   const replaceInputRef = useRef(null)
+  const uploadGenerationRef = useRef(0)
   const previewType = getAttachmentPreviewType(name, mime)
+
+  useEffect(() => {
+    // A later return to editing is a new permission to act, not to finish old work.
+    const unregister = editor.registerEditableListener(editable => {
+      if (!editable) {
+        uploadGenerationRef.current += 1
+        setReplacing(false)
+      }
+    })
+    return () => {
+      uploadGenerationRef.current += 1
+      unregister()
+    }
+  }, [editor])
 
   useEffect(() => {
     if (!previewOpen) return undefined
@@ -238,20 +255,24 @@ function AttachmentComponent({ nodeKey, src, name, size, mime }) {
 
 
   const replaceAttachment = async event => {
+    if (!editor.isEditable()) return
     const file = event.target.files?.[0]
+    event.target.value = ''
     if (!file) return
     if (file.size > 100 * 1024 * 1024) {
       console.warn('替换附件超过 100 MB，已取消')
-      event.target.value = ''
       return
     }
 
+    const uploadGeneration = ++uploadGenerationRef.current
+    const canWrite = () => editor.isEditable() && uploadGeneration === uploadGenerationRef.current
     setReplacing(true)
     try {
       const result = await uploadFile(file)
-      if (!result?.url) return
+      if (!result?.url || !canWrite()) return
 
       editor.update(() => {
+        if (!canWrite()) return
         const node = $getNodeByKey(nodeKey)
         if (!$isAttachmentNode(node)) return
         node.setFile({
@@ -268,14 +289,15 @@ function AttachmentComponent({ nodeKey, src, name, size, mime }) {
     } catch (error) {
       console.error('替换附件失败', error)
     } finally {
-      setReplacing(false)
-      event.target.value = ''
+      if (uploadGeneration === uploadGenerationRef.current) setReplacing(false)
     }
   }
 
   const removeAttachment = () => {
+    if (!editor.isEditable()) return
     setPreviewOpen(false)
     editor.update(() => {
+      if (!editor.isEditable()) return
       const node = $getNodeByKey(nodeKey)
       if ($isAttachmentNode(node)) node.remove()
     })
@@ -315,15 +337,19 @@ function AttachmentComponent({ nodeKey, src, name, size, mime }) {
         </div>
 
         <div className="attachment-actions">
-          <button
-            type="button"
-            className="attachment-replace-button"
-            onClick={() => replaceInputRef.current?.click()}
-            disabled={replacing}
-          >
-            {replacing ? '替换中…' : '替换'}
-          </button>
-          <input ref={replaceInputRef} type="file" hidden onChange={replaceAttachment} />
+          {isEditable && (
+            <button
+              type="button"
+              className="attachment-replace-button"
+              onClick={() => {
+                if (editor.isEditable()) replaceInputRef.current?.click()
+              }}
+              disabled={replacing}
+            >
+              {replacing ? '替换中…' : '替换'}
+            </button>
+          )}
+          <input ref={replaceInputRef} type="file" hidden disabled={!isEditable || replacing} onChange={replaceAttachment} />
           {previewType && (
             <button
               type="button"
@@ -343,13 +369,13 @@ function AttachmentComponent({ nodeKey, src, name, size, mime }) {
           >
             {downloading ? '下载中…' : '下载'}
           </button>
-          <button
+          {isEditable && <button
             type="button"
             className="attachment-delete-button"
             onClick={removeAttachment}
           >
             删除
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -377,9 +403,9 @@ function AttachmentComponent({ nodeKey, src, name, size, mime }) {
                 <button type="button" onClick={download} disabled={downloading}>
                   {downloading ? '下载中…' : '下载'}
                 </button>
-                <button type="button" className="attachment-preview-delete" onClick={removeAttachment}>
+                {isEditable && <button type="button" className="attachment-preview-delete" onClick={removeAttachment}>
                   删除
-                </button>
+                </button>}
                 <button
                   type="button"
                   className="attachment-preview-close"

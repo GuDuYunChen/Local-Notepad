@@ -1,6 +1,7 @@
 import { DecoratorNode } from 'lexical';
 import React, { useRef, useEffect, useState } from 'react';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
+import { useLexicalEditable } from '@lexical/react/useLexicalEditable';
 import { $getNodeByKey } from 'lexical';
 
 import 'highlight.js/styles/atom-one-dark.css';
@@ -253,6 +254,7 @@ function LanguageSelector({ value, onChange, disabled = false }) {
 
 const CodeBlockComponent = React.memo(function CodeBlockComponent({ code, language, nodeKey }) {
   const [editor] = useLexicalComposerContext();
+  const isEditable = useLexicalEditable();
   const textareaRef = useRef(null);
   const preRef = useRef(null);
   const [autoHighlight, setAutoHighlight] = useState(true);
@@ -263,6 +265,16 @@ const CodeBlockComponent = React.memo(function CodeBlockComponent({ code, langua
   const highlightTimeoutRef = useRef(null);
   const highlightRequestRef = useRef(0);
   const searchTargetTimeoutRef = useRef(null);
+  const pasteTimeoutRef = useRef(null);
+
+  useEffect(() => {
+    const cancelPaste = () => {
+      if (pasteTimeoutRef.current !== null) clearTimeout(pasteTimeoutRef.current);
+      pasteTimeoutRef.current = null;
+    };
+    const unregister = editor.registerEditableListener(editable => { if (!editable) cancelPaste(); });
+    return () => { unregister(); cancelPaste(); };
+  }, [editor]);
 
   // Performance optimization: detect large files
   const MAX_LINES_FOR_AUTO_HIGHLIGHT = 1000;
@@ -386,8 +398,6 @@ const CodeBlockComponent = React.memo(function CodeBlockComponent({ code, langua
     };
   }, [code, nodeKey]);
 
-  const isEditable = editor.isEditable();
-
   const copyCode = async () => {
     try {
       if (navigator.clipboard?.writeText) {
@@ -411,8 +421,9 @@ const CodeBlockComponent = React.memo(function CodeBlockComponent({ code, langua
   };
 
   const removeCodeBlock = () => {
-    if (!isEditable) return;
+    if (!editor.isEditable()) return;
     editor.update(() => {
+      if (!editor.isEditable()) return;
       const node = $getNodeByKey(nodeKey);
       if (node && $isCodeBlockNode(node)) {
         node.remove();
@@ -422,8 +433,10 @@ const CodeBlockComponent = React.memo(function CodeBlockComponent({ code, langua
 
   // Handle textarea input changes
   const handleTextareaChange = (event) => {
+    if (!editor.isEditable()) return;
     const newCode = event.target.value;
     editor.update(() => {
+      if (!editor.isEditable()) return;
       const node = $getNodeByKey(nodeKey);
       if (node && $isCodeBlockNode(node)) {
         node.setCode(newCode);
@@ -433,10 +446,16 @@ const CodeBlockComponent = React.memo(function CodeBlockComponent({ code, langua
 
   // Handle paste events
   const handlePaste = (event) => {
+    if (!editor.isEditable()) return;
+    const target = event.currentTarget;
+    if (pasteTimeoutRef.current !== null) clearTimeout(pasteTimeoutRef.current);
     // Let the default paste behavior work
-    setTimeout(() => {
+    pasteTimeoutRef.current = setTimeout(() => {
+      pasteTimeoutRef.current = null;
+      if (!editor.isEditable() || textareaRef.current !== target || !target.isConnected) return;
       const newCode = textareaRef.current?.value || '';
       editor.update(() => {
+        if (!editor.isEditable()) return;
         const node = $getNodeByKey(nodeKey);
         if (node && $isCodeBlockNode(node)) {
           node.setCode(newCode);
@@ -447,7 +466,9 @@ const CodeBlockComponent = React.memo(function CodeBlockComponent({ code, langua
 
   // Handle language selection changes
   const handleLanguageChange = (newLanguage) => {
+    if (!editor.isEditable()) return;
     editor.update(() => {
+      if (!editor.isEditable()) return;
       const node = $getNodeByKey(nodeKey);
       if (node && $isCodeBlockNode(node)) {
         node.setLanguage(newLanguage);

@@ -1,5 +1,6 @@
 import { $getNodeByKey, DecoratorNode } from 'lexical'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
+import { useLexicalEditable } from '@lexical/react/useLexicalEditable'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { uploadFile } from '../utils/fileUpload'
 
@@ -128,6 +129,7 @@ export function reorderImageGridItems(items, fromIndex, toIndex) {
 
 function ImageGridComponent({ nodeKey, items, columns, gap }) {
   const [editor] = useLexicalComposerContext()
+  const isEditable = useLexicalEditable()
   const [selected, setSelected] = useState(false)
   const [currentColumns, setCurrentColumns] = useState(columns || 3)
   const [currentGap, setCurrentGap] = useState(gap || 8)
@@ -139,10 +141,31 @@ function ImageGridComponent({ nodeKey, items, columns, gap }) {
   const wrapperRef = useRef(null)
   const addInputRef = useRef(null)
   const replaceInputRef = useRef(null)
+  const uploadGenerationRef = useRef(0)
+  const dragIndexRef = useRef(-1)
 
   useEffect(() => setCurrentColumns(columns || 3), [columns])
   useEffect(() => setCurrentGap(gap || 8), [gap])
   useEffect(() => setCurrentItems(normalizeItems(items)), [items])
+
+  useEffect(() => {
+    // Revoke pending uploads and drags at the transition, even within one React batch.
+    const unregister = editor.registerEditableListener(editable => {
+      if (!editable) {
+        uploadGenerationRef.current += 1
+        dragIndexRef.current = -1
+        setDragIndex(-1)
+        setDragOverIndex(-1)
+        setReplaceIndex(-1)
+        setUploading(false)
+      }
+    })
+    return () => {
+      uploadGenerationRef.current += 1
+      dragIndexRef.current = -1
+      unregister()
+    }
+  }, [editor])
 
   useEffect(() => {
     if (!selected) return undefined
@@ -158,8 +181,15 @@ function ImageGridComponent({ nodeKey, items, columns, gap }) {
     [currentColumns]
   )
 
-  const updateNode = patch => {
+  const uploadIsCurrent = generation => editor.isEditable() && generation === uploadGenerationRef.current
+
+  const updateNode = (patch, uploadGeneration) => {
+    const canWrite = () => editor.isEditable() && (
+      uploadGeneration === undefined || uploadIsCurrent(uploadGeneration)
+    )
+    if (!canWrite()) return
     editor.update(() => {
+      if (!canWrite()) return
       const node = $getNodeByKey(nodeKey)
       if (!$isImageGridNode(node)) return
       if (patch.columns !== undefined) node.setColumns(patch.columns)
@@ -169,16 +199,19 @@ function ImageGridComponent({ nodeKey, items, columns, gap }) {
   }
 
   const changeColumns = next => {
+    if (!editor.isEditable()) return
     setCurrentColumns(next)
     updateNode({ columns: next })
   }
 
   const changeGap = next => {
+    if (!editor.isEditable()) return
     setCurrentGap(next)
     updateNode({ gap: next })
   }
 
   const changeCaption = (index, caption) => {
+    if (!editor.isEditable()) return
     const nextItems = currentItems.map((item, itemIndex) => (
       itemIndex === index ? { ...item, caption } : item
     ))
@@ -187,6 +220,7 @@ function ImageGridComponent({ nodeKey, items, columns, gap }) {
   }
 
   const reorderItems = (fromIndex, toIndex) => {
+    if (!editor.isEditable()) return
     const nextItems = reorderImageGridItems(currentItems, fromIndex, toIndex)
     if (nextItems === currentItems) return
     setCurrentItems(nextItems)
@@ -194,7 +228,12 @@ function ImageGridComponent({ nodeKey, items, columns, gap }) {
   }
 
   const handleDragStart = (event, index) => {
+    if (!editor.isEditable()) {
+      event.preventDefault()
+      return
+    }
     event.stopPropagation()
+    dragIndexRef.current = index
     setSelected(true)
     setDragIndex(index)
     setDragOverIndex(index)
@@ -203,6 +242,7 @@ function ImageGridComponent({ nodeKey, items, columns, gap }) {
   }
 
   const handleDragOver = (event, index) => {
+    if (!editor.isEditable() || dragIndexRef.current < 0) return
     if (dragIndex < 0 || index === dragOverIndex) return
     event.preventDefault()
     event.dataTransfer.dropEffect = 'move'
@@ -212,24 +252,28 @@ function ImageGridComponent({ nodeKey, items, columns, gap }) {
   const handleDrop = (event, index) => {
     event.preventDefault()
     event.stopPropagation()
-    if (dragIndex >= 0) reorderItems(dragIndex, index)
+    if (editor.isEditable() && dragIndexRef.current >= 0) reorderItems(dragIndexRef.current, index)
+    dragIndexRef.current = -1
     setDragIndex(-1)
     setDragOverIndex(-1)
   }
 
   const handleDragEnd = () => {
+    dragIndexRef.current = -1
     setDragIndex(-1)
     setDragOverIndex(-1)
   }
 
-  const uploadImageFiles = async files => {
+  const uploadImageFiles = async (files, uploadGeneration) => {
     const validFiles = Array.from(files || []).filter(file => file.size <= 10 * 1024 * 1024)
     if (!validFiles.length) return []
 
     const results = []
     for (const file of validFiles) {
+      if (!uploadIsCurrent(uploadGeneration)) return []
       try {
         const result = await uploadFile(file)
+        if (!uploadIsCurrent(uploadGeneration)) return []
         if (result?.url) {
           results.push({
             src: result.url,
@@ -247,34 +291,38 @@ function ImageGridComponent({ nodeKey, items, columns, gap }) {
   }
 
   const handleAddImages = async event => {
-    const files = event.target.files
+    if (!editor.isEditable()) return
+    const files = Array.from(event.target.files || [])
+    event.target.value = ''
     if (!files?.length) return
 
+    const uploadGeneration = ++uploadGenerationRef.current
     setUploading(true)
     try {
-      const additions = await uploadImageFiles(files)
-      if (!additions.length) return
+      const additions = await uploadImageFiles(files, uploadGeneration)
+      if (!additions.length || !uploadIsCurrent(uploadGeneration)) return
       const nextItems = appendImageGridItems(currentItems, additions)
       setCurrentItems(nextItems)
-      updateNode({ items: nextItems })
+      updateNode({ items: nextItems }, uploadGeneration)
     } finally {
-      setUploading(false)
-      event.target.value = ''
+      if (uploadGeneration === uploadGenerationRef.current) setUploading(false)
     }
   }
 
   const handleReplaceImage = async event => {
+    if (!editor.isEditable()) return
     const file = event.target.files?.[0]
+    event.target.value = ''
     if (!file || replaceIndex < 0) return
     if (file.size > 10 * 1024 * 1024) {
-      event.target.value = ''
       return
     }
 
+    const uploadGeneration = ++uploadGenerationRef.current
     setUploading(true)
     try {
       const result = await uploadFile(file)
-      if (!result?.url) return
+      if (!result?.url || !uploadIsCurrent(uploadGeneration)) return
 
       const nextItems = replaceImageGridItem(currentItems, replaceIndex, {
         src: result.url,
@@ -282,21 +330,24 @@ function ImageGridComponent({ nodeKey, items, columns, gap }) {
         alt: file.name,
       })
       setCurrentItems(nextItems)
-      updateNode({ items: nextItems })
+      updateNode({ items: nextItems }, uploadGeneration)
     } catch (error) {
       console.error('替换图片组图片失败', error)
     } finally {
-      setUploading(false)
-      setReplaceIndex(-1)
-      event.target.value = ''
+      if (uploadGeneration === uploadGenerationRef.current) {
+        setUploading(false)
+        setReplaceIndex(-1)
+      }
     }
   }
 
   const removeItem = index => {
+    if (!editor.isEditable()) return
     const nextItems = currentItems.filter((_, itemIndex) => itemIndex !== index)
 
     if (nextItems.length === 0) {
       editor.update(() => {
+        if (!editor.isEditable()) return
         const node = $getNodeByKey(nodeKey)
         if ($isImageGridNode(node)) node.remove()
       })
@@ -308,7 +359,9 @@ function ImageGridComponent({ nodeKey, items, columns, gap }) {
   }
 
   const deleteGrid = () => {
+    if (!editor.isEditable()) return
     editor.update(() => {
+      if (!editor.isEditable()) return
       const node = $getNodeByKey(nodeKey)
       if ($isImageGridNode(node)) node.remove()
     })
@@ -320,7 +373,7 @@ function ImageGridComponent({ nodeKey, items, columns, gap }) {
       className={`editor-image-grid-block${selected ? ' selected' : ''}`}
       onClick={() => setSelected(true)}
     >
-      {selected && (
+      {selected && isEditable && (
         <div className="editor-image-grid-toolbar" role="toolbar" aria-label="图片组工具">
           <span>列数</span>
           {[2, 3, 4].map(value => (
@@ -364,6 +417,7 @@ function ImageGridComponent({ nodeKey, items, columns, gap }) {
             type="button"
             onClick={event => {
               event.stopPropagation()
+              if (!editor.isEditable()) return
               addInputRef.current?.click()
             }}
             disabled={uploading}
@@ -376,6 +430,7 @@ function ImageGridComponent({ nodeKey, items, columns, gap }) {
             accept="image/*"
             multiple
             hidden
+            disabled={!isEditable || uploading}
             onChange={handleAddImages}
           />
 
@@ -407,7 +462,7 @@ function ImageGridComponent({ nodeKey, items, columns, gap }) {
             onDrop={event => handleDrop(event, index)}
           >
             <div className="editor-image-grid-media">
-              {selected && (
+              {selected && isEditable && (
                 <button
                   type="button"
                   className="editor-image-grid-drag"
@@ -428,13 +483,14 @@ function ImageGridComponent({ nodeKey, items, columns, gap }) {
                 title={item.alt || item.caption || ''}
               />
 
-              {selected && (
+              {selected && isEditable && (
                 <div className="editor-image-grid-card-actions">
                   <button
                     type="button"
                     className="editor-image-grid-replace"
                     onClick={event => {
                       event.stopPropagation()
+                      if (!editor.isEditable()) return
                       setReplaceIndex(index)
                       replaceInputRef.current?.click()
                     }}
@@ -464,6 +520,7 @@ function ImageGridComponent({ nodeKey, items, columns, gap }) {
               <input
                 className="editor-image-grid-caption"
                 value={item.caption || ''}
+                readOnly={!isEditable}
                 onChange={event => changeCaption(index, event.target.value)}
                 onClick={event => event.stopPropagation()}
                 placeholder="图片说明…"
@@ -478,6 +535,7 @@ function ImageGridComponent({ nodeKey, items, columns, gap }) {
         type="file"
         accept="image/*"
         hidden
+        disabled={!isEditable || uploading}
         onChange={handleReplaceImage}
       />
     </figure>

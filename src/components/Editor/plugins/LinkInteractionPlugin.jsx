@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
+import { useLexicalEditable } from '@lexical/react/useLexicalEditable'
 import {
   $getNearestNodeFromDOMNode,
   $getNodeByKey,
@@ -24,6 +25,8 @@ function getLinkNodeFromDOM(anchor) {
 
 export default function LinkInteractionPlugin({ readOnly = false }) {
   const [editor] = useLexicalComposerContext()
+  const isEditable = useLexicalEditable()
+  const canEdit = isEditable && !readOnly
   const [popover, setPopover] = useState(null)
   const [draftUrl, setDraftUrl] = useState('')
   const [invalid, setInvalid] = useState(false)
@@ -52,11 +55,12 @@ export default function LinkInteractionPlugin({ readOnly = false }) {
   }, [close])
 
   useEffect(() => {
-    if (readOnly) return undefined
+    if (!canEdit) return undefined
 
     return editor.registerCommand(
       PASTE_COMMAND,
       event => {
+        if (!editor.isEditable() || readOnly) return false
         if (event.clipboardData?.files?.length) return false
 
         const pasted = event.clipboardData?.getData('text/plain')?.trim() || ''
@@ -79,7 +83,7 @@ export default function LinkInteractionPlugin({ readOnly = false }) {
       },
       COMMAND_PRIORITY_HIGH
     )
-  }, [editor, readOnly])
+  }, [editor, readOnly, canEdit])
 
   useEffect(() => {
     const root = editor.getRootElement()
@@ -92,7 +96,7 @@ export default function LinkInteractionPlugin({ readOnly = false }) {
       event.preventDefault()
 
       const href = anchor.getAttribute('href') || ''
-      if (readOnly || event.ctrlKey || event.metaKey) {
+      if (readOnly || !editor.isEditable() || event.ctrlKey || event.metaKey) {
         openUrl(href)
         return
       }
@@ -105,7 +109,7 @@ export default function LinkInteractionPlugin({ readOnly = false }) {
         if (!linkNode) return
         nodeKey = linkNode.getKey()
         url = linkNode.getURL()
-      })
+      }, { editor })
 
       if (!nodeKey) return
 
@@ -162,7 +166,7 @@ export default function LinkInteractionPlugin({ readOnly = false }) {
   }, [popover])
 
   const applyUrl = () => {
-    if (!popover?.nodeKey || readOnly) return
+    if (!popover?.nodeKey || readOnly || !editor.isEditable()) return
 
     const nextUrl = normalizeLinkUrl(draftUrl)
     if (!nextUrl) {
@@ -171,6 +175,7 @@ export default function LinkInteractionPlugin({ readOnly = false }) {
     }
 
     editor.update(() => {
+      if (readOnly || !editor.isEditable()) return
       const node = $getNodeByKey(popover.nodeKey)
       if ($isLinkNode(node)) node.setURL(nextUrl)
     })
@@ -182,9 +187,10 @@ export default function LinkInteractionPlugin({ readOnly = false }) {
   }
 
   const removeLink = () => {
-    if (!popover?.nodeKey || readOnly) return
+    if (!popover?.nodeKey || readOnly || !editor.isEditable()) return
 
     editor.update(() => {
+      if (readOnly || !editor.isEditable()) return
       const node = $getNodeByKey(popover.nodeKey)
       if (!$isLinkNode(node)) return
 
@@ -197,8 +203,10 @@ export default function LinkInteractionPlugin({ readOnly = false }) {
     editor.focus()
   }
 
+  const actionUrl = () => !readOnly && editor.isEditable() ? draftUrl || popover?.url : popover?.url
+
   const copyUrl = async () => {
-    const value = draftUrl || popover?.url
+    const value = actionUrl()
     if (!value) return
 
     try {
@@ -223,7 +231,7 @@ export default function LinkInteractionPlugin({ readOnly = false }) {
         {isHeadingAnchor(popover.url) ? '章节链接' : '网页链接'}
       </div>
 
-      {!readOnly ? (
+      {canEdit ? (
         <div className="editor-link-popover-input-row">
           <input
             value={draftUrl}
@@ -254,11 +262,11 @@ export default function LinkInteractionPlugin({ readOnly = false }) {
       )}
 
       <div className="editor-link-popover-actions">
-        <button type="button" onClick={() => openUrl(draftUrl || popover.url)}>
-          {isHeadingAnchor(draftUrl || popover.url) ? '跳转' : '打开'}
+        <button type="button" onClick={() => openUrl(actionUrl())}>
+          {isHeadingAnchor(actionUrl()) ? '跳转' : '打开'}
         </button>
         <button type="button" onClick={() => void copyUrl()}>复制</button>
-        {!readOnly && (
+        {canEdit && (
           <button type="button" className="danger" onClick={removeLink}>移除</button>
         )}
       </div>

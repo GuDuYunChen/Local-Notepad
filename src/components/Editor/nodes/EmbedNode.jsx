@@ -1,5 +1,6 @@
 import { $getNodeByKey, DecoratorNode } from 'lexical'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
+import { useLexicalEditable } from '@lexical/react/useLexicalEditable'
 import React, { useEffect, useState } from 'react'
 
 export class EmbedNode extends DecoratorNode {
@@ -71,6 +72,7 @@ export class EmbedNode extends DecoratorNode {
 
 function EmbedComponent({ nodeKey, url, title }) {
   const [editor] = useLexicalComposerContext()
+  const isEditable = useLexicalEditable()
   const [editUrl, setEditUrl] = useState(url || '')
   const [editTitle, setEditTitle] = useState(title || '')
   const [isEditing, setIsEditing] = useState(!url)
@@ -79,7 +81,9 @@ function EmbedComponent({ nodeKey, url, title }) {
   useEffect(() => setEditTitle(title || ''), [title])
 
   const persist = () => {
+    if (!editor.isEditable()) return
     editor.update(() => {
+      if (!editor.isEditable()) return
       const node = $getNodeByKey(nodeKey)
       if (!$isEmbedNode(node)) return
       node.setUrl(editUrl.trim())
@@ -88,7 +92,7 @@ function EmbedComponent({ nodeKey, url, title }) {
   }
 
   const handleSave = () => {
-    if (!editUrl.trim()) return
+    if (!editor.isEditable() || !editUrl.trim()) return
     persist()
     setIsEditing(false)
   }
@@ -131,20 +135,20 @@ function EmbedComponent({ nodeKey, url, title }) {
 
   const embedUrl = getEmbedUrl(editUrl)
 
-  if (isEditing) {
+  if (isEditing && isEditable) {
     return (
       <div className="embed-block embed-editing">
         <input
           type="url"
           value={editUrl}
-          onChange={(event) => setEditUrl(event.target.value)}
+          onChange={(event) => { if (editor.isEditable()) setEditUrl(event.target.value) }}
           placeholder="粘贴 YouTube、Bilibili 或其他支持的链接"
           className="embed-input"
         />
         <input
           type="text"
           value={editTitle}
-          onChange={(event) => setEditTitle(event.target.value)}
+          onChange={(event) => { if (editor.isEditable()) setEditTitle(event.target.value) }}
           placeholder="标题（可选）"
           className="embed-input"
         />
@@ -182,9 +186,9 @@ function EmbedComponent({ nodeKey, url, title }) {
       ) : (
         <div className="embed-placeholder">这个链接暂不支持嵌入显示</div>
       )}
-      <button type="button" onClick={() => setIsEditing(true)} className="embed-edit-btn" aria-label="编辑嵌入内容">
+      {isEditable && <button type="button" onClick={() => { if (editor.isEditable()) setIsEditing(true) }} className="embed-edit-btn" aria-label="编辑嵌入内容">
         编辑嵌入
-      </button>
+      </button>}
     </div>
   )
 }

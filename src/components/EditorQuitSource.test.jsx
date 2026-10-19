@@ -8,6 +8,7 @@ import { editorQuit } from '~/services/editorQuit.mjs'
 // This narrow source-panel fixture must not replace the Lexical context used by
 // the separate TextEditor/IME tests. Both suites run in the exit-save CI gate.
 const fakeEditor = vi.hoisted(() => ({
+  isEditable: () => true,
   getEditorState: () => ({}),
   parseEditorState: value => value,
   setEditorState: vi.fn(),
@@ -15,6 +16,11 @@ const fakeEditor = vi.hoisted(() => ({
 }))
 vi.mock('@lexical/react/LexicalComposerContext', () => ({
   useLexicalComposerContext: () => [fakeEditor],
+}))
+// This fixture models the editable source/quit bridge only. The real reactive
+// Lexical subscription and mode changes are exercised by ReadingModePlugins.
+vi.mock('@lexical/react/useLexicalEditable', () => ({
+  useLexicalEditable: () => fakeEditor.isEditable(),
 }))
 vi.mock('~/services/markdownSource', () => ({
   analyzeMarkdownSourceCompatibility: () => ({ markdown: 'original', issues: [], editable: true }),

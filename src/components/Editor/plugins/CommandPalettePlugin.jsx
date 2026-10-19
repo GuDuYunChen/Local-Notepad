@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { $insertNodes } from 'lexical'
 import { blockRegistry } from '../utils/blockRegistry'
+import { useEditorWriteScope } from '../hooks/useEditorWriteScope'
 
 const EXTRA_COMMANDS = [
   {
@@ -55,20 +56,23 @@ export function filterCommandPaletteCommands(commands, query) {
   })
 }
 
-function buildCommands(editor) {
+function buildCommands(editor, captureWrite) {
   const blockCommands = blockRegistry.map(block => ({
     id: 'block:' + block.type,
     label: block.label,
     description: block.description || '插入内容块',
     keywords: block.keywords || [],
     run: async () => {
+      const canWrite = captureWrite()
+      if (!canWrite()) return
       if (block.run) {
-        await block.run(editor)
+        await block.run(editor, canWrite)
         return
       }
 
       if (!block.createNode) return
       editor.update(() => {
+        if (!canWrite()) return
         const node = block.createNode()
         if (node) $insertNodes([node])
       })
@@ -82,13 +86,14 @@ function buildCommands(editor) {
   ]
 }
 
-export default function CommandPalettePlugin() {
+export default function CommandPalettePlugin({ documentId } = {}) {
   const [editor] = useLexicalComposerContext()
+  const captureWrite = useEditorWriteScope(editor, documentId)
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
   const inputRef = useRef(null)
-  const commands = useMemo(() => buildCommands(editor), [editor])
+  const commands = useMemo(() => buildCommands(editor, captureWrite), [editor, captureWrite])
   const filtered = useMemo(
     () => filterCommandPaletteCommands(commands, query),
     [commands, query]
@@ -134,13 +139,14 @@ export default function CommandPalettePlugin() {
   }
 
   const runCommand = async command => {
-    if (!command) return
+    const canWrite = captureWrite()
+    if (!command || !canWrite()) return
     setOpen(false)
     setQuery('')
     try {
       await command.run()
     } finally {
-      editor.focus()
+      if (canWrite()) editor.focus()
     }
   }
 

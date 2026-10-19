@@ -51,6 +51,7 @@ import { compressImage, generateVideoMetadata, loadXLSX, uploadFile } from '../u
 import { toast } from '~/services/toast'
 import TableMenu from './TableMenu'
 import { normalizeLinkUrl } from '../utils/linkUtils'
+import { useEditorWriteScope } from '../hooks/useEditorWriteScope'
 import './TextColorPlugin.css'
 
 const FontOptions = [
@@ -94,8 +95,9 @@ const BLOCK_OPTIONS = [
   ['quote', '引用'],
 ]
 
-export default function ToolbarPlugin() {
+export default function ToolbarPlugin({ documentId } = {}) {
   const [editor] = useLexicalComposerContext()
+  const captureWrite = useEditorWriteScope(editor, documentId)
   const [canUndo, setCanUndo] = useState(false)
   const [canRedo, setCanRedo] = useState(false)
   const [fontSize, setFontSize] = useState('16px')
@@ -337,6 +339,8 @@ export default function ToolbarPlugin() {
   }
 
   const handleAttachment = async (event) => {
+    const canWrite = captureWrite()
+    if (!canWrite()) return
     const file = event.target.files?.[0]
     if (!file) return
 
@@ -349,9 +353,10 @@ export default function ToolbarPlugin() {
     setIsUploading(true)
     try {
       const result = await uploadFileSafe(file)
-      if (!result) return
+      if (!result || !canWrite()) return
 
       editor.update(() => {
+        if (!canWrite()) return
         $insertNodes([
           $createAttachmentNode({
             src: result.url,
@@ -369,6 +374,8 @@ export default function ToolbarPlugin() {
   }
 
   const handleImage = async (event) => {
+    const canWrite = captureWrite()
+    if (!canWrite()) return
     const files = Array.from(event.target.files || [])
     if (!files.length) return
 
@@ -387,6 +394,7 @@ export default function ToolbarPlugin() {
         if (!skipCompress && file.size > 2 * 1024 * 1024) {
           try {
             const compressedFile = await compressImage(file)
+            if (!canWrite()) return null
             const [compressed, original] = await Promise.all([
               uploadFileSafe(compressedFile),
               uploadFileSafe(file),
@@ -403,6 +411,7 @@ export default function ToolbarPlugin() {
           }
         }
 
+        if (!canWrite()) return null
         const result = await uploadFileSafe(file)
         return result
           ? { src: result.url, originalSrc: result.url, alt: file.name }
@@ -410,9 +419,10 @@ export default function ToolbarPlugin() {
       }))
 
       const items = uploads.filter(Boolean)
-      if (!items.length) return
+      if (!items.length || !canWrite()) return
 
       editor.update(() => {
+        if (!canWrite()) return
         if (items.length === 1) {
           const item = items[0]
           $insertNodes([
@@ -435,6 +445,8 @@ export default function ToolbarPlugin() {
   }
 
   const handleVideo = async (event) => {
+    const canWrite = captureWrite()
+    if (!canWrite()) return
     const file = event.target.files?.[0]
     if (!file) return
 
@@ -447,8 +459,9 @@ export default function ToolbarPlugin() {
     setIsUploading(true)
     try {
       const metadata = await generateVideoMetadata(file)
+      if (!canWrite()) return
       const videoResult = await uploadFileSafe(file)
-      if (!videoResult) return
+      if (!videoResult || !canWrite()) return
 
       let coverUrl = null
       if (metadata.coverFile) {
@@ -457,6 +470,7 @@ export default function ToolbarPlugin() {
       }
 
       editor.update(() => {
+        if (!canWrite()) return
         $insertNodes([
           $createVideoNode({
             src: videoResult.url,
@@ -476,6 +490,8 @@ export default function ToolbarPlugin() {
   }
 
   const handleExcel = async (event) => {
+    const canWrite = captureWrite()
+    if (!canWrite()) return
     const file = event.target.files?.[0]
     if (!file) return
 
@@ -490,13 +506,16 @@ export default function ToolbarPlugin() {
 
     reader.onload = async (loadEvent) => {
       try {
+        if (!canWrite()) return
         const XLSX = await loadXLSX()
+        if (!canWrite()) return
         const data = new Uint8Array(loadEvent.target.result)
         const workbook = XLSX.read(data, { type: 'array' })
         const sheet = workbook.Sheets[workbook.SheetNames[0]]
         const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
 
         editor.update(() => {
+          if (!canWrite()) return
           const table = $createTableNode()
           for (const rowData of rows) {
             const tableRow = $createTableRowNode()
@@ -523,7 +542,7 @@ export default function ToolbarPlugin() {
     reader.onerror = () => {
       setIsUploading(false)
       event.target.value = ''
-      toast.error('读取 Excel 文件失败')
+      if (canWrite()) toast.error('读取 Excel 文件失败')
     }
 
     reader.readAsArrayBuffer(file)

@@ -1,5 +1,6 @@
 import { $getNodeByKey, DecoratorNode } from 'lexical'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
+import { useLexicalEditable } from '@lexical/react/useLexicalEditable'
 import React, { useEffect, useState } from 'react'
 
 const CALLOUT_ICONS = ['💡', '⚠️', 'ℹ️', '✅', '❌', '📌', '🔔', '💬']
@@ -73,6 +74,7 @@ export class CalloutNode extends DecoratorNode {
 
 function CalloutComponent({ nodeKey, icon, text }) {
   const [editor] = useLexicalComposerContext()
+  const isEditable = useLexicalEditable()
   const [currentIcon, setCurrentIcon] = useState(icon || '💡')
   const [editText, setEditText] = useState(text || '')
   const [showIconPicker, setShowIconPicker] = useState(false)
@@ -81,7 +83,9 @@ function CalloutComponent({ nodeKey, icon, text }) {
   useEffect(() => setEditText(text || ''), [text])
 
   const persist = (patch) => {
+    if (!editor.isEditable()) return
     editor.update(() => {
+      if (!editor.isEditable()) return
       const node = $getNodeByKey(nodeKey)
       if (!$isCalloutNode(node)) return
       if (patch.icon !== undefined) node.setIcon(patch.icon)
@@ -90,12 +94,14 @@ function CalloutComponent({ nodeKey, icon, text }) {
   }
 
   const handleIconSelect = (nextIcon) => {
+    if (!editor.isEditable()) return
     setCurrentIcon(nextIcon)
     setShowIconPicker(false)
     persist({ icon: nextIcon })
   }
 
   const handleTextChange = (event) => {
+    if (!editor.isEditable()) return
     const next = event.target.value
     setEditText(next)
     persist({ text: next })
@@ -107,14 +113,15 @@ function CalloutComponent({ nodeKey, icon, text }) {
         <button
           type="button"
           className="callout-icon-btn"
-          onClick={() => setShowIconPicker(prev => !prev)}
+          onClick={() => { if (editor.isEditable()) setShowIconPicker(prev => !prev) }}
+          disabled={!isEditable}
           aria-label="选择提示图标"
-          aria-expanded={showIconPicker}
+          aria-expanded={showIconPicker && isEditable}
         >
           {currentIcon}
         </button>
 
-        {showIconPicker && (
+        {showIconPicker && isEditable && (
           <div className="callout-icon-picker">
             {CALLOUT_ICONS.map(item => (
               <button
@@ -134,6 +141,7 @@ function CalloutComponent({ nodeKey, icon, text }) {
       <div className="callout-content">
         <textarea
           value={editText}
+          readOnly={!isEditable}
           onChange={handleTextChange}
           className="callout-textarea"
           placeholder="输入提示、结论或注意事项…"
