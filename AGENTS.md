@@ -22,6 +22,7 @@ These process limits do not diagnose or guarantee prevention of ChatGPT stream f
 
 Read `docs/ASSISTANT_EXECUTION_INCIDENTS.md` for assistant-caused execution risks; do not substitute the product defect catalog for that request.
 Before pushing, test negative evidence/scope cases locally. Do not chain a new feature onto an unaccepted fix.
+Before a code-bearing push, run the unfiltered default Vitest suite as well as the focused test:ui list; the default suite also reaches shared Electron source pins and real loopback/Go contracts. Use the exact CI Go toolchain when needed. Missing tools, EPERM, filtered cases or a file-level pass are not full-suite acceptance. Review every protected source pin affected by an intentional change before rebasing its exact digest; preserve the original assertions and failures.
 Observe the same workflow at least 90 seconds apart. At 30 external connector calls, checkpoint and reassess the remaining work instead of unbounded polling/downloads.
 Record final acceptance in a PR comment/local report, not a new source commit just to update status and restart every workflow.
 

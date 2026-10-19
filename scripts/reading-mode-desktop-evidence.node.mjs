@@ -6,6 +6,8 @@ import os from 'node:os'
 import path from 'node:path'
 import { READING_CHECKS, READING_ATTEMPTS, validateReadingModeDesktopReport, verifyReadingModeDesktopReport } from './reading-mode-desktop-evidence.mjs'
 import { readingEvidenceFixture } from './reading-mode-test-fixture.mjs'
+import { inspectReadingNativeWindows } from './check-reading-mode-desktop.mjs'
+import { selectDesktopUnappliedDialog, UNAPPLIED_QUIT_DIALOG_TITLE, UNAPPLIED_QUIT_DIALOG_MESSAGE } from './desktop-window-target.mjs'
 
 const validate = report => validateReadingModeDesktopReport(report, 'b'.repeat(40), 'a'.repeat(40))
 test('reading report contract binds draft, native guards, exact changes and real reload', () => assert.equal(validate(readingEvidenceFixture()), true))
@@ -79,6 +81,12 @@ for (const [name, mutate] of [
   ['quit no longer has the main window during rejection', p => p.quit.windowsDuringBlock.shift()],
   ['native error has only a partial message', p => { p.quit.dialog.childText = ['未应用']; p.quit.windowsDuringBlock[1].childText = ['未应用'] }],
   ['native error has another title', p => { p.quit.dialog.title = 'Other error'; p.quit.windowsDuringBlock[1].title = 'Other error' }],
+  ['native Error caption lacks application instruction', p => {
+    p.quit.dialog.childText = [UNAPPLIED_QUIT_DIALOG_MESSAGE, 'OK']; p.quit.windowsDuringBlock[1].childText = [...p.quit.dialog.childText]
+  }],
+  ['native Error caption lacks complete content', p => {
+    p.quit.dialog.childText = [UNAPPLIED_QUIT_DIALOG_TITLE, 'OK']; p.quit.windowsDuringBlock[1].childText = [...p.quit.dialog.childText]
+  }],
   ['native error belongs to another process', p => { p.quit.dialog.pid++; p.quit.windowsDuringBlock[1].pid++ }],
   ['ambiguous matching native error dialogs', p => p.quit.windowsDuringBlock.push({ ...p.quit.dialog, handle: 401 })],
   ['native dialog remains after claimed dismissal', p => p.quit.windowsAfterDismiss.push({ ...p.quit.dialog })],
@@ -93,6 +101,15 @@ for (const [name, mutate] of [
   ['replayed request ID', p => p.quit.helperEvents[3].id--],
   ['native receipt belongs to another PID', p => p.quit.helperEvents[1].pid++],
   ['unconfirmed native refusal close', p => p.quit.helperEvents[1].completed = false],
+  ['missing raw native observations', p => delete p.quit.nativeObservations],
+  ['missing changed native snapshot', p => p.quit.nativeObservations.changes.splice(1, 1)],
+  ['missing last native snapshot', p => delete p.quit.nativeObservations.last],
+  ['native snapshot forged inspect ID', p => p.quit.nativeObservations.last.nativeRequest.id += 100],
+  ['native snapshot wrong receipt time', p => p.quit.nativeObservations.changes[1].nativeRequest.elapsedMs++],
+  ['native snapshot wrong request PID', p => p.quit.nativeObservations.changes[1].nativeRequest.pid++],
+  ['native snapshot rows differ from matched dialog', p => p.quit.nativeObservations.changes[1].windows[1].childText = ['changed observation']],
+  ['native snapshot has wrong lifecycle phase', p => p.quit.nativeObservations.changes[1].phase = 'after-dismiss'],
+  ['native last snapshot differs from returned windows', p => p.quit.nativeObservations.last.windows = []],
   ['recovery lost formula before explicit Cancel', p => p.recovery.returned.formulaDraft = 'x^2 + y^2'],
   ['recovery lost embed before explicit Cancel', p => p.recovery.returned.embedDraftURL = ''],
   ['recovery Cancel kept pending registration', p => p.recovery.cancelled.pendingText = '公式、嵌入内容'],
@@ -114,11 +131,65 @@ for (const stage of ['afterFormula', 'afterEmbed']) test(stage + ' exact body co
   assert.throws(() => validate(report), new RegExp(stage === 'afterFormula' ? 'Formula completion changed' : 'Embed completion changed'))
 })
 test('reading trace accepts preexisting installed-session IDs and additional observed dialog polls', () => {
-  const report = readingEvidenceFixture(), events = report.pendingDrafts.quit.helperEvents
+  const report = readingEvidenceFixture(), quit = report.pendingDrafts.quit, events = quit.helperEvents
   events.splice(2, 0, { ...events[2] })
   events.splice(-1, 0, { ...events.at(-1) })
   for (const [index, event] of events.entries()) { event.id = index + 31; event.elapsedMs = index + 100 }
+  const indices = [0, 3, 5]
+  for (const [index, observation] of quit.nativeObservations.changes.entries()) observation.nativeRequest = { ...events[indices[index]] }
+  quit.nativeObservations.last.nativeRequest = { ...events.at(-1) }
   assert.equal(validate(report), true)
+})
+
+test('unrelated Error caption does not masquerade as the verified dismissed dialog', () => {
+  const report = readingEvidenceFixture(), quit = report.pendingDrafts.quit
+  const windows = [...quit.windowsAfterDismiss, { ...quit.dialog, handle: 888, childText: ['unrelated instruction', 'unrelated content'] }]
+  quit.windowsAfterDismiss = structuredClone(windows)
+  quit.nativeObservations.changes.at(-1).windows = structuredClone(windows)
+  quit.nativeObservations.last.windows = structuredClone(windows)
+  assert.equal(validate(report), true)
+})
+
+test('matching failure retains actual last and changed native windows before the selector runs', async () => {
+  const { pendingDrafts: { quit: source }, processID } = readingEvidenceFixture()
+  const mismatch = [{ ...source.dialog, title: 'Observed other caption', childText: ['observed content only'] }]
+  const changed = [{ ...mismatch[0], childText: ['observed changed content'] }]
+  const returns = [mismatch, mismatch, changed], quit = {}, saved = []
+  const events = [{ type: 'ready', pid: 800, elapsedMs: 1 }]
+  const windowSession = {
+    inspect: async pid => {
+      events.push({ type: 'inspect', pid, id: 41 + events.length, elapsedMs: 200 + events.length, completed: true })
+      return returns.shift()
+    },
+    events: () => structuredClone(events),
+  }
+  const inspect = () => inspectReadingNativeWindows({ windowSession, processID, quit,
+    phase: 'awaiting-unapplied-dialog', firstNativeEvent: 1, save: () => saved.push(structuredClone(quit)) })
+  for (let index = 0; index < 3; index++) {
+    const windows = await inspect()
+    assert.equal(saved.length, index + 1, 'Must checkpoint before attempting to select a dialog')
+    assert.throws(() => selectDesktopUnappliedDialog(windows, processID, source.executablePath))
+  }
+  const last = saved.at(-1)
+  assert.equal(last.nativeObservations.changes.length, 2)
+  assert.deepEqual(last.nativeObservations.changes[0].windows, mismatch)
+  assert.deepEqual(last.nativeObservations.last.windows, changed)
+  assert.deepEqual(last.nativeObservations.last.nativeRequest, events.at(-1))
+  assert.deepEqual(last.helperEvents, events.slice(1))
+  changed[0].childText.push('mutated caller copy')
+  assert.deepEqual(quit.nativeObservations.last.windows[0].childText, ['observed changed content'])
+})
+
+test('native receipt mismatch also keeps its raw observation without manufacturing a successful receipt', async () => {
+  const quit = {}, saved = [], native = [{ pid: 104, handle: 444, title: 'raw title', childText: [] }]
+  const receipt = { type: 'close', pid: 104, id: 44, elapsedMs: 200, completed: true }
+  await assert.rejects(inspectReadingNativeWindows({
+    windowSession: { inspect: async () => native, events: () => [receipt] }, processID: 104,
+    quit, phase: 'awaiting-unapplied-dialog', firstNativeEvent: 0, save: () => saved.push(structuredClone(quit)),
+  }))
+  assert.equal(saved.length, 1)
+  assert.deepEqual(saved[0].nativeObservations.last.windows, native)
+  assert.deepEqual(saved[0].nativeObservations.last.nativeRequest, receipt)
 })
 test('the final read-back must be exactly the last applied body', () => {
   const report = readingEvidenceFixture()

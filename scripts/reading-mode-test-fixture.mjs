@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { READING_CHECKS, READING_ATTEMPTS, READING_MODE_VERSION, READING_SCREENSHOTS, READING_DRAFT_VALUES as text } from './reading-mode-desktop-evidence.mjs'
 import { readingModeDesktopFixture } from './reading-mode-desktop-fixture.bundle.mjs'
 import { READING_FORMULA_SELECTOR, READING_EMBED_URL_SELECTOR, READING_EMBED_TITLE_SELECTOR } from './reading-mode-native-input.mjs'
-import { UNAPPLIED_QUIT_DIALOG_TITLE, UNAPPLIED_QUIT_DIALOG_MESSAGE } from './desktop-window-target.mjs'
+import { UNAPPLIED_QUIT_DIALOG_CAPTION, UNAPPLIED_QUIT_DIALOG_TITLE, UNAPPLIED_QUIT_DIALOG_MESSAGE } from './desktop-window-target.mjs'
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex')
 const body = value => { const content = JSON.stringify(value); return { content, sha256: hash(content) } }
@@ -60,8 +60,8 @@ export function readingEvidenceFixture({ processID = 104 } = {}) {
   const executablePath = 'C:\\owned-reading-contract\\Notepad.exe'
   const main = { pid: processID, handle: 300, title: '记事本', cls: 'Chrome_WidgetWin_1',
     visible: true, childText: ['Chrome Legacy Window'], image: executablePath }
-  const dialog = { pid: processID, handle: 400, title: UNAPPLIED_QUIT_DIALOG_TITLE, cls: '#32770',
-    visible: true, childText: [UNAPPLIED_QUIT_DIALOG_MESSAGE, 'OK'], image: executablePath }
+  const dialog = { pid: processID, handle: 400, title: UNAPPLIED_QUIT_DIALOG_CAPTION, cls: '#32770',
+    visible: true, childText: [UNAPPLIED_QUIT_DIALOG_TITLE, UNAPPLIED_QUIT_DIALOG_MESSAGE, 'OK'], image: executablePath }
   const pendingDrafts = {
     destinationNoteID: 'synthetic-navigation-target', destinationBodySHA256: '6'.repeat(64),
     bodies: { before, afterFormula, afterEmbed, final: { ...afterEmbed } },
@@ -108,6 +108,13 @@ export function readingEvidenceFixture({ processID = 104 } = {}) {
       destinationBodySHA256: '6'.repeat(64), reopened: ui(text.formulaApplied, text.embedAppliedTitle),
     },
   }
+  const quit = pendingDrafts.quit
+  const changes = [
+    ['before-close', 0, quit.windowsBeforeClose],
+    ['awaiting-unapplied-dialog', 2, quit.windowsDuringBlock],
+    ['after-dismiss', 4, quit.windowsAfterDismiss],
+  ].map(([phase, index, windows]) => ({ phase, nativeRequest: { ...quit.helperEvents[index] }, windows: structuredClone(windows) }))
+  quit.nativeObservations = { changes, last: structuredClone(changes.at(-1)) }
   return { complete: true, commit: 'b'.repeat(40), productCommit: 'a'.repeat(40), version: READING_MODE_VERSION,
     platform: 'win32', processID, noteID: 'synthetic-contract-note',
     realPackagedApp: true, realBackend: true, realPreload: true, syntheticData: true,

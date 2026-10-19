@@ -209,7 +209,19 @@ async function screenshot(name) {
 }
 async function closeSnapshot(phase) {
   const native = await windowSession.inspect(child.pid)
-  const renderer = await evaluate(`(()=>({
+  const nativeRequest = { ...windowSession.events().at(-1) }
+  report.closeDiagnostics ||= []
+  const snapshot = { phase, pid: child.pid, native, nativeRequest }
+  report.closeDiagnostics.push(snapshot)
+  // The modal can block renderer evaluation. Preserve native rows and the
+  // completed inspect receipt before waiting on a separate renderer response.
+  saveReport()
+  assert.equal(nativeRequest.type, 'inspect'); assert.equal(nativeRequest.pid, child.pid)
+  assert.equal(nativeRequest.completed, true)
+  assert.ok(Number.isSafeInteger(nativeRequest.id) && nativeRequest.id > 0)
+  assert.ok(Number.isFinite(nativeRequest.elapsedMs) && nativeRequest.elapsedMs >= 0)
+  try {
+    snapshot.renderer = await evaluate(`(()=>({
     url:location.href, title:document.title,
     body:document.body.innerText, active:document.activeElement?.outerHTML,
     quit:window.__desktopObservedQuit || [],
@@ -217,9 +229,11 @@ async function closeSnapshot(phase) {
     quitObserverReady:window.__desktopQuitObserverOrigin===performance.timeOrigin&&window.__desktopQuitObserverSubscriptions?.length===2&&window.__desktopQuitObserverSubscriptions.every(dispose=>typeof dispose==='function'),
     drafts:Object.fromEntries(Object.keys(localStorage).filter(k=>/editor.*cache|draft/.test(k)).map(k=>[k,localStorage.getItem(k)]))
   }))()`)
-  report.closeDiagnostics ||= []
-  const snapshot = { phase, pid: child.pid, native, renderer }
-  report.closeDiagnostics.push(snapshot)
+  } catch (error) {
+    snapshot.rendererError = String(error.stack || error)
+    saveReport()
+    throw error
+  }
   saveReport()
   return snapshot
 }

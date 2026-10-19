@@ -59,15 +59,19 @@ public static class DesktopInspect {
       PostMessage(hwnd, 0x0010, IntPtr.Zero, IntPtr.Zero);
   }
   public static bool DismissUnapplied(uint pid, long handle, string executablePath) {
+    const string caption = "Error";
     const string title = "退出未完成，窗口已保留";
     const string message = "公式、嵌入内容或源码有尚未应用的更改。请返回编辑，完成或取消这些更改后再退出。";
     if (String.IsNullOrEmpty(executablePath) || !System.IO.Path.IsPathRooted(executablePath)) return false;
     DesktopWindow chosen = null;
     foreach (var item in Read(pid)) {
-      if (!item.visible || item.title != title || item.cls != "#32770") continue;
-      bool matchesMessage = false;
-      foreach (var text in item.childText) if (text.Contains(message)) matchesMessage = true;
-      if (!matchesMessage) continue;
+      if (!item.visible || item.title != caption || item.cls != "#32770") continue;
+      bool matchesTitle = false, matchesMessage = false;
+      foreach (var text in item.childText) {
+        if (text.Contains(title)) matchesTitle = true;
+        if (text.Contains(message)) matchesMessage = true;
+      }
+      if (!matchesTitle || !matchesMessage) continue;
       if (chosen != null) return false;
       chosen = item;
     }

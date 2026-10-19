@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, writeFileSync, rmSync, unlinkSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, rmSync, unlinkSync, readFileSync } from 'node:fs'
+import { runInNewContext } from 'node:vm'
 import path from 'node:path'
 import { tmpdir } from 'node:os'
 import { createHash } from 'node:crypto'
@@ -10,6 +11,49 @@ import { desktopNote } from './desktop-save-fixture.mjs'
 import { createEditor } from 'lexical'
 import { HeadingNode } from '@lexical/rich-text'
 import { verifyDesktopSaveReport } from './desktop-save-evidence.mjs'
+
+// Exercise the actual driver function without starting Electron or replacing
+// its implementation with a fixture. Only the native/renderer I/O is synthetic.
+function closeSnapshotContract(evaluate) {
+ const source = readFileSync(new URL('./check-desktop-save.mjs', import.meta.url), 'utf8')
+ const match = source.match(/async function closeSnapshot\(phase\) \{[\s\S]*?\n\}/)
+ assert.ok(match, 'Actual closeSnapshot function must remain covered')
+ const native = [{ pid: 2820, handle: 412, title: 'Observed mismatching caption', cls: '#32770',
+  visible: true, childText: ['observed child text'], image: 'C:\\owned\\Notepad.exe' }]
+ const receipt = { type: 'inspect', id: 149, pid: 2820, completed: true, elapsedMs: 120856.25 }
+ const report = {}, saved = []
+ const snapshot = runInNewContext('(' + match[0] + ')', {
+  assert, structuredClone, child: { pid: 2820 }, report,
+  windowSession: { inspect: async () => native, events: () => [receipt] },
+  evaluate: () => evaluate({ native, receipt, report, saved }),
+  saveReport: () => saved.push(JSON.parse(JSON.stringify(report))),
+ })
+ return { snapshot, native, receipt, report, saved }
+}
+
+test('closeSnapshot saves native observation and inspect receipt before reading renderer', async () => {
+ const contract = closeSnapshotContract(({ native, receipt, saved }) => {
+  assert.equal(saved.length, 1)
+  assert.deepEqual(saved[0].closeDiagnostics[0].native, native)
+  assert.deepEqual(saved[0].closeDiagnostics[0].nativeRequest, receipt)
+  return { title: 'actual renderer title' }
+ })
+ await contract.snapshot('before-close')
+ assert.equal(contract.saved.at(-1).closeDiagnostics[0].renderer.title, 'actual renderer title')
+})
+
+test('closeSnapshot retains native mismatch and separately records a renderer timeout', async () => {
+ const failure = new Error('renderer timed out while native dialog was open')
+ const contract = closeSnapshotContract(() => { throw failure })
+ await assert.rejects(contract.snapshot('failure'), error => error === failure)
+ assert.ok(contract.saved.length >= 2, 'Native checkpoint must precede the renderer failure checkpoint')
+ const observation = contract.saved.at(-1).closeDiagnostics[0]
+ assert.deepEqual(observation.native, contract.native)
+ assert.deepEqual(observation.nativeRequest, contract.receipt)
+ assert.match(observation.rendererError, /renderer timed out while native dialog was open/)
+ assert.equal(Object.hasOwn(observation, 'renderer'), false)
+})
+
 const sha = 'a'.repeat(40)
 const crc = b => { let n = 0xffffffff; for (const x of b) { n ^= x; for(let i=0;i<8;i++)n=(n>>>1)^((n&1)?0xedb88320:0) } return (n^0xffffffff)>>>0 }
 function png() {

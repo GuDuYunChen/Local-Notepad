@@ -4,13 +4,13 @@ import { EventEmitter } from 'node:events'
 import { PassThrough, Writable } from 'node:stream'
 import { setTimeout as delay } from 'node:timers/promises'
 import { createDesktopWindowSession } from './desktop-window-session.mjs'
-import { selectDesktopUnappliedDialog, UNAPPLIED_QUIT_DIALOG_TITLE, UNAPPLIED_QUIT_DIALOG_MESSAGE } from './desktop-window-target.mjs'
+import { selectDesktopUnappliedDialog, UNAPPLIED_QUIT_DIALOG_CAPTION, UNAPPLIED_QUIT_DIALOG_TITLE, UNAPPLIED_QUIT_DIALOG_MESSAGE } from './desktop-window-target.mjs'
 
 const window = { pid: 100, handle: 300, title: '记事本', cls: 'Chrome_WidgetWin_1',
   visible: true, childText: ['Chrome Legacy Window'] }
 const executablePath = 'C:\\owned-reading-contract\\Notepad.exe'
-const unappliedDialog = { pid: 100, handle: 400, title: UNAPPLIED_QUIT_DIALOG_TITLE,
-  cls: '#32770', visible: true, childText: [UNAPPLIED_QUIT_DIALOG_MESSAGE, 'OK'], image: executablePath }
+const unappliedDialog = { pid: 100, handle: 400, title: UNAPPLIED_QUIT_DIALOG_CAPTION,
+  cls: '#32770', visible: true, childText: [UNAPPLIED_QUIT_DIALOG_TITLE, UNAPPLIED_QUIT_DIALOG_MESSAGE, 'OK'], image: executablePath }
 function mock({ ready = true, response, replyDelay = 0, holdExit = false } = {}) {
   const child = new EventEmitter(), calls = [], commands = [], events = []
   let ended = false, killed = 0
@@ -46,6 +46,13 @@ function session(t, options = {}, budget = {}) {
   return { m, s }
 }
 
+test('Electron Windows TaskDialog uses Error caption with separate exact instruction and content', () => {
+  // This is the documented Electron 31.7.7 mapping, not a captured Windows run.
+  const dialog = { ...unappliedDialog, title: 'Error',
+    childText: [UNAPPLIED_QUIT_DIALOG_TITLE, UNAPPLIED_QUIT_DIALOG_MESSAGE, 'OK'] }
+  assert.deepEqual(selectDesktopUnappliedDialog([window, dialog], 100, executablePath), dialog)
+})
+
 test('the specific unapplied dialog is dismissed once and the event journal cannot be edited by a caller', async t => {
   const { m, s } = session(t)
   await s.ready
@@ -60,6 +67,9 @@ test('the specific unapplied dialog is dismissed once and the event journal cann
 
 for (const [name, patch] of [
   ['different error title', { title: 'another window' }],
+  ['application instruction used as native caption', { title: UNAPPLIED_QUIT_DIALOG_TITLE }],
+  ['Error caption without application instruction', { childText: [UNAPPLIED_QUIT_DIALOG_MESSAGE, 'OK'] }],
+  ['Error caption without complete message', { childText: [UNAPPLIED_QUIT_DIALOG_TITLE, 'OK'] }],
   ['partial unapplied message', { childText: ['未应用'] }],
   ['renderer instead of native dialog', { cls: 'Chrome_WidgetWin_1' }],
   ['hidden dialog', { visible: false }],
@@ -75,6 +85,7 @@ for (const [name, patch] of [
 test('native unapplied selection refuses another process and ambiguous matching dialogs', () => {
   assert.throws(() => selectDesktopUnappliedDialog([{ ...unappliedDialog, pid: 999 }], 100, executablePath))
   assert.throws(() => selectDesktopUnappliedDialog([unappliedDialog, { ...unappliedDialog, handle: 401 }], 100, executablePath))
+  assert.throws(() => selectDesktopUnappliedDialog([unappliedDialog, { ...unappliedDialog }], 100, executablePath))
 })
 
 test('an unconfirmed native dismissal is never replayed or reported as a completed action', async t => {
@@ -102,6 +113,11 @@ test('one prewarmed helper handles both processes and four requests with no repl
   const script=Buffer.from(m.calls[0][1].at(-1),'base64').toString('utf16le')
   assert.equal((script.match(/Add-Type -TypeDefinition/g)||[]).length,1)
   assert.ok(script.includes('PostMessage(hwnd, 0x0010'))
+  assert.ok(script.includes('const string caption = "' + UNAPPLIED_QUIT_DIALOG_CAPTION + '"'))
+  assert.ok(script.includes('const string title = "' + UNAPPLIED_QUIT_DIALOG_TITLE + '"'))
+  assert.ok(script.includes('const string message = "' + UNAPPLIED_QUIT_DIALOG_MESSAGE + '"'))
+  assert.ok(script.includes('item.title != caption'))
+  assert.ok(script.includes('if (!matchesTitle || !matchesMessage) continue;'))
   assert.ok(!script.includes('Stop-Process'))
 })
 test('a pending native request does not block the Node event loop', async t => {

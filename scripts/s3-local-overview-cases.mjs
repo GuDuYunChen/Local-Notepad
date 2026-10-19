@@ -329,16 +329,17 @@ export function registerS3LocalOverviewTests(test) {
     assert.match(host, /subtle\.ConstantTimeCompare\(received\[:\], h\.tokenHash\[:\]\) != 1/)
     assert.match(host, /RawQuery: "mode=ro"/)
     assert.match(host, /rootErr, dbErr := root\.close\(\), db\.Close\(\)/)
-    // 2F.87 intentionally adds the guarded history adapter to TextEditor. Its
-    // original saveNow/cache policy is byte-compared before this exact digest
-    // update; all other save/quit files and wiring assertions remain pinned.
+    // 2F.100 / 4.233.2: reviewed against accepted 4a16a9a. Pending-field
+    // guards and the fixed unapplied refusal are authorized; saveNow,
+    // cachePendingDraft, 30s autosave and the original quit participant
+    // remain byte-identical. Retain all six exact LF-normalized pins.
     for (const [file, expected] of [
-      ['src/components/TextEditor.jsx', 'e416fdfbd8985abb41d82d083b5bb6c84b0ba3ec336f1eaa067675986967987c'],
+      ['src/components/TextEditor.jsx', '3131406cdb77173ac9eb6f4cfc135d805a65c4cce4f863371709bf186aeefc33'],
       ['src/services/editorDraftCache.js', '7d461ff7a46271d8e8d64707559ac872878f3d2786d770bc0a09434df1474e89'],
       ['src/services/editorSaveTransaction.mjs', 'b449dad16834a936fbd5fad318352c961e160e11723cb6627d6a47714d4d36e2'],
       ['src/services/editorQuit.mjs', 'abc21ea59352fede521e6ce6f6904f67af8f3d00b2378efae6a5e6b45c48c205'],
       ['src/services/editorQuitBridge.mjs', '76e0d15c2dbe53548df2aa3c332bd2860047f855cbef45f0f2043031a8d35302'],
-      ['electron/quit-save.mjs', '230c779cf1be912a7cfdc0a649eccf53e0a5f79fa4b1c3c94d9013f3372c3a49'],
+      ['electron/quit-save.mjs', 'd0f0d4020059af53193c19fc5e0ad0e85c80d978f6a10ecc0af07eeb93849429'],
     ]) assert.equal(createHash('sha256').update(source(file).replace(/\r\n/g, '\n')).digest('hex'), expected, file)
   })
   test('local overview accepts actual Go handler success and every fixed refusal', () => {

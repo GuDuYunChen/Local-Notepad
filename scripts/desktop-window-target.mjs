@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict'
 import path from 'node:path'
 
+// Electron 31.7.7 uses Error as pszWindowTitle and the application title as
+// pszMainInstruction. Keep both identities; the caption alone is insufficient.
+export const UNAPPLIED_QUIT_DIALOG_CAPTION = 'Error'
 export const UNAPPLIED_QUIT_DIALOG_TITLE = '退出未完成，窗口已保留'
 export const UNAPPLIED_QUIT_DIALOG_MESSAGE = '公式、嵌入内容或源码有尚未应用的更改。请返回编辑，完成或取消这些更改后再退出。'
 
@@ -13,12 +16,18 @@ export function assertDesktopWindowImage(window, executablePath) {
 
 // showErrorBox need not have the BrowserWindow as its Win32 owner. Bind the
 // exact failure dialog to the isolated application's PID and executable instead.
+export function isDesktopUnappliedDialogWindow(window, pid) {
+  return window?.pid === pid && window.visible === true &&
+    window.cls === '#32770' && window.title === UNAPPLIED_QUIT_DIALOG_CAPTION &&
+    Number.isSafeInteger(window.handle) && window.handle > 0 &&
+    Array.isArray(window.childText) &&
+    [UNAPPLIED_QUIT_DIALOG_TITLE, UNAPPLIED_QUIT_DIALOG_MESSAGE].every(expected =>
+      window.childText.some(text => typeof text === 'string' && text.includes(expected)))
+}
+
 export function selectDesktopUnappliedDialog(windows, pid, executablePath) {
   assert.ok(Array.isArray(windows)); assert.ok(Number.isInteger(pid) && pid > 0)
-  const matches = windows.filter(window => window.pid === pid && window.visible === true &&
-    window.cls === '#32770' && window.title === UNAPPLIED_QUIT_DIALOG_TITLE &&
-    Number.isSafeInteger(window.handle) && window.handle > 0 &&
-    Array.isArray(window.childText) && window.childText.some(text => typeof text === 'string' && text.includes(UNAPPLIED_QUIT_DIALOG_MESSAGE)))
+  const matches = windows.filter(window => isDesktopUnappliedDialogWindow(window, pid))
   assert.equal(matches.length, 1, 'Expected one owned native unapplied-draft error dialog')
   assertDesktopWindowImage(matches[0], executablePath)
   return matches[0]

@@ -8,10 +8,33 @@ import { READING_CHECKS, READING_MODE_VERSION, READING_DRAFT_VALUES, assertReadi
 import { READING_CAPTION_SELECTOR, READING_EMBED_TITLE_SELECTOR,
   replaceNativeTextInput, replaceNativeFormulaInput, replaceNativeUrlInput } from './reading-mode-native-input.mjs'
 import { assertDesktopWindowImage, selectDesktopMainWindow, selectDesktopUnappliedDialog,
-  UNAPPLIED_QUIT_DIALOG_TITLE, UNAPPLIED_QUIT_DIALOG_MESSAGE } from './desktop-window-target.mjs'
+  isDesktopUnappliedDialogWindow } from './desktop-window-target.mjs'
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex')
 const q = JSON.stringify
+
+// Persist the actual native return before any selector or renderer read can
+// fail. Repeated polls retain the last receipt; changed rows retain their own
+// original receipt as well. No expected title or message enters the observation.
+export async function inspectReadingNativeWindows({ windowSession, processID, quit, phase, firstNativeEvent, save }) {
+  const windows = await windowSession.inspect(processID)
+  const events = windowSession.events()
+  const observation = { phase, nativeRequest: { ...events.at(-1) }, windows: structuredClone(windows) }
+  quit.nativeObservations ||= { last: null, changes: [] }
+  const previous = quit.nativeObservations.last
+  if (!previous || previous.phase !== phase || q(previous.windows) !== q(observation.windows)) {
+    quit.nativeObservations.changes.push(structuredClone(observation))
+  }
+  quit.nativeObservations.last = observation
+  quit.helperEvents = events.slice(firstNativeEvent)
+  save()
+  assert.equal(observation.nativeRequest.type, 'inspect')
+  assert.equal(observation.nativeRequest.pid, processID)
+  assert.equal(observation.nativeRequest.completed, true)
+  assert.ok(Number.isSafeInteger(observation.nativeRequest.id) && observation.nativeRequest.id > 0)
+  assert.ok(Number.isFinite(observation.nativeRequest.elapsedMs) && observation.nativeRequest.elapsedMs >= 0)
+  return windows
+}
 
 // Shared by the packaged desktop check and the installed lifecycle check. All
 // mutations after fixture creation use native CDP mouse/keyboard input. Runtime
@@ -375,14 +398,14 @@ export async function verifyReadingModeDesktop(context) {
     quit.timeOriginBefore = await evaluate('performance.timeOrigin')
     quit.windowTitle = await evaluate('document.title'); quit.executablePath = executablePath
     const firstNativeEvent = windowSession.events().length
-    quit.windowsBeforeClose = await windowSession.inspect(processID)
+    const inspect = phase => inspectReadingNativeWindows({ windowSession, processID, quit, phase, firstNativeEvent, save })
+    quit.windowsBeforeClose = await inspect('before-close')
     quit.target = selectDesktopMainWindow(quit.windowsBeforeClose, processID, quit.windowTitle)
     assertDesktopWindowImage(quit.target, executablePath)
     await windowSession.close(quit.target)
     const blocked = await until(async () => {
-      const windows = await windowSession.inspect(processID)
-      if (!windows.some(window => window.visible && window.cls === '#32770' && window.title === UNAPPLIED_QUIT_DIALOG_TITLE &&
-        window.childText.some(value => value.includes(UNAPPLIED_QUIT_DIALOG_MESSAGE)))) return false
+      const windows = await inspect('awaiting-unapplied-dialog')
+      if (!windows.some(window => isDesktopUnappliedDialogWindow(window, processID))) return false
       return { windows, dialog: selectDesktopUnappliedDialog(windows, processID, executablePath) }
     }, 'Native close did not produce the owned unapplied-draft rejection dialog')
     quit.windowsDuringBlock = blocked.windows; quit.dialog = blocked.dialog
@@ -393,8 +416,9 @@ export async function verifyReadingModeDesktop(context) {
     assert.equal(await windowSession.dismissUnappliedDialog(quit.dialog, executablePath), true)
     quit.dismissed = true
     quit.windowsAfterDismiss = await until(async () => {
-      const windows = await windowSession.inspect(processID)
-      if (windows.some(window => window.visible && window.cls === '#32770' && window.title === UNAPPLIED_QUIT_DIALOG_TITLE)) return false
+      const windows = await inspect('after-dismiss')
+      if (windows.some(window => window.pid === processID && window.visible &&
+        (window.handle === quit.dialog.handle || isDesktopUnappliedDialogWindow(window, processID)))) return false
       assertDesktopWindowImage(selectDesktopMainWindow(windows, processID, quit.windowTitle), executablePath)
       return windows
     }, 'The verified native error dialog did not dismiss while preserving the app')
