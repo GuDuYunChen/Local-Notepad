@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { READING_CHECKS, READING_ATTEMPTS, READING_MODE_VERSION, READING_SCREENSHOTS, READING_DRAFT_VALUES as text } from './reading-mode-desktop-evidence.mjs'
 import { readingModeDesktopFixture } from './reading-mode-desktop-fixture.bundle.mjs'
 import { READING_FORMULA_SELECTOR, READING_EMBED_URL_SELECTOR, READING_EMBED_TITLE_SELECTOR } from './reading-mode-native-input.mjs'
-import { UNAPPLIED_QUIT_DIALOG_CAPTION, UNAPPLIED_QUIT_DIALOG_TITLE, UNAPPLIED_QUIT_DIALOG_MESSAGE } from './desktop-window-target.mjs'
+import { DESKTOP_ACCESSIBILITY_SOURCE, UNAPPLIED_QUIT_DIALOG_CAPTION, UNAPPLIED_QUIT_DIALOG_TITLE, UNAPPLIED_QUIT_DIALOG_MESSAGE } from './desktop-window-target.mjs'
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex')
 const body = value => { const content = JSON.stringify(value); return { content, sha256: hash(content) } }
@@ -61,7 +61,12 @@ export function readingEvidenceFixture({ processID = 104 } = {}) {
   const main = { pid: processID, handle: 300, title: '记事本', cls: 'Chrome_WidgetWin_1',
     visible: true, childText: ['Chrome Legacy Window'], image: executablePath }
   const dialog = { pid: processID, handle: 400, title: UNAPPLIED_QUIT_DIALOG_CAPTION, cls: '#32770',
-    visible: true, childText: [UNAPPLIED_QUIT_DIALOG_TITLE, UNAPPLIED_QUIT_DIALOG_MESSAGE, 'OK'], image: executablePath }
+    visible: true, childText: ['OK'], image: executablePath }
+  const boundWindow = Object.fromEntries(['pid', 'handle', 'image', 'title', 'cls', 'visible'].map(key => [key, dialog[key]]))
+  dialog.accessibility = { source: DESKTOP_ACCESSIBILITY_SOURCE, status: 'complete', budgetMs: 2000, elapsedMs: 12,
+    boundWindow, revalidatedWindow: { ...boundWindow }, root: { pid: processID, handle: 400, name: 'Error', cls: '#32770' },
+    elements: [UNAPPLIED_QUIT_DIALOG_TITLE, UNAPPLIED_QUIT_DIALOG_MESSAGE, 'OK'].map(name => ({ pid: processID, handle: 0, name, cls: 'Text' })),
+    errorCode: null, errorType: null }
   const pendingDrafts = {
     destinationNoteID: 'synthetic-navigation-target', destinationBodySHA256: '6'.repeat(64),
     bodies: { before, afterFormula, afterEmbed, final: { ...afterEmbed } },
@@ -109,6 +114,8 @@ export function readingEvidenceFixture({ processID = 104 } = {}) {
     },
   }
   const quit = pendingDrafts.quit
+  const fresh = quit.helperEvents.find(event => event.type === 'dismiss-unapplied')
+  fresh.window = structuredClone(dialog); fresh.windows = [structuredClone(main), structuredClone(dialog)]
   const changes = [
     ['before-close', 0, quit.windowsBeforeClose],
     ['awaiting-unapplied-dialog', 2, quit.windowsDuringBlock],

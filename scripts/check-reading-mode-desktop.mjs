@@ -8,7 +8,7 @@ import { READING_CHECKS, READING_MODE_VERSION, READING_DRAFT_VALUES, assertReadi
 import { READING_CAPTION_SELECTOR, READING_EMBED_TITLE_SELECTOR,
   replaceNativeTextInput, replaceNativeFormulaInput, replaceNativeUrlInput } from './reading-mode-native-input.mjs'
 import { assertDesktopWindowImage, selectDesktopMainWindow, selectDesktopUnappliedDialog,
-  isDesktopUnappliedDialogWindow } from './desktop-window-target.mjs'
+  isDesktopUnappliedDialogWindow, assertDesktopAccessibleText } from './desktop-window-target.mjs'
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex')
 const q = JSON.stringify
@@ -16,8 +16,8 @@ const q = JSON.stringify
 // Persist the actual native return before any selector or renderer read can
 // fail. Repeated polls retain the last receipt; changed rows retain their own
 // original receipt as well. No expected title or message enters the observation.
-export async function inspectReadingNativeWindows({ windowSession, processID, quit, phase, firstNativeEvent, save }) {
-  const windows = await windowSession.inspect(processID)
+export async function inspectReadingNativeWindows({ windowSession, processID, executablePath, quit, phase, firstNativeEvent, save }) {
+  const windows = await windowSession.inspect(processID, executablePath)
   const events = windowSession.events()
   const observation = { phase, nativeRequest: { ...events.at(-1) }, windows: structuredClone(windows) }
   quit.nativeObservations ||= { last: null, changes: [] }
@@ -33,6 +33,7 @@ export async function inspectReadingNativeWindows({ windowSession, processID, qu
   assert.equal(observation.nativeRequest.completed, true)
   assert.ok(Number.isSafeInteger(observation.nativeRequest.id) && observation.nativeRequest.id > 0)
   assert.ok(Number.isFinite(observation.nativeRequest.elapsedMs) && observation.nativeRequest.elapsedMs >= 0)
+  for (const window of windows) if (window.accessibility != null) assertDesktopAccessibleText(window)
   return windows
 }
 
@@ -398,7 +399,7 @@ export async function verifyReadingModeDesktop(context) {
     quit.timeOriginBefore = await evaluate('performance.timeOrigin')
     quit.windowTitle = await evaluate('document.title'); quit.executablePath = executablePath
     const firstNativeEvent = windowSession.events().length
-    const inspect = phase => inspectReadingNativeWindows({ windowSession, processID, quit, phase, firstNativeEvent, save })
+    const inspect = phase => inspectReadingNativeWindows({ windowSession, processID, executablePath, quit, phase, firstNativeEvent, save })
     quit.windowsBeforeClose = await inspect('before-close')
     quit.target = selectDesktopMainWindow(quit.windowsBeforeClose, processID, quit.windowTitle)
     assertDesktopWindowImage(quit.target, executablePath)

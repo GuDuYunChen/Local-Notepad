@@ -143,7 +143,11 @@ test('reading trace accepts preexisting installed-session IDs and additional obs
 
 test('unrelated Error caption does not masquerade as the verified dismissed dialog', () => {
   const report = readingEvidenceFixture(), quit = report.pendingDrafts.quit
-  const windows = [...quit.windowsAfterDismiss, { ...quit.dialog, handle: 888, childText: ['unrelated instruction', 'unrelated content'] }]
+  const other = structuredClone(quit.dialog)
+  other.handle = 888; other.childText = ['unrelated instruction', 'unrelated content']
+  other.accessibility.boundWindow.handle = 888; other.accessibility.revalidatedWindow.handle = 888
+  other.accessibility.root.handle = 888; other.accessibility.elements = []
+  const windows = [...quit.windowsAfterDismiss, other]
   quit.windowsAfterDismiss = structuredClone(windows)
   quit.nativeObservations.changes.at(-1).windows = structuredClone(windows)
   quit.nativeObservations.last.windows = structuredClone(windows)
@@ -152,7 +156,7 @@ test('unrelated Error caption does not masquerade as the verified dismissed dial
 
 test('matching failure retains actual last and changed native windows before the selector runs', async () => {
   const { pendingDrafts: { quit: source }, processID } = readingEvidenceFixture()
-  const mismatch = [{ ...source.dialog, title: 'Observed other caption', childText: ['observed content only'] }]
+  const mismatch = [{ ...source.dialog, accessibility: undefined, title: 'Observed other caption', childText: ['observed content only'] }]
   const changed = [{ ...mismatch[0], childText: ['observed changed content'] }]
   const returns = [mismatch, mismatch, changed], quit = {}, saved = []
   const events = [{ type: 'ready', pid: 800, elapsedMs: 1 }]
@@ -190,6 +194,34 @@ test('native receipt mismatch also keeps its raw observation without manufacturi
   assert.equal(saved.length, 1)
   assert.deepEqual(saved[0].nativeObservations.last.windows, native)
   assert.deepEqual(saved[0].nativeObservations.last.nativeRequest, receipt)
+})
+
+for (const status of ['timeout', 'unsupported', 'error']) test('reading retains native and accessible ' + status + ' evidence before refusing the observation', async () => {
+  const source = readingEvidenceFixture(), dialog = structuredClone(source.pendingDrafts.quit.dialog)
+  Object.assign(dialog.accessibility, { status, errorCode: 'UIA_' + status.toUpperCase(), elapsedMs: status === 'timeout' ? 2001 : 12 })
+  const windows = [dialog], quit = {}, saved = [], receipt = { type: 'inspect', id: 150, pid: source.processID, completed: true, elapsedMs: 112779 }
+  await assert.rejects(inspectReadingNativeWindows({
+    windowSession: { inspect: async () => windows, events: () => [receipt] }, processID: source.processID,
+    executablePath: dialog.image, quit, phase: 'awaiting-unapplied-dialog', firstNativeEvent: 0,
+    save: () => saved.push(structuredClone(quit)),
+  }), /Native accessibility read refused/)
+  assert.equal(saved.length, 1)
+  assert.deepEqual(saved[0].nativeObservations.last.windows[0].childText, ['OK'])
+  assert.equal(saved[0].nativeObservations.last.windows[0].accessibility.status, status)
+  assert.deepEqual(saved[0].nativeObservations.last.nativeRequest, receipt)
+})
+
+for (const [name, change] of [
+  ['missing fresh window', event => delete event.window],
+  ['missing fresh windows', event => delete event.windows],
+  ['fresh UIA deadline expired', event => event.window.accessibility.elapsedMs = 2001],
+  ['fresh accessibility text came from another HWND', event => event.window.accessibility.root.handle++],
+  ['fresh content missing', event => event.window.accessibility.elements[1].name = 'partial content'],
+]) test('reading acceptance refuses ' + name, () => {
+  const report = readingEvidenceFixture(), event = report.pendingDrafts.quit.helperEvents.find(value => value.type === 'dismiss-unapplied')
+  change(event)
+  if (event.window && event.windows) event.windows[1] = structuredClone(event.window)
+  assert.throws(() => validate(report))
 })
 test('the final read-back must be exactly the last applied body', () => {
   const report = readingEvidenceFixture()

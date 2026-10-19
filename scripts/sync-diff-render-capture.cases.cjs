@@ -1,11 +1,73 @@
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
+const os = require('node:os')
+const { spawnSync } = require('node:child_process')
 const { createHash } = require('node:crypto')
 const { deflateSync } = require('node:zlib')
 const { EventEmitter } = require('node:events')
 const { verifyDiffRaster, validateDiffCapture, captureDiffFrame, loadDiffWindow } = require('./sync-diff-render-capture.cjs')
 const hash = bytes => createHash('sha256').update(bytes).digest('hex')
+
+function readArchivedDiffFiles(directory) {
+  const provenance = JSON.parse(fs.readFileSync(path.join(directory, 'provenance.json'), 'utf8'))
+  const files = {}
+  for (const [filename, expected] of Object.entries(provenance.files)) {
+    files[filename] = fs.readFileSync(path.join(directory, filename))
+    assert.equal(files[filename].length, expected.bytes); assert.equal(hash(files[filename]), expected.sha256)
+  }
+  return files
+}
+
+// Exercise Git's actual checkout conversion in an owned, uncommitted repository.
+// Neither the caller's repository/index/config nor the archived bytes are edited.
+function archivedDiffCheckout(autocrlf, keepAttributes, inspect) {
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'diff-archive-checkout-'))
+  try {
+    const repository = path.join(scratch, 'repository'), checkout = path.join(scratch, 'checkout')
+    const relative = 'scripts/fixtures/sync-diff-capture-4a16a9a'
+    const source = path.join(__dirname, 'fixtures', 'sync-diff-capture-4a16a9a')
+    const destination = path.join(repository, relative), emptyConfig = path.join(scratch, 'empty-config')
+    fs.mkdirSync(destination, { recursive: true }); fs.mkdirSync(checkout); fs.writeFileSync(emptyConfig, '')
+    const env = { ...process.env }
+    for (const key of Object.keys(env)) if (key.startsWith('GIT_')) delete env[key]
+    Object.assign(env, { GIT_CONFIG_NOSYSTEM: '1', GIT_ATTR_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: emptyConfig })
+    const git = args => {
+      const result = spawnSync('git', ['-c', 'core.attributesFile=' + emptyConfig, '-C', repository, ...args],
+        { env, timeout: 10000, maxBuffer: 1024 * 1024, windowsHide: true })
+      assert.ifError(result.error); assert.equal(result.signal, null)
+      assert.equal(result.status, 0, 'Isolated Git command failed: ' + result.stderr.toString())
+      return result.stdout
+    }
+    git(['init', '--quiet'])
+    for (const filename of ['checks.json', 'light-1200.png', 'dark-1200.png', 'provenance.json']) {
+      fs.copyFileSync(path.join(source, filename), path.join(destination, filename))
+    }
+    const attributes = path.join(source, '.gitattributes')
+    const attributesCopied = keepAttributes && fs.existsSync(attributes)
+    if (attributesCopied) fs.copyFileSync(attributes, path.join(destination, '.gitattributes'))
+    fs.writeFileSync(path.join(repository, 'outside-evidence.txt'), 'unrelated\ntext\n')
+    git(['-c', 'core.autocrlf=false', '-c', 'core.eol=lf', 'add', '--', '.'])
+    const provenance = JSON.parse(fs.readFileSync(path.join(source, 'provenance.json'), 'utf8'))
+    const objects = Object.entries(provenance.files).map(([filename, expected]) => {
+      const object = git(['cat-file', 'blob', ':' + relative + '/' + filename])
+      assert.equal(object.length, expected.bytes); assert.equal(hash(object), expected.sha256)
+      assert.deepEqual(object, fs.readFileSync(path.join(source, filename)))
+      return { filename, gitBlob: createHash('sha1').update('blob ' + object.length + '\0').update(object).digest('hex') }
+    })
+    git(['-c', 'core.autocrlf=' + autocrlf, '-c', 'core.eol=' + (autocrlf ? 'crlf' : 'lf'),
+      'checkout-index', '--all', '--force', '--prefix=' + checkout.split(path.sep).join('/') + '/'])
+    const directory = path.join(checkout, relative)
+    const files = objects.map(object => {
+      const bytes = fs.readFileSync(path.join(directory, object.filename))
+      return { ...object, checkoutBytes: bytes.length, checkoutSHA256: hash(bytes) }
+    })
+    assert.equal(fs.readFileSync(path.join(checkout, 'outside-evidence.txt'), 'utf8'), autocrlf ? 'unrelated\r\ntext\r\n' : 'unrelated\ntext\n')
+    const textAttribute = git(['check-attr', 'text', '--', relative + '/checks.json']).toString().trim()
+    inspect(directory, { autocrlf, attributesRequested: keepAttributes, attributesCopied, textAttribute,
+      files, unrelatedTextConversionPreserved: true })
+  } finally { fs.rmSync(scratch, { recursive: true, force: true }) }
+}
 
 // Structural/pixel contract fixture only; this is not a Chromium-render claim.
 function syntheticPNG(frame, phase, corruptProbe = false) {
@@ -26,6 +88,28 @@ function registerDiffCaptureTests(test, originalFrame) {
       { kind, position: 'left', x: 60, y: 240 + index * 60, exposed: true },
       { kind, position: 'right', x: 480, y: 240 + index * 60, exposed: true },
     ]) })
+  test('archived diff evidence survives both Git checkout newline policies without changing unrelated text', t => {
+    for (const autocrlf of [false, true]) archivedDiffCheckout(autocrlf, true, (directory, evidence) => {
+      t.diagnostic(JSON.stringify(evidence))
+      readArchivedDiffFiles(directory)
+    })
+  })
+  test('the original archived-byte gate refuses the exact CRLF checkout counterexample', t => {
+    archivedDiffCheckout(true, false, (directory, evidence) => {
+      t.diagnostic(JSON.stringify(evidence))
+      const original = fs.readFileSync(path.join(__dirname, 'fixtures', 'sync-diff-capture-4a16a9a', 'checks.json'))
+      const converted = fs.readFileSync(path.join(directory, 'checks.json'))
+      assert.equal(original.length, 29143)
+      assert.equal(converted.length, 30517)
+      assert.deepEqual(converted, Buffer.from(original.toString('utf8').replace(/\n/g, '\r\n')))
+      assert.equal(hash(converted), '5161cda1528db6d6d56c975404379525129713e5094ecd554ce2ca61a476cbfa')
+      assert.throws(() => readArchivedDiffFiles(directory), { code: 'ERR_ASSERTION', actual: 30517, expected: 29143 })
+      for (const filename of ['light-1200.png', 'dark-1200.png']) {
+        assert.deepEqual(fs.readFileSync(path.join(directory, filename)),
+          fs.readFileSync(path.join(__dirname, 'fixtures', 'sync-diff-capture-4a16a9a', filename)))
+      }
+    })
+  })
   test('the same pixel gate rejects the exact archived unscrolled light PNG and accepts its scrolled dark control', () => {
     const directory = path.join(__dirname, 'fixtures', 'sync-diff-capture-4a16a9a')
     const provenance = JSON.parse(fs.readFileSync(path.join(directory, 'provenance.json'), 'utf8'))

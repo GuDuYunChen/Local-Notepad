@@ -6,7 +6,7 @@ import { assertFullNativeTextSelection, assertFullNativeFormulaSelection, assert
   READING_CAPTION_SELECTOR, READING_FORMULA_SELECTOR, READING_EMBED_URL_SELECTOR, READING_EMBED_TITLE_SELECTOR } from './reading-mode-native-input.mjs'
 import { assertDesktopWindowImage, selectDesktopMainWindow, selectDesktopUnappliedDialog,
   isDesktopUnappliedDialogWindow, UNAPPLIED_QUIT_DIALOG_CAPTION,
-  UNAPPLIED_QUIT_DIALOG_TITLE, UNAPPLIED_QUIT_DIALOG_MESSAGE } from './desktop-window-target.mjs'
+  UNAPPLIED_QUIT_DIALOG_TITLE, UNAPPLIED_QUIT_DIALOG_MESSAGE, assertDesktopAccessibleText } from './desktop-window-target.mjs'
 
 export const READING_MODE_VERSION = '4.233.2'
 export const READING_DRAFT_VALUES = Object.freeze({
@@ -153,6 +153,7 @@ function validateNativeObservations(quit, processID) {
     assert.deepEqual(receipt, events[index])
     assert.equal(receipt.type, 'inspect'); assert.equal(receipt.pid, processID)
     assert.ok(observation.windows.every(window => window.pid === processID))
+    for (const window of observation.windows) if (window.accessibility != null) assertDesktopAccessibleText(window)
     assert.equal(observation.phase, index === 0 ? 'before-close' : index < dismiss ? 'awaiting-unapplied-dialog' : 'after-dismiss')
   }
   for (let index = 1; index < changes.length; index++) {
@@ -238,14 +239,19 @@ function validatePendingDrafts(report) {
   assertDesktopWindowImage(selectDesktopMainWindow(quit.windowsDuringBlock, report.processID, quit.windowTitle), quit.executablePath)
   assert.deepEqual(quit.dialog, selectDesktopUnappliedDialog(quit.windowsDuringBlock, report.processID, quit.executablePath))
   assert.equal(quit.dialog.title, UNAPPLIED_QUIT_DIALOG_CAPTION)
-  assert.ok(quit.dialog.childText.some(value => value.includes(UNAPPLIED_QUIT_DIALOG_TITLE)))
-  assert.ok(quit.dialog.childText.some(value => value.includes(UNAPPLIED_QUIT_DIALOG_MESSAGE)))
+  const dialogText = [...quit.dialog.childText,
+    ...(quit.dialog.accessibility == null ? [] : assertDesktopAccessibleText(quit.dialog))]
+  assert.ok(dialogText.some(value => value.includes(UNAPPLIED_QUIT_DIALOG_TITLE)))
+  assert.ok(dialogText.some(value => value.includes(UNAPPLIED_QUIT_DIALOG_MESSAGE)))
   assertDesktopWindowImage(selectDesktopMainWindow(quit.windowsAfterDismiss, report.processID, quit.windowTitle), quit.executablePath)
   assert.equal(quit.windowsAfterDismiss.some(window => window.pid === report.processID && window.visible &&
     (window.handle === quit.dialog.handle || isDesktopUnappliedDialogWindow(window, report.processID))), false)
   for (const key of ['processStillAlive', 'backendStillAlive', 'dismissed']) assert.equal(quit[key], true)
   assert.equal(quit.dialogEvidence, 'native-window-title-and-child-text')
   validateReadingNativeQuitEvents(quit.helperEvents, report.processID)
+  const fresh = quit.helperEvents.find(event => event.type === 'dismiss-unapplied')
+  assert.deepEqual(fresh.window, selectDesktopUnappliedDialog(fresh.windows, report.processID, quit.executablePath))
+  assert.equal(fresh.window.handle, quit.dialog.handle, 'Fresh dismissal addressed another dialog')
   validateNativeObservations(quit, report.processID)
 
   const recovery = pending.recovery
