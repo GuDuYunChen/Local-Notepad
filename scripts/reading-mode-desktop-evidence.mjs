@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
+import { assertFullNativeTextSelection, READING_CAPTION_SELECTOR } from './reading-mode-native-input.mjs'
 
 export const READING_MODE_VERSION = '4.233.1'
 export const READING_CHECKS = Object.freeze([
@@ -35,6 +36,7 @@ export function validateReadingModeDesktopReport(report, commit, productCommit =
   assert.match(report.noteID, /^[a-zA-Z0-9-]+$/)
   assert.deepEqual(report.checks, READING_CHECKS)
   assert.deepEqual(report.attempts, READING_ATTEMPTS)
+  assertFullNativeTextSelection(report.captionSelection, READING_CAPTION_SELECTOR, '原始图片说明')
   for (const key of ['draftSourceSHA256', 'databaseDuringDraftSHA256', 'captionSavedSHA256',
     'beforeReadSHA256', 'afterReadSHA256', 'savedSHA256', 'reloadedSHA256']) assert.match(report[key], /^[a-f0-9]{64}$/, key)
   assert.equal(report.draftSourceSHA256, report.databaseDuringDraftSHA256)

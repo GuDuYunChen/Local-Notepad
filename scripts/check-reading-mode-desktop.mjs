@@ -4,6 +4,7 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { readingModeDesktopFixture, READING_FIXTURE_TEXT } from './reading-mode-desktop-fixture.bundle.mjs'
 import { READING_CHECKS, READING_MODE_VERSION, validateReadingModeDesktopReport } from './reading-mode-desktop-evidence.mjs'
+import { READING_CAPTION_SELECTOR, replaceNativeTextInput } from './reading-mode-native-input.mjs'
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex')
 const q = JSON.stringify
@@ -106,8 +107,9 @@ export async function verifyReadingModeDesktop(context) {
 
     const source = await body(), caption = 'reading100-native-caption'
     report.draftSourceSHA256 = hash(source)
-    await click('.editor-image-caption-input'); await key('a', 65, 2)
-    await cdp.send('Input.insertText', { text: caption })
+    await replaceNativeTextInput({ evaluate, click, cdp, settle,
+      onSelection(selection) { report.captionSelection = selection; save() },
+    }, READING_CAPTION_SELECTOR, READING_FIXTURE_TEXT.caption, caption)
     await until(() => value('.editor-image-caption-input').then(result => result === caption), 'Native caption edit was not applied')
     await mode(true)
     assert.equal(await evaluate("!!document.querySelector('.editor-reading-draft-pill')"), true, 'Reading mode lost the unsaved caption draft')
