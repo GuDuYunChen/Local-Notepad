@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { LexicalComposer } from '@lexical/react/LexicalComposer';
 import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin';
 import { ContentEditable } from '@lexical/react/LexicalContentEditable';
@@ -110,7 +110,7 @@ function Placeholder({ readOnly = false }) {
 
 function EditableModePlugin({ readOnly }) {
   const [editor] = useLexicalComposerContext();
-  useEffect(() => { editor.setEditable(!readOnly); }, [editor, readOnly]);
+  useLayoutEffect(() => { editor.setEditable(!readOnly); }, [editor, readOnly]);
   return null;
 }
 

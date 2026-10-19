@@ -45,6 +45,7 @@ export function verifyDesktopSaveReport(directory, commit) {
     'real failed browser PUT retains draft, actual retry saves it',
     'WM_CLOSE with dirty Lexical body completed real quit gate and backend shutdown',
     'production preload connected for process ' + report.processIDs[1],
+    'real packaged reading mode blocks input, preserves unsaved draft and saves after return',
     'fresh-profile packaged restart reads latest body from real database and closes cleanly',
   ])
   for (const field of ['appSHA256', 'asarSHA256', 'backendSHA256', 'finalBodySHA256']) assert.match(report[field], /^[a-f0-9]{64}$/)
@@ -54,6 +55,7 @@ export function verifyDesktopSaveReport(directory, commit) {
     ['failure-retains-draft', 'recovered-after-block'],
     ['retry-saved', 'recovered-after-block'],
     ['restarted-fresh-profile', 'native-close-latest'],
+    ['reading-mode', 'reading-mode-unsaved-draft'],
   ]
   assert.equal(report.screenshots.length, expected.length)
   for (const [index, [name, marker]] of expected.entries()) {

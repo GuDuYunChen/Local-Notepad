@@ -333,7 +333,7 @@ export function registerS3LocalOverviewTests(test) {
     // original saveNow/cache policy is byte-compared before this exact digest
     // update; all other save/quit files and wiring assertions remain pinned.
     for (const [file, expected] of [
-      ['src/components/TextEditor.jsx', 'f8fa9aa73c9d0c9e67655d70a2021be2d0b075845e002ea833811ed073f6e377'],
+      ['src/components/TextEditor.jsx', 'e416fdfbd8985abb41d82d083b5bb6c84b0ba3ec336f1eaa067675986967987c'],
       ['src/services/editorDraftCache.js', '7d461ff7a46271d8e8d64707559ac872878f3d2786d770bc0a09434df1474e89'],
       ['src/services/editorSaveTransaction.mjs', 'b449dad16834a936fbd5fad318352c961e160e11723cb6627d6a47714d4d36e2'],
       ['src/services/editorQuit.mjs', 'abc21ea59352fede521e6ce6f6904f67af8f3d00b2378efae6a5e6b45c48c205'],

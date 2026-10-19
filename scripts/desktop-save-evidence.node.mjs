@@ -34,10 +34,11 @@ function fixture(fn) {
    'real failed browser PUT retains draft, actual retry saves it',
    'WM_CLOSE with dirty Lexical body completed real quit gate and backend shutdown',
    'production preload connected for process 200',
+   'real packaged reading mode blocks input, preserves unsaved draft and saves after return',
    'fresh-profile packaged restart reads latest body from real database and closes cleanly'],
   screenshots:[['manual-saved','manual-native-4189'],['automatic-saved','automatic-native-4189'],
    ['failure-retains-draft','recovered-after-block'],['retry-saved','recovered-after-block'],
-   ['restarted-fresh-profile','native-close-latest']].map(([n,text])=>({filename:n+'.png',text,bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')}))}
+   ['restarted-fresh-profile','native-close-latest'],['reading-mode','reading-mode-unsaved-draft']].map(([n,text])=>({filename:n+'.png',text,bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')}))}
  report.windowHelper={stoppedCleanly:true,events:[
   {type:'spawn',pid:800,elapsedMs:0},{type:'ready',pid:800,elapsedMs:100},
   ...['inspect','close','inspect','close'].map((type,i)=>({type,id:i+1,pid:i<2?100:200,completed:true,elapsedMs:200+i*100})),
@@ -56,7 +57,7 @@ for(const [label,change] of [
  ['replaced Lexical input',r=>r.realLexical=false],['accelerated autosave',r=>r.timerAccelerated=true],
  ['already saved before close',r=>r.dirtyBeforeClose=false],['forced backend warning',r=>r.noForcedBackendWarning=false],
  ['missing actual restart',r=>r.processIDs.pop()],['forced process termination',r=>r.exits[0].signal='SIGKILL'],
- ['missing quit check',r=>r.checks.splice(5,1)],['wrong visible marker',r=>r.screenshots[4].text='old body'],
+ ['missing quit check',r=>r.checks.splice(5,1)],['missing reading mode check',r=>r.checks.splice(7,1)],['wrong visible marker',r=>r.screenshots[5].text='old body'],
 ])test('rejects '+label,()=>fixture((dir,r,save)=>{change(r);save();assert.throws(()=>verifyDesktopSaveReport(dir,sha))}))
 test('rejects missing or modified screenshot even when run reports success',()=>{
  fixture((dir,r)=>{unlinkSync(path.join(dir,r.screenshots[0].filename));assert.throws(()=>verifyDesktopSaveReport(dir,sha))})
