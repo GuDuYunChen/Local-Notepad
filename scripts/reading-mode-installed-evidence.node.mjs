@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { cpSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { cpSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import os from 'node:os'
@@ -91,16 +91,37 @@ for (const key of ['importBlob', 'importEvidenceBlob', 'importEvidenceTestsBlob'
   assert.throws(() => prepareReadingModeVerifierSources(pin, source))
 })
 
-test('offline complete prepare chain preserves original lifecycle and adds reading after actual import restart', async t => {
+for (const lineEnding of ['LF', 'CRLF']) test('offline complete ' + lineEnding + ' prepare chain preserves original lifecycle and adds reading after actual import restart', async t => {
   const directory = mkdtempSync(path.join(os.tmpdir(), 'reading100-prepare-contract-'))
   try {
     const scripts = path.join(directory, 'scripts')
     cpSync(fileURLToPath(new URL('.', import.meta.url)), scripts, { recursive: true })
-    const { pin } = fixture(), generated = prepareReadingModeVerifierSources(pin, source)
+    // Exercise both actual checkout forms, including on a Linux host. Only
+    // newline bytes change in these isolated code copies; binary fixtures stay
+    // intact. The real installer runner already normalizes CRLF before hashing.
+    const checkout = folder => {
+      for (const entry of readdirSync(folder, { withFileTypes: true })) {
+        const file = path.join(folder, entry.name)
+        if (entry.isDirectory()) checkout(file)
+        else if (/\.(?:mjs|cjs|js|jsx|ps1)$/.test(entry.name)) {
+          const normalized = readFileSync(file, 'utf8').replace(/\r\n/g, '\n')
+          writeFileSync(file, lineEnding === 'CRLF' ? normalized.replace(/\n/g, '\r\n') : normalized)
+          assert.equal(readFileSync(file, 'utf8').replace(/\r\n/g, '\n'), normalized)
+        }
+      }
+    }
+    checkout(scripts)
+    const raw = name => readFileSync(path.join(scripts, name), 'utf8')
+    const read = name => raw(name).replace(/\r\n/g, '\n')
+    const blob = text => createHash('sha1').update('blob ' + Buffer.byteLength(text) + '\0').update(text).digest('hex')
+    const originalCore = raw('installer-lifecycle-core.mjs')
+    assert.equal(blob(originalCore), lineEnding === 'CRLF' ? 'e83e76da3a4679682a731cb1cabdbf4e705182f9' : 'e9c64b370582da9b21a8ea299ef40db01eb96b0a')
+    assert.equal(blob(read('installer-lifecycle-core.mjs')), 'e9c64b370582da9b21a8ea299ef40db01eb96b0a')
+    const { pin } = fixture(), generated = prepareReadingModeVerifierSources(pin, read)
     for (const item of generated) writeFileSync(path.join(scripts, item.output), item.pinned)
     const module = name => import(pathToFileURL(path.join(scripts, name)).href)
     const { prepareLocalImportValidatorPin } = await module('pin-reading-import-generated.mjs')
-    const inheritedPins = prepareLocalImportValidatorPin(pin, source)
+    const inheritedPins = prepareLocalImportValidatorPin(pin, read)
     writeFileSync(path.join(scripts, 'template-installed-evidence.mjs'), inheritedPins.after)
     for (const item of inheritedPins.generated) writeFileSync(path.join(scripts, item.output), item.pinned)
     const { prepareOutlineInstallation } = await module('document-outline-installed-evidence.mjs')
@@ -110,7 +131,10 @@ test('offline complete prepare chain preserves original lifecycle and adds readi
     const { prepareInstallerHistoryReadiness } = await module('installer-history-readiness.mjs')
     const { extendWikiInstallation } = await module('import-wiki-validator.mjs')
     const { extendLocalImportInstallation } = await module('reading-import-validator.mjs')
-    const inherited = prepareOutlineInstallation(source('installer-lifecycle-core.mjs'), source('check-windows-installer-lifecycle.mjs'), pin)
+    if (lineEnding === 'CRLF') assert.throws(() => prepareOutlineInstallation(originalCore, read('check-windows-installer-lifecycle.mjs'), pin), {
+      code: 'ERR_ASSERTION', actual: 'e83e76da3a4679682a731cb1cabdbf4e705182f9', expected: 'e9c64b370582da9b21a8ea299ef40db01eb96b0a',
+    }, 'Unnormalized CRLF must still fail the original fixed source identity gate')
+    const inherited = prepareOutlineInstallation(read('installer-lifecycle-core.mjs'), read('check-windows-installer-lifecycle.mjs'), pin)
     const prepared = extendLocalImportInstallation(extendWikiInstallation(prepareInstallerHistoryReadiness(extendRecentInstallation(extendPinsInstallation(extendGraphInstallation(inherited, pin), pin), pin)), pin), pin)
     const final = extendReadingModeInstallation(prepared, pin)
     assert.equal(final.script.match(/await verifyReadingModeDesktop\(/g).length, 1)
@@ -137,6 +161,6 @@ test('offline complete prepare chain preserves original lifecycle and adds readi
     assert.equal(child.status, 0, 'Prepared original refusal suite failed:\n' + child.stdout.slice(-10000) + child.stderr)
     assert.match(child.stdout, /^# tests 848$/m, 'The isolated original tests did not all execute')
     assert.match(child.stdout, /^# pass 848$/m)
-    t.diagnostic('Prepared original 17 refusal files and generated import refusal file all passed (848 assertions). Synthetic contract inputs only; no native installation executed.')
+    t.diagnostic(lineEnding + ': prepared original 17 refusal files and generated import refusal file all passed (848 assertions). Synthetic contract inputs only; no native installation executed.')
   } finally { rmSync(directory, { recursive: true, force: true }) }
 })
