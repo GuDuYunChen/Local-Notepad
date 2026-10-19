@@ -104,8 +104,14 @@ const theme = {
   codeBlock: 'code-block-wrapper',
 };
 
-function Placeholder() {
-  return <div className="editor-placeholder">开始输入…</div>;
+function Placeholder({ readOnly = false }) {
+  return <div className="editor-placeholder">{readOnly ? '这篇笔记还没有内容' : '开始输入…'}</div>;
+}
+
+function EditableModePlugin({ readOnly }) {
+  const [editor] = useLexicalComposerContext();
+  useEffect(() => { editor.setEditable(!readOnly); }, [editor, readOnly]);
+  return null;
 }
 
 function OnChangePlugin({ onChange }) {
@@ -192,7 +198,8 @@ export default function Editor({ documentId, documentTitle, initialContent, onCh
 
   return (
     <LexicalComposer initialConfig={initialConfig}>
-      <div className="editor-shell">
+      <div className={`editor-shell${readOnly ? ' editor-reading-mode' : ''}`}>
+        <EditableModePlugin readOnly={readOnly} />
         {!readOnly && <ToolbarPlugin />}
         <SearchPlugin key={documentId} documentId={documentId} />
         {!readOnly && <CommandPalettePlugin />}
@@ -212,11 +219,11 @@ export default function Editor({ documentId, documentTitle, initialContent, onCh
                 autoCapitalize="off"
               />
             )}
-            placeholder={<Placeholder />}
+            placeholder={<Placeholder readOnly={readOnly} />}
             ErrorBoundary={LexicalErrorBoundary}
           />
           <HistoryPlugin />
-          <AutoFocusPlugin />
+          {!readOnly && <AutoFocusPlugin />}
           <TablePlugin />
           <ListPlugin />
           <CheckListPlugin />

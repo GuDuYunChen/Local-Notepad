@@ -16,6 +16,7 @@ import { createEditorSaveAttempt, commitEditorSave, boundedEditorRequest } from 
 
 import { captureEditorDraftRecovery, recoverEditorDraft } from '~/services/editorDraftRecovery.mjs'
 import EditorSaveConflictDialog from './EditorSaveConflictDialog'
+import { loadEditorMode, saveEditorMode } from '~/services/editorReadingMode.mjs'
 
 const Editor = React.lazy(() => import('./Editor/Editor'))
 
@@ -72,6 +73,8 @@ function TextEditorInternal({
   const statusRef = useRef(null)
   const pendingStructureMappingsRef = useRef([])
   const [editorContent, setEditorContent] = useState('')
+  const [editorMode, setEditorMode] = useState(loadEditorMode)
+  const [modePreferenceWarning, setModePreferenceWarning] = useState(false)
 
   const onChangeRef = useRef(onChange)
   const onLoadedRef = useRef(onLoaded)
@@ -610,6 +613,12 @@ function TextEditorInternal({
     }
   }, [])
 
+  const toggleEditorMode = () => {
+    const nextMode = editorMode === 'reading' ? 'editing' : 'reading'
+    setEditorMode(nextMode)
+    setModePreferenceWarning(!saveEditorMode(nextMode))
+  }
+
   const formatSavedTime = (ts) => {
     if (!ts) return ''
     return new Intl.DateTimeFormat('zh-CN', {
@@ -764,6 +773,7 @@ function TextEditorInternal({
               documentTitle={documentTitle}
               initialContent={editorContent}
               onChange={handleEditorChange}
+              readOnly={editorMode === 'reading'}
             />
           </React.Suspense>
           <div ref={statusRef} className="editor-status-bar">
@@ -794,6 +804,13 @@ function TextEditorInternal({
                 </span>
               )}
               {selMode && <span className="selection-mode-pill">表格选择</span>}
+              {editorMode === 'reading' && contentRef.current !== lastSavedContentRef.current && (
+                <span className="selection-mode-pill editor-reading-draft-pill" role="status">阅读模式 · 未保存草稿已保留</span>
+              )}
+              {modePreferenceWarning && <span className="editor-mode-preference-warning" role="status">模式偏好未能保存，本次会话仍生效</span>}
+              <button type="button" className={`editor-mode-toggle${editorMode === 'reading' ? ' active' : ''}`} aria-pressed={editorMode === 'reading'} aria-label={editorMode === 'reading' ? '切换到编辑模式' : '切换到阅读模式'} title="切换阅读/编辑模式；不会丢弃或覆盖未保存草稿" onClick={toggleEditorMode}>
+                {editorMode === 'reading' ? '进入编辑模式' : '阅读模式'}
+              </button>
               <span>{wordCount.toLocaleString()} 字</span>
             </span>
           </div>

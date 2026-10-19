@@ -18,9 +18,10 @@ vi.mock('~/services/tagApi', () => ({
 }))
 
 vi.mock('./Editor/Editor', () => ({
-  default: function MockEditor({ initialContent, onChange }) {
+  default: function MockEditor({ initialContent, onChange, readOnly }) {
     globalThis.__textEditorMockInitialContent = initialContent
     globalThis.__textEditorMockOnChange = onChange
+    globalThis.__textEditorMockReadOnly = Boolean(readOnly)
     return React.createElement('div', null)
   },
 }))
@@ -989,5 +990,49 @@ describe('TextEditor save coordination', () => {
       expect(editorQuit.pending()).toBe(1)
       expect(container.textContent).toContain('保存未确认')
     })
+  })
+})
+
+
+describe('local reading mode handoff', () => {
+  let container
+  let root
+  beforeEach(() => {
+    vi.useFakeTimers()
+    api.mockReset()
+    localStorage.clear()
+    globalThis.IS_REACT_ACT_ENVIRONMENT = true
+    container = document.createElement('div')
+    document.body.appendChild(container)
+    root = createRoot(container)
+  })
+  afterEach(async () => {
+    if (root) await act(async () => { root.unmount() })
+    container?.remove()
+    delete globalThis.IS_REACT_ACT_ENVIRONMENT
+    delete globalThis.__textEditorMockReadOnly
+    delete globalThis.__textEditorMockOnChange
+    delete globalThis.__textEditorMockInitialContent
+    vi.clearAllTimers()
+    vi.useRealTimers()
+  })
+  it('switches the live editor between read-only and editing without changing its loaded body', async () => {
+    const body = JSON.stringify({ root: { children: [{ type: 'paragraph', children: [{ type: 'text', text: 'preserve-this-draft' }] }] } })
+    api.mockResolvedValue({ id: 'file-1', content: body, updated_at: 1 })
+    await act(async () => { root.render(<TextEditor activeId="file-1" deletedIds={new Set()} autoSaveOnSwitch={false} onChange={() => {}} onLoaded={() => {}} onSaved={() => {}} />) })
+    await flushPromises()
+    const toggle = container.querySelector('[aria-label="切换到阅读模式"]')
+    expect(toggle).toBeTruthy()
+    expect(globalThis.__textEditorMockReadOnly).toBe(false)
+    await act(async () => { toggle.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+    expect(globalThis.__textEditorMockReadOnly).toBe(true)
+    expect(localStorage.getItem('localNotepad.editorMode.v1')).toBe('reading')
+    expect(globalThis.__textEditorMockInitialContent).toBe(body)
+    const back = container.querySelector('[aria-label="切换到编辑模式"]')
+    expect(back).toBeTruthy()
+    await act(async () => { back.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+    expect(globalThis.__textEditorMockReadOnly).toBe(false)
+    expect(localStorage.getItem('localNotepad.editorMode.v1')).toBe('editing')
+    expect(globalThis.__textEditorMockInitialContent).toBe(body)
   })
 })
