@@ -110,7 +110,10 @@ function Placeholder({ readOnly = false }) {
 
 function EditableModePlugin({ readOnly }) {
   const [editor] = useLexicalComposerContext();
-  useLayoutEffect(() => { editor.setEditable(!readOnly); }, [editor, readOnly]);
+  useLayoutEffect(() => {
+    const shouldBeEditable = !readOnly;
+    if (editor.isEditable() !== shouldBeEditable) editor.setEditable(shouldBeEditable);
+  }, [editor, readOnly]);
   return null;
 }
 
