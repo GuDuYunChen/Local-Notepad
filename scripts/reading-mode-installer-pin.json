@@ -1,0 +1,42 @@
+{
+  "product": "4a16a9a60e04357402bbd05c7592c5964b6b97e0",
+  "quickBlob": "c1e8f40862b770f82af47c26a455b57efc853700",
+  "tagsBlob": "54bb56864e58e2aa3f5ed08aedb52a00de5f0769",
+  "templateBlob": "42378f13f71a03c3e91cdfdcb6dec44dbbb05f33",
+  "backlinksBlob": "1d2092c29521962556e8f69e1a44ce693a71f544",
+  "searchBlob": "260743d8676cfc4f896e5a80ad4705337f8ccbde",
+  "outlineBlob": "0b8bc518c9d34102528c75ffdbd39d53d1394c2a",
+  "graphBlob": "70014eb8fc8d94c08898d62faa49e92e547bce4e",
+  "pinsBlob": "7abf0331d1b3a7c1b626e7c2e2b5f68d6a77c588",
+  "recentBlob": "cbe5a8897c082210363357fd33f2cb0f3d7bd1cc",
+  "wikiBlob": "8cb64e31bf79c3ec2b17d5b8c152eccc0f2de6ca",
+  "importBlob": "834a0f899611f84c64dcee0caa74863ea906362e",
+  "importFixtureBlob": "022e484ef96e8a2dd6b2f57601bda8af29869666",
+  "importEvidenceBlob": "212d90b2b23e40f272b3ee73f0f0c128f9fd9359",
+  "importEvidenceTestsBlob": "591673bb0dbac36c38515cb8ff9ab64d71b7bb1b",
+  "current": {
+    "version": "4.233.1",
+    "bytes": 104342778,
+    "sha256": "dbc5af531a693d6c0e57f5d7edfe1e9dc22573abe1b47e8b7e9ac8fbe838f977"
+  },
+  "previous": {
+    "version": "4.232.0",
+    "bytes": 104335681,
+    "sha256": "3b1b743a61e3dd7a13c5642f7310e68f7ba2bd912d0f98f6b8c1d7e2f7707e9e"
+  },
+  "previousSource": {
+    "run": 39092212511,
+    "artifact": 12123865208,
+    "name": "local-notepad-windows-1a8e17ba775312c359f4ac23851c8c365b57a9cb"
+  },
+  "currentSource": {
+    "run": 39250585180,
+    "artifact": 12185168675,
+    "name": "local-notepad-windows-4a16a9a60e04357402bbd05c7592c5964b6b97e0"
+  },
+  "readingDriverBlob": "38294a44414d96b2dda9656b6299ba3427c3420e",
+  "readingFixtureBlob": "5b4b7c66a60a42b65d374691049c49d87d051838",
+  "readingEvidenceBlob": "9aaea36a83479495772d25e74523a214db185011",
+  "readingBuilderBlob": "fbc7ead7bf8a6f765c00619920778b9aac1c8c8a",
+  "readingInputBlob": "967618682572906f4a11ed57309f51750bdb0e63"
+}

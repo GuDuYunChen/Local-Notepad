@@ -1,4 +1,4 @@
-name: Actual local document import installation lifecycle 2F99
+name: Actual local reading mode installation lifecycle 2F100
 on:
   push:
     branches: [ci/local-installation-2f86]
@@ -28,12 +28,21 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Ensure lock was not modified
         run: git diff --exit-code -- package.json package-lock.json
-      - name: Download accepted 4.231.2 upgrade seed
+      - name: Refuse missing reading gates and prove complete original preparation
+        run: node --test scripts/reading-mode-desktop-evidence.node.mjs scripts/reading-mode-installed-evidence.node.mjs scripts/reading-mode-native-input.node.mjs
+      - name: Resolve only complete source and binary pins
+        id: reading-pin
+        run: node scripts/pin-reading-mode-installer.mjs outputs
+      - name: Verify exact artifact IDs against original run and product metadata
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/pin-reading-mode-installer.mjs verify-artifacts
+      - name: Download accepted 4.232.0 upgrade seed
         uses: actions/download-artifact@v4
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: 39042666537
-          name: local-notepad-windows-b6ad9c63587a7af0625c94a7ebe0b2c23e69ca6f
+          run-id: ${{ steps.reading-pin.outputs.previous-run }}
+          name: ${{ steps.reading-pin.outputs.previous-name }}
           path: .installer-input/previous
       - name: Download unchanged old path-failure counterexample
         uses: actions/download-artifact@v4
@@ -42,21 +51,23 @@ jobs:
           run-id: 38337004784
           name: local-notepad-windows-191439e04ddbf6b4423194d2978ae72da926df3c
           path: .installer-input/legacy
-      - name: Download source-bound 4.232.0 installer
+      - name: Download source-bound 4.233.1 installer
         uses: actions/download-artifact@v4
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: 39092212511
-          name: local-notepad-windows-1a8e17ba775312c359f4ac23851c8c365b57a9cb
+          run-id: ${{ steps.reading-pin.outputs.current-run }}
+          name: ${{ steps.reading-pin.outputs.current-name }}
           path: .installer-input/current
       - name: Verify exact current and upgrade binary identities
-        run: node scripts/pin-local-import-installer.mjs
-      - name: Preserve original lifecycle and all modules plus exact native import workflow
-        run: node scripts/run-local-import-installer.mjs prepare
+        run: node scripts/pin-reading-mode-installer.mjs prepare
+      - name: Preserve original lifecycle and all modules plus exact native reading workflow
+        run: node scripts/run-reading-mode-installer.mjs prepare
       - name: Retain all original refusal checks and add import evidence contracts
         run: node --test scripts/installer-lifecycle-core.node.mjs scripts/installer-shell-core.node.mjs scripts/history-installation-evidence.node.mjs scripts/daily-installed-evidence.node.mjs scripts/template-installed-evidence.node.mjs scripts/quick-installed-evidence.node.mjs scripts/note-tags-installed-evidence.node.mjs scripts/backlinks-installed-evidence.node.mjs scripts/document-search-installed-evidence.node.mjs scripts/document-outline-installed-evidence.node.mjs scripts/local-graph-installed-evidence.node.mjs scripts/local-pins-installed-evidence.node.mjs scripts/recent-notes-installed-evidence.node.mjs scripts/installer-history-readiness.node.mjs scripts/wiki-installed-evidence.node.mjs scripts/local-import-desktop-evidence.node.mjs scripts/local-import-installed-evidence.node.mjs
+      - name: Apply unchanged import refusal contracts to generated target-version validator
+        run: node --test scripts/reading-import-desktop-validator.node.mjs
       - name: Actual installed modules upgrade overwrite uninstall reinstall and data retention
-        run: node scripts/run-local-import-installer.mjs run
+        run: node scripts/run-reading-mode-installer.mjs run
       - name: Retain complete or failed original evidence
         if: always()
         uses: actions/upload-artifact@v4

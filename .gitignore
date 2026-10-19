@@ -37,3 +37,13 @@ build/icon.png
 build/icon.ico
 build/icon.svg
 src/public/brand/
+
+# Verifier-only generated reading-mode fixture and release-pinned copies
+scripts/reading-mode-desktop-fixture.bundle.mjs
+scripts/reading-import-validator.mjs
+scripts/reading-import-desktop-validator.mjs
+scripts/reading-import-desktop-validator.node.mjs
+scripts/reading-import-desktop-driver.mjs
+scripts/pin-reading-import-generated.mjs
+scripts/run-reading-import-generated.mjs
+scripts/check-windows-installer-lifecycle.reading-mode.mjs
