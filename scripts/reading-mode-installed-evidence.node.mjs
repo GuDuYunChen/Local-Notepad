@@ -7,33 +7,43 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { ACCEPTED_READING_SEED, ACCEPTED_READING_SEED_SOURCE, READING_SOURCE_KEYS,
-  validateReadingModePin, prepareReadingModeVerifierSources, extendReadingModeInstallation,
+  validateReadingModePin, validateReadingModeHistorySource, prepareReadingModeVerifierSources, extendReadingModeInstallation,
   replaceExactlyAndProveInverse, validateInstalledReadingMode, validateGeneratedReadingModeSources } from './reading-mode-installed-evidence.mjs'
 import { readingEvidenceFixture } from './reading-mode-test-fixture.mjs'
 import { REQUIRED_CHECKS, LEGACY_DEFECT } from './installer-lifecycle-core.mjs'
 import { validateReadingArtifact } from './pin-reading-mode-installer.mjs'
 
+const source = name => readFileSync(new URL('./' + name, import.meta.url), 'utf8')
+const blob = text => createHash('sha1').update('blob ' + Buffer.byteLength(text) + '\0').update(text).digest('hex')
 const verifier = 'b'.repeat(40)
 function fixture() {
+  const reading = readingEvidenceFixture()
   const pin = { product: 'a'.repeat(40), previous: { ...ACCEPTED_READING_SEED }, previousSource: { ...ACCEPTED_READING_SEED_SOURCE },
-    current: { version: '4.233.1', bytes: 1001, sha256: createHash('sha256').update('synthetic-reading-mode-contract-input').digest('hex') }, currentSource: { run: 100, artifact: 200, name: 'local-notepad-windows-' + 'a'.repeat(40) } }
+    current: { version: '4.233.2', bytes: 1001, sha256: createHash('sha256').update('synthetic-reading-mode-contract-input').digest('hex') }, currentSource: { run: 100, artifact: 200, name: 'local-notepad-windows-' + 'a'.repeat(40) } }
   for (const key of READING_SOURCE_KEYS) pin[key] = 'd'.repeat(40)
-  Object.assign(pin, { importBlob: '834a0f899611f84c64dcee0caa74863ea906362e',
-    importEvidenceBlob: '212d90b2b23e40f272b3ee73f0f0c128f9fd9359',
-    importEvidenceTestsBlob: '591673bb0dbac36c38515cb8ff9ab64d71b7bb1b' })
+  Object.assign(pin, { importBlob: 'ebb969e105d92a92d62874942f8ea622f61e50ca',
+    importEvidenceBlob: '261bfd7c3e43698d173f85b5af342c7ff68ccd2e',
+    importEvidenceTestsBlob: '39fac5da22fb6cfe1ddc9963401bbd2c5a5455ef',
+    historyDriverBlob: blob(source('check-version-history-desktop.mjs').replace(/\r\n/g, '\n')) })
   const report = { productCommit: pin.product, verifierCommit: verifier, complete: true, cleanupComplete: true,
     syntheticData: true, usedDefaultDataPath: true, forceTerminated: false, platform: 'win32', runnerEnvironment: 'github-hosted',
     installers: { current: { ...pin.current }, previous: { ...pin.previous } },
+    moduleSources: { history: pin.historyDriverBlob },
     readingModeSource: { productCommit: pin.product, driver: pin.readingDriverBlob, fixture: pin.readingFixtureBlob,
-      validator: pin.readingEvidenceBlob, builder: pin.readingBuilderBlob, nativeInput: pin.readingInputBlob },
+      validator: pin.readingEvidenceBlob, builder: pin.readingBuilderBlob, nativeInput: pin.readingInputBlob,
+      windowSession: pin.readingWindowSessionBlob, windowTarget: pin.readingWindowTargetBlob, windowWorker: pin.readingWindowWorkerBlob },
     checks: ['installed-app-wiki-navigation-workflow', 'installed-app-local-import-workflow', 'installed-app-reading-mode-workflow'],
     appExits: Array.from({ length: 6 }, (_, i) => ({ pid: i + 100, code: 0, signal: null, nativeClose: true })),
     dataComparisons: Array.from({ length: 6 }, () => ({ equal: true, files: 4, digest: 'e'.repeat(64) })),
+    shortcutLaunch: { target: reading.pendingDrafts.quit.executablePath },
   }
-  return { pin, report, reading: readingEvidenceFixture() }
+  return { pin, report, reading }
 }
 test('installation binds accepted 4.232.0 seed and new reading report to the actual fifth native process', () => {
   const f = fixture(); assert.equal(validateReadingModePin(f.pin), true)
+  assert.equal(READING_SOURCE_KEYS.length, 23)
+  assert.equal(new Set(READING_SOURCE_KEYS).size, 23)
+  assert.equal(READING_SOURCE_KEYS.at(-1), 'historyDriverBlob')
   assert.equal(validateInstalledReadingMode(f.report, f.reading, f.pin, verifier), true)
 })
 test('artifact identity requires the exact remote ID, name, run, product head and availability', () => {
@@ -52,6 +62,7 @@ test('artifact identity requires the exact remote ID, name, run, product head an
 })
 for (const [name, mutate] of [
   ['unresolved target', f => f.pin.product = null], ['old version', f => f.pin.current.version = '4.233.0'],
+  ['previous reading fix version', f => f.pin.current.version = '4.233.1'],
   ['unresolved bytes', f => f.pin.current.bytes = null], ['unresolved digest', f => f.pin.current.sha256 = null],
   ['wrong upgrade version', f => f.pin.previous.version = '4.231.2'], ['wrong upgrade hash', f => f.pin.previous.sha256 = '0'.repeat(64)],
   ['wrong upgrade artifact', f => f.pin.previousSource.artifact++], ['wrong upgrade run', f => f.pin.previousSource.run++],
@@ -64,27 +75,74 @@ for (const [name, mutate] of [
   ['wrong driver', f => f.report.readingModeSource.driver = verifier], ['wrong serializer', f => f.report.readingModeSource.fixture = verifier],
   ['wrong evidence code', f => f.report.readingModeSource.validator = verifier], ['wrong builder', f => f.report.readingModeSource.builder = verifier],
   ['wrong native input source', f => f.report.readingModeSource.nativeInput = verifier],
+  ['wrong native window session source', f => f.report.readingModeSource.windowSession = verifier],
+  ['wrong native window selector source', f => f.report.readingModeSource.windowTarget = verifier],
+  ['wrong native window worker source', f => f.report.readingModeSource.windowWorker = verifier],
+  ['wrong installed history source', f => f.report.moduleSources.history = verifier],
+  ['missing installed history source', f => delete f.report.moduleSources],
   ['incomplete lifecycle', f => f.report.complete = false], ['incomplete cleanup', f => f.report.cleanupComplete = false],
   ['self-hosted runner', f => f.report.runnerEnvironment = 'self-hosted'], ['forced app', f => f.report.forceTerminated = true],
   ['missing exit', f => f.report.appExits.pop()], ['forced exit', f => f.report.appExits[4].nativeClose = false],
   ['exit failure', f => f.report.appExits[4].code = 1], ['exit signal', f => f.report.appExits[4].signal = 'SIGTERM'],
   ['missing retained comparison', f => f.report.dataComparisons.pop()], ['changed retained bytes', f => f.report.dataComparisons[0].equal = false],
-  ['wrong native process', f => f.reading.processID = 999], ['missing independent reading check', f => delete f.reading.attempts.caption],
+  ['wrong native process', f => f.reading = readingEvidenceFixture({ processID: 999 })], ['missing independent reading check', f => delete f.reading.attempts.caption],
+  ['missing installed image', f => delete f.report.shortcutLaunch],
+  ['another installed image', f => f.report.shortcutLaunch.target = 'C:\\unrelated\\Other.exe'],
 ]) test('refuses installed reading ' + name, () => {
   const f = fixture(); mutate(f); assert.throws(() => validateInstalledReadingMode(f.report, f.reading, f.pin, verifier))
 })
 
-const source = name => readFileSync(new URL('./' + name, import.meta.url), 'utf8')
 test('all generated import copies retain exact inverse source identity', () => {
   const { pin } = fixture(), generated = prepareReadingModeVerifierSources(pin, source)
   assert.equal(generated.length, 6)
-  assert.ok(generated.find(item => item.output === 'run-reading-import-generated.mjs').pinned.includes("['./reading-mode-native-input.mjs',pin.readingInputBlob]"), 'Native input helper must remain source-bound in the actual installer runner')
+  for (const [file, key] of [
+    ['check-reading-mode-desktop.mjs', 'readingDriverBlob'], ['reading-mode-desktop-fixture.jsx', 'readingFixtureBlob'],
+    ['reading-mode-desktop-evidence.mjs', 'readingEvidenceBlob'], ['build-reading-mode-fixture.mjs', 'readingBuilderBlob'],
+    ['reading-mode-native-input.mjs', 'readingInputBlob'], ['desktop-window-session.mjs', 'readingWindowSessionBlob'],
+    ['desktop-window-target.mjs', 'readingWindowTargetBlob'], ['desktop-window-worker.ps1', 'readingWindowWorkerBlob'],
+    ['check-version-history-desktop.mjs', 'historyDriverBlob'],
+  ]) assert.ok(generated.find(item => item.output === 'run-reading-import-generated.mjs').pinned.includes("['./" + file + "',pin." + key + "]"),
+    'Native reading and owned-window dependencies must remain source-bound in the actual installer runner: ' + file)
   for (const item of generated) assert.equal(replaceExactlyAndProveInverse(item.pinned, [...item.changes].reverse().map(([before, after]) => [after, before])), item.original)
   for (const item of generated) assert.throws(() => prepareReadingModeVerifierSources(pin, name => source(name) + (name === item.source ? '\n// changed policy' : '')))
   assert.throws(() => replaceExactlyAndProveInverse('same same', [['same', 'other']]))
   const readGenerated = name => generated.find(item => item.output === name)?.pinned ?? source(name)
   assert.equal(validateGeneratedReadingModeSources(pin, readGenerated), true)
   assert.throws(() => validateGeneratedReadingModeSources(pin, name => readGenerated(name) + (name === 'run-reading-import-generated.mjs' ? '\n// changed gate' : '')))
+})
+test('refuses a well-formed history pin that differs from the actual driver source', () => {
+  const { pin } = fixture(); pin.historyDriverBlob = 'e'.repeat(40)
+  assert.equal(validateReadingModePin(pin), true)
+  assert.throws(() => prepareReadingModeVerifierSources(pin, source), /Current history driver source differs from product pin/)
+})
+test('refuses changed history driver bytes under the same product pin', () => {
+  const { pin } = fixture()
+  assert.equal(validateReadingModeHistorySource(pin, source), true)
+  assert.throws(() => prepareReadingModeVerifierSources(pin, name => source(name) +
+    (name === 'check-version-history-desktop.mjs' ? '\n// altered driver source' : '')),
+  /Current history driver source differs from product pin/)
+})
+test('refuses missing actual history driver source before verifier generation', () => {
+  const { pin } = fixture()
+  assert.throws(() => prepareReadingModeVerifierSources(pin,
+    name => name === 'check-version-history-desktop.mjs' ? undefined : source(name)), /Current history driver source is missing/)
+})
+for (const output of ['pin-reading-import-generated.mjs', 'run-reading-import-generated.mjs']) test('refuses missing generated source proof ' + output, () => {
+  const { pin } = fixture(), generated = prepareReadingModeVerifierSources(pin, source)
+  const read = name => generated.find(item => item.output === name)?.pinned ?? source(name)
+  assert.throws(() => validateGeneratedReadingModeSources(pin, name => name === output ? undefined : read(name)),
+    error => error.code === 'ERR_ASSERTION' && error.message.startsWith('Prepared verifier source is missing: ' + output))
+})
+for (const [name, output, anchor] of [
+  ['history source verification', 'pin-reading-import-generated.mjs', 'validateReadingModeHistorySource(pin,readSource)'],
+  ['history template binding', 'pin-reading-import-generated.mjs', " [\"export const HISTORY_BLOB='c9800f23c9f924d31edb1c7f7c7c4e1a1cf851a6'\",`export const HISTORY_BLOB='${pin.historyDriverBlob}'`],\n"],
+  ['history runner binding', 'run-reading-import-generated.mjs', 'assert.equal(HISTORY_BLOB,pin.historyDriverBlob)'],
+]) test('refuses generated verifier without ' + name, () => {
+  const { pin } = fixture(), generated = prepareReadingModeVerifierSources(pin, source)
+  const read = file => generated.find(item => item.output === file)?.pinned ?? source(file)
+  assert.equal(read(output).split(anchor).length, 2)
+  assert.throws(() => validateGeneratedReadingModeSources(pin, file => file === output ? read(file).replace(anchor, '') : read(file)),
+    error => error.code === 'ERR_ASSERTION' && error.message.startsWith('Prepared verifier was changed after source proof: ' + output))
 })
 for (const key of ['importBlob', 'importEvidenceBlob', 'importEvidenceTestsBlob']) test('refuses a version-pinned copy that differs from target product ' + key, () => {
   const { pin } = fixture(); pin[key] = 'd'.repeat(40)
@@ -117,11 +175,34 @@ for (const lineEnding of ['LF', 'CRLF']) test('offline complete ' + lineEnding +
     const originalCore = raw('installer-lifecycle-core.mjs')
     assert.equal(blob(originalCore), lineEnding === 'CRLF' ? 'e83e76da3a4679682a731cb1cabdbf4e705182f9' : 'e9c64b370582da9b21a8ea299ef40db01eb96b0a')
     assert.equal(blob(read('installer-lifecycle-core.mjs')), 'e9c64b370582da9b21a8ea299ef40db01eb96b0a')
-    const { pin } = fixture(), generated = prepareReadingModeVerifierSources(pin, read)
+    // Give the isolated driver distinct source bytes so this contract proves a
+    // new history binding, even while the real candidate driver is still held.
+    const historySource = read('check-version-history-desktop.mjs') + '\n// Synthetic history source-pin contract input.\n'
+    writeFileSync(path.join(scripts, 'check-version-history-desktop.mjs'), lineEnding === 'CRLF' ? historySource.replace(/\n/g, '\r\n') : historySource)
+    const { pin } = fixture(); pin.historyDriverBlob = blob(historySource)
+    const generated = prepareReadingModeVerifierSources(pin, read)
     for (const item of generated) writeFileSync(path.join(scripts, item.output), item.pinned)
     const module = name => import(pathToFileURL(path.join(scripts, name)).href)
     const { prepareLocalImportValidatorPin } = await module('pin-reading-import-generated.mjs')
     const inheritedPins = prepareLocalImportValidatorPin(pin, read)
+    assert.equal(blob(inheritedPins.before), '5c676571f38982d2df6053dc8ca735f474684e9e')
+    assert.notEqual(pin.historyDriverBlob, 'c9800f23c9f924d31edb1c7f7c7c4e1a1cf851a6')
+    const historyAnchor = "export const HISTORY_BLOB='c9800f23c9f924d31edb1c7f7c7c4e1a1cf851a6'"
+    const pinnedHistory = `export const HISTORY_BLOB='${pin.historyDriverBlob}'`
+    assert.equal(inheritedPins.after.split(pinnedHistory).length, 2)
+    assert.equal(replaceExactlyAndProveInverse(inheritedPins.after, [
+      [pinnedHistory, historyAnchor],
+      [`export const PRODUCT='${pin.product}'`, "export const PRODUCT='29c140a989984e981d6e99a6078145f1d05323dc'"],
+      [`export const CURRENT=Object.freeze(${JSON.stringify(pin.current)})`, "export const CURRENT=Object.freeze({version:'4.222.2',bytes:104244051,sha256:'7d8b4d6196c90a3346b64e0c4124a4b92f80e0c46aa4e4bb347e3e04aaa373b2'})"],
+      [`export const PREVIOUS=Object.freeze(${JSON.stringify(pin.previous)})`, "export const PREVIOUS=Object.freeze({version:'4.221.1',bytes:104218653,sha256:'de069090d8013bbbcc8aa076d610909b99703f1372fce22ed713cad0bfeeab6a'})"],
+      [`export const TEMPLATE_BLOB='${pin.templateBlob}'`, "export const TEMPLATE_BLOB='c440d9bf107fe6f1d4bef1f06f845139b57fe9ef'"],
+    ]), inheritedPins.before, 'Every generated template byte must restore the original historical validator')
+    assert.throws(() => prepareLocalImportValidatorPin({ ...pin, historyDriverBlob: 'e'.repeat(40) }, read),
+      /Current history driver source differs from product pin/)
+    assert.throws(() => prepareLocalImportValidatorPin(pin, name => name === 'check-version-history-desktop.mjs' ? undefined : read(name)),
+      /Current history driver source is missing/)
+    assert.throws(() => prepareLocalImportValidatorPin(pin, name => read(name) + (name === 'template-installed-evidence.mjs' ? '\n// changed historical validator' : '')),
+      { code: 'ERR_ASSERTION', expected: '5c676571f38982d2df6053dc8ca735f474684e9e' })
     writeFileSync(path.join(scripts, 'template-installed-evidence.mjs'), inheritedPins.after)
     for (const item of inheritedPins.generated) writeFileSync(path.join(scripts, item.output), item.pinned)
     const { prepareOutlineInstallation } = await module('document-outline-installed-evidence.mjs')
@@ -137,17 +218,26 @@ for (const lineEnding of ['LF', 'CRLF']) test('offline complete ' + lineEnding +
     const inherited = prepareOutlineInstallation(read('installer-lifecycle-core.mjs'), read('check-windows-installer-lifecycle.mjs'), pin)
     const prepared = extendLocalImportInstallation(extendWikiInstallation(prepareInstallerHistoryReadiness(extendRecentInstallation(extendPinsInstallation(extendGraphInstallation(inherited, pin), pin), pin)), pin), pin)
     const final = extendReadingModeInstallation(prepared, pin)
+    assert.equal((await module('template-installed-evidence.mjs')).HISTORY_BLOB, pin.historyDriverBlob)
+    assert.equal(final.script.split("history:'" + pin.historyDriverBlob + "'").length, 2)
     assert.equal(final.script.match(/await verifyReadingModeDesktop\(/g).length, 1)
+    assert.match(final.script, /await verifyReadingModeDesktop\(\{evaluate,click,cdp,until,api,out,windowSession,executablePath:appExe,processID:appChild.pid,productCommit:PRODUCT_COMMIT,version:RELEASES.current.version\}\)/)
     assert.equal(final.script.match(/await verifyLocalImportRestart\(/g).length, 1)
     assert.ok(final.script.indexOf('await verifyReadingModeDesktop(') > final.script.indexOf('await verifyLocalImportRestart('))
     assert.equal(final.core.match(/'installed-app-reading-mode-workflow'/g).length, 1)
-    assert.ok(final.core.includes('4.233.1')); assert.ok(final.core.includes('4.232.0'))
+    assert.ok(final.core.includes('4.233.2')); assert.ok(final.core.includes('4.232.0'))
     for (const marker of REQUIRED_CHECKS) assert.ok(final.core.includes(marker), marker)
     assert.ok(final.core.includes(LEGACY_DEFECT.sha256))
     assert.ok(final.script.includes("assert.equal(observedDirectory,legacyTarget.split(' ')[0],'Old directory truncation was not reproduced')"))
     assert.throws(() => extendReadingModeInstallation(final, pin))
     assert.throws(() => extendReadingModeInstallation({ ...prepared, script: prepared.script.replace('await verifyLocalImportRestart(', 'await missingRestart(') }, pin))
+    assert.throws(() => extendReadingModeInstallation({ ...prepared, script: prepared.script.replace('windowSession=createDesktopWindowSession();await windowSession.ready', 'windowSession=undefined') }, pin), /prewarmed native window session/)
+    assert.throws(() => extendReadingModeInstallation({ ...prepared, script: prepared.script.replace("const appExe = path.join(installDir, '记事本.exe')", "const appExe = 'unowned.exe'") }, pin), /exact installed application image path/)
     writeFileSync(path.join(scripts, 'installer-lifecycle-core.mjs'), final.core)
+    const finalCore = await import(pathToFileURL(path.join(scripts, 'installer-lifecycle-core.mjs')).href + '?reading-final')
+    assert.equal(finalCore.REQUIRED_CHECKS.length, 26)
+    assert.equal(finalCore.PRODUCT_COMMIT, pin.product)
+    assert.deepEqual(finalCore.RELEASES, { previous: pin.previous, current: pin.current })
     symlinkSync(fileURLToPath(new URL('../node_modules', import.meta.url)), path.join(directory, 'node_modules'), 'junction')
     const workflow = readFileSync(new URL('../.github/workflows/local-installation-2f86.yml', import.meta.url), 'utf8')
     const refusalLine = workflow.split('\n').find(line => line.includes('run: node --test scripts/installer-lifecycle-core.node.mjs'))
