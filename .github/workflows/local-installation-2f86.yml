@@ -31,7 +31,11 @@ jobs:
       - name: Build canonical reading fixture before refusal contracts
         run: node scripts/build-reading-mode-fixture.mjs
       - name: Refuse missing reading and shortcut gates and prove complete original preparation
-        run: node --test scripts/reading-mode-desktop-evidence.node.mjs scripts/reading-mode-installed-evidence.node.mjs scripts/reading-mode-native-input.node.mjs scripts/desktop-window-session.node.mjs scripts/shortcut-management-desktop-evidence.node.mjs scripts/shortcut-management-installed-evidence.node.mjs
+        shell: pwsh
+        run: |
+          node -e "const fs = require('node:fs'); const out = 'test-results/installer-lifecycle'; fs.mkdirSync(out, { recursive: true }); fs.writeFileSync(out + '/preparation-context.json', JSON.stringify({ schemaVersion: 1, scope: 'installer-preparation-contracts-only', nativeLifecycleExecuted: false, verifierCommit: process.env.GITHUB_SHA ?? null, runID: process.env.GITHUB_RUN_ID ?? null, runAttempt: process.env.GITHUB_RUN_ATTEMPT ?? null, job: process.env.GITHUB_JOB ?? null, platform: process.platform, node: process.version, startedAt: new Date().toISOString() }, null, 2) + '\n', { flag: 'wx' })"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --test --test-reporter=tap --test-reporter-destination=test-results/installer-lifecycle/preparation-contracts.tap scripts/reading-mode-desktop-evidence.node.mjs scripts/reading-mode-installed-evidence.node.mjs scripts/reading-mode-native-input.node.mjs scripts/desktop-window-session.node.mjs scripts/shortcut-management-desktop-evidence.node.mjs scripts/shortcut-management-installed-evidence.node.mjs
       - name: Verify fixed legacy installer restoration and refusals
         run: node --test scripts/prepare-legacy-installer.node.mjs
       - name: Resolve only complete source and binary pins

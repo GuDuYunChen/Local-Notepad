@@ -238,10 +238,22 @@ test('installation binds the exact raw shortcut report bytes in addition to ever
   } finally { rmSync(directory, { recursive: true, force: true }) }
 })
 
-test('workflow retains fixed legacy restoration, original 17 refusal files and 20-minute budget', () => {
-  const workflow = readFileSync(new URL('../.github/workflows/local-installation-2f86.yml', import.meta.url), 'utf8')
+function assertWorkflowContract(rawWorkflow) {
+  const workflow = rawWorkflow.replace(/\r\n/g, '\n')
   assert.match(workflow, /timeout-minutes: 20\n/)
-  assert.ok(workflow.indexOf('run: node scripts/build-reading-mode-fixture.mjs') < workflow.indexOf('run: node --test scripts/reading-mode-desktop-evidence.node.mjs'))
+  assert.deepEqual(workflow.split('\n').filter(line => /^[ \t]*timeout-minutes:/.test(line)), ['    timeout-minutes: 20'])
+  const preparation = workflow.match(/^          node --test --test-reporter=tap --test-reporter-destination=test-results\/installer-lifecycle\/preparation-contracts\.tap (.+)$/m)
+  assert.ok(preparation, 'Keep the complete preparation TAP even when a contract refuses the candidate')
+  assert.deepEqual(preparation[1].split(/\s+/), [
+    'scripts/reading-mode-desktop-evidence.node.mjs', 'scripts/reading-mode-installed-evidence.node.mjs',
+    'scripts/reading-mode-native-input.node.mjs', 'scripts/desktop-window-session.node.mjs',
+    'scripts/shortcut-management-desktop-evidence.node.mjs', 'scripts/shortcut-management-installed-evidence.node.mjs',
+  ])
+  const builder = workflow.indexOf('run: node scripts/build-reading-mode-fixture.mjs')
+  assert.ok(builder >= 0 && builder < workflow.indexOf(preparation[0]))
+  const context = workflow.indexOf("scope: 'installer-preparation-contracts-only', nativeLifecycleExecuted: false")
+  assert.ok(context >= 0 && context < workflow.indexOf(preparation[0]))
+  assert.ok(workflow.includes('          if-no-files-found: error'))
   assert.ok(workflow.includes('run: node scripts/prepare-legacy-installer.mjs'))
   const original = workflow.split('\n').find(line => line.includes('run: node --test scripts/installer-lifecycle-core.node.mjs'))
   assert.equal(original.trim().split(/\s+/).slice(3).length, 17)
@@ -252,4 +264,22 @@ test('workflow retains fixed legacy restoration, original 17 refusal files and 2
   assert.match(pin, /prepareShortcutManagementVerifierSources\(pin,/)
   assert.match(runner, /validateShortcutManagementInstallerPin\(pin\)/)
   assert.match(runner, /assert\.ifError\(child\.error\)/)
+}
+
+test('workflow retains fixed legacy restoration, original 17 refusal files and 20-minute budget', () => {
+  assertWorkflowContract(readFileSync(new URL('../.github/workflows/local-installation-2f86.yml', import.meta.url), 'utf8'))
+})
+
+test('workflow accepts actual LF and CRLF checkout text with the same strict preparation gates', () => {
+  const normalized = readFileSync(new URL('../.github/workflows/local-installation-2f86.yml', import.meta.url), 'utf8').replace(/\r\n/g, '\n')
+  for (const workflow of [normalized, normalized.replace(/\n/g, '\r\n')]) assertWorkflowContract(workflow)
+})
+
+test('workflow refuses missing changed or duplicated installation time budgets in either checkout format', () => {
+  const normalized = readFileSync(new URL('../.github/workflows/local-installation-2f86.yml', import.meta.url), 'utf8').replace(/\r\n/g, '\n')
+  for (const replacement of ['', '    timeout-minutes: 19\n', '    timeout-minutes: 21\n',
+    '    timeout-minutes: 200\n', '    timeout-minutes: 20\n    timeout-minutes: 21\n']) {
+    const changed = normalized.replace('    timeout-minutes: 20\n', replacement)
+    for (const workflow of [changed, changed.replace(/\n/g, '\r\n')]) assert.throws(() => assertWorkflowContract(workflow))
+  }
 })
