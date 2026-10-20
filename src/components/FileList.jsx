@@ -5,6 +5,8 @@ import { api, listAllFiles } from '~/services/api'
 import { toast } from '~/services/toast'
 import { changePin } from '~/services/localPins.mjs'
 import { executeFileHistoryAction } from '~/services/fileHistory'
+import useLocalShortcuts from '../hooks/useLocalShortcuts'
+import { isShortcutContextBlocked, matchShortcut, shortcutFromEvent, shortcutLabel } from '../services/localShortcuts'
 import ConfirmDialog from './ConfirmDialog'
 import { FileContextMenu, FileLibraryMenu, FileNewMenu } from './FileListMenus'
 import {
@@ -176,6 +178,7 @@ export default function FileList({
   onItemsChanged,
   updatedItem,
 }) {
+  const { bindings: shortcutBindings } = useLocalShortcuts()
   const [pinReview, setPinReview] = useState(null)
   const pinOwner = useRef(null)
   const pinMounted = useRef(false)
@@ -463,18 +466,14 @@ export default function FileList({
   // Keyboard shortcut for Undo/Redo
   useEffect(() => {
       function handleUndoRedo(e) {
-          if (e.ctrlKey && e.key === 'z') {
-              // 如果焦点在可编辑元素内（编辑器、输入框等），不拦截，让编辑器自行处理
-              const el = document.activeElement
-              const tag = el?.tagName?.toLowerCase()
-              if (tag === 'input' || tag === 'textarea' || el?.isContentEditable) return
-              e.preventDefault()
-              if (e.shiftKey) {
-                  void performRedo()
-              } else {
-                  void performUndo()
-              }
-          }
+          // Fixed history keys yield to foreground fields, dialogs and any
+          // earlier command. Extra modifiers may belong to a configured key.
+          if (isShortcutContextBlocked(e, { allowFormFields: false })) return
+          const binding = shortcutFromEvent(e)
+          if (binding !== 'Mod+Z' && binding !== 'Mod+Shift+Z') return
+          e.preventDefault()
+          if (binding === 'Mod+Shift+Z') void performRedo()
+          else void performUndo()
       }
       window.addEventListener('keydown', handleUndoRedo)
       return () => window.removeEventListener('keydown', handleUndoRedo)
@@ -538,13 +537,15 @@ export default function FileList({
   useEffect(() => {
     // 快捷键支持
     function handleKeyDown(e) {
-      if (e.ctrlKey && e.key === 'n') {
+      if (!isShortcutContextBlocked(e) && matchShortcut(e, 'newFolder')) {
         e.preventDefault()
-        if (e.shiftKey) {
-           onNewFolderCheck()
-        } else {
-           onNewFileCheck()
-        }
+        onNewFolderCheck()
+        return
+      }
+      if (!isShortcutContextBlocked(e) && matchShortcut(e, 'newNote')) {
+        e.preventDefault()
+        onNewFileCheck()
+        return
       }
       if (e.key === 'Escape') {
         if (contextMenu) {
@@ -560,7 +561,7 @@ export default function FileList({
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [items, contextMenu, showNewMenu, showLibraryMenu]) // 保持快捷键读取最新菜单状态
+  }, [items, selectedId, onBeforeNew, contextMenu, showNewMenu, showLibraryMenu]) // 新按键总是使用当前目录与保存决定
 
   useEffect(() => {
     if (!updatedItem) return
@@ -1745,7 +1746,7 @@ export default function FileList({
                   <button className="btn" onClick={() => onNewFolderCheck()}>新建文件夹</button>
                 </div>
                 <div className="empty-tips">
-                  <div>快捷键：Ctrl+N 新建笔记 · Ctrl+Shift+N 新建文件夹</div>
+                  <div>快捷键：{shortcutLabel('newNote', shortcutBindings)} 新建笔记 · {shortcutLabel('newFolder', shortcutBindings)} 新建文件夹</div>
                   <div>支持拖拽导入本地文件</div>
                 </div>
               </div>

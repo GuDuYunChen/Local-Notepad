@@ -235,9 +235,9 @@ export default function SettingsPanel({
           <div className="settings-row">
             <div>
               <strong>快捷键</strong>
-              <span>查看搜索、保存、专注模式等快捷操作。</span>
+              <span>查找常用操作，自定义快捷键并保存到本机。</span>
             </div>
-            <button className="btn" onClick={onOpenShortcuts}>查看</button>
+            <button className="btn" onClick={onOpenShortcuts}>管理</button>
           </div>
 
           <button

@@ -52,6 +52,8 @@ import { toast } from '~/services/toast'
 import TableMenu from './TableMenu'
 import { normalizeLinkUrl } from '../utils/linkUtils'
 import { useEditorWriteScope } from '../hooks/useEditorWriteScope'
+import { isShortcutContextBlocked, shortcutFromEvent, shortcutLabel } from '~/services/localShortcuts'
+import useLocalShortcuts from '~/hooks/useLocalShortcuts'
 import './TextColorPlugin.css'
 
 const FontOptions = [
@@ -97,6 +99,7 @@ const BLOCK_OPTIONS = [
 
 export default function ToolbarPlugin({ documentId } = {}) {
   const [editor] = useLexicalComposerContext()
+  const { bindings } = useLocalShortcuts()
   const captureWrite = useEditorWriteScope(editor, documentId)
   const [canUndo, setCanUndo] = useState(false)
   const [canRedo, setCanRedo] = useState(false)
@@ -124,21 +127,36 @@ export default function ToolbarPlugin({ documentId } = {}) {
   const [linkUrl, setLinkUrl] = useState('')
 
   const fontSelectRef = useRef(null)
+  const fontFocusRequestedRef = useRef(false)
   const colorPickerRef = useRef(null)
   const insertMenuRef = useRef(null)
   const moreMenuRef = useRef(null)
   const linkRef = useRef(null)
 
   useEffect(() => {
+    if (!moreOpen || !fontFocusRequestedRef.current) return
+    fontFocusRequestedRef.current = false
+    if (editor.isEditable()) fontSelectRef.current?.focus()
+  }, [editor, moreOpen])
+
+  useEffect(() => {
     const handleKeyDown = (event) => {
-      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'f') {
+      if (!editor.isEditable() || editor.isComposing() || isShortcutContextBlocked(event)) return
+      const target = event.target?.nodeType === 1 ? event.target : document.activeElement
+      if (target?.closest?.('input,textarea,select')) return
+      if (shortcutFromEvent(event) === 'Mod+Shift+F') {
         event.preventDefault()
-        fontSelectRef.current?.focus()
+        if (fontSelectRef.current) fontSelectRef.current.focus()
+        else {
+          fontFocusRequestedRef.current = true
+          setMoreOpen(true)
+          setInsertOpen(false)
+        }
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [])
+  }, [editor])
 
   useEffect(() => {
     const openLink = () => {
@@ -654,7 +672,7 @@ export default function ToolbarPlugin({ documentId } = {}) {
           className={`btn toolbar-text-btn${isCheckList ? ' active' : ''}`}
           onClick={() => toggleList('check')}
           aria-label="待办清单"
-          title="待办清单 · Ctrl+Alt+T · Tab/Shift+Tab 调整层级"
+          title={`待办清单 · ${shortcutLabel('checklist', bindings)} · Tab/Shift+Tab 调整层级`}
         >
           <span aria-hidden="true">☑</span>
         </button>
@@ -709,7 +727,7 @@ export default function ToolbarPlugin({ documentId } = {}) {
         className="btn toolbar-text-btn toolbar-find-btn"
         onClick={() => window.dispatchEvent(new Event('editor:open-search'))}
         aria-label="文内查找与替换"
-        title="文内查找与替换 (Ctrl+F)"
+        title={`文内查找与替换 (${shortcutLabel('find', bindings)})`}
       >
         <span aria-hidden="true">⌕</span>
       </button>
@@ -719,7 +737,7 @@ export default function ToolbarPlugin({ documentId } = {}) {
         className="btn toolbar-text-btn toolbar-command-btn"
         onClick={() => window.dispatchEvent(new Event('editor:open-command-palette'))}
         aria-label="编辑器命令"
-        title="编辑器命令 (Ctrl+Shift+P)"
+        title={`编辑器命令 (${shortcutLabel('commandPalette', bindings)})`}
       >
         <span aria-hidden="true">⌘</span>
       </button>
@@ -788,7 +806,7 @@ export default function ToolbarPlugin({ documentId } = {}) {
                 >
                   代码块
                 </button>
-                <button type="button" className="btn toolbar-menu-action" onClick={() => insertNode($createFormulaNode())} title="Ctrl+Alt+E">
+                <button type="button" className="btn toolbar-menu-action" onClick={() => insertNode($createFormulaNode())} title={shortcutLabel('formula', bindings)}>
                   数学公式
                 </button>
                 <button type="button" className="btn toolbar-menu-action" onClick={() => insertNode($createCalloutNode())}>

@@ -254,7 +254,7 @@ export default function Editor({ documentId, documentTitle, initialContent, onCh
           {!readOnly && <MentionPlugin />}
           <WikiLinkPlugin />
           {!readOnly && <DragDropPlugin />}
-          {!readOnly && <EditorShortcutPlugin />}
+          {!readOnly && <EditorShortcutPlugin documentId={documentId} />}
           {!readOnly && <FormulaShortcutPlugin />}
           {!readOnly && <ChecklistKeyboardPlugin />}
           <OnChangePlugin onChange={onChange} />

@@ -3,6 +3,8 @@ import { api, searchFiles } from '~/services/api'
 import { extractLexicalText } from '~/utils/lexicalText'
 import { readQuickResults, readQuickTarget, QUICK_RESULT_LIMIT } from '../services/quickSwitcher.mjs'
 import './QuickSwitcher.css'
+import useLocalShortcuts from '../hooks/useLocalShortcuts'
+import { shortcutLabel } from '../services/localShortcuts'
 
 export function buildHighlightSegments(text, query) {
   const source = String(text || '')
@@ -79,6 +81,7 @@ function formatRelativeTime(ts) {
 }
 
 export default function QuickSwitcher({ open, onClose, onSelectFile, onOpenSearchWorkspace, navigationEpoch }) {
+  const { bindings: shortcutBindings } = useLocalShortcuts()
   const [query, setQuery] = useState(''), [applied, setApplied] = useState('')
   const [results, setResults] = useState([]), [status, setStatus] = useState('loading')
   const [error, setError] = useState(''), [notice, setNotice] = useState('')
@@ -204,7 +207,7 @@ export default function QuickSwitcher({ open, onClose, onSelectFile, onOpenSearc
           onChange={e => edit(e.target.value)} onKeyDown={keys}
           onCompositionStart={() => { composing.current = true; cancelReading(); setResults([]); setStatus('loading') }}
           onCompositionEnd={e => { composing.current = false; edit(e.currentTarget.value, true) }} />
-        <kbd>Ctrl K</kbd><button type="button" className="btn small" aria-label="关闭快速搜索" onClick={close}>关闭</button>
+        <kbd>{shortcutLabel('quickSwitch', shortcutBindings)}</kbd><button type="button" className="btn small" aria-label="关闭快速搜索" onClick={close}>关闭</button>
       </div>
       <div className="quick-switcher-meta" role="status"><span>{applied.trim() ? '搜索结果' : '最近修改 · 置顶优先'}</span><span>{status === 'loading' ? '搜索中…' : status === 'error' ? '读取失败' : `${visibleResults.length} 项`}</span></div>
       {notice && <div className="quick-switcher-notice" role="status">{notice}</div>}

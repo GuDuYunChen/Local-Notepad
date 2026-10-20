@@ -6,6 +6,8 @@ import { TableNode, TableRowNode, TableCellNode, $createTableCellNode, $createTa
 import { $getNodeByKey } from 'lexical'
 import { toast } from '~/services/toast'
 import { useEditorWriteScope } from '../hooks/useEditorWriteScope'
+import { isShortcutContextBlocked, matchShortcut, shortcutLabel } from '~/services/localShortcuts'
+import useLocalShortcuts from '~/hooks/useLocalShortcuts'
 
 export function forEachSelectedTableCell(tables, rects, callback) {
   for (const rect of Array.isArray(rects) ? rects : []) {
@@ -48,6 +50,7 @@ export function parseTableTSV(text) {
 
 export default function TableSelectionPlugin({ documentId }) {
   const [editor] = useLexicalComposerContext()
+  const { bindings } = useLocalShortcuts()
   const isEditable = useLexicalEditable()
   const beginWrite = useEditorWriteScope(editor, documentId)
   const [active, setActive] = useState(false)
@@ -126,6 +129,10 @@ export default function TableSelectionPlugin({ documentId }) {
 
     const onKey = (e) => { ctrlRef.current = e.ctrlKey || e.metaKey }
     const onShortcut = (e) => {
+      if (!editor.isEditable() || editor.isComposing() || isShortcutContextBlocked(e)) return
+      const target = e.target?.nodeType === 1 ? e.target : document.activeElement
+      if (target?.closest?.('input,textarea,select')) return
+      if (target && target !== document.body && !container.contains(target) && !overlayRef.current?.contains(target)) return
       if (e.key === 'Escape') {
         e.preventDefault()
         setRects([])
@@ -137,21 +144,20 @@ export default function TableSelectionPlugin({ documentId }) {
       const modifier = e.ctrlKey || e.metaKey
       const key = e.key.toLowerCase()
 
-      if (modifier && !e.altKey && key === 'c') {
+      if (modifier && !e.altKey && !e.shiftKey && key === 'c') {
         e.preventDefault()
         void copySelection()
         return
       }
-      if (modifier && !e.altKey && key === 'v') {
+      if (modifier && !e.altKey && !e.shiftKey && key === 'v') {
         if (!navigator.clipboard?.readText) return
         e.preventDefault()
         void pasteSelection()
         return
       }
 
-      if (!modifier || !e.altKey) return
-      if (key === 'm') { e.preventDefault(); doMerge() }
-      if (key === 's') { e.preventDefault(); doSplit() }
+      if (matchShortcut(e, 'mergeCells')) { e.preventDefault(); doMerge(); return }
+      if (matchShortcut(e, 'splitCell')) { e.preventDefault(); doSplit() }
     }
     const onDown = (e) => {
       const cell = getCell(e.target)
@@ -346,12 +352,11 @@ export default function TableSelectionPlugin({ documentId }) {
         target.setColSpan?.(1)
         for (let rr = r.r1; rr < r.r1 + rs; rr++) {
           const row = rows[rr]
-          const cells = row.getChildren()
           for (let cc = r.c1; cc < r.c1 + cs; cc++) {
             if (rr === r.r1 && cc === r.c1) continue
             const cell = $createTableCellNode()
             cell.append($createParagraphNode())
-            row.insertAt(Math.min(cc, cells.length), cell)
+            row.splice(Math.min(cc, row.getChildrenSize()), 0, [cell])
           }
         }
       } else {
@@ -372,12 +377,11 @@ export default function TableSelectionPlugin({ documentId }) {
         const rows = table.getChildren()
         for (let rr = rowIndex; rr < rowIndex + rs; rr++) {
           const rNode = rows[rr]
-          const cells = rNode.getChildren()
           for (let cc = colIndex; cc < colIndex + cs; cc++) {
             if (rr === rowIndex && cc === colIndex) continue
             const nc = $createTableCellNode()
             nc.append($createParagraphNode())
-            rNode.insertAt(Math.min(cc, cells.length), nc)
+            rNode.splice(Math.min(cc, rNode.getChildrenSize()), 0, [nc])
           }
         }
       }
@@ -1050,8 +1054,8 @@ export default function TableSelectionPlugin({ documentId }) {
             <button type="button" onClick={() => applyHorizontal('center')} disabled={selectedCellCount === 0}>居中</button>
             <button type="button" onClick={() => applyHorizontal('right')} disabled={selectedCellCount === 0}>右对齐</button>
             <button type="button" onClick={() => applyAlign('middle')} disabled={selectedCellCount === 0}>垂直居中</button>
-            <button type="button" onClick={doMerge} disabled={selectedCellCount < 2}>合并</button>
-            <button type="button" onClick={doSplit} disabled={selectedCellCount === 0}>拆分</button>
+            <button type="button" onClick={doMerge} disabled={selectedCellCount < 2} title={`合并 (${shortcutLabel('mergeCells', bindings)})`}>合并</button>
+            <button type="button" onClick={doSplit} disabled={selectedCellCount === 0} title={`拆分 (${shortcutLabel('splitCell', bindings)})`}>拆分</button>
             <button type="button" onClick={() => doClear()} disabled={selectedCellCount === 0}>清空</button>
             <button type="button" className="primary" onClick={exitSelectionMode}>完成</button>
           </div>

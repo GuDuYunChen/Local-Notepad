@@ -20,6 +20,8 @@ import CollectionReadingBar from './components/CollectionReadingBar'
 import { evidenceReview } from '~/services/evidenceReviewSession'
 import useGuardedNoteOpener from './hooks/useGuardedNoteOpener'
 import useRecentNoteTracking from './hooks/useRecentNoteTracking'
+import useLocalShortcuts from './hooks/useLocalShortcuts'
+import { isShortcutContextBlocked, matchShortcut, shortcutFromEvent, shortcutLabel } from './services/localShortcuts'
 import { toast } from '~/services/toast'
 import {
   appendFocusSession,
@@ -76,6 +78,7 @@ function buildExtractedNoteTitle(files, sourceFile, sectionText) {
 }
 
 export default function App() {
+  const { bindings: shortcutBindings } = useLocalShortcuts()
   const editorRef = useRef(null)
   const navigationEpoch = useRef(0)
   const titleInputRef = useRef(null)
@@ -719,29 +722,41 @@ export default function App() {
 
   useEffect(() => {
     const onKey = (e) => {
-      const k = e.key.toLowerCase()
-      if ((e.ctrlKey || e.metaKey) && k === 's') {
+      if (isShortcutContextBlocked(e, { allowDialogs: true })) return
+      const k = String(e.key || '').toLowerCase()
+      if (shortcutFromEvent(e) === 'Mod+S') {
         e.preventDefault()
         void saveCurrent()
+        return
       }
-      if ((e.ctrlKey || e.metaKey) && k === 'k') {
+      if (isShortcutContextBlocked(e)) return
+      if (matchShortcut(e, 'globalSearch')) {
         e.preventDefault()
-        if (e.shiftKey) openGlobalSearch()
-        else { setGlobalSearchOpen(false); setQuickSearchOpen(true) }
+        openGlobalSearch()
+        return
       }
-      if (k === '/' && (e.ctrlKey || e.metaKey)) {
+      if (matchShortcut(e, 'quickSwitch')) {
+        e.preventDefault()
+        setGlobalSearchOpen(false)
+        setQuickSearchOpen(true)
+        return
+      }
+      if (matchShortcut(e, 'shortcuts')) {
         e.preventDefault()
         setShortcutsOpen(prev => !prev)
+        return
       }
-      if (k === 'f1') {
+      if (k === 'f1' && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
         e.preventDefault()
         setShortcutsOpen(true)
+        return
       }
-      if (k === 'f11') {
+      if (matchShortcut(e, 'focusMode')) {
         e.preventDefault()
         setFocusMode(prev => !prev)
+        return
       }
-      if (k === 'f2' && workspace === 'notes' && current && !current.is_folder) {
+      if (k === 'f2' && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && workspace === 'notes' && current && !current.is_folder) {
         const el = document.activeElement
         const tag = el?.tagName?.toLowerCase()
         if (tag !== 'input' && tag !== 'textarea' && !el?.isContentEditable) {
@@ -1031,7 +1046,7 @@ export default function App() {
         </button>
       )}
       {workspace === 'notes' && (
-        <button className="icon-btn" onClick={() => setFocusMode(true)} title="专注模式 (F11)" aria-label="进入专注模式">
+        <button className="icon-btn" onClick={() => setFocusMode(true)} title={`专注模式 (${shortcutLabel('focusMode', shortcutBindings)})`} aria-label="进入专注模式">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3" />
           </svg>
@@ -1051,7 +1066,7 @@ export default function App() {
 
 
         {focusMode && !focusSession?.active && (
-          <button className="focus-exit-floating" onClick={() => setFocusMode(false)} title="退出专注模式 (F11)" aria-label="退出专注模式">
+          <button className="focus-exit-floating" onClick={() => setFocusMode(false)} title={`退出专注模式 (${shortcutLabel('focusMode', shortcutBindings)})`} aria-label="退出专注模式">
             ✕ 退出专注
           </button>
         )}

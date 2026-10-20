@@ -5,6 +5,8 @@ import {$isHeadingNode} from '@lexical/rich-text'
 import {buildHeadingAnchor} from '../utils/linkUtils'
 import {formatWikiReferenceText,rememberReference} from '../utils/referenceUtils'
 import {isEvidenceContentReady,subscribeEvidenceContentReady} from '~/services/evidenceNavigation'
+import {isShortcutContextBlocked,matchShortcut,shortcutLabel} from '~/services/localShortcuts'
+import useLocalShortcuts from '~/hooks/useLocalShortcuts'
 import {OUTLINE_LIMITS,outlineSnapshot,filterOutline,expandedOutlineKeys,copyOutlineText,resolveOutlinePath,
   calculateReadingProgress,getOutlineBreadcrumb,getCollapsedOutlineKeys,findOutlineHeadingForKey} from '~/services/documentOutline.mjs'
 import './DocumentOutline.css'
@@ -13,6 +15,7 @@ export {calculateReadingProgress,getOutlineBreadcrumb,getCollapsedOutlineKeys,fi
 export default function DocumentOutlinePlugin(props) {return <CurrentOutline key={props.documentId||''} {...props}/>}
 function CurrentOutline({documentId='',documentTitle='',initialContent,requireLoaded=false}) {
   const [editor]=useLexicalComposerContext()
+  const {bindings}=useLocalShortcuts()
   const [snapshot,setSnapshot]=useState({nodes:[],headings:[]}),[status,setStatus]=useState('loading')
   const [open,setOpen]=useState(false),[search,setSearch]=useState(''),[query,setQuery]=useState('')
   const [collapsed,setCollapsed]=useState(new Set()),[active,setActive]=useState(''),[caret,setCaret]=useState('')
@@ -140,9 +143,12 @@ function CurrentOutline({documentId='',documentTitle='',initialContent,requireLo
       if(ready()&&state.current.open)close()
     }
     const keyboard=e=>{
-      if(e.isComposing||e.keyCode===229||composing.current)return
-      if((e.ctrlKey||e.metaKey)&&!e.altKey&&['f','h'].includes(e.key.toLowerCase())&&!e.target?.closest?.('[role="dialog"]'))yieldToSearch(e)
-      if((e.ctrlKey||e.metaKey)&&e.shiftKey&&e.key.toLowerCase()==='o'){e.preventDefault();toggle()}
+      if(composing.current||editor.isComposing()||isShortcutContextBlocked(e))return
+      const target=e.target?.nodeType===1?e.target:document.activeElement
+      const shell=editor.getRootElement()?.closest('.editor-shell')
+      const ownPanel=shell&&target?.closest?.('.local-outline,.document-search')?.closest('.editor-shell')===shell
+      if(target?.closest?.('input,textarea,select')&&!ownPanel)return
+      if(matchShortcut(e,'outline')){e.preventDefault();toggle()}
     }
     const anchor=e=>{
       if(e.detail?.documentId&&e.detail.documentId!==documentId)return
@@ -182,7 +188,7 @@ function CurrentOutline({documentId='',documentTitle='',initialContent,requireLo
     {bodyToggle&&<button type="button" className={'heading-body-collapse'+(collapsed.has(bodyToggle.key)?' collapsed':'')} style={{top:bodyToggle.top,left:bodyToggle.left}} onMouseDown={e=>e.preventDefault()} onClick={()=>fold(bodyToggle.key)} aria-label={collapsed.has(bodyToggle.key)?'展开当前章节':'折叠当前章节'}>›</button>}
     <div className="document-reading-progress" aria-hidden="true"><span style={{width:progress+'%'}}/></div>
     <div className={'document-outline local-outline'+(open?' open':'')} onKeyDown={e=>{if(e.key==='Escape'&&!e.isComposing&&!composing.current&&open){e.preventDefault();e.stopPropagation();close()}}}>
-      <button ref={entry} type="button" className="document-outline-toggle" aria-label="文档目录" aria-expanded={open} title="文档目录 (Ctrl+Shift+O)" onClick={()=>open?close():setOpen(true)}><span aria-hidden="true">☰</span><span>{snapshot.headings.length}</span></button>
+      <button ref={entry} type="button" className="document-outline-toggle" aria-label="文档目录" aria-expanded={open} title={`文档目录 (${shortcutLabel('outline',bindings)})`} onClick={()=>open?close():setOpen(true)}><span aria-hidden="true">☰</span><span>{snapshot.headings.length}</span></button>
       {open&&<section className="document-outline-panel" aria-label="当前文档大纲">
         <div className="document-outline-header"><div><strong>文档目录</strong><small>当前正文 · 只读导航</small></div><button type="button" aria-label="关闭文档目录" onClick={close}>×</button></div>
         <div className="outline-tools"><button type="button" onClick={()=>{invalidate();collect()}}>重新读取大纲</button><button type="button" disabled={!collapsed.size} onClick={()=>{invalidate();setCollapsed(new Set())}}>展开全部</button><button type="button" onClick={()=>window.dispatchEvent(new Event('editor:open-structure-manager'))}>结构</button></div>

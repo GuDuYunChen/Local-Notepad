@@ -4,6 +4,7 @@ import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext
 import { HISTORY_PUSH_TAG, SKIP_DOM_SELECTION_TAG } from 'lexical'
 import ConfirmDialog from '../../ConfirmDialog'
 import { SEARCH_LIMITS, assertSearchString } from '~/services/documentSearch.mjs'
+import { isShortcutContextBlocked, matchShortcut } from '~/services/localShortcuts'
 import { $readDocumentSearch, $replaceDocumentMatches, searchTopLevelKey, searchDOMRange } from './documentSearchLexical'
 import './DocumentSearch.css'
 export { findTextMatchOffsets } from '~/services/documentSearch.mjs'
@@ -46,10 +47,18 @@ export default function SearchPlugin({ documentId = '' }) {
       focusFrame.current=requestAnimationFrame(()=>{if(alive.current&&epoch.current===ticket){inputRef.current?.focus();inputRef.current?.select()}})
     }
     const onKey = e => {
-      if (e.defaultPrevented || e.isComposing || e.keyCode===229 || !(e.ctrlKey||e.metaKey) || e.altKey) return
-      const otherDialog = e.target?.closest?.('[role="dialog"]')
-      if (otherDialog) return
-      if (['f','h'].includes(e.key.toLowerCase())) {e.preventDefault();start(e.key.toLowerCase()==='h')}
+      if (compose.current || editor.isComposing() || isShortcutContextBlocked(e)) return
+      const target = e.target?.nodeType === 1 ? e.target : document.activeElement
+      const shell = editor.getRootElement()?.closest('.editor-shell')
+      const ownSearch = panelRef.current?.contains(target)
+      const ownOutline = shell && target?.closest?.('.local-outline')?.closest('.editor-shell') === shell
+      if (target?.closest?.('input,textarea,select') && !ownSearch && !ownOutline) return
+      const replace = matchShortcut(e, 'replace')
+      if (!replace && !matchShortcut(e, 'find')) return
+      e.preventDefault()
+      // Both listeners receive this explicit document event even when the
+      // keyboard event has already been consumed, so the outline can yield.
+      window.dispatchEvent(new CustomEvent('editor:open-search', {detail:{documentId,replace}}))
     }
     const onOpen = e => { if (e.detail?.documentId && e.detail.documentId!==documentId) return; start(e.detail?.replace) }
     window.addEventListener('keydown',onKey);window.addEventListener('editor:open-search',onOpen)
