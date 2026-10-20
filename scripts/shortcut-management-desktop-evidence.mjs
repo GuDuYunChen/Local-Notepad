@@ -50,6 +50,58 @@ export function assertShortcutManagementConfiguration(raw, focusBinding) {
   return decoded
 }
 
+export function assertShortcutManagementRefusalVisibility(observation, kind) {
+  object(observation); assert.ok(['reserved', 'conflict'].includes(kind))
+  const bounds = value => {
+    object(value)
+    for (const key of ['left', 'top', 'right', 'bottom']) assert.ok(Number.isFinite(value[key]))
+    assert.ok(value.right > value.left && value.bottom > value.top)
+    return value
+  }
+  const within = (inner, outer) => {
+    bounds(inner); bounds(outer)
+    assert.ok(inner.left >= outer.left && inner.top >= outer.top &&
+      inner.right <= outer.right && inner.bottom <= outer.bottom, 'Refusal content is clipped by its viewport')
+  }
+  const outsideFooter = rect => assert.ok(rect.right <= observation.footer.left || rect.left >= observation.footer.right ||
+    rect.bottom <= observation.footer.top || rect.top >= observation.footer.bottom, 'Footer obscures refusal content')
+  object(observation.viewport)
+  for (const key of ['width', 'height', 'devicePixelRatio']) assert.ok(Number.isFinite(observation.viewport[key]) && observation.viewport[key] > 0)
+  const viewport = { left: 0, top: 0, right: observation.viewport.width, bottom: observation.viewport.height }
+  within(observation.dialog, viewport); within(observation.footer, observation.dialog)
+  object(observation.scroll)
+  within(observation.scroll.viewport, observation.dialog)
+  const scroll = observation.scroll
+  for (const key of ['clientWidth', 'clientHeight', 'scrollWidth', 'scrollHeight']) integer(scroll[key])
+  assert.equal(scroll.viewport.right - scroll.viewport.left, scroll.clientWidth)
+  assert.equal(scroll.viewport.bottom - scroll.viewport.top, scroll.clientHeight)
+  for (const key of ['scrollLeft', 'scrollTop']) assert.ok(Number.isFinite(scroll[key]) && scroll[key] >= 0)
+  assert.ok(scroll.scrollHeight > scroll.clientHeight, 'The actual full command list must overflow its viewport')
+  assert.ok(scroll.scrollWidth >= scroll.clientWidth)
+  assert.equal(observation.command, 'focusMode'); assert.equal(observation.commandCount, 15)
+  assert.equal(observation.focused, true)
+  within(observation.recordingPanel, scroll.viewport); outsideFooter(observation.recordingPanel)
+  object(observation.nodes)
+  assert.deepEqual(Object.keys(observation.nodes).sort(), ['accept', 'cancel', 'feedback', 'recorder'])
+  const points = [[.5, .5], [.25, .25], [.75, .25], [.25, .75], [.75, .75]]
+  for (const node of Object.values(observation.nodes)) {
+    object(node); assert.equal(typeof node.text, 'string'); assert.equal(typeof node.disabled, 'boolean')
+    assert.equal(node.rendered, true); within(node.rect, observation.recordingPanel); outsideFooter(node.rect)
+    assert.ok(Array.isArray(node.hitPoints)); assert.equal(node.hitPoints.length, points.length)
+    for (const [index, [fx, fy]] of points.entries()) {
+      const point = node.hitPoints[index]
+      assert.equal(point.x, node.rect.left + (node.rect.right - node.rect.left) * fx)
+      assert.equal(point.y, node.rect.top + (node.rect.bottom - node.rect.top) * fy)
+      assert.equal(point.matched, true, 'Refusal content is occluded at an actual hit-test point')
+    }
+  }
+  assert.ok(observation.nodes.feedback.text.includes(kind === 'reserved' ? '保存' : '快速切换笔记'))
+  assert.equal(observation.nodes.cancel.text, '取消录入'); assert.equal(observation.nodes.cancel.disabled, false)
+  assert.equal(observation.nodes.accept.text, kind === 'reserved' ? '使用此快捷键' : '替换冲突快捷键')
+  assert.equal(observation.nodes.accept.disabled, kind === 'reserved')
+  return true
+}
+
 export function validateShortcutManagementNativeAction(action, expected) {
   object(action); object(expected)
   assert.equal(action.label, expected.label)
@@ -149,6 +201,21 @@ export function validateShortcutManagementDesktopReport(report, commit, productC
   assert.ok(report.refusals.reservedText.includes('保存'))
   assert.ok(report.refusals.conflictText.includes('快速切换笔记'))
   assert.equal(report.refusals.storageUnchanged, true)
+  for (const kind of ['reserved', 'conflict']) {
+    assertShortcutManagementRefusalVisibility(report.refusals[kind + 'Visibility'], kind)
+    assert.equal(report.refusals[kind + 'Visibility'].nodes.feedback.text, report.refusals[kind + 'Text'].trim())
+  }
+  const conflictScreenshot = report.refusals.conflictScreenshot
+  object(conflictScreenshot)
+  assert.equal(conflictScreenshot.filename, 'shortcut-management-conflict.png')
+  const conflictImage = report.screenshots.find(item => item.filename === conflictScreenshot.filename)
+  object(conflictImage)
+  assert.equal(conflictScreenshot.bytes, conflictImage.bytes)
+  assert.equal(conflictScreenshot.sha256, conflictImage.sha256)
+  assertShortcutManagementRefusalVisibility(conflictScreenshot.before, 'conflict')
+  assertShortcutManagementRefusalVisibility(conflictScreenshot.after, 'conflict')
+  assert.deepEqual(conflictScreenshot.before, report.refusals.conflictVisibility)
+  assert.deepEqual(conflictScreenshot.after, conflictScreenshot.before)
   assert.equal(report.recording.backgroundFocusUnchanged, true)
   assert.equal(report.recording.backgroundNoteCountUnchanged, true)
   assert.equal(report.recording.bodyUnchanged, true)

@@ -5,12 +5,14 @@ import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { deflateSync } from 'node:zlib'
+import { Script } from 'node:vm'
+import { parse } from 'acorn'
 import { SHORTCUT_MANAGEMENT_VERSION, SHORTCUT_MANAGEMENT_REPORT, SHORTCUT_MANAGEMENT_STORAGE_KEY,
   SHORTCUT_MANAGEMENT_BINDINGS, SHORTCUT_MANAGEMENT_SOURCES, SHORTCUT_MANAGEMENT_CHECKS,
   SHORTCUT_MANAGEMENT_IMAGES, assertShortcutManagementConfiguration,
   validateShortcutManagementNativeAction, validateShortcutManagementDesktopReport,
   verifyShortcutManagementDesktopReport } from './shortcut-management-desktop-evidence.mjs'
-import { shortcutManagementNote } from './shortcut-management-desktop-fixture.mjs'
+import { SHORTCUT_FIXTURE, shortcutManagementNote } from './shortcut-management-desktop-fixture.mjs'
 
 const HEAD = '1'.repeat(40), sha = value => createHash('sha256').update(value).digest('hex')
 const configuration = focusMode => JSON.stringify({ schemaVersion: 1, bindings: { ...SHORTCUT_MANAGEMENT_BINDINGS, focusMode } })
@@ -59,7 +61,10 @@ function fixture() {
       applied: configuration('Mod+Alt+J'), beforeRestart: configuration('Mod+Alt+J'),
       afterRestart: configuration('Mod+Alt+J'), afterResetCancel: configuration('Mod+Alt+J'), defaults: configuration('F11') },
     entries: ['more', 'settings', 'help'], search: { initialCount: 15, filteredCount: 1, filteredCommand: 'focusMode', restoredCount: 15 },
-    refusals: { reservedText: '该快捷键用于保存笔记', conflictText: '该快捷键用于快速切换笔记', storageUnchanged: true },
+    refusals: { reservedText: '该快捷键用于保存笔记', conflictText: '该快捷键用于快速切换笔记', storageUnchanged: true,
+      reservedVisibility: refusalObservation('reserved'), conflictVisibility: refusalObservation('conflict'),
+      conflictScreenshot: { filename: 'shortcut-management-conflict.png', bytes: 100, sha256: 'e'.repeat(64),
+        before: refusalObservation('conflict'), after: refusalObservation('conflict') } },
     recording: { backgroundFocusUnchanged: true, backgroundNoteCountUnchanged: true, bodyUnchanged: true, writeRequests: 0 },
     actions, editor: { noteID: 'synthetic-shortcut-101', before: body(false), afterAltSave: body(false),
       shortDirtyRound: { via: 'settings-return', editorRemountedAt: 100000, savedAt: 101000 },
@@ -182,6 +187,7 @@ test('byte verifier binds every original PNG and refuses edited bytes', () => {
     const report = fixture(), png = testPNG()
     for (const image of report.screenshots) {
       image.bytes = png.length; image.sha256 = sha(png); writeFileSync(path.join(dir, image.filename), png)
+      if (image.filename === 'shortcut-management-conflict.png') Object.assign(report.refusals.conflictScreenshot, image)
     }
     writeFileSync(path.join(dir, SHORTCUT_MANAGEMENT_REPORT), JSON.stringify(report))
     assert.equal(verifyShortcutManagementDesktopReport(dir, HEAD).complete, true)
@@ -206,4 +212,215 @@ test('new native runner leaves original desktop lifecycle source and gates as in
   const original = readFileSync(new URL('./check-desktop-save.mjs', import.meta.url), 'utf8')
   assert.match(original, /Use a fresh Chromium profile so a stale draft cache cannot fake persistence/)
   assert.doesNotMatch(original, /runShortcutManagementLifecycle/)
+})
+
+// Parse the actual arguments passed to the runner's evaluate boundary. Merely
+// parsing these .mjs files does not parse the JavaScript inside their strings.
+// These are local code-generation contracts, never native application evidence.
+function rendererExpressions(filename, bindings = {}) {
+  const source = readFileSync(new URL('./' + filename, import.meta.url), 'utf8')
+  const ast = parse(source, { ecmaVersion: 'latest', sourceType: 'module', locations: true })
+  const sites = []
+  const visit = node => {
+    if (!node || typeof node !== 'object') return
+    if (node.type === 'CallExpression' && node.callee.type === 'Identifier' && node.callee.name === 'evaluate') {
+      assert.equal(node.arguments.length, 1, 'Every renderer call must have one auditable expression')
+      const argument = node.arguments[0]
+      assert.ok(['Literal', 'TemplateLiteral'].includes(argument.type), 'Audit a new renderer expression construction explicitly')
+      const generated = new Script(source.slice(argument.start, argument.end)).runInNewContext({
+        q: JSON.stringify, panel: '[data-shortcut-settings="true"]',
+        recorder: '[data-shortcut-recorder="true"]', row: '[data-shortcut-command="focusMode"]',
+        SHORTCUT_MANAGEMENT_STORAGE_KEY, SHORTCUT_FIXTURE,
+        report: { editor: { noteID: 'synthetic-shortcut-101' } }, cursor: 3,
+        selector: '[data-shortcut-search="true"]', value: '专注',
+        requested: { selector: '[data-shortcut-settings="true"] button', text: '取消录入' },
+        ...bindings,
+      })
+      assert.equal(typeof generated, 'string')
+      sites.push({ line: node.loc.start.line, generated })
+    }
+    for (const value of Object.values(node)) {
+      if (Array.isArray(value)) value.forEach(visit)
+      else if (value && typeof value === 'object') visit(value)
+    }
+  }
+  visit(ast)
+  return sites
+}
+
+const expressionFiles = [
+  ['check-shortcut-management-desktop.mjs', 29],
+  ['run-shortcut-management-desktop.mjs', 6],
+]
+const expressionEdgeText = ['quotes\'"', 'slash\\', 'line\r\n', '\u2028\u2029', '` ${globalThis.unexpectedNativeMutation = true}'].join(' ')
+for (const [name, bindings] of [
+  ['normal inputs', {}],
+  ['quoted and multiline inputs', { value: expressionEdgeText, requested: {
+    selector: '[data-shortcut-settings="true"] button', text: expressionEdgeText,
+  } }],
+]) for (const [filename, expected] of expressionFiles) test('renderer expressions compile at every ' + filename + ' call site with ' + name, () => {
+  const expressions = rendererExpressions(filename, bindings)
+  assert.equal(expressions.length, expected, 'Keep the complete evaluate call-site inventory')
+  for (const { line, generated } of expressions) {
+    assert.doesNotThrow(() => new Script(generated), filename + ':' + line)
+  }
+})
+
+test('native alert expression reads all refusal text separated by a real newline', () => {
+  const expressions = rendererExpressions('check-shortcut-management-desktop.mjs')
+  const alerts = expressions.filter(item => item.generated.includes('.map(n=>n.textContent).join('))
+  assert.equal(alerts.length, 1, 'The same alert reader must cover reserved and conflicting keys')
+  const values = ['该快捷键用于保存笔记', '该快捷键用于快速切换笔记', expressionEdgeText]
+  const result = new Script(alerts[0].generated).runInNewContext({ document: {
+    querySelectorAll: selector => {
+      assert.equal(selector, '[data-shortcut-settings="true"] [role="alert"]')
+      return values.map(textContent => ({ textContent }))
+    },
+  } })
+  assert.equal(result, values.join('\n'))
+})
+
+test('native input and click expressions preserve quoted data without executing it', () => {
+  const driver = rendererExpressions('check-shortcut-management-desktop.mjs', { value: expressionEdgeText })
+  const text = driver.filter(item => item.generated.includes('?.value==='))
+  assert.equal(text.length, 1)
+  const fieldContext = { document: { querySelector: selector => {
+    assert.equal(selector, '[data-shortcut-search="true"]')
+    return { value: expressionEdgeText }
+  } } }
+  assert.equal(new Script(text[0].generated).runInNewContext(fieldContext), true)
+  assert.equal(fieldContext.unexpectedNativeMutation, undefined)
+  const runner = rendererExpressions('run-shortcut-management-desktop.mjs', { requested: {
+    selector: '[data-shortcut-settings="true"] button', text: expressionEdgeText,
+  } })
+  const clicks = runner.filter(item => item.generated.includes('const request='))
+  assert.equal(clicks.length, 1)
+  const node = { disabled: false, textContent: expressionEdgeText,
+    getBoundingClientRect: () => ({ x: 10, y: 20, width: 100, height: 40 }),
+    scrollIntoView: options => assert.equal(options.block, 'center') }
+  const clickContext = { document: {
+    querySelectorAll: selector => { assert.equal(selector, '[data-shortcut-settings="true"] button'); return [node] },
+    elementFromPoint: (x, y) => { assert.equal(x, 60); assert.equal(y, 40); return node },
+  } }
+  const point = new Script(clicks[0].generated).runInNewContext(clickContext)
+  assert.deepEqual({ x: point.x, y: point.y }, { x: 60, y: 40 })
+  assert.equal(clickContext.unexpectedNativeMutation, undefined)
+})
+
+// These geometry records are controlled validator fixtures, not screenshots or
+// observations from Windows. The observer tests below run the actual generated
+// renderer expression against a small DOM-shaped geometry contract.
+function refusalObservation(kind) {
+  const visibilityPoints = [[.5, .5], [.25, .25], [.75, .25], [.25, .75], [.75, .75]]
+  const rect = (left, top, right, bottom) => ({ left, top, right, bottom })
+  const node = (text, bounds, disabled = false) => ({ text, rect: bounds, disabled, rendered: true,
+    hitPoints: visibilityPoints.map(([x, y]) => ({ x: bounds.left + (bounds.right - bounds.left) * x,
+      y: bounds.top + (bounds.bottom - bounds.top) * y, matched: true })) })
+  return {
+    viewport: { width: 1008, height: 656, devicePixelRatio: 1 },
+    command: 'focusMode', commandCount: 15, focused: true,
+    dialog: rect(84, 24, 924, 632), footer: rect(84, 538, 924, 632),
+    scroll: { viewport: rect(108, 196, 900, 538), clientWidth: 792, clientHeight: 342,
+      scrollWidth: 792, scrollHeight: 1530, scrollLeft: 0, scrollTop: 270 },
+    recordingPanel: rect(120, 236, 880, 524),
+    nodes: {
+      recorder: node(kind === 'reserved' ? '请按下组合键' : 'Ctrl + K', rect(134, 274, 866, 322)),
+      feedback: node(kind === 'reserved' ? '该快捷键用于保存笔记' : '该快捷键用于快速切换笔记', rect(134, 362, 866, 398)),
+      cancel: node('取消录入', rect(602, 470, 704, 504)),
+      accept: node(kind === 'reserved' ? '使用此快捷键' : '替换冲突快捷键', rect(716, 470, 866, 504), kind === 'reserved'),
+    },
+  }
+}
+
+for (const [name, mutate] of [
+  ['text without a visibility observation', r => { delete r.refusals.reservedVisibility }],
+  ['feedback clipped by its scroll viewport', r => { r.refusals.conflictVisibility.nodes.feedback.rect.bottom = 550 }],
+  ['footer covering the recording card', r => { r.refusals.conflictVisibility.footer.top = 480 }],
+  ['feedback hidden by an ancestor', r => { r.refusals.conflictVisibility.nodes.feedback.rendered = false }],
+  ['feedback hit testing to an occluding element', r => { r.refusals.conflictVisibility.nodes.feedback.hitPoints[0].matched = false }],
+  ['cancel control outside the viewport', r => { r.refusals.conflictVisibility.nodes.cancel.rect.bottom = 552 }],
+  ['reserved key leaving its accept control enabled', r => { r.refusals.reservedVisibility.nodes.accept.disabled = false }],
+  ['short list masquerading as the full scrolling list', r => { r.refusals.conflictVisibility.scroll.scrollHeight = 342 }],
+  ['conflict screenshot without its observed state', r => { delete r.refusals.conflictScreenshot }],
+  ['conflict screenshot with a different PNG digest', r => { r.refusals.conflictScreenshot.sha256 = 'f'.repeat(64) }],
+  ['conflict state changing while its screenshot is captured', r => { r.refusals.conflictScreenshot.after.nodes.feedback.text = '另一条提示' }],
+]) test('shortcut visibility evidence refuses ' + name, () => {
+  const report = fixture(); mutate(report)
+  assert.throws(() => validateShortcutManagementDesktopReport(report, HEAD))
+})
+
+function refusalDOM(kind, change = () => {}) {
+  const expected = refusalObservation(kind), nodes = {}
+  const element = (bounds, parentElement = null) => ({
+    isConnected: true, parentElement, hidden: false, styleHidden: false,
+    getBoundingClientRect: () => bounds, getClientRects: () => [bounds],
+    getAttribute: name => name === 'data-shortcut-command' ? 'focusMode' : null,
+    contains(other) { for (let current = other; current; current = current.parentElement) if (current === this) return true; return false },
+    scrollIntoView() { throw Error('A read-only refusal observer must never scroll the product') },
+  })
+  const dialog = element(expected.dialog), scroll = element(expected.scroll.viewport, dialog)
+  Object.assign(scroll, expected.scroll, { clientLeft: 0, clientTop: 0 })
+  const card = element(expected.recordingPanel, scroll), footer = element(expected.footer, dialog)
+  for (const [name, value] of Object.entries(expected.nodes)) {
+    nodes[name] = Object.assign(element(value.rect, card), {
+      tagName: name === 'recorder' ? 'INPUT' : name === 'feedback' ? 'P' : 'BUTTON',
+      textContent: name === 'recorder' ? '' : value.text, value: name === 'recorder' ? value.text : '', disabled: value.disabled,
+    })
+  }
+  card.closest = selector => { assert.equal(selector, '[data-shortcut-command]'); return card }
+  card.querySelector = selector => {
+    if (selector === '[data-shortcut-recorder="true"]') return nodes.recorder
+    if (selector === '#shortcut-recording-feedback[role="alert"]') return nodes.feedback
+    throw Error('Unexpected recording-card selector: ' + selector)
+  }
+  card.querySelectorAll = selector => {
+    assert.equal(selector, '.local-shortcuts-recorder-actions button'); return [nodes.cancel, nodes.accept]
+  }
+  dialog.querySelector = selector => {
+    if (selector === '.local-shortcuts-scroll') return scroll
+    if (selector === '.local-shortcuts-footer') return footer
+    if (selector === '.local-shortcuts-recorder-panel') return card
+    throw Error('Unexpected dialog selector: ' + selector)
+  }
+  dialog.querySelectorAll = selector => { assert.equal(selector, '[data-shortcut-command]'); return Array.from({ length: 15 }, () => card) }
+  const context = {
+    window: { innerWidth: 1008, innerHeight: 656, devicePixelRatio: 1 },
+    getComputedStyle: node => ({ display: node.styleHidden ? 'none' : 'block', visibility: 'visible', opacity: '1' }),
+    document: {
+      activeElement: nodes.recorder,
+      querySelector: selector => { assert.equal(selector, '[data-shortcut-settings="true"]'); return dialog },
+      elementFromPoint: (x, y) => Object.values(nodes).find(node => {
+        const r = node.getBoundingClientRect(); return x > r.left && x < r.right && y > r.top && y < r.bottom
+      }) || footer,
+    },
+  }
+  change({ context, nodes, card, scroll, footer })
+  return { context, expected }
+}
+
+test('native refusal observer records visible feedback and controls for both refusal states without scrolling', async () => {
+  const { observeShortcutManagementRefusal } = await import('./check-shortcut-management-desktop.mjs')
+  assert.equal(typeof observeShortcutManagementRefusal, 'function')
+  for (const kind of ['reserved', 'conflict']) {
+    const { context, expected } = refusalDOM(kind)
+    const observed = await observeShortcutManagementRefusal(expression => new Script(expression).runInNewContext(context))
+    assert.deepEqual(JSON.parse(JSON.stringify(observed)), expected)
+  }
+})
+
+test('native refusal observer exposes clipping hidden ancestors and hit-test occlusion to the strict oracle', async () => {
+  const { observeShortcutManagementRefusal } = await import('./check-shortcut-management-desktop.mjs')
+  const { assertShortcutManagementRefusalVisibility } = await import('./shortcut-management-desktop-evidence.mjs')
+  assert.equal(typeof observeShortcutManagementRefusal, 'function')
+  assert.equal(typeof assertShortcutManagementRefusalVisibility, 'function')
+  for (const change of [
+    ({ nodes }) => { nodes.feedback.getBoundingClientRect = () => ({ left: 134, top: 525, right: 866, bottom: 560 }) },
+    ({ footer }) => { footer.getBoundingClientRect = () => ({ left: 84, top: 480, right: 924, bottom: 632 }) },
+    ({ card }) => { card.styleHidden = true },
+    ({ context, footer }) => { context.document.elementFromPoint = () => footer },
+  ]) {
+    const { context } = refusalDOM('conflict', change)
+    const observed = await observeShortcutManagementRefusal(expression => new Script(expression).runInNewContext(context))
+    assert.throws(() => assertShortcutManagementRefusalVisibility(observed, 'conflict'))
+  }
 })

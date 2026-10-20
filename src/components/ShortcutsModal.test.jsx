@@ -114,6 +114,136 @@ describe('complete local shortcut settings workflow', () => {
     })
   }
 
+  function recordingViewport({ panelTop = 560, height = 340 } = {}) {
+    const scroll = query('.local-shortcuts-scroll')
+    const metrics = { height }
+    Object.defineProperty(scroll, 'clientHeight', { configurable: true, get: () => metrics.height })
+    Object.defineProperty(scroll, 'scrollHeight', { configurable: true, get: () => 1800 })
+    scroll.scrollTop = 100
+    const rect = (top, bottom) => ({ x: 100, y: top, top, bottom, left: 100, right: 900, width: 800, height: bottom - top, toJSON() {} })
+    const originalRect = HTMLElement.prototype.getBoundingClientRect
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
+      if (this === scroll) return rect(200, 200 + metrics.height)
+      const panel = query('.local-shortcuts-recorder-panel')
+      const top = panelTop - scroll.scrollTop
+      const feedback = panel?.querySelector('[role="alert"]')
+      if (this === panel) return rect(top, top + (feedback ? 268 : 228))
+      if (this === recorder()) return rect(top + 30, top + 78)
+      if (this === feedback) return rect(top + 115, top + 163)
+      if (this.matches('[data-shortcut-edit="newNote"]')) return rect(920 - scroll.scrollTop, 956 - scroll.scrollTop)
+      return originalRect.call(this)
+    })
+    return { scroll, metrics, panelRect: () => query('.local-shortcuts-recorder-panel').getBoundingClientRect() }
+  }
+
+  it('reveals the complete recording card above the footer when a lower list row opens', async () => {
+    await mount()
+    const view = recordingViewport()
+    const write = vi.spyOn(localStorage, 'setItem')
+    await click(query('[data-shortcut-edit="focusMode"]'))
+    expect(view.panelRect().top).toBeGreaterThanOrEqual(208)
+    expect(view.panelRect().bottom).toBeLessThanOrEqual(532)
+    expect(document.activeElement).toBe(recorder())
+    expect(document.documentElement.scrollTop).toBe(0)
+    expect(document.body.scrollTop).toBe(0)
+    expect(write).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['reserved save', { key: 's', code: 'KeyS', ctrlKey: true }, /保留|保存/],
+    ['conflicting quick switch', { key: 'k', code: 'KeyK', ctrlKey: true }, /已用于/],
+  ])('keeps the recording input, %s feedback and its actions inside the scroll viewport', async (_name, keys, message) => {
+    await mount()
+    const view = recordingViewport()
+    await click(query('[data-shortcut-edit="focusMode"]'))
+    // Begin with the old-height card fully visible, then grow it with real feedback.
+    view.scroll.scrollTop = 256
+    await key(recorder(), keys)
+    expect(query('.local-shortcuts-recorder-panel [role="alert"]').textContent).toMatch(message)
+    expect(view.panelRect().top).toBeGreaterThanOrEqual(208)
+    expect(view.panelRect().bottom).toBeLessThanOrEqual(532)
+    expect(document.activeElement).toBe(recorder())
+    expect(savedBindings()).toBe(null)
+  })
+
+  it('keeps the open recording card visible after a viewport resize without taking button focus', async () => {
+    const observers = []
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(callback) { this.callback = callback; this.observe = vi.fn(); this.disconnect = vi.fn(); observers.push(this) }
+    })
+    await mount()
+    const view = recordingViewport()
+    await click(query('[data-shortcut-edit="focusMode"]'))
+    view.scroll.scrollTop = 256
+    button('取消录入').focus()
+    view.metrics.height = 280
+    await act(async () => {
+      for (const observer of observers) observer.callback([])
+      window.dispatchEvent(new Event('resize'))
+    })
+    expect(view.panelRect().bottom).toBeLessThanOrEqual(472)
+    expect(document.activeElement).toBe(button('取消录入'))
+    expect(savedBindings()).toBe(null)
+  })
+
+  it('does not move an already visible recording card or scroll after recording closes', async () => {
+    const observers = []
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(callback) { this.callback = callback; this.observe = vi.fn(); this.disconnect = vi.fn(); observers.push(this) }
+    })
+    await mount()
+    const view = recordingViewport({ panelTop: 360 })
+    await click(query('[data-shortcut-edit="focusMode"]'))
+    expect(view.scroll.scrollTop).toBe(100)
+    await click(button('取消录入'))
+    view.scroll.scrollTop = 180
+    query('[data-shortcut-search]').focus()
+    await act(async () => {
+      for (const observer of observers) observer.callback([])
+      window.dispatchEvent(new Event('resize'))
+    })
+    expect(view.scroll.scrollTop).toBe(180)
+    expect(document.activeElement).toBe(query('[data-shortcut-search]'))
+    expect(savedBindings()).toBe(null)
+    for (const observer of observers) expect(observer.disconnect).toHaveBeenCalled()
+  })
+
+  it('keeps a different focused list control visible when an older recording card observes a resize', async () => {
+    const observers = []
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(callback) { this.callback = callback; this.observe = vi.fn(); this.disconnect = vi.fn(); observers.push(this) }
+    })
+    await mount()
+    const view = recordingViewport()
+    await click(query('[data-shortcut-edit="focusMode"]'))
+    const next = query('[data-shortcut-edit="newNote"]')
+    next.focus()
+    view.scroll.scrollTop = 500
+    view.metrics.height = 280
+    expect(next.getBoundingClientRect().bottom).toBeLessThanOrEqual(480)
+    await act(async () => {
+      for (const observer of observers) observer.callback([])
+      window.dispatchEvent(new Event('resize'))
+    })
+    expect(view.scroll.scrollTop).toBe(500)
+    expect(next.getBoundingClientRect().bottom).toBeLessThanOrEqual(480)
+    expect(document.activeElement).toBe(next)
+    expect(recorder()).toBeTruthy()
+    expect(savedBindings()).toBe(null)
+  })
+
+  it('prioritizes the recording input and current refusal when a very short viewport cannot fit the whole card', async () => {
+    await mount()
+    const view = recordingViewport({ height: 180 })
+    await click(query('[data-shortcut-edit="focusMode"]'))
+    await key(recorder(), { key: 's', code: 'KeyS', ctrlKey: true })
+    const feedback = query('.local-shortcuts-recorder-panel [role="alert"]').getBoundingClientRect()
+    expect(recorder().getBoundingClientRect().top).toBeGreaterThanOrEqual(208)
+    expect(feedback.bottom).toBeLessThanOrEqual(372)
+    expect(document.activeElement).toBe(recorder())
+    expect(savedBindings()).toBe(null)
+  })
+
   it('opens all supported commands and fixed save help without writing preferences', async () => {
     const write = vi.spyOn(localStorage, 'setItem')
     await mount()

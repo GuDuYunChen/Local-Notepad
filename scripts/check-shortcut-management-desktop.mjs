@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { SHORTCUT_FIXTURE, shortcutManagementNote } from './shortcut-management-desktop-fixture.mjs'
-import { SHORTCUT_MANAGEMENT_STORAGE_KEY, assertShortcutManagementConfiguration } from './shortcut-management-desktop-evidence.mjs'
+import { SHORTCUT_MANAGEMENT_STORAGE_KEY, assertShortcutManagementConfiguration,
+  assertShortcutManagementRefusalVisibility } from './shortcut-management-desktop-evidence.mjs'
 
 const q = JSON.stringify
 const hash = value => createHash('sha256').update(value).digest('hex')
@@ -24,6 +25,59 @@ export async function observeShortcutManagementKeys(evaluate) {
         recorder:event.target?.getAttribute?.('data-shortcut-recorder')==='true'});
     }, {capture:true, passive:true});
     return true;
+  })()`)
+}
+
+// Observe the state already presented by the product. Reading text alone cannot
+// prove a refusal is visible, and scrolling here would conceal a product defect.
+export async function observeShortcutManagementRefusal(evaluate) {
+  return evaluate(`(() => {
+    const dialog = document.querySelector(${q(panel)});
+    const scroll = dialog?.querySelector('.local-shortcuts-scroll');
+    const card = dialog?.querySelector('.local-shortcuts-recorder-panel');
+    const footer = dialog?.querySelector('.local-shortcuts-footer');
+    if (!dialog || !scroll || !card || !footer) return null;
+    const rect = node => {
+      const r = node.getBoundingClientRect();
+      return {left:r.left, top:r.top, right:r.right, bottom:r.bottom};
+    };
+    const rendered = node => {
+      if (!node?.isConnected || !node.getClientRects().length) return false;
+      for (let current = node; current; current = current.parentElement) {
+        const style = getComputedStyle(current);
+        if (current.hidden || current.getAttribute('aria-hidden') === 'true' ||
+          style.display === 'none' || ['hidden', 'collapse'].includes(style.visibility) ||
+          Number(style.opacity) <= 0) return false;
+      }
+      return true;
+    };
+    const observe = node => {
+      if (!node) return null;
+      const r = rect(node);
+      return {text:(node.tagName === 'INPUT' ? node.value : node.textContent).trim(), rect:r,
+        disabled:Boolean(node.disabled), rendered:rendered(node),
+        hitPoints:[[.5,.5],[.25,.25],[.75,.25],[.25,.75],[.75,.75]].map(([fx,fy]) => {
+          const x=r.left+(r.right-r.left)*fx, y=r.top+(r.bottom-r.top)*fy;
+          const hit=document.elementFromPoint(x,y);
+          return {x,y,matched:Boolean(hit && (hit===node || node.contains(hit)))};
+        })};
+    };
+    const input = card.querySelector(${q(recorder)});
+    const feedback = card.querySelector('#shortcut-recording-feedback[role="alert"]');
+    const buttons = Array.from(card.querySelectorAll('.local-shortcuts-recorder-actions button'));
+    const cancel = buttons.find(node => node.textContent.trim() === '取消录入');
+    const accept = buttons.find(node => ['使用此快捷键','替换冲突快捷键'].includes(node.textContent.trim()));
+    const r = rect(scroll), left = r.left + scroll.clientLeft, top = r.top + scroll.clientTop;
+    return {
+      viewport:{width:window.innerWidth,height:window.innerHeight,devicePixelRatio:window.devicePixelRatio},
+      command:card.closest('[data-shortcut-command]')?.getAttribute('data-shortcut-command'),
+      commandCount:dialog.querySelectorAll('[data-shortcut-command]').length, focused:document.activeElement===input,
+      dialog:rect(dialog), footer:rect(footer), recordingPanel:rect(card),
+      scroll:{viewport:{left,top,right:left+scroll.clientWidth,bottom:top+scroll.clientHeight},
+        clientWidth:scroll.clientWidth,clientHeight:scroll.clientHeight,scrollWidth:scroll.scrollWidth,
+        scrollHeight:scroll.scrollHeight,scrollLeft:scroll.scrollLeft,scrollTop:scroll.scrollTop},
+      nodes:{recorder:observe(input),feedback:observe(feedback),cancel:observe(cancel),accept:observe(accept)}
+    };
   })()`)
 }
 
@@ -119,14 +173,31 @@ export async function verifyShortcutManagementBeforeRestart(context) {
   await ui.help('first'); report.entries.push('help'); mark('existing-panel-entries-and-search')
 
   await ui.edit(); await ui.key('record-reserved-save', 's', 83, 2)
-  const alertText = () => evaluate(`Array.from(document.querySelectorAll(${q(panel + ' [role="alert"]')})).map(n=>n.textContent).join('\n')`)
-  report.refusals = { reservedText: await until(async () => { const value = await alertText(); return value.includes('保存') && value }, 'Reserved save key was not visibly refused') }
+  const alertText = () => evaluate(`Array.from(document.querySelectorAll(${q(panel + ' [role="alert"]')})).map(n=>n.textContent).join(${q('\n')})`)
+  report.refusals = {}
+  const visibleRefusal = async (kind, expectedText) => {
+    const value = await alertText()
+    const observation = await observeShortcutManagementRefusal(evaluate)
+    report.refusals[kind + 'Visibility'] = observation; save()
+    assertShortcutManagementRefusalVisibility(observation, kind)
+    assert.equal(observation.nodes.feedback.text, value.trim())
+    return value.includes(expectedText) && value
+  }
+  report.refusals.reservedText = await until(() => visibleRefusal('reserved', '保存'), 'Reserved save key was not visibly refused')
   await ui.named('取消录入')
   await ui.edit(); await ui.key('record-conflict', 'k', 75, 2)
-  report.refusals.conflictText = await until(async () => { const value = await alertText(); return value.includes('快速切换笔记') && value }, 'Conflicting quick-switch key was not visibly identified')
+  report.refusals.conflictText = await until(() => visibleRefusal('conflict', '快速切换笔记'), 'Conflicting quick-switch key was not visibly identified')
   report.refusals.storageUnchanged = (await ui.raw()) === report.storage.initial
   assert.equal(report.refusals.storageUnchanged, true)
-  await capture('shortcut-management-conflict.png'); await ui.named('取消录入')
+  await capture('shortcut-management-conflict.png')
+  const conflictImage = report.screenshots.find(item => item.filename === 'shortcut-management-conflict.png')
+  assert.ok(conflictImage, 'Conflict screenshot must have its original byte receipt')
+  report.refusals.conflictScreenshot = { ...conflictImage, before: report.refusals.conflictVisibility,
+    after: await observeShortcutManagementRefusal(evaluate) }; save()
+  assertShortcutManagementRefusalVisibility(report.refusals.conflictScreenshot.after, 'conflict')
+  assert.deepEqual(report.refusals.conflictScreenshot.after, report.refusals.conflictScreenshot.before,
+    'Conflict feedback or its visible controls changed while the screenshot was captured')
+  await ui.named('取消录入')
   mark('reserved-and-conflicting-keys-refused')
   report.recording = {
     backgroundFocusUnchanged: await ui.focus() === false,

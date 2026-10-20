@@ -56,7 +56,9 @@ function ShortcutSettingsSession({ onClose }) {
   const [message, setMessage] = React.useState('')
   const dialogRef = React.useRef(null)
   const searchRef = React.useRef(null)
+  const scrollRef = React.useRef(null)
   const recorderRef = React.useRef(null)
+  const recorderPanelRef = React.useRef(null)
   const returnFocusRef = React.useRef(null)
   const composingSearch = React.useRef(false)
   const changedCount = SHORTCUT_COMMANDS.filter(command => draft[command.id] !== baseline.bindings[command.id]).length
@@ -73,9 +75,61 @@ function ShortcutSettingsSession({ onClose }) {
     }
   }, [])
 
-  React.useEffect(() => {
-    if (recording) recorderRef.current?.focus()
+  React.useLayoutEffect(() => {
+    if (recording) recorderRef.current?.focus({ preventScroll: true })
   }, [recording?.commandId])
+
+  React.useLayoutEffect(() => {
+    if (!recording) return
+    const scroll = scrollRef.current
+    const panel = recorderPanelRef.current
+    if (!scroll || !panel) return
+    let active = true
+
+    function revealRecording() {
+      if (!active || !scroll.isConnected || !panel.isConnected || recorderPanelRef.current !== panel) return
+      if (!panel.contains(document.activeElement)) return
+      const viewport = scroll.getBoundingClientRect()
+      const card = panel.getBoundingClientRect()
+      const top = viewport.top + scroll.clientTop + 8
+      const bottom = viewport.top + scroll.clientTop + scroll.clientHeight - 8
+      const available = bottom - top
+      if (available <= 0 || card.height <= 0) return
+
+      let start = card.top
+      let end = card.bottom
+      if (card.height > available) {
+        // On unusually short windows, keep the active input and its feedback
+        // together; keyboard navigation can still reveal the other controls.
+        const input = recorderRef.current?.getBoundingClientRect()
+        const feedback = panel.querySelector('[role="alert"]')?.getBoundingClientRect()
+        if (input?.height > 0) {
+          start = input.top
+          end = feedback?.height > 0 ? feedback.bottom : input.bottom
+        }
+        const focused = document.activeElement
+        if (focused !== recorderRef.current && panel.contains(focused)) {
+          const control = focused.getBoundingClientRect()
+          if (control.height > 0) { start = control.top; end = control.bottom }
+        }
+        if (end - start > available) start = end - available
+      }
+
+      const delta = end > bottom ? end - bottom : start < top ? start - top : 0
+      if (delta) scroll.scrollTop = Math.max(0, Math.min(scroll.scrollHeight - scroll.clientHeight, scroll.scrollTop + delta))
+    }
+
+    revealRecording()
+    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(revealRecording) : null
+    observer?.observe(scroll)
+    observer?.observe(panel)
+    window.addEventListener('resize', revealRecording)
+    return () => {
+      active = false
+      observer?.disconnect()
+      window.removeEventListener('resize', revealRecording)
+    }
+  }, [recording?.commandId, recording?.candidate, recording?.error])
 
   React.useEffect(() => {
     if (snapshot.revision === baseline.revision) return
@@ -309,7 +363,7 @@ function ShortcutSettingsSession({ onClose }) {
           </label>
         </div>
 
-        <div className="local-shortcuts-scroll">
+        <div ref={scrollRef} className="local-shortcuts-scroll">
           <div className="local-shortcuts-list-summary">{visibleCommands.length} 项可配置操作<span>修改在应用后生效</span></div>
           {categories.map(group => {
             const commands = visibleCommands.filter(command => command.category === group)
@@ -337,14 +391,14 @@ function ShortcutSettingsSession({ onClose }) {
                         aria-label={`恢复${command.label}默认快捷键`} onClick={() => restoreCommand(command)}>默认</button>
                     </div>
                     {isRecording && (
-                      <div className="local-shortcuts-recorder-panel">
+                      <div ref={recorderPanelRef} className="local-shortcuts-recorder-panel">
                         <label htmlFor="shortcut-recorder">为“{activeRecording.label}”设置快捷键</label>
                         <input id="shortcut-recorder" ref={recorderRef} data-shortcut-recorder="true" readOnly
-                          aria-label={`录入${activeRecording.label}快捷键`} aria-describedby="shortcut-recording-hint"
+                          aria-label={`录入${activeRecording.label}快捷键`} aria-describedby={`shortcut-recording-hint${recording.error || recordingConflict ? ' shortcut-recording-feedback' : ''}`}
                           value={recording.candidate ? formatShortcut(recording.candidate) : '请按下组合键'} onKeyDownCapture={recordKey} />
                         <p id="shortcut-recording-hint">按下 Ctrl / ⌘ 与字母等组合键，或可用的功能键。按 Esc 取消录入。</p>
-                        {recording.error && <p className="local-shortcuts-inline-error" role="alert">{recording.error}</p>}
-                        {recordingConflict && <p className="local-shortcuts-inline-error" role="alert">
+                        {recording.error && <p id="shortcut-recording-feedback" className="local-shortcuts-inline-error" role="alert">{recording.error}</p>}
+                        {recordingConflict && <p id="shortcut-recording-feedback" className="local-shortcuts-inline-error" role="alert">
                           已用于“{recordingConflict.label}”。替换后，该操作将不再绑定快捷键。
                         </p>}
                         <div className="local-shortcuts-recorder-actions">
