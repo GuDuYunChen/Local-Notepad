@@ -32,6 +32,8 @@ jobs:
         run: node scripts/build-reading-mode-fixture.mjs
       - name: Refuse missing reading gates and prove complete original preparation
         run: node --test scripts/reading-mode-desktop-evidence.node.mjs scripts/reading-mode-installed-evidence.node.mjs scripts/reading-mode-native-input.node.mjs scripts/desktop-window-session.node.mjs
+      - name: Verify fixed legacy installer restoration and refusals
+        run: node --test scripts/prepare-legacy-installer.node.mjs
       - name: Resolve only complete source and binary pins
         id: reading-pin
         run: node scripts/pin-reading-mode-installer.mjs outputs
@@ -46,13 +48,8 @@ jobs:
           run-id: ${{ steps.reading-pin.outputs.previous-run }}
           name: ${{ steps.reading-pin.outputs.previous-name }}
           path: .installer-input/previous
-      - name: Download unchanged old path-failure counterexample
-        uses: actions/download-artifact@v4
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: 38337004784
-          name: local-notepad-windows-191439e04ddbf6b4423194d2978ae72da926df3c
-          path: .installer-input/legacy
+      - name: Restore unchanged old path-failure counterexample
+        run: node scripts/prepare-legacy-installer.mjs
       - name: Download source-bound 4.233.2 installer
         uses: actions/download-artifact@v4
         with:
