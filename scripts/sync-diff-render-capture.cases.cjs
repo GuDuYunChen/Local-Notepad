@@ -6,7 +6,9 @@ const { spawnSync } = require('node:child_process')
 const { createHash } = require('node:crypto')
 const { deflateSync } = require('node:zlib')
 const { EventEmitter } = require('node:events')
-const { verifyDiffRaster, validateDiffCapture, captureDiffFrame, loadDiffWindow } = require('./sync-diff-render-capture.cjs')
+const { JSDOM } = require('jsdom')
+const { diffCSSReferences, validateCSSReferences, createDiffCaptureGate, verifyDiffRaster, verifyDiffCSSRaster,
+  validateDiffCapture, captureDiffFrame, loadDiffWindow } = require('./sync-diff-render-capture.cjs')
 const hash = bytes => createHash('sha256').update(bytes).digest('hex')
 
 function readArchivedDiffFiles(directory) {
@@ -21,12 +23,13 @@ function readArchivedDiffFiles(directory) {
 
 // Exercise Git's actual checkout conversion in an owned, uncommitted repository.
 // Neither the caller's repository/index/config nor the archived bytes are edited.
-function archivedDiffCheckout(autocrlf, keepAttributes, inspect) {
+function archivedDiffCheckout(autocrlf, keepAttributes, inspect, fixtureName = 'sync-diff-capture-4a16a9a') {
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'diff-archive-checkout-'))
   try {
     const repository = path.join(scratch, 'repository'), checkout = path.join(scratch, 'checkout')
-    const relative = 'scripts/fixtures/sync-diff-capture-4a16a9a'
-    const source = path.join(__dirname, 'fixtures', 'sync-diff-capture-4a16a9a')
+    const relative = 'scripts/fixtures/' + fixtureName
+    const source = path.join(__dirname, 'fixtures', fixtureName)
+    const provenance = JSON.parse(fs.readFileSync(path.join(source, 'provenance.json'), 'utf8'))
     const destination = path.join(repository, relative), emptyConfig = path.join(scratch, 'empty-config')
     fs.mkdirSync(destination, { recursive: true }); fs.mkdirSync(checkout); fs.writeFileSync(emptyConfig, '')
     const env = { ...process.env }
@@ -40,7 +43,7 @@ function archivedDiffCheckout(autocrlf, keepAttributes, inspect) {
       return result.stdout
     }
     git(['init', '--quiet'])
-    for (const filename of ['checks.json', 'light-1200.png', 'dark-1200.png', 'provenance.json']) {
+    for (const filename of [...Object.keys(provenance.files), 'provenance.json']) {
       fs.copyFileSync(path.join(source, filename), path.join(destination, filename))
     }
     const attributes = path.join(source, '.gitattributes')
@@ -48,7 +51,6 @@ function archivedDiffCheckout(autocrlf, keepAttributes, inspect) {
     if (attributesCopied) fs.copyFileSync(attributes, path.join(destination, '.gitattributes'))
     fs.writeFileSync(path.join(repository, 'outside-evidence.txt'), 'unrelated\ntext\n')
     git(['-c', 'core.autocrlf=false', '-c', 'core.eol=lf', 'add', '--', '.'])
-    const provenance = JSON.parse(fs.readFileSync(path.join(source, 'provenance.json'), 'utf8'))
     const objects = Object.entries(provenance.files).map(([filename, expected]) => {
       const object = git(['cat-file', 'blob', ':' + relative + '/' + filename])
       assert.equal(object.length, expected.bytes); assert.equal(hash(object), expected.sha256)
@@ -70,24 +72,81 @@ function archivedDiffCheckout(autocrlf, keepAttributes, inspect) {
 }
 
 // Structural/pixel contract fixture only; this is not a Chromium-render claim.
-function syntheticPNG(frame, phase, corruptProbe = false) {
+function syntheticPNG(frame, phase, corruptProbe = false, changes = {}) {
   const { width, height } = frame.viewport, stride = width * 4 + 1, raw = Buffer.alloc(stride * height)
-  const pixel = (x, y, rgb) => { const offset = y * stride + 1 + x * 4; raw.set([...rgb, 255], offset) }
-  for (const probe of frame.rasterProbes) pixel(probe.x, probe.y, corruptProbe ? [255, 255, 255] : frame.colors.find(color => color.kind === probe.kind).background)
+  const pixel = (x, y, rgb) => { const offset = y * stride + 1 + x * 4; raw.set(rgb.length === 4 ? rgb : [...rgb, 255], offset) }
+  for (const probe of frame.rasterProbes) pixel(probe.x, probe.y, corruptProbe ? [255, 255, 255] :
+    changes.rowColors?.[probe.kind] || frame.colors.find(color => color.kind === probe.kind).background)
+  for (const reference of frame.cssReferences?.references || []) pixel(reference.x, reference.y,
+    changes.referenceColors?.[reference.kind] || frame.colors.find(color => color.kind === reference.kind).background)
   for (let bit = 0; bit < 8; bit++) for (let y = 0; y < 4; y++) for (let x = bit * 4; x < bit * 4 + 4; x++) pixel(x, y, (phase >>> bit) & 1 ? [221, 238, 255] : [17, 34, 51])
+  for (const change of changes.pixels || []) pixel(change.x, change.y, change.rgba)
   const crc = bytes => { let value = 0xffffffff; for (const byte of bytes) { value ^= byte; for (let bit = 0; bit < 8; bit++) value = (value >>> 1) ^ ((value & 1) ? 0xedb88320 : 0) } return (value ^ 0xffffffff) >>> 0 }
   const chunk = (type, bytes) => { const body = Buffer.concat([Buffer.from(type), bytes]), result = Buffer.alloc(bytes.length + 12); result.writeUInt32BE(bytes.length); body.copy(result, 4); result.writeUInt32BE(crc(body), result.length - 4); return result }
   const header = Buffer.alloc(13); header.writeUInt32BE(width); header.writeUInt32BE(height, 4); header[8] = 8; header[9] = 6
   return Buffer.concat([Buffer.from('89504e470d0a1a0a', 'hex'), chunk('IHDR', header), chunk('IDAT', deflateSync(raw)), chunk('IEND', Buffer.alloc(0))])
 }
 
+const referencePaint = (backgroundColor, position = 'absolute') => ({ backgroundColor, backgroundImage: 'none', opacity: '1',
+  filter: 'none', transform: 'none', mixBlendMode: 'normal', visibility: 'visible', display: 'block', position, pointerEvents: 'auto',
+  boxShadow: 'none', borderRadius: '0px', borderTopWidth: '0px', borderRightWidth: '0px', borderBottomWidth: '0px', borderLeftWidth: '0px',
+  transitionDuration: '0s', animationName: 'none' })
+function syntheticReferences(frame) {
+  return { schema: 'diff-css-reference-v1', source: 'root-semantic-tokens-and-cell-ancestor-backgrounds', phase: frame.capturePhase,
+    theme: frame.theme, generation: 1, rootID: 'diff-css-references', rootBounds: { left: 40, top: 8, right: 80, bottom: 24 },
+    rootStyle: referencePaint('rgba(0, 0, 0, 0)', 'fixed'), rootZIndex: '2147483646', identityValid: true, sourceStable: true,
+    references: ['local', 'remote'].map((kind, index) => {
+      const token = kind === 'local' ? '--danger-light' : '--success-light'
+      const fill = 'rgb(' + frame.colors.find(color => color.kind === kind).background.join(', ') + ')'
+      const bounds = { left: 40 + index * 24, top: 8, right: 56 + index * 24, bottom: 24 }
+      const backgrounds = [{ path: 'html', tag: 'HTML', background: 'rgba(0, 0, 0, 0)' },
+        { path: 'html>body:nth-child(2)', tag: 'BODY', background: 'rgb(255, 255, 255)' },
+        { path: 'html>body:nth-child(2)>table:nth-child(1)>tbody:nth-child(1)>tr:nth-child(' + (index + 1) + ')', tag: 'TR', background: 'rgba(0, 0, 0, 0)' }]
+      const layers = [{ source: 'opaque-white', background: 'rgb(255, 255, 255)' },
+        ...backgrounds.map(layer => ({ source: layer.path, background: layer.background })), { source: 'root-token:' + token, background: fill }]
+      return { kind, selector: '.sync-diff-' + kind + ' td:last-child', token, tokenOwner: 'document.documentElement',
+        tokenValue: fill, paperValue: 'rgb(255, 255, 255)', selectedToken: token, fill, backgrounds,
+        x: bounds.left + 8, y: 16, bounds, blockers: [], sourceIdentityValid: true, exposed: true,
+        layers: layers.map(layer => ({ source: layer.source, kind, phase: frame.capturePhase, identityValid: true,
+          specifiedBackground: layer.background, style: referencePaint(layer.background), bounds: { ...bounds } })) }
+    }) }
+}
+
+// Real DOM/style preparation in an isolated JS realm. Geometry and hit testing
+// are explicit Node fixtures, not a claim that JSDOM rendered a Chromium PNG.
+function referenceDOM() {
+  const dom = new JSDOM('<!doctype html><html data-theme="light"><head></head><body><main><table><tbody>' +
+    '<tr class="sync-diff-local"><td><pre>local</pre></td></tr><tr class="sync-diff-remote"><td><pre>remote</pre></td></tr>' +
+    '</tbody></table></main></body></html>', { runScripts: 'outside-only' })
+  const { window } = dom, { document } = window
+  const style = document.documentElement.style
+  style.setProperty('--danger-light', 'rgba(200, 90, 90, 0.1)'); style.setProperty('--success-light', '#17382a'); style.setProperty('--paper', '#f6f6f8')
+  document.body.style.backgroundColor = '#ffffff'; document.querySelector('main').style.backgroundColor = '#f6f6f8'
+  window.Element.prototype.getBoundingClientRect = function () {
+    if (this.id === 'diff-css-references' || this.closest('#diff-css-references')) {
+      let left = 0, top = 0
+      for (let node = this; node; node = node.parentElement) { left += Number.parseFloat(node.style.left) || 0; top += Number.parseFloat(node.style.top) || 0 }
+      return { left, top, right: left + Number.parseFloat(this.style.width), bottom: top + Number.parseFloat(this.style.height) }
+    }
+    return { left: 0, top: 0, right: 0, bottom: 0 }
+  }
+  document.elementFromPoint = (x, y) => [...document.querySelectorAll('#diff-css-references div')].reverse().find(node => {
+    const rect = node.getBoundingClientRect(); return x >= rect.left && x < rect.right && y >= rect.top && y < rect.bottom
+  }) || null
+  const invoke = (action, phase = 1) => JSON.parse(JSON.stringify(window.eval('(' + diffCSSReferences.toString() + ')(' + JSON.stringify(action) + ',' + phase + ')')))
+  return { window, document, invoke, close: () => window.close() }
+}
+
 function registerDiffCaptureTests(test, originalFrame) {
-  const frame = (phase = 1) => ({ ...originalFrame(), theme: 'dark', capturePhase: phase, visibility: 'visible', windowVisible: true,
+  const frame = (phase = 1) => {
+    const value = { ...originalFrame(), theme: phase === 1 ? 'light' : 'dark', capturePhase: phase, visibility: 'visible', windowVisible: true,
     scroll: { x: 0, y: 400, tableLeft: 0, tableTop: 0 }, tableText: '本机行 远端行 对照文本 仅本机 仅远端',
     rasterProbes: ['local', 'remote'].flatMap((kind, index) => [
       { kind, position: 'left', x: 60, y: 240 + index * 60, exposed: true },
       { kind, position: 'right', x: 480, y: 240 + index * 60, exposed: true },
-    ]) })
+    ]) }
+    value.cssReferences = syntheticReferences(value); return value
+  }
   test('archived diff evidence survives both Git checkout newline policies without changing unrelated text', t => {
     for (const autocrlf of [false, true]) archivedDiffCheckout(autocrlf, true, (directory, evidence) => {
       t.diagnostic(JSON.stringify(evidence))
@@ -125,6 +184,164 @@ function registerDiffCaptureTests(test, originalFrame) {
     // invented fields in the historical DOM reports (see provenance.json).
     assert.throws(() => verifyDiffRaster(files['light-1200.png'], { ...light, rasterProbes: provenance.comparisonProbes }), /Saved PNG does not contain the measured local row/)
     assert.equal(verifyDiffRaster(files['dark-1200.png'], { ...dark, rasterProbes: provenance.comparisonProbes }).probes.length, 4)
+  })
+  test('the original exact Canvas assertion still rejects the unchanged bed Windows PNG by its observed blue channel', () => {
+    const directory = path.join(__dirname, 'fixtures', 'sync-diff-capture-bed26f7'), files = readArchivedDiffFiles(directory)
+    const report = JSON.parse(files['checks.json'])
+    assert.equal(report.commit, 'bed26f73d02e3feebcb14d56488cceb40bafe240'); assert.equal(report.complete, false)
+    const { before, after } = report.reports[0].capture
+    assert.deepEqual(before, after); assert.equal(before.capturePhase, 1); assert.equal(before.theme, 'light')
+    assert.throws(() => verifyDiffRaster(files['light-1200.png'], before), error => {
+      assert.deepEqual(error.actual, [242, 230, 232, 255]); assert.deepEqual(error.expected, [242, 230, 231, 255])
+      assert.match(error.message, /Saved PNG does not contain the measured local row/); return true
+    })
+    assert.throws(() => validateDiffCapture(before, after, files['light-1200.png'], 1), /require independent CSS references/)
+  })
+  test('the new exact bed archive survives LF and CRLF checkouts and rejects conversion without its own attribute', t => {
+    for (const autocrlf of [false, true]) archivedDiffCheckout(autocrlf, true, (directory, evidence) => {
+      t.diagnostic(JSON.stringify(evidence)); readArchivedDiffFiles(directory)
+    }, 'sync-diff-capture-bed26f7')
+    archivedDiffCheckout(true, false, (directory, evidence) => {
+      t.diagnostic(JSON.stringify(evidence))
+      assert.throws(() => readArchivedDiffFiles(directory))
+      assert.deepEqual(fs.readFileSync(path.join(directory, 'light-1200.png')),
+        fs.readFileSync(path.join(__dirname, 'fixtures/sync-diff-capture-bed26f7/light-1200.png')))
+    }, 'sync-diff-capture-bed26f7')
+  })
+  test('serialized CSS preparation uses independent root tokens and ancestor layers without a Node closure', () => {
+    const dom = referenceDOM()
+    try {
+      const before = dom.invoke('prepare'); validateCSSReferences({ ...frame(), cssReferences: before })
+      const local = before.references[0]
+      assert.equal(local.tokenValue, 'rgba(200, 90, 90, 0.1)'); assert.equal(local.fill, 'rgba(200, 90, 90, 0.1)')
+      assert.ok(local.backgrounds.some(layer => layer.background === 'rgb(246, 246, 248)'))
+      for (const cell of dom.document.querySelectorAll('td,pre')) cell.style.backgroundColor = '#010203'
+      const after = dom.invoke('prepare')
+      assert.deepEqual(after, before, 'The independent reference copied an actual td/pre fill')
+      assert.equal(dom.document.querySelectorAll('#diff-css-references').length, 1)
+      assert.equal(dom.document.querySelectorAll('canvas').length, 0)
+      assert.deepEqual(dom.invoke('inspect'), after, 'Inspection changed the prepared reference')
+    } finally { dom.close() }
+  })
+  test('root fallback tokens are resolved independently and invalid colors cannot create a reference', () => {
+    const dom = referenceDOM()
+    try {
+      dom.document.documentElement.style.removeProperty('--success-light')
+      const prepared = dom.invoke('prepare'); validateCSSReferences({ ...frame(), cssReferences: prepared })
+      assert.equal(prepared.references[1].selectedToken, '--paper'); assert.equal(prepared.references[1].fill, 'rgb(246, 246, 248)')
+      dom.document.documentElement.style.setProperty('--danger-light', 'unresolved-color')
+      assert.throws(() => dom.invoke('prepare'), /resolved root color token/)
+    } finally { dom.close() }
+  })
+  test('source changes are rejected during inspection and refreshed only before three new stable frames', () => {
+    const dom = referenceDOM()
+    try {
+      const gate = createDiffCaptureGate(), observed = () => ({ ...frame(), cssReferences: dom.invoke('inspect') })
+      dom.invoke('prepare')
+      for (let i = 1; i <= 3; i++) assert.equal(gate.observe(observed()).ready, i === 3)
+      dom.document.querySelector('main').style.backgroundColor = '#f5f5f5'
+      assert.equal(dom.invoke('inspect').sourceStable, false)
+      assert.deepEqual(gate.observe(observed()), { ready: false, samples: 0 })
+      assert.throws(() => validateCSSReferences(observed()))
+      const prepared = dom.invoke('prepare'); assert.equal(prepared.generation, 2)
+      for (let i = 1; i <= 3; i++) assert.deepEqual(gate.observe(observed()), { ready: i === 3, samples: i })
+      assert.equal(dom.invoke('prepare').generation, 2, 'An unchanged source unnecessarily restarted stabilization')
+    } finally { dom.close() }
+  })
+  test('replacing a source node with identical CSS cannot reuse its original reference identity', () => {
+    const dom = referenceDOM()
+    try {
+      dom.invoke('prepare')
+      const cell = dom.document.querySelector('.sync-diff-local td'); cell.replaceWith(cell.cloneNode(true))
+      const inspected = dom.invoke('inspect'); assert.equal(inspected.references[0].sourceIdentityValid, false)
+      assert.throws(() => validateCSSReferences({ ...frame(), cssReferences: inspected }))
+      const refreshed = dom.invoke('prepare'); assert.equal(refreshed.generation, 2)
+      validateCSSReferences({ ...frame(), cssReferences: refreshed })
+    } finally { dom.close() }
+  })
+  test('real DOM reference style changes and pointer-transparent painted occluders cannot pass exposure', () => {
+    for (const change of [dom => { dom.document.querySelector('#diff-css-references div').style.backgroundColor = '#123456' },
+      dom => { dom.document.querySelector('#diff-css-references').remove() },
+      dom => {
+        const overlay = dom.document.createElement('div'); overlay.style.cssText = 'position:fixed;z-index:2147483647;pointer-events:none;visibility:visible;display:block'
+        overlay.getBoundingClientRect = () => ({ left: 40, top: 8, right: 56, bottom: 24 }); dom.document.body.append(overlay)
+      }]) {
+      const dom = referenceDOM()
+      try {
+        dom.invoke('prepare'); change(dom)
+        assert.throws(() => validateCSSReferences({ ...frame(), cssReferences: dom.invoke('inspect') }))
+      } finally { dom.close() }
+    }
+  })
+  test('reference provenance, kind, phase, styles, geometry, opaque base and exposure are mandatory', () => {
+    const changes = [value => { delete value.cssReferences }, value => { value.cssReferences.schema = 'legacy' },
+      value => { value.cssReferences.source = 'observed-cell-fill' }, value => { value.cssReferences.identityValid = false },
+      value => { value.cssReferences.sourceStable = false }, value => { value.cssReferences.generation = 0 },
+      value => { value.cssReferences.references.reverse() }, value => { value.cssReferences.references.pop() },
+      value => { value.cssReferences.references[0].selector = '.sync-diff-remote td:last-child' },
+      value => { value.cssReferences.references[0].tokenOwner = 'actual-cell' },
+      value => { value.cssReferences.references[0].tokenValue = '#010203' },
+      value => { value.cssReferences.references[0].backgrounds.at(-1).tag = 'TD' },
+      value => { value.cssReferences.references[0].layers.at(-1).source = 'actual-cell-fill' },
+      value => { value.cssReferences.references[0].layers[0].style.backgroundColor = 'rgba(255, 255, 255, 0)' },
+      value => { value.cssReferences.references[0].layers[0].style.opacity = '0.5' },
+      value => { value.cssReferences.references[0].layers[0].specifiedBackground = 'rgb(0, 0, 0)' },
+      value => { value.cssReferences.references[0].layers[0].identityValid = false },
+      value => { value.cssReferences.references[0].layers[0].phase = 2 },
+      value => { value.cssReferences.references[0].sourceIdentityValid = false },
+      value => { value.cssReferences.references[0].exposed = false }, value => { value.cssReferences.references[0].blockers.push('overlay') },
+      value => { value.cssReferences.references[0].x++ }, value => { value.cssReferences.references[0].bounds.left++ },
+      value => { value.cssReferences.rootBounds.left++ }, value => { value.cssReferences.rootStyle.transform = 'matrix(1,0,0,1,0,1)' },
+      value => { value.cssReferences.rootZIndex = '0' }]
+    for (const change of changes) {
+      const before = frame(), png = syntheticPNG(before, 1); change(before)
+      assert.throws(() => validateDiffCapture(before, before, png, 1))
+    }
+  })
+  test('equal colors cannot substitute a wrong reference theme or phase', () => {
+    for (const change of [value => { value.cssReferences.phase = 2 }, value => { value.cssReferences.theme = 'dark' },
+      value => { value.theme = value.cssReferences.theme = 'dark' }]) {
+      const before = frame(), png = syntheticPNG(before, 1); change(before)
+      assert.throws(() => validateDiffCapture(before, before, png, 1))
+    }
+  })
+  test('all four row RGBA probes use exact same-image CSS references even when Canvas predicts another value', () => {
+    const before = frame(), canvasRGB = [242, 230, 231], cssRGBA = [242, 230, 232, 255]
+    for (const color of before.colors) if (color.kind === 'local') color.background = canvasRGB
+    const local = before.cssReferences.references[0]
+    local.tokenValue = local.fill = 'rgba(200, 90, 90, 0.1)'
+    local.backgrounds[1].background = 'rgb(246, 246, 248)'
+    local.layers[2].specifiedBackground = local.backgrounds[1].background
+    local.layers[2].style = referencePaint(local.backgrounds[1].background)
+    local.layers.at(-1).specifiedBackground = local.fill; local.layers.at(-1).style = referencePaint(local.fill)
+    // Synthetic pixels exercise the new contract, not a replacement or edit of
+    // the archived failed Windows PNG, which has no CSS references at all.
+    const changes = { rowColors: { local: cssRGBA }, referenceColors: { local: cssRGBA } }
+    const png = syntheticPNG(before, 1, false, changes)
+    assert.throws(() => verifyDiffRaster(png, before), /Saved PNG does not contain/)
+    const result = validateDiffCapture(before, before, png, 1)
+    assert.equal(result.referenceSchema, 'diff-css-reference-v1'); assert.equal(result.probes.length, 4)
+    for (const probe of result.probes.filter(probe => probe.kind === 'local')) assert.deepEqual(probe.rgba, cssRGBA)
+    for (const probe of before.rasterProbes) for (let channel = 0; channel < 4; channel++) {
+      const rgba = probe.kind === 'local' ? [...cssRGBA] : [...before.colors.find(color => color.kind === probe.kind).background, 255]
+      rgba[channel] += rgba[channel] === 255 ? -1 : 1
+      assert.throws(() => verifyDiffCSSRaster(syntheticPNG(before, 1, false, { ...changes, pixels: [{ ...probe, rgba }] }), before), /does not match the independent CSS/)
+    }
+    const reference = before.cssReferences.references[0]
+    assert.throws(() => verifyDiffCSSRaster(syntheticPNG(before, 1, false, { ...changes, pixels: [{ ...reference, rgba: [242, 230, 231, 255] }] }), before), /does not match the independent CSS/)
+  })
+  test('reference-only changes restart the original three-frame gate and are retained as failed captures', async () => {
+    for (const change of [value => { value.cssReferences.generation++ }, value => { value.cssReferences.references[0].tokenValue = '#17382a' }]) {
+      const gate = createDiffCaptureGate(), before = frame()
+      for (let i = 0; i < 3; i++) gate.observe(before)
+      const changed = structuredClone(before); change(changed)
+      assert.equal(gate.observe(changed).ready, false)
+      const shared = frame(), png = syntheticPNG(shared, 1)
+      const result = await captureDiffFrame({ stableFrame: shared, stableSamples: 3, phase: 1,
+        inspect: async () => shared, capture: async () => { change(shared); return png } })
+      assert.equal(result.complete, false); assert.equal(result.png, png); assert.equal(result.receipt, undefined)
+      assert.deepEqual(result.before, before); assert.match(result.error, /changed during PNG capture/)
+    }
   })
   test('capture approval binds unchanged observations, viewport pixels and the current raster phase', () => {
     const before = frame(), after = structuredClone(before), png = syntheticPNG(before, 1)
@@ -175,7 +392,7 @@ function registerDiffCaptureTests(test, originalFrame) {
     assert.equal(result.complete, false); assert.equal(result.png, null); assert.match(result.error, /settled frame changed/)
   })
   test('layout, theme, text, scroll, phase and visibility changes during capture retain a failed PNG', async () => {
-    for (const change of [value => { value.bounds.top++ }, value => { value.theme = 'light' }, value => { value.tableText += ' changed' },
+    for (const change of [value => { value.bounds.top++ }, value => { value.theme = value.theme === 'light' ? 'dark' : 'light' }, value => { value.tableText += ' changed' },
       value => { value.scroll.y++ }, value => { value.rasterProbes[0].x++ }, value => { value.capturePhase++ },
       value => { value.visibility = 'hidden' }, value => { value.windowVisible = false }]) {
       const shared = frame(), png = syntheticPNG(shared, 1)

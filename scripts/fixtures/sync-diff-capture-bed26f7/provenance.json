@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "description": "Original failed Windows CSS-versus-Canvas capture; not a successful screenshot or a CSS-reference capture. Preserve its exact rejection and bytes.",
+  "commit": "bed26f73d02e3feebcb14d56488cceb40bafe240",
+  "tree": "9182a5e20c29c7c367a43192f2eaf68fa93cb93d",
+  "runId": 39283609470,
+  "jobId": 118165584664,
+  "artifactId": 12202702582,
+  "archive": {
+    "bytes": 64824,
+    "sha256": "512ade4d02a318272b7b9e8a5f90b346a952363322689618d93839074eab8c7a"
+  },
+  "files": {
+    "checks.json": {
+      "bytes": 24342,
+      "sha256": "9d95f9b641e6c48e0400dc6d694d44a7ee5ab27b4172e3ca7ae894b1fda18b90"
+    },
+    "light-1200.png": {
+      "bytes": 67388,
+      "sha256": "2093766e495fab06d0fad0555f935c01c1626261888b5877b4bc83c8eb83c1a8"
+    }
+  }
+}

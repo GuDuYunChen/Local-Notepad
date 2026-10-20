@@ -6,8 +6,7 @@ const path = require('node:path')
 const os = require('node:os')
 const { pathToFileURL } = require('node:url')
 const { build } = require('esbuild')
-const { createDiffFrameGate } = require('./sync-diff-render-frame.cjs')
-const { captureDiffFrame, loadDiffWindow } = require('./sync-diff-render-capture.cjs')
+const { diffCSSReferences, createDiffCaptureGate, captureDiffFrame, loadDiffWindow } = require('./sync-diff-render-capture.cjs')
 const root = path.resolve(__dirname, '..')
 const output = path.join(root, 'test-results', 'sync-conflict-diff')
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-diff-render-'))
@@ -32,7 +31,7 @@ const wait = ms => new Promise(resolve => setTimeout(resolve, ms))
 // This function executes inside Chromium. Canvas resolves CSS colors and alpha
 // compositing against the actual ancestor backgrounds, including light-mode
 // translucent semantic colors. Do not treat rgba(..., .1) as opaque RGB.
-function inspectDiff() {
+function inspectDiff(cssReferences) {
   const table = document.querySelector('.sync-diff-table')
   const wrap = document.querySelector('.sync-diff-table-wrap')
   if (!table || !wrap) return { themeColorsReady: false, visible: false }
@@ -108,7 +107,7 @@ function inspectDiff() {
     activeContent: table.querySelectorAll('img,script,a,iframe').length,
     theme: document.documentElement.dataset.theme, visibility: document.visibilityState,
     capturePhase: window.__diffCapturePhase, tableText: table.textContent,
-    scroll: { x: scrollX, y: scrollY, tableLeft: wrap.scrollLeft, tableTop: wrap.scrollTop }, rasterProbes,
+    scroll: { x: scrollX, y: scrollY, tableLeft: wrap.scrollLeft, tableTop: wrap.scrollTop }, rasterProbes, cssReferences,
     runningAnimations: runningAnimations.slice(0, 30), runningAnimationCount: runningAnimations.length }
 }
 
@@ -168,16 +167,19 @@ app.whenReady().then(async () => {
     currentPhase = name
     const phase = reports.length + 1
     await win.webContents.executeJavaScript('(' + setCapturePhase.toString() + ')(' + phase + ')')
-    const inspect = async () => ({ ...await win.webContents.executeJavaScript('(' + inspectDiff.toString() + ')()'),
+    const inspect = async () => ({ ...await win.webContents.executeJavaScript('(' + inspectDiff.toString() + ')((' + diffCSSReferences.toString() + ')("inspect",' + phase + '))'),
       windowVisible: win.isVisible() && !win.isMinimized() })
     const capturePNG = async () => (await win.capturePage()).toPNG({ scaleFactor: 1 })
     let check, stability = { ready: false, samples: 0 }
-    const gate = createDiffFrameGate()
+    const gate = createDiffCaptureGate()
     // Three consecutive correctly colored and geometrically identical frames,
     // not page-wide animation completion. Keep transitions enabled and record
     // animation diagnostics; unrelated animation cannot approve a bad frame.
     for (let i = 0; i < 60; i++) {
-      await win.webContents.executeJavaScript(`document.querySelector('.sync-diff-table-wrap').scrollIntoView({block:'center',behavior:'instant'})`)
+      // Refresh only during the existing settling loop, never inside either
+      // capture observation. A changed independent source starts three new
+      // stable observations; no extra waiting or product-style override.
+      await win.webContents.executeJavaScript(`document.querySelector('.sync-diff-table-wrap').scrollIntoView({block:'center',behavior:'instant'});(` + diffCSSReferences.toString() + ')("prepare",' + phase + ')')
       await wait(100)
       check = await inspect()
       stability = gate.observe(check)
