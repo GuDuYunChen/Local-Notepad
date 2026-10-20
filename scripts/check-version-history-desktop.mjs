@@ -184,6 +184,49 @@ export function observeHistorySaveTraffic(cdp, record, noteID) {
  } }
 }
 
+// Serialized read-only readiness probe. The lazy inspector's fallback is an
+// .inspector-panel too, but it does not contain the real history tab yet.
+function historyTabReadiness(document, getStyle) {
+ const matches = document.querySelectorAll('#inspector-tab-history'), node = matches[0]
+ const bounds = node?.getBoundingClientRect(), style = node ? getStyle(node) : null
+ const observation = { matchCount:matches.length, connected:node?.isConnected === true,
+  disabled:node?.disabled === true, ariaDisabled:node?.getAttribute('aria-disabled') || null,
+  loading:!!document.querySelector('.inspector-panel.inspector-loading'),
+  bounds:bounds ? { left:bounds.left, top:bounds.top, right:bounds.right, bottom:bounds.bottom, width:bounds.width, height:bounds.height } : null,
+  style:style ? { display:style.display, visibility:style.visibility } : null }
+ observation.ready = observation.matchCount === 1 && observation.connected && !observation.disabled &&
+  observation.ariaDisabled !== 'true' && !observation.loading && !!bounds && bounds.width > 0 && bounds.height > 0 &&
+  style.display !== 'none' && style.visibility !== 'hidden' && style.visibility !== 'collapse'
+ return observation
+}
+
+export async function clickHistoryTab({ evaluate, until, click, record, checkpoint }) {
+ Object.assign(record, { selector:'#inspector-tab-history', complete:false, samples:0, startedAt:new Date().toISOString() })
+ const expression = `(${historyTabReadiness.toString()})(document, getComputedStyle)`
+ const sample = async phase => {
+  const observation = { phase, startedAt:new Date().toISOString() }
+  try { observation.state = await evaluate(expression); return observation.state }
+  catch (error) { observation.error = String(error.stack || error); throw error }
+  finally {
+   observation.finishedAt = new Date().toISOString(); record.samples++
+   record.first ||= observation; record.last = observation; checkpoint()
+  }
+ }
+ try {
+  // Keep the existing until budget. Waiting observes mounting; it never
+  // reopens the inspector, modifies its DOM, or repeats native input.
+  await until(async () => (await sample('waiting')).ready, 'History inspector tab has not finished loading')
+  record.beforeOriginalClick = await sample('before-original-click'); checkpoint()
+  assert.equal(record.beforeOriginalClick.ready, true, 'History tab became unavailable before original mouse input')
+  record.originalClickRequested = true; checkpoint()
+  await click('#inspector-tab-history')
+  // The shared click's completion is not a trusted event receipt or a read.
+  record.originalClickCompleted = true; record.complete = true
+ } catch (error) { record.error = String(error.stack || error); throw error }
+ finally { record.finishedAt = new Date().toISOString(); checkpoint() }
+ return record
+}
+
 // Part of the ORIGINAL packaged Windows application run. Only owned fixture
 // notes and browser request blocking are used; App/preload/Go/SQLite stay real.
 export async function beginHistoryWriteFailure(cdp, target) {
@@ -244,7 +287,8 @@ export async function verifyVersionHistoryDesktop({ evaluate, click, cdp, until,
   await open(file.id);await until(()=>evaluate("document.querySelector('.editor-input')?.innerText.includes('latest-history-body')"),'Latest body not loaded')
   if(!await evaluate("!!document.querySelector('.inspector-panel')"))await click('button[aria-label="笔记详情"]')
   await cdp.send('Network.setBlockedURLs',{urls:[base+versionsRoute]})
-  await click('#inspector-tab-history');await waitText('读取历史失败');assert.ok(!(await text()).includes('暂无版本历史'));mark('read-error-not-empty')
+  report.historyTabReadiness = {}
+  await clickHistoryTab({ evaluate, until, click, record:report.historyTabReadiness, checkpoint:save });await waitText('读取历史失败');assert.ok(!(await text()).includes('暂无版本历史'));mark('read-error-not-empty')
   await cdp.send('Network.setBlockedURLs',{urls:[]});await button('重试读取历史');await waitText('历史快照 #'+seeded[0].id)
   assert.ok(!(await text()).includes('当前版本'));mark('real-history-read-and-correct-snapshot-label')
   await button('恢复此快照正文');await button('取消','.version-history [role=dialog]');assert.equal((await api(route)).content,latest);mark('cancel-confirmation-no-write')

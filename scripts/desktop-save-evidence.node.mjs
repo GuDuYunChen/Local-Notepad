@@ -13,6 +13,7 @@ import { HeadingNode } from '@lexical/rich-text'
 import { verifyDesktopSaveReport } from './desktop-save-evidence.mjs'
 import { JSDOM } from 'jsdom'
 import { clickHistoryButton, waitForHistoryExplicitSave, observeHistorySaveTraffic } from './check-version-history-desktop.mjs'
+import { clickHistoryTab } from './check-version-history-desktop.mjs'
 
 // Exercise the actual driver function without starting Electron or replacing
 // its implementation with a fixture. Only the native/renderer I/O is synthetic.
@@ -383,4 +384,125 @@ test('history save traffic observes only exact-note PUT identity and records mis
  assert.equal(record.requests[1].request.postDataPresent, false); assert.equal(Object.hasOwn(record.requests[1].request, 'postData'), false)
  assert.equal(record.requests[1].failed.errorText, 'net::ERR_FAILED')
  assert.equal(detached, 1); assert.equal(sends, 0); assert.equal(record.detached, true)
+})
+
+// Exercise the actual serialized readiness probe and unchanged shared click.
+// DOM mounting, geometry and protocol delivery here are synthetic Node I/O;
+// these contracts do not claim Chromium rendering or trusted mouse receipts.
+function historyTabContract(options = {}) {
+ const dom = new JSDOM('<!doctype html><body></body>', { runScripts:'outside-only' })
+ const { window } = dom, { document } = window, record = {}, saved = [], commands = [], clickCalls = []
+ let state, probes = 0, untilFinished = false, finalObserved = false, scrolls = 0
+ const setState = next => {
+  state = next
+  document.body.innerHTML = next === 'missing' ? '' : next === 'fallback' ? '<aside class="inspector-panel inspector-loading">正在加载…</aside>' :
+   '<aside class="inspector-panel"><button id="inspector-tab-history" role="tab">版本历史</button></aside>'
+  const node = document.querySelector('#inspector-tab-history')
+  if (!node) return
+  if (next === 'disabled') node.disabled = true
+  if (next === 'aria-disabled') node.setAttribute('aria-disabled', 'true')
+  if (next === 'hidden') node.style.visibility = 'hidden'
+  if (next === 'collapsed') node.style.visibility = 'collapse'
+  if (next === 'display-none') node.style.display = 'none'
+  if (next === 'loading') document.querySelector('.inspector-panel').classList.add('inspector-loading')
+  if (next === 'disconnected') Object.defineProperty(node, 'isConnected', { value:false })
+  if (next === 'duplicate') node.after(node.cloneNode(true))
+ }
+ window.Element.prototype.getBoundingClientRect = () => ({ x:40, y:20, left:40, top:20, right:140, bottom:50,
+  width:state === 'zero-width' ? 0 : 100, height:state === 'zero-height' ? 0 : 30 })
+ window.Element.prototype.scrollIntoView = function () {
+  assert.equal(this.id, 'inspector-tab-history'); scrolls++
+ }
+ setState(options.initial || 'ready')
+ const evaluate = async expression => {
+  if (untilFinished && !finalObserved) {
+   finalObserved = true
+   if (options.beforeOriginalClick) setState(options.beforeOriginalClick)
+  }
+  const value = await window.eval(expression)
+  return value === undefined ? undefined : JSON.parse(JSON.stringify(value))
+ }
+ const pressFailure = Error('original press outcome unknown')
+ const cdp = { async send(method, params) {
+  assert.equal(method, 'Input.dispatchMouseEvent'); commands.push(structuredClone(params))
+  if (options.pressFailure && params.type === 'mousePressed') throw pressFailure
+ } }
+ const source = readFileSync(new URL('./check-desktop-save.mjs', import.meta.url), 'utf8')
+ const body = source.match(/async function click\(selector\) \{[\s\S]*?\n\}/)
+ assert.ok(body, 'The original native click must remain under test')
+ const originalClick = runInNewContext('(' + body[0] + ')', { assert, evaluate, cdp })
+ const click = async selector => { clickCalls.push(selector); return originalClick(selector) }
+ const until = async (...args) => {
+  assert.equal(args.length, 2, 'The history-tab wait must retain the original default budget')
+  assert.equal(args[1], 'History inspector tab has not finished loading')
+  for (let index = 0; index < 6; index++) {
+   probes++; assert.deepEqual(commands, []); assert.deepEqual(clickCalls, [])
+   if (options.mounting) setState(options.mounting[Math.min(index, options.mounting.length - 1)])
+   if (await args[0]()) { untilFinished = true; return true }
+  }
+  throw Error(args[1])
+ }
+ const checkpoint = () => saved.push(structuredClone(record))
+ return { record, saved, commands, clickCalls, pressFailure, document,
+  run:() => clickHistoryTab({ evaluate, until, click, record, checkpoint }),
+  originalClick:() => originalClick('#inspector-tab-history'), setState,
+  get probes() { return probes }, get scrolls() { return scrolls }, dispose:() => window.close() }
+}
+
+test('history tab waits for late inspector mounting before one unchanged original native click', async () => {
+ const h = historyTabContract({ initial:'fallback', mounting:['missing','fallback','disabled','ready'] })
+ try {
+  await assert.rejects(h.originalClick(), /Missing visible control: #inspector-tab-history/)
+  assert.deepEqual(h.commands, [])
+  await h.run()
+  assert.equal(h.probes, 4); assert.equal(h.record.samples, 5)
+  assert.equal(h.record.first.state.matchCount, 0); assert.equal(h.record.first.state.ready, false)
+  assert.ok(h.saved.some(snapshot => snapshot.last?.state.loading === true))
+  assert.ok(h.saved.some(snapshot => snapshot.last?.state.disabled === true))
+  assert.equal(h.record.last.phase, 'before-original-click'); assert.equal(h.record.beforeOriginalClick.ready, true)
+  assert.deepEqual(h.clickCalls, ['#inspector-tab-history']); assert.equal(h.scrolls, 1)
+  assert.deepEqual(h.commands, ['mousePressed','mouseReleased'].map(type => ({ type, x:90, y:35, button:'left', clickCount:1 })))
+  assert.equal(h.record.originalClickRequested, true); assert.equal(h.record.originalClickCompleted, true)
+  assert.equal(h.record.complete, true); assert.ok(h.record.finishedAt)
+  assert.equal(Object.hasOwn(h.record, 'observations'), false, 'Keep only bounded readiness observations')
+ } finally { h.dispose() }
+})
+
+test('history tab rejects missing, loading, ambiguous, disabled, disconnected and invisible controls within the original wait policy', async () => {
+ for (const initial of ['missing','fallback','loading','duplicate','disabled','aria-disabled','disconnected','hidden','collapsed','display-none','zero-width','zero-height']) {
+  const h = historyTabContract({ initial })
+  try {
+   await assert.rejects(h.run(), /History inspector tab has not finished loading/)
+   assert.equal(h.probes, 6); assert.equal(h.record.samples, 6)
+   assert.equal(h.record.first.state.ready, false); assert.equal(h.record.last.state.ready, false)
+   assert.deepEqual(h.clickCalls, []); assert.deepEqual(h.commands, []); assert.equal(h.scrolls, 0)
+   assert.equal(h.record.originalClickRequested, undefined); assert.equal(h.record.complete, false)
+   assert.ok(h.record.error); assert.ok(h.record.finishedAt)
+  } finally { h.dispose() }
+ }
+})
+
+test('history tab rechecks readiness and refuses a control lost after the wait without native input', async () => {
+ for (const beforeOriginalClick of ['missing','fallback','disabled','aria-disabled','hidden','zero-width']) {
+  const h = historyTabContract({ beforeOriginalClick })
+  try {
+   await assert.rejects(h.run(), /History tab became unavailable before original mouse input/)
+   assert.equal(h.probes, 1); assert.equal(h.record.samples, 2)
+   assert.equal(h.record.first.state.ready, true); assert.equal(h.record.beforeOriginalClick.ready, false)
+   assert.deepEqual(h.clickCalls, []); assert.deepEqual(h.commands, []); assert.equal(h.scrolls, 0)
+   assert.equal(h.record.originalClickRequested, undefined); assert.equal(h.record.complete, false)
+  } finally { h.dispose() }
+ }
+})
+
+test('history tab preserves an uncertain original native click failure without replay or a completion claim', async () => {
+ const h = historyTabContract({ pressFailure:true })
+ try {
+  await assert.rejects(h.run(), error => error === h.pressFailure)
+  assert.deepEqual(h.clickCalls, ['#inspector-tab-history']); assert.equal(h.scrolls, 1)
+  assert.deepEqual(h.commands.map(command => command.type), ['mousePressed'])
+  assert.equal(h.record.originalClickRequested, true); assert.equal(h.record.originalClickCompleted, undefined)
+  assert.equal(h.record.complete, false); assert.match(h.record.error, /original press outcome unknown/)
+  assert.ok(h.record.finishedAt); assert.equal(h.saved.at(-1).complete, false)
+ } finally { h.dispose() }
 })
