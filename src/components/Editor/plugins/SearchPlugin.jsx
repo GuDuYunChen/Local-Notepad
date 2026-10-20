@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { HISTORY_PUSH_TAG, SKIP_DOM_SELECTION_TAG } from 'lexical'
@@ -19,6 +19,7 @@ export default function SearchPlugin({ documentId = '' }) {
   const [snapshot,setSnapshot] = useState(null), [index,setIndex] = useState(0), [revision,setRevision] = useState(0)
   const [error,setError] = useState(''), [feedback,setFeedback] = useState(''), [review,setReview] = useState(null)
   const [editable,setEditable] = useState(editor.isEditable()), [composing,setComposing] = useState(false)
+  const [focusRequest,setFocusRequest] = useState(null)
   const inputRef = useRef(null), panelRef = useRef(null), alive = useRef(false), compose = useRef(false), mutation = useRef(0), active = useRef(null)
   const signature = useRef(''), inAction = useRef(false), epoch = useRef(0), focusFrame = useRef(0)
   const options = { matchCase, wholeWord }
@@ -38,13 +39,32 @@ export default function SearchPlugin({ documentId = '' }) {
     const offEditable = editor.registerEditableListener(value => {setEditable(value); if (!value) setReview(null)})
     return () => {alive.current=false;epoch.current++;unregister();offEditable();clearHighlight();cancelAnimationFrame(focusFrame.current)}
   }, [editor,documentId])
+  useLayoutEffect(() => {
+    if (!open || !focusRequest || focusRequest.documentId!==documentId || focusRequest.ticket!==epoch.current) return
+    const input = inputRef.current
+    if (!input?.isConnected) return
+    // A frame can run before a CustomEvent's pending React update commits.
+    // Queue autofocus only after the requested input is actually mounted.
+    const frame = requestAnimationFrame(() => {
+      if (alive.current && epoch.current===focusRequest.ticket && inputRef.current===input && input.isConnected) {
+        const target = document.activeElement, root = editor.getRootElement()
+        if (!root?.isConnected || compose.current || editor.isComposing() || isShortcutContextBlocked({target})) return
+        const shell = root.closest('.editor-shell')
+        const ownOutline = shell && target?.closest?.('.local-outline')?.closest('.editor-shell')===shell
+        if (target?.closest?.('input,textarea,select,[contenteditable="true"],[role="textbox"]') && !panelRef.current?.contains(target) && !root.contains(target) && !ownOutline) return
+        input.focus(); input.select()
+      }
+    })
+    focusFrame.current = frame
+    return () => cancelAnimationFrame(frame)
+  }, [editor,documentId,open,focusRequest])
   useEffect(() => {
     const start = replace => {
       if (!editor.getRootElement()?.isConnected || editor.isComposing()) return
       setOpen(true);setReplaceOpen(Boolean(replace && editor.isEditable()));setError('');setFeedback('');setReview(null)
       const ticket = ++epoch.current
       cancelAnimationFrame(focusFrame.current)
-      focusFrame.current=requestAnimationFrame(()=>{if(alive.current&&epoch.current===ticket){inputRef.current?.focus();inputRef.current?.select()}})
+      setFocusRequest({documentId,ticket})
     }
     const onKey = e => {
       if (compose.current || editor.isComposing() || isShortcutContextBlocked(e)) return
