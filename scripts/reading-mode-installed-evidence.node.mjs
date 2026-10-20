@@ -19,11 +19,11 @@ const verifier = 'b'.repeat(40)
 function fixture() {
   const reading = readingEvidenceFixture()
   const pin = { product: 'a'.repeat(40), previous: { ...ACCEPTED_READING_SEED }, previousSource: { ...ACCEPTED_READING_SEED_SOURCE },
-    current: { version: '4.233.2', bytes: 1001, sha256: createHash('sha256').update('synthetic-reading-mode-contract-input').digest('hex') }, currentSource: { run: 100, artifact: 200, name: 'local-notepad-windows-' + 'a'.repeat(40) } }
+    current: { version: '4.234.0', bytes: 1001, sha256: createHash('sha256').update('synthetic-reading-mode-contract-input').digest('hex') }, currentSource: { run: 100, artifact: 200, name: 'local-notepad-windows-' + 'a'.repeat(40) } }
   for (const key of READING_SOURCE_KEYS) pin[key] = 'd'.repeat(40)
-  Object.assign(pin, { importBlob: 'ebb969e105d92a92d62874942f8ea622f61e50ca',
-    importEvidenceBlob: '261bfd7c3e43698d173f85b5af342c7ff68ccd2e',
-    importEvidenceTestsBlob: '39fac5da22fb6cfe1ddc9963401bbd2c5a5455ef',
+  Object.assign(pin, { importBlob: 'a3fa709546eee99e76538f8cd125a77bdbc823d1',
+    importEvidenceBlob: '801a7e2d33c0ffe3d6dcd05287fb0b595822ce2b',
+    importEvidenceTestsBlob: '754f1cb656c2a5cd4fb7acf10b84205a623261fc',
     historyDriverBlob: blob(source('check-version-history-desktop.mjs').replace(/\r\n/g, '\n')) })
   const report = { productCommit: pin.product, verifierCommit: verifier, complete: true, cleanupComplete: true,
     syntheticData: true, usedDefaultDataPath: true, forceTerminated: false, platform: 'win32', runnerEnvironment: 'github-hosted',
@@ -225,7 +225,7 @@ for (const lineEnding of ['LF', 'CRLF']) test('offline complete ' + lineEnding +
     assert.equal(final.script.match(/await verifyLocalImportRestart\(/g).length, 1)
     assert.ok(final.script.indexOf('await verifyReadingModeDesktop(') > final.script.indexOf('await verifyLocalImportRestart('))
     assert.equal(final.core.match(/'installed-app-reading-mode-workflow'/g).length, 1)
-    assert.ok(final.core.includes('4.233.2')); assert.ok(final.core.includes('4.232.0'))
+    assert.ok(final.core.includes('4.234.0')); assert.ok(final.core.includes('4.232.0'))
     for (const marker of REQUIRED_CHECKS) assert.ok(final.core.includes(marker), marker)
     assert.ok(final.core.includes(LEGACY_DEFECT.sha256))
     assert.ok(final.script.includes("assert.equal(observedDirectory,legacyTarget.split(' ')[0],'Old directory truncation was not reproduced')"))

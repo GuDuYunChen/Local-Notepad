@@ -1,4 +1,4 @@
-name: Actual local reading mode installation lifecycle 2F100
+name: Actual local shortcut management installation lifecycle 2F101
 on:
   push:
     branches: [ci/local-installation-2f86]
@@ -30,8 +30,8 @@ jobs:
         run: git diff --exit-code -- package.json package-lock.json
       - name: Build canonical reading fixture before refusal contracts
         run: node scripts/build-reading-mode-fixture.mjs
-      - name: Refuse missing reading gates and prove complete original preparation
-        run: node --test scripts/reading-mode-desktop-evidence.node.mjs scripts/reading-mode-installed-evidence.node.mjs scripts/reading-mode-native-input.node.mjs scripts/desktop-window-session.node.mjs
+      - name: Refuse missing reading and shortcut gates and prove complete original preparation
+        run: node --test scripts/reading-mode-desktop-evidence.node.mjs scripts/reading-mode-installed-evidence.node.mjs scripts/reading-mode-native-input.node.mjs scripts/desktop-window-session.node.mjs scripts/shortcut-management-desktop-evidence.node.mjs scripts/shortcut-management-installed-evidence.node.mjs
       - name: Verify fixed legacy installer restoration and refusals
         run: node --test scripts/prepare-legacy-installer.node.mjs
       - name: Resolve only complete source and binary pins
@@ -50,7 +50,7 @@ jobs:
           path: .installer-input/previous
       - name: Restore unchanged old path-failure counterexample
         run: node scripts/prepare-legacy-installer.mjs
-      - name: Download source-bound 4.233.2 installer
+      - name: Download source-bound 4.234.0 installer
         uses: actions/download-artifact@v4
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -61,7 +61,7 @@ jobs:
         run: node scripts/pin-reading-mode-installer.mjs prepare
       - name: Verify canonical reading fixture from the prepared serializer
         run: node --test scripts/reading-mode-desktop-fixture.node.mjs
-      - name: Preserve original lifecycle and all modules plus exact native reading workflow
+      - name: Preserve original lifecycle and all modules plus native reading and shortcut workflows
         run: node scripts/run-reading-mode-installer.mjs prepare
       - name: Retain all original refusal checks and add import evidence contracts
         run: node --test scripts/installer-lifecycle-core.node.mjs scripts/installer-shell-core.node.mjs scripts/history-installation-evidence.node.mjs scripts/daily-installed-evidence.node.mjs scripts/template-installed-evidence.node.mjs scripts/quick-installed-evidence.node.mjs scripts/note-tags-installed-evidence.node.mjs scripts/backlinks-installed-evidence.node.mjs scripts/document-search-installed-evidence.node.mjs scripts/document-outline-installed-evidence.node.mjs scripts/local-graph-installed-evidence.node.mjs scripts/local-pins-installed-evidence.node.mjs scripts/recent-notes-installed-evidence.node.mjs scripts/installer-history-readiness.node.mjs scripts/wiki-installed-evidence.node.mjs scripts/local-import-desktop-evidence.node.mjs scripts/local-import-installed-evidence.node.mjs

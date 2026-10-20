@@ -19,7 +19,7 @@ export function validateReadingModePin(pin) {
   for (const key of ['product', ...READING_SOURCE_KEYS]) assert.match(pin[key] || '', /^[a-f0-9]{40}$/, 'Unresolved or invalid pin: ' + key)
   assert.deepEqual(pin.previous, ACCEPTED_READING_SEED)
   assert.deepEqual(pin.previousSource, ACCEPTED_READING_SEED_SOURCE)
-  assert.equal(pin.current?.version, '4.233.2')
+  assert.equal(pin.current?.version, '4.234.0')
   assert.ok(Number.isSafeInteger(pin.current.bytes) && pin.current.bytes > 0, 'Current installer bytes are unresolved')
   assert.match(pin.current.sha256 || '', /^[a-f0-9]{64}$/, 'Current installer digest is unresolved')
   for (const key of ['run', 'artifact']) assert.ok(Number.isSafeInteger(pin.currentSource?.[key]) && pin.currentSource[key] > 0, 'Current artifact identity is unresolved: ' + key)
@@ -61,19 +61,19 @@ export function prepareReadingModeVerifierSources(pin, readSource) {
     { source: 'local-import-installed-evidence.mjs', output: 'reading-import-validator.mjs', hash: 'b70f45bceea1b299d18beefd5b985851cf753f9e', changes: [
       ["version: '4.231.2', bytes: 104320482", "version: '4.232.0', bytes: 104335681"],
       ["sha256: '5327515821f06c1d471ed038a32e14d02a178e9eebdff7899f94f437512f8c71'", "sha256: '3b1b743a61e3dd7a13c5642f7310e68f7ba2bd912d0f98f6b8c1d7e2f7707e9e'"],
-      ["assert.equal(pin.current.version, '4.232.0')", "assert.equal(pin.current.version, '4.233.2')"],
+      ["assert.equal(pin.current.version, '4.232.0')", "assert.equal(pin.current.version, '4.234.0')"],
       ["from './local-import-desktop-evidence.mjs'", "from './reading-import-desktop-validator.mjs'"],
       ["from './check-local-import-desktop.mjs'", "from './reading-import-desktop-driver.mjs'"],
     ] },
     { source: 'local-import-desktop-evidence.mjs', output: 'reading-import-desktop-validator.mjs', hash: '6fc3c3d069384fc2bd7c671987ace423d004ddf8', productPin: 'importEvidenceBlob', changes: [
-      ["assert.equal(report.appVersion, '4.232.0')", "assert.equal(report.appVersion, '4.233.2')"],
+      ["assert.equal(report.appVersion, '4.232.0')", "assert.equal(report.appVersion, '4.234.0')"],
     ] },
     { source: 'check-local-import-desktop.mjs', output: 'reading-import-desktop-driver.mjs', hash: '6f0bfd54c7b7e1ea673e80b55a91be82244dfcef', productPin: 'importBlob', changes: [
-      ["assert.equal(diagnostics.version, '4.232.0')", "assert.equal(diagnostics.version, '4.233.2')"],
+      ["assert.equal(diagnostics.version, '4.232.0')", "assert.equal(diagnostics.version, '4.234.0')"],
       ["from './local-import-desktop-evidence.mjs'", "from './reading-import-desktop-validator.mjs'"],
     ] },
     { source: 'local-import-desktop-evidence.node.mjs', output: 'reading-import-desktop-validator.node.mjs', hash: '12cc53ff2ff11d2aa8d6508feadd2a4734077bb3', productPin: 'importEvidenceTestsBlob', changes: [
-      ["appVersion: '4.232.0'", "appVersion: '4.233.2'"],
+      ["appVersion: '4.232.0'", "appVersion: '4.234.0'"],
       ["from './local-import-desktop-evidence.mjs'", "from './reading-import-desktop-validator.mjs'"],
     ] },
     { source: 'pin-local-import-installer.mjs', output: 'pin-reading-import-generated.mjs', hash: 'ef3ce5e4e2f0b4952107bfae81d556fd0c7fc036', changes: [
