@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "description": "Original failed Windows CSS-reference capture under the production reduced-motion !important rule. Preserve the exact 1e-05s versus 0s rejection and original PNG; this is not a completed capture or current-source acceptance.",
+  "commit": "b65a489cd625e2793c01c64e9c9b014341099c64",
+  "tree": "b2df5a0e4d4304c2b2f6d179dcf3a19b5b9c1073",
+  "runId": 39379213708,
+  "jobId": 118485520966,
+  "artifactId": 12244697361,
+  "archive": {
+    "bytes": 66087,
+    "sha256": "383641a7bae5343d3e88b043a84b18e9b63917d2e3c95551e8aa56dab929d608"
+  },
+  "files": {
+    "checks.json": {
+      "bytes": 53263,
+      "sha256": "6f606bddd985487c130e702750a366abfac570c0c86d468f25e8f158e3c5ae23"
+    },
+    "light-1200.png": {
+      "bytes": 67459,
+      "sha256": "e9be366d8d2dee18bd9a271bb25631898bec1500421f9a77230479a47b5f9b26"
+    }
+  }
+}

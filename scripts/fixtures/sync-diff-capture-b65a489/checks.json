@@ -1,0 +1,1465 @@
+{
+  "commit": "b65a489cd625e2793c01c64e9c9b014341099c64",
+  "platform": "win32",
+  "realComponents": true,
+  "syntheticRecords": true,
+  "backendExercised": false,
+  "windowLifecycle": {
+    "firstPaintObserved": true,
+    "visible": true,
+    "focusedByHarness": false
+  },
+  "reports": [
+    {
+      "name": "light-1200",
+      "themeColorsReady": true,
+      "visible": true,
+      "bounds": {
+        "top": 335.9375,
+        "bottom": 611.625,
+        "left": 65,
+        "right": 871
+      },
+      "viewport": {
+        "width": 1200,
+        "height": 900
+      },
+      "rows": 4,
+      "bodyOverflow": -8,
+      "tableOverflow": 0,
+      "colors": [
+        {
+          "kind": "local",
+          "selector": "pre",
+          "foreground": [
+            36,
+            34,
+            42
+          ],
+          "background": [
+            242,
+            230,
+            231
+          ],
+          "ratio": 12.898093548560535,
+          "finalForeground": true,
+          "finalBackground": true
+        },
+        {
+          "kind": "local",
+          "selector": ".sync-diff-line-meta strong",
+          "foreground": [
+            36,
+            34,
+            42
+          ],
+          "background": [
+            242,
+            230,
+            231
+          ],
+          "ratio": 12.898093548560535,
+          "finalForeground": true,
+          "finalBackground": true
+        },
+        {
+          "kind": "local",
+          "selector": ".sync-diff-line-meta span",
+          "foreground": [
+            36,
+            34,
+            42
+          ],
+          "background": [
+            242,
+            230,
+            231
+          ],
+          "ratio": 12.898093548560535,
+          "finalForeground": true,
+          "finalBackground": true
+        },
+        {
+          "kind": "remote",
+          "selector": "pre",
+          "foreground": [
+            36,
+            34,
+            42
+          ],
+          "background": [
+            246,
+            246,
+            248
+          ],
+          "ratio": 14.549424761712238,
+          "finalForeground": true,
+          "finalBackground": true
+        },
+        {
+          "kind": "remote",
+          "selector": ".sync-diff-line-meta strong",
+          "foreground": [
+            36,
+            34,
+            42
+          ],
+          "background": [
+            246,
+            246,
+            248
+          ],
+          "ratio": 14.549424761712238,
+          "finalForeground": true,
+          "finalBackground": true
+        },
+        {
+          "kind": "remote",
+          "selector": ".sync-diff-line-meta span",
+          "foreground": [
+            36,
+            34,
+            42
+          ],
+          "background": [
+            246,
+            246,
+            248
+          ],
+          "ratio": 14.549424761712238,
+          "finalForeground": true,
+          "finalBackground": true
+        }
+      ],
+      "textChecks": [
+        {
+          "id": "heading",
+          "foreground": [
+            36,
+            34,
+            42
+          ],
+          "background": [
+            255,
+            255,
+            255
+          ],
+          "ratio": 15.703775565080118,
+          "finalForeground": true
+        },
+        {
+          "id": "position",
+          "foreground": [
+            36,
+            34,
+            42
+          ],
+          "background": [
+            255,
+            255,
+            255
+          ],
+          "ratio": 15.703775565080118,
+          "finalForeground": true
+        },
+        {
+          "id": "local-column",
+          "foreground": [
+            111,
+            107,
+            120
+          ],
+          "background": [
+            255,
+            255,
+            255
+          ],
+          "ratio": 5.184938502630094,
+          "finalForeground": true
+        },
+        {
+          "id": "remote-column",
+          "foreground": [
+            111,
+            107,
+            120
+          ],
+          "background": [
+            255,
+            255,
+            255
+          ],
+          "ratio": 5.184938502630094,
+          "finalForeground": true
+        },
+        {
+          "id": "text-column",
+          "foreground": [
+            36,
+            34,
+            42
+          ],
+          "background": [
+            255,
+            255,
+            255
+          ],
+          "ratio": 15.703775565080118,
+          "finalForeground": true
+        },
+        {
+          "id": "summary",
+          "foreground": [
+            36,
+            34,
+            42
+          ],
+          "background": [
+            255,
+            255,
+            255
+          ],
+          "ratio": 15.703775565080118,
+          "finalForeground": true
+        },
+        {
+          "id": "description",
+          "foreground": [
+            111,
+            107,
+            120
+          ],
+          "background": [
+            255,
+            255,
+            255
+          ],
+          "ratio": 5.184938502630094,
+          "finalForeground": true
+        },
+        {
+          "id": "range",
+          "foreground": [
+            111,
+            107,
+            120
+          ],
+          "background": [
+            255,
+            255,
+            255
+          ],
+          "ratio": 5.184938502630094,
+          "finalForeground": true
+        },
+        {
+          "id": "source",
+          "foreground": [
+            111,
+            107,
+            120
+          ],
+          "background": [
+            255,
+            255,
+            255
+          ],
+          "ratio": 5.184938502630094,
+          "finalForeground": true
+        }
+      ],
+      "writes": 0,
+      "activeContent": 0,
+      "theme": "light",
+      "visibility": "visible",
+      "capturePhase": 1,
+      "tableText": "本机行远端行对照文本11相同上下文换行 LF开始核对2—仅本机换行 LF本机保留原有说明。—2仅远端换行 LF远端增加一条补充说明。33相同上下文换行 LF共同上下文。",
+      "scroll": {
+        "x": 0,
+        "y": 706,
+        "tableLeft": 0,
+        "tableTop": 0
+      },
+      "rasterProbes": [
+        {
+          "kind": "local",
+          "position": "left",
+          "x": 190,
+          "y": 436,
+          "exposed": true
+        },
+        {
+          "kind": "local",
+          "position": "right",
+          "x": 847,
+          "y": 436,
+          "exposed": true
+        },
+        {
+          "kind": "remote",
+          "position": "left",
+          "x": 190,
+          "y": 496,
+          "exposed": true
+        },
+        {
+          "kind": "remote",
+          "position": "right",
+          "x": 847,
+          "y": 496,
+          "exposed": true
+        }
+      ],
+      "cssReferences": {
+        "schema": "diff-css-reference-v1",
+        "source": "root-semantic-tokens-and-cell-ancestor-backgrounds",
+        "phase": 1,
+        "theme": "light",
+        "generation": 1,
+        "rootID": "diff-css-references",
+        "rootBounds": {
+          "left": 40,
+          "top": 8,
+          "right": 80,
+          "bottom": 24
+        },
+        "rootStyle": {
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "backgroundImage": "none",
+          "opacity": "1",
+          "filter": "none",
+          "transform": "none",
+          "mixBlendMode": "normal",
+          "visibility": "visible",
+          "display": "block",
+          "position": "fixed",
+          "pointerEvents": "auto",
+          "boxShadow": "none",
+          "borderRadius": "0px",
+          "borderTopWidth": "0px",
+          "borderRightWidth": "0px",
+          "borderBottomWidth": "0px",
+          "borderLeftWidth": "0px",
+          "transitionDuration": "1e-05s",
+          "animationName": "none"
+        },
+        "rootZIndex": "2147483646",
+        "identityValid": true,
+        "sourceStable": true,
+        "references": [
+          {
+            "kind": "local",
+            "selector": ".sync-diff-local td:last-child",
+            "token": "--danger-light",
+            "tokenOwner": "document.documentElement",
+            "tokenValue": "rgba(200, 90, 90, .1)",
+            "paperValue": "#f6f6f8",
+            "selectedToken": "--danger-light",
+            "fill": "rgba(200, 90, 90, 0.1)",
+            "backgrounds": [
+              {
+                "path": "html",
+                "tag": "HTML",
+                "background": "rgba(0, 0, 0, 0)"
+              },
+              {
+                "path": "html>body:nth-child(2)",
+                "tag": "BODY",
+                "background": "rgb(246, 246, 248)"
+              },
+              {
+                "path": "html>body:nth-child(2)>div:nth-child(1)",
+                "tag": "DIV",
+                "background": "rgba(0, 0, 0, 0)"
+              },
+              {
+                "path": "html>body:nth-child(2)>div:nth-child(1)>div:nth-child(1)",
+                "tag": "DIV",
+                "background": "rgb(255, 255, 255)"
+              },
+              {
+                "path": "html>body:nth-child(2)>div:nth-child(1)>div:nth-child(1)>article:nth-child(1)",
+                "tag": "ARTICLE",
+                "background": "rgb(246, 246, 248)"
+              },
+              {
+                "path": "html>body:nth-child(2)>div:nth-child(1)>div:nth-child(1)>article:nth-child(1)>section:nth-child(3)",
+                "tag": "SECTION",
+                "background": "rgba(0, 0, 0, 0)"
+              },
+              {
+                "path": "html>body:nth-child(2)>div:nth-child(1)>div:nth-child(1)>article:nth-child(1)>section:nth-child(3)>section:nth-child(5)",
+                "tag": "SECTION",
+                "background": "rgb(255, 255, 255)"
+              },
+              {
+                "path": "html>body:nth-child(2)>div:nth-child(1)>div:nth-child(1)>article:nth-child(1)>section:nth-child(3)>section:nth-child(5)>div:nth-child(2)",
+                "tag": "DIV",
+                "background": "rgba(0, 0, 0, 0)"
+              },
+              {
+                "path": "html>body:nth-child(2)>div:nth-child(1)>div:nth-child(1)>article:nth-child(1)>section:nth-child(3)>section:nth-child(5)>div:nth-child(2)>div:nth-child(5)",
+                "tag": "DIV",
+                "background": "rgba(0, 0, 0, 0)"
+              },
+              {
+                "path": "html>body:nth-child(2)>div:nth-child(1)>div:nth-child(1)>article:nth-child(1)>section:nth-child(3)>section:nth-child(5)>div:nth-child(2)>div:nth-child(5)>table:nth-child(1)",
+                "tag": "TABLE",
+                "background": "rgb(246, 246, 248)"
+              },
+              {
+                "path": "html>body:nth-child(2)>div:nth-child(1)>div:nth-child(1)>article:nth-child(1)>section:nth-child(3)>section:nth-child(5)>div:nth-child(2)>div:nth-child(5)>table:nth-child(1)>tbody:nth-child(2)",
+                "tag": "TBODY",
+                "background": "rgba(0, 0, 0, 0)"
+              },
+              {
+                "path": "html>body:nth-child(2)>div:nth-child(1)>div:nth-child(1)>article:nth-child(1)>section:nth-child(3)>section:nth-child(5)>div:nth-child(2)>div:nth-child(5)>table:nth-child(1)>tbody:nth-child(2)>tr:nth-child(2)",
+                "tag": "TR",
+                "background": "rgba(0, 0, 0, 0)"
+              }
+            ],
+            "x": 48,
+            "y": 16,
+            "bounds": {
+              "left": 40,
+              "top": 8,
+              "right": 56,
+              "bottom": 24
+            },
+            "blockers": [],
+            "sourceIdentityValid": true,
+            "exposed": true,
+            "layers": [
+              {
+                "source": "opaque-white",
+                "kind": "local",
+                "phase": 1,
+                "identityValid": true,
+                "specifiedBackground": "rgb(255, 255, 255)",
+                "style": {
+                  "backgroundColor": "rgb(255, 255, 255)",
+                  "backgroundImage": "none",
+                  "opacity": "1",
+                  "filter": "none",
+                  "transform": "none",
+                  "mixBlendMode": "normal",
+                  "visibility": "visible",
+                  "display": "block",
+                  "position": "absolute",
+                  "pointerEvents": "auto",
+                  "boxShadow": "none",
+                  "borderRadius": "0px",
+                  "borderTopWidth": "0px",
+                  "borderRightWidth": "0px",
+                  "borderBottomWidth": "0px",
+                  "borderLeftWidth": "0px",
+                  "transitionDuration": "1e-05s",
+                  "animationName": "none"
+                },
+                "bounds": {
+                  "left": 40,
+                  "top": 8,
+                  "right": 56,
+                  "bottom": 24
+                }
+              },
+              {
+                "source": "html",
+                "kind": "local",
+                "phase": 1,
+                "identityValid": true,
+                "specifiedBackground": "rgba(0, 0, 0, 0)",
+                "style": {
+                  "backgroundColor": "rgba(0, 0, 0, 0)",
+                  "backgroundImage": "none",
+                  "opacity": "1",
+                  "filter": "none",
+                  "transform": "none",
+                  "mixBlendMode": "normal",
+                  "visibility": "visible",
+                  "display": "block",
+                  "position": "absolute",
+                  "pointerEvents": "auto",
+                  "boxShadow": "none",
+                  "borderRadius": "0px",
+                  "borderTopWidth": "0px",
+                  "borderRightWidth": "0px",
+                  "borderBottomWidth": "0px",
+                  "borderLeftWidth": "0px",
+                  "transitionDuration": "1e-05s",
+                  "animationName": "none"
+                },
+                "bounds": {
+                  "left": 40,
+                  "top": 8,
+                  "right": 56,
+                  "bottom": 24
+                }
+              },
+              {
+                "source": "html>body:nth-child(2)",
+                "kind": "local",
+                "phase": 1,
+                "identityValid": true,
+                "specifiedBackground": "rgb(246, 246, 248)",
+                "style": {
+                  "backgroundColor": "rgb(246, 246, 248)",
+                  "backgroundImage": "none",
+                  "opacity": "1",
+                  "filter": "none",
+                  "transform": "none",
+                  "mixBlendMode": "normal",
+                  "visibility": "visible",
+                  "display": "block",
+                  "position": "absolute",
+                  "pointerEvents": "auto",
+                  "boxShadow": "none",
+                  "borderRadius": "0px",
+                  "borderTopWidth": "0px",
+                  "borderRightWidth": "0px",
+                  "borderBottomWidth": "0px",
+                  "borderLeftWidth": "0px",
+                  "transitionDuration": "1e-05s",
+                  "animationName": "none"
+                },
+                "bounds": {
+                  "left": 40,
+                  "top": 8,
+                  "right": 56,
+                  "bottom": 24
+                }
+              },
+              {
+                "source": "html>body:nth-child(2)>div:nth-child(1)",
+                "kind": "local",
+                "phase": 1,
+                "identityValid": true,
+                "specifiedBackground": "rgba(0, 0, 0, 0)",
+                "style": {
+                  "backgroundColor": "rgba(0, 0, 0, 0)",
+                  "backgroundImage": "none",
+                  "opacity": "1",
+                  "filter": "none",
+                  "transform": "none",
+                  "mixBlendMode": "normal",
+                  "visibility": "visible",
+                  "display": "block",
+                  "position": "absolute",
+                  "pointerEvents": "auto",
+                  "boxShadow": "none",
+                  "borderRadius": "0px",
+                  "borderTopWidth": "0px",
+                  "borderRightWidth": "0px",
+                  "borderBottomWidth": "0px",
+                  "borderLeftWidth": "0px",
+                  "transitionDuration": "1e-05s",
+                  "animationName": "none"
+                },
+                "bounds": {
+                  "left": 40,
+                  "top": 8,
+                  "right": 56,
+                  "bottom": 24
+                }
+              },
+              {
+                "source": "html>body:nth-child(2)>div:nth-child(1)>div:nth-child(1)",
+                "kind": "local",
+                "phase": 1,
+                "identityValid": true,
+                "specifiedBackground": "rgb(255, 255, 255)",
+                "style": {
+                  "backgroundColor": "rgb(255, 255, 255)",
+                  "backgroundImage": "none",
+                  "opacity": "1",
+                  "filter": "none",
+                  "transform": "none",
+                  "mixBlendMode": "normal",
+                  "visibility": "visible",
+                  "display": "block",
+                  "position": "absolute",
+                  "pointerEvents": "auto",
+                  "boxShadow": "none",
+                  "borderRadius": "0px",
+                  "borderTopWidth": "0px",
+                  "borderRightWidth": "0px",
+                  "borderBottomWidth": "0px",
+                  "borderLeftWidth": "0px",
+                  "transitionDuration": "1e-05s",
+                  "animationName": "none"
+                },
+                "bounds": {
+                  "left": 40,
+                  "top": 8,
+                  "right": 56,
+                  "bottom": 24
+                }
+              },
+              {
+                "source": "html>body:nth-child(2)>div:nth-child(1)>div:nth-child(1)>article:nth-child(1)",
+                "kind": "local",
+                "phase": 1,
+                "identityValid": true,
+                "specifiedBackground": "rgb(246, 246, 248)",
+                "style": {
+                  "backgroundColor": "rgb(246, 246, 248)",
+                  "backgroundImage": "none",
+                  "opacity": "1",
+                  "filter": "none",
+                  "transform": "none",
+                  "mixBlendMode": "normal",
+                  "visibility": "visible",
+                  "display": "block",
+                  "position": "absolute",
+                  "pointerEvents": "auto",
+                  "boxShadow": "none",
+                  "borderRadius": "0px",
+                  "borderTopWidth": "0px",
+                  "borderRightWidth": "0px",
+                  "borderBottomWidth": "0px",
+                  "borderLeftWidth": "0px",
+                  "transitionDuration": "1e-05s",
+                  "animationName": "none"
+                },
+                "bounds": {
+                  "left": 40,
+                  "top": 8,
+                  "right": 56,
+                  "bottom": 24
+                }
+              },
+              {
+                "source": "html>body:nth-child(2)>div:nth-child(1)>div:nth-child(1)>article:nth-child(1)>section:nth-child(3)",
+                "kind": "local",
+                "phase": 1,
+                "identityValid": true,
+                "specifiedBackground": "rgba(0, 0, 0, 0)",
+                "style": {
+                  "backgroundColor": "rgba(0, 0, 0, 0)",
+                  "backgroundImage": "none",
+                  "opacity": "1",
+                  "filter": "none",
+                  "transform": "none",
+                  "mixBlendMode": "normal",
+                  "visibility": "visible",
+                  "display": "block",
+                  "position": "absolute",
+                  "pointerEvents": "auto",
+                  "boxShadow": "none",
+                  "borderRadius": "0px",
+                  "borderTopWidth": "0px",
+                  "borderRightWidth": "0px",
+                  "borderBottomWidth": "0px",
+                  "borderLeftWidth": "0px",
+                  "transitionDuration": "1e-05s",
+                  "animationName": "none"
+                },
+                "bounds": {
+                  "left": 40,
+                  "top": 8,
+                  "right": 56,
+                  "bottom": 24
+                }
+              },
+              {
+                "source": "html>body:nth-child(2)>div:nth-child(1)>div:nth-child(1)>article:nth-child(1)>section:nth-child(3)>section:nth-child(5)",
+                "kind": "local",
+                "phase": 1,
+                "identityValid": true,
+                "specifiedBackground": "rgb(255, 255, 255)",
+                "style": {
+                  "backgroundColor": "rgb(255, 255, 255)",
+                  "backgroundImage": "none",
+                  "opacity": "1",
+                  "filter": "none",
+                  "transform": "none",
+                  "mixBlendMode": "normal",
+                  "visibility": "visible",
+                  "display": "block",
+                  "position": "absolute",
+                  "pointerEvents": "auto",
+                  "boxShadow": "none",
+                  "borderRadius": "0px",
+                  "borderTopWidth": "0px",
+                  "borderRightWidth": "0px",
+                  "borderBottomWidth": "0px",
+                  "borderLeftWidth": "0px",
+                  "transitionDuration": "1e-05s",
+                  "animationName": "none"
+                },
+                "bounds": {
+                  "left": 40,
+                  "top": 8,
+                  "right": 56,
+                  "bottom": 24
+                }
+              },
+              {
+                "source": "html>body:nth-child(2)>div:nth-child(1)>div:nth-child(1)>article:nth-child(1)>section:nth-child(3)>section:nth-child(5)>div:nth-child(2)",
+                "kind": "local",
+                "phase": 1,
+                "identityValid": true,
+                "specifiedBackground": "rgba(0, 0, 0, 0)",
+                "style": {
+                  "backgroundColor": "rgba(0, 0, 0, 0)",
+                  "backgroundImage": "none",
+                  "opacity": "1",
+                  "filter": "none",
+                  "transform": "none",
+                  "mixBlendMode": "normal",
+                  "visibility": "visible",
+                  "display": "block",
+                  "position": "absolute",
+                  "pointerEvents": "auto",
+                  "boxShadow": "none",
+                  "borderRadius": "0px",
+                  "borderTopWidth": "0px",
+                  "borderRightWidth": "0px",
+                  "borderBottomWidth": "0px",
+                  "borderLeftWidth": "0px",
+                  "transitionDuration": "1e-05s",
+                  "animationName": "none"
+                },
+                "bounds": {
+                  "left": 40,
+                  "top": 8,
+                  "right": 56,
+                  "bottom": 24
+                }
+              },
+              {
+                "source": "html>body:nth-child(2)>div:nth-child(1)>div:nth-child(1)>article:nth-child(1)>section:nth-child(3)>section:nth-child(5)>div:nth-child(2)>div:nth-child(5)",
+                "kind": "local",
+                "phase": 1,
+                "identityValid": true,
+                "specifiedBackground": "rgba(0, 0, 0, 0)",
+                "style": {
+                  "backgroundColor": "rgba(0, 0, 0, 0)",
+                  "backgroundImage": "none",
+                  "opacity": "1",
+                  "filter": "none",
+                  "transform": "none",
+                  "mixBlendMode": "normal",
+                  "visibility": "visible",
+                  "display": "block",
+                  "position": "absolute",
+                  "pointerEvents": "auto",
+                  "boxShadow": "none",
+                  "borderRadius": "0px",
+                  "borderTopWidth": "0px",
+                  "borderRightWidth": "0px",
+                  "borderBottomWidth": "0px",
+                  "borderLeftWidth": "0px",
+                  "transitionDuration": "1e-05s",
+                  "animationName": "none"
+                },
+                "bounds": {
+                  "left": 40,
+                  "top": 8,
+                  "right": 56,
+                  "bottom": 24
+                }
+              },
+              {
+                "source": "html>body:nth-child(2)>div:nth-child(1)>div:nth-child(1)>article:nth-child(1)>section:nth-child(3)>section:nth-child(5)>div:nth-child(2)>div:nth-child(5)>table:nth-child(1)",
+                "kind": "local",
+                "phase": 1,
+                "identityValid": true,
+                "specifiedBackground": "rgb(246, 246, 248)",
+                "style": {
+                  "backgroundColor": "rgb(246, 246, 248)",
+                  "backgroundImage": "none",
+                  "opacity": "1",
+                  "filter": "none",
+                  "transform": "none",
+                  "mixBlendMode": "normal",
+                  "visibility": "visible",
+                  "display": "block",
+                  "position": "absolute",
+                  "pointerEvents": "auto",
+                  "boxShadow": "none",
+                  "borderRadius": "0px",
+                  "borderTopWidth": "0px",
+                  "borderRightWidth": "0px",
+                  "borderBottomWidth": "0px",
+                  "borderLeftWidth": "0px",
+                  "transitionDuration": "1e-05s",
+                  "animationName": "none"
+                },
+                "bounds": {
+                  "left": 40,
+                  "top": 8,
+                  "right": 56,
+                  "bottom": 24
+                }
+              },
+              {
+                "source": "html>body:nth-child(2)>div:nth-child(1)>div:nth-child(1)>article:nth-child(1)>section:nth-child(3)>section:nth-child(5)>div:nth-child(2)>div:nth-child(5)>table:nth-child(1)>tbody:nth-child(2)",
+                "kind": "local",
+                "phase": 1,
+                "identityValid": true,
+                "specifiedBackground": "rgba(0, 0, 0, 0)",
+                "style": {
+                  "backgroundColor": "rgba(0, 0, 0, 0)",
+                  "backgroundImage": "none",
+                  "opacity": "1",
+                  "filter": "none",
+                  "transform": "none",
+                  "mixBlendMode": "normal",
+                  "visibility": "visible",
+                  "display": "block",
+                  "position": "absolute",
+                  "pointerEvents": "auto",
+                  "boxShadow": "none",
+                  "borderRadius": "0px",
+                  "borderTopWidth": "0px",
+                  "borderRightWidth": "0px",
+                  "borderBottomWidth": "0px",
+                  "borderLeftWidth": "0px",
+                  "transitionDuration": "1e-05s",
+                  "animationName": "none"
+                },
+                "bounds": {
+                  "left": 40,
+                  "top": 8,
+                  "right": 56,
+                  "bottom": 24
+                }
+              },
+              {
+                "source": "html>body:nth-child(2)>div:nth-child(1)>div:nth-child(1)>article:nth-child(1)>section:nth-child(3)>section:nth-child(5)>div:nth-child(2)>div:nth-child(5)>table:nth-child(1)>tbody:nth-child(2)>tr:nth-child(2)",
+                "kind": "local",
+                "phase": 1,
+                "identityValid": true,
+                "specifiedBackground": "rgba(0, 0, 0, 0)",
+                "style": {
+                  "backgroundColor": "rgba(0, 0, 0, 0)",
+                  "backgroundImage": "none",
+                  "opacity": "1",
+                  "filter": "none",
+                  "transform": "none",
+                  "mixBlendMode": "normal",
+                  "visibility": "visible",
+                  "display": "block",
+                  "position": "absolute",
+                  "pointerEvents": "auto",
+                  "boxShadow": "none",
+                  "borderRadius": "0px",
+                  "borderTopWidth": "0px",
+                  "borderRightWidth": "0px",
+                  "borderBottomWidth": "0px",
+                  "borderLeftWidth": "0px",
+                  "transitionDuration": "1e-05s",
+                  "animationName": "none"
+                },
+                "bounds": {
+                  "left": 40,
+                  "top": 8,
+                  "right": 56,
+                  "bottom": 24
+                }
+              },
+              {
+                "source": "root-token:--danger-light",
+                "kind": "local",
+                "phase": 1,
+                "identityValid": true,
+                "specifiedBackground": "rgba(200, 90, 90, 0.1)",
+                "style": {
+                  "backgroundColor": "rgba(200, 90, 90, 0.1)",
+                  "backgroundImage": "none",
+                  "opacity": "1",
+                  "filter": "none",
+                  "transform": "none",
+                  "mixBlendMode": "normal",
+                  "visibility": "visible",
+                  "display": "block",
+                  "position": "absolute",
+                  "pointerEvents": "auto",
+                  "boxShadow": "none",
+                  "borderRadius": "0px",
+                  "borderTopWidth": "0px",
+                  "borderRightWidth": "0px",
+                  "borderBottomWidth": "0px",
+                  "borderLeftWidth": "0px",
+                  "transitionDuration": "1e-05s",
+                  "animationName": "none"
+                },
+                "bounds": {
+                  "left": 40,
+                  "top": 8,
+                  "right": 56,
+                  "bottom": 24
+                }
+              }
+            ]
+          },
+          {
+            "kind": "remote",
+            "selector": ".sync-diff-remote td:last-child",
+            "token": "--success-light",
+            "tokenOwner": "document.documentElement",
+            "tokenValue": "",
+            "paperValue": "#f6f6f8",
+            "selectedToken": "--paper",
+            "fill": "rgb(246, 246, 248)",
+            "backgrounds": [
+              {
+                "path": "html",
+                "tag": "HTML",
+                "background": "rgba(0, 0, 0, 0)"
+              },
+              {
+                "path": "html>body:nth-child(2)",
+                "tag": "BODY",
+                "background": "rgb(246, 246, 248)"
+              },
+              {
+                "path": "html>body:nth-child(2)>div:nth-child(1)",
+                "tag": "DIV",
+                "background": "rgba(0, 0, 0, 0)"
+              },
+              {
+                "path": "html>body:nth-child(2)>div:nth-child(1)>div:nth-child(1)",
+                "tag": "DIV",
+                "background": "rgb(255, 255, 255)"
+              },
+              {
+                "path": "html>body:nth-child(2)>div:nth-child(1)>div:nth-child(1)>article:nth-child(1)",
+                "tag": "ARTICLE",
+                "background": "rgb(246, 246, 248)"
+              },
+              {
+                "path": "html>body:nth-child(2)>div:nth-child(1)>div:nth-child(1)>article:nth-child(1)>section:nth-child(3)",
+                "tag": "SECTION",
+                "background": "rgba(0, 0, 0, 0)"
+              },
+              {
+                "path": "html>body:nth-child(2)>div:nth-child(1)>div:nth-child(1)>article:nth-child(1)>section:nth-child(3)>section:nth-child(5)",
+                "tag": "SECTION",
+                "background": "rgb(255, 255, 255)"
+              },
+              {
+                "path": "html>body:nth-child(2)>div:nth-child(1)>div:nth-child(1)>article:nth-child(1)>section:nth-child(3)>section:nth-child(5)>div:nth-child(2)",
+                "tag": "DIV",
+                "background": "rgba(0, 0, 0, 0)"
+              },
+              {
+                "path": "html>body:nth-child(2)>div:nth-child(1)>div:nth-child(1)>article:nth-child(1)>section:nth-child(3)>section:nth-child(5)>div:nth-child(2)>div:nth-child(5)",
+                "tag": "DIV",
+                "background": "rgba(0, 0, 0, 0)"
+              },
+              {
+                "path": "html>body:nth-child(2)>div:nth-child(1)>div:nth-child(1)>article:nth-child(1)>section:nth-child(3)>section:nth-child(5)>div:nth-child(2)>div:nth-child(5)>table:nth-child(1)",
+                "tag": "TABLE",
+                "background": "rgb(246, 246, 248)"
+              },
+              {
+                "path": "html>body:nth-child(2)>div:nth-child(1)>div:nth-child(1)>article:nth-child(1)>section:nth-child(3)>section:nth-child(5)>div:nth-child(2)>div:nth-child(5)>table:nth-child(1)>tbody:nth-child(2)",
+                "tag": "TBODY",
+                "background": "rgba(0, 0, 0, 0)"
+              },
+              {
+                "path": "html>body:nth-child(2)>div:nth-child(1)>div:nth-child(1)>article:nth-child(1)>section:nth-child(3)>section:nth-child(5)>div:nth-child(2)>div:nth-child(5)>table:nth-child(1)>tbody:nth-child(2)>tr:nth-child(3)",
+                "tag": "TR",
+                "background": "rgba(0, 0, 0, 0)"
+              }
+            ],
+            "x": 72,
+            "y": 16,
+            "bounds": {
+              "left": 64,
+              "top": 8,
+              "right": 80,
+              "bottom": 24
+            },
+            "blockers": [],
+            "sourceIdentityValid": true,
+            "exposed": true,
+            "layers": [
+              {
+                "source": "opaque-white",
+                "kind": "remote",
+                "phase": 1,
+                "identityValid": true,
+                "specifiedBackground": "rgb(255, 255, 255)",
+                "style": {
+                  "backgroundColor": "rgb(255, 255, 255)",
+                  "backgroundImage": "none",
+                  "opacity": "1",
+                  "filter": "none",
+                  "transform": "none",
+                  "mixBlendMode": "normal",
+                  "visibility": "visible",
+                  "display": "block",
+                  "position": "absolute",
+                  "pointerEvents": "auto",
+                  "boxShadow": "none",
+                  "borderRadius": "0px",
+                  "borderTopWidth": "0px",
+                  "borderRightWidth": "0px",
+                  "borderBottomWidth": "0px",
+                  "borderLeftWidth": "0px",
+                  "transitionDuration": "1e-05s",
+                  "animationName": "none"
+                },
+                "bounds": {
+                  "left": 64,
+                  "top": 8,
+                  "right": 80,
+                  "bottom": 24
+                }
+              },
+              {
+                "source": "html",
+                "kind": "remote",
+                "phase": 1,
+                "identityValid": true,
+                "specifiedBackground": "rgba(0, 0, 0, 0)",
+                "style": {
+                  "backgroundColor": "rgba(0, 0, 0, 0)",
+                  "backgroundImage": "none",
+                  "opacity": "1",
+                  "filter": "none",
+                  "transform": "none",
+                  "mixBlendMode": "normal",
+                  "visibility": "visible",
+                  "display": "block",
+                  "position": "absolute",
+                  "pointerEvents": "auto",
+                  "boxShadow": "none",
+                  "borderRadius": "0px",
+                  "borderTopWidth": "0px",
+                  "borderRightWidth": "0px",
+                  "borderBottomWidth": "0px",
+                  "borderLeftWidth": "0px",
+                  "transitionDuration": "1e-05s",
+                  "animationName": "none"
+                },
+                "bounds": {
+                  "left": 64,
+                  "top": 8,
+                  "right": 80,
+                  "bottom": 24
+                }
+              },
+              {
+                "source": "html>body:nth-child(2)",
+                "kind": "remote",
+                "phase": 1,
+                "identityValid": true,
+                "specifiedBackground": "rgb(246, 246, 248)",
+                "style": {
+                  "backgroundColor": "rgb(246, 246, 248)",
+                  "backgroundImage": "none",
+                  "opacity": "1",
+                  "filter": "none",
+                  "transform": "none",
+                  "mixBlendMode": "normal",
+                  "visibility": "visible",
+                  "display": "block",
+                  "position": "absolute",
+                  "pointerEvents": "auto",
+                  "boxShadow": "none",
+                  "borderRadius": "0px",
+                  "borderTopWidth": "0px",
+                  "borderRightWidth": "0px",
+                  "borderBottomWidth": "0px",
+                  "borderLeftWidth": "0px",
+                  "transitionDuration": "1e-05s",
+                  "animationName": "none"
+                },
+                "bounds": {
+                  "left": 64,
+                  "top": 8,
+                  "right": 80,
+                  "bottom": 24
+                }
+              },
+              {
+                "source": "html>body:nth-child(2)>div:nth-child(1)",
+                "kind": "remote",
+                "phase": 1,
+                "identityValid": true,
+                "specifiedBackground": "rgba(0, 0, 0, 0)",
+                "style": {
+                  "backgroundColor": "rgba(0, 0, 0, 0)",
+                  "backgroundImage": "none",
+                  "opacity": "1",
+                  "filter": "none",
+                  "transform": "none",
+                  "mixBlendMode": "normal",
+                  "visibility": "visible",
+                  "display": "block",
+                  "position": "absolute",
+                  "pointerEvents": "auto",
+                  "boxShadow": "none",
+                  "borderRadius": "0px",
+                  "borderTopWidth": "0px",
+                  "borderRightWidth": "0px",
+                  "borderBottomWidth": "0px",
+                  "borderLeftWidth": "0px",
+                  "transitionDuration": "1e-05s",
+                  "animationName": "none"
+                },
+                "bounds": {
+                  "left": 64,
+                  "top": 8,
+                  "right": 80,
+                  "bottom": 24
+                }
+              },
+              {
+                "source": "html>body:nth-child(2)>div:nth-child(1)>div:nth-child(1)",
+                "kind": "remote",
+                "phase": 1,
+                "identityValid": true,
+                "specifiedBackground": "rgb(255, 255, 255)",
+                "style": {
+                  "backgroundColor": "rgb(255, 255, 255)",
+                  "backgroundImage": "none",
+                  "opacity": "1",
+                  "filter": "none",
+                  "transform": "none",
+                  "mixBlendMode": "normal",
+                  "visibility": "visible",
+                  "display": "block",
+                  "position": "absolute",
+                  "pointerEvents": "auto",
+                  "boxShadow": "none",
+                  "borderRadius": "0px",
+                  "borderTopWidth": "0px",
+                  "borderRightWidth": "0px",
+                  "borderBottomWidth": "0px",
+                  "borderLeftWidth": "0px",
+                  "transitionDuration": "1e-05s",
+                  "animationName": "none"
+                },
+                "bounds": {
+                  "left": 64,
+                  "top": 8,
+                  "right": 80,
+                  "bottom": 24
+                }
+              },
+              {
+                "source": "html>body:nth-child(2)>div:nth-child(1)>div:nth-child(1)>article:nth-child(1)",
+                "kind": "remote",
+                "phase": 1,
+                "identityValid": true,
+                "specifiedBackground": "rgb(246, 246, 248)",
+                "style": {
+                  "backgroundColor": "rgb(246, 246, 248)",
+                  "backgroundImage": "none",
+                  "opacity": "1",
+                  "filter": "none",
+                  "transform": "none",
+                  "mixBlendMode": "normal",
+                  "visibility": "visible",
+                  "display": "block",
+                  "position": "absolute",
+                  "pointerEvents": "auto",
+                  "boxShadow": "none",
+                  "borderRadius": "0px",
+                  "borderTopWidth": "0px",
+                  "borderRightWidth": "0px",
+                  "borderBottomWidth": "0px",
+                  "borderLeftWidth": "0px",
+                  "transitionDuration": "1e-05s",
+                  "animationName": "none"
+                },
+                "bounds": {
+                  "left": 64,
+                  "top": 8,
+                  "right": 80,
+                  "bottom": 24
+                }
+              },
+              {
+                "source": "html>body:nth-child(2)>div:nth-child(1)>div:nth-child(1)>article:nth-child(1)>section:nth-child(3)",
+                "kind": "remote",
+                "phase": 1,
+                "identityValid": true,
+                "specifiedBackground": "rgba(0, 0, 0, 0)",
+                "style": {
+                  "backgroundColor": "rgba(0, 0, 0, 0)",
+                  "backgroundImage": "none",
+                  "opacity": "1",
+                  "filter": "none",
+                  "transform": "none",
+                  "mixBlendMode": "normal",
+                  "visibility": "visible",
+                  "display": "block",
+                  "position": "absolute",
+                  "pointerEvents": "auto",
+                  "boxShadow": "none",
+                  "borderRadius": "0px",
+                  "borderTopWidth": "0px",
+                  "borderRightWidth": "0px",
+                  "borderBottomWidth": "0px",
+                  "borderLeftWidth": "0px",
+                  "transitionDuration": "1e-05s",
+                  "animationName": "none"
+                },
+                "bounds": {
+                  "left": 64,
+                  "top": 8,
+                  "right": 80,
+                  "bottom": 24
+                }
+              },
+              {
+                "source": "html>body:nth-child(2)>div:nth-child(1)>div:nth-child(1)>article:nth-child(1)>section:nth-child(3)>section:nth-child(5)",
+                "kind": "remote",
+                "phase": 1,
+                "identityValid": true,
+                "specifiedBackground": "rgb(255, 255, 255)",
+                "style": {
+                  "backgroundColor": "rgb(255, 255, 255)",
+                  "backgroundImage": "none",
+                  "opacity": "1",
+                  "filter": "none",
+                  "transform": "none",
+                  "mixBlendMode": "normal",
+                  "visibility": "visible",
+                  "display": "block",
+                  "position": "absolute",
+                  "pointerEvents": "auto",
+                  "boxShadow": "none",
+                  "borderRadius": "0px",
+                  "borderTopWidth": "0px",
+                  "borderRightWidth": "0px",
+                  "borderBottomWidth": "0px",
+                  "borderLeftWidth": "0px",
+                  "transitionDuration": "1e-05s",
+                  "animationName": "none"
+                },
+                "bounds": {
+                  "left": 64,
+                  "top": 8,
+                  "right": 80,
+                  "bottom": 24
+                }
+              },
+              {
+                "source": "html>body:nth-child(2)>div:nth-child(1)>div:nth-child(1)>article:nth-child(1)>section:nth-child(3)>section:nth-child(5)>div:nth-child(2)",
+                "kind": "remote",
+                "phase": 1,
+                "identityValid": true,
+                "specifiedBackground": "rgba(0, 0, 0, 0)",
+                "style": {
+                  "backgroundColor": "rgba(0, 0, 0, 0)",
+                  "backgroundImage": "none",
+                  "opacity": "1",
+                  "filter": "none",
+                  "transform": "none",
+                  "mixBlendMode": "normal",
+                  "visibility": "visible",
+                  "display": "block",
+                  "position": "absolute",
+                  "pointerEvents": "auto",
+                  "boxShadow": "none",
+                  "borderRadius": "0px",
+                  "borderTopWidth": "0px",
+                  "borderRightWidth": "0px",
+                  "borderBottomWidth": "0px",
+                  "borderLeftWidth": "0px",
+                  "transitionDuration": "1e-05s",
+                  "animationName": "none"
+                },
+                "bounds": {
+                  "left": 64,
+                  "top": 8,
+                  "right": 80,
+                  "bottom": 24
+                }
+              },
+              {
+                "source": "html>body:nth-child(2)>div:nth-child(1)>div:nth-child(1)>article:nth-child(1)>section:nth-child(3)>section:nth-child(5)>div:nth-child(2)>div:nth-child(5)",
+                "kind": "remote",
+                "phase": 1,
+                "identityValid": true,
+                "specifiedBackground": "rgba(0, 0, 0, 0)",
+                "style": {
+                  "backgroundColor": "rgba(0, 0, 0, 0)",
+                  "backgroundImage": "none",
+                  "opacity": "1",
+                  "filter": "none",
+                  "transform": "none",
+                  "mixBlendMode": "normal",
+                  "visibility": "visible",
+                  "display": "block",
+                  "position": "absolute",
+                  "pointerEvents": "auto",
+                  "boxShadow": "none",
+                  "borderRadius": "0px",
+                  "borderTopWidth": "0px",
+                  "borderRightWidth": "0px",
+                  "borderBottomWidth": "0px",
+                  "borderLeftWidth": "0px",
+                  "transitionDuration": "1e-05s",
+                  "animationName": "none"
+                },
+                "bounds": {
+                  "left": 64,
+                  "top": 8,
+                  "right": 80,
+                  "bottom": 24
+                }
+              },
+              {
+                "source": "html>body:nth-child(2)>div:nth-child(1)>div:nth-child(1)>article:nth-child(1)>section:nth-child(3)>section:nth-child(5)>div:nth-child(2)>div:nth-child(5)>table:nth-child(1)",
+                "kind": "remote",
+                "phase": 1,
+                "identityValid": true,
+                "specifiedBackground": "rgb(246, 246, 248)",
+                "style": {
+                  "backgroundColor": "rgb(246, 246, 248)",
+                  "backgroundImage": "none",
+                  "opacity": "1",
+                  "filter": "none",
+                  "transform": "none",
+                  "mixBlendMode": "normal",
+                  "visibility": "visible",
+                  "display": "block",
+                  "position": "absolute",
+                  "pointerEvents": "auto",
+                  "boxShadow": "none",
+                  "borderRadius": "0px",
+                  "borderTopWidth": "0px",
+                  "borderRightWidth": "0px",
+                  "borderBottomWidth": "0px",
+                  "borderLeftWidth": "0px",
+                  "transitionDuration": "1e-05s",
+                  "animationName": "none"
+                },
+                "bounds": {
+                  "left": 64,
+                  "top": 8,
+                  "right": 80,
+                  "bottom": 24
+                }
+              },
+              {
+                "source": "html>body:nth-child(2)>div:nth-child(1)>div:nth-child(1)>article:nth-child(1)>section:nth-child(3)>section:nth-child(5)>div:nth-child(2)>div:nth-child(5)>table:nth-child(1)>tbody:nth-child(2)",
+                "kind": "remote",
+                "phase": 1,
+                "identityValid": true,
+                "specifiedBackground": "rgba(0, 0, 0, 0)",
+                "style": {
+                  "backgroundColor": "rgba(0, 0, 0, 0)",
+                  "backgroundImage": "none",
+                  "opacity": "1",
+                  "filter": "none",
+                  "transform": "none",
+                  "mixBlendMode": "normal",
+                  "visibility": "visible",
+                  "display": "block",
+                  "position": "absolute",
+                  "pointerEvents": "auto",
+                  "boxShadow": "none",
+                  "borderRadius": "0px",
+                  "borderTopWidth": "0px",
+                  "borderRightWidth": "0px",
+                  "borderBottomWidth": "0px",
+                  "borderLeftWidth": "0px",
+                  "transitionDuration": "1e-05s",
+                  "animationName": "none"
+                },
+                "bounds": {
+                  "left": 64,
+                  "top": 8,
+                  "right": 80,
+                  "bottom": 24
+                }
+              },
+              {
+                "source": "html>body:nth-child(2)>div:nth-child(1)>div:nth-child(1)>article:nth-child(1)>section:nth-child(3)>section:nth-child(5)>div:nth-child(2)>div:nth-child(5)>table:nth-child(1)>tbody:nth-child(2)>tr:nth-child(3)",
+                "kind": "remote",
+                "phase": 1,
+                "identityValid": true,
+                "specifiedBackground": "rgba(0, 0, 0, 0)",
+                "style": {
+                  "backgroundColor": "rgba(0, 0, 0, 0)",
+                  "backgroundImage": "none",
+                  "opacity": "1",
+                  "filter": "none",
+                  "transform": "none",
+                  "mixBlendMode": "normal",
+                  "visibility": "visible",
+                  "display": "block",
+                  "position": "absolute",
+                  "pointerEvents": "auto",
+                  "boxShadow": "none",
+                  "borderRadius": "0px",
+                  "borderTopWidth": "0px",
+                  "borderRightWidth": "0px",
+                  "borderBottomWidth": "0px",
+                  "borderLeftWidth": "0px",
+                  "transitionDuration": "1e-05s",
+                  "animationName": "none"
+                },
+                "bounds": {
+                  "left": 64,
+                  "top": 8,
+                  "right": 80,
+                  "bottom": 24
+                }
+              },
+              {
+                "source": "root-token:--paper",
+                "kind": "remote",
+                "phase": 1,
+                "identityValid": true,
+                "specifiedBackground": "rgb(246, 246, 248)",
+                "style": {
+                  "backgroundColor": "rgb(246, 246, 248)",
+                  "backgroundImage": "none",
+                  "opacity": "1",
+                  "filter": "none",
+                  "transform": "none",
+                  "mixBlendMode": "normal",
+                  "visibility": "visible",
+                  "display": "block",
+                  "position": "absolute",
+                  "pointerEvents": "auto",
+                  "boxShadow": "none",
+                  "borderRadius": "0px",
+                  "borderTopWidth": "0px",
+                  "borderRightWidth": "0px",
+                  "borderBottomWidth": "0px",
+                  "borderLeftWidth": "0px",
+                  "transitionDuration": "1e-05s",
+                  "animationName": "none"
+                },
+                "bounds": {
+                  "left": 64,
+                  "top": 8,
+                  "right": 80,
+                  "bottom": 24
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "runningAnimations": [],
+      "runningAnimationCount": 0,
+      "windowVisible": true,
+      "settled": false,
+      "stableSamples": 0,
+      "capture": {
+        "complete": false,
+        "capturePhase": 1,
+        "stableSamples": 0,
+        "before": null,
+        "after": null,
+        "error": "AssertionError [ERR_ASSERTION]: Three original stable frames are required before capture\n    at captureDiffFrame (D:\\a\\Local-Notepad\\Local-Notepad\\scripts\\sync-diff-render-capture.cjs:296:12)\n    at capture (D:\\a\\Local-Notepad\\Local-Notepad\\scripts\\check-sync-conflict-diff-render.cjs:189:28)\n    at async D:\\a\\Local-Notepad\\Local-Notepad\\scripts\\check-sync-conflict-diff-render.cjs:207:5",
+        "diagnosticOnly": true
+      }
+    }
+  ],
+  "complete": false,
+  "phase": "light-1200",
+  "error": "Error: Diff screenshot did not match its observations: AssertionError [ERR_ASSERTION]: Three original stable frames are required before capture\n    at captureDiffFrame (D:\\a\\Local-Notepad\\Local-Notepad\\scripts\\sync-diff-render-capture.cjs:296:12)\n    at capture (D:\\a\\Local-Notepad\\Local-Notepad\\scripts\\check-sync-conflict-diff-render.cjs:189:28)\n    at async D:\\a\\Local-Notepad\\Local-Notepad\\scripts\\check-sync-conflict-diff-render.cjs:207:5\n    at capture (D:\\a\\Local-Notepad\\Local-Notepad\\scripts\\check-sync-conflict-diff-render.cjs:201:35)\n    at async D:\\a\\Local-Notepad\\Local-Notepad\\scripts\\check-sync-conflict-diff-render.cjs:207:5"
+}

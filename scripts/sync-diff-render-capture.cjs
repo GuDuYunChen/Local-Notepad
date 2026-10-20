@@ -66,6 +66,9 @@ function diffCSSReferences(action, phase) {
       animationName: 'none', pointerEvents: 'auto', visibility: 'visible' }
     Object.assign(root.style, cleanStyle, { position: 'fixed', left: '40px', top: '8px', width: '40px',
       backgroundColor: 'transparent', zIndex: '2147483646', isolation: 'isolate' })
+    // Keep only fixture references at the exact static duration, including when
+    // the production reduced-motion stylesheet declares an important duration.
+    root.style.setProperty('transition-duration', '0s', 'important')
     const entries = sources.map((source, index) => {
       const spec = source.expected
       const definitions = [{ source: 'opaque-white', background: 'rgb(255, 255, 255)' },
@@ -76,6 +79,7 @@ function diffCSSReferences(action, phase) {
         const node = document.createElement('div')
         node.dataset.kind = spec.kind; node.dataset.source = definition.source; node.dataset.phase = String(phase)
         Object.assign(node.style, cleanStyle, { left: ordinal === 0 ? index * 24 + 'px' : '0px', backgroundColor: definition.background })
+        node.style.setProperty('transition-duration', '0s', 'important')
         parent.append(node); parent = node; return node
       })
       return { layers }

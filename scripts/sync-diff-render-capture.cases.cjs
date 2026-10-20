@@ -9,6 +9,8 @@ const { EventEmitter } = require('node:events')
 const { JSDOM } = require('jsdom')
 const { diffCSSReferences, validateCSSReferences, createDiffCaptureGate, verifyDiffRaster, verifyDiffCSSRaster,
   validateDiffCapture, captureDiffFrame, loadDiffWindow } = require('./sync-diff-render-capture.cjs')
+const { createDiffFrameGate } = require('./sync-diff-render-frame.cjs')
+const { verifyRasterWitness } = require('./sync-clock-raster-evidence.cjs')
 const hash = bytes => createHash('sha256').update(bytes).digest('hex')
 
 function readArchivedDiffFiles(directory) {
@@ -137,6 +139,42 @@ function referenceDOM() {
   return { window, document, invoke, close: () => window.close() }
 }
 
+// Replay ONLY the observed Windows transition-duration cascade. JSDOM drops
+// this longhand's !important priority and does not render media queries/PNGs;
+// its computed style cannot prove Chromium behavior. Keep real DOM preparation,
+// record the inline declarations, and select between the actual product rule
+// and the archived computed value. Other properties use the existing fixture.
+function reducedMotionReplay() {
+  const dom = referenceDOM(), declarations = new WeakMap()
+  const css = fs.readFileSync(path.join(__dirname, '../src/styles/redesign.css'), 'utf8')
+  const rule = /@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{\s*\*,\s*\*::before,\s*\*::after\s*\{([^}]+)\}/.exec(css)
+  assert.ok(rule, 'The actual universal reduced-motion rule is required by this replay')
+  const duration = /transition-duration:\s*([\d.]+)ms\s*!important\s*;/.exec(rule[1])
+  assert.ok(duration, 'The production transition-duration rule must retain its important priority')
+  const files = readArchivedDiffFiles(path.join(__dirname, 'fixtures/sync-diff-capture-b65a489'))
+  const archivedDuration = JSON.parse(files['checks.json']).reports[0].cssReferences.rootStyle.transitionDuration
+  assert.equal(Number(archivedDuration.slice(0, -1)), Number(duration[1]) / 1000)
+  const createElement = dom.document.createElement.bind(dom.document)
+  dom.document.createElement = (...args) => {
+    const node = createElement(...args), setProperty = node.style?.setProperty.bind(node.style)
+    if (setProperty) node.style.setProperty = (name, value, priority) => {
+      if (name === 'transition-duration') declarations.set(node.style, { value, priority })
+      return setProperty(name, value, priority)
+    }
+    return node
+  }
+  let reduced = false
+  const computed = dom.window.getComputedStyle.bind(dom.window)
+  dom.window.getComputedStyle = node => {
+    const style = computed(node)
+    if (!reduced || !(node.id === 'diff-css-references' || node.closest('#diff-css-references'))) return style
+    const inline = declarations.get(node.style)
+    return new Proxy(style, { get: (target, key) => key === 'transitionDuration'
+      ? inline?.priority === 'important' ? inline.value : archivedDuration : Reflect.get(target, key, target) })
+  }
+  return { ...dom, setReduced: value => { reduced = value }, archivedDuration }
+}
+
 function registerDiffCaptureTests(test, originalFrame) {
   const frame = (phase = 1) => {
     const value = { ...originalFrame(), theme: phase === 1 ? 'light' : 'dark', capturePhase: phase, visibility: 'visible', windowVisible: true,
@@ -207,6 +245,76 @@ function registerDiffCaptureTests(test, originalFrame) {
       assert.deepEqual(fs.readFileSync(path.join(directory, 'light-1200.png')),
         fs.readFileSync(path.join(__dirname, 'fixtures/sync-diff-capture-bed26f7/light-1200.png')))
     }, 'sync-diff-capture-bed26f7')
+  })
+  test('the unchanged b65 Windows frame retains its exact reduced-motion rejection and failed capture', () => {
+    const files = readArchivedDiffFiles(path.join(__dirname, 'fixtures/sync-diff-capture-b65a489'))
+    const report = JSON.parse(files['checks.json']), observed = report.reports[0]
+    assert.equal(report.commit, 'b65a489cd625e2793c01c64e9c9b014341099c64'); assert.equal(report.complete, false)
+    assert.equal(observed.stableSamples, 0); assert.equal(observed.capture.complete, false)
+    assert.equal(observed.capture.before, null); assert.equal(observed.capture.after, null)
+    assert.match(observed.capture.error, /Three original stable frames are required/)
+    const original = createDiffFrameGate(), capture = createDiffCaptureGate()
+    for (let samples = 1; samples <= 3; samples++) {
+      // Repetitions of one archived frame test predicates, not historical stability.
+      assert.deepEqual(original.observe(observed), { ready: samples === 3, samples })
+      assert.deepEqual(capture.observe(observed), { ready: false, samples: 0 })
+    }
+    const styles = [observed.cssReferences.rootStyle, ...observed.cssReferences.references.flatMap(entry => entry.layers.map(layer => layer.style))]
+    assert.equal(styles.length, 29); assert.ok(styles.every(style => style.transitionDuration === '1e-05s'))
+    assert.throws(() => validateCSSReferences(observed), error => {
+      assert.equal(error.actual.transitionDuration, '1e-05s'); assert.equal(error.expected.transitionDuration, '0s')
+      assert.deepEqual({ ...error.actual, transitionDuration: '0s' }, error.expected); return true
+    })
+    assert.throws(() => verifyDiffCSSRaster(files['light-1200.png'], observed), /CSS reference paint style changed/)
+    assert.equal(verifyRasterWitness(files['light-1200.png'], 1), true)
+    assert.throws(() => verifyRasterWitness(files['light-1200.png'], 2), /raster phase marker/)
+  })
+  test('the b65 archive keeps original bytes under LF and CRLF and rejects a checkout without its own attribute', t => {
+    for (const autocrlf of [false, true]) archivedDiffCheckout(autocrlf, true, (directory, evidence) => {
+      t.diagnostic(JSON.stringify(evidence)); readArchivedDiffFiles(directory)
+    }, 'sync-diff-capture-b65a489')
+    archivedDiffCheckout(true, false, (directory, evidence) => {
+      t.diagnostic(JSON.stringify(evidence)); assert.throws(() => readArchivedDiffFiles(directory))
+      assert.deepEqual(fs.readFileSync(path.join(directory, 'light-1200.png')),
+        fs.readFileSync(path.join(__dirname, 'fixtures/sync-diff-capture-b65a489/light-1200.png')))
+    }, 'sync-diff-capture-b65a489')
+  })
+  test('serialized references retain exact zero-duration paint in every phase of the archived reduced-motion cascade replay', () => {
+    const dom = reducedMotionReplay()
+    try {
+      const product = [...dom.document.querySelectorAll('html,body,main,table,tr,td,pre')]
+      const productStyles = product.map(node => node.getAttribute('style'))
+      const productText = dom.document.querySelector('table').textContent
+      for (const reduced of [false, true]) for (const phase of [1, 2, 3, 4]) {
+        dom.setReduced(reduced); dom.document.documentElement.dataset.theme = phase === 1 ? 'light' : 'dark'
+        const references = dom.invoke('prepare', phase), observed = { ...frame(phase), cssReferences: references }
+        observed.viewport.width = phase <= 2 ? 1200 : 560
+        validateCSSReferences(observed)
+        const gate = createDiffCaptureGate()
+        for (let samples = 1; samples <= 3; samples++) assert.deepEqual(gate.observe(observed), { ready: samples === 3, samples })
+        assert.deepEqual(dom.invoke('inspect', phase), references)
+        assert.equal(dom.document.querySelector('#diff-css-references').getAttribute('aria-hidden'), 'true')
+      }
+      assert.deepEqual(product.map(node => node.getAttribute('style')), productStyles)
+      assert.equal(dom.document.querySelector('table').textContent, productText)
+    } finally { dom.close() }
+  })
+  test('removing inline priority restores the archived reduced-motion rejection and requires three fresh stable frames', () => {
+    const dom = reducedMotionReplay()
+    try {
+      dom.setReduced(true); dom.invoke('prepare')
+      const observed = () => ({ ...frame(), cssReferences: dom.invoke('inspect') }), gate = createDiffCaptureGate()
+      for (let samples = 1; samples <= 3; samples++) assert.deepEqual(gate.observe(observed()), { ready: samples === 3, samples })
+      for (const selector of ['#diff-css-references', '[data-kind="local"]', '[data-kind="remote"]']) {
+        const node = dom.document.querySelector(selector)
+        node.style.setProperty('transition-duration', '0s', '')
+        assert.equal(dom.window.getComputedStyle(node).transitionDuration, dom.archivedDuration)
+        assert.throws(() => validateCSSReferences(observed()), /CSS reference paint style changed/)
+        assert.deepEqual(gate.observe(observed()), { ready: false, samples: 0 })
+        node.style.setProperty('transition-duration', '0s', 'important')
+        for (let samples = 1; samples <= 3; samples++) assert.deepEqual(gate.observe(observed()), { ready: samples === 3, samples })
+      }
+    } finally { dom.close() }
   })
   test('serialized CSS preparation uses independent root tokens and ancestor layers without a Node closure', () => {
     const dom = referenceDOM()
