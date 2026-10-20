@@ -28,6 +28,8 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Ensure lock was not modified
         run: git diff --exit-code -- package.json package-lock.json
+      - name: Build canonical reading fixture before refusal contracts
+        run: node scripts/build-reading-mode-fixture.mjs
       - name: Refuse missing reading gates and prove complete original preparation
         run: node --test scripts/reading-mode-desktop-evidence.node.mjs scripts/reading-mode-installed-evidence.node.mjs scripts/reading-mode-native-input.node.mjs scripts/desktop-window-session.node.mjs
       - name: Resolve only complete source and binary pins
