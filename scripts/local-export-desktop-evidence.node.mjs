@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { EventEmitter } from 'node:events'
 import { PassThrough, Writable } from 'node:stream'
 import { mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync, lstatSync, symlinkSync } from 'node:fs'
+import { realpath as realpathAsync } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { Script } from 'node:vm'
@@ -264,12 +265,12 @@ test('canonical export fixture uses actual production nodes and stable Lexical s
 })
 
 async function actualOutputFixture(directory) {
-  // Core output receipts use canonical filesystem paths. Normalize the created
-  // fixture roots as well, including Windows 8.3 names and owned junctions,
-  // before deriving either output receipts or the retained file manifest.
-  directory = realpathSync(directory)
+  // Match the core's native realpath operation: the default sync implementation
+  // resolves links but preserves Windows 8.3 directory aliases. Canonicalize
+  // both roots before mapping native receipts into the retained file manifest.
+  directory = realpathSync.native(directory)
   const report = fixture(), exportDirectory = path.join(directory, 'local-export-files'); mkdirSync(exportDirectory)
-  const root = realpathSync(exportDirectory)
+  const root = realpathSync.native(exportDirectory)
   const apiResponse = value => new Response(JSON.stringify({ code: 0, data: value }), { headers: { 'content-type': 'application/json' } })
   for (const [label, count, format] of [['markdown', 3, 'markdown'], ['partial', 3, 'markdown'], ['word', 3, 'docx'], ['cancelled', 100, 'docx']]) {
     const parent = { id: count === 100 ? 'folder-cancel' : 'folder-main', title: '目录', is_folder: true, parent_id: '' }
@@ -379,9 +380,13 @@ test('raw output fixture canonicalizes an owned directory alias before mapping r
   const directory = path.join(parent, 'actual'), alias = path.join(parent, 'alias'); mkdirSync(directory)
   symlinkSync(directory, alias, 'junction')
   assert.notEqual(path.resolve(alias), realpathSync(alias)); assert.equal(realpathSync(alias), realpathSync(directory))
+  const canonicalDirectory = await realpathAsync(directory)
+  assert.equal(realpathSync.native(directory), canonicalDirectory)
+  assert.equal(realpathSync.native(alias), canonicalDirectory)
+  assert.equal(await realpathAsync(alias), canonicalDirectory)
   const report = await actualOutputFixture(alias)
   const output = report.files.find(file => file.filename.endsWith('.docx')); assert.ok(output)
-  const canonicalFile = realpathSync(path.join(alias, output.filename)), lexicalRelative = path.relative(alias, canonicalFile)
+  const canonicalFile = await realpathAsync(path.join(alias, output.filename)), lexicalRelative = path.relative(alias, canonicalFile)
   assert.ok(lexicalRelative.startsWith('..' + path.sep), 'The fixture must exercise an actual filesystem alias')
   t.diagnostic('Owned alias resolves to the same root while lexical mapping escapes: ' + lexicalRelative)
   assert.equal((await verifyLocalExportDesktopReport(alias, HEAD)).complete, true)

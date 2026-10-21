@@ -32,7 +32,7 @@ function makePlan(ids = ['note-1'], format = 'markdown') {
 }
 
 function harness(overrides = {}) {
-  const directory = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-export-bridge-test-')))
+  const directory = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-export-bridge-test-')))
   const contents = new EventEmitter(), owner = new EventEmitter(), frame = { url: 'http://localhost:5000/' }
   contents.mainFrame = frame; contents.getURL = () => frame.url; contents.isDestroyed = () => false
   owner.webContents = contents; owner.isDestroyed = () => false
@@ -270,13 +270,14 @@ describe('native export workspace authority and lifetime', () => {
   })
 
   it('normalizes a temporary-root directory alias for native reveal and save receipts', async () => {
-    const owner = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-export-alias-owner-')))
+    const owner = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-export-alias-owner-')))
     dispose.push(() => fs.rmSync(owner, { recursive: true, force: true }))
     const physical = path.join(owner, 'physical-temporary-root'), alias = path.join(owner, 'temporary-root-alias')
     fs.mkdirSync(physical)
     fs.symlinkSync(physical, alias, process.platform === 'win32' ? 'junction' : 'dir')
     vi.spyOn(os, 'tmpdir').mockReturnValue(alias)
     const h = harness(), plan = await h.ready()
+    expect(h.directory).toBe(await fs.promises.realpath(h.directory))
     expect((await h.call('reveal', { planId: plan.planId })).success).toBe(true)
     expect(h.shell.openPath).toHaveBeenLastCalledWith(h.directory)
     const selected = path.join(h.directory, 'chosen.md')
