@@ -1,0 +1,23 @@
+{
+  "product": "b6ad9c63587a7af0625c94a7ebe0b2c23e69ca6f",
+  "quickBlob": "c1e8f40862b770f82af47c26a455b57efc853700",
+  "tagsBlob": "54bb56864e58e2aa3f5ed08aedb52a00de5f0769",
+  "templateBlob": "42378f13f71a03c3e91cdfdcb6dec44dbbb05f33",
+  "backlinksBlob": "1d2092c29521962556e8f69e1a44ce693a71f544",
+  "searchBlob": "260743d8676cfc4f896e5a80ad4705337f8ccbde",
+  "outlineBlob": "0b8bc518c9d34102528c75ffdbd39d53d1394c2a",
+  "graphBlob": "70014eb8fc8d94c08898d62faa49e92e547bce4e",
+  "current": {
+    "version": "4.231.2",
+    "bytes": 104320482,
+    "sha256": "5327515821f06c1d471ed038a32e14d02a178e9eebdff7899f94f437512f8c71"
+  },
+  "previous": {
+    "version": "4.230.1",
+    "bytes": 104305659,
+    "sha256": "014fb36c61710ef010216f5958c3d7eef427926503447726529d805f52925a62"
+  },
+  "pinsBlob": "7abf0331d1b3a7c1b626e7c2e2b5f68d6a77c588",
+  "recentBlob": "cbe5a8897c082210363357fd33f2cb0f3d7bd1cc",
+  "wikiBlob": "8cb64e31bf79c3ec2b17d5b8c152eccc0f2de6ca"
+}

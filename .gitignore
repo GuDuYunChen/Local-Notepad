@@ -41,3 +41,12 @@ src/public/brand/
 # Canonical native-reading test fixture, rebuilt from production node classes
 scripts/reading-mode-desktop-fixture.bundle.mjs
 scripts/local-export-desktop-fixture.bundle.mjs
+
+# Generated installation verifier sources
+scripts/reading-import-validator.mjs
+scripts/reading-import-desktop-validator.mjs
+scripts/reading-import-desktop-validator.node.mjs
+scripts/reading-import-desktop-driver.mjs
+scripts/pin-reading-import-generated.mjs
+scripts/run-reading-import-generated.mjs
+scripts/check-windows-installer-lifecycle.reading-mode.mjs

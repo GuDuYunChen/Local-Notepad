@@ -1,0 +1,16 @@
+{
+  "product": "8925c2097e74ce6720dc29b3c2ddd1b5038c3fc5",
+  "quickBlob": "c1e8f40862b770f82af47c26a455b57efc853700",
+  "tagsBlob": "bdeb1996ee94c327a65a6a224265e495861339d2",
+  "templateBlob": "42378f13f71a03c3e91cdfdcb6dec44dbbb05f33",
+  "current": {
+    "version": "4.224.0",
+    "bytes": 104250246,
+    "sha256": "e3a3e3b469e463215b06f569a9dc520bde0fe6b6a7d715acddf48a810433ff87"
+  },
+  "previous": {
+    "version": "4.223.0",
+    "bytes": 104241152,
+    "sha256": "a1a5fd0adf94c1a825bbd8b8bcf8f59af19391557354681107715d978664b88c"
+  }
+}

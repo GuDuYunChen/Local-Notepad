@@ -1,0 +1,51 @@
+{
+  "product": "d3f47277a6a148bf62e50f22b3bf068819a7e1fe",
+  "quickBlob": "c1e8f40862b770f82af47c26a455b57efc853700",
+  "tagsBlob": "54bb56864e58e2aa3f5ed08aedb52a00de5f0769",
+  "templateBlob": "42378f13f71a03c3e91cdfdcb6dec44dbbb05f33",
+  "backlinksBlob": "1d2092c29521962556e8f69e1a44ce693a71f544",
+  "searchBlob": "260743d8676cfc4f896e5a80ad4705337f8ccbde",
+  "outlineBlob": "0b8bc518c9d34102528c75ffdbd39d53d1394c2a",
+  "graphBlob": "70014eb8fc8d94c08898d62faa49e92e547bce4e",
+  "pinsBlob": "7abf0331d1b3a7c1b626e7c2e2b5f68d6a77c588",
+  "recentBlob": "cbe5a8897c082210363357fd33f2cb0f3d7bd1cc",
+  "wikiBlob": "8cb64e31bf79c3ec2b17d5b8c152eccc0f2de6ca",
+  "importBlob": "a3fa709546eee99e76538f8cd125a77bdbc823d1",
+  "importFixtureBlob": "022e484ef96e8a2dd6b2f57601bda8af29869666",
+  "importEvidenceBlob": "801a7e2d33c0ffe3d6dcd05287fb0b595822ce2b",
+  "importEvidenceTestsBlob": "754f1cb656c2a5cd4fb7acf10b84205a623261fc",
+  "current": {
+    "version": "4.234.0",
+    "bytes": 104348287,
+    "sha256": "62cc2acb45ef5e5cc08fc53f7129d9a966298e36076901ebcc007860b54c8dd1"
+  },
+  "previous": {
+    "version": "4.232.0",
+    "bytes": 104335681,
+    "sha256": "3b1b743a61e3dd7a13c5642f7310e68f7ba2bd912d0f98f6b8c1d7e2f7707e9e"
+  },
+  "previousSource": {
+    "run": 39092212511,
+    "artifact": 12123865208,
+    "name": "local-notepad-windows-1a8e17ba775312c359f4ac23851c8c365b57a9cb"
+  },
+  "currentSource": {
+    "run": 39535161608,
+    "artifact": 12317154285,
+    "name": "local-notepad-windows-d3f47277a6a148bf62e50f22b3bf068819a7e1fe"
+  },
+  "readingDriverBlob": "6924b128c1125424c91f71dbd1ecc415762e2f77",
+  "readingFixtureBlob": "0c7ffadbb187dd33a7bc6b5aa8c69427eec5cc34",
+  "readingEvidenceBlob": "6242b0374c345f3cfe9454c711acbdcef718617d",
+  "readingBuilderBlob": "fbc7ead7bf8a6f765c00619920778b9aac1c8c8a",
+  "readingInputBlob": "b69a1d282926cb7cc40375d58feeea7970a33a4d",
+  "readingWindowSessionBlob": "5905369c693500e6b68e506bbf1dac0601922449",
+  "readingWindowTargetBlob": "a5e0f1e055fddb632723baec67ec09610e58a04d",
+  "readingWindowWorkerBlob": "95f9ced7a00787536606e4bc846bf8ceeaf5fee0",
+  "historyDriverBlob": "cca9480ce41883f1f64fc37bbc655e5f5c51582b",
+  "shortcutManagementDriverBlob": "a728dd1e03bc75eecec1aa85df5d33085066751d",
+  "shortcutManagementRunnerBlob": "0fada01b2c802b0299c2c606a0004c4657f0e1c2",
+  "shortcutManagementEvidenceBlob": "c415d910b9b7bf085d22b83b71ee11017cf35c20",
+  "shortcutManagementFixtureBlob": "eb49f859eb9c9b51f8c31d3354f81231c647fb87",
+  "shortcutManagementCanonicalFixtureBlob": "f86598e0d552a5d884eff9e30739617366c685c9"
+}

@@ -1,0 +1,14 @@
+{
+  "product": "89b99b57bf021315752e6809ec684a5d8d0dc3b0",
+  "quickBlob": "c1e8f40862b770f82af47c26a455b57efc853700",
+  "current": {
+    "version": "4.223.0",
+    "bytes": 104241152,
+    "sha256": "a1a5fd0adf94c1a825bbd8b8bcf8f59af19391557354681107715d978664b88c"
+  },
+  "previous": {
+    "version": "4.222.3",
+    "bytes": 104247187,
+    "sha256": "fcfd696fca085b61eed80f7331e81b57167c56e28548b5ca849f323f0f9cd037"
+  }
+}

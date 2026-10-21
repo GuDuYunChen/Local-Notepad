@@ -1,0 +1,21 @@
+import {test} from 'node:test'
+import assert from 'node:assert/strict'
+import {DOCUMENT_SEARCH_CHECKS,validateInstalledDocumentSearch,prepareDocumentSearchInstallation} from './document-search-installed-evidence.mjs'
+const verifier='a'.repeat(40),product='b'.repeat(40),source='c'.repeat(40)
+function fixture(){
+ const pin={product,searchBlob:source,current:{version:'4.226.0',bytes:104272851,sha256:'d'.repeat(64)},previous:{version:'4.225.0',bytes:104270822,sha256:'e'.repeat(64)}}
+ return {pin,report:{productCommit:product,verifierCommit:verifier,complete:true,cleanupComplete:true,syntheticData:true,usedDefaultDataPath:true,forceTerminated:false,platform:'win32',runnerEnvironment:'github-hosted',installers:structuredClone({current:pin.current,previous:pin.previous}),documentSearchSource:{productCommit:product,sha:source},checks:['installed-app-document-search-workflow']},search:{commit:verifier,complete:true,realPackagedApp:true,realBackend:true,syntheticData:true,checks:[...DOCUMENT_SEARCH_CHECKS],screenshots:[{filename:'document-search-installed.png',bytes:200,sha256:'f'.repeat(64)}]}}
+}
+const verify=f=>validateInstalledDocumentSearch(f.report,f.search,f.pin,verifier)
+test('source-bound installed document search evidence accepted without mutation',()=>{const f=fixture(),old=structuredClone(f);assert.equal(verify(f),true);assert.deepEqual(f,old)})
+for(const[label,change]of[
+ ['wrong product',f=>f.report.productCommit='1'.repeat(40)],['wrong verifier',f=>f.report.verifierCommit='1'.repeat(40)],
+ ['incomplete installation',f=>f.report.complete=false],['unclean exit',f=>f.report.cleanupComplete=false],['user data',f=>f.report.syntheticData=false],['alternate data path',f=>f.report.usedDefaultDataPath=false],['forced exit',f=>f.report.forceTerminated=true],['wrong platform',f=>f.report.platform='linux'],['self hosted',f=>f.report.runnerEnvironment='self-hosted'],
+ ['old installer',f=>f.report.installers.current.version='4.225.0'],['wrong installer size',f=>f.report.installers.current.bytes++],['wrong installer digest',f=>f.report.installers.current.sha256='0'.repeat(64)],['wrong previous installer',f=>f.report.installers.previous.version='4.224.0'],['missing installer',f=>delete f.report.installers.current],
+ ['missing installation checkpoint',f=>f.report.checks=[]],['duplicate installation checkpoint',f=>f.report.checks.push('installed-app-document-search-workflow')],['missing source binding',f=>delete f.report.documentSearchSource],['different source binding',f=>f.report.documentSearchSource.sha='0'.repeat(40)],['different source product',f=>f.report.documentSearchSource.productCommit='0'.repeat(40)],
+ ['missing module',f=>delete f.search],['different module run',f=>f.search.commit='0'.repeat(40)],['unfinished module',f=>f.search.complete=false],['fake app',f=>f.search.realPackagedApp=false],['fake backend',f=>f.search.realBackend=false],['non fixture data',f=>f.search.syntheticData=false],
+ ['missing case',f=>f.search.checks.pop()],['duplicate case',f=>f.search.checks[1]=f.search.checks[0]],['reordered cases',f=>f.search.checks.reverse()],['undo omitted',f=>f.search.checks=f.search.checks.filter(x=>x!=='single-original-undo-restores-bulk-edit')],['cancel omitted',f=>f.search.checks=f.search.checks.filter(x=>x!=='bulk-replacement-cancel-preserves-body')],
+ ['missing screenshot',f=>f.search.screenshots=[]],['duplicate screenshot',f=>f.search.screenshots.push({...f.search.screenshots[0]})],['path traversal',f=>f.search.screenshots[0].filename='../document-search-installed.png'],['empty image',f=>f.search.screenshots[0].bytes=0],['invalid image digest',f=>f.search.screenshots[0].sha256='invalid'],
+ ['bad pin identity',f=>f.pin.product='bad'],['bad pin source',f=>f.pin.searchBlob='bad'],['bad pin version',f=>f.pin.current.version='4.225.0'],['bad previous pin version',f=>f.pin.previous.version='4.224.0'],['bad pin size',f=>f.pin.current.bytes=0],['bad pin digest',f=>f.pin.current.sha256='invalid'],
+])test('refuses '+label,()=>{const f=fixture();change(f);assert.throws(()=>verify(f))})
+test('unrecognized installer source cannot be transformed',()=>assert.throws(()=>prepareDocumentSearchInstallation('wrong','wrong',{searchBlob:source,backlinksBlob:source,tagsBlob:source,quickBlob:source})))
