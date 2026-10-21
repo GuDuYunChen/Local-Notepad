@@ -47,3 +47,4 @@ scripts/reading-import-desktop-driver.mjs
 scripts/pin-reading-import-generated.mjs
 scripts/run-reading-import-generated.mjs
 scripts/check-windows-installer-lifecycle.reading-mode.mjs
+scripts/local-export-desktop-fixture.bundle.mjs

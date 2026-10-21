@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { assertHostedWindows } from './installer-lifecycle-core.mjs'
 import { validateReadingModePin } from './reading-mode-installed-evidence.mjs'
 import { prepareShortcutManagementVerifierSources, validateShortcutManagementInstallerPin } from './shortcut-management-installed-evidence.mjs'
+import { prepareLocalExportVerifierSources, validateLocalExportInstallerPin } from './local-export-installed-evidence.mjs'
 import { buildReadingModeFixture } from './build-reading-mode-fixture.mjs'
 
 const blob = source => createHash('sha1').update('blob ' + Buffer.byteLength(source) + '\0').update(source).digest('hex')
@@ -25,6 +26,7 @@ export function validateReadingArtifact(pin, which, artifact) {
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const pin = JSON.parse(readFileSync(new URL('./reading-mode-installer-pin.json', import.meta.url), 'utf8'))
   validateShortcutManagementInstallerPin(pin)
+  validateLocalExportInstallerPin(pin)
   const command = process.argv[2]
   const out = path.resolve('test-results/installer-lifecycle')
   if (command === 'outputs') {
@@ -56,7 +58,10 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     assert.equal(metadata.productCommit, pin.product); assert.equal(metadata.verifierCommit, process.env.GITHUB_SHA)
     assert.equal(metadata.exactArtifactMetadataVerified, true)
     for (const which of ['previous', 'current']) validateReadingArtifact(pin, which, metadata.metadata[which])
-    const generated = prepareShortcutManagementVerifierSources(pin, name => readFileSync(new URL('./' + name, import.meta.url), 'utf8'))
+    const inherited = prepareShortcutManagementVerifierSources(pin, name => readFileSync(new URL('./' + name, import.meta.url), 'utf8'))
+    const generated = prepareLocalExportVerifierSources(pin, name => readFileSync(new URL('./' + name, import.meta.url), 'utf8'))
+    assert.equal(generated.length, inherited.length)
+    for (const [index, item] of inherited.entries()) assert.equal(generated[index].original, item.original)
     mkdirSync(out, { recursive: true })
     for (const item of generated) {
       writeFileSync(new URL('./' + item.output, import.meta.url), item.pinned, { flag: 'wx' })
