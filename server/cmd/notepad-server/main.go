@@ -29,6 +29,11 @@ func configureDatabasePool(db *sql.DB) {
 	db.SetMaxIdleConns(1)
 }
 
+func configureLocalServerAddress(s *ghttp.Server, port int) {
+	// SetPort replaces GoFrame's Address; keep the host and port in one binding.
+	s.SetAddr("127.0.0.1:" + strconv.Itoa(port))
+}
+
 func applySQLitePragmas(ctx context.Context, db *sql.DB) {
 	pragmas := []struct {
 		name string
@@ -176,8 +181,7 @@ func main() {
 	}
 	// 桌面应用仅通过本机回环地址访问后端，避免将笔记 API 暴露到局域网。
 	p, _ := strconv.Atoi(port)
-	s.SetAddr("127.0.0.1")
-	s.SetPort(p)
+	configureLocalServerAddress(s, p)
 
 	// 健康检查
 	s.BindHandler("GET:/api/health", func(r *ghttp.Request) {

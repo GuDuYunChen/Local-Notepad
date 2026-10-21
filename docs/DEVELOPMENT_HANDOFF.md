@@ -20,6 +20,14 @@
 
 同一46字节附件经原`UploadController.Register`的真实multipart接口，在Go1.24.11下复现code1010、`文件内容类型不匹配: application/octet-stream`，且输出目录零文件。原实现忽略实际读取长度，把512字节缓冲中剩余零字节一起识别；只截取实际长度仍会因`text/plain; charset=utf-8`与基础MIME名单比较而拒绝。本次修实际读取边界和MIME基础类型，保留原扩展名／类型名单、100MiB及空文件规则，并补真实路由与逐字文件读回回归。驱动保留同一附件、真实API和原4秒预算，补受控上传失败诊断；不改用直写附件绕过接口。完成本次全量门禁及新HEAD Windows／安装后再交付，不重跑282或接受其EXE。
 
+`2251e2335fac94850727b7858fb5c91c2975bbb7`／树`99aa075b00a82e9f766230d86a7735884911cc1a`的17项首次CI已终止为15成功／2失败，未重跑或接受EXE。真实Windows的三个上传回执均为HTTP200／code0／OK，文本上传修补已越过原阻塞；原620准备、状态模型及保存／阅读／快捷键通过。新导出仍停在夹具创建：第二份同级`EXPORT102 重名.md`被原API以code1006正确拒绝，checks和directoryActions仍为空。修补用合法不同的`.md`／`.txt`标题维持相同导出stem与` (2)`冲突消解检查，不放宽生产同级唯一规则、原正文／附件数量或文件回读断言。
+
+另一个失败来自PR Save Recovery的Linux完整报告，4973项中4972通过；原“local overview does not refresh the absolute deadline during response-body wait”在真实30ms时钟下假定一轮微任务后必有响应对象，实际出现`Cannot read properties of undefined (reading 'emit')`。生产服务可以在创建请求前正确耗尽绝对预算。该用例修补以既有单调时钟控制方式明确投递响应和截止边界，保持原名称、30ms、绝对期限及真实close前busy要求，不扩大预算或修改生产超时策略。两处修补和原始失败均收录在同一完整模块；再次冻结全量本地门禁后，仍须新HEAD真实导出及完整安装。
+
+真实接口复查还确认原后端主入口未实现注释承诺的仅本机监听：先SetAddr("127.0.0.1")再SetPort，会被锁定GoFrame2.7.4的SetPort清空Address并改成通配地址。原2251完整main在隔离数据下实际记录`[:44875]`，未发API请求，parent pipe EOF后正常exit0。修补把主机与端口通过一次SetAddr绑定为127.0.0.1:port，原PORT解析、27121默认值和关闭流程保持；新增真实监听／HTTP回归，旧配置同名测试真实失败，修复后通过。此生产修补也在当前模块完成，因此原Go四条全量命令和Windows后端构建必须重新执行，不能复用2251后端绿灯。
+
+2251的8份文件先在网页VSCode保存并逐字回读；其后网页插件只读快照、排错读取及备用连接连续超时，未反复触发未知提交。最终通过GitHub连接以准确父提交、相同受测树和force:false更新原分支，并回读实际commit/ref。这是网页编辑回读后由连接器提交，不冒称网页SCM完成；后续恢复网页时先刷新实际远端HEAD，避免再次提交已有内容。连接超时不是ChatGPT中断根因的证明。
+
 当前完整本地模块沿用“更多笔记操作 → 导出”的Word／Markdown入口：选择笔记与文件夹，读取并冻结已保存正文预览，原生选择目标目录，创建独占导出批次，逐项显示真实文件与失败原因，停止后显式继续，仅重试失败项，并打开本批目录。导出不保存编辑器草稿、不改笔记数据库；成功项目不重写，关闭或导航撤销旧请求，目录取消保留选择。范围、实际旧源反例与异常处理见 [LOCAL_DOCUMENT_EXPORT_2F102.md](LOCAL_DOCUMENT_EXPORT_2F102.md)。
 
 继续 `feature/knowledge-os-phase2` / Draft PR #2，版本显式升为4.235.0，schema14及679依赖节点不变。先完成本模块源码、默认无过滤Vitest、原test:ui及当前HEAD的全部CI、真实Windows文件／附件、对应新EXE和完整安装生命周期，最终结果再记PR／交付报告。网页VSCode编辑与提交和隔离运行环境中的执行证据分别核对，不能把网页“没有问题”、UI mock或旧候选绿灯当成完整验收。

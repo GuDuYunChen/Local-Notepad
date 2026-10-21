@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { EventEmitter } from 'node:events'
+import { performance } from 'node:perf_hooks'
 import http from 'node:http'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -285,10 +286,29 @@ export function registerS3LocalOverviewTests(test) {
     }
   })
   test('local overview does not refresh the absolute deadline during response-body wait', async () => {
-    const f = fake({ holdBody: true, holdClose: true }), s = service({ requestImpl: f.requestImpl, timeoutMs: 30 })
-    const p = s.read(intent()); await Promise.resolve(); f.res.emit('data', Buffer.from('{'))
-    assert.equal((await p).code, 'native-local-overview-timeout')
-    assert.equal((await s.read(intent())).code, 'native-local-overview-busy'); f.requests[0].emit('close')
+    const descriptor = Object.getOwnPropertyDescriptor(performance, 'now')
+    let at = 1000
+    Object.defineProperty(performance, 'now', { configurable: true, value: () => at })
+    const f = fake({ holdHeaders: true, holdBody: true, holdClose: true }), s = service({ requestImpl: f.requestImpl, timeoutMs: 30 })
+    try {
+      const p = s.read(intent()), res = f.deliver()
+      assert.equal(f.calls.length, 1)
+      // Deliver the original handlers synchronously so host scheduling cannot
+      // expire preflight before the response-body scenario has even started.
+      at = 1029; res.emit('data', Buffer.from('{'))
+      assert.notEqual(res.destroyed, true); assert.notEqual(f.requests[0].destroyed, true)
+      at = 1030; res.emit('data', Buffer.from('"late":true}'))
+      // Check destruction before awaiting: a refreshed deadline must not pass
+      // merely because the real timer eventually fires after this assertion.
+      assert.equal(res.destroyed, true); assert.equal(f.requests[0].destroyed, true)
+      assert.equal((await p).code, 'native-local-overview-timeout')
+      assert.equal((await s.read(intent())).code, 'native-local-overview-busy'); f.requests[0].emit('close')
+      assert.equal(f.calls.length, 1)
+    } finally {
+      for (const req of f.requests) req.emit('close')
+      if (descriptor) Object.defineProperty(performance, 'now', descriptor)
+      else delete performance.now
+    }
   })
   test('local overview cancellation during request creation destroys the owned request before sending', async () => {
     const c = new AbortController(), f = fake()

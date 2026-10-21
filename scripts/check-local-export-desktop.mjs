@@ -162,7 +162,8 @@ export async function verifyLocalExportDesktop(context) {
     content: localExportDesktopDocument({ image: imageA.url, attachment: attachment.url }) })
   const frozen = await create({ title: 'EXPORT102 重名.md', parent_id: folder.id,
     content: localExportDesktopDocument({ image: imageA.url, attachment: attachment.url }) })
-  const failing = await create({ title: 'EXPORT102 重名.md', parent_id: folder.id,
+  // Full sibling titles stay unique; both extensions map to the same export stem.
+  const failing = await create({ title: 'EXPORT102 重名.txt', parent_id: folder.id,
     content: localExportDesktopDocument({ image: imageB.url, attachment: attachment.url }) })
   const cancellationFolder = await create({ title: 'EXPORT102 取消后继续', is_folder: true })
   for (let i = 0; i < 100; i++) await create({ title: 'EXPORT102 Batch ' + String(i + 1).padStart(3, '0') + '.md',

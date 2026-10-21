@@ -110,3 +110,29 @@ Windows准备合同增加同一worker的实际冷启动与EOF正常关闭子验�
 原实现创建512字节缓冲，读取后却把整个缓冲交给`http.DetectContentType`，46字节正文后的466个零字节使文本被归为二进制。仅改为实际读取切片仍不足：真实文本嗅探结果包含`charset=utf-8`参数，而原白名单存储基础`text/plain`。修补将嗅探限定为实际读取字节，用`mime.ParseMediaType`提取基础类型，并对非EOF读取错误返回已有读取失败结果；不扩展原扩展名或MIME白名单，不改变100MiB限制、空文件约定、保存名称和返回URL。新增测试仍调用生产Register／Upload，核同一短附件、长UTF8文本及原PNG的真实HTTP成功和完整磁盘字节，并核含NUL伪装文本的拒绝／零落盘。
 
 验收驱动继续用原三份固定附件、实际上传接口、HTTP200／code0及逐字读回断言和4秒请求预算，只增加受控失败诊断；不通过换附件类型、直接写uploads或放宽成功码取得绿灯。此生产后端修补与驱动补证随同一候选完成无过滤默认、原UI、Desktop合同及实际Go全包回归，再由新HEAD完成Windows导出与对应新EXE完整安装。版本仍为同一未接受功能4.235.0，不另拆模块或预写未来通过状态。
+
+## 2251合法同名夹具与绝对期限测试前置
+
+产品`2251e2335fac94850727b7858fb5c91c2975bbb7`／树`99aa075b00a82e9f766230d86a7735884911cc1a`的17项首次CI终态为15成功／2失败，全部attempt1。PR测试合并提交`aa76e839a7c25471c7733ce904d2e6192acf259c`的有序父提交为master `c399ca720a20c02e7578e1be116d21644ff1e7a0`与2251，合并树与完整1575文件受测树相同。原失败候选没有手动重跑，其EXE没有被下载、接受或写入安装pin。
+
+### 三上传成功之后的同级重复标题
+
+[Desktop运行39602829055](https://github.com/GuDuYunChen/Local-Notepad/actions/runs/39602829055)／job119231393249已经通过原620项准备、80状态模型、构建及保存／阅读／快捷键流程。三个真实上传回执依次为`export102-a.png`、`export102-b.png`、`export102.txt`，均HTTP200／code0／OK，随后原磁盘逐字断言通过。原46字节文本上传的生产修补在Windows已有本次实际证据，不重新记作未知或未执行。
+
+新导出第14步在创建夹具时停止：第二次向同一父目录POST标题`EXPORT102 重名.md`，生产API返回code1006、detail为`已存在同名文件或文件夹: EXPORT102 重名.md`。原失败日志142882字节，SHA256 `b80000fd94e0377e9864679708c285fccac48b86752a9c7b60d6ae8b77de759f`；Desktop artifact12346609109为4077984字节。报告checks／directoryActions仍为空，complete:false、cleanupComplete:false、forceTerminated:true；原失败图是应用主页，不能视作工作台已进入。该结果证明夹具违反了既有同级名称约束，不证明产品应该接受重复标题。
+
+最小修补保留frozen笔记标题`EXPORT102 重名.md`，将failing笔记改为`EXPORT102 重名.txt`。原创建规则按完整标题去重，两个标题合法不同；生产`exportStem`去除最后扩展名后仍得到相同的`EXPORT102 重名`，所以原Word／Markdown冲突消解必须继续生成独立路径及` (2)`后缀。原始文件oracle按笔记ID核对确切源标题，模拟文件夹具同步为同一合法pair；不能只换成不冲突的导出名称，不能把标题检查改为通配。新增定点回归执行实际driver的创建前缀，并用真实`exportStem`／`prepareExportPlan`验证合法原名和同stem分配；旧driver重复标题负对照与真实生产创建接口的正负结果独立保留。原87条合同名称／顺序、16业务检查、109份正文、100篇继续批次、本地附件、预算和逐字回读保持。
+
+### PR完整回归的30ms真实时间假设
+
+[Save Recovery运行39602835543](https://github.com/GuDuYunChen/Local-Notepad/actions/runs/39602835543)的Linux job119231415096在完整4973项中通过4972项，唯一失败名称是`local overview does not refresh the absolute deadline during response-body wait`；原错误为`Cannot read properties of undefined (reading 'emit')`。原full-ui.json为1328490字节，SHA256 `281e4593a5f49958ca0e14fd68d68502ab4e85f86c628b37986fc1df89136f42`。失败发生在该用例投递正文事件前，Linux后续live-server步骤未运行；同run的Windows成功不能替代此失败。
+
+原用例给生产服务30ms真实预算，调用read后仅等待一轮微任务便假定响应已创建。生产服务在前置校验、创建请求和响应事件都核原绝对截止，因此真实调度延迟可以在请求建立前合法耗尽预算，令`f.res`尚不存在。修补沿用已有原生期限测试的单调时钟控制与finally恢复方式，明确建立响应、在原截止前投递部分正文，再到同一截止边界验证timeout；保留原30ms、原用例名、未close前busy与释放检查。生产时钟、计时器、请求策略和全部安全断言不改，不通过放大timeout、追加sleep或删除用例消除失败。
+
+### 真实主入口的监听配置覆盖
+
+为核对标题接口，用原2251完整main、官方Go1.24.11及隔离NOTEPAD_DATA启动本地后端。PORT=0时实际日志为`http server started listening on [:44875]`，不是预期127.0.0.1；监视器拒绝继续，零API调用，pid97718在parent pipe EOF后正常退出0，未强杀。原日志25452字节，SHA256 `0c1e36d5c3c1c8538dc9428bac9102298185e6e76e56383d38c429fb81347b80`；原main.go为22191字节，SHA256 `e42f460fcfcc0ce3764b57f5a70521c7422bfa452b8d4a2bca255e9689bc8798`。这是实际未修改主入口的观察，不将测试用Go overlay监听代替它。
+
+锁定GoFrame2.7.4的SetPort先清空config.Address，再拼接`:port`；原main先SetAddr("127.0.0.1")再SetPort的调用顺序因此丢失主机限制，影响不限于PORT=0。修补让main通过同一配置函数一次设置`127.0.0.1:`与原解析端口，不改默认27121、端口解析、路由、数据库或serveManaged关闭管理。新增`TestLocalServerListenerUsesLoopbackAddress`启动真实GoFrame服务，核对唯一实际端口及127.0.0.1地址，并用真实HTTP取固定合成响应。原两步配置提取到同函数后，同名回归真实失败于`:44803`；修复后同一回归通过。原未修改main探针、提取后旧配置负例与新配置正例分别保存，不混淆受测源码身份。监听地址接口读取配置与实际分配端口，完整主入口的实际监听／HTTP／EOF结果另行核对；不据此声称已发现外部访问或数据泄漏。
+
+两项CI前置修补和这个已确认主入口缺陷随同一候选冻结，执行原默认全量、原UI及Desktop名册；Go生产源码和新增实际监听回归已变化，必须重新运行原四条Go全量命令和Windows后端构建。其它构建只在完整输入字节相同时复用，涉及的夹具和合同按本次最终输入执行。真实新HEAD Word／Markdown文件、附件、取消／继续、失败重试和正常退出，以及绑定合格新EXE的完整安装生命周期仍须通过；本源码记录不提前宣称未来验收结果。

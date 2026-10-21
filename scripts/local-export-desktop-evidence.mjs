@@ -210,7 +210,7 @@ function expectedExportDocuments(report) {
   for (const name of ['preview', 'markdown', 'partial', 'retry', 'word']) {
     assert.deepEqual(report[name].items.map(item => item.id).sort(), mainIDs, 'Fixture note IDs differ: ' + name)
     for (const item of report[name].items) assert.equal(item.title,
-      item.id === fixture.noteID ? 'EXPORT102 原文.md' : 'EXPORT102 重名.md')
+      item.id === fixture.noteID ? 'EXPORT102 原文.md' : item.id === fixture.frozenID ? 'EXPORT102 重名.md' : 'EXPORT102 重名.txt')
   }
   const cancelled = new Map(report.cancelled.items.map(item => [item.id, item]))
   assert.equal(cancelled.size, 100)

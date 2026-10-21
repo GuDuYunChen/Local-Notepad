@@ -12,6 +12,7 @@ import { gunzipSync } from 'node:zlib'
 import { parse } from 'acorn'
 import JSZip from 'jszip'
 import { prepareExportPlan, executeExportPlan } from '../electron/local-export.js'
+import { exportStem } from '../electron/local-export-policy.js'
 import { localExportDesktopDocument } from './local-export-desktop-fixture.bundle.mjs'
 import { verifyLocalExportDesktop } from './check-local-export-desktop.mjs'
 import { LOCAL_EXPORT_FIXTURE as F } from './local-export-desktop-values.mjs'
@@ -39,7 +40,7 @@ const visibility = () => {
 function view(prefix, count, status = 'succeeded', format = 'md') {
   return { phase: status === 'ready' ? 'prepared' : 'settled', state: status === 'ready' ? 'prepared' : 'completed',
     items: Array.from({ length: count }, (_, i) => ({ id: (count === 100 ? 'batch-' : 'note-') + i,
-      title: count === 100 ? 'EXPORT102 Batch ' + String(i + 1).padStart(3, '0') + '.md' : i ? 'EXPORT102 重名.md' : 'EXPORT102 原文.md',
+      title: count === 100 ? 'EXPORT102 Batch ' + String(i + 1).padStart(3, '0') + '.md' : i === 0 ? 'EXPORT102 原文.md' : i === 1 ? 'EXPORT102 重名.md' : 'EXPORT102 重名.txt',
       path: run + '\\exports\\' + prefix + '\\Notepad-export-contract\\目录\\笔记' + (i === 2 ? ' (2)' : i) + '.' + format,
       preview: F.heading + '\n' + (count === 100 ? F.body + ' batch ' + i : i === 1 && !['preview', 'markdown'].includes(prefix) ? F.frozen : F.body),
       status, message: '', warnings: [], bytes: status === 'succeeded' ? 20 : null,
@@ -502,6 +503,65 @@ test('export fixture upload retains a bounded request failure before any respons
   assert.doesNotMatch(JSON.stringify(saved), /PRIVATE_UPLOAD_NETWORK|credential/)
 })
 
+test('export fixture creates distinct sibling titles with real portable-name collisions', async t => {
+  const directory = realpathSync.native(mkdtempSync(path.join(tmpdir(), 'export102-create-contract-')))
+  t.after(() => rmSync(directory, { recursive: true, force: true }))
+  mkdirSync(path.join(directory, 'uploads'))
+  const report = {}, records = new Map(), createRequests = []
+  let uploads = 0
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    assert.equal(url, 'http://127.0.0.1:27121/api/upload'); assert.equal(options.method, 'POST')
+    const file = options.body.get('file'), bytes = Buffer.from(await file.arrayBuffer())
+    const filename = 'created-' + uploads++ + path.extname(file.name)
+    writeFileSync(path.join(directory, 'uploads', filename), bytes)
+    return Response.json({ code: 0, message: 'OK', data: { url: '/uploads/' + filename } })
+  })
+  const api = async (route, options) => {
+    assert.equal(route, '/api/files'); assert.equal(options.method, 'POST')
+    const value = JSON.parse(options.body), parent = value.parent_id || ''
+    createRequests.push(structuredClone(value))
+    // Enforce the already observed create-route full-title constraint while
+    // running the actual driver's requests, before testing the export planner.
+    assert.equal(value.title, value.title.trim()); assert.doesNotMatch(value.title, /[<>:"/\\|?*]/)
+    if ([...records.values()].some(item => item.parent_id === parent && item.title.toLowerCase() === value.title.toLowerCase())) {
+      throw Object.assign(new Error('Existing sibling title: ' + value.title), { code: 1006 })
+    }
+    const item = { ...value, id: 'created-' + (records.size + 1), parent_id: parent, is_folder: value.is_folder === true }
+    records.set(item.id, item); return item
+  }
+  const fixtureComplete = new Error('Fixture preparation captured; native UI is outside this contract')
+  let observed
+  try {
+    await verifyLocalExportDesktop({ report, save: () => {}, dataDirectory: directory, api,
+      evaluate: async expression => !expression.includes("getAttribute('aria-expanded')==='false'"),
+      until: async probe => { const result = await probe(); assert.ok(result); return result }, click: async () => {},
+      mark: name => { assert.equal(name, LOCAL_EXPORT_CHECKS[0]); throw fixtureComplete },
+    })
+  } catch (error) { observed = error }
+  assert.equal(observed, fixtureComplete, 'Actual driver fixture must complete before native UI checks')
+  assert.equal(uploads, 3); assert.equal(createRequests.length, 105); assert.equal(report.fixture.documents, 103)
+  const selected = [report.fixture.noteID, report.fixture.frozenID, report.fixture.failingID].map(id => records.get(id))
+  assert.ok(selected.every(item => item.parent_id === report.fixture.folderID && !item.is_folder))
+  assert.deepEqual(selected.map(item => item.title), ['EXPORT102 原文.md', 'EXPORT102 重名.md', 'EXPORT102 重名.txt'])
+  const colliding = selected.slice(1)
+  assert.equal(new Set(colliding.map(item => item.title.toLowerCase())).size, 2)
+  assert.deepEqual(colliding.map(item => exportStem(item.title)), ['EXPORT102 重名', 'EXPORT102 重名'])
+  const fetchImpl = async url => {
+    const pathname = new URL(url).pathname
+    const data = pathname === '/api/files' ? [...records.values()].map(({ content, ...item }) => item)
+      : records.get(decodeURIComponent(pathname.slice('/api/files/'.length)))
+    assert.ok(data); return Response.json({ code: 0, data })
+  }
+  for (const format of ['markdown', 'docx']) {
+    const plan = await prepareExportPlan({ ids: [report.fixture.folderID], format, fetchImpl })
+    assert.equal(plan.items.length, 3); assert.ok(plan.items.every(item => item.status === 'ready'))
+    assert.equal(new Set(plan.items.map(item => item.relativePath.toLowerCase())).size, 3)
+    const extension = format === 'markdown' ? '.md' : '.docx'
+    assert.deepEqual(plan.items.filter(item => colliding.some(note => note.id === item.id))
+      .map(item => path.posix.basename(item.relativePath)), ['EXPORT102 重名' + extension, 'EXPORT102 重名 (2)' + extension])
+  }
+})
+
 async function actualOutputFixture(directory) {
   // Match the core's native realpath operation: the default sync implementation
   // resolves links but preserves Windows 8.3 directory aliases. Canonicalize
@@ -513,7 +573,7 @@ async function actualOutputFixture(directory) {
   for (const [label, count, format] of [['markdown', 3, 'markdown'], ['partial', 3, 'markdown'], ['word', 3, 'docx'], ['cancelled', 100, 'docx']]) {
     const parent = { id: count === 100 ? 'folder-cancel' : 'folder-main', title: '目录', is_folder: true, parent_id: '' }
     const documents = Array.from({ length: count }, (_, i) => ({ id: (count === 100 ? 'batch-' : 'note-') + i, is_folder: false, parent_id: parent.id,
-      title: count === 100 ? 'EXPORT102 Batch ' + String(i + 1).padStart(3, '0') + '.md' : i ? 'EXPORT102 重名.md' : 'EXPORT102 原文.md',
+      title: count === 100 ? 'EXPORT102 Batch ' + String(i + 1).padStart(3, '0') + '.md' : i === 0 ? 'EXPORT102 原文.md' : i === 1 ? 'EXPORT102 重名.md' : 'EXPORT102 重名.txt',
       content: localExportDesktopDocument(count === 3 ? { body: label !== 'markdown' && i === 1 ? F.frozen : F.body,
         image: '/uploads/image.png', attachment: '/uploads/a.txt' } : { body: F.body + ' batch ' + i }) }))
     const fetchImpl = async url => {
