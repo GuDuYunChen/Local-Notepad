@@ -11,10 +11,11 @@ import { Script } from 'node:vm'
 import { gunzipSync } from 'node:zlib'
 import { parse } from 'acorn'
 import JSZip from 'jszip'
+import { JSDOM } from 'jsdom'
 import { prepareExportPlan, executeExportPlan } from '../electron/local-export.js'
 import { exportStem } from '../electron/local-export-policy.js'
 import { localExportDesktopDocument } from './local-export-desktop-fixture.bundle.mjs'
-import { verifyLocalExportDesktop } from './check-local-export-desktop.mjs'
+import { refreshLocalExportLibrary, verifyLocalExportDesktop } from './check-local-export-desktop.mjs'
 import { LOCAL_EXPORT_FIXTURE as F } from './local-export-desktop-values.mjs'
 import { LOCAL_EXPORT_VERSION, LOCAL_EXPORT_REPORT, LOCAL_EXPORT_CHECKS, LOCAL_EXPORT_IMAGES, LOCAL_EXPORT_SOURCES,
   exportSHA256 as hash, exportBlob, validateLocalExportDesktopReport, validateExportFeedbackVisibility,
@@ -398,7 +399,8 @@ function rendererExpressions(filename, bindings = {}) {
       const generated = new Script(source.slice(argument.start, argument.end)).runInNewContext({ q: JSON.stringify,
         panel: '[data-local-export-workspace]', F, folder: { id: 'folder-1' }, failing: { id: 'note-2' },
         itemSelector: id => '[data-local-export-item=' + JSON.stringify(id) + ']', feedback: '[data-local-export-feedback]',
-        controls: ['[data-local-export-continue]'], requested: { selector: 'button', text: '中文' }, ...bindings })
+        controls: ['[data-local-export-continue]'], requiredSelector: '[data-file-id="folder-1"]',
+        requested: { selector: 'button', text: '中文' }, ...bindings })
       sites.push({ line: node.loc.start.line, generated }); assert.equal(typeof generated, 'string')
     }
     for (const value of Object.values(node)) if (Array.isArray(value)) value.forEach(visit); else if (value && typeof value === 'object') visit(value)
@@ -406,9 +408,9 @@ function rendererExpressions(filename, bindings = {}) {
   visit(ast); return sites
 }
 const edge = 'quotes\'" slash\\ line\r\n \u2028\u2029 ` ${globalThis.unexpectedMutation=true}'
-for (const [filename, expected] of [['check-local-export-desktop.mjs', 20], ['run-local-export-desktop.mjs', 6]])
+for (const [filename, expected] of [['check-local-export-desktop.mjs', 22], ['run-local-export-desktop.mjs', 6]])
   for (const [name, bindings] of [['normal', {}], ['quoted multiline', { F: { ...F, body: edge, dirty: edge }, feedback: edge,
-    controls: [edge], requested: { selector: 'button', text: edge } }]]) test(filename + ' compiles all renderer boundaries with ' + name + ' values', () => {
+    controls: [edge], requiredSelector: edge, requested: { selector: 'button', text: edge } }]]) test(filename + ' compiles all renderer boundaries with ' + name + ' values', () => {
     const sites = rendererExpressions(filename, bindings); assert.equal(sites.length, expected)
     for (const site of sites) assert.doesNotThrow(() => new Script(site.generated), filename + ':' + site.line)
   })
@@ -560,6 +562,38 @@ test('export fixture creates distinct sibling titles with real portable-name col
     assert.deepEqual(plan.items.filter(item => colliding.some(note => note.id === item.id))
       .map(item => path.posix.basename(item.relativePath)), ['EXPORT102 重名' + extension, 'EXPORT102 重名 (2)' + extension])
   }
+})
+
+test('export library restoration propagates an uncertain native click without replay', async t => {
+  const dom = new JSDOM('<aside class="workspace-sidebar collapsed"><button aria-label="展开侧边栏">展开</button></aside>',
+    { runScripts: 'outside-only' })
+  t.after(() => dom.window.close())
+  const source = readFileSync(new URL('./run-local-export-desktop.mjs', import.meta.url), 'utf8')
+  const declaration = parse(source, { ecmaVersion: 'latest', sourceType: 'module' }).body
+    .find(node => node.type === 'FunctionDeclaration' && node.id?.name === 'until')
+  assert.ok(declaration)
+  const until = new Script(source.slice(declaration.start, declaration.end) + '; until').runInNewContext({
+    performance, sleep: () => assert.fail('A rejected native click must not become another poll'),
+  })
+  let refreshes = 0, clicks = 0
+  dom.window.addEventListener('library:refresh', () => { refreshes++ })
+  dom.window.document.querySelector('button').addEventListener('click', () => {
+    const sidebar = dom.window.document.querySelector('.workspace-sidebar')
+    sidebar.classList.remove('collapsed')
+    sidebar.innerHTML = '<div class="file-list"><div class="tree-list"><div data-file-id="fixture-folder"></div></div></div>'
+  })
+  const refusal = new Error('Native click response is uncertain')
+  await assert.rejects(refreshLocalExportLibrary({ until,
+    evaluate: expression => new Script(expression).runInContext(dom.getInternalVMContext()),
+    click: async selector => {
+      clicks++; assert.equal(selector, 'button[aria-label="展开侧边栏"]')
+      const button = dom.window.document.querySelector(selector); assert.ok(button)
+      button.click(); throw refusal
+    },
+  }, '[data-file-id="fixture-folder"]', 'Export fixture folder missing'), error => error === refusal)
+  assert.equal(refreshes, 1); assert.equal(clicks, 1)
+  assert.equal(dom.window.document.querySelector('.workspace-sidebar').classList.contains('collapsed'), false)
+  assert.ok(dom.window.document.querySelector('[data-file-id="fixture-folder"]'))
 })
 
 async function actualOutputFixture(directory) {

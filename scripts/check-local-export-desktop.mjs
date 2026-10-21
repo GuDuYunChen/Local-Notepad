@@ -62,6 +62,31 @@ export async function observeLocalExportFeedback(evaluate, feedback, controls) {
   })()`)
 }
 
+export async function refreshLocalExportLibrary({ evaluate, click, until }, requiredSelector, label) {
+  const ready = () => evaluate(`(() => {
+    const sidebar=document.querySelector('.workspace-sidebar');
+    return Boolean(sidebar&&!sidebar.classList.contains('collapsed')&&
+      sidebar.querySelector('.file-list .tree-list')&&sidebar.querySelector(${q(requiredSelector)}));
+  })()`)
+  await evaluate("window.dispatchEvent(new Event('library:refresh'))")
+  let expansionRequested = false
+  return until(async () => {
+    // The tree is absent while the actual FileList read is pending. Frames
+    // only settle its rendered result, including App's narrow-window selection.
+    if (await ready()) {
+      await evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(true))))')
+      if (await ready()) return true
+    }
+    if (!expansionRequested && await evaluate("Boolean(document.querySelector('.workspace-sidebar.collapsed button[aria-label=\"展开侧边栏\"]'))")) {
+      // Never replay an uncertain native click; its rejection propagates
+      // through the original bounded until without becoming a later success.
+      expansionRequested = true
+      await click('button[aria-label="展开侧边栏"]')
+    }
+    return false
+  }, label)
+}
+
 export async function verifyLocalExportDesktop(context) {
   const { report, save, mark, api, evaluate, click, cdp, until, capture, directorySession,
     binding, ownedRoot, dataDirectory, requests } = context
@@ -84,9 +109,8 @@ export async function verifyLocalExportDesktop(context) {
     await settle(); const result = await observeLocalExportFeedback(evaluate, feedback, controls)
     validateExportFeedbackVisibility(result); return result
   }
-  const refresh = () => evaluate("window.dispatchEvent(new Event('library:refresh'))")
   const open = async (title, count, format) => {
-    await refresh()
+    await refreshLocalExportLibrary({ evaluate, click, until }, 'button[aria-label="更多笔记操作"]', 'Original export library missing')
     await click('button[aria-label="更多笔记操作"]'); await click('[data-local-export-entry]')
     await until(() => evaluate("document.querySelector('#selector-dialog-title')?.textContent==='选择导出内容'"), 'Original export selection dialog missing')
     // Real selection controls clear any selection retained by the file list.
@@ -168,8 +192,7 @@ export async function verifyLocalExportDesktop(context) {
   const cancellationFolder = await create({ title: 'EXPORT102 取消后继续', is_folder: true })
   for (let i = 0; i < 100; i++) await create({ title: 'EXPORT102 Batch ' + String(i + 1).padStart(3, '0') + '.md',
     parent_id: cancellationFolder.id, content: localExportDesktopDocument({ body: F.body + ' batch ' + i }) })
-  await refresh()
-  await until(() => evaluate(`Boolean(document.querySelector('[data-file-id="${folder.id}"]'))`), 'Export fixture folder missing')
+  await refreshLocalExportLibrary({ evaluate, click, until }, '[data-file-id="' + folder.id + '"]', 'Export fixture folder missing')
   if (await evaluate(`document.querySelector('[data-file-id="${folder.id}"]')?.getAttribute('aria-expanded')==='false'`)) await click('[data-file-id="' + folder.id + '"]')
   await click('[data-file-id="' + note.id + '"]')
   await until(() => evaluate(`document.querySelector('.editor-input')?.innerText.includes(${q(F.body)})&&!document.querySelector('.save-state')`), 'Canonical export note not clean in actual editor')

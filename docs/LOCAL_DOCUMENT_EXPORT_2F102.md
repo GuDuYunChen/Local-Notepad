@@ -136,3 +136,19 @@ Windows准备合同增加同一worker的实际冷启动与EOF正常关闭子验�
 锁定GoFrame2.7.4的SetPort先清空config.Address，再拼接`:port`；原main先SetAddr("127.0.0.1")再SetPort的调用顺序因此丢失主机限制，影响不限于PORT=0。修补让main通过同一配置函数一次设置`127.0.0.1:`与原解析端口，不改默认27121、端口解析、路由、数据库或serveManaged关闭管理。新增`TestLocalServerListenerUsesLoopbackAddress`启动真实GoFrame服务，核对唯一实际端口及127.0.0.1地址，并用真实HTTP取固定合成响应。原两步配置提取到同函数后，同名回归真实失败于`:44803`；修复后同一回归通过。原未修改main探针、提取后旧配置负例与新配置正例分别保存，不混淆受测源码身份。监听地址接口读取配置与实际分配端口，完整主入口的实际监听／HTTP／EOF结果另行核对；不据此声称已发现外部访问或数据泄漏。
 
 两项CI前置修补和这个已确认主入口缺陷随同一候选冻结，执行原默认全量、原UI及Desktop名册；Go生产源码和新增实际监听回归已变化，必须重新运行原四条Go全量命令和Windows后端构建。其它构建只在完整输入字节相同时复用，涉及的夹具和合同按本次最终输入执行。真实新HEAD Word／Markdown文件、附件、取消／继续、失败重试和正常退出，以及绑定合格新EXE的完整安装生命周期仍须通过；本源码记录不提前宣称未来验收结果。
+
+## 154b真实Windows：最小窗口侧边栏折叠与入口修补
+
+候选`154b113f8d31d712cf918f46796cb303c8c0ae40`、tree`e4a8b860b5f097516402cf0893c1208101181045`的17项首次流程终态为16成功／1失败，全部attempt1。唯一失败为[Desktop运行39607751622](https://github.com/GuDuYunChen/Local-Notepad/actions/runs/39607751622)／job119248269491第14步。原621项准备、80状态模型、保存、阅读及快捷键步骤通过；旧Main的Windows拒绝对照和修复助手冷启动也实际通过。三个夹具上传仍为HTTP200／code0／OK；合法md/txt创建已走过，不再是原1006失败。
+
+原错误`Export fixture folder missing`来自check-local-export-desktop.mjs等待文件夹行。日志141968字节，SHA256 `b78089281dccc849c1bcd19b58ef33eb5016dcaf2553f0a66a80c53ae15f58b8`；artifact12348758209为4104925字节。local-export-desktop.json为4377字节，SHA256 `fb5624cccb7caebb1a0326b9f7a6ad9ae5a53cd1a375c67644912677add2abd6`；失败PNG30001字节，SHA256 `23690e698687a5071937054efa86f951f3b7ee46c7889216bc4482f86599eba5`，IHDR为704×455。原图显示`EXPORT102 Batch 100.md`正文和折叠侧栏。报告11源码blob绑定当前tree，checks及directoryActions仍为空，complete:false、cleanupComplete:false、forceTerminated:true，无正常产品退出回执；不将它计为导出业务完成。
+
+### 实际因果链与最小修补边界
+
+原目录助手正确将主窗口设为720×520，实际客户端宽704。刷新列表在尚无当前笔记时调用App.select；App在innerWidth<=720时设置sidebarCollapsed=true，WorkspaceSidebar只在未折叠时渲染包含FileList的children。驱动却在刷新后直接等data-file-id，没有点击现有“展开侧边栏”。因此即使夹具已存在，列表DOM也会被卸载；仅延长等待或在刷新前展开都没有覆盖这个异步状态变化。
+
+同一入口辅助逻辑用于第一次刷新后定位文件夹和每次“更多笔记操作”前：读取实际折叠／列表加载／目标状态，只通过原按钮的一次真实点击恢复列表，随后核目标和展开状态仍有效。后续点击笔记会再次按生产规则折叠，所以每次导出入口都必须重新观察。双animation-frame只用于核渲染稳定，不能替代尚未完成的列表请求。原等待界限、最小窗口、CDP真实输入方式、产品响应式行为、数据与业务断言均保留；不得直接写组件状态、localStorage或替换桥接绕过，不确定输入不自动重放。
+
+实际App／WorkspaceSidebar／FileList的回归使用明确范围的数据API和编辑器替身，验证原驱动入口失败与修复入口成功；它是DOM层回归，不能冒充Windows原生结果。原88项导出合同、完整默认／UI／Desktop名册必须保留。原Go生产、依赖和构建输入无变化时才能复用已绑定的完整2146事件及交叉构建证据；新的Windows流程仍按原17项完整运行。
+
+此前安装准备中的独立结构fixture曾保留旧的重名md标题，原507项有506通过／1失败。严格oracle没有放松，只同步既定25文件范围内一行后，原507/507与114/114通过；原失败和后续原件分别保存。本次driver镜像及其真实blob继续同步，产品／EXE pin在新候选合格前保持未解析。16项业务检查、109份正文、100篇继续批次、6张原图、正常关闭与资源清理，以及原28门／9产品进程／6组数据比较／20分钟安装验收仍全部必需；不接受154b的EXE、不重跑不变失败、不提前宣布模块完成。
