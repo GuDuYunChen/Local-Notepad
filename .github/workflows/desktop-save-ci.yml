@@ -30,11 +30,16 @@ jobs:
       - name: Verify install preserved manifest and lock
         run: git diff --exit-code -- package.json package-lock.json
       - name: Build canonical rich editor fixture with the production node registry
-        run: node scripts/build-reading-mode-fixture.mjs
+        shell: pwsh
+        run: |
+          node scripts/build-reading-mode-fixture.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/build-local-export-fixture.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Validate evidence refusal cases and state-model interleavings
         shell: pwsh
         run: |
-          node --test scripts/desktop-save-evidence.node.mjs scripts/desktop-window-session.node.mjs scripts/local-import-desktop-evidence.node.mjs scripts/reading-mode-desktop-evidence.node.mjs scripts/reading-mode-save-evidence.node.mjs scripts/reading-mode-desktop-fixture.node.mjs scripts/reading-mode-native-input.node.mjs scripts/shortcut-management-desktop-evidence.node.mjs
+          node --test scripts/desktop-save-evidence.node.mjs scripts/desktop-window-session.node.mjs scripts/local-import-desktop-evidence.node.mjs scripts/reading-mode-desktop-evidence.node.mjs scripts/reading-mode-save-evidence.node.mjs scripts/reading-mode-desktop-fixture.node.mjs scripts/reading-mode-native-input.node.mjs scripts/shortcut-management-desktop-evidence.node.mjs scripts/local-export-desktop-evidence.node.mjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npx vitest run --root=. src/components/EditorStateModel.test.jsx
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -46,6 +51,8 @@ jobs:
         run: node scripts/reading-mode-save-evidence.mjs
       - name: Actual shortcut configuration, key dispatch, same-profile restart and native exit
         run: node scripts/run-shortcut-management-desktop.mjs
+      - name: Actual local Word and Markdown export, native directory choice, retry and cancellation
+        run: node scripts/run-local-export-desktop.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

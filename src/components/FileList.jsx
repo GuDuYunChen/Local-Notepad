@@ -23,6 +23,7 @@ const NameDialog = React.lazy(() => import('./NameDialog'))
 const FileSelectorDialog = React.lazy(() => import('./FileSelectorDialog'))
 const TemplateSelector = React.lazy(() => import('./TemplateSelector'))
 const ImportWorkspace = React.lazy(() => import('./ImportWorkspace'))
+const ExportWorkspace = React.lazy(() => import('./ExportWorkspace'))
 const ItemType = 'FILE_NODE'
 
 const FileNode = ({ 
@@ -194,7 +195,7 @@ export default function FileList({
   const [renaming, setRenaming] = useState(null)
   const [showExport, setShowExport] = useState(false)
   const [pendingExport, setPendingExport] = useState(null)
-  const [exportBusy, setExportBusy] = useState(null)
+  const [exportSelection, setExportSelection] = useState([])
   const [showBatchDelete, setShowBatchDelete] = useState(false)
   const [expanded, setExpanded] = useState(new Set()) // 展开的文件夹ID集合
   const [showNewMenu, setShowNewMenu] = useState(false) // 新建菜单显隐
@@ -828,34 +829,8 @@ export default function FileList({
   }
 
   async function onExportConfirm(ids, roots) {
+    setExportSelection(ids.slice())
     setPendingExport({ ids, roots })
-  }
-
-  async function performExport(format) {
-    if (!pendingExport || exportBusy) return
-
-    setExportBusy(format)
-    try {
-        const targetDir = await window.electronAPI.openDirectoryDialog()
-        if (!targetDir) return
-
-        const res = await window.electronAPI.exportToDocx(pendingExport.roots, targetDir, format)
-
-        if (res && res.success) {
-             toast.success('导出成功')
-             if (res.errors && res.errors.length > 0) {
-                 toast.warning(`部分笔记导出失败：${res.errors.length} 项`)
-             }
-        } else {
-             toast.error('导出失败：' + (res?.message || '未知错误'))
-        }
-    } catch (e) {
-        console.error(e)
-        toast.error('导出失败：' + (e.message || '未知错误'))
-    } finally {
-        setExportBusy(null)
-        setPendingExport(null)
-    }
   }
 
   function collectDeleteTargetIds(roots) {
@@ -1667,6 +1642,7 @@ export default function FileList({
                   }}
                   onExport={() => {
                     setShowLibraryMenu(false)
+                    setExportSelection(Array.from(selectedIds))
                     setShowExport(true)
                   }}
                   onBatchOrganize={() => {
@@ -1842,7 +1818,7 @@ export default function FileList({
           onPathSelect={() => setShowFolderSelector(true)}
         />
       )}
-      {showExport && <FileSelectorDialog open={showExport} onClose={() => setShowExport(false)} items={items} onConfirm={onExportConfirm} title="导出笔记" confirmText="下一步" />}
+      {showExport && <FileSelectorDialog open={showExport} onClose={() => setShowExport(false)} items={items} onConfirm={onExportConfirm} title="选择导出内容" confirmText="下一步" initialSelectedIds={exportSelection} />}
       {importWorkspace && <ImportWorkspace initialPaths={importWorkspace.paths}
         onClose={() => setImportWorkspace(null)} onChanged={() => void load()}
         onOpenNote={onOpenImportNote} />}
@@ -1857,35 +1833,9 @@ export default function FileList({
           if (item.parent_id) setExpanded(previous => new Set([...previous, item.parent_id]))
           setShowTemplate(false); onSelect(item)
         }} />}
-      {pendingExport && (
-        <ConfirmDialog
-          title="选择导出格式"
-          message="导出的内容会保存到你接下来选择的文件夹。"
-          onClose={() => {
-            if (!exportBusy) setPendingExport(null)
-          }}
-          actions={[
-            {
-              label: '取消',
-              disabled: Boolean(exportBusy),
-              onClick: () => setPendingExport(null),
-            },
-            {
-              label: 'Markdown',
-              loading: exportBusy === 'markdown',
-              disabled: Boolean(exportBusy),
-              onClick: () => void performExport('markdown'),
-            },
-            {
-              label: 'Word 文档',
-              kind: 'primary',
-              loading: exportBusy === 'docx',
-              disabled: Boolean(exportBusy),
-              onClick: () => void performExport('docx'),
-            },
-          ]}
-        />
-      )}
+      {pendingExport && <ExportWorkspace ids={pendingExport.roots}
+        onClose={() => setPendingExport(null)}
+        onReselect={() => { setPendingExport(null); setShowExport(true) }} />}
       {showFolderSelector && (
           <FileSelectorDialog 
               open={showFolderSelector}

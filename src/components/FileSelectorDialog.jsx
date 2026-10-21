@@ -33,6 +33,22 @@ const HomeIcon = () => (
     </Icon>
 );
 
+// A selected folder represents its entire subtree. Only retain that recursive
+// root when every child is selected; otherwise the selected descendants remain
+// explicit roots. Reconcile bottom-up so an unchecked grandchild cannot return
+// through a stale selected ancestor when an export or delete is confirmed.
+function reconcileSelection(selection, tree, treeItemIds, disabledIds) {
+    const next = new Set(Array.from(selection).filter(id => treeItemIds.has(id) && !disabledIds.has(id)));
+    const visit = node => {
+        node.children.forEach(visit);
+        if (!node.is_folder || node.children.length === 0) return;
+        if (!disabledIds.has(node.id) && node.children.every(child => next.has(child.id))) next.add(node.id);
+        else next.delete(node.id);
+    };
+    tree.forEach(visit);
+    return next;
+}
+
 /**
  * File Selector Dialog Component
  * 
@@ -64,7 +80,7 @@ export default function FileSelectorDialog({
     initialSelectedIds = [],
     mode = 'multi' // 'multi' | 'single-folder'
 }) {
-    const [selectedIds, setSelectedIds] = useState(new Set(initialSelectedIds));
+    const [rawSelectedIds, setSelectedIds] = useState(new Set(initialSelectedIds));
     const [expandedIds, setExpandedIds] = useState(new Set());
     const [processing, setProcessing] = useState(false);
     const [lastClickedId, setLastClickedId] = useState(null);
@@ -103,7 +119,7 @@ export default function FileSelectorDialog({
         };
         sortRecursive(roots);
         return roots;
-    }, [items]);
+    }, [items, mode]);
 
     // Flatten visible items for Shift-Selection
     const visibleFlatList = useMemo(() => {
@@ -126,12 +142,13 @@ export default function FileSelectorDialog({
                 setSingleSelectedId(initialSelectedIds[0] || '');
                 setExpandedIds(new Set()); 
             } else {
-                // Filter out selectedFileId from initial selection if it exists
-                const initialSet = new Set(initialSelectedIds);
-                if (selectedFileId && initialSet.has(selectedFileId)) {
-                    initialSet.delete(selectedFileId);
-                }
-                setSelectedIds(initialSet);
+                // A folder passed back from the caller means its descendants
+                // too, just as checking that folder does in this dialog.
+                const initialSet = new Set();
+                initialSelectedIds.forEach(id => {
+                    (descendantsMap[id] || []).forEach(childId => initialSet.add(childId));
+                });
+                setSelectedIds(reconcileSelection(initialSet, tree, treeItemIds, containsSelectedFile));
                 setExpandedIds(new Set());
             }
             setProcessing(false);
@@ -149,8 +166,6 @@ export default function FileSelectorDialog({
         document.addEventListener('keydown', onKeyDown);
         return () => document.removeEventListener('keydown', onKeyDown);
     }, [open, processing, onClose]);
-
-    if (!open) return null;
 
     const handleExpand = (id, e) => {
         e.stopPropagation();
@@ -258,6 +273,11 @@ export default function FileSelectorDialog({
         traverse(tree);
         return ids;
     }, [tree]);
+
+    // Also reconcile when the current tree changes. A newly arriving child is
+    // unchecked and therefore prevents an old folder ID from exporting it.
+    const selectedIds = useMemo(() => reconcileSelection(rawSelectedIds, tree, treeItemIds, containsSelectedFile),
+        [rawSelectedIds, tree, treeItemIds, containsSelectedFile]);
 
     const handleSelectAll = () => {
         // Exclude selectedFileId and its parents from total count
@@ -371,6 +391,9 @@ export default function FileSelectorDialog({
             setProcessing(false);
         }
     };
+
+    // Keep hook ordering stable when callers retain the dialog while closed.
+    if (!open) return null;
 
     // Recursive render
     const renderNode = (node, level = 0) => {

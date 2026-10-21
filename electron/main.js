@@ -5,11 +5,12 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 import {
-  processExport,
   exportCombinedManuscript,
   exportToPDF,
   exportToHTML,
 } from './export.js'
+import { prepareExportPlan, describeExportPlan, executeExportPlan, LocalExportError } from './local-export.js'
+import { registerLocalExportHandlers } from './export-workspace-ipc.js'
 import { registerLocalImportHandlers } from './import.js'
 import { ensureBackupDir, getDefaultBackupDir, getDefaultDataDir, listBackups } from './backup.js'
 import { spawnManagedBackend, stopChildProcess, waitForHttpService } from './backend-process.js'
@@ -363,80 +364,18 @@ ipcMain.handle('dialog:saveFile', async () => {
   return res.canceled ? '' : (res.filePath || '')
 })
 
-ipcMain.handle('file:saveContentAs', async (event, { suggestedName = 'note.md', content = '' } = {}) => {
-  try {
-    const result = await dialog.showSaveDialog({
-      defaultPath: suggestedName,
-      filters: [
-        { name: 'Markdown', extensions: ['md'] },
-        { name: 'Text', extensions: ['txt'] },
-        { name: 'All Files', extensions: ['*'] },
-      ],
-    })
-    if (result.canceled || !result.filePath) {
-      return { success: false, canceled: true }
-    }
-
-    await fs.writeFile(result.filePath, String(content ?? ''), 'utf8')
-    return { success: true, path: result.filePath }
-  } catch (error) {
-    console.error(error)
-    return { success: false, canceled: false, message: error.message }
-  }
+const localExports = registerLocalExportHandlers({
+  ipcMain, dialog, shell, getWindow: () => mainWindow,
+  getExpectedURL: () => app.isPackaged
+    ? pathToFileURL(path.join(app.getAppPath(), 'dist/index.html')).href
+    : 'http://localhost:5000/',
+  isClosing: () => quitting || allowQuit || Boolean(windowClosePromise),
+  prepare: prepareExportPlan, describe: describeExportPlan, execute: executeExportPlan,
+  isExportError: error => error instanceof LocalExportError,
+  combinedExport: exportCombinedManuscript, pdfExport: exportToPDF, htmlExport: exportToHTML,
 })
-
-ipcMain.handle('dialog:openDirectory', async () => {
-  const res = await dialog.showOpenDialog({ properties: ['openDirectory'] })
-  return res.canceled ? '' : (res.filePaths[0] || '')
-})
-
-ipcMain.handle('export:docx', async (event, { ids, targetDir, format = 'docx' }) => {
-  try {
-    const errors = await processExport(ids, targetDir, format)
-    return { success: true, errors }
-  } catch (e) {
-    console.error(e)
-    return { success: false, message: e.message }
-  }
-})
-
-ipcMain.handle('export:combined-manuscript', async (
-  event,
-  { ids = [], targetDir, format = 'docx', title = '合并稿' } = {}
-) => {
-  try {
-    const outputPath = await exportCombinedManuscript(
-      ids,
-      targetDir,
-      format,
-      title,
-    )
-    return { success: true, path: outputPath }
-  } catch (e) {
-    console.error(e)
-    return { success: false, message: e.message }
-  }
-})
-
-ipcMain.handle('export:pdf', async (event, { file, outputPath }) => {
-  try {
-    const path = await exportToPDF(file, outputPath)
-    return { success: true, path }
-  } catch (e) {
-    console.error(e)
-    return { success: false, message: e.message }
-  }
-})
-
-ipcMain.handle('export:html', async (event, { file, outputPath }) => {
-  try {
-    const path = await exportToHTML(file, outputPath)
-    return { success: true, path }
-  } catch (e) {
-    console.error(e)
-    return { success: false, message: e.message }
-  }
-})
+// Cancellation is independent of the existing editor save/quit transaction.
+app.on('before-quit', () => localExports.abort())
 
 registerLocalImportHandlers({
   ipcMain, dialog, getWindow: () => mainWindow,

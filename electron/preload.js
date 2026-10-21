@@ -9,6 +9,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveContentAs: (payload) => ipcRenderer.invoke('file:saveContentAs', payload),
   openDirectoryDialog: () => ipcRenderer.invoke('dialog:openDirectory'),
   exportToDocx: (ids, targetDir, format) => ipcRenderer.invoke('export:docx', { ids, targetDir, format }),
+  exportWorkspacePrepare: payload => ipcRenderer.invoke('export:workspace:prepare', payload),
+  exportWorkspaceChooseDirectory: payload => ipcRenderer.invoke('export:workspace:choose-directory', payload),
+  exportWorkspaceStart: payload => ipcRenderer.invoke('export:workspace:start', payload),
+  exportWorkspaceStatus: payload => ipcRenderer.invoke('export:workspace:status', payload),
+  exportWorkspaceCancel: payload => ipcRenderer.invoke('export:workspace:cancel', payload),
+  exportWorkspaceRetry: payload => ipcRenderer.invoke('export:workspace:retry', payload),
+  exportWorkspaceReveal: payload => ipcRenderer.invoke('export:workspace:reveal', payload),
+  exportWorkspaceRelease: payload => ipcRenderer.invoke('export:workspace:release', payload),
   exportCombinedManuscript: (ids, targetDir, format, title) => ipcRenderer.invoke(
     'export:combined-manuscript',
     { ids, targetDir, format, title }

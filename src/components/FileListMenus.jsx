@@ -49,7 +49,7 @@ export function FileLibraryMenu({
         </span>
       </button>
 
-      <button type="button" className="menu-item" role="menuitem" onClick={onExport}>
+      <button type="button" className="menu-item" role="menuitem" onClick={onExport} data-local-export-entry>
         <span className="menu-item-icon" aria-hidden="true">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 21V9M7 16l5 5 5-5" />

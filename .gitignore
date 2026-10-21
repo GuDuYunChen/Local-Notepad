@@ -40,3 +40,4 @@ src/public/brand/
 
 # Canonical native-reading test fixture, rebuilt from production node classes
 scripts/reading-mode-desktop-fixture.bundle.mjs
+scripts/local-export-desktop-fixture.bundle.mjs

@@ -4,6 +4,7 @@ import path from 'path'
 import { BrowserWindow } from 'electron'
 import {
     codeBlockText,
+    checkExportContinuation,
     embedLocalImagesInLexical,
     materializeLocalAssetsInLexical,
     fetchAllFileMetadata,
@@ -15,11 +16,14 @@ import {
 } from './export-utils.js'
 
 // 辅助：获取文件内容（从 Go 后端）
-async function fetchFileContent(id) {
+async function fetchFileContent(id, options = {}) {
+    checkExportContinuation(options)
     const base = process.env.API_BASE || 'http://127.0.0.1:27121'
-    const res = await fetch(`${base}/api/files/${id}`)
+    const res = await fetch(`${base}/api/files/${id}`, options.signal ? { signal: options.signal } : undefined)
+    checkExportContinuation(options)
     if (!res.ok) throw new Error(`Fetch failed: ${res.statusText}`)
     const body = await res.json()
+    checkExportContinuation(options)
     if (body.code !== 0) throw new Error(body.message)
     return body.data
 }
@@ -36,7 +40,8 @@ function parseLexicalState(content) {
 }
 
 // 转换器：Lexical Node -> Docx Object
-async function convertNode(node) {
+async function convertNode(node, options = {}) {
+    checkExportContinuation(options)
     if (!node.type) return null
 
     switch (node.type) {
@@ -47,19 +52,19 @@ async function convertNode(node) {
                           HeadingLevel.HEADING_4
             return new Paragraph({
                 heading: level,
-                children: await convertChildren(node.children)
+                children: await convertChildren(node.children, options)
             })
             
         case 'paragraph':
             return new Paragraph({
-                children: await convertChildren(node.children)
+                children: await convertChildren(node.children, options)
             })
             
         case 'quote':
             return new Paragraph({
                 style: 'Quote', // 需要在 Document 样式中定义，或者直接设置缩进/斜体
                 indent: { left: 720 }, // 0.5 inch
-                children: await convertChildren(node.children)
+                children: await convertChildren(node.children, options)
             })
             
         case 'list': // unordered-list or ordered-list
@@ -67,10 +72,10 @@ async function convertNode(node) {
              // But here 'list' usually contains 'listitem'
              // We need to handle list items individually.
              // Actually Lexical 0.10+ structure: list -> listitem
-             return await convertList(node)
+             return await convertList(node, 0, options)
 
         case 'table':
-            return await convertTable(node)
+            return await convertTable(node, options)
 
         case 'code-block':
             return new Paragraph({
@@ -83,12 +88,12 @@ async function convertNode(node) {
             })
             
         case 'image':
-            return await convertImage(node)
+            return await convertImage(node, options)
 
         case 'image-grid': {
             const paragraphs = []
             for (const item of node.items || []) {
-                const paragraph = await convertImage(item)
+                const paragraph = await convertImage(item, options)
                 if (paragraph) paragraphs.push(paragraph)
             }
             return paragraphs
@@ -120,13 +125,14 @@ async function convertNode(node) {
         default:
             // Fallback for unknown nodes
             if (node.children) {
-                 return new Paragraph({ children: await convertChildren(node.children) })
+                 return new Paragraph({ children: await convertChildren(node.children, options) })
             }
             return null
     }
 }
 
-async function convertChildren(children) {
+async function convertChildren(children, options = {}) {
+    checkExportContinuation(options)
     if (!children) return []
     const runs = []
     for (const child of children) {
@@ -144,7 +150,7 @@ async function convertChildren(children) {
              // Usually TextRun can contain break.
              runs.push(new TextRun({ text: '\n' })) // or break: 1
         } else if (child.type === 'link') {
-             const linkRuns = await convertChildren(child.children)
+             const linkRuns = await convertChildren(child.children, options)
              linkRuns.forEach(r => runs.push(r))
         } else if (child.type === 'wiki-link') {
              const section = Array.isArray(child.sectionPath)
@@ -161,7 +167,8 @@ async function convertChildren(children) {
     return runs
 }
 
-async function convertList(node, level = 0) {
+async function convertList(node, level = 0, options = {}) {
+    checkExportContinuation(options)
     const paras = []
     const isNumbered = node.listType === 'number'
     let counter = Number(node.start) || 1
@@ -186,7 +193,7 @@ async function convertList(node, level = 0) {
 
         for (const child of item.children || []) {
             if (child.type === 'list') {
-                paras.push(...await convertList(child, level + 1))
+                paras.push(...await convertList(child, level + 1, options))
             }
         }
     }
@@ -194,7 +201,8 @@ async function convertList(node, level = 0) {
     return paras
 }
 
-async function convertTable(node) {
+async function convertTable(node, options = {}) {
+    checkExportContinuation(options)
     // node.children (rows) -> row.children (cells)
     const rows = []
     for (const rowNode of node.children) {
@@ -207,7 +215,7 @@ async function convertTable(node) {
             
             const cellContent = []
             for (const n of cellNode.children) {
-                const converted = await convertNode(n)
+                const converted = await convertNode(n, options)
                 if (converted) {
                      if (Array.isArray(converted)) cellContent.push(...converted)
                      else cellContent.push(converted)
@@ -237,7 +245,8 @@ async function convertTable(node) {
     })
 }
 
-async function convertImage(node) {
+async function convertImage(node, options = {}) {
+    checkExportContinuation(options)
     // node.src
     try {
         let buffer
@@ -246,8 +255,10 @@ async function convertImage(node) {
             buffer = Buffer.from(base64, 'base64')
         } else if (node.src.startsWith('http')) {
             // Fetch
-            const res = await fetch(node.src)
+            const res = await fetch(node.src, options.signal ? { signal: options.signal } : undefined)
+            checkExportContinuation(options)
             const arr = await res.arrayBuffer()
+            checkExportContinuation(options)
             buffer = Buffer.from(arr)
         }
         
@@ -262,6 +273,7 @@ async function convertImage(node) {
              })
         }
     } catch (e) {
+        checkExportContinuation(options)
         console.error("Image convert error", e)
     }
     return new Paragraph({ text: "[图片加载失败]" })
@@ -286,14 +298,15 @@ export async function exportToDocx(files, targetDir) {
     // Let's accept IDs.
 }
 
-export async function processExport(ids, targetDir, format = 'docx') {
+export async function processExport(ids, targetDir, format = 'docx', options = {}) {
+    checkExportContinuation(options)
     const errors = []
-    const allFiles = await fetchAllFileMetadata()
+    const allFiles = await fetchAllFileMetadata(undefined, undefined, options)
     const childrenByParent = indexChildrenByParent(allFiles)
     
     async function processItem(id, currentDir) {
         try {
-            const file = await fetchFileContent(id)
+            const file = await fetchFileContent(id, options)
             const safeTitle = String(file.title || 'Untitled').replace(/[\\/:*?"<>|]/g, '_')
             
             if (file.is_folder) {
@@ -311,16 +324,17 @@ export async function processExport(ids, targetDir, format = 'docx') {
                     const portableContent = await materializeLocalAssetsInLexical(
                         file.content,
                         currentDir,
-                        `${stem}_assets`
+                        `${stem}_assets`, undefined, options
                     )
                     const mdContent = convertToMarkdown(portableContent)
+                    checkExportContinuation(options)
                     fs.writeFileSync(path.join(currentDir, `${stem}.md`), mdContent)
                 } else {
                     const docChildren = []
                     const lexicalNodes = parseLexicalState(file.content)
                     
                     for (const node of lexicalNodes) {
-                        const converted = await convertNode(node)
+                        const converted = await convertNode(node, options)
                         if (converted) {
                             if (Array.isArray(converted)) docChildren.push(...converted)
                             else docChildren.push(converted)
@@ -335,10 +349,12 @@ export async function processExport(ids, targetDir, format = 'docx') {
                     })
                     
                     const buffer = await Packer.toBuffer(doc)
+                    checkExportContinuation(options)
                     fs.writeFileSync(path.join(currentDir, `${stem}.docx`), buffer)
                 }
             }
         } catch (e) {
+            checkExportContinuation(options)
             console.error(`Export ${id} failed`, e)
             errors.push(id)
         }
@@ -356,7 +372,9 @@ export async function exportCombinedManuscript(
     targetDir,
     format = 'docx',
     title = '合并稿',
+    options = {},
   ) {
+    checkExportContinuation(options)
     const orderedIds = (Array.isArray(ids) ? ids : []).filter(Boolean)
     if (!orderedIds.length) {
         throw new Error('没有可导出的章节')
@@ -368,13 +386,13 @@ export async function exportCombinedManuscript(
         const sections = []
 
         for (let index = 0; index < orderedIds.length; index++) {
-            const file = await fetchFileContent(orderedIds[index])
+            const file = await fetchFileContent(orderedIds[index], options)
             if (!file || file.is_folder) continue
 
             const portableContent = await materializeLocalAssetsInLexical(
                 file.content,
                 targetDir,
-                `${safeTitle}_assets/${String(index + 1).padStart(2, '0')}`
+                `${safeTitle}_assets/${String(index + 1).padStart(2, '0')}`, undefined, options
             )
             const markdown = convertToMarkdown(portableContent).trim()
             const chapterTitle = escapeMarkdownText(
@@ -386,6 +404,7 @@ export async function exportCombinedManuscript(
         }
 
         const outputPath = path.join(targetDir, `${safeTitle}.md`)
+        checkExportContinuation(options)
         fs.writeFileSync(outputPath, sections.join('\n\n---\n\n') + '\n', 'utf8')
         return outputPath
     }
@@ -404,7 +423,7 @@ export async function exportCombinedManuscript(
     ]
 
     for (const id of orderedIds) {
-        const file = await fetchFileContent(id)
+        const file = await fetchFileContent(id, options)
         if (!file || file.is_folder) continue
 
         docChildren.push(
@@ -420,7 +439,7 @@ export async function exportCombinedManuscript(
 
         const lexicalNodes = parseLexicalState(file.content)
         for (const node of lexicalNodes) {
-            const converted = await convertNode(node)
+            const converted = await convertNode(node, options)
             if (!converted) continue
             if (Array.isArray(converted)) docChildren.push(...converted)
             else docChildren.push(converted)
@@ -436,6 +455,7 @@ export async function exportCombinedManuscript(
     })
     const buffer = await Packer.toBuffer(doc)
     const outputPath = path.join(targetDir, `${safeTitle}.docx`)
+    checkExportContinuation(options)
     fs.writeFileSync(outputPath, buffer)
     return outputPath
 }
@@ -630,7 +650,8 @@ function processTableToMarkdown(node, lines) {
     lines.push('')
 }
 
-export async function exportToPDF(file, outputPath) {
+export async function exportToPDF(file, outputPath, options = {}) {
+    checkExportContinuation(options)
     const win = new BrowserWindow({
         show: false,
         width: 800,
@@ -642,10 +663,15 @@ export async function exportToPDF(file, outputPath) {
         }
     })
 
+    const abort = () => { if (!win.isDestroyed()) win.destroy() }
+    options.signal?.addEventListener('abort', abort, { once: true })
     try {
-        const portableContent = await embedLocalImagesInLexical(file.content)
+        checkExportContinuation(options)
+        const portableContent = await embedLocalImagesInLexical(file.content, undefined, options)
+        checkExportContinuation(options)
         const htmlContent = convertLexicalToFullHTML({ ...file, content: portableContent })
         await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(htmlContent))
+        checkExportContinuation(options)
 
         // Wait for images referenced by the note before printing.
         await win.webContents.executeJavaScript(`
@@ -660,6 +686,7 @@ export async function exportToPDF(file, outputPath) {
               })
             )
         `)
+        checkExportContinuation(options)
 
         const pdfBuffer = await win.webContents.printToPDF({
             pageSize: 'A4',
@@ -667,18 +694,23 @@ export async function exportToPDF(file, outputPath) {
             printBackground: true
         })
 
+        checkExportContinuation(options)
         fs.writeFileSync(outputPath, pdfBuffer)
         return outputPath
     } finally {
+        options.signal?.removeEventListener('abort', abort)
         if (!win.isDestroyed()) {
             win.close()
         }
     }
 }
 
-export async function exportToHTML(file, outputPath) {
-    const portableContent = await embedLocalImagesInLexical(file.content)
+export async function exportToHTML(file, outputPath, options = {}) {
+    checkExportContinuation(options)
+    const portableContent = await embedLocalImagesInLexical(file.content, undefined, options)
+    checkExportContinuation(options)
     const htmlContent = convertLexicalToFullHTML({ ...file, content: portableContent })
+    checkExportContinuation(options)
     fs.writeFileSync(outputPath, htmlContent, 'utf-8')
     return outputPath
 }
