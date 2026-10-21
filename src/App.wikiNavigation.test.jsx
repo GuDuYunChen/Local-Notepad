@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { beforeEach, afterEach, test, expect, vi } from 'vitest'
 import App from './App'
 import { api } from './services/api'
-const m = vi.hoisted(() => ({ select:null, current:null, save:vi.fn(), clear:vi.fn(), delayedLoads:new Set(), loads:[] }))
+const m = vi.hoisted(() => ({ select:null, current:null, save:vi.fn(), clear:vi.fn(), delayedLoads:new Set(), delayedOutlines:new Set(), loads:[] }))
 vi.mock('./services/api', () => ({ api:vi.fn(), searchFiles:vi.fn().mockResolvedValue([]), createFileVersionSnapshot:vi.fn(), listAllFilesWithContent:vi.fn() }))
 vi.mock('./components/FileList', () => ({ default:({onSelect,updatedItem}) => { m.select=onSelect; m.current=updatedItem; return null } }))
 vi.mock('./components/WorkspaceSidebar', () => ({ default:({children,onChangeWorkspace}) => <aside><button onClick={()=>onChangeWorkspace('recent')}>其他工作区</button><button onClick={()=>onChangeWorkspace('notes')}>笔记工作区</button>{children}</aside> }))
@@ -12,9 +12,16 @@ vi.mock('./components/TextEditor', () => ({ default:React.forwardRef(function Ed
   React.useEffect(()=>{
     if(!activeId)return
     let active=true
-    const load={id:activeId,completed:false,cancelled:false,complete(){
+    const load={id:activeId,completed:false,cancelled:false,outlineReady:false,content:null,ready(){
+      if(!active||!load.completed||load.outlineReady)return false
+      load.outlineReady=true
+      window.dispatchEvent(new CustomEvent('editor:heading-navigation-ready',{detail:{documentId:activeId,content:load.content}}))
+      return true
+    },complete(){
       if(!active||load.completed)return false
-      load.completed=true;onLoaded?.(m.current.content);onStatusChange?.({dirty:false});return true
+      load.completed=true;load.content=m.current.content;onLoaded?.(load.content);onStatusChange?.({dirty:false})
+      if(!m.delayedOutlines.has(activeId))load.ready()
+      return true
     }}
     m.loads.push(load)
     if(!m.delayedLoads.has(activeId))load.complete()
@@ -35,7 +42,7 @@ const click = async label => { expect(button(label),'missing '+label).toBeTruthy
 const emit = async detail => { await act(async()=>window.dispatchEvent(new CustomEvent('wikiLink:open',{detail:{id:'target',title:'旧标题',headingPath:[],...detail}}))); await drain() }
 beforeEach(async()=>{
   globalThis.IS_REACT_ACT_ENVIRONMENT=true;vi.useFakeTimers();localStorage.clear();api.mockReset().mockResolvedValue(target);m.clear.mockReset().mockReturnValue(true);m.save.mockReset().mockReturnValue(null)
-  m.delayedLoads.clear();m.loads.length=0
+  m.delayedLoads.clear();m.delayedOutlines.clear();m.loads.length=0
   host=document.createElement('div');document.body.append(host);root=createRoot(host);await act(async()=>root.render(<App/>));await settle();await act(async()=>m.select(source));await settle()
 })
 afterEach(async()=>{await act(async()=>root.unmount());host.remove();vi.useRealTimers();vi.restoreAllMocks();delete globalThis.IS_REACT_ACT_ENVIRONMENT})
@@ -138,5 +145,50 @@ test('queued frames from an older section cannot run as part of a newer B naviga
   expect(frames.size).toBe(0)
   expect(headingEvents(events)).toEqual([{documentId:target.id,path:['新章节']}])
   expect(title()).toBe(target.title)
+  expect(m.save).not.toHaveBeenCalled();expect(m.clear).not.toHaveBeenCalled()
+})
+
+test('an accepted section waits for the target outline commit after its body-load frames elapse',async()=>{
+  const events=vi.spyOn(window,'dispatchEvent')
+  m.delayedOutlines.add(target.id)
+  await emit({headingPath:['目标章节']});await settle()
+  const load=selectedLoad(target.id)
+  expect(title()).toBe(target.title);expect(load.completed).toBe(true);expect(load.outlineReady).toBe(false)
+  expect(headingEvents(events)).toEqual([])
+  await act(async()=>expect(load.ready()).toBe(true));await settle()
+  expect(headingEvents(events)).toEqual([{documentId:target.id,path:['目标章节']}])
+  await act(async()=>window.dispatchEvent(new CustomEvent('editor:heading-navigation-ready',{detail:{documentId:target.id,content:target.content}})));await settle()
+  expect(headingEvents(events)).toEqual([{documentId:target.id,path:['目标章节']}])
+  expect(load.ready()).toBe(false)
+  expect(m.save).not.toHaveBeenCalled();expect(m.clear).not.toHaveBeenCalled()
+})
+
+test('a different document or body readiness cannot consume the accepted section request',async()=>{
+  const events=vi.spyOn(window,'dispatchEvent')
+  m.delayedOutlines.add(target.id)
+  await emit({headingPath:['目标章节']});await settle()
+  const load=selectedLoad(target.id)
+  for(const detail of [{documentId:other.id,content:target.content},{documentId:target.id,content:body('旧正文章节')}]){
+    await act(async()=>window.dispatchEvent(new CustomEvent('editor:heading-navigation-ready',{detail})));await settle()
+  }
+  expect(headingEvents(events)).toEqual([])
+  await act(async()=>expect(load.ready()).toBe(true));await settle()
+  expect(headingEvents(events)).toEqual([{documentId:target.id,path:['目标章节']}])
+  expect(m.save).not.toHaveBeenCalled();expect(m.clear).not.toHaveBeenCalled()
+})
+
+test('leaving after the body read invalidates its pending outline before an ordinary reopen',async()=>{
+  const events=vi.spyOn(window,'dispatchEvent')
+  m.delayedOutlines.add(target.id)
+  await emit({headingPath:['目标章节']});await settle()
+  const oldLoad=selectedLoad(target.id)
+  expect(oldLoad.completed).toBe(true);expect(headingEvents(events)).toEqual([])
+  await act(async()=>m.select(other));await settle()
+  expect(oldLoad.cancelled).toBe(true);expect(oldLoad.ready()).toBe(false)
+  await act(async()=>window.dispatchEvent(new CustomEvent('editor:heading-navigation-ready',{detail:{documentId:target.id,content:target.content}})));await settle()
+  m.delayedOutlines.delete(target.id)
+  await act(async()=>m.select(target));await settle()
+  expect(title()).toBe(target.title);expect(selectedLoad(target.id).outlineReady).toBe(true)
+  expect(headingEvents(events)).toEqual([])
   expect(m.save).not.toHaveBeenCalled();expect(m.clear).not.toHaveBeenCalled()
 })

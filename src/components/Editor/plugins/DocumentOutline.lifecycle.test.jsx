@@ -9,7 +9,7 @@ import {LexicalErrorBoundary} from '@lexical/react/LexicalErrorBoundary'
 import {$getRoot,$createTextNode,$createParagraphNode} from 'lexical'
 import {HeadingNode,$createHeadingNode} from '@lexical/rich-text'
 import DocumentOutlinePlugin from './DocumentOutlinePlugin'
-import {beginEvidenceContentLoad,completeEvidenceContentLoad} from '~/services/evidenceNavigation'
+import {beginEvidenceContentLoad,completeEvidenceContentLoad,cancelEvidenceContentLoad} from '~/services/evidenceNavigation'
 let host,root,editor,errors,scrolls,frames,nextFrame
 function Capture(){const [e]=useLexicalComposerContext();useEffect(()=>{editor=e},[e]);return null}
 function Harness({id='A',requireLoaded=false}) {return <LexicalComposer initialConfig={{namespace:'outline-real',nodes:[HeadingNode],onError:e=>errors.push(e)}}><div className="editor-shell"><DocumentOutlinePlugin documentId={id} documentTitle={'笔记'+id} initialContent={id} requireLoaded={requireLoaded}/><div className="editor-container"><RichTextPlugin contentEditable={<ContentEditable className="editor-input"/>} placeholder={null} ErrorBoundary={LexicalErrorBoundary}/><Capture/></div></div></LexicalComposer>}
@@ -53,3 +53,120 @@ test('search reveals a collapsed section without editing body',async()=>{await s
 test('readonly editor supports navigation without entering editable state',async()=>{await start();editor.setEditable(false);const before=serialized();await click('章节甲');await tick();expect(editor.isEditable()).toBe(false);expect(serialized()).toBe(before)})
 test('oversize query shows an explicit error and never navigates a truncated result',async()=>{await start();await field('X'.repeat(201));expect(host.textContent).toContain('最多 200');expect(host.querySelectorAll('.document-outline-item')).toHaveLength(0)})
 test('over-budget outline reports an error and a later valid read recovers',async()=>{await render();await seed(Array.from({length:501},(_,i)=>['h1','H'+i]));await click('文档目录');expect(host.textContent).toContain('完整读取上限');await seed([['h1','恢复']]);expect(host.textContent).toContain('恢复');expect(host.textContent).not.toContain('完整读取上限')})
+
+async function withHeadingReadiness(run,onReady=()=>{}) {
+  const observations=[]
+  const observe=event=>{
+    observations.push({
+      detail:event.detail,
+      headings:[...host.querySelectorAll('.document-outline-item')].map(n=>n.textContent),
+      bodyHeadings:[...host.querySelectorAll('.editor-input h1,.editor-input h2')].map(n=>n.textContent),
+      count:button('文档目录')?.querySelector('span:last-child')?.textContent,
+      loading:host.textContent.includes('正文正在加载'),
+    })
+    onReady(event)
+  }
+  window.addEventListener('editor:heading-navigation-ready',observe)
+  try{await run(observations)}finally{window.removeEventListener('editor:heading-navigation-ready',observe)}
+}
+function LoadedOutlineHarness({showOutline=false}) {
+  return <LexicalComposer initialConfig={{namespace:'outline-loaded-mount',nodes:[HeadingNode],onError:e=>errors.push(e)}}><div className="editor-shell">{showOutline&&<DocumentOutlinePlugin documentId="A" documentTitle="已加载笔记" initialContent="mounted-body" requireLoaded/>}<div className="editor-container"><RichTextPlugin contentEditable={<ContentEditable className="editor-input"/>} placeholder={null} ErrorBoundary={LexicalErrorBoundary}/><Capture/></div></div></LexicalComposer>
+}
+
+test('heading readiness waits for the exact body and committed outline before original navigation',async()=>{
+  await withHeadingReadiness(async observations=>{
+    await render({requireLoaded:true});await seed();await click('文档目录')
+    const before=serialized(),token=beginEvidenceContentLoad(editor,'A','A')
+    await tick()
+    expect(observations).toEqual([])
+    expect(host.textContent).toContain('正文正在加载')
+    await act(async()=>{
+      completeEvidenceContentLoad(editor,token)
+      expect(observations).toEqual([])
+      expect(host.querySelectorAll('.document-outline-item')).toHaveLength(0)
+      expect(host.textContent).toContain('正文正在加载')
+    })
+    await flush()
+    expect(observations).toEqual([{detail:{documentId:'A',content:'A'},headings:['卷一','章节甲','章节乙','卷二'],bodyHeadings:['卷一','章节甲','章节乙','卷二'],count:'4',loading:false}])
+    expect(host.textContent).not.toContain('已定位：章节乙')
+    await tick()
+    expect(host.textContent).toContain('已定位：章节乙')
+    expect(scrolls.some(s=>s.element.className==='editor-container')).toBe(true)
+    expect(serialized()).toBe(before)
+    expect(errors).toEqual([])
+  },event=>window.dispatchEvent(new CustomEvent('editor:open-heading-anchor',{detail:{documentId:event.detail.documentId,path:['卷一','章节乙']}})))
+})
+
+test('an outline mounted after body readiness signals its committed heading count',async()=>{
+  await withHeadingReadiness(async observations=>{
+    await act(async()=>root.render(<LoadedOutlineHarness/>));await flush()
+    await seed([['h1','预先加载章节'],['p','已加载正文']])
+    const loadedEditor=editor,token=beginEvidenceContentLoad(editor,'A','mounted-body')
+    await act(async()=>completeEvidenceContentLoad(editor,token))
+    expect(observations).toEqual([])
+    expect(host.querySelector('.document-outline')).toBeNull()
+    await act(async()=>root.render(<LoadedOutlineHarness showOutline/>));await flush()
+    expect(editor).toBe(loadedEditor)
+    expect(observations).toEqual([{detail:{documentId:'A',content:'mounted-body'},headings:[],bodyHeadings:['预先加载章节'],count:'1',loading:false}])
+    await click('文档目录')
+    expect([...host.querySelectorAll('.document-outline-item')].map(n=>n.textContent)).toEqual(['预先加载章节'])
+    expect(observations).toHaveLength(1)
+    expect(errors).toEqual([])
+  })
+})
+
+test('invalidated or mismatched content cannot publish a pending heading readiness signal',async()=>{
+  await withHeadingReadiness(async observations=>{
+    await render({requireLoaded:true});await seed();await click('文档目录')
+    const stale=beginEvidenceContentLoad(editor,'A','A')
+    await act(async()=>{
+      completeEvidenceContentLoad(editor,stale)
+      cancelEvidenceContentLoad(editor,stale)
+      expect(observations).toEqual([])
+    })
+    await flush()
+    expect(observations).toEqual([])
+    await act(async()=>completeEvidenceContentLoad(editor,stale));await flush()
+    const mismatched=beginEvidenceContentLoad(editor,'A','different-content')
+    await act(async()=>completeEvidenceContentLoad(editor,mismatched));await flush()
+    expect(observations).toEqual([])
+    expect(host.textContent).toContain('正文正在加载')
+    const current=beginEvidenceContentLoad(editor,'A','A')
+    await seed([['h1','恢复章节'],['p','最新正文']])
+    await act(async()=>{
+      completeEvidenceContentLoad(editor,current)
+      expect(observations).toEqual([])
+    })
+    await flush()
+    expect(observations).toEqual([{detail:{documentId:'A',content:'A'},headings:['恢复章节'],bodyHeadings:['恢复章节'],count:'1',loading:false}])
+    expect(errors).toEqual([])
+  })
+})
+
+test('a same-composer document switch discards the old uncommitted heading readiness',async()=>{
+  await withHeadingReadiness(async observations=>{
+    await render({requireLoaded:true});await seed();await click('文档目录')
+    const previousEditor=editor,stale=beginEvidenceContentLoad(editor,'A','A')
+    await act(async()=>{
+      completeEvidenceContentLoad(editor,stale)
+      root.render(<Harness id="B" requireLoaded/>)
+      expect(observations).toEqual([])
+    })
+    await flush()
+    expect(editor).toBe(previousEditor)
+    expect(observations).toEqual([])
+    await seed([['h1','B标题'],['p','B正文']]);await click('文档目录')
+    await act(async()=>completeEvidenceContentLoad(editor,stale));await flush()
+    expect(observations).toEqual([])
+    expect(host.textContent).toContain('正文正在加载')
+    const current=beginEvidenceContentLoad(editor,'B','B')
+    await act(async()=>{
+      completeEvidenceContentLoad(editor,current)
+      expect(observations).toEqual([])
+    })
+    await flush()
+    expect(observations).toEqual([{detail:{documentId:'B',content:'B'},headings:['B标题'],bodyHeadings:['B标题'],count:'1',loading:false}])
+    expect(host.textContent).not.toContain('卷一')
+    expect(errors).toEqual([])
+  })
+})

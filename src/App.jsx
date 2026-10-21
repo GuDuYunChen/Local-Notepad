@@ -138,6 +138,38 @@ export default function App() {
   const unappliedDrafts = Boolean(current && editorStatus.activeId === current.id && editorStatus.unappliedDrafts)
   const unsaved = !!(current && (content !== (current.content || '') || unappliedDrafts))
 
+  useEffect(() => {
+    const onHeadingNavigationReady = event => {
+      const pending = pendingEditorNavigationRef.current
+      if (!pending) return
+      if (pending.epoch !== navigationEpoch.current) {
+        pendingEditorNavigationRef.current = null
+        return
+      }
+      if (
+        event.detail?.documentId !== pending.id ||
+        typeof pending.loadedContent !== 'string' ||
+        event.detail?.content !== pending.loadedContent ||
+        !pending.headingPath?.length
+      ) return
+
+      // The body read can finish before the editor and its outline commit.
+      // Consume this selection only when that exact document body is ready.
+      pendingEditorNavigationRef.current = null
+      const epoch = pending.epoch
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
+          if (epoch !== navigationEpoch.current) return
+          window.dispatchEvent(new CustomEvent('editor:open-heading-anchor', {
+            detail: { documentId: pending.id, path: pending.headingPath },
+          }))
+        })
+      })
+    }
+    window.addEventListener('editor:heading-navigation-ready', onHeadingNavigationReady)
+    return () => window.removeEventListener('editor:heading-navigation-ready', onHeadingNavigationReady)
+  }, [])
+
   const select = React.useCallback((f) => {
     navigationEpoch.current += 1
     pendingEditorNavigationRef.current = null
@@ -1219,16 +1251,7 @@ export default function App() {
                           if (pending && pending.epoch !== navigationEpoch.current) {
                             pendingEditorNavigationRef.current = null
                           } else if (pending?.id === current.id && pending.headingPath?.length) {
-                            pendingEditorNavigationRef.current = null
-                            const epoch = pending.epoch
-                            window.requestAnimationFrame(() => {
-                              window.requestAnimationFrame(() => {
-                                if (epoch !== navigationEpoch.current) return
-                                window.dispatchEvent(new CustomEvent('editor:open-heading-anchor', {
-                                  detail: { documentId: current.id, path: pending.headingPath },
-                                }))
-                              })
-                            })
+                            pending.loadedContent = text
                           }
                         }
                       }}

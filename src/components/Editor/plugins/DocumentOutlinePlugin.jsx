@@ -64,6 +64,11 @@ function CurrentOutline({documentId='',documentTitle='',initialContent,requireLo
     })
     return()=>{alive.current=false;invalidate();unsubscribe();update();resetDisplays()}
   },[editor,documentId,initialContent,requireLoaded])
+  useEffect(()=>{
+    // Body completion can precede this outline's committed snapshot. Publish
+    // readiness from the snapshot commit so pending anchors use the current rows.
+    if(alive.current&&status==='ready'&&ready())window.dispatchEvent(new CustomEvent('editor:heading-navigation-ready',{detail:{documentId,content:initialContent}}))
+  },[snapshot,status])
   useEffect(()=>{applyFolds(snapshot.nodes,collapsed);return resetDisplays},[editor,snapshot,collapsed])
   const reveal=key=>{
     const current=state.current,next=expandedOutlineKeys(current.snapshot.nodes,current.collapsed,key)
