@@ -18,7 +18,7 @@ const startupErrorTypes = new Set(['UNKNOWN', 'System.Exception', 'System.Invali
 const startupReferences = new Set(['System.dll', 'System.Core.dll', 'UIAutomationClient.dll', 'UIAutomationTypes.dll', 'WindowsBase.dll'])
 function startupDiagnostic(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
-  const keys = ['stage', 'errorType', 'hresult', 'compilerCodes', 'powerShellVersion', 'references']
+  const keys = ['stage', 'errorType', 'hresult', 'compilerCodes', 'compilerErrors', 'powerShellVersion', 'references']
   if (Object.keys(value).length !== keys.length || !keys.every(key => Object.hasOwn(value, key))) return null
   if (!startupStages.has(value.stage) || !startupErrorTypes.has(value.errorType)) return null
   if (value.hresult !== null && (!Number.isInteger(value.hresult) || value.hresult < -2147483648 || value.hresult > 2147483647)) return null
@@ -27,11 +27,23 @@ function startupDiagnostic(value) {
   if (!Array.isArray(value.compilerCodes) || value.compilerCodes.length > 8
     || !value.compilerCodes.every(code => typeof code === 'string' && /^CS\d{4}$/.test(code))
     || new Set(value.compilerCodes).size !== value.compilerCodes.length) return null
+  if (!Array.isArray(value.compilerErrors) || value.compilerErrors.length > 8
+    || (value.compilerErrors.length > 0 && value.stage !== 'SOURCE_COMPILATION')) return null
+  const errorKeys = ['code', 'line', 'column', 'isWarning']
+  for (const error of value.compilerErrors) {
+    if (!error || typeof error !== 'object' || Array.isArray(error)
+      || Object.keys(error).length !== errorKeys.length || !errorKeys.every(key => Object.hasOwn(error, key))
+      || !value.compilerCodes.includes(error.code) || typeof error.isWarning !== 'boolean'
+      || ![error.line, error.column].every(position => Number.isInteger(position) && position >= 0 && position <= 65535)) return null
+  }
+  if (new Set(value.compilerErrors.map(error => [error.code, error.line, error.column, error.isWarning].join(':'))).size
+    !== value.compilerErrors.length) return null
   if (!Array.isArray(value.references) || value.references.length > 5
     || !value.references.every(name => startupReferences.has(name))
     || new Set(value.references).size !== value.references.length) return null
   return { stage: value.stage, errorType: value.errorType, hresult: value.hresult,
-    compilerCodes: [...value.compilerCodes], powerShellVersion: value.powerShellVersion, references: [...value.references] }
+    compilerCodes: [...value.compilerCodes], compilerErrors: value.compilerErrors.map(({ code, line, column, isWarning }) => ({ code, line, column, isWarning })),
+    powerShellVersion: value.powerShellVersion, references: [...value.references] }
 }
 export function assertExportDirectoryBinding(value) {
   assert.ok(value && integer(value.pid) && value.pid <= 0xffffffff)

@@ -84,3 +84,17 @@ Windows路径问题、实际复制异常和诊断前的未知原因分别记录�
 Windows准备合同增加同一worker的实际冷启动与EOF正常关闭子验证，不发鼠标、键盘或目录动作；原30秒启动与10秒命令预算、PID／owner绑定、单次命令与失败不重播保持。Linux没有PowerShell／.NET Framework时只报告实际运行的协议与拒绝合同，不把条件分支视作Windows已执行。生产导出和包含边界保持；安装共享源同步，下一真实提交仍须完成全部CI、新导出原件与当前EXE完整安装后才能验收。
 
 同轮沿实际驱动复核路径身份链，发现其`mkdtempSync`返回的scratch尚未原生规范化：report.exportRoot沿词法scratch派生，而实际成功item.path来自core原生realpath。若临时根含8.3短名或junction，同一物理目录仍可能在最终包含检查被拒绝。e74在助手启动已停止，这一条件风险不是当次已发生的业务失败。修补仅在独占创建scratch后调用`realpathSync.native`，使profile、导出目录、回执根和最终自有目录清理共享同一个身份；原参数限制、60秒执行预算和相对路径拒绝不变。安装驱动复用同一文件并保持字节一致，不另造通用模块或放宽比较。
+
+## 7ba冷启动原件与确定的CS0028修补
+
+`7ba6d55c72b3cca50c024eda573ccee2b7defce1`／树`46a76fd53258afca9ce3a0ecce89aad1d5f2b560`的17项首次CI为16成功／1失败。[Desktop运行39571162056](https://github.com/GuDuYunChen/Local-Notepad/actions/runs/39571162056)在原617项准备中616通过／1失败，唯一失败是同worker实际冷启动；80状态模型、构建和全部GUI步骤未执行，也没有Desktop产物。原日志99677字节，SHA256 `7ed27ab1fb5a0df2aa4bb05b2ac49d98244e524f094a5d9207e0bc907b777b75`。它报告SOURCE_COMPILATION、System.Exception、HRESULT -2146233088、空compilerCodes；五个引用已含System.Core。不能继续把“补引用”写成启动已解决。
+
+独立诊断从原7ba创建`ci/export-directory-diagnostic-7ba6d55`，通过网页VSCode只新增两份文件，实际提交`2cb99c051c7071b4e373ff36dfe7c7287a9432a0`、唯一父提交7ba、树`24adf507b6b3d16b93d9469843ef066306c591bf`全部核定。原1574个产品文件逐字未变，新增文件不进入原默认／UI发现或导入路径，仅触发[诊断运行39575041025](https://github.com/GuDuYunChen/Local-Notepad/actions/runs/39575041025)的首次attempt，没有重跑旧17项。工作流为Windows、contents:read、4分钟上限，不装依赖、不启动产品，不生成或接受EXE。
+
+原worker和只增加启动catch观察的worker分别在自有进程运行，使用同一实际checkout的CRLF字节、同一C#及五个引用、原UTF8压缩参数和MTA模式。两者均ready:false／exit1，均观察到退出，窗口命令和应用启动为零；原worker仍只能记录阶段和空编号，增强观察读取真实`Microsoft.PowerShell.Commands.AddTypeCompilerError`，取得CS0028、C#第54行15列、isWarning:false，错误说明为私有`ExportDialog.Main(uint, long, string)`的入口签名不符，警告按错误处理。实际环境为Node24.22.0、PowerShell5.1.26100.33648、Desktop／FullLanguage、CLR4.0.30319.42000；没有改变C#去制造这个错误。
+
+原ZIP12332634868为2913字节，SHA256 `21ed156a63ce6d774b3893051c1235499e24dd5446dffd104c59c0ddf9833bfc`；其中原diagnostic.json为9416字节，SHA256 `e3a5b6f7031d17b4bae78228a7e1332dbc8a5e162c221fb840cff05fae21b80b`。Git worker15238字节的SHA为`60d28fad1b4b3b48be16cc96f5949ac8484bda4bec3c05192cce10047618bfc6`，实际CRLF worker15457字节SHA为`26606a6a2a09263b6cd9f6200d5d4b2f085046babaff5b1f64195b497112b816`；两次实际C# SHA均为`00692cd01b9bc873b6a80e2125a797a1c8ab38596d2db0ee93eef193cdc623cd`。原件、换行变换和源码行号已独立核对。官方Roslyn／net48的Linux静态编译虽然通过，不能替代上述Windows CodeDom结果；该诊断也不能反推e74未保留的底层错误已被直接观察。
+
+本次最小修补把内部主窗口校验方法及其全部调用改名`ValidateMainWindow`，方法内PID、可见性、窗口类和可执行文件身份判断逐字保留，五个引用、警告政策和预算不变。启动catch从真实TargetObject提取限定CS编号、行列及布尔警告标记，session严格核验结构，不保存任意ErrorText／异常原文或路径。真实Windows冷启动合同保留旧命名的精确正文反向对照与CS0028拒绝，再验证修复worker正常ready／EOF退出；原协议、失败不重播及目录安全名册继续保留。
+
+这是同一完整模块内的验收助手修补。诊断采集完成不表示产品成功；新提交仍需默认无过滤Vitest、原test:ui、全部17项产品CI、真实Word／Markdown正文及附件、对应4.235.0 EXE和原完整安装生命周期。安装共享脚本须与产品字节一致，pin只能来自合格的当前产品原件；当前源码文档不预写这些未来结果为通过。

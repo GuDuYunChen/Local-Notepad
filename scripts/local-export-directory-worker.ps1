@@ -68,7 +68,7 @@ public static class ExportDialog {
     } finally {CloseHandle(process);}
   }
   static bool SamePath(string a,string b) {return String.Equals(Path.GetFullPath(a),Path.GetFullPath(b),StringComparison.OrdinalIgnoreCase);}
-  static void Main(uint pid,long main,string executable) {
+  static void ValidateMainWindow(uint pid,long main,string executable) {
     var hwnd=new IntPtr(main);uint actual;
     GetWindowThreadProcessId(hwnd,out actual);
     if(actual!=pid||!IsWindowVisible(hwnd)||Text(hwnd,true)!="Chrome_WidgetWin_1"||!SamePath(Image(pid),executable))
@@ -89,7 +89,7 @@ public static class ExportDialog {
     return owned?row:null;
   }
   public static ExportDialogIdentity Find(uint pid,long main,string executable) {
-    Main(pid,main,executable);var matches=new List<ExportDialogIdentity>();int examined=0;
+    ValidateMainWindow(pid,main,executable);var matches=new List<ExportDialogIdentity>();int examined=0;
     EnumWindows((hwnd,param)=> {
       if(++examined>4096)throw new InvalidOperationException("WINDOW_ENUMERATION_LIMIT");
       var row=Identity(hwnd,pid,main,executable);if(row!=null)matches.Add(row);return true;
@@ -98,11 +98,11 @@ public static class ExportDialog {
     return matches.Count==1?matches[0]:null;
   }
   public static ExportWindowSize MinimumWindow(uint pid,long main,string executable) {
-    Main(pid,main,executable);
+    ValidateMainWindow(pid,main,executable);
     if(Find(pid,main,executable)!=null)throw new InvalidOperationException("DIRECTORY_DIALOG_STILL_OPEN");
     var hwnd=new IntPtr(main);
     if(!SetWindowPos(hwnd,IntPtr.Zero,0,0,720,520,0x0016))throw new InvalidOperationException("MINIMUM_WINDOW_NOT_APPLIED");
-    Main(pid,main,executable);Rect rect;
+    ValidateMainWindow(pid,main,executable);Rect rect;
     if(!GetWindowRect(hwnd,out rect)||rect.right-rect.left!=720||rect.bottom-rect.top!=520)throw new InvalidOperationException("MINIMUM_WINDOW_NOT_CONFIRMED");
     return new ExportWindowSize {handle=main,pid=pid,width=720,height=520,applied=true};
   }
@@ -154,7 +154,7 @@ public static class ExportDialog {
     while(IsWindow(new IntPtr(dialog.handle))&&IsWindowVisible(new IntPtr(dialog.handle))&&watch.ElapsedMilliseconds<3000)Thread.Sleep(25);
     result.dialogClosed=!IsWindow(new IntPtr(dialog.handle))||!IsWindowVisible(new IntPtr(dialog.handle));
     if(!result.dialogClosed)throw new InvalidOperationException("DIRECTORY_DIALOG_DID_NOT_CLOSE");
-    Main(pid,main,executable);return result;
+    ValidateMainWindow(pid,main,executable);return result;
   }
 }
 '@ -ReferencedAssemblies $references
@@ -178,13 +178,29 @@ public static class ExportDialog {
     $hresult = [int]$startupError.Exception.HResult
     $diagnosticText = [string]$startupError.ToString()
     if ($diagnosticText.Length -gt 16384) { $diagnosticText = $diagnosticText.Substring(0,16384) }
-    $compilerCodes = @([regex]::Matches($diagnosticText, '\bCS[0-9]{4}\b') |
-      ForEach-Object { $_.Value } | Select-Object -Unique -First 8)
+    # Windows PowerShell omits ErrorNumber from ErrorRecord.ToString(). Keep
+    # typed CompilerError fields; never its ErrorText, FileName or source text.
+    $compilerErrors = @(); $targetCodes = @()
+    $compilerTarget = $startupError.TargetObject
+    if ($null -ne $compilerTarget -and $startupStage -ceq 'SOURCE_COMPILATION' -and
+        $compilerTarget.GetType().FullName -cin @('Microsoft.PowerShell.Commands.AddTypeCompilerError', 'System.CodeDom.Compiler.CompilerError')) {
+      $targetCode = [string]$compilerTarget.ErrorNumber
+      if ($targetCode -cmatch '^CS[0-9]{4}$') {
+        $targetCodes = @($targetCode)
+        if ($compilerTarget.Line -is [int] -and $compilerTarget.Line -ge 0 -and $compilerTarget.Line -le 65535 -and
+            $compilerTarget.Column -is [int] -and $compilerTarget.Column -ge 0 -and $compilerTarget.Column -le 65535 -and
+            $compilerTarget.IsWarning -is [bool]) {
+          $compilerErrors = @(@{code=$targetCode;line=$compilerTarget.Line;column=$compilerTarget.Column;isWarning=$compilerTarget.IsWarning})
+        }
+      }
+    }
+    $compilerCodes = @(@($targetCodes) + @([regex]::Matches($diagnosticText, '\bCS[0-9]{4}\b') |
+      ForEach-Object { $_.Value }) | Select-Object -Unique -First 8)
     $powerShellVersion = [string]$PSVersionTable.PSVersion.ToString()
     if ($powerShellVersion -notmatch '^\d{1,5}\.\d{1,5}(?:\.\d{1,5}){0,2}$') { $powerShellVersion = $null }
     $allowedReferences = @('System.dll', 'System.Core.dll', 'UIAutomationClient.dll', 'UIAutomationTypes.dll', 'WindowsBase.dll')
     $safeReferences = @($referenceNames | Where-Object { $_ -cin $allowedReferences } | Select-Object -Unique -First 5)
-    $diagnostic = @{stage=$startupStage;errorType=$errorType;hresult=$hresult;compilerCodes=$compilerCodes;
+    $diagnostic = @{stage=$startupStage;errorType=$errorType;hresult=$hresult;compilerCodes=$compilerCodes;compilerErrors=$compilerErrors;
       powerShellVersion=$powerShellVersion;references=$safeReferences}
     [Console]::WriteLine((ConvertTo-Json -InputObject @{protocol=1;ready=$false;error='DIRECTORY_HELPER_STARTUP';diagnostic=$diagnostic} -Depth 4 -Compress))
   } catch {

@@ -10,6 +10,12 @@
 
 `e74c87e080c7b004d2fd2ce6ab213b4ba095fb1b`已在实际Windows通过原614项准备、80状态模型、保存／阅读与快捷键重启，原短／长路径阻塞解除；17项CI终态为16成功／1失败。唯一失败来自导出目录助手启动时`STARTUP_REFUSED`，报告中新导出checks／screenshots／directoryActions均为空，不能计作实际导出完成。原启动catch与session没有保留底层异常，无法从该次原件证明具体编译错误。源码复核发现HashSet使用的System.Core未列入显式引用；本次补引用、限定启动诊断，并在Windows准备合同中冷启动同一worker／EOF正常退出，不发送窗口操作。原预算、身份与目录包含边界保持，新HEAD实际导出和完整安装仍待验收；不再轮询或下载e74未合格EXE。
 
+`7ba6d55c72b3cca50c024eda573ccee2b7defce1`的17项首次CI仍为16成功／1失败；新增真实Windows冷启动在原617项准备中提前发现唯一失败，616通过，后续状态模型、构建和实际桌面均未执行。原日志证明阶段为SOURCE_COMPILATION，System.Core已在五个引用中，但CS编号仍为空，不能将补引用视为已修复。没有重跑该候选或下载其EXE。
+
+为取得确切错误，通过网页VSCode从7ba建立仅含两份诊断文件的独立分支，实际提交`2cb99c051c7071b4e373ff36dfe7c7287a9432a0`／树`24adf507b6b3d16b93d9469843ef066306c591bf`；原1574产品文件逐字不变，仅触发一次[Windows诊断39575041025](https://github.com/GuDuYunChen/Local-Notepad/actions/runs/39575041025)。原worker和仅增强catch观察的同一worker均拒绝，实际TargetObject给出CS0028：私有`ExportDialog.Main(uint, long, string)`被当作入口方法，签名不符的警告按错误处理，位置为C#第54行15列。原JSON与ZIP12332634868保留；两个自有PowerShell进程均已退出，没有窗口命令或产品启动。诊断采集成功不等于产品通过，也不替代e74未保留的底层原件。
+
+本次仍修当前完整导出模块：将该内部校验方法及调用改名`ValidateMainWindow`，保留原窗口身份判断、引用、编译警告和预算；启动错误从真实TargetObject读取限定的CS编号和位置，由session严格验证。保留原命名的真实Windows拒绝对照，再核修复worker正常就绪／EOF退出。当前产品HEAD全部CI、实际文档／附件与对应新包的完整安装生命周期仍须独立通过，不能用诊断分支或Linux静态编译充当完成依据。
+
 当前完整本地模块沿用“更多笔记操作 → 导出”的Word／Markdown入口：选择笔记与文件夹，读取并冻结已保存正文预览，原生选择目标目录，创建独占导出批次，逐项显示真实文件与失败原因，停止后显式继续，仅重试失败项，并打开本批目录。导出不保存编辑器草稿、不改笔记数据库；成功项目不重写，关闭或导航撤销旧请求，目录取消保留选择。范围、实际旧源反例与异常处理见 [LOCAL_DOCUMENT_EXPORT_2F102.md](LOCAL_DOCUMENT_EXPORT_2F102.md)。
 
 继续 `feature/knowledge-os-phase2` / Draft PR #2，版本显式升为4.235.0，schema14及679依赖节点不变。先完成本模块源码、默认无过滤Vitest、原test:ui及当前HEAD的全部CI、真实Windows文件／附件、对应新EXE和完整安装生命周期，最终结果再记PR／交付报告。网页VSCode编辑与提交和隔离运行环境中的执行证据分别核对，不能把网页“没有问题”、UI mock或旧候选绿灯当成完整验收。

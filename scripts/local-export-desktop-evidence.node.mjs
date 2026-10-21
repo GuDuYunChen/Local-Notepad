@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { EventEmitter } from 'node:events'
+import { spawn } from 'node:child_process'
 import { PassThrough, Writable } from 'node:stream'
 import { mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync, lstatSync, symlinkSync } from 'node:fs'
 import { realpath as realpathAsync } from 'node:fs/promises'
@@ -18,6 +19,7 @@ import { LOCAL_EXPORT_VERSION, LOCAL_EXPORT_REPORT, LOCAL_EXPORT_CHECKS, LOCAL_E
   validateExportFileManifest, verifyLocalExportFiles, verifyLocalExportDesktopReport } from './local-export-desktop-evidence.mjs'
 import { assertExportDirectoryBinding, assertExportOwnedDirectory, validateExportDirectoryObservation,
   validateExportDirectoryResult, createExportDirectorySession } from './local-export-directory-session.mjs'
+import { desktopWindowWorkerArguments } from './desktop-window-session.mjs'
 
 // All fixtures in this file are contract inputs. Passing these cases does not
 // claim that a Windows process, native picker or installed app has been tested.
@@ -175,14 +177,58 @@ test('one native helper decodes exact UTF8 worker below CreateProcessW limit and
   assert.ok([command, ...args].map(item => '"' + item + '"').join(' ').length + 1 < 32767)
   const bootstrap = Buffer.from(args[4], 'base64').toString('utf16le')
   const payload = bootstrap.match(/FromBase64String\('([A-Za-z0-9+/]+={0,2})'\)/)?.[1]; assert.ok(payload)
-  assert.deepEqual(gunzipSync(Buffer.from(payload, 'base64')), readFileSync(new URL('./local-export-directory-worker.ps1', import.meta.url)))
+  const source = readFileSync(new URL('./local-export-directory-worker.ps1', import.meta.url))
+  assert.deepEqual(gunzipSync(Buffer.from(payload, 'base64')), source)
   assert.equal((await value.minimumWindow(binding)).width, 720)
   assert.equal((await value.inspect(binding)).handle, 401)
   assert.equal((await value.cancel(binding)).closePosts, 1)
   assert.equal((await value.choose(binding, run + '\\exports\\中文')).invocations, 1)
   assert.equal(worker.spawns.length, 1); assert.equal(worker.commands.length, 4)
   assert.equal(await value.dispose(), true); assert.equal(await value.dispose(), true); assert.equal(worker.kills, 0)
+  // Reverse only the five identity-validator identifiers. The resulting C#
+  // and five references must exactly match the observed 7ba Windows failure.
+  const text = source.toString('utf8')
+  assert.equal((text.match(/\bValidateMainWindow\(/g) || []).length, 5)
+  assert.doesNotMatch(text, /\bMain\(/)
+  const originalNaming = Buffer.from(text.replace(/\bValidateMainWindow\(/g, 'Main('))
+  const csharp = originalNaming.toString('utf8').match(/Add-Type -TypeDefinition @'\r?\n([\s\S]*?)\r?\n'@ -ReferencedAssemblies \$references/)?.[1]
+  const references = text.match(/  \$references = @\([\s\S]*?\r?\n    \[System\.Windows\.Automation\.TreeScope\]\.Assembly\.Location, \[System\.Windows\.DependencyObject\]\.Assembly\.Location\)/)?.[0]
+  assert.ok(csharp && references)
+  assert.equal(hash(Buffer.from(csharp.replace(/\r\n/g, '\n'))), '320ee6364b208756a72978f231bea1dc4f3c5ba24a5eace211b417f746c23f2f')
+  assert.equal(hash(Buffer.from(references.replace(/\r\n/g, '\n'))), '4f7812356172ece23d84e60bdd72ac4e78c85d6e1c907327495ac149ec4b5f6d')
+  const originalArguments = desktopWindowWorkerArguments(originalNaming); originalArguments.splice(1, 0, '-Mta')
+  assert.ok([command, ...originalArguments].map(item => '"' + item + '"').join(' ').length + 1 < 32767)
+  const originalBootstrap = Buffer.from(originalArguments[4], 'base64').toString('utf16le')
+  const originalPayload = originalBootstrap.match(/FromBase64String\('([A-Za-z0-9+/]+={0,2})'\)/)?.[1]; assert.ok(originalPayload)
+  assert.deepEqual(gunzipSync(Buffer.from(originalPayload, 'base64')), originalNaming)
   if (process.platform === 'win32') {
+    let originalSpawns = 0, originalChild, originalExit = null
+    const original = createExportDirectorySession({ ownedRoot: tmpdir(), spawnWorker: (name, actualArgs, actualOptions) => {
+      originalSpawns++; assert.equal(originalSpawns, 1)
+      assert.equal(name, command); assert.deepEqual(actualArgs, args); assert.deepEqual(actualOptions, options)
+      originalChild = spawn(name, originalArguments, actualOptions)
+      originalChild.once('exit', (code, signal) => { originalExit = { code, signal } })
+      return originalChild
+    } })
+    t.after(() => original.dispose())
+    try {
+      await assert.rejects(original.ready, { code: 'STARTUP_REFUSED' })
+      const diagnostic = original.events().find(event => event.type === 'failed')?.startupDiagnostic
+      assert.equal(diagnostic?.stage, 'SOURCE_COMPILATION')
+      assert.deepEqual(diagnostic.compilerCodes, ['CS0028'])
+      assert.deepEqual(diagnostic.compilerErrors, [{ code: 'CS0028', line: 54, column: 15, isWarning: false }])
+    } finally {
+      const stoppedCleanly = await original.dispose()
+      t.diagnostic(JSON.stringify({ scope: 'windows-native-directory-original-entrypoint-negative', executed: true,
+        platform: process.platform, node: process.version, startupMs: 30000, requestMs: 10000,
+        nativeCommands: 0, originalCSharpSHA256: hash(Buffer.from(csharp.replace(/\r\n/g, '\n'))),
+        expectedStartupRefusal: true, stoppedCleanly, pid: originalChild?.pid ?? null,
+        exitObserved: originalExit !== null, exit: originalExit, events: original.events() }))
+      assert.equal(stoppedCleanly, false)
+      assert.notEqual(originalExit, null, 'The owned rejected helper must exit before starting the repaired helper')
+      assert.equal(original.events()[0].pid, originalChild.pid)
+    }
+    assert.equal(originalSpawns, 1)
     // This branch actually compiles the same worker under Windows PowerShell.
     // Readiness then EOF is the entire operation: no window commands or input.
     const native = createExportDirectorySession({ ownedRoot: tmpdir() }); let clean = false
@@ -198,6 +244,8 @@ test('one native helper decodes exact UTF8 worker below CreateProcessW limit and
     assert.ok(Number.isSafeInteger(native.events()[0].pid) && native.events()[0].pid > 0)
     assert.equal(native.events()[1].pid, native.events()[0].pid)
   } else {
+    t.diagnostic(JSON.stringify({ scope: 'windows-native-directory-original-entrypoint-negative', executed: false,
+      platform: process.platform, reason: 'Requires Windows PowerShell and Windows UIAutomation assemblies' }))
     t.diagnostic(JSON.stringify({ scope: 'windows-native-directory-cold-start', executed: false,
       platform: process.platform, reason: 'Requires Windows PowerShell and Windows UIAutomation assemblies' }))
   }
@@ -237,15 +285,19 @@ test('directory helper startup refusal and timeout are terminal', async t => {
 })
 function diagnosticFixture() {
   return { stage: 'SOURCE_COMPILATION', errorType: 'System.InvalidOperationException', hresult: -2146233079,
-    compilerCodes: ['CS0246'], powerShellVersion: '5.1.26100.6584',
+    compilerCodes: ['CS0246'], compilerErrors: [], powerShellVersion: '5.1.26100.6584',
     references: ['System.dll', 'System.Core.dll', 'UIAutomationClient.dll', 'UIAutomationTypes.dll', 'WindowsBase.dll'] }
 }
 test('directory helper retains only allowlisted startup diagnostics without exposing stderr', async t => {
   const atLimits = { ...diagnosticFixture(), hresult: -2147483648, powerShellVersion: '65535.65535.65535.65535',
     compilerCodes: Array.from({ length: 8 }, (_, i) => 'CS' + String(1000 + i)) }
   const unknown = { stage: 'CONSOLE_ENCODING', errorType: 'UNKNOWN', hresult: null,
-    compilerCodes: [], powerShellVersion: null, references: [] }
-  for (const diagnostic of [diagnosticFixture(), atLimits, unknown]) {
+    compilerCodes: [], compilerErrors: [], powerShellVersion: null, references: [] }
+  const observedError = { ...diagnosticFixture(), errorType: 'System.Exception', hresult: -2146233088,
+    compilerCodes: ['CS0028'], compilerErrors: [{ code: 'CS0028', line: 54, column: 15, isWarning: false }] }
+  const errorLimits = { ...atLimits, compilerErrors: atLimits.compilerCodes.map(code => ({ code, line: 65535, column: 65535, isWarning: true })) }
+  const zeroPosition = { ...diagnosticFixture(), compilerErrors: [{ code: 'CS0246', line: 0, column: 0, isWarning: false }] }
+  for (const diagnostic of [diagnosticFixture(), atLimits, unknown, observedError, errorLimits, zeroPosition]) {
     const { worker, value } = session(t, { ready: false })
     worker.child.stderr.write('private native exception C:\\private\\source.ps1 secret payload')
     worker.send({ protocol: 1, ready: false, error: 'DIRECTORY_HELPER_STARTUP', diagnostic,
@@ -266,6 +318,19 @@ test('directory helper refuses malformed startup diagnostics without trusting ar
     { ...diagnosticFixture(), compilerCodes: 'CS0246' },
     { ...diagnosticFixture(), compilerCodes: ['CS0246 private'] },
     { ...diagnosticFixture(), compilerCodes: [246] },
+    { ...diagnosticFixture(), compilerErrors: null },
+    { ...diagnosticFixture(), compilerErrors: {} },
+    { ...diagnosticFixture(), compilerErrors: [null] },
+    { ...diagnosticFixture(), compilerErrors: [[]] },
+    { ...diagnosticFixture(), compilerErrors: [{ code: 'CS0246', line: 1, column: 2 }] },
+    { ...diagnosticFixture(), compilerErrors: [{ code: 'CS0028', line: 54, column: 15, isWarning: false }] },
+    { ...diagnosticFixture(), compilerErrors: [{ code: 'CS0246 private', line: 1, column: 2, isWarning: false }] },
+    { ...diagnosticFixture(), compilerErrors: [{ code: 'CS0246', line: '54', column: 15, isWarning: false }] },
+    { ...diagnosticFixture(), compilerErrors: [{ code: 'CS0246', line: 54, column: 1.5, isWarning: false }] },
+    { ...diagnosticFixture(), compilerErrors: [{ code: 'CS0246', line: 54, column: 15, isWarning: 'false' }] },
+    { ...diagnosticFixture(), compilerErrors: [{ code: 'CS0246', line: 54, column: 15, isWarning: false, errorText: 'private native exception' }] },
+    { ...diagnosticFixture(), compilerErrors: [{ code: 'CS0246', line: 54, column: 15, isWarning: false, fileName: 'C:\\private\\source.cs' }] },
+    { ...diagnosticFixture(), stage: 'UIA_READINESS', compilerErrors: [{ code: 'CS0246', line: 1, column: 2, isWarning: false }] },
     { ...diagnosticFixture(), powerShellVersion: '5.1 private' },
     { ...diagnosticFixture(), powerShellVersion: 5.1 },
     { ...diagnosticFixture(), references: 'System.Core.dll' },
@@ -291,6 +356,10 @@ test('directory helper refuses oversized diagnostics and incompatible startup en
     { diagnostic: { ...diagnosticFixture(), hresult: 2147483648 } },
     { diagnostic: { ...diagnosticFixture(), compilerCodes: Array.from({ length: 9 }, (_, i) => 'CS' + String(1000 + i)) } },
     { diagnostic: { ...diagnosticFixture(), compilerCodes: ['CS0246', 'CS0246'] } },
+    { diagnostic: { ...diagnosticFixture(), compilerErrors: Array.from({ length: 9 }, (_, line) => ({ code: 'CS0246', line, column: 1, isWarning: false })) } },
+    { diagnostic: { ...diagnosticFixture(), compilerErrors: Array.from({ length: 2 }, () => ({ code: 'CS0246', line: 1, column: 1, isWarning: false })) } },
+    ...['line', 'column'].flatMap(key => [-1, 65536].map(position => ({ diagnostic: { ...diagnosticFixture(),
+      compilerErrors: [{ code: 'CS0246', line: 1, column: 1, isWarning: false, [key]: position }] } }))),
     { diagnostic: { ...diagnosticFixture(), powerShellVersion: '100000.1' } },
     { diagnostic: { ...diagnosticFixture(), powerShellVersion: '1.2.3.4.5' } },
     { diagnostic: { ...diagnosticFixture(), references: [...diagnosticFixture().references, 'System.dll'] } },
