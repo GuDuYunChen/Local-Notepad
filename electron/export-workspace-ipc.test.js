@@ -32,7 +32,7 @@ function makePlan(ids = ['note-1'], format = 'markdown') {
 }
 
 function harness(overrides = {}) {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-export-bridge-test-'))
+  const directory = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-export-bridge-test-')))
   const contents = new EventEmitter(), owner = new EventEmitter(), frame = { url: 'http://localhost:5000/' }
   contents.mainFrame = frame; contents.getURL = () => frame.url; contents.isDestroyed = () => false
   owner.webContents = contents; owner.isDestroyed = () => false
@@ -269,6 +269,22 @@ describe('native export workspace authority and lifetime', () => {
     expect(h.shell.openPath).toHaveBeenCalledTimes(1)
   })
 
+  it('normalizes a temporary-root directory alias for native reveal and save receipts', async () => {
+    const owner = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-export-alias-owner-')))
+    dispose.push(() => fs.rmSync(owner, { recursive: true, force: true }))
+    const physical = path.join(owner, 'physical-temporary-root'), alias = path.join(owner, 'temporary-root-alias')
+    fs.mkdirSync(physical)
+    fs.symlinkSync(physical, alias, process.platform === 'win32' ? 'junction' : 'dir')
+    vi.spyOn(os, 'tmpdir').mockReturnValue(alias)
+    const h = harness(), plan = await h.ready()
+    expect((await h.call('reveal', { planId: plan.planId })).success).toBe(true)
+    expect(h.shell.openPath).toHaveBeenLastCalledWith(h.directory)
+    const selected = path.join(h.directory, 'chosen.md')
+    expect(await h.call('file:saveContentAs', { content: 'same directory through its canonical name' }))
+      .toEqual({ success: true, path: selected })
+    expect(fs.readFileSync(selected, 'utf8')).toBe('same directory through its canonical name')
+  })
+
   it('holds one set of document listeners across replacements and releases every listener at close', async () => {
     const h = harness()
     let plan
@@ -310,17 +326,58 @@ describe('legacy exports cannot bypass native destination consent', () => {
   })
 
   it('combined manuscripts publish in a new exclusive directory and preserve existing names', async () => {
-    const converter = vi.fn(async (_ids, dir, _format, _title, options) => {
-      expect(options.signal).toBeInstanceOf(AbortSignal)
+    const observedErrors = vi.fn(() => false)
+    const converter = vi.fn(async (_ids, dir) => {
+      fs.mkdirSync(path.join(dir, 'assets', 'nested'), { recursive: true })
+      fs.writeFileSync(path.join(dir, 'assets', 'nested', 'attachment.bin'), Buffer.from([0, 23, 128, 255]))
       const filename = path.join(dir, '合并稿.md'); fs.writeFileSync(filename, 'new manuscript'); return filename
     })
-    const h = harness({ combinedExport: converter })
+    const h = harness({ combinedExport: converter, isExportError: observedErrors })
     const old = path.join(h.directory, '合并稿.md'); fs.writeFileSync(old, 'keep existing')
-    await h.call('dialog:openDirectory')
+    fs.mkdirSync(path.join(h.directory, 'assets', 'nested'), { recursive: true })
+    const oldAsset = path.join(h.directory, 'assets', 'nested', 'attachment.bin')
+    fs.writeFileSync(oldAsset, Buffer.from([42, 99]))
+    expect(await h.call('dialog:openDirectory')).toBe(h.directory)
     const result = await h.call('export:combined-manuscript', { ids: ['a'], targetDir: h.directory, format: 'markdown', title: '合并稿' })
-    expect(result.success).toBe(true); expect(path.dirname(result.path)).not.toBe(h.directory)
+    const nativeErrors = observedErrors.mock.calls.map(([error]) => ({ name: error.name, message: error.message,
+      code: error.code, syscall: error.syscall, stack: error.stack }))
+    expect(result.success, JSON.stringify({ result, nativeErrors })).toBe(true); expect(path.dirname(result.path)).not.toBe(h.directory)
+    expect(converter).toHaveBeenCalledTimes(1); expect(converter.mock.calls[0][4].signal).toBeInstanceOf(AbortSignal)
+    expect(nativeErrors).toEqual([])
     expect(fs.readFileSync(result.path, 'utf8')).toBe('new manuscript'); expect(fs.readFileSync(old, 'utf8')).toBe('keep existing')
+    expect(fs.readFileSync(path.join(result.directory, 'assets', 'nested', 'attachment.bin'))).toEqual(Buffer.from([0, 23, 128, 255]))
+    expect(fs.readFileSync(oldAsset)).toEqual(Buffer.from([42, 99]))
     expect(await h.call('export:combined-manuscript', { ids: ['a'], targetDir: h.directory })).toMatchObject({ success: false })
+  })
+
+  it('a combined publication failure removes only its own partially copied directory', async () => {
+    let staging, publicationBeforeFailure, copied = 0
+    const observedErrors = vi.fn(() => false)
+    const converter = vi.fn(async (_ids, dir) => {
+      staging = dir
+      fs.writeFileSync(path.join(dir, 'first.md'), 'first manuscript')
+      fs.writeFileSync(path.join(dir, 'second.md'), 'second manuscript')
+      return path.join(dir, 'first.md')
+    })
+    const h = harness({ combinedExport: converter, isExportError: observedErrors }), old = path.join(h.directory, 'keep.md')
+    fs.writeFileSync(old, 'existing bytes')
+    const copy = fs.cpSync.bind(fs)
+    vi.spyOn(fs, 'cpSync').mockImplementation((source, destination, options) => {
+      if (copied === 1) {
+        publicationBeforeFailure = fs.readdirSync(path.dirname(destination))
+        throw Object.assign(new Error('Synthetic second-entry write failure'), { code: 'EIO' })
+      }
+      copy(source, destination, options); copied++
+    })
+    expect(await h.call('dialog:openDirectory')).toBe(h.directory)
+    expect(await h.call('export:combined-manuscript', { ids: ['a'], targetDir: h.directory, format: 'markdown' }))
+      .toMatchObject({ success: false, code: 'export-failed' })
+    expect(copied).toBe(1); expect(fs.cpSync).toHaveBeenCalledTimes(2)
+    expect(publicationBeforeFailure).toHaveLength(1)
+    expect(observedErrors).toHaveBeenCalledTimes(1); expect(observedErrors.mock.calls[0][0].code).toBe('EIO')
+    expect(fs.readFileSync(old, 'utf8')).toBe('existing bytes')
+    expect(fs.readdirSync(h.directory)).toEqual(['keep.md'])
+    expect(fs.existsSync(staging)).toBe(false)
   })
 
   it('a combined manuscript cancelled during conversion never publishes late temporary output', async () => {

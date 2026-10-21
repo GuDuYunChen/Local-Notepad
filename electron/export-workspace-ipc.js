@@ -583,7 +583,14 @@ export function registerLocalExportHandlers({ ipcMain, dialog, shell, getWindow,
       if (!check(operation)) return cancellation(operation)
       published = path.join(parent, `Local-Notepad-合并稿-${createId()}`)
       fsSync.mkdirSync(published)
-      try { fsSync.cpSync(staging, published, { recursive: true, force: false, errorOnExist: true }) }
+      try {
+        // Keep the exclusive root claim. errorOnExist also rejects an existing
+        // directory, so copy each child to its own absent destination instead.
+        for (const name of fsSync.readdirSync(staging)) {
+          fsSync.cpSync(path.join(staging, name), path.join(published, name),
+            { recursive: true, force: false, errorOnExist: true })
+        }
+      }
       catch (error) { fsSync.rmSync(published, { recursive: true, force: true }); published = null; throw error }
       return { success: true, path: path.join(published, path.relative(staging, output)), directory: published }
     } catch (error) { return check(operation) ? safeError(error) : cancellation(operation) }

@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { EventEmitter } from 'node:events'
 import { PassThrough, Writable } from 'node:stream'
-import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync, lstatSync, symlinkSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync, lstatSync, symlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { Script } from 'node:vm'
@@ -264,7 +264,12 @@ test('canonical export fixture uses actual production nodes and stable Lexical s
 })
 
 async function actualOutputFixture(directory) {
-  const report = fixture(), root = path.join(directory, 'local-export-files'); mkdirSync(root)
+  // Core output receipts use canonical filesystem paths. Normalize the created
+  // fixture roots as well, including Windows 8.3 names and owned junctions,
+  // before deriving either output receipts or the retained file manifest.
+  directory = realpathSync(directory)
+  const report = fixture(), exportDirectory = path.join(directory, 'local-export-files'); mkdirSync(exportDirectory)
+  const root = realpathSync(exportDirectory)
   const apiResponse = value => new Response(JSON.stringify({ code: 0, data: value }), { headers: { 'content-type': 'application/json' } })
   for (const [label, count, format] of [['markdown', 3, 'markdown'], ['partial', 3, 'markdown'], ['word', 3, 'docx'], ['cancelled', 100, 'docx']]) {
     const parent = { id: count === 100 ? 'folder-cancel' : 'folder-main', title: '目录', is_folder: true, parent_id: '' }
@@ -367,6 +372,20 @@ test('raw oracle reads real core Markdown, DOCX ZIP/CRC, embedded images and eve
   await consistentCorruption('Word attachment points to another document sidecar with identical bytes', wordNote,
     bytes => rewriteZip(bytes, zip => replaceXML(zip, 'word/_rels/document.xml.rels', xml =>
       xml.replace(/(<Relationship\b[^>]*Type="[^"]*\/hyperlink"[^>]*Target=")[^"]+/, '$1' + wrongTarget))))
+})
+test('raw output fixture canonicalizes an owned directory alias before mapping receipts', async t => {
+  const parent = mkdtempSync(path.join(tmpdir(), 'local-export-alias-contract-'))
+  t.after(() => rmSync(parent, { recursive: true, force: true }))
+  const directory = path.join(parent, 'actual'), alias = path.join(parent, 'alias'); mkdirSync(directory)
+  symlinkSync(directory, alias, 'junction')
+  assert.notEqual(path.resolve(alias), realpathSync(alias)); assert.equal(realpathSync(alias), realpathSync(directory))
+  const report = await actualOutputFixture(alias)
+  const output = report.files.find(file => file.filename.endsWith('.docx')); assert.ok(output)
+  const canonicalFile = realpathSync(path.join(alias, output.filename)), lexicalRelative = path.relative(alias, canonicalFile)
+  assert.ok(lexicalRelative.startsWith('..' + path.sep), 'The fixture must exercise an actual filesystem alias')
+  t.diagnostic('Owned alias resolves to the same root while lexical mapping escapes: ' + lexicalRelative)
+  assert.equal((await verifyLocalExportDesktopReport(alias, HEAD)).complete, true)
+  assert.equal(validateLocalExportDesktopReport(report, HEAD), true)
 })
 test('raw output manifest rejects unsafe paths, duplicates, empty files and excessive totals', () => {
   const entry = { filename: 'local-export-files/one.md', bytes: 1, sha256: H }
