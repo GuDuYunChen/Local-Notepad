@@ -8,6 +8,18 @@ import { exportSHA256, validateExportFeedbackVisibility } from './local-export-d
 
 const q = JSON.stringify, panel = '[data-local-export-workspace]'
 const itemSelector = id => '[data-local-export-item=' + q(id) + ']'
+const fixtureUploadNames = ['export102-a.png', 'export102-b.png', 'export102.txt']
+const fixtureUploadMessages = new Set([
+  'OK', '请选择文件', '文件大小超过限制 (100MB)', '文件读取失败', '服务端错误: 无法创建上传目录', '保存文件失败',
+  '不支持的文件类型: .png', '不支持的文件类型: .txt',
+  '文件内容类型不匹配: application/octet-stream', '文件内容类型不匹配: text/plain',
+  '文件内容类型不匹配: text/plain; charset=utf-8', '文件内容类型不匹配: text/html; charset=utf-8',
+])
+function fixtureUploadEvidence(name, httpStatus = null, result = null) {
+  return { name, httpStatus: Number.isInteger(httpStatus) && httpStatus >= 100 && httpStatus <= 599 ? httpStatus : null,
+    code: Number.isSafeInteger(result?.code) && result.code >= 0 && result.code <= 65535 ? result.code : null,
+    message: result === null ? 'RESPONSE_JSON_UNAVAILABLE' : fixtureUploadMessages.has(result?.message) ? result.message : 'UNRECOGNIZED_SERVER_MESSAGE' }
+}
 export function localExportDirectoryInventory(directory) {
   const files = []
   const walk = current => {
@@ -110,9 +122,26 @@ export async function verifyLocalExportDesktop(context) {
   }
   const uploads = path.join(dataDirectory, 'uploads')
   const upload = async (name, bytes, type) => {
+    const evidence = report.fixtureUploads ??= []
+    assert.ok(Array.isArray(evidence) && evidence.length < fixtureUploadNames.length, 'Export fixture upload limit')
+    assert.equal(name, fixtureUploadNames[evidence.length], 'Unexpected export fixture upload order')
+    const receipt = { ...fixtureUploadEvidence(name), message: 'NO_RESPONSE' }
+    evidence.push(receipt); save()
+    const failure = () => 'Export fixture upload failed: ' + q(receipt)
     const data = new FormData(); data.append('file', new Blob([bytes], { type }), name)
-    const response = await fetch('http://127.0.0.1:27121/api/upload', { method: 'POST', body: data, headers: { Origin: 'null' }, signal: AbortSignal.timeout(4000) })
-    assert.equal(response.status, 200); const result = await response.json(); assert.equal(result.code, 0)
+    let response
+    try {
+      response = await fetch('http://127.0.0.1:27121/api/upload', { method: 'POST', body: data, headers: { Origin: 'null' }, signal: AbortSignal.timeout(4000) })
+    } catch {
+      receipt.message = 'REQUEST_FAILED'; save(); throw new Error(failure())
+    }
+    Object.assign(receipt, fixtureUploadEvidence(name, response.status), { message: 'RESPONSE_NOT_READ' }); save()
+    assert.equal(response.status, 200, failure())
+    const result = await response.json().catch(() => null)
+    Object.assign(receipt, fixtureUploadEvidence(name, response.status, result)); save()
+    // AssertionError can append actual values even with a custom message.
+    assert.ok(Number.isSafeInteger(result?.code) && result.code >= 0 && result.code <= 65535, failure())
+    assert.equal(result.code, 0, failure())
     assert.match(result.data.url, /^\/uploads\/[^/\\]+$/)
     const filename = path.join(uploads, decodeURIComponent(result.data.url.slice('/uploads/'.length)))
     assert.deepEqual(readFileSync(filename), bytes)

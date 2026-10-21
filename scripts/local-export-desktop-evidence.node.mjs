@@ -13,6 +13,7 @@ import { parse } from 'acorn'
 import JSZip from 'jszip'
 import { prepareExportPlan, executeExportPlan } from '../electron/local-export.js'
 import { localExportDesktopDocument } from './local-export-desktop-fixture.bundle.mjs'
+import { verifyLocalExportDesktop } from './check-local-export-desktop.mjs'
 import { LOCAL_EXPORT_FIXTURE as F } from './local-export-desktop-values.mjs'
 import { LOCAL_EXPORT_VERSION, LOCAL_EXPORT_REPORT, LOCAL_EXPORT_CHECKS, LOCAL_EXPORT_IMAGES, LOCAL_EXPORT_SOURCES,
   exportSHA256 as hash, exportBlob, validateLocalExportDesktopReport, validateExportFeedbackVisibility,
@@ -424,6 +425,81 @@ test('canonical export fixture uses actual production nodes and stable Lexical s
   assert.deepEqual(nodes.map(item => item.type), ['heading', 'paragraph', 'paragraph', 'table', 'image', 'attachment', 'paragraph'])
   assert.equal(nodes[2].children[0].format, 1); assert.equal(nodes[3].children.length, 2)
   assert.equal(nodes[4].caption, F.imageCaption); assert.equal(nodes[5].name, F.attachmentName)
+})
+
+test('export fixture upload preserves the third attachment refusal and original request bytes', async t => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'export102-upload-contract-'))
+  t.after(() => rmSync(directory, { recursive: true, force: true }))
+  mkdirSync(path.join(directory, 'uploads'))
+  const names = ['export102-a.png', 'export102-b.png', 'export102.txt'], saved = [], report = {}
+  let calls = 0
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    const index = calls++, file = options.body.get('file'), bytes = Buffer.from(await file.arrayBuffer())
+    assert.equal(url, 'http://127.0.0.1:27121/api/upload'); assert.equal(options.method, 'POST')
+    assert.equal(options.headers.Origin, 'null'); assert.ok(options.signal instanceof AbortSignal)
+    assert.deepEqual([...options.body.keys()], ['file']); assert.equal(file.name, names[index])
+    assert.equal(file.type, index === 2 ? 'text/plain' : 'image/png')
+    assert.deepEqual(bytes, index === 2 ? Buffer.from(F.attachment) : Buffer.from(F.pngBase64, 'base64'))
+    if (index === 2) {
+      assert.equal(bytes.length, 46)
+      return Response.json({ code: 1010, message: '文件内容类型不匹配: application/octet-stream', detail: 'PRIVATE_UPLOAD_DETAIL' })
+    }
+    const filename = 'uploaded-' + index + '.png'; writeFileSync(path.join(directory, 'uploads', filename), bytes)
+    return Response.json({ code: 0, message: 'OK', data: { url: '/uploads/' + filename }, detail: 'PRIVATE_UPLOAD_DETAIL' })
+  })
+  await assert.rejects(verifyLocalExportDesktop({ report, save: () => saved.push(structuredClone(report)), dataDirectory: directory }), error => {
+    assert.equal(error.code, 'ERR_ASSERTION'); assert.equal(error.actual, 1010); assert.equal(error.expected, 0)
+    assert.match(error.message, /export102\.txt/); assert.match(error.message, /application\/octet-stream/)
+    assert.doesNotMatch(error.message, /PRIVATE_UPLOAD_DETAIL/); return true
+  })
+  assert.equal(calls, 3)
+  assert.deepEqual(report.fixtureUploads, names.map((name, index) => ({ name, httpStatus: 200, code: index === 2 ? 1010 : 0,
+    message: index === 2 ? '文件内容类型不匹配: application/octet-stream' : 'OK' })))
+  assert.deepEqual(saved.at(-1).fixtureUploads, report.fixtureUploads)
+  assert.doesNotMatch(JSON.stringify(saved), /PRIVATE_UPLOAD_DETAIL|uploaded-0|uploaded-1/)
+})
+
+test('export fixture upload bounds HTTP failures and untrusted response details', async t => {
+  const secret = 'PRIVATE_UPLOAD_MARKER C:\\private\\token /private/token ' + 'x'.repeat(8192)
+  const cases = [
+    { response: () => new Response(secret, { status: 503 }), httpStatus: 503, code: null, message: 'RESPONSE_NOT_READ', actual: 503, expected: 200 },
+    { response: () => new Response(secret, { status: 200 }), httpStatus: 200, code: null, message: 'RESPONSE_JSON_UNAVAILABLE', actual: false, expected: true },
+    { response: () => Response.json({ code: 1010, message: secret, detail: secret }), httpStatus: 200, code: 1010, message: 'UNRECOGNIZED_SERVER_MESSAGE', actual: 1010, expected: 0 },
+    { response: () => Response.json({ code: secret, message: { path: secret } }), httpStatus: 200, code: null, message: 'UNRECOGNIZED_SERVER_MESSAGE', actual: false, expected: true },
+    { response: () => Response.json({ code: 70000, message: secret }), httpStatus: 200, code: null, message: 'UNRECOGNIZED_SERVER_MESSAGE', actual: false, expected: true },
+  ]
+  let selected, calls = 0, response
+  t.mock.method(globalThis, 'fetch', async () => { calls++; response = selected.response(); return response })
+  for (const sample of cases) {
+    selected = sample
+    const report = {}, saved = [], before = calls
+    await assert.rejects(verifyLocalExportDesktop({ report, save: () => saved.push(structuredClone(report)), dataDirectory: run }), error => {
+      assert.equal(error.code, 'ERR_ASSERTION'); assert.equal(error.actual, sample.actual); assert.equal(error.expected, sample.expected)
+      assert.match(error.message, /export102-a\.png/); assert.doesNotMatch(error.stack, /PRIVATE_UPLOAD_MARKER|private\\\\token|private\/token/)
+      assert.ok(error.message.length < 256); return true
+    })
+    assert.equal(calls, before + 1)
+    assert.deepEqual(report.fixtureUploads, [{ name: 'export102-a.png', httpStatus: sample.httpStatus, code: sample.code, message: sample.message }])
+    assert.deepEqual(saved.at(-1).fixtureUploads, report.fixtureUploads)
+    assert.doesNotMatch(JSON.stringify(saved), /PRIVATE_UPLOAD_MARKER/); assert.ok(JSON.stringify(report).length < 256)
+    if (sample.httpStatus !== 200) assert.equal(response.bodyUsed, false)
+  }
+  const before = calls, full = { fixtureUploads: Array(3).fill({ name: 'export102.txt' }) }
+  await assert.rejects(verifyLocalExportDesktop({ report: full, save: () => assert.fail('Full fixture log must not be changed'), dataDirectory: run }), /Export fixture upload limit/)
+  assert.equal(calls, before); assert.equal(full.fixtureUploads.length, 3)
+})
+
+test('export fixture upload retains a bounded request failure before any response', async t => {
+  const report = {}, saved = []; let calls = 0
+  t.mock.method(globalThis, 'fetch', async () => { calls++; throw new Error('PRIVATE_UPLOAD_NETWORK C:\\private\\credential') })
+  await assert.rejects(verifyLocalExportDesktop({ report, save: () => saved.push(structuredClone(report)), dataDirectory: run }), error => {
+    assert.match(error.message, /export102-a\.png/); assert.match(error.message, /REQUEST_FAILED/)
+    assert.doesNotMatch(error.stack, /PRIVATE_UPLOAD_NETWORK|credential/); return true
+  })
+  assert.equal(calls, 1)
+  assert.deepEqual(report.fixtureUploads, [{ name: 'export102-a.png', httpStatus: null, code: null, message: 'REQUEST_FAILED' }])
+  assert.deepEqual(saved.at(-1).fixtureUploads, report.fixtureUploads)
+  assert.doesNotMatch(JSON.stringify(saved), /PRIVATE_UPLOAD_NETWORK|credential/)
 })
 
 async function actualOutputFixture(directory) {

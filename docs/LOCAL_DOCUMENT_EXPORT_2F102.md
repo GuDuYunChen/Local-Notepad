@@ -98,3 +98,15 @@ Windows准备合同增加同一worker的实际冷启动与EOF正常关闭子验�
 本次最小修补把内部主窗口校验方法及其全部调用改名`ValidateMainWindow`，方法内PID、可见性、窗口类和可执行文件身份判断逐字保留，五个引用、警告政策和预算不变。启动catch从真实TargetObject提取限定CS编号、行列及布尔警告标记，session严格核验结构，不保存任意ErrorText／异常原文或路径。真实Windows冷启动合同保留旧命名的精确正文反向对照与CS0028拒绝，再验证修复worker正常ready／EOF退出；原协议、失败不重播及目录安全名册继续保留。
 
 这是同一完整模块内的验收助手修补。诊断采集完成不表示产品成功；新提交仍需默认无过滤Vitest、原test:ui、全部17项产品CI、真实Word／Markdown正文及附件、对应4.235.0 EXE和原完整安装生命周期。安装共享脚本须与产品字节一致，pin只能来自合格的当前产品原件；当前源码文档不预写这些未来结果为通过。
+
+## 282实际导出准备的文本上传失败
+
+产品`282fab2948a16d74244f7c385a41fdf668c63269`／树`97192d918f10b593388216b86cc9ec58f0d1777b`的17项首次CI为16成功／1失败。[Desktop运行39577417121](https://github.com/GuDuYunChen/Local-Notepad/actions/runs/39577417121)原617项准备全部按原名册通过。实际Node24.21.0、PowerShell5.1.26100.33438中，旧`Main`命名负对照返回CS0028／54:15，并观察到被拒绝进程退出（code:null、signal:SIGTERM，不能称为正常EOF退出）；修复worker在479ms就绪、523ms完成干净EOF退出。原80状态模型、构建、保存／阅读与快捷键操作通过。目录会话随后已操作真实720×520窗口，原助手启动问题不再是待查的未知异常。
+
+新失败发生在第14步导出准备：`check-local-export-desktop.mjs`连续成功上传两张PNG后，固定`export102.txt`返回HTTP200／code1010，原断言要求code0。该文本为46个UTF8字节，SHA256 `7c9d82808f6eda5e25e8eee4d88fd05a3a17ca503a740e9ec7b3bd629c3105ac`。原驱动未记录message，故该次原件只证明数字拒绝，不能倒填后续复现的错误文字。导出checks和directoryActions均为空，complete:false、cleanupComplete:false、forceTerminated:true；唯一失败PNG是夹具笔记尚未建立的首页，不是导出成功图。原日志144098字节、SHA256 `d9b9964fc7c884a98e40bd17fb6ebbc825af97a8ac776daa7c1c8bd6f74303aa`及Desktop ZIP12334673941保留；停止所有已终态轮询，不下载或固定本候选EXE。
+
+修改生产源码前，使用原`UploadController.Register`、独立临时上传目录和`127.0.0.1:0`实际multipart请求，在官方Go1.24.11下重现同一附件被拒绝：HTTP200、code1010、message为`文件内容类型不匹配: application/octet-stream`，输出文件数0；应成功的回归真实exit1。受测原upload.go为3081字节，SHA256 `a3e60dde7e2255de2af730fef2584ab51312b4bc88dbf3efa374aee5f08575b4`，原JSONL SHA256 `0792d5a7d698ab2e79d3d5f9a651a3b6b1dcd68b6caeeb5e4e7724f8f3486a85`。这是本地同源同输入的确定反例，不宣称Windows原件曾保存这段message。
+
+原实现创建512字节缓冲，读取后却把整个缓冲交给`http.DetectContentType`，46字节正文后的466个零字节使文本被归为二进制。仅改为实际读取切片仍不足：真实文本嗅探结果包含`charset=utf-8`参数，而原白名单存储基础`text/plain`。修补将嗅探限定为实际读取字节，用`mime.ParseMediaType`提取基础类型，并对非EOF读取错误返回已有读取失败结果；不扩展原扩展名或MIME白名单，不改变100MiB限制、空文件约定、保存名称和返回URL。新增测试仍调用生产Register／Upload，核同一短附件、长UTF8文本及原PNG的真实HTTP成功和完整磁盘字节，并核含NUL伪装文本的拒绝／零落盘。
+
+验收驱动继续用原三份固定附件、实际上传接口、HTTP200／code0及逐字读回断言和4秒请求预算，只增加受控失败诊断；不通过换附件类型、直接写uploads或放宽成功码取得绿灯。此生产后端修补与驱动补证随同一候选完成无过滤默认、原UI、Desktop合同及实际Go全包回归，再由新HEAD完成Windows导出与对应新EXE完整安装。版本仍为同一未接受功能4.235.0，不另拆模块或预写未来通过状态。
