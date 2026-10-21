@@ -182,6 +182,25 @@ test('one native helper decodes exact UTF8 worker below CreateProcessW limit and
   assert.equal((await value.choose(binding, run + '\\exports\\中文')).invocations, 1)
   assert.equal(worker.spawns.length, 1); assert.equal(worker.commands.length, 4)
   assert.equal(await value.dispose(), true); assert.equal(await value.dispose(), true); assert.equal(worker.kills, 0)
+  if (process.platform === 'win32') {
+    // This branch actually compiles the same worker under Windows PowerShell.
+    // Readiness then EOF is the entire operation: no window commands or input.
+    const native = createExportDirectorySession({ ownedRoot: tmpdir() }); let clean = false
+    t.after(() => native.dispose())
+    try { await native.ready } finally {
+      clean = await native.dispose()
+      t.diagnostic(JSON.stringify({ scope: 'windows-native-directory-cold-start', executed: true,
+        platform: process.platform, node: process.version, startupMs: 30000, requestMs: 10000,
+        nativeCommands: 0, stoppedCleanly: clean, events: native.events() }))
+    }
+    assert.equal(clean, true)
+    assert.deepEqual(native.events().map(event => event.type), ['spawn', 'ready', 'dispose'])
+    assert.ok(Number.isSafeInteger(native.events()[0].pid) && native.events()[0].pid > 0)
+    assert.equal(native.events()[1].pid, native.events()[0].pid)
+  } else {
+    t.diagnostic(JSON.stringify({ scope: 'windows-native-directory-cold-start', executed: false,
+      platform: process.platform, reason: 'Requires Windows PowerShell and Windows UIAutomation assemblies' }))
+  }
 })
 for (const [name, response, expected] of [
   ['wrong sequence', r => ({ id: r.id + 1, ok: true, dialog: dialog() }), 'UNCONFIRMED_REPLY'],
@@ -214,6 +233,80 @@ test('directory helper startup refusal and timeout are terminal', async t => {
     if (!timeout) worker.send({ protocol: 1, ready: false })
     await assert.rejects(value.ready, { code: timeout ? 'STARTUP_TIMEOUT' : 'STARTUP_REFUSED' })
     assert.equal(worker.commands.length, 0); assert.equal(await value.dispose(), false)
+  }
+})
+function diagnosticFixture() {
+  return { stage: 'SOURCE_COMPILATION', errorType: 'System.InvalidOperationException', hresult: -2146233079,
+    compilerCodes: ['CS0246'], powerShellVersion: '5.1.26100.6584',
+    references: ['System.dll', 'System.Core.dll', 'UIAutomationClient.dll', 'UIAutomationTypes.dll', 'WindowsBase.dll'] }
+}
+test('directory helper retains only allowlisted startup diagnostics without exposing stderr', async t => {
+  const atLimits = { ...diagnosticFixture(), hresult: -2147483648, powerShellVersion: '65535.65535.65535.65535',
+    compilerCodes: Array.from({ length: 8 }, (_, i) => 'CS' + String(1000 + i)) }
+  const unknown = { stage: 'CONSOLE_ENCODING', errorType: 'UNKNOWN', hresult: null,
+    compilerCodes: [], powerShellVersion: null, references: [] }
+  for (const diagnostic of [diagnosticFixture(), atLimits, unknown]) {
+    const { worker, value } = session(t, { ready: false })
+    worker.child.stderr.write('private native exception C:\\private\\source.ps1 secret payload')
+    worker.send({ protocol: 1, ready: false, error: 'DIRECTORY_HELPER_STARTUP', diagnostic,
+      message: 'private native exception', command: 'secret payload' })
+    await assert.rejects(value.ready, { code: 'STARTUP_REFUSED' })
+    assert.deepEqual(value.events().find(event => event.type === 'failed').startupDiagnostic, diagnostic)
+    assert.doesNotMatch(JSON.stringify(value.events()), /private|secret|source\.ps1|message|command/)
+    assert.equal(worker.commands.length, 0); assert.equal(worker.spawns.length, 1); assert.equal(worker.kills, 1)
+    assert.equal(await value.dispose(), false)
+  }
+})
+test('directory helper refuses malformed startup diagnostics without trusting arbitrary contents', async t => {
+  const variants = [null, [], 'private native exception', {},
+    { ...diagnosticFixture(), stage: 'SOURCE_COMPILATION private' },
+    { ...diagnosticFixture(), errorType: 'Private.User.Secret' },
+    { ...diagnosticFixture(), hresult: '0x80131509' },
+    { ...diagnosticFixture(), hresult: 1.5 },
+    { ...diagnosticFixture(), compilerCodes: 'CS0246' },
+    { ...diagnosticFixture(), compilerCodes: ['CS0246 private'] },
+    { ...diagnosticFixture(), compilerCodes: [246] },
+    { ...diagnosticFixture(), powerShellVersion: '5.1 private' },
+    { ...diagnosticFixture(), powerShellVersion: 5.1 },
+    { ...diagnosticFixture(), references: 'System.Core.dll' },
+    { ...diagnosticFixture(), references: ['C:\\private\\System.Core.dll'] },
+    { ...diagnosticFixture(), references: ['Unexpected.dll'] },
+    { ...diagnosticFixture(), message: 'private native exception' }]
+  for (const key of Object.keys(diagnosticFixture())) {
+    const missing = diagnosticFixture(); delete missing[key]; variants.push(missing)
+  }
+  for (const diagnostic of variants) {
+    const { worker, value } = session(t, { ready: false })
+    worker.send({ protocol: 1, ready: false, error: 'DIRECTORY_HELPER_STARTUP', diagnostic })
+    await assert.rejects(value.ready, { code: 'STARTUP_REFUSED' })
+    assert.equal(value.events().find(event => event.type === 'failed').startupDiagnostic, null)
+    assert.doesNotMatch(JSON.stringify(value.events()), /private|Private|Unexpected/)
+    assert.equal(worker.commands.length, 0); assert.equal(worker.spawns.length, 1); assert.equal(worker.kills, 1)
+    assert.equal(await value.dispose(), false)
+  }
+})
+test('directory helper refuses oversized diagnostics and incompatible startup envelopes', async t => {
+  const variants = [
+    { diagnostic: { ...diagnosticFixture(), hresult: -2147483649 } },
+    { diagnostic: { ...diagnosticFixture(), hresult: 2147483648 } },
+    { diagnostic: { ...diagnosticFixture(), compilerCodes: Array.from({ length: 9 }, (_, i) => 'CS' + String(1000 + i)) } },
+    { diagnostic: { ...diagnosticFixture(), compilerCodes: ['CS0246', 'CS0246'] } },
+    { diagnostic: { ...diagnosticFixture(), powerShellVersion: '100000.1' } },
+    { diagnostic: { ...diagnosticFixture(), powerShellVersion: '1.2.3.4.5' } },
+    { diagnostic: { ...diagnosticFixture(), references: [...diagnosticFixture().references, 'System.dll'] } },
+    { diagnostic: { ...diagnosticFixture(), references: ['System.dll', 'System.dll'] } },
+    { diagnostic: { ...diagnosticFixture(), errorType: 'System.' + 'x'.repeat(1024) } },
+    { diagnostic: { ...diagnosticFixture(), stage: 'SOURCE_COMPILATION' + 'x'.repeat(1024) } },
+    { protocol: 2 }, { ready: 'false' }, { error: 'private startup failure' }, { error: null },
+  ]
+  for (const change of variants) {
+    const { worker, value } = session(t, { ready: false })
+    worker.send({ protocol: 1, ready: false, error: 'DIRECTORY_HELPER_STARTUP', diagnostic: diagnosticFixture(), ...change })
+    await assert.rejects(value.ready, { code: 'STARTUP_REFUSED' })
+    assert.equal(value.events().find(event => event.type === 'failed').startupDiagnostic, null)
+    assert.doesNotMatch(JSON.stringify(value.events()), /private|xxx/)
+    assert.equal(worker.commands.length, 0); assert.equal(worker.spawns.length, 1); assert.equal(worker.kills, 1)
+    assert.equal(await value.dispose(), false)
   }
 })
 test('minimum native window result cannot claim a renderer-only resize', async t => {

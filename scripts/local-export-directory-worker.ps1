@@ -1,14 +1,19 @@
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
-[Console]::InputEncoding = [Text.UTF8Encoding]::new($false)
-[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
 # Isolated Windows acceptance only. The product never loads this worker.
 # It operates one uniquely owned native folder dialog; it cannot supply a
 # renderer path, override a bridge, dismiss an arbitrary window or kill an app.
+$startupStage = 'CONSOLE_ENCODING'
+$referenceNames = @()
 try {
+  [Console]::InputEncoding = [Text.UTF8Encoding]::new($false)
+  [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
+  $startupStage = 'ASSEMBLY_LOAD'
   Add-Type -AssemblyName UIAutomationClient,UIAutomationTypes,WindowsBase
-  $references = @('System.dll', [System.Windows.Automation.AutomationElement].Assembly.Location,
+  $references = @('System.dll', 'System.Core.dll', [System.Windows.Automation.AutomationElement].Assembly.Location,
     [System.Windows.Automation.TreeScope].Assembly.Location, [System.Windows.DependencyObject].Assembly.Location)
+  $referenceNames = @($references | ForEach-Object { [IO.Path]::GetFileName([string]$_) })
+  $startupStage = 'SOURCE_COMPILATION'
   Add-Type -TypeDefinition @'
 using System;
 using System.IO;
@@ -153,10 +158,38 @@ public static class ExportDialog {
   }
 }
 '@ -ReferencedAssemblies $references
+  $startupStage = 'UIA_READINESS'
   $null = [System.Windows.Automation.AutomationElement]::NameProperty
   [Console]::WriteLine('{"protocol":1,"ready":true}')
 } catch {
-  [Console]::WriteLine('{"protocol":1,"ready":false,"error":"DIRECTORY_HELPER_STARTUP"}')
+  # Keep bounded machine diagnostics, never native exception text, source code,
+  # command arguments, paths or stderr. A diagnostic failure retains refusal.
+  $startupError = $_
+  try {
+    $allowedTypes = @('System.Exception', 'System.InvalidOperationException',
+      'System.ArgumentException', 'System.TypeLoadException', 'System.TypeInitializationException',
+      'System.IO.FileNotFoundException', 'System.IO.FileLoadException', 'System.BadImageFormatException',
+      'System.Security.SecurityException', 'System.NotSupportedException', 'System.PlatformNotSupportedException',
+      'System.Reflection.ReflectionTypeLoadException', 'System.Management.Automation.RuntimeException',
+      'System.Management.Automation.PSInvalidOperationException', 'System.Management.Automation.MethodInvocationException',
+      'System.Management.Automation.CmdletInvocationException', 'System.Management.Automation.ParseException')
+    $errorType = $startupError.Exception.GetType().FullName
+    if ($errorType -cnotin $allowedTypes) { $errorType = 'UNKNOWN' }
+    $hresult = [int]$startupError.Exception.HResult
+    $diagnosticText = [string]$startupError.ToString()
+    if ($diagnosticText.Length -gt 16384) { $diagnosticText = $diagnosticText.Substring(0,16384) }
+    $compilerCodes = @([regex]::Matches($diagnosticText, '\bCS[0-9]{4}\b') |
+      ForEach-Object { $_.Value } | Select-Object -Unique -First 8)
+    $powerShellVersion = [string]$PSVersionTable.PSVersion.ToString()
+    if ($powerShellVersion -notmatch '^\d{1,5}\.\d{1,5}(?:\.\d{1,5}){0,2}$') { $powerShellVersion = $null }
+    $allowedReferences = @('System.dll', 'System.Core.dll', 'UIAutomationClient.dll', 'UIAutomationTypes.dll', 'WindowsBase.dll')
+    $safeReferences = @($referenceNames | Where-Object { $_ -cin $allowedReferences } | Select-Object -Unique -First 5)
+    $diagnostic = @{stage=$startupStage;errorType=$errorType;hresult=$hresult;compilerCodes=$compilerCodes;
+      powerShellVersion=$powerShellVersion;references=$safeReferences}
+    [Console]::WriteLine((ConvertTo-Json -InputObject @{protocol=1;ready=$false;error='DIRECTORY_HELPER_STARTUP';diagnostic=$diagnostic} -Depth 4 -Compress))
+  } catch {
+    [Console]::WriteLine('{"protocol":1,"ready":false,"error":"DIRECTORY_HELPER_STARTUP"}')
+  }
   exit 1
 }
 while ($null -ne ($line = [Console]::ReadLine())) {

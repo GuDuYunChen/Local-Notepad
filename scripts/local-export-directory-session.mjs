@@ -7,6 +7,32 @@ import { desktopWindowWorkerArguments } from './desktop-window-session.mjs'
 const failure = code => Object.assign(new Error('Local export native directory: ' + code), { code })
 const integer = value => Number.isSafeInteger(value) && value > 0
 const normalized = value => path.win32.normalize(value).toLowerCase()
+const startupStages = new Set(['CONSOLE_ENCODING', 'ASSEMBLY_LOAD', 'SOURCE_COMPILATION', 'UIA_READINESS'])
+const startupErrorTypes = new Set(['UNKNOWN', 'System.Exception', 'System.InvalidOperationException',
+  'System.ArgumentException', 'System.TypeLoadException', 'System.TypeInitializationException',
+  'System.IO.FileNotFoundException', 'System.IO.FileLoadException', 'System.BadImageFormatException',
+  'System.Security.SecurityException', 'System.NotSupportedException', 'System.PlatformNotSupportedException',
+  'System.Reflection.ReflectionTypeLoadException', 'System.Management.Automation.RuntimeException',
+  'System.Management.Automation.PSInvalidOperationException', 'System.Management.Automation.MethodInvocationException',
+  'System.Management.Automation.CmdletInvocationException', 'System.Management.Automation.ParseException'])
+const startupReferences = new Set(['System.dll', 'System.Core.dll', 'UIAutomationClient.dll', 'UIAutomationTypes.dll', 'WindowsBase.dll'])
+function startupDiagnostic(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const keys = ['stage', 'errorType', 'hresult', 'compilerCodes', 'powerShellVersion', 'references']
+  if (Object.keys(value).length !== keys.length || !keys.every(key => Object.hasOwn(value, key))) return null
+  if (!startupStages.has(value.stage) || !startupErrorTypes.has(value.errorType)) return null
+  if (value.hresult !== null && (!Number.isInteger(value.hresult) || value.hresult < -2147483648 || value.hresult > 2147483647)) return null
+  if (value.powerShellVersion !== null && (typeof value.powerShellVersion !== 'string'
+    || !/^\d{1,5}\.\d{1,5}(?:\.\d{1,5}){0,2}$/.test(value.powerShellVersion))) return null
+  if (!Array.isArray(value.compilerCodes) || value.compilerCodes.length > 8
+    || !value.compilerCodes.every(code => typeof code === 'string' && /^CS\d{4}$/.test(code))
+    || new Set(value.compilerCodes).size !== value.compilerCodes.length) return null
+  if (!Array.isArray(value.references) || value.references.length > 5
+    || !value.references.every(name => startupReferences.has(name))
+    || new Set(value.references).size !== value.references.length) return null
+  return { stage: value.stage, errorType: value.errorType, hresult: value.hresult,
+    compilerCodes: [...value.compilerCodes], powerShellVersion: value.powerShellVersion, references: [...value.references] }
+}
 export function assertExportDirectoryBinding(value) {
   assert.ok(value && integer(value.pid) && value.pid <= 0xffffffff)
   assert.ok(integer(value.mainHandle))
@@ -87,7 +113,11 @@ export function createExportDirectorySession({ ownedRoot, spawnWorker = spawn,
     let value
     try { value = JSON.parse(line) } catch { fail('INVALID_REPLY'); return }
     if (state === 'starting') {
-      if (value?.protocol !== 1 || value.ready !== true) { fail('STARTUP_REFUSED'); return }
+      if (value?.protocol !== 1 || value.ready !== true) {
+        const diagnostic = value?.protocol === 1 && value.ready === false && value.error === 'DIRECTORY_HELPER_STARTUP'
+          ? startupDiagnostic(value.diagnostic) : null
+        fail('STARTUP_REFUSED', { startupDiagnostic: diagnostic }); return
+      }
       state = 'ready'; clearTimeout(startupTimer); event({ type: 'ready', pid: child.pid }); resolveReady(); return
     }
     if (state !== 'ready' || disposed) return

@@ -8,6 +8,8 @@
 
 后续修补候选 `f409bfcc0c5762a058fac464a2aad63dc1d5f00a` 的本地完整门禁通过，但Windows原报告仍有路径失败：四份完整4973项报告各4966通过／7失败，Desktop准备614项中612通过／2失败，实际桌面和Desktop产物均未执行成功。原因是夹具误用普通`fs.realpathSync`；官方Node24.22内置实现只展开符号链接，不保证展开Windows 8.3短目录名，而生产`fs.promises.realpath`使用原生`binding.realpath`。本次仅将两处测试夹具改为`fs.realpathSync.native`，并把现有别名用例的真值绑定独立的异步realpath；不修改生产包含边界、回执断言或任何原预算。Linux symlink通过不能替代新HEAD的Windows8.3实际结果。f409原失败保留，不接受其安装包，详见模块文档及助手事故记录。
 
+`e74c87e080c7b004d2fd2ce6ab213b4ba095fb1b`已在实际Windows通过原614项准备、80状态模型、保存／阅读与快捷键重启，原短／长路径阻塞解除；17项CI终态为16成功／1失败。唯一失败来自导出目录助手启动时`STARTUP_REFUSED`，报告中新导出checks／screenshots／directoryActions均为空，不能计作实际导出完成。原启动catch与session没有保留底层异常，无法从该次原件证明具体编译错误。源码复核发现HashSet使用的System.Core未列入显式引用；本次补引用、限定启动诊断，并在Windows准备合同中冷启动同一worker／EOF正常退出，不发送窗口操作。原预算、身份与目录包含边界保持，新HEAD实际导出和完整安装仍待验收；不再轮询或下载e74未合格EXE。
+
 当前完整本地模块沿用“更多笔记操作 → 导出”的Word／Markdown入口：选择笔记与文件夹，读取并冻结已保存正文预览，原生选择目标目录，创建独占导出批次，逐项显示真实文件与失败原因，停止后显式继续，仅重试失败项，并打开本批目录。导出不保存编辑器草稿、不改笔记数据库；成功项目不重写，关闭或导航撤销旧请求，目录取消保留选择。范围、实际旧源反例与异常处理见 [LOCAL_DOCUMENT_EXPORT_2F102.md](LOCAL_DOCUMENT_EXPORT_2F102.md)。
 
 继续 `feature/knowledge-os-phase2` / Draft PR #2，版本显式升为4.235.0，schema14及679依赖节点不变。先完成本模块源码、默认无过滤Vitest、原test:ui及当前HEAD的全部CI、真实Windows文件／附件、对应新EXE和完整安装生命周期，最终结果再记PR／交付报告。网页VSCode编辑与提交和隔离运行环境中的执行证据分别核对，不能把网页“没有问题”、UI mock或旧候选绿灯当成完整验收。

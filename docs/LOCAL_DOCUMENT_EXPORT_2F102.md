@@ -72,3 +72,15 @@ Windows路径问题、实际复制异常和诊断前的未知原因分别记录�
 本次只将IPC测试和原始导出证据测试的目录创建／别名解析改为原生同步实现，并把既有别名用例的独立真值取自异步realpath。原52项IPC和81项原始导出合同的名册、生产授权／包含／文件字节断言与超时预算保持，不改产品源码来容忍越界路径。安装验证器共享的原始证据文件同步为同一字节；新产品、实际导出与安装仍须按其真实提交独立验收。
 
 上一轮完整本地报告还发现stdout与执行摘要的字节摘要不一致，机制未确证。原成功JSON、现存日志及两次摘要保留，仅为证据完整性以同源同命令补跑默认全量，4973项名册一致，并在执行环境内封存二进制ZIP核对大小／SHA／CRC及内部三件原始证据；其他门禁未重复运行。此事不作为Windows失败原因，也不推断为ChatGPT中断根因。
+
+## e74真实Windows目录助手启动拒绝
+
+`e74c87e080c7b004d2fd2ce6ab213b4ba095fb1b`／树`c3e62587497d2b99205411cade63191b0e227eae`的17项首次CI为16成功／1失败。[Desktop运行39567379839](https://github.com/GuDuYunChen/Local-Notepad/actions/runs/39567379839)实际通过原614项Node合同、80状态模型、production构建、真实保存／阅读和快捷键两进程重启；Windows路径前置不再失败。原Desktop包12330896226的4059050字节、SHA256与152成员已核，原保存／阅读／快捷键各自证据仍按其范围保留，不能抵消新导出失败。
+
+新导出驱动在目录助手启动后约502ms收到`STARTUP_REFUSED`，约512ms记录清理未完成。`local-export-desktop.json`为`complete:false`、`cleanupComplete:false`，`checks`、`screenshots`、`directoryActions`全部为空；业务操作尚未开始，没有109份实际文档或6张新导出图的成功证据。窗口助手正常就绪，目录助手的原始catch仅输出固定`DIRECTORY_HELPER_STARTUP`，session又未保留详细字段，日志为0字节，因此原件不能证明具体编译或初始化异常。该run实际Node为24.21.0，环境事实保留，不据此推断原因。
+
+源码复核确认C#使用`HashSet<long>`，显式程序集列表未列.NET Framework的`System.Core.dll`。本次补齐该引用，并保留白名单阶段、异常类型、HRESULT、编译器CS编号、PowerShell版本及程序集文件名诊断；不转储任意异常原文、命令、环境或用户路径。session严格校验诊断再写失败事件，畸形或越界内容不能变成可信信息。原现场底层异常未知与当前引用修补的依据分开记录，不将静态推断冒充原始编译日志。
+
+Windows准备合同增加同一worker的实际冷启动与EOF正常关闭子验证，不发鼠标、键盘或目录动作；原30秒启动与10秒命令预算、PID／owner绑定、单次命令与失败不重播保持。Linux没有PowerShell／.NET Framework时只报告实际运行的协议与拒绝合同，不把条件分支视作Windows已执行。生产导出和包含边界保持；安装共享源同步，下一真实提交仍须完成全部CI、新导出原件与当前EXE完整安装后才能验收。
+
+同轮沿实际驱动复核路径身份链，发现其`mkdtempSync`返回的scratch尚未原生规范化：report.exportRoot沿词法scratch派生，而实际成功item.path来自core原生realpath。若临时根含8.3短名或junction，同一物理目录仍可能在最终包含检查被拒绝。e74在助手启动已停止，这一条件风险不是当次已发生的业务失败。修补仅在独占创建scratch后调用`realpathSync.native`，使profile、导出目录、回执根和最终自有目录清理共享同一个身份；原参数限制、60秒执行预算和相对路径拒绝不变。安装驱动复用同一文件并保持字节一致，不另造通用模块或放宽比较。

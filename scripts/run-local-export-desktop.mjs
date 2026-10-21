@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { spawn, spawnSync } from 'node:child_process'
 import { createServer } from 'node:net'
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, readdirSync, rmSync, cpSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, readdirSync, rmSync, cpSync, realpathSync } from 'node:fs'
 import { tmpdir, homedir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -59,7 +59,7 @@ export async function runLocalExportLifecycle({ executablePath, out, productComm
   assert.match(process.env.GITHUB_SHA || '', /^[a-f0-9]{40}$/); assert.match(productCommit || '', /^[a-f0-9]{40}$/)
   assert.ok(['packaged', 'installed'].includes(scope)); assert.equal(version, LOCAL_EXPORT_VERSION)
   assert.ok(path.win32.isAbsolute(executablePath || ''))
-  const scratch = mkdtempSync(path.join(ownedRoot, 'notepad-export-')), profile = path.join(scratch, 'profile')
+  const scratch = realpathSync.native(mkdtempSync(path.join(ownedRoot, 'notepad-export-'))), profile = path.join(scratch, 'profile')
   const applicationDirectory = path.dirname(executablePath)
   const dataDirectory = scope === 'installed' ? path.join(homedir(), 'AppData', 'Roaming', 'Notepad') : path.join(scratch, 'data')
   if (scope === 'packaged') mkdirSync(dataDirectory)
