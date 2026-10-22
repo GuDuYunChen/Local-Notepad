@@ -566,7 +566,7 @@ test('export fixture creates distinct sibling titles with real portable-name col
 
 test('export library restoration expands the real collapsed-sidebar state and confirms the target', async t => {
   const dom = new JSDOM('<aside class="workspace-sidebar collapsed"><button aria-label="展开侧边栏">展开</button></aside>',
-    { runScripts: 'outside-only' })
+    { runScripts: 'outside-only', pretendToBeVisual: true })
   t.after(() => dom.window.close())
   const source = readFileSync(new URL('./run-local-export-desktop.mjs', import.meta.url), 'utf8')
   const declaration = parse(source, { ecmaVersion: 'latest', sourceType: 'module' }).body
