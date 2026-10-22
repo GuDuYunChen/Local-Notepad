@@ -573,7 +573,7 @@ test('export library restoration expands the real collapsed-sidebar state and co
     .find(node => node.type === 'FunctionDeclaration' && node.id?.name === 'until')
   assert.ok(declaration)
   const until = new Script(source.slice(declaration.start, declaration.end) + '; until').runInNewContext({
-    performance, sleep: () => Promise.resolve(),
+    performance, setTimeout, sleep: () => new Promise(resolve => setTimeout(resolve, 1)),
   })
   let refreshes = 0, clicks = 0
   dom.window.addEventListener('library:refresh', () => { refreshes++ })
