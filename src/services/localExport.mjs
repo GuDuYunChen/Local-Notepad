@@ -60,7 +60,7 @@ export function localExportRequest(operation, timeout = 65000) {
   const request = Promise.resolve().then(operation).catch(cause => {
     // A rejected IPC promise has no authoritative native receipt. Treat it as an
     // unknown outcome; callers must query/reuse the same idempotency identity.
-    const error = new Error(cause?.message || '桌面导出响应连接中断，请查回结果后再操作。')
+    const error = new Error('桌面导出响应连接中断，请查回结果后再操作。')
     error.code = 'local-export-response-lost'
     throw error
   })
