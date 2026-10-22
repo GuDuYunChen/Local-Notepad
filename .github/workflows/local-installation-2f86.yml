@@ -2,6 +2,7 @@ name: Actual local document export installation lifecycle 2F102
 on:
   push:
     branches: [ci/local-installation-2f86]
+  workflow_dispatch:
 permissions:
   contents: read
   actions: read

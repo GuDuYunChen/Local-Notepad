@@ -1,9 +1,6 @@
 name: Sync Conflict History CI
 on:
-  push:
-    branches: [feature/knowledge-os-phase2]
-  pull_request:
-    branches: [master]
+  workflow_dispatch:
 permissions:
   contents: read
 concurrency:

@@ -1,9 +1,6 @@
 name: Sync Help Navigation CI
 on:
-  push:
-    branches: [feature/knowledge-os-phase2]
-  pull_request:
-    branches: [master]
+  workflow_dispatch:
 concurrency:
   group: sync-help-navigation-${{ github.ref }}
   cancel-in-progress: true
