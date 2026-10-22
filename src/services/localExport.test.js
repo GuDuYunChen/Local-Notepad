@@ -73,4 +73,9 @@ describe('local export response and selection boundaries', () => {
       expect(error.code).toBe('local-export-request-timeout')
     } finally { vi.useRealTimers() }
   })
+  it('marks a rejected bridge response as an unknown outcome', async () => {
+    const error = await localExportRequest(() => Promise.reject(new Error('IPC disconnected'))).then(() => null, value => value)
+    expect(error.message).toBe('IPC disconnected')
+    expect(error.code).toBe('local-export-response-lost')
+  })
 })

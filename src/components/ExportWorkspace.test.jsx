@@ -113,6 +113,20 @@ describe('complete local document export workspace', () => {
     expect(query('[data-local-export-item="one"]')).toBeTruthy()
     expect(button('关闭').disabled).toBe(false)
   })
+  it('reuses the same preparation identity after the native response connection is lost', async () => {
+    native.exportWorkspacePrepare.mockRejectedValueOnce(new Error('响应连接中断'))
+    await mount()
+    await prepare()
+    const originalId = native.exportWorkspacePrepare.mock.calls[0][0].requestId
+    expect(host.textContent).toContain('响应连接中断')
+    expect(button('查回预览')).toBeTruthy()
+    expect(native.exportWorkspaceCancel).not.toHaveBeenCalled()
+    await click(button('查回预览'))
+    expect(native.exportWorkspacePrepare).toHaveBeenCalledTimes(2)
+    expect(native.exportWorkspacePrepare.mock.calls[1][0].requestId).toBe(originalId)
+    expect(query('[data-local-export-item="one"]')).toBeTruthy()
+    expect(button('关闭').disabled).toBe(false)
+  })
   it('can cancel preparation using its original request identity', async () => {
     const pending = deferred(); native.exportWorkspacePrepare.mockImplementation(() => pending.promise)
     await mount(); await prepare(); await click(button('停止读取'))

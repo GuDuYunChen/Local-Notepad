@@ -98,8 +98,8 @@ export default function ExportWorkspace({ ids, onClose, onReselect }) {
     } catch (error) {
       if (valid(task)) {
         setMessage(messageOf(error))
-        if (error?.code === 'local-export-request-timeout') {
-          // A renderer timeout does not prove that the native preparation stopped.
+        if (['local-export-request-timeout', 'local-export-response-lost'].includes(error?.code)) {
+          // A timeout or lost IPC response does not prove that native preparation stopped.
           // Keep the same request identity so an explicit retry retrieves the original result.
           preserveRequestId = true
           setUncertain(true); setPollPaused(true)
