@@ -62,12 +62,15 @@ describe('local export response and selection boundaries', () => {
     expect(() => exportResult({ success: false, message: '未取得目录授权' })).toThrow('未取得目录授权')
     expect(() => exportResult({ success: true })).toThrow(/回执/)
   })
-  it('bounds an unanswered request without reporting success', async () => {
+  it('bounds an unanswered request with a recoverable timeout identity', async () => {
     vi.useFakeTimers()
     try {
       const promise = localExportRequest(() => new Promise(() => {}), 100)
-      const result = expect(promise).rejects.toThrow(/超时/)
-      await vi.advanceTimersByTimeAsync(100); await result
+      const rejection = promise.then(() => null, error => error)
+      await vi.advanceTimersByTimeAsync(100)
+      const error = await rejection
+      expect(error.message).toMatch(/超时/)
+      expect(error.code).toBe('local-export-request-timeout')
     } finally { vi.useRealTimers() }
   })
 })
