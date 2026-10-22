@@ -1,0 +1,26 @@
+import assert from 'node:assert/strict'
+import {findLiteralMatches,findTextMatchOffsets,buildReplacementValues,assertSearchString,SEARCH_LIMITS} from '../src/services/documentSearch.mjs'
+const part=(original,start,end,key='x')=>({key,kind:'text',original,start,end})
+export function registerDocumentSearchTests(test){
+ test('literal punctuation does not become a regex',()=>assert.deepEqual(findTextMatchOffsets('[a].* [a].*','[a].*'),[0,6]))
+ test('case folding never shifts original Turkish-prefix offsets',()=>assert.deepEqual(findTextMatchOffsets('İx AB','ab'),[3]))
+ test('supplementary letters cannot become false whole-word boundaries',()=>assert.deepEqual(findTextMatchOffsets('𐐀cat cat','cat',{wholeWord:true}),[6]))
+ test('combining marks belong to words',()=>assert.deepEqual(findTextMatchOffsets('cat\u0301 cat','cat',{wholeWord:true}),[5]))
+ test('Unicode simple folding keeps actual match lengths',()=>assert.deepEqual(findLiteralMatches('KKk','k').map(m=>[m.offset,m.length]),[[0,1],[1,1],[2,1]]))
+ test('CJK and emoji preserve exact code-unit offsets',()=>assert.deepEqual(findTextMatchOffsets('🙂写作 🙂写作','写作'),[2,7]))
+ test('case sensitive and whole-word options compose',()=>assert.deepEqual(findTextMatchOffsets('Cat cat_ cat Cat!','Cat',{matchCase:true,wholeWord:true}),[0,13]))
+ test('empty query is not a zero-width replacement pattern',()=>assert.deepEqual(findLiteralMatches('abc',''),[]))
+ test('matches are non overlapping',()=>assert.deepEqual(findTextMatchOffsets('aaaaa','aa'),[0,2]))
+ test('replacement metacharacters remain literal',()=>assert.equal(buildReplacementValues([{parts:[part('cat',0,3)]}],'$&\\$1')[0].value,'$&\\$1'))
+ test('all replacements are computed backward against the same source',()=>assert.equal(buildReplacementValues([{parts:[part('cat cat',0,3)]},{parts:[part('cat cat',4,7)]}],'elephant')[0].value,'elephant elephant'))
+ test('cross-format replacement stays in the first leaf',()=>assert.deepEqual(buildReplacementValues([{parts:[part('al',0,2,'a'),part('pha!',0,3,'b')]}],'β').map(x=>x.value),['β','!']))
+ test('empty replacement deletes only the exact range',()=>assert.equal(buildReplacementValues([{parts:[part('x cat y',2,5)]}],'')[0].value,'x  y'))
+ test('equal replacement is a true no-op',()=>assert.deepEqual(buildReplacementValues([{parts:[part('abc',0,3)]}],'abc'),[]))
+ for(const [label,pieces]of [['negative',[part('abc',-1,2)]],['zero',[part('abc',1,1)]],['overflow',[part('abc',0,5)]],['overlap',[part('abc',0,2),part('abc',1,3)]],['different-baseline',[part('abc',0,1),part('def',1,2)]]])test('invalid plan refuses '+label,()=>assert.throws(()=>buildReplacementValues(pieces.map(p=>({parts:[p]})),'x')))
+ test('query limit rejects rather than truncates',()=>assert.throws(()=>findLiteralMatches('x','x'.repeat(1025))))
+ test('match limit rejects rather than silently replacing first 5000',()=>assert.throws(()=>findLiteralMatches('a'.repeat(5001),'a')))
+ test('text budget is enforced even with no matches',()=>assert.throws(()=>findLiteralMatches('a'.repeat(SEARCH_LIMITS.text+1),'z')))
+ test('replacement budget is checked before plan mutation',()=>assert.throws(()=>buildReplacementValues([{parts:[part('a',0,1)]}],'x'.repeat(4097))))
+ for(const value of ['\ud800','\udfff','a\ud800b',null])test('invalid Unicode rejected '+JSON.stringify(value),()=>assert.throws(()=>assertSearchString(value,100,'内容')))
+ test('valid astral characters survive validation',()=>assert.equal(assertSearchString('🙂𐐀',2,'内容'),'🙂𐐀'))
+}

@@ -1,4 +1,5 @@
-import React, { useEffect } from 'react'
+import TemplateLibrary from './TemplateLibrary'
+import React, { useEffect, useState } from 'react'
 
 const TEMPLATES = [
   {
@@ -119,9 +120,10 @@ function TemplateIcon({ id }) {
   return <svg {...common}><path d="M6 3h9l3 3v15H6z" /><path d="M15 3v4h4" /></svg>
 }
 
-export default function TemplateSelector({ open, onClose, onSelect }) {
+export default function TemplateSelector({ open, onClose, onSelect, onCreated, beforeCreate, parentId, parentLabel }) {
+  const [libraryOpen, setLibraryOpen] = useState(false), [seed, setSeed] = useState(null)
   useEffect(() => {
-    if (!open) return undefined
+    if (!open || libraryOpen) return undefined
 
     const onKeyDown = (event) => {
       if (event.key === 'Escape') onClose?.()
@@ -129,11 +131,14 @@ export default function TemplateSelector({ open, onClose, onSelect }) {
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [open, onClose])
+  }, [open, onClose, libraryOpen])
 
   if (!open) return null
 
+  if (libraryOpen) return <TemplateLibrary seed={seed} onClose={() => { setLibraryOpen(false); setSeed(null) }} onCreated={onCreated} beforeCreate={beforeCreate} parentId={parentId} parentLabel={parentLabel} />
+
   const choose = (template) => {
+    if (template.id !== 'blank' && onCreated) { setSeed(template); setLibraryOpen(true); return }
     if (template.id === 'blank') onSelect?.(null)
     else onSelect?.({ id: template.id, title: template.title, content: template.content })
   }
@@ -155,6 +160,7 @@ export default function TemplateSelector({ open, onClose, onSelect }) {
           <button type="button" className="icon-btn" onClick={onClose} aria-label="关闭" title="关闭">×</button>
         </header>
 
+        <button type="button" className="btn" onClick={() => { setSeed(null); setLibraryOpen(true) }}>管理我的模板</button>
         <div className="template-grid">
           {TEMPLATES.map((template, index) => (
             <button

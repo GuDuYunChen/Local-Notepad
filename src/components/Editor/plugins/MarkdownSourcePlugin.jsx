@@ -1,16 +1,42 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
+import { useLexicalEditable } from '@lexical/react/useLexicalEditable'
 import { markdownToLexical } from '~/services/importContent'
 import { analyzeMarkdownSourceCompatibility } from '~/services/markdownSource'
+import { editorQuit, EditorQuitError } from '~/services/editorQuit.mjs'
+import ConfirmDialog from '../../ConfirmDialog'
+import { useEditorPendingDraft } from '../hooks/useEditorPendingDraft'
 
 export default function MarkdownSourcePlugin({ readOnly = false }) {
   const [editor] = useLexicalComposerContext()
+  const editorEditable = useLexicalEditable()
   const [open, setOpen] = useState(false)
   const [source, setSource] = useState('')
   const [original, setOriginal] = useState('')
   const [issues, setIssues] = useState([])
   const [editable, setEditable] = useState(false)
+  const [closeReview, setCloseReview] = useState(null)
+  const canEdit = editable && editorEditable && !readOnly
+  useEditorPendingDraft({
+    nodeKey: 'markdown-source', label: 'Markdown 源码',
+    dirty: open && editable && source !== original,
+    value: JSON.stringify([source, original]),
+    discard: () => {
+      setSource(original)
+      setCloseReview(null)
+      setOpen(false)
+    },
+  })
   const textareaRef = useRef(null)
+  const quitSource = useRef(null)
+  quitSource.current = { open, editable, source, original }
+  useEffect(() => editorQuit.register(() => {
+    const current = quitSource.current
+    if (current.open && current.editable && current.source !== current.original) {
+      throw new EditorQuitError('source')
+    }
+  }), [])
 
   const refreshFromEditor = () => {
     const serialized = JSON.stringify(editor.getEditorState())
@@ -19,7 +45,8 @@ export default function MarkdownSourcePlugin({ readOnly = false }) {
       setSource(analysis.markdown)
       setOriginal(analysis.markdown)
       setIssues(analysis.issues)
-      setEditable(analysis.editable && !readOnly)
+      // Compatibility belongs to the draft; a mode switch only pauses editing.
+      setEditable(analysis.editable)
     } catch (error) {
       console.error('生成 Markdown 源码失败', error)
       setSource('')
@@ -29,18 +56,35 @@ export default function MarkdownSourcePlugin({ readOnly = false }) {
     }
   }
 
+  const closeSource = () => {
+    if (editable && source !== original) {
+      setCloseReview({ source, original })
+      return
+    }
+    setOpen(false)
+    editor.focus()
+  }
+
+  const discardAndClose = () => {
+    if (!closeReview || closeReview.source !== source || closeReview.original !== original) {
+      setCloseReview(null)
+      return
+    }
+    setSource(original)
+    setCloseReview(null)
+    setOpen(false)
+    editor.focus()
+  }
+
   useEffect(() => {
     const toggle = () => {
-      setOpen(previous => {
-        const next = !previous
-        if (next) refreshFromEditor()
-        return next
-      })
+      if (open) closeSource()
+      else { refreshFromEditor(); setOpen(true) }
     }
 
     window.addEventListener('editor:toggle-source-mode', toggle)
     return () => window.removeEventListener('editor:toggle-source-mode', toggle)
-  }, [editor, readOnly])
+  }, [editor, readOnly, open, editable, source, original])
 
   useEffect(() => {
     if (!open) return
@@ -50,7 +94,7 @@ export default function MarkdownSourcePlugin({ readOnly = false }) {
   const dirty = source !== original
 
   const applySource = () => {
-    if (!editable || !dirty) return
+    if (!editable || readOnly || !editor.isEditable() || !dirty) return
 
     try {
       const lexical = markdownToLexical(source)
@@ -71,20 +115,17 @@ export default function MarkdownSourcePlugin({ readOnly = false }) {
         <header className="markdown-source-header">
           <div>
             <strong>Markdown 源码</strong>
-            <span>{editable ? '修改后可应用回视觉编辑器' : '只读保护：当前文档包含非标准 Markdown 内容'}</span>
+            <span>{canEdit ? '修改后可应用回视觉编辑器' : readOnly || !editorEditable ? '阅读模式：源码只读' : '只读保护：当前文档包含非标准 Markdown 内容'}</span>
           </div>
           <div className="markdown-source-actions">
-            {editable && (
+            {canEdit && (
               <button type="button" onClick={applySource} disabled={!dirty}>
                 应用更改
               </button>
             )}
             <button
               type="button"
-              onClick={() => {
-                setOpen(false)
-                editor.focus()
-              }}
+              onClick={closeSource}
             >
               关闭
             </button>
@@ -101,8 +142,8 @@ export default function MarkdownSourcePlugin({ readOnly = false }) {
         <textarea
           ref={textareaRef}
           value={source}
-          onChange={event => editable && setSource(event.target.value)}
-          readOnly={!editable}
+          onChange={event => { if (canEdit && editor.isEditable()) setSource(event.target.value) }}
+          readOnly={!canEdit}
           spellCheck={false}
           className="markdown-source-textarea"
           aria-label="Markdown 源码内容"
@@ -110,9 +151,18 @@ export default function MarkdownSourcePlugin({ readOnly = false }) {
 
         <footer className="markdown-source-footer">
           <span>{source.length.toLocaleString() + ' 字符'}</span>
-          <span>{dirty && editable ? '有未应用更改' : editable ? '已同步' : '只读源码'}</span>
+          <span>{dirty && editable ? canEdit ? '有未应用更改' : '未应用更改已保留' : canEdit ? '已同步' : '只读源码'}</span>
         </footer>
       </section>
+      {closeReview && createPortal(<ConfirmDialog
+        title="放弃未应用的源码更改？"
+        message="源码更改还没有应用到正文。继续查看会保留草稿；放弃后关闭，正文保持不变。"
+        onClose={() => setCloseReview(null)}
+        actions={[
+          { label: '继续查看', onClick: () => setCloseReview(null) },
+          { label: '放弃更改并关闭', kind: 'danger', onClick: discardAndClose },
+        ]}
+      />, document.body)}
     </div>
   )
 }

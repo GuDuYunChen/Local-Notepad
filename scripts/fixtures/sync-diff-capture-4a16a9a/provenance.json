@@ -1,0 +1,50 @@
+{
+  "sourceProduct": "4a16a9a60e04357402bbd05c7592c5964b6b97e0",
+  "sourceRun": 39250585180,
+  "sourceArtifact": 12185323271,
+  "files": {
+    "checks.json": {
+      "bytes": 29143,
+      "sha256": "7460c9da60e37f7bf411dc592354f16e5da7122f70a22d1b6c5d3bc83ea1940c"
+    },
+    "light-1200.png": {
+      "bytes": 59257,
+      "sha256": "8b338e8f362f126b9091d7e1c9c04a8ac5d87c1e5a4e15c85d236d4fc4fab9c4"
+    },
+    "dark-1200.png": {
+      "bytes": 66289,
+      "sha256": "dc0548b2f856d6dc5daede9aaa0fd6036cd6ba702fc69ecc72e1686f23b7c17d"
+    }
+  },
+  "comparisonProbes": [
+    {
+      "kind": "local",
+      "position": "left",
+      "x": 181,
+      "y": 440,
+      "exposed": true
+    },
+    {
+      "kind": "local",
+      "position": "right",
+      "x": 866,
+      "y": 445,
+      "exposed": true
+    },
+    {
+      "kind": "remote",
+      "position": "left",
+      "x": 181,
+      "y": 500,
+      "exposed": true
+    },
+    {
+      "kind": "remote",
+      "position": "right",
+      "x": 866,
+      "y": 505,
+      "exposed": true
+    }
+  ],
+  "provenance": "PNG and checks.json are exact archived bytes. comparisonProbes are audit-selected coordinates in the correctly scrolled dark image and reused at the same coordinates in the light image; they were not fields in the historical DOM report. exposed is a synthetic comparison precondition, not a recovered historical DOM observation."
+}

@@ -2075,7 +2075,7 @@ body {
   box-shadow: var(--shadow-raised);
   font-size: 11px;
   line-height: 1.45;
-  pointer-events: auto;
+  pointer-events: none;
   animation: app-toast-in 150ms ease-out;
 }
 
@@ -5508,3 +5508,12 @@ body {
   height: 15px;
   accent-color: var(--clay);
 }
+
+
+/* 2F.100 local reading/editing mode controls */
+.editor-mode-toggle { min-height: 25px; padding: 0 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--ink-soft); font: inherit; font-size: 10px; white-space: nowrap; cursor: pointer; transition: background-color .15s, border-color .15s, color .15s; }
+.editor-mode-toggle:hover, .editor-mode-toggle:focus-visible { border-color: var(--clay); background: var(--clay-light); color: var(--clay); outline: none; }
+.editor-mode-toggle.active { border-color: color-mix(in srgb, var(--clay) 42%, var(--line)); background: var(--clay-light); color: var(--clay); }
+.editor-mode-preference-warning { color: var(--red, #c7433c); font-size: 9px; }
+.editor-reading-draft-pill { background: color-mix(in srgb, #b97820 12%, var(--surface)); color: #95621c; }
+@media (max-width: 640px) { .editor-status-bar { flex-wrap: wrap; min-height: 38px !important; gap: 6px; } .status-right { flex-wrap: wrap; gap: 6px; } .editor-mode-toggle { min-height: 28px; } }

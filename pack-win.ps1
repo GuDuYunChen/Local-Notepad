@@ -1,22 +1,18 @@
+#requires -Version 5.1
+param([switch]$NoOpen)
 $ErrorActionPreference = 'Stop'
-if (-not (Test-Path 'package.json')) { Write-Host '请在项目根目录运行脚本' -ForegroundColor Red; exit 1 }
-try { node -v > $null } catch { Write-Host '未检测到 Node.js，请安装后重试' -ForegroundColor Red; exit 1 }
-try { npm -v > $null } catch { Write-Host '未检测到 npm，请安装后重试' -ForegroundColor Red; exit 1 }
-try { go version > $null } catch { Write-Host '未检测到 Go 环境，请安装 Go 后重试' -ForegroundColor Red; exit 1 }
-Write-Host '安装依赖…' -ForegroundColor Cyan
-if (-not (Test-Path 'node_modules')) { npm install }
-
-# 设置 Electron 镜像，解决国内网络下载失败问题
-$env:ELECTRON_MIRROR="https://npmmirror.com/mirrors/electron/"
-$env:ELECTRON_BUILDER_BINARIES_MIRROR="https://npmmirror.com/mirrors/electron-builder-binaries/"
-
-Write-Host '开始打包…' -ForegroundColor Cyan
-npm run build
-$exeFiles = Get-ChildItem -Path 'release' -Filter '*.exe' -Recurse -ErrorAction SilentlyContinue
-if ($exeFiles.Count -gt 0) {
-  $first = $exeFiles[0].FullName
-  Write-Host ("生成安装包：" + $first) -ForegroundColor Green
-  Start-Process explorer.exe (Split-Path $first)
-} else {
-  Write-Host '未找到生成的 exe，请检查构建输出（release 目录）' -ForegroundColor Yellow
+$code = 1
+try {
+  $node = (Get-Command node.exe -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
+  & $node (Join-Path $PSScriptRoot 'scripts\package-windows.mjs')
+  $code = $LASTEXITCODE
+  if ($code -eq 0 -and -not $NoOpen) {
+    try { Invoke-Item -LiteralPath (Join-Path $PSScriptRoot 'release') }
+    catch { Write-Warning 'Package is ready, but Explorer could not open. See the printed package path.' }
+  }
+} catch {
+  Write-Host ('Packaging failed: ' + $_.Exception.Message) -ForegroundColor Red
+  Write-Host 'Install Node.js 22.12+ (CI uses 24), npm and Go 1.24.11+, then retry.'
+  $code = 1
 }
+exit $code

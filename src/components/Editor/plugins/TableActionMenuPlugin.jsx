@@ -147,6 +147,7 @@ export default function TableActionMenuPlugin() {
           menuRef={menuRef}
           pos={menuPosition}
           dispatch={dispatch}
+          enterSelectionMode={enterSelectionMode}
         />
       )}
     </>,
@@ -154,7 +155,7 @@ export default function TableActionMenuPlugin() {
   )
 }
 
-function TableActionMenu({ menuRef, pos, dispatch }) {
+function TableActionMenu({ menuRef, pos, dispatch, enterSelectionMode }) {
   useEffect(() => {
     if (!menuRef.current) return
 

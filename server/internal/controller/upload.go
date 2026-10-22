@@ -2,6 +2,8 @@ package controller
 
 import (
 	"fmt"
+	"io"
+	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -28,7 +30,7 @@ var allowedExtensions = map[string]bool{
 var allowedMIMETypes = map[string]bool{
 	"image/png": true, "image/jpeg": true, "image/gif": true, "image/webp": true, "image/svg+xml": true, "image/bmp": true, "image/x-icon": true,
 	"video/mp4": true, "video/webm": true, "video/ogg": true, "video/quicktime": true, "video/x-msvideo": true,
-	"application/pdf": true,
+	"application/pdf":    true,
 	"application/msword": true, "application/vnd.openxmlformats-officedocument.wordprocessingml.document": true,
 	"application/vnd.ms-excel": true, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": true,
 	"application/vnd.ms-powerpoint": true, "application/vnd.openxmlformats-officedocument.presentationml.presentation": true,
@@ -38,6 +40,19 @@ var allowedMIMETypes = map[string]bool{
 
 func (c *UploadController) Register(group *ghttp.RouterGroup) {
 	group.POST("/upload", c.Upload)
+}
+
+func sniffUploadMIME(reader io.Reader) (string, error) {
+	buffer := make([]byte, 512)
+	n, err := reader.Read(buffer)
+	if err != nil && err != io.EOF {
+		return "", err
+	}
+	if n == 0 {
+		return "", nil
+	}
+	mediaType, _, err := mime.ParseMediaType(http.DetectContentType(buffer[:n]))
+	return mediaType, err
 }
 
 func (c *UploadController) Upload(r *ghttp.Request) {
@@ -63,15 +78,15 @@ func (c *UploadController) Upload(r *ghttp.Request) {
 		writeErr(r, 1010, "文件读取失败", err)
 		return
 	}
-	buffer := make([]byte, 512)
-	n, _ := f.Read(buffer)
+	mimeType, err := sniffUploadMIME(f)
 	f.Close()
-	if n > 0 {
-		mimeType := http.DetectContentType(buffer)
-		if !allowedMIMETypes[mimeType] {
-			writeErr(r, 1010, fmt.Sprintf("文件内容类型不匹配: %s", mimeType), nil)
-			return
-		}
+	if err != nil {
+		writeErr(r, 1010, "文件读取失败", err)
+		return
+	}
+	if mimeType != "" && !allowedMIMETypes[mimeType] {
+		writeErr(r, 1010, fmt.Sprintf("文件内容类型不匹配: %s", mimeType), nil)
+		return
 	}
 
 	uploadDir := c.UploadDir

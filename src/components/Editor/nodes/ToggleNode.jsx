@@ -1,5 +1,6 @@
 import { $getNodeByKey, DecoratorNode } from 'lexical'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
+import { useLexicalEditable } from '@lexical/react/useLexicalEditable'
 import React, { useEffect, useState } from 'react'
 
 export class ToggleNode extends DecoratorNode {
@@ -90,6 +91,7 @@ export class ToggleNode extends DecoratorNode {
 
 function ToggleComponent({ nodeKey, title, content, collapsed }) {
   const [editor] = useLexicalComposerContext()
+  const isEditable = useLexicalEditable()
   const [isCollapsed, setIsCollapsed] = useState(Boolean(collapsed))
   const [editTitle, setEditTitle] = useState(title || '')
   const [editContent, setEditContent] = useState(content || '')
@@ -99,7 +101,9 @@ function ToggleComponent({ nodeKey, title, content, collapsed }) {
   useEffect(() => setEditContent(content || ''), [content])
 
   const persist = (patch) => {
+    if (!editor.isEditable()) return
     editor.update(() => {
+      if (!editor.isEditable()) return
       const node = $getNodeByKey(nodeKey)
       if (!$isToggleNode(node)) return
       if (patch.title !== undefined) node.setTitle(patch.title)
@@ -111,7 +115,8 @@ function ToggleComponent({ nodeKey, title, content, collapsed }) {
   const toggleCollapsed = () => {
     const next = !isCollapsed
     setIsCollapsed(next)
-    persist({ collapsed: next })
+    // Reading can reveal hidden text without rewriting the stored document.
+    if (editor.isEditable()) persist({ collapsed: next })
   }
 
   return (
@@ -130,7 +135,9 @@ function ToggleComponent({ nodeKey, title, content, collapsed }) {
         <input
           className="toggle-title-input"
           value={editTitle}
+          readOnly={!isEditable}
           onChange={(event) => {
+            if (!editor.isEditable()) return
             const next = event.target.value
             setEditTitle(next)
             persist({ title: next })
@@ -144,7 +151,9 @@ function ToggleComponent({ nodeKey, title, content, collapsed }) {
         <div className="toggle-content">
           <textarea
             value={editContent}
+            readOnly={!isEditable}
             onChange={(event) => {
+              if (!editor.isEditable()) return
               const next = event.target.value
               setEditContent(next)
               persist({ content: next })

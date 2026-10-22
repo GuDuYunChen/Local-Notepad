@@ -226,10 +226,10 @@ describe('UI redesign smoke tests', () => {
   })
 
   it('opens recent notes and supports keyboard selection in quick search', async () => {
-    const onSelectFile = vi.fn()
+    const onSelectFile = vi.fn((file, options) => options.afterSelect(file))
     const onClose = vi.fn()
 
-    api.mockResolvedValue([
+    const quickRows = [
       {
         id: 'file-1',
         title: '第一篇笔记',
@@ -246,7 +246,8 @@ describe('UI redesign smoke tests', () => {
         is_folder: false,
         is_deleted: false,
       },
-    ])
+    ]
+    api.mockImplementation(async path => path.startsWith('/api/files?') ? quickRows : quickRows.find(file => path.endsWith('/' + file.id)))
     searchFiles.mockResolvedValue([])
 
     await act(async () => {
@@ -275,7 +276,8 @@ describe('UI redesign smoke tests', () => {
       await Promise.resolve()
     })
 
-    expect(onSelectFile).toHaveBeenCalledWith(expect.objectContaining({ id: 'file-1' }))
+    expect(onSelectFile).toHaveBeenCalledWith(expect.objectContaining({ id: 'file-1' }), expect.objectContaining({ shouldSelect: expect.any(Function), afterSelect: expect.any(Function), onCancel: expect.any(Function) }))
+    expect(api).toHaveBeenCalledTimes(2)
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
@@ -3666,19 +3668,22 @@ describe('UI redesign smoke tests', () => {
 
   it('restores a recycle-bin item through the restore endpoint', async () => {
     const onRestored = vi.fn()
+    let removed = false
+    const deletedAt = Math.floor(Date.now() / 1000)
     api.mockImplementation((path, init) => {
       if (path === '/api/files/trash' && !init?.method) {
-        return Promise.resolve([
+        return Promise.resolve(removed ? [] : [
           {
             id: 'deleted-1',
             title: 'Deleted.md',
             is_folder: false,
             is_deleted: true,
-            deleted_at: Math.floor(Date.now() / 1000),
+            deleted_at: deletedAt,
           },
         ])
       }
       if (path === '/api/files/deleted-1/restore' && init?.method === 'POST') {
+        removed = true
         return Promise.resolve(null)
       }
       return Promise.reject(new Error(`Unexpected request: ${path}`))
@@ -3695,27 +3700,36 @@ describe('UI redesign smoke tests', () => {
     expect(restoreButton).toBeTruthy()
 
     await click(restoreButton)
+    expect(api.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(0)
+    const restoreDialog = container.querySelector('.trash-workspace-dialog')
+    expect(restoreDialog).toBeTruthy()
+    expect(restoreDialog.textContent).toContain('Deleted.md')
+    await click(Array.from(restoreDialog.querySelectorAll('button')).find(button => button.textContent === '确认恢复'))
     await flushPromises()
 
-    expect(api).toHaveBeenCalledWith('/api/files/deleted-1/restore', { method: 'POST' })
+    expect(api).toHaveBeenCalledWith('/api/files/deleted-1/restore', { method: 'POST', signal: expect.any(AbortSignal) })
+    expect(api.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1)
     expect(onRestored).toHaveBeenCalledWith(['deleted-1'])
     expect(container.textContent).toContain('回收站是空的')
   })
 
   it('uses an in-app confirmation before permanently deleting from trash', async () => {
+    let removed = false
+    const deletedAt = Math.floor(Date.now() / 1000)
     api.mockImplementation((path, init) => {
       if (path === '/api/files/trash' && !init?.method) {
-        return Promise.resolve([
+        return Promise.resolve(removed ? [] : [
           {
             id: 'deleted-2',
             title: '旧笔记.md',
             is_folder: false,
             is_deleted: true,
-            deleted_at: Math.floor(Date.now() / 1000),
+            deleted_at: deletedAt,
           },
         ])
       }
       if (path === '/api/files/deleted-2/permanent' && init?.method === 'DELETE') {
+        removed = true
         return Promise.resolve(null)
       }
       return Promise.reject(new Error(`Unexpected request: ${path}`))
@@ -3732,17 +3746,26 @@ describe('UI redesign smoke tests', () => {
     expect(rowDeleteButton).toBeTruthy()
     await click(rowDeleteButton)
 
-    const dialog = container.querySelector('.consumer-confirm-modal')
+    const dialog = container.querySelector('.trash-workspace-dialog')
     expect(dialog).toBeTruthy()
-    expect(dialog.textContent).toContain('永久删除这项内容？')
+    expect(dialog.textContent).toContain('永久删除 1 个回收站项目？')
     expect(dialog.textContent).toContain('旧笔记.md')
 
     const confirmButton = Array.from(dialog.querySelectorAll('button'))
-      .find(button => button.textContent === '永久删除')
+      .find(button => button.textContent === '确认永久删除')
+    expect(confirmButton.disabled).toBe(true)
+    expect(api.mock.calls.filter(([, init]) => init?.method === 'DELETE')).toHaveLength(0)
+    await act(async () => {
+      const input = dialog.querySelector('input[aria-label="输入永久删除确认"]')
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, '永久删除')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    expect(confirmButton.disabled).toBe(false)
     await click(confirmButton)
     await flushPromises()
 
-    expect(api).toHaveBeenCalledWith('/api/files/deleted-2/permanent', { method: 'DELETE' })
+    expect(api).toHaveBeenCalledWith('/api/files/deleted-2/permanent', { method: 'DELETE', signal: expect.any(AbortSignal) })
+    expect(api.mock.calls.filter(([, init]) => init?.method === 'DELETE')).toHaveLength(1)
     expect(container.textContent).toContain('回收站是空的')
   })
 

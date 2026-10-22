@@ -9,7 +9,12 @@ import './styles/redesign.css'
 import './styles/editor-document.css'
 import './styles/dark-theme.css'
 
+import { installDocumentQuitBridge } from './services/editorQuitBridge.mjs'
+import './styles/editor-quit.css'
+
 initializeThemeFromStorage()
+const disposeQuitBridge = installDocumentQuitBridge({ bridge: window.electronAPI })
+if (import.meta.hot) import.meta.hot.dispose(disposeQuitBridge)
 
 const el = document.getElementById('root')
 if (el) {

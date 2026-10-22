@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
+import { useLexicalEditable } from '@lexical/react/useLexicalEditable'
 import {
   $createTextNode,
   $getSelection,
@@ -140,6 +141,7 @@ export function $insertWikiLinkAtSelection(file) {
 
 export default function WikiLinkPlugin() {
   const [editor] = useLexicalComposerContext()
+  const isEditable = useLexicalEditable()
   const [isOpen, setIsOpen] = useState(false)
   const [queryInfo, setQueryInfo] = useState({
     query: '',
@@ -167,8 +169,10 @@ export default function WikiLinkPlugin() {
   }, [])
 
   const insertLink = useCallback((file) => {
+    if (!editor.isEditable()) return
     let inserted = false
     editor.update(() => {
+      if (!editor.isEditable()) return
       inserted = $insertWikiLinkAtSelection(file)
     })
 
@@ -179,6 +183,10 @@ export default function WikiLinkPlugin() {
     }
   }, [editor, close])
 
+  useEffect(() => editor.registerEditableListener(editable => {
+    if (!editable) close()
+  }), [editor, close])
+
   useEffect(() => {
     if (!editor.hasNodes([WikiLinkNode])) {
       console.error('WikiLinkPlugin: WikiLinkNode 未注册')
@@ -186,6 +194,7 @@ export default function WikiLinkPlugin() {
     }
 
     return editor.registerUpdateListener(({ editorState }) => {
+      if (!editor.isEditable()) { close(); return }
       editorState.read(() => {
         const selection = $getSelection()
         if (!$isRangeSelection(selection) || !selection.isCollapsed()) {
@@ -225,7 +234,7 @@ export default function WikiLinkPlugin() {
   }, [editor, close])
 
   useEffect(() => {
-    if (!isOpen) return undefined
+    if (!isOpen || !isEditable) return undefined
 
     const requestId = ++requestRef.current
     const trimmedQuery = queryInfo.query.trim()
@@ -265,12 +274,13 @@ export default function WikiLinkPlugin() {
     }, trimmedQuery ? 120 : 0)
 
     return () => window.clearTimeout(timer)
-  }, [isOpen, queryInfo])
+  }, [isOpen, isEditable, queryInfo])
 
   useEffect(() => {
     if (!isOpen) return undefined
 
     const handleKeyDown = (event) => {
+      if (!editor.isEditable()) { close(); return }
       if (event.key === 'Escape') {
         event.preventDefault()
         close()
@@ -293,7 +303,7 @@ export default function WikiLinkPlugin() {
 
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, results, selectedIndex, insertLink, close])
+  }, [editor, isOpen, results, selectedIndex, insertLink, close])
 
   useEffect(() => {
     if (!isOpen || !menuRef.current) return
@@ -314,7 +324,7 @@ export default function WikiLinkPlugin() {
     menuRef.current.style.left = left + 'px'
   }, [isOpen, position, results])
 
-  if (!isOpen) return null
+  if (!isOpen || !isEditable) return null
 
   const modeLabel = queryInfo.hasSectionQuery ? '链接章节' : '链接笔记'
   const queryLabel = queryInfo.hasSectionQuery

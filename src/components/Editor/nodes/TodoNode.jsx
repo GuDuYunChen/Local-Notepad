@@ -1,5 +1,6 @@
 import { $getNodeByKey, DecoratorNode } from 'lexical'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
+import { useLexicalEditable } from '@lexical/react/useLexicalEditable'
 import React, { useEffect, useState } from 'react'
 
 export class TodoNode extends DecoratorNode {
@@ -71,6 +72,7 @@ export class TodoNode extends DecoratorNode {
 
 function TodoComponent({ nodeKey, checked, text }) {
   const [editor] = useLexicalComposerContext()
+  const isEditable = useLexicalEditable()
   const [isChecked, setIsChecked] = useState(Boolean(checked))
   const [editText, setEditText] = useState(text || '')
   const [isEditing, setIsEditing] = useState(!text)
@@ -84,7 +86,9 @@ function TodoComponent({ nodeKey, checked, text }) {
   }, [text])
 
   const persist = (patch) => {
+    if (!editor.isEditable()) return
     editor.update(() => {
+      if (!editor.isEditable()) return
       const node = $getNodeByKey(nodeKey)
       if (!$isTodoNode(node)) return
       if (patch.checked !== undefined) node.setChecked(patch.checked)
@@ -93,18 +97,21 @@ function TodoComponent({ nodeKey, checked, text }) {
   }
 
   const handleToggle = () => {
+    if (!editor.isEditable()) return
     const next = !isChecked
     setIsChecked(next)
     persist({ checked: next })
   }
 
   const handleTextChange = (event) => {
+    if (!editor.isEditable()) return
     const next = event.target.value
     setEditText(next)
     persist({ text: next })
   }
 
   const finishEditing = () => {
+    if (!editor.isEditable()) return
     setIsEditing(false)
     persist({ text: editText.trim() })
   }
@@ -114,6 +121,7 @@ function TodoComponent({ nodeKey, checked, text }) {
       <input
         type="checkbox"
         checked={isChecked}
+        disabled={!isEditable}
         onChange={handleToggle}
         className="todo-checkbox"
         aria-label="切换待办状态"
@@ -123,9 +131,11 @@ function TodoComponent({ nodeKey, checked, text }) {
         <input
           type="text"
           value={editText}
+          readOnly={!isEditable}
           onChange={handleTextChange}
           onBlur={finishEditing}
           onKeyDown={(event) => {
+            if (!editor.isEditable()) return
             if (event.key === 'Enter') {
               event.preventDefault()
               event.currentTarget.blur()
@@ -138,14 +148,15 @@ function TodoComponent({ nodeKey, checked, text }) {
           }}
           className="todo-input"
           placeholder="待办事项"
-          autoFocus
+          autoFocus={isEditable}
         />
       ) : (
         <button
           type="button"
           className="todo-text todo-text-button"
-          onClick={() => setIsEditing(true)}
-          title="点击编辑"
+          onClick={() => { if (editor.isEditable()) setIsEditing(true) }}
+          disabled={!isEditable}
+          title={isEditable ? '点击编辑' : undefined}
         >
           {editText || '待办事项'}
         </button>

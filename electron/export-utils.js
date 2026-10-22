@@ -1,5 +1,11 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { LocalExportError } from './local-export-policy.js'
+
+export function checkExportContinuation(options = {}) {
+  if (options.signal?.aborted) throw new LocalExportError('cancelled', '已停止导出，未继续写入文件。')
+  if (options.deadline !== undefined && (!Number.isFinite(options.deadline) || Date.now() >= options.deadline)) throw new LocalExportError('timeout', '导出超过本次时间预算，未继续写入文件。')
+}
 
 export function safeExportStem(title) {
   const safeTitle = String(title || 'Untitled').replace(/[\\/:*?"<>|]/g, '_')
@@ -15,21 +21,24 @@ export function codeBlockText(node) {
   return node.children.map(child => child?.text || '').join('')
 }
 
-export async function fetchAllFileMetadata(fetchImpl = fetch, baseUrl = process.env.API_BASE || 'http://127.0.0.1:27121') {
+export async function fetchAllFileMetadata(fetchImpl = fetch, baseUrl = process.env.API_BASE || 'http://127.0.0.1:27121', options = {}) {
   const files = []
   const seen = new Set()
   const pageSize = 200
 
   for (let page = 1; ; page += 1) {
+    checkExportContinuation(options)
     const params = new URLSearchParams({
       page: String(page),
       size: String(pageSize),
       compact: '1',
     })
-    const res = await fetchImpl(`${baseUrl}/api/files?${params.toString()}`)
+    const res = await fetchImpl(`${baseUrl}/api/files?${params.toString()}`, options.signal ? { signal: options.signal } : undefined)
+    checkExportContinuation(options)
     if (!res.ok) throw new Error(`Fetch file list failed: ${res.statusText}`)
 
     const body = await res.json()
+    checkExportContinuation(options)
     if (body.code !== 0) {
       throw new Error(body.detail || body.message || '读取文件列表失败')
     }
@@ -118,23 +127,28 @@ function mimeFromSource(src) {
   return 'image/jpeg'
 }
 
-export async function localUploadToDataUri(src, fetchImpl = globalThis.fetch) {
+export async function localUploadToDataUri(src, fetchImpl = globalThis.fetch, options = {}) {
+  checkExportContinuation(options)
   if (!isLocalUploadUrl(src)) return src
 
   try {
-    const response = await fetchImpl(src)
+    const response = await fetchImpl(src, options.signal ? { signal: options.signal } : undefined)
+    checkExportContinuation(options)
     if (!response?.ok) return src
 
     const bytes = Buffer.from(await response.arrayBuffer())
+    checkExportContinuation(options)
     const contentType = response.headers?.get?.('content-type')?.split(';')[0]?.trim()
     const mime = contentType || mimeFromSource(src)
     return `data:${mime};base64,${bytes.toString('base64')}`
   } catch {
+    checkExportContinuation(options)
     return src
   }
 }
 
-export async function embedLocalImagesInLexical(content, fetchImpl = globalThis.fetch) {
+export async function embedLocalImagesInLexical(content, fetchImpl = globalThis.fetch, options = {}) {
+  checkExportContinuation(options)
   let state
   try {
     state = JSON.parse(content || '')
@@ -144,10 +158,11 @@ export async function embedLocalImagesInLexical(content, fetchImpl = globalThis.
 
   const rewrite = async (src) => {
     if (!src || String(src).startsWith('data:')) return src
-    return localUploadToDataUri(src, fetchImpl)
+    return localUploadToDataUri(src, fetchImpl, options)
   }
 
   const walk = async (node) => {
+    checkExportContinuation(options)
     if (!node) return
 
     if (node.type === 'image') {
@@ -166,6 +181,7 @@ export async function embedLocalImagesInLexical(content, fetchImpl = globalThis.
   }
 
   await walk(state.root)
+  checkExportContinuation(options)
   return JSON.stringify(state)
 }
 
@@ -185,8 +201,10 @@ export async function materializeLocalAssetsInLexical(
   content,
   outputDir,
   assetDirName,
-  fetchImpl = globalThis.fetch
+  fetchImpl = globalThis.fetch,
+  options = {}
 ) {
+  checkExportContinuation(options)
   let state
   try {
     state = JSON.parse(content || '')
@@ -199,13 +217,17 @@ export async function materializeLocalAssetsInLexical(
   let assetIndex = 0
 
   const rewrite = async (src) => {
+    checkExportContinuation(options)
     if (!isLocalUploadUrl(src)) return src
     if (written.has(src)) return written.get(src)
 
     try {
-      const response = await fetchImpl(src)
+      const response = await fetchImpl(src, options.signal ? { signal: options.signal } : undefined)
+      checkExportContinuation(options)
       if (!response?.ok) return src
 
+      const bytes = Buffer.from(await response.arrayBuffer())
+      checkExportContinuation(options)
       fs.mkdirSync(assetDir, { recursive: true })
       let filename = safeAssetFilename(src, assetIndex++)
       let target = path.join(assetDir, filename)
@@ -218,16 +240,19 @@ export async function materializeLocalAssetsInLexical(
         target = path.join(assetDir, filename)
       }
 
-      fs.writeFileSync(target, Buffer.from(await response.arrayBuffer()))
+      checkExportContinuation(options)
+      fs.writeFileSync(target, bytes)
       const relative = `./${assetDirName}/${filename}`.replace(/\\/g, '/')
       written.set(src, relative)
       return relative
     } catch {
+      checkExportContinuation(options)
       return src
     }
   }
 
   const walk = async (node) => {
+    checkExportContinuation(options)
     if (!node) return
     if (node.type === 'image') {
       node.src = await rewrite(node.src)
@@ -246,5 +271,6 @@ export async function materializeLocalAssetsInLexical(
   }
 
   await walk(state.root)
+  checkExportContinuation(options)
   return JSON.stringify(state)
 }

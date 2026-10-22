@@ -1,0 +1,935 @@
+{
+  "commit": "bed26f73d02e3feebcb14d56488cceb40bafe240",
+  "platform": "win32",
+  "realComponents": true,
+  "syntheticRecords": true,
+  "backendExercised": false,
+  "windowLifecycle": {
+    "firstPaintObserved": true,
+    "visible": true,
+    "focusedByHarness": false
+  },
+  "reports": [
+    {
+      "name": "light-1200",
+      "themeColorsReady": true,
+      "visible": true,
+      "bounds": {
+        "top": 335.9375,
+        "bottom": 611.625,
+        "left": 65,
+        "right": 871
+      },
+      "viewport": {
+        "width": 1200,
+        "height": 900
+      },
+      "rows": 4,
+      "bodyOverflow": -8,
+      "tableOverflow": 0,
+      "colors": [
+        {
+          "kind": "local",
+          "selector": "pre",
+          "foreground": [
+            36,
+            34,
+            42
+          ],
+          "background": [
+            242,
+            230,
+            231
+          ],
+          "ratio": 12.898093548560535,
+          "finalForeground": true,
+          "finalBackground": true
+        },
+        {
+          "kind": "local",
+          "selector": ".sync-diff-line-meta strong",
+          "foreground": [
+            36,
+            34,
+            42
+          ],
+          "background": [
+            242,
+            230,
+            231
+          ],
+          "ratio": 12.898093548560535,
+          "finalForeground": true,
+          "finalBackground": true
+        },
+        {
+          "kind": "local",
+          "selector": ".sync-diff-line-meta span",
+          "foreground": [
+            36,
+            34,
+            42
+          ],
+          "background": [
+            242,
+            230,
+            231
+          ],
+          "ratio": 12.898093548560535,
+          "finalForeground": true,
+          "finalBackground": true
+        },
+        {
+          "kind": "remote",
+          "selector": "pre",
+          "foreground": [
+            36,
+            34,
+            42
+          ],
+          "background": [
+            246,
+            246,
+            248
+          ],
+          "ratio": 14.549424761712238,
+          "finalForeground": true,
+          "finalBackground": true
+        },
+        {
+          "kind": "remote",
+          "selector": ".sync-diff-line-meta strong",
+          "foreground": [
+            36,
+            34,
+            42
+          ],
+          "background": [
+            246,
+            246,
+            248
+          ],
+          "ratio": 14.549424761712238,
+          "finalForeground": true,
+          "finalBackground": true
+        },
+        {
+          "kind": "remote",
+          "selector": ".sync-diff-line-meta span",
+          "foreground": [
+            36,
+            34,
+            42
+          ],
+          "background": [
+            246,
+            246,
+            248
+          ],
+          "ratio": 14.549424761712238,
+          "finalForeground": true,
+          "finalBackground": true
+        }
+      ],
+      "textChecks": [
+        {
+          "id": "heading",
+          "foreground": [
+            36,
+            34,
+            42
+          ],
+          "background": [
+            255,
+            255,
+            255
+          ],
+          "ratio": 15.703775565080118,
+          "finalForeground": true
+        },
+        {
+          "id": "position",
+          "foreground": [
+            36,
+            34,
+            42
+          ],
+          "background": [
+            255,
+            255,
+            255
+          ],
+          "ratio": 15.703775565080118,
+          "finalForeground": true
+        },
+        {
+          "id": "local-column",
+          "foreground": [
+            111,
+            107,
+            120
+          ],
+          "background": [
+            255,
+            255,
+            255
+          ],
+          "ratio": 5.184938502630094,
+          "finalForeground": true
+        },
+        {
+          "id": "remote-column",
+          "foreground": [
+            111,
+            107,
+            120
+          ],
+          "background": [
+            255,
+            255,
+            255
+          ],
+          "ratio": 5.184938502630094,
+          "finalForeground": true
+        },
+        {
+          "id": "text-column",
+          "foreground": [
+            36,
+            34,
+            42
+          ],
+          "background": [
+            255,
+            255,
+            255
+          ],
+          "ratio": 15.703775565080118,
+          "finalForeground": true
+        },
+        {
+          "id": "summary",
+          "foreground": [
+            36,
+            34,
+            42
+          ],
+          "background": [
+            255,
+            255,
+            255
+          ],
+          "ratio": 15.703775565080118,
+          "finalForeground": true
+        },
+        {
+          "id": "description",
+          "foreground": [
+            111,
+            107,
+            120
+          ],
+          "background": [
+            255,
+            255,
+            255
+          ],
+          "ratio": 5.184938502630094,
+          "finalForeground": true
+        },
+        {
+          "id": "range",
+          "foreground": [
+            111,
+            107,
+            120
+          ],
+          "background": [
+            255,
+            255,
+            255
+          ],
+          "ratio": 5.184938502630094,
+          "finalForeground": true
+        },
+        {
+          "id": "source",
+          "foreground": [
+            111,
+            107,
+            120
+          ],
+          "background": [
+            255,
+            255,
+            255
+          ],
+          "ratio": 5.184938502630094,
+          "finalForeground": true
+        }
+      ],
+      "writes": 0,
+      "activeContent": 0,
+      "theme": "light",
+      "visibility": "visible",
+      "capturePhase": 1,
+      "tableText": "本机行远端行对照文本11相同上下文换行 LF开始核对2—仅本机换行 LF本机保留原有说明。—2仅远端换行 LF远端增加一条补充说明。33相同上下文换行 LF共同上下文。",
+      "scroll": {
+        "x": 0,
+        "y": 706,
+        "tableLeft": 0,
+        "tableTop": 0
+      },
+      "rasterProbes": [
+        {
+          "kind": "local",
+          "position": "left",
+          "x": 190,
+          "y": 436,
+          "exposed": true
+        },
+        {
+          "kind": "local",
+          "position": "right",
+          "x": 847,
+          "y": 436,
+          "exposed": true
+        },
+        {
+          "kind": "remote",
+          "position": "left",
+          "x": 190,
+          "y": 496,
+          "exposed": true
+        },
+        {
+          "kind": "remote",
+          "position": "right",
+          "x": 847,
+          "y": 496,
+          "exposed": true
+        }
+      ],
+      "runningAnimations": [],
+      "runningAnimationCount": 0,
+      "windowVisible": true,
+      "settled": true,
+      "stableSamples": 3,
+      "capture": {
+        "complete": false,
+        "capturePhase": 1,
+        "stableSamples": 3,
+        "before": {
+          "themeColorsReady": true,
+          "visible": true,
+          "bounds": {
+            "top": 335.9375,
+            "bottom": 611.625,
+            "left": 65,
+            "right": 871
+          },
+          "viewport": {
+            "width": 1200,
+            "height": 900
+          },
+          "rows": 4,
+          "bodyOverflow": -8,
+          "tableOverflow": 0,
+          "colors": [
+            {
+              "kind": "local",
+              "selector": "pre",
+              "foreground": [
+                36,
+                34,
+                42
+              ],
+              "background": [
+                242,
+                230,
+                231
+              ],
+              "ratio": 12.898093548560535,
+              "finalForeground": true,
+              "finalBackground": true
+            },
+            {
+              "kind": "local",
+              "selector": ".sync-diff-line-meta strong",
+              "foreground": [
+                36,
+                34,
+                42
+              ],
+              "background": [
+                242,
+                230,
+                231
+              ],
+              "ratio": 12.898093548560535,
+              "finalForeground": true,
+              "finalBackground": true
+            },
+            {
+              "kind": "local",
+              "selector": ".sync-diff-line-meta span",
+              "foreground": [
+                36,
+                34,
+                42
+              ],
+              "background": [
+                242,
+                230,
+                231
+              ],
+              "ratio": 12.898093548560535,
+              "finalForeground": true,
+              "finalBackground": true
+            },
+            {
+              "kind": "remote",
+              "selector": "pre",
+              "foreground": [
+                36,
+                34,
+                42
+              ],
+              "background": [
+                246,
+                246,
+                248
+              ],
+              "ratio": 14.549424761712238,
+              "finalForeground": true,
+              "finalBackground": true
+            },
+            {
+              "kind": "remote",
+              "selector": ".sync-diff-line-meta strong",
+              "foreground": [
+                36,
+                34,
+                42
+              ],
+              "background": [
+                246,
+                246,
+                248
+              ],
+              "ratio": 14.549424761712238,
+              "finalForeground": true,
+              "finalBackground": true
+            },
+            {
+              "kind": "remote",
+              "selector": ".sync-diff-line-meta span",
+              "foreground": [
+                36,
+                34,
+                42
+              ],
+              "background": [
+                246,
+                246,
+                248
+              ],
+              "ratio": 14.549424761712238,
+              "finalForeground": true,
+              "finalBackground": true
+            }
+          ],
+          "textChecks": [
+            {
+              "id": "heading",
+              "foreground": [
+                36,
+                34,
+                42
+              ],
+              "background": [
+                255,
+                255,
+                255
+              ],
+              "ratio": 15.703775565080118,
+              "finalForeground": true
+            },
+            {
+              "id": "position",
+              "foreground": [
+                36,
+                34,
+                42
+              ],
+              "background": [
+                255,
+                255,
+                255
+              ],
+              "ratio": 15.703775565080118,
+              "finalForeground": true
+            },
+            {
+              "id": "local-column",
+              "foreground": [
+                111,
+                107,
+                120
+              ],
+              "background": [
+                255,
+                255,
+                255
+              ],
+              "ratio": 5.184938502630094,
+              "finalForeground": true
+            },
+            {
+              "id": "remote-column",
+              "foreground": [
+                111,
+                107,
+                120
+              ],
+              "background": [
+                255,
+                255,
+                255
+              ],
+              "ratio": 5.184938502630094,
+              "finalForeground": true
+            },
+            {
+              "id": "text-column",
+              "foreground": [
+                36,
+                34,
+                42
+              ],
+              "background": [
+                255,
+                255,
+                255
+              ],
+              "ratio": 15.703775565080118,
+              "finalForeground": true
+            },
+            {
+              "id": "summary",
+              "foreground": [
+                36,
+                34,
+                42
+              ],
+              "background": [
+                255,
+                255,
+                255
+              ],
+              "ratio": 15.703775565080118,
+              "finalForeground": true
+            },
+            {
+              "id": "description",
+              "foreground": [
+                111,
+                107,
+                120
+              ],
+              "background": [
+                255,
+                255,
+                255
+              ],
+              "ratio": 5.184938502630094,
+              "finalForeground": true
+            },
+            {
+              "id": "range",
+              "foreground": [
+                111,
+                107,
+                120
+              ],
+              "background": [
+                255,
+                255,
+                255
+              ],
+              "ratio": 5.184938502630094,
+              "finalForeground": true
+            },
+            {
+              "id": "source",
+              "foreground": [
+                111,
+                107,
+                120
+              ],
+              "background": [
+                255,
+                255,
+                255
+              ],
+              "ratio": 5.184938502630094,
+              "finalForeground": true
+            }
+          ],
+          "writes": 0,
+          "activeContent": 0,
+          "theme": "light",
+          "visibility": "visible",
+          "capturePhase": 1,
+          "tableText": "本机行远端行对照文本11相同上下文换行 LF开始核对2—仅本机换行 LF本机保留原有说明。—2仅远端换行 LF远端增加一条补充说明。33相同上下文换行 LF共同上下文。",
+          "scroll": {
+            "x": 0,
+            "y": 706,
+            "tableLeft": 0,
+            "tableTop": 0
+          },
+          "rasterProbes": [
+            {
+              "kind": "local",
+              "position": "left",
+              "x": 190,
+              "y": 436,
+              "exposed": true
+            },
+            {
+              "kind": "local",
+              "position": "right",
+              "x": 847,
+              "y": 436,
+              "exposed": true
+            },
+            {
+              "kind": "remote",
+              "position": "left",
+              "x": 190,
+              "y": 496,
+              "exposed": true
+            },
+            {
+              "kind": "remote",
+              "position": "right",
+              "x": 847,
+              "y": 496,
+              "exposed": true
+            }
+          ],
+          "runningAnimations": [],
+          "runningAnimationCount": 0,
+          "windowVisible": true
+        },
+        "after": {
+          "themeColorsReady": true,
+          "visible": true,
+          "bounds": {
+            "top": 335.9375,
+            "bottom": 611.625,
+            "left": 65,
+            "right": 871
+          },
+          "viewport": {
+            "width": 1200,
+            "height": 900
+          },
+          "rows": 4,
+          "bodyOverflow": -8,
+          "tableOverflow": 0,
+          "colors": [
+            {
+              "kind": "local",
+              "selector": "pre",
+              "foreground": [
+                36,
+                34,
+                42
+              ],
+              "background": [
+                242,
+                230,
+                231
+              ],
+              "ratio": 12.898093548560535,
+              "finalForeground": true,
+              "finalBackground": true
+            },
+            {
+              "kind": "local",
+              "selector": ".sync-diff-line-meta strong",
+              "foreground": [
+                36,
+                34,
+                42
+              ],
+              "background": [
+                242,
+                230,
+                231
+              ],
+              "ratio": 12.898093548560535,
+              "finalForeground": true,
+              "finalBackground": true
+            },
+            {
+              "kind": "local",
+              "selector": ".sync-diff-line-meta span",
+              "foreground": [
+                36,
+                34,
+                42
+              ],
+              "background": [
+                242,
+                230,
+                231
+              ],
+              "ratio": 12.898093548560535,
+              "finalForeground": true,
+              "finalBackground": true
+            },
+            {
+              "kind": "remote",
+              "selector": "pre",
+              "foreground": [
+                36,
+                34,
+                42
+              ],
+              "background": [
+                246,
+                246,
+                248
+              ],
+              "ratio": 14.549424761712238,
+              "finalForeground": true,
+              "finalBackground": true
+            },
+            {
+              "kind": "remote",
+              "selector": ".sync-diff-line-meta strong",
+              "foreground": [
+                36,
+                34,
+                42
+              ],
+              "background": [
+                246,
+                246,
+                248
+              ],
+              "ratio": 14.549424761712238,
+              "finalForeground": true,
+              "finalBackground": true
+            },
+            {
+              "kind": "remote",
+              "selector": ".sync-diff-line-meta span",
+              "foreground": [
+                36,
+                34,
+                42
+              ],
+              "background": [
+                246,
+                246,
+                248
+              ],
+              "ratio": 14.549424761712238,
+              "finalForeground": true,
+              "finalBackground": true
+            }
+          ],
+          "textChecks": [
+            {
+              "id": "heading",
+              "foreground": [
+                36,
+                34,
+                42
+              ],
+              "background": [
+                255,
+                255,
+                255
+              ],
+              "ratio": 15.703775565080118,
+              "finalForeground": true
+            },
+            {
+              "id": "position",
+              "foreground": [
+                36,
+                34,
+                42
+              ],
+              "background": [
+                255,
+                255,
+                255
+              ],
+              "ratio": 15.703775565080118,
+              "finalForeground": true
+            },
+            {
+              "id": "local-column",
+              "foreground": [
+                111,
+                107,
+                120
+              ],
+              "background": [
+                255,
+                255,
+                255
+              ],
+              "ratio": 5.184938502630094,
+              "finalForeground": true
+            },
+            {
+              "id": "remote-column",
+              "foreground": [
+                111,
+                107,
+                120
+              ],
+              "background": [
+                255,
+                255,
+                255
+              ],
+              "ratio": 5.184938502630094,
+              "finalForeground": true
+            },
+            {
+              "id": "text-column",
+              "foreground": [
+                36,
+                34,
+                42
+              ],
+              "background": [
+                255,
+                255,
+                255
+              ],
+              "ratio": 15.703775565080118,
+              "finalForeground": true
+            },
+            {
+              "id": "summary",
+              "foreground": [
+                36,
+                34,
+                42
+              ],
+              "background": [
+                255,
+                255,
+                255
+              ],
+              "ratio": 15.703775565080118,
+              "finalForeground": true
+            },
+            {
+              "id": "description",
+              "foreground": [
+                111,
+                107,
+                120
+              ],
+              "background": [
+                255,
+                255,
+                255
+              ],
+              "ratio": 5.184938502630094,
+              "finalForeground": true
+            },
+            {
+              "id": "range",
+              "foreground": [
+                111,
+                107,
+                120
+              ],
+              "background": [
+                255,
+                255,
+                255
+              ],
+              "ratio": 5.184938502630094,
+              "finalForeground": true
+            },
+            {
+              "id": "source",
+              "foreground": [
+                111,
+                107,
+                120
+              ],
+              "background": [
+                255,
+                255,
+                255
+              ],
+              "ratio": 5.184938502630094,
+              "finalForeground": true
+            }
+          ],
+          "writes": 0,
+          "activeContent": 0,
+          "theme": "light",
+          "visibility": "visible",
+          "capturePhase": 1,
+          "tableText": "本机行远端行对照文本11相同上下文换行 LF开始核对2—仅本机换行 LF本机保留原有说明。—2仅远端换行 LF远端增加一条补充说明。33相同上下文换行 LF共同上下文。",
+          "scroll": {
+            "x": 0,
+            "y": 706,
+            "tableLeft": 0,
+            "tableTop": 0
+          },
+          "rasterProbes": [
+            {
+              "kind": "local",
+              "position": "left",
+              "x": 190,
+              "y": 436,
+              "exposed": true
+            },
+            {
+              "kind": "local",
+              "position": "right",
+              "x": 847,
+              "y": 436,
+              "exposed": true
+            },
+            {
+              "kind": "remote",
+              "position": "left",
+              "x": 190,
+              "y": 496,
+              "exposed": true
+            },
+            {
+              "kind": "remote",
+              "position": "right",
+              "x": 847,
+              "y": 496,
+              "exposed": true
+            }
+          ],
+          "runningAnimations": [],
+          "runningAnimationCount": 0,
+          "windowVisible": true
+        },
+        "error": "AssertionError [ERR_ASSERTION]: Saved PNG does not contain the measured local row at its observed coordinates\n    at D:\\a\\Local-Notepad\\Local-Notepad\\scripts\\sync-diff-render-capture.cjs:69:12\n    at Array.map (<anonymous>)\n    at verifyDiffRaster (D:\\a\\Local-Notepad\\Local-Notepad\\scripts\\sync-diff-render-capture.cjs:64:37)\n    at validateDiffCapture (D:\\a\\Local-Notepad\\Local-Notepad\\scripts\\sync-diff-render-capture.cjs:86:18)\n    at captureDiffFrame (D:\\a\\Local-Notepad\\Local-Notepad\\scripts\\sync-diff-render-capture.cjs:103:22)\n    at async capture (D:\\a\\Local-Notepad\\Local-Notepad\\scripts\\check-sync-conflict-diff-render.cjs:187:22)\n    at async D:\\a\\Local-Notepad\\Local-Notepad\\scripts\\check-sync-conflict-diff-render.cjs:205:5"
+      }
+    }
+  ],
+  "complete": false,
+  "phase": "light-1200",
+  "error": "Error: Diff screenshot did not match its observations: AssertionError [ERR_ASSERTION]: Saved PNG does not contain the measured local row at its observed coordinates\n    at D:\\a\\Local-Notepad\\Local-Notepad\\scripts\\sync-diff-render-capture.cjs:69:12\n    at Array.map (<anonymous>)\n    at verifyDiffRaster (D:\\a\\Local-Notepad\\Local-Notepad\\scripts\\sync-diff-render-capture.cjs:64:37)\n    at validateDiffCapture (D:\\a\\Local-Notepad\\Local-Notepad\\scripts\\sync-diff-render-capture.cjs:86:18)\n    at captureDiffFrame (D:\\a\\Local-Notepad\\Local-Notepad\\scripts\\sync-diff-render-capture.cjs:103:22)\n    at async capture (D:\\a\\Local-Notepad\\Local-Notepad\\scripts\\check-sync-conflict-diff-render.cjs:187:22)\n    at async D:\\a\\Local-Notepad\\Local-Notepad\\scripts\\check-sync-conflict-diff-render.cjs:205:5\n    at capture (D:\\a\\Local-Notepad\\Local-Notepad\\scripts\\check-sync-conflict-diff-render.cjs:199:35)\n    at async D:\\a\\Local-Notepad\\Local-Notepad\\scripts\\check-sync-conflict-diff-render.cjs:205:5"
+}

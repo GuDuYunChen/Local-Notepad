@@ -1,6 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import ThemeToggle from './ThemeToggle'
 import LibraryReferenceHealthPanel from './LibraryReferenceHealthPanel'
+import SyncCenterPanel from './SyncCenterPanel'
+import S3ReadInspectionPanel from './S3ReadInspectionPanel'
+import './S3ReadInspectionPanel.css'
+import S3LocalOverviewPanel from './S3LocalOverviewPanel'
 import { api } from '~/services/api'
 import { toast } from '~/services/toast'
 
@@ -204,6 +208,10 @@ export default function SettingsPanel({
           </div>
         </section>
 
+        <SyncCenterPanel />
+        <S3ReadInspectionPanel />
+        <S3LocalOverviewPanel />
+
         <section className="settings-card consumer-settings-section">
           <div className="settings-card-header">
             <h3>知识库引用</h3>
@@ -227,9 +235,9 @@ export default function SettingsPanel({
           <div className="settings-row">
             <div>
               <strong>快捷键</strong>
-              <span>查看搜索、保存、专注模式等快捷操作。</span>
+              <span>查找常用操作，自定义快捷键并保存到本机。</span>
             </div>
-            <button className="btn" onClick={onOpenShortcuts}>查看</button>
+            <button className="btn" onClick={onOpenShortcuts}>管理</button>
           </div>
 
           <button

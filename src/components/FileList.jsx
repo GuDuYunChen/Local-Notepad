@@ -3,7 +3,10 @@ import { useDrag, useDrop } from 'react-dnd'
 import { NativeTypes } from 'react-dnd-html5-backend'
 import { api, listAllFiles } from '~/services/api'
 import { toast } from '~/services/toast'
+import { changePin } from '~/services/localPins.mjs'
 import { executeFileHistoryAction } from '~/services/fileHistory'
+import useLocalShortcuts from '../hooks/useLocalShortcuts'
+import { isShortcutContextBlocked, matchShortcut, shortcutFromEvent, shortcutLabel } from '../services/localShortcuts'
 import ConfirmDialog from './ConfirmDialog'
 import { FileContextMenu, FileLibraryMenu, FileNewMenu } from './FileListMenus'
 import {
@@ -19,6 +22,8 @@ export { compareLibraryItems } from './fileTreeUtils'
 const NameDialog = React.lazy(() => import('./NameDialog'))
 const FileSelectorDialog = React.lazy(() => import('./FileSelectorDialog'))
 const TemplateSelector = React.lazy(() => import('./TemplateSelector'))
+const ImportWorkspace = React.lazy(() => import('./ImportWorkspace'))
+const ExportWorkspace = React.lazy(() => import('./ExportWorkspace'))
 const ItemType = 'FILE_NODE'
 
 const FileNode = ({ 
@@ -166,6 +171,7 @@ const FileNode = ({
 export default function FileList({
   selectedId,
   onSelect,
+  onOpenImportNote,
   onBeforeNew,
   onBeforeDelete,
   onBeforeRename,
@@ -173,6 +179,14 @@ export default function FileList({
   onItemsChanged,
   updatedItem,
 }) {
+  const { bindings: shortcutBindings } = useLocalShortcuts()
+  const [pinReview, setPinReview] = useState(null)
+  const pinOwner = useRef(null)
+  const pinMounted = useRef(false)
+  useEffect(() => {
+    pinMounted.current = true
+    return () => { pinMounted.current = false; pinOwner.current?.abort() }
+  }, [])
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(false)
   const [q, setQ] = useState('')
@@ -181,7 +195,7 @@ export default function FileList({
   const [renaming, setRenaming] = useState(null)
   const [showExport, setShowExport] = useState(false)
   const [pendingExport, setPendingExport] = useState(null)
-  const [exportBusy, setExportBusy] = useState(null)
+  const [exportSelection, setExportSelection] = useState([])
   const [showBatchDelete, setShowBatchDelete] = useState(false)
   const [expanded, setExpanded] = useState(new Set()) // 展开的文件夹ID集合
   const [showNewMenu, setShowNewMenu] = useState(false) // 新建菜单显隐
@@ -190,11 +204,17 @@ export default function FileList({
   const [targetParentId, setTargetParentId] = useState('') // 新建时的目标父目录ID
   const [showFolderSelector, setShowFolderSelector] = useState(false) // 路径选择器
   const [showTemplate, setShowTemplate] = useState(false) // 模板选择器
+  const [importWorkspace, setImportWorkspace] = useState(null)
   const [pendingNewFile, setPendingNewFile] = useState(null) // 待新建文件信息
   
   const [selectedIds, setSelectedIds] = useState(new Set()) // Multi-select state
   const [keyboardFocusId, setKeyboardFocusId] = useState(selectedId || '')
   const treeListRef = useRef(null)
+  // Reads may finish after another module selected a note. Deliver metadata to
+  // the current parent, never the callback captured when the read started.
+  const listContextRef = useRef(null)
+  listContextRef.current = { q, selectedId, onItemsChanged, onSelect }
+  const listReadRef = useRef({ active: false, epoch: 0 })
 
   // Sync selectedId (prop) with selectedIds
   useEffect(() => {
@@ -447,18 +467,14 @@ export default function FileList({
   // Keyboard shortcut for Undo/Redo
   useEffect(() => {
       function handleUndoRedo(e) {
-          if (e.ctrlKey && e.key === 'z') {
-              // 如果焦点在可编辑元素内（编辑器、输入框等），不拦截，让编辑器自行处理
-              const el = document.activeElement
-              const tag = el?.tagName?.toLowerCase()
-              if (tag === 'input' || tag === 'textarea' || el?.isContentEditable) return
-              e.preventDefault()
-              if (e.shiftKey) {
-                  void performRedo()
-              } else {
-                  void performUndo()
-              }
-          }
+          // Fixed history keys yield to foreground fields, dialogs and any
+          // earlier command. Extra modifiers may belong to a configured key.
+          if (isShortcutContextBlocked(e, { allowFormFields: false })) return
+          const binding = shortcutFromEvent(e)
+          if (binding !== 'Mod+Z' && binding !== 'Mod+Shift+Z') return
+          e.preventDefault()
+          if (binding === 'Mod+Shift+Z') void performRedo()
+          else void performUndo()
       }
       window.addEventListener('keydown', handleUndoRedo)
       return () => window.removeEventListener('keydown', handleUndoRedo)
@@ -482,6 +498,7 @@ export default function FileList({
   }, [selectedId, items])
 
   useEffect(() => {
+    listReadRef.current.active = true
     void load()
     
     function handleClickOutside(e) {
@@ -497,6 +514,8 @@ export default function FileList({
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => {
+      listReadRef.current.active = false
+      listReadRef.current.epoch += 1
       document.removeEventListener('mousedown', handleClickOutside)
       if (retryTimerRef.current) {
         clearTimeout(retryTimerRef.current)
@@ -519,13 +538,15 @@ export default function FileList({
   useEffect(() => {
     // 快捷键支持
     function handleKeyDown(e) {
-      if (e.ctrlKey && e.key === 'n') {
+      if (!isShortcutContextBlocked(e) && matchShortcut(e, 'newFolder')) {
         e.preventDefault()
-        if (e.shiftKey) {
-           onNewFolderCheck()
-        } else {
-           onNewFileCheck()
-        }
+        onNewFolderCheck()
+        return
+      }
+      if (!isShortcutContextBlocked(e) && matchShortcut(e, 'newNote')) {
+        e.preventDefault()
+        onNewFileCheck()
+        return
       }
       if (e.key === 'Escape') {
         if (contextMenu) {
@@ -541,7 +562,7 @@ export default function FileList({
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [items, contextMenu, showNewMenu, showLibraryMenu]) // 保持快捷键读取最新菜单状态
+  }, [items, selectedId, onBeforeNew, contextMenu, showNewMenu, showLibraryMenu]) // 新按键总是使用当前目录与保存决定
 
   useEffect(() => {
     if (!updatedItem) return
@@ -559,29 +580,47 @@ export default function FileList({
   const findFirstFileInFolder = findFirstFileInFolderUtil
 
   async function load(retryCount = 0) {
+    const lifetime = listReadRef.current
+    if (!lifetime.active) return
+    const epoch = ++lifetime.epoch
+    const query = listContextRef.current.q
+    const selectedAtStart = listContextRef.current.selectedId
+    const ownsRead = () => lifetime.active && lifetime.epoch === epoch && listContextRef.current.q === query
+    if (retryTimerRef.current) {
+      clearTimeout(retryTimerRef.current)
+      retryTimerRef.current = null
+    }
     setLoading(true)
     try {
-      const normalizedList = await listAllFiles(q)
-      setItems(normalizedList)
-      onItemsChanged?.(normalizedList)
-      
-      // Ensure selection
-      if (!selectedId && normalizedList.length > 0) {
-          const tree = buildTree(normalizedList)
-          const first = findFirstFileInTree(tree)
-          if (first) onSelect(first)
+      const normalizedList = await listAllFiles(query)
+      if (!ownsRead()) return
+      const current = listContextRef.current
+      // A pre-navigation snapshot cannot prove the new selection was deleted.
+      // Read again once under its own identity; never navigate using old data.
+      if (current.selectedId && current.selectedId !== selectedAtStart &&
+          !normalizedList.some(item => item.id === current.selectedId)) {
+        void load()
+        return
       }
-    } catch (e) {
-      console.error(e)
+      setItems(normalizedList)
+      current.onItemsChanged?.(normalizedList)
+      if (!current.selectedId && normalizedList.length > 0) {
+        const tree = buildTree(normalizedList)
+        const first = findFirstFileInTree(tree)
+        if (first) current.onSelect?.(first)
+      }
+    } catch (error) {
+      if (!ownsRead()) return
+      console.error(error)
       if (retryCount < 3) {
-          console.log(`Load failed, retrying (${retryCount + 1}/3)...`)
-          if (retryTimerRef.current) clearTimeout(retryTimerRef.current)
-          retryTimerRef.current = setTimeout(() => load(retryCount + 1), 1000)
+        retryTimerRef.current = setTimeout(() => {
+          if (ownsRead()) void load(retryCount + 1)
+        }, 1000)
       } else {
-          toast.error('加载文件列表失败，请手动刷新')
+        toast.error('加载文件列表失败，请手动刷新')
       }
     } finally {
-      setLoading(false)
+      if (ownsRead()) setLoading(false)
     }
   }
 
@@ -790,34 +829,8 @@ export default function FileList({
   }
 
   async function onExportConfirm(ids, roots) {
+    setExportSelection(ids.slice())
     setPendingExport({ ids, roots })
-  }
-
-  async function performExport(format) {
-    if (!pendingExport || exportBusy) return
-
-    setExportBusy(format)
-    try {
-        const targetDir = await window.electronAPI.openDirectoryDialog()
-        if (!targetDir) return
-
-        const res = await window.electronAPI.exportToDocx(pendingExport.roots, targetDir, format)
-
-        if (res && res.success) {
-             toast.success('导出成功')
-             if (res.errors && res.errors.length > 0) {
-                 toast.warning(`部分笔记导出失败：${res.errors.length} 项`)
-             }
-        } else {
-             toast.error('导出失败：' + (res?.message || '未知错误'))
-        }
-    } catch (e) {
-        console.error(e)
-        toast.error('导出失败：' + (e.message || '未知错误'))
-    } finally {
-        setExportBusy(null)
-        setPendingExport(null)
-    }
   }
 
   function collectDeleteTargetIds(roots) {
@@ -966,65 +979,8 @@ export default function FileList({
       return false
   }
 
-  async function importParsedResults(results) {
-    if (!Array.isArray(results) || results.length === 0) return
-
-    const loadingMsg = toast.loading(`正在导入 ${results.length} 个文件...`, 0)
-    let successCount = 0
-    let failCount = 0
-
-    try {
-      const { normalizeImportedContent } = await import('~/services/importContent')
-      for (const item of results) {
-        if (item.error) {
-          failCount++
-          continue
-        }
-
-        try {
-          const title = item.title || '未命名'
-          const content = normalizeImportedContent(item)
-
-          await api('/api/files', {
-            method: 'POST',
-            body: JSON.stringify({
-              title,
-              content,
-              is_folder: false,
-              parent_id: ''
-            })
-          })
-          successCount++
-        } catch (e) {
-          console.error(`Import create failed for ${item.title}`, e)
-          failCount++
-        }
-      }
-    } finally {
-      loadingMsg()
-    }
-
-    if (successCount > 0) {
-      toast.success(`成功导入 ${successCount} 个文件`)
-      void load()
-    }
-    if (failCount > 0) {
-      toast.warning(`${failCount} 个文件导入失败`)
-    }
-  }
-
-  async function onImport() {
-    try {
-      const res = await window.electronAPI.importFiles()
-      if (!res?.success) {
-        if (res?.message) toast.error('导入出错: ' + res.message)
-        return
-      }
-      await importParsedResults(res.results)
-    } catch (e) {
-      console.error(e)
-      toast.error('导入出错: ' + (e.message || '未知错误'))
-    }
+  function onImport() {
+    setImportWorkspace(previous => previous || { paths: [] })
   }
 
   async function onSaveAs(id) {
@@ -1045,13 +1001,19 @@ export default function FileList({
     }
   }
 
-  async function togglePin(id, isPinned) {
+  async function togglePin(item) {
+    if (pinOwner.current) return
+    const controller = new AbortController()
+    pinOwner.current = controller
     try {
-      await api.updateFile(id, { is_pinned: isPinned })
-      await loadList()
-    } catch (e) {
-      console.error(e)
-      toast.error('置顶操作失败: ' + (e.message || '未知错误'))
+      await changePin(api, item, !item.is_pinned, { signal: controller.signal })
+      // changePin publishes the existing library:refresh only after confirmation.
+      if (pinMounted.current && !controller.signal.aborted)
+        toast.success(item.is_pinned ? '已取消置顶，笔记仍然保留' : '已置顶')
+    } catch (error) {
+      if (pinMounted.current) toast.error(error.message || '置顶未确认，请在置顶笔记中核对')
+    } finally {
+      if (pinOwner.current === controller) pinOwner.current = null
     }
   }
 
@@ -1515,11 +1477,15 @@ export default function FileList({
         return
       }
 
-      const res = await window.electronAPI?.importPaths?.(paths)
-      if (!res?.success) {
-        throw new Error(res?.message || '解析拖入文件失败')
+      if (paths.length !== files.length) {
+        toast.warning('部分文件路径无法读取，请通过导入工作台重新选择')
+        return
       }
-      await importParsedResults(res.results)
+      if (importWorkspace) {
+        toast.warning('请先在已打开的导入工作台处理当前批次')
+        return
+      }
+      setImportWorkspace({ paths })
     } catch (e) {
       console.error(e)
       toast.error('拖放导入失败: ' + (e.message || '未知错误'))
@@ -1623,7 +1589,7 @@ export default function FileList({
   }
 
   return (
-    <div className="file-list" ref={dropContainer}>
+    <div className="file-list" ref={dropContainer} data-local-import-drop>
       <div className="file-library-header">
         <div className="file-library-title-row">
           <div>
@@ -1676,6 +1642,7 @@ export default function FileList({
                   }}
                   onExport={() => {
                     setShowLibraryMenu(false)
+                    setExportSelection(Array.from(selectedIds))
                     setShowExport(true)
                   }}
                   onBatchOrganize={() => {
@@ -1755,7 +1722,7 @@ export default function FileList({
                   <button className="btn" onClick={() => onNewFolderCheck()}>新建文件夹</button>
                 </div>
                 <div className="empty-tips">
-                  <div>快捷键：Ctrl+N 新建笔记 · Ctrl+Shift+N 新建文件夹</div>
+                  <div>快捷键：{shortcutLabel('newNote', shortcutBindings)} 新建笔记 · {shortcutLabel('newFolder', shortcutBindings)} 新建文件夹</div>
                   <div>支持拖拽导入本地文件</div>
                 </div>
               </div>
@@ -1764,6 +1731,12 @@ export default function FileList({
         </div>
       )}
 
+      {pinReview && <ConfirmDialog title="取消置顶？"
+        message={`只取消“${pinReview.title}”的置顶，不删除内容或改变位置。`}
+        onClose={() => setPinReview(null)} actions={[
+          { label: '取消', onClick: () => setPinReview(null) },
+          { label: '确认', kind: 'primary', onClick: () => { const item = pinReview; setPinReview(null); void togglePin(item) } },
+        ]} />}
       {/* 右键菜单 */}
       <FileContextMenu
         contextMenu={contextMenu}
@@ -1777,7 +1750,8 @@ export default function FileList({
           onNewFolderCheck(item.id)
         }}
         onTogglePin={(item) => {
-          togglePin(item.id, !item.is_pinned)
+          if (item.is_pinned) setPinReview(item)
+          else void togglePin(item)
           setContextMenu(null)
         }}
         onRename={(item) => {
@@ -1844,38 +1818,24 @@ export default function FileList({
           onPathSelect={() => setShowFolderSelector(true)}
         />
       )}
-      {showExport && <FileSelectorDialog open={showExport} onClose={() => setShowExport(false)} items={items} onConfirm={onExportConfirm} title="导出笔记" confirmText="下一步" />}
+      {showExport && <FileSelectorDialog open={showExport} onClose={() => setShowExport(false)} items={items} onConfirm={onExportConfirm} title="选择导出内容" confirmText="下一步" initialSelectedIds={exportSelection} />}
+      {importWorkspace && <ImportWorkspace initialPaths={importWorkspace.paths}
+        onClose={() => setImportWorkspace(null)} onChanged={() => void load()}
+        onOpenNote={onOpenImportNote} />}
       {showBatchDelete && <FileSelectorDialog open={showBatchDelete} onClose={() => setShowBatchDelete(false)} items={items} onConfirm={onBatchDeleteConfirm} title="移到回收站" confirmText="移到回收站" processingText="处理中…" showDeleteWarning={true} selectedFileId={selectedId} initialSelectedIds={Array.from(selectedIds)} />}
-      {showTemplate && <TemplateSelector open={showTemplate} onClose={() => setShowTemplate(false)} onSelect={handleTemplateSelect} />}
-      {pendingExport && (
-        <ConfirmDialog
-          title="选择导出格式"
-          message="导出的内容会保存到你接下来选择的文件夹。"
-          onClose={() => {
-            if (!exportBusy) setPendingExport(null)
-          }}
-          actions={[
-            {
-              label: '取消',
-              disabled: Boolean(exportBusy),
-              onClick: () => setPendingExport(null),
-            },
-            {
-              label: 'Markdown',
-              loading: exportBusy === 'markdown',
-              disabled: Boolean(exportBusy),
-              onClick: () => void performExport('markdown'),
-            },
-            {
-              label: 'Word 文档',
-              kind: 'primary',
-              loading: exportBusy === 'docx',
-              disabled: Boolean(exportBusy),
-              onClick: () => void performExport('docx'),
-            },
-          ]}
-        />
-      )}
+      {showTemplate && <TemplateSelector open={showTemplate} onClose={() => setShowTemplate(false)} onSelect={handleTemplateSelect}
+        parentId={targetParentId} parentLabel={getPathLabel(targetParentId)} beforeCreate={onBeforeNew}
+        onCreated={async item => {
+          // Publish metadata before selection. A deferred updater or an old
+          // load callback must not replace the newly selected note's identity.
+          const next = [item, ...items.filter(x => x.id !== item.id)]
+          setItems(next); onItemsChanged?.(next)
+          if (item.parent_id) setExpanded(previous => new Set([...previous, item.parent_id]))
+          setShowTemplate(false); onSelect(item)
+        }} />}
+      {pendingExport && <ExportWorkspace ids={pendingExport.roots}
+        onClose={() => setPendingExport(null)}
+        onReselect={() => { setPendingExport(null); setShowExport(true) }} />}
       {showFolderSelector && (
           <FileSelectorDialog 
               open={showFolderSelector}

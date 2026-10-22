@@ -18,6 +18,31 @@ const ResearchRequestsSchema = `CREATE TABLE IF NOT EXISTS research_note_request
  created_at INTEGER NOT NULL
 )`
 
+// ResearchPrecommitError is returned only after a known refusal has rolled
+// back successfully. Callers must not infer this guarantee from error text:
+// database, context, rollback and commit failures have an unknown outcome.
+// The original messages remain unchanged for the research/template APIs.
+type ResearchPrecommitError struct {
+	Reason string
+	Cause  error
+}
+
+func (e *ResearchPrecommitError) Error() string { return e.Cause.Error() }
+func (e *ResearchPrecommitError) Unwrap() error { return e.Cause }
+
+func rejectResearchPrecommit(ctx context.Context, tx *sql.Tx, reason string, cause error) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if err := tx.Rollback(); err != nil {
+		return fmt.Errorf("%s: rollback failed: %w", cause.Error(), err)
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return &ResearchPrecommitError{Reason: reason, Cause: cause}
+}
+
 // No foreign key to files: deleting a note must not erase its replay guard.
 type researchQuerier interface {
 	QueryRowContext(context.Context, string, ...any) *sql.Row
@@ -69,7 +94,7 @@ func (d *FileDAO) CreateResearch(ctx context.Context, requestID, hash string, f 
 			return nil, err
 		}
 		if !receipt.Found || receipt.PayloadSHA256 != hash {
-			return nil, fmt.Errorf("此研究任务已绑定不同内容，未覆盖原笔记或重新创建")
+			return nil, rejectResearchPrecommit(ctx, tx, "payload-mismatch", fmt.Errorf("此研究任务已绑定不同内容，未覆盖原笔记或重新创建"))
 		}
 		return receipt, nil // read of an existing receipt needs no write commit
 	}
@@ -77,16 +102,20 @@ func (d *FileDAO) CreateResearch(ctx context.Context, requestID, hash string, f 
 	seen := make(map[string]bool)
 	for id := f.ParentID; id != ""; {
 		if seen[id] {
-			return nil, fmt.Errorf("目标目录结构存在循环，未创建")
+			return nil, rejectResearchPrecommit(ctx, tx, "folder-unavailable", fmt.Errorf("目标目录结构存在循环，未创建"))
 		}
 		seen[id] = true
 		var folder, deleted bool
 		var parent string
 		if err := tx.QueryRowContext(ctx, `SELECT is_folder,is_deleted,parent_id FROM files WHERE id=?`, id).Scan(&folder, &deleted, &parent); err != nil {
-			return nil, fmt.Errorf("目标目录不存在或不可读取，未改存根目录: %w", err)
+			cause := fmt.Errorf("目标目录不存在或不可读取，未改存根目录: %w", err)
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil, rejectResearchPrecommit(ctx, tx, "folder-unavailable", cause)
+			}
+			return nil, cause
 		}
 		if !folder || deleted {
-			return nil, fmt.Errorf("目标目录或上级目录不可用，未创建")
+			return nil, rejectResearchPrecommit(ctx, tx, "folder-unavailable", fmt.Errorf("目标目录或上级目录不可用，未创建"))
 		}
 		id = parent
 	}
@@ -95,7 +124,7 @@ func (d *FileDAO) CreateResearch(ctx context.Context, requestID, hash string, f 
 		return nil, err
 	}
 	if duplicate > 0 {
-		return nil, fmt.Errorf("已存在同名文件或文件夹，未覆盖；请另存一份新标题的研究草稿")
+		return nil, rejectResearchPrecommit(ctx, tx, "name-conflict", fmt.Errorf("已存在同名文件或文件夹，未覆盖；请另存一份新标题的研究草稿"))
 	}
 	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(MAX(sort_order),0)+1000 FROM files WHERE parent_id=? AND is_deleted=0`, f.ParentID).Scan(&f.SortOrder); err != nil {
 		return nil, err

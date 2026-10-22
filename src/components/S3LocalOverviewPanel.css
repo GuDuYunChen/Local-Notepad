@@ -1,0 +1,20 @@
+.local-inventory { min-width: 0; max-width: 100%; color: var(--ink, var(--fg)); }
+.local-inventory-header { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.local-inventory h3 { margin: 0; font-size: 17px; line-height: 1.5; }
+.local-inventory-header p, .local-inventory-note { margin: 8px 0; font-size: 13px; line-height: 1.7; color: var(--ink-muted, var(--muted)); overflow-wrap: anywhere; }
+.local-inventory-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 16px 0; }
+.local-inventory-actions button { min-height: 36px; max-width: 100%; white-space: normal; }
+.local-inventory-status { border-left: 3px solid var(--line-strong, var(--line)); padding: 10px 12px; background: var(--surface-hover, var(--panel)); line-height: 1.6; font-size: 14px; overflow-wrap: anywhere; }
+.local-inventory-status p { margin: 4px 0 0; }
+.local-inventory-totals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 16px 0; }
+.local-inventory-totals > div { padding: 12px; border: 1px solid var(--line); border-radius: 8px; min-width: 0; }
+.local-inventory dt { font-size: 13px; line-height: 1.6; color: var(--ink-muted, var(--muted)); }
+.local-inventory dd { margin: 4px 0 0; font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.local-inventory-table { overflow-x: auto; max-width: 100%; border: 1px solid var(--line); border-radius: 8px; }
+.local-inventory table { width: 100%; min-width: 350px; border-collapse: collapse; font-size: 13px; line-height: 1.6; }
+.local-inventory caption { text-align: left; padding: 10px; font-weight: 600; }
+.local-inventory :is(th,td) { padding: 10px; border-top: 1px solid var(--line); text-align: right; font-variant-numeric: tabular-nums; }
+.local-inventory tr > :first-child { text-align: left; }
+.local-inventory :is(button,summary,[tabindex]):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.local-inventory summary { cursor: pointer; width: fit-content; }
+@media (max-width: 620px) { .local-inventory-totals { grid-template-columns: 1fr; gap: 8px; } }

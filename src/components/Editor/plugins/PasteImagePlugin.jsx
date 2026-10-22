@@ -3,14 +3,18 @@ import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext
 import { PASTE_COMMAND, COMMAND_PRIORITY_CRITICAL, $insertNodes } from 'lexical';
 import { $createImageNode } from '../nodes/ImageNode';
 import { compressImage, uploadFile } from '../utils/fileUpload';
+import { useEditorWriteScope } from '../hooks/useEditorWriteScope';
 
-export default function PasteImagePlugin() {
+export default function PasteImagePlugin({ documentId } = {}) {
     const [editor] = useLexicalComposerContext();
+    const captureWrite = useEditorWriteScope(editor, documentId);
 
     useEffect(() => {
         return editor.registerCommand(
             PASTE_COMMAND,
             (event) => {
+                const canWrite = captureWrite();
+                if (!canWrite()) return false;
                 const files = event.clipboardData?.files;
                 // console.log('Paste event:', event);
                 // console.log('Clipboard files:', files);
@@ -26,6 +30,7 @@ export default function PasteImagePlugin() {
                             (async () => {
                                 let srcUrl, originalUrl;
                                 const uploadSafe = async (f) => {
+                                    if (!canWrite()) return null;
                                     try { return await uploadFile(f); } catch (e) { console.error('Upload error:', e); return null; }
                                 };
 
@@ -52,8 +57,9 @@ export default function PasteImagePlugin() {
                                     if (res) srcUrl = originalUrl = res.url;
                                 }
 
-                                if (srcUrl) {
+                                if (srcUrl && canWrite()) {
                                     editor.update(() => {
+                                        if (!canWrite()) return;
                                         const node = $createImageNode({ src: srcUrl, originalSrc: originalUrl, alt: file.name || 'Pasted Image', width: 500 });
                                         $insertNodes([node]);
                                     });
@@ -67,7 +73,7 @@ export default function PasteImagePlugin() {
             },
             COMMAND_PRIORITY_CRITICAL
         );
-    }, [editor]);
+    }, [editor, captureWrite]);
 
     return null;
 }

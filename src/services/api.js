@@ -42,7 +42,11 @@ export async function api(path, init) {
   const body = await res.json()
   if (body.code !== 0) {
     const msg = body.detail || body.message || ERROR_MESSAGES[body.code] || '请求失败'
-    throw new Error(msg)
+    const failure = new Error(msg)
+    // Preserve existing Error/message behavior while retaining a safe, non-enumerable
+    // business identity for callers that must distinguish unavailable targets.
+    if (Number.isSafeInteger(body.code)) Object.defineProperty(failure, 'apiCode', { value: body.code })
+    throw failure
   }
   return body.data
 }
@@ -52,18 +56,24 @@ export async function getBacklinks(fileId) {
   return res
 }
 
-export async function searchFiles(query) {
-  const res = await api(`/api/files?q=${encodeURIComponent(query)}`)
+export async function searchFiles(query, init) {
+  const res = await api(`/api/files?q=${encodeURIComponent(query)}`, init)
   return res
 }
 
 
-export async function listAllFiles(query = '') {
+export async function listAllFiles(query = '', options = {}) {
   const pageSize = 200
   const normalizedQuery = String(query || '').trim()
   const byId = new Map()
+  const strict = options.strict === true
+  const checkAbort = () => {
+    if (options.signal?.aborted) throw new DOMException('已停止读取目录', 'AbortError')
+  }
 
   for (let page = 1; ; page += 1) {
+    checkAbort()
+    if (strict && page > 100) throw new Error('目录清单超过 20000 项，请缩小资料库后重试')
     const params = new URLSearchParams({
       page: String(page),
       size: String(pageSize),
@@ -71,10 +81,15 @@ export async function listAllFiles(query = '') {
     })
     if (normalizedQuery) params.set('q', normalizedQuery)
 
-    const batch = await api(`/api/files?${params.toString()}`)
+    const batch = await api(`/api/files?${params.toString()}`, options.signal ? { signal: options.signal } : undefined)
+    checkAbort()
+    if (strict && (!Array.isArray(batch) || batch.length > pageSize)) throw new Error('目录清单读取不完整，请刷新后重试')
     const items = Array.isArray(batch) ? batch : []
 
     for (const item of items) {
+      if (strict && (typeof item?.id !== 'string' || !item.id || byId.has(item.id))) {
+        throw new Error('目录清单发生变化或包含无效项目，请刷新后重试')
+      }
       if (item?.id) byId.set(item.id, item)
     }
 
@@ -114,3 +129,9 @@ export async function createFileVersionSnapshot(fileId) {
     method: 'POST',
   })
 }
+
+// Explicit native-only S3 preflight; never use api()/fetch as a fallback.
+export { createS3ReadProbeSession } from './s3ReadProbe.mjs'
+
+// Explicit native-only count preview; importing/creating does not issue I/O.
+export { createS3PreviewSession } from './s3PreviewSession.mjs'

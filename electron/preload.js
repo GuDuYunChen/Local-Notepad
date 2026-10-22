@@ -9,21 +9,54 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveContentAs: (payload) => ipcRenderer.invoke('file:saveContentAs', payload),
   openDirectoryDialog: () => ipcRenderer.invoke('dialog:openDirectory'),
   exportToDocx: (ids, targetDir, format) => ipcRenderer.invoke('export:docx', { ids, targetDir, format }),
+  exportWorkspacePrepare: payload => ipcRenderer.invoke('export:workspace:prepare', payload),
+  exportWorkspaceChooseDirectory: payload => ipcRenderer.invoke('export:workspace:choose-directory', payload),
+  exportWorkspaceStart: payload => ipcRenderer.invoke('export:workspace:start', payload),
+  exportWorkspaceStatus: payload => ipcRenderer.invoke('export:workspace:status', payload),
+  exportWorkspaceCancel: payload => ipcRenderer.invoke('export:workspace:cancel', payload),
+  exportWorkspaceRetry: payload => ipcRenderer.invoke('export:workspace:retry', payload),
+  exportWorkspaceReveal: payload => ipcRenderer.invoke('export:workspace:reveal', payload),
+  exportWorkspaceRelease: payload => ipcRenderer.invoke('export:workspace:release', payload),
   exportCombinedManuscript: (ids, targetDir, format, title) => ipcRenderer.invoke(
     'export:combined-manuscript',
     { ids, targetDir, format, title }
   ),
   exportToPDF: (file, outputPath) => ipcRenderer.invoke('export:pdf', { file, outputPath }),
   exportToHTML: (file, outputPath) => ipcRenderer.invoke('export:html', { file, outputPath }),
-  importFiles: () => ipcRenderer.invoke('import:files'),
-  importPaths: (paths) => ipcRenderer.invoke('import:paths', { paths }),
+  importFiles: options => ipcRenderer.invoke('import:files', { requestId: options?.requestId }),
+  importPaths: (paths, options) => ipcRenderer.invoke('import:paths', { paths, requestId: options?.requestId }),
+  cancelImport: requestId => ipcRenderer.invoke('import:cancel', { requestId }),
   getPathForFile: (file) => webUtils?.getPathForFile ? webUtils.getPathForFile(file) : (file?.path || ''),
   backupCreate: () => ipcRenderer.invoke('backup:create'),
   backupInspect: name => ipcRenderer.invoke('backup:inspect', name),
   backupExport: name => ipcRenderer.invoke('backup:export', name),
   backupList: () => ipcRenderer.invoke('backup:list'),
   backupOpenFolder: () => ipcRenderer.invoke('backup:openFolder'),
+  workspaceExport: () => ipcRenderer.invoke('workspace:export'),
+  workspaceInspect: () => ipcRenderer.invoke('workspace:inspect'),
+  workspacePrepareRestore: () => ipcRenderer.invoke('workspace:restore:prepare'),
+  workspaceConfirmRestore: id => ipcRenderer.invoke('workspace:restore:confirm', id),
+  workspaceCancelRestore: id => ipcRenderer.invoke('workspace:restore:cancel', id),
   appDiagnostics: () => ipcRenderer.invoke('app:diagnostics'),
   openAppFolder: (kind) => ipcRenderer.invoke('app:openFolder', { kind }),
+  webdavSecretStatus: () => ipcRenderer.invoke('sync:webdav-secret:status'),
+  webdavSecretSave: password => ipcRenderer.invoke('sync:webdav-secret:save', password),
+  webdavSecretClear: () => ipcRenderer.invoke('sync:webdav-secret:clear'),
+  s3ProbeRead: payload => ipcRenderer.invoke('sync:s3-probe:read', payload),
+  s3PreviewRead: payload => ipcRenderer.invoke('sync:s3-preview:read', payload),
+  s3LocalOverviewRead: payload => ipcRenderer.invoke('sync:s3-local-overview:read', payload),
+  onQuitPrepare: callback => {
+    const handler = (_event, value) => callback({ id: value?.id })
+    ipcRenderer.on('editor:quit:prepare', handler)
+    return () => ipcRenderer.removeListener('editor:quit:prepare', handler)
+  },
+  onQuitRelease: callback => {
+    const handler = (_event, value) => callback({ id: value?.id })
+    ipcRenderer.on('editor:quit:release', handler)
+    return () => ipcRenderer.removeListener('editor:quit:release', handler)
+  },
+  reportQuitResult: value => ipcRenderer.send('editor:quit:result', {
+    id: value?.id, ready: value?.ready === true, code: value?.code,
+  }),
   onReload: (callback) => ipcRenderer.on('app:reload', callback),
 })

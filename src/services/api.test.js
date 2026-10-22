@@ -18,6 +18,37 @@ afterEach(() => {
 })
 
 describe('listAllFiles', () => {
+  it('strict directory reads reject malformed pages and duplicate identities instead of returning a false empty root', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+    for (const invalid of [null, {}, [{ title: 'missing id' }], [{ id: 'a' }, { id: 'a' }]]) {
+      fetchMock.mockResolvedValueOnce(response(invalid))
+      await expect(listAllFiles('', { strict: true })).rejects.toThrow(/目录清单/)
+    }
+    fetchMock.mockResolvedValueOnce(response(null))
+    await expect(listAllFiles()).resolves.toEqual([])
+  })
+
+  it('strict reads abort before the next page and pass cancellation to the API', async () => {
+    const controller = new AbortController()
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementationOnce(async (_url, init) => {
+      expect(init.signal).toBe(controller.signal)
+      controller.abort()
+      return response(Array.from({ length: 200 }, (_, i) => ({ id: String(i) })))
+    })
+    await expect(listAllFiles('', { strict: true, signal: controller.signal })).rejects.toMatchObject({ name: 'AbortError' })
+    expect(fetchMock).toHaveBeenCalledOnce()
+    await expect(listAllFiles('', { strict: true, signal: controller.signal })).rejects.toMatchObject({ name: 'AbortError' })
+    expect(fetchMock).toHaveBeenCalledOnce()
+  })
+
+  it('strict reads stop at the finite page budget rather than looping on a full response', async () => {
+    let n = 0
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+      response(Array.from({ length: 200 }, () => ({ id: String(++n) }))))
+    await expect(listAllFiles('', { strict: true })).rejects.toThrow('20000')
+    expect(fetchMock).toHaveBeenCalledTimes(100)
+  })
+
   it('surfaces server detail messages for actionable errors', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
       ok: true,

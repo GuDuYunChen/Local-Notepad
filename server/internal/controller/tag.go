@@ -11,6 +11,7 @@ type TagController struct {
 }
 
 func (c *TagController) Register(group *ghttp.RouterGroup) {
+	c.RegisterNoteTags(group)
 	group.GET("/tags", c.List)
 	group.POST("/tags", c.Create)
 	group.DELETE("/tags/{id}", c.Delete)

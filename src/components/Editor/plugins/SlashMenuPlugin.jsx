@@ -2,12 +2,14 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { $getSelection, $isRangeSelection, $isParagraphNode } from 'lexical'
 import { searchBlocks } from '../utils/blockRegistry'
+import { useEditorWriteScope } from '../hooks/useEditorWriteScope'
 import './SlashMenuPlugin.css'
 
 const SLASH_TRIGGER = '/'
 
-export default function SlashMenuPlugin() {
+export default function SlashMenuPlugin({ documentId } = {}) {
   const [editor] = useLexicalComposerContext()
+  const captureWrite = useEditorWriteScope(editor, documentId)
   const [isOpen, setIsOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [position, setPosition] = useState({ top: 0, left: 0 })
@@ -25,9 +27,12 @@ export default function SlashMenuPlugin() {
 
   const selectBlock = useCallback(
     (block) => {
+      const canWrite = captureWrite()
+      if (!canWrite()) return
       let runAfterUpdate = false
 
       editor.update(() => {
+        if (!canWrite()) return
         const selection = $getSelection()
         if (!$isRangeSelection(selection)) return
 
@@ -64,13 +69,13 @@ export default function SlashMenuPlugin() {
       })
 
       if (runAfterUpdate) {
-        Promise.resolve().then(() => block.run?.(editor))
+        Promise.resolve().then(() => { if (canWrite()) return block.run?.(editor, canWrite) })
       }
 
       closeMenu()
       editor.focus()
     },
-    [editor, closeMenu]
+    [editor, closeMenu, captureWrite]
   )
 
   useEffect(() => {

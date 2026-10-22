@@ -1,0 +1,41 @@
+/* The existing save/discard/cancel dialog uses layer 100 and must stay above
+   this workspace while the guarded note opener waits for the user's choice. */
+.local-import-overlay { z-index: 95; padding: 20px; }
+.local-import-workspace { box-sizing: border-box; width: min(1080px, calc(100vw - 40px)); max-height: calc(100vh - 40px); overflow: auto; padding: 24px; border: 1px solid var(--line, #d4d8df); border-radius: 16px; background: var(--surface, #fff); color: var(--ink, #242933); box-shadow: var(--shadow-pop); }
+.local-import-workspace > header, .local-import-workspace > footer { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+.local-import-workspace h2 { font-size: 24px; margin: 5px 0; }
+.local-import-workspace p { margin: 7px 0; color: var(--ink-soft, #5a626e); font-size: 13px; line-height: 1.75; }
+.local-import-eyebrow { font-size: 12px; color: var(--ink-soft, #5a626e); }
+.local-import-intro { margin: 20px 0 16px; padding: 16px; border: 1px solid var(--line, #d4d8df); border-radius: 10px; background: var(--paper, #f7f7f5); }
+.local-import-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; font-size: 14px; font-weight: 650; }
+.local-import-picker input { max-width: 100%; color: inherit; font: inherit; }
+.local-import-picker input::file-selector-button { border: 1px solid var(--line, #d4d8df); border-radius: 6px; margin-right: 12px; padding: 7px 12px; color: inherit; background: var(--surface, #fff); cursor: pointer; }
+.local-import-toolbar, .local-import-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.local-import-toolbar { margin: 12px 0; font-size: 13px; color: var(--ink-soft, #5a626e); }
+.local-import-toolbar > span { margin-right: auto; }
+.local-import-notice, .local-import-fault { padding: 12px 16px; border: 1px solid var(--line, #d4d8df); border-left: 3px solid var(--clay, #93633f); border-radius: 7px; overflow-wrap: anywhere; }
+.local-import-fault { margin: 12px 0; color: var(--ink, #242933); font-size: 13px; }
+.local-import-fault details { margin: 12px 0; }
+.local-import-fault summary { cursor: pointer; }
+.local-import-fault label { display: block; margin: 10px 0; }
+.local-import-fault textarea { box-sizing: border-box; width: 100%; min-height: 110px; padding: 10px; resize: vertical; border: 1px solid var(--line, #d4d8df); border-radius: 6px; color: inherit; background: var(--paper, #f7f7f5); }
+.local-import-rows { display: flex; flex-direction: column; gap: 16px; margin: 18px 0; }
+.local-import-row { border: 1px solid var(--line, #d4d8df); border-radius: 10px; padding: 16px; min-width: 0; }
+.local-import-row-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.local-import-check { display: flex; align-items: center; gap: 9px; overflow-wrap: anywhere; min-width: 0; font-size: 14px; }
+.local-import-badge { padding: 4px 9px; border: 1px solid var(--line, #d4d8df); border-radius: 30px; font-size: 12px; white-space: nowrap; color: var(--ink-soft, #5a626e); }
+.local-import-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; margin: 14px 0; }
+.local-import-fields label { display: flex; flex-direction: column; gap: 6px; min-width: 0; font-size: 13px; font-weight: 600; }
+.local-import-fields input, .local-import-fields select { width: 100%; box-sizing: border-box; min-width: 0; padding: 8px 10px; border: 1px solid var(--line, #d4d8df); border-radius: 6px; font: inherit; background: var(--paper, #f7f7f5); color: inherit; }
+.local-import-fields input:disabled, .local-import-fields select:disabled { opacity: 0.8; }
+.local-import-preview { font-size: 13px; margin: 12px 0; }
+.local-import-preview summary { cursor: pointer; color: var(--ink-soft, #5a626e); }
+.local-import-preview pre { max-height: 280px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; padding: 14px; border: 1px solid var(--line, #d4d8df); border-radius: 8px; line-height: 1.7; font: inherit; background: var(--paper, #f7f7f5); }
+.local-import-warnings { margin: 12px 0; padding-left: 20px; font-size: 13px; line-height: 1.7; color: var(--ink-soft, #5a626e); }
+.local-import-row-message { overflow-wrap: anywhere; }
+.local-import-row > .local-import-actions { margin-top: 12px; }
+.local-import-workspace > footer { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line, #d4d8df); font-size: 13px; align-items: center; }
+.local-import-workspace > footer > div:first-child { min-width: 160px; }
+.local-import-empty { padding: 40px 20px; text-align: center; font-size: 14px; color: var(--ink-soft, #5a626e); }
+.local-import-workspace button:focus-visible, .local-import-workspace input:focus-visible, .local-import-workspace select:focus-visible, .local-import-workspace summary:focus-visible { outline: 2px solid var(--clay, #93633f); outline-offset: 3px; }
+@media (max-width: 700px) { .local-import-overlay { padding: 10px; } .local-import-workspace { width: calc(100vw - 20px); max-height: calc(100vh - 20px); padding: 16px; } .local-import-fields { grid-template-columns: minmax(0, 1fr); gap: 10px; } .local-import-workspace > header, .local-import-workspace > footer { flex-wrap: wrap; gap: 10px; } .local-import-workspace > footer .local-import-actions { width: 100%; } }

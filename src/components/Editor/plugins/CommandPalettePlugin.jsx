@@ -2,6 +2,9 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { $insertNodes } from 'lexical'
 import { blockRegistry } from '../utils/blockRegistry'
+import { useEditorWriteScope } from '../hooks/useEditorWriteScope'
+import { isShortcutContextBlocked, matchShortcut, shortcutLabel } from '~/services/localShortcuts'
+import useLocalShortcuts from '~/hooks/useLocalShortcuts'
 
 const EXTRA_COMMANDS = [
   {
@@ -55,20 +58,23 @@ export function filterCommandPaletteCommands(commands, query) {
   })
 }
 
-function buildCommands(editor) {
+function buildCommands(editor, captureWrite) {
   const blockCommands = blockRegistry.map(block => ({
     id: 'block:' + block.type,
     label: block.label,
     description: block.description || '插入内容块',
     keywords: block.keywords || [],
     run: async () => {
+      const canWrite = captureWrite()
+      if (!canWrite()) return
       if (block.run) {
-        await block.run(editor)
+        await block.run(editor, canWrite)
         return
       }
 
       if (!block.createNode) return
       editor.update(() => {
+        if (!canWrite()) return
         const node = block.createNode()
         if (node) $insertNodes([node])
       })
@@ -82,13 +88,16 @@ function buildCommands(editor) {
   ]
 }
 
-export default function CommandPalettePlugin() {
+export default function CommandPalettePlugin({ documentId } = {}) {
   const [editor] = useLexicalComposerContext()
+  const { bindings } = useLocalShortcuts()
+  const captureWrite = useEditorWriteScope(editor, documentId)
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
   const inputRef = useRef(null)
-  const commands = useMemo(() => buildCommands(editor), [editor])
+  const composing = useRef(false)
+  const commands = useMemo(() => buildCommands(editor, captureWrite), [editor, captureWrite])
   const filtered = useMemo(
     () => filterCommandPaletteCommands(commands, query),
     [commands, query]
@@ -107,12 +116,17 @@ export default function CommandPalettePlugin() {
 
   useEffect(() => {
     const openPalette = () => {
+      if (!editor.isEditable() || !editor.getRootElement()?.isConnected) return
+      composing.current = false
       setOpen(true)
       setQuery('')
     }
 
     const onKeyDown = event => {
-      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'p') {
+      if (!editor.isEditable() || editor.isComposing() || isShortcutContextBlocked(event)) return
+      const target = event.target?.nodeType === 1 ? event.target : document.activeElement
+      if (target?.closest?.('input,textarea,select')) return
+      if (matchShortcut(event, 'commandPalette')) {
         event.preventDefault()
         openPalette()
       }
@@ -125,22 +139,25 @@ export default function CommandPalettePlugin() {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('editor:open-command-palette', openPalette)
     }
-  }, [])
+  }, [editor])
 
   const close = () => {
+    composing.current = false
     setOpen(false)
     setQuery('')
     editor.focus()
   }
 
   const runCommand = async command => {
-    if (!command) return
+    const canWrite = captureWrite()
+    if (!command || !canWrite()) return
+    composing.current = false
     setOpen(false)
     setQuery('')
     try {
       await command.run()
     } finally {
-      editor.focus()
+      if (canWrite()) editor.focus()
     }
   }
 
@@ -165,11 +182,14 @@ export default function CommandPalettePlugin() {
           <input
             ref={inputRef}
             value={query}
+            onCompositionStart={() => { composing.current = true }}
+            onCompositionEnd={() => { composing.current = false }}
             onChange={event => {
               setQuery(event.target.value)
               setSelectedIndex(0)
             }}
             onKeyDown={event => {
+              if (composing.current || event.nativeEvent?.isComposing || event.nativeEvent?.keyCode === 229) return
               if (event.key === 'ArrowDown') {
                 event.preventDefault()
                 if (filtered.length) setSelectedIndex(index => (index + 1) % filtered.length)
@@ -187,7 +207,7 @@ export default function CommandPalettePlugin() {
             placeholder="输入命令，例如：公式、表格、标题、查找…"
             aria-label="搜索编辑器命令"
           />
-          <kbd>Ctrl ⇧ P</kbd>
+          <kbd>{shortcutLabel('commandPalette', bindings)}</kbd>
         </div>
 
         <div className="editor-command-palette-list" role="listbox">

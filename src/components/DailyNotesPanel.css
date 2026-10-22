@@ -149,3 +149,19 @@
   color: var(--muted);
   font-size: 12px;
 }
+
+/* Scoped to the existing workspace. Global shell and theme rules remain intact. */
+.daily-notes-panel .daily-feedback { margin: 12px 0; padding: 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+.daily-notes-panel .daily-feedback p { margin: 0 0 8px; }
+.daily-notes-panel .daily-feedback.error, .daily-notes-panel .daily-feedback.uncertain { border-inline-start: 3px solid var(--danger, #ac3939); }
+.daily-notes-panel .daily-feedback .btn { margin: 4px 8px 0 0; }
+.daily-notes-panel .daily-jump { display: flex; align-items: end; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.daily-notes-panel .daily-jump label, .daily-notes-panel .daily-search { display: flex; flex-direction: column; gap: 6px; font-size: 12px; min-width: 0; }
+.daily-notes-panel .daily-search { margin: 12px 0; }
+.daily-notes-panel input { box-sizing: border-box; min-width: 0; max-width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); color: var(--ink); font: inherit; }
+.daily-notes-panel .daily-scope, .daily-notes-panel .daily-unconfirmed { margin: 12px 0; color: var(--ink-soft); font-size: 12px; line-height: 1.7; }
+.daily-notes-panel .daily-unconfirmed button { margin: 6px 8px 0 0; }
+.daily-notes-panel .daily-pagination { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-top: 16px; font-size: 12px; }
+.daily-notes-panel button:disabled { opacity: .55; cursor: default; }
+.daily-notes-panel button:focus-visible, .daily-notes-panel input:focus-visible { outline: 2px solid var(--clay); outline-offset: 3px; }
+.daily-notes-panel .daily-note-title, .daily-notes-panel .daily-note-date { overflow-wrap: anywhere; min-width: 0; }

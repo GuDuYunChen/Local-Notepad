@@ -1,0 +1,96 @@
+{
+  "format": "local-notepad-legacy-installer-parts-v1",
+  "installer": {
+    "version": "4.219.0",
+    "bytes": 104197801,
+    "sha256": "b3fab086b8f34f2dd7025223e8322a80b2e0634bfbc88631b25ad2d0d727b43a"
+  },
+  "partBytes": 6291456,
+  "parts": [
+    {
+      "name": "part-00.bin",
+      "bytes": 6291456,
+      "sha256": "7e41214fa2c14b627c58fceb6ab20621e9925fc37cced12160db11fede1d4efd"
+    },
+    {
+      "name": "part-01.bin",
+      "bytes": 6291456,
+      "sha256": "64892ae519f5768eb7a58c7e8398c6940e0cfb2ad5c8aef09e34cf99f9813fd7"
+    },
+    {
+      "name": "part-02.bin",
+      "bytes": 6291456,
+      "sha256": "1fc0e11cfbe88f8a5c3db3926a0255c99b8e94158dc6e08ac115807da32e2fa8"
+    },
+    {
+      "name": "part-03.bin",
+      "bytes": 6291456,
+      "sha256": "83ec72b4b9313801ac929d3606a7587c2b99625c28a534939688d7227ece1638"
+    },
+    {
+      "name": "part-04.bin",
+      "bytes": 6291456,
+      "sha256": "786305a894decee51622d8ee40964414a3be03bcbbc02eb9ae08d17c613a1f77"
+    },
+    {
+      "name": "part-05.bin",
+      "bytes": 6291456,
+      "sha256": "b67e2587aceffc774e2576bca628eefb29bfcbb007b88959091a4b42172e8b4e"
+    },
+    {
+      "name": "part-06.bin",
+      "bytes": 6291456,
+      "sha256": "adfa01c7095a701877528e79909333f288e0cc49ee03f16ae3526ea2bc353ec2"
+    },
+    {
+      "name": "part-07.bin",
+      "bytes": 6291456,
+      "sha256": "a3ad740ff896c858e066f20381173cd12dd8cde93e6f3858e94e186486b69a1e"
+    },
+    {
+      "name": "part-08.bin",
+      "bytes": 6291456,
+      "sha256": "2634f454c8b45f4a2ceeea0aae6970825f087fdeeeb18159ad4d8434b7a7575f"
+    },
+    {
+      "name": "part-09.bin",
+      "bytes": 6291456,
+      "sha256": "b995ef5756ee54484858d9ba4292916a9dd600958010a49bfb751cf0fc619295"
+    },
+    {
+      "name": "part-10.bin",
+      "bytes": 6291456,
+      "sha256": "ccbbd9486c5c223a2f2197632fec46c960815e2b798fef86215cb576a13831a8"
+    },
+    {
+      "name": "part-11.bin",
+      "bytes": 6291456,
+      "sha256": "6377c18221543d48690089ee27ccdb5eea6a7a26b49ce9d785da2a61b373338d"
+    },
+    {
+      "name": "part-12.bin",
+      "bytes": 6291456,
+      "sha256": "1224ef4f9f55a4cc3ddfefd4d9f5560927d6b354076ed8b2942865aa0c568888"
+    },
+    {
+      "name": "part-13.bin",
+      "bytes": 6291456,
+      "sha256": "0e580f9472e12d58deb66c090791d4db9d0599c5be245468c0313b1d1eb2cb31"
+    },
+    {
+      "name": "part-14.bin",
+      "bytes": 6291456,
+      "sha256": "959af455b4c678372949bcffd184f56213c59df9775134fa3c7aa9c535505f09"
+    },
+    {
+      "name": "part-15.bin",
+      "bytes": 6291456,
+      "sha256": "5ccb800d7d14817b6c1a25a5b076ebfb44b72c5d53457de38ed2d8c8e135f25a"
+    },
+    {
+      "name": "part-16.bin",
+      "bytes": 3534505,
+      "sha256": "9a453e15a96278b693198a1c97bd4e9730dd57a832c3d4c3f517a83d7331e0d5"
+    }
+  ]
+}

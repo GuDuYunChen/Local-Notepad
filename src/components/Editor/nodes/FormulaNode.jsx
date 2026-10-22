@@ -1,7 +1,9 @@
 import { $getNodeByKey, DecoratorNode } from 'lexical'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
+import { useLexicalEditable } from '@lexical/react/useLexicalEditable'
 import katex from 'katex'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { useEditorPendingDraft } from '../hooks/useEditorPendingDraft'
 import 'katex/dist/katex.min.css'
 
 const FORMULA_HISTORY_KEY = 'localNotepad.formulaHistory.v1'
@@ -143,6 +145,7 @@ export class FormulaNode extends DecoratorNode {
 
 function FormulaComponent({ nodeKey, expression, displayMode }) {
   const [editor] = useLexicalComposerContext()
+  const isEditable = useLexicalEditable()
   const [editing, setEditing] = useState(!expression)
   const [draft, setDraft] = useState(expression || '')
   const [blockMode, setBlockMode] = useState(Boolean(displayMode))
@@ -153,22 +156,41 @@ function FormulaComponent({ nodeKey, expression, displayMode }) {
   useEffect(() => setDraft(expression || ''), [expression])
   useEffect(() => setBlockMode(Boolean(displayMode)), [displayMode])
 
+  const hasPendingDraft = draft !== (expression || '') || blockMode !== Boolean(displayMode)
+  const discardDraft = () => {
+    setDraft(expression || '')
+    setBlockMode(Boolean(displayMode))
+    setEditing(false)
+  }
+
+  useEditorPendingDraft({
+    nodeKey,
+    label: '公式',
+    dirty: hasPendingDraft,
+    value: JSON.stringify([draft, blockMode]),
+    discard: discardDraft,
+  })
+
+  const previewExpression = editing && isEditable ? draft : (expression || '')
+  const previewBlockMode = editing && isEditable ? blockMode : Boolean(displayMode)
   const html = useMemo(() => {
-    if (!draft.trim()) return ''
+    if (!previewExpression.trim()) return ''
     try {
-      return katex.renderToString(draft, {
+      return katex.renderToString(previewExpression, {
         throwOnError: false,
-        displayMode: blockMode,
+        displayMode: previewBlockMode,
         strict: 'ignore',
         trust: false,
       })
     } catch {
       return ''
     }
-  }, [draft, blockMode])
+  }, [previewExpression, previewBlockMode])
 
   const persist = patch => {
+    if (!editor.isEditable()) return
     editor.update(() => {
+      if (!editor.isEditable()) return
       const node = $getNodeByKey(nodeKey)
       if (!$isFormulaNode(node)) return
       if (patch.expression !== undefined) node.setExpression(patch.expression)
@@ -177,8 +199,10 @@ function FormulaComponent({ nodeKey, expression, displayMode }) {
   }
 
   const save = () => {
+    if (!editor.isEditable()) return
     const next = draft.trim()
     persist({ expression: next, displayMode: blockMode })
+    setDraft(next)
 
     if (next) {
       const history = rememberFormulaExpression(recentFormulas, next)
@@ -197,13 +221,15 @@ function FormulaComponent({ nodeKey, expression, displayMode }) {
   }
 
   const remove = () => {
+    if (!editor.isEditable()) return
     editor.update(() => {
+      if (!editor.isEditable()) return
       const node = $getNodeByKey(nodeKey)
       if ($isFormulaNode(node)) node.remove()
     })
   }
 
-  if (editing) {
+  if (editing && isEditable) {
     return (
       <span className={`formula-editor${blockMode ? ' block' : ' inline'}`} ref={editorRef}>
         <span className="formula-editor-preview">
@@ -216,19 +242,19 @@ function FormulaComponent({ nodeKey, expression, displayMode }) {
 
         <textarea
           value={draft}
-          onChange={event => setDraft(event.target.value)}
+          onChange={event => { if (editor.isEditable()) setDraft(event.target.value) }}
           placeholder="例如：E = mc^2"
           rows={blockMode ? 3 : 1}
           autoFocus
           onKeyDown={event => {
+            if (!editor.isEditable()) return
             if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
               event.preventDefault()
               save()
             }
             if (event.key === 'Escape') {
               event.preventDefault()
-              setDraft(expression || '')
-              setEditing(false)
+              discardDraft()
             }
           }}
         />
@@ -241,7 +267,7 @@ function FormulaComponent({ nodeKey, expression, displayMode }) {
                 <button
                   type="button"
                   key={item.label}
-                  onClick={() => setDraft(item.expression)}
+                  onClick={() => { if (editor.isEditable()) setDraft(item.expression) }}
                   title={item.expression}
                 >
                   {item.label}
@@ -258,7 +284,7 @@ function FormulaComponent({ nodeKey, expression, displayMode }) {
                   <button
                     type="button"
                     key={item}
-                    onClick={() => setDraft(item)}
+                    onClick={() => { if (editor.isEditable()) setDraft(item) }}
                     title={item}
                   >
                     ★ {item}
@@ -276,7 +302,7 @@ function FormulaComponent({ nodeKey, expression, displayMode }) {
                   <button
                     type="button"
                     key={item}
-                    onClick={() => setDraft(item)}
+                    onClick={() => { if (editor.isEditable()) setDraft(item) }}
                     title={item}
                   >
                     {item}
@@ -291,14 +317,14 @@ function FormulaComponent({ nodeKey, expression, displayMode }) {
           <button
             type="button"
             className={blockMode ? 'active' : ''}
-            onClick={() => setBlockMode(true)}
+            onClick={() => { if (editor.isEditable()) setBlockMode(true) }}
           >
             独立公式
           </button>
           <button
             type="button"
             className={!blockMode ? 'active' : ''}
-            onClick={() => setBlockMode(false)}
+            onClick={() => { if (editor.isEditable()) setBlockMode(false) }}
           >
             行内公式
           </button>
@@ -310,6 +336,7 @@ function FormulaComponent({ nodeKey, expression, displayMode }) {
           >
             {favoriteFormulas.includes(draft.trim()) ? '取消收藏' : '收藏'}
           </button>
+          <button type="button" onClick={discardDraft}>取消</button>
           <button type="button" onClick={save}>完成</button>
           <button type="button" className="danger" onClick={remove}>删除</button>
         </span>
@@ -319,15 +346,20 @@ function FormulaComponent({ nodeKey, expression, displayMode }) {
 
   return (
     <span
-      className={`formula-rendered${blockMode ? ' block' : ' inline'}`}
-      onDoubleClick={() => setEditing(true)}
-      title="双击编辑公式"
+      className={`formula-rendered${previewBlockMode ? ' block' : ' inline'}`}
+      onDoubleClick={() => { if (editor.isEditable()) setEditing(true) }}
+      title={isEditable ? '双击编辑公式' : undefined}
     >
       {html ? (
         <span dangerouslySetInnerHTML={{ __html: html }} />
       ) : (
-        <span className="formula-editor-placeholder" onClick={() => setEditing(true)}>
-          添加公式
+        <span className="formula-editor-placeholder" onClick={() => { if (editor.isEditable()) setEditing(true) }}>
+          {isEditable ? '添加公式' : '空公式'}
+        </span>
+      )}
+      {!isEditable && hasPendingDraft && (
+        <span className="decorator-pending-draft" role="status">
+          有未应用的公式修改，返回编辑模式后继续或取消。
         </span>
       )}
     </span>

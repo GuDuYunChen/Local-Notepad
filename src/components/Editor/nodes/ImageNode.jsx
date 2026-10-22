@@ -1,5 +1,6 @@
 import { $getNodeByKey, DecoratorNode } from 'lexical'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
+import { useLexicalEditable } from '@lexical/react/useLexicalEditable'
 import React, { useEffect, useRef, useState } from 'react'
 import { uploadFile } from '../utils/fileUpload'
 
@@ -139,6 +140,7 @@ function normalizeWidth(width) {
 
 function ImageComponent({ nodeKey, src, alt, width, height, originalSrc, caption, align }) {
   const [editor] = useLexicalComposerContext()
+  const isEditable = useLexicalEditable()
   const [selected, setSelected] = useState(false)
   const [currentWidth, setCurrentWidth] = useState(width || 640)
   const [currentAlign, setCurrentAlign] = useState(align || 'center')
@@ -146,6 +148,7 @@ function ImageComponent({ nodeKey, src, alt, width, height, originalSrc, caption
   const [replacing, setReplacing] = useState(false)
   const wrapperRef = useRef(null)
   const replaceInputRef = useRef(null)
+  const uploadGenerationRef = useRef(0)
 
   const safeSrc = isValidImageUrl(src) ? src : ''
   const safeOriginalSrc = isValidImageUrl(originalSrc) ? originalSrc : ''
@@ -153,6 +156,20 @@ function ImageComponent({ nodeKey, src, alt, width, height, originalSrc, caption
   useEffect(() => setCurrentWidth(width || 640), [width])
   useEffect(() => setCurrentAlign(align || 'center'), [align])
   useEffect(() => setCaptionText(caption || ''), [caption])
+
+  useEffect(() => {
+    // Returning to editing must not revive an upload started before reading.
+    const unregister = editor.registerEditableListener(editable => {
+      if (!editable) {
+        uploadGenerationRef.current += 1
+        setReplacing(false)
+      }
+    })
+    return () => {
+      uploadGenerationRef.current += 1
+      unregister()
+    }
+  }, [editor])
 
   useEffect(() => {
     if (!selected) return undefined
@@ -163,8 +180,13 @@ function ImageComponent({ nodeKey, src, alt, width, height, originalSrc, caption
     return () => document.removeEventListener('mousedown', onPointerDown)
   }, [selected])
 
-  const updateNode = (patch) => {
+  const updateNode = (patch, uploadGeneration) => {
+    const canWrite = () => editor.isEditable() && (
+      uploadGeneration === undefined || uploadGeneration === uploadGenerationRef.current
+    )
+    if (!canWrite()) return
     editor.update(() => {
+      if (!canWrite()) return
       const node = $getNodeByKey(nodeKey)
       if (!$isImageNode(node)) return
       if (patch.width !== undefined) node.setWidth(patch.width)
@@ -175,34 +197,39 @@ function ImageComponent({ nodeKey, src, alt, width, height, originalSrc, caption
   }
 
   const changeWidth = (nextWidth) => {
+    if (!editor.isEditable()) return
     setCurrentWidth(nextWidth)
     updateNode({ width: nextWidth })
   }
 
   const changeAlign = (nextAlign) => {
+    if (!editor.isEditable()) return
     setCurrentAlign(nextAlign)
     updateNode({ align: nextAlign })
   }
 
   const changeCaption = (event) => {
+    if (!editor.isEditable()) return
     const next = event.target.value
     setCaptionText(next)
     updateNode({ caption: next })
   }
 
   const handleReplace = async (event) => {
+    if (!editor.isEditable()) return
     const file = event.target.files?.[0]
+    event.target.value = ''
     if (!file) return
     if (file.size > 10 * 1024 * 1024) {
       console.warn('替换图片超过 10 MB，已取消')
-      event.target.value = ''
       return
     }
 
+    const uploadGeneration = ++uploadGenerationRef.current
     setReplacing(true)
     try {
       const result = await uploadFile(file)
-      if (!result?.url) return
+      if (!result?.url || !editor.isEditable() || uploadGeneration !== uploadGenerationRef.current) return
 
       updateNode({
         source: {
@@ -210,12 +237,11 @@ function ImageComponent({ nodeKey, src, alt, width, height, originalSrc, caption
           originalSrc: result.url,
           alt: file.name,
         },
-      })
+      }, uploadGeneration)
     } catch (error) {
       console.error('替换图片失败', error)
     } finally {
-      setReplacing(false)
-      event.target.value = ''
+      if (uploadGeneration === uploadGenerationRef.current) setReplacing(false)
     }
   }
 
@@ -235,7 +261,9 @@ function ImageComponent({ nodeKey, src, alt, width, height, originalSrc, caption
   }
 
   const handleDelete = () => {
+    if (!editor.isEditable()) return
     editor.update(() => {
+      if (!editor.isEditable()) return
       const node = $getNodeByKey(nodeKey)
       if ($isImageNode(node)) node.remove()
     })
@@ -268,6 +296,7 @@ function ImageComponent({ nodeKey, src, alt, width, height, originalSrc, caption
 
         {selected && (
           <div className="editor-image-toolbar" role="toolbar" aria-label="图片工具">
+            {isEditable && <>
             <div className="editor-image-toolbar-group" aria-label="图片尺寸">
               {[
                 ['320', '小'],
@@ -318,21 +347,24 @@ function ImageComponent({ nodeKey, src, alt, width, height, originalSrc, caption
               type="button"
               onClick={(event) => {
                 event.stopPropagation()
+                if (!editor.isEditable()) return
                 replaceInputRef.current?.click()
               }}
               disabled={replacing}
             >
               {replacing ? '替换中…' : '替换'}
             </button>
-            <button type="button" onClick={handleDownload}>下载</button>
             <input
               ref={replaceInputRef}
               type="file"
               accept="image/*"
               hidden
+              disabled={!isEditable || replacing}
               onChange={handleReplace}
             />
-            <button
+            </>}
+            <button type="button" onClick={handleDownload}>下载</button>
+            {isEditable && <button
               type="button"
               className="danger"
               onClick={(event) => {
@@ -341,7 +373,7 @@ function ImageComponent({ nodeKey, src, alt, width, height, originalSrc, caption
               }}
             >
               删除
-            </button>
+            </button>}
           </div>
         )}
       </div>
@@ -350,6 +382,7 @@ function ImageComponent({ nodeKey, src, alt, width, height, originalSrc, caption
         <input
           className="editor-image-caption-input"
           value={captionText}
+          readOnly={!isEditable}
           onChange={changeCaption}
           onClick={(event) => event.stopPropagation()}
           placeholder="添加图片说明…"

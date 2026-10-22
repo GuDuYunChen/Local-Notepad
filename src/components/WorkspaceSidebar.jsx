@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react'
 import ThemeToggle from './ThemeToggle'
 import { APP_ICON_DATA_URL } from '../assets/appIconData'
+import useLocalShortcuts from '../hooks/useLocalShortcuts'
+import { shortcutLabel } from '../services/localShortcuts'
 
 const Icon = ({ children, size = 18 }) => (
   <svg
@@ -28,6 +30,7 @@ export default function WorkspaceSidebar({
   onOpenShortcuts,
   children,
 }) {
+  const { bindings: shortcutBindings } = useLocalShortcuts()
   const [moreOpen, setMoreOpen] = useState(false)
   const moreRef = useRef(null)
 
@@ -69,6 +72,16 @@ export default function WorkspaceSidebar({
       id: 'daily',
       label: '每日笔记',
       icon: <Icon><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 10h18" /></Icon>,
+    },
+    {
+      id: 'recent',
+      label: '最近访问',
+      icon: <Icon><circle cx="12" cy="12" r="9" /><path d="M12 7v5l4 2" /></Icon>,
+    },
+    {
+      id: 'pinned',
+      label: '置顶笔记',
+      icon: <Icon><path d="m9 3 6 0-1 5 4 4v2H6v-2l4-4zM12 14v7" /></Icon>,
     },
     {
       id: 'graph',
@@ -116,7 +129,7 @@ export default function WorkspaceSidebar({
             className="workspace-sidebar-icon-btn"
             onClick={onOpenSearch}
             aria-label="搜索笔记"
-            title="全局检索 (Ctrl+Shift+K)"
+            title={`全局检索 (${shortcutLabel('globalSearch', shortcutBindings)})`}
           >
             <Icon><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></Icon>
           </button>
@@ -129,7 +142,7 @@ export default function WorkspaceSidebar({
           >
             <Icon size={16}><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></Icon>
             <span>搜索笔记</span>
-            <kbd>Ctrl ⇧ K</kbd>
+            <kbd>{shortcutLabel('globalSearch', shortcutBindings)}</kbd>
           </button>
         )}
 

@@ -41,19 +41,21 @@ function createListNode(listType) {
   return list
 }
 
-async function insertUploadedAttachment(editor) {
+async function insertUploadedAttachment(editor, canWrite = () => editor.isEditable()) {
+  if (!canWrite()) return
   const input = document.createElement('input')
   input.type = 'file'
 
   input.onchange = async (event) => {
     const file = event.target.files?.[0]
-    if (!file) return
+    if (!file || !canWrite()) return
 
     try {
       const result = await uploadFile(file)
-      if (!result?.url) return
+      if (!result?.url || !canWrite()) return
 
       editor.update(() => {
+        if (!canWrite()) return
         $insertNodes([
           $createAttachmentNode({
             src: result.url,
@@ -71,20 +73,22 @@ async function insertUploadedAttachment(editor) {
   input.click()
 }
 
-async function insertUploadedImage(editor) {
+async function insertUploadedImage(editor, canWrite = () => editor.isEditable()) {
+  if (!canWrite()) return
   const input = document.createElement('input')
   input.type = 'file'
   input.accept = 'image/*'
 
   input.onchange = async (event) => {
     const file = event.target.files?.[0]
-    if (!file) return
+    if (!file || !canWrite()) return
 
     try {
       const result = await uploadFile(file)
-      if (!result?.url) return
+      if (!result?.url || !canWrite()) return
 
       editor.update(() => {
+        if (!canWrite()) return
         $insertNodes([
           $createImageNode({
             src: result.url,
