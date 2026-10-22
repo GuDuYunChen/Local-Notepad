@@ -564,6 +564,38 @@ test('export fixture creates distinct sibling titles with real portable-name col
   }
 })
 
+test('export library restoration expands the real collapsed-sidebar state and confirms the target', async t => {
+  const dom = new JSDOM('<aside class="workspace-sidebar collapsed"><button aria-label="展开侧边栏">展开</button></aside>',
+    { runScripts: 'outside-only' })
+  t.after(() => dom.window.close())
+  const source = readFileSync(new URL('./run-local-export-desktop.mjs', import.meta.url), 'utf8')
+  const declaration = parse(source, { ecmaVersion: 'latest', sourceType: 'module' }).body
+    .find(node => node.type === 'FunctionDeclaration' && node.id?.name === 'until')
+  assert.ok(declaration)
+  const until = new Script(source.slice(declaration.start, declaration.end) + '; until').runInNewContext({
+    performance, sleep: () => Promise.resolve(),
+  })
+  let refreshes = 0, clicks = 0
+  dom.window.addEventListener('library:refresh', () => { refreshes++ })
+  dom.window.document.querySelector('button').addEventListener('click', () => {
+    const sidebar = dom.window.document.querySelector('.workspace-sidebar')
+    sidebar.classList.remove('collapsed')
+    sidebar.innerHTML = '<div class="file-list"><div class="tree-list"><div data-file-id="fixture-folder"></div></div></div>'
+  })
+  const result = await refreshLocalExportLibrary({
+    until,
+    evaluate: expression => new Script(expression).runInContext(dom.getInternalVMContext()),
+    click: async selector => {
+      clicks++; assert.equal(selector, 'button[aria-label="展开侧边栏"]')
+      const button = dom.window.document.querySelector(selector); assert.ok(button); button.click()
+    },
+  }, '[data-file-id="fixture-folder"]', 'Export fixture folder missing')
+  assert.equal(result, true)
+  assert.equal(refreshes, 1); assert.equal(clicks, 1)
+  assert.equal(dom.window.document.querySelector('.workspace-sidebar').classList.contains('collapsed'), false)
+  assert.ok(dom.window.document.querySelector('[data-file-id="fixture-folder"]'))
+})
+
 test('export library restoration propagates an uncertain native click without replay', async t => {
   const dom = new JSDOM('<aside class="workspace-sidebar collapsed"><button aria-label="展开侧边栏">展开</button></aside>',
     { runScripts: 'outside-only' })
