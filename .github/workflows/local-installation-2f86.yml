@@ -1,0 +1,88 @@
+name: Actual local document export installation lifecycle 2F102
+on:
+  push:
+    branches: [ci/local-installation-2f86]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: local-installation-2f86
+  cancel-in-progress: false
+jobs:
+  install-upgrade-uninstall:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Verify historical issue catalog and locked dependencies
+        shell: pwsh
+        run: |
+          node scripts/stage-review.mjs catalog
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/verify-dependency-lock.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Install exact verifier dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Ensure lock was not modified
+        run: git diff --exit-code -- package.json package-lock.json
+      - name: Build canonical reading fixture before refusal contracts
+        run: node scripts/build-reading-mode-fixture.mjs
+      - name: Refuse missing reading and shortcut gates and prove complete original preparation
+        shell: pwsh
+        run: |
+          node -e "const fs = require('node:fs'); const out = 'test-results/installer-lifecycle'; fs.mkdirSync(out, { recursive: true }); fs.writeFileSync(out + '/preparation-context.json', JSON.stringify({ schemaVersion: 1, scope: 'installer-preparation-contracts-only', nativeLifecycleExecuted: false, verifierCommit: process.env.GITHUB_SHA ?? null, runID: process.env.GITHUB_RUN_ID ?? null, runAttempt: process.env.GITHUB_RUN_ATTEMPT ?? null, job: process.env.GITHUB_JOB ?? null, platform: process.platform, node: process.version, startedAt: new Date().toISOString() }, null, 2) + '\n', { flag: 'wx' })"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node --test --test-reporter=tap --test-reporter-destination=test-results/installer-lifecycle/preparation-contracts.tap scripts/reading-mode-desktop-evidence.node.mjs scripts/reading-mode-installed-evidence.node.mjs scripts/reading-mode-native-input.node.mjs scripts/desktop-window-session.node.mjs scripts/shortcut-management-desktop-evidence.node.mjs scripts/shortcut-management-installed-evidence.node.mjs
+      - name: Build canonical local export fixture before added refusal contracts
+        run: node scripts/build-local-export-fixture.mjs
+      - name: Add source-bound export preparation and file evidence contracts
+        run: node --test --test-reporter=tap --test-reporter-destination=test-results/installer-lifecycle/local-export-preparation-contracts.tap scripts/local-export-desktop-evidence.node.mjs scripts/local-export-installed-evidence.node.mjs
+      - name: Verify fixed legacy installer restoration and refusals
+        run: node --test scripts/prepare-legacy-installer.node.mjs
+      - name: Resolve only complete source and binary pins
+        id: reading-pin
+        run: node scripts/pin-reading-mode-installer.mjs outputs
+      - name: Verify exact artifact IDs against original run and product metadata
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/pin-reading-mode-installer.mjs verify-artifacts
+      - name: Download accepted 4.232.0 upgrade seed
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ steps.reading-pin.outputs.previous-run }}
+          name: ${{ steps.reading-pin.outputs.previous-name }}
+          path: .installer-input/previous
+      - name: Restore unchanged old path-failure counterexample
+        run: node scripts/prepare-legacy-installer.mjs
+      - name: Download source-bound 4.235.0 installer
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ steps.reading-pin.outputs.current-run }}
+          name: ${{ steps.reading-pin.outputs.current-name }}
+          path: .installer-input/current
+      - name: Verify exact current and upgrade binary identities
+        run: node scripts/pin-reading-mode-installer.mjs prepare
+      - name: Verify canonical reading fixture from the prepared serializer
+        run: node --test scripts/reading-mode-desktop-fixture.node.mjs
+      - name: Preserve original lifecycle and all modules plus native reading and shortcut workflows
+        run: node scripts/run-reading-mode-installer.mjs prepare
+      - name: Retain all original refusal checks and add import evidence contracts
+        run: node --test scripts/installer-lifecycle-core.node.mjs scripts/installer-shell-core.node.mjs scripts/history-installation-evidence.node.mjs scripts/daily-installed-evidence.node.mjs scripts/template-installed-evidence.node.mjs scripts/quick-installed-evidence.node.mjs scripts/note-tags-installed-evidence.node.mjs scripts/backlinks-installed-evidence.node.mjs scripts/document-search-installed-evidence.node.mjs scripts/document-outline-installed-evidence.node.mjs scripts/local-graph-installed-evidence.node.mjs scripts/local-pins-installed-evidence.node.mjs scripts/recent-notes-installed-evidence.node.mjs scripts/installer-history-readiness.node.mjs scripts/wiki-installed-evidence.node.mjs scripts/local-import-desktop-evidence.node.mjs scripts/local-import-installed-evidence.node.mjs
+      - name: Apply unchanged import refusal contracts to generated target-version validator
+        run: node --test scripts/reading-import-desktop-validator.node.mjs
+      - name: Actual installed modules upgrade overwrite uninstall reinstall and data retention
+        run: node scripts/run-reading-mode-installer.mjs run
+      - name: Retain complete or failed original evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-notepad-install-lifecycle-${{ github.sha }}
+          path: test-results/installer-lifecycle/
+          if-no-files-found: error
+          retention-days: 14
