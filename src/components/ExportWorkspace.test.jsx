@@ -91,6 +91,28 @@ describe('complete local document export workspace', () => {
     expect(native.exportWorkspacePrepare).toHaveBeenCalledTimes(1)
     await act(async () => pending.resolve(reply()))
   })
+  it('reuses the same preparation request identity after a renderer timeout', async () => {
+    const pending = deferred()
+    native.exportWorkspacePrepare.mockImplementationOnce(input => {
+      current = makePlan(input.requestId)
+      return pending.promise
+    })
+    await mount()
+    await prepare()
+    const originalId = native.exportWorkspacePrepare.mock.calls[0][0].requestId
+    await act(async () => { await vi.advanceTimersByTimeAsync(65000) })
+    expect(host.textContent).toContain('等待桌面导出响应超时')
+    expect(button('查回预览')).toBeTruthy()
+    expect(native.exportWorkspaceCancel).not.toHaveBeenCalled()
+
+    current = makePlan(originalId)
+    await act(async () => pending.resolve(reply()))
+    await click(button('查回预览'))
+    expect(native.exportWorkspacePrepare).toHaveBeenCalledTimes(2)
+    expect(native.exportWorkspacePrepare.mock.calls[1][0].requestId).toBe(originalId)
+    expect(query('[data-local-export-item="one"]')).toBeTruthy()
+    expect(button('关闭').disabled).toBe(false)
+  })
   it('can cancel preparation using its original request identity', async () => {
     const pending = deferred(); native.exportWorkspacePrepare.mockImplementation(() => pending.promise)
     await mount(); await prepare(); await click(button('停止读取'))

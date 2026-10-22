@@ -59,7 +59,11 @@ export function localExportRequest(operation, timeout = 65000) {
   let timer
   return Promise.race([
     Promise.resolve().then(operation),
-    new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('等待桌面导出响应超时。请先查回结果，避免重复操作。')), timeout) }),
+    new Promise((_, reject) => { timer = setTimeout(() => {
+      const error = new Error('等待桌面导出响应超时。请先查回结果，避免重复操作。')
+      error.code = 'local-export-request-timeout'
+      reject(error)
+    }, timeout) }),
   ]).finally(() => clearTimeout(timer))
 }
 
