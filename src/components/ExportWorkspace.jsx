@@ -85,17 +85,29 @@ export default function ExportWorkspace({ ids, onClose, onReselect }) {
   const prepare = async () => {
     if (planRef.current || operation.current) return
     const task = begin('prepare'); if (!task) return
-    const id = requestId(); prepareId.current = id
+    const id = prepareId.current || requestId(); prepareId.current = id
+    let preserveRequestId = false
     try {
       const roots = validateExportSelection(selection.current)
       const response = await localExportRequest(() => native.current.exportWorkspacePrepare({ requestId: id, ids: roots, format }))
       if (!valid(task)) { dispose(response?.plan); return }
       const next = exportResult(response, { format })
       if (next.requestId !== id) throw new Error('预览与本次读取请求不一致，没有采用。')
-      setCurrent(next); setUncertain(false); setMessage('预览已就绪。请核对内容并选择文件夹，再开始导出。')
+      prepareId.current = null
+      setCurrent(next); setUncertain(false); setPollPaused(false); setMessage('预览已就绪。请核对内容并选择文件夹，再开始导出。')
     } catch (error) {
-      if (valid(task)) { stopNative(); setMessage(messageOf(error)); setUncertain(false) }
-    } finally { if (prepareId.current === id) prepareId.current = null; finish(task) }
+      if (valid(task)) {
+        setMessage(messageOf(error))
+        if (error?.code === 'local-export-request-timeout') {
+          // A renderer timeout does not prove that the native preparation stopped.
+          // Keep the same request identity so an explicit retry retrieves the original result.
+          preserveRequestId = true
+          setUncertain(true); setPollPaused(true)
+        } else {
+          stopNative(); setUncertain(false); prepareId.current = null
+        }
+      }
+    } finally { if (prepareId.current === id && !preserveRequestId) prepareId.current = null; finish(task) }
   }
 
   const act = async (kind, method) => {
@@ -154,7 +166,7 @@ export default function ExportWorkspace({ ids, onClose, onReselect }) {
             <label><input type="radio" name="local-export-format" value="markdown" checked={format === 'markdown'} onChange={() => changeFormat('markdown')} />Markdown <small>正文和本地附件放在一起</small></label>
             <label><input type="radio" name="local-export-format" value="docx" checked={format === 'docx'} onChange={() => changeFormat('docx')} />Word 文档 <small>可用 Word 或兼容软件打开</small></label>
           </fieldset>
-          {!plan && <button type="button" className="btn primary" data-local-export-prepare disabled={busy || !native.current} onClick={() => void prepare()}>{working === 'prepare' ? '正在读取预览…' : '读取导出预览'}</button>}
+          {!plan && <button type="button" className="btn primary" data-local-export-prepare disabled={busy || !native.current} onClick={() => void prepare()}>{working === 'prepare' ? '正在读取预览…' : uncertain && prepareId.current ? '查回预览' : '读取导出预览'}</button>}
           {plan && <>
             <div className="export-destination"><div><strong>导出位置</strong><p>{plan.destination || '尚未选择文件夹'}</p></div><button type="button" className="btn" data-local-export-choose disabled={busy || uncertain || Boolean(begun) || plan.canChooseDirectory === false} onClick={() => void act('choose', value => native.current.exportWorkspaceChooseDirectory({ planId: value.planId }))}>{plan.destination ? '更换文件夹' : '选择导出文件夹'}</button></div>
             <section className="export-results" aria-label="导出预览与结果">
@@ -180,7 +192,7 @@ export default function ExportWorkspace({ ids, onClose, onReselect }) {
           </div>
           <div className="export-primary-actions">
             {(working === 'prepare' || (uncertain && !plan && prepareId.current)) && <button type="button" className="btn" data-local-export-cancel onClick={cancelPreparation}>{working === 'prepare' ? '停止读取' : '请求停止读取'}</button>}
-            {plan?.busy || uncertain ? <button type="button" className="btn" data-local-export-cancel disabled={Boolean(working)} onClick={() => void cancel()}>{plan?.phase === 'cancelling' ? '正在停止…' : '停止导出'}</button> : null}
+            {plan?.busy || (uncertain && plan) ? <button type="button" className="btn" data-local-export-cancel disabled={Boolean(working)} onClick={() => void cancel()}>{plan?.phase === 'cancelling' ? '正在停止…' : '停止导出'}</button> : null}
             {!begun && plan && <button type="button" className="btn primary" data-local-export-start disabled={busy || uncertain || !plan.canStart || !plan.destination} onClick={() => void start(false)}>开始导出</button>}
             {canContinue && <button type="button" className="btn primary" data-local-export-continue onClick={() => void start(false)}>继续未完成项（{remaining}）</button>}
             {plan?.counts.failed > 0 && <button type="button" className="btn primary" data-local-export-retry disabled={busy || uncertain || !plan.canRetry} onClick={() => void start(true)}>仅重试失败项（{plan.counts.failed}）</button>}
