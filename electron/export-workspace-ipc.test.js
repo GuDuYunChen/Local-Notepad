@@ -245,6 +245,25 @@ describe('native export workspace authority and lifetime', () => {
     expect(await h.call('choose-directory', { planId: plan.planId })).toMatchObject({ success: false, code: 'export-directory-locked' })
   })
 
+  it('blocks direct IPC retry while failed items retain unconfirmed residual paths', async () => {
+    const execute = vi.fn(async plan => {
+      plan.dto.items[0].status = 'failed'
+      plan.dto.items[0].code = 'cleanup-incomplete'
+      plan.dto.items[0].partialPath = 'C:\\\\Exports\\\\Notepad-export\\\\a.md'
+      plan.dto.items[0].partialPaths = [plan.dto.items[0].partialPath, 'C:\\\\Exports\\\\Notepad-export\\\\a_assets\\\\image.png']
+      return recalculate(plan, 'partial')
+    })
+    const h = harness({ execute }), plan = await h.ready(['a', 'b'])
+    await h.call('start', { planId: plan.planId, requestId: 'run' })
+    const result = await h.settled(plan.planId)
+    expect(result.plan.canRetry).toBe(false)
+    expect(result.plan.items[0].partialPaths).toHaveLength(2)
+    await expect(h.call('retry', { planId: plan.planId, requestId: 'retry' })).resolves.toMatchObject({
+      success: false, code: 'cleanup-incomplete',
+    })
+    expect(execute).toHaveBeenCalledTimes(1)
+  })
+
   it('a replaced directory is rejected before execution and an escaping reveal path never reaches the shell', async () => {
     const h = harness(), plan = await h.ready(), original = `${h.directory}-original`
     fs.renameSync(h.directory, original); fs.mkdirSync(h.directory)

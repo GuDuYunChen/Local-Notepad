@@ -309,6 +309,9 @@ export function registerLocalExportHandlers({ ipcMain, dialog, shell, getWindow,
     }
     if (active) return busy()
     if (!record.directory) return refused('export-directory-required', '请先通过系统对话框选择导出目录')
+    if (retryFailed && record.dto.items.some(item => item.status === 'failed' && (item.partialPath || item.partialPaths?.length))) {
+      return refused('cleanup-incomplete', '部分导出文件仍未确认清理。请先检查残留路径，再重新预览；系统不会覆盖这些文件。')
+    }
     if (retryFailed ? record.dto.counts.failed < 1 : record.dto.counts.ready + record.dto.counts.cancelled < 1) {
       return refused('export-nothing-to-run', retryFailed ? '没有需要重试的失败项' : '没有尚未导出的项目')
     }
