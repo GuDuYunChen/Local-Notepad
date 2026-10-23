@@ -49,23 +49,96 @@ async function connect(url, onEvent) {
   }) } }
 }
 
+// Local verification is opt-in and never impersonates a hosted CI run. The
+// source commit labels the checked-out source, not provenance of a supplied EXE.
+export function resolveExportExecution({ mode = 'github-hosted', scope = 'packaged', productCommit,
+  sourceCommit, sourceWorktreeDirty, environment = process.env, platform = process.platform } = {}) {
+  assert.equal(platform, 'win32', 'Native export verification requires Windows')
+  assert.ok(['github-hosted', 'local-windows'].includes(mode), 'Unknown export execution mode')
+  assert.ok(['packaged', 'installed'].includes(scope))
+  assert.match(productCommit || '', /^[a-f0-9]{40}$/)
+  if (mode === 'github-hosted') {
+    assert.equal(environment.GITHUB_ACTIONS, 'true')
+    assert.equal(environment.RUNNER_ENVIRONMENT, 'github-hosted')
+    assert.equal(environment.GITHUB_REPOSITORY, 'GuDuYunChen/Local-Notepad')
+    assert.match(environment.GITHUB_SHA || '', /^[a-f0-9]{40}$/)
+    return { commit: environment.GITHUB_SHA, runnerEnvironment: mode }
+  }
+  assert.notEqual(environment.GITHUB_ACTIONS, 'true', 'Do not relabel a CI run as local')
+  assert.equal(scope, 'packaged', 'Local verification must not use installed user data')
+  assert.match(sourceCommit || '', /^[a-f0-9]{40}$/)
+  assert.equal(productCommit, sourceCommit, 'Local commit is a source reference only')
+  assert.equal(typeof sourceWorktreeDirty, 'boolean')
+  return { commit: sourceCommit, runnerEnvironment: mode,
+    moduleAccepted: false, installationVerified: false, buildProvenanceVerified: false,
+    localValidation: { sourceReferenceOnly: true, sourceWorktreeDirty } }
+}
+
+export function parseLocalExportArguments(args) {
+  assert.ok(Array.isArray(args) && args[0] === '--local', 'Expected --local first')
+  const values = {}
+  for (let i = 1; i < args.length; i += 2) {
+    const key = args[i], value = args[i + 1]
+    assert.ok(['--executable', '--out'].includes(key) && !Object.hasOwn(values, key), 'Unknown or duplicate local option')
+    assert.ok(typeof value === 'string' && value.length > 0 && value.length <= 32767 && !value.includes('\0') &&
+      path.win32.isAbsolute(value) && /^[a-z]:[\\/]/i.test(value), 'Use an absolute local Windows drive path')
+    values[key] = value
+  }
+  assert.deepEqual(Object.keys(values).sort(), ['--executable', '--out'])
+  assert.equal(path.win32.extname(values['--executable']).toLowerCase(), '.exe')
+  assert.ok(!/^uninstall/i.test(path.win32.basename(values['--executable'])))
+  return { executablePath: values['--executable'], out: values['--out'] }
+}
+
+export async function runLocalExportFromCLI(args, root) {
+  assert.equal(process.platform, 'win32', 'Native export verification requires Windows')
+  assert.notEqual(process.env.GITHUB_ACTIONS, 'true', 'Use the original CI entry in CI')
+  const options = parseLocalExportArguments(args)
+  const git = (...command) => {
+    const result = spawnSync('git', ['-C', root, ...command],
+      { encoding: 'utf8', timeout: 10000, windowsHide: true, maxBuffer: 4 * 1024 * 1024 })
+    assert.equal(result.error, undefined, 'Cannot read the local source identity')
+    assert.equal(result.status, 0, 'Cannot read the local source identity')
+    return result.stdout.trim()
+  }
+  const sourceCommit = git('rev-parse', 'HEAD')
+  assert.equal(git('branch', '--show-current'), 'feature/local-export-2f102-closure')
+  const sourceWorktreeDirty = git('status', '--porcelain', '--untracked-files=normal') !== ''
+  resolveExportExecution({ mode: 'local-windows', scope: 'packaged', productCommit: sourceCommit,
+    sourceCommit, sourceWorktreeDirty })
+  // Fresh child output and data/profile directories prevent reuse of old reports
+  // or user notes. No Git writes, environment spoofing, install or uninstall.
+  mkdirSync(options.out, { recursive: true })
+  const out = mkdtempSync(path.join(realpathSync.native(options.out), 'export102-local-'))
+  const result = await runLocalExportLifecycle({ ...options, out, mode: 'local-windows',
+    productCommit: sourceCommit, sourceCommit, sourceWorktreeDirty, scope: 'packaged', ownedRoot: tmpdir() })
+  assert.equal(git('rev-parse', 'HEAD'), sourceCommit, 'Source HEAD changed during local verification')
+  assert.equal(git('branch', '--show-current'), 'feature/local-export-2f102-closure', 'Source branch changed during local verification')
+  const summary = { nativeExportVerified: true, moduleAccepted: false, installationVerified: false,
+    buildProvenanceVerified: false, runnerEnvironment: 'local-windows', sourceCommit,
+    sourceWorktreeDirty, localExportChecks: result.checks.length, files: result.files.length, out }
+  writeFileSync(path.join(out, 'local-export-local-summary.json'), JSON.stringify(summary, null, 2), { flag: 'wx' })
+  console.log(JSON.stringify(summary))
+  return summary
+}
+
 // Both unpacked and NSIS-installed verification execute this original module.
 // Existing save/reading/shortcut processes and installation comparisons remain
 // separate prerequisites; this process never impersonates one of their exits.
 export async function runLocalExportLifecycle({ executablePath, out, productCommit = process.env.GITHUB_SHA,
-  version = LOCAL_EXPORT_VERSION, scope = 'packaged', ownedRoot = process.env.RUNNER_TEMP || tmpdir() } = {}) {
-  assert.equal(process.platform, 'win32'); assert.equal(process.env.GITHUB_ACTIONS, 'true')
-  assert.equal(process.env.RUNNER_ENVIRONMENT, 'github-hosted'); assert.equal(process.env.GITHUB_REPOSITORY, 'GuDuYunChen/Local-Notepad')
-  assert.match(process.env.GITHUB_SHA || '', /^[a-f0-9]{40}$/); assert.match(productCommit || '', /^[a-f0-9]{40}$/)
-  assert.ok(['packaged', 'installed'].includes(scope)); assert.equal(version, LOCAL_EXPORT_VERSION)
+  version = LOCAL_EXPORT_VERSION, scope = 'packaged', ownedRoot = process.env.RUNNER_TEMP || tmpdir(),
+  mode = 'github-hosted', sourceCommit, sourceWorktreeDirty } = {}) {
+  const execution = resolveExportExecution({ mode, scope, productCommit, sourceCommit, sourceWorktreeDirty })
+  assert.equal(version, LOCAL_EXPORT_VERSION)
   assert.ok(path.win32.isAbsolute(executablePath || ''))
   const scratch = realpathSync.native(mkdtempSync(path.join(ownedRoot, 'notepad-export-'))), profile = path.join(scratch, 'profile')
   const applicationDirectory = path.dirname(executablePath)
   const dataDirectory = scope === 'installed' ? path.join(homedir(), 'AppData', 'Roaming', 'Notepad') : path.join(scratch, 'data')
   if (scope === 'packaged') mkdirSync(dataDirectory)
   mkdirSync(out, { recursive: true }); const reportPath = path.join(out, LOCAL_EXPORT_REPORT)
-  const report = { schemaVersion: 1, module: '2F.102', version, commit: process.env.GITHUB_SHA, productCommit, scope,
-    platform: process.platform, runnerEnvironment: process.env.RUNNER_ENVIRONMENT, syntheticData: true,
+  const report = { schemaVersion: 1, module: '2F.102', version, ...execution, productCommit, scope,
+    ...(mode === 'local-windows' ? { localValidation: { ...execution.localValidation, isolatedDataDirectory: dataDirectory } } : {}),
+    platform: process.platform, syntheticData: true,
     bridgeOverridden: false, timerAccelerated: false, forceTerminated: false, complete: false, cleanupComplete: false,
     startedAt: new Date().toISOString(), checks: [], screenshots: [], directoryActions: [],
     windowHelper: { events: [], stoppedCleanly: false }, directoryHelper: { events: [], stoppedCleanly: false },
@@ -174,7 +247,7 @@ export async function runLocalExportLifecycle({ executablePath, out, productComm
     rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
     report.cleanupComplete = true; mark('owned-resources-cleaned')
     report.complete = true; report.finishedAt = new Date().toISOString(); save()
-    return await verifyLocalExportDesktopReport(out, process.env.GITHUB_SHA, productCommit, scope)
+    return await verifyLocalExportDesktopReport(out, execution.commit, productCommit, scope, undefined, mode)
   } catch (error) {
     report.complete = false; report.error = String(error?.stack || error); save()
     if (cdp) { try { await capture('local-export-failed.png') } catch {} }
@@ -191,7 +264,11 @@ export async function runLocalExportLifecycle({ executablePath, out, productComm
   }
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), out = path.join(root, 'test-results', 'desktop-save')
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+  if (process.argv.includes('--local')) {
+    await runLocalExportFromCLI(process.argv.slice(2), root)
+  } else {
+  const out = path.join(root, 'test-results', 'desktop-save')
   const { verifyDesktopSaveReadingReport } = await import('./reading-mode-save-evidence.mjs')
   const { verifyShortcutManagementDesktopReport } = await import('./shortcut-management-desktop-evidence.mjs')
   const original = verifyDesktopSaveReadingReport(out, process.env.GITHUB_SHA)
@@ -212,4 +289,5 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     exportReportSHA256: hash(readFileSync(path.join(out, LOCAL_EXPORT_REPORT))), files: result.files.length,
   }, null, 2), { flag: 'wx' })
   console.log(JSON.stringify({ complete: true, originalSaveReadingShortcutAccepted: true, localExportChecks: result.checks.length }))
+  }
 }
