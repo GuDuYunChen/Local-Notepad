@@ -181,7 +181,9 @@ jobs:
 
 
   windows-package:
-    if: github.event_name == 'push'
+    # This workflow is triggered by pull_request and workflow_dispatch (not push).
+    # Run Windows package verification for PR validation and manual dispatch too.
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     needs: renderer-build
     runs-on: windows-latest
     timeout-minutes: 30
