@@ -164,7 +164,8 @@ export function describeExportPlan(plan) {
     counts[item.status]++
     return { id: item.id, title: item.title, relativePath: item.relativePath, preview: item.preview, status: item.status,
       message: item.message, warnings: [...item.warnings], ...(item.code ? { code: item.code } : {}),
-      ...(item.receipt ? item.receipt : {}), ...(item.partialPath ? { partialPath: item.partialPath } : {}) }
+      ...(item.receipt ? item.receipt : {}), ...(item.partialPath ? { partialPath: item.partialPath } : {}),
+      ...(item.partialPaths?.length ? { partialPaths: [...item.partialPaths] } : {}) }
   })
   return { format: plan.format, createdAt: plan.createdAt, source: 'saved', state: plan.state, exportDirectory: plan.exportDirectory, items, counts }
 }
@@ -260,6 +261,9 @@ async function cleanupWritten(written) {
 
 export async function executeExportPlan(plan, { targetDir, signal, deadline = Date.now() + LIMIT.timeoutMs, onProgress, retryFailed = false } = {}) {
   if (!plan || !FORMAT.has(plan.format) || !Array.isArray(plan.items) || plan.running) throw error('busy', '导出计划无效或仍在执行，请先查回结果。')
+  if (retryFailed && plan.items.some(item => item.status === 'failed' && (item.partialPath || item.partialPaths?.length))) {
+    throw error('cleanup-incomplete', '部分导出文件仍未确认清理。请先检查每个残留路径并手动处理，再重新预览；系统不会覆盖这些文件。')
+  }
   const eligible = plan.items.filter(item => retryFailed ? item.status === 'failed' : ['ready', 'cancelled'].includes(item.status))
   if (!eligible.length) return describeExportPlan(plan)
   if (typeof targetDir !== 'string' || !path.isAbsolute(targetDir) || targetDir.includes('\0')) throw error('invalid-destination', '请选择有效的本地导出目录。')

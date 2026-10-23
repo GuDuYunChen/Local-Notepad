@@ -174,7 +174,7 @@ export function registerLocalExportHandlers({ ipcMain, dialog, shell, getWindow,
       destination: record.directory?.selected || '', phase: record.phase, busy: Boolean(working),
       canChooseDirectory: !working && !record.directoryLocked,
       canStart: !working && Boolean(record.directory) && (dto.counts.ready > 0 || dto.counts.cancelled > 0),
-      canRetry: !working && Boolean(record.directory) && dto.counts.failed > 0,
+      canRetry: !working && Boolean(record.directory) && dto.items.some(item => item.status === 'failed' && !item.partialPath && !item.partialPaths?.length),
       canReveal: !working && Boolean(record.directory), releasePending: record.releaseRequested,
       ...(record.problem || {}),
       ...(stopping ? { code: 'export-cancelling', message: '正在停止并确认已开始的文件操作，请等待结果' } : {}) }

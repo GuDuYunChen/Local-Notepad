@@ -251,8 +251,8 @@ describe('complete local output transactions', () => {
     expect(first.items[0].partialPaths).toContain(first.items[0].partialPath)
     expect(first.items[0].partialPaths.some(value => value.endsWith(path.join('a_assets', 'image-' + sha(PNG).slice(0, 12) + '.png')))).toBe(true)
     const originals = await Promise.all(first.items[0].partialPaths.map(filename => fs.readFile(filename)))
-    const second = await executeExportPlan(plan, { targetDir, retryFailed: true })
-    expect(second.items[0].status).toBe('failed')
+    await expect(executeExportPlan(plan, { targetDir, retryFailed: true })).rejects.toMatchObject({ code: 'cleanup-incomplete' })
+    expect(plan.items[0].partialPaths).toEqual(first.items[0].partialPaths)
     expect(await Promise.all(first.items[0].partialPaths.map(filename => fs.readFile(filename)))).toEqual(originals)
   })
   it('refuses a symlink introduced into its owned output hierarchy', async () => {
