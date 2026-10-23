@@ -134,10 +134,10 @@ describe('complete local document export workspace', () => {
     const originalId = native.exportWorkspacePrepare.mock.calls[0][0].requestId
     expect(native.exportWorkspaceCancel).toHaveBeenCalledWith({ requestId: originalId })
     expect(button('关闭').disabled).toBe(true)
-    // The recovery action intentionally remains labelled "请求停止读取";
-    // repeated activation is ignored while the original request is being reconciled.
-    expect(button('请求停止读取')).toBeTruthy()
-    await click(button('请求停止读取'))
+    // While the original request is being reconciled, show the in-progress
+    // label and disable the control so the user cannot issue duplicate cancellation.
+    expect(button('正在停止读取…').disabled).toBe(true)
+    await click(button('正在停止读取…'))
     expect(native.exportWorkspaceCancel).toHaveBeenCalledTimes(1)
     await act(async () => pending.resolve({ success: false, code: 'export-cancelled', cancelled: true, message: '已停止读取' }))
     expect(query('[data-local-export-prepare]').disabled).toBe(false)

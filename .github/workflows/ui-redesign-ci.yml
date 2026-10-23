@@ -122,9 +122,8 @@ jobs:
         run: node scripts/backend-test-evidence.mjs
 
       - name: Upload source-bound backend test evidence
-        # The preceding smoke-test gate can skip backend tests. Do not create a
-        # second, misleading failure for an artifact that was never produced.
-        # If backend tests ran successfully, the evidence remains mandatory.
+        # Upload only after the evidence-producing step ran successfully.
+        # If an earlier gate skipped it, don't report a second missing-artifact failure.
         if: always() && steps.backend_tests.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
