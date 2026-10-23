@@ -118,10 +118,14 @@ jobs:
         run: node --test scripts/backend-test-evidence.node.mjs
 
       - name: Run backend tests
+        id: backend_tests
         run: node scripts/backend-test-evidence.mjs
 
       - name: Upload source-bound backend test evidence
-        if: always()
+        # The preceding smoke-test gate can skip backend tests. Do not create a
+        # second, misleading failure for an artifact that was never produced.
+        # If backend tests ran successfully, the evidence remains mandatory.
+        if: always() && steps.backend_tests.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: local-notepad-backend-tests-${{ github.sha }}

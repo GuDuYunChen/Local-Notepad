@@ -134,8 +134,10 @@ describe('complete local document export workspace', () => {
     const originalId = native.exportWorkspacePrepare.mock.calls[0][0].requestId
     expect(native.exportWorkspaceCancel).toHaveBeenCalledWith({ requestId: originalId })
     expect(button('关闭').disabled).toBe(true)
-    expect(button('正在停止读取…').disabled).toBe(true)
-    await click(button('正在停止读取…'))
+    // The recovery action intentionally remains labelled "请求停止读取";
+    // repeated activation is ignored while the original request is being reconciled.
+    expect(button('请求停止读取')).toBeTruthy()
+    await click(button('请求停止读取'))
     expect(native.exportWorkspaceCancel).toHaveBeenCalledTimes(1)
     await act(async () => pending.resolve({ success: false, code: 'export-cancelled', cancelled: true, message: '已停止读取' }))
     expect(query('[data-local-export-prepare]').disabled).toBe(false)
@@ -287,7 +289,9 @@ describe('complete local document export workspace', () => {
     await mount(); await prepare(); await choose(); await click(query('[data-local-export-start]'))
     native.exportWorkspaceStatus.mockRejectedValueOnce(new Error('暂时无法查回'))
     await act(async () => vi.advanceTimersByTimeAsync(750)); await act(async () => vi.advanceTimersByTimeAsync(5000))
-    expect(native.exportWorkspaceStatus).toHaveBeenCalledTimes(1); expect(host.textContent).toContain('暂时无法查回')
+    expect(native.exportWorkspaceStatus).toHaveBeenCalledTimes(1)
+    expect(host.textContent).toContain('桌面导出响应连接中断，请查回结果后再操作。')
+    expect(host.textContent).not.toContain('暂时无法查回')
     current = snapshot(current, ['succeeded', 'succeeded']); await click(query('[data-local-export-status]'))
     expect(button('完成')).toBeTruthy(); expect(native.exportWorkspaceStart).toHaveBeenCalledTimes(1)
   })
