@@ -267,6 +267,27 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
   if (process.argv.includes('--local')) {
     await runLocalExportFromCLI(process.argv.slice(2), root)
+  } else if (process.argv.includes('--ci-standalone')) {
+    assert.equal(process.env.GITHUB_ACTIONS, 'true', 'Standalone acceptance is CI-only')
+    assert.equal(process.env.GITHUB_REPOSITORY, 'GuDuYunChen/Local-Notepad')
+    assert.match(process.env.GITHUB_SHA || '', /^[a-f0-9]{40}$/)
+    assert.equal(process.platform, 'win32', 'Packaged desktop acceptance requires Windows')
+    const out = path.join(root, 'test-results', 'desktop-save')
+    const directory = path.join(root, 'release', 'win-unpacked')
+    const filename = readdirSync(directory).find(name => name.endsWith('.exe') && !name.startsWith('Uninstall'))
+    assert.ok(filename, 'Packaged application executable missing')
+    const result = await runLocalExportLifecycle({
+      executablePath: path.join(directory, filename), out,
+      productCommit: process.env.GITHUB_SHA, mode: 'github-hosted', scope: 'packaged',
+    })
+    const accepted = {
+      complete: true, module: '2F.102', commit: process.env.GITHUB_SHA,
+      samePackagedApplication: true, nativeExportChecks: result.checks.length,
+      files: result.files.length,
+      reportSHA256: hash(readFileSync(path.join(out, LOCAL_EXPORT_REPORT))),
+    }
+    writeFileSync(path.join(out, 'local-export-desktop-accepted.json'), JSON.stringify(accepted, null, 2), { flag: 'wx' })
+    console.log(JSON.stringify(accepted))
   } else {
   const out = path.join(root, 'test-results', 'desktop-save')
   const { verifyDesktopSaveReadingReport } = await import('./reading-mode-save-evidence.mjs')

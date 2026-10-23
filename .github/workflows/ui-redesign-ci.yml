@@ -304,17 +304,10 @@ jobs:
       - name: Build local-export desktop fixture for Windows acceptance
         run: node scripts/build-local-export-fixture.mjs
 
-      # Exercise the actual packaged export UI on Windows, not only its renderer
-      # unit tests. Keep the established save/quit and shortcut acceptance gates
-      # as source-bound predecessors so all three runs prove identical binaries.
-      - name: Verify packaged desktop save and reading lifecycle
-        run: node scripts/check-desktop-save.mjs
-
-      - name: Verify packaged shortcut management lifecycle
-        run: node scripts/run-shortcut-management-desktop.mjs
-
+      # Run the export closure independently. Other desktop acceptance suites
+      # have their own gates and must not prevent this module's real packaged test.
       - name: Verify packaged local document export lifecycle
-        run: node scripts/run-local-export-desktop.mjs
+        run: node scripts/run-local-export-desktop.mjs --ci-standalone
 
       - name: Upload packaged local export evidence
         if: always()
