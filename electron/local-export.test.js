@@ -244,8 +244,14 @@ describe('complete local output transactions', () => {
       ['a'], 'markdown', { '/uploads/picture.png': { bytes: PNG, mime: 'image/png' } })
     const targetDir = await temp(), controller = new AbortController(), open = fs.open.bind(fs)
     vi.spyOn(fs, 'open').mockImplementation(async (...args) => {
+      const filename = args[0]
       const handle = await open(...args), write = handle.writeFile.bind(handle)
-      handle.writeFile = async (...params) => { await write(...params); controller.abort() }
+      handle.writeFile = async (...params) => {
+        await write(...params)
+        // Assets are emitted before the document; cancel after the document
+        // write to verify cleanup reports both real residual files.
+        if (path.basename(filename) === 'a.md') controller.abort()
+      }
       return handle
     })
     vi.spyOn(fs, 'unlink').mockRejectedValue(Object.assign(new Error('permission denied'), { code: 'EACCES' }))

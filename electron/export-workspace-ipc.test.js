@@ -262,9 +262,8 @@ describe('native export workspace authority and lifetime', () => {
     const result = await h.settled(plan.planId)
     expect(result.plan.canRetry).toBe(false)
     expect(result.plan.items[0].partialPaths).toHaveLength(2)
-    await expect(h.call('retry', { planId: plan.planId, requestId: 'retry' })).resolves.toMatchObject({
-      success: false, code: 'cleanup-incomplete',
-    })
+    const retry = await h.call('retry', { planId: plan.planId, requestId: 'retry' })
+    expect(retry).toMatchObject({ success: false, code: 'cleanup-incomplete' })
     expect(execute).toHaveBeenCalledTimes(1)
   })
 
