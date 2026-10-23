@@ -146,6 +146,13 @@ export function registerLocalExportHandlers({ ipcMain, dialog, shell, getWindow,
     operation.finished = true
     if (operation.timer !== undefined) clearTimer(operation.timer)
     if (active === operation) active = null
+    // Release may arrive while a native read, write or directory dialog is
+    // still pending. Keep its slot until drain, then revoke only that plan.
+    const ownerSession = operation.session, record = operation.record
+    if (record?.releaseRequested && ownerSession.valid && ownerSession.record === record) {
+      ownerSession.record = null
+      if (!ownerSession.legacyDirectory && active?.session !== ownerSession && session === ownerSession) invalidate(ownerSession)
+    }
   }
 
   function arm(operation) {
@@ -174,7 +181,8 @@ export function registerLocalExportHandlers({ ipcMain, dialog, shell, getWindow,
       destination: record.directory?.selected || '', phase: record.phase, busy: Boolean(working),
       canChooseDirectory: !working && !record.directoryLocked,
       canStart: !working && Boolean(record.directory) && (dto.counts.ready > 0 || dto.counts.cancelled > 0),
-      canRetry: !working && Boolean(record.directory) && dto.items.some(item => item.status === 'failed' && !item.partialPath && !item.partialPaths?.length),
+      canRetry: !working && Boolean(record.directory) && dto.counts.failed > 0 &&
+        !dto.items.some(item => item.status === 'failed' && (item.partialPath || item.partialPaths?.length)),
       canReveal: !working && Boolean(record.directory), releasePending: record.releaseRequested,
       ...(record.problem || {}),
       ...(stopping ? { code: 'export-cancelling', message: '正在停止并确认已开始的文件操作，请等待结果' } : {}) }

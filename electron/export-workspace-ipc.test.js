@@ -183,12 +183,16 @@ describe('native export workspace authority and lifetime', () => {
     expect((await h.call('status', { planId: plan.planId })).plan.phase).toBe('cancelling')
     nativePlan.dto.items[0].status = 'cancelled'; held.resolve(recalculate(nativePlan, 'cancelled'))
     const stopped = await h.settled(plan.planId)
-    expect(stopped.plan).toMatchObject({ phase: 'settled', state: 'cancelled', busy: false, releasePending: true, canStart: true })
+    // The renderer disposes once. Finalization must not require another release.
+    expect(stopped).toMatchObject({ success: false })
+    expect(h.contents.eventNames()).toEqual([]); expect(h.owner.eventNames()).toEqual([])
     const stable = structuredClone(stopped)
     options.onProgress({ ...nativePlan.dto, state: 'completed' })
     expect(await h.call('status', { planId: plan.planId })).toEqual(stable)
-    expect(await h.call('release', { planId: plan.planId })).toMatchObject({ success: true, released: true })
-    expect(await h.call('status', { planId: plan.planId })).toMatchObject({ success: false })
+    const next = await h.call('prepare', { requestId: 'after-release', ids: ['note-2'], format: 'docx' })
+    expect(next.success).toBe(true); expect(next.plan.planId).not.toBe(plan.planId)
+    options.onProgress({ ...nativePlan.dto, state: 'completed' })
+    expect((await h.call('status', { planId: next.plan.planId })).plan.items.map(item => item.id)).toEqual(['note-2'])
   })
 
   it.each(['navigation', 'render-process-gone', 'destroyed', 'closed'])('revokes the owner on %s and prevents a replacement until old reads settle', async kind => {
@@ -262,6 +266,41 @@ describe('native export workspace authority and lifetime', () => {
       success: false, code: 'cleanup-incomplete',
     })
     expect(execute).toHaveBeenCalledTimes(1)
+  })
+
+  it('finalizes a pending release when native execution rejects, without retaining listeners', async () => {
+    const held = deferred(), entered = deferred(); let signal
+    const h = harness({ execute: vi.fn((_plan, options) => {
+      signal = options.signal; entered.resolve(); return held.promise
+    }) })
+    const plan = await h.ready()
+    await h.call('start', { planId: plan.planId, requestId: 'run' }); await entered.promise
+    expect(await h.call('release', { planId: plan.planId })).toMatchObject({ success: true, releasePending: true })
+    expect(signal.aborted).toBe(true)
+    expect(await h.call('prepare', { requestId: 'during-drain', ids: ['b'], format: 'docx' }))
+      .toMatchObject({ success: false, code: 'export-busy' })
+    held.reject(new Error('Synthetic native failure'))
+    expect(await h.settled(plan.planId)).toMatchObject({ success: false })
+    expect(h.contents.eventNames()).toEqual([]); expect(h.owner.eventNames()).toEqual([])
+    expect((await h.call('prepare', { requestId: 'after-drain', ids: ['b'], format: 'docx' })).success).toBe(true)
+  })
+
+  it.each(['selected', 'cancelled', 'rejected'])('finishes release after a %s directory dialog without granting late consent', async outcome => {
+    const held = deferred(), h = harness()
+    const prepared = await h.call('prepare', { requestId: 'preview', ids: ['a'], format: 'markdown' })
+    h.dialog.showOpenDialog.mockReturnValueOnce(held.promise)
+    const choosing = h.call('choose-directory', { planId: prepared.plan.planId })
+    expect(await h.call('release', { planId: prepared.plan.planId })).toMatchObject({ success: true, releasePending: true })
+    expect(await h.call('prepare', { requestId: 'during-dialog', ids: ['b'], format: 'docx' }))
+      .toMatchObject({ success: false, code: 'export-busy' })
+    if (outcome === 'rejected') held.reject(new Error('Synthetic dialog failure'))
+    else held.resolve(outcome === 'cancelled' ? { canceled: true } : { canceled: false, filePaths: [h.directory] })
+    expect(await choosing).toMatchObject({ success: false })
+    expect(await h.call('status', { planId: prepared.plan.planId })).toMatchObject({ success: false })
+    expect(h.contents.eventNames()).toEqual([]); expect(h.owner.eventNames()).toEqual([])
+    expect(h.execute).not.toHaveBeenCalled()
+    const next = await h.call('prepare', { requestId: 'next', ids: ['b'], format: 'docx' })
+    expect(next.success).toBe(true); expect(next.plan.destination).toBe('')
   })
 
   it('a replaced directory is rejected before execution and an escaping reveal path never reaches the shell', async () => {
