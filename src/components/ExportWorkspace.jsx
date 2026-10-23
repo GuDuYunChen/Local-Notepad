@@ -249,15 +249,15 @@ export default function ExportWorkspace({ ids, onClose, onReselect }) {
         </div>}
         <footer className="export-workspace-footer">
           <div className="export-secondary-actions">
-            {plan && <button type="button" className="btn" data-local-export-status disabled={Boolean(working)} onClick={() => void readStatus()}>查回结果</button>}
-            {plan?.canReveal && <button type="button" className="btn" data-local-export-reveal disabled={Boolean(working)} onClick={() => void act('reveal', value => native.current.exportWorkspaceReveal({ planId: value.planId }))}>打开导出文件夹</button>}
+            {plan && <button type="button" className="btn" data-local-export-status disabled={Boolean(working) || unavailable} onClick={() => void readStatus()}>查回结果</button>}
+            {plan?.canReveal && <button type="button" className="btn" data-local-export-reveal disabled={Boolean(working) || unavailable} onClick={() => void act('reveal', value => native.current.exportWorkspaceReveal({ planId: value.planId }))}>打开导出文件夹</button>}
           </div>
           <div className="export-primary-actions">
             {(working === 'prepare' || (uncertain && !plan && prepareId.current)) && <button type="button" className="btn" data-local-export-cancel onClick={cancelPreparation}>{working === 'prepare' ? '停止读取' : '请求停止读取'}</button>}
-            {plan?.busy || (uncertain && plan) ? <button type="button" className="btn" data-local-export-cancel disabled={Boolean(working)} onClick={() => void cancel()}>{plan?.phase === 'cancelling' ? '正在停止…' : '停止导出'}</button> : null}
-            {!begun && plan && <button type="button" className="btn primary" data-local-export-start disabled={busy || uncertain || !plan.canStart || !plan.destination} onClick={() => void start(false)}>开始导出</button>}
+            {!unavailable && (plan?.busy || (uncertain && plan)) ? <button type="button" className="btn" data-local-export-cancel disabled={Boolean(working)} onClick={() => void cancel()}>{plan?.phase === 'cancelling' ? '正在停止…' : '停止导出'}</button> : null}
+            {!begun && plan && <button type="button" className="btn primary" data-local-export-start disabled={busy || uncertain || unavailable || !plan.canStart || !plan.destination} onClick={() => void start(false)}>开始导出</button>}
             {canContinue && <button type="button" className="btn primary" data-local-export-continue onClick={() => void start(false)}>继续未完成项（{remaining}）</button>}
-            {plan?.counts.failed > 0 && <button type="button" className="btn primary" data-local-export-retry disabled={busy || uncertain || !plan.canRetry} onClick={() => void start(true)}>仅重试失败项（{plan.counts.failed}）</button>}
+            {plan?.counts.failed > 0 && <button type="button" className="btn primary" data-local-export-retry disabled={busy || uncertain || unavailable || !plan.canRetry} onClick={() => void start(true)}>仅重试失败项（{plan.counts.failed}）</button>}
             <button type="button" className="btn" disabled={busy || uncertain} onClick={close}>{plan?.state === 'completed' ? '完成' : '关闭'}</button>
           </div>
         </footer>
