@@ -226,8 +226,12 @@ async function writeExclusive(filename, bytes, written, plan, check) {
   let handle
   try {
     handle = await fs.open(filename, 'wx', 0o600)
-    const identity = await handle.stat(), record = { filename, identity, bytes }
+    // Exclusive creation already changed the filesystem. Register it before
+    // fstat so an identity-read failure cannot hide a real residual file.
+    // Without confirmed identity, cleanup reports the path but never deletes it.
+    const record = { filename, identity: null, bytes }
     written.push(record)
+    const identity = await handle.stat(); record.identity = identity
     check(); await handle.writeFile(bytes); await handle.sync(); await handle.close(); handle = null
     // Read-back is needed even when cancellation arrived during a started I/O.
     // It does not start another output write or claim that an abort rolled back.
