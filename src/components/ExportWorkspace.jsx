@@ -195,6 +195,7 @@ export default function ExportWorkspace({ ids, onClose, onReselect }) {
     // Supersede the renderer wait, never the main-owned operation. The old
     // continuation cannot clear the new task's identity or restore its preview.
     operation.current = null
+    setWorking('cancel-prepare')
     void prepare(true)
   }
   const changeFormat = next => {
