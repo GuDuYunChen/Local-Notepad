@@ -239,17 +239,23 @@ async function writeExclusive(filename, bytes, written, plan, check) {
 }
 
 async function cleanupWritten(written) {
-  let incomplete = false
+  const residualPaths = []
   for (const entry of [...written].reverse()) {
     try {
       const actual = await fs.lstat(entry.filename)
-      if (!owns(entry.identity, actual) || !actual.isFile() || actual.size > entry.bytes.length) { incomplete = true; continue }
+      if (!owns(entry.identity, actual) || !actual.isFile() || actual.size > entry.bytes.length) {
+        residualPaths.push(entry.filename); continue
+      }
       const bytes = await fs.readFile(entry.filename)
-      if (!bytes.equals(entry.bytes.subarray(0, bytes.length))) { incomplete = true; continue }
+      if (!bytes.equals(entry.bytes.subarray(0, bytes.length))) {
+        residualPaths.push(entry.filename); continue
+      }
       await fs.unlink(entry.filename)
-    } catch (cause) { if (cause?.code !== 'ENOENT') incomplete = true }
+    } catch (cause) {
+      if (cause?.code !== 'ENOENT') residualPaths.push(entry.filename)
+    }
   }
-  return !incomplete
+  return { complete: residualPaths.length === 0, residualPaths }
 }
 
 export async function executeExportPlan(plan, { targetDir, signal, deadline = Date.now() + LIMIT.timeoutMs, onProgress, retryFailed = false } = {}) {
@@ -290,16 +296,25 @@ export async function executeExportPlan(plan, { targetDir, signal, deadline = Da
         await writeExclusive(outputPath, rendered.bytes, written, plan, check)
         item.receipt = { outputPath, bytes: rendered.bytes.length, sha256: hash(rendered.bytes), assetCount: rendered.assets.length }
         delete item.partialPath
+        delete item.partialPaths
         item.status = 'succeeded'; item.message = '文档及附件已写入，并完成读回校验。'
         plan.outputAssetBytes = budget.bytes
       } catch (cause) {
-        const clean = await cleanupWritten(written)
+        const cleanup = await cleanupWritten(written)
         budget.bytes = beforeAssets
         const cancellation = signal?.aborted || cause?.code === 'cancelled', timedOut = Date.now() >= deadline || cause?.code === 'timeout'
         item.status = cancellation || timedOut ? 'cancelled' : 'failed'
         item.code = cancellation ? 'cancelled' : timedOut ? 'timeout' : cause instanceof LocalExportError ? cause.code : 'write-failed'
         item.message = cause instanceof LocalExportError ? cause.message : '导出文件无法可靠写入；请检查权限、磁盘空间或同名文件后重试。'
-        if (!clean) { item.partialPath = path.join(plan.exportDirectory, item.relativePath); item.status = 'failed'; item.code = 'cleanup-incomplete'; item.message += ' 部分临时输出无法确认清理，请先检查该路径；系统不会覆盖已有文件。' }
+        if (cleanup.complete) {
+          delete item.partialPath
+          delete item.partialPaths
+        } else {
+          item.partialPaths = cleanup.residualPaths
+          if (cleanup.residualPaths.length) item.partialPath = cleanup.residualPaths[0]
+          item.status = 'failed'; item.code = 'cleanup-incomplete'
+          item.message += ' 以下部分输出未能确认清理，请先检查列出的实际路径；系统不会覆盖已有文件。'
+        }
       }
       notify()
       if (signal?.aborted || Date.now() >= deadline) break

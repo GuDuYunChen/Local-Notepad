@@ -174,8 +174,9 @@ export default function ExportWorkspace({ ids, onClose, onReselect }) {
               {plan.busy && <progress aria-label="导出进度" max={plan.counts.total} value={completed} />}
               <ol className="export-items">{plan.items.map(item => <li key={item.id} data-local-export-item={item.id} data-status={item.status} data-output-bytes={item.status === 'succeeded' ? item.bytes : undefined} data-output-sha256={item.status === 'succeeded' ? item.sha256 : undefined}>
                 <div className="export-item-heading"><strong>{item.title}</strong><span className={'export-item-status export-status-' + item.status}>{exportStatusLabels[item.status]}</span></div>
-                <p className="export-item-path">{item.outputPath || item.partialPath || item.relativePath}</p>
+                <p className="export-item-path">{item.outputPath || item.partialPaths?.[0] || item.partialPath || item.relativePath}</p>
                 {item.message && <p className={item.status === 'failed' ? 'export-error' : 'export-item-message'}>{item.message}</p>}
+                {item.partialPaths?.length > 0 && <ul className="export-warnings" aria-label={item.title + ' 未清理输出路径'}>{item.partialPaths.map((filename, index) => <li key={filename + index}>{filename}</li>)}</ul>}
                 {item.warnings.length > 0 && <ul className="export-warnings" aria-label={item.title + ' 导出提示'}>{item.warnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul>}
                 <details><summary>查看已保存正文预览</summary><pre>{item.preview || '（空白笔记）'}</pre></details>
               </li>)}</ol>

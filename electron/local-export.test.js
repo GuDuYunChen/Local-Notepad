@@ -235,8 +235,10 @@ describe('complete local output transactions', () => {
     expect(report.items[0]).toMatchObject({ status: 'failed', code: 'write-unconfirmed' }); expect(report.items[0].sha256).toBeUndefined()
     expect(await fs.readdir(report.exportDirectory)).toEqual([])
   })
-  it('reports a blocked cleanup explicitly and refuses to overwrite its residual on retry', async () => {
-    const { plan } = await prepare([note('a')]), targetDir = await temp(), controller = new AbortController(), open = fs.open.bind(fs)
+  it('reports every actual residual path and refuses to overwrite residual document or asset on retry', async () => {
+    const { plan } = await prepare([note('a', 'a.md', body({ type: 'image', src: '/uploads/picture.png' }))],
+      ['a'], 'markdown', { '/uploads/picture.png': { bytes: PNG, mime: 'image/png' } })
+    const targetDir = await temp(), controller = new AbortController(), open = fs.open.bind(fs)
     vi.spyOn(fs, 'open').mockImplementation(async (...args) => {
       const handle = await open(...args), write = handle.writeFile.bind(handle)
       handle.writeFile = async (...params) => { await write(...params); controller.abort() }
@@ -245,9 +247,13 @@ describe('complete local output transactions', () => {
     vi.spyOn(fs, 'unlink').mockRejectedValue(Object.assign(new Error('permission denied'), { code: 'EACCES' }))
     const first = await executeExportPlan(plan, { targetDir, signal: controller.signal })
     expect(first.items[0]).toMatchObject({ status: 'failed', code: 'cleanup-incomplete', partialPath: expect.stringContaining('a.md') })
-    const original = await fs.readFile(first.items[0].partialPath)
+    expect(first.items[0].partialPaths).toHaveLength(2)
+    expect(first.items[0].partialPaths).toContain(first.items[0].partialPath)
+    expect(first.items[0].partialPaths.some(value => value.endsWith(path.join('a_assets', 'image-' + sha(PNG).slice(0, 12) + '.png')))).toBe(true)
+    const originals = await Promise.all(first.items[0].partialPaths.map(filename => fs.readFile(filename)))
     const second = await executeExportPlan(plan, { targetDir, retryFailed: true })
-    expect(second.items[0].status).toBe('failed'); expect(await fs.readFile(first.items[0].partialPath)).toEqual(original)
+    expect(second.items[0].status).toBe('failed')
+    expect(await Promise.all(first.items[0].partialPaths.map(filename => fs.readFile(filename)))).toEqual(originals)
   })
   it('refuses a symlink introduced into its owned output hierarchy', async () => {
     const { plan } = await prepare([folder('f', 'folder'), note('a', 'a.md', body(paragraph('body')), 'f')], ['f']), targetDir = await temp(), outside = await temp()

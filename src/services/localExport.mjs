@@ -33,7 +33,9 @@ export function validateExportPlan(value, { planId, format, previous } = {}) {
     if (!item || !text(item.id, 256, false) || seen.has(item.id) || !text(item.title, 4096, false) ||
         !text(item.relativePath, 32768, false) || !text(item.preview, 20000) || !statuses.includes(item.status) ||
         !text(item.message || '', 4000) || !Array.isArray(item.warnings) || item.warnings.length > 100 ||
-        item.warnings.some(warning => !text(warning, 4000)) || (item.partialPath !== undefined && !text(item.partialPath, 32768, false))) invalid()
+        item.warnings.some(warning => !text(warning, 4000)) || (item.partialPath !== undefined && !text(item.partialPath, 32768, false)) ||
+        (item.partialPaths !== undefined && (!Array.isArray(item.partialPaths) || item.partialPaths.length < 1 || item.partialPaths.length > 200 ||
+          item.partialPaths.some(filename => !text(filename, 32768, false))))) invalid()
     seen.add(item.id); computed[item.status]++
     if (item.status === 'succeeded' && (!text(item.outputPath, 32768, false) ||
         !Number.isSafeInteger(item.bytes) || item.bytes < 0 || !/^[a-f0-9]{64}$/.test(item.sha256 || ''))) invalid()
