@@ -295,6 +295,27 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      # Exercise the actual packaged export UI on Windows, not only its renderer
+      # unit tests. Keep the established save/quit and shortcut acceptance gates
+      # as source-bound predecessors so all three runs prove identical binaries.
+      - name: Verify packaged desktop save and reading lifecycle
+        run: node scripts/check-desktop-save.mjs
+
+      - name: Verify packaged shortcut management lifecycle
+        run: node scripts/run-shortcut-management-desktop.mjs
+
+      - name: Verify packaged local document export lifecycle
+        run: node scripts/run-local-export-desktop.mjs
+
+      - name: Upload packaged local export evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-notepad-local-export-desktop-${{ github.sha }}
+          path: test-results/desktop-save/local-export*
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Verify parent-pipe shutdown on Windows
         env:
           NOTEPAD_TEST_BACKEND: server/bin/notepad-server.exe
