@@ -146,6 +146,13 @@ export function registerLocalExportHandlers({ ipcMain, dialog, shell, getWindow,
     operation.finished = true
     if (operation.timer !== undefined) clearTimer(operation.timer)
     if (active === operation) active = null
+    // Release may arrive while a native read, write or directory dialog is
+    // still pending. Keep its slot until drain, then revoke only that plan.
+    const ownerSession = operation.session, record = operation.record
+    if (record?.releaseRequested && ownerSession.valid && ownerSession.record === record) {
+      ownerSession.record = null
+      if (!ownerSession.legacyDirectory && active?.session !== ownerSession && session === ownerSession) invalidate(ownerSession)
+    }
   }
 
   function arm(operation) {
@@ -174,7 +181,8 @@ export function registerLocalExportHandlers({ ipcMain, dialog, shell, getWindow,
       destination: record.directory?.selected || '', phase: record.phase, busy: Boolean(working),
       canChooseDirectory: !working && !record.directoryLocked,
       canStart: !working && Boolean(record.directory) && (dto.counts.ready > 0 || dto.counts.cancelled > 0),
-      canRetry: !working && Boolean(record.directory) && dto.counts.failed > 0,
+      canRetry: !working && Boolean(record.directory) && dto.counts.failed > 0 &&
+        !dto.items.some(item => item.status === 'failed' && (item.partialPath || item.partialPaths?.length)),
       canReveal: !working && Boolean(record.directory), releasePending: record.releaseRequested,
       ...(record.problem || {}),
       ...(stopping ? { code: 'export-cancelling', message: '正在停止并确认已开始的文件操作，请等待结果' } : {}) }
@@ -309,6 +317,9 @@ export function registerLocalExportHandlers({ ipcMain, dialog, shell, getWindow,
     }
     if (active) return busy()
     if (!record.directory) return refused('export-directory-required', '请先通过系统对话框选择导出目录')
+    if (retryFailed && record.dto.items.some(item => item.status === 'failed' && (item.partialPath || item.partialPaths?.length))) {
+      return refused('cleanup-incomplete', '部分导出文件仍未确认清理。请先检查残留路径，再重新预览；系统不会覆盖这些文件。')
+    }
     if (retryFailed ? record.dto.counts.failed < 1 : record.dto.counts.ready + record.dto.counts.cancelled < 1) {
       return refused('export-nothing-to-run', retryFailed ? '没有需要重试的失败项' : '没有尚未导出的项目')
     }

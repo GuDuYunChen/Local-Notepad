@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { exportResult, localExportBridge, localExportRequest, validateExportPlan, validateExportSelection } from './localExport.mjs'
+import { exportResult, localExportBridge, localExportRequest, nativeExportFailure, validateExportPlan, validateExportSelection } from './localExport.mjs'
 
 const plan = () => ({
   planId: 'plan-1', requestId: 'request-1', format: 'markdown', source: 'saved', phase: 'prepared', state: 'prepared', busy: false,
@@ -59,15 +59,41 @@ describe('local export response and selection boundaries', () => {
     expect(localExportBridge(null)).toBeNull()
   })
   it('preserves an explicit native failure and rejects a falsely successful reply', () => {
-    expect(() => exportResult({ success: false, message: '未取得目录授权' })).toThrow('未取得目录授权')
+    expect(() => exportResult({ success: false, code: 'export-directory-required', message: '未取得目录授权' })).toThrow('未取得目录授权')
     expect(() => exportResult({ success: true })).toThrow(/回执/)
   })
-  it('bounds an unanswered request without reporting success', async () => {
+  it.each([
+    { success: false, message: '缺少错误标识' },
+    { success: false, code: 42, message: '无效错误标识' },
+    { success: false, code: 'export-not-found' },
+    { success: false, code: 'export-not-found', message: {} },
+    { success: false, code: 'export-not-found', message: '矛盾回执', plan: plan() },
+    { success: false, code: 'export-not-found', message: '矛盾回执', cancelled: 'true' },
+  ])('keeps an incomplete native rejection unknown: %j', response => {
+    expect(() => exportResult(response)).toThrow(/回执/)
+    expect(() => nativeExportFailure(response)).toThrow(/回执/)
+  })
+  it.each(['export-not-found', 'export-owner-changed', 'read-failed'])('retains the verified native rejection code %s', code => {
+    const response = { success: false, code, message: '已确认的原生拒绝' }
+    expect(nativeExportFailure(response)).toMatchObject({ code: 'local-export-native-rejected', nativeCode: code })
+    expect(() => exportResult(response)).toThrow('已确认的原生拒绝')
+  })
+  it('bounds an unanswered request with a recoverable timeout identity', async () => {
     vi.useFakeTimers()
     try {
       const promise = localExportRequest(() => new Promise(() => {}), 100)
-      const result = expect(promise).rejects.toThrow(/超时/)
-      await vi.advanceTimersByTimeAsync(100); await result
+      const rejection = promise.then(() => null, error => error)
+      await vi.advanceTimersByTimeAsync(100)
+      const error = await rejection
+      expect(error.message).toMatch(/超时/)
+      expect(error.code).toBe('local-export-request-timeout')
     } finally { vi.useRealTimers() }
+  })
+  it('marks a rejected bridge response as unknown without exposing raw native diagnostics', async () => {
+    const secret = 'C:\\\\Users\\\\example\\\\private\\\\internal-detail'
+    const error = await localExportRequest(() => Promise.reject(new Error(secret))).then(() => null, value => value)
+    expect(error.message).toBe('桌面导出响应连接中断，请查回结果后再操作。')
+    expect(error.message).not.toContain('private')
+    expect(error.code).toBe('local-export-response-lost')
   })
 })

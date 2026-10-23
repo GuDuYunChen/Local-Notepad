@@ -206,7 +206,11 @@ describe('complete local output transactions', () => {
     const open = fs.open.bind(fs)
     vi.spyOn(fs, 'open').mockImplementation(async (...args) => {
       const handle = await open(...args), write = handle.writeFile.bind(handle)
-      handle.writeFile = async (...params) => { await write(...params); controller.abort() }
+      handle.writeFile = async (...params) => {
+        await write(...params)
+        // Assets are written first; cancel only after both the image and document exist.
+        if (path.basename(args[0]) === 'a.md') controller.abort()
+      }
       return handle
     })
     const result = await executeExportPlan(plan, { targetDir, signal: controller.signal })
@@ -235,8 +239,41 @@ describe('complete local output transactions', () => {
     expect(report.items[0]).toMatchObject({ status: 'failed', code: 'write-unconfirmed' }); expect(report.items[0].sha256).toBeUndefined()
     expect(await fs.readdir(report.exportDirectory)).toEqual([])
   })
-  it('reports a blocked cleanup explicitly and refuses to overwrite its residual on retry', async () => {
-    const { plan } = await prepare([note('a')]), targetDir = await temp(), controller = new AbortController(), open = fs.open.bind(fs)
+  it('reports every actual residual path and refuses to overwrite residual document or asset on retry', async () => {
+    const { plan } = await prepare([note('a', 'a.md', body({ type: 'image', src: '/uploads/picture.png' }))],
+      ['a'], 'markdown', { '/uploads/picture.png': { bytes: PNG, mime: 'image/png' } })
+    const targetDir = await temp(), controller = new AbortController(), open = fs.open.bind(fs)
+    vi.spyOn(fs, 'open').mockImplementation(async (...args) => {
+      const filename = args[0]
+      const handle = await open(...args), write = handle.writeFile.bind(handle)
+      handle.writeFile = async (...params) => {
+        await write(...params)
+        // Assets are emitted before the document; cancel after the document
+        // write to verify cleanup reports both real residual files.
+        if (path.basename(filename) === 'a.md') controller.abort()
+      }
+      return handle
+    })
+    vi.spyOn(fs, 'unlink').mockRejectedValue(Object.assign(new Error('permission denied'), { code: 'EACCES' }))
+    const first = await executeExportPlan(plan, { targetDir, signal: controller.signal })
+    expect(first.items[0]).toMatchObject({ status: 'failed', code: 'cleanup-incomplete', partialPath: expect.stringContaining('a.md') })
+    expect(first.items[0].partialPaths).toHaveLength(2)
+    expect(first.items[0].partialPaths).toContain(first.items[0].partialPath)
+    expect(first.items[0].partialPaths).toEqual([
+      path.join(first.exportDirectory, 'a.md'),
+      path.join(first.exportDirectory, 'a_assets', 'picture.png'),
+    ])
+    expect(fs.open).toHaveBeenCalledTimes(2)
+    const originals = await Promise.all(first.items[0].partialPaths.map(filename => fs.readFile(filename)))
+    await expect(executeExportPlan(plan, { targetDir, retryFailed: true })).rejects.toMatchObject({ code: 'cleanup-incomplete' })
+    expect(fs.open).toHaveBeenCalledTimes(2)
+    expect(plan.items[0].partialPaths).toEqual(first.items[0].partialPaths)
+    expect(await Promise.all(first.items[0].partialPaths.map(filename => fs.readFile(filename)))).toEqual(originals)
+  })
+  it('reports only the actual asset when cancellation happens before the document write', async () => {
+    const { plan } = await prepare([note('a', 'a.md', body({ type: 'image', src: '/uploads/picture.png' }))],
+      ['a'], 'markdown', { '/uploads/picture.png': { bytes: PNG, mime: 'image/png' } })
+    const targetDir = await temp(), controller = new AbortController(), open = fs.open.bind(fs)
     vi.spyOn(fs, 'open').mockImplementation(async (...args) => {
       const handle = await open(...args), write = handle.writeFile.bind(handle)
       handle.writeFile = async (...params) => { await write(...params); controller.abort() }
@@ -244,10 +281,54 @@ describe('complete local output transactions', () => {
     })
     vi.spyOn(fs, 'unlink').mockRejectedValue(Object.assign(new Error('permission denied'), { code: 'EACCES' }))
     const first = await executeExportPlan(plan, { targetDir, signal: controller.signal })
-    expect(first.items[0]).toMatchObject({ status: 'failed', code: 'cleanup-incomplete', partialPath: expect.stringContaining('a.md') })
-    const original = await fs.readFile(first.items[0].partialPath)
-    const second = await executeExportPlan(plan, { targetDir, retryFailed: true })
-    expect(second.items[0].status).toBe('failed'); expect(await fs.readFile(first.items[0].partialPath)).toEqual(original)
+    const asset = path.join(first.exportDirectory, 'a_assets', 'picture.png')
+    expect(first.items[0]).toMatchObject({ status: 'failed', code: 'cleanup-incomplete', partialPath: asset, partialPaths: [asset] })
+    expect(await fs.readFile(asset)).toEqual(PNG)
+    await expect(fs.stat(path.join(first.exportDirectory, 'a.md'))).rejects.toMatchObject({ code: 'ENOENT' })
+    expect(fs.open).toHaveBeenCalledTimes(1)
+    await expect(executeExportPlan(plan, { targetDir, retryFailed: true })).rejects.toMatchObject({ code: 'cleanup-incomplete' })
+    expect(fs.open).toHaveBeenCalledTimes(1)
+    expect(await fs.readFile(asset)).toEqual(PNG)
+    expect(plan.items[0].partialPaths).toEqual([asset])
+  })
+  it.each(['document', 'asset', 'document-after-asset'])('keeps the actual residual when identity reading fails after exclusive creation: %s', async failure => {
+    const image = failure !== 'document'
+    const content = image ? body({ type: 'image', src: '/uploads/picture.png' }) : body(paragraph('saved content'))
+    const { plan } = await prepare([note('a', 'a.md', content)], ['a'], 'markdown', { '/uploads/picture.png': PNG })
+    const targetDir = await temp(), open = fs.open.bind(fs)
+    let failedPath, opened = 0, closed = 0
+    vi.spyOn(fs, 'open').mockImplementation(async (...args) => {
+      const handle = await open(...args), close = handle.close.bind(handle)
+      opened++
+      handle.close = async () => { closed++; return close() }
+      const document = path.basename(args[0]) === 'a.md'
+      if ((failure === 'asset' && !document) || (failure !== 'asset' && document)) {
+        failedPath = args[0]
+        handle.stat = async () => { throw Object.assign(new Error('PRIVATE_IO_DIAGNOSTIC'), { code: 'EIO' }) }
+      }
+      return handle
+    })
+    const result = await executeExportPlan(plan, { targetDir })
+    expect(result.items[0]).toMatchObject({ status: 'failed', code: 'cleanup-incomplete', partialPath: failedPath, partialPaths: [failedPath] })
+    expect(result.items[0].sha256).toBeUndefined()
+    expect(result.items[0].message).not.toContain('PRIVATE_IO_DIAGNOSTIC')
+    expect((await fs.stat(failedPath)).size).toBe(0)
+    expect(closed).toBe(opened)
+    const before = opened
+    await expect(executeExportPlan(plan, { targetDir, retryFailed: true })).rejects.toMatchObject({ code: 'cleanup-incomplete' })
+    expect(opened).toBe(before)
+    expect((await fs.stat(failedPath)).size).toBe(0)
+    if (failure === 'document-after-asset') await expect(fs.stat(path.join(result.exportDirectory, 'a_assets', 'picture.png'))).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+  it('does not report a residual if exclusive creation itself was rejected', async () => {
+    const { plan } = await prepare([note('a')]), targetDir = await temp()
+    const open = vi.spyOn(fs, 'open').mockRejectedValueOnce(Object.assign(new Error('Denied'), { code: 'EACCES' }))
+    const result = await executeExportPlan(plan, { targetDir })
+    expect(result.items[0].status).toBe('failed')
+    expect(result.items[0].partialPaths).toBeUndefined()
+    expect(await fs.readdir(result.exportDirectory)).toEqual([])
+    open.mockRestore()
+    expect((await executeExportPlan(plan, { targetDir, retryFailed: true })).items[0].status).toBe('succeeded')
   })
   it('refuses a symlink introduced into its owned output hierarchy', async () => {
     const { plan } = await prepare([folder('f', 'folder'), note('a', 'a.md', body(paragraph('body')), 'f')], ['f']), targetDir = await temp(), outside = await temp()

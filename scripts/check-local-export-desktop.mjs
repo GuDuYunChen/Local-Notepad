@@ -204,8 +204,14 @@ export async function verifyLocalExportDesktop(context) {
   await evaluate(`(() => {window.__export102Input=[];document.addEventListener('input',event=>{if(event.target?.closest?.('.editor-input'))window.__export102Input.push({isTrusted:event.isTrusted,type:event.inputType,data:event.data})},{capture:true,passive:true});return true})()`)
   await click('.editor-input[contenteditable="true"]'); await key('End', 35, 2)
   await cdp.send('Input.insertText', { text: F.dirty })
-  await until(() => evaluate(`document.querySelector('.editor-input')?.innerText.includes(${q(F.dirty)})&&Boolean(document.querySelector('.save-state'))`), 'Actual unsaved draft was not created')
+  // Do not begin with whitespace: Chromium may normalize a leading space at
+  // a contenteditable boundary. Wait for the actual marker first, then verify
+  // that it was trusted input and has not reached the persistent note API.
+  await until(() => evaluate(`document.querySelector('.editor-input')?.innerText.includes(${q(F.dirty)})`), 'Actual unsaved draft text did not reach Lexical')
   report.dirty.trustedInput = await evaluate(`window.__export102Input.some(event=>event.isTrusted===true&&event.data===${q(F.dirty)})`)
+  assert.equal(report.dirty.trustedInput, true, 'Unsaved draft was not produced by native trusted input')
+  report.dirty.databaseAfterInput = (await api('/api/files/' + note.id)).content
+  assert.equal(report.dirty.databaseAfterInput, report.dirty.databaseBefore, 'Draft was persisted before export preview')
   report.preview = await open(folder.title, 3, 'markdown'); report.entries = ['more-notes', 'selector', 'workbench']
   mark('original-entry-selection-and-preview')
   assert.ok(report.preview.items.every(item => !item.preview.includes(F.dirty)))
