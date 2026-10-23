@@ -4,7 +4,11 @@ const statuses = ['ready', 'running', 'succeeded', 'failed', 'cancelled']
 const methods = ['Prepare', 'ChooseDirectory', 'Start', 'Status', 'Cancel', 'Retry', 'Reveal', 'Release']
 export const LOCAL_EXPORT_LIMIT = 100
 const text = (value, max, empty = true) => typeof value === 'string' && value.length <= max && (empty || value.length > 0)
-const invalid = () => { throw new Error('桌面导出回执不完整或身份不匹配，请查回结果后再操作。') }
+const invalid = () => {
+  const error = new Error('桌面导出回执不完整或身份不匹配，请查回结果后再操作。')
+  error.code = 'local-export-invalid-response'
+  throw error
+}
 
 export function localExportBridge(value = globalThis.window?.electronAPI) {
   return value && methods.every(name => typeof value['exportWorkspace' + name] === 'function') ? value : null
@@ -17,9 +21,9 @@ export function validateExportSelection(ids) {
   return ids.slice()
 }
 
-export function validateExportPlan(value, { planId, format, previous } = {}) {
+export function validateExportPlan(value, { planId, requestId, format, previous } = {}) {
   if (!value || typeof value !== 'object' || !text(value.planId, 128, false) || (planId && value.planId !== planId) ||
-      !text(value.requestId, 128, false) || !['markdown', 'docx'].includes(value.format) || (format && value.format !== format) ||
+      !text(value.requestId, 128, false) || (requestId !== undefined && value.requestId !== requestId) || !['markdown', 'docx'].includes(value.format) || (format && value.format !== format) ||
       value.source !== 'saved' || !phases.has(value.phase) || !states.has(value.state) || typeof value.busy !== 'boolean' ||
       value.busy !== ['choosing', 'running', 'cancelling'].includes(value.phase) ||
       !Array.isArray(value.items) || value.items.length < 1 || value.items.length > LOCAL_EXPORT_LIMIT ||
@@ -52,8 +56,23 @@ export function validateExportPlan(value, { planId, format, previous } = {}) {
   return value
 }
 
+export function nativeExportFailure(response) {
+  // Validate the whole rejection, including stop/lookup replies. A boolean or
+  // a familiar error code by itself is not an authoritative native receipt.
+  if (!response || typeof response !== 'object' || Array.isArray(response) || response.success !== false ||
+      typeof response.code !== 'string' || !/^[a-z0-9-]{1,64}$/.test(response.code) ||
+      !text(response.message, 4000, false) || response.plan != null ||
+      (response.cancelled !== undefined && typeof response.cancelled !== 'boolean')) invalid()
+  const error = new Error(response.message)
+  error.code = 'local-export-native-rejected'
+  error.nativeCode = response.code
+  return error
+}
+
 export function exportResult(response, expected) {
-  if (response?.success !== true) throw new Error(text(response?.message, 4000, false) ? response.message : '本次导出操作没有完成，请查回结果或重试。')
+  // Missing or malformed replies are unknown outcomes, not native rejections.
+  if (!response || typeof response !== 'object' || Array.isArray(response) || typeof response.success !== 'boolean') invalid()
+  if (response.success === false) throw nativeExportFailure(response)
   return validateExportPlan(response.plan, expected)
 }
 
