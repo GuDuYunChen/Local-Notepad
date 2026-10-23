@@ -134,6 +134,23 @@ describe('complete local document export workspace', () => {
     await act(async () => pending.resolve({ success: false, message: '已停止读取' }))
     expect(query('[data-local-export-prepare]').disabled).toBe(false)
   })
+  it('renders every actual residual output path after cleanup cannot be confirmed', async () => {
+    await mount(); await prepare(); await choose()
+    native.exportWorkspaceStart.mockImplementationOnce(async () => {
+      current = snapshot(current, ['failed', 'ready'])
+      current.items[0].partialPath = 'C:\\\\Exports\\\\Notepad-export-a\\\\one.md'
+      current.items[0].partialPaths = [
+        current.items[0].partialPath,
+        'C:\\\\Exports\\\\Notepad-export-a\\\\one_assets\\\\image.png',
+      ]
+      current.items[0].code = 'cleanup-incomplete'
+      current.items[0].message = '以下部分输出未能确认清理。'
+      return reply()
+    })
+    await click(query('[data-local-export-start]'))
+    expect(host.textContent).toContain('C:\\\\Exports\\\\Notepad-export-a\\\\one.md')
+    expect(host.textContent).toContain('C:\\\\Exports\\\\Notepad-export-a\\\\one_assets\\\\image.png')
+  })
   it('adopts per-item terminal results and retries only the failed operation', async () => {
     await mount(); await prepare(); await choose(); await click(query('[data-local-export-start]'))
     current = snapshot(current, ['succeeded', 'failed']); await click(query('[data-local-export-status]'))
