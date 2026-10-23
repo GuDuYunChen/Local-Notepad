@@ -172,6 +172,8 @@ describe('complete local document export workspace', () => {
     expect(query('[data-local-export-item="one"]').getAttribute('data-status')).toBe('succeeded')
     expect(host.textContent).toContain(output)
     expect(query('[data-local-export-retry]').disabled).toBe(true)
+    expect(query('[data-local-export-status]').disabled).toBe(true)
+    expect(query('[data-local-export-reveal]').disabled).toBe(true)
     expect(button('关闭').disabled).toBe(false)
     expect(native.exportWorkspaceRetry).not.toHaveBeenCalled()
   })
