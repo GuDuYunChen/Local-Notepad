@@ -27,12 +27,7 @@
   "previousSource": {
     "run": 39092212511,
     "artifact": 12123865208,
-    "name": "local-notepad-windows-1a8e17ba775312c359f4ac23851c8c365b57a9cb",
-    "headSha": "1a8e17ba775312c359f4ac23851c8c365b57a9cb",
-    "branch": "feature/knowledge-os-phase2",
-    "repositoryId": 1105107817,
-    "archiveBytes": 104337729,
-    "archiveSha256": "f52e581cafa9ce31a327b817cd86d02f22d5929179cdb06000eb622cb66a3707"
+    "name": "local-notepad-windows-1a8e17ba775312c359f4ac23851c8c365b57a9cb"
   },
   "currentSource": {
     "run": 39996106211,
@@ -65,5 +60,12 @@
   "localExportFixtureBlob": "802be649735c7ce56dab17bc15647934c036662c",
   "localExportBuilderBlob": "20e6d532a30689ed221b2ce184b13e337f2a5a4c",
   "localExportDirectorySessionBlob": "14c920126e12b5c8282020df55dd61119c757c25",
-  "localExportDirectoryWorkerBlob": "690929d434c14b317ef8e5cc4d6b468895d4f37c"
+  "localExportDirectoryWorkerBlob": "690929d434c14b317ef8e5cc4d6b468895d4f37c",
+  "previousArtifactMetadata": {
+    "headSha": "1a8e17ba775312c359f4ac23851c8c365b57a9cb",
+    "branch": "feature/knowledge-os-phase2",
+    "repositoryId": 1105107817,
+    "archiveBytes": 104337729,
+    "archiveSha256": "f52e581cafa9ce31a327b817cd86d02f22d5929179cdb06000eb622cb66a3707"
+  }
 }

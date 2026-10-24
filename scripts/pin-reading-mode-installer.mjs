@@ -15,22 +15,23 @@ export function validateReadingArtifact(pin, which, artifact) {
   validateReadingModePin(pin)
   assert.ok(['previous', 'current'].includes(which))
   const expected = pin[which + 'Source']
+  const metadata = which === 'previous' ? pin.previousArtifactMetadata : expected
   assert.equal(artifact.id, expected.artifact); assert.equal(artifact.name, expected.name)
   assert.equal(artifact.expired, false)
   assert.equal(artifact.workflow_run.id, expected.run)
-  assert.equal(artifact.workflow_run.repository_id, expected.repositoryId)
-  assert.equal(artifact.workflow_run.head_repository_id, expected.repositoryId)
-  assert.equal(artifact.workflow_run.head_branch, expected.branch)
-  assert.equal(artifact.workflow_run.head_sha, expected.headSha)
+  assert.equal(artifact.workflow_run.repository_id, metadata.repositoryId)
+  assert.equal(artifact.workflow_run.head_repository_id, metadata.repositoryId)
+  assert.equal(artifact.workflow_run.head_branch, metadata.branch)
+  assert.equal(artifact.workflow_run.head_sha, metadata.headSha)
   if (which === 'current') {
     // Pull-request artifacts are named with the merge-ref product SHA, while
     // GitHub artifact metadata records the source branch HEAD SHA.
     assert.equal(expected.name.slice(-40), pin.product, 'Artifact name must bind the product build identity')
   } else {
-    assert.equal(expected.name.slice(-40), expected.headSha, 'Historical seed name must bind its source commit')
+    assert.equal(expected.name.slice(-40), metadata.headSha, 'Historical seed name must bind its source commit')
   }
-  assert.equal(artifact.size_in_bytes, expected.archiveBytes, 'Pinned artifact archive size changed')
-  assert.equal(artifact.digest, 'sha256:' + expected.archiveSha256, 'Pinned artifact archive digest changed')
+  assert.equal(artifact.size_in_bytes, metadata.archiveBytes, 'Pinned artifact archive size changed')
+  assert.equal(artifact.digest, 'sha256:' + metadata.archiveSha256, 'Pinned artifact archive digest changed')
   return true
 }
 

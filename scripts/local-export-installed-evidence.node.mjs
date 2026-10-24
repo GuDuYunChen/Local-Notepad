@@ -67,11 +67,11 @@ test('PR merge artifact binds product identity separately from the branch head',
     workflow_run: { id: source.run, repository_id: source.repositoryId, head_repository_id: source.repositoryId,
       head_branch: source.branch, head_sha: source.headSha } }
   assert.equal(validateReadingArtifact(f.pin, 'current', artifact), true)
-  const previous = f.pin.previousSource
+  const previous = f.pin.previousSource, previousMetadata = f.pin.previousArtifactMetadata
   assert.equal(validateReadingArtifact(f.pin, 'previous', { id: previous.artifact, name: previous.name, expired: false,
-    size_in_bytes: previous.archiveBytes, digest: 'sha256:' + previous.archiveSha256,
-    workflow_run: { id: previous.run, repository_id: previous.repositoryId, head_repository_id: previous.repositoryId,
-      head_branch: previous.branch, head_sha: previous.headSha } }), true)
+    size_in_bytes: previousMetadata.archiveBytes, digest: 'sha256:' + previousMetadata.archiveSha256,
+    workflow_run: { id: previous.run, repository_id: previousMetadata.repositoryId, head_repository_id: previousMetadata.repositoryId,
+      head_branch: previousMetadata.branch, head_sha: previousMetadata.headSha } }), true)
   for (const [field, value] of [
     ['head_sha', 'd'.repeat(40)], ['head_branch', 'master'], ['repository_id', 999],
     ['head_repository_id', 999], ['id', source.artifact + 1], ['name', source.name + '-wrong'],
