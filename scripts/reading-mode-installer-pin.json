@@ -27,7 +27,12 @@
   "previousSource": {
     "run": 39092212511,
     "artifact": 12123865208,
-    "name": "local-notepad-windows-1a8e17ba775312c359f4ac23851c8c365b57a9cb"
+    "name": "local-notepad-windows-1a8e17ba775312c359f4ac23851c8c365b57a9cb",
+    "headSha": "1a8e17ba775312c359f4ac23851c8c365b57a9cb",
+    "branch": "feature/knowledge-os-phase2",
+    "repositoryId": 1105107817,
+    "archiveBytes": 104337729,
+    "archiveSha256": "f52e581cafa9ce31a327b817cd86d02f22d5929179cdb06000eb622cb66a3707"
   },
   "currentSource": {
     "run": 39996106211,

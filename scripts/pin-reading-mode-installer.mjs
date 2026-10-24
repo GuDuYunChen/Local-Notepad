@@ -22,7 +22,13 @@ export function validateReadingArtifact(pin, which, artifact) {
   assert.equal(artifact.workflow_run.head_repository_id, expected.repositoryId)
   assert.equal(artifact.workflow_run.head_branch, expected.branch)
   assert.equal(artifact.workflow_run.head_sha, expected.headSha)
-  assert.equal(expected.name.slice(-40), pin.product, 'Artifact name must bind the product build identity')
+  if (which === 'current') {
+    // Pull-request artifacts are named with the merge-ref product SHA, while
+    // GitHub artifact metadata records the source branch HEAD SHA.
+    assert.equal(expected.name.slice(-40), pin.product, 'Artifact name must bind the product build identity')
+  } else {
+    assert.equal(expected.name.slice(-40), expected.headSha, 'Historical seed name must bind its source commit')
+  }
   assert.equal(artifact.size_in_bytes, expected.archiveBytes, 'Pinned artifact archive size changed')
   assert.equal(artifact.digest, 'sha256:' + expected.archiveSha256, 'Pinned artifact archive digest changed')
   return true
