@@ -18,8 +18,13 @@ export function validateReadingArtifact(pin, which, artifact) {
   assert.equal(artifact.id, expected.artifact); assert.equal(artifact.name, expected.name)
   assert.equal(artifact.expired, false)
   assert.equal(artifact.workflow_run.id, expected.run)
-  assert.equal(artifact.workflow_run.head_sha, expected.name.slice(-40))
-  assert.ok(Number.isSafeInteger(artifact.size_in_bytes) && artifact.size_in_bytes > 0)
+  assert.equal(artifact.workflow_run.repository_id, expected.repositoryId)
+  assert.equal(artifact.workflow_run.head_repository_id, expected.repositoryId)
+  assert.equal(artifact.workflow_run.head_branch, expected.branch)
+  assert.equal(artifact.workflow_run.head_sha, expected.headSha)
+  assert.equal(expected.name.slice(-40), pin.product, 'Artifact name must bind the product build identity')
+  assert.equal(artifact.size_in_bytes, expected.archiveBytes, 'Pinned artifact archive size changed')
+  assert.equal(artifact.digest, 'sha256:' + expected.archiveSha256, 'Pinned artifact archive digest changed')
   return true
 }
 

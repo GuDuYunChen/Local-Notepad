@@ -13,6 +13,7 @@ import { LOCAL_EXPORT_INSTALLATION_GATE, LOCAL_EXPORT_INSTALLATION_SOURCES, vali
   validateLocalExportVerifierSources, prepareLocalExportVerifierSources, validateGeneratedLocalExportSources,
   extendLocalExportInstallation, validateInstalledLocalExport, verifyLocalExportInstalledReport } from './local-export-installed-evidence.mjs'
 import { LOCAL_EXPORT_VERSION, LOCAL_EXPORT_REPORT } from './local-export-desktop-evidence.mjs'
+import { validateReadingArtifact } from './pin-reading-mode-installer.mjs'
 import { localExportEvidenceFixture } from './local-export-installed-test-fixture.mjs'
 import { shortcutManagementEvidenceFixture } from './shortcut-management-installed-test-fixture.mjs'
 
@@ -26,7 +27,9 @@ function pinFixture() {
   const pin = JSON.parse(source('reading-mode-installer-pin.json'))
   Object.assign(pin, { product, previous: { ...ACCEPTED_READING_SEED }, previousSource: { ...ACCEPTED_READING_SEED_SOURCE },
     current: { version: LOCAL_EXPORT_VERSION, bytes: 1001, sha256: sha('synthetic export installer source contract') },
-    currentSource: { run: 100, artifact: 200, name: 'local-notepad-windows-' + product },
+    currentSource: { run: 100, artifact: 200, name: 'local-notepad-windows-' + product,
+      headSha: 'c'.repeat(40), branch: 'feature/local-export-2f102-closure', repositoryId: 1105107817,
+      archiveBytes: 5000, archiveSha256: sha('synthetic archive') },
     importBlob: 'f7001589494d6ae81b51275512ed406f6892974c',
     importEvidenceBlob: '6984a22dba599d4026769de34a76c0aa8e01229f',
     importEvidenceTestsBlob: '12ceb52310ca16bb964661f7894d76c920a47779',
@@ -57,6 +60,24 @@ function fixture() {
       executableSHA256: shortcut.app.executableSHA256, asarSHA256: shortcut.app.asarSHA256, backendSHA256: shortcut.app.backendSHA256 }] }
   return { pin, report, shortcut, exported }
 }
+test('PR merge artifact binds product identity separately from the branch head', () => {
+  const f = fixture(), source = f.pin.currentSource
+  const artifact = { id: source.artifact, name: source.name, expired: false, size_in_bytes: source.archiveBytes,
+    digest: 'sha256:' + source.archiveSha256,
+    workflow_run: { id: source.run, repository_id: source.repositoryId, head_repository_id: source.repositoryId,
+      head_branch: source.branch, head_sha: source.headSha } }
+  assert.equal(validateReadingArtifact(f.pin, 'current', artifact), true)
+  for (const [field, value] of [
+    ['head_sha', 'd'.repeat(40)], ['head_branch', 'master'], ['repository_id', 999],
+    ['head_repository_id', 999], ['id', source.artifact + 1], ['name', source.name + '-wrong'],
+    ['size_in_bytes', source.archiveBytes + 1], ['digest', 'sha256:' + 'f'.repeat(64)],
+  ]) {
+    const changed = structuredClone(artifact)
+    if (field === 'id' || field === 'name' || field === 'size_in_bytes' || field === 'digest') changed[field] = value
+    else changed.workflow_run[field] = value
+    assert.throws(() => validateReadingArtifact(f.pin, 'current', changed), field)
+  }
+})
 test('installed export binds the same installed bytes and a ninth independent native process', () => {
   const f = fixture(); assert.equal(validateInstalledLocalExport(f.report, f.exported, f.shortcut, f.pin, verifier), true)
   assert.equal(Object.keys(LOCAL_EXPORT_INSTALLATION_SOURCES).length, 11)

@@ -1,5 +1,5 @@
 {
-  "product": "d3f47277a6a148bf62e50f22b3bf068819a7e1fe",
+  "product": "ed277f9c49516d29ced8dabe6fb773715cbc227c",
   "quickBlob": "c1e8f40862b770f82af47c26a455b57efc853700",
   "tagsBlob": "54bb56864e58e2aa3f5ed08aedb52a00de5f0769",
   "templateBlob": "42378f13f71a03c3e91cdfdcb6dec44dbbb05f33",
@@ -15,9 +15,9 @@
   "importEvidenceBlob": "801a7e2d33c0ffe3d6dcd05287fb0b595822ce2b",
   "importEvidenceTestsBlob": "754f1cb656c2a5cd4fb7acf10b84205a623261fc",
   "current": {
-    "version": "4.234.0",
-    "bytes": 104348287,
-    "sha256": "62cc2acb45ef5e5cc08fc53f7129d9a966298e36076901ebcc007860b54c8dd1"
+    "version": "4.235.0",
+    "bytes": 104348576,
+    "sha256": "62f0909a3a31956ede44bcbdc8a62828dab485b986c66e36f104639e2d1ea36cb"
   },
   "previous": {
     "version": "4.232.0",
@@ -30,9 +30,14 @@
     "name": "local-notepad-windows-1a8e17ba775312c359f4ac23851c8c365b57a9cb"
   },
   "currentSource": {
-    "run": 39535161608,
-    "artifact": 12317154285,
-    "name": "local-notepad-windows-d3f47277a6a148bf62e50f22b3bf068819a7e1fe"
+    "run": 39996106211,
+    "artifact": 12520023127,
+    "name": "local-notepad-windows-ed277f9c49516d29ced8dabe6fb773715cbc227c",
+    "headSha": "03f5495330e2fe0d418f1727e7921e10a13f240f",
+    "branch": "feature/local-export-2f102-closure",
+    "repositoryId": 1105107817,
+    "archiveBytes": 104351631,
+    "archiveSha256": "c717b923bc4bfd7c8038a6eccb9eeb80e6c0e485a81b14a808b98a25bf04e6e3"
   },
   "readingDriverBlob": "6924b128c1125424c91f71dbd1ecc415762e2f77",
   "readingFixtureBlob": "0c7ffadbb187dd33a7bc6b5aa8c69427eec5cc34",
@@ -47,5 +52,13 @@
   "shortcutManagementRunnerBlob": "0fada01b2c802b0299c2c606a0004c4657f0e1c2",
   "shortcutManagementEvidenceBlob": "c415d910b9b7bf085d22b83b71ee11017cf35c20",
   "shortcutManagementFixtureBlob": "eb49f859eb9c9b51f8c31d3354f81231c647fb87",
-  "shortcutManagementCanonicalFixtureBlob": "f86598e0d552a5d884eff9e30739617366c685c9"
+  "shortcutManagementCanonicalFixtureBlob": "f86598e0d552a5d884eff9e30739617366c685c9",
+  "localExportDriverBlob": "2d1dbfaa84a19117e2f83bc9784f0fcd77405126",
+  "localExportRunnerBlob": "ffde8b2684e79327db84e64e58e7ecd5dd37edfd",
+  "localExportEvidenceBlob": "55f3a5dcd15d4cd4d55f0ea354ae78bf76dcd6a4",
+  "localExportValuesBlob": "8c2af4276b34c42e5b346b666c08adc402470672",
+  "localExportFixtureBlob": "802be649735c7ce56dab17bc15647934c036662c",
+  "localExportBuilderBlob": "20e6d532a30689ed221b2ce184b13e337f2a5a4c",
+  "localExportDirectorySessionBlob": "14c920126e12b5c8282020df55dd61119c757c25",
+  "localExportDirectoryWorkerBlob": "690929d434c14b317ef8e5cc4d6b468895d4f37c"
 }
