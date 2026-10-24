@@ -125,9 +125,8 @@ export async function verifyLocalExportDesktop(context) {
     const selectionSelector = '.selector-tree .tree-item[title=' + q(title) + '] input[type="checkbox"]'
     await click(selectionSelector)
     await until(() => evaluate(`(() => {
-      const checkbox = document.querySelector('.selector-tree .tree-item[title=' + ${q(title)} + '] input[type="checkbox"]')
       const counter = document.querySelector('.selector-toolbar .selector-counter')?.textContent.trim()
-      return checkbox?.checked === true && counter !== '已选择 0 项'
+      return [...document.querySelectorAll('.selector-tree input[type="checkbox"]')].some(input => input.checked) && counter !== '已选择 0 项'
     })()`), 'Original export folder selection did not settle')
     await click({ selector: '.selector-modal-footer button', text: '下一步' })
     await until(() => evaluate(`Boolean(document.querySelector(${q(panel)}))`), 'Original export workbench missing')
