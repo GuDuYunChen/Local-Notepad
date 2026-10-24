@@ -125,7 +125,7 @@ export async function verifyLocalExportDesktop(context) {
     const selectionSelector = '.selector-tree .tree-item[title=' + q(title) + '] input[type="checkbox"]'
     await click(selectionSelector)
     await until(() => evaluate(`(() => {
-      const checkbox = document.querySelector(${q(selectionSelector)})
+      const checkbox = document.querySelector('.selector-tree .tree-item[title=' + ${q(title)} + '] input[type="checkbox"]')
       const counter = document.querySelector('.selector-toolbar .selector-counter')?.textContent.trim()
       return checkbox?.checked === true && counter !== '已选择 0 项'
     })()`), 'Original export folder selection did not settle')
