@@ -408,7 +408,7 @@ function rendererExpressions(filename, bindings = {}) {
   visit(ast); return sites
 }
 const edge = 'quotes\'" slash\\ line\r\n \u2028\u2029 ` ${globalThis.unexpectedMutation=true}'
-for (const [filename, expected] of [['check-local-export-desktop.mjs', 22], ['run-local-export-desktop.mjs', 6]])
+for (const [filename, expected] of [['check-local-export-desktop.mjs', 24], ['run-local-export-desktop.mjs', 6]])
   for (const [name, bindings] of [['normal', {}], ['quoted multiline', { F: { ...F, body: edge, dirty: edge }, feedback: edge,
     controls: [edge], requiredSelector: edge, requested: { selector: 'button', text: edge } }]]) test(filename + ' compiles all renderer boundaries with ' + name + ' values', () => {
     const sites = rendererExpressions(filename, bindings); assert.equal(sites.length, expected)
