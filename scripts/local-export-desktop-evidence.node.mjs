@@ -771,3 +771,13 @@ test('raw output reader refuses a symlink to bytes outside the retained archive'
   symlinkSync(path.join(directory, 'outside'), path.join(directory, 'local-export-files', 'linked'), 'junction')
   await assert.rejects(verifyLocalExportFiles(directory, { files: [{ filename: 'local-export-files/linked/one.md', bytes: 1, sha256: hash('x') }] }))
 })
+
+
+test('installed export selector waits for React selection clear and reselect before continuing', () => {
+  const driver = readFileSync(new URL('./check-local-export-desktop.mjs', import.meta.url), 'utf8')
+  const clear = driver.indexOf('Original export selection did not clear')
+  const selected = driver.indexOf('Original export folder selection did not settle')
+  const next = driver.indexOf("await click({ selector: '.selector-modal-footer button', text: '下一步' })")
+  assert.ok(clear >= 0 && selected > clear && next > selected, 'The driver must wait for both selection state transitions before advancing')
+  assert.ok(driver.includes("document.querySelector('.selector-toolbar .selector-counter')?.textContent.trim() === '已选择 0 项'"))
+})

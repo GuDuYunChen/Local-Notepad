@@ -117,7 +117,18 @@ export async function verifyLocalExportDesktop(context) {
     const all = await evaluate("document.querySelector('.selector-toolbar button')?.textContent.trim()")
     if (all === '全选') await click({ selector: '.selector-toolbar button', text: '全选' })
     await click({ selector: '.selector-toolbar button', text: '取消全选' })
-    await click('.selector-tree .tree-item[title=' + q(title) + '] input[type="checkbox"]')
+    // React owns the controlled selection state. Wait for the clear to commit
+    // before toggling the folder; otherwise a stale checked prop can turn the
+    // next click into a deselection on a fast installed-app run.
+    await until(() => evaluate("document.querySelector('.selector-toolbar .selector-counter')?.textContent.trim() === '已选择 0 项' && [...document.querySelectorAll('.selector-tree input[type=\\\"checkbox\\\"]')].every(input => !input.checked)"),
+      'Original export selection did not clear')
+    const selectionSelector = '.selector-tree .tree-item[title=' + q(title) + '] input[type="checkbox"]'
+    await click(selectionSelector)
+    await until(() => evaluate(`(() => {
+      const checkbox = document.querySelector(${q(selectionSelector)})
+      const counter = document.querySelector('.selector-toolbar .selector-counter')?.textContent.trim()
+      return checkbox?.checked === true && counter !== '已选择 0 项'
+    })()`), 'Original export folder selection did not settle')
     await click({ selector: '.selector-modal-footer button', text: '下一步' })
     await until(() => evaluate(`Boolean(document.querySelector(${q(panel)}))`), 'Original export workbench missing')
     if (format === 'docx') await click(panel + ' input[value="docx"]')
