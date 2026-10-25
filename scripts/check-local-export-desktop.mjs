@@ -156,8 +156,11 @@ export async function verifyLocalExportDesktop(context) {
       // retaining focus on a checkbox after React reconciles the tree. Focus
       // the real rendered control, verify focus, then send one trusted native
       // Space key pair. Do not replay the original pointer click.
-      const focused = await evaluate('(() => { const input = document.querySelector(' + JSON.stringify(selectionSelector) +
-        '); input?.focus({ preventScroll: true }); return document.activeElement === input })()')
+      const focused = await evaluate(`(() => {
+        const input = document.querySelector(${q(selectionSelector)})
+        input?.focus({ preventScroll: true })
+        return document.activeElement === input
+      })()`)
       const afterFocus = await selectionState()
       report.selectionAttempts.push({ method: 'focus-real-checkbox', before: beforeKeyboard, after: afterFocus, focused })
       save()
