@@ -123,17 +123,19 @@ export async function verifyLocalExportDesktop(context) {
     await until(() => evaluate("document.querySelector('.selector-toolbar .selector-counter')?.textContent.trim() === '已选择 0 项' && [...document.querySelectorAll('.selector-tree input[type=\\\"checkbox\\\"]')].every(input => !input.checked)"),
       'Original export selection did not clear')
     const selectionSelector = '.selector-tree .tree-item[title=' + q(title) + '] input[type="checkbox"]'
-    const selectionState = async () => evaluate('(() => {\n' +
-      '      const input = document.querySelector(' + JSON.stringify(selectionSelector) + ')\n' +
-      '      const row = input?.closest(\'.tree-item\')\n' +
-      '      const bounds = input?.getBoundingClientRect()\n' +
-      '      return { exists: Boolean(input), checked: Boolean(input?.checked), disabled: Boolean(input?.disabled),\n' +
-      '        focused: document.activeElement === input, title: row?.getAttribute(\'title\'),\n' +
-      '        counter: document.querySelector(\'.selector-toolbar .selector-counter\')?.textContent.trim() ?? null,\n' +
-      '        bounds: bounds ? { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height } : null }\n' +
-      '    })()')
-    const selected = async () => evaluate('(() => { const input = document.querySelector(' + JSON.stringify(selectionSelector) +
-      '); return Boolean(input?.checked) && document.querySelector(\'.selector-toolbar .selector-counter\')?.textContent.trim() !== \'已选择 0 项\' })()')
+    const selectionState = async () => evaluate(`(() => {
+      const input = document.querySelector(${q(selectionSelector)})
+      const row = input?.closest('.tree-item')
+      const bounds = input?.getBoundingClientRect()
+      return { exists: Boolean(input), checked: Boolean(input?.checked), disabled: Boolean(input?.disabled),
+        focused: document.activeElement === input, title: row?.getAttribute('title'),
+        counter: document.querySelector('.selector-toolbar .selector-counter')?.textContent.trim() ?? null,
+        bounds: bounds ? { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height } : null }
+    })()`)
+    const selected = async () => evaluate(`(() => {
+      const input = document.querySelector(${q(selectionSelector)})
+      return Boolean(input?.checked) && document.querySelector('.selector-toolbar .selector-counter')?.textContent.trim() !== '已选择 0 项'
+    })()`)
     const beforeSelection = await selectionState()
     assert.equal(beforeSelection.exists, true, 'Original export folder checkbox is missing')
     assert.equal(beforeSelection.disabled, false, 'Original export folder checkbox is disabled')
