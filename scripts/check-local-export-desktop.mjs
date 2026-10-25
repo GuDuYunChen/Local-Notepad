@@ -117,7 +117,63 @@ export async function verifyLocalExportDesktop(context) {
     const all = await evaluate("document.querySelector('.selector-toolbar button')?.textContent.trim()")
     if (all === '全选') await click({ selector: '.selector-toolbar button', text: '全选' })
     await click({ selector: '.selector-toolbar button', text: '取消全选' })
-    await click('.selector-tree .tree-item[title=' + q(title) + '] input[type="checkbox"]')
+    // React owns the controlled selection state. Wait for the clear to commit
+    // before toggling the folder; otherwise a stale checked prop can turn the
+    // next click into a deselection on a fast installed-app run.
+    await until(() => evaluate("document.querySelector('.selector-toolbar .selector-counter')?.textContent.trim() === '已选择 0 项' && [...document.querySelectorAll('.selector-tree input[type=\\\"checkbox\\\"]')].every(input => !input.checked)"),
+      'Original export selection did not clear')
+    const selectionSelector = '.selector-tree .tree-item[title=' + q(title) + '] input[type="checkbox"]'
+    const selectionState = async () => evaluate(`(() => {
+      const input = document.querySelector(${q(selectionSelector)})
+      const row = input?.closest('.tree-item')
+      const bounds = input?.getBoundingClientRect()
+      return { exists: Boolean(input), checked: Boolean(input?.checked), disabled: Boolean(input?.disabled),
+        focused: document.activeElement === input, title: row?.getAttribute('title'),
+        counter: document.querySelector('.selector-toolbar .selector-counter')?.textContent.trim() ?? null,
+        bounds: bounds ? { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height } : null }
+    })()`)
+    const selected = async () => evaluate(`(() => {
+      const input = document.querySelector(${q(selectionSelector)})
+      return Boolean(input?.checked) && document.querySelector('.selector-toolbar .selector-counter')?.textContent.trim() !== '已选择 0 项'
+    })()`)
+    const beforeSelection = await selectionState()
+    assert.equal(beforeSelection.exists, true, 'Original export folder checkbox is missing')
+    assert.equal(beforeSelection.disabled, false, 'Original export folder checkbox is disabled')
+    assert.equal(beforeSelection.checked, false, 'Original export folder was unexpectedly selected after clear')
+    await click(selectionSelector)
+    // Native mouse input is the primary path. If the DOM confirms that it did
+    // not change the controlled React checkbox, use the already-focused native
+    // Space-key interaction once; never repeat an uncertain click.
+    let selectedState = await until(selected, 'Original export folder mouse selection did not settle', 1200).catch(() => null)
+    report.selectionAttempts = [{ method: 'mouse', before: beforeSelection, after: await selectionState(), settled: Boolean(selectedState) }]
+    save()
+    if (!selectedState) {
+      const beforeKeyboard = await selectionState()
+      assert.equal(beforeKeyboard.exists, true, 'Original export folder checkbox disappeared before keyboard recovery')
+      assert.equal(beforeKeyboard.disabled, false, 'Original export folder checkbox became disabled before keyboard recovery')
+      assert.equal(beforeKeyboard.checked, false, 'Selection changed without a settled selection receipt')
+      // The installed Chromium build can dispatch the pointer click without
+      // retaining focus on a checkbox after React reconciles the tree. Focus
+      // the real rendered control, verify focus, then send one trusted native
+      // Space key pair. Do not replay the original pointer click.
+      const focused = await evaluate(`(() => {
+        const input = document.querySelector(${q(selectionSelector)})
+        input?.focus({ preventScroll: true })
+        return document.activeElement === input
+      })()`)
+      const afterFocus = await selectionState()
+      report.selectionAttempts.push({ method: 'focus-real-checkbox', before: beforeKeyboard, after: afterFocus, focused })
+      save()
+      assert.equal(focused, true, 'Original export folder checkbox could not receive focus for keyboard recovery')
+      await key(' ', 32)
+      selectedState = await until(selected, 'Original export folder selection did not settle after native keyboard recovery', 2500).catch(() => null)
+      report.selectionAttempts.push({ method: 'native-space', before: afterFocus, after: await selectionState(), settled: Boolean(selectedState) })
+      save()
+    }
+    if (!selectedState) {
+      await capture('local-export-selection-recovery.png')
+      throw Error('Original export folder selection did not settle after verified mouse and keyboard interactions: ' + JSON.stringify(report.selectionAttempts))
+    }
     await click({ selector: '.selector-modal-footer button', text: '下一步' })
     await until(() => evaluate(`Boolean(document.querySelector(${q(panel)}))`), 'Original export workbench missing')
     if (format === 'docx') await click(panel + ' input[value="docx"]')
@@ -204,8 +260,14 @@ export async function verifyLocalExportDesktop(context) {
   await evaluate(`(() => {window.__export102Input=[];document.addEventListener('input',event=>{if(event.target?.closest?.('.editor-input'))window.__export102Input.push({isTrusted:event.isTrusted,type:event.inputType,data:event.data})},{capture:true,passive:true});return true})()`)
   await click('.editor-input[contenteditable="true"]'); await key('End', 35, 2)
   await cdp.send('Input.insertText', { text: F.dirty })
-  await until(() => evaluate(`document.querySelector('.editor-input')?.innerText.includes(${q(F.dirty)})&&Boolean(document.querySelector('.save-state'))`), 'Actual unsaved draft was not created')
+  // Do not begin with whitespace: Chromium may normalize a leading space at
+  // a contenteditable boundary. Wait for the actual marker first, then verify
+  // that it was trusted input and has not reached the persistent note API.
+  await until(() => evaluate(`document.querySelector('.editor-input')?.innerText.includes(${q(F.dirty)})`), 'Actual unsaved draft text did not reach Lexical')
   report.dirty.trustedInput = await evaluate(`window.__export102Input.some(event=>event.isTrusted===true&&event.data===${q(F.dirty)})`)
+  assert.equal(report.dirty.trustedInput, true, 'Unsaved draft was not produced by native trusted input')
+  report.dirty.databaseAfterInput = (await api('/api/files/' + note.id)).content
+  assert.equal(report.dirty.databaseAfterInput, report.dirty.databaseBefore, 'Draft was persisted before export preview')
   report.preview = await open(folder.title, 3, 'markdown'); report.entries = ['more-notes', 'selector', 'workbench']
   mark('original-entry-selection-and-preview')
   assert.ok(report.preview.items.every(item => !item.preview.includes(F.dirty)))

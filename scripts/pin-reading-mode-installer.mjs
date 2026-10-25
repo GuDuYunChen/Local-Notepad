@@ -15,11 +15,24 @@ export function validateReadingArtifact(pin, which, artifact) {
   validateReadingModePin(pin)
   assert.ok(['previous', 'current'].includes(which))
   const expected = pin[which + 'Source']
+  const metadata = which === 'previous' ? pin.previousArtifactMetadata : expected
   assert.equal(artifact.id, expected.artifact); assert.equal(artifact.name, expected.name)
   assert.equal(artifact.expired, false)
   assert.equal(artifact.workflow_run.id, expected.run)
-  assert.equal(artifact.workflow_run.head_sha, expected.name.slice(-40))
-  assert.ok(Number.isSafeInteger(artifact.size_in_bytes) && artifact.size_in_bytes > 0)
+  assert.equal(artifact.workflow_run.repository_id, metadata.repositoryId)
+  assert.equal(artifact.workflow_run.head_repository_id, metadata.repositoryId)
+  assert.equal(artifact.workflow_run.head_branch, metadata.branch)
+  assert.equal(artifact.workflow_run.head_sha, metadata.headSha)
+  if (which === 'current') {
+    // Pull-request artifacts are named with the merge-ref product SHA, while
+    // GitHub artifact metadata records the source branch HEAD SHA.
+    assert.equal(expected.name.slice(-40), pin.product, 'Artifact name must bind the product build identity')
+  } else {
+    assert.equal(expected.productSourceCommit, metadata.productSourceSha, 'Historical installer must bind its exact product source commit')
+    assert.equal(metadata.productSourceSha, '1a8e17ba775312c359f4ac23851c8c365b57a9cb')
+  }
+  assert.equal(artifact.size_in_bytes, metadata.archiveBytes, 'Pinned artifact archive size changed')
+  assert.equal(artifact.digest, 'sha256:' + metadata.archiveSha256, 'Pinned artifact archive digest changed')
   return true
 }
 
@@ -47,7 +60,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
       })
       assert.equal(response.status, 200, 'Unable to read pinned artifact metadata: ' + which)
       const artifact = await response.json(); validateReadingArtifact(pin, which, artifact)
-      metadata[which] = artifact
+      metadata[which] = which === 'previous' ? { ...artifact, productSourceSha: source.productSourceCommit } : artifact
     }
     mkdirSync(out, { recursive: true })
     writeFileSync(path.join(out, 'reading-artifact-source.json'), JSON.stringify({ productCommit: pin.product,

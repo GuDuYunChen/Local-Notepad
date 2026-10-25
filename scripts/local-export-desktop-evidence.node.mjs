@@ -400,7 +400,8 @@ function rendererExpressions(filename, bindings = {}) {
         panel: '[data-local-export-workspace]', F, folder: { id: 'folder-1' }, failing: { id: 'note-2' },
         itemSelector: id => '[data-local-export-item=' + JSON.stringify(id) + ']', feedback: '[data-local-export-feedback]',
         controls: ['[data-local-export-continue]'], requiredSelector: '[data-file-id="folder-1"]',
-        requested: { selector: 'button', text: '中文' }, ...bindings })
+        requested: { selector: 'button', text: '中文' },
+        selectionSelector: '.selector-tree .tree-item[title="目录"] input[type="checkbox"]', ...bindings })
       sites.push({ line: node.loc.start.line, generated }); assert.equal(typeof generated, 'string')
     }
     for (const value of Object.values(node)) if (Array.isArray(value)) value.forEach(visit); else if (value && typeof value === 'object') visit(value)
@@ -408,7 +409,7 @@ function rendererExpressions(filename, bindings = {}) {
   visit(ast); return sites
 }
 const edge = 'quotes\'" slash\\ line\r\n \u2028\u2029 ` ${globalThis.unexpectedMutation=true}'
-for (const [filename, expected] of [['check-local-export-desktop.mjs', 22], ['run-local-export-desktop.mjs', 6]])
+for (const [filename, expected] of [['check-local-export-desktop.mjs', 26], ['run-local-export-desktop.mjs', 6]])
   for (const [name, bindings] of [['normal', {}], ['quoted multiline', { F: { ...F, body: edge, dirty: edge }, feedback: edge,
     controls: [edge], requiredSelector: edge, requested: { selector: 'button', text: edge } }]]) test(filename + ' compiles all renderer boundaries with ' + name + ' values', () => {
     const sites = rendererExpressions(filename, bindings); assert.equal(sites.length, expected)
@@ -562,6 +563,38 @@ test('export fixture creates distinct sibling titles with real portable-name col
     assert.deepEqual(plan.items.filter(item => colliding.some(note => note.id === item.id))
       .map(item => path.posix.basename(item.relativePath)), ['EXPORT102 重名' + extension, 'EXPORT102 重名 (2)' + extension])
   }
+})
+
+test('export library restoration expands the real collapsed-sidebar state and confirms the target', async t => {
+  const dom = new JSDOM('<aside class="workspace-sidebar collapsed"><button aria-label="展开侧边栏">展开</button></aside>',
+    { runScripts: 'outside-only', pretendToBeVisual: true })
+  t.after(() => dom.window.close())
+  const source = readFileSync(new URL('./run-local-export-desktop.mjs', import.meta.url), 'utf8')
+  const declaration = parse(source, { ecmaVersion: 'latest', sourceType: 'module' }).body
+    .find(node => node.type === 'FunctionDeclaration' && node.id?.name === 'until')
+  assert.ok(declaration)
+  const until = new Script(source.slice(declaration.start, declaration.end) + '; until').runInNewContext({
+    performance, setTimeout, sleep: () => new Promise(resolve => setTimeout(resolve, 1)),
+  })
+  let refreshes = 0, clicks = 0
+  dom.window.addEventListener('library:refresh', () => { refreshes++ })
+  dom.window.document.querySelector('button').addEventListener('click', () => {
+    const sidebar = dom.window.document.querySelector('.workspace-sidebar')
+    sidebar.classList.remove('collapsed')
+    sidebar.innerHTML = '<div class="file-list"><div class="tree-list"><div data-file-id="fixture-folder"></div></div></div>'
+  })
+  const result = await refreshLocalExportLibrary({
+    until,
+    evaluate: expression => new Script(expression).runInContext(dom.getInternalVMContext()),
+    click: async selector => {
+      clicks++; assert.equal(selector, 'button[aria-label="展开侧边栏"]')
+      const button = dom.window.document.querySelector(selector); assert.ok(button); button.click()
+    },
+  }, '[data-file-id="fixture-folder"]', 'Export fixture folder missing')
+  assert.equal(result, true)
+  assert.equal(refreshes, 1); assert.equal(clicks, 1)
+  assert.equal(dom.window.document.querySelector('.workspace-sidebar').classList.contains('collapsed'), false)
+  assert.ok(dom.window.document.querySelector('[data-file-id="fixture-folder"]'))
 })
 
 test('export library restoration propagates an uncertain native click without replay', async t => {
@@ -738,4 +771,20 @@ test('raw output reader refuses a symlink to bytes outside the retained archive'
   writeFileSync(path.join(directory, 'outside', 'one.md'), 'x')
   symlinkSync(path.join(directory, 'outside'), path.join(directory, 'local-export-files', 'linked'), 'junction')
   await assert.rejects(verifyLocalExportFiles(directory, { files: [{ filename: 'local-export-files/linked/one.md', bytes: 1, sha256: hash('x') }] }))
+})
+
+
+test('installed export selector waits for React selection clear and reselect before continuing', () => {
+  const driver = readFileSync(new URL('./check-local-export-desktop.mjs', import.meta.url), 'utf8')
+  const clear = driver.indexOf('Original export selection did not clear')
+  const selected = driver.indexOf('Original export folder selection did not settle')
+  const next = driver.indexOf("await click({ selector: '.selector-modal-footer button', text: '下一步' })")
+  assert.ok(clear >= 0 && selected > clear && next > selected, 'The driver must wait for both selection state transitions before advancing')
+  assert.ok(driver.includes("document.querySelector('.selector-toolbar .selector-counter')?.textContent.trim() === '已选择 0 项'"))
+  assert.ok(driver.includes("Original export folder mouse selection did not settle"))
+  assert.ok(driver.includes("await key(' ', 32)"), 'A verified no-change mouse result must use a bounded native keyboard recovery')
+  assert.ok(driver.includes("input?.focus({ preventScroll: true })"), 'Keyboard recovery must focus the real rendered checkbox')
+  assert.ok(driver.includes("return document.activeElement === input"), 'Keyboard recovery must verify focus before sending Space')
+  assert.ok(driver.includes("report.selectionAttempts.push"), 'Both selection attempts must retain before/after evidence')
+  assert.ok(driver.includes("Original export folder selection did not settle after verified mouse and keyboard interactions"))
 })

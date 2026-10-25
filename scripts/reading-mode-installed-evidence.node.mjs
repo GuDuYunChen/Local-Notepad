@@ -19,7 +19,13 @@ const verifier = 'b'.repeat(40)
 function fixture() {
   const reading = readingEvidenceFixture()
   const pin = { product: 'a'.repeat(40), previous: { ...ACCEPTED_READING_SEED }, previousSource: { ...ACCEPTED_READING_SEED_SOURCE },
-    current: { version: '4.235.0', bytes: 1001, sha256: createHash('sha256').update('synthetic-reading-mode-contract-input').digest('hex') }, currentSource: { run: 100, artifact: 200, name: 'local-notepad-windows-' + 'a'.repeat(40) } }
+    previousArtifactMetadata: { headSha: 'f'.repeat(40), branch: 'ci/rebuild-legacy-seed-4-232',
+      repositoryId: 1105107817, archiveBytes: 100, archiveSha256: createHash('sha256').update('synthetic archive').digest('hex'),
+      productSourceSha: ACCEPTED_READING_SEED_SOURCE.productSourceCommit },
+    current: { version: '4.235.0', bytes: 1001, sha256: createHash('sha256').update('synthetic-reading-mode-contract-input').digest('hex') },
+    currentSource: { run: 100, artifact: 200, name: 'local-notepad-windows-' + 'a'.repeat(40),
+      headSha: 'c'.repeat(40), branch: 'feature/local-export-2f102-closure', repositoryId: 1105107817,
+      archiveBytes: 100, archiveSha256: createHash('sha256').update('synthetic archive').digest('hex') } }
   for (const key of READING_SOURCE_KEYS) pin[key] = 'd'.repeat(40)
   Object.assign(pin, { importBlob: 'f7001589494d6ae81b51275512ed406f6892974c',
     importEvidenceBlob: '6984a22dba599d4026769de34a76c0aa8e01229f',
@@ -50,11 +56,16 @@ test('artifact identity requires the exact remote ID, name, run, product head an
   const { pin } = fixture()
   for (const which of ['previous', 'current']) {
     const expected = pin[which + 'Source']
-    const artifact = { id: expected.artifact, name: expected.name, expired: false, size_in_bytes: 100,
-      workflow_run: { id: expected.run, head_sha: expected.name.slice(-40) } }
+    const metadata = which === 'previous' ? pin.previousArtifactMetadata : expected
+    const artifact = { id: expected.artifact, name: expected.name, expired: false, size_in_bytes: metadata.archiveBytes,
+      digest: 'sha256:' + metadata.archiveSha256,
+      workflow_run: { id: expected.run, head_sha: metadata.headSha, head_branch: metadata.branch,
+        repository_id: metadata.repositoryId, head_repository_id: metadata.repositoryId } }
     assert.equal(validateReadingArtifact(pin, which, artifact), true)
     for (const mutate of [a => a.id++, a => a.name += '-other', a => a.expired = true,
-      a => a.workflow_run.id++, a => a.workflow_run.head_sha = 'e'.repeat(40), a => a.size_in_bytes = 0]) {
+      a => a.workflow_run.id++, a => a.workflow_run.head_sha = 'e'.repeat(40), a => a.workflow_run.head_branch = 'master',
+      a => a.workflow_run.repository_id++, a => a.workflow_run.head_repository_id++, a => a.size_in_bytes = 0,
+      a => a.digest = 'sha256:' + 'f'.repeat(64)]) {
       const changed = structuredClone(artifact); mutate(changed)
       assert.throws(() => validateReadingArtifact(pin, which, changed))
     }

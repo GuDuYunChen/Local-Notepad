@@ -164,7 +164,8 @@ export function describeExportPlan(plan) {
     counts[item.status]++
     return { id: item.id, title: item.title, relativePath: item.relativePath, preview: item.preview, status: item.status,
       message: item.message, warnings: [...item.warnings], ...(item.code ? { code: item.code } : {}),
-      ...(item.receipt ? item.receipt : {}), ...(item.partialPath ? { partialPath: item.partialPath } : {}) }
+      ...(item.receipt ? item.receipt : {}), ...(item.partialPath ? { partialPath: item.partialPath } : {}),
+      ...(item.partialPaths?.length ? { partialPaths: [...item.partialPaths] } : {}) }
   })
   return { format: plan.format, createdAt: plan.createdAt, source: 'saved', state: plan.state, exportDirectory: plan.exportDirectory, items, counts }
 }
@@ -225,8 +226,12 @@ async function writeExclusive(filename, bytes, written, plan, check) {
   let handle
   try {
     handle = await fs.open(filename, 'wx', 0o600)
-    const identity = await handle.stat(), record = { filename, identity, bytes }
+    // Exclusive creation already changed the filesystem. Register it before
+    // fstat so an identity-read failure cannot hide a real residual file.
+    // Without confirmed identity, cleanup reports the path but never deletes it.
+    const record = { filename, identity: null, bytes }
     written.push(record)
+    const identity = await handle.stat(); record.identity = identity
     check(); await handle.writeFile(bytes); await handle.sync(); await handle.close(); handle = null
     // Read-back is needed even when cancellation arrived during a started I/O.
     // It does not start another output write or claim that an abort rolled back.
@@ -239,21 +244,30 @@ async function writeExclusive(filename, bytes, written, plan, check) {
 }
 
 async function cleanupWritten(written) {
-  let incomplete = false
+  const residualPaths = []
   for (const entry of [...written].reverse()) {
     try {
       const actual = await fs.lstat(entry.filename)
-      if (!owns(entry.identity, actual) || !actual.isFile() || actual.size > entry.bytes.length) { incomplete = true; continue }
+      if (!owns(entry.identity, actual) || !actual.isFile() || actual.size > entry.bytes.length) {
+        residualPaths.push(entry.filename); continue
+      }
       const bytes = await fs.readFile(entry.filename)
-      if (!bytes.equals(entry.bytes.subarray(0, bytes.length))) { incomplete = true; continue }
+      if (!bytes.equals(entry.bytes.subarray(0, bytes.length))) {
+        residualPaths.push(entry.filename); continue
+      }
       await fs.unlink(entry.filename)
-    } catch (cause) { if (cause?.code !== 'ENOENT') incomplete = true }
+    } catch (cause) {
+      if (cause?.code !== 'ENOENT') residualPaths.push(entry.filename)
+    }
   }
-  return !incomplete
+  return { complete: residualPaths.length === 0, residualPaths }
 }
 
 export async function executeExportPlan(plan, { targetDir, signal, deadline = Date.now() + LIMIT.timeoutMs, onProgress, retryFailed = false } = {}) {
   if (!plan || !FORMAT.has(plan.format) || !Array.isArray(plan.items) || plan.running) throw error('busy', '导出计划无效或仍在执行，请先查回结果。')
+  if (retryFailed && plan.items.some(item => item.status === 'failed' && (item.partialPath || item.partialPaths?.length))) {
+    throw error('cleanup-incomplete', '部分导出文件仍未确认清理。请先检查每个残留路径并手动处理，再重新预览；系统不会覆盖这些文件。')
+  }
   const eligible = plan.items.filter(item => retryFailed ? item.status === 'failed' : ['ready', 'cancelled'].includes(item.status))
   if (!eligible.length) return describeExportPlan(plan)
   if (typeof targetDir !== 'string' || !path.isAbsolute(targetDir) || targetDir.includes('\0')) throw error('invalid-destination', '请选择有效的本地导出目录。')
@@ -290,16 +304,25 @@ export async function executeExportPlan(plan, { targetDir, signal, deadline = Da
         await writeExclusive(outputPath, rendered.bytes, written, plan, check)
         item.receipt = { outputPath, bytes: rendered.bytes.length, sha256: hash(rendered.bytes), assetCount: rendered.assets.length }
         delete item.partialPath
+        delete item.partialPaths
         item.status = 'succeeded'; item.message = '文档及附件已写入，并完成读回校验。'
         plan.outputAssetBytes = budget.bytes
       } catch (cause) {
-        const clean = await cleanupWritten(written)
+        const cleanup = await cleanupWritten(written)
         budget.bytes = beforeAssets
         const cancellation = signal?.aborted || cause?.code === 'cancelled', timedOut = Date.now() >= deadline || cause?.code === 'timeout'
         item.status = cancellation || timedOut ? 'cancelled' : 'failed'
         item.code = cancellation ? 'cancelled' : timedOut ? 'timeout' : cause instanceof LocalExportError ? cause.code : 'write-failed'
         item.message = cause instanceof LocalExportError ? cause.message : '导出文件无法可靠写入；请检查权限、磁盘空间或同名文件后重试。'
-        if (!clean) { item.partialPath = path.join(plan.exportDirectory, item.relativePath); item.status = 'failed'; item.code = 'cleanup-incomplete'; item.message += ' 部分临时输出无法确认清理，请先检查该路径；系统不会覆盖已有文件。' }
+        if (cleanup.complete) {
+          delete item.partialPath
+          delete item.partialPaths
+        } else {
+          item.partialPaths = cleanup.residualPaths
+          if (cleanup.residualPaths.length) item.partialPath = cleanup.residualPaths[0]
+          item.status = 'failed'; item.code = 'cleanup-incomplete'
+          item.message += ' 以下部分输出未能确认清理，请先检查列出的实际路径；系统不会覆盖已有文件。'
+        }
       }
       notify()
       if (signal?.aborted || Date.now() >= deadline) break

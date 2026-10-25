@@ -67,7 +67,7 @@ describe('complete local document export workspace', () => {
     await click(button('关闭')); expect(onClose).toHaveBeenCalledTimes(1)
   })
   it('retains the chosen content and format after a failed preview', async () => {
-    native.exportWorkspacePrepare.mockResolvedValueOnce({ success: false, message: '笔记 two 读取失败' })
+    native.exportWorkspacePrepare.mockResolvedValueOnce({ success: false, code: 'read-failed', message: '笔记 two 读取失败' })
     await mount(); await click(query('input[value="docx"]')); await prepare()
     expect(host.textContent).toContain('笔记 two 读取失败'); expect(query('input[value="docx"]').checked).toBe(true)
     await prepare(); expect(native.exportWorkspacePrepare).toHaveBeenLastCalledWith(expect.objectContaining({ ids: ['one', 'two'], format: 'docx' }))
@@ -91,12 +91,110 @@ describe('complete local document export workspace', () => {
     expect(native.exportWorkspacePrepare).toHaveBeenCalledTimes(1)
     await act(async () => pending.resolve(reply()))
   })
+  it('reuses the same preparation request identity after a renderer timeout', async () => {
+    const pending = deferred()
+    native.exportWorkspacePrepare.mockImplementationOnce(input => {
+      current = makePlan(input.requestId)
+      return pending.promise
+    })
+    await mount()
+    await prepare()
+    const originalId = native.exportWorkspacePrepare.mock.calls[0][0].requestId
+    await act(async () => { await vi.advanceTimersByTimeAsync(65000) })
+    expect(host.textContent).toContain('等待桌面导出响应超时')
+    expect(button('查回预览')).toBeTruthy()
+    expect(native.exportWorkspaceCancel).not.toHaveBeenCalled()
+
+    current = makePlan(originalId)
+    await act(async () => pending.resolve(reply()))
+    await click(button('查回预览'))
+    expect(native.exportWorkspacePrepare).toHaveBeenCalledTimes(2)
+    expect(native.exportWorkspacePrepare.mock.calls[1][0].requestId).toBe(originalId)
+    expect(query('[data-local-export-item="one"]')).toBeTruthy()
+    expect(button('关闭').disabled).toBe(false)
+  })
+  it('reuses the same preparation identity after the native response connection is lost', async () => {
+    native.exportWorkspacePrepare.mockRejectedValueOnce(new Error('响应连接中断'))
+    await mount()
+    await prepare()
+    const originalId = native.exportWorkspacePrepare.mock.calls[0][0].requestId
+    expect(host.textContent).toContain('响应连接中断')
+    expect(button('查回预览')).toBeTruthy()
+    expect(native.exportWorkspaceCancel).not.toHaveBeenCalled()
+    await click(button('查回预览'))
+    expect(native.exportWorkspacePrepare).toHaveBeenCalledTimes(2)
+    expect(native.exportWorkspacePrepare.mock.calls[1][0].requestId).toBe(originalId)
+    expect(query('[data-local-export-item="one"]')).toBeTruthy()
+    expect(button('关闭').disabled).toBe(false)
+  })
   it('can cancel preparation using its original request identity', async () => {
     const pending = deferred(); native.exportWorkspacePrepare.mockImplementation(() => pending.promise)
+    native.exportWorkspaceCancel.mockResolvedValueOnce({ success: true, cancelled: true })
     await mount(); await prepare(); await click(button('停止读取'))
-    expect(native.exportWorkspaceCancel).toHaveBeenCalledWith(expect.objectContaining({ requestId: native.exportWorkspacePrepare.mock.calls[0][0].requestId }))
-    await act(async () => pending.resolve({ success: false, message: '已停止读取' }))
+    const originalId = native.exportWorkspacePrepare.mock.calls[0][0].requestId
+    expect(native.exportWorkspaceCancel).toHaveBeenCalledWith({ requestId: originalId })
+    expect(button('关闭').disabled).toBe(true)
+    // While the original request is being reconciled, show the in-progress
+    // label and disable the control so the user cannot issue duplicate cancellation.
+    expect(button('正在停止读取…').disabled).toBe(true)
+    await click(button('正在停止读取…'))
+    expect(native.exportWorkspaceCancel).toHaveBeenCalledTimes(1)
+    await act(async () => pending.resolve({ success: false, code: 'export-cancelled', cancelled: true, message: '已停止读取' }))
     expect(query('[data-local-export-prepare]').disabled).toBe(false)
+    expect(button('关闭').disabled).toBe(false)
+    expect(native.exportWorkspacePrepare.mock.calls.every(([input]) => input.requestId === originalId)).toBe(true)
+  })
+  it('does not create a new preview when native confirms the stopped request is absent', async () => {
+    native.exportWorkspacePrepare.mockRejectedValueOnce(new Error('lost'))
+    native.exportWorkspaceCancel.mockResolvedValueOnce({ success: false, code: 'export-not-found', message: '该导出操作已经结束或已被替换' })
+    await mount(); await prepare(); await click(button('请求停止读取'))
+    expect(native.exportWorkspacePrepare).toHaveBeenCalledTimes(1)
+    expect(button('关闭').disabled).toBe(false)
+    expect(query('[data-local-export-item]')).toBeNull()
+  })
+  it('retains preview identity when stop acknowledgement is malformed', async () => {
+    native.exportWorkspacePrepare.mockRejectedValueOnce(new Error('lost'))
+    native.exportWorkspaceCancel.mockResolvedValueOnce({ success: true })
+    await mount(); await prepare()
+    const id = native.exportWorkspacePrepare.mock.calls[0][0].requestId
+    await click(button('请求停止读取'))
+    expect(button('关闭').disabled).toBe(true)
+    expect(native.exportWorkspacePrepare).toHaveBeenCalledTimes(1)
+    await click(button('查回预览'))
+    expect(native.exportWorkspacePrepare.mock.calls[1][0].requestId).toBe(id)
+    expect(button('关闭').disabled).toBe(false)
+  })
+  it('keeps confirmed rows visible but prevents more writes after native owner loss', async () => {
+    await mount(); await prepare(); await choose(); await click(query('[data-local-export-start]'))
+    current = snapshot(current, ['succeeded', 'failed'])
+    await click(query('[data-local-export-status]'))
+    const output = current.items[0].outputPath
+    native.exportWorkspaceStatus.mockResolvedValueOnce({ success: false, code: 'export-not-found', message: '任务已经失效' })
+    await click(query('[data-local-export-status]'))
+    expect(query('[data-local-export-item="one"]').getAttribute('data-status')).toBe('succeeded')
+    expect(host.textContent).toContain(output)
+    expect(query('[data-local-export-retry]').disabled).toBe(true)
+    expect(query('[data-local-export-status]').disabled).toBe(true)
+    expect(query('[data-local-export-reveal]').disabled).toBe(true)
+    expect(button('关闭').disabled).toBe(false)
+    expect(native.exportWorkspaceRetry).not.toHaveBeenCalled()
+  })
+  it('renders every actual residual output path after cleanup cannot be confirmed', async () => {
+    await mount(); await prepare(); await choose()
+    native.exportWorkspaceStart.mockImplementationOnce(async () => {
+      current = snapshot(current, ['failed', 'ready'])
+      current.items[0].partialPath = 'C:\\\\Exports\\\\Notepad-export-a\\\\one.md'
+      current.items[0].partialPaths = [
+        current.items[0].partialPath,
+        'C:\\\\Exports\\\\Notepad-export-a\\\\one_assets\\\\image.png',
+      ]
+      current.items[0].code = 'cleanup-incomplete'
+      current.items[0].message = '以下部分输出未能确认清理。'
+      return reply()
+    })
+    await click(query('[data-local-export-start]'))
+    expect(host.textContent).toContain('C:\\\\Exports\\\\Notepad-export-a\\\\one.md')
+    expect(host.textContent).toContain('C:\\\\Exports\\\\Notepad-export-a\\\\one_assets\\\\image.png')
   })
   it('adopts per-item terminal results and retries only the failed operation', async () => {
     await mount(); await prepare(); await choose(); await click(query('[data-local-export-start]'))
@@ -191,7 +289,9 @@ describe('complete local document export workspace', () => {
     await mount(); await prepare(); await choose(); await click(query('[data-local-export-start]'))
     native.exportWorkspaceStatus.mockRejectedValueOnce(new Error('暂时无法查回'))
     await act(async () => vi.advanceTimersByTimeAsync(750)); await act(async () => vi.advanceTimersByTimeAsync(5000))
-    expect(native.exportWorkspaceStatus).toHaveBeenCalledTimes(1); expect(host.textContent).toContain('暂时无法查回')
+    expect(native.exportWorkspaceStatus).toHaveBeenCalledTimes(1)
+    expect(host.textContent).toContain('桌面导出响应连接中断，请查回结果后再操作。')
+    expect(host.textContent).not.toContain('暂时无法查回')
     current = snapshot(current, ['succeeded', 'succeeded']); await click(query('[data-local-export-status]'))
     expect(button('完成')).toBeTruthy(); expect(native.exportWorkspaceStart).toHaveBeenCalledTimes(1)
   })

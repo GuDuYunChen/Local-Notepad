@@ -5,10 +5,10 @@ import { IMPORT_PIN_BLOBS } from './local-import-installed-evidence.mjs'
 import { validateReadingModeDesktopReport, verifyReadingModeDesktopReport } from './reading-mode-desktop-evidence.mjs'
 export { READING_CHECKS } from './reading-mode-desktop-evidence.mjs'
 
-export const ACCEPTED_READING_SEED = Object.freeze({ version: '4.232.0', bytes: 104335681,
-  sha256: '3b1b743a61e3dd7a13c5642f7310e68f7ba2bd912d0f98f6b8c1d7e2f7707e9e' })
-export const ACCEPTED_READING_SEED_SOURCE = Object.freeze({ run: 39092212511, artifact: 12123865208,
-  name: 'local-notepad-windows-1a8e17ba775312c359f4ac23851c8c365b57a9cb' })
+export const ACCEPTED_READING_SEED = Object.freeze({ version: '4.232.0', bytes: 104335117,
+  sha256: 'd3a152a1e4c36eba88513cc8748cee81eb68178470cf209bb21aa98de6fd7754' })
+export const ACCEPTED_READING_SEED_SOURCE = Object.freeze({ run: 40184977753, artifact: 12596021406,
+  name: 'local-notepad-historical-4.232.0-seed', productSourceCommit: '1a8e17ba775312c359f4ac23851c8c365b57a9cb' })
 export const READING_SOURCE_KEYS = Object.freeze([...IMPORT_PIN_BLOBS,
   'readingDriverBlob', 'readingFixtureBlob', 'readingEvidenceBlob', 'readingBuilderBlob', 'readingInputBlob',
   'readingWindowSessionBlob', 'readingWindowTargetBlob', 'readingWindowWorkerBlob', 'historyDriverBlob'])
@@ -61,8 +61,8 @@ export function prepareReadingModeVerifierSources(pin, readSource) {
   const sourceHashes = new Map()
   const specs = [
     { source: 'local-import-installed-evidence.mjs', output: 'reading-import-validator.mjs', hash: 'b70f45bceea1b299d18beefd5b985851cf753f9e', changes: [
-      ["version: '4.231.2', bytes: 104320482", "version: '4.232.0', bytes: 104335681"],
-      ["sha256: '5327515821f06c1d471ed038a32e14d02a178e9eebdff7899f94f437512f8c71'", "sha256: '3b1b743a61e3dd7a13c5642f7310e68f7ba2bd912d0f98f6b8c1d7e2f7707e9e'"],
+      ["version: '4.231.2', bytes: 104320482", "version: '4.232.0', bytes: 104335117"],
+      ["sha256: '5327515821f06c1d471ed038a32e14d02a178e9eebdff7899f94f437512f8c71'", "sha256: 'd3a152a1e4c36eba88513cc8748cee81eb68178470cf209bb21aa98de6fd7754'"],
       ["assert.equal(pin.current.version, '4.232.0')", "assert.equal(pin.current.version, '4.235.0')"],
       ["from './local-import-desktop-evidence.mjs'", "from './reading-import-desktop-validator.mjs'"],
       ["from './check-local-import-desktop.mjs'", "from './reading-import-desktop-driver.mjs'"],

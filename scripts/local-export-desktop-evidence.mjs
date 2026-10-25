@@ -87,12 +87,40 @@ export function validateExportFeedbackVisibility(value) {
   }
   return true
 }
-export function validateLocalExportDesktopReport(report, commit, productCommit = commit, scope = 'packaged') {
+// The caller selects the expected provenance, never the report itself. Existing
+// CI/install callers keep the hosted default and cannot accept local evidence.
+export function validateExportExecutionIdentity(report, execution = 'github-hosted') {
+  object(report)
+  assert.ok(['github-hosted', 'local-windows'].includes(execution))
+  assert.equal(report.runnerEnvironment, execution)
+  if (execution === 'github-hosted') {
+    assert.equal(report.localValidation, undefined, 'Local evidence is not hosted acceptance')
+    return true
+  }
+  assert.equal(report.scope, 'packaged', 'Local evidence cannot accept installed user data')
+  assert.equal(report.productCommit, report.commit, 'Local product commit is only a source reference')
+  assert.equal(report.moduleAccepted, false)
+  assert.equal(report.installationVerified, false)
+  assert.equal(report.buildProvenanceVerified, false)
+  const local = report.localValidation; object(local)
+  assert.equal(local.sourceReferenceOnly, true)
+  assert.equal(typeof local.sourceWorktreeDirty, 'boolean')
+  const profile = report.launch?.profile
+  assert.ok(typeof profile === 'string' && path.win32.isAbsolute(profile))
+  assert.equal(path.win32.basename(profile), 'profile')
+  const scratch = path.win32.dirname(profile)
+  assert.ok(/^notepad-export-[A-Za-z0-9_-]+$/.test(path.win32.basename(scratch)))
+  assert.equal(path.win32.normalize(local.isolatedDataDirectory || '').toLowerCase(),
+    path.win32.join(scratch, 'data').toLowerCase())
+  return true
+}
+
+export function validateLocalExportDesktopReport(report, commit, productCommit = commit, scope = 'packaged', execution = 'github-hosted') {
   sha1(commit); sha1(productCommit); object(report)
   assert.equal(report.schemaVersion, 1); assert.equal(report.module, '2F.102'); assert.equal(report.version, LOCAL_EXPORT_VERSION)
   assert.equal(report.commit, commit); assert.equal(report.productCommit, productCommit); assert.equal(report.scope, scope)
   assert.ok(['packaged', 'installed'].includes(scope)); assert.equal(report.platform, 'win32')
-  assert.equal(report.runnerEnvironment, 'github-hosted')
+  validateExportExecutionIdentity(report, execution)
   for (const key of ['complete', 'syntheticData', 'cleanupComplete']) assert.equal(report[key], true, key)
   for (const key of ['bridgeOverridden', 'timerAccelerated', 'forceTerminated']) assert.equal(report[key], false, key)
   assert.equal(report.error, undefined); assert.deepEqual(report.checks, LOCAL_EXPORT_CHECKS)
@@ -358,9 +386,9 @@ export async function verifyLocalExportFiles(directory, report) {
   assert.ok(wordWithMedia >= 3 && offlineImages >= 6 && offlineAttachments >= 9)
   return { markdownDocuments, wordDocuments, wordWithMedia, offlineImages, offlineAttachments }
 }
-export async function verifyLocalExportDesktopReport(directory, commit, productCommit = commit, scope = 'packaged', sources) {
+export async function verifyLocalExportDesktopReport(directory, commit, productCommit = commit, scope = 'packaged', sources, execution = 'github-hosted') {
   const report = JSON.parse(readFileSync(path.join(directory, LOCAL_EXPORT_REPORT), 'utf8'))
-  validateLocalExportDesktopReport(report, commit, productCommit, scope)
+  validateLocalExportDesktopReport(report, commit, productCommit, scope, execution)
   const expected = sources || Object.fromEntries(LOCAL_EXPORT_SOURCES.map(name => [name,
     exportBlob(readFileSync(new URL('./' + name, import.meta.url), 'utf8').replace(/\r\n/g, '\n'))]))
   assert.deepEqual(report.sourceFiles, expected)

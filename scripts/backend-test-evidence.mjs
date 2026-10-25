@@ -138,7 +138,10 @@ export function verifyBackendReport(dir, root, expected) {
   assert.equal(r.schemaVersion, 1); assert.equal(r.complete, true)
   assert.equal(r.commit, expected.commit); assert.equal(r.tree, expected.tree)
   assert.equal(r.repository, 'GuDuYunChen/Local-Notepad')
-  assert.equal(r.branch, 'feature/knowledge-os-phase2')
+  const expectedBranch = expected.branch ?? (expected.localFixture ? 'feature/knowledge-os-phase2' :
+    (process.env.GITHUB_HEAD_REF || process.env.GITHUB_REF_NAME))
+  assert.ok(typeof expectedBranch === 'string' && expectedBranch.length > 0, 'trusted source branch unavailable')
+  assert.equal(r.branch, expectedBranch)
   assert.ok((expected.localFixture ? ['local-fixture'] : ['push','pull_request']).includes(r.event), 'fixture is not CI evidence')
   const source = sourceIdentity(root, expected.tree)
   assert.deepEqual(r.sourceBefore, source); assert.deepEqual(r.sourceAfter, source)
@@ -189,7 +192,11 @@ export function collectBackendEvidence(root = ROOT, output = path.join(root, 'te
       branch: options.localFixture ? 'feature/knowledge-os-phase2' : (process.env.GITHUB_HEAD_REF || process.env.GITHUB_REF_NAME),
       event: options.localFixture ? 'local-fixture' : process.env.GITHUB_EVENT_NAME, testArgs: [...TEST_ARGS],
       environment: { GOTOOLCHAIN: 'local', GOWORK: 'off', GOFLAGS: '' }, sourceBefore: sourceIdentity(root, report.tree) })
-    assert.equal(report.repository, 'GuDuYunChen/Local-Notepad'); assert.equal(report.branch, 'feature/knowledge-os-phase2')
+    assert.equal(report.repository, 'GuDuYunChen/Local-Notepad')
+    const expectedBranch = options.localFixture ? 'feature/knowledge-os-phase2' :
+      (process.env.GITHUB_HEAD_REF || process.env.GITHUB_REF_NAME)
+    assert.ok(typeof expectedBranch === 'string' && expectedBranch.length > 0, 'trusted source branch unavailable')
+    assert.equal(report.branch, expectedBranch)
     command('environment', ['env', '-json', 'GOVERSION','GOOS','GOARCH','GOMOD'], 'go-env.json', 15000)
     const go = JSON.parse(text(path.join(output,'go-env.json'), 65536))
     assert.equal(go.GOVERSION, report.sourceBefore.toolchain, 'toolchain mismatch; no automatic download')
@@ -202,7 +209,7 @@ export function collectBackendEvidence(root = ROOT, output = path.join(root, 'te
     assert.equal(git(root, ['ls-files', '--others', '--exclude-standard', '--', 'server']), '', 'untracked backend input after tests')
     report.result = parseTestEvents(text(path.join(output,'tests.jsonl')), parsePackages(text(path.join(output,'packages.tsv')), report.sourceBefore), discover(text(path.join(output,'s3-list.txt'))))
     report.complete = true; save()
-    return verifyBackendReport(output, root, { commit: report.commit, tree: report.tree, localFixture: !!options.localFixture })
+    return verifyBackendReport(output, root, { commit: report.commit, tree: report.tree, branch: report.branch, localFixture: !!options.localFixture })
   } catch (error) {
     report.complete = false; report.failure = 'backend evidence incomplete; inspect preserved raw files'; save(); throw error
   }
@@ -212,7 +219,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   try {
     if (process.argv[2] === 'verify') {
       assert.equal(process.argv.length, 6, 'usage: verify <directory> <checkout-commit> <tree>')
-      console.log(JSON.stringify(verifyBackendReport(path.resolve(process.argv[3]), ROOT, {commit: process.argv[4], tree: process.argv[5]})))
+      console.log(JSON.stringify(verifyBackendReport(path.resolve(process.argv[3]), ROOT, {commit: process.argv[4], tree: process.argv[5], branch: process.env.GITHUB_HEAD_REF || process.env.GITHUB_REF_NAME})))
     } else { assert.equal(process.argv.length, 2); console.log(JSON.stringify(collectBackendEvidence())) }
   } catch (error) { console.error(`Backend evidence check failed: ${error.message}`); process.exitCode = 1 }
 }
