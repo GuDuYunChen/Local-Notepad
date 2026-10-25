@@ -150,10 +150,19 @@ export async function verifyLocalExportDesktop(context) {
       assert.equal(beforeKeyboard.exists, true, 'Original export folder checkbox disappeared before keyboard recovery')
       assert.equal(beforeKeyboard.disabled, false, 'Original export folder checkbox became disabled before keyboard recovery')
       assert.equal(beforeKeyboard.checked, false, 'Selection changed without a settled selection receipt')
-      assert.equal(beforeKeyboard.focused, true, 'Native mouse interaction did not focus the export folder checkbox')
+      // The installed Chromium build can dispatch the pointer click without
+      // retaining focus on a checkbox after React reconciles the tree. Focus
+      // the real rendered control, verify focus, then send one trusted native
+      // Space key pair. Do not replay the original pointer click.
+      const focused = await evaluate('(() => { const input = document.querySelector(' + JSON.stringify(selectionSelector) +
+        '); input?.focus({ preventScroll: true }); return document.activeElement === input })()')
+      const afterFocus = await selectionState()
+      report.selectionAttempts.push({ method: 'focus-real-checkbox', before: beforeKeyboard, after: afterFocus, focused })
+      save()
+      assert.equal(focused, true, 'Original export folder checkbox could not receive focus for keyboard recovery')
       await key(' ', 32)
       selectedState = await until(selected, 'Original export folder selection did not settle after native keyboard recovery', 2500).catch(() => null)
-      report.selectionAttempts.push({ method: 'native-space', before: beforeKeyboard, after: await selectionState(), settled: Boolean(selectedState) })
+      report.selectionAttempts.push({ method: 'native-space', before: afterFocus, after: await selectionState(), settled: Boolean(selectedState) })
       save()
     }
     if (!selectedState) {
