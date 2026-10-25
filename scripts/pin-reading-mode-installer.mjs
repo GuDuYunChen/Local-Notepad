@@ -28,7 +28,8 @@ export function validateReadingArtifact(pin, which, artifact) {
     // GitHub artifact metadata records the source branch HEAD SHA.
     assert.equal(expected.name.slice(-40), pin.product, 'Artifact name must bind the product build identity')
   } else {
-    assert.equal(expected.name.slice(-40), metadata.headSha, 'Historical seed name must bind its source commit')
+    assert.equal(expected.productSourceCommit, metadata.productSourceSha, 'Historical installer must bind its exact product source commit')
+    assert.equal(metadata.productSourceSha, '1a8e17ba775312c359f4ac23851c8c365b57a9cb')
   }
   assert.equal(artifact.size_in_bytes, metadata.archiveBytes, 'Pinned artifact archive size changed')
   assert.equal(artifact.digest, 'sha256:' + metadata.archiveSha256, 'Pinned artifact archive digest changed')
@@ -59,7 +60,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
       })
       assert.equal(response.status, 200, 'Unable to read pinned artifact metadata: ' + which)
       const artifact = await response.json(); validateReadingArtifact(pin, which, artifact)
-      metadata[which] = artifact
+      metadata[which] = which === 'previous' ? { ...artifact, productSourceSha: source.productSourceCommit } : artifact
     }
     mkdirSync(out, { recursive: true })
     writeFileSync(path.join(out, 'reading-artifact-source.json'), JSON.stringify({ productCommit: pin.product,
