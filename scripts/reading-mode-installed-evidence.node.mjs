@@ -19,8 +19,9 @@ const verifier = 'b'.repeat(40)
 function fixture() {
   const reading = readingEvidenceFixture()
   const pin = { product: 'a'.repeat(40), previous: { ...ACCEPTED_READING_SEED }, previousSource: { ...ACCEPTED_READING_SEED_SOURCE },
-    previousArtifactMetadata: { headSha: ACCEPTED_READING_SEED_SOURCE.name.slice(-40), branch: 'feature/knowledge-os-phase2',
-      repositoryId: 1105107817, archiveBytes: 100, archiveSha256: createHash('sha256').update('synthetic archive').digest('hex') },
+    previousArtifactMetadata: { headSha: 'f'.repeat(40), branch: 'ci/rebuild-legacy-seed-4-232',
+      repositoryId: 1105107817, archiveBytes: 100, archiveSha256: createHash('sha256').update('synthetic archive').digest('hex'),
+      productSourceSha: ACCEPTED_READING_SEED_SOURCE.productSourceCommit },
     current: { version: '4.235.0', bytes: 1001, sha256: createHash('sha256').update('synthetic-reading-mode-contract-input').digest('hex') },
     currentSource: { run: 100, artifact: 200, name: 'local-notepad-windows-' + 'a'.repeat(40),
       headSha: 'c'.repeat(40), branch: 'feature/local-export-2f102-closure', repositoryId: 1105107817,
