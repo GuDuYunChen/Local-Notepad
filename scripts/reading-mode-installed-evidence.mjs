@@ -5,10 +5,10 @@ import { IMPORT_PIN_BLOBS } from './local-import-installed-evidence.mjs'
 import { validateReadingModeDesktopReport, verifyReadingModeDesktopReport } from './reading-mode-desktop-evidence.mjs'
 export { READING_CHECKS } from './reading-mode-desktop-evidence.mjs'
 
-export const ACCEPTED_READING_SEED = Object.freeze({ version: '4.232.0', bytes: 104335681,
-  sha256: '3b1b743a61e3dd7a13c5642f7310e68f7ba2bd912d0f98f6b8c1d7e2f7707e9e' })
-export const ACCEPTED_READING_SEED_SOURCE = Object.freeze({ run: 39092212511, artifact: 12123865208,
-  name: 'local-notepad-windows-1a8e17ba775312c359f4ac23851c8c365b57a9cb' })
+export const ACCEPTED_READING_SEED = Object.freeze({ version: '4.232.0', bytes: 104335117,
+  sha256: 'd3a152a1e4c36eba88513cc8748cee81eb68178470cf209bb21aa98de6fd7754' })
+export const ACCEPTED_READING_SEED_SOURCE = Object.freeze({ run: 40184977753, artifact: 12596021406,
+  name: 'local-notepad-historical-4.232.0-seed', productSourceCommit: '1a8e17ba775312c359f4ac23851c8c365b57a9cb' })
 export const READING_SOURCE_KEYS = Object.freeze([...IMPORT_PIN_BLOBS,
   'readingDriverBlob', 'readingFixtureBlob', 'readingEvidenceBlob', 'readingBuilderBlob', 'readingInputBlob',
   'readingWindowSessionBlob', 'readingWindowTargetBlob', 'readingWindowWorkerBlob', 'historyDriverBlob'])
