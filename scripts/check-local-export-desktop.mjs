@@ -123,11 +123,45 @@ export async function verifyLocalExportDesktop(context) {
     await until(() => evaluate("document.querySelector('.selector-toolbar .selector-counter')?.textContent.trim() === '已选择 0 项' && [...document.querySelectorAll('.selector-tree input[type=\\\"checkbox\\\"]')].every(input => !input.checked)"),
       'Original export selection did not clear')
     const selectionSelector = '.selector-tree .tree-item[title=' + q(title) + '] input[type="checkbox"]'
+    const selectionState = async () => evaluate(`(() => {
+      const input = document.querySelector(${q(selectionSelector)})
+      const row = input?.closest('.tree-item')
+      const bounds = input?.getBoundingClientRect()
+      return { exists: Boolean(input), checked: Boolean(input?.checked), disabled: Boolean(input?.disabled),
+        focused: document.activeElement === input, title: row?.getAttribute('title'),
+        counter: document.querySelector('.selector-toolbar .selector-counter')?.textContent.trim() ?? null,
+        bounds: bounds ? { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height } : null }
+    })()`)
+    const selected = async () => evaluate(`(() => {
+      const input = document.querySelector(${q(selectionSelector)})
+      return Boolean(input?.checked) && document.querySelector('.selector-toolbar .selector-counter')?.textContent.trim() !== '已选择 0 项'
+    })()`)
+    const beforeSelection = await selectionState()
+    assert.equal(beforeSelection.exists, true, 'Original export folder checkbox is missing')
+    assert.equal(beforeSelection.disabled, false, 'Original export folder checkbox is disabled')
+    assert.equal(beforeSelection.checked, false, 'Original export folder was unexpectedly selected after clear')
     await click(selectionSelector)
-    await until(() => evaluate(`(() => {
-      const counter = document.querySelector('.selector-toolbar .selector-counter')?.textContent.trim()
-      return [...document.querySelectorAll('.selector-tree input[type="checkbox"]')].some(input => input.checked) && counter !== '已选择 0 项'
-    })()`), 'Original export folder selection did not settle')
+    // Native mouse input is the primary path. If the DOM confirms that it did
+    // not change the controlled React checkbox, use the already-focused native
+    // Space-key interaction once; never repeat an uncertain click.
+    let selectedState = await until(selected, 'Original export folder mouse selection did not settle', 1200).catch(() => null)
+    report.selectionAttempts = [{ method: 'mouse', before: beforeSelection, after: await selectionState(), settled: Boolean(selectedState) }]
+    save()
+    if (!selectedState) {
+      const beforeKeyboard = await selectionState()
+      assert.equal(beforeKeyboard.exists, true, 'Original export folder checkbox disappeared before keyboard recovery')
+      assert.equal(beforeKeyboard.disabled, false, 'Original export folder checkbox became disabled before keyboard recovery')
+      assert.equal(beforeKeyboard.checked, false, 'Selection changed without a settled selection receipt')
+      assert.equal(beforeKeyboard.focused, true, 'Native mouse interaction did not focus the export folder checkbox')
+      await key(' ', 32)
+      selectedState = await until(selected, 'Original export folder selection did not settle after native keyboard recovery', 2500).catch(() => null)
+      report.selectionAttempts.push({ method: 'native-space', before: beforeKeyboard, after: await selectionState(), settled: Boolean(selectedState) })
+      save()
+    }
+    if (!selectedState) {
+      await capture('local-export-selection-recovery.png')
+      throw Error('Original export folder selection did not settle after verified mouse and keyboard interactions: ' + JSON.stringify(report.selectionAttempts))
+    }
     await click({ selector: '.selector-modal-footer button', text: '下一步' })
     await until(() => evaluate(`Boolean(document.querySelector(${q(panel)}))`), 'Original export workbench missing')
     if (format === 'docx') await click(panel + ' input[value="docx"]')
