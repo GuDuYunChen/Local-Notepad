@@ -35,12 +35,14 @@ jobs:
           $sourceCommit = '1a8e17ba775312c359f4ac23851c8c365b57a9cb'
           git fetch --no-tags origin $sourceCommit
           if ($LASTEXITCODE -ne 0) { throw 'Could not fetch pinned historical source commit' }
-          $source = Join-Path $env:RUNNER_TEMP 'local-notepad-4.232.0-source'
-          git worktree add --detach $source $sourceCommit
+          $legacyRoot = [System.IO.Path]::Combine($env:RUNNER_TEMP, 'local-notepad-4.232.0-source')
+          git worktree add --detach "$legacyRoot" $sourceCommit
           if ($LASTEXITCODE -ne 0) { throw 'Could not create isolated historical source worktree' }
-          $version = node -p "JSON.parse(require('fs').readFileSync('$source/package.json','utf8')).version"
+          $env:LEGACY_SOURCE = $legacyRoot
+          $version = node -e "const fs=require('node:fs'); const p=process.env.LEGACY_SOURCE; console.log(JSON.parse(fs.readFileSync(require('node:path').join(p,'package.json'),'utf8')).version)"
+          if ($LASTEXITCODE -ne 0) { throw 'Could not read historical package version' }
           if ($version -ne '4.232.0') { throw "Historical source version mismatch: $version" }
-          "LEGACY_SOURCE=$source" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "LEGACY_SOURCE=$legacyRoot" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           "LEGACY_SOURCE_COMMIT=$sourceCommit" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Install exact historical dependencies
