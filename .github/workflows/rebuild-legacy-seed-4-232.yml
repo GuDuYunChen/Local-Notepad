@@ -1,0 +1,101 @@
+name: Rebuild historical 4.232.0 upgrade seed
+
+on:
+  push:
+    branches: [ci/rebuild-legacy-seed-4-232]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rebuild-legacy-seed-4-232
+  cancel-in-progress: false
+
+jobs:
+  rebuild-historical-installer:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout verifier workflow
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      - name: Setup Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: '1.24.11'
+
+      - name: Fetch exact historical product source
+        shell: pwsh
+        run: |
+          $sourceCommit = '1a8e17ba775312c359f4ac23851c8c365b57a9cb'
+          git fetch --no-tags origin $sourceCommit
+          if ($LASTEXITCODE -ne 0) { throw 'Could not fetch pinned historical source commit' }
+          $source = Join-Path $env:RUNNER_TEMP 'local-notepad-4.232.0-source'
+          git worktree add --detach $source $sourceCommit
+          if ($LASTEXITCODE -ne 0) { throw 'Could not create isolated historical source worktree' }
+          $version = node -p "JSON.parse(require('fs').readFileSync('$source/package.json','utf8')).version"
+          if ($version -ne '4.232.0') { throw "Historical source version mismatch: $version" }
+          "LEGACY_SOURCE=$source" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "LEGACY_SOURCE_COMMIT=$sourceCommit" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Install exact historical dependencies
+        shell: pwsh
+        run: |
+          Push-Location $env:LEGACY_SOURCE
+          try {
+            npm ci --no-audit --no-fund
+            if ($LASTEXITCODE -ne 0) { throw 'Historical npm ci failed' }
+            node scripts/verify-dependency-lock.mjs
+            if ($LASTEXITCODE -ne 0) { throw 'Historical dependency lock verification failed' }
+          } finally { Pop-Location }
+
+      - name: Build historical Windows installer from pinned source
+        shell: pwsh
+        run: |
+          Push-Location $env:LEGACY_SOURCE
+          try {
+            & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\pack-win.ps1 -NoOpen
+            if ($LASTEXITCODE -ne 0) { throw 'Historical Windows packaging failed' }
+            $installer = Join-Path $env:LEGACY_SOURCE 'release/Notepad-4.232.0-Setup.exe'
+            if (-not (Test-Path -LiteralPath $installer -PathType Leaf)) { throw 'Expected 4.232.0 installer was not produced' }
+            $item = Get-Item -LiteralPath $installer
+            $hash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
+            $stream = [System.IO.File]::OpenRead($installer)
+            try {
+              $header = New-Object byte[] 2
+              if ($stream.Read($header, 0, 2) -ne 2 -or $header[0] -ne 0x4d -or $header[1] -ne 0x5a) { throw 'Historical installer is not a Windows PE executable' }
+            } finally { $stream.Dispose() }
+            $out = Join-Path $env:GITHUB_WORKSPACE 'historical-seed-output'
+            New-Item -ItemType Directory -Force -Path $out | Out-Null
+            Copy-Item -LiteralPath $installer -Destination (Join-Path $out 'Notepad-4.232.0-Setup.exe')
+            $report = [ordered]@{
+              schemaVersion = 1
+              version = '4.232.0'
+              productSourceCommit = $env:LEGACY_SOURCE_COMMIT
+              workflowCommit = $env:GITHUB_SHA
+              repository = $env:GITHUB_REPOSITORY
+              runId = $env:GITHUB_RUN_ID
+              runAttempt = $env:GITHUB_RUN_ATTEMPT
+              installerFile = 'Notepad-4.232.0-Setup.exe'
+              installerBytes = $item.Length
+              installerSha256 = $hash
+              peHeaderVerified = $true
+              builtOn = 'windows-latest'
+              buildCommand = 'pack-win.ps1 -NoOpen'
+            }
+            $report | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $out 'historical-seed-metadata.json') -Encoding utf8
+            $report | ConvertTo-Json -Depth 5
+          } finally { Pop-Location }
+
+      - name: Upload rebuilt historical installer and provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-notepad-historical-4.232.0-seed
+          path: historical-seed-output/*
+          if-no-files-found: error
+          retention-days: 90
