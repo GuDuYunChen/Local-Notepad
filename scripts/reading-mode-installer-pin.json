@@ -21,13 +21,14 @@
   },
   "previous": {
     "version": "4.232.0",
-    "bytes": 104335681,
-    "sha256": "3b1b743a61e3dd7a13c5642f7310e68f7ba2bd912d0f98f6b8c1d7e2f7707e9e"
+    "bytes": 104335117,
+    "sha256": "d3a152a1e4c36eba88513cc8748cee81eb68178470cf209bb21aa98de6fd7754"
   },
   "previousSource": {
-    "run": 39092212511,
-    "artifact": 12123865208,
-    "name": "local-notepad-windows-1a8e17ba775312c359f4ac23851c8c365b57a9cb"
+    "run": 40184977753,
+    "artifact": 12596021406,
+    "name": "local-notepad-historical-4.232.0-seed",
+    "productSourceCommit": "1a8e17ba775312c359f4ac23851c8c365b57a9cb"
   },
   "currentSource": {
     "run": 39996106211,
@@ -62,10 +63,11 @@
   "localExportDirectorySessionBlob": "14c920126e12b5c8282020df55dd61119c757c25",
   "localExportDirectoryWorkerBlob": "690929d434c14b317ef8e5cc4d6b468895d4f37c",
   "previousArtifactMetadata": {
-    "headSha": "1a8e17ba775312c359f4ac23851c8c365b57a9cb",
-    "branch": "feature/knowledge-os-phase2",
+    "headSha": "7280b794814eb282a1f882adf39179eb5c47b519",
+    "branch": "ci/rebuild-legacy-seed-4-232",
     "repositoryId": 1105107817,
-    "archiveBytes": 104337729,
-    "archiveSha256": "f52e581cafa9ce31a327b817cd86d02f22d5929179cdb06000eb622cb66a3707"
+    "archiveBytes": 104338160,
+    "archiveSha256": "8bdaba7b79eb81fa0c793bb56050145764ddd2da573f0f301bcf9e3ac9ec776d",
+    "productSourceSha": "1a8e17ba775312c359f4ac23851c8c365b57a9cb"
   }
 }
