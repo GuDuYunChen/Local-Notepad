@@ -400,7 +400,8 @@ function rendererExpressions(filename, bindings = {}) {
         panel: '[data-local-export-workspace]', F, folder: { id: 'folder-1' }, failing: { id: 'note-2' },
         itemSelector: id => '[data-local-export-item=' + JSON.stringify(id) + ']', feedback: '[data-local-export-feedback]',
         controls: ['[data-local-export-continue]'], requiredSelector: '[data-file-id="folder-1"]',
-        requested: { selector: 'button', text: '中文' }, ...bindings })
+        requested: { selector: 'button', text: '中文' },
+        selectionSelector: '.selector-tree .tree-item[title="目录"] input[type="checkbox"]', ...bindings })
       sites.push({ line: node.loc.start.line, generated }); assert.equal(typeof generated, 'string')
     }
     for (const value of Object.values(node)) if (Array.isArray(value)) value.forEach(visit); else if (value && typeof value === 'object') visit(value)
