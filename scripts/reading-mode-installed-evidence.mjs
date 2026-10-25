@@ -61,8 +61,8 @@ export function prepareReadingModeVerifierSources(pin, readSource) {
   const sourceHashes = new Map()
   const specs = [
     { source: 'local-import-installed-evidence.mjs', output: 'reading-import-validator.mjs', hash: 'b70f45bceea1b299d18beefd5b985851cf753f9e', changes: [
-      ["version: '4.231.2', bytes: 104320482", "version: '4.232.0', bytes: 104335681"],
-      ["sha256: '5327515821f06c1d471ed038a32e14d02a178e9eebdff7899f94f437512f8c71'", "sha256: '3b1b743a61e3dd7a13c5642f7310e68f7ba2bd912d0f98f6b8c1d7e2f7707e9e'"],
+      ["version: '4.231.2', bytes: 104320482", "version: '4.232.0', bytes: 104335117"],
+      ["sha256: '5327515821f06c1d471ed038a32e14d02a178e9eebdff7899f94f437512f8c71'", "sha256: 'd3a152a1e4c36eba88513cc8748cee81eb68178470cf209bb21aa98de6fd7754'"],
       ["assert.equal(pin.current.version, '4.232.0')", "assert.equal(pin.current.version, '4.235.0')"],
       ["from './local-import-desktop-evidence.mjs'", "from './reading-import-desktop-validator.mjs'"],
       ["from './check-local-import-desktop.mjs'", "from './reading-import-desktop-driver.mjs'"],
