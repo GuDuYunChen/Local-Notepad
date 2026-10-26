@@ -15,14 +15,14 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: 5e44e91c94ef2dc48e0c15d2c7dbb2420fc55475
+          ref: 4c5dff10780907d515b5f3d8f5c5bb2cd205184a
           persist-credentials: false
       - name: Export source difference without changing product refs
         shell: bash
         run: |
           set -euo pipefail
           base=ac7914962242fcab16a14125ce3ea353e331b6ef
-          head=5e44e91c94ef2dc48e0c15d2c7dbb2420fc55475
+          head=4c5dff10780907d515b5f3d8f5c5bb2cd205184a
           test "$(git rev-parse HEAD)" = "$head"
           git fetch --no-tags --depth=1 origin "$base"
           test "$(git rev-parse "$base^{tree}")" = 2caa3ab98c8118f68d0ebb4d0f2e51b4e6abfb4e
@@ -36,7 +36,7 @@ jobs:
           wc -c "$out"/*
       - uses: actions/upload-artifact@v4
         with:
-          name: pr9-source-delta-5e44e91
+          name: pr9-source-delta-4c5dff1
           path: ${{ runner.temp }}/pr9-source-delta/*
           retention-days: 7
           if-no-files-found: error
