@@ -150,8 +150,10 @@ export default function App() {
         event.detail?.documentId !== pending.id ||
         typeof pending.loadedContent !== 'string' ||
         event.detail?.content !== pending.loadedContent ||
-        !pending.headingPath?.length
+        !(pending.headingPath?.length || pending.blockId)
       ) return
+
+      if ((pending.blockId && event.type !== 'editor:block-navigation-ready') || (!pending.blockId && event.type !== 'editor:heading-navigation-ready')) return
 
       // The body read can finish before the editor and its outline commit.
       // Consume this selection only when that exact document body is ready.
@@ -160,14 +162,15 @@ export default function App() {
       window.requestAnimationFrame(() => {
         window.requestAnimationFrame(() => {
           if (epoch !== navigationEpoch.current) return
-          window.dispatchEvent(new CustomEvent('editor:open-heading-anchor', {
-            detail: { documentId: pending.id, path: pending.headingPath },
+          window.dispatchEvent(new CustomEvent(pending.blockId ? 'editor:open-block-anchor' : 'editor:open-heading-anchor', {
+            detail: { documentId: pending.id, path: pending.headingPath, ...(pending.blockId ? { blockId: pending.blockId } : {}) },
           }))
         })
       })
     }
     window.addEventListener('editor:heading-navigation-ready', onHeadingNavigationReady)
-    return () => window.removeEventListener('editor:heading-navigation-ready', onHeadingNavigationReady)
+    window.addEventListener('editor:block-navigation-ready', onHeadingNavigationReady)
+    return () => { window.removeEventListener('editor:heading-navigation-ready', onHeadingNavigationReady); window.removeEventListener('editor:block-navigation-ready', onHeadingNavigationReady) }
   }, [])
 
   const select = React.useCallback((f) => {
@@ -896,6 +899,14 @@ export default function App() {
     workspace,
     navigationEpoch,
     onSelectFile: handleSelectFile,
+    onBlock: (id, blockId, isCurrent) => {
+      if (isCurrent) {
+        const epoch = navigationEpoch.current
+        window.requestAnimationFrame(() => {
+          if (epoch === navigationEpoch.current) window.dispatchEvent(new CustomEvent('editor:open-block-anchor', { detail: { documentId: id, blockId } }))
+        })
+      } else pendingEditorNavigationRef.current = { id, blockId, epoch: navigationEpoch.current }
+    },
     onHeading: (id, headingPath, isCurrent) => {
       if (isCurrent) {
         const epoch = navigationEpoch.current
@@ -1250,7 +1261,7 @@ export default function App() {
                           const pending = pendingEditorNavigationRef.current
                           if (pending && pending.epoch !== navigationEpoch.current) {
                             pendingEditorNavigationRef.current = null
-                          } else if (pending?.id === current.id && pending.headingPath?.length) {
+                          } else if (pending?.id === current.id && (pending.headingPath?.length || pending.blockId)) {
                             pending.loadedContent = text
                           }
                         }

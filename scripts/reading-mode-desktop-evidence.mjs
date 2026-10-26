@@ -8,7 +8,7 @@ import { assertDesktopWindowImage, selectDesktopMainWindow, selectDesktopUnappli
   isDesktopUnappliedDialogWindow, UNAPPLIED_QUIT_DIALOG_CAPTION,
   UNAPPLIED_QUIT_DIALOG_TITLE, UNAPPLIED_QUIT_DIALOG_MESSAGE, assertDesktopAccessibleText } from './desktop-window-target.mjs'
 
-export const READING_MODE_VERSION = '4.235.0'
+export const READING_MODE_VERSION = '4.236.0'
 export const READING_DRAFT_VALUES = Object.freeze({
   formulaOriginal: 'x^2', formulaPending: 'y^3', formulaApplied: 'x^2 + y^2', formulaQuit: 'z^4',
   embedOriginalURL: 'https://example.invalid/reading-mode-original',

@@ -17,7 +17,7 @@ export function extractLexicalText(content) {
     if (node.type === 'image') return node.caption || node.alt || ''
     if (node.type === 'wiki-link') {
       if (!node.title) return ''
-      const section = Array.isArray(node.sectionPath)
+      const section = node.blockId ? '^' + node.blockId : Array.isArray(node.sectionPath)
         ? node.sectionPath.map(value => String(value || '').trim()).filter(Boolean).join(' › ')
         : ''
       return section

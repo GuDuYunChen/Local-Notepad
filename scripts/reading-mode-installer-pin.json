@@ -1,5 +1,5 @@
 {
-  "product": "ed277f9c49516d29ced8dabe6fb773715cbc227c",
+  "product": "e05660c2bd708419ff09f64e527799e9d3fe52e0",
   "quickBlob": "c1e8f40862b770f82af47c26a455b57efc853700",
   "tagsBlob": "54bb56864e58e2aa3f5ed08aedb52a00de5f0769",
   "templateBlob": "42378f13f71a03c3e91cdfdcb6dec44dbbb05f33",
@@ -10,14 +10,14 @@
   "pinsBlob": "7abf0331d1b3a7c1b626e7c2e2b5f68d6a77c588",
   "recentBlob": "cbe5a8897c082210363357fd33f2cb0f3d7bd1cc",
   "wikiBlob": "8cb64e31bf79c3ec2b17d5b8c152eccc0f2de6ca",
-  "importBlob": "f7001589494d6ae81b51275512ed406f6892974c",
+  "importBlob": "e71e3f05bc3ac64d25cc8cc513a0341c06f50024",
   "importFixtureBlob": "022e484ef96e8a2dd6b2f57601bda8af29869666",
-  "importEvidenceBlob": "6984a22dba599d4026769de34a76c0aa8e01229f",
-  "importEvidenceTestsBlob": "12ceb52310ca16bb964661f7894d76c920a47779",
+  "importEvidenceBlob": "c29f36c5e36248d9ad768cba05735c32af11c2d1",
+  "importEvidenceTestsBlob": "49a0fa28df31ccd5fb09737652600b27e6138748",
   "current": {
-    "version": "4.235.0",
-    "bytes": 104348576,
-    "sha256": "62f0909a3a31956ede44bcdc8a62828dab485b986c66e36f104639e2d1ea36cb"
+    "version": "4.236.0",
+    "bytes": 104352125,
+    "sha256": "d3c83bd79b1276dcd199add1d6f91f2cb1e5cc3f357613e1198ff853abc21643"
   },
   "previous": {
     "version": "4.232.0",
@@ -31,18 +31,18 @@
     "productSourceCommit": "1a8e17ba775312c359f4ac23851c8c365b57a9cb"
   },
   "currentSource": {
-    "run": 39996106211,
-    "artifact": 12520023127,
-    "name": "local-notepad-windows-ed277f9c49516d29ced8dabe6fb773715cbc227c",
-    "headSha": "03f5495330e2fe0d418f1727e7921e10a13f240f",
-    "branch": "feature/local-export-2f102-closure",
+    "run": 40292809325,
+    "artifact": 12637102784,
+    "name": "local-notepad-windows-e05660c2bd708419ff09f64e527799e9d3fe52e0",
+    "headSha": "b48cdaddcfed088c9e0e7f45257dc067b141a13b",
+    "branch": "feature/local-block-references-2f103",
     "repositoryId": 1105107817,
-    "archiveBytes": 104351631,
-    "archiveSha256": "c717b923bc4bfd7c8038a6eccb9eeb80e6c0e485a81b14a808b98a25bf04e6e3"
+    "archiveBytes": 104355168,
+    "archiveSha256": "7fc76bbeb880ab8aa4a0f37ba1db7907172cdd5e9e00ee9f46dbb10ff9c217c4"
   },
   "readingDriverBlob": "6924b128c1125424c91f71dbd1ecc415762e2f77",
   "readingFixtureBlob": "0c7ffadbb187dd33a7bc6b5aa8c69427eec5cc34",
-  "readingEvidenceBlob": "be131f7c79bdbdc1937ba892b1ce7d98704f55e1",
+  "readingEvidenceBlob": "664103199e6ceae406af654f9de0dd68c01fbc26",
   "readingBuilderBlob": "fbc7ead7bf8a6f765c00619920778b9aac1c8c8a",
   "readingInputBlob": "b69a1d282926cb7cc40375d58feeea7970a33a4d",
   "readingWindowSessionBlob": "5905369c693500e6b68e506bbf1dac0601922449",
@@ -51,12 +51,12 @@
   "historyDriverBlob": "cca9480ce41883f1f64fc37bbc655e5f5c51582b",
   "shortcutManagementDriverBlob": "a728dd1e03bc75eecec1aa85df5d33085066751d",
   "shortcutManagementRunnerBlob": "0fada01b2c802b0299c2c606a0004c4657f0e1c2",
-  "shortcutManagementEvidenceBlob": "8ab05f8ece3900f26cab0130e21d0fbafd63c99b",
+  "shortcutManagementEvidenceBlob": "a73a2622e388805dc555f9f29ff35c85b17d798a",
   "shortcutManagementFixtureBlob": "eb49f859eb9c9b51f8c31d3354f81231c647fb87",
   "shortcutManagementCanonicalFixtureBlob": "f86598e0d552a5d884eff9e30739617366c685c9",
   "localExportDriverBlob": "154b4552317cedf9c0e94c3fbbebeffb6b025f1b",
   "localExportRunnerBlob": "ffde8b2684e79327db84e64e58e7ecd5dd37edfd",
-  "localExportEvidenceBlob": "55f3a5dcd15d4cd4d55f0ea354ae78bf76dcd6a4",
+  "localExportEvidenceBlob": "4d2c9cf9d6aec5fdfb7bfab502be98454cad778f",
   "localExportValuesBlob": "8c2af4276b34c42e5b346b666c08adc402470672",
   "localExportFixtureBlob": "802be649735c7ce56dab17bc15647934c036662c",
   "localExportBuilderBlob": "20e6d532a30689ed221b2ce184b13e337f2a5a4c",
@@ -69,5 +69,28 @@
     "archiveBytes": 104338160,
     "archiveSha256": "8bdaba7b79eb81fa0c793bb56050145764ddd2da573f0f301bcf9e3ac9ec776d",
     "productSourceSha": "1a8e17ba775312c359f4ac23851c8c365b57a9cb"
+  },
+  "blockReferenceSources": {
+    "scripts/block-references-desktop-driver.mjs": "d6e92bfb3f403278cf01500da357ed1d30f00811",
+    "scripts/run-block-references-desktop.mjs": "fe5d43271b7e2916ddcaf7182e0d1e2775c3a238",
+    "scripts/block-references-evidence.mjs": "14b9d56ac8dc7eafb10f025c17f7c87d82ef8d2d",
+    "src/services/blockReferenceModel.mjs": "192a962099478836bb8e97d66a39853cc4f365ac",
+    "src/services/blockReferences.mjs": "f260d8b5a08c1d1aa139777e3a3dfcfbfd9fdb9c",
+    "src/components/Editor/plugins/BlockReferencePlugin.jsx": "b239eb70afc53debf8a023ec5a15cd8e004f5b18",
+    "src/components/Editor/plugins/BlockReferences.css": "1fcbff9ba48d2349ca9322a9966492e9210cac1c",
+    "src/components/Editor/utils/blockReferenceState.js": "36ead2f4c18d3d721fec0e23dde3ba184f6ad9cf",
+    "src/components/Editor/nodes/BlockEmbedView.jsx": "151df1549735dbdd1c3a4e2266c62f0d3e257458",
+    "src/components/Editor/nodes/WikiLinkNode.jsx": "7764d6b5da9c464fa4bd7c35b292d784f5721f12",
+    "src/components/Editor/nodes/WikiLinkView.jsx": "c905c43086714795cb955ddc678871168a546417",
+    "src/components/Editor/nodes/CodeBlockNode.jsx": "fd2598414e901dc71c8020fa304a6636fbf44e52",
+    "src/components/Editor/plugins/BlockHandlePlugin.jsx": "f62a4bb8e309371059afd872bbf2e73178898b2c",
+    "src/components/Editor/Editor.jsx": "08c6f8bb08d5f885b26ac97ad5f01bcb45265886",
+    "src/services/wikiNavigation.mjs": "4ecc8c52880deb514cdb950c9432dcabd13da110",
+    "src/hooks/useGuardedNoteOpener.js": "13c0ae3b56a7df0c8954ce9113c0b46352162d98",
+    "src/App.jsx": "60653a7d7b3a61e0a8f0e76a7d1ce3fb41796644",
+    "src/services/markdownSource.js": "37d1097e06e01242562be1c6b6c0442175d9e61e",
+    "electron/local-export-document.js": "e9ed11cfced23369f51333b1bf1208ff247f2c25",
+    "src/utils/lexicalText.js": "a65c6fb38a5406494683686a6083a9079560f71c",
+    "src/components/Editor/utils/referenceUtils.js": "046ede7392ba863a82bd28c6857fc8b8cceaf30c"
   }
 }

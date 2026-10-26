@@ -97,11 +97,12 @@ export class CodeBlockNode extends DecoratorNode {
 
   static importJSON(serializedNode) {
     const { code, language } = serializedNode;
-    return new CodeBlockNode(code || '', validateLanguage(language || 'plaintext'));
+    return new CodeBlockNode(code || '', validateLanguage(language || 'plaintext')).updateFromJSON(serializedNode);
   }
 
   exportJSON() {
     return {
+      ...super.exportJSON(),
       type: 'code-block',
       code: this.__code,
       language: this.__language,

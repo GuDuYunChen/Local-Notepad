@@ -192,3 +192,26 @@ test('leaving after the body read invalidates its pending outline before an ordi
   expect(headingEvents(events)).toEqual([])
   expect(m.save).not.toHaveBeenCalled();expect(m.clear).not.toHaveBeenCalled()
 })
+
+const blockId = 'b-'+'a'.repeat(32)
+const blockTarget = {...target, content:JSON.stringify({root:{type:'root',children:[{type:'paragraph',$:{localBlockId:blockId},children:[{type:'text',text:'块正文'}]}]}})}
+const blockEvents = spy => spy.mock.calls.filter(([event])=>event.type==='editor:open-block-anchor').map(([event])=>event.detail)
+test('block navigation waits for its exact loaded body and block-ready event, not an outline event',async()=>{
+  api.mockResolvedValue(blockTarget); const events=vi.spyOn(window,'dispatchEvent')
+  await emit({blockId});await settle();expect(title()).toBe(blockTarget.title);expect(blockEvents(events)).toEqual([])
+  await act(async()=>window.dispatchEvent(new CustomEvent('editor:block-navigation-ready',{detail:{documentId:target.id,content:'wrong body'}})));await settle();expect(blockEvents(events)).toEqual([])
+  await act(async()=>window.dispatchEvent(new CustomEvent('editor:block-navigation-ready',{detail:{documentId:target.id,content:blockTarget.content}})));await settle()
+  expect(blockEvents(events)).toEqual([{documentId:target.id,path:undefined,blockId}]);expect(m.save).not.toHaveBeenCalled()
+})
+test('leaving a block destination before readiness discards the pending anchor',async()=>{
+  api.mockResolvedValue(blockTarget);const events=vi.spyOn(window,'dispatchEvent')
+  await emit({blockId});await settle();await act(async()=>m.select(other));await settle()
+  await act(async()=>window.dispatchEvent(new CustomEvent('editor:block-navigation-ready',{detail:{documentId:target.id,content:blockTarget.content}})));await settle();expect(blockEvents(events)).toEqual([]);expect(title()).toBe(other.title)
+})
+test('block navigation preserves the original save-discard-cancel decision',async()=>{
+  api.mockResolvedValue(blockTarget);await click('写入正文草稿');const events=vi.spyOn(window,'dispatchEvent');await emit({blockId});await settle()
+  expect(host.querySelector('.consumer-confirm-modal')).toBeTruthy();await click('取消');expect(title()).toBe(source.title);expect(blockEvents(events)).toEqual([]);expect(m.clear).not.toHaveBeenCalled()
+})
+test('deleted stable block does not silently navigate to a similarly titled note',async()=>{
+  api.mockResolvedValue(target);await emit({blockId});await settle();expect(title()).toBe(source.title);expect(host.textContent).toContain('来源块已删除');expect(button('仅打开笔记正文')).toBeUndefined()
+})
