@@ -1,40 +1,42 @@
-name: Publish verified block-reference source objects
+name: Fixed PR9 source delta for local verification
 on:
   push:
     branches: [ci/local-dev-kit-ac791496]
     paths: [.github/workflows/local-dev-kit.yml]
 permissions:
-  contents: write
+  contents: read
 concurrency:
   group: local-dev-kit-ac791496
   cancel-in-progress: false
 jobs:
-  publish-fixed-source-objects:
+  export-fixed-delta:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - name: Checkout publisher inputs
-        uses: actions/checkout@v7
+      - uses: actions/checkout@v7
         with:
-          path: publisher
+          ref: 5e44e91c94ef2dc48e0c15d2c7dbb2420fc55475
           persist-credentials: false
-      - name: Checkout exact accepted product base
-        uses: actions/checkout@v7
+      - name: Export source difference without changing product refs
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=ac7914962242fcab16a14125ce3ea353e331b6ef
+          head=5e44e91c94ef2dc48e0c15d2c7dbb2420fc55475
+          test "$(git rev-parse HEAD)" = "$head"
+          git fetch --no-tags --depth=1 origin "$base"
+          test "$(git rev-parse "$base^{tree}")" = 2caa3ab98c8118f68d0ebb4d0f2e51b4e6abfb4e
+          out="$RUNNER_TEMP/pr9-source-delta"
+          mkdir -p "$out"
+          git diff --binary "$base" "$head" > "$out/candidate.patch"
+          git cat-file commit "$head" > "$out/candidate-commit.raw"
+          git ls-tree -r -z "$head" > "$out/candidate-tree.zlist"
+          git rev-parse "$head^{tree}" > "$out/candidate-tree.txt"
+          (cd "$out" && sha256sum candidate.* candidate-* > SHA256SUMS)
+          wc -c "$out"/*
+      - uses: actions/upload-artifact@v4
         with:
-          ref: ac7914962242fcab16a14125ce3ea353e331b6ef
-          path: candidate
-          persist-credentials: false
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '24'
-      - name: Verify exact patch and create immutable source objects only
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node publisher/.github/scripts/publish-block-source.mjs
-      - name: Retain immutable-source receipt
-        uses: actions/upload-artifact@v4
-        with:
-          name: verified-block-source-objects
-          path: source-object-receipt/immutable-source-objects.json
-          retention-days: 30
+          name: pr9-source-delta-5e44e91
+          path: ${{ runner.temp }}/pr9-source-delta/*
+          retention-days: 7
           if-no-files-found: error
