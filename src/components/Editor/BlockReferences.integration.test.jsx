@@ -77,6 +77,17 @@ async function mount(props={}){await act(async()=>root.render(<Harness {...props
 beforeEach(()=>{globalThis.IS_REACT_ACT_ENVIRONMENT=true;vi.clearAllMocks();host=document.createElement('div');document.body.append(host);root=createRoot(host);saveClipboard=Object.getOwnPropertyDescriptor(navigator,'clipboard');Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:vi.fn().mockResolvedValue()}});api.mockResolvedValue(file())})
 afterEach(async()=>{await act(async()=>root.unmount());host.remove();if(saveClipboard)Object.defineProperty(navigator,'clipboard',saveClipboard);else delete navigator.clipboard;delete globalThis.IS_REACT_ACT_ENVIRONMENT})
 describe('entry, saved source, review, insertion and exception lifecycle',()=>{
+ test('root boundary after a readonly embed is refused; selecting its preceding paragraph recovers without edits',async()=>{
+  await mount();await click('取消')
+  await act(async()=>change(liveEditor,()=>{$getRoot().append($createBlockReferenceNode('source','来源',id,true));$getRoot().selectEnd()}))
+  await flush();const original=json(liveEditor)
+  await click('块引用');expect(host.querySelector('[role=dialog]')).toBeNull();expect(host.textContent).toContain('当前光标不在可引用的正文块中')
+  expect(json(liveEditor)).toBe(original)
+  await act(async()=>change(liveEditor,()=>{$getRoot().getFirstChild().selectEnd()}))
+  await click('块引用');expect(host.querySelector('[role=dialog]')).not.toBeNull();expect(json(liveEditor)).toBe(original)
+  await click('取消');expect(json(liveEditor)).toBe(original)
+ })
+
  test('opening and cancelling the dialog never changes the note',async()=>{await mount();const original=json(liveEditor);await click('取消');expect(json(liveEditor)).toBe(original);expect(host.querySelector('[role=dialog]')).toBeNull();expect(api).not.toHaveBeenCalled()})
  test('creation changes only the draft and copy refuses until saved bytes match',async()=>{
   await mount();await click('为当前块创建引用');const draft=json(liveEditor);expect(draft).toContain('localBlockId');expect(api).not.toHaveBeenCalled()

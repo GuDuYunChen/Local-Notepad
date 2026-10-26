@@ -27,8 +27,9 @@ export function blockReportFixture(){
  const sourceBlock={type:'paragraph',version:1,$:{localBlockId:blockId},children:[{type:'text',version:1,text:'Synthetic fixture, not a native run.'}]}
  const ref=embedded=>({type:'wiki-link',version:1,id,title:'合成笔记',blockId,embedded,sectionPath:[]})
  const screenshots=['block103-source-address.png','block103-reviewed-insertion.png','block103-exact-navigation.png','block103-embedded.png','block103-reading-mode.png','block103-small-window.png','block103-dark-theme.png'].map(filename=>({filename,bytes:2000,sha256:'d'.repeat(64)}))
+ const caret=()=>({method:'native-text-click',before:{candidateCount:1,marker:'BLOCK103 destination',x:120,y:180,width:704,height:455},after:{marker:'BLOCK103 destination',collapsed:true,textNode:true,topLevelParagraph:true,editable:true,width:704,height:455}})
  return{pin,report:{schemaVersion:1,module:'2F.103',version:BLOCK_REFERENCE_VERSION,productCommit:product,verifierCommit:verifier,scope:'installed',platform:'win32',runnerEnvironment:'github-hosted',localValidationOnly:false,
- complete:true,cleanupComplete:true,syntheticData:true,realBackend:true,bridgeOverridden:false,timerAccelerated:false,forceTerminated:false,
+ smallWindowCaret:caret(),darkWindowCaret:caret(),complete:true,cleanupComplete:true,syntheticData:true,realBackend:true,bridgeOverridden:false,timerAccelerated:false,forceTerminated:false,
  checks:[...BLOCK_REFERENCE_CHECKS],app:{version:BLOCK_REFERENCE_VERSION,packaged:true},executable:'D:\\owned\\Notepad.exe',executableSHA256:'a'.repeat(64),asarSHA256:'b'.repeat(64),backendSHA256:'c'.repeat(64),pid:3011,
  exit:{pid:3011,code:0,signal:null,normalClose:true},backendStopped:true,verificationScope:'windows-complete',smallWindowEntry:{
  before:{width:704,height:455,sidebarPresent:true,sidebarExpanded:true,entryPresent:true,entryReachable:false,blockedBySidebar:true},

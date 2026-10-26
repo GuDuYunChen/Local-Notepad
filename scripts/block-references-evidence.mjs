@@ -54,6 +54,16 @@ export function validateBlockReferencesReport(report,{commit,verifier=commit,sco
   assert.equal(entry.after.width,report.smallViewport.width);assert.equal(entry.after.height,report.smallViewport.height)
   assert.equal(entry.collapsedByClick,entry.before.width<=820&&entry.before.sidebarExpanded&&entry.before.blockedBySidebar)
   if(entry.collapsedByClick)assert.equal(entry.after.sidebarExpanded,false)
+  for(const key of ['smallWindowCaret','darkWindowCaret']) {
+    const caret=report[key]
+    assert.equal(caret.method,'native-text-click');assert.equal(caret.before.candidateCount,1)
+    assert.equal(caret.before.marker,'BLOCK103 destination');assert.equal(caret.after.marker,caret.before.marker)
+    for(const field of ['collapsed','textNode','topLevelParagraph','editable'])assert.equal(caret.after[field],true,key+' '+field)
+    assert.equal(caret.after.width,caret.before.width);assert.equal(caret.after.height,caret.before.height)
+    assert.equal(caret.after.width,report.smallViewport.width);assert.equal(caret.after.height,report.smallViewport.height)
+    assert.ok(Number.isFinite(caret.before.x)&&caret.before.x>=0&&caret.before.x<caret.before.width)
+    assert.ok(Number.isFinite(caret.before.y)&&caret.before.y>=0&&caret.before.y<caret.before.height)
+  }
   assert.equal(report.smallViewport.overflow,false);assert.ok(report.smallViewport.width>=640&&report.smallViewport.width<=720&&report.smallViewport.height>=400)
   assert.equal(report.minimumWindow.pid,report.pid);assert.equal(report.minimumWindow.applied,true);assert.equal(report.minimumWindow.width,720);assert.equal(report.minimumWindow.height,520)
   assert.equal(report.darkPanel.theme,'dark');assert.notEqual(report.darkPanel.color,report.darkPanel.background)

@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
-import { revealBlockReferenceEditor } from './block-references-desktop-driver.mjs'
+import { revealBlockReferenceEditor, focusBlockReferenceParagraph } from './block-references-desktop-driver.mjs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { blockReportFixture, product, verifier } from './block-references-test-fixture.mjs'
@@ -81,4 +81,38 @@ test('a different overlay stays a failure instead of collapsing the sidebar',asy
 })
 test('missing entry is not silently repaired or reported as visible',async()=>{
  const f=entryFixture();f.set({entryPresent:false});await assert.rejects(revealBlockReferenceEditor(f.context),/entry is missing/);assert.equal(f.clicks.length,0)
+})
+
+for(const key of ['smallWindowCaret','darkWindowCaret'])for(const [name,change]of[
+ ['missing',r=>delete r[key]],['ambiguous',r=>r[key].before.candidateCount=2],
+ ['root boundary',r=>r[key].after.topLevelParagraph=false],['readonly',r=>r[key].after.editable=false],
+ ['range',r=>r[key].after.collapsed=false],['nontext',r=>r[key].after.textNode=false],
+ ['wrong note',r=>r[key].after.marker='another note'],['offscreen',r=>r[key].before.x=800],
+ ['resized',r=>r[key].after.width=1400],['synthetic method',r=>r[key].method='setSelection'],
+])test('refuses '+key+' '+name,()=>{const{pin,report}=blockReportFixture();change(report);assert.throws(()=>validateBlockReferencesReport(report,expected(pin)))})
+function caretFixture() {
+ const before={candidateCount:1,marker:'BLOCK103 destination',x:120,y:180,width:704,height:455}
+ const after={marker:before.marker,collapsed:true,textNode:true,topLevelParagraph:true,editable:true,width:704,height:455}
+ const inputs=[],expressions=[]
+ const context={evaluate:async expression=>{expressions.push(expression);return expression.includes('getSelection()')?after:before},
+ cdp:{send:async(method,input)=>{inputs.push({method,...input})}},
+ until:async(probe,label)=>{for(let n=0;n<3;n++){const value=await probe();if(value)return value}throw Error(label)}}
+ return {context,before,after,inputs,expressions}
+}
+test('native caret positioning sends one mouse pair and does not mutate selection or content',async()=>{
+ const f=caretFixture(),receipt=await focusBlockReferenceParagraph(f.context)
+ assert.equal(receipt.method,'native-text-click');assert.deepEqual(f.inputs.map(i=>i.type),['mousePressed','mouseReleased'])
+ assert.ok(f.inputs.every(i=>i.method==='Input.dispatchMouseEvent'&&i.x===120&&i.y===180&&i.clickCount===1))
+ assert.ok(f.expressions.every(s=>!s.includes('removeAllRanges')&&!s.includes('addRange')&&!s.includes('setSelection')&&!s.includes('.click(')&&!s.includes('localStorage')))
+})
+test('ambiguous paragraph refuses before input',async()=>{
+ const f=caretFixture();f.before.candidateCount=2;await assert.rejects(focusBlockReferenceParagraph(f.context),/ambiguous/);assert.equal(f.inputs.length,0)
+})
+test('unconfirmed native caret is not clicked again',async()=>{
+ const f=caretFixture();f.context.evaluate=async s=>s.includes('getSelection()')?null:f.before
+ await assert.rejects(focusBlockReferenceParagraph(f.context),/did not establish/);assert.equal(f.inputs.length,2)
+})
+test('native caret input failure is not replayed',async()=>{
+ const f=caretFixture();f.context.cdp.send=async(method,input)=>{f.inputs.push(input);throw Error('native unavailable')}
+ await assert.rejects(focusBlockReferenceParagraph(f.context),/native unavailable/);assert.equal(f.inputs.length,1)
 })

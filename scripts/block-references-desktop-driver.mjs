@@ -45,6 +45,42 @@ export async function revealBlockReferenceEditor({evaluate,click,until}) {
   assert.equal(after.height,before.height,'Entry recovery must not change window height')
   return {before,after,collapsedByClick}
 }
+// A document ending with a read-only embed has a root boundary after it.
+// Ctrl+End may place the caret there, which is not a writable paragraph.
+// Select visible fixture text with ONE trusted native mouse pair. Measuring a
+// DOM Range does not change the document selection or the application state.
+export async function focusBlockReferenceParagraph({evaluate,cdp,until}, marker='BLOCK103 destination') {
+  const before=await until(()=>evaluate(`(() => {
+    const root=document.querySelector('.editor-input[contenteditable="true"]')
+    if(!root)return null
+    const paragraphs=[...root.children].filter(e=>e.tagName==='P'&&e.textContent.includes(${q(marker)}))
+    if(paragraphs.length!==1)return {candidateCount:paragraphs.length}
+    const paragraph=paragraphs[0],texts=[]
+    const walker=document.createTreeWalker(paragraph,NodeFilter.SHOW_TEXT)
+    for(let node=walker.nextNode();node;node=walker.nextNode()){
+      if(node.data.includes(${q(marker)})&&!node.parentElement.closest('.wiki-link,.block-reference-embed,[contenteditable="false"]'))texts.push(node)
+    }
+    if(texts.length!==1)return {candidateCount:texts.length}
+    paragraph.scrollIntoView({block:'nearest'})
+    const node=texts[0],offset=node.data.indexOf(${q(marker)}),range=document.createRange()
+    range.setStart(node,offset);range.setEnd(node,offset+Math.min(8,${q(marker)}.length))
+    const r=range.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2,hit=document.elementFromPoint(x,y)
+    if(!r.width||!r.height||x<0||y<0||x>=innerWidth||y>=innerHeight||!hit||!paragraph.contains(hit)||hit.closest('.wiki-link,.block-reference-embed,[contenteditable="false"]'))return null
+    return {candidateCount:1,marker:${q(marker)},x,y,width:innerWidth,height:innerHeight}
+  })()`),'Writable block-reference paragraph is missing or occluded')
+  assert.equal(before.candidateCount,1,'Writable block-reference paragraph is ambiguous')
+  for(const type of ['mousePressed','mouseReleased'])await cdp.send('Input.dispatchMouseEvent',{type,x:before.x,y:before.y,button:'left',clickCount:1})
+  const after=await until(()=>evaluate(`(() => {
+    const root=document.querySelector('.editor-input[contenteditable="true"]'),selection=getSelection()
+    const node=selection?.anchorNode,element=node?.nodeType===Node.TEXT_NODE?node.parentElement:node
+    const paragraph=element?.closest?.('p')
+    const valid=Boolean(root&&selection?.isCollapsed&&node?.nodeType===Node.TEXT_NODE&&node.data.includes(${q(marker)})&&paragraph?.parentElement===root&&!element.closest('.wiki-link,.block-reference-embed,[contenteditable="false"]')&&(document.activeElement===root||root.contains(document.activeElement)))
+    return valid?{marker:${q(marker)},collapsed:true,textNode:true,topLevelParagraph:true,editable:true,width:innerWidth,height:innerHeight}:null
+  })()`),'Native click did not establish a writable paragraph caret')
+  assert.equal(after.width,before.width,'Caret selection must not resize the window')
+  assert.equal(after.height,before.height,'Caret selection must not resize the window')
+  return {method:'native-text-click',before,after}
+}
 export async function verifyBlockReferencesDesktop({api,evaluate,click,cdp,until,capture,report,save,resizeSmall}) {
   const prefix='BLOCK103 '+randomUUID().slice(0,8)
   const source=await api('/api/files',{method:'POST',body:q({title:prefix+' Source.md',content:blockReferenceFixture('BLOCK103 source original')})})
@@ -63,7 +99,7 @@ export async function verifyBlockReferencesDesktop({api,evaluate,click,cdp,until
     await until(()=>evaluate(`document.querySelector('.workspace-title-button')?.textContent===${q(file.title)}&&document.querySelector('.editor-input')?.innerText.includes(${q(needle)})`),'Block reference note not opened')
     await clean()
   }
-  const show=async()=>{await click('.editor-input[contenteditable="true"]');await key('End',35,2);await click({selector:'.block-reference-entry button',text:'块引用'});await until(()=>evaluate("Boolean(document.querySelector('.block-reference-panel'))"),'Block-reference entry did not open')}
+  const show=async(preserveCaret=false)=>{if(!preserveCaret){await click('.editor-input[contenteditable="true"]');await key('End',35,2)}await click({selector:'.block-reference-entry button',text:'块引用'});await until(()=>evaluate("Boolean(document.querySelector('.block-reference-panel'))"),'Block-reference entry did not open')}
   const address=async value=>{await click('.block-reference-panel input[placeholder]');await key('a',65,2);await cdp.send('Input.insertText',{text:value});
     const actual=await evaluate("document.querySelector('.block-reference-panel input[placeholder]').value");assert.equal(actual,value,'Actual native input differs from locator');
     report.locatorObservation=await evaluate("(()=>{const value=document.querySelector('.block-reference-panel input[placeholder]').value;const url=new URL(value);return {value,protocol:url.protocol,host:url.host,username:url.username,password:url.password,search:url.search,hash:url.hash,pathname:url.pathname}})()");save()
@@ -137,7 +173,8 @@ export async function verifyBlockReferencesDesktop({api,evaluate,click,cdp,until
   await until(()=>evaluate('innerWidth <= 720 && innerWidth >= 640 && innerHeight >= 400'), 'Real small-window bounds did not settle')
   report.smallWindowEntry=await revealBlockReferenceEditor({evaluate,click,until});save()
   await click('button.editor-mode-toggle[aria-label="切换到编辑模式"]')
-  await show();await address(locator);await action('读取来源块');await until(()=>evaluate("Boolean(document.querySelector('.block-reference-preview pre'))"),'Small-window preview missing')
+  report.smallWindowCaret=await focusBlockReferenceParagraph({evaluate,cdp,until});save()
+  await show(true);await address(locator);await action('读取来源块');await until(()=>evaluate("Boolean(document.querySelector('.block-reference-preview pre'))"),'Small-window preview missing')
   report.smallViewport=await evaluate('({width:innerWidth,height:innerHeight,overflow:document.documentElement.scrollWidth>innerWidth+1})')
   assert.equal(report.smallViewport.overflow,false)
   await capture('block103-small-window.png');await action('取消');mark('small-window-controls-remain-reachable')
@@ -145,7 +182,8 @@ export async function verifyBlockReferencesDesktop({api,evaluate,click,cdp,until
   if(await evaluate("document.documentElement.getAttribute('data-theme') !== 'dark'"))await click('.theme-toggle[aria-label="切换主题"]')
   await until(()=>evaluate("document.documentElement.getAttribute('data-theme') === 'dark'"),'Real theme switch did not settle')
   await click('.workspace-sidebar-more[aria-label="更多功能"]')
-  await show();await address(locator);await action('读取来源块');await until(()=>evaluate("Boolean(document.querySelector('.block-reference-preview pre'))"),'Dark preview missing')
+  report.darkWindowCaret=await focusBlockReferenceParagraph({evaluate,cdp,until});save()
+  await show(true);await address(locator);await action('读取来源块');await until(()=>evaluate("Boolean(document.querySelector('.block-reference-preview pre'))"),'Dark preview missing')
   report.darkPanel=await evaluate("(()=>{const e=document.querySelector('.block-reference-panel'),s=getComputedStyle(e);const root=getComputedStyle(document.documentElement);return{theme:document.documentElement.getAttribute('data-theme'),color:s.color,background:s.backgroundColor,surface:root.getPropertyValue('--surface').trim(),ink:root.getPropertyValue('--ink').trim()}})()")
   assert.notEqual(report.darkPanel.color,report.darkPanel.background)
   await capture('block103-dark-theme.png');await action('取消');mark('dark-theme-retains-readable-block-panel')
