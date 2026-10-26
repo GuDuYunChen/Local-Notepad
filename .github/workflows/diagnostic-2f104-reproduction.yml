@@ -1,0 +1,65 @@
+name: 2F104 one-shot reproduction
+
+on:
+  pull_request:
+    branches: [master]
+    paths: [.github/workflows/diagnostic-2f104-reproduction.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  reproduce:
+    if: github.head_ref == 'feature/local-draft-durability-2f104'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.24.11'
+          cache-dependency-path: server/go.sum
+      - name: Install the existing locked dependency graph
+        id: dependencies
+        run: |
+          node scripts/verify-dependency-lock.mjs
+          npm ci --no-audit --no-fund
+          git diff --exit-code -- package.json package-lock.json
+      - name: Reproduce the unchanged installation contract failure
+        run: |
+          node scripts/build-local-export-fixture.mjs
+          node --test scripts/block-references-evidence.node.mjs scripts/block-references-installed-evidence.node.mjs
+      - name: Capture tracked source and isolated test tools
+        if: always() && steps.dependencies.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/notepad-2f104-reproduction"
+          mkdir -p "$out"
+          git rev-parse HEAD > "$out/source-commit.txt"
+          git rev-parse HEAD^{tree} > "$out/source-tree.txt"
+          git ls-tree -r HEAD > "$out/source-manifest.txt"
+          node --version > "$out/node-version.txt"
+          go version > "$out/go-version.txt"
+          git archive --format=tar.gz --output="$out/source.tar.gz" HEAD
+          tar --exclude='node_modules/electron/dist' -czf "$out/node-modules.tar.gz" node_modules
+          tar -C "$(dirname "$(dirname "$(command -v node)")")" -czf "$out/node-toolchain.tar.gz" .
+          tar -C "$(go env GOROOT)" -czf "$out/go-toolchain.tar.gz" .
+          if [ -d "$(go env GOMODCACHE)" ]; then
+            tar -C "$(go env GOMODCACHE)" -czf "$out/go-modules.tar.gz" .
+          fi
+          (cd "$out" && sha256sum *.tar.gz > SHA256SUMS)
+      - name: Upload reproduction inputs, not acceptance evidence
+        if: always() && steps.dependencies.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-notepad-2f104-reproduction-${{ github.sha }}
+          path: ${{ runner.temp }}/notepad-2f104-reproduction/
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 2
