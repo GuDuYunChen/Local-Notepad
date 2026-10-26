@@ -19,15 +19,45 @@ export const BLOCK_REFERENCE_SOURCES = Object.freeze([
 ])
 export const blockReferenceHash = value => createHash('sha256').update(value).digest('hex')
 export const blockReferenceBlob = value => createHash('sha1').update('blob '+Buffer.byteLength(value)+'\0').update(value).digest('hex')
+function blockColor(value) {
+  assert.equal(typeof value,'string','Computed theme color missing')
+  const hex=value.match(/^#([a-f0-9]{6})$/i)
+  if(hex)return [0,2,4].map(i=>parseInt(hex[1].slice(i,i+2),16))
+  const rgb=value.match(/^rgb\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*\)$/)
+  assert.ok(rgb,'Expected opaque computed color or six-digit theme token')
+  const color=rgb.slice(1).map(Number);assert.ok(color.every(v=>v<=255));return color
+}
+function blockLuminance(color) {
+  const linear=color.map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4})
+  return linear[0]*.2126+linear[1]*.7152+linear[2]*.0722
+}
+export function validateBlockReferenceDarkPanel(panel) {
+  assert.equal(panel.theme,'dark')
+  const fg=blockColor(panel.color),bg=blockColor(panel.background)
+  assert.deepEqual(bg,blockColor(panel.surface),'Block panel must use the actual dark surface token')
+  assert.deepEqual(fg,blockColor(panel.ink),'Block panel must use the actual dark text token')
+  const light=blockLuminance(fg),dark=blockLuminance(bg)
+  assert.ok(light>dark,'Dark panel must not fall back to light colors')
+  assert.ok((light+.05)/(dark+.05)>=4.5,'Block panel text contrast is below 4.5')
+  return true
+}
 export function validateBlockReferencesReport(report,{commit,verifier=commit,scope='packaged',sources}={}) {
   assert.match(commit||'',/^[a-f0-9]{40}$/);assert.match(verifier||'',/^[a-f0-9]{40}$/)
   assert.equal(report.schemaVersion,1);assert.equal(report.module,'2F.103');assert.equal(report.version,BLOCK_REFERENCE_VERSION)
   assert.equal(report.productCommit,commit);assert.equal(report.verifierCommit,verifier);assert.equal(report.scope,scope)
   assert.equal(report.platform,'win32');assert.equal(report.runnerEnvironment,'github-hosted');assert.equal(report.localValidationOnly,false)
   assert.equal(report.verificationScope,'windows-complete')
+  const entry=report.smallWindowEntry
+  assert.equal(entry.before.sidebarPresent,true);assert.equal(entry.before.entryPresent,true)
+  assert.equal(entry.after.entryReachable,true);assert.equal(entry.after.blockedBySidebar,false)
+  assert.equal(entry.after.width,entry.before.width);assert.equal(entry.after.height,entry.before.height)
+  assert.equal(entry.after.width,report.smallViewport.width);assert.equal(entry.after.height,report.smallViewport.height)
+  assert.equal(entry.collapsedByClick,entry.before.width<=820&&entry.before.sidebarExpanded&&entry.before.blockedBySidebar)
+  if(entry.collapsedByClick)assert.equal(entry.after.sidebarExpanded,false)
   assert.equal(report.smallViewport.overflow,false);assert.ok(report.smallViewport.width>=640&&report.smallViewport.width<=720&&report.smallViewport.height>=400)
   assert.equal(report.minimumWindow.pid,report.pid);assert.equal(report.minimumWindow.applied,true);assert.equal(report.minimumWindow.width,720);assert.equal(report.minimumWindow.height,520)
   assert.equal(report.darkPanel.theme,'dark');assert.notEqual(report.darkPanel.color,report.darkPanel.background)
+  validateBlockReferenceDarkPanel(report.darkPanel)
   for(const field of ['complete','cleanupComplete','syntheticData','realBackend'])assert.equal(report[field],true,field)
   for(const field of ['bridgeOverridden','timerAccelerated','forceTerminated'])assert.equal(report[field],false,field)
   assert.equal(report.error,undefined);assert.equal(report.cleanupError,undefined)

@@ -30,6 +30,8 @@ export function blockReportFixture(){
  return{pin,report:{schemaVersion:1,module:'2F.103',version:BLOCK_REFERENCE_VERSION,productCommit:product,verifierCommit:verifier,scope:'installed',platform:'win32',runnerEnvironment:'github-hosted',localValidationOnly:false,
  complete:true,cleanupComplete:true,syntheticData:true,realBackend:true,bridgeOverridden:false,timerAccelerated:false,forceTerminated:false,
  checks:[...BLOCK_REFERENCE_CHECKS],app:{version:BLOCK_REFERENCE_VERSION,packaged:true},executable:'D:\\owned\\Notepad.exe',executableSHA256:'a'.repeat(64),asarSHA256:'b'.repeat(64),backendSHA256:'c'.repeat(64),pid:3011,
- exit:{pid:3011,code:0,signal:null,normalClose:true},backendStopped:true,verificationScope:'windows-complete',smallViewport:{width:704,height:455,overflow:false},minimumWindow:{pid:3011,applied:true,width:720,height:520},darkPanel:{theme:'dark',color:'rgb(230, 230, 230)',background:'rgb(20, 20, 20)'},sourceFiles:{...pin.blockReferenceSources},fixture:{sourceId:id,destinationId:dest,blockId,locator:blockLocator(id,blockId)},
+ exit:{pid:3011,code:0,signal:null,normalClose:true},backendStopped:true,verificationScope:'windows-complete',smallWindowEntry:{
+ before:{width:704,height:455,sidebarPresent:true,sidebarExpanded:true,entryPresent:true,entryReachable:false,blockedBySidebar:true},
+ after:{width:704,height:455,sidebarPresent:true,sidebarExpanded:false,entryPresent:true,entryReachable:true,blockedBySidebar:false},collapsedByClick:true},smallViewport:{width:704,height:455,overflow:false},minimumWindow:{pid:3011,applied:true,width:720,height:520},darkPanel:{theme:'dark',color:'rgb(234, 242, 255)',background:'rgb(27, 35, 48)',surface:'#1b2330',ink:'#eaf2ff'},sourceFiles:{...pin.blockReferenceSources},fixture:{sourceId:id,destinationId:dest,blockId,locator:blockLocator(id,blockId)},
  saved:{source:record(id,body([sourceBlock])),destination:record(dest,body([{type:'paragraph',children:[ref(false)]},ref(true)]))},screenshots}}
 }

@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { revealBlockReferenceEditor } from './block-references-desktop-driver.mjs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { blockReportFixture, product, verifier } from './block-references-test-fixture.mjs'
@@ -8,6 +9,13 @@ import { BLOCK_REFERENCE_REPORT, blockReferenceHash, validateBlockReferencesRepo
 const expected=pin=>({commit:product,verifier,scope:'installed',sources:pin.blockReferenceSources})
 test('synthetic valid report exercises the full validator, not native acceptance',()=>{const{pin,report}=blockReportFixture();assert.equal(validateBlockReferencesReport(report,expected(pin)),true)})
 for(const [name,change]of[
+ ['missing entry receipt',r=>delete r.smallWindowEntry],['covered entry',r=>r.smallWindowEntry.after.entryReachable=false],
+ ['unproven collapse',r=>r.smallWindowEntry.collapsedByClick=false],['changed viewport',r=>r.smallWindowEntry.after.width=1400],
+ ['sidebar still covering',r=>r.smallWindowEntry.after.blockedBySidebar=true],
+ ['white dark panel',r=>r.darkPanel.background='rgb(255, 255, 255)'],['wrong dark ink',r=>r.darkPanel.color='rgb(34, 34, 34)'],
+ ['light tokens in dark mode',r=>Object.assign(r.darkPanel,{background:'rgb(255, 255, 255)',surface:'#ffffff',color:'rgb(34, 34, 34)',ink:'#222222'})],
+ ['low contrast dark panel',r=>Object.assign(r.darkPanel,{color:'rgb(40, 40, 40)',ink:'#282828'})],
+ ['missing dark token',r=>delete r.darkPanel.surface],
  ['fake layout',r=>r.verificationScope='development-business-only'],['overflow',r=>r.smallViewport.overflow=true],['wrong window owner',r=>r.minimumWindow.pid++],['not dark',r=>r.darkPanel.theme='light'],
  ['missing check',r=>r.checks.pop()],['duplicate check',r=>r.checks.push(r.checks[0])],['wrong order',r=>r.checks.reverse()],
  ['incomplete',r=>r.complete=false],['unclean',r=>r.cleanupComplete=false],['force exit',r=>r.forceTerminated=true],['wrong platform',r=>r.platform='linux'],['local report',r=>r.localValidationOnly=true],['wrong runner',r=>r.runnerEnvironment='self-hosted'],
@@ -26,4 +34,51 @@ test('file verification reads actual bytes and rejects tampered screenshot',t=>{
  for(const item of report.screenshots){item.sha256=blockReferenceHash(image);writeFileSync(path.join(dir,item.filename),image)}
  writeFileSync(path.join(dir,BLOCK_REFERENCE_REPORT),JSON.stringify(report));assert.equal(verifyBlockReferencesReport(dir,expected(pin)).complete,true)
  writeFileSync(path.join(dir,report.screenshots[0].filename),Buffer.from('tampered'));assert.throws(()=>verifyBlockReferencesReport(dir,expected(pin)))
+})
+
+// Protocol-level recovery tests; native reachability is still proved by the
+// packaged/installed Windows run, not these synthetic DOM observations.
+function entryFixture({width=704,expanded=true,blocked=true}={}) {
+ let state={width,height:455,sidebarPresent:true,sidebarExpanded:expanded,entryPresent:true,
+   entryReachable:!blocked,blockedBySidebar:blocked}
+ const clicks=[],observations=[]
+ const context={evaluate:async expression=>{
+   observations.push(expression)
+   if(expression.includes("document.querySelector('.workspace-sidebar.collapsed')"))return !state.sidebarExpanded
+   return {...state}
+ },click:async selector=>{clicks.push(selector);state={...state,sidebarExpanded:false,blockedBySidebar:false,entryReachable:true}},
+ until:async(probe,label)=>{for(let n=0;n<3;n++){const value=await probe();if(value)return value}throw Error(label)}}
+ return{context,clicks,observations,set:patch=>{state={...state,...patch}}}
+}
+test('small-window entry uses one native collapse and retains actual bounds',async()=>{
+ const f=entryFixture(),receipt=await revealBlockReferenceEditor(f.context)
+ assert.deepEqual(f.clicks,['.workspace-sidebar button[aria-label="折叠侧边栏"]'])
+ assert.equal(receipt.before.entryReachable,false);assert.equal(receipt.after.entryReachable,true)
+ assert.equal(receipt.collapsedByClick,true);assert.equal(receipt.after.width,704);assert.equal(receipt.after.height,455)
+ assert.ok(f.observations.every(source=>!source.includes('localStorage')&&!source.includes('.click(')&&!source.includes('.style')))
+})
+test('large-window expanded sidebar is preserved',async()=>{
+ const f=entryFixture({width:1400,blocked:false}),receipt=await revealBlockReferenceEditor(f.context)
+ assert.deepEqual(f.clicks,[]);assert.equal(receipt.after.sidebarExpanded,true);assert.equal(receipt.collapsedByClick,false)
+})
+test('already collapsed narrow sidebar is not toggled back open',async()=>{
+ const f=entryFixture({expanded:false,blocked:false});await revealBlockReferenceEditor(f.context);assert.deepEqual(f.clicks,[])
+})
+test('visible narrow-window entry does not collapse an unrelated expanded sidebar',async()=>{
+ const f=entryFixture({blocked:false});await revealBlockReferenceEditor(f.context);assert.deepEqual(f.clicks,[])
+})
+test('unconfirmed native collapse is not replayed',async()=>{
+ const f=entryFixture(),error=Error('native click unconfirmed');f.context.click=async selector=>{f.clicks.push(selector);throw error}
+ await assert.rejects(revealBlockReferenceEditor(f.context),e=>e===error);assert.equal(f.clicks.length,1)
+})
+test('no-change native collapse fails without re-clicking',async()=>{
+ const f=entryFixture();f.context.click=async selector=>{f.clicks.push(selector)}
+ await assert.rejects(revealBlockReferenceEditor(f.context),/did not collapse/);assert.equal(f.clicks.length,1)
+})
+test('a different overlay stays a failure instead of collapsing the sidebar',async()=>{
+ const f=entryFixture({blocked:false});f.set({entryReachable:false})
+ await assert.rejects(revealBlockReferenceEditor(f.context),/still occluded/);assert.equal(f.clicks.length,0)
+})
+test('missing entry is not silently repaired or reported as visible',async()=>{
+ const f=entryFixture();f.set({entryPresent:false});await assert.rejects(revealBlockReferenceEditor(f.context),/entry is missing/);assert.equal(f.clicks.length,0)
 })

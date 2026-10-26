@@ -14,6 +14,37 @@ const q=JSON.stringify
 export function blockReferenceFixture(text) {
   return JSON.stringify({root:{type:'root',version:1,format:'',indent:0,direction:null,children:[{type:'paragraph',version:1,format:'',indent:0,direction:null,children:[{type:'text',version:1,text,format:0,detail:0,mode:'normal',style:''}]}]}})
 }
+// At <=820px the existing sidebar is an overlay. A native resize does not
+// select a note, so App's selection-triggered collapse has not run. Use the
+// user's existing button once, only when hit-testing proves that overlay is
+// covering the block entry. Never resize again or mutate application state.
+export async function revealBlockReferenceEditor({evaluate,click,until}) {
+  const observe=()=>evaluate(`(() => {
+    const sidebar=document.querySelector('.workspace-sidebar')
+    const entry=document.querySelector('.block-reference-entry button')
+    const r=entry?.getBoundingClientRect()
+    const hit=r&&r.width>0&&r.height>0?document.elementFromPoint(r.x+r.width/2,r.y+r.height/2):null
+    return {width:innerWidth,height:innerHeight,sidebarPresent:Boolean(sidebar),
+      sidebarExpanded:Boolean(sidebar&&!sidebar.classList.contains('collapsed')),
+      entryPresent:Boolean(entry),entryReachable:Boolean(hit&&entry.contains(hit)),
+      blockedBySidebar:Boolean(hit&&sidebar?.contains(hit))}
+  })()`)
+  const before=await observe()
+  assert.equal(before.sidebarPresent,true,'Block-reference sidebar is missing')
+  assert.equal(before.entryPresent,true,'Block-reference entry is missing')
+  let collapsedByClick=false
+  if(before.width<=820&&before.sidebarExpanded&&before.blockedBySidebar){
+    await click('.workspace-sidebar button[aria-label="折叠侧边栏"]')
+    collapsedByClick=true
+    await until(()=>evaluate("Boolean(document.querySelector('.workspace-sidebar.collapsed'))"),
+      'Sidebar did not collapse after its native button was clicked')
+  }
+  const after=await until(async()=>{const value=await observe();return value.entryReachable&&value},
+    'Block-reference entry is still occluded')
+  assert.equal(after.width,before.width,'Entry recovery must not change window width')
+  assert.equal(after.height,before.height,'Entry recovery must not change window height')
+  return {before,after,collapsedByClick}
+}
 export async function verifyBlockReferencesDesktop({api,evaluate,click,cdp,until,capture,report,save,resizeSmall}) {
   const prefix='BLOCK103 '+randomUUID().slice(0,8)
   const source=await api('/api/files',{method:'POST',body:q({title:prefix+' Source.md',content:blockReferenceFixture('BLOCK103 source original')})})
@@ -104,6 +135,7 @@ export async function verifyBlockReferencesDesktop({api,evaluate,click,cdp,until
   // accelerated clocks or hidden layout overrides are used.
   await resizeSmall()
   await until(()=>evaluate('innerWidth <= 720 && innerWidth >= 640 && innerHeight >= 400'), 'Real small-window bounds did not settle')
+  report.smallWindowEntry=await revealBlockReferenceEditor({evaluate,click,until});save()
   await click('button.editor-mode-toggle[aria-label="切换到编辑模式"]')
   await show();await address(locator);await action('读取来源块');await until(()=>evaluate("Boolean(document.querySelector('.block-reference-preview pre'))"),'Small-window preview missing')
   report.smallViewport=await evaluate('({width:innerWidth,height:innerHeight,overflow:document.documentElement.scrollWidth>innerWidth+1})')
@@ -114,7 +146,7 @@ export async function verifyBlockReferencesDesktop({api,evaluate,click,cdp,until
   await until(()=>evaluate("document.documentElement.getAttribute('data-theme') === 'dark'"),'Real theme switch did not settle')
   await click('.workspace-sidebar-more[aria-label="更多功能"]')
   await show();await address(locator);await action('读取来源块');await until(()=>evaluate("Boolean(document.querySelector('.block-reference-preview pre'))"),'Dark preview missing')
-  report.darkPanel=await evaluate("(()=>{const e=document.querySelector('.block-reference-panel'),s=getComputedStyle(e);return{theme:document.documentElement.getAttribute('data-theme'),color:s.color,background:s.backgroundColor}})()")
+  report.darkPanel=await evaluate("(()=>{const e=document.querySelector('.block-reference-panel'),s=getComputedStyle(e);const root=getComputedStyle(document.documentElement);return{theme:document.documentElement.getAttribute('data-theme'),color:s.color,background:s.backgroundColor,surface:root.getPropertyValue('--surface').trim(),ink:root.getPropertyValue('--ink').trim()}})()")
   assert.notEqual(report.darkPanel.color,report.darkPanel.background)
   await capture('block103-dark-theme.png');await action('取消');mark('dark-theme-retains-readable-block-panel')
   assert.equal((await api(destinationRoute)).content,embeddedDestination.content)
