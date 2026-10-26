@@ -6,6 +6,7 @@ import { normalizeLegacyTableBreakMarkup } from '~/services/legacyContentCompati
 import { hasHeadingStructureChanged } from './Editor/utils/referenceUtils'
 import {
   readEditorDraft,
+  readEditorDraftDurable,
   removeEditorDraft,
   writeEditorDraft,
 } from '~/services/editorDraftCache'
@@ -528,7 +529,8 @@ function TextEditorInternal({
         }
         if (!f) throw new Error('读取期间正文持续变化，请重试加载；草稿保留')
 
-        const cached = readEditorDraft(id)
+        const cached = await readEditorDraftDurable(id)
+        if (loadCtl.signal.aborted || loadAbortRef.current !== loadCtl || id !== currentIdRef.current) return
         const rawServer = f.content || ''
         const serverText = normalizeLegacyTableBreakMarkup(rawServer)
         const recovery = recoverEditorDraft(id, cached, rawServer)
