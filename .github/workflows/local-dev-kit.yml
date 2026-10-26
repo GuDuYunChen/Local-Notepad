@@ -1,95 +1,40 @@
-name: Fixed-source local development kit
+name: Publish verified block-reference source objects
 on:
   push:
     branches: [ci/local-dev-kit-ac791496]
     paths: [.github/workflows/local-dev-kit.yml]
 permissions:
-  contents: read
+  contents: write
 concurrency:
   group: local-dev-kit-ac791496
   cancel-in-progress: false
 jobs:
-  export-fixed-source-and-locked-tools:
+  publish-fixed-source-objects:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    env:
-      GOTOOLCHAIN: local
+    timeout-minutes: 5
     steps:
-      - name: Checkout exact accepted source
+      - name: Checkout publisher inputs
+        uses: actions/checkout@v7
+        with:
+          path: publisher
+          persist-credentials: false
+      - name: Checkout exact accepted product base
         uses: actions/checkout@v7
         with:
           ref: ac7914962242fcab16a14125ce3ea353e331b6ef
+          path: candidate
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
-      - uses: actions/setup-go@v7
-        with:
-          go-version: '1.24.11'
-          cache: false
-      - name: Verify source and dependency lock
-        run: |
-          set -euo pipefail
-          test "$(git rev-parse HEAD)" = ac7914962242fcab16a14125ce3ea353e331b6ef
-          test "$(git rev-parse HEAD^{tree})" = 2caa3ab98c8118f68d0ebb4d0f2e51b4e6abfb4e
-          node scripts/stage-review.mjs catalog
-          node scripts/verify-dependency-lock.mjs
-          npm ci --no-audit --no-fund
-          go -C server mod download
-          git diff --exit-code -- package.json package-lock.json server/go.mod server/go.sum
-      - name: Archive only fixed source and installed dependencies
-        run: |
-          set -euo pipefail
-          out="$RUNNER_TEMP/local-notepad-kit"
-          mkdir -p "$out"
-          git archive --format=tar.gz HEAD > "$out/source.tar.gz"
-          git cat-file commit HEAD > "$out/source-commit.raw"
-          git ls-tree -r -z HEAD > "$out/source-tree.zlist"
-          tar -czf "$out/javascript-dependencies.tar.gz" node_modules
-          node_root="$(dirname "$(dirname "$(readlink -f "$(command -v node)")")")"
-          tar -C "$node_root" -czf "$out/node-runtime.tar.gz" bin/node bin/npm bin/npx lib/node_modules/npm
-          tar -C "$(go env GOROOT)" -czf "$out/go-toolchain.tar.gz" .
-          tar -C "$(go env GOMODCACHE)" -czf "$out/go-modules.tar.gz" .
-          {
-            printf 'source_commit=ac7914962242fcab16a14125ce3ea353e331b6ef\nsource_tree=2caa3ab98c8118f68d0ebb4d0f2e51b4e6abfb4e\n'
-            printf 'workflow_commit=%s\nrun_id=%s\n' "$GITHUB_SHA" "$GITHUB_RUN_ID"
-            node --version
-            npm --version
-            go version
-            sha256sum package-lock.json server/go.sum
-          } > "$out/provenance.txt"
-          (cd "$out" && sha256sum *.gz source-commit.raw source-tree.zlist provenance.txt > SHA256SUMS)
-          du -h "$out"/*
-      - name: Upload source and provenance
+      - name: Verify exact patch and create immutable source objects only
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node publisher/.github/scripts/publish-block-source.mjs
+      - name: Retain immutable-source receipt
         uses: actions/upload-artifact@v4
         with:
-          name: local-dev-source-ac791496
-          path: |
-            ${{ runner.temp }}/local-notepad-kit/source.tar.gz
-            ${{ runner.temp }}/local-notepad-kit/source-commit.raw
-            ${{ runner.temp }}/local-notepad-kit/source-tree.zlist
-            ${{ runner.temp }}/local-notepad-kit/provenance.txt
-            ${{ runner.temp }}/local-notepad-kit/SHA256SUMS
-          compression-level: 0
-          retention-days: 3
-          if-no-files-found: error
-      - name: Upload locked JavaScript environment
-        uses: actions/upload-artifact@v4
-        with:
-          name: local-dev-javascript-ac791496
-          path: |
-            ${{ runner.temp }}/local-notepad-kit/javascript-dependencies.tar.gz
-            ${{ runner.temp }}/local-notepad-kit/node-runtime.tar.gz
-          compression-level: 0
-          retention-days: 3
-          if-no-files-found: error
-      - name: Upload locked Go environment
-        uses: actions/upload-artifact@v4
-        with:
-          name: local-dev-go-ac791496
-          path: |
-            ${{ runner.temp }}/local-notepad-kit/go-toolchain.tar.gz
-            ${{ runner.temp }}/local-notepad-kit/go-modules.tar.gz
-          compression-level: 0
-          retention-days: 3
+          name: verified-block-source-objects
+          path: source-object-receipt/immutable-source-objects.json
+          retention-days: 30
           if-no-files-found: error
