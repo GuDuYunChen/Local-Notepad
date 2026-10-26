@@ -9,6 +9,9 @@ import { blockRegistry, getBlockByType } from '../utils/blockRegistry'
 import { $getNearestBlockElementAncestorOrThrow } from '@lexical/utils'
 import { $generateJSONFromSelectedNodes, $generateNodesFromSerializedNodes } from '@lexical/clipboard'
 import './BlockHandlePlugin.css'
+import { removeCopiedBlockIds } from '../../../services/blockReferenceModel.mjs'
+import { $blockId, $setBlockId } from '../utils/blockReferenceState.js'
+import { BLOCK_TYPES } from '../../../services/blockReferenceModel.mjs'
 
 let internalBlockClipboard = null
 
@@ -31,7 +34,7 @@ export function $serializeBlockClipboard(editor, blockNode) {
 export function $insertBlockClipboardPayloadAfter(payload, blockNode) {
   if (!blockNode || !payload?.nodes?.length) return []
 
-  const nodes = $generateNodesFromSerializedNodes(payload.nodes)
+  const nodes = $generateNodesFromSerializedNodes(removeCopiedBlockIds(payload.nodes))
   let cursor = blockNode
   for (const node of nodes) {
     cursor.insertAfter(node)
@@ -184,6 +187,8 @@ export default function BlockHandlePlugin() {
         }
       }
 
+      const identity = $blockId(blockNode)
+      if (identity && BLOCK_TYPES.has(newNode.getType())) $setBlockId(newNode, identity)
       blockNode.replace(newNode)
       if (typeof newNode.selectStart === 'function') newNode.selectStart()
       setBlockKey(newNode.getKey())

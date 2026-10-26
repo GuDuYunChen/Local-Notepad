@@ -1,14 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { api } from '~/services/api'
+import { readBlockReference } from '../../../services/blockReferences.mjs'
 import { readWikiPreview } from '../../../services/wikiNavigation.mjs'
 import { normalizeSectionPath, formatSectionPath } from '../utils/referenceUtils.js'
 
-export default function WikiLinkView({ id, title, sectionPath = [] }) {
+export default function WikiLinkView({ id, title, sectionPath = [], blockId = '' }) {
   const path = normalizeSectionPath(sectionPath)
-  return <Preview key={JSON.stringify([id, title, path])} id={id} title={title} path={path} />
+  return <Preview key={JSON.stringify([id, title, path, blockId])} id={id} title={title} path={path} blockId={blockId} />
 }
 
-function Preview({ id, title, path }) {
+function Preview({ id, title, path, blockId }) {
   const [open, setOpen] = useState(false)
   const [preview, setPreview] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -23,7 +24,8 @@ function Preview({ id, title, path }) {
     const controller = new AbortController(); owner.current = controller
     setLoading(true); setPreview(null); setError('')
     try {
-      const result = await readWikiPreview(api, { id, title, headingPath: path }, controller.signal)
+      const source = blockId ? await readBlockReference(api, { id, blockId }, controller.signal) : null
+      const result = source ? { title: source.title, excerpt: source.text, titleChanged: source.title !== title, backlinkCount: null } : await readWikiPreview(api, { id, title, headingPath: path }, controller.signal)
       if (alive.current && owner.current === controller && !controller.signal.aborted) setPreview(result)
     } catch (failure) {
       if (alive.current && owner.current === controller && !controller.signal.aborted) setError(failure.message)
@@ -44,7 +46,7 @@ function Preview({ id, title, path }) {
     if (controls(event)) return
     event.preventDefault(); event.stopPropagation()
     clearTimeout(timer.current); owner.current?.abort(); setOpen(false)
-    window.dispatchEvent(new CustomEvent('wikiLink:open', { detail: { id, title, headingPath: path } }))
+    window.dispatchEvent(new CustomEvent('wikiLink:open', { detail: { id, title, headingPath: path, ...(blockId ? { blockId } : {}) } }))
   }
   const section = formatSectionPath(path)
   return <span className={'wiki-link' + (error ? ' broken' : preview?.titleChanged || preview?.sectionMissing ? ' stale' : '')}
@@ -56,6 +58,7 @@ function Preview({ id, title, path }) {
     onKeyDown={event => { if (event.target === event.currentTarget && !event.nativeEvent.isComposing && event.keyCode !== 229 && ['Enter', ' '].includes(event.key)) navigate(event) }}>
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 4h10l2 2v14H6z" /><path d="M9 9h6M9 13h6M9 17h4" /></svg>
     <span>{preview?.title || title}</span>
+    {blockId && <small className="wiki-link-section">› 块</small>}
     {section && <small className="wiki-link-section">› {path[path.length - 1]}</small>}
     {open && <span className="wiki-link-preview" role="group" aria-label="引用预览" onMouseEnter={() => clearTimeout(timer.current)} onMouseLeave={hide}>
       <span className="wiki-link-preview-kicker">{error ? '引用暂不可用' : preview?.sectionMissing ? '章节需要核对' : section ? '关联章节' : '关联笔记'}</span>

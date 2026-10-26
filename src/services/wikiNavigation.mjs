@@ -1,3 +1,4 @@
+import { requireBlockId, findReferenceBlock } from './blockReferenceModel.mjs'
 import { dailyRequest } from './dailyNotes.mjs'
 import { extractHeadingReferences, normalizeSectionPath } from '../components/Editor/utils/referenceUtils.js'
 import { extractLexicalText } from '../utils/lexicalText.js'
@@ -19,7 +20,9 @@ export function wikiRequest(value) {
     fail('path', '引用章节路径无效，未猜测或截断路径。')
   if (value.title !== undefined && (!text(value.title) || bytes(value.title) > 16384))
     fail('title', '引用标题无效。')
-  return Object.freeze({ id: value.id, title: value.title || '关联笔记', headingPath: Object.freeze(normalizeSectionPath(path)) })
+  const blockId = value.blockId === undefined || value.blockId === '' ? '' : requireBlockId(value.blockId)
+  if (blockId && path.length) fail('path', '块引用不能同时指定章节路径。')
+  return Object.freeze({ id: value.id, title: value.title || '关联笔记', headingPath: Object.freeze(normalizeSectionPath(path)), ...(blockId ? { blockId } : {}) })
 }
 
 // Bound recursive legacy readers before they inspect imported rich text.
@@ -143,6 +146,7 @@ export function createWikiNavigator({ getContext, openFile, api, remember = () =
         signal: operation.controller.signal,
         shouldSelect: valid,
         headingPath: request.headingPath,
+        ...(request.blockId ? { blockId: request.blockId } : {}),
         readFile: async (id, { signal }) => {
           try {
             if (id !== request.id) fail('identity', '引用目标标识发生变化。')
@@ -150,8 +154,9 @@ export function createWikiNavigator({ getContext, openFile, api, remember = () =
             if (!valid()) fail('cancelled', '来源已变化，停止打开。')
             const current = getContext()
             const body = id === current.currentId ? current.content : file.content
-            requireWikiHeading(body, request.headingPath)
-            if (id === current.currentId && request.headingPath.length) operation.headingContent = body
+            if (request.blockId) findReferenceBlock(body, request.blockId)
+            else requireWikiHeading(body, request.headingPath)
+            if (id === current.currentId && (request.headingPath.length || request.blockId)) operation.headingContent = body
             operation.file = file
             publish({ phase: 'decision', message: '目标已核对，正在等待原有保存／放弃／取消决定。', request, source })
             return file
@@ -186,7 +191,7 @@ export function createWikiNavigator({ getContext, openFile, api, remember = () =
     contextChanged() { if (state && !inSource(state.source)) cancel(true) },
     retry(bodyOnly = false) {
       if (!state?.request || !inSource(state.source)) { cancel(true); return Promise.resolve(false) }
-      return start({ ...state.request, ...(bodyOnly ? { headingPath: [] } : {}) })
+      return start({ ...state.request, ...(bodyOnly ? { headingPath: [], blockId: '' } : {}) })
     },
   }
 }

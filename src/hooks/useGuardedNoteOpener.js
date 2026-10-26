@@ -4,11 +4,11 @@ import { toast } from '~/services/toast'
 
 // Fetching a file is not permission to leave the current draft. Invoke the latest
 // selection guard only after the fetch completes, and resolve after its decision.
-export default function useGuardedNoteOpener({ currentId, workspace, navigationEpoch, onSelectFile, onHeading }) {
-  const latest = useRef({ currentId, onSelectFile, onHeading })
+export default function useGuardedNoteOpener({ currentId, workspace, navigationEpoch, onSelectFile, onHeading, onBlock }) {
+  const latest = useRef({ currentId, onSelectFile, onHeading, onBlock })
   const pending = useRef(null)
   const generation = useRef(0)
-  useLayoutEffect(() => { latest.current = { currentId, onSelectFile, onHeading } })
+  useLayoutEffect(() => { latest.current = { currentId, onSelectFile, onHeading, onBlock } })
   const cancel = useCallback(() => {
     if (!pending.current) return
     const operation = pending.current
@@ -61,7 +61,8 @@ export default function useGuardedNoteOpener({ currentId, workspace, navigationE
             onCancel: () => finish(false),
             afterSelect: () => {
               // onSelectFile has synchronously crossed its save/discard guard.
-              if (headingPath.length) latest.current.onHeading?.(id, headingPath, latest.current.currentId === id)
+              if (options.blockId) latest.current.onBlock?.(id, options.blockId, latest.current.currentId === id)
+              else if (headingPath.length) latest.current.onHeading?.(id, headingPath, latest.current.currentId === id)
               finish(true)
             },
           })

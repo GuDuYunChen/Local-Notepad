@@ -77,6 +77,7 @@ export function findWikiLinkOccurrences(content, targetId) {
         sourceSectionPath: normalizeSectionPath(sourceSectionPath),
         targetSectionPath: normalizeSectionPath(node.sectionPath),
         title: String(node.title || ''),
+        ...(node.blockId ? { targetBlockId: node.blockId, embedded: node.embedded === true } : {}),
       })
     }
 
@@ -294,6 +295,7 @@ export function collectWikiReferences(content) {
         ordinal: ordinal++,
         id: String(node.id || ''),
         title: String(node.title || ''),
+        ...(node.blockId ? { targetBlockId: node.blockId, embedded: node.embedded === true } : {}),
         sectionPath: normalizeSectionPath(node.sectionPath),
         sourceSectionPath: normalizeSectionPath(sourceSectionPath),
       })

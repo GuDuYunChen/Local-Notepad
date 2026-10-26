@@ -161,3 +161,10 @@ SREAD-02由合成凭据格式化回归确认，发现时在原45项后追加unre
 详细边界与回归入口见 [LOCAL_DOCUMENT_EXPORT_2F102.md](LOCAL_DOCUMENT_EXPORT_2F102.md)。新问题单列本模块，原46项JSON编号／分类和12个EXEC事故保持；网页无错误标记、单独UI mock或旧Windows成功都不是新完整验收。README中重复且互相矛盾的旧安装目录uploads说明随实际模块更正，附件仍以当前用户数据目录为准。
 
 本阶段真实选择器又复现取消子笔记后仍由父目录重新纳入的问题；原失败保存，修复对完整子树重新核对并保留明确勾选的后代，不让半选祖先扩大范围。工作台同时修补失去Start响应后旧requestId妨碍停止、批次级错误未显示和锁定目录仍可点击三个回执消费缺口。当前阶段一并回归并完成交付，不留给下一模块。
+
+
+## 2F.103 / 4.236.0：块引用身份和跨笔记生命周期
+
+来源块必须使用持久随机身份，拒绝重复／缺失锚点；副本不继承源锚点，未知或错误引用字段不静默退化为笔记链接。原代码块NodeState序列化遗漏、Chromium未注册协议URL解析差异和标题/块导航就绪不能混用已在本模块以反例和真实运行检查处理。详情见 `LOCAL_BLOCK_REFERENCES_2F103.md`；回归为 `BlockReferences.integration.test.jsx`、`blockReferences.test.js`、`App.wikiNavigation.test.jsx` 和 `block_references_test.go`。
+
+已有46条结构化历史问题和分类保持，不据此声称全产品零缺陷或聊天平台根因已解决。新版本的Windows／安装验收以最终PR记录为准。

@@ -33,6 +33,7 @@ import FloatingTextToolbarPlugin from "./plugins/FloatingTextToolbarPlugin";
 import DocumentOutlinePlugin from "./plugins/DocumentOutlinePlugin";
 import SlashMenuPlugin from "./plugins/SlashMenuPlugin";
 import BlockHandlePlugin from "./plugins/BlockHandlePlugin";
+import BlockReferencePlugin from "./plugins/BlockReferencePlugin";
 import MentionPlugin from "./plugins/MentionPlugin";
 import WikiLinkPlugin from "./plugins/WikiLinkPlugin";
 import LinkInteractionPlugin from "./plugins/LinkInteractionPlugin";
@@ -220,6 +221,7 @@ export default function Editor({ documentId, documentTitle, initialContent, onCh
         {!readOnly && <ToolbarPlugin documentId={documentId} />}
         <SearchPlugin key={documentId} documentId={documentId} />
         {!readOnly && <CommandPalettePlugin documentId={documentId} />}
+        <BlockReferencePlugin documentId={documentId} documentTitle={documentTitle} initialContent={initialContent} />
         <EditorViewSettingsPlugin readOnly={readOnly} />
         <MarkdownSourcePlugin readOnly={readOnly} />
         <ResourceManagerPlugin readOnly={readOnly} />

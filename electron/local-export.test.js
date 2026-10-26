@@ -373,3 +373,23 @@ describe('complete local output transactions', () => {
     expect((await executeExportPlan(plan, { targetDir: await temp(), onProgress: () => { throw new Error('UI gone') } })).state).toBe('completed')
   })
 })
+
+describe('block reference export compatibility', () => {
+  it('preserves block identities in Markdown and warns that embeds are references, not source copies', async () => {
+    const blockId='b-'+'a'.repeat(32)
+    const files=[note('blocks','blocks.md',body({type:'paragraph',children:[{type:'wiki-link',id:'source',title:'来源',blockId,embedded:false,sectionPath:[]}]},{type:'wiki-link',id:'source',title:'来源',blockId,embedded:true,sectionPath:[]}))]
+    const {plan,calls}=await prepare(files)
+    expect(JSON.stringify(describeExportPlan(plan))).toContain('不读取或复制来源正文')
+    const report=await executeExportPlan(plan,{targetDir:await temp()})
+    expect(report.state).toBe('completed')
+    expect(calls.some(call=>new URL(call.url).pathname==='/api/files/source')).toBe(false)
+    const receipt=report.items[0]
+    const output=await fs.readFile(receipt.outputPath,'utf8')
+    expect(output).toContain(blockId.replace('-', '\\-'))
+    expect(output).toContain('来源')
+    expect(report.items[0].status).toBe('succeeded')
+  })
+  it('rejects malformed block identities before generating any export', () => {
+    expect(()=>inspectExportContent(body({type:'wiki-link',id:'source',title:'来源',blockId:'bad'}),'markdown')).toThrow(/块引用/)
+  })
+})

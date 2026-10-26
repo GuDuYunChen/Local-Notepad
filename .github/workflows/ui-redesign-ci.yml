@@ -42,6 +42,9 @@ jobs:
       - name: Build renderer
         run: npm run build:renderer
 
+      - name: Verify block-reference source and installation preservation contracts
+        run: node --test scripts/block-references-evidence.node.mjs scripts/block-references-installed-evidence.node.mjs
+
       - name: Verify editor cache and save receipt regressions
         run: |
           node --test scripts/editor-cache-regression.node.mjs
@@ -321,6 +324,18 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
+      - name: Verify packaged local block references and embeds
+        run: node scripts/run-block-references-desktop.mjs
+
+      - name: Upload native block reference evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-notepad-block-references-${{ github.sha }}
+          path: test-results/block-references/
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Verify parent-pipe shutdown on Windows
         env:
           NOTEPAD_TEST_BACKEND: server/bin/notepad-server.exe
@@ -381,4 +396,4 @@ jobs:
           name: local-notepad-windows-${{ github.sha }}
           path: release/Notepad-*-Setup.exe
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 90
