@@ -19,7 +19,7 @@ export function validateReadingModePin(pin) {
   for (const key of ['product', ...READING_SOURCE_KEYS]) assert.match(pin[key] || '', /^[a-f0-9]{40}$/, 'Unresolved or invalid pin: ' + key)
   assert.deepEqual(pin.previous, ACCEPTED_READING_SEED)
   assert.deepEqual(pin.previousSource, ACCEPTED_READING_SEED_SOURCE)
-  assert.match(pin.current?.version || '', /^\d+\.\d+\.\d+$/, 'Current installer version is unresolved')
+  assert.equal(pin.current?.version, '4.237.0')
   assert.ok(Number.isSafeInteger(pin.current.bytes) && pin.current.bytes > 0, 'Current installer bytes are unresolved')
   assert.match(pin.current.sha256 || '', /^[a-f0-9]{64}$/, 'Current installer digest is unresolved')
   for (const key of ['run', 'artifact']) assert.ok(Number.isSafeInteger(pin.currentSource?.[key]) && pin.currentSource[key] > 0, 'Current artifact identity is unresolved: ' + key)
