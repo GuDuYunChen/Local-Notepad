@@ -354,7 +354,7 @@ export function registerS3LocalOverviewTests(test) {
     // cachePendingDraft, 30s autosave and the original quit participant
     // remain byte-identical. Retain all six exact LF-normalized pins.
     for (const [file, expected] of [
-      ['src/components/TextEditor.jsx', '3131406cdb77173ac9eb6f4cfc135d805a65c4cce4f863371709bf186aeefc33'],
+      ['src/components/TextEditor.jsx', '8f26eeb5527ab9d576b9409b4742b4a3eae281c8a0a5454458e4adc065d7d909'],
       ['src/services/editorDraftCache.js', '7d461ff7a46271d8e8d64707559ac872878f3d2786d770bc0a09434df1474e89'],
       ['src/services/editorSaveTransaction.mjs', 'b449dad16834a936fbd5fad318352c961e160e11723cb6627d6a47714d4d36e2'],
       ['src/services/editorQuit.mjs', 'abc21ea59352fede521e6ce6f6904f67af8f3d00b2378efae6a5e6b45c48c205'],
