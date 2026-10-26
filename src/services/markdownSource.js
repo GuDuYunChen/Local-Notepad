@@ -211,6 +211,8 @@ function hasUnsupportedBlockFormatting(node) {
 function collectCompatibilityIssues(node, issues) {
   if (!node) return
 
+  if (node.$?.localBlockId) issues.add('块引用锚点（源码转换会丢失稳定身份）')
+
   if (!SAFE_TYPES.has(node.type)) {
     issues.add(UNSUPPORTED_LABELS[node.type] || node.type || '未知节点')
   }

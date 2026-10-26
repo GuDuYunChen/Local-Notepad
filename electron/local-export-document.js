@@ -10,7 +10,7 @@ const CONTAINERS = new Set(['root', 'paragraph', 'heading', 'quote', 'list', 'li
 const LEAVES = new Set(['linebreak', 'code-block', 'image', 'image-grid', 'video', 'attachment', 'todo', 'divider', 'callout', 'toggle', 'formula', 'embed', 'mention', 'wiki-link'])
 const string = (value, fallback = '') => value === undefined || value === null ? fallback : typeof value === 'string' ? value : (() => { throw new LocalExportError('invalid-document', '正文包含无效字段，未导出不完整内容。') })()
 const safeText = value => string(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/[\\`*_{}[\]()#+.!|~$\-]/g, '\\$&')
-const wiki = node => `[[${string(node.title, '未命名')}${node.sectionPath?.length ? '#' + node.sectionPath.join(' › ') : ''}]]`
+const wiki = node => `${node.embedded ? '!' : ''}[[${string(node.title, '未命名')}${node.blockId ? '#^' + node.blockId : node.sectionPath?.length ? '#' + node.sectionPath.join(' › ') : ''}]]`
 const own = (object, key) => Object.prototype.hasOwnProperty.call(object, key)
 
 function nodeText(node) {
@@ -50,6 +50,11 @@ export function inspectExportContent(content, format) {
     for (const key of ['text', 'code', 'src', 'caption', 'alt', 'name', 'url', 'title', 'expression', 'content', 'mention', 'icon', 'language']) if (own(node, key)) string(node[key])
     if (TEXT.has(node.type) && own(node, 'format') && (!Number.isSafeInteger(node.format) || node.format < 0 || node.format > 1023)) throw new LocalExportError('invalid-document', '正文文字样式无效，未导出。')
     if (node.type === 'wiki-link' && node.sectionPath !== undefined && (!Array.isArray(node.sectionPath) || node.sectionPath.length > 64 || node.sectionPath.some(value => typeof value !== 'string'))) throw new LocalExportError('invalid-document', 'Wiki 章节路径无效，未导出。')
+    if (node.type === 'wiki-link' && node.blockId !== undefined) {
+      if (!/^b-[a-f0-9]{32}$/.test(node.blockId) || typeof node.blockId !== 'string' || (node.embedded !== undefined && typeof node.embedded !== 'boolean')) throw new LocalExportError('invalid-document', '块引用身份无效，未导出。')
+      warnings.add('块引用和只读嵌入仅导出目标标识，不读取或复制来源正文。')
+    }
+    if (node.$?.localBlockId) warnings.add('导出文件不是应用备份；块锚点关系须通过工作区备份保留。')
     if (node.type === 'heading' && !/^h[1-6]$/.test(node.tag || '')) throw new LocalExportError('invalid-document', '标题级别无效，未导出。')
     if (node.type === 'list' && !['number', 'bullet', 'check'].includes(node.listType)) throw new LocalExportError('invalid-document', '列表类型无效，未导出。')
     if (node.type === 'tablecell') {
