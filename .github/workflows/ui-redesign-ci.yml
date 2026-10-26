@@ -42,8 +42,12 @@ jobs:
       - name: Build renderer
         run: npm run build:renderer
 
+      # Contract imports share the native export driver; a clean Ubuntu checkout
+      # needs its generated fixture just as the independent Windows runner does.
       - name: Verify block-reference source and installation preservation contracts
-        run: node --test scripts/block-references-evidence.node.mjs scripts/block-references-installed-evidence.node.mjs
+        run: |
+          node scripts/build-local-export-fixture.mjs
+          node --test scripts/block-references-evidence.node.mjs scripts/block-references-installed-evidence.node.mjs
 
       - name: Verify editor cache and save receipt regressions
         run: |
