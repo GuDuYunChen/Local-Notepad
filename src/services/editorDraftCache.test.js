@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   isFreshEditorDraft,
   readEditorDraft,
+  readEditorDraftDurable,
   removeEditorDraft,
   writeEditorDraft,
 } from './editorDraftCache'
@@ -23,6 +24,32 @@ describe('editor draft cache', () => {
 
     removeEditorDraft('note-1')
     expect(readEditorDraft('note-1')).toBeNull()
+  })
+
+  it('restores a durable-cache read through the synchronous fallback when IndexedDB is unavailable', async () => {
+    vi.stubGlobal('indexedDB', undefined)
+    writeEditorDraft('note-durable-fallback', 'unconfirmed local draft', 456, {
+      version: 1, id: 'note-durable-fallback', expectedContent: 'database', conflicted: false, attempt: null,
+    })
+
+    await expect(readEditorDraftDurable('note-durable-fallback')).resolves.toMatchObject({
+      content: 'unconfirmed local draft',
+      savedAt: 456,
+      recovery: { expectedContent: 'database' },
+    })
+    vi.unstubAllGlobals()
+    removeEditorDraft('note-durable-fallback')
+  })
+
+  it('keeps the current in-memory draft when durable storage cannot be opened', async () => {
+    vi.stubGlobal('indexedDB', undefined)
+    writeEditorDraft('note-memory-fallback', 'latest in-memory text', 789)
+    await expect(readEditorDraftDurable('note-memory-fallback')).resolves.toMatchObject({
+      content: 'latest in-memory text',
+      savedAt: 789,
+    })
+    vi.unstubAllGlobals()
+    removeEditorDraft('note-memory-fallback')
   })
 
   it('distinguishes fresh and stale drafts', () => {

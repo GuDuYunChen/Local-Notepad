@@ -27,9 +27,9 @@ function pinFixture() {
   Object.assign(pin, { product, previous: { ...ACCEPTED_READING_SEED }, previousSource: { ...ACCEPTED_READING_SEED_SOURCE },
     current: { version: SHORTCUT_MANAGEMENT_VERSION, bytes: 1001, sha256: sha('synthetic shortcut installer contract input') },
     currentSource: { run: 100, artifact: 200, name: 'local-notepad-windows-' + product },
-    importBlob: 'e71e3f05bc3ac64d25cc8cc513a0341c06f50024',
-    importEvidenceBlob: 'c29f36c5e36248d9ad768cba05735c32af11c2d1',
-    importEvidenceTestsBlob: '49a0fa28df31ccd5fb09737652600b27e6138748',
+    importBlob: 'd7a71f759debf24fde5b8bd4b0d19d8a5b802aba',
+    importEvidenceBlob: '7b860fe6862e50c9b299fb06abe4684bfd273da1',
+    importEvidenceTestsBlob: 'ad1c2677590a733652729c339e13a9894b2421a8',
     readingEvidenceBlob: blob(source('reading-mode-desktop-evidence.mjs')),
     historyDriverBlob: blob(source('check-version-history-desktop.mjs')) })
   for (const [file, key] of Object.entries(SHORTCUT_INSTALLATION_SOURCES)) pin[key] = blob(source(file))

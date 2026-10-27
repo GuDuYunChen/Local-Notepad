@@ -2,11 +2,12 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { replaceExactlyAndProveInverse } from './reading-mode-installed-evidence.mjs'
+import { LOCAL_EXPORT_VERSION } from './local-export-desktop-evidence.mjs'
 import { prepareLocalExportVerifierSources, validateLocalExportInstallerPin } from './local-export-installed-evidence.mjs'
 import { BLOCK_REFERENCE_SOURCES, BLOCK_REFERENCE_REPORT, BLOCK_REFERENCE_VERSION, blockReferenceBlob, blockReferenceHash, verifyBlockReferencesReport } from './block-references-evidence.mjs'
 export const BLOCK_REFERENCE_INSTALLATION_GATE='installed-app-block-reference-workflow'
 export function validateBlockReferencePin(pin){
-  validateLocalExportInstallerPin(pin);assert.equal(pin.current.version,BLOCK_REFERENCE_VERSION)
+  validateLocalExportInstallerPin(pin);assert.equal(pin.current.version,LOCAL_EXPORT_VERSION)
   assert.deepEqual(Object.keys(pin.blockReferenceSources||{}).sort(),[...BLOCK_REFERENCE_SOURCES].sort())
   for(const value of Object.values(pin.blockReferenceSources))assert.match(value||'',/^[a-f0-9]{40}$/)
   return true
