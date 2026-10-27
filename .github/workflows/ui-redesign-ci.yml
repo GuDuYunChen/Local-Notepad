@@ -31,6 +31,8 @@ jobs:
 
       - name: Verify committed dependency lock
         run: node scripts/verify-dependency-lock.mjs
+      - name: Verify complete acceptance release bindings
+        run: node scripts/check-acceptance-versions.mjs
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
       - name: Verify install preserved manifest and lock
@@ -218,6 +220,8 @@ jobs:
 
       - name: Verify committed dependency lock
         run: node scripts/verify-dependency-lock.mjs
+      - name: Verify complete acceptance release bindings
+        run: node scripts/check-acceptance-versions.mjs
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
       - name: Verify install preserved manifest and lock
