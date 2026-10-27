@@ -20,6 +20,7 @@ export const APPEARANCE_CHECKS = Object.freeze([
   'real-quota-failure-and-retry', 'external-context-invalidates-preview', 'corrupt-storage-explicit-repair',
   'minimum-native-window', 'normal-restart-restores', 'installation-retains-appearance', 'note-body-unchanged',
 ])
+export const APPEARANCE_FEEDBACK = Object.freeze(['invalidColor','saved','importError','quotaError','externalChange','corruptStorage','minimumWindowStatus'])
 export const APPEARANCE_IMAGES = Object.freeze(['appearance105-light-preview.png', 'appearance105-dark.png',
   'appearance105-quota-error.png', 'appearance105-external-change.png', 'appearance105-small.png', 'appearance105-reinstalled.png'])
 export function validateAppearanceNativeReport(report, { product, verifier, sources, native = true } = {}) {
@@ -52,6 +53,16 @@ export function validateAppearanceNativeReport(report, { product, verifier, sour
   }
   assert.deepEqual(report.retention.map(item => item.operation), ['same-version-install','uninstall','reinstall'])
   for (const item of report.retention) { assert.equal(item.equal, true); assert.ok(item.files > 0); assert.match(item.digest, /^[a-f0-9]{64}$/) }
+  assert.deepEqual(Object.keys(report.feedback || {}).sort(), [...APPEARANCE_FEEDBACK].sort())
+  for (const item of Object.values(report.feedback)) {
+    for (const key of ['top','bottom','left','right','areaTop','areaBottom','footerTop','viewportWidth','viewportHeight']) assert.equal(Number.isFinite(item[key]), true)
+    assert.equal(item.hit, true); assert.equal(item.outsideScroll, true)
+    assert.ok(item.top >= Math.max(0,item.areaTop) && item.bottom > item.top)
+    assert.ok(item.bottom <= Math.min(item.viewportHeight,item.areaBottom,item.footerTop))
+    assert.ok(item.left >= 0 && item.right > item.left && item.right <= item.viewportWidth)
+    assert.ok(typeof item.text === 'string' && item.text.length > 0)
+    assert.ok(['status','alert'].includes(item.role))
+  }
   assert.equal(report.trustedMouseInput, true); assert.equal(report.trustedKeyboardInput, true)
   assert.equal(report.quota.error, 'QuotaExceededError'); assert.ok(report.quota.keys > 0)
   assert.equal(report.quota.originalConfigurationPreserved, true); assert.equal(report.quota.retryReadBack, true)

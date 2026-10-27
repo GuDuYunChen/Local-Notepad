@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { mkdtempSync, writeFileSync, rmSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { APPEARANCE_SOURCES, APPEARANCE_CHECKS, APPEARANCE_IMAGES, APPEARANCE_REPORT, appearanceHash, validateAppearanceNativeReport, verifyAppearanceNativeReport } from './appearance-desktop-evidence.mjs'
+import { APPEARANCE_SOURCES, APPEARANCE_CHECKS, APPEARANCE_FEEDBACK, APPEARANCE_IMAGES, APPEARANCE_REPORT, appearanceHash, validateAppearanceNativeReport, verifyAppearanceNativeReport } from './appearance-desktop-evidence.mjs'
 import { adaptDraftVersion, buildAppearanceRunner, copyAppearanceInstallerCore } from './prepare-appearance-verifier.mjs'
 // Schema/refusal fixtures ONLY. They cannot establish native execution.
 function fixture() {
@@ -17,6 +17,7 @@ function fixture() {
     crashes:[],launches:[100,101,102].map(pid=>({pid})),exits,exit:exits[2],backendStopped:true,storageDirectoriesRemoved:true,
     installationCommands:['initial-install','same-version-install','uninstall','reinstall','final-uninstall'].map(operation=>({operation,code:0,signal:null,timedOut:false})),
     retention:['same-version-install','uninstall','reinstall'].map(operation=>({operation,equal:true,files:12,digest:'4'.repeat(64)})),
+    feedback:Object.fromEntries(APPEARANCE_FEEDBACK.map(name=>[name,{text:'schema fixture only',role:'alert',top:100,bottom:122,left:20,right:650,areaTop:90,areaBottom:140,footerTop:150,viewportWidth:704,viewportHeight:455,hit:true,outsideScroll:true}])),
     trustedMouseInput:true,trustedKeyboardInput:true,quota:{error:'QuotaExceededError',keys:23,originalConfigurationPreserved:true,retryReadBack:true},
     externalChange:{method:'same-origin-frame-real-storage-event',previewRevoked:true},corruption:{explicitTestDataInjection:true,automaticOverwrite:false,explicitRepairReadBack:true},
     fileImport:{method:'DOM.setFileInputFiles-real-file',noWriteBeforeApply:true},fileExport:{format:'local-notepad-appearance',version:1,bytes:140,sha256:'5'.repeat(64)},
@@ -78,3 +79,9 @@ test('a changed shared installer core is rejected rather than repinned',()=>{
  assert.throws(()=>copyAppearanceInstallerCore(core+'\n'))
  assert.throws(()=>copyAppearanceInstallerCore(core.replace('assertHostedWindows','weakenedGuard')))
 })
+
+for (const name of APPEARANCE_FEEDBACK) {
+  test('refuses missing visible feedback '+name,()=>{const {report,expected}=fixture();delete report.feedback[name];assert.throws(()=>validateAppearanceNativeReport(report,expected))})
+  test('refuses feedback clipped by its scroll area '+name,()=>{const {report,expected}=fixture();report.feedback[name].bottom=200;assert.throws(()=>validateAppearanceNativeReport(report,expected))})
+}
+for (const [key,value] of [['hit',false],['outsideScroll',false],['top',NaN],['right',900],['role','unknown']]) test('refuses feedback '+key,()=>{const {report,expected}=fixture();report.feedback.saved[key]=value;assert.throws(()=>validateAppearanceNativeReport(report,expected))})

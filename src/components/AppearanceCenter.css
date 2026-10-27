@@ -31,7 +31,7 @@
 .appearance-examples p { margin: 8px 0; }
 .appearance-warning { padding: 10px 12px; background: var(--warning-light, #fff2d9); color: var(--ink); border: 1px solid var(--warning, #996900); border-radius: 7px; overflow-wrap: anywhere; }
 .appearance-warning p { margin: 0 0 8px; }
-.appearance-feedback { min-height: 22px; margin: 14px 0 0; color: var(--ink-soft); overflow-wrap: anywhere; }
+.appearance-feedback { min-height: 22px; margin: 0; color: var(--ink-soft); overflow-wrap: anywhere; }
 .appearance-confirm { padding: 16px; border: 2px solid var(--clay); border-radius: 9px; margin-top: 14px; background: var(--surface-elevated); }
 .appearance-confirm p { margin: 0 0 12px; }
 .appearance-confirm button + button { margin-left: 8px; }
@@ -48,3 +48,8 @@
   .appearance-footer > span { width: 100%; order: -1; }
   .appearance-tools > span { margin-left: 0; width: 100%; }
 }
+
+/* Action results must not disappear with the independently scrolling form. */
+.appearance-feedback-area { flex: 0 0 auto; padding: 10px 24px; border-top: 1px solid var(--line); max-height: min(180px, 35dvh); overflow-y: auto; overscroll-behavior: contain; }
+.appearance-feedback-area .appearance-warning { margin: 0 0 6px; }
+@media (max-width: 600px) { .appearance-feedback-area { padding: 8px 14px; } }
