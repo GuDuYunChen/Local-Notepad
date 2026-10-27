@@ -6,6 +6,7 @@ import { normalizeLegacyTableBreakMarkup } from '~/services/legacyContentCompati
 import { hasHeadingStructureChanged } from './Editor/utils/referenceUtils'
 import {
   readEditorDraft,
+  readEditorDraftDurable,
   removeEditorDraft,
   writeEditorDraft,
 } from '~/services/editorDraftCache'
@@ -77,9 +78,27 @@ function TextEditorInternal({
   const [editorContent, setEditorContent] = useState('')
   const [editorMode, setEditorMode] = useState(loadEditorMode)
   const [modePreferenceWarning, setModePreferenceWarning] = useState(false)
+  const draftPersistenceProblems = useRef(new Set())
+  const [, refreshDraftPersistence] = useState(0)
   const [pendingBlockDrafts] = useState(createEditorPendingDrafts)
   const [pendingDraftRevision, setPendingDraftRevision] = useState(0)
   const unappliedDraftLabels = [...new Set(pendingBlockDrafts.capture().drafts.map(item => item.label))]
+
+  useEffect(() => {
+    const receive = event => {
+      const id = event.detail?.id
+      if (typeof id !== 'string' || !id) return
+      if (event.type === 'editor:draft-persistence-error') draftPersistenceProblems.current.add(id)
+      else draftPersistenceProblems.current.delete(id)
+      if (id === currentIdRef.current) refreshDraftPersistence(value => value + 1)
+    }
+    window.addEventListener('editor:draft-persistence-error', receive)
+    window.addEventListener('editor:draft-persistence-ready', receive)
+    return () => {
+      window.removeEventListener('editor:draft-persistence-error', receive)
+      window.removeEventListener('editor:draft-persistence-ready', receive)
+    }
+  }, [])
 
   useEffect(() => pendingBlockDrafts.subscribe(() => setPendingDraftRevision(value => value + 1)), [pendingBlockDrafts])
   useEffect(() => editorQuit.register(() => {
@@ -516,19 +535,21 @@ function TextEditorInternal({
     const load = async (id) => {
       setLoading(true)
       try {
-        let f = null
+        let f = null, cached = null
         for (let readAttempt = 0; readAttempt < 3; readAttempt += 1) {
           const revision = databaseRevisionRef.current.get(id) || 0
           const result = await boundedEditorRequest(api, `/api/files/${encodeURIComponent(id)}`, { signal: loadCtl.signal })
           if (loadCtl.signal.aborted || loadAbortRef.current !== loadCtl || id !== currentIdRef.current) return
           if (result?.id !== id || typeof result.content !== 'string') throw new Error('正文读取响应不匹配，未打开编辑器或替换草稿')
-          // A receipt/conflict received during this GET makes its snapshot old.
-          // Re-read instead of restoring a draft against a pre-save database body.
-          if ((databaseRevisionRef.current.get(id) || 0) === revision) { f = result; break }
+          if ((databaseRevisionRef.current.get(id) || 0) !== revision) continue
+          const draft = await readEditorDraftDurable(id)
+          if (loadCtl.signal.aborted || loadAbortRef.current !== loadCtl || id !== currentIdRef.current) return
+          // A receipt/conflict can arrive during either await. Never reconcile
+          // a persistent draft against a pre-save database snapshot.
+          if ((databaseRevisionRef.current.get(id) || 0) === revision) { f = result; cached = draft; break }
         }
         if (!f) throw new Error('读取期间正文持续变化，请重试加载；草稿保留')
 
-        const cached = readEditorDraft(id)
         const rawServer = f.content || ''
         const serverText = normalizeLegacyTableBreakMarkup(rawServer)
         const recovery = recoverEditorDraft(id, cached, rawServer)
@@ -813,6 +834,15 @@ function TextEditorInternal({
         <div className="placeholder">加载中…</div>
       ) : (
         <>
+          {draftPersistenceProblems.current.has(activeId) && contentRef.current !== lastSavedContentRef.current && (
+            <div className="save-state error" role="alert" data-draft-persistence-warning
+              style={{ padding: '8px 12px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
+              <span>当前正文草稿未能写入恢复缓存，关闭或崩溃后可能无法恢复。请先保存正文，或重试草稿备份。</span>
+              <button type="button" className="status-retry-btn" onClick={() => {
+                if (currentIdRef.current === activeId && loadedDocumentRef.current === activeId) cachePendingBodyForRetry(activeId, contentRef.current)
+              }}>重试草稿备份</button>
+            </div>
+          )}
           <React.Suspense fallback={<div className="placeholder">正在加载编辑器…</div>}>
             <EditorPendingDraftContext.Provider value={pendingBlockDrafts}>
             <Editor

@@ -8,7 +8,7 @@ import mammoth from 'mammoth'
 import { LOCAL_EXPORT_FIXTURE as F } from './local-export-desktop-values.mjs'
 import { assertExportOwnedDirectory, validateExportDirectoryResult } from './local-export-directory-session.mjs'
 
-export const LOCAL_EXPORT_VERSION = '4.236.0'
+export const LOCAL_EXPORT_VERSION = '4.237.0'
 export const LOCAL_EXPORT_REPORT = 'local-export-desktop.json'
 export const LOCAL_EXPORT_CHECKS = Object.freeze([
   'actual-app-and-canonical-synthetic-documents', 'original-entry-selection-and-preview',

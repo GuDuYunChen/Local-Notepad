@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { BLOCK_REFERENCE_VERSION, BLOCK_REFERENCE_SOURCES, blockReferenceBlob, blockReferenceHash } from './block-references-evidence.mjs'
 import { BLOCK_REFERENCE_CHECKS } from './block-references-desktop-driver.mjs'
 import { LOCAL_EXPORT_INSTALLATION_SOURCES } from './local-export-installed-evidence.mjs'
+import { LOCAL_EXPORT_VERSION } from './local-export-desktop-evidence.mjs'
 import { SHORTCUT_INSTALLATION_SOURCES } from './shortcut-management-installed-evidence.mjs'
 import { READING_SOURCE_KEYS } from './reading-mode-installed-evidence.mjs'
 import { blockLocator } from '../src/services/blockReferenceModel.mjs'
@@ -10,7 +11,7 @@ export const product='a'.repeat(40), verifier='b'.repeat(40)
 export const source=name=>readFileSync(new URL('../'+name,import.meta.url),'utf8').replace(/\r\n/g,'\n')
 export function blockPinFixture(){
  const pin=JSON.parse(source('scripts/reading-mode-installer-pin.json'))
- pin.product=product;pin.current={version:BLOCK_REFERENCE_VERSION,bytes:1001,sha256:blockReferenceHash('synthetic source contract only')}
+ pin.product=product;pin.current={version:LOCAL_EXPORT_VERSION,bytes:1001,sha256:blockReferenceHash('synthetic source contract only')}
  pin.currentSource={run:100,artifact:200,name:'local-notepad-windows-'+product,headSha:'c'.repeat(40),branch:'feature/test',repositoryId:1105107817,archiveBytes:5000,archiveSha256:blockReferenceHash('synthetic archive')}
  const names={...LOCAL_EXPORT_INSTALLATION_SOURCES,...SHORTCUT_INSTALLATION_SOURCES,
  'check-local-import-desktop.mjs':'importBlob','local-import-desktop-evidence.mjs':'importEvidenceBlob','local-import-desktop-evidence.node.mjs':'importEvidenceTestsBlob',

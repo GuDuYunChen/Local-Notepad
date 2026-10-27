@@ -1,4 +1,4 @@
-name: Actual local document export installation lifecycle 2F102
+name: Actual local draft recovery and complete installation lifecycle 2F104
 on:
   push:
     branches: [ci/local-installation-2f86]
@@ -43,6 +43,8 @@ jobs:
         run: node --test --test-reporter=tap --test-reporter-destination=test-results/installer-lifecycle/local-export-preparation-contracts.tap scripts/local-export-desktop-evidence.node.mjs scripts/local-export-installed-evidence.node.mjs
       - name: Verify block reference boundaries and preserved installed lifecycle
         run: node --test --test-reporter=tap --test-reporter-destination=test-results/installer-lifecycle/block-reference-preparation-contracts.tap scripts/block-references-evidence.node.mjs scripts/block-references-installed-evidence.node.mjs
+      - name: Refuse incomplete draft crash recovery and retention evidence
+        run: node --test scripts/draft-durability-desktop-evidence.node.mjs
       - name: Verify fixed legacy installer restoration and refusals
         run: node --test scripts/prepare-legacy-installer.node.mjs
       - name: Resolve only complete source and binary pins
@@ -61,7 +63,7 @@ jobs:
           path: .installer-input/previous
       - name: Restore unchanged old path-failure counterexample
         run: node scripts/prepare-legacy-installer.mjs
-      - name: Download source-bound 4.235.0 installer
+      - name: Download source-bound 4.237.0 installer
         uses: actions/download-artifact@v4
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -78,6 +80,8 @@ jobs:
         run: node --test scripts/installer-lifecycle-core.node.mjs scripts/installer-shell-core.node.mjs scripts/history-installation-evidence.node.mjs scripts/daily-installed-evidence.node.mjs scripts/template-installed-evidence.node.mjs scripts/quick-installed-evidence.node.mjs scripts/note-tags-installed-evidence.node.mjs scripts/backlinks-installed-evidence.node.mjs scripts/document-search-installed-evidence.node.mjs scripts/document-outline-installed-evidence.node.mjs scripts/local-graph-installed-evidence.node.mjs scripts/local-pins-installed-evidence.node.mjs scripts/recent-notes-installed-evidence.node.mjs scripts/installer-history-readiness.node.mjs scripts/wiki-installed-evidence.node.mjs scripts/local-import-desktop-evidence.node.mjs scripts/local-import-installed-evidence.node.mjs
       - name: Apply unchanged import refusal contracts to generated target-version validator
         run: node --test scripts/reading-import-desktop-validator.node.mjs
+      - name: Actual installed draft crashes storage faults retry and unsaved-data retention
+        run: node scripts/run-draft-durability-desktop.mjs
       - name: Actual installed modules upgrade overwrite uninstall reinstall and data retention
         run: node scripts/run-reading-mode-installer.mjs run
       - name: Retain complete or failed original evidence

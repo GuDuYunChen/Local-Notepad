@@ -12,6 +12,9 @@ vi.mock('./Editor/utils/referenceUtils', () => ({
 }))
 vi.mock('~/services/editorDraftCache', () => ({
   isFreshEditorDraft: () => false,
+  // TextEditor now checks the durable mirror before reconciling the editor.
+  // This exit-handshake suite isolates save/quit behavior, so restore no draft.
+  readEditorDraftDurable: () => Promise.resolve(null),
   readEditorDraft: () => null,
   removeEditorDraft: vi.fn(),
   writeEditorDraft: vi.fn(),

@@ -1,5 +1,5 @@
 {
-  "product": "e05660c2bd708419ff09f64e527799e9d3fe52e0",
+  "product": "00d9279cbf087a31fb5c4116f251e6c3c442dae7",
   "quickBlob": "c1e8f40862b770f82af47c26a455b57efc853700",
   "tagsBlob": "54bb56864e58e2aa3f5ed08aedb52a00de5f0769",
   "templateBlob": "42378f13f71a03c3e91cdfdcb6dec44dbbb05f33",
@@ -10,14 +10,14 @@
   "pinsBlob": "7abf0331d1b3a7c1b626e7c2e2b5f68d6a77c588",
   "recentBlob": "cbe5a8897c082210363357fd33f2cb0f3d7bd1cc",
   "wikiBlob": "8cb64e31bf79c3ec2b17d5b8c152eccc0f2de6ca",
-  "importBlob": "e71e3f05bc3ac64d25cc8cc513a0341c06f50024",
+  "importBlob": "d7a71f759debf24fde5b8bd4b0d19d8a5b802aba",
   "importFixtureBlob": "022e484ef96e8a2dd6b2f57601bda8af29869666",
-  "importEvidenceBlob": "c29f36c5e36248d9ad768cba05735c32af11c2d1",
-  "importEvidenceTestsBlob": "49a0fa28df31ccd5fb09737652600b27e6138748",
+  "importEvidenceBlob": "7b860fe6862e50c9b299fb06abe4684bfd273da1",
+  "importEvidenceTestsBlob": "ad1c2677590a733652729c339e13a9894b2421a8",
   "current": {
-    "version": "4.236.0",
-    "bytes": 104352125,
-    "sha256": "d3c83bd79b1276dcd199add1d6f91f2cb1e5cc3f357613e1198ff853abc21643"
+    "version": "4.237.0",
+    "bytes": 104355060,
+    "sha256": "4fc0af6dee8aa12ca4f1f2bb1389b1ad1ff4006cd78250ff8f5c312b1aeb175c"
   },
   "previous": {
     "version": "4.232.0",
@@ -31,18 +31,18 @@
     "productSourceCommit": "1a8e17ba775312c359f4ac23851c8c365b57a9cb"
   },
   "currentSource": {
-    "run": 40292809325,
-    "artifact": 12637102784,
-    "name": "local-notepad-windows-e05660c2bd708419ff09f64e527799e9d3fe52e0",
-    "headSha": "b48cdaddcfed088c9e0e7f45257dc067b141a13b",
-    "branch": "feature/local-block-references-2f103",
+    "run": 40444269357,
+    "artifact": 12707778356,
+    "name": "local-notepad-windows-00d9279cbf087a31fb5c4116f251e6c3c442dae7",
+    "headSha": "8cefe847a01cbcf71d661d348103e57dd3bfecee",
+    "branch": "feature/local-draft-durability-2f104",
     "repositoryId": 1105107817,
-    "archiveBytes": 104355168,
-    "archiveSha256": "7fc76bbeb880ab8aa4a0f37ba1db7907172cdd5e9e00ee9f46dbb10ff9c217c4"
+    "archiveBytes": 104358113,
+    "archiveSha256": "8386d5d1a4a3541491b68502768123481d13d6ef6beae930583be124c7de92d4"
   },
   "readingDriverBlob": "6924b128c1125424c91f71dbd1ecc415762e2f77",
   "readingFixtureBlob": "0c7ffadbb187dd33a7bc6b5aa8c69427eec5cc34",
-  "readingEvidenceBlob": "664103199e6ceae406af654f9de0dd68c01fbc26",
+  "readingEvidenceBlob": "1525cb0cd9c78182cf0345a6d220324273cb4b11",
   "readingBuilderBlob": "fbc7ead7bf8a6f765c00619920778b9aac1c8c8a",
   "readingInputBlob": "b69a1d282926cb7cc40375d58feeea7970a33a4d",
   "readingWindowSessionBlob": "5905369c693500e6b68e506bbf1dac0601922449",
@@ -51,12 +51,12 @@
   "historyDriverBlob": "cca9480ce41883f1f64fc37bbc655e5f5c51582b",
   "shortcutManagementDriverBlob": "a728dd1e03bc75eecec1aa85df5d33085066751d",
   "shortcutManagementRunnerBlob": "0fada01b2c802b0299c2c606a0004c4657f0e1c2",
-  "shortcutManagementEvidenceBlob": "a73a2622e388805dc555f9f29ff35c85b17d798a",
+  "shortcutManagementEvidenceBlob": "d06b3d0701e632c087aa3a3b89d0dc76df888ba7",
   "shortcutManagementFixtureBlob": "eb49f859eb9c9b51f8c31d3354f81231c647fb87",
   "shortcutManagementCanonicalFixtureBlob": "f86598e0d552a5d884eff9e30739617366c685c9",
   "localExportDriverBlob": "154b4552317cedf9c0e94c3fbbebeffb6b025f1b",
   "localExportRunnerBlob": "ffde8b2684e79327db84e64e58e7ecd5dd37edfd",
-  "localExportEvidenceBlob": "4d2c9cf9d6aec5fdfb7bfab502be98454cad778f",
+  "localExportEvidenceBlob": "862f01568cf670ab4914b6225c7f9f75fc9a5ab3",
   "localExportValuesBlob": "8c2af4276b34c42e5b346b666c08adc402470672",
   "localExportFixtureBlob": "802be649735c7ce56dab17bc15647934c036662c",
   "localExportBuilderBlob": "20e6d532a30689ed221b2ce184b13e337f2a5a4c",
@@ -73,7 +73,7 @@
   "blockReferenceSources": {
     "scripts/block-references-desktop-driver.mjs": "d6e92bfb3f403278cf01500da357ed1d30f00811",
     "scripts/run-block-references-desktop.mjs": "fe5d43271b7e2916ddcaf7182e0d1e2775c3a238",
-    "scripts/block-references-evidence.mjs": "14b9d56ac8dc7eafb10f025c17f7c87d82ef8d2d",
+    "scripts/block-references-evidence.mjs": "1570c3a036020a972f9577a5f2ae1c272ec9f471",
     "src/services/blockReferenceModel.mjs": "192a962099478836bb8e97d66a39853cc4f365ac",
     "src/services/blockReferences.mjs": "f260d8b5a08c1d1aa139777e3a3dfcfbfd9fdb9c",
     "src/components/Editor/plugins/BlockReferencePlugin.jsx": "b239eb70afc53debf8a023ec5a15cd8e004f5b18",
@@ -92,5 +92,15 @@
     "electron/local-export-document.js": "e9ed11cfced23369f51333b1bf1208ff247f2c25",
     "src/utils/lexicalText.js": "a65c6fb38a5406494683686a6083a9079560f71c",
     "src/components/Editor/utils/referenceUtils.js": "046ede7392ba863a82bd28c6857fc8b8cceaf30c"
+  },
+  "draftSourceFiles": {
+    "src/services/editorDraftCache.js": "6efd02a6350a73efbd64118cc907e5d43559398c",
+    "src/services/editorDraftRecovery.mjs": "52d59e42646ebddb283d158d47a2fcfe517d6559",
+    "src/services/editorSaveTransaction.mjs": "49fcbea6db41810a2d99ff21001907f9ea8b00b7",
+    "src/services/editorQuit.mjs": "59f38fd48c05b5a68e37e872fb85b696c6ca4fc1",
+    "src/components/TextEditor.jsx": "f2202c2fafc7e6ffa1cae157e20763b6e3584829",
+    "scripts/draft-durability-desktop-driver.mjs": "90c03fac35042ca9e4a120eb4f41ca6436f25b21",
+    "scripts/run-draft-durability-desktop.mjs": "ca77b90dca615335559a13c35ee065728f0c8d6d",
+    "scripts/draft-durability-desktop-evidence.mjs": "30c05b158fd928fc469b37bda262fd8691f9ba0a"
   }
 }
