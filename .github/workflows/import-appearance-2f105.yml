@@ -1,0 +1,92 @@
+name: Import frozen local appearance candidate 2F105
+on:
+  push:
+    branches: [feature/local-appearance-2f105]
+    paths:
+      - .github/workflows/import-appearance-2f105.yml
+      - .github/appearance-2f105-payload/**
+permissions:
+  contents: write
+concurrency:
+  group: import-frozen-appearance-2f105
+  cancel-in-progress: false
+jobs:
+  import-reviewed-tree:
+    if: github.repository == 'GuDuYunChen/Local-Notepad' && github.ref == 'refs/heads/feature/local-appearance-2f105'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+      - name: Verify exact payload and publish only the frozen candidate
+        shell: bash
+        env:
+          GIT_AUTHOR_NAME: Local appearance candidate import
+          GIT_AUTHOR_EMAIL: candidate-import@users.noreply.github.com
+          GIT_COMMITTER_NAME: Local appearance candidate import
+          GIT_COMMITTER_EMAIL: candidate-import@users.noreply.github.com
+        run: |
+          python3 - <<'PY'
+          import base64, hashlib, json, lzma, os, pathlib, subprocess
+          BASE = 'c193924b0be53c08b960b7c279ea56f655f43e8e'
+          BASE_TREE = '534090a73322f6caf81ef1dd00962f48b766809a'
+          CANDIDATE_TREE = '3771454dc3b66f9d904bb4c169d06d6352f86c78'
+          REF = 'refs/heads/feature/local-appearance-2f105'
+          def git(*args, data=None):
+              return subprocess.check_output(['git', *args], input=data).decode().strip()
+          def require(condition, message):
+              if not condition:
+                  raise RuntimeError(message)
+          head = os.environ['GITHUB_SHA']
+          require(git('rev-parse', 'HEAD') == head, 'Checkout differs from workflow source')
+          require(git('rev-parse', 'HEAD^') == BASE, 'Unexpected bootstrap parent')
+          require(git('rev-parse', BASE + '^{tree}') == BASE_TREE, 'Wrong accepted baseline tree')
+          transport = {'.github/workflows/import-appearance-2f105.yml', '.github/appearance-2f105-payload/part1.txt', '.github/appearance-2f105-payload/part2.txt'}
+          require(set(git('diff', '--name-only', BASE, head).splitlines()) == transport, 'Bootstrap contains unreviewed changes')
+          parts = [pathlib.Path('.github/appearance-2f105-payload/' + name).read_bytes() for name in ['part1.txt', 'part2.txt']]
+          require(all(len(part) == 18260 for part in parts), 'Incomplete transport parts')
+          compressed = base64.b64decode(b''.join(parts), validate=True)
+          require(hashlib.sha256(compressed).hexdigest() == '530d33077646a8790779d929a8d156631c75181f4129781683386fb59eda76c9', 'Compressed payload digest mismatch')
+          decoder = lzma.LZMADecompressor(memlimit=134217728)
+          patch = decoder.decompress(compressed, max_length=111997)
+          require(len(patch) == 111996 and decoder.eof and not decoder.unused_data, 'Unexpected patch length or trailing data')
+          require(hashlib.sha256(patch).hexdigest() == '63af3b50227ef25a3e1294444d5790dad205c7daca4ebf42d0650d5a047902cb', 'Patch digest mismatch')
+          require(git('ls-remote', 'origin', 'refs/heads/master').split()[0] == BASE, 'Master changed; review before publishing')
+          require(git('ls-remote', 'origin', REF).split()[0] == head, 'Feature branch changed; refuse stale publication')
+          git('read-tree', BASE)
+          git('apply', '--cached', '--binary', '-', data=patch)
+          tree = git('write-tree')
+          require(tree == CANDIDATE_TREE, 'Applied tree differs from locally tested tree')
+          message = ('feat: complete local appearance workspace 2F.105 / 4.238.0\n\n'
+                     'Import the exact previously tested tree 3771454dc3b66f9d904bb4c169d06d6352f86c78. '
+                     'Settings entry, built-in/custom schemes, light/dark accent validation, preview/cancel/apply, '
+                     'persistence/readback, bounded import/export, delete/reset, failure/retry and external changes. '
+                     'Preserve note/save/draft/quit sources, schema14 and locked dependency graph. '
+                     'Local evidence: unfiltered Vitest 5178, original UI/Electron/backend and builds passed. '
+                     'New product CI, native Windows appearance and installation acceptance remain required. '
+                     'This import is not product acceptance. Temporary transport files are absent from this tree.\n')
+          commit = git('commit-tree', tree, '-p', head, data=message.encode())
+          out = pathlib.Path(os.environ['RUNNER_TEMP']) / 'appearance-2f105-import'
+          out.mkdir()
+          subprocess.run(['git', 'archive', '--format=tar.gz', '--output=' + str(out / 'source.tar.gz'), commit], check=True)
+          (out / 'source-manifest.txt').write_text(git('ls-tree', '-r', commit) + '\n')
+          report = {'repository': os.environ['GITHUB_REPOSITORY'], 'baseline': BASE, 'bootstrap': head, 'commit': commit,
+                    'tree': tree, 'branch': REF, 'sourceArchiveSHA256': hashlib.sha256((out / 'source.tar.gz').read_bytes()).hexdigest(),
+                    'branchUpdated': False, 'testsExecutedByImport': False, 'windowsVerified': False, 'moduleAccepted': False}
+          (out / 'receipt.json').write_text(json.dumps(report, indent=2) + '\n')
+          require(git('ls-remote', 'origin', REF).split()[0] == head, 'Concurrent feature update before push')
+          subprocess.run(['git', 'push', 'origin', commit + ':' + REF], check=True)
+          require(git('ls-remote', 'origin', REF).split()[0] == commit, 'Published branch identity mismatch')
+          report['branchUpdated'] = True
+          (out / 'receipt.json').write_text(json.dumps(report, indent=2) + '\n')
+          print(json.dumps(report, indent=2))
+          PY
+      - name: Preserve source and import receipt, not acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-appearance-2f105-source-${{ github.sha }}
+          path: ${{ runner.temp }}/appearance-2f105-import/
+          if-no-files-found: warn
+          retention-days: 7
