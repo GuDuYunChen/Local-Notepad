@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import ThemeToggle from './ThemeToggle'
+import AppearanceCenter from './AppearanceCenter'
 import LibraryReferenceHealthPanel from './LibraryReferenceHealthPanel'
 import SyncCenterPanel from './SyncCenterPanel'
 import S3ReadInspectionPanel from './S3ReadInspectionPanel'
@@ -87,6 +88,7 @@ export default function SettingsPanel({
   const [latency, setLatency] = useState(null)
   const [loading, setLoading] = useState(false)
   const [advancedOpen, setAdvancedOpen] = useState(false)
+  const [appearanceOpen, setAppearanceOpen] = useState(false)
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -166,6 +168,11 @@ export default function SettingsPanel({
             </div>
             <ThemeToggle />
           </div>
+          <div className="settings-row">
+            <div><strong>主题方案</strong><span>本地自定义强调色，支持预览、导入导出和恢复默认。</span></div>
+            <button type="button" className="btn" onClick={() => setAppearanceOpen(true)}>管理主题方案</button>
+          </div>
+          {appearanceOpen && <AppearanceCenter onClose={() => setAppearanceOpen(false)} />}
         </section>
 
         <section className="settings-card consumer-settings-section">

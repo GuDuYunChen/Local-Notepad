@@ -1,0 +1,11 @@
+{
+  "productHead": "d31e68e6fd47363852840189b3c19de8b8cced98",
+  "productTree": "3771454dc3b66f9d904bb4c169d06d6352f86c78",
+  "productionTrees": {
+    "src": "61deb4094821a217ba9a33fc588db3404077f8d9",
+    "electron": "aab66353ec0937a93e9882c5d621f62e4ee2e931",
+    "server": "41f156ce38a8008c951d1d2a4b565655e553d7cc",
+    "package.json": "9c777f8d0af2748a85a16cb334cf4508e775f827",
+    "package-lock.json": "bee4d2c6a3c744f5c2c83196b81f274d91f83c02"
+  }
+}

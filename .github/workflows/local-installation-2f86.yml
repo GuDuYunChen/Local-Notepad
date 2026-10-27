@@ -1,4 +1,4 @@
-name: Actual local draft recovery and complete installation lifecycle 2F104
+name: Actual local appearance and complete installation lifecycle 2F105
 on:
   push:
     branches: [ci/local-installation-2f86]
@@ -18,6 +18,8 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
+      - name: Prepare source-bound appearance and retained draft verifiers
+        run: node scripts/prepare-appearance-verifier.mjs
       - name: Verify historical issue catalog and locked dependencies
         shell: pwsh
         run: |
@@ -45,6 +47,8 @@ jobs:
         run: node --test --test-reporter=tap --test-reporter-destination=test-results/installer-lifecycle/block-reference-preparation-contracts.tap scripts/block-references-evidence.node.mjs scripts/block-references-installed-evidence.node.mjs
       - name: Refuse incomplete draft crash recovery and retention evidence
         run: node --test scripts/draft-durability-desktop-evidence.node.mjs
+      - name: Refuse incomplete appearance workflow and retention evidence
+        run: node --test scripts/appearance-desktop-evidence.node.mjs
       - name: Verify fixed legacy installer restoration and refusals
         run: node --test scripts/prepare-legacy-installer.node.mjs
       - name: Resolve only complete source and binary pins
@@ -63,7 +67,7 @@ jobs:
           path: .installer-input/previous
       - name: Restore unchanged old path-failure counterexample
         run: node scripts/prepare-legacy-installer.mjs
-      - name: Download source-bound 4.237.0 installer
+      - name: Download source-bound 4.238.0 installer
         uses: actions/download-artifact@v4
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -82,6 +86,8 @@ jobs:
         run: node --test scripts/reading-import-desktop-validator.node.mjs
       - name: Actual installed draft crashes storage faults retry and unsaved-data retention
         run: node scripts/run-draft-durability-desktop.mjs
+      - name: Actual installed appearance files retry restart and configuration retention
+        run: node scripts/run-appearance-desktop-generated.mjs
       - name: Actual installed modules upgrade overwrite uninstall reinstall and data retention
         run: node scripts/run-reading-mode-installer.mjs run
       - name: Retain complete or failed original evidence
