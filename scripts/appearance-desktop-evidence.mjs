@@ -10,7 +10,7 @@ export const APPEARANCE_SOURCES = Object.freeze([
   'src/components/SettingsPanel.jsx', 'src/components/ThemeToggle.jsx', 'src/services/themePreference.js', 'src/main.jsx',
   'scripts/appearance-desktop-driver.mjs', 'scripts/appearance-desktop-evidence.mjs',
   'scripts/prepare-appearance-verifier.mjs', 'scripts/run-appearance-desktop-generated.mjs',
-  'scripts/installer-lifecycle-core.mjs', 'scripts/desktop-window-session.mjs', 'scripts/desktop-window-worker.ps1',
+  'scripts/appearance-installer-core.mjs', 'scripts/desktop-window-session.mjs', 'scripts/desktop-window-worker.ps1',
   'scripts/desktop-window-target.mjs', 'scripts/local-export-directory-session.mjs', 'scripts/local-export-directory-worker.ps1',
 ])
 export const APPEARANCE_CHECKS = Object.freeze([

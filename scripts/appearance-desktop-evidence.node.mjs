@@ -4,7 +4,7 @@ import { mkdtempSync, writeFileSync, rmSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { APPEARANCE_SOURCES, APPEARANCE_CHECKS, APPEARANCE_IMAGES, APPEARANCE_REPORT, appearanceHash, validateAppearanceNativeReport, verifyAppearanceNativeReport } from './appearance-desktop-evidence.mjs'
-import { adaptDraftVersion, buildAppearanceRunner } from './prepare-appearance-verifier.mjs'
+import { adaptDraftVersion, buildAppearanceRunner, copyAppearanceInstallerCore } from './prepare-appearance-verifier.mjs'
 // Schema/refusal fixtures ONLY. They cannot establish native execution.
 function fixture() {
   const sources=Object.fromEntries(APPEARANCE_SOURCES.map(file=>[file,'a'.repeat(40)]))
@@ -65,4 +65,16 @@ test('native driver observes real file operations and retained original lifecycl
  const s=readFileSync(new URL('./appearance-desktop-driver.mjs',import.meta.url),'utf8')
  for(const pattern of [/Input\.dispatchKeyEvent/,/Input\.insertText/,/DOM\.setFileInputFiles/,/Page\.setDownloadBehavior/,/QuotaExceededError/,/reinstallWithRetainedDraft\(\)/,/bodyWritesSince/,/resizeSmall\(\)/])assert.match(s,pattern)
  assert.doesNotMatch(s,/window\.electronAPI\s*=|setInterval\s*=|setTimeout\s*=|Emulation\.setDeviceMetricsOverride/)
+})
+
+test('appearance freezes the exact original installer helper before inherited preparation',()=>{
+ const core=readFileSync(new URL('./installer-lifecycle-core.mjs',import.meta.url),'utf8').replace(/\r\n/g,'\n')
+ assert.equal(copyAppearanceInstallerCore(core),core)
+ assert.ok(APPEARANCE_SOURCES.includes('scripts/appearance-installer-core.mjs'))
+ assert.equal(APPEARANCE_SOURCES.includes('scripts/installer-lifecycle-core.mjs'),false)
+})
+test('a changed shared installer core is rejected rather than repinned',()=>{
+ const core=readFileSync(new URL('./installer-lifecycle-core.mjs',import.meta.url),'utf8').replace(/\r\n/g,'\n')
+ assert.throws(()=>copyAppearanceInstallerCore(core+'\n'))
+ assert.throws(()=>copyAppearanceInstallerCore(core.replace('assertHostedWindows','weakenedGuard')))
 })

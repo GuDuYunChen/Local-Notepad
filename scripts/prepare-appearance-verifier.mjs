@@ -10,6 +10,12 @@ export const RETAINED_DRAFT_SOURCES = Object.freeze({
   'draft-durability-desktop-evidence.mjs': ['30c05b158fd928fc469b37bda262fd8691f9ba0a', 1],
   'draft-durability-desktop-evidence.node.mjs': ['f2eacedc869bbd1fd9d70b06023cae2fb47613ad', 2],
 })
+// The original lifecycle prepares its shared core later. Freeze the reviewed
+// helper bytes for the independent appearance process, never repin after mutation.
+export function copyAppearanceInstallerCore(original) {
+  assert.equal(appearanceBlob(original), 'e9c64b370582da9b21a8ea299ef40db01eb96b0a', 'Unreviewed installer helper')
+  return original
+}
 export function adaptDraftVersion(file, original) {
   const spec = RETAINED_DRAFT_SOURCES[file]; assert.ok(spec, 'Unknown retained verifier')
   assert.equal(appearanceBlob(original), spec[0], 'Retained draft verifier identity changed')
@@ -22,6 +28,7 @@ export function adaptDraftVersion(file, original) {
 export function buildAppearanceRunner(original) {
   assert.equal(appearanceBlob(original), RETAINED_DRAFT_SOURCES['run-draft-durability-desktop.mjs'][0])
   const changes = [
+    ["from './installer-lifecycle-core.mjs'", "from './appearance-installer-core.mjs'"],
     ["from './draft-durability-desktop-evidence.mjs'", "from './appearance-desktop-evidence.mjs'"],
     ['DRAFT_REPORT, DRAFT_SOURCES, draftHash, draftBlob, verifyDraftDurabilityReport', 'APPEARANCE_REPORT as DRAFT_REPORT, APPEARANCE_SOURCES as DRAFT_SOURCES, appearanceHash as draftHash, appearanceBlob as draftBlob, verifyAppearanceNativeReport as verifyDraftDurabilityReport'],
     ["import { verifyDraftDurabilityDesktop } from './draft-durability-desktop-driver.mjs'", "import { verifyAppearanceDesktop as verifyDraftDurabilityDesktop } from './appearance-desktop-driver.mjs'\nimport { createExportDirectorySession } from './local-export-directory-session.mjs'"],
@@ -70,6 +77,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     generated.push({ file, before: appearanceBlob(original), after: appearanceBlob(current), versionOnly: true, inverseBytesEqual: true })
     if (file === 'run-draft-durability-desktop.mjs') template = original
   }
+  const core = copyAppearanceInstallerCore(read('scripts/installer-lifecycle-core.mjs'))
+  writeFileSync(path.join(root, 'scripts/appearance-installer-core.mjs'), core, { flag: 'wx' })
+  writeFileSync(path.join(out, 'appearance-installer-core.mjs'), core, { flag: 'wx' })
   const runner = buildAppearanceRunner(template)
   writeFileSync(path.join(root, 'scripts/run-appearance-desktop-generated.mjs'), runner, { flag: 'wx' })
   writeFileSync(path.join(out, 'run-appearance-desktop-generated.mjs'), runner, { flag: 'wx' })
