@@ -159,8 +159,6 @@ export default function AppearanceCenter({ onClose }) {
           <button type="button" data-appearance-close aria-label="关闭主题方案中心" disabled={Boolean(confirmation)} onClick={close}>×</button>
         </header>
         <div className="appearance-scroll">
-          {baseline.error && <div role="alert" className="appearance-warning"><p>{baseline.error}</p>{baseline.raw !== undefined && !repair && <button type="button" onClick={() => setConfirmation({ kind: 'repair' })}>确认修复配置</button>}</div>}
-          {externalChanged && <p className="appearance-warning">外部配置已变化，预览已撤销。重新载入前不能应用。</p>}
           <fieldset disabled={Boolean(confirmation)} className="appearance-fields">
             <legend>选择方案</legend>
             <div className="appearance-schemes" role="group" aria-label="主题方案列表">
@@ -180,7 +178,6 @@ export default function AppearanceCenter({ onClose }) {
               <label>深色强调色<input aria-label="深色强调色" value={selected.darkAccent} disabled={!custom} spellCheck="false" maxLength={7} onChange={event => edit('darkAccent', event.target.value)} /></label>
             </div>
             <p className="appearance-hint">内置方案不能改写，复制后可编辑。强调色须与对应界面背景达到 4.5:1 的对比度；此检查不代表整个界面的无障碍认证。</p>
-            {invalid && <p role="alert" className="appearance-warning">{invalid}</p>}
             <div className="appearance-examples" aria-label="浅深色方案示例">
               {['light', 'dark'].map(mode => <article key={mode} data-mode={mode}>
                 <strong>{mode === 'light' ? '浅色' : '深色'}界面示例</strong><p>正文与背景保持原样，只调整界面强调色。</p>
@@ -195,18 +192,23 @@ export default function AppearanceCenter({ onClose }) {
               {reading && <button type="button" onClick={() => { cancelRead(); setMessage('导入已取消，现有方案未改变。') }}>取消导入</button>}
             </div>
           </fieldset>
-          {error && <p role="alert" className="appearance-warning">{error}</p>}
-          <p role="status" aria-live="polite" className="appearance-feedback">{reading ? '正在读取主题文件…' : message || (dirty ? '有尚未应用的方案更改。' : '当前方案已应用；预览和编辑不会自动保存。')}</p>
           {confirmation && <div className="appearance-confirm" role="alertdialog" aria-modal="true" aria-label="确认主题方案操作">
             <p>{confirmationText[confirmation.kind]}</p>
             <button type="button" onClick={cancelConfirmation}>继续编辑</button>
             <button type="button" onClick={confirm}>确认</button>
           </div>}
         </div>
+        <div className="appearance-feedback-area" aria-label="主题操作反馈">
+          {baseline.error && <div role="alert" className="appearance-warning"><p>{baseline.error}</p>{baseline.raw !== undefined && !repair && <button type="button" disabled={Boolean(confirmation)} onClick={() => setConfirmation({ kind: 'repair' })}>确认修复配置</button>}</div>}
+          {externalChanged && <p role="alert" className="appearance-warning">外部配置已变化，预览已撤销。重新载入前不能应用。</p>}
+          {invalid && <p role="alert" className="appearance-warning">{invalid}</p>}
+          {error && !externalChanged && error !== baseline.error && <p role="alert" className="appearance-warning">{error}</p>}
+          <p role="status" aria-live="polite" className="appearance-feedback">{reading ? '正在读取主题文件…' : message || (dirty ? '有尚未应用的方案更改。' : '当前方案已应用；预览和编辑不会自动保存。')}</p>
+        </div>
         <footer className="appearance-footer">
           <button type="button" disabled={Boolean(confirmation)} onClick={reload}>重新载入</button>
           <span>{previewing ? '预览中 · 未保存' : '仅本机配置'}</span>
-          <button type="button" onClick={clearPreview} disabled={!previewing || Boolean(confirmation)}>取消预览</button>
+          <button type="button" onClick={() => { clearPreview(); setMessage('预览已取消，已恢复当前应用的外观；尚未应用的编辑仍保留。') }} disabled={!previewing || Boolean(confirmation)}>取消预览</button>
           <button type="button" onClick={preview} disabled={Boolean(invalid) || externalChanged || Boolean(confirmation)}>预览当前方案</button>
           <button type="button" className="appearance-apply" onClick={apply} disabled={!dirty || Boolean(invalid) || externalChanged || reading || Boolean(confirmation) || (Boolean(baseline.error) && !repair)}>应用并保存</button>
         </footer>

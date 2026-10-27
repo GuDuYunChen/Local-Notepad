@@ -56,6 +56,8 @@ describe('complete local appearance workflow', () => {
   })
   it('cancels preview without discarding the edited candidate', async () => {
     await choose('松林绿'); await click('预览当前方案'); await click('取消预览')
+    expect(panel().querySelector('[role="status"]').textContent).toContain('预览已取消')
+    expect(panel().querySelector('[role="status"]').textContent).not.toContain('正在预览')
     expect(document.documentElement.style.getPropertyValue('--clay')).toBe('')
     expect(button('应用并保存').disabled).toBe(false)
     expect(localStorage.getItem(APPEARANCE_KEY)).toBeNull()
@@ -182,5 +184,50 @@ describe('complete local appearance workflow', () => {
     expect(onClose).not.toHaveBeenCalled()
     await act(async () => root.render(null))
     expect(document.activeElement).toBe(opener)
+  })
+})
+
+describe('feedback remains outside the independently scrolling editor', () => {
+  const fixedFeedback = (role, text) => {
+    const node = [...panel().querySelectorAll(`[role="${role}"]`)].find(item => item.textContent.includes(text))
+    expect(node, text).toBeTruthy()
+    expect(node.closest('.appearance-scroll')).toBeNull()
+    expect(node.closest('.appearance-feedback-area')?.parentElement).toBe(panel())
+    expect(node.closest('.appearance-feedback-area')?.nextElementSibling).toBe(panel().querySelector('.appearance-footer'))
+  }
+  it('keeps failed-save feedback and later readback success next to the actions', async () => {
+    await choose('松林绿')
+    const storage = localStorage
+    vi.stubGlobal('localStorage', { getItem: key => storage.getItem(key), setItem() { throw Error('quota') } })
+    await click('应用并保存'); fixedFeedback('alert', '未能写入本机')
+    expect(storage.getItem(APPEARANCE_KEY)).toBeNull()
+    vi.stubGlobal('localStorage', storage); await click('应用并保存')
+    fixedFeedback('status', '读回确认')
+  })
+  it('keeps external-change refusal visible without scrolling back to the top', async () => {
+    await choose('松林绿'); await click('预览当前方案')
+    await act(async () => {
+      saveAppearance({ ...defaultAppearance(), activeId: 'ocean' }, readAppearance(), { target: null })
+      window.dispatchEvent(new StorageEvent('storage', { key: APPEARANCE_KEY }))
+    })
+    fixedFeedback('alert', '外部配置已变化')
+    expect(button('应用并保存').disabled).toBe(true)
+  })
+  it('keeps invalid-color refusal by the disabled apply action', async () => {
+    await click('复制为自定义方案'); await input('浅色强调色', '#ffffff')
+    fixedFeedback('alert', '对比度不足')
+    expect(button('应用并保存').disabled).toBe(true)
+  })
+  it('keeps unreadable-file feedback by the actions', async () => {
+    await upload(new File(['not json'], 'broken.json'))
+    fixedFeedback('alert', '无法解析')
+    expect(localStorage.getItem(APPEARANCE_KEY)).toBeNull()
+  })
+  it('keeps corrupt-storage refusal and explicit repair outside the form scroll', async () => {
+    localStorage.setItem(APPEARANCE_KEY, '{')
+    await act(async () => root.render(null)); await mount()
+    fixedFeedback('alert', '配置损坏')
+    expect(button('确认修复配置').closest('.appearance-scroll')).toBeNull()
+    expect(localStorage.getItem(APPEARANCE_KEY)).toBe('{')
   })
 })
