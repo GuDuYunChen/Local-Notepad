@@ -349,13 +349,13 @@ export function registerS3LocalOverviewTests(test) {
     assert.match(host, /subtle\.ConstantTimeCompare\(received\[:\], h\.tokenHash\[:\]\) != 1/)
     assert.match(host, /RawQuery: "mode=ro"/)
     assert.match(host, /rootErr, dbErr := root\.close\(\), db\.Close\(\)/)
-    // 2F.100 / 4.233.2: reviewed against accepted 4a16a9a. Pending-field
-    // guards and the fixed unapplied refusal are authorized; saveNow,
-    // cachePendingDraft, 30s autosave and the original quit participant
-    // remain byte-identical. Retain all six exact LF-normalized pins.
+    // 2F.104: reviewed durable-cache generation/commit/deadline handling and
+    // the editor's read-side revision recheck and backup warning/retry.
+    // saveNow, CAS/receipt service, 30s autosave and the quit participant stay
+    // unchanged. Preserve all six exact LF-normalized source pins.
     for (const [file, expected] of [
-      ['src/components/TextEditor.jsx', '8f26eeb5527ab9d576b9409b4742b4a3eae281c8a0a5454458e4adc065d7d909'],
-      ['src/services/editorDraftCache.js', '98c5c869f9cd5e58df34884fe7aca3d63342a2514c5599001be454c0d90da8df'],
+      ['src/components/TextEditor.jsx', 'f9ae29dcb35bd11b9a8fad1a0fff4e61f534a1b70e476324992c69bcef2dba04'],
+      ['src/services/editorDraftCache.js', '8f464fe90922201c29c7acb334065397f3efe1971f918d77eb55b356924eddc4'],
       ['src/services/editorSaveTransaction.mjs', 'b449dad16834a936fbd5fad318352c961e160e11723cb6627d6a47714d4d36e2'],
       ['src/services/editorQuit.mjs', 'abc21ea59352fede521e6ce6f6904f67af8f3d00b2378efae6a5e6b45c48c205'],
       ['src/services/editorQuitBridge.mjs', '76e0d15c2dbe53548df2aa3c332bd2860047f855cbef45f0f2043031a8d35302'],
