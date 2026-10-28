@@ -75,6 +75,11 @@ export function validateTagWorkspaceNativeReport(r,{product,verifier,sources,nat
  assert.equal(observation?.method,'stopped-backend-readonly-sqlite');assert.equal(observation.readOnly,true)
  assert.equal(observation.databaseFilesUnchanged,true);assert.equal(observation.normalRows,52);assert.equal(observation.trashRows,1)
  assert.equal(observation.removedTagLinks,0);assert.equal(observation.removedTags,0);assert.match(observation.databaseSHA256,/^[a-f0-9]{64}$/)
+ assert.equal(observation.originalDatabaseOpened,false);assert.equal(observation.observationLocation,'verified-private-copy')
+ assert.equal(observation.snapshotVerified,true);assert.equal(observation.snapshotRemoved,true)
+ assert.deepEqual(Object.keys(observation.snapshotFiles||{}).sort(),['data.db','data.db-shm','data.db-wal'])
+ assert.equal(observation.snapshotFiles['data.db']?.sha256,observation.databaseSHA256)
+ for(const [name,file] of Object.entries(observation.snapshotFiles)){if(name==='data.db')assert.ok(file);if(file!==null){assert.ok(Number.isSafeInteger(file.bytes)&&file.bytes>=0);assert.match(file.sha256,/^[a-f0-9]{64}$/)}}
  assert.deepEqual(observation.hashes,r.notes.hashes)
  assert.equal(r.notes.normalVerified,52);assert.equal(r.notes.trashVerified,1);assert.equal(r.notes.bodyWrites,0);assert.match(r.notes.before,/^[a-f0-9]{64}$/);assert.equal(r.notes.after,r.notes.before)
  assert.equal(Object.keys(r.notes.hashes).length,53);for(const sha of Object.values(r.notes.hashes))assert.match(sha,/^[a-f0-9]{64}$/)

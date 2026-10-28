@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {readFileSync,writeFileSync,mkdtempSync,rmSync,existsSync,realpathSync,symlinkSync,unlinkSync} from 'node:fs'
 import {tmpdir} from 'node:os'
 import path from 'node:path'
+import { execFileSync } from 'node:child_process'
 import {TAG_SOURCES,TAG_CHECKS,TAG_FEEDBACK,TAG_IMAGES,TAG_REPORT,tagHash,verifyRemovedFileTagsAbsent,validateTagWorkspaceNativeReport,verifyTagWorkspaceNativeReport} from './tag-workspace-desktop-evidence.mjs'
 import {buildTagWorkspaceRunner} from './prepare-tag-workspace-verifier.mjs'
 // Synthetic schema/refusal fixtures only, never evidence of Windows execution.
@@ -14,11 +15,12 @@ function fixture(){
  feedback:Object.fromEntries(TAG_FEEDBACK.map(n=>[n,{text:'schema fixture only',role:'alert',top:300,bottom:322,left:20,right:650,areaTop:290,areaBottom:340,footerTop:350,width:704,height:481,hit:true,outsideScroll:true}])),trustedMouseInput:true,trustedKeyboardInput:true,
  pagination:{normal:51,hidden:1,total:52,pages:[50,1],unique:51,hiddenExcluded:true},guardedOpen:{freshRead:true,accepted:true,title:'fixture'},created:{id:'unused',name:'Unused',color:'#7e5bef',total:0},renamed:{id:'source',name:'Renamed',color:'#315b8c',countsPreserved:true},merge:{sourceId:'source',targetId:'target',normal:52,hidden:1,total:53,sourceRemoved:true,targetIdentityPreserved:true,cancelUnchanged:true},delete:{id:'target',allLinksRemoved:true,cancelUnchanged:true},
  quota:{error:'QuotaExceededError',keys:10,zeroRequestsWhileFull:true,unchangedBeforeRetry:true,retryAcknowledged:true},conflict:{backendRefusedStaleSnapshot:true,originalMetadataPreserved:true,recordSurvivedClose:true,reconciliationReadOnly:true,cancelKeptRecord:true},lostResponse:{status:200,stage:'response',injectedTransportFailure:true,backendCommitObserved:true,recordSurvivedClose:true,recordSurvivedRestart:true,mutationPosts:1,reconciliationReadOnly:true,noHistoricReceiptClaim:true,explicitRecordEnd:true},corruption:{explicitFixtureInjection:true,automaticOverwrite:false,cancelPreserved:true,explicitClear:true},viewport:{width:704,height:481,horizontalOverflow:false,footerReachable:true},catalog:{sha256:'5'.repeat(64),restartedEqual:true,reinstalledEqual:true},notes:{normalVerified:52,trashVerified:1,bodyWrites:0,before:'6'.repeat(64),after:'6'.repeat(64),hashes:Object.fromEntries(Array.from({length:53},(_,i)=>['note'+i,'7'.repeat(64)]))},screenshots:TAG_IMAGES.map(filename=>({filename,bytes:128,sha256:'8'.repeat(64)}))}
- r.retainedBodyObservation={method:'stopped-backend-readonly-sqlite',readOnly:true,databaseFilesUnchanged:true,normalRows:52,trashRows:1,removedTagLinks:0,removedTags:0,databaseSHA256:'9'.repeat(64),hashes:{...r.notes.hashes}}
+ r.retainedBodyObservation={method:'stopped-backend-readonly-sqlite',readOnly:true,databaseFilesUnchanged:true,normalRows:52,trashRows:1,removedTagLinks:0,removedTags:0,databaseSHA256:'9'.repeat(64),hashes:{...r.notes.hashes},originalDatabaseOpened:false,observationLocation:'verified-private-copy',snapshotVerified:true,snapshotRemoved:true,snapshotFiles:{'data.db':{bytes:8192,sha256:'9'.repeat(64)},'data.db-wal':null,'data.db-shm':null}}
  return{r,expected}
 }
 test('complete synthetic schema accepted only as schema',()=>{const{r,expected}=fixture();assert.equal(validateTagWorkspaceNativeReport(r,expected),true)})
 const bad={
+ 'retainedBodyObservation.originalDatabaseOpened':true,'retainedBodyObservation.observationLocation':'original','retainedBodyObservation.snapshotVerified':false,'retainedBodyObservation.snapshotRemoved':false,'retainedBodyObservation.snapshotFiles':{},
  'retainedBodyObservation':{},'retainedBodyObservation.method':'trash-list-metadata','retainedBodyObservation.readOnly':false,'retainedBodyObservation.databaseFilesUnchanged':false,'retainedBodyObservation.trashRows':0,'retainedBodyObservation.removedTagLinks':1,'retainedBodyObservation.hashes':{},
  'module':'old','version':'4.238.0','productCommit':'e'.repeat(40),'verifierCommit':'f'.repeat(40),'platform':'linux','runnerEnvironment':'self-hosted','scope':'fake',
  'defaultProfile':false,'nativeAcceptance':false,'syntheticData':false,'realBackend':false,'complete':false,'cleanupComplete':false,'backendStopped':false,'storageDirectoriesRemoved':false,
@@ -113,3 +115,39 @@ for(const id of ['source','target'])test('file tag observation refuses retained 
 test('file tag observation requires distinct removed identities',()=>{
  assert.throws(()=>verifyRemovedFileTagsAbsent(null,['source','source']),/Invalid removed tag identities/)
 })
+
+function originalDatabaseBytes(directory) {
+ return Object.fromEntries(['data.db','data.db-wal','data.db-shm'].map(name=>{const f=path.join(directory,name);return[name,existsSync(f)?readFileSync(f):null]}))
+}
+test('read-only WAL observation does not create sidecars in the original profile',()=>bodyDatabase((directory,file,expected)=>{
+ const db=new DatabaseSync(file);db.exec('PRAGMA journal_mode=WAL');db.close()
+ const before=originalDatabaseBytes(directory)
+ assert.equal(before['data.db-wal'],null);assert.equal(before['data.db-shm'],null)
+ const observed=observeRetainedTagBodies(directory,expected)
+ assert.equal(observed.evidence.originalDatabaseOpened,false)
+ assert.equal(observed.evidence.snapshotVerified,true);assert.equal(observed.evidence.snapshotRemoved,true)
+ assert.equal(observed.evidence.observationLocation,'verified-private-copy')
+ assert.deepEqual(originalDatabaseBytes(directory),before)
+}))
+test('private observation retains committed WAL content instead of reading only the main file',()=>bodyDatabase((directory,file,expected)=>{
+ execFileSync(process.execPath,['--input-type=module','-e',`import {DatabaseSync} from 'node:sqlite';const db=new DatabaseSync(process.argv[1]);db.exec("PRAGMA journal_mode=WAL;PRAGMA wal_autocheckpoint=0;PRAGMA wal_checkpoint(TRUNCATE);UPDATE files SET content='committed WAL body' WHERE id='trash'");process.exit(0)`,file])
+ const before=originalDatabaseBytes(directory)
+ assert.ok(before['data.db-wal']?.length>32,'Fixture must actually retain committed WAL bytes')
+ expected.files[1].content='committed WAL body'
+ const observed=observeRetainedTagBodies(directory,expected)
+ assert.equal(observed.bodies.trash,'committed WAL body')
+ assert.equal(observed.evidence.snapshotFiles['data.db-wal'].sha256,tagHash(before['data.db-wal']))
+ assert.deepEqual(originalDatabaseBytes(directory),before)
+}))
+test('WAL-backed changed hidden content still fails its body invariant',()=>bodyDatabase((directory,file,expected)=>{
+ execFileSync(process.execPath,['--input-type=module','-e',`import {DatabaseSync} from 'node:sqlite';const db=new DatabaseSync(process.argv[1]);db.exec("PRAGMA journal_mode=WAL;PRAGMA wal_autocheckpoint=0;PRAGMA wal_checkpoint(TRUNCATE);UPDATE files SET content='unexpected WAL content' WHERE id='trash'");process.exit(0)`,file])
+ const before=originalDatabaseBytes(directory);assert.ok(before['data.db-wal']?.length>32)
+ assert.throws(()=>observeRetainedTagBodies(directory,expected),/Retained body changed: trash/)
+ assert.deepEqual(originalDatabaseBytes(directory),before)
+}))
+test('an unhandled rollback journal is refused rather than silently omitted',()=>bodyDatabase((directory,file,expected)=>{
+ writeFileSync(path.join(directory,'data.db-journal'),'fixture')
+ const before=originalDatabaseBytes(directory)
+ assert.throws(()=>observeRetainedTagBodies(directory,expected),/Unexpected rollback journal/)
+ assert.deepEqual(originalDatabaseBytes(directory),before)
+}))
