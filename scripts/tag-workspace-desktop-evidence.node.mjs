@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {readFileSync,writeFileSync,mkdtempSync,rmSync} from 'node:fs'
+import {readFileSync,writeFileSync,mkdtempSync,rmSync,existsSync} from 'node:fs'
 import {tmpdir} from 'node:os'
 import path from 'node:path'
 import {TAG_SOURCES,TAG_CHECKS,TAG_FEEDBACK,TAG_IMAGES,TAG_REPORT,tagHash,validateTagWorkspaceNativeReport,verifyTagWorkspaceNativeReport} from './tag-workspace-desktop-evidence.mjs'
@@ -14,10 +14,12 @@ function fixture(){
  feedback:Object.fromEntries(TAG_FEEDBACK.map(n=>[n,{text:'schema fixture only',role:'alert',top:300,bottom:322,left:20,right:650,areaTop:290,areaBottom:340,footerTop:350,width:704,height:481,hit:true,outsideScroll:true}])),trustedMouseInput:true,trustedKeyboardInput:true,
  pagination:{normal:51,hidden:1,total:52,pages:[50,1],unique:51,hiddenExcluded:true},guardedOpen:{freshRead:true,accepted:true,title:'fixture'},created:{id:'unused',name:'Unused',color:'#7e5bef',total:0},renamed:{id:'source',name:'Renamed',color:'#315b8c',countsPreserved:true},merge:{sourceId:'source',targetId:'target',normal:52,hidden:1,total:53,sourceRemoved:true,targetIdentityPreserved:true,cancelUnchanged:true},delete:{id:'target',allLinksRemoved:true,cancelUnchanged:true},
  quota:{error:'QuotaExceededError',keys:10,zeroRequestsWhileFull:true,unchangedBeforeRetry:true,retryAcknowledged:true},conflict:{backendRefusedStaleSnapshot:true,originalMetadataPreserved:true,recordSurvivedClose:true,reconciliationReadOnly:true,cancelKeptRecord:true},lostResponse:{status:200,stage:'response',injectedTransportFailure:true,backendCommitObserved:true,recordSurvivedClose:true,recordSurvivedRestart:true,mutationPosts:1,reconciliationReadOnly:true,noHistoricReceiptClaim:true,explicitRecordEnd:true},corruption:{explicitFixtureInjection:true,automaticOverwrite:false,cancelPreserved:true,explicitClear:true},viewport:{width:704,height:481,horizontalOverflow:false,footerReachable:true},catalog:{sha256:'5'.repeat(64),restartedEqual:true,reinstalledEqual:true},notes:{normalVerified:52,trashVerified:1,bodyWrites:0,before:'6'.repeat(64),after:'6'.repeat(64),hashes:Object.fromEntries(Array.from({length:53},(_,i)=>['note'+i,'7'.repeat(64)]))},screenshots:TAG_IMAGES.map(filename=>({filename,bytes:128,sha256:'8'.repeat(64)}))}
+ r.retainedBodyObservation={method:'stopped-backend-readonly-sqlite',readOnly:true,databaseFilesUnchanged:true,normalRows:52,trashRows:1,removedTagLinks:0,removedTags:0,databaseSHA256:'9'.repeat(64),hashes:{...r.notes.hashes}}
  return{r,expected}
 }
 test('complete synthetic schema accepted only as schema',()=>{const{r,expected}=fixture();assert.equal(validateTagWorkspaceNativeReport(r,expected),true)})
 const bad={
+ 'retainedBodyObservation':{},'retainedBodyObservation.method':'trash-list-metadata','retainedBodyObservation.readOnly':false,'retainedBodyObservation.databaseFilesUnchanged':false,'retainedBodyObservation.trashRows':0,'retainedBodyObservation.removedTagLinks':1,'retainedBodyObservation.hashes':{},
  'module':'old','version':'4.238.0','productCommit':'e'.repeat(40),'verifierCommit':'f'.repeat(40),'platform':'linux','runnerEnvironment':'self-hosted','scope':'fake',
  'defaultProfile':false,'nativeAcceptance':false,'syntheticData':false,'realBackend':false,'complete':false,'cleanupComplete':false,'backendStopped':false,'storageDirectoriesRemoved':false,
  'bridgeOverridden':true,'timerAccelerated':true,'forcedFailureCleanup':true,'error':{},'cleanupError':'bad','sourceFiles':{},'app.packaged':false,'app.version':'4.238.0','executableSHA256':'',
@@ -40,3 +42,53 @@ test('external source expectations are mandatory',()=>{const{r,expected}=fixture
 test('verifies actual PNG bytes rather than screenshot paths alone',()=>{const dir=mkdtempSync(path.join(tmpdir(),'tag106-contract-'));try{const{r,expected}=fixture();const png=Buffer.concat([Buffer.from('89504e470d0a1a0a','hex'),Buffer.alloc(120)]);for(const item of r.screenshots){item.sha256=tagHash(png);writeFileSync(path.join(dir,item.filename),png)}writeFileSync(path.join(dir,TAG_REPORT),JSON.stringify(r));assert.equal(verifyTagWorkspaceNativeReport(dir,expected).complete,true);writeFileSync(path.join(dir,r.screenshots[1].filename),'wrong');assert.throws(()=>verifyTagWorkspaceNativeReport(dir,expected))}finally{rmSync(dir,{recursive:true,force:true})}})
 test('refuses unreviewed runner templates',()=>{assert.throws(()=>buildTagWorkspaceRunner('arbitrary runner'));assert.throws(()=>buildTagWorkspaceRunner('4.237.0'))})
 test('driver exercises native inputs, real quota, real response-stage failure and no body PUT',()=>{const s=readFileSync(new URL('./tag-workspace-desktop-driver.mjs',import.meta.url),'utf8');for(const p of [/Input\.dispatchKeyEvent/,/Input\.insertText/,/Fetch\.failRequest/,/requestStage:'Response'/,/QuotaExceededError/,/reinstallWithRetainedDraft\(\)/,/bodyWritesSince/,/resizeSmall\(\)/,/assert\.equal\(posts\.length,lossPosts\+1\)/])assert.match(s,p);assert.doesNotMatch(s,/window\.electronAPI\s*=|setInterval\s*=|setTimeout\s*=|Emulation\.setDeviceMetricsOverride|method:\s*['"]PUT['"]/)})
+
+// Real temporary SQLite files, not synthetic native execution.
+import { DatabaseSync } from 'node:sqlite'
+import { observeRetainedTagBodies } from './tag-workspace-retained-bodies.mjs'
+function bodyDatabase(check) {
+ const directory=mkdtempSync(path.join(tmpdir(),'tag106-bodies-')),file=path.join(directory,'data.db')
+ const db=new DatabaseSync(file)
+ db.exec('CREATE TABLE files(id TEXT PRIMARY KEY,content TEXT,is_deleted INTEGER);CREATE TABLE tags(id TEXT PRIMARY KEY);CREATE TABLE file_tags(file_id TEXT,tag_id TEXT)')
+ const expected={files:[{id:'normal',content:'normal body',deleted:0},{id:'trash',content:'retained hidden body',deleted:1}],removedTagIds:['merged-source','deleted-target']}
+ const put=db.prepare('INSERT INTO files VALUES(?,?,?)')
+ for(const row of expected.files)put.run(row.id,row.content,row.deleted)
+ db.close()
+ try { check(directory,file,expected) } finally { rmSync(directory,{recursive:true,force:true}) }
+}
+test('metadata-only trash list is not a body; read-only SQLite preserves actual hidden content',()=>bodyDatabase((directory,file,expected)=>{
+ const before=readFileSync(file),db=new DatabaseSync(file,{readOnly:true})
+ const metadata=db.prepare("SELECT id,'' AS content FROM files WHERE is_deleted=1").get();db.close()
+ assert.equal(metadata.content,'');assert.notEqual(metadata.content,expected.files[1].content)
+ const observed=observeRetainedTagBodies(directory,expected)
+ assert.equal(observed.bodies.trash,'retained hidden body');assert.equal(observed.evidence.trashRows,1)
+ assert.equal(observed.evidence.databaseFilesUnchanged,true);assert.deepEqual(readFileSync(file),before)
+}))
+for(const [name,sql] of Object.entries({
+ 'changed hidden body':"UPDATE files SET content='' WHERE id='trash'",
+ 'removed hidden row':"DELETE FROM files WHERE id='trash'",
+ 'restored trash state':"UPDATE files SET is_deleted=0 WHERE id='trash'",
+ 'left hidden association':"INSERT INTO file_tags VALUES('trash','deleted-target')",
+ 'left removed tag':"INSERT INTO tags VALUES('merged-source')",
+ 'changed normal body':"UPDATE files SET content='changed' WHERE id='normal'",
+}))test('read-only observer rejects '+name,()=>bodyDatabase((directory,file,expected)=>{
+ const db=new DatabaseSync(file);db.exec(sql);db.close();const before=readFileSync(file)
+ assert.throws(()=>observeRetainedTagBodies(directory,expected));assert.deepEqual(readFileSync(file),before)
+}))
+test('missing database is refused without creating one',()=>{
+ const directory=mkdtempSync(path.join(tmpdir(),'tag106-missing-'))
+ try{assert.throws(()=>observeRetainedTagBodies(directory,{files:[{id:'n',content:'x',deleted:0}],removedTagIds:['a','b']}));assert.throws(()=>readFileSync(path.join(directory,'data.db')))}finally{rmSync(directory,{recursive:true,force:true})}
+})
+test('observer refuses duplicate expected rows instead of counting them twice',()=>bodyDatabase((directory,file,expected)=>{
+ expected.files.push({...expected.files[0]});assert.throws(()=>observeRetainedTagBodies(directory,expected))
+}))
+test('native runner closes owned app and backend before read-only evidence',()=>{
+ const prepared=new URL('../test-results/installer-lifecycle/appearance-preparation/run-draft-durability-desktop.mjs.before.txt',import.meta.url)
+ const original=readFileSync(existsSync(prepared)?prepared:new URL('./run-draft-durability-desktop.mjs',import.meta.url),'utf8').replace(/\r\n/g,'\n')
+ const runner=buildTagWorkspaceRunner(original)
+ assert.match(runner,/readRetainedTagBodies: async expected => \{\s*assert.equal\(alive\(app\), false/)
+ assert.match(runner,/await stopped\(\)\s*return observeRetainedTagBodies\(data, expected\)/)
+ const driver=readFileSync(new URL('./tag-workspace-desktop-driver.mjs',import.meta.url),'utf8')
+ assert.match(driver,/await closeNormally\(\);report.exits.push\(\{\.\.\.report.exit\}\);save\(\)\s*const observed=await ctx.readRetainedTagBodies/)
+ assert.doesNotMatch(driver,/assert.equal\(hidden.content|method:\s*['"]POST['"][^\n]*restore/)
+})

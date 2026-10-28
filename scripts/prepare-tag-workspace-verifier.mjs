@@ -15,6 +15,14 @@ export function buildTagWorkspaceRunner(originalDraft){
   ["'appearance105-'","'tag-workspace106-'"],["'test-results/installer-lifecycle/appearance'","'test-results/installer-lifecycle/tag-workspace'"],
   ["module: '2F.105'","module: '2F.106'"],['pin.appearanceSourceFiles','pin.tagWorkspaceSourceFiles'],
   ["capture('appearance105-failure.png')","capture('tag106-failure.png')"],
+  ["import { createExportDirectorySession } from './local-export-directory-session.mjs'", "import { createExportDirectorySession } from './local-export-directory-session.mjs'\nimport { observeRetainedTagBodies } from './tag-workspace-retained-bodies.mjs'"],
+  ['      requestCount: () => requests.length,', `      readRetainedTagBodies: async expected => {
+        assert.equal(alive(app), false, 'Body observation requires the owned application to exit')
+        assert.equal(report.exit?.normal, true)
+        await stopped()
+        return observeRetainedTagBodies(data, expected)
+      },
+      requestCount: () => requests.length,`],
  ]
  return replaceExactlyAndProveInverse(original,changes)
 }

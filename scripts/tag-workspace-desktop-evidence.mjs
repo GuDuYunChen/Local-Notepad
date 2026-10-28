@@ -8,7 +8,7 @@ export const tagBlob=value=>createHash('sha1').update('blob '+Buffer.byteLength(
 export const TAG_SOURCES=Object.freeze([
  'src/services/tagWorkspace.mjs','src/components/TagWorkspace.jsx','src/components/TagWorkspace.css','src/components/SettingsPanel.jsx',
  'src/hooks/useGuardedNoteOpener.js','src/App.jsx','server/internal/dao/tag_workspace.go','server/internal/controller/tag_workspace.go','server/internal/controller/tag.go',
- 'scripts/tag-workspace-desktop-driver.mjs','scripts/tag-workspace-desktop-evidence.mjs','scripts/prepare-tag-workspace-verifier.mjs',
+ 'scripts/tag-workspace-retained-bodies.mjs','scripts/tag-workspace-desktop-driver.mjs','scripts/tag-workspace-desktop-evidence.mjs','scripts/prepare-tag-workspace-verifier.mjs',
  'scripts/run-tag-workspace-desktop-generated.mjs','scripts/appearance-installer-core.mjs','scripts/desktop-window-session.mjs',
  'scripts/desktop-window-worker.ps1','scripts/desktop-window-target.mjs','scripts/local-export-directory-session.mjs','scripts/local-export-directory-worker.ps1',
 ])
@@ -59,6 +59,11 @@ export function validateTagWorkspaceNativeReport(r,{product,verifier,sources,nat
  assert.deepEqual(r.corruption,{explicitFixtureInjection:true,automaticOverwrite:false,cancelPreserved:true,explicitClear:true})
  assert.ok(r.viewport.width>0&&r.viewport.width<=720&&r.viewport.height>0&&r.viewport.height<=520);assert.equal(r.viewport.horizontalOverflow,false);assert.equal(r.viewport.footerReachable,true)
  assert.equal(r.catalog.restartedEqual,true);assert.equal(r.catalog.reinstalledEqual,true);assert.match(r.catalog.sha256,/^[a-f0-9]{64}$/)
+ const observation=r.retainedBodyObservation
+ assert.equal(observation?.method,'stopped-backend-readonly-sqlite');assert.equal(observation.readOnly,true)
+ assert.equal(observation.databaseFilesUnchanged,true);assert.equal(observation.normalRows,52);assert.equal(observation.trashRows,1)
+ assert.equal(observation.removedTagLinks,0);assert.equal(observation.removedTags,0);assert.match(observation.databaseSHA256,/^[a-f0-9]{64}$/)
+ assert.deepEqual(observation.hashes,r.notes.hashes)
  assert.equal(r.notes.normalVerified,52);assert.equal(r.notes.trashVerified,1);assert.equal(r.notes.bodyWrites,0);assert.match(r.notes.before,/^[a-f0-9]{64}$/);assert.equal(r.notes.after,r.notes.before)
  assert.equal(Object.keys(r.notes.hashes).length,53);for(const sha of Object.values(r.notes.hashes))assert.match(sha,/^[a-f0-9]{64}$/)
  assert.deepEqual(r.screenshots.map(x=>x.filename),TAG_IMAGES);for(const x of r.screenshots){assert.ok(x.bytes>100);assert.match(x.sha256,/^[a-f0-9]{64}$/)}
