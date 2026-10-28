@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import {readFileSync,writeFileSync,mkdtempSync,rmSync,existsSync,realpathSync,symlinkSync,unlinkSync} from 'node:fs'
 import {tmpdir} from 'node:os'
 import path from 'node:path'
-import {TAG_SOURCES,TAG_CHECKS,TAG_FEEDBACK,TAG_IMAGES,TAG_REPORT,tagHash,validateTagWorkspaceNativeReport,verifyTagWorkspaceNativeReport} from './tag-workspace-desktop-evidence.mjs'
+import {TAG_SOURCES,TAG_CHECKS,TAG_FEEDBACK,TAG_IMAGES,TAG_REPORT,tagHash,verifyRemovedFileTagsAbsent,validateTagWorkspaceNativeReport,verifyTagWorkspaceNativeReport} from './tag-workspace-desktop-evidence.mjs'
 import {buildTagWorkspaceRunner} from './prepare-tag-workspace-verifier.mjs'
 // Synthetic schema/refusal fixtures only, never evidence of Windows execution.
 function fixture(){
@@ -99,4 +99,17 @@ test('native runner closes owned app and backend before read-only evidence',()=>
  const driver=readFileSync(new URL('./tag-workspace-desktop-driver.mjs',import.meta.url),'utf8')
  assert.match(driver,/await closeNormally\(\);report.exits.push\(\{\.\.\.report.exit\}\);save\(\)\s*const observed=await ctx.readRetainedTagBodies/)
  assert.doesNotMatch(driver,/assert.equal\(hidden.content|method:\s*['"]POST['"][^\n]*restore/)
+})
+
+for(const [name,tags] of [['nil-empty',null],['array-empty',[]],['unrelated',[{id:'other'}]]])test('file tag observation accepts '+name,()=>{
+ assert.equal(verifyRemovedFileTagsAbsent(tags,['source','target']),true)
+})
+for(const [name,tags] of [['missing',undefined],['object',{}],['text',''],['number',0],['false',false],['null-row',[null]],['missing-id',[{}]],['empty-id',[{id:''}]],['number-id',[{id:1}]]])test('file tag observation refuses '+name,()=>{
+ assert.throws(()=>verifyRemovedFileTagsAbsent(tags,['source','target']),/Unexpected file tags response|Invalid file tag row/)
+})
+for(const id of ['source','target'])test('file tag observation refuses retained '+id,()=>{
+ assert.throws(()=>verifyRemovedFileTagsAbsent([{id}],['source','target']),/Removed tag links remain in API/)
+})
+test('file tag observation requires distinct removed identities',()=>{
+ assert.throws(()=>verifyRemovedFileTagsAbsent(null,['source','source']),/Invalid removed tag identities/)
 })

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { refreshLocalExportLibrary } from './check-local-export-desktop.mjs'
 import { blockReferenceFixture } from './block-references-desktop-driver.mjs'
-import { TAG_CHECKS, tagHash } from './tag-workspace-desktop-evidence.mjs'
+import { TAG_CHECKS, tagHash, verifyRemovedFileTagsAbsent } from './tag-workspace-desktop-evidence.mjs'
 const q=JSON.stringify, KEY='local-notepad.tag-workspace.v1'
 export async function verifyTagWorkspaceDesktop(ctx) {
   const {api,evaluate,click,until,capture,report,save,start,closeNormally,reinstallWithRetainedDraft,resizeSmall}=ctx
@@ -94,7 +94,7 @@ export async function verifyTagWorkspaceDesktop(ctx) {
   const retained=await snapshot();assert.equal(tagHash(JSON.stringify(retained)),report.catalog.sha256);assert.equal(report.catalog.restartedEqual,true);assert.equal(await journal(),null);await close();mark('normal-restart-restores-catalog')
   await closeNormally();report.exits.push({...report.exit});await reinstallWithRetainedDraft();phase('reinstall');await start();assert.deepEqual(await snapshot(),retained);assert.equal(await journal(),null);report.catalog.reinstalledEqual=true;await open();await select(unused.id);await capture('tag106-reinstalled.png');await close();mark('installation-retains-tags-and-journal-state')
   const normalBodies={};for(const note of notes.slice(0,52)){const current=await api('/api/files/'+note.id);assert.equal(current.content,originalBodies[note.id]);normalBodies[note.id]=tagHash(current.content)}
-  const trash=await api('/api/files/trash'),hidden=trash.find(n=>n.id===notes[52].id);assert.ok(hidden);/* Trash list is metadata-only; actual body is checked from stopped read-only SQLite below. */assert.equal((await api('/api/files/'+hidden.id+'/tags')).some(t=>t.id===source.id||t.id===target.id),false)
+  const trash=await api('/api/files/trash'),hidden=trash.find(n=>n.id===notes[52].id);assert.ok(hidden);/* Trash list is metadata-only; actual body is checked from stopped read-only SQLite below. */verifyRemovedFileTagsAbsent(await api('/api/files/'+hidden.id+'/tags'),[source.id,target.id])
   const bodyWrites=notes.reduce((count,n)=>count+ctx.bodyWritesSince(index,n.id),0);assert.equal(bodyWrites,0)
   await closeNormally();report.exits.push({...report.exit});save()
   const observed=await ctx.readRetainedTagBodies({files:notes.map(note=>({id:note.id,content:originalBodies[note.id],deleted:note.id===hidden.id?1:0})),removedTagIds:[source.id,target.id]})

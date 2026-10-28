@@ -21,6 +21,18 @@ export const TAG_CHECKS=Object.freeze([
 ])
 export const TAG_FEEDBACK=Object.freeze(['success','invalid','mergeConfirm','deleteConfirm','quota','conflict','reconciliation','corrupt','smallConfirm'])
 export const TAG_IMAGES=Object.freeze(['tag106-catalog.png','tag106-merge.png','tag106-quota.png','tag106-conflict.png','tag106-reconciled.png','tag106-small.png','tag106-reinstalled.png'])
+// The existing GetFileTags endpoint returns null for its nil empty slice.
+// Only null or an actual tag array is accepted; malformed responses stay errors.
+export function verifyRemovedFileTagsAbsent(tags, removedTagIds) {
+ assert.ok(Array.isArray(removedTagIds)&&removedTagIds.length===2&&new Set(removedTagIds).size===2&&removedTagIds.every(id=>typeof id==='string'&&id.length>0),'Invalid removed tag identities')
+ assert.ok(tags===null||Array.isArray(tags),'Unexpected file tags response')
+ if(tags===null)return true
+ for(const tag of tags){
+  assert.ok(tag&&typeof tag==='object'&&!Array.isArray(tag)&&typeof tag.id==='string'&&tag.id.length>0,'Invalid file tag row')
+  assert.equal(removedTagIds.includes(tag.id),false,'Removed tag links remain in API')
+ }
+ return true
+}
 export function validateTagWorkspaceNativeReport(r,{product,verifier,sources,native=true}={}) {
  assert.equal(native,true);for(const sha of [product,verifier])assert.match(sha||'',/^[a-f0-9]{40}$/)
  assert.equal(r.schemaVersion,1);assert.equal(r.module,'2F.106');assert.equal(r.version,'4.239.0')
