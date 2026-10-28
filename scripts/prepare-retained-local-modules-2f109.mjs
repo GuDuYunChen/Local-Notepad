@@ -46,7 +46,7 @@ export const RETAINED_109=Object.freeze({
   "version": "4.238.0",
   "count": 5,
   "head": "32e3a8aa2212a95c5707797f3d3afb2b3c55b24e",
-  "after": "545d5d1b60b1d0bb5f9922a13fdd27c849aca782"
+  "after": "fa3718b82cb2bfe0d8a05821be0bce13c5ce7ccb"
  },
  "prepare-attachment-audit-verifier.mjs": {
   "sha": "9529c667f9aaed9d69d38bd3e740325e2a77b5d6",
@@ -55,7 +55,7 @@ export const RETAINED_109=Object.freeze({
   "head": "ed96da5efa6ae8cd6e0af591a9b6e7349d4406c6",
   "runnerBefore": "fdcaa659a6cfc8eb5e279d430d6d23d42e6a6e68",
   "runnerAfter": "1d717c8f58ac07cb4a7dd77819d5d2b9127a56f2",
-  "after": "69559c6ffb816b4813176a18d1d22b8e49056298"
+  "after": "9d1538ad9f55d75d95863f436cd350522fb252c5"
  },
  "prepare-library-statistics-verifier.mjs": {
   "sha": "d3a3538d53430ff723fffaeafb2eb09526cf1186",
@@ -64,14 +64,14 @@ export const RETAINED_109=Object.freeze({
   "head": "9ad6be13bc2c7dee0902c7464724b23ad535b3e3",
   "runnerBefore": "b4ac535ad4f30ebb0458d106ce88eb941d0fddf6",
   "runnerAfter": "e19d16373fd3600e0c99719279e0c47cd880ebf0",
-  "after": "6c64129bc3a93ebdec8a4986564a114760f95582"
+  "after": "91dcd458b15b7709948ffe89bb53fdd629da5ac2"
  },
  "prepare-tag-workspace-verifier.mjs": {
   "sha": "325c01296995f6d2587a0fe10da59aef56176b18",
   "version": "4.239.0",
   "count": 1,
   "head": "568c229706a26973163bde1efc553fc2d900b1da",
-  "after": "2a48698a98c1659bba43521cf08c1ebfd26a73d2"
+  "after": "5a7b24aa7361a4f63db70a45a25eec494455bfb0"
  },
  "tag-workspace-desktop-evidence.mjs": {
   "sha": "5783e1fa6ba0638f1db58e7225cee9c493cdcc23",
@@ -90,9 +90,9 @@ export function adaptRetained109(file,original){
  const spec=RETAINED_109[file];assert.ok(spec,'Unlisted retained source');assert.equal(blob(original),spec.sha,'Unreviewed retained source')
  assert.equal(original.split(spec.version).length-1,spec.count);assert.equal(original.includes('4.242.0'),false)
  let next=original.replaceAll(spec.version,'4.242.0')
- if(spec.head){assert.equal(next.split(spec.head).length,2);next=next.replace(spec.head,'754b97e696b4075038e288b92c4740a0142ec4a2')}
+ if(spec.head){assert.equal(next.split(spec.head).length,2);next=next.replace(spec.head,'1535cbe23b7d6c22e701d4ffd1c08fa8b5c9fc39')}
  if(spec.runnerBefore){assert.equal(next.split(spec.runnerBefore).length,2);next=next.replace(spec.runnerBefore,spec.runnerAfter)}
- let inverse=next;if(spec.runnerBefore)inverse=inverse.replace(spec.runnerAfter,spec.runnerBefore);if(spec.head)inverse=inverse.replace('754b97e696b4075038e288b92c4740a0142ec4a2',spec.head);inverse=inverse.replaceAll('4.242.0',spec.version)
+ let inverse=next;if(spec.runnerBefore)inverse=inverse.replace(spec.runnerAfter,spec.runnerBefore);if(spec.head)inverse=inverse.replace('1535cbe23b7d6c22e701d4ffd1c08fa8b5c9fc39',spec.head);inverse=inverse.replaceAll('4.242.0',spec.version)
  assert.equal(inverse,original,'Retained assertions or process policies changed');assert.equal(blob(next),spec.after);return next
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
