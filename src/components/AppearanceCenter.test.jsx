@@ -211,6 +211,9 @@ describe('feedback remains outside the independently scrolling editor', () => {
       window.dispatchEvent(new StorageEvent('storage', { key: APPEARANCE_KEY }))
     })
     fixedFeedback('alert', '外部配置已变化')
+    expect(panel().querySelector('[role="status"]').textContent).not.toContain('正在预览')
+    expect(panel().querySelector('.appearance-footer > span').textContent).not.toContain('预览中')
+    expect(button('取消预览').disabled).toBe(true)
     expect(button('应用并保存').disabled).toBe(true)
   })
   it('keeps invalid-color refusal by the disabled apply action', async () => {

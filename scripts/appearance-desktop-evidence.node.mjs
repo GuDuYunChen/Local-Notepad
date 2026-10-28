@@ -19,7 +19,7 @@ function fixture() {
     retention:['same-version-install','uninstall','reinstall'].map(operation=>({operation,equal:true,files:12,digest:'4'.repeat(64)})),
     feedback:Object.fromEntries(APPEARANCE_FEEDBACK.map(name=>[name,{text:'schema fixture only',role:'alert',top:100,bottom:122,left:20,right:650,areaTop:90,areaBottom:140,footerTop:150,viewportWidth:704,viewportHeight:455,hit:true,outsideScroll:true}])),
     trustedMouseInput:true,trustedKeyboardInput:true,quota:{error:'QuotaExceededError',keys:23,originalConfigurationPreserved:true,retryReadBack:true},
-    externalChange:{method:'same-origin-frame-real-storage-event',previewRevoked:true},corruption:{explicitTestDataInjection:true,automaticOverwrite:false,explicitRepairReadBack:true},
+    externalChange:{method:'same-origin-frame-real-storage-event',previewRevoked:true,statusText:'有尚未应用的方案更改。',footerText:'仅本机配置',cancelPreviewDisabled:true},corruption:{explicitTestDataInjection:true,automaticOverwrite:false,explicitRepairReadBack:true},
     fileImport:{method:'DOM.setFileInputFiles-real-file',noWriteBeforeApply:true},fileExport:{format:'local-notepad-appearance',version:1,bytes:140,sha256:'5'.repeat(64)},
     configuration:{sha256:'6'.repeat(64),restartedRawEqual:true,reinstalledRawEqual:true},note:{bodyWrites:0,before:'7'.repeat(64),after:'7'.repeat(64)},
     viewport:{width:704,height:481,horizontalOverflow:false,footerReachable:true},screenshots:APPEARANCE_IMAGES.map(filename=>({filename,bytes:128,sha256:'8'.repeat(64)}))}
@@ -85,3 +85,8 @@ for (const name of APPEARANCE_FEEDBACK) {
   test('refuses feedback clipped by its scroll area '+name,()=>{const {report,expected}=fixture();report.feedback[name].bottom=200;assert.throws(()=>validateAppearanceNativeReport(report,expected))})
 }
 for (const [key,value] of [['hit',false],['outsideScroll',false],['top',NaN],['right',900],['role','unknown']]) test('refuses feedback '+key,()=>{const {report,expected}=fixture();report.feedback.saved[key]=value;assert.throws(()=>validateAppearanceNativeReport(report,expected))})
+
+for (const [key,value] of [['statusText','正在预览，尚未保存。'],['footerText','预览中 · 未保存'],['cancelPreviewDisabled',false]]) test('refuses contradictory stopped-preview '+key,()=>{const {report,expected}=fixture();report.externalChange[key]=value;assert.throws(()=>validateAppearanceNativeReport(report,expected))})
+test('refuses missing stopped-preview observations rather than inferring them from colors',()=>{
+ for(const key of ['statusText','footerText','cancelPreviewDisabled']){const {report,expected}=fixture();delete report.externalChange[key];assert.throws(()=>validateAppearanceNativeReport(report,expected))}
+})

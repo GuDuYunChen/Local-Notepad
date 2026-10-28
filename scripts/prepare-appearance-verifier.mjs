@@ -60,7 +60,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   assert.equal(process.env.GITHUB_REPOSITORY, 'GuDuYunChen/Local-Notepad')
   assert.equal(process.env.GITHUB_REF, 'refs/heads/ci/local-installation-2f86')
   const pin = JSON.parse(read('scripts/reading-mode-installer-pin.json'))
-  assert.equal(pin.currentSource.headSha, 'b85362a419cdd59418ee7e83050a322ec607cfae')
+  assert.equal(pin.currentSource.headSha, '32e3a8aa2212a95c5707797f3d3afb2b3c55b24e')
   const expected = JSON.parse(read('scripts/appearance-product-binding.json'))
   assert.equal(expected.productHead, pin.currentSource.headSha)
   for (const [file, digest] of Object.entries(expected.productionTrees)) {

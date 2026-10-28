@@ -39,7 +39,7 @@ export default function AppearanceCenter({ onClose }) {
     pendingRead.current?.abort(); pendingRead.current = null
     setReading(false)
   }
-  const clearPreview = () => { session.current.clear(); setPreviewing(false) }
+  const clearPreview = () => { session.current.clear(); setPreviewing(false); setMessage('') }
   const change = next => {
     cancelRead(); clearPreview(); setDraft(next); setMessage(''); setError('')
   }
