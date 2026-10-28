@@ -1,10 +1,10 @@
 # Local-Notepad development
 
-Current local module: 2F.108 / 4.241.0 local attachment audit, branch `feature/local-attachment-audit-2f108`. Read `docs/LOCAL_ATTACHMENT_AUDIT_2F108.md`. Accepted master21f987b4/tree d9414895 is 2F107/4.240.0 after CI1770 and Windows75. Preserve historical issues, saving/receipts/quit protections, schema14 and dependencies. Complete read-only inventory, conservative candidate references, missing/blocked/gap reporting, guarded navigation, explicit private export, cancellation/errors and current-version native/install acceptance together. Never infer safe deletion from missing references. Cloud/multidevice remains deferred.
+Current local module: 2F.109 / 4.242.0 local task center, branch `feature/local-task-center-2f109`. Read `docs/LOCAL_TASK_CENTER_2F109.md`. Accepted master928caf6c/tree f600aa7f is 2F108/4.241.0 after CI1771 and Windows76. Preserve historical issues, saving/receipts/quit protections, schema14 and dependencies. Deliver saved checklist discovery, explicit coverage, filtering/paging, fresh-source guarded navigation, completion through the original editor and return/reload, private export, cancellation/errors and current-version native/install acceptance together. No separate task-body writes, cloud or multidevice feature.
 
 
 Read `docs/DEVELOPMENT_HANDOFF.md` before resuming an interrupted task.
-Work on `feature/local-attachment-audit-2f108` from the accepted master baseline. The older branch/PR references below are historical. Do not merge master as part of ordinary stage development.
+Work on `feature/local-task-center-2f109` from the accepted master baseline. The older branch/PR references below are historical. Do not merge master as part of ordinary stage development.
 
 Resolve the current remote HEAD before interpreting a stage name or an older PR description. Treat source completion, current-HEAD CI acceptance and verified deliverables as separate checkpoints.
 Use `npm ci --no-audit --no-fund` with the committed package-lock.json. Do not remove the lock or add an npm-install fallback to make a test pass.

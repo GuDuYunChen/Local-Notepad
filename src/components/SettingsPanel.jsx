@@ -4,6 +4,7 @@ import AppearanceCenter from './AppearanceCenter'
 import TagWorkspace from './TagWorkspace'
 import LibraryStatistics from './LibraryStatistics'
 import AttachmentAudit from './AttachmentAudit'
+import TaskCenter from './TaskCenter'
 import LibraryReferenceHealthPanel from './LibraryReferenceHealthPanel'
 import SyncCenterPanel from './SyncCenterPanel'
 import S3ReadInspectionPanel from './S3ReadInspectionPanel'
@@ -95,6 +96,7 @@ export default function SettingsPanel({
   const [tagWorkspaceOpen, setTagWorkspaceOpen] = useState(false)
   const [statisticsOpen, setStatisticsOpen] = useState(false)
   const [attachmentAuditOpen, setAttachmentAuditOpen] = useState(false)
+  const [taskCenterOpen, setTaskCenterOpen] = useState(false)
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -187,6 +189,8 @@ export default function SettingsPanel({
           {tagWorkspaceOpen && <TagWorkspace onClose={() => setTagWorkspaceOpen(false)} onOpenFile={onOpenFile} />}
           <div className="settings-row"><div><strong>笔记库统计</strong><span>只读查看数量、字符、标签覆盖和日期分布，筛选定位并导出统计。</span></div><button type="button" className="btn" onClick={() => setStatisticsOpen(true)}>打开笔记库统计</button></div>
           {statisticsOpen && <LibraryStatistics onClose={() => setStatisticsOpen(false)} onOpenFile={onOpenFile} />}
+          <div className="settings-row"><div><strong>待办任务中心</strong><span>汇总已保存待办，筛选回访来源笔记；勾选和保存沿用原编辑器。</span></div><button type="button" className="btn" onClick={() => setTaskCenterOpen(true)}>打开待办任务中心</button></div>
+          {taskCenterOpen && <TaskCenter onClose={() => setTaskCenterOpen(false)} onOpenFile={onOpenFile} />}
         </section>
 
         <section className="settings-card consumer-settings-section">

@@ -224,6 +224,14 @@
   line-height: inherit;
 }
 
+/* The general list reset above outranks the native checklist's one-class
+   gutter. Reserve space for its fixed 16px marker in both stylesheet orders.
+   The 28px gutter leaves at least 8px at all supported editor font sizes. */
+.editor-input .editor-list-item.editor-list-item-checked,
+.editor-input .editor-list-item.editor-list-item-unchecked {
+  padding-left: 28px;
+}
+
 .editor-input .editor-list-item::marker {
   color: var(--ink-muted);
 }
