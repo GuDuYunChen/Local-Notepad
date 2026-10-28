@@ -1,10 +1,10 @@
 # Local-Notepad development
 
-Current local module: 2F.107 / 4.240.0 local library statistics workspace, branch `feature/local-library-statistics-2f107`. Read `docs/LOCAL_LIBRARY_STATISTICS_2F107.md`. Accepted master is `53e216aeb5346ffe311d88b99da5f327a855cdb8`, tree `20a161bdf6b63bc81a669de6aeb3f546411f85b8` / 4.239.0. PR12 is accepted after product1769 and Windows72. Preserve prior issue/incident records, original saving/receipts/quit protections, schema14 and dependency graph. Deliver settings entry, coherent read-only metrics, filtering/paging, guarded navigation, explicit report export, cancellation, stale/failed responses and retry together. No cloud/multidevice work or premature acceptance.
+Current local module: 2F.108 / 4.241.0 local attachment audit, branch `feature/local-attachment-audit-2f108`. Read `docs/LOCAL_ATTACHMENT_AUDIT_2F108.md`. Accepted master21f987b4/tree d9414895 is 2F107/4.240.0 after CI1770 and Windows75. Preserve historical issues, saving/receipts/quit protections, schema14 and dependencies. Complete read-only inventory, conservative candidate references, missing/blocked/gap reporting, guarded navigation, explicit private export, cancellation/errors and current-version native/install acceptance together. Never infer safe deletion from missing references. Cloud/multidevice remains deferred.
 
 
 Read `docs/DEVELOPMENT_HANDOFF.md` before resuming an interrupted task.
-Work on `feature/local-library-statistics-2f107` from the accepted master baseline. The older branch/PR references below are historical. Do not merge master as part of ordinary stage development.
+Work on `feature/local-attachment-audit-2f108` from the accepted master baseline. The older branch/PR references below are historical. Do not merge master as part of ordinary stage development.
 
 Resolve the current remote HEAD before interpreting a stage name or an older PR description. Treat source completion, current-HEAD CI acceptance and verified deliverables as separate checkpoints.
 Use `npm ci --no-audit --no-fund` with the committed package-lock.json. Do not remove the lock or add an npm-install fallback to make a test pass.

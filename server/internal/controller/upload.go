@@ -5,6 +5,7 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"notepad-server/internal/dao"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,6 +17,7 @@ import (
 
 type UploadController struct {
 	UploadDir string
+	FileDAO   *dao.FileDAO
 }
 
 var allowedExtensions = map[string]bool{
@@ -40,6 +42,7 @@ var allowedMIMETypes = map[string]bool{
 
 func (c *UploadController) Register(group *ghttp.RouterGroup) {
 	group.POST("/upload", c.Upload)
+	group.GET("/attachment-audit", c.AttachmentAudit)
 }
 
 func sniffUploadMIME(reader io.Reader) (string, error) {

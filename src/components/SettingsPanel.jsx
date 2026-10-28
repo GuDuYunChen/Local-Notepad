@@ -3,6 +3,7 @@ import ThemeToggle from './ThemeToggle'
 import AppearanceCenter from './AppearanceCenter'
 import TagWorkspace from './TagWorkspace'
 import LibraryStatistics from './LibraryStatistics'
+import AttachmentAudit from './AttachmentAudit'
 import LibraryReferenceHealthPanel from './LibraryReferenceHealthPanel'
 import SyncCenterPanel from './SyncCenterPanel'
 import S3ReadInspectionPanel from './S3ReadInspectionPanel'
@@ -93,6 +94,7 @@ export default function SettingsPanel({
   const [appearanceOpen, setAppearanceOpen] = useState(false)
   const [tagWorkspaceOpen, setTagWorkspaceOpen] = useState(false)
   const [statisticsOpen, setStatisticsOpen] = useState(false)
+  const [attachmentAuditOpen, setAttachmentAuditOpen] = useState(false)
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -192,6 +194,9 @@ export default function SettingsPanel({
             <h3>数据与备份</h3>
             <StatusPill tone={dataStatusTone}>{dataStatusLabel}</StatusPill>
           </div>
+
+          <div className="settings-row"><div><strong>附件检查中心</strong><span>只读检查附件与候选引用，定位缺失文件；不自动清理或修改正文。</span></div><button type="button" className="btn" onClick={() => setAttachmentAuditOpen(true)}>打开附件检查中心</button></div>
+          {attachmentAuditOpen && <AttachmentAudit onClose={() => setAttachmentAuditOpen(false)} onOpenFile={onOpenFile} />}
 
           <div className="consumer-data-summary">
             <div><strong>{server?.active_notes ?? '—'}</strong><span>篇笔记</span></div>
