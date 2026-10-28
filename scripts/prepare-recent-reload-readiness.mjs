@@ -5,7 +5,7 @@ import {fileURLToPath} from 'node:url'
 import path from 'node:path'
 const blob=s=>createHash('sha1').update('blob '+Buffer.byteLength(s)+'\0').update(s).digest('hex')
 export function prepareRecentReloadReadiness(original){
- assert.equal(blob(original),'ff1f73001eb5693fdb304f10e759f61c7ee0f84a','Unreviewed inherited reading preparation')
+ assert.equal(blob(original),'6e4ea504cc71129acdeb8c125b3098e4abb21994','Unreviewed inherited reading preparation')
  const old=`  const script = "import {verifyReadingModeDesktop} from './check-reading-mode-desktop.mjs'\\n" +
     replaceExactlyAndProveInverse(prepared.script, [[anchor, addition], [marker, marker + ";mark('installed-app-reading-mode-workflow')"]])`
  const next=`  const recent = '  await verifyRecentNotesDesktop({evaluate,click,cdp,until,api,out,noteIDs:[a.id,b.id]})'
@@ -21,7 +21,7 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
  assert.equal(process.platform,'win32');assert.equal(process.env.RUNNER_ENVIRONMENT,'github-hosted')
  assert.equal(process.env.GITHUB_REPOSITORY,'GuDuYunChen/Local-Notepad');assert.equal(process.env.GITHUB_REF,'refs/heads/ci/local-installation-2f86')
  const root=fileURLToPath(new URL('../',import.meta.url)),file=path.join(root,'scripts/reading-mode-installed-evidence.mjs')
- assert.equal(JSON.parse(readFileSync(path.join(root,'package.json'),'utf8')).version,'4.241.0')
+ assert.equal(JSON.parse(readFileSync(path.join(root,'package.json'),'utf8')).version,'4.242.0')
  const before=readFileSync(file,'utf8').replace(/\r\n/g,'\n'),after=prepareRecentReloadReadiness(before),out=path.join(root,'test-results/installer-lifecycle/recent-reload-preparation')
  mkdirSync(out,{recursive:true});writeFileSync(path.join(out,'reading-mode-installed-evidence.mjs.before.txt'),before,{flag:'wx'});writeFileSync(path.join(out,'reading-mode-installed-evidence.mjs'),after,{flag:'wx'})
  const helper=readFileSync(new URL('./recent-reload-readiness.mjs',import.meta.url),'utf8').replace(/\r\n/g,'\n')
