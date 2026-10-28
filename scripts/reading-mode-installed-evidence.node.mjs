@@ -22,14 +22,14 @@ function fixture() {
     previousArtifactMetadata: { headSha: 'f'.repeat(40), branch: 'ci/rebuild-legacy-seed-4-232',
       repositoryId: 1105107817, archiveBytes: 100, archiveSha256: createHash('sha256').update('synthetic archive').digest('hex'),
       productSourceSha: ACCEPTED_READING_SEED_SOURCE.productSourceCommit },
-    current: { version: '4.237.0', bytes: 1001, sha256: createHash('sha256').update('synthetic-reading-mode-contract-input').digest('hex') },
+    current: { version: '4.238.0', bytes: 1001, sha256: createHash('sha256').update('synthetic-reading-mode-contract-input').digest('hex') },
     currentSource: { run: 100, artifact: 200, name: 'local-notepad-windows-' + 'a'.repeat(40),
       headSha: 'c'.repeat(40), branch: 'feature/local-export-2f102-closure', repositoryId: 1105107817,
       archiveBytes: 100, archiveSha256: createHash('sha256').update('synthetic archive').digest('hex') } }
   for (const key of READING_SOURCE_KEYS) pin[key] = 'd'.repeat(40)
-  Object.assign(pin, { importBlob: 'd7a71f759debf24fde5b8bd4b0d19d8a5b802aba',
-    importEvidenceBlob: '7b860fe6862e50c9b299fb06abe4684bfd273da1',
-    importEvidenceTestsBlob: 'ad1c2677590a733652729c339e13a9894b2421a8',
+  Object.assign(pin, { importBlob: '461928325398d912f7b2cd2e64d0250a1a6114e2',
+    importEvidenceBlob: '05de50269885f2c922017e99b9b124090ff65221',
+    importEvidenceTestsBlob: 'f42da881e1ca094455440a3b35c24f75ad3ffbd1',
     historyDriverBlob: blob(source('check-version-history-desktop.mjs').replace(/\r\n/g, '\n')) })
   const report = { productCommit: pin.product, verifierCommit: verifier, complete: true, cleanupComplete: true,
     syntheticData: true, usedDefaultDataPath: true, forceTerminated: false, platform: 'win32', runnerEnvironment: 'github-hosted',
@@ -123,11 +123,11 @@ test('all generated import copies retain exact inverse source identity', () => {
 })
 const importCheckoutSources = [
   { source: 'local-import-desktop-evidence.mjs', pin: 'importEvidenceBlob', hash: '6fc3c3d069384fc2bd7c671987ace423d004ddf8',
-    old: "assert.equal(report.appVersion, '4.232.0')", current: "assert.equal(report.appVersion, '4.237.0')" },
+    old: "assert.equal(report.appVersion, '4.232.0')", current: "assert.equal(report.appVersion, '4.238.0')" },
   { source: 'check-local-import-desktop.mjs', pin: 'importBlob', hash: '6f0bfd54c7b7e1ea673e80b55a91be82244dfcef',
-    old: "assert.equal(diagnostics.version, '4.232.0')", current: "assert.equal(diagnostics.version, '4.237.0')" },
+    old: "assert.equal(diagnostics.version, '4.232.0')", current: "assert.equal(diagnostics.version, '4.238.0')" },
   { source: 'local-import-desktop-evidence.node.mjs', pin: 'importEvidenceTestsBlob', hash: '12cc53ff2ff11d2aa8d6508feadd2a4734077bb3',
-    old: "appVersion: '4.232.0'", current: "appVersion: '4.237.0'" },
+    old: "appVersion: '4.232.0'", current: "appVersion: '4.238.0'" },
 ]
 for (const lineEnding of ['LF', 'CRLF']) {
   const checkout = text => lineEnding === 'CRLF' ? text.replace(/\n/g, '\r\n') : text
@@ -168,7 +168,7 @@ for (const lineEnding of ['LF', 'CRLF']) {
         error => error.code === 'ERR_ASSERTION' && error.message.startsWith('Original verifier source identity changed: ' + spec.source))
     })
     test(lineEnding + ' refuses unsupported product import version even with a matching replacement pin: ' + spec.source, () => {
-      const { pin } = fixture(), changed = current(spec.source).replace(spec.current, spec.current.replace('4.237.0', '4.234.0'))
+      const { pin } = fixture(), changed = current(spec.source).replace(spec.current, spec.current.replace('4.238.0', '4.234.0'))
       pin[spec.pin] = blob(changed)
       assert.throws(() => prepareReadingModeVerifierSources(pin, name => checkout(name === spec.source ? changed : current(name))),
         /Original verifier anchor missing or ambiguous/)
@@ -297,7 +297,7 @@ for (const lineEnding of ['LF', 'CRLF']) test('offline complete ' + lineEnding +
     assert.equal(final.script.match(/await verifyLocalImportRestart\(/g).length, 1)
     assert.ok(final.script.indexOf('await verifyReadingModeDesktop(') > final.script.indexOf('await verifyLocalImportRestart('))
     assert.equal(final.core.match(/'installed-app-reading-mode-workflow'/g).length, 1)
-    assert.ok(final.core.includes('4.237.0')); assert.ok(final.core.includes('4.232.0'))
+    assert.ok(final.core.includes('4.238.0')); assert.ok(final.core.includes('4.232.0'))
     for (const marker of REQUIRED_CHECKS) assert.ok(final.core.includes(marker), marker)
     assert.ok(final.core.includes(LEGACY_DEFECT.sha256))
     assert.ok(final.script.includes("assert.equal(observedDirectory,legacyTarget.split(' ')[0],'Old directory truncation was not reproduced')"))
