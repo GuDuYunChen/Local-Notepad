@@ -71,6 +71,8 @@ jobs:
         run: node --test scripts/attachment-audit-desktop-evidence.node.mjs
       - name: Refuse incomplete task completion privacy and retention evidence
         run: node --test scripts/task-center-desktop-evidence.node.mjs
+      - name: Refuse ambiguous sidebar ownership or repeated native input
+        run: node --test --test-reporter=tap --test-reporter-destination=test-results/installer-lifecycle/task-sidebar-contracts.tap scripts/task-center-sidebar.node.mjs
       - name: Verify fixed legacy installer restoration and refusals
         run: node --test scripts/prepare-legacy-installer.node.mjs
       - name: Resolve only complete source and binary pins

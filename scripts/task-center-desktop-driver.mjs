@@ -29,6 +29,17 @@ export async function leaveTaskSettings({evaluate,click,until}) {
  await until(()=>evaluate("!document.querySelector('.settings-panel')"),'Settings did not close after its own return action')
  return true
 }
+// A narrow viewport can leave the existing sidebar overlay expanded. Use its
+// original visible control once; never alter CSS, storage, React or the viewport.
+export async function prepareTaskEditorViewport({evaluate,click,until}) {
+ const observe=()=>evaluate(`(()=>{const owners=document.querySelectorAll('.workspace-sidebar');const n=owners[0];return {owners:owners.length,collapsed:n?.classList.contains('collapsed'),collapseButtons:n?.querySelectorAll('button[aria-label="折叠侧边栏"]').length,expandButtons:n?.querySelectorAll('button[aria-label="展开侧边栏"]').length,settings:document.querySelectorAll('.settings-panel').length,centers:document.querySelectorAll('.task-center').length,width:innerWidth,height:innerHeight}})()`)
+ const verify=s=>{assert.equal(s?.owners,1,'Expected one sidebar owner');assert.equal(s.settings,0,'Settings still cover the editor');assert.equal(s.centers,0,'Task center still covers the editor');assert.equal(typeof s.collapsed,'boolean');assert.ok(Number.isFinite(s.width)&&s.width>0&&s.width<=720);assert.ok(Number.isFinite(s.height)&&s.height>0&&s.height<=520);assert.equal(s.collapseButtons,s.collapsed?0:1,'Ambiguous collapse control');assert.equal(s.expandButtons,s.collapsed?1:0,'Ambiguous expand control');return s}
+ const before=verify(await observe())
+ if(before.collapsed)return {method:'original-sidebar-control',clicked:false,before,after:before}
+ await click('.workspace-sidebar button[aria-label="折叠侧边栏"]')
+ const after=await until(async()=>{const s=verify(await observe());assert.equal(s.width,before.width,'Viewport changed');assert.equal(s.height,before.height,'Viewport changed');return s.collapsed?s:false},'Sidebar did not collapse after its original action')
+ return {method:'original-sidebar-control',clicked:true,before,after}
+}
 export async function verifyTaskCenterDesktop(ctx){
  const {api,evaluate,click,until,capture,report,save,start,closeNormally,reinstallWithRetainedDraft,resizeSmall,outputDirectory,ownedRoot}=ctx
  report.checks=[];report.feedback={};report.exits=[];report.exports=[]
@@ -101,6 +112,7 @@ export async function verifyTaskCenterDesktop(ctx){
  fault='hold';await connection.send('Fetch.enable',{patterns:[{urlPattern:'*/api/task-center',requestStage:'Request'}]});await action('重新读取');await until(()=>paused,'Task request not held');await action('取消读取');await feedback('cancel','读取已取消');try{await connection.send('Fetch.continueRequest',{requestId:paused})}catch(e){assert.match(String(e),/Invalid InterceptionId|Invalid interception|No resource|not found|Invalid request/i)}await connection.send('Fetch.disable');assert.equal(await evaluate("Boolean(document.querySelector('.task-center-cards'))"),false);report.cancellation={injectedHeldRead:true,partialDiscarded:true,lateResultNotAdopted:true};mark('cancelled-read-does-not-adopt-late-results');await action('重新读取');await ready()
  await evaluate("window.dispatchEvent(new CustomEvent('library:refresh'));true");await feedback('stale','资料库已变化','alert');assert.equal(await evaluate("[...document.querySelectorAll('.task-center footer button')].find(n=>n.textContent==='导出待办报告').disabled"),true);assert.equal(await evaluate("[...document.querySelectorAll('.task-center-items button')].every(n=>n.disabled)"),true);report.stale={explicitOriginalEventInjection:true,exportRefused:true,openRefused:true};await capture('task109-stale.png');mark('external-change-refuses-stale-open-and-export');await action('重新读取');await ready()
  await close();await leaveTaskSettings({evaluate,click,until});await resizeSmall();
+ report.sidebarReadiness=await prepareTaskEditorViewport({evaluate,click,until});save();
  await observeLayout('smallChecked',prefix+' item 00','true');await observeLayout('smallUnchecked',prefix+' item 01','false');await capture('task109-editor-small.png');
  await open();await action('导出待办报告');await feedback('smallConfirm','默认只导出计数','alertdialog');report.viewport=await evaluate("(()=>{const n=document.querySelector('.task-center'),b=n.querySelector('footer').getBoundingClientRect();return{width:innerWidth,height:innerHeight,horizontalOverflow:n.scrollWidth>n.clientWidth+1,footerReachable:b.top>=0&&b.bottom<=innerHeight}})()");assert.equal(report.viewport.horizontalOverflow,false);assert.equal(report.viewport.footerReachable,true);await capture('task109-small.png');await action('取消导出');mark('minimum-window-feedback-and-confirmation')
  const input=await evaluate('window.__task109Input');report.trustedMouseInput=input.mouse;report.trustedKeyboardInput=input.keyboard
