@@ -24,7 +24,7 @@ const sourcesFor = pin => Object.fromEntries(Object.entries(SHORTCUT_INSTALLATIO
 
 export function validateShortcutManagementInstallerPin(pin) {
   validateReadingModePin(pin)
-  assert.equal(pin.current.version, '4.239.0')
+  assert.equal(pin.current.version, '4.240.0')
   for (const key of Object.values(SHORTCUT_INSTALLATION_SOURCES)) {
     assert.match(pin[key] || '', /^[a-f0-9]{40}$/, 'Unresolved shortcut source pin: ' + key)
   }
