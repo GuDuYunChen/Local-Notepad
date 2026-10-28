@@ -1,5 +1,6 @@
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
+import { flushSync } from 'react-dom'
 import { beforeEach, afterEach, expect, it, vi } from 'vitest'
 import App from './App'
 import { api } from './services/api'
@@ -41,3 +42,21 @@ it('opens the real settings task panel and does not reopen it on close',async()=
 it('global shortcut management opens through its existing owner without clearing a draft',async()=>{await click('编辑正文');await click('打开快捷操作');await action('shortcuts');expect(host.querySelector('[data-shortcut-settings]')).not.toBeNull();expect(host.querySelector('.local-actions')).toBeNull();expect(fixture.clear).not.toHaveBeenCalled();expect(fixture.save).not.toHaveBeenCalled()})
 it('accepted original save is the only path to the requested destination',async()=>{fixture.save.mockResolvedValue({id:'source',content:'未保存草稿'});await click('编辑正文');await click('打开快捷操作');await action('daily');await click('保存');expect(fixture.save).toHaveBeenCalledTimes(1);expect(fixture.clear).not.toHaveBeenCalled();expect(host.querySelector('[data-daily-target]')).not.toBeNull();expect(host.querySelector('.local-actions')).toBeNull()})
 it('cannot discard after a different workspace invalidated the invocation',async()=>{await click('编辑正文');await click('打开快捷操作');await action('daily');await act(async()=>fixture.select({id:'external',title:'新来源.md',content:'另一正文'},{skipSave:true}));await settle();await click('不保存');expect(fixture.clear).not.toHaveBeenCalled();expect(host.querySelector('[data-daily-target]')).toBeNull()})
+
+// Native81: a browser event may commit the changed workspace before the async
+// promise continuation runs. Async act alone hid this ordering in old tests.
+it.each(['daily','tasks'])('acknowledges owned %s navigation before its synchronous React commit',async id=>{
+ await click('打开快捷操作')
+ act(()=>flushSync(()=>host.querySelector('[data-local-action='+id+']').click()))
+ await settle()
+ expect(host.querySelector('.local-actions')).toBeNull()
+ expect(document.querySelector(id==='daily'?'[data-daily-target]':'.task-center')).not.toBeNull()
+ expect(fixture.save).not.toHaveBeenCalled();expect(fixture.clear).not.toHaveBeenCalled()
+})
+it('does not call a successful original discard an external context change',async()=>{
+ await click('编辑正文');await click('打开快捷操作');await action('daily')
+ act(()=>flushSync(()=>button('不保存').click()));await settle()
+ expect(fixture.clear).toHaveBeenCalledTimes(1)
+ expect(host.querySelector('[data-daily-target]')).not.toBeNull()
+ expect(host.querySelector('.local-actions')).toBeNull()
+})
