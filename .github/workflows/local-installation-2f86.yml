@@ -1,4 +1,4 @@
-name: Actual library statistics and complete installation lifecycle 2F107
+name: Actual attachment audit and complete installation lifecycle 2F108
 on:
   push:
     branches: [ci/local-installation-2f86]
@@ -18,14 +18,16 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
-      - name: Retain exact accepted appearance and tag assertions for 4.240.0
-        run: node scripts/prepare-retained-local-modules-2f107.mjs
+      - name: Retain exact accepted appearance tag and statistics assertions for 4.241.0
+        run: node scripts/prepare-retained-local-modules-2f108.mjs
       - name: Prepare source-bound appearance and retained draft verifiers
         run: node scripts/prepare-appearance-verifier.mjs
       - name: Prepare source-bound tag workspace verifier without changing product bytes
         run: node scripts/prepare-tag-workspace-verifier.mjs
       - name: Prepare source-bound statistics verifier preserving original process ownership
         run: node scripts/prepare-library-statistics-verifier.mjs
+      - name: Prepare source-bound attachment audit without changing product bytes
+        run: node scripts/prepare-attachment-audit-verifier.mjs
       - name: Verify historical issue catalog and locked dependencies
         shell: pwsh
         run: |
@@ -63,6 +65,8 @@ jobs:
         run: node --test scripts/tag-workspace-desktop-evidence.node.mjs
       - name: Refuse incomplete statistics export cancellation and readonly evidence
         run: node --test scripts/library-statistics-desktop-evidence.node.mjs
+      - name: Refuse incomplete attachment inventory privacy and retention evidence
+        run: node --test scripts/attachment-audit-desktop-evidence.node.mjs
       - name: Verify fixed legacy installer restoration and refusals
         run: node --test scripts/prepare-legacy-installer.node.mjs
       - name: Resolve only complete source and binary pins
@@ -81,7 +85,7 @@ jobs:
           path: .installer-input/previous
       - name: Restore unchanged old path-failure counterexample
         run: node scripts/prepare-legacy-installer.mjs
-      - name: Download source-bound 4.240.0 installer
+      - name: Download source-bound 4.241.0 installer
         uses: actions/download-artifact@v4
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -106,6 +110,8 @@ jobs:
         run: node scripts/run-tag-workspace-desktop-generated.mjs
       - name: Actual installed library statistics privacy downloads retry and unchanged bodies
         run: node scripts/run-library-statistics-desktop-generated.mjs
+      - name: Actual installed attachment audit uploads sources privacy cancellation and retention
+        run: node scripts/run-attachment-audit-desktop-generated.mjs
       - name: Actual installed modules upgrade overwrite uninstall reinstall and data retention
         run: node scripts/run-reading-mode-installer.mjs run
       - name: Retain complete or failed original evidence
