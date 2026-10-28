@@ -30,9 +30,9 @@ function pinFixture() {
     currentSource: { run: 100, artifact: 200, name: 'local-notepad-windows-' + product,
       headSha: 'c'.repeat(40), branch: 'feature/local-export-2f102-closure', repositoryId: 1105107817,
       archiveBytes: 5000, archiveSha256: sha('synthetic archive') },
-    importBlob: '23892d283dfd85038dd467e88ef32a55efe4a747',
-    importEvidenceBlob: 'd5ff3b84665b06685ff67b36686ce0121c428417',
-    importEvidenceTestsBlob: '907400ff6bc027431c612d352bd516ea06e264b0',
+    importBlob: 'cfb769300740316594ddfbfb351b166c65fc1c27',
+    importEvidenceBlob: '24a55149ac12539ffd9e3eb9175da8afaf11abf8',
+    importEvidenceTestsBlob: '0964d43e8c9ec00188b6944c0551cb69f6bdd117',
     historyDriverBlob: blob(source('check-version-history-desktop.mjs')), readingEvidenceBlob: blob(source('reading-mode-desktop-evidence.mjs')) })
   for (const [file, key] of Object.entries({ ...SHORTCUT_INSTALLATION_SOURCES, ...LOCAL_EXPORT_INSTALLATION_SOURCES })) pin[key] = blob(source(file))
   return pin

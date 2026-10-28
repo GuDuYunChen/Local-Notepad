@@ -1,3 +1,9 @@
+# Current module: 2F.110 / 4.243.0 local quick actions
+
+Accepted master `bf5f0ed5cb4cad4a1f1b0f874a87fa093b47f6e4` / tree `23d22c72321747b1314b418082bc453276f83ec0` is 2F.109, already merged and verified. Work on `feature/local-actions-2f110`; read `docs/LOCAL_ACTIONS_2F110.md`. Deliver the local registry, search/category/keyboard panel, original-owner navigation/save decisions, cancellations/errors and actual new-version native/install acceptance as one module. No arbitrary commands, cloud or second note-write path. Older module references below are retained history.
+
+---
+
 # Local-Notepad development
 
 Current local module: 2F.109 / 4.242.0 local task center, branch `feature/local-task-center-2f109`. Read `docs/LOCAL_TASK_CENTER_2F109.md`. Accepted master928caf6c/tree f600aa7f is 2F108/4.241.0 after CI1771 and Windows76. Preserve historical issues, saving/receipts/quit protections, schema14 and dependencies. Deliver saved checklist discovery, explicit coverage, filtering/paging, fresh-source guarded navigation, completion through the original editor and return/reload, private export, cancellation/errors and current-version native/install acceptance together. No separate task-body writes, cloud or multidevice feature.

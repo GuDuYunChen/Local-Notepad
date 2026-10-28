@@ -86,6 +86,9 @@ export default function SettingsPanel({
   onOpenBackup,
   onOpenShortcuts,
   onOpenFile,
+  onOpenLocalActions,
+  launchRequest,
+  onLaunchConsumed,
 }) {
   const [server, setServer] = useState(null)
   const [appInfo, setAppInfo] = useState(null)
@@ -97,6 +100,14 @@ export default function SettingsPanel({
   const [statisticsOpen, setStatisticsOpen] = useState(false)
   const [attachmentAuditOpen, setAttachmentAuditOpen] = useState(false)
   const [taskCenterOpen, setTaskCenterOpen] = useState(false)
+
+  useEffect(() => {
+    if (!launchRequest) return
+    const setters = { appearance: setAppearanceOpen, tags: setTagWorkspaceOpen, statistics: setStatisticsOpen, attachments: setAttachmentAuditOpen, tasks: setTaskCenterOpen }
+    const setter = setters[launchRequest.tool]
+    if (setter) setter(true)
+    onLaunchConsumed?.()
+  }, [launchRequest?.token])
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -185,6 +196,7 @@ export default function SettingsPanel({
 
         <section className="settings-card consumer-settings-section">
           <div className="settings-card-header"><h3>标签与分类</h3></div>
+          {onOpenLocalActions && <div className="settings-row"><div><strong>快捷操作</strong><span>查找并打开本地功能，跳转沿用原保存保护。</span></div><button type="button" className="btn" onClick={onOpenLocalActions}>打开快捷操作</button></div>}
           <div className="settings-row"><div><strong>本地标签工作台</strong><span>查看关联笔记，集中创建、重命名、合并和删除标签。</span></div><button type="button" className="btn" onClick={() => setTagWorkspaceOpen(true)}>打开标签工作台</button></div>
           {tagWorkspaceOpen && <TagWorkspace onClose={() => setTagWorkspaceOpen(false)} onOpenFile={onOpenFile} />}
           <div className="settings-row"><div><strong>笔记库统计</strong><span>只读查看数量、字符、标签覆盖和日期分布，筛选定位并导出统计。</span></div><button type="button" className="btn" onClick={() => setStatisticsOpen(true)}>打开笔记库统计</button></div>
