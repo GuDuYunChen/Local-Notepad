@@ -24,7 +24,7 @@ function fixture() {
   const gets = [6, 7, 8].map(value => ({ networkId: String(value + 30), requestId: id(value), method: 'GET', title: null }))
   const image = filename => ({ filename, bytes: 100, sha256: sha })
   return {
-    complete: true, commit, platform: 'win32', appVersion: '4.238.0', realPackagedApp: true, realBackend: true,
+    complete: true, commit, platform: 'win32', appVersion: '4.239.0', realPackagedApp: true, realBackend: true,
     realPreload: true, syntheticData: true, cleanupComplete: true, timerAccelerated: false, bridgeOverridden: false,
     checks: [...LOCAL_IMPORT_CHECKS], fileInput: { method: 'DOM.setFileInputFiles', selector: '[data-local-import-input]', ownedNativeFiles: true },
     preview: { validRows: 3, errorRows: 1, noteWrites: 0, unchangedInventory: true, markers: ['import99-markdown-body', 'import99-text-body', 'import99-sheet-one', 'import99-sheet-two'] },

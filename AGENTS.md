@@ -1,9 +1,10 @@
 # Local-Notepad development
 
-Current local module: 2F.105 / 4.238.0 local appearance scheme center, intended branch `feature/local-appearance-2f105`. Read `docs/LOCAL_APPEARANCE_2F105.md`. Accepted baseline is master `c193924b0be53c08b960b7c279ea56f655f43e8e`, tree `534090a73322f6caf81ef1dd00962f48b766809a` / 4.237.0. PR #10 (2F.104) is accepted and merged after product run 40444269357 and native Windows/installation run 40472644224; do not reopen its old Draft text or #1760 failure. Complete the local settings entry, editing, preview, persistent apply, import/export, deletion/reset, cancellation, malformed storage, write failures and external-change handling as one module. Do not alter note save/CAS/receipt/quit protection, schema14 or dependency graph. Cloud/multidevice work remains deferred. Local candidate tests are not remote publication or Windows acceptance; verify the actual current branch before publishing.
+Current local module: 2F.106 / 4.239.0 local tag workspace, branch `feature/local-tag-workspace-2f106`. Read `docs/LOCAL_TAG_WORKSPACE_2F106.md`. Accepted master is `61b06716a0c846bab4afd5244acdb4ef033f532a`, tree `3e2d33dcd0e7c41e99835ec5263f1852d1ed708b` / 4.238.0. PR11 is accepted after CI1767 and native Windows66. Do not reopen old appearance failures. Complete catalog/association browsing, guarded note opening, create/rename/merge/delete, transactional version checks, cancellation, rollback, uncertainty reconciliation and restart as one module. Preserve note save/CAS/receipt/quit sources, schema14 and locked dependencies. Cloud/multidevice work remains deferred.
+
 
 Read `docs/DEVELOPMENT_HANDOFF.md` before resuming an interrupted task.
-Work on `feature/local-appearance-2f105` from the accepted master baseline. The older branch/PR references below are historical. Do not merge master as part of ordinary stage development.
+Work on `feature/local-tag-workspace-2f106` from the accepted master baseline. The older branch/PR references below are historical. Do not merge master as part of ordinary stage development.
 
 Resolve the current remote HEAD before interpreting a stage name or an older PR description. Treat source completion, current-HEAD CI acceptance and verified deliverables as separate checkpoints.
 Use `npm ci --no-audit --no-fund` with the committed package-lock.json. Do not remove the lock or add an npm-install fallback to make a test pass.
