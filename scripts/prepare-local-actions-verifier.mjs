@@ -47,7 +47,7 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
  const root=fileURLToPath(new URL('../',import.meta.url)),read=f=>readFileSync(path.join(root,f),'utf8').replace(/\r\n/g,'\n')
  assert.equal(process.env.GITHUB_REPOSITORY,'GuDuYunChen/Local-Notepad');assert.equal(process.env.GITHUB_REF,'refs/heads/ci/local-installation-2f86');assert.equal(JSON.parse(read('package.json')).version,'4.243.0')
  const pin=JSON.parse(read('scripts/reading-mode-installer-pin.json')),binding=JSON.parse(read('scripts/appearance-product-binding.json'))
- assert.equal(binding.productHead,'5403c821fc226092d02e3b616a6483461de487c5');assert.equal(pin.currentSource.headSha,binding.productHead)
+ assert.equal(binding.productHead,'1e6742fe7032b17bbc6688605ce4a8c18c254967');assert.equal(pin.currentSource.headSha,binding.productHead)
  for(const[f,sha]of Object.entries(binding.productionTrees))assert.equal(execFileSync('git',['rev-parse','HEAD:'+f],{cwd:root,encoding:'utf8'}).trim(),sha,'Unreviewed product '+f)
  const source=read('scripts/run-task-center-desktop-generated.mjs'),runner=buildLocalActionsRunner(source),out=path.join(root,'test-results/installer-lifecycle/local-actions-preparation');mkdirSync(out,{recursive:true})
  for(const[f,v]of [['run-task-center-desktop-generated.mjs.before.txt',source],['run-local-actions-desktop-generated.mjs',runner]])writeFileSync(path.join(out,f),v,{flag:'wx'})

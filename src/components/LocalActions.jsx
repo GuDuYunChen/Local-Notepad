@@ -26,11 +26,15 @@ export default function LocalActions({ open, onClose, onExecute, contextVersion 
     if (!action || request.current || composing.current) return
     const controller = new AbortController(); request.current = controller; setBusy(true); setError(''); setNotice('正在交给原功能入口；如有未保存内容，请先完成原保存确认。')
     const owns = () => mounted.current && request.current === controller && !controller.signal.aborted
+    const acknowledge = result => {
+      if (!owns() || result?.accepted !== true || result.id !== action.id) return false
+      accepted.current = true; request.current = null; latest.current.onClose?.(); return true
+    }
     try {
       if (typeof latest.current.onExecute !== 'function') throw new Error('本地功能入口暂不可用，请关闭后重新打开。')
-      const result = await latest.current.onExecute(action.id, { signal: controller.signal })
+      const result = await latest.current.onExecute(action.id, { signal: controller.signal, onAccepted: acknowledge })
       if (!owns()) return
-      if (result?.accepted === true && result.id === action.id) { accepted.current = true; request.current = null; latest.current.onClose?.(); return }
+      if (acknowledge(result)) return
       setNotice(result?.reason === 'focus-session' ? '请先结束当前专注 Session，再执行工作区跳转。' : '未执行操作，当前笔记和未保存内容保持不变。')
     } catch {
       if (owns()) { setNotice(''); setError('入口执行失败，未自动重试。请确认当前页面后，再选择操作重试。') }

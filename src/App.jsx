@@ -872,10 +872,10 @@ export default function App() {
     if (document.querySelector('[role="dialog"][aria-modal="true"]')) return
     setLocalActionsOpen(true)
   }
-  const runLocalAction = (id, { signal }) => {
+  const runLocalAction = (id, { signal, onAccepted }) => {
     const epoch = navigationEpoch.current
     return executeLocalAction(id, {
-      signal,
+      signal, onAccepted,
       isCurrent: () => !signal.aborted,
       navigate: (target, options) => {
         if (target === workspace) { if (options.shouldChange()) options.afterChange(); else options.onCancel(); return }
