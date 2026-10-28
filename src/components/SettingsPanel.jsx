@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import ThemeToggle from './ThemeToggle'
 import AppearanceCenter from './AppearanceCenter'
+import TagWorkspace from './TagWorkspace'
 import LibraryReferenceHealthPanel from './LibraryReferenceHealthPanel'
 import SyncCenterPanel from './SyncCenterPanel'
 import S3ReadInspectionPanel from './S3ReadInspectionPanel'
@@ -89,6 +90,7 @@ export default function SettingsPanel({
   const [loading, setLoading] = useState(false)
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [appearanceOpen, setAppearanceOpen] = useState(false)
+  const [tagWorkspaceOpen, setTagWorkspaceOpen] = useState(false)
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -173,6 +175,12 @@ export default function SettingsPanel({
             <button type="button" className="btn" onClick={() => setAppearanceOpen(true)}>管理主题方案</button>
           </div>
           {appearanceOpen && <AppearanceCenter onClose={() => setAppearanceOpen(false)} />}
+        </section>
+
+        <section className="settings-card consumer-settings-section">
+          <div className="settings-card-header"><h3>标签与分类</h3></div>
+          <div className="settings-row"><div><strong>本地标签工作台</strong><span>查看关联笔记，集中创建、重命名、合并和删除标签。</span></div><button type="button" className="btn" onClick={() => setTagWorkspaceOpen(true)}>打开标签工作台</button></div>
+          {tagWorkspaceOpen && <TagWorkspace onClose={() => setTagWorkspaceOpen(false)} onOpenFile={onOpenFile} />}
         </section>
 
         <section className="settings-card consumer-settings-section">

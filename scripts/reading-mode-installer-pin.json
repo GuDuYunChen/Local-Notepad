@@ -1,5 +1,5 @@
 {
-  "product": "793e73ec4d04a86abe0ab19d69ca44e6533d7d3b",
+  "product": "96e972210952fa5fdf475ce08f338d9df6039138",
   "quickBlob": "c1e8f40862b770f82af47c26a455b57efc853700",
   "tagsBlob": "54bb56864e58e2aa3f5ed08aedb52a00de5f0769",
   "templateBlob": "42378f13f71a03c3e91cdfdcb6dec44dbbb05f33",
@@ -10,14 +10,14 @@
   "pinsBlob": "7abf0331d1b3a7c1b626e7c2e2b5f68d6a77c588",
   "recentBlob": "cbe5a8897c082210363357fd33f2cb0f3d7bd1cc",
   "wikiBlob": "8cb64e31bf79c3ec2b17d5b8c152eccc0f2de6ca",
-  "importBlob": "461928325398d912f7b2cd2e64d0250a1a6114e2",
+  "importBlob": "73627de55d5b47cd2e943f917002b74d7a90d895",
   "importFixtureBlob": "022e484ef96e8a2dd6b2f57601bda8af29869666",
-  "importEvidenceBlob": "05de50269885f2c922017e99b9b124090ff65221",
-  "importEvidenceTestsBlob": "f42da881e1ca094455440a3b35c24f75ad3ffbd1",
+  "importEvidenceBlob": "bf6e221bbb3896568cc886959b7a51f65b1c6054",
+  "importEvidenceTestsBlob": "005762a2978d03c3cd9c036e947d86ff25be2a70",
   "current": {
-    "version": "4.238.0",
-    "bytes": 104379133,
-    "sha256": "aae3ae1c14c601231114664edea612fe55790697e1254ea5e28619d11fb79f25"
+    "version": "4.239.0",
+    "bytes": 104420251,
+    "sha256": "0f41ca23867b9caccd2c06a9d0a86386d1b50764cb45561bf7a5d7f9b48c9934"
   },
   "previous": {
     "version": "4.232.0",
@@ -31,18 +31,18 @@
     "productSourceCommit": "1a8e17ba775312c359f4ac23851c8c365b57a9cb"
   },
   "currentSource": {
-    "run": 40509794320,
-    "artifact": 12737207114,
-    "name": "local-notepad-windows-793e73ec4d04a86abe0ab19d69ca44e6533d7d3b",
-    "headSha": "32e3a8aa2212a95c5707797f3d3afb2b3c55b24e",
-    "branch": "feature/local-appearance-2f105",
+    "run": 40630801500,
+    "artifact": 12792056461,
+    "name": "local-notepad-windows-96e972210952fa5fdf475ce08f338d9df6039138",
+    "headSha": "b9784d3d8391962f5a2ee4133c77d7f766386423",
+    "branch": "feature/local-tag-workspace-2f106",
     "repositoryId": 1105107817,
-    "archiveBytes": 104382217,
-    "archiveSha256": "94cf290c0bb97eacdf3cd79c60a6b89c9d1464510d3f509d58108a9e83359755"
+    "archiveBytes": 104422434,
+    "archiveSha256": "61b43dcaadc9d6cddcdd4b8fcee3402cf28346b300508fc007a537e098250b54"
   },
   "readingDriverBlob": "6924b128c1125424c91f71dbd1ecc415762e2f77",
   "readingFixtureBlob": "0c7ffadbb187dd33a7bc6b5aa8c69427eec5cc34",
-  "readingEvidenceBlob": "73a6d435ddca39da75b15c717c2253564322ffa8",
+  "readingEvidenceBlob": "113fa8e71863d7ef2f3ceb06ff74a71b664179be",
   "readingBuilderBlob": "fbc7ead7bf8a6f765c00619920778b9aac1c8c8a",
   "readingInputBlob": "b69a1d282926cb7cc40375d58feeea7970a33a4d",
   "readingWindowSessionBlob": "5905369c693500e6b68e506bbf1dac0601922449",
@@ -51,12 +51,12 @@
   "historyDriverBlob": "cca9480ce41883f1f64fc37bbc655e5f5c51582b",
   "shortcutManagementDriverBlob": "a728dd1e03bc75eecec1aa85df5d33085066751d",
   "shortcutManagementRunnerBlob": "0fada01b2c802b0299c2c606a0004c4657f0e1c2",
-  "shortcutManagementEvidenceBlob": "9642ca99ef7752ad3baa5d409633d88eb179dd1b",
+  "shortcutManagementEvidenceBlob": "534eac30622b6cc9e7d34ec48bd21f1b17cf360f",
   "shortcutManagementFixtureBlob": "eb49f859eb9c9b51f8c31d3354f81231c647fb87",
   "shortcutManagementCanonicalFixtureBlob": "f86598e0d552a5d884eff9e30739617366c685c9",
   "localExportDriverBlob": "154b4552317cedf9c0e94c3fbbebeffb6b025f1b",
   "localExportRunnerBlob": "ffde8b2684e79327db84e64e58e7ecd5dd37edfd",
-  "localExportEvidenceBlob": "9060ecce44c9fae3acf5a68b89db15ad805c8f3f",
+  "localExportEvidenceBlob": "ae0ba6a4f0339bc3975c7a034812d24540829496",
   "localExportValuesBlob": "8c2af4276b34c42e5b346b666c08adc402470672",
   "localExportFixtureBlob": "802be649735c7ce56dab17bc15647934c036662c",
   "localExportBuilderBlob": "20e6d532a30689ed221b2ce184b13e337f2a5a4c",
@@ -73,7 +73,7 @@
   "blockReferenceSources": {
     "scripts/block-references-desktop-driver.mjs": "d6e92bfb3f403278cf01500da357ed1d30f00811",
     "scripts/run-block-references-desktop.mjs": "fe5d43271b7e2916ddcaf7182e0d1e2775c3a238",
-    "scripts/block-references-evidence.mjs": "93aa2f109d57bde35a2587d3126987b816dacdea",
+    "scripts/block-references-evidence.mjs": "96436b93aa1a2637082e083159383c2995c17085",
     "src/services/blockReferenceModel.mjs": "192a962099478836bb8e97d66a39853cc4f365ac",
     "src/services/blockReferences.mjs": "f260d8b5a08c1d1aa139777e3a3dfcfbfd9fdb9c",
     "src/components/Editor/plugins/BlockReferencePlugin.jsx": "b239eb70afc53debf8a023ec5a15cd8e004f5b18",
