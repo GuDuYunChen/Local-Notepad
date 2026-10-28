@@ -79,3 +79,45 @@ it('does not adopt an older acknowledged snapshot after an external change', asy
  expect(writes()).toHaveLength(1);expect(localStorage.getItem(TAG_WORKSPACE_JOURNAL)).toBeNull()
  await click('重新读取标签库');expect(panel().textContent).toContain('随后变化');expect(writes()).toHaveLength(1)
 })
+
+// A previous operation's acknowledgement must never describe a new refusal.
+describe('sequential operation feedback belongs to the current attempt',()=>{
+ const statusText=()=>panel().querySelector('.tag-workspace-feedback [role="status"]')?.textContent || ''
+ const acknowledgeFirst=async()=>{
+  await input('工作台标签名称','第一次成功');await click('创建标签');await click('确认')
+  expect(statusText()).toContain('本机数据库已确认标签修改');expect(writes()).toHaveLength(1)
+ }
+ it('clears the old acknowledgement when the next journal write is denied',async()=>{
+  await acknowledgeFirst();const storage=localStorage
+  vi.stubGlobal('localStorage',{getItem:k=>storage.getItem(k),setItem(){throw Error('quota')},removeItem:k=>storage.removeItem(k)})
+  await input('工作台标签名称','这次未发送');await click('创建标签');await click('确认')
+  expect(panel().querySelector('[role="alert"]').textContent).toContain('尚未发送标签修改')
+  expect(statusText()).not.toContain('数据库已确认');expect(writes()).toHaveLength(1)
+  expect(tags.some(t=>t.name==='这次未发送')).toBe(false);expect(storage.getItem(TAG_WORKSPACE_JOURNAL)).toBeNull()
+ })
+ it('does not combine invalid input with the previous success',async()=>{
+  await acknowledgeFirst();await input('工作台标签名称','新的无效输入');await input('工作台标签颜色','#zzzzzz');await click('创建标签')
+  expect(panel().querySelector('[role="alert"]').textContent).toContain('颜色')
+  expect(statusText()).not.toContain('数据库已确认');expect(writes()).toHaveLength(1)
+ })
+ it('does not claim a pending or cancelled deletion was acknowledged',async()=>{
+  await acknowledgeFirst();await click('删除标签')
+  expect(panel().querySelector('[role="alertdialog"]')).not.toBeNull()
+  expect(statusText()).not.toContain('数据库已确认');await click('取消')
+  expect(statusText()).not.toContain('数据库已确认');expect(writes()).toHaveLength(1)
+ })
+ it('keeps the second refused request unresolved without reusing the first receipt',async()=>{
+  await acknowledgeFirst();writeMode='refuse';await input('工作台标签名称','被拒绝');await click('创建标签');await click('确认')
+  expect(panel().querySelector('[role="alert"]').textContent).toContain('结果未确认')
+  expect(statusText()).not.toContain('数据库已确认');expect(writes()).toHaveLength(2)
+  expect(localStorage.getItem(TAG_WORKSPACE_JOURNAL)).not.toBeNull()
+ })
+ it('preserves a genuine current acknowledgement if only journal cleanup fails',async()=>{
+  await acknowledgeFirst();const storage=localStorage
+  vi.stubGlobal('localStorage',{getItem:k=>storage.getItem(k),setItem:(k,v)=>storage.setItem(k,v),removeItem(){throw Error('cleanup denied')}})
+  await input('工作台标签名称','这次也已保存');await click('创建标签');await click('确认')
+  expect(tags.some(t=>t.name==='这次也已保存')).toBe(true);expect(writes()).toHaveLength(2)
+  expect(panel().querySelector('[role="alert"]').textContent).toContain('数据库已确认，但本机操作记录未能清除')
+  expect(statusText()).toContain('本机数据库已确认标签修改');expect(storage.getItem(TAG_WORKSPACE_JOURNAL)).not.toBeNull()
+ })
+})

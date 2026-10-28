@@ -69,6 +69,7 @@ export default function TagWorkspace({ onClose, onOpenFile }) {
   const close = () => { if (confirmation) return; if (dirty || busy) setConfirmation({ kind: 'leave' }); else closeNow() }
   const run = async intent => {
     if (action.current || blocked || currentSnapshot.current?.revision !== intent.expected_revision) return
+    setMessage('')
     try { journal.save(intent) } catch { setError('本机操作记录未能保存，尚未发送标签修改。请释放本机存储空间后重试，或先核对待处理记录。'); readPending(); return }
     action.current = true; setBusy(true); setPending(intent); setReviewed(false); setError(''); setMessage('')
     readOwner.current?.abort(); pageOwner.current?.abort(); setPageBusy(false)
@@ -87,6 +88,7 @@ export default function TagWorkspace({ onClose, onOpenFile }) {
   }
   const propose = kind => {
     if (blocked || composingRef.current) return
+    setMessage('')
     try {
       const intent = tagWorkspaceIntent(snapshot, kind, kind === 'create' || kind === 'rename' ? form : { id: selected, target_id: target })
       const source = snapshot.tags.find(tag => tag.id === intent.id), destination = snapshot.tags.find(tag => tag.id === intent.target_id)

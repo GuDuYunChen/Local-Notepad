@@ -30,7 +30,7 @@ if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.ur
  const root=fileURLToPath(new URL('../',import.meta.url)),read=f=>readFileSync(path.join(root,f),'utf8').replace(/\r\n/g,'\n')
  assert.equal(process.env.GITHUB_REPOSITORY,'GuDuYunChen/Local-Notepad');assert.equal(process.env.GITHUB_REF,'refs/heads/ci/local-installation-2f86');assert.equal(JSON.parse(read('package.json')).version,'4.239.0')
  const pin=JSON.parse(read('scripts/reading-mode-installer-pin.json')),binding=JSON.parse(read('scripts/appearance-product-binding.json'))
- assert.equal(pin.currentSource.headSha,binding.productHead);assert.equal(pin.currentSource.headSha,'b9784d3d8391962f5a2ee4133c77d7f766386423')
+ assert.equal(pin.currentSource.headSha,binding.productHead);assert.equal(pin.currentSource.headSha,'568c229706a26973163bde1efc553fc2d900b1da')
  for(const [f,sha] of Object.entries(binding.productionTrees))assert.equal(execFileSync('git',['rev-parse','HEAD:'+f],{cwd:root,encoding:'utf8'}).trim(),sha,'Product source differs: '+f)
  const original=read('test-results/installer-lifecycle/appearance-preparation/run-draft-durability-desktop.mjs.before.txt')
  const runner=buildTagWorkspaceRunner(original),out=path.join(root,'test-results/installer-lifecycle/tag-workspace-preparation');mkdirSync(out,{recursive:true})

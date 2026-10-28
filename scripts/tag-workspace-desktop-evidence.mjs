@@ -55,6 +55,10 @@ export function validateTagWorkspaceNativeReport(r,{product,verifier,sources,nat
  assert.deepEqual(Object.keys(r.feedback||{}).sort(),[...TAG_FEEDBACK].sort())
  for(const x of Object.values(r.feedback)){for(const k of ['top','bottom','left','right','areaTop','areaBottom','footerTop','width','height'])assert.ok(Number.isFinite(x[k]),k)
   assert.equal(x.hit,true);assert.equal(x.outsideScroll,true);assert.ok(x.top>=Math.max(0,x.areaTop)&&x.bottom>x.top&&x.bottom<=Math.min(x.height,x.areaBottom,x.footerTop));assert.ok(x.left>=0&&x.right>x.left&&x.right<=x.width);assert.ok(x.text);assert.ok(['status','alert','alertdialog','recovery'].includes(x.role))}
+ for(const [name,feedback] of Object.entries(r.feedback)){
+  assert.equal(typeof feedback.statusText,'string');assert.ok(feedback.statusText.length<=4096)
+  assert.equal(feedback.statusText.includes('本机数据库已确认标签修改'),name==='success','Stale operation acknowledgment: '+name)
+ }
  assert.equal(r.trustedMouseInput,true);assert.equal(r.trustedKeyboardInput,true)
  assert.deepEqual(r.pagination,{normal:51,hidden:1,total:52,pages:[50,1],unique:51,hiddenExcluded:true})
  assert.equal(r.guardedOpen.freshRead,true);assert.equal(r.guardedOpen.accepted,true);assert.ok(r.guardedOpen.title)
