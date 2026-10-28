@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {readFileSync,writeFileSync,mkdtempSync,rmSync,existsSync} from 'node:fs'
+import {readFileSync,writeFileSync,mkdtempSync,rmSync,existsSync,realpathSync,symlinkSync,unlinkSync} from 'node:fs'
 import {tmpdir} from 'node:os'
 import path from 'node:path'
 import {TAG_SOURCES,TAG_CHECKS,TAG_FEEDBACK,TAG_IMAGES,TAG_REPORT,tagHash,validateTagWorkspaceNativeReport,verifyTagWorkspaceNativeReport} from './tag-workspace-desktop-evidence.mjs'
@@ -47,7 +47,9 @@ test('driver exercises native inputs, real quota, real response-stage failure an
 import { DatabaseSync } from 'node:sqlite'
 import { observeRetainedTagBodies } from './tag-workspace-retained-bodies.mjs'
 function bodyDatabase(check) {
- const directory=mkdtempSync(path.join(tmpdir(),'tag106-bodies-')),file=path.join(directory,'data.db')
+ // Windows tmpdir may use an 8.3 alias. Canonicalize our newly created fixture,
+ // never weaken the observer's independent linked/redirected-path refusal.
+ const directory=realpathSync.native(mkdtempSync(path.join(tmpdir(),'tag106-bodies-'))),file=path.join(directory,'data.db')
  const db=new DatabaseSync(file)
  db.exec('CREATE TABLE files(id TEXT PRIMARY KEY,content TEXT,is_deleted INTEGER);CREATE TABLE tags(id TEXT PRIMARY KEY);CREATE TABLE file_tags(file_id TEXT,tag_id TEXT)')
  const expected={files:[{id:'normal',content:'normal body',deleted:0},{id:'trash',content:'retained hidden body',deleted:1}],removedTagIds:['merged-source','deleted-target']}
@@ -64,23 +66,29 @@ test('metadata-only trash list is not a body; read-only SQLite preserves actual 
  assert.equal(observed.bodies.trash,'retained hidden body');assert.equal(observed.evidence.trashRows,1)
  assert.equal(observed.evidence.databaseFilesUnchanged,true);assert.deepEqual(readFileSync(file),before)
 }))
-for(const [name,sql] of Object.entries({
- 'changed hidden body':"UPDATE files SET content='' WHERE id='trash'",
- 'removed hidden row':"DELETE FROM files WHERE id='trash'",
- 'restored trash state':"UPDATE files SET is_deleted=0 WHERE id='trash'",
- 'left hidden association':"INSERT INTO file_tags VALUES('trash','deleted-target')",
- 'left removed tag':"INSERT INTO tags VALUES('merged-source')",
- 'changed normal body':"UPDATE files SET content='changed' WHERE id='normal'",
+for(const [name,[sql,reason]] of Object.entries({
+ 'changed hidden body':["UPDATE files SET content='' WHERE id='trash'",/Retained body changed: trash/],
+ 'removed hidden row':["DELETE FROM files WHERE id='trash'",/Retained note missing: trash/],
+ 'restored trash state':["UPDATE files SET is_deleted=0 WHERE id='trash'",/Retained trash state changed: trash/],
+ 'left hidden association':["INSERT INTO file_tags VALUES('trash','deleted-target')",/Removed tag links remain/],
+ 'left removed tag':["INSERT INTO tags VALUES('merged-source')",/Removed tag remains/],
+ 'changed normal body':["UPDATE files SET content='changed' WHERE id='normal'",/Retained body changed: normal/],
 }))test('read-only observer rejects '+name,()=>bodyDatabase((directory,file,expected)=>{
  const db=new DatabaseSync(file);db.exec(sql);db.close();const before=readFileSync(file)
- assert.throws(()=>observeRetainedTagBodies(directory,expected));assert.deepEqual(readFileSync(file),before)
+ assert.throws(()=>observeRetainedTagBodies(directory,expected),reason);assert.deepEqual(readFileSync(file),before)
 }))
 test('missing database is refused without creating one',()=>{
- const directory=mkdtempSync(path.join(tmpdir(),'tag106-missing-'))
- try{assert.throws(()=>observeRetainedTagBodies(directory,{files:[{id:'n',content:'x',deleted:0}],removedTagIds:['a','b']}));assert.throws(()=>readFileSync(path.join(directory,'data.db')))}finally{rmSync(directory,{recursive:true,force:true})}
+ const directory=realpathSync.native(mkdtempSync(path.join(tmpdir(),'tag106-missing-')))
+ try{assert.throws(()=>observeRetainedTagBodies(directory,{files:[{id:'n',content:'x',deleted:0}],removedTagIds:['a','b']}),/Actual retained database missing/);assert.throws(()=>readFileSync(path.join(directory,'data.db')))}finally{rmSync(directory,{recursive:true,force:true})}
 })
 test('observer refuses duplicate expected rows instead of counting them twice',()=>bodyDatabase((directory,file,expected)=>{
- expected.files.push({...expected.files[0]});assert.throws(()=>observeRetainedTagBodies(directory,expected))
+ expected.files.push({...expected.files[0]});assert.throws(()=>observeRetainedTagBodies(directory,expected),/Duplicate expected notes/)
+}))
+test('canonical fixtures do not relax the linked-directory refusal',()=>bodyDatabase((directory,file,expected)=>{
+ assert.equal(directory,realpathSync.native(directory))
+ const link=directory+'-link',before=readFileSync(file)
+ symlinkSync(directory,link,process.platform==='win32'?'junction':'dir')
+ try{assert.throws(()=>observeRetainedTagBodies(link,expected),/Linked data directory refused/);assert.deepEqual(readFileSync(file),before)}finally{unlinkSync(link)}
 }))
 test('native runner closes owned app and backend before read-only evidence',()=>{
  const prepared=new URL('../test-results/installer-lifecycle/appearance-preparation/run-draft-durability-desktop.mjs.before.txt',import.meta.url)
