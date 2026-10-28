@@ -49,3 +49,26 @@ describe('original-entry dispatch without mutation/replay', () => {
   it('does not navigate before checking the required settings entry', async () => {const navigate=vi.fn();await expect(executeLocalAction('tasks',{navigate})).rejects.toThrow();expect(navigate).not.toHaveBeenCalled()})
   it('propagates entry failure without automatic repeat', async () => {const openOverlay=vi.fn(()=>{throw Error('unavailable')});await expect(executeLocalAction('backup',{openOverlay})).rejects.toThrow('unavailable');expect(openOverlay).toHaveBeenCalledTimes(1)})
 })
+
+describe('synchronous original-owner acceptance receipt',()=>{
+ it.each(['daily','tasks','backup'])('publishes %s acceptance once before the Promise continuation',async id=>{
+  const order=[],onAccepted=vi.fn(r=>{expect(r).toEqual({accepted:true,id});order.push('accepted')}),launch=vi.fn(()=>order.push('child'))
+  let owner
+  const result=executeLocalAction(id,{onAccepted,navigate:(_,o)=>{owner=o;o.afterChange();o.afterChange()},openOverlay:()=>{},openSettingsTool:launch})
+  expect(onAccepted).toHaveBeenCalledTimes(1);expect(order.at(-1)).toBe('accepted')
+  if(id==='tasks')expect(order).toEqual(['child','accepted'])
+  await result;expect(onAccepted).toHaveBeenCalledTimes(1)
+ })
+ it.each(['cancel','abort','stale'])('does not acknowledge a %s invocation or its late callback',async kind=>{
+  const c=new AbortController(),onAccepted=vi.fn(),child=vi.fn();let owner,current=true
+  const run=executeLocalAction('tasks',{signal:c.signal,isCurrent:()=>current,onAccepted,navigate:(_,o)=>{owner=o},openSettingsTool:child})
+  expect(onAccepted).not.toHaveBeenCalled()
+  if(kind==='cancel')owner.onCancel();else if(kind==='abort')c.abort();else current=false
+  owner.afterChange();expect((await run).accepted).toBe(false);expect(onAccepted).not.toHaveBeenCalled();expect(child).not.toHaveBeenCalled()
+ })
+ it('does not acknowledge a child entry which throws',async()=>{
+  const onAccepted=vi.fn()
+  await expect(executeLocalAction('tasks',{onAccepted,navigate:(_,o)=>o.afterChange(),openSettingsTool:()=>{throw Error('refused')}})).rejects.toThrow('refused')
+  expect(onAccepted).not.toHaveBeenCalled()
+ })
+})

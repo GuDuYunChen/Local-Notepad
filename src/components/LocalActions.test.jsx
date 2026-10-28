@@ -25,3 +25,22 @@ it('context change aborts pending action without adopting stale completion',asyn
 it('resets search and prior notices on reopen',async()=>{await input('附件');await render({open:false});await render({open:true});expect(document.querySelector('input').value).toBe('');expect(document.querySelectorAll('[role=option]')).toHaveLength(17)})
 it('leaves a nested original save dialog in control of Escape',async()=>{const other=document.createElement('div');other.setAttribute('role','dialog');other.setAttribute('aria-modal','true');document.body.append(other);try{await key('Escape');expect(close).not.toHaveBeenCalled()}finally{other.remove()}})
 it('traps keyboard focus between close and execute controls',async()=>{const first=document.querySelector('[aria-label="关闭快捷操作"]'),last=document.querySelector('footer button');first.focus();expect((await key('Tab',{shiftKey:true},first)).defaultPrevented).toBe(true);expect(document.activeElement).toBe(last);await key('Tab',{},last);expect(document.activeElement).toBe(first)})
+
+it('consumes a matching synchronous acknowledgement only once',async()=>{
+ execute.mockImplementation(async(id,{onAccepted})=>{onAccepted({accepted:true,id});onAccepted({accepted:true,id});return{accepted:true,id}})
+ await key('Enter');expect(close).toHaveBeenCalledTimes(1)
+})
+it('refuses a synchronous acknowledgement for the wrong target',async()=>{
+ execute.mockImplementation(async(_, {onAccepted})=>{onAccepted({accepted:true,id:'tasks'});return{accepted:false}})
+ await key('Enter');expect(close).not.toHaveBeenCalled()
+})
+it('external context cancellation still rejects the late synchronous receipt',async()=>{
+ let notify,resolve;execute.mockImplementation((_,{onAccepted})=>{notify=onAccepted;return new Promise(r=>{resolve=r})})
+ await key('Enter');await render({contextVersion:2});await act(async()=>{notify({accepted:true,id:'notes'});resolve({accepted:true,id:'notes'});await drain()})
+ expect(close).not.toHaveBeenCalled();expect(document.querySelector('[role=status]').textContent).toContain('页面已变化')
+})
+it('closing the palette rejects a late receipt without a second close',async()=>{
+ let notify,resolve;execute.mockImplementation((_,{onAccepted})=>{notify=onAccepted;return new Promise(r=>{resolve=r})})
+ await key('Enter');await click('[aria-label="关闭快捷操作"]');await act(async()=>{notify({accepted:true,id:'notes'});resolve({accepted:true,id:'notes'});await drain()})
+ expect(close).toHaveBeenCalledTimes(1)
+})

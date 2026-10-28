@@ -30,7 +30,7 @@ export function filterLocalActions(query = '', category = '全部') {
 
 // Wait for the original owner to accept/cancel. An abort invalidates all late
 // callbacks; never replay an action or clear a note draft from this module.
-export function executeLocalAction(id, { signal, isCurrent = () => true, navigate, openOverlay, openSettingsTool } = {}) {
+export function executeLocalAction(id, { signal, isCurrent = () => true, navigate, openOverlay, openSettingsTool, onAccepted } = {}) {
   const action = findLocalAction(id)
   if (!action) return Promise.reject(new Error('该操作不在本地功能列表中。'))
   return new Promise((resolve, reject) => {
@@ -39,7 +39,14 @@ export function executeLocalAction(id, { signal, isCurrent = () => true, navigat
     const finish = (result, error) => {
       if (finished) return
       finished = true; signal?.removeEventListener('abort', abort)
-      if (error) reject(error); else resolve(result)
+      if (error) reject(error)
+      else {
+        // Original-owner acceptance is synchronous with its navigation commit.
+        // Notify the palette before React can treat that owned commit as stale.
+        // A pending/cancelled/failed invocation never produces this receipt.
+        try { if (result?.accepted === true) onAccepted?.(result); resolve(result) }
+        catch (notificationError) { reject(notificationError) }
+      }
     }
     const abort = () => finish({ accepted: false, reason: 'cancelled' })
     signal?.addEventListener('abort', abort, { once: true })
