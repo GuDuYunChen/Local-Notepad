@@ -21,6 +21,14 @@ export function checklistGeometryExpression(text) {
   return {x,y,before:n.getAttribute('aria-checked'),pseudoWidth:w,hit:true,editable:true,markerLeft:left,markerRight:left+w,markerTop:top,markerBottom:top+h,textLeft:t.left,textRight:t.right,textTop:t.top,textBottom:t.bottom,firstCharacter:first,paddingLeft:parseFloat(style.paddingLeft),fontSize:parseFloat(style.fontSize),width:innerWidth,height:innerHeight};
  })()`
 }
+// The brand button and settings close button share the same accessible label.
+// Preserve the original unique/hit-tested native click, but scope its owner.
+export async function leaveTaskSettings({evaluate,click,until}) {
+ if(!await evaluate("Boolean(document.querySelector('.settings-panel'))"))return false
+ await click('.settings-panel button[aria-label="返回笔记"]')
+ await until(()=>evaluate("!document.querySelector('.settings-panel')"),'Settings did not close after its own return action')
+ return true
+}
 export async function verifyTaskCenterDesktop(ctx){
  const {api,evaluate,click,until,capture,report,save,start,closeNormally,reinstallWithRetainedDraft,resizeSmall,outputDirectory,ownedRoot}=ctx
  report.checks=[];report.feedback={};report.exits=[];report.exports=[]
@@ -60,7 +68,7 @@ export async function verifyTaskCenterDesktop(ctx){
  await field(prefix+' item');await select('待办状态','pending');const reads=network.length;centerActive=false
  await click('.task-center-items [data-task-note='+q(main.id)+'][data-task-ordinal="1"] button');await until(()=>evaluate("!document.querySelector('.task-center')"),'Source navigation did not close');await until(()=>evaluate(`document.querySelector('.workspace-title-button')?.textContent===${q(main.title)}`),'Source note title mismatch')
  // Settings may be retained by an owner that does not close itself on selection.
- if(await evaluate("Boolean(document.querySelector('.settings-panel'))"))await click('button[aria-label="返回笔记"]')
+ await leaveTaskSettings({evaluate,click,until})
  report.guardedOpen={freshRead:network.slice(reads).some(n=>n.method==='GET'&&n.path==='/api/files/'+main.id),accepted:true,originalGuard:true};assert.equal(report.guardedOpen.freshRead,true);mark('fresh-source-through-original-navigation-guard')
  phase('actual-editor-checkbox-and-save')
  const observeLayout=async(name,text,checked)=>{
@@ -92,7 +100,7 @@ export async function verifyTaskCenterDesktop(ctx){
  await connection.send('Fetch.enable',{patterns:[{urlPattern:'*/api/task-center',requestStage:'Request'}]});await action('重新读取');await until(()=>evaluate("Boolean(document.querySelector('.task-center-feedback [role=alert]'))"),'Task error missing');const error=await evaluate("document.querySelector('.task-center-feedback [role=alert]').textContent");await feedback('readFailure',error,'alert');assert.equal(await evaluate("Boolean(document.querySelector('.task-center-cards'))"),false);await capture('task109-error.png');await connection.send('Fetch.disable');assert.equal(interceptError,null);await action('重新读取');await ready();report.failure={injectedNetworkFailure:true,partialDiscarded:true,retryComplete:true};mark('failed-read-retry-without-partial-results')
  fault='hold';await connection.send('Fetch.enable',{patterns:[{urlPattern:'*/api/task-center',requestStage:'Request'}]});await action('重新读取');await until(()=>paused,'Task request not held');await action('取消读取');await feedback('cancel','读取已取消');try{await connection.send('Fetch.continueRequest',{requestId:paused})}catch(e){assert.match(String(e),/Invalid InterceptionId|Invalid interception|No resource|not found|Invalid request/i)}await connection.send('Fetch.disable');assert.equal(await evaluate("Boolean(document.querySelector('.task-center-cards'))"),false);report.cancellation={injectedHeldRead:true,partialDiscarded:true,lateResultNotAdopted:true};mark('cancelled-read-does-not-adopt-late-results');await action('重新读取');await ready()
  await evaluate("window.dispatchEvent(new CustomEvent('library:refresh'));true");await feedback('stale','资料库已变化','alert');assert.equal(await evaluate("[...document.querySelectorAll('.task-center footer button')].find(n=>n.textContent==='导出待办报告').disabled"),true);assert.equal(await evaluate("[...document.querySelectorAll('.task-center-items button')].every(n=>n.disabled)"),true);report.stale={explicitOriginalEventInjection:true,exportRefused:true,openRefused:true};await capture('task109-stale.png');mark('external-change-refuses-stale-open-and-export');await action('重新读取');await ready()
- await close();if(await evaluate("Boolean(document.querySelector('.settings-panel'))"))await click('button[aria-label="返回笔记"]');await resizeSmall();
+ await close();await leaveTaskSettings({evaluate,click,until});await resizeSmall();
  await observeLayout('smallChecked',prefix+' item 00','true');await observeLayout('smallUnchecked',prefix+' item 01','false');await capture('task109-editor-small.png');
  await open();await action('导出待办报告');await feedback('smallConfirm','默认只导出计数','alertdialog');report.viewport=await evaluate("(()=>{const n=document.querySelector('.task-center'),b=n.querySelector('footer').getBoundingClientRect();return{width:innerWidth,height:innerHeight,horizontalOverflow:n.scrollWidth>n.clientWidth+1,footerReachable:b.top>=0&&b.bottom<=innerHeight}})()");assert.equal(report.viewport.horizontalOverflow,false);assert.equal(report.viewport.footerReachable,true);await capture('task109-small.png');await action('取消导出');mark('minimum-window-feedback-and-confirmation')
  const input=await evaluate('window.__task109Input');report.trustedMouseInput=input.mouse;report.trustedKeyboardInput=input.keyboard

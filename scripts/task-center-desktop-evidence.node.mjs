@@ -5,6 +5,8 @@ import {tmpdir} from 'node:os'
 import path from 'node:path'
 import {TASK_SOURCES,TASK_CHECKS,TASK_FEEDBACK,TASK_IMAGES,TASK_REPORT,taskHash,validateTaskNativeReport,verifyTaskNativeReport} from './task-center-desktop-evidence.mjs'
 import {buildTaskRunner} from './prepare-task-center-verifier.mjs'
+import {Window} from 'happy-dom'
+import {leaveTaskSettings} from './task-center-desktop-driver.mjs'
 import {adaptRetained109,RETAINED_109} from './prepare-retained-local-modules-2f109.mjs'
 // Schema/refusal fixtures only. These are not records of native execution.
 function fixture(){
@@ -53,4 +55,39 @@ test('actual file witnesses refuse corrupt bytes, summary identity leakage and f
  const d=path.join(out,r.exports[1].filename),details=JSON.parse(readFileSync(d));details.tasks[1].done=true;b=Buffer.from(JSON.stringify(details));r.exports[1].bytes=b.length;r.exports[1].sha256=taskHash(b);writeFileSync(d,b);save();assert.throws(()=>verifyTaskNativeReport(out,expected))
  writeFileSync(path.join(out,r.screenshots[0].filename),'bad');assert.throws(()=>verifyTaskNativeReport(out,expected))
  }finally{rmSync(out,{recursive:true,force:true})}
+})
+
+// These exercise selector ownership, not browser geometry or native execution.
+function settingsOwnerFixture() {
+ const window=new Window(),document=window.document,clicks=[]
+ document.body.innerHTML='<aside class="workspace-sidebar"><button aria-label="返回笔记">brand</button></aside><div class="settings-panel"><header><button aria-label="返回笔记">×</button></header></div>'
+ let attempts=0,waits=0
+ const ctx={evaluate:async expression=>window.eval(expression),click:async selector=>{
+  attempts++;const nodes=document.querySelectorAll(selector);assert.equal(nodes.length,1,'Ambiguous native target');clicks.push(nodes[0].textContent);nodes[0].closest('.settings-panel')?.remove()
+ },until:async fn=>{waits++;assert.equal(await fn(),true)}}
+ return{window,document,ctx,clicks,attempts:()=>attempts,waits:()=>waits}
+}
+test('native78 unscoped return label is deterministically ambiguous',async()=>{
+ const f=settingsOwnerFixture();try{await assert.rejects(()=>f.ctx.click('button[aria-label="返回笔记"]'),/Ambiguous native target/);assert.ok(f.document.querySelector('.settings-panel'));assert.deepEqual(f.clicks,[])}finally{f.window.close()}
+})
+test('settings-owned return closes the panel without selecting the sidebar brand',async()=>{
+ const f=settingsOwnerFixture();try{assert.equal(await leaveTaskSettings(f.ctx),true);assert.deepEqual(f.clicks,['×']);assert.equal(f.attempts(),1);assert.equal(f.waits(),1);assert.equal(f.document.querySelector('.settings-panel'),null);assert.equal(f.document.querySelector('.workspace-sidebar button').textContent,'brand')}finally{f.window.close()}
+})
+test('does not send a return action when settings already closed',async()=>{
+ const f=settingsOwnerFixture();try{f.document.querySelector('.settings-panel').remove();assert.equal(await leaveTaskSettings(f.ctx),false);assert.equal(f.attempts(),0);assert.equal(f.waits(),0)}finally{f.window.close()}
+})
+test('refuses a duplicate return button inside the actual settings owner',async()=>{
+ const f=settingsOwnerFixture();try{const p=f.document.querySelector('.settings-panel');p.append(p.querySelector('button').cloneNode(true));await assert.rejects(()=>leaveTaskSettings(f.ctx),/Ambiguous native target/);assert.equal(f.attempts(),1);assert.equal(f.waits(),0);assert.ok(p.isConnected)}finally{f.window.close()}
+})
+test('does not replay or fall back when the original native click fails',async()=>{
+ const f=settingsOwnerFixture();let attempts=0;try{f.ctx.click=async()=>{attempts++;throw Error('native input refused')};await assert.rejects(()=>leaveTaskSettings(f.ctx),/native input refused/);assert.equal(attempts,1);assert.ok(f.document.querySelector('.settings-panel'))}finally{f.window.close()}
+})
+test('refuses to continue if the clicked settings owner stays mounted',async()=>{
+ const f=settingsOwnerFixture();try{f.ctx.click=async()=>{};await assert.rejects(()=>leaveTaskSettings(f.ctx));assert.equal(f.waits(),1);assert.ok(f.document.querySelector('.settings-panel'))}finally{f.window.close()}
+})
+test('both driver return paths use scoped original settings navigation',()=>{
+ const driver=readFileSync(new URL('./task-center-desktop-driver.mjs',import.meta.url),'utf8')
+ assert.equal(driver.split('await leaveTaskSettings({evaluate,click,until})').length-1,2)
+ assert.doesNotMatch(driver,/click\('button\[aria-label="返回笔记"\]'\)/)
+ for(const file of ['src/components/WorkspaceSidebar.jsx','src/components/SettingsPanel.jsx'])assert.ok(readFileSync(new URL('../'+file,import.meta.url),'utf8').includes('aria-label="返回笔记"'))
 })
