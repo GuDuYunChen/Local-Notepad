@@ -1,0 +1,91 @@
+name: Import frozen local tag workspace candidate 2F106
+on:
+  push:
+    branches: [feature/local-tag-workspace-2f106]
+    paths:
+      - .github/workflows/import-tag-workspace-2f106.yml
+      - .github/tag-workspace-2f106-payload/**
+permissions:
+  contents: write
+concurrency:
+  group: import-frozen-tag-workspace-2f106
+  cancel-in-progress: false
+jobs:
+  import-reviewed-tree:
+    if: github.repository == 'GuDuYunChen/Local-Notepad' && github.ref == 'refs/heads/feature/local-tag-workspace-2f106'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+      - name: Verify exact payload and publish only the frozen candidate
+        shell: bash
+        env:
+          GIT_AUTHOR_NAME: Local tag workspace candidate import
+          GIT_AUTHOR_EMAIL: candidate-import@users.noreply.github.com
+          GIT_COMMITTER_NAME: Local tag workspace candidate import
+          GIT_COMMITTER_EMAIL: candidate-import@users.noreply.github.com
+        run: |
+          python3 - <<'PY'
+          import base64, hashlib, json, lzma, os, pathlib, subprocess
+          BASE = '61b06716a0c846bab4afd5244acdb4ef033f532a'
+          BASE_TREE = '3e2d33dcd0e7c41e99835ec5263f1852d1ed708b'
+          TREE = 'edd535dae9d9c5ad44174428b631d8ece2cff920'
+          REF = 'refs/heads/feature/local-tag-workspace-2f106'
+          def git(*args, data=None):
+              return subprocess.check_output(['git', *args], input=data).decode().strip()
+          def require(ok, message):
+              if not ok: raise RuntimeError(message)
+          head = os.environ['GITHUB_SHA']
+          require(git('rev-parse', 'HEAD') == head, 'Unexpected checkout')
+          require(git('rev-parse', 'HEAD^') == BASE, 'Unexpected bootstrap parent')
+          require(git('rev-parse', BASE + '^{tree}') == BASE_TREE, 'Wrong accepted baseline tree')
+          transport = {'.github/workflows/import-tag-workspace-2f106.yml'} | {f'.github/tag-workspace-2f106-payload/part{i}.txt' for i in (1,2,3)}
+          require(set(git('diff', '--name-only', BASE, head).splitlines()) == transport, 'Unreviewed bootstrap changes')
+          parts = [pathlib.Path(f'.github/tag-workspace-2f106-payload/part{i}.txt').read_bytes() for i in (1,2,3)]
+          require([len(p) for p in parts] == [16000,16000,10736], 'Incomplete transport')
+          compressed = base64.b64decode(b''.join(parts), validate=True)
+          require(len(compressed) == 32052 and hashlib.sha256(compressed).hexdigest() == 'ba49421eeea4aec0849504e11deee93da56ba16d6901eb2c62baf0ca88931c80', 'Compressed payload mismatch')
+          decoder = lzma.LZMADecompressor(memlimit=134217728)
+          patch = decoder.decompress(compressed, max_length=133709)
+          require(len(patch) == 133708 and decoder.eof and not decoder.unused_data, 'Unexpected patch length or trailing data')
+          require(hashlib.sha256(patch).hexdigest() == '59ce4d9639104a994fd106749fd3fbc4a6f9406f724ac9c06a85296526730a29', 'Patch digest mismatch')
+          require(git('ls-remote', 'origin', 'refs/heads/master').split()[0] == BASE, 'Master changed; review before publication')
+          require(git('ls-remote', 'origin', REF).split()[0] == head, 'Feature changed; refuse stale publication')
+          git('read-tree', BASE)
+          git('apply', '--cached', '--binary', '-', data=patch)
+          require(git('write-tree') == TREE, 'Applied tree differs from tested candidate')
+          message = ('feat: complete local tag workspace 2F.106 / 4.239.0\n\n'
+                     'Import exact frozen tree edd535dae9d9c5ad44174428b631d8ece2cff920. '
+                     'Settings entry, catalog/search/unused filtering, guarded paged note navigation, create/rename/recolor, '
+                     'transactional merge/delete with frozen revision confirmation, durable unresolved-operation journal, '
+                     'read-only reconciliation, cancellation, corruption and storage/external-change handling. '
+                     'Preserve note body/save/CAS/receipt/quit sources, schema14 and locked dependency graph. '
+                     'Local unfiltered Vitest5253/5253, original UI/Electron/Go and builds passed. '
+                     'New source-bound product CI, Windows native workflow and complete installation acceptance remain required. '
+                     'Import is not acceptance; temporary transport files are absent from this final source tree.\n')
+          commit = git('commit-tree', TREE, '-p', head, data=message.encode())
+          out = pathlib.Path(os.environ['RUNNER_TEMP']) / 'tag-workspace-2f106-import'
+          out.mkdir()
+          subprocess.run(['git', 'archive', '--format=tar.gz', '--output=' + str(out / 'source.tar.gz'), commit], check=True)
+          (out / 'source-manifest.txt').write_text(git('ls-tree', '-r', commit) + '\n')
+          report = {'baseline':BASE,'bootstrap':head,'commit':commit,'tree':TREE,'branch':REF,
+                    'sourceArchiveSHA256':hashlib.sha256((out/'source.tar.gz').read_bytes()).hexdigest(),
+                    'branchUpdated':False,'testsExecutedByImport':False,'windowsVerified':False,'moduleAccepted':False}
+          (out/'receipt.json').write_text(json.dumps(report,indent=2)+'\n')
+          require(git('ls-remote','origin',REF).split()[0] == head, 'Concurrent feature update')
+          subprocess.run(['git','push','origin',commit+':'+REF],check=True)
+          require(git('ls-remote','origin',REF).split()[0] == commit, 'Published branch mismatch')
+          report['branchUpdated']=True
+          (out/'receipt.json').write_text(json.dumps(report,indent=2)+'\n')
+          print(json.dumps(report,indent=2))
+          PY
+      - name: Preserve source and import receipt, not acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-tag-workspace-2f106-source-${{ github.sha }}
+          path: ${{ runner.temp }}/tag-workspace-2f106-import/
+          if-no-files-found: warn
+          retention-days: 7
