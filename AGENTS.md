@@ -1,10 +1,10 @@
 # Local-Notepad development
 
-Current local module: 2F.106 / 4.239.0 local tag workspace, branch `feature/local-tag-workspace-2f106`. Read `docs/LOCAL_TAG_WORKSPACE_2F106.md`. Accepted master is `61b06716a0c846bab4afd5244acdb4ef033f532a`, tree `3e2d33dcd0e7c41e99835ec5263f1852d1ed708b` / 4.238.0. PR11 is accepted after CI1767 and native Windows66. Do not reopen old appearance failures. Complete catalog/association browsing, guarded note opening, create/rename/merge/delete, transactional version checks, cancellation, rollback, uncertainty reconciliation and restart as one module. Preserve note save/CAS/receipt/quit sources, schema14 and locked dependencies. Cloud/multidevice work remains deferred.
+Current local module: 2F.107 / 4.240.0 local library statistics workspace, branch `feature/local-library-statistics-2f107`. Read `docs/LOCAL_LIBRARY_STATISTICS_2F107.md`. Accepted master is `53e216aeb5346ffe311d88b99da5f327a855cdb8`, tree `20a161bdf6b63bc81a669de6aeb3f546411f85b8` / 4.239.0. PR12 is accepted after product1769 and Windows72. Preserve prior issue/incident records, original saving/receipts/quit protections, schema14 and dependency graph. Deliver settings entry, coherent read-only metrics, filtering/paging, guarded navigation, explicit report export, cancellation, stale/failed responses and retry together. No cloud/multidevice work or premature acceptance.
 
 
 Read `docs/DEVELOPMENT_HANDOFF.md` before resuming an interrupted task.
-Work on `feature/local-tag-workspace-2f106` from the accepted master baseline. The older branch/PR references below are historical. Do not merge master as part of ordinary stage development.
+Work on `feature/local-library-statistics-2f107` from the accepted master baseline. The older branch/PR references below are historical. Do not merge master as part of ordinary stage development.
 
 Resolve the current remote HEAD before interpreting a stage name or an older PR description. Treat source completion, current-HEAD CI acceptance and verified deliverables as separate checkpoints.
 Use `npm ci --no-audit --no-fund` with the committed package-lock.json. Do not remove the lock or add an npm-install fallback to make a test pass.

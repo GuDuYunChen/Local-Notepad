@@ -20,6 +20,7 @@ func (c *FileController) Register(group *ghttp.RouterGroup) {
 	c.RegisterLocalPins(group)
 	c.RegisterTemplateLibrary(group)
 	c.RegisterLocalImport(group)
+	group.GET("/library-statistics", c.LibraryStatistics)
 	group.GET("/editor-reference-jobs", c.EditorReferenceJobs)
 	group.POST("/editor-reference-jobs/{requestId}", c.CompleteEditorReferences)
 	group.GET("/search", c.GlobalSearch)
