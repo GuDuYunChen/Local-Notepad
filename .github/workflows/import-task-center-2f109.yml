@@ -1,0 +1,85 @@
+name: Import frozen local task center 2F109
+on:
+  push:
+    branches: [feature/local-task-center-2f109]
+    paths:
+      - .github/workflows/import-task-center-2f109.yml
+      - .github/task-center-2f109/**
+permissions:
+  contents: write
+concurrency:
+  group: import-frozen-task-center-2f109
+  cancel-in-progress: false
+jobs:
+  import-reviewed-tree:
+    if: github.repository == 'GuDuYunChen/Local-Notepad' && github.ref == 'refs/heads/feature/local-task-center-2f109'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+      - name: Verify and publish only the exact tested source tree
+        shell: bash
+        env:
+          GIT_AUTHOR_NAME: Task center candidate import
+          GIT_AUTHOR_EMAIL: candidate-import@users.noreply.github.com
+          GIT_COMMITTER_NAME: Task center candidate import
+          GIT_COMMITTER_EMAIL: candidate-import@users.noreply.github.com
+        run: |
+          python3 - <<'PY'
+          import base64, hashlib, json, lzma, os, pathlib, subprocess
+          BASE='928caf6cf3688f46d5c785c42759d70483797d5d'
+          BASE_TREE='f600aa7ffd3be0aad5fdee639dcee966a65d5689'
+          TREE='7e7c5351a4cbdea65a772f67233a0bd10d6db8c4'
+          REF='refs/heads/feature/local-task-center-2f109'
+          def git(*a,data=None): return subprocess.check_output(['git',*a],input=data).decode().strip()
+          def require(ok,message):
+              if not ok: raise RuntimeError(message)
+          head=os.environ['GITHUB_SHA']
+          require(git('rev-parse','HEAD')==head,'Wrong checkout')
+          require(git('rev-parse','HEAD^')==BASE,'Unexpected parent')
+          require(git('rev-parse',BASE+'^{tree}')==BASE_TREE,'Wrong accepted baseline')
+          paths={'.github/workflows/import-task-center-2f109.yml'}|{f'.github/task-center-2f109/part{i}.txt' for i in (1,2,3,4)}
+          require(set(git('diff','--name-only',BASE,head).splitlines())==paths,'Unreviewed transport changes')
+          parts=[pathlib.Path(f'.github/task-center-2f109/part{i}.txt').read_bytes() for i in (1,2,3,4)]
+          require([len(p) for p in parts]==[12000,12000,12000,4364],'Incomplete payload')
+          compressed=base64.b64decode(b''.join(parts),validate=True)
+          require(len(compressed)==30272 and hashlib.sha256(compressed).hexdigest()=='4f6647050fbf93b82f4c3c05e868a0e2ef1a73bc4b41ba74f34b249108b0eab3','Payload mismatch')
+          decoder=lzma.LZMADecompressor(memlimit=134217728)
+          patch=decoder.decompress(compressed,max_length=117118)
+          require(len(patch)==117117 and decoder.eof and not decoder.unused_data,'Unexpected patch extent')
+          require(hashlib.sha256(patch).hexdigest()=='ea0e8ba2ccddb23e93c6fe9fe4094c5b92a4d137fcc8b25cefb1a651ce9e8427','Patch digest mismatch')
+          require(git('ls-remote','origin','refs/heads/master').split()[0]==BASE,'Master changed; review first')
+          require(git('ls-remote','origin',REF).split()[0]==head,'Feature changed')
+          git('read-tree',BASE);git('apply','--cached','--binary','-',data=patch)
+          require(git('write-tree')==TREE,'Not the tested tree')
+          message=('feat: complete local saved task center 2F.109 / 4.242.0\n\n'
+                   'Exact locally tested tree 7e7c5351a4cbdea65a772f67233a0bd10d6db8c4. '
+                   'Settings entry, bounded consistent saved-checklist discovery, conservative Lexical/Markdown parsing, '
+                   'coverage gaps, state filtering/search/sort/pagination, fresh-body hash verification inside original guarded navigation, '
+                   'completion through the original editor/save workflow and reload, explicit private JSON export, cancellation/stale/error retry. '
+                   'No secondary task-body writes, schema change, dependency graph change or cloud functionality. '
+                   'Actual local full unfiltered Vitest328 files/5404 passed,0failed/skipped; originalUI1709/Electron657/fullGo1.24.11/main/renderer builds passed. '
+                   '183 installation contracts and13 active release bindings pass; six protected saving/quit sources and679 dependency nodes unchanged. '
+                   'Current productCI and actual new Windows task editing/save/revisit plus complete installation acceptance remain required. '
+                   'Transport does not constitute acceptance and is absent from this final tree.\n')
+          commit=git('commit-tree',TREE,'-p',head,data=message.encode())
+          out=pathlib.Path(os.environ['RUNNER_TEMP'])/'task-center-2f109-import';out.mkdir()
+          subprocess.run(['git','archive','--format=tar.gz','--output='+str(out/'source.tar.gz'),commit],check=True)
+          (out/'source-manifest.txt').write_text(git('ls-tree','-r',commit)+'\n')
+          report={'baseline':BASE,'bootstrap':head,'commit':commit,'tree':TREE,'branch':REF,'sourceArchiveSHA256':hashlib.sha256((out/'source.tar.gz').read_bytes()).hexdigest(),'branchUpdated':False,'nativeAccepted':False}
+          (out/'receipt.json').write_text(json.dumps(report,indent=2)+'\n')
+          require(git('ls-remote','origin',REF).split()[0]==head,'Concurrent feature update')
+          subprocess.run(['git','push','origin',commit+':'+REF],check=True)
+          require(git('ls-remote','origin',REF).split()[0]==commit,'Published branch mismatch')
+          report['branchUpdated']=True;(out/'receipt.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report,indent=2))
+          PY
+      - name: Preserve source and transport receipt, not acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-task-center-2f109-source-${{ github.sha }}
+          path: ${{ runner.temp }}/task-center-2f109-import/
+          if-no-files-found: warn
+          retention-days: 7
