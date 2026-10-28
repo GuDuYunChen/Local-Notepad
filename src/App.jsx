@@ -21,6 +21,8 @@ import { evidenceReview } from '~/services/evidenceReviewSession'
 import useGuardedNoteOpener from './hooks/useGuardedNoteOpener'
 import useRecentNoteTracking from './hooks/useRecentNoteTracking'
 import useLocalShortcuts from './hooks/useLocalShortcuts'
+import { executeLocalAction } from './services/localActions.mjs'
+import LocalActions from './components/LocalActions'
 import { isShortcutContextBlocked, matchShortcut, shortcutFromEvent, shortcutLabel } from './services/localShortcuts'
 import { toast } from '~/services/toast'
 import {
@@ -108,6 +110,9 @@ export default function App() {
   const [deletedIds, setDeletedIds] = useState(new Set())
   const [dialog, setDialog] = useState(null)
   const [referenceRefactor, setReferenceRefactor] = useState(null)
+  const [localActionsOpen, setLocalActionsOpen] = useState(false)
+  const [settingsLaunch, setSettingsLaunch] = useState(null)
+  const localActionSerial = useRef(0)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [backupOpen, setBackupOpen] = useState(false)
   const [quickSearchOpen, setQuickSearchOpen] = useState(false)
@@ -826,11 +831,12 @@ export default function App() {
     if (!nextWorkspace || nextWorkspace === workspace) return
 
     const proceed = () => {
-      if (options.beforeChange?.() === false) return
+      if (options.shouldChange?.() === false || options.beforeChange?.() === false) { options.onCancel?.(); return }
       navigationEpoch.current += 1
       pendingEditorNavigationRef.current = null
       setFocusMode(false)
       setWorkspace(nextWorkspace)
+      options.afterChange?.()
     }
 
     if (
@@ -839,6 +845,7 @@ export default function App() {
       nextWorkspace !== 'notes'
     ) {
       toast.warning('请先结束当前专注 Session')
+      options.onCancel?.('focus-session')
       return
     }
 
@@ -852,12 +859,37 @@ export default function App() {
       setDialog({
         type: 'unsaved',
         next: proceed,
+        canProceed: options.shouldChange,
+        cancel: options.onCancel,
       })
       return
     }
 
     proceed()
   }, [workspace, current, deletedIds, unsaved, focusSession?.active])
+
+  const openLocalActions = () => {
+    if (document.querySelector('[role="dialog"][aria-modal="true"]')) return
+    setLocalActionsOpen(true)
+  }
+  const runLocalAction = (id, { signal, onAccepted }) => {
+    const epoch = navigationEpoch.current
+    return executeLocalAction(id, {
+      signal, onAccepted,
+      isCurrent: () => !signal.aborted,
+      navigate: (target, options) => {
+        if (target === workspace) { if (options.shouldChange()) options.afterChange(); else options.onCancel(); return }
+        // Acceptance occurs after the original guarded transition. The epoch
+        // changes in that transition, so only its before-change owns the check.
+        changeWorkspace(target, { ...options, shouldChange: () => options.shouldChange() && epoch === navigationEpoch.current })
+      },
+      openOverlay: target => {
+        const entries = { quickSwitch: () => setQuickSearchOpen(true), globalSearch: () => openGlobalSearch(), shortcuts: () => setShortcutsOpen(true), backup: () => setBackupOpen(true) }
+        entries[target]()
+      },
+      openSettingsTool: tool => setSettingsLaunch({ tool, token: ++localActionSerial.current }),
+    })
+  }
 
   const handleNavigation = React.useCallback((nextWorkspace) => {
     changeWorkspace(nextWorkspace)
@@ -1141,6 +1173,7 @@ export default function App() {
                     }}
                     onChangeWorkspace={handleNavigation}
                     onOpenSearch={() => openGlobalSearch()}
+                    onOpenLocalActions={openLocalActions}
                     onOpenBackup={() => setBackupOpen(true)}
                     onOpenShortcuts={() => setShortcutsOpen(true)}
                   >
@@ -1341,6 +1374,9 @@ export default function App() {
                 {workspace === 'settings' && (
                   <React.Suspense fallback={<div className="workspace-loading">正在读取诊断信息…</div>}>
                     <SettingsPanel
+                      launchRequest={settingsLaunch}
+                      onLaunchConsumed={() => setSettingsLaunch(null)}
+                      onOpenLocalActions={openLocalActions}
                       onClose={() => setWorkspace('notes')}
                       onOpenBackup={() => setBackupOpen(true)}
                       onOpenShortcuts={() => setShortcutsOpen(true)}
@@ -1380,6 +1416,7 @@ export default function App() {
         </main>
       </div>
 
+      <LocalActions open={localActionsOpen} onClose={() => setLocalActionsOpen(false)} onExecute={runLocalAction} contextVersion={navigationEpoch.current} />
       <ReferenceMaintenanceStatus/>
       <WikiNavigationStatus {...wikiNavigation} />
       <ToastViewport />

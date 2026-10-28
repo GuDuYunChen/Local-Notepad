@@ -26,6 +26,7 @@ export default function WorkspaceSidebar({
   onToggleCollapsed,
   onChangeWorkspace,
   onOpenSearch,
+  onOpenLocalActions,
   onOpenBackup,
   onOpenShortcuts,
   children,
@@ -146,6 +147,9 @@ export default function WorkspaceSidebar({
           </button>
         )}
 
+        {onOpenLocalActions && <button type="button" className="workspace-sidebar-search" onClick={onOpenLocalActions} aria-label="打开快捷操作" title="查找本地功能">
+          <Icon size={16}><path d="m9 4-5 8 5 8M15 4l5 8-5 8" /></Icon>{!collapsed && <span>快捷操作</span>}
+        </button>}
         <nav className="workspace-sidebar-nav" aria-label="主要功能">
           {navItems.map(item => (
             <button
