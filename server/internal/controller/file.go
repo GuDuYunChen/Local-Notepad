@@ -24,6 +24,7 @@ func (c *FileController) Register(group *ghttp.RouterGroup) {
 	c.RegisterLocalImport(group)
 	group.GET("/library-statistics", c.LibraryStatistics)
 	group.GET("/duplicate-notes", c.DuplicateNotes)
+	group.GET("/note-comparison", c.CompareNotes)
 	group.GET("/task-center", c.TaskCenter)
 	group.GET("/editor-reference-jobs", c.EditorReferenceJobs)
 	group.POST("/editor-reference-jobs/{requestId}", c.CompleteEditorReferences)
