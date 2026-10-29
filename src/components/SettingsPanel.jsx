@@ -5,6 +5,7 @@ import TagWorkspace from './TagWorkspace'
 import FolderWorkspace from './FolderWorkspace'
 import TrashRecovery from './TrashRecovery'
 import LibraryStatistics from './LibraryStatistics'
+import DuplicateNotes from './DuplicateNotes'
 import AttachmentAudit from './AttachmentAudit'
 import TaskCenter from './TaskCenter'
 import LibraryReferenceHealthPanel from './LibraryReferenceHealthPanel'
@@ -102,6 +103,7 @@ export default function SettingsPanel({
   const [folderWorkspaceOpen, setFolderWorkspaceOpen] = useState(false)
   const [trashRecoveryOpen, setTrashRecoveryOpen] = useState(false)
   const [statisticsOpen, setStatisticsOpen] = useState(false)
+  const [duplicateNotesOpen, setDuplicateNotesOpen] = useState(false)
   const [attachmentAuditOpen, setAttachmentAuditOpen] = useState(false)
   const [taskCenterOpen, setTaskCenterOpen] = useState(false)
 
@@ -207,6 +209,8 @@ export default function SettingsPanel({
           {folderWorkspaceOpen && <FolderWorkspace onClose={() => setFolderWorkspaceOpen(false)} onOpenFile={onOpenFile} />}
           <div className="settings-row"><div><strong>笔记库统计</strong><span>只读查看数量、字符、标签覆盖和日期分布，筛选定位并导出统计。</span></div><button type="button" className="btn" onClick={() => setStatisticsOpen(true)}>打开笔记库统计</button></div>
           {statisticsOpen && <LibraryStatistics onClose={() => setStatisticsOpen(false)} onOpenFile={onOpenFile} />}
+          <div className="settings-row"><div><strong>重复笔记检查</strong><span>只读分组完全相同的保存正文，回访来源并导出；不自动删除。</span></div><button type="button" className="btn" onClick={() => setDuplicateNotesOpen(true)}>打开重复笔记检查</button></div>
+          {duplicateNotesOpen && <DuplicateNotes onClose={() => setDuplicateNotesOpen(false)} onOpenFile={onOpenFile} />}
           <div className="settings-row"><div><strong>待办任务中心</strong><span>汇总已保存待办，筛选回访来源笔记；勾选和保存沿用原编辑器。</span></div><button type="button" className="btn" onClick={() => setTaskCenterOpen(true)}>打开待办任务中心</button></div>
           {taskCenterOpen && <TaskCenter onClose={() => setTaskCenterOpen(false)} onOpenFile={onOpenFile} />}
         </section>

@@ -1,3 +1,9 @@
+# Current module: 2F.113 / 4.246.0 local duplicate-note inspection
+
+Accepted master f60ef2562b595dfbd5b4513b3c6a43c22d872856/tree846024d1619f4c02ee6718b0ab14c434366f2ed9 is completed2F112. Work on feature/local-duplicate-notes-2f113; read docs/LOCAL_DUPLICATE_NOTES_2F113.md. Deliver exact saved-body grouping, complete scope, search/two-level pagination, fresh-source original guarded navigation, explicitly confirmed private export with revalidation, cancellation/errors and current-version native/full installation together. Do not delete/merge notes, read attachment content or change protected saving/schema/dependencies. Historical references below do not reopen accepted work.
+
+---
+
 # Current module: 2F.112 / 4.245.0 local trash recovery workspace
 
 Accepted baseline master8683fc5119a1f53269e7bff9acdb01daa26e0b23/tree7418529253ded3266a27a196b60aaa1c04729b16 is accepted 2F111. Work on feature/local-trash-recovery-2f112; read docs/LOCAL_TRASH_RECOVERY_2F112.md. Deliver complete snapshot/search/paging, explicit original/available destination, atomic subtree recovery, strict conflicts and scope, durable uncertainty/read-only reconciliation, original guarded opening and full current-version native/install validation as ONE module. No permanent deletion, body writes, schema or dependency changes. Historical references below do not reopen accepted work.
