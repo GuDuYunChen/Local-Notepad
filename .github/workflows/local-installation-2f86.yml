@@ -22,6 +22,12 @@ jobs:
         shell: pwsh
         run: |
           node -e "const fs=require('node:fs'),cp=require('node:child_process'),crypto=require('node:crypto'); const out='test-results/installer-lifecycle'; fs.mkdirSync(out,{recursive:true}); const file=out+'/native-source-checkout.tar'; cp.execFileSync('git',['archive','--format=tar','--output='+file,'HEAD','scripts']); const bytes=fs.readFileSync(file),tree=cp.execFileSync('git',['rev-parse','HEAD:scripts'],{encoding:'utf8'}).trim(); fs.writeFileSync(out+'/native-source-checkout.json',JSON.stringify({verifierCommit:process.env.GITHUB_SHA,runID:process.env.GITHUB_RUN_ID,scriptsTree:tree,bytes:bytes.length,sha256:crypto.createHash('sha256').update(bytes).digest('hex'),source:'git HEAD before preparation',nativeAcceptanceClaimed:false},null,2)+'\n',{flag:'wx'})"
+      - name: Require settled backup close target before one original click
+        shell: pwsh
+        run: |
+          node --test scripts/backup-close-readiness.node.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/prepare-backup-close-readiness.mjs
       - name: Retain exact accepted local module assertions for 4.245.0
         run: node scripts/prepare-retained-local-modules-2f112.mjs
       - name: Prepare source-bound appearance and retained draft verifiers
