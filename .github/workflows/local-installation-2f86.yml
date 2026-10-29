@@ -1,4 +1,4 @@
-name: Actual duplicate notes and complete installation lifecycle 2F113
+name: Actual two-note comparison and complete installation lifecycle 2F114
 on:
   push:
     branches: [ci/local-installation-2f86]
@@ -34,6 +34,8 @@ jobs:
         run: node scripts/prepare-retained-local-modules-2f112.mjs
       - name: Retain exact source-bound local assertions for 4.246.0
         run: node scripts/prepare-retained-local-modules-2f113.mjs
+      - name: Retain exact accepted local module assertions for 4.247.0
+        run: node scripts/prepare-retained-local-modules-2f114.mjs
       - name: Prepare source-bound appearance and retained draft verifiers
         run: node scripts/prepare-appearance-verifier.mjs
       - name: Prepare source-bound tag workspace verifier without changing product bytes
@@ -52,6 +54,8 @@ jobs:
         run: node scripts/prepare-trash-recovery-verifier.mjs
       - name: Prepare source-bound duplicate inspection preserving original process ownership
         run: node scripts/prepare-duplicate-notes-verifier.mjs
+      - name: Prepare source-bound note comparison with unchanged process ownership
+        run: node scripts/prepare-note-comparison-verifier.mjs
       - name: Verify historical issue catalog and locked dependencies
         shell: pwsh
         run: |
@@ -103,6 +107,8 @@ jobs:
         run: node --test scripts/trash-recovery-desktop-evidence.node.mjs
       - name: Refuse incomplete duplicate groups privacy cancellation and readonly evidence
         run: node --test scripts/duplicate-notes-desktop-evidence.node.mjs
+      - name: Refuse incomplete comparison identity difference privacy and retention evidence
+        run: node --test scripts/note-comparison-desktop-evidence.node.mjs
       - name: Verify fixed legacy installer restoration and refusals
         run: node --test scripts/prepare-legacy-installer.node.mjs
       - name: Resolve only complete source and binary pins
@@ -121,7 +127,7 @@ jobs:
           path: .installer-input/previous
       - name: Restore unchanged old path-failure counterexample
         run: node scripts/prepare-legacy-installer.mjs
-      - name: Download source-bound 4.246.0 installer
+      - name: Download source-bound 4.247.0 installer
         uses: actions/download-artifact@v4
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -158,6 +164,8 @@ jobs:
         run: node scripts/run-trash-recovery-desktop-generated.mjs
       - name: Actual installed duplicate inspection pagination original save guard privacy and retention
         run: node scripts/run-duplicate-notes-desktop-generated.mjs
+      - name: Actual installed two-note selection exact differences privacy and readonly retention
+        run: node scripts/run-note-comparison-desktop-generated.mjs
       - name: Verify passive export HTTP diagnostics without changing transport
         run: node --test scripts/export-http-observer.node.mjs
       - name: Actual installed modules upgrade overwrite uninstall reinstall and data retention

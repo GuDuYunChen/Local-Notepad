@@ -1,3 +1,9 @@
+# Current module: 2F.114 / 4.247.0 local two-note comparison
+
+Accepted master042db00172114d85ad76cff4eba5450d1022d81e/tree1bd8858605c2c039cfa628d7ae4a47f52c4ca40b is completed2F113 (PR19 merged, productCI1779/native91). Work on feature/local-note-comparison-2f114. Read docs/LOCAL_NOTE_COMPARISON_2F114.md. Deliver explicit two-note selection, one readonly saved-body snapshot, bounded exact text/raw differences, original guarded source opening, privacy-confirmed revalidated export, cancellation/errors and current-version native/full installation as ONE module. No merge, deletion, body writes, schema or dependencies change. Older entries below are retained history, not unresolved current work.
+
+---
+
 # Current module: 2F.113 / 4.246.0 local duplicate-note inspection
 
 Accepted master f60ef2562b595dfbd5b4513b3c6a43c22d872856/tree846024d1619f4c02ee6718b0ab14c434366f2ed9 is completed2F112. Work on feature/local-duplicate-notes-2f113; read docs/LOCAL_DUPLICATE_NOTES_2F113.md. Deliver exact saved-body grouping, complete scope, search/two-level pagination, fresh-source original guarded navigation, explicitly confirmed private export with revalidation, cancellation/errors and current-version native/full installation together. Do not delete/merge notes, read attachment content or change protected saving/schema/dependencies. Historical references below do not reopen accepted work.
