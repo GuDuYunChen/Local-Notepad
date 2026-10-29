@@ -1,3 +1,9 @@
+# Current module: 2F.111 / 4.244.0 local folder workspace
+
+Accepted master `b0d02d0f1b29054390f55608904e253343e64421`, tree `9b3701e7318d902554da4d012a81eb2152fc7bb8`, is accepted 2F.110. Work on `feature/local-folder-workspace-2f111`; read `docs/LOCAL_FOLDER_WORKSPACE_2F111.md`. Deliver browsing, create/rename, selected atomic moves, guarded note opening, empty-folder-only trash, durable uncertainty/reconciliation and full current-version native/install acceptance together. Never add a note-body write or recursively delete through this workspace. Keep original storage/save/receipt/quit policies, schema14, locked dependencies and all installation gates. Older references below are retained history, not current open work.
+
+---
+
 # Current module: 2F.110 / 4.243.0 local quick actions
 
 Accepted master `bf5f0ed5cb4cad4a1f1b0f874a87fa093b47f6e4` / tree `23d22c72321747b1314b418082bc453276f83ec0` is 2F.109, already merged and verified. Work on `feature/local-actions-2f110`; read `docs/LOCAL_ACTIONS_2F110.md`. Deliver the local registry, search/category/keyboard panel, original-owner navigation/save decisions, cancellations/errors and actual new-version native/install acceptance as one module. No arbitrary commands, cloud or second note-write path. Older module references below are retained history.
