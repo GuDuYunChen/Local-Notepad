@@ -4,7 +4,7 @@ import { lstatSync, readFileSync, realpathSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-export const SHORTCUT_MANAGEMENT_VERSION = '4.246.0'
+export const SHORTCUT_MANAGEMENT_VERSION = '4.247.0'
 export const SHORTCUT_MANAGEMENT_STORAGE_KEY = 'local-notepad.shortcuts.v1'
 export const SHORTCUT_MANAGEMENT_REPORT = 'shortcut-management-desktop.json'
 export const SHORTCUT_MANAGEMENT_BINDINGS = Object.freeze({
