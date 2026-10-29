@@ -1,7 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {createServer} from 'node:http'
-import {readFileSync} from 'node:fs'
+import {readFileSync,writeFileSync,mkdtempSync,rmSync} from 'node:fs'
+import {spawnSync} from 'node:child_process'
+import {pathToFileURL,fileURLToPath} from 'node:url'
+import {tmpdir} from 'node:os'
+import path from 'node:path'
 import {observeExportRequests} from './export-http-observer.mjs'
 function fake(options={}){
  const listeners=new Map();const channelFor=name=>({subscribe:fn=>listeners.set(name,fn),unsubscribe:fn=>{assert.equal(listeners.get(name),fn);listeners.delete(name)}})
@@ -39,8 +43,35 @@ test('real loopback successful POST and original aborted GET keep status/body an
 })
 test('launcher change is only an explicit child observer import, no environment inheritance or policy changes',()=>{
  const root=new URL('./',import.meta.url),s=readFileSync(new URL('run-reading-mode-installer.mjs',root),'utf8')
- assert.match(s,/\['--import', fileURLToPath\(new URL\('\.\/export-http-observer\.mjs', import.meta.url\)\), fileURLToPath/)
+ assert.match(s,/\['--import', new URL\('\.\/export-http-observer\.mjs', import.meta.url\)\.href, fileURLToPath/)
  assert.doesNotMatch(s,/NODE_OPTIONS|process\.execArgv|timeout:/)
  const helper=readFileSync(new URL('export-http-observer.mjs',root),'utf8');assert.doesNotMatch(helper,/globalThis\.fetch\s*=|await fetch\(|\.addHeader\(|request\.[a-zA-Z]+\s*=/)
  const workflow=readFileSync(new URL('../.github/workflows/local-installation-2f86.yml',root),'utf8');assert.match(workflow,/timeout-minutes: 20/);assert.match(workflow,/run: node scripts\/run-reading-mode-installer.mjs run/)
+})
+
+// Native90 passed a drive path as an ESM specifier. Test the actual CLI loader,
+// including its unchanged refusal, rather than treating a filesystem path as a URL.
+test('the original Windows drive-path preload deterministically refuses the d protocol',()=>{
+ const p=spawnSync(process.execPath,['--import',String.raw`D:\a\Local-Notepad\scripts\export-http-observer.mjs`,'--eval','throw Error("child must not start")'],{encoding:'utf8',timeout:10000})
+ assert.ifError(p.error);assert.equal(p.signal,null);assert.notEqual(p.status,0)
+ assert.match(p.stderr,/ERR_UNSUPPORTED_ESM_URL_SCHEME/);assert.match(p.stderr,/protocol 'd:'/)
+ assert.doesNotMatch(p.stderr,/Error: child must not start/)
+})
+for(const parent of ['file:///D:/a/Local-Notepad/scripts/run-reading-mode-installer.mjs','file:///D:/work%20space/%E4%B8%AD%E6%96%87/scripts/run-reading-mode-installer.mjs'])test('preload remains a file URL for '+parent,()=>{
+ const value=new URL('./export-http-observer.mjs',parent).href
+ assert.equal(new URL(value).protocol,'file:');assert.ok(value.startsWith('file:///D:/'))
+ assert.equal(new URL(value).pathname.endsWith('/scripts/export-http-observer.mjs'),true)
+ const source=readFileSync(new URL('./run-reading-mode-installer.mjs',import.meta.url),'utf8')
+ assert.equal(source.includes("['--import', new URL('./export-http-observer.mjs', import.meta.url).href, fileURLToPath"),true)
+})
+test('actual CLI preload of the unchanged observer succeeds from spaces Unicode and hash paths',()=>{
+ const dir=mkdtempSync(path.join(tmpdir(),'observer URL 中文 # '))
+ try{
+  const observer=path.join(dir,'export-http-observer.mjs'),entry=path.join(dir,'run-observer-fixture.mjs')
+  writeFileSync(observer,readFileSync(new URL('./export-http-observer.mjs',import.meta.url)))
+  writeFileSync(entry,"import assert from 'node:assert/strict';import {observeExportRequests} from './export-http-observer.mjs';assert.equal(typeof observeExportRequests,'function');assert.deepEqual(process.argv.slice(2),['prepare']);console.log('OBSERVER_URL_OK')")
+  const parent=pathToFileURL(path.join(dir,'run-reading-mode-installer.mjs'))
+  const p=spawnSync(process.execPath,['--import',new URL('./export-http-observer.mjs',parent).href,fileURLToPath(new URL('./run-observer-fixture.mjs',parent)),'prepare'],{encoding:'utf8',timeout:10000})
+  assert.ifError(p.error);assert.equal(p.signal,null);assert.equal(p.status,0,p.stderr);assert.equal(p.stdout.trim(),'OBSERVER_URL_OK')
+ }finally{rmSync(dir,{recursive:true,force:true})}
 })
