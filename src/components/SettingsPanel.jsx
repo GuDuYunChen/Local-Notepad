@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import ThemeToggle from './ThemeToggle'
 import AppearanceCenter from './AppearanceCenter'
 import TagWorkspace from './TagWorkspace'
+import FolderWorkspace from './FolderWorkspace'
 import LibraryStatistics from './LibraryStatistics'
 import AttachmentAudit from './AttachmentAudit'
 import TaskCenter from './TaskCenter'
@@ -97,6 +98,7 @@ export default function SettingsPanel({
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [appearanceOpen, setAppearanceOpen] = useState(false)
   const [tagWorkspaceOpen, setTagWorkspaceOpen] = useState(false)
+  const [folderWorkspaceOpen, setFolderWorkspaceOpen] = useState(false)
   const [statisticsOpen, setStatisticsOpen] = useState(false)
   const [attachmentAuditOpen, setAttachmentAuditOpen] = useState(false)
   const [taskCenterOpen, setTaskCenterOpen] = useState(false)
@@ -199,6 +201,8 @@ export default function SettingsPanel({
           {onOpenLocalActions && <div className="settings-row"><div><strong>快捷操作</strong><span>查找并打开本地功能，跳转沿用原保存保护。</span></div><button type="button" className="btn" onClick={onOpenLocalActions}>打开快捷操作</button></div>}
           <div className="settings-row"><div><strong>本地标签工作台</strong><span>查看关联笔记，集中创建、重命名、合并和删除标签。</span></div><button type="button" className="btn" onClick={() => setTagWorkspaceOpen(true)}>打开标签工作台</button></div>
           {tagWorkspaceOpen && <TagWorkspace onClose={() => setTagWorkspaceOpen(false)} onOpenFile={onOpenFile} />}
+          <div className="settings-row"><div><strong>本地文件夹整理</strong><span>浏览目录、批量移动、新建改名与空目录回收；确认冲突，不改正文。</span></div><button type="button" className="btn" onClick={() => setFolderWorkspaceOpen(true)}>打开文件夹整理</button></div>
+          {folderWorkspaceOpen && <FolderWorkspace onClose={() => setFolderWorkspaceOpen(false)} onOpenFile={onOpenFile} />}
           <div className="settings-row"><div><strong>笔记库统计</strong><span>只读查看数量、字符、标签覆盖和日期分布，筛选定位并导出统计。</span></div><button type="button" className="btn" onClick={() => setStatisticsOpen(true)}>打开笔记库统计</button></div>
           {statisticsOpen && <LibraryStatistics onClose={() => setStatisticsOpen(false)} onOpenFile={onOpenFile} />}
           <div className="settings-row"><div><strong>待办任务中心</strong><span>汇总已保存待办，筛选回访来源笔记；勾选和保存沿用原编辑器。</span></div><button type="button" className="btn" onClick={() => setTaskCenterOpen(true)}>打开待办任务中心</button></div>
