@@ -85,7 +85,7 @@ export function validateLocalImportDesktopReport(report, commit) {
   assert.equal(report.complete, true)
   assert.equal(report.error, undefined)
   assert.equal(report.platform, 'win32')
-  assert.equal(report.appVersion, '4.244.0')
+  assert.equal(report.appVersion, '4.245.0')
   for (const name of ['realPackagedApp', 'realBackend', 'realPreload', 'syntheticData', 'cleanupComplete']) assert.equal(report[name], true)
   assert.equal(report.timerAccelerated, false)
   assert.equal(report.bridgeOverridden, false)
