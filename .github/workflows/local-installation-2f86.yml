@@ -28,6 +28,8 @@ jobs:
           node --test scripts/backup-close-readiness.node.mjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node scripts/prepare-backup-close-readiness.mjs
+      - name: Bind corrected restore controls and require four actual radio text layouts
+        run: node scripts/prepare-trash-recovery-layout-2f112.mjs
       - name: Retain exact accepted local module assertions for 4.245.0
         run: node scripts/prepare-retained-local-modules-2f112.mjs
       - name: Prepare source-bound appearance and retained draft verifiers

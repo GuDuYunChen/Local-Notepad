@@ -1,6 +1,7 @@
 import React,{act} from 'react'
 import {createRoot} from 'react-dom/client'
 import {webcrypto} from 'node:crypto'
+import {readFileSync} from 'node:fs'
 import {beforeEach,afterEach,describe,it,expect,vi} from 'vitest'
 import TrashRecovery,{recoveryTargets} from './TrashRecovery'
 import {api} from '~/services/api'
@@ -61,4 +62,21 @@ describe('cancellation, stale scopes, ownership and keyboard',()=>{
  it('focus is trapped in confirmation and cancelled before restoration',async()=>{await choose('gone');await click('预览整批恢复');expect(document.activeElement).toBe(button('取消操作'));await act(async()=>{document.activeElement.dispatchEvent(new KeyboardEvent('keydown',{key:'Tab',shiftKey:true,bubbles:true,cancelable:true}));await drain()});expect(document.activeElement).toBe(button('确认继续'));await click('取消操作');expect(posts()).toHaveLength(0)})
  it('restores the originating focus on unmount',async()=>{await unmount();const entry=document.createElement('button');document.body.append(entry);entry.focus();await render();await unmount();expect(document.activeElement).toBe(entry);entry.remove();await render()})
  it('filters invalid target ancestry once and never offers notes or trash as targets',()=>{const items=[...data.items,recoveryRow('bad','bad',true,'missing',{is_deleted:false}),recoveryRow('cycle','cycle',true,'cycle',{is_deleted:false})];expect(recoveryTargets(items).map(r=>r.id)).toEqual(['live'])})
+})
+
+// Cascade-only regression. Real Windows acceptance separately measures radio/text bounds.
+describe('restore destination controls retain compact native radio geometry',()=>{
+ let style
+ beforeEach(()=>{style=document.createElement('style');style.textContent=readFileSync('src/components/TrashRecovery.css','utf8');document.head.append(style)})
+ afterEach(()=>style.remove())
+ for(const mode of ['original','target'])for(const index of [0,1])it(`${mode} selection keeps radio ${index+1} compact and non-growing`,async()=>{
+  if(mode==='target')await click(document.querySelectorAll('input[name="recovery-mode"]')[1])
+  const radios=document.querySelectorAll('input[name="recovery-mode"]'),css=getComputedStyle(radios[index])
+  expect(css.flexGrow).toBe('0');expect(css.flexShrink).toBe('0');expect(css.flexBasis).toBe('16px')
+  expect(css.width).toBe('16px');expect(css.height).toBe('16px');expect(css.padding).toBe('0px')
+  expect(radios[mode==='original'?0:1].checked).toBe(true);expect(posts()).toHaveLength(0)
+ })
+ it('keeps the search text control flexible and padded',()=>{const css=getComputedStyle(document.querySelector('input[aria-label="恢复项目查找"]'));expect(css.flexGrow).toBe('1');expect(css.padding).toBe('8px 10px')})
+ it('does not apply the search control growth rule to row checkboxes',()=>{const css=getComputedStyle(document.querySelector('[data-recovery-item] input'));expect(css.flexGrow).not.toBe('1');expect(css.padding).not.toBe('8px 10px')})
+ it('keeps each radio next to its own label with the existing inline gap',()=>{for(const radio of document.querySelectorAll('input[name="recovery-mode"]')){const label=radio.closest('label'),css=getComputedStyle(label);expect(css.display).toBe('flex');expect(css.alignItems).toBe('center');expect(css.gap).toBe('8px');expect(label.querySelectorAll('input')).toHaveLength(1);expect(label.textContent.trim()).toMatch(/^(各自原位置|指定现存目录)$/)}})
 })
