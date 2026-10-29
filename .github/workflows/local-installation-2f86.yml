@@ -158,6 +158,8 @@ jobs:
         run: node scripts/run-trash-recovery-desktop-generated.mjs
       - name: Actual installed duplicate inspection pagination original save guard privacy and retention
         run: node scripts/run-duplicate-notes-desktop-generated.mjs
+      - name: Verify passive export HTTP diagnostics without changing transport
+        run: node --test scripts/export-http-observer.node.mjs
       - name: Actual installed modules upgrade overwrite uninstall reinstall and data retention
         run: node scripts/run-reading-mode-installer.mjs run
       - name: Retain complete or failed original evidence
