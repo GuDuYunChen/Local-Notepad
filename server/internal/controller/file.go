@@ -17,6 +17,7 @@ type FileController struct {
 }
 
 func (c *FileController) Register(group *ghttp.RouterGroup) {
+	c.RegisterFolderWorkspace(group)
 	c.RegisterLocalPins(group)
 	c.RegisterTemplateLibrary(group)
 	c.RegisterLocalImport(group)
