@@ -1,3 +1,9 @@
+# Current module: 2F.112 / 4.245.0 local trash recovery workspace
+
+Accepted baseline master8683fc5119a1f53269e7bff9acdb01daa26e0b23/tree7418529253ded3266a27a196b60aaa1c04729b16 is accepted 2F111. Work on feature/local-trash-recovery-2f112; read docs/LOCAL_TRASH_RECOVERY_2F112.md. Deliver complete snapshot/search/paging, explicit original/available destination, atomic subtree recovery, strict conflicts and scope, durable uncertainty/read-only reconciliation, original guarded opening and full current-version native/install validation as ONE module. No permanent deletion, body writes, schema or dependency changes. Historical references below do not reopen accepted work.
+
+---
+
 # Current module: 2F.111 / 4.244.0 local folder workspace
 
 Accepted master `b0d02d0f1b29054390f55608904e253343e64421`, tree `9b3701e7318d902554da4d012a81eb2152fc7bb8`, is accepted 2F.110. Work on `feature/local-folder-workspace-2f111`; read `docs/LOCAL_FOLDER_WORKSPACE_2F111.md`. Deliver browsing, create/rename, selected atomic moves, guarded note opening, empty-folder-only trash, durable uncertainty/reconciliation and full current-version native/install acceptance together. Never add a note-body write or recursively delete through this workspace. Keep original storage/save/receipt/quit policies, schema14, locked dependencies and all installation gates. Older references below are retained history, not current open work.

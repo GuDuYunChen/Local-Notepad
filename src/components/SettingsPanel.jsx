@@ -3,6 +3,7 @@ import ThemeToggle from './ThemeToggle'
 import AppearanceCenter from './AppearanceCenter'
 import TagWorkspace from './TagWorkspace'
 import FolderWorkspace from './FolderWorkspace'
+import TrashRecovery from './TrashRecovery'
 import LibraryStatistics from './LibraryStatistics'
 import AttachmentAudit from './AttachmentAudit'
 import TaskCenter from './TaskCenter'
@@ -99,6 +100,7 @@ export default function SettingsPanel({
   const [appearanceOpen, setAppearanceOpen] = useState(false)
   const [tagWorkspaceOpen, setTagWorkspaceOpen] = useState(false)
   const [folderWorkspaceOpen, setFolderWorkspaceOpen] = useState(false)
+  const [trashRecoveryOpen, setTrashRecoveryOpen] = useState(false)
   const [statisticsOpen, setStatisticsOpen] = useState(false)
   const [attachmentAuditOpen, setAttachmentAuditOpen] = useState(false)
   const [taskCenterOpen, setTaskCenterOpen] = useState(false)
@@ -217,6 +219,9 @@ export default function SettingsPanel({
 
           <div className="settings-row"><div><strong>附件检查中心</strong><span>只读检查附件与候选引用，定位缺失文件；不自动清理或修改正文。</span></div><button type="button" className="btn" onClick={() => setAttachmentAuditOpen(true)}>打开附件检查中心</button></div>
           {attachmentAuditOpen && <AttachmentAudit onClose={() => setAttachmentAuditOpen(false)} onOpenFile={onOpenFile} />}
+
+          <div className="settings-row"><div><strong>回收站恢复工作台</strong><span>预览整批恢复、选择原位置或现存目录；拒绝覆盖，保留未确认记录。</span></div><button type="button" className="btn" onClick={() => setTrashRecoveryOpen(true)}>打开回收站恢复</button></div>
+          {trashRecoveryOpen && <TrashRecovery onClose={() => setTrashRecoveryOpen(false)} onOpenFile={onOpenFile} />}
 
           <div className="consumer-data-summary">
             <div><strong>{server?.active_notes ?? '—'}</strong><span>篇笔记</span></div>
