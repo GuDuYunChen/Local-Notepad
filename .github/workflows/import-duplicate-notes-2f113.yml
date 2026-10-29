@@ -1,0 +1,84 @@
+name: Import frozen duplicate notes candidate 2F113
+on:
+  push:
+    branches: [feature/local-duplicate-notes-2f113]
+    paths:
+      - .github/workflows/import-duplicate-notes-2f113.yml
+      - .github/duplicate-notes-2f113/**
+permissions:
+  contents: write
+concurrency:
+  group: import-frozen-duplicate-notes-2f113
+  cancel-in-progress: false
+jobs:
+  import-reviewed-tree:
+    if: github.repository == 'GuDuYunChen/Local-Notepad' && github.ref == 'refs/heads/feature/local-duplicate-notes-2f113'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+      - name: Verify and publish only the complete tested source
+        shell: bash
+        env:
+          GIT_AUTHOR_NAME: Duplicate notes candidate import
+          GIT_AUTHOR_EMAIL: candidate-import@users.noreply.github.com
+          GIT_COMMITTER_NAME: Duplicate notes candidate import
+          GIT_COMMITTER_EMAIL: candidate-import@users.noreply.github.com
+        run: |
+          python3 - <<'PY'
+          import base64,hashlib,json,lzma,os,pathlib,subprocess
+          BASE='f60ef2562b595dfbd5b4513b3c6a43c22d872856'
+          BASE_TREE='846024d1619f4c02ee6718b0ab14c434366f2ed9'
+          TREE='1bd8858605c2c039cfa628d7ae4a47f52c4ca40b'
+          REF='refs/heads/feature/local-duplicate-notes-2f113'
+          def git(*a,data=None):return subprocess.check_output(['git',*a],input=data).decode().strip()
+          def require(ok,message):
+              if not ok:raise RuntimeError(message)
+          head=os.environ['GITHUB_SHA']
+          require(git('rev-parse','HEAD')==head,'Wrong checkout')
+          require(git('rev-parse','HEAD^')==BASE,'Unexpected parent')
+          require(git('rev-parse',BASE+'^{tree}')==BASE_TREE,'Wrong accepted baseline')
+          paths={'.github/workflows/import-duplicate-notes-2f113.yml'}|{f'.github/duplicate-notes-2f113/part{i}.txt' for i in (1,2,3)}
+          require(set(git('diff','--name-only',BASE,head).splitlines())==paths,'Unreviewed transport changes')
+          parts=[pathlib.Path(f'.github/duplicate-notes-2f113/part{i}.txt').read_bytes() for i in (1,2,3)]
+          require([len(p) for p in parts]==[14000,14000,10924],'Incomplete payload')
+          compressed=base64.b64decode(b''.join(parts),validate=True)
+          require(len(compressed)==29192 and hashlib.sha256(compressed).hexdigest()=='8924f63c56aa33dee08c96d365673abcebc925d27ae5ca29919cd0720ba60e2b','Payload mismatch')
+          decoder=lzma.LZMADecompressor(memlimit=134217728)
+          patch=decoder.decompress(compressed,max_length=112795)
+          require(len(patch)==112794 and decoder.eof and not decoder.unused_data,'Unexpected patch extent')
+          require(hashlib.sha256(patch).hexdigest()=='a8f7ed2a03a24a5f9cc3bfa9344cc006b4346551d30171f2860942a4eca307d6','Patch mismatch')
+          require(git('ls-remote','origin','refs/heads/master').split()[0]==BASE,'Master changed; review first')
+          require(git('ls-remote','origin',REF).split()[0]==head,'Feature changed')
+          git('read-tree',BASE);git('apply','--cached','--binary','-',data=patch)
+          require(git('write-tree')==TREE,'Not the tested tree')
+          message=('feat: complete local duplicate note inspection 2F.113 / 4.246.0\n\n'
+                   'Exact tested tree1bd8858605c2c039cfa628d7ae4a47f52c4ca40b. '
+                   'Bounded readonly SQLite snapshot, exact saved-body byte groups with direct equality verification, '
+                   'explicit exclusions, whole-group search, group/member pagination, original fresh-source guarded navigation, '
+                   'confirmed privacy-tiered JSON export after full revision revalidation, cancellation, late-result refusal and retry. '
+                   'No merge/delete/body writes, schema or dependency changes, or cloud feature. '
+                   'Actual local unfiltered Vitest341 files/5741 passed,0failed/skipped; originalUI2046/Electron657/fullGo1.24.11/main/renderer passed. '
+                   'Inherited178 contracts and13 release bindings passed. Current productCI, actual new installer and complete native/install acceptance remain required. '
+                   'This import is not acceptance; temporary transport files are absent from the final source.\n')
+          commit=git('commit-tree',TREE,'-p',head,data=message.encode())
+          out=pathlib.Path(os.environ['RUNNER_TEMP'])/'duplicate-notes-2f113-import';out.mkdir()
+          subprocess.run(['git','archive','--format=tar.gz','--output='+str(out/'source.tar.gz'),commit],check=True)
+          (out/'source-manifest.txt').write_text(git('ls-tree','-r',commit)+'\n')
+          report={'baseline':BASE,'bootstrap':head,'commit':commit,'tree':TREE,'branch':REF,'sourceArchiveSHA256':hashlib.sha256((out/'source.tar.gz').read_bytes()).hexdigest(),'branchUpdated':False,'nativeAccepted':False}
+          (out/'receipt.json').write_text(json.dumps(report,indent=2)+'\n')
+          require(git('ls-remote','origin',REF).split()[0]==head,'Concurrent feature update')
+          subprocess.run(['git','push','origin',commit+':'+REF],check=True)
+          require(git('ls-remote','origin',REF).split()[0]==commit,'Published branch mismatch')
+          report['branchUpdated']=True;(out/'receipt.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report,indent=2))
+          PY
+      - name: Preserve exact source and publication receipt, not acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-duplicate-notes-2f113-source-${{ github.sha }}
+          path: ${{ runner.temp }}/duplicate-notes-2f113-import/
+          if-no-files-found: warn
+          retention-days: 7
