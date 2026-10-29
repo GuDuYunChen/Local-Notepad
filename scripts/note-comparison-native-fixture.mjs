@@ -32,3 +32,24 @@ export function validateComparisonExport(v,{details,pair,rows}){
  else {const s=JSON.stringify(v);for(const t of [pair.revision,...pair.notes.flatMap(n=>[n.id,n.title,n.parent_id,n.folder,n.content_hash,n.content])])if(t)assert.equal(s.includes(t),false,'Summary leaked source data')}
  return true
 }
+
+// "Return to selection" intentionally keeps each source. Clear through the
+// original visible buttons before choosing a new pair; do not click a disabled
+// already-selected button, silently skip it, or write React/DOM state directly.
+const emptySelection=()=>[{title:'尚未选择',disabled:true},{title:'尚未选择',disabled:true}]
+function selectionShape(value){
+ assert.ok(Array.isArray(value)&&value.length===2,'Two selection owners required')
+ for(const x of value){assert.deepEqual(Object.keys(x).sort(),['disabled','title']);assert.equal(typeof x.title,'string');assert.ok(x.title.length>0);assert.equal(typeof x.disabled,'boolean');assert.equal(x.disabled,x.title==='尚未选择','Disabled nonempty selection cannot be cleared')}
+}
+export function validateClearedComparisonSelections(r){
+ selectionShape(r.before);assert.deepEqual(r.cleared,r.before.flatMap((x,i)=>x.disabled?[]:[i]));assert.deepEqual(r.after,emptySelection());return true
+}
+export async function clearComparisonSelections(io){
+ const before=await io.read();selectionShape(before);let expected=structuredClone(before);const cleared=[]
+ for(let i=0;i<2;i++){
+  if(before[i].disabled)continue
+  await io.clear(i);cleared.push(i);expected[i]=emptySelection()[i]
+  assert.deepEqual(await io.read(),expected,'Original clear did not change only its own selection')
+ }
+ const result={before,cleared,after:await io.read()};validateClearedComparisonSelections(result);return result
+}

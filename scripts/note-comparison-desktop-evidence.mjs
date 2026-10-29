@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import {readFileSync} from 'node:fs'
 import path from 'node:path'
 import {validateDuplicateEntryGuard} from './duplicate-entry-guard.mjs'
-import {comparisonNativeHash,comparisonNativeBlob,comparisonNativeFixture,validateObservedComparisonRows,validateComparisonExport} from './note-comparison-native-fixture.mjs'
+import {comparisonNativeHash,comparisonNativeBlob,comparisonNativeFixture,validateObservedComparisonRows,validateComparisonExport,validateClearedComparisonSelections} from './note-comparison-native-fixture.mjs'
 export const comparisonHash=comparisonNativeHash,comparisonBlob=comparisonNativeBlob
 export const COMPARISON_REPORT='note-comparison-desktop.json'
 export const COMPARISON_SOURCES=Object.freeze(['src/services/noteComparison.mjs','src/components/NoteComparison.jsx','src/components/NoteComparison.css','src/components/SettingsPanel.jsx','src/hooks/useGuardedNoteOpener.js','src/components/TextEditor.jsx','src/services/editorSaveTransaction.mjs','src/services/editorDraftCache.js','src/services/editorQuit.mjs','server/internal/dao/note_comparison.go','server/internal/controller/note_comparison.go','server/internal/controller/file.go','scripts/note-comparison-native-fixture.mjs','scripts/duplicate-entry-guard.mjs','scripts/note-comparison-desktop-driver.mjs','scripts/note-comparison-desktop-evidence.mjs','scripts/prepare-note-comparison-verifier.mjs','scripts/run-note-comparison-desktop-generated.mjs','scripts/tag-workspace-retained-bodies.mjs','scripts/appearance-installer-core.mjs','scripts/desktop-window-session.mjs','scripts/desktop-window-worker.ps1','scripts/desktop-window-target.mjs','scripts/local-export-directory-session.mjs','scripts/local-export-directory-worker.ps1'])
@@ -29,6 +29,7 @@ export function validateComparisonNativeReport(r,{product,verifier,sources,nativ
  for(const[i,x]of r.launches.entries()){integer(x.pid);assert.deepEqual(r.exits[i],{pid:x.pid,code:0,signal:null,normal:true})}assert.deepEqual(r.exit,r.exits.at(-1))
  assert.deepEqual(r.installationCommands.map(x=>x.operation),['initial-install','same-version-install','uninstall','reinstall','final-uninstall']);for(const x of r.installationCommands){assert.equal(x.code,0);assert.equal(x.signal,null);assert.equal(x.timedOut,false)}
  assert.deepEqual(r.retention.map(x=>x.operation),['same-version-install','uninstall','reinstall']);for(const x of r.retention){assert.equal(x.equal,true);integer(x.files);hash(x.digest)}assert.equal(new Set(r.retention.map(x=>x.digest)).size,1)
+ assert.ok(Array.isArray(r.selectionResets)&&r.selectionResets.length>=5);for(const reset of r.selectionResets)validateClearedComparisonSelections(reset);assert.ok(r.selectionResets.some(v=>v.cleared.length===2),'Retained pair must be explicitly cleared')
  const f=verifyFixture(r.fixture)
  assert.deepEqual(r.inventory,{ordinary:55,excludedTemplate:true,excludedTrash:true,excludedFolder:true,themeUnchanged:true})
  assert.deepEqual(r.selection.pages,[50,1]);assert.equal(r.selection.unique,51);yes(r.selection,['crossPageRetained','swapReversible']);assert.equal(r.selection.ids.length,2);assert.equal(new Set(r.selection.ids).size,2);for(const id of r.selection.ids)assert.ok(r.fixture.ordinary.slice(0,51).includes(id))
