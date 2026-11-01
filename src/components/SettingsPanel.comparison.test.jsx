@@ -33,9 +33,25 @@ beforeEach(async()=>{
  });host=document.createElement('div');document.body.append(host);root=createRoot(host);await act(async()=>{root.render(<Harness/>);await drain()})
 })
 afterEach(async()=>{await act(async()=>root.unmount());host.remove();vi.restoreAllMocks();vi.unstubAllGlobals()})
-const choosePair=async()=>{await act(async()=>{document.querySelector('[data-compare-note="a"] button').click();await drain()});await act(async()=>{document.querySelectorAll('[data-compare-note="b"] button')[1].click();await drain()});await click('开始比较');await act(async()=>{await new Promise(r=>setTimeout(r,10));await drain()})}
+const choosePair=async()=>{await act(async()=>{document.querySelector('[data-compare-note="a"] button').click();await drain()});await act(async()=>{document.querySelectorAll('[data-compare-note="b"] button')[1].click();await drain()});await click('开始比较');await vi.waitFor(async()=>{await act(drain);expect(document.querySelector('[data-comparison-state]'),document.querySelector('.note-comparison-feedback')?.textContent).not.toBeNull()},{timeout:2000,interval:10})}
 describe('comparison with real Settings and original guarded opener',()=>{
  it('entry is readonly, preserves theme and restores focus',async()=>{const entry=find('打开双笔记比较');await click('打开双笔记比较');expect(document.querySelector('.note-comparison')).not.toBeNull();await click('关闭双笔记比较');expect(document.querySelector('.note-comparison')).toBeNull();expect(document.activeElement).toBe(entry);expect(document.documentElement.getAttribute('data-theme')).toBe(mode);expect(api.mock.calls.every(([,init])=>!init?.method)).toBe(true)})
  it('preserves the panel on the original cancellation',async()=>{await click('打开双笔记比较');await choosePair();await click('打开左侧原文');expect(selected).not.toHaveBeenCalled();expect(document.querySelector('.note-comparison')).not.toBeNull()})
- it('routes fresh source through the original owner rather than selecting directly',async()=>{accept=true;await click('打开双笔记比较');await choosePair();await click('打开左侧原文');await act(async()=>{await new Promise(r=>setTimeout(r,10));await drain()});expect(selected).toHaveBeenCalledWith(expect.objectContaining({id:'a',content:comparisonFixture().notes[0].content}));expect(document.querySelector('.note-comparison')).toBeNull();expect(api.mock.calls.some(([p])=>p==='/api/files/a')).toBe(true)})
+ it('routes fresh source through the original owner rather than selecting directly',async()=>{accept=true;await click('打开双笔记比较');await choosePair();await click('打开左侧原文');await vi.waitFor(async()=>{await act(drain);expect(selected).toHaveBeenCalledTimes(1);expect(document.querySelector('.note-comparison')).toBeNull()},{timeout:2000,interval:10});expect(selected).toHaveBeenCalledWith(expect.objectContaining({id:'a',content:comparisonFixture().notes[0].content}));expect(document.querySelector('.note-comparison')).toBeNull();expect(api.mock.calls.some(([p])=>p==='/api/files/a')).toBe(true)})
 })
+
+// Cover both original-owner decisions across the real asynchronous digest boundary.
+// The delay is a test injection, not a product timeout or a new save path.
+for (const decision of [false, true]) it('waits for a slow verified pair before original-owner ' + (decision ? 'acceptance' : 'cancellation'), async()=>{
+ const digest=vi.fn(async(...args)=>{await new Promise(resolve=>setTimeout(resolve,50));return webcrypto.subtle.digest(...args)});
+ vi.stubGlobal('crypto',{subtle:{digest}});accept=decision;
+ await click('打开双笔记比较');await choosePair();
+ expect(document.querySelector('[data-comparison-state]')?.dataset.comparisonState).toBe('different');
+ await click('打开左侧原文');
+ await vi.waitFor(async()=>{
+  await act(drain);
+  if(decision){expect(selected).toHaveBeenCalledWith(expect.objectContaining({id:'a',content:comparisonFixture().notes[0].content}));expect(document.querySelector('.note-comparison')).toBeNull()}
+  else{expect(selected).not.toHaveBeenCalled();expect(document.querySelector('.note-comparison-feedback [role=status]')?.textContent).toContain('打开已取消')}
+ },{timeout:2000,interval:10});
+ expect(digest).toHaveBeenCalledTimes(2);expect(api.mock.calls.every(([,init])=>!init?.method)).toBe(true);
+});
