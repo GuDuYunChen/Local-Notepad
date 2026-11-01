@@ -1,0 +1,87 @@
+name: Publish reviewed comparison navigation source
+on:
+  push:
+    branches: [fix/local-note-comparison-navigation-2f114]
+    paths:
+      - .github/reviewed-comparison-navigation.patch
+      - .github/workflows/publish-reviewed-navigation.yml
+permissions:
+  contents: write
+concurrency:
+  group: publish-reviewed-comparison-navigation-2f1141
+  cancel-in-progress: false
+jobs:
+  publish-reviewed-source:
+    if: github.repository == 'GuDuYunChen/Local-Notepad' && github.ref == 'refs/heads/fix/local-note-comparison-navigation-2f114'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+      - name: Validate the readable patch and exact candidate tree before updating this branch
+        shell: bash
+        env:
+          GIT_AUTHOR_NAME: Local Notepad reviewed repair
+          GIT_AUTHOR_EMAIL: reviewed-repair@users.noreply.github.com
+          GIT_COMMITTER_NAME: Local Notepad reviewed repair
+          GIT_COMMITTER_EMAIL: reviewed-repair@users.noreply.github.com
+        run: |
+          python3 - <<'PY'
+          import hashlib,json,os,pathlib,subprocess
+          BASE='770c626e15928dab56f5bbf5f357e26855e812b7'
+          BASE_TREE='a2bd9f5244f1d26095c2418f01aa3e79b1017559'
+          TREE='8443b5a34d0c7948f8c017e22952d0a6b379a359'
+          REF='refs/heads/fix/local-note-comparison-navigation-2f114'
+          PATCH='.github/reviewed-comparison-navigation.patch'
+          def git(*args,data=None):
+              return subprocess.check_output(['git',*args],input=data).decode().strip()
+          def require(ok,message):
+              if not ok: raise RuntimeError(message)
+          head=os.environ['GITHUB_SHA']
+          require(git('rev-parse','HEAD')==head,'Wrong checkout')
+          require(git('rev-parse','HEAD^')==BASE,'Unexpected baseline parent')
+          require(git('rev-parse',BASE+'^{tree}')==BASE_TREE,'Baseline source changed')
+          require(set(git('diff','--name-only',BASE,head).splitlines())=={PATCH,'.github/workflows/publish-reviewed-navigation.yml'},'Unexpected publication files')
+          patch=pathlib.Path(PATCH).read_bytes()
+          require(len(patch)<50000,'Unexpected patch extent')
+          require(git('hash-object',PATCH)=='bba86371321618bd5cacbebe5f60473f697fcf49','Readable patch identity changed')
+          require(git('ls-remote','origin','refs/heads/master').split()[0]==BASE,'Master advanced; review is required')
+          require(git('ls-remote','origin',REF).split()[0]==head,'Repair branch advanced')
+          git('read-tree',BASE)
+          # Ignore only unchanged-context indentation in the readable patch.
+          # New/removed source bytes are still constrained by the complete tree.
+          git('apply','--cached','--ignore-space-change','--recount','-',data=patch)
+          require(git('write-tree')==TREE,'Source differs from the complete tested candidate')
+          require(len(git('diff','--cached','--name-only',BASE).splitlines())==21,'Unexpected source scope')
+          message=('fix: restore distant first-change navigation (2F.114 / 4.247.1)\n\n'
+                   'Publish the exact complete tested source tree8443b5a34d0c7948f8c017e22952d0a6b379a359. '
+                   'The first difference, mode changes and explicit relocation use the actual difference page; '
+                   'retain cancellation, stale-result and export-confirmation protection. '
+                   'No note-body/save/draft/backend/schema/dependency changes. '
+                   'The source was freshly tested with the unfiltered5821-case suite and originalUI suite before publication. '
+                   'Current productCI, actual4.247.1 installer and full native/install acceptance remain required. '
+                   'Earlier source notes describe candidate preparation history; this commit is the publication receipt. '
+                   'No compressed or encoded patch payload is used; the readable patch and one-time publication workflow '
+                   'are absent from this final source tree. Main and master are not updated.\n')
+          commit=git('commit-tree',TREE,'-p',head,data=message.encode())
+          out=pathlib.Path(os.environ['RUNNER_TEMP'])/'navigation-repair-source';out.mkdir()
+          subprocess.run(['git','archive','--format=tar.gz','--output='+str(out/'source.tar.gz'),commit],check=True)
+          (out/'source-manifest.txt').write_text(git('ls-tree','-r',commit)+'\n')
+          receipt={'baseline':BASE,'bootstrap':head,'commit':commit,'tree':TREE,'branch':REF,'patchBlob':'bba86371321618bd5cacbebe5f60473f697fcf49','readablePatchSHA256':hashlib.sha256(patch).hexdigest(),'sourceArchiveSHA256':hashlib.sha256((out/'source.tar.gz').read_bytes()).hexdigest(),'branchUpdated':False,'nativeAccepted':False}
+          (out/'receipt.json').write_text(json.dumps(receipt,indent=2)+'\n')
+          require(git('ls-remote','origin',REF).split()[0]==head,'Concurrent branch update')
+          subprocess.run(['git','push','origin',commit+':'+REF],check=True)
+          require(git('ls-remote','origin',REF).split()[0]==commit,'Published commit mismatch')
+          receipt['branchUpdated']=True
+          (out/'receipt.json').write_text(json.dumps(receipt,indent=2)+'\n')
+          print(json.dumps(receipt,indent=2))
+          PY
+      - name: Preserve source publication receipt, not native acceptance
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: navigation-repair-source-${{ github.sha }}
+          path: ${{ runner.temp }}/navigation-repair-source/
+          if-no-files-found: warn
+          retention-days: 7
