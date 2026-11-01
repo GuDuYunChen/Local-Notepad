@@ -18,8 +18,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          fetch-depth: 3
-      - name: Validate the readable patch and exact candidate tree before updating this branch
+          fetch-depth: 4
+      - name: Publish only the exact tested source tree
         shell: bash
         env:
           GIT_AUTHOR_NAME: Local Notepad reviewed repair
@@ -30,69 +30,66 @@ jobs:
           python3 - <<'PY'
           import hashlib,json,os,pathlib,subprocess
           BASE='770c626e15928dab56f5bbf5f357e26855e812b7'
-          BOOTSTRAP='ddd7ecdca004e32f791dcfa8587f93502f02f2f3'
-          BASE_TREE='a2bd9f5244f1d26095c2418f01aa3e79b1017559'
+          BOOT='ddd7ecdca004e32f791dcfa8587f93502f02f2f3'
+          PRIOR='a8b85ec54c7058315bcd84c5bf3d8624deb5e2c9'
           TREE='8443b5a34d0c7948f8c017e22952d0a6b379a359'
           REF='refs/heads/fix/local-note-comparison-navigation-2f114'
           PATCH='.github/reviewed-comparison-navigation.patch'
-          def git(*args,data=None):
-              return subprocess.check_output(['git',*args],input=data).decode().strip()
+          WORKFLOW='.github/workflows/publish-reviewed-navigation.yml'
+          def git(*a,data=None):return subprocess.check_output(['git',*a],input=data).decode().strip()
           def require(ok,message):
-              if not ok: raise RuntimeError(message)
+              if not ok:raise RuntimeError(message)
           head=os.environ['GITHUB_SHA']
           out=pathlib.Path(os.environ['RUNNER_TEMP'])/'navigation-repair-source';out.mkdir()
           require(git('rev-parse','HEAD')==head,'Wrong checkout')
-          require(git('rev-parse','HEAD^')==BOOTSTRAP,'Unexpected publication parent')
-          require(git('rev-parse','HEAD^^')==BASE,'Unexpected accepted ancestor')
-          require(git('rev-parse',BASE+'^{tree}')==BASE_TREE,'Baseline source changed')
-          require(set(git('diff','--name-only',BOOTSTRAP,head).splitlines())=={'.github/workflows/publish-reviewed-navigation.yml'},'Unexpected repair changes')
-          require(set(git('diff','--name-only',BASE,head).splitlines())=={PATCH,'.github/workflows/publish-reviewed-navigation.yml'},'Unexpected publication files')
-          patch=pathlib.Path(PATCH).read_bytes()
-          (out/'reviewed.patch').write_bytes(patch)
-          require(len(patch)<50000,'Unexpected patch extent')
-          require(git('hash-object',PATCH)=='bba86371321618bd5cacbebe5f60473f697fcf49','Readable patch identity changed')
-          require(git('ls-remote','origin','refs/heads/master').split()[0]==BASE,'Master advanced; review is required')
+          require(git('rev-parse','HEAD^')==PRIOR and git('rev-parse','HEAD^^')==BOOT and git('rev-parse','HEAD^^^')==BASE,'Unexpected ancestry')
+          require(git('rev-parse',BASE+'^{tree}')=='a2bd9f5244f1d26095c2418f01aa3e79b1017559','Wrong baseline tree')
+          require(set(git('diff','--name-only',PRIOR,head).splitlines())=={WORKFLOW},'Unexpected repair changes')
+          require(set(git('diff','--name-only',BASE,head).splitlines())=={PATCH,WORKFLOW},'Unexpected publication scope')
+          raw=pathlib.Path(PATCH).read_bytes();(out/'reviewed-original.patch').write_bytes(raw)
+          require(len(raw)<50000 and git('hash-object',PATCH)=='bba86371321618bd5cacbebe5f60473f697fcf49','Wrong readable patch')
+          before=b"+      assert.equal(diagnostics.packaged, true); assert.equal(diagnostics.version, '4.247.1')\n"
+          after=b"+    assert.equal(diagnostics.packaged, true); assert.equal(diagnostics.version, '4.247.1')\n"
+          require(raw.count(before)==1,'Unexpected indentation correction extent')
+          patch=raw.replace(before,after)
+          require(hashlib.sha256(patch).hexdigest()=='ba029a5f0618f60988bf9b2f049376d1b7d1df5a9a60b05f8c2f24e285e2cfb6','Corrected readable patch differs')
+          (out/'reviewed-corrected.patch').write_bytes(patch)
+          require(git('ls-remote','origin','refs/heads/master').split()[0]==BASE,'Master advanced')
           require(git('ls-remote','origin',REF).split()[0]==head,'Repair branch advanced')
           name='src/components/NoteComparison.test.jsx'
-          marker=b'diff --git a/src/components/NoteComparison.test.jsx b/src/components/NoteComparison.test.jsx\n'
-          require(patch.count(marker)==1,'Missing or ambiguous final append-only test hunk')
+          marker=('diff --git a/'+name+' b/'+name+'\n').encode()
+          require(patch.count(marker)==1,'Ambiguous final test hunk')
           prefix,tests=patch.split(marker)
-          require(b'diff --git ' not in tests,'Unexpected following file')
-          require(not any(line.startswith(b'-') and not line.startswith(b'--- ') for line in tests.splitlines()),'Test patch is not append-only')
+          require(b'diff --git ' not in tests and not any(x.startswith(b'-') and not x.startswith(b'--- ') for x in tests.splitlines()),'Not the append-only test')
           original=subprocess.check_output(['git','show',BASE+':'+name])
-          extra=b''.join(line[1:] for line in tests.splitlines(keepends=True) if line.startswith(b'+') and not line.startswith(b'+++ '))
-          test_content=original+extra
-          test_blob=hashlib.sha1(b'blob '+str(len(test_content)).encode()+b'\0'+test_content).hexdigest()
-          require(test_blob=='be7458cacc5fe51fd1c79f376ac9f41aa187fbe2','Test source differs from the tested complete file')
+          content=original+b''.join(x[1:] for x in tests.splitlines(keepends=True) if x.startswith(b'+') and not x.startswith(b'+++ '))
+          test_blob=hashlib.sha1(b'blob '+str(len(content)).encode()+b'\0'+content).hexdigest()
+          require(test_blob=='be7458cacc5fe51fd1c79f376ac9f41aa187fbe2','Tested file mismatch')
           git('read-tree',BASE)
           git('apply','--cached','--ignore-space-change','--recount','-',data=prefix)
-          require(git('hash-object','-w','--stdin',data=test_content)==test_blob,'Written test blob mismatch')
+          require(git('hash-object','-w','--stdin',data=content)==test_blob,'Written blob mismatch')
           git('update-index','--add','--cacheinfo','100644,'+test_blob+','+name)
-          require(git('write-tree')==TREE,'Source differs from the complete tested candidate')
-          require(len(git('diff','--cached','--name-only',BASE).splitlines())==21,'Unexpected source scope')
+          actual=git('write-tree');(out/'actual-tree.txt').write_text(actual+'\n')
+          require(actual==TREE,'Not the complete tested tree')
+          require(len(git('diff','--cached','--name-only',BASE).splitlines())==21,'Unexpected changed-file scope')
           message=('fix: restore distant first-change navigation (2F.114 / 4.247.1)\n\n'
-                   'Publish exact tested tree8443b5a34d0c7948f8c017e22952d0a6b379a359. '
-                   'First-change pagination, mode changes and repeated explicit relocation retain all cancellation, stale-result and export-confirmation protections. '
-                   'No note-body/save/draft/backend/schema/dependency changes. '
-                   'Fresh unfiltered344files/5821tests and originalUI122files/2126tests passed before publication. '
-                   'The first publication attempt failed only on transcribed unchanged test context. '
-                   'The append-only test is reconstructed from accepted baseline plus literal additions and verified against its original full blob; the full tested tree is mandatory. '
-                   'Current productCI, actual4.247.1 installer and full native/install acceptance remain required. '
-                   'Earlier source notes are candidate preparation history, not a current read-only limitation. '
-                   'No compressed or encoded payload; temporary publication files are absent from this final source. Main/master unchanged.\n')
+                   'Exact tested tree8443b5a34d0c7948f8c017e22952d0a6b379a359. First-change pagination, mode changes and repeated explicit relocation preserve all original protections. '
+                   'Fresh unfiltered344files/5821tests and originalUI122files/2126tests passed. No body/save/draft/backend/schema/dependency change. '
+                   'Two failed publication attempts were source-transport context/indentation errors, rejected before any product ref update; exact received bytes were downloaded and the correction independently reconstructed. '
+                   'Current productCI, actual4.247.1 installer and full Windows/install acceptance remain required. '
+                   'Earlier source notes are candidate preparation history, not a current read-only limitation. Temporary publication files absent; no compressed payload; main/master unchanged.\n')
           commit=git('commit-tree',TREE,'-p',head,data=message.encode())
           subprocess.run(['git','archive','--format=tar.gz','--output='+str(out/'source.tar.gz'),commit],check=True)
           (out/'source-manifest.txt').write_text(git('ls-tree','-r',commit)+'\n')
-          receipt={'baseline':BASE,'bootstrap':head,'commit':commit,'tree':TREE,'branch':REF,'patchBlob':'bba86371321618bd5cacbebe5f60473f697fcf49','appendOnlyTestBlob':test_blob,'readablePatchSHA256':hashlib.sha256(patch).hexdigest(),'sourceArchiveSHA256':hashlib.sha256((out/'source.tar.gz').read_bytes()).hexdigest(),'branchUpdated':False,'nativeAccepted':False}
-          (out/'receipt.json').write_text(json.dumps(receipt,indent=2)+'\n')
+          report={'baseline':BASE,'bootstrap':head,'commit':commit,'tree':TREE,'branch':REF,'patchBlob':'bba86371321618bd5cacbebe5f60473f697fcf49','testBlob':test_blob,'correctedPatchSHA256':hashlib.sha256(patch).hexdigest(),'sourceArchiveSHA256':hashlib.sha256((out/'source.tar.gz').read_bytes()).hexdigest(),'branchUpdated':False,'nativeAccepted':False}
+          (out/'receipt.json').write_text(json.dumps(report,indent=2)+'\n')
           require(git('ls-remote','origin',REF).split()[0]==head,'Concurrent branch update')
           subprocess.run(['git','push','origin',commit+':'+REF],check=True)
           require(git('ls-remote','origin',REF).split()[0]==commit,'Published commit mismatch')
-          receipt['branchUpdated']=True
-          (out/'receipt.json').write_text(json.dumps(receipt,indent=2)+'\n')
-          print(json.dumps(receipt,indent=2))
+          report['branchUpdated']=True;(out/'receipt.json').write_text(json.dumps(report,indent=2)+'\n')
+          print(json.dumps(report,indent=2))
           PY
-      - name: Preserve source publication receipt, not native acceptance
+      - name: Preserve publication and failure evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
