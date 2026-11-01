@@ -1,3 +1,9 @@
+# Current repair candidate: 2F.114 / 4.247.1 first-change navigation
+
+Accepted remote master770c626e/treea2bd9f52 is 4.247.0 (PR20 merged). A NEW reproduced comparison navigation defect is under repair; this is not a repeat of native92's old disabled-button test mistake. Read docs/LOCAL_NOTE_COMPARISON_NAVIGATION_FIX_2F114_1.md. Local branch fix/local-note-comparison-navigation-2f114 is reconstructed history, NOT the remote branch. The current session has read-only GitHub tools; do not claim a push, Windows acceptance or merge. Do not begin2F115 before this repair's current-version native/full installation gates. Preserve original saving, schema, dependencies and evidence. Older accepted records below are history.
+
+---
+
 # Current module: 2F.114 / 4.247.0 local two-note comparison
 
 Accepted master042db00172114d85ad76cff4eba5450d1022d81e/tree1bd8858605c2c039cfa628d7ae4a47f52c4ca40b is completed2F113 (PR19 merged, productCI1779/native91). Work on feature/local-note-comparison-2f114. Read docs/LOCAL_NOTE_COMPARISON_2F114.md. Deliver explicit two-note selection, one readonly saved-body snapshot, bounded exact text/raw differences, original guarded source opening, privacy-confirmed revalidated export, cancellation/errors and current-version native/full installation as ONE module. No merge, deletion, body writes, schema or dependencies change. Older entries below are retained history, not unresolved current work.

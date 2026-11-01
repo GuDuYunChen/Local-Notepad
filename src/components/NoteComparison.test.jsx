@@ -12,7 +12,7 @@ const button=(text,owner=document)=>[...owner.querySelectorAll('button')].find(n
 const click=async(text,owner=document)=>act(async()=>{const n=button(text,owner);expect(n,text).toBeTruthy();expect(n.disabled,text).toBe(false);n.focus();n.click();await drain()})
 const select=async(id,side)=>click(side==='left'?'设为左侧':'设为右侧',document.querySelector('[data-compare-note="'+id+'"]'))
 const change=async(selector,value)=>act(async()=>{const n=document.querySelector(selector);expect(n).toBeTruthy();const proto=n.tagName==='SELECT'?HTMLSelectElement.prototype:HTMLInputElement.prototype;Object.getOwnPropertyDescriptor(proto,'value').set.call(n,value);n.dispatchEvent(new Event(n.tagName==='SELECT'?'change':'input',{bubbles:true}));await drain()})
-const compare=async()=>{await select('a','left');await select('b','right');await click('开始比较')}
+const compare=async()=>{await select('a','left');await select('b','right');await click('开始比较');await awaitComparisonResult()}
 function Harness(){const [show,setShow]=useState(true);return <>{show&&<NoteComparison onClose={()=>{closed();setShow(false)}} onOpenFile={opened}/>}</>}
 beforeEach(async()=>{
  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT',true);vi.stubGlobal('crypto',webcrypto);localStorage.clear();closed=vi.fn();held=null;readError=false;downloads=[];indexData=comparisonIndexFixture(51);bodyData=comparisonFixture();current=bodyData.notes[0]
@@ -24,7 +24,7 @@ beforeEach(async()=>{
 afterEach(async()=>{await act(async()=>root.unmount());host.remove();vi.restoreAllMocks();vi.unstubAllGlobals()})
 describe('whole note comparison workflow',()=>{
  it('requires two explicit distinct sources, pages all 51 and retains selected IDs',async()=>{expect(button('开始比较').disabled).toBe(true);await select('a','left');await click('下一页笔记');expect(document.querySelectorAll('[data-compare-note]')).toHaveLength(1);expect(document.querySelector('[data-comparison-selection="0"]').textContent).toContain('a.md');await click('上一页笔记');await select('a','right');expect(document.querySelector('[data-comparison-selection="0"]').textContent).toBe('尚未选择');await select('b','left');expect(button('开始比较').disabled).toBe(false)})
- it('compares full pair, exposes direction/EOL, returns and swaps deliberately',async()=>{await compare();expect(document.querySelector('[data-comparison-state]').dataset.comparisonState).toBe('different');expect(document.querySelector('[data-diff-kind=left] pre').textContent).toBe('left');expect(document.querySelector('[data-diff-kind=right] pre').textContent).toBe('right');await click('返回选择');await click('交换左右');expect(document.querySelector('[data-comparison-selection="0"]').textContent).toContain('b.md');await click('开始比较');expect(document.querySelector('[data-diff-kind=left] pre').textContent).toBe('right')})
+ it('compares full pair, exposes direction/EOL, returns and swaps deliberately',async()=>{await compare();expect(document.querySelector('[data-comparison-state]').dataset.comparisonState).toBe('different');expect(document.querySelector('[data-diff-kind=left] pre').textContent).toBe('left');expect(document.querySelector('[data-diff-kind=right] pre').textContent).toBe('right');await click('返回选择');await click('交换左右');expect(document.querySelector('[data-comparison-selection="0"]').textContent).toContain('b.md');await click('开始比较');await awaitComparisonResult();expect(document.querySelector('[data-diff-kind=left] pre').textContent).toBe('right')})
  it('searches a complete title or location without losing selections',async()=>{await select('a','left');await change('input[aria-label="比较笔记查找"]','note-50');expect(document.querySelectorAll('[data-compare-note]')).toHaveLength(1);expect(document.querySelector('[data-comparison-selection="0"]').textContent).toContain('a.md');await change('input[aria-label="比较笔记查找"]','no match');expect(document.body.textContent).toContain('没有匹配的普通笔记')})
  it('distinguishes projected text equality from raw content and refuses unknown nodes',async()=>{const a=lexicalComparisonBody('hello');bodyData=comparisonFixture([a,a.replace('"format":0','"format":1')]);await compare();expect(document.body.textContent).toContain('文本投影相同，但保存正文不同');await change('select[aria-label="笔记比较模式"]','raw');expect(document.querySelector('[data-comparison-state]').dataset.comparisonState).toBe('different')})
  it('renders raw hostile markup as plain text, not image or script',async()=>{bodyData=comparisonFixture(['<img src="x" onerror="alert(1)">','<script>danger()</script>']);await compare();expect(document.querySelector('.note-comparison img')).toBeNull();expect(document.querySelector('.note-comparison script')).toBeNull();expect(document.querySelector('.note-comparison-lines').textContent).toContain('<script>danger()</script>')})
@@ -37,7 +37,7 @@ describe('whole note comparison workflow',()=>{
  it('keeps original source guard and remains mounted on cancel',async()=>{await compare();await click('打开左侧原文');expect(opened).toHaveBeenCalledTimes(1);expect(document.querySelector('.note-comparison')).not.toBeNull();expect(document.querySelector('[role=status]').textContent).toContain('打开已取消');expect(api.mock.calls.some(([p])=>p==='/api/files/a')).toBe(true)})
  it('closes only when original source owner accepts a fresh read',async()=>{opened.mockImplementation(async(id,opts)=>{await opts.readFile(id,{signal:opts.signal});return opts.shouldSelect()});await compare();await click('打开左侧原文');expect(closed).toHaveBeenCalledTimes(1);expect(document.querySelector('.note-comparison')).toBeNull()})
  it('refuses changed source navigation',async()=>{await compare();current={...current,content:'changed'};await click('打开左侧原文');expect(closed).not.toHaveBeenCalled();expect(document.querySelector('[role=alert]').textContent).toContain('资料库已变化')})
- it('read errors discard results and allow explicit complete retry',async()=>{await select('a','left');await select('b','right');readError=true;await click('开始比较');expect(document.querySelector('[role=alert]')).not.toBeNull();expect(document.querySelector('[data-comparison-state]')).toBeNull();readError=false;await click('开始比较');expect(document.querySelector('[data-comparison-state]')).not.toBeNull()})
+ it('read errors discard results and allow explicit complete retry',async()=>{await select('a','left');await select('b','right');readError=true;await click('开始比较');expect(document.querySelector('[role=alert]')).not.toBeNull();expect(document.querySelector('[data-comparison-state]')).toBeNull();readError=false;await click('开始比较');await awaitComparisonResult();expect(document.querySelector('[data-comparison-state]')).not.toBeNull()})
 })
 const defer=()=>{let resolve;return {promise:new Promise(r=>{resolve=r}),resolve:v=>resolve(v)}}
 describe('cancellation and ownership',()=>{
@@ -50,3 +50,103 @@ describe('cancellation and ownership',()=>{
  it('confirmation owns Tab/Escape and never propagates to page navigation',async()=>{await compare();await click('导出比较报告');const box=document.querySelector('[role=alertdialog]'),last=button('确认导出',box);last.focus();await act(async()=>{box.dispatchEvent(new KeyboardEvent('keydown',{key:'Tab',bubbles:true,cancelable:true}));await drain()});expect(document.activeElement).toBe(box.querySelector('input'));await act(async()=>{box.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));await drain()});expect(document.querySelector('[role=alertdialog]')).toBeNull();expect(document.activeElement).toBe(button('导出比较报告'));expect(closed).not.toHaveBeenCalled()})
  it('all product interactions use GET-only requests and no saved comparison state',async()=>{await compare();await click('导出比较报告');await click('确认导出');expect(api.mock.calls.every(([,o])=>!o.method)).toBe(true);expect(localStorage.length).toBe(0)})
 })
+
+// Crypto verification crosses the actual Node/WebCrypto boundary. Wait for the
+// adopted result, not an assumed 8ms completion time under concurrent Vitest load.
+const awaitComparisonResult = () => vi.waitFor(async () => {
+ await act(drain)
+ expect(document.querySelector('[data-comparison-state]'), document.querySelector('.note-comparison-feedback')?.textContent).not.toBeNull()
+}, { timeout: 2000, interval: 10 })
+const compareSettled = compare
+
+// Regression: a long common prefix must not hide the only selected difference
+// behind disabled Previous/Next buttons on the first page.
+describe('distant first-change navigation regression',()=>{
+ it('lands on the only difference after 130 unchanged lines',async()=>{
+  bodyData=comparisonFixture(['same\n'.repeat(130)+'LEFT\n','same\n'.repeat(130)+'RIGHT\n']);
+  await compareSettled();
+  expect(document.querySelector('[data-change-target=true] pre')?.textContent).toBe('LEFT');
+  expect(document.querySelector('[aria-label="笔记差异分页"]').textContent).toContain('第 3/3 页');
+  expect(button('上一处差异').disabled).toBe(true);expect(button('下一处差异').disabled).toBe(true);
+ });
+ it('initially locates the first distant group, then next and previous remain exact',async()=>{
+  const common='same\n'.repeat(130);
+  bodyData=comparisonFixture([common+'FIRST-L\n'+'between\n'.repeat(80)+'LAST-L\n',common+'FIRST-R\n'+'between\n'.repeat(80)+'LAST-R\n']);
+  await compareSettled();expect(document.querySelector('[data-change-target=true] pre')?.textContent).toBe('FIRST-L');
+  await click('下一处差异');expect(document.querySelector('[data-change-target=true] pre')?.textContent).toBe('LAST-L');
+  await click('上一处差异');expect(document.querySelector('[data-change-target=true] pre')?.textContent).toBe('FIRST-L');
+ });
+ it('mode changes locate the first difference in the new model rather than resetting to page one',async()=>{
+  const prefix='same\n'.repeat(130);
+  bodyData=comparisonFixture([lexicalComparisonBody(prefix+'LEFT'),lexicalComparisonBody(prefix+'RIGHT')]);
+  await compareSettled();await change('select[aria-label="笔记比较模式"]','raw');
+  expect(document.querySelector('[aria-label="笔记差异分页"]').textContent).toContain('第 1/1 页');
+  await change('select[aria-label="笔记比较模式"]','text');
+  expect(document.querySelector('[data-change-target=true] pre')?.textContent).toBe('LEFT');
+  expect(document.querySelector('[aria-label="笔记差异分页"]').textContent).toContain('第 3/3 页');
+ });
+ it('re-comparing another pair initializes its own distant first difference',async()=>{
+  await compareSettled();await click('返回选择');
+  bodyData=comparisonFixture(['same\n'.repeat(121)+'NEW-L\n','same\n'.repeat(121)+'NEW-R\n']);
+  await click('开始比较');await awaitComparisonResult();expect(document.querySelector('[data-change-target=true] pre')?.textContent).toBe('NEW-L');
+ });
+});
+
+describe('explicit current-change relocation',()=>{
+ it('returns to the only distant difference after browsing earlier common pages',async()=>{
+  bodyData=comparisonFixture(['same\n'.repeat(130)+'LEFT\n','same\n'.repeat(130)+'RIGHT\n']);await compareSettled();
+  await click('上一页差异');await click('上一页差异');
+  expect(document.querySelector('[data-change-target=true]')).toBeNull();
+  const before=api.mock.calls.length;await click('定位当前差异');
+  expect(document.querySelector('[data-change-target=true] pre')?.textContent).toBe('LEFT');
+  expect(document.querySelector('[aria-label="笔记差异分页"]').textContent).toContain('第 3/3 页');
+  expect(api.mock.calls.length).toBe(before);expect(downloads).toHaveLength(0);
+ });
+ it('re-locates twice on the same page without requiring a state-changing page jump',async()=>{
+  await compareSettled();const row=document.querySelector('[data-change-target=true]');row.scrollIntoView=vi.fn();
+  await click('定位当前差异');await click('定位当前差异');
+  expect(row.scrollIntoView).toHaveBeenCalledTimes(2);
+  expect(row.scrollIntoView).toHaveBeenLastCalledWith({block:'nearest'});
+ });
+ it('cannot relocate stale results or steal focus from export confirmation',async()=>{
+  await compareSettled();await click('导出比较报告');expect(button('定位当前差异').disabled).toBe(true);
+  await click('取消导出');expect(button('定位当前差异').disabled).toBe(false);
+  await act(async()=>{window.dispatchEvent(new CustomEvent('library:refresh'));await drain()});
+  expect(button('定位当前差异').disabled).toBe(true);
+ });
+ it('keeps long identical and refused results out of difference navigation',async()=>{
+  const same='same\n'.repeat(130);bodyData=comparisonFixture([same,same]);await compareSettled();
+  expect(document.querySelector('[aria-label="笔记差异导航"]')).toBeNull();
+  await click('返回选择');bodyData=comparisonFixture(['a\n'.repeat(2001),'b']);await click('开始比较');await awaitComparisonResult();
+  expect(document.querySelector('[data-comparison-state]').dataset.comparisonState).toBe('unavailable');
+  expect(document.querySelector('[aria-label="笔记差异导航"]')).toBeNull();
+ });
+});
+
+it('locates exact first-change page at both sides of each 60-row boundary',async()=>{
+ for(const prefixLength of [59,60,61,119,120,180]){
+  if(document.querySelector('[data-comparison-state]'))await click('返回选择');
+  bodyData=comparisonFixture(['same\n'.repeat(prefixLength)+'BOUNDARY-LEFT\n','same\n'.repeat(prefixLength)+'BOUNDARY-RIGHT\n']);
+  // Returning preserves the original explicit source selection.
+  if(!document.querySelector('[data-comparison-selection="0"]').textContent.includes('a.md')){await select('a','left');await select('b','right')}
+  await click('开始比较');await awaitComparisonResult();
+  expect(document.querySelector('[data-change-target=true] pre')?.textContent).toBe('BOUNDARY-LEFT');
+  expect(document.querySelector('[aria-label="笔记差异分页"]').textContent).toContain('第 '+(Math.floor(prefixLength/60)+1)+'/');
+ }
+});
+
+// Exercise the real WebCrypto implementation with an intentionally slow boundary.
+// The comparison helper must wait for the adopted pair, not an elapsed 8ms sleep.
+it('waits for both real body digests before treating comparison as complete',async()=>{
+ const digest=vi.fn(async(...args)=>{
+  await new Promise(resolve=>setTimeout(resolve,50));
+  return webcrypto.subtle.digest(...args);
+ });
+ vi.stubGlobal('crypto',{subtle:{digest}});
+ const body=lexicalComparisonBody('delayed but complete');
+ bodyData=comparisonFixture([body,body.replace('"format":0','"format":1')]);
+ await compare();
+ expect(document.querySelector('[data-comparison-state]')?.dataset.comparisonState).toBe('same');
+ expect(document.body.textContent).toContain('文本投影相同，但保存正文不同');
+ expect(digest).toHaveBeenCalledTimes(2);
+});
