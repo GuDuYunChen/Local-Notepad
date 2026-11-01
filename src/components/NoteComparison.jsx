@@ -10,6 +10,7 @@ export default function NoteComparison({ onClose, onOpenFile }) {
   const [snapshot, setSnapshot] = useState(null), [mode, setMode] = useState('text'), [rowPage, setRowPage] = useState(0), [changeIndex, setChangeIndex] = useState(0)
   const [busy, setBusy] = useState(''), [stale, setStale] = useState(false), [error, setError] = useState(''), [message, setMessage] = useState('')
   const [confirm, setConfirm] = useState(false), [details, setDetails] = useState(false)
+  const [locateRequest, setLocateRequest] = useState(0)
   const panel = useRef(null), active = useRef(null), alive = useRef(false), staleRef = useRef(false), closing = useRef(false), composing = useRef(false), exporting = useRef(null), hadConfirm = useRef(false)
   const current = ctl => alive.current && !closing.current && active.current === ctl && !ctl.signal.aborted
   const begin = kind => { if (active.current || closing.current) return null; const ctl = new AbortController(); active.current = ctl; setBusy(kind); setError(''); setMessage(''); return ctl }
@@ -34,7 +35,13 @@ export default function NoteComparison({ onClose, onOpenFile }) {
   const choices = useMemo(() => index ? comparisonChoices(index, query) : [], [index, query])
   const model = useMemo(() => snapshot ? compareNoteText(snapshot.notes[0].content, snapshot.notes[1].content, mode) : null, [snapshot, mode])
   const pages = Math.max(1, Math.ceil(choices.length / COMPARISON_PAGE)), rowPages = Math.max(1, Math.ceil((model?.rows.length || 0) / COMPARISON_ROW_PAGE))
-  useLayoutEffect(() => { if (model?.state === 'different') panel.current?.querySelector('[data-change-target=true]')?.scrollIntoView?.({ block: 'nearest' }) }, [changeIndex, rowPage, model])
+  // Start each new comparison/mode at its actual first change, not at an
+  // arbitrary first page of common lines. Manual paging does not reset this.
+  useLayoutEffect(() => {
+    setChangeIndex(0)
+    setRowPage(Math.floor((model?.changes[0] ?? 0) / COMPARISON_ROW_PAGE))
+  }, [model])
+  useLayoutEffect(() => { if (model?.state === 'different') panel.current?.querySelector('[data-change-target=true]')?.scrollIntoView?.({ block: 'nearest' }) }, [changeIndex, rowPage, model, locateRequest])
   const blocked = Boolean(busy || stale || confirm)
   const clearResult = () => { setSnapshot(null); setRowPage(0); setChangeIndex(0); setError(''); setMessage(''); setConfirm(false) }
   const select = (id, side) => { if (blocked) return; clearResult(); setIds(old => old.map((value, i) => i === side ? id : value === id ? '' : value)) }
@@ -70,7 +77,13 @@ export default function NoteComparison({ onClose, onOpenFile }) {
       downloadComparisonReport(frozen, chosenMode, include); setConfirm(false); setMessage('已发起比较报告下载，请核对保存结果；笔记没有修改。')
     } catch { if (current(ctl)) setError('报告未能导出；可重试或取消，不采用新的部分结果。') } finally { finish(ctl) }
   }
-  const jump = delta => { const i = Math.max(0, Math.min(model.changes.length - 1, changeIndex + delta)); setChangeIndex(i); setRowPage(Math.floor(model.changes[i] / COMPARISON_ROW_PAGE)) }
+  const locate = i => {
+    if (blocked || model?.state !== 'different' || !Number.isInteger(i) || i < 0 || i >= model.changes.length) return
+    setChangeIndex(i); setRowPage(Math.floor(model.changes[i] / COMPARISON_ROW_PAGE))
+    // Re-locate also scrolls after manual scrolling within the same page.
+    setLocateRequest(v => v + 1)
+  }
+  const jump = delta => locate(Math.max(0, Math.min(model.changes.length - 1, changeIndex + delta)))
   const keyboard = e => {
     e.stopPropagation()
     if (composing.current || e.isComposing || e.nativeEvent?.isComposing || e.keyCode === 229) return
@@ -96,7 +109,7 @@ export default function NoteComparison({ onClose, onOpenFile }) {
           <p className="note-comparison-result" role="note" data-comparison-state={model.state}>{model.message}{stale ? ' 当前结果已过时。' : ''}</p>
           {model.counts && <p>左侧独有 {model.counts.leftOnly} 行 · 右侧独有 {model.counts.rightOnly} 行 · {model.changes.length} 处差异</p>}
           {model.state === 'different' && <>
-            <nav aria-label="笔记差异导航"><button type="button" disabled={blocked || changeIndex === 0} onClick={() => jump(-1)}>上一处差异</button><span>差异 {changeIndex + 1}/{model.changes.length}</span><button type="button" disabled={blocked || changeIndex + 1 >= model.changes.length} onClick={() => jump(1)}>下一处差异</button></nav>
+            <nav aria-label="笔记差异导航"><button type="button" disabled={blocked || changeIndex === 0} onClick={() => jump(-1)}>上一处差异</button><span>差异 {changeIndex + 1}/{model.changes.length}</span><button type="button" disabled={blocked} onClick={() => locate(changeIndex)}>定位当前差异</button><button type="button" disabled={blocked || changeIndex + 1 >= model.changes.length} onClick={() => jump(1)}>下一处差异</button></nav>
             <div className="note-comparison-lines" role="table" aria-label="笔记行差异"><div role="row" className="note-comparison-line-head"><span role="columnheader">左行</span><span role="columnheader">右行</span><span role="columnheader">保存文本差异</span></div>{model.rows.slice(rowPage * COMPARISON_ROW_PAGE, (rowPage + 1) * COMPARISON_ROW_PAGE).map((r, n) => <div key={rowPage * COMPARISON_ROW_PAGE + n} role="row" data-diff-kind={r.kind} data-change-target={rowPage * COMPARISON_ROW_PAGE + n === model.changes[changeIndex] ? 'true' : undefined}><span role="cell">{r.left ?? '—'}</span><span role="cell">{r.right ?? '—'}</span><div role="cell"><small>{r.kind === 'left' ? '左侧独有' : r.kind === 'right' ? '右侧独有' : '两侧相同'} · 行结束 {r.ending}</small><pre>{r.text || ' '}</pre></div></div>)}</div>
             <nav aria-label="笔记差异分页"><button type="button" disabled={blocked || rowPage === 0} onClick={() => setRowPage(v => v - 1)}>上一页差异</button><span>第 {rowPage + 1}/{rowPages} 页</span><button type="button" disabled={blocked || rowPage + 1 >= rowPages} onClick={() => setRowPage(v => v + 1)}>下一页差异</button></nav>
           </>}
