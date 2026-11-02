@@ -7,6 +7,7 @@ import TrashRecovery from './TrashRecovery'
 import LibraryStatistics from './LibraryStatistics'
 import DuplicateNotes from './DuplicateNotes'
 import NoteComparison from './NoteComparison'
+import HistoryReview from './HistoryReview'
 import AttachmentAudit from './AttachmentAudit'
 import TaskCenter from './TaskCenter'
 import LibraryReferenceHealthPanel from './LibraryReferenceHealthPanel'
@@ -106,6 +107,7 @@ export default function SettingsPanel({
   const [statisticsOpen, setStatisticsOpen] = useState(false)
   const [duplicateNotesOpen, setDuplicateNotesOpen] = useState(false)
   const [noteComparisonOpen, setNoteComparisonOpen] = useState(false)
+  const [historyReviewOpen, setHistoryReviewOpen] = useState(false)
   const [attachmentAuditOpen, setAttachmentAuditOpen] = useState(false)
   const [taskCenterOpen, setTaskCenterOpen] = useState(false)
 
@@ -213,6 +215,8 @@ export default function SettingsPanel({
           {statisticsOpen && <LibraryStatistics onClose={() => setStatisticsOpen(false)} onOpenFile={onOpenFile} />}
           <div className="settings-row"><div><strong>双笔记比较</strong><span>明确选择两篇保存笔记、逐行比较、回访原文和私密报告；不合并或改写。</span></div><button type="button" className="btn" onClick={() => setNoteComparisonOpen(true)}>打开双笔记比较</button></div>
           {noteComparisonOpen && <NoteComparison onClose={() => setNoteComparisonOpen(false)} onOpenFile={onOpenFile} />}
+          <div className="settings-row"><div><strong>历史检索与对照</strong><span>从全库选取笔记、浏览保留快照，对照当前保存正文并确认导出；不自动恢复。</span></div><button type="button" className="btn" onClick={() => setHistoryReviewOpen(true)}>打开历史中心</button></div>
+          {historyReviewOpen && <HistoryReview onClose={() => setHistoryReviewOpen(false)} onOpenFile={onOpenFile} />}
           <div className="settings-row"><div><strong>重复笔记检查</strong><span>只读分组完全相同的保存正文，回访来源并导出；不自动删除。</span></div><button type="button" className="btn" onClick={() => setDuplicateNotesOpen(true)}>打开重复笔记检查</button></div>
           {duplicateNotesOpen && <DuplicateNotes onClose={() => setDuplicateNotesOpen(false)} onOpenFile={onOpenFile} />}
           <div className="settings-row"><div><strong>待办任务中心</strong><span>汇总已保存待办，筛选回访来源笔记；勾选和保存沿用原编辑器。</span></div><button type="button" className="btn" onClick={() => setTaskCenterOpen(true)}>打开待办任务中心</button></div>

@@ -1,0 +1,42 @@
+import { beforeEach,afterEach,describe,it,expect,vi } from 'vitest'
+import { webcrypto } from 'node:crypto'
+import { historyReviewFixture } from '../test/historyReviewFixture.mjs'
+import { validateHistoryReview,readHistoryReview,sameHistoryReview,historyReviewChoices,historyReviewReport,historySourceChoices,limitHistoryReviewQuery } from './historyReview.mjs'
+beforeEach(()=>vi.stubGlobal('crypto',webcrypto));afterEach(()=>{vi.unstubAllGlobals();vi.restoreAllMocks()})
+describe('complete read-only historical snapshot ownership',()=>{
+ it('index is complete and never masquerades current text as a snapshot',async()=>{const v=await validateHistoryReview(historyReviewFixture(),'a');expect(v.selected).toBeNull();expect(v.total).toBe(3);expect(Object.isFrozen(v.versions)).toBe(true)})
+ it('reads only explicit historical selection and binds exact content',async()=>{const raw=historyReviewFixture(2),v=await validateHistoryReview(raw,'a',2);expect(v.selected).toEqual(raw.selected);expect(Object.isFrozen(v.current)).toBe(true)})
+ it('retains genuine no-history as null, not a made-up current snapshot',async()=>{const v=await validateHistoryReview(historyReviewFixture(null,{count:0}),'a');expect(v.total).toBe(0);expect(v.selected).toBeNull()})
+ it('sends no writes and encodes both identities',async()=>{const load=vi.fn(async()=>historyReviewFixture(1,{file:'a/& ?'}));await readHistoryReview(load,'a/& ?',1);expect(load).toHaveBeenCalledTimes(1);const [url,init]=load.mock.calls[0];expect(new URL(url,'http://local').searchParams.get('file')).toBe('a/& ?');expect(init.method).toBeUndefined()})
+ it('does not send an already cancelled request',async()=>{const c=new AbortController();c.abort();const load=vi.fn();await expect(readHistoryReview(load,'a',1,c.signal)).rejects.toMatchObject({code:'cancelled'});expect(load).not.toHaveBeenCalled()})
+ it('abort rejects late transport result without adopting it',async()=>{let complete;const load=()=>new Promise(r=>{complete=r}),c=new AbortController(),read=readHistoryReview(load,'a',1,c.signal);await Promise.resolve();c.abort();await expect(read).rejects.toMatchObject({code:'cancelled'});complete(historyReviewFixture(1))})
+ it('bounded request rejects when a service never settles',async()=>{await expect(readHistoryReview(()=>new Promise(()=>{}),'a',1,undefined,10)).rejects.toMatchObject({code:'timeout'})})
+ it('real digest completion must not adopt results after cancellation',async()=>{const c=new AbortController();vi.stubGlobal('crypto',{subtle:{digest:async(...args)=>{const r=await webcrypto.subtle.digest(...args);c.abort();return r}}});await expect(validateHistoryReview(historyReviewFixture(1),'a',1,c.signal)).rejects.toMatchObject({code:'cancelled'})})
+ it('transport errors never become empty history',async()=>{await expect(readHistoryReview(async()=>{throw Error('offline')},'a')).rejects.toMatchObject({code:'request'})})
+ it('timestamp alone is not freshness; metadata and both raw bodies must match',()=>{const a=historyReviewFixture(2),b=structuredClone(a);b.captured_at++;expect(sameHistoryReview(a,b)).toBe(true);b.selected.content+='x';expect(sameHistoryReview(a,b)).toBe(false);expect(sameHistoryReview(a,null)).toBe(false)})
+ it('filters the whole retained index by id/title/ISO date',()=>{const a=historyReviewFixture(null,{count:45});expect(historyReviewChoices(a,'历史标题 44').map(v=>v.id)).toEqual([44]);expect(historyReviewChoices(a,'1970-01-01')).toHaveLength(45);expect(historyReviewChoices(a,'not found')).toEqual([]);expect(()=>historyReviewChoices(a,'a'.repeat(129))).toThrow()})
+ it('private summary excludes note identities, historical title, time and body',()=>{const r=JSON.parse(historyReviewReport(historyReviewFixture(2)));expect(Object.keys(r).sort()).toEqual(['captured_at','contains_contents','counts','format','mode','raw_equal','retained_versions','scope','state','version']);expect(r.contains_contents).toBe(false);expect(JSON.stringify(r)).not.toContain('历史标题');expect(r.selected).toBeUndefined()})
+ it('explicit detailed export preserves original historical and current bodies',()=>{const a=historyReviewFixture(2,{old:'历史\r\n😀',body:'当前\n'}),r=JSON.parse(historyReviewReport(a,'raw',true));expect(r.current).toEqual(a.current);expect(r.selected).toEqual(a.selected);expect(r.contains_contents).toBe(true);expect(r.rows[0].ending).toBe('CRLF')})
+ it('refuses export without a selected history or invalid mode/consent',()=>{expect(()=>historyReviewReport(historyReviewFixture())).toThrow();expect(()=>historyReviewReport(historyReviewFixture(2),'other')).toThrow();expect(()=>historyReviewReport(historyReviewFixture(2),'text','true')).toThrow()})
+})
+const malformed={version:0,complete:false,total:2,revision:'bad',captured_at:-1,'current.id':'other','current.title':'__tpl__secret','current.folder':null,'current.updated_at':-1,'current.content':null,'current.content_hash':'0'.repeat(64),'current.content_bytes':3,'current.parent_id':'bad\0','versions.0.id':-1,'versions.0.file_id':'other','versions.0.title':null,'versions.0.created_at':Infinity,'versions.0.content_bytes':-1,'versions.1.id':3,'selected.id':999,'selected.file_id':'b','selected.title':'other','selected.content_hash':'0'.repeat(64),'selected.content_bytes':0,'selected.created_at':0}
+for(const [path,value]of Object.entries(malformed))it('rejects malformed '+path,async()=>{const a=historyReviewFixture(3);let n=a;const parts=path.split('.');for(const k of parts.slice(0,-1))n=n[k];n[parts.at(-1)]=value;await expect(validateHistoryReview(a,'a',3)).rejects.toThrow()})
+for(const key of ['versions','current','selected','revision','captured_at','complete','total'])it('refuses missing '+key,async()=>{const a=historyReviewFixture(3);delete a[key];await expect(validateHistoryReview(a,'a',3)).rejects.toThrow()})
+for(const body of ['',' ','e\u0301\r\n中😀','<script>unsafe</script>'])it('preserves complete original bytes '+JSON.stringify(body),async()=>{const raw=historyReviewFixture(1,{old:body,body}),v=await validateHistoryReview(raw,'a',1);expect(v.selected.content).toBe(body);expect(v.current.content).toBe(body)})
+it('refuses wrong ordering, oversized index and any truncated selection',async()=>{for(const mutate of [v=>v.versions.reverse(),v=>{v.versions=Array(501).fill(v.versions[0]);v.total=501},v=>{v.selected=null},v=>{v.selected.content='x'.repeat(512*1024+1)}]){const a=historyReviewFixture(3);mutate(a);await expect(validateHistoryReview(a,'a',3)).rejects.toThrow()}})
+it('does not adopt selected historical text on an index-only request',async()=>{await expect(validateHistoryReview(historyReviewFixture(3),'a')).rejects.toThrow()})
+it('history filters consistently accept 128 Unicode code points but refuse 129',()=>{
+ const query='🌱'.repeat(128),index={notes:[{id:'a',title:query,parent_id:'',folder:'root',updated_at:1}]},snapshot=historyReviewFixture()
+ snapshot.versions[0].title=query
+ expect(historySourceChoices(index,query).map(n=>n.id)).toEqual(['a'])
+ expect(historyReviewChoices(snapshot,query).map(n=>n.id)).toEqual([3])
+ for(const run of [q=>historySourceChoices(index,q),q=>historyReviewChoices(snapshot,q)]){
+  expect(()=>run(query+'🌱')).toThrow();expect(()=>run('\uD800')).toThrow();expect(()=>run(null)).toThrow()
+ }
+})
+it('confirmed query limiter preserves Unicode and removes only ill-formed scalar fragments',()=>{
+ expect(limitHistoryReviewQuery('🌱'.repeat(129))).toBe('🌱'.repeat(128))
+ expect(limitHistoryReviewQuery('e\u0301中')).toBe('e\u0301中')
+ expect(limitHistoryReviewQuery('中\uD800文')).toBe('中文')
+ expect(()=>limitHistoryReviewQuery(null)).toThrow()
+})
