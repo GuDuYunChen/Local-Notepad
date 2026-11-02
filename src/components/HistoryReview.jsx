@@ -1,19 +1,32 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { api } from '~/services/api'
-import { readComparisonIndex, comparisonChoices, readComparisonSource, compareNoteText, COMPARISON_ROW_PAGE } from '~/services/noteComparison.mjs'
-import { readHistoryReview, sameHistoryReview, historyReviewChoices, downloadHistoryReview, HISTORY_REVIEW_PAGE } from '~/services/historyReview.mjs'
+import { readComparisonIndex, readComparisonSource, compareNoteText, COMPARISON_ROW_PAGE } from '~/services/noteComparison.mjs'
+import { readHistoryReview, sameHistoryReview, historyReviewChoices, historySourceChoices, limitHistoryReviewQuery, downloadHistoryReview, HISTORY_REVIEW_PAGE } from '~/services/historyReview.mjs'
 import { formatHistoryTime } from '~/services/versionHistory.mjs'
 import './HistoryReview.css'
 
 const controls = node => [...(node?.querySelectorAll('button:not(:disabled),input:not(:disabled),select:not(:disabled)') || [])].filter(n=>!n.closest('[hidden],fieldset:disabled'))
+// Each input owns its candidate buffer. Candidate edits are neither truncated
+// nor used to filter; compositionend/blur commits the actual input value once.
+function useHistorySearch(onCommit) {
+  const [query,setQuery]=useState(''), [draft,setDraft]=useState(''), [pending,setPending]=useState(false)
+  const active=useRef(false), hintId=useId()
+  const apply=value=>{const next=limitHistoryReviewQuery(value);setDraft(next);setQuery(next);onCommit()}
+  const finish=event=>{if(!active.current)return;active.current=false;setPending(false);apply(event.currentTarget.value)}
+  const reset=()=>{active.current=false;setPending(false);setDraft('');setQuery('');onCommit()}
+  return {query,pending,active,hintId,reset,input:{value:draft,'aria-describedby':hintId,
+    onCompositionStart:()=>{active.current=true;setPending(true)},onCompositionEnd:finish,onBlur:finish,
+    onChange:event=>{if(active.current||event.nativeEvent.isComposing){active.current=true;setPending(true);setDraft(event.target.value)}else apply(event.target.value)}}}
+}
 export default function HistoryReview({ onClose, onOpenFile }) {
-  const [index,setIndex]=useState(null), [query,setQuery]=useState(''), [page,setPage]=useState(0)
-  const [file,setFile]=useState(''), [snapshot,setSnapshot]=useState(null), [historyQuery,setHistoryQuery]=useState(''), [historyPage,setHistoryPage]=useState(0)
+  const [index,setIndex]=useState(null), [page,setPage]=useState(0)
+  const [file,setFile]=useState(''), [snapshot,setSnapshot]=useState(null), [historyPage,setHistoryPage]=useState(0)
+  const noteSearch=useHistorySearch(()=>setPage(0)), historySearch=useHistorySearch(()=>setHistoryPage(0))
+  const query=noteSearch.query, historyQuery=historySearch.query
   const [mode,setMode]=useState('text'), [rowPage,setRowPage]=useState(0), [change,setChange]=useState(0), [relocate,setRelocate]=useState(0)
   const [busy,setBusy]=useState(''), [stale,setStale]=useState(false), [problem,setProblem]=useState(''), [message,setMessage]=useState('')
   const [confirm,setConfirm]=useState(false), [contents,setContents]=useState(false)
-  const composing=useRef(false)
   const panel=useRef(null), active=useRef(null), alive=useRef(false), closing=useRef(false), invalid=useRef(false), lastRead=useRef({file:'',version:null}), exportButton=useRef(null), previousConfirm=useRef(false)
   const current=ctl=>alive.current&&!closing.current&&active.current===ctl&&!ctl.signal.aborted
   const begin=kind=>{if(active.current||closing.current)return null;const ctl=new AbortController();active.current=ctl;setBusy(kind);setProblem('');setMessage('');return ctl}
@@ -22,7 +35,7 @@ export default function HistoryReview({ onClose, onOpenFile }) {
   const invalidate=()=>{invalid.current=true;active.current?.abort();active.current=null;setBusy('');setStale(true);setConfirm(false);setMessage('');setProblem('资料库已变化，旧对照不能打开或导出。请重新读取目录。')}
   const refresh=async()=>{
     const ctl=begin('index');if(!ctl)return
-    invalid.current=false;setStale(false);setIndex(null);setSnapshot(null);setFile('');setConfirm(false);setPage(0);setHistoryPage(0);setHistoryQuery('')
+    invalid.current=false;setStale(false);setIndex(null);setSnapshot(null);setFile('');setConfirm(false);setPage(0);setHistoryPage(0);historySearch.reset()
     try{const value=await readComparisonIndex(api,ctl.signal);if(current(ctl)){setIndex(value);setMessage('目录已读取。请选择一篇普通笔记；不会自动恢复、清理或保存正文。')}}
     catch(e){if(current(ctl))setProblem(e.message)}finally{finish(ctl)}
   }
@@ -30,7 +43,7 @@ export default function HistoryReview({ onClose, onOpenFile }) {
     if(!index||invalid.current||confirm)return
     const ctl=begin('history');if(!ctl)return
     const switching=file!==id;lastRead.current={file:id,version};setFile(id);setSnapshot(null)
-    if(switching){setHistoryQuery('');setHistoryPage(0)}
+    if(switching){historySearch.reset();setHistoryPage(0)}
     try{
       const value=await readHistoryReview(api,id,version,ctl.signal)
       if(!current(ctl))return
@@ -44,7 +57,7 @@ export default function HistoryReview({ onClose, onOpenFile }) {
   useEffect(()=>{void refresh()},[])
   useEffect(()=>{const events=['library:refresh','folder-workspace:changed','trash-recovery:changed'];for(const name of events)window.addEventListener(name,invalidate);return()=>{for(const name of events)window.removeEventListener(name,invalidate)}},[])
   useLayoutEffect(()=>{if(confirm)controls(panel.current?.querySelector('[role=alertdialog]'))[0]?.focus();else if(previousConfirm.current)exportButton.current?.focus();previousConfirm.current=confirm},[confirm])
-  const notes=useMemo(()=>index?comparisonChoices(index,query):[],[index,query])
+  const notes=useMemo(()=>index?historySourceChoices(index,query):[],[index,query])
   const versions=useMemo(()=>snapshot?historyReviewChoices(snapshot,historyQuery):[],[snapshot,historyQuery])
   const model=useMemo(()=>snapshot?.selected?compareNoteText(snapshot.selected.content,snapshot.current.content,mode):null,[snapshot,mode])
   const notePages=Math.max(1,Math.ceil(notes.length/HISTORY_REVIEW_PAGE)), versionPages=Math.max(1,Math.ceil(versions.length/HISTORY_REVIEW_PAGE)), rowPages=Math.max(1,Math.ceil((model?.rows.length||0)/COMPARISON_ROW_PAGE))
@@ -75,24 +88,24 @@ export default function HistoryReview({ onClose, onOpenFile }) {
   }
   const keyboard=e=>{
     e.stopPropagation()
-    if(composing.current||e.nativeEvent?.isComposing||e.isComposing||e.keyCode===229||e.repeat)return
+    if(noteSearch.active.current||historySearch.active.current||e.nativeEvent?.isComposing||e.isComposing||e.keyCode===229||e.repeat)return
     if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'){e.preventDefault();return}
     if(e.key==='Escape'){e.preventDefault();e.stopPropagation();if(busy)cancel();else if(confirm)setConfirm(false);else close()}
     if(e.key==='Tab'){const list=controls(confirm?panel.current?.querySelector('[role=alertdialog]'):panel.current);if(list.length){const first=list[0],last=list.at(-1);if(e.shiftKey&&(document.activeElement===first||!list.includes(document.activeElement))){e.preventDefault();last.focus()}else if(!e.shiftKey&&(document.activeElement===last||!list.includes(document.activeElement))){e.preventDefault();first.focus()}}}
   }
-  return createPortal(<div className="history-review-overlay" data-opening={busy==='open'?'true':undefined} onKeyDown={keyboard} onCompositionStart={()=>{composing.current=true}} onCompositionEnd={()=>{composing.current=false}}><section ref={panel} className="history-review" role="dialog" aria-modal="true" aria-label="本地历史检索与对照" aria-busy={!!busy}>
+  return createPortal(<div className="history-review-overlay" data-opening={busy==='open'?'true':undefined} onKeyDown={keyboard}><section ref={panel} className="history-review" role="dialog" aria-modal="true" aria-label="本地历史检索与对照" aria-busy={!!busy}>
     <header className="history-review-header"><div><small>本地 · 只读 · 不覆盖草稿</small><h2>历史检索与对照</h2></div><button type="button" className="btn" disabled={confirm} onClick={close}>关闭历史中心</button></header>
     <div className="history-review-feedback" aria-live="polite">{problem?<p role="alert">{problem}</p>:<p role="status">{message||(busy==='index'?'正在读取本地目录…':busy==='history'?'正在读取当前正文与保留历史…':busy==='export'?'正在重新核对导出来源…':busy==='open'?'正在通过原保存保护打开来源…':'请选择笔记和历史快照。')}</p>}{busy&&<button type="button" className="btn" onClick={cancel}>取消当前操作</button>}{!busy&&(stale||!index)&&<button type="button" className="btn" onClick={()=>void refresh()}>重新读取目录</button>}{!busy&&!stale&&index&&file&&!snapshot&&<button type="button" className="btn" onClick={()=>void load(lastRead.current.file,lastRead.current.version)}>重试读取历史</button>}</div>
     <div className="history-review-scroll">
       <p className="history-review-scope">仅查看普通笔记中仍被保留的快照；不包含模板、回收站、附件内容或未保存草稿，也不是完整编辑审计。恢复正文请先打开来源，再使用原编辑器的版本历史。</p>
       <div className="history-review-columns">
-        <section aria-label="选择历史来源" className="history-review-source"><h3>1. 选择笔记</h3><label>查找笔记<input aria-label="历史中心查找笔记" maxLength={128} value={query} disabled={blocked} onChange={e=>{setQuery(e.target.value);setPage(0)}}/></label>
+        <section aria-label="选择历史来源" className="history-review-source"><h3>1. 选择笔记</h3><label>查找笔记<input aria-label="历史中心查找笔记" {...noteSearch.input} disabled={blocked}/><small id={noteSearch.hintId} role="status">{noteSearch.pending?'输入法文字尚未确认，仍按上次条件显示。':'输入法确认后最多128个字符，不搜索正文。'}</small></label>
           <p>共 {notes.length} 篇匹配笔记{index?` · 排除 ${index.hidden} 个隐藏项目`:''}</p>
           {index&&!notes.length&&<p role="status">{index.notes.length?'没有匹配笔记，请清除查找条件。':'当前没有可查看的普通笔记。'}</p>}
           <ul>{notes.slice(page*HISTORY_REVIEW_PAGE,(page+1)*HISTORY_REVIEW_PAGE).map(n=><li key={n.id}><button type="button" className={file===n.id?'selected':''} data-history-file={n.id} disabled={blocked} aria-pressed={file===n.id} onClick={()=>void load(n.id)}><strong>{n.title||'未命名'}</strong><small>{n.folder}</small></button></li>)}</ul>
           <nav aria-label="历史来源分页"><button type="button" disabled={blocked||page===0} onClick={()=>setPage(n=>n-1)}>上一页笔记</button><span>{page+1}/{notePages}</span><button type="button" disabled={blocked||page+1>=notePages} onClick={()=>setPage(n=>n+1)}>下一页笔记</button></nav>
         </section>
-        <section aria-label="选择历史快照" className="history-review-versions"><h3>2. 选择保留快照</h3><label>查找快照<input aria-label="历史中心查找快照" maxLength={128} value={historyQuery} disabled={blocked||!snapshot} placeholder="快照编号、历史标题或 ISO 日期" onChange={e=>{setHistoryQuery(e.target.value);setHistoryPage(0)}}/></label>
+        <section aria-label="选择历史快照" className="history-review-versions"><h3>2. 选择保留快照</h3><label>查找快照<input aria-label="历史中心查找快照" {...historySearch.input} disabled={blocked||!snapshot} placeholder="快照编号、历史标题或 ISO 日期"/><small id={historySearch.hintId} role="status">{historySearch.pending?'输入法文字尚未确认，仍按上次条件显示。':'输入法确认后最多128个字符，不搜索历史正文。'}</small></label>
           {!file&&<p>先选择左侧笔记。</p>}{snapshot&&<><p>匹配 {versions.length} / 当前保留 {snapshot.total} 份</p>{!versions.length&&<p role="status">{snapshot.total?'没有匹配快照；清除查找可查看其余记录。':'暂无保留历史，不提供虚构的恢复点。'}</p>}
           <ul>{versions.slice(historyPage*HISTORY_REVIEW_PAGE,(historyPage+1)*HISTORY_REVIEW_PAGE).map(v=><li key={v.id}><button type="button" data-history-version={v.id} aria-pressed={snapshot.selected?.id===v.id} className={snapshot.selected?.id===v.id?'selected':''} disabled={blocked||v.content_bytes>512*1024} onClick={()=>void load(file,v.id)}><strong>快照 #{v.id} · {v.title||'未命名'}</strong><small>{formatHistoryTime(v.created_at)} · {v.content_bytes} 字节{v.content_bytes>512*1024?' · 超过对照预算':''}</small></button></li>)}</ul>
           <nav aria-label="历史快照分页"><button type="button" disabled={blocked||historyPage===0} onClick={()=>setHistoryPage(n=>n-1)}>上一页快照</button><span>{historyPage+1}/{versionPages}</span><button type="button" disabled={blocked||historyPage+1>=versionPages} onClick={()=>setHistoryPage(n=>n+1)}>下一页快照</button></nav></>}

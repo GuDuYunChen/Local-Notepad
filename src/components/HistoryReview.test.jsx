@@ -42,3 +42,90 @@ it('source owner acceptance is the only event that closes after opening',async()
 it('changed source is refused by the original-owner read hook',async()=>{await compare();freshSource=historyReviewFixture(null,{body:'changed'}).current;await click('打开当前笔记');await wait(()=>expect(document.querySelector('[role=alert]').textContent).toContain('已变化'));expect(closed).not.toHaveBeenCalled()})
 it('Ctrl+S, composing Escape and focus trap cannot trigger background commands',async()=>{const modal=document.querySelector('.history-review-overlay');const save=new KeyboardEvent('keydown',{key:'s',ctrlKey:true,bubbles:true,cancelable:true});await act(async()=>{modal.dispatchEvent(save);modal.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',isComposing:true,bubbles:true}));await drain()});expect(save.defaultPrevented).toBe(true);expect(closed).not.toHaveBeenCalled();await compare();await click('导出历史对照报告');const first=document.querySelector('[role=alertdialog] input');first.focus();await act(async()=>{first.dispatchEvent(new KeyboardEvent('keydown',{key:'Tab',shiftKey:true,bubbles:true,cancelable:true}));await drain()});expect(document.activeElement).toBe(button('核对后下载'));await click('取消导出');expect(document.activeElement).toBe(button('导出历史对照报告'))})
 it('one synchronous operation lock prevents duplicate native actions',async()=>{let resolve;held={promise:new Promise(r=>{resolve=r})};const b=document.querySelector('[data-history-file="a"]');await act(async()=>{b.click();b.click();await drain()});expect(api.mock.calls.filter(([p])=>p.startsWith('/api/history-review'))).toHaveLength(1);await click('关闭历史中心');await act(async()=>{resolve(historyReviewFixture());await drain()});expect(closed).toHaveBeenCalledTimes(1)})
+
+// Regression for HISTORY-01 in BOTH new search inputs. These are React input-
+// method event tests, not a claim of Windows IME execution.
+const historySearchScopes=[
+ {name:'note source',label:'历史中心查找笔记',rows:'[data-history-file]',prepare:async()=>{},final:'比较笔记 a.md',expected:'a'},
+ {name:'retained snapshot',label:'历史中心查找快照',rows:'[data-history-version]',prepare:selectNote,final:'历史标题 2',expected:'2'},
+]
+const searchRows=scope=>[...document.querySelectorAll(scope.rows)].map(n=>n.getAttribute(scope.rows.slice(1,-1)))
+const searchInput=scope=>document.querySelector(`[aria-label="${scope.label}"]`)
+async function ime(scope,type,value){await act(async()=>{
+ const input=searchInput(scope)
+ if(value!==undefined)Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,value)
+ input.dispatchEvent(new CompositionEvent(type,{bubbles:true,data:value??''}));await drain()
+})}
+async function candidate(scope,value,composing=true){await act(async()=>{
+ const input=searchInput(scope);Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,value)
+ input.dispatchEvent(new InputEvent('input',{bubbles:true,isComposing:composing,inputType:composing?'insertCompositionText':'insertText'}));await drain()
+})}
+for(const scope of historySearchScopes){
+ it('IME '+scope.name+': candidate does not change committed results or fetch bodies',async()=>{
+  await scope.prepare();const before=searchRows(scope),reads=api.mock.calls.length
+  await ime(scope,'compositionstart');await candidate(scope,'xingtu')
+  expect(searchInput(scope).value).toBe('xingtu');expect(searchRows(scope)).toEqual(before)
+  expect(document.body.textContent).toContain('输入法文字尚未确认');expect(api).toHaveBeenCalledTimes(reads)
+ })
+ it('IME '+scope.name+': isComposing input without start still holds results',async()=>{
+  await scope.prepare();const before=searchRows(scope)
+  await candidate(scope,'xingtu');expect(searchRows(scope)).toEqual(before)
+ })
+ it('IME '+scope.name+': end commits Chinese text and filters the full index',async()=>{
+  await scope.prepare();await ime(scope,'compositionstart');await candidate(scope,'zhongwen')
+  await ime(scope,'compositionend',scope.final)
+  expect(searchInput(scope).value).toBe(scope.final);expect(searchRows(scope)).toEqual([scope.expected])
+ })
+ it('IME '+scope.name+': no browser maxlength truncates an active candidate',async()=>{
+  await scope.prepare();expect(searchInput(scope).hasAttribute('maxlength')).toBe(false)
+ })
+}
+for(const scope of historySearchScopes){
+ it('IME '+scope.name+': long candidate stays intact and commit is code-point bounded',async()=>{
+  await scope.prepare();const prefix='文'.repeat(127)
+  await candidate(scope,prefix,false);await ime(scope,'compositionstart');await candidate(scope,prefix+'zhong')
+  expect(searchInput(scope).value).toBe(prefix+'zhong')
+  await ime(scope,'compositionend',prefix+'中文');expect(searchInput(scope).value).toBe(prefix+'中')
+ })
+ it('IME '+scope.name+': emoji limit never splits a surrogate pair or crashes filtering',async()=>{
+  await scope.prepare();const prefix='🌱'.repeat(127)
+  await candidate(scope,prefix,false);expect(searchInput(scope).value).toBe(prefix)
+  await ime(scope,'compositionstart');await candidate(scope,prefix+'zhong')
+  expect(searchInput(scope).value).toBe(prefix+'zhong')
+  await ime(scope,'compositionend',prefix+'🌿多余');expect(searchInput(scope).value).toBe(prefix+'🌿')
+  expect(Array.from(searchInput(scope).value)).toHaveLength(128);expect(document.querySelector('.history-review')).not.toBeNull()
+ })
+ it('IME '+scope.name+': blur commits once and late compositionend does not revive a condition',async()=>{
+  await scope.prepare();searchInput(scope).focus();await ime(scope,'compositionstart');await candidate(scope,scope.final)
+  await act(async()=>{searchInput(scope).blur();await drain()});expect(searchRows(scope)).toEqual([scope.expected])
+  await candidate(scope,'',false)
+  await act(async()=>{searchInput(scope).dispatchEvent(new CompositionEvent('compositionend',{bubbles:true,data:scope.final}));await drain()})
+  expect(searchInput(scope).value).toBe('');expect(searchRows(scope).length).toBeGreaterThan(1)
+ })
+ it('IME '+scope.name+': ending before final input and cancelled composition are safe',async()=>{
+  await scope.prepare();await ime(scope,'compositionstart');await candidate(scope,'unfinished')
+  await ime(scope,'compositionend','');await candidate(scope,'',false);expect(searchRows(scope).length).toBeGreaterThan(1)
+  await ime(scope,'compositionstart');await ime(scope,'compositionend',scope.final);await candidate(scope,scope.final,false)
+  expect(searchRows(scope)).toEqual([scope.expected])
+ })
+ it('IME '+scope.name+': confirmed typing filters immediately and does not issue a query request',async()=>{
+  await scope.prepare();const n=api.mock.calls.length;await candidate(scope,scope.final,false)
+  expect(searchRows(scope)).toEqual([scope.expected]);expect(api).toHaveBeenCalledTimes(n)
+ })
+}
+it('IME snapshot reset when changing note cannot be undone by an old end event',async()=>{
+ const scope=historySearchScopes[1];await selectNote();await ime(scope,'compositionstart');await candidate(scope,'oldcandidate')
+ await tap('[data-history-file="b"]');await wait(()=>expect(document.querySelector('[data-history-version]')).not.toBeNull())
+ expect(searchInput(scope).value).toBe('')
+ await act(async()=>{searchInput(scope).dispatchEvent(new CompositionEvent('compositionend',{bubbles:true,data:'oldcandidate'}));await drain()})
+ expect(searchInput(scope).value).toBe('');expect(searchRows(scope)).toEqual(['3','2','1'])
+})
+it('IME search is read-only and does not invalidate selected comparison or export consent',async()=>{
+ await compare();const before=document.querySelector('[data-history-state]').dataset.historyState,requests=api.mock.calls.length
+ const scope=historySearchScopes[1];await ime(scope,'compositionstart');await candidate(scope,'snapshot')
+ expect(document.querySelector('[data-history-state]').dataset.historyState).toBe(before)
+ expect(api).toHaveBeenCalledTimes(requests);expect(downloads).toHaveLength(0)
+ await ime(scope,'compositionend','missing');expect(document.body.textContent).toContain('当前对照的快照不在查找结果中')
+ await click('导出历史对照报告');expect(document.querySelector('input[type=checkbox]').checked).toBe(false)
+ await click('取消导出');expect(api).toHaveBeenCalledTimes(requests)
+})

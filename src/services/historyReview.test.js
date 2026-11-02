@@ -1,7 +1,7 @@
 import { beforeEach,afterEach,describe,it,expect,vi } from 'vitest'
 import { webcrypto } from 'node:crypto'
 import { historyReviewFixture } from '../test/historyReviewFixture.mjs'
-import { validateHistoryReview,readHistoryReview,sameHistoryReview,historyReviewChoices,historyReviewReport } from './historyReview.mjs'
+import { validateHistoryReview,readHistoryReview,sameHistoryReview,historyReviewChoices,historyReviewReport,historySourceChoices,limitHistoryReviewQuery } from './historyReview.mjs'
 beforeEach(()=>vi.stubGlobal('crypto',webcrypto));afterEach(()=>{vi.unstubAllGlobals();vi.restoreAllMocks()})
 describe('complete read-only historical snapshot ownership',()=>{
  it('index is complete and never masquerades current text as a snapshot',async()=>{const v=await validateHistoryReview(historyReviewFixture(),'a');expect(v.selected).toBeNull();expect(v.total).toBe(3);expect(Object.isFrozen(v.versions)).toBe(true)})
@@ -25,3 +25,18 @@ for(const key of ['versions','current','selected','revision','captured_at','comp
 for(const body of ['',' ','e\u0301\r\n中😀','<script>unsafe</script>'])it('preserves complete original bytes '+JSON.stringify(body),async()=>{const raw=historyReviewFixture(1,{old:body,body}),v=await validateHistoryReview(raw,'a',1);expect(v.selected.content).toBe(body);expect(v.current.content).toBe(body)})
 it('refuses wrong ordering, oversized index and any truncated selection',async()=>{for(const mutate of [v=>v.versions.reverse(),v=>{v.versions=Array(501).fill(v.versions[0]);v.total=501},v=>{v.selected=null},v=>{v.selected.content='x'.repeat(512*1024+1)}]){const a=historyReviewFixture(3);mutate(a);await expect(validateHistoryReview(a,'a',3)).rejects.toThrow()}})
 it('does not adopt selected historical text on an index-only request',async()=>{await expect(validateHistoryReview(historyReviewFixture(3),'a')).rejects.toThrow()})
+it('history filters consistently accept 128 Unicode code points but refuse 129',()=>{
+ const query='🌱'.repeat(128),index={notes:[{id:'a',title:query,parent_id:'',folder:'root',updated_at:1}]},snapshot=historyReviewFixture()
+ snapshot.versions[0].title=query
+ expect(historySourceChoices(index,query).map(n=>n.id)).toEqual(['a'])
+ expect(historyReviewChoices(snapshot,query).map(n=>n.id)).toEqual([3])
+ for(const run of [q=>historySourceChoices(index,q),q=>historyReviewChoices(snapshot,q)]){
+  expect(()=>run(query+'🌱')).toThrow();expect(()=>run('\uD800')).toThrow();expect(()=>run(null)).toThrow()
+ }
+})
+it('confirmed query limiter preserves Unicode and removes only ill-formed scalar fragments',()=>{
+ expect(limitHistoryReviewQuery('🌱'.repeat(129))).toBe('🌱'.repeat(128))
+ expect(limitHistoryReviewQuery('e\u0301中')).toBe('e\u0301中')
+ expect(limitHistoryReviewQuery('中\uD800文')).toBe('中文')
+ expect(()=>limitHistoryReviewQuery(null)).toThrow()
+})

@@ -1,5 +1,5 @@
 import { dailyRequest } from './dailyNotes.mjs'
-import { comparisonHash, compareNoteText, COMPARISON_BODY_LIMIT, COMPARISON_REPORT_LIMIT } from './noteComparison.mjs'
+import { comparisonHash, comparisonChoices, compareNoteText, COMPARISON_BODY_LIMIT, COMPARISON_REPORT_LIMIT } from './noteComparison.mjs'
 
 export const HISTORY_REVIEW_LIMIT = 500
 export const HISTORY_REVIEW_PAGE = 20
@@ -55,9 +55,23 @@ export async function readHistoryReview(load, fileId, versionId = null, signal, 
 export function sameHistoryReview(a,b) {
   return !!a && !!b && a.revision === b.revision && JSON.stringify([a.current,a.versions,a.selected]) === JSON.stringify([b.current,b.versions,b.selected])
 }
+// Input-method candidates never enter these bounded committed filters.
+export const HISTORY_REVIEW_QUERY_LIMIT = 128
+export function limitHistoryReviewQuery(value) {
+  if (typeof value !== 'string') throw error('input','查找文字格式无效。')
+  return Array.from(value).filter(unicode).slice(0,HISTORY_REVIEW_QUERY_LIMIT).join('')
+}
+function committedQuery(query) {
+  if (!unicode(query) || Array.from(query).length > HISTORY_REVIEW_QUERY_LIMIT) throw error('input','历史查找文字不能超过128个字符。')
+  return query.trim().normalize('NFC').toLocaleLowerCase('zh-CN')
+}
+export function historySourceChoices(index, query = '') {
+  const q = committedQuery(query)
+  // Retain the original complete-index sort without its older UTF-16 query cap.
+  return comparisonChoices(index).filter(n => !q || [n.title,n.folder].some(t => t.normalize('NFC').toLocaleLowerCase('zh-CN').includes(q)))
+}
 export function historyReviewChoices(snapshot, query = '') {
-  if (typeof query !== 'string' || query.length > 128) throw error('input','历史查找文字不能超过128个字符。')
-  const q = query.trim().normalize('NFC').toLocaleLowerCase('zh-CN')
+  const q = committedQuery(query)
   return snapshot.versions.filter(v => !q || [String(v.id),v.title,new Date(v.created_at*1000).toISOString()].some(t => t.normalize('NFC').toLocaleLowerCase('zh-CN').includes(q)))
 }
 export function historyReviewReport(snapshot, mode = 'text', contents = false) {
