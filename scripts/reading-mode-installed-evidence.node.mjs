@@ -27,9 +27,9 @@ function fixture() {
       headSha: 'c'.repeat(40), branch: 'feature/local-export-2f102-closure', repositoryId: 1105107817,
       archiveBytes: 100, archiveSha256: createHash('sha256').update('synthetic archive').digest('hex') } }
   for (const key of READING_SOURCE_KEYS) pin[key] = 'd'.repeat(40)
-  Object.assign(pin, { importBlob: 'e4b79484a7cb7010294b62e2558c7038a757f5ad',
-    importEvidenceBlob: '5fc8018ae3d6a93a3c45d1fddbc52fa19d2d0d15',
-    importEvidenceTestsBlob: '36208525b839ef50a22f9d1e14ea78720490b039',
+  Object.assign(pin, { importBlob: '1e071bbc9370e993858369eed712703413c37072',
+    importEvidenceBlob: 'c6ba9deaea17cfcad69ca92ae530c2f831451345',
+    importEvidenceTestsBlob: '4e28a1ed041e5406c682e0ebdd73adaa2985c628',
     historyDriverBlob: blob(source('check-version-history-desktop.mjs').replace(/\r\n/g, '\n')) })
   const report = { productCommit: pin.product, verifierCommit: verifier, complete: true, cleanupComplete: true,
     syntheticData: true, usedDefaultDataPath: true, forceTerminated: false, platform: 'win32', runnerEnvironment: 'github-hosted',
