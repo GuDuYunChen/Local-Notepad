@@ -204,7 +204,7 @@ export function createExportDirectorySession({ ownedRoot, spawnWorker = spawn,
         let timeout
         try {
           try { child?.stdin.end() } catch { streamFailed = true }
-          const result = await Promise.race([exited, new Promise(resolve => { timeout = setTimeout(() => resolve(null), 5000) })])
+          const result = await Promise.race([exited, new Promise(resolve => { timeout = setTimeout(() => resolve(null), 2000) })])
           if (result === null) { try { child?.kill() } catch {}; event({ type: 'dispose', clean: false }); state = 'closed'; return false }
           const clean = state !== 'failed' && !streamFailed && result.code === 0 && result.signal === null
           state = 'closed'; event({ type: 'dispose', clean }); return clean
