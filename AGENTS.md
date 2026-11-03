@@ -1,3 +1,7 @@
+# Active verification repair: native helper lifecycle / product 4.248.0 unchanged
+
+Current accepted master is8538e3f41729f245721ef6dff531c6431182a14d; PR23/2F115 is accepted. Continue the existing fix/native-helper-lifecycle-4-248 branch. Read docs/NATIVE_HELPER_LIFECYCLE_4_248.md and actual remote receipts. This task fixes verifier event/cleanup truthfulness; no new product feature, version bump, cloud work or bulk branch deletion. Preserve original startup/request/disposal budgets, all business assertions and independent Windows verification. The earlier instructions below are retained history; their old accepted baseline is not current.
+
 # Current local module: 2F.115 / 4.248.0 history review workspace
 
 Accepted remote baseline: master `ca1a6c6479b23be43a17d3b6c39e032e6fde61c9`, tree `e0f90bc655d805fd0a704a4d31b2c55b41f27d1b`, version4.247.1. PR22 merged and Issue21 completed after productCI1782 and independent Windows96. Do not reopen the old publication block, 94/95 row-border rejection or unfinished asynchronous test follow-ups as current defects. Actual remote objects and final PR evidence override older source headings.

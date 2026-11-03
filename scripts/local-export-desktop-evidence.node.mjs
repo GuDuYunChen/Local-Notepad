@@ -155,7 +155,7 @@ test('native picker requires exactly one action and a closed original dialog', (
 function fakeWorker({ response, ready = true, holdExit = false } = {}) {
   const child = new EventEmitter(), commands = [], spawns = []; let ended = false, kills = 0
   child.pid = 991; child.stdout = new PassThrough(); child.stderr = new PassThrough()
-  const exit = (code, signal = null) => { if (!ended) { ended = true; child.emit('exit', code, signal) } }
+  const exit = (code, signal = null) => { if (!ended) { ended = true; child.emit('exit', code, signal); child.emit('close', code, signal) } }
   const send = value => child.stdout.write(JSON.stringify(value) + '\r\n')
   child.stdin = new Writable({ write(chunk, _encoding, done) {
     const request = JSON.parse(chunk.toString()); commands.push(request); done()

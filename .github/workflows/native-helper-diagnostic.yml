@@ -1,159 +1,63 @@
-name: Native helper lifecycle investigation
+name: Native helper lifecycle verification
 on:
-  push:
-    branches: [fix/native-helper-lifecycle-4-248]
-    paths: [.github/workflows/native-helper-diagnostic.yml]
+  pull_request:
+    branches: [master]
+    paths:
+      - scripts/desktop-window-session.mjs
+      - scripts/local-export-directory-session.mjs
+      - scripts/desktop-window-worker.ps1
+      - scripts/local-export-directory-worker.ps1
+      - scripts/native-helper-lifecycle.node.mjs
+      - scripts/check-native-helper-lifecycle.mjs
+      - .github/workflows/native-helper-diagnostic.yml
+  workflow_dispatch:
 permissions:
   contents: read
 concurrency:
-  group: native-helper-investigation-8538
+  group: native-helper-${{ github.ref }}
   cancel-in-progress: false
 jobs:
-  source-and-locked-environment:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    env:
-      GOTOOLCHAIN: local
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: 8538e3f41729f245721ef6dff531c6431182a14d
-          persist-credentials: false
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '24.22.2'
-      - uses: actions/setup-go@v7
-        with:
-          go-version: '1.24.11'
-          cache: false
-      - name: Export exact accepted source before dependency preparation
-        shell: bash
-        run: |
-          set -euo pipefail
-          test "$(git rev-parse HEAD)" = 8538e3f41729f245721ef6dff531c6431182a14d
-          test "$(git rev-parse 'HEAD^{tree}')" = d0a9f8eea51db5eb546361be161e595e56901f95
-          out="$RUNNER_TEMP/native-helper-source"
-          mkdir -p "$out"
-          git archive --format=tar.gz HEAD > "$out/source.tar.gz"
-          git cat-file commit HEAD > "$out/source-commit.raw"
-          git ls-tree -r -z HEAD > "$out/source-tree.zlist"
-          printf 'source=8538e3f41729f245721ef6dff531c6431182a14d\ntree=d0a9f8eea51db5eb546361be161e595e56901f95\nworkflow=%s\nrun=%s\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" > "$out/provenance.txt"
-          sha256sum package-lock.json server/go.sum >> "$out/provenance.txt"
-          (cd "$out" && sha256sum source.tar.gz source-commit.raw source-tree.zlist provenance.txt > SHA256SUMS)
-      - uses: actions/upload-artifact@v4
-        with:
-          name: helper-source-8538
-          path: ${{ runner.temp }}/native-helper-source/*
-          compression-level: 0
-          retention-days: 14
-          if-no-files-found: error
-      - name: Restore only committed locked dependencies
-        shell: bash
-        run: |
-          set -euo pipefail
-          node scripts/verify-dependency-lock.mjs
-          npm ci --no-audit --no-fund
-          go -C server mod download
-          git diff --exit-code -- package.json package-lock.json server/go.mod server/go.sum
-      - name: Preserve verified local execution environment
-        shell: bash
-        run: |
-          set -euo pipefail
-          out="$RUNNER_TEMP/native-helper-tools"
-          mkdir -p "$out"
-          tar -czf "$out/javascript-dependencies.tar.gz" node_modules
-          node_root="$(dirname "$(dirname "$(readlink -f "$(command -v node)")")")"
-          tar -C "$node_root" -czf "$out/node-runtime.tar.gz" bin/node bin/npm bin/npx lib/node_modules/npm
-          tar -C "$(go env GOROOT)" -czf "$out/go-toolchain.tar.gz" .
-          tar -C "$(go env GOMODCACHE)" -czf "$out/go-modules.tar.gz" .
-          { node --version; npm --version; go version; sha256sum package-lock.json server/go.sum; } > "$out/provenance.txt"
-          (cd "$out" && sha256sum *.gz provenance.txt > SHA256SUMS)
-      - uses: actions/upload-artifact@v4
-        with:
-          name: helper-locked-tools-8538
-          path: ${{ runner.temp }}/native-helper-tools/*
-          compression-level: 0
-          retention-days: 3
-          if-no-files-found: error
-  original-native-helpers:
+  native-helper-lifecycle:
     runs-on: windows-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: 8538e3f41729f245721ef6dff531c6431182a14d
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version: '24.22.2'
-      - name: Observe original startup and EOF without window commands or changed budgets
+      - name: Verify committed lock and current acceptance versions
         shell: pwsh
         run: |
-          @'
-          import assert from 'node:assert/strict'
-          import { spawn } from 'node:child_process'
-          import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs'
-          import { tmpdir, release } from 'node:os'
-          import path from 'node:path'
-          import { pathToFileURL } from 'node:url'
-          import { createHash } from 'node:crypto'
-          const base = process.cwd(), out = path.join(base, 'test-results', 'native-helper-observation')
-          mkdirSync(out, { recursive: true })
-          const report = { diagnosticOnly: true, productAcceptance: false, sourceCommit: '8538e3f41729f245721ef6dff531c6431182a14d', workflowCommit: process.env.GITHUB_SHA, run: process.env.GITHUB_RUN_ID, node: process.version, osRelease: release(), processes: {}, sessions: {}, sources: {} }
-          const save = () => writeFileSync(path.join(out, 'observation.json'), JSON.stringify(report, null, 2))
-          const exitWaits = []
-          const observedSpawn = name => (...args) => {
-            const started = Date.now(), p = spawn(...args)
-            const record = report.processes[name] = { pid: p.pid ?? null, stdoutBytes: 0, stderrBytes: 0, exit: null, close: null, errors: [] }
-            const code = e => typeof e?.code === 'string' && /^[A-Z_0-9]{1,40}$/.test(e.code) ? e.code : 'OTHER'
-            const elapsed = () => Date.now() - started
-            p.stdout.on('data', b => { record.stdoutBytes += Buffer.byteLength(b); save() })
-            p.stderr.on('data', b => { record.stderrBytes += Buffer.byteLength(b); save() })
-            for (const [key, stream] of [['stdin', p.stdin], ['stdout', p.stdout], ['stderr', p.stderr]]) stream.on('error', e => { record.errors.push({ stream: key, code: code(e), ms: elapsed() }); save() })
-            p.on('error', e => { record.errors.push({ stream: 'process', code: code(e), ms: elapsed() }); save() })
-            p.on('exit', (code, signal) => { record.exit = { code, signal, ms: elapsed() }; save() })
-            exitWaits.push(new Promise(resolve => p.once('close', (code, signal) => { record.close = { code, signal, ms: elapsed() }; save(); resolve() })))
-            save(); return p
-          }
-          const root = mkdtempSync(path.join(process.env.RUNNER_TEMP || tmpdir(), 'owned-helper-observation-'))
-          const sessions = []
-          try {
-            for (const file of ['desktop-window-session.mjs', 'desktop-window-worker.ps1', 'local-export-directory-session.mjs', 'local-export-directory-worker.ps1']) {
-              const bytes = readFileSync(path.join(base, 'scripts', file))
-              report.sources[file] = createHash('sha256').update(bytes).digest('hex')
-            }
-            const { createDesktopWindowSession } = await import(pathToFileURL(path.join(base, 'scripts', 'desktop-window-session.mjs')))
-            const { createExportDirectorySession } = await import(pathToFileURL(path.join(base, 'scripts', 'local-export-directory-session.mjs')))
-            for (const [name, factory, options] of [['window', createDesktopWindowSession, {}], ['directory', createExportDirectorySession, { ownedRoot: root }]]) {
-              const record = report.sessions[name] = { events: [], ready: false, clean: false }
-              const session = factory({ ...options, spawnWorker: observedSpawn(name), onEvent: e => { record.events.push(e); save() } })
-              sessions.push([name, session])
-            }
-            await Promise.all(sessions.map(async ([name, session]) => { await session.ready; report.sessions[name].ready = true; save() }))
-          } catch (e) { report.failureCode = /^[A-Z_]{1,80}$/.test(e?.code || '') ? e.code : 'PROBE_FAILED' }
-          finally {
-            for (const [name, session] of sessions.reverse()) {
-              try { report.sessions[name].clean = await session.dispose() } catch { report.sessions[name].disposeThrew = true }
-              save()
-            }
-            let timer
-            try { await Promise.race([Promise.all(exitWaits), new Promise(resolve => { timer = setTimeout(resolve, 3000) })]) } finally { clearTimeout(timer) }
-            report.allExitsObserved = Object.values(report.processes).every(p => p.exit !== null && p.close !== null)
-            report.noWindowCommands = true
-            rmSync(root, { recursive: true, force: false })
-            save()
-          }
-          assert.equal(report.failureCode, undefined)
-          assert.equal(sessions.length, 2)
-          assert.equal(report.allExitsObserved, true)
-          assert.ok(Object.values(report.sessions).every(s => s.ready && s.clean))
-          console.log(JSON.stringify({ diagnosticOnly: true, originalHelpersCompleted: true, productAcceptance: false }))
-          '@ | node --input-type=module
+          node scripts/verify-dependency-lock.mjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - uses: actions/upload-artifact@v4
+          node scripts/check-acceptance-versions.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Install only locked verifier dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Refuse dependency drift and prepare original canonical fixtures
+        shell: pwsh
+        run: |
+          git diff --exit-code -- package.json package-lock.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/build-reading-mode-fixture.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/build-local-export-fixture.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Run retained contracts and new event-order counterexamples
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force test-results/native-helper-lifecycle | Out-Null
+          node --test --test-reporter=tap --test-reporter-destination=test-results/native-helper-lifecycle/contracts.tap scripts/reading-mode-desktop-evidence.node.mjs scripts/reading-mode-installed-evidence.node.mjs scripts/reading-mode-native-input.node.mjs scripts/desktop-window-session.node.mjs scripts/shortcut-management-desktop-evidence.node.mjs scripts/shortcut-management-installed-evidence.node.mjs scripts/local-export-desktop-evidence.node.mjs scripts/local-export-installed-evidence.node.mjs scripts/block-references-evidence.node.mjs scripts/block-references-installed-evidence.node.mjs scripts/native-helper-lifecycle.node.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Prove real PowerShell readiness and EOF with independent exit and close receipts
+        run: node scripts/check-native-helper-lifecycle.mjs
+      - name: Preserve complete or failed original evidence
         if: always()
+        uses: actions/upload-artifact@v4
         with:
-          name: original-helper-observation-8538
-          path: test-results/native-helper-observation/*
+          name: native-helper-lifecycle-${{ github.sha }}
+          path: test-results/native-helper-lifecycle/*
           if-no-files-found: error
           retention-days: 14

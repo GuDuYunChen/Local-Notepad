@@ -1,3 +1,9 @@
+# Active handoff: native helper lifecycle investigation
+
+2F.115/4.248.0 is already accepted in master8538e3f4 by PR23. The current working branch is fix/native-helper-lifecycle-4-248. Diagnostic9f2c0338/run41563100415 verified original empty startup/EOF and exported source/locked tools; it did not accept a product or explain the earlier intermittent failures. Current repair addresses independently reproduced lifecycle truthfulness defects with unchanged budgets. Read NATIVE_HELPER_LIFECYCLE_4_248.md and the latest PR/remote HEAD before writes. No new business module starts until this repair is accepted. Never revive duplicate closed PR24 or the reverted2s-to5s timeout change.
+
+The historical handoff below is preserved, not the current task status.
+
 # Current handoff: 2F.115 / 4.248.0 local history review
 
 The previous2F114/4.247.1 repair IS accepted and merged: masterca1a6c6479b23be43a17d3b6c39e032e6fde61c9, treee0f90bc655d805fd0a704a4d31b2c55b41f27d1b; productCI1782, actualWindows96, PR22merged, Issue21completed. main remains untouched. Final acceptance is inPR22 and the delivered accepted records. Older pending statements are preserved in `docs/history/HANDOFF-before-2F115.md`, not current task state.
