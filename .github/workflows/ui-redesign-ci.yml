@@ -318,8 +318,8 @@ jobs:
           $fixture = Join-Path $env:RUNNER_TEMP 'image-upload-recovery.jpg'
           $width = 2048
           $height = 1536
-          $bitmap = New-Object System.Drawing.Bitmap($width, $height, [System.Drawing.Imaging.PixelFormat]::Format24bppRgb)
-          $rectangle = New-Object System.Drawing.Rectangle(0, 0, $width, $height)
+          $bitmap = [System.Drawing.Bitmap]::new($width, $height, [System.Drawing.Imaging.PixelFormat]::Format24bppRgb)
+          $rectangle = [System.Drawing.Rectangle]::new(0, 0, $width, $height)
           $bits = $bitmap.LockBits($rectangle, [System.Drawing.Imaging.ImageLockMode]::WriteOnly, [System.Drawing.Imaging.PixelFormat]::Format24bppRgb)
           try {
             $bytes = New-Object byte[] ($bits.Stride * $height)
@@ -329,8 +329,8 @@ jobs:
           } finally { $bitmap.UnlockBits($bits) }
           try {
             $encoder = [System.Drawing.Imaging.ImageCodecInfo]::GetImageEncoders() | Where-Object { $_.MimeType -eq 'image/jpeg' }
-            $parameters = New-Object System.Drawing.Imaging.EncoderParameters(1)
-            $parameters.Param[0] = New-Object System.Drawing.Imaging.EncoderParameter([System.Drawing.Imaging.Encoder]::Quality, [long]90)
+            $parameters = [System.Drawing.Imaging.EncoderParameters]::new(1)
+            $parameters.Param[0] = [System.Drawing.Imaging.EncoderParameter]::new([System.Drawing.Imaging.Encoder]::Quality, [long]90)
             $bitmap.Save($fixture, $encoder, $parameters)
             $parameters.Dispose()
           } finally { $bitmap.Dispose() }
