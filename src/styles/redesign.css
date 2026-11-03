@@ -5517,3 +5517,28 @@ body {
 .editor-mode-preference-warning { color: var(--red, #c7433c); font-size: 9px; }
 .editor-reading-draft-pill { background: color-mix(in srgb, #b97820 12%, var(--surface)); color: #95621c; }
 @media (max-width: 640px) { .editor-status-bar { flex-wrap: wrap; min-height: 38px !important; gap: 6px; } .status-right { flex-wrap: wrap; gap: 6px; } .editor-mode-toggle { min-height: 28px; } }
+
+
+/* Pending image insertion stays reachable below transient top-right feedback.
+   Reuse the editor's existing button and theme tokens, not another dialog. */
+.editor-image-upload-status {
+  position: fixed;
+  right: 16px;
+  bottom: 56px;
+  z-index: 200;
+  max-width: calc(100vw - 32px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-raised);
+}
+
+.editor-image-upload-status .btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}

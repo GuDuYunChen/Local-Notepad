@@ -1,3 +1,7 @@
+# Current repair: local image insertion recovery / 4.248.1 candidate
+
+Accepted master is f989a5d74a81875311d9ab09dab4c062237889ca (PR25 merged). Continue existing fix/local-image-upload-recovery-4-248-1. Read docs/LOCAL_IMAGE_UPLOAD_RECOVERY_4_248_1.md and actual remote HEAD before writes. Repair toolbar/paste image recovery together; preserve existing save/draft/reading/quit policy, node serialization, upload API and schema14. No new business module/cloud work. Current session may lack GitHub write/PR/merge tools; record actual capabilities without disguising local changes as remote commits. A retained merged branch is maintenance, not a product blocker. The older Active headers below are historical context.
+
 # Active verification repair: native helper lifecycle / product 4.248.0 unchanged
 
 Current accepted master is8538e3f41729f245721ef6dff531c6431182a14d; PR23/2F115 is accepted. Continue the existing fix/native-helper-lifecycle-4-248 branch. Read docs/NATIVE_HELPER_LIFECYCLE_4_248.md and actual remote receipts. This task fixes verifier event/cleanup truthfulness; no new product feature, version bump, cloud work or bulk branch deletion. Preserve original startup/request/disposal budgets, all business assertions and independent Windows verification. The earlier instructions below are retained history; their old accepted baseline is not current.

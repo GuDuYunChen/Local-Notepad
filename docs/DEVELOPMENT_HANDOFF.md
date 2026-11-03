@@ -1,3 +1,9 @@
+# Current handoff: local image insertion recovery, 4.248.1 candidate
+
+PR25 is merged in master f989a5d74a81875311d9ab09dab4c062237889ca. A new existing branch fix/local-image-upload-recovery-4-248-1 was created at that exact commit before interruption; at recovery it had no new commits or open PR. Continue the scoped repair in LOCAL_IMAGE_UPLOAD_RECOVERY_4_248_1.md, not the already accepted helper repair. Baseline image-insertion checks reproduce 8 failures in 12 cases; preserve their original logs. Current local source was restored from SHA256-verified archives and matched full accepted tree9fcb62bd before edits. It is not the user's Windows workspace or remote Git history.
+
+Do not retry missing publishing/deletion tools or create parallel branches. Do not advance the next product module until this repair's code, full regressions, actual current-version Windows/installation evidence, review and real merge are obtained. Local tests and Linux renderer checks must remain separately labelled. Final execution evidence is held in the accompanying checkpoint; do not assume source text itself proves acceptance.
+
 # Active handoff: native helper lifecycle investigation
 
 2F.115/4.248.0 is already accepted in master8538e3f4 by PR23. The current working branch is fix/native-helper-lifecycle-4-248. Diagnostic9f2c0338/run41563100415 verified original empty startup/EOF and exported source/locked tools; it did not accept a product or explain the earlier intermittent failures. Current repair addresses independently reproduced lifecycle truthfulness defects with unchanged budgets. Read NATIVE_HELPER_LIFECYCLE_4_248.md and the latest PR/remote HEAD before writes. No new business module starts until this repair is accepted. Never revive duplicate closed PR24 or the reverted2s-to5s timeout change.
