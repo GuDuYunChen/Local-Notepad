@@ -1,5 +1,5 @@
 $ErrorActionPreference='Stop'
-$root=(Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$root=(Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $old=Get-ChildItem (Join-Path $root '.installer-input\4.248.0') -Filter 'Notepad-4.248.0-Setup.exe' -File | Select-Object -First 1
 $new=Get-ChildItem (Join-Path $root '.installer-input\4.248.1') -Filter 'Notepad-4.248.1-Setup.exe' -File | Select-Object -First 1
 if(!$old -or !$new){throw 'Both versioned installers are required.'}
