@@ -14,7 +14,7 @@ New-Item -ItemType Directory -Force $out|Out-Null
 if(Test-Path $install){Remove-Item $install -Recurse -Force}
 if(Test-Path $data){throw "Refusing to overwrite existing profile data: $data"}
 $r=[ordered]@{complete=$false;status='running';versions=@('4.248.0','4.248.1');installerSha256=@{old=$oldHash;new=$newHash};checks=[System.Collections.Generic.List[string]]::new();backendExitCodes=[System.Collections.Generic.List[int]]::new();startedAt=[DateTime]::UtcNow.ToString('o')}
-$http=[Net.Http.HttpClient]::new();$s=$null
+$http=[Net.Http.HttpClient]::new();$s=$null;$gui=$null;$safeCleanup=$true
 function Install-App($exe){$p=Start-Process $exe -ArgumentList @('/S',"/D=$install") -PassThru -Wait;if($p.ExitCode -ne 0){throw "Installer exit $($p.ExitCode): $exe"}}
 function Start-Api([int]$port){
  $exe=Join-Path $install 'resources\bin\notepad-server.exe';if(!(Test-Path $exe)){throw "Missing backend $exe"}
@@ -84,7 +84,7 @@ try{
    try{
      $health=Invoke-RestMethod "$guiBase/api/health" -TimeoutSec 2
      $targets=Invoke-RestMethod $cdp -TimeoutSec 2
-     $page=$targets|Where-Object{$_.type -eq 'page' -and $_.url -match 'dist/index\\.html'}|Select-Object -First 1
+     $page=$targets|Where-Object{$_.type -eq 'page' -and $_.url -match 'dist/index\.html'}|Select-Object -First 1
      if($health.code -eq 0 -and $page){break}
    }catch{Start-Sleep -Milliseconds 250}
  }
@@ -103,11 +103,17 @@ try{
  $r.complete=$true;$r.status='passed';$r.finishedAt=[DateTime]::UtcNow.ToString('o')
 }catch{$r.status='failed';$r.error=$_.Exception.Message;$r.finishedAt=[DateTime]::UtcNow.ToString('o');throw}
 finally{
- if($s){try{Stop-Api $s}catch{$r.cleanupError=$_.Exception.Message}}
+ if($gui -and -not $gui.HasExited){
+   try{if($gui.CloseMainWindow()){$null=$gui.WaitForExit(20000)};if(-not $gui.HasExited){$safeCleanup=$false;$r.cleanupError='Upgraded desktop did not close; test profile preserved.'}}catch{$safeCleanup=$false;$r.cleanupError=$_.Exception.Message}
+ }
+ if($s){try{Stop-Api $s}catch{$safeCleanup=$false;$r.cleanupError=$_.Exception.Message}}
  $http.Dispose()
+ if($safeCleanup){
+   if(Test-Path $install){$un=Get-ChildItem $install -Filter 'Uninstall*.exe' -File|Select-Object -First 1;if($un){$p=Start-Process $un.FullName -ArgumentList '/S' -PassThru -Wait;if($p.ExitCode -ne 0){$r.cleanupError='Upgrade runner cleanup uninstall failed.';$safeCleanup=$false}}}
+   if($safeCleanup -and (Test-Path $data)){Remove-Item $data -Recurse -Force}
+ }
+ $r.cleanupComplete=$safeCleanup
  $r|ConvertTo-Json -Depth 8|Set-Content (Join-Path $out 'upgrade-report.json') -Encoding utf8
- if(Test-Path $install){$un=Get-ChildItem $install -Filter 'Uninstall*.exe' -File|Select-Object -First 1;if($un){$p=Start-Process $un.FullName -ArgumentList '/S' -PassThru -Wait;if($p.ExitCode -ne 0){throw 'Upgrade runner cleanup uninstall failed.'}}}
- if(Test-Path $data){Remove-Item $data -Recurse -Force}
 }
 if(!$r.complete){throw 'In-place upgrade acceptance incomplete.'}
 Write-Host ($r|ConvertTo-Json -Depth 8)
