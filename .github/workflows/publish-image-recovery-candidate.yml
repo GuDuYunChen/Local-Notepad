@@ -27,7 +27,7 @@ jobs:
           expected_tree=0f66adea9bea56df414ecb307fcc4c6c5fbd0501
           patch="$RUNNER_TEMP/image-recovery.patch"
           encoded="$RUNNER_TEMP/image-recovery.patch.gz.b64"
-          cat .github/automation/image-repair-patch-{01,02,03,04,05,06,07,08,09,10,11}.b64 > "$encoded"
+          cat .github/automation/image-repair-patch-{01,02,03,04a1,04a2a,04a2b,04b1,04b2,04c,04d,05,06,07,08,09,10,11a,11b,11c,11d}.b64 > "$encoded"
           base64 --decode "$encoded" | gzip -dc > "$patch"
           printf '%s  %s\n' 0c749bcb556d401810ac0a9d6775e0a5278bce2cf785bbedf2d79d3d11ffdeb9 "$patch" | sha256sum -c -
           git fetch --no-tags origin master
