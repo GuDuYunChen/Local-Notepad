@@ -448,6 +448,14 @@ jobs:
           name: local-notepad-windows-e3c36f1ac994c3a990da6a8d4b4742b32b7d0eb2
           path: .installer-input/4.248.0
 
+      - name: Download exact accepted 4.248.1 installer
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 41647679354
+          name: local-notepad-windows-7bee8ed1effde41e3657a36a66b9a6ecec1c940b
+          path: .installer-input/4.248.1
+
       - name: Verify actual 4.248.0 to 4.248.1 in-place upgrade and data retention
         shell: pwsh
         run: .\.github\scripts\windows-in-place-upgrade.ps1
