@@ -5,6 +5,7 @@ on:
     paths:
       - .github/workflows/publish-image-recovery-candidate.yml
       - .github/automation/image-repair-trigger.txt
+      - .github/automation/image-repair-trigger-2.txt
 permissions:
   contents: write
 concurrency:
