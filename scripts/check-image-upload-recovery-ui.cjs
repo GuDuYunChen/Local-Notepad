@@ -82,7 +82,7 @@ async function finish(error) {
   }
   if (report.checks.length !== expectedChecks.length) report.error ||= 'Required UI checks incomplete'
   report.complete = !report.error && report.backendExit?.code === 0; persist()
-  console.log(JSON.stringify({ complete: report.complete, checks: report.checks.length, platform: report.platform, windowsAcceptance: false }))
+  console.log(JSON.stringify({ complete: report.complete, checks: report.checks.length, platform: report.platform, windowsAcceptance: report.windowsAcceptance, installationTested: report.installationTested }))
   app.exit(report.complete ? 0 : 1)
 }
 process.on('unhandledRejection', finish)
