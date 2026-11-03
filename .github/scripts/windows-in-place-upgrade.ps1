@@ -18,14 +18,14 @@ $http=[System.Net.Http.HttpClient]::new();$s=$null;$gui=$null;$safeCleanup=$true
 function Install-App($exe){$p=Start-Process $exe -ArgumentList @('/S',"/D=$install") -PassThru -Wait;if($p.ExitCode -ne 0){throw "Installer exit $($p.ExitCode): $exe"}}
 function Start-Api([int]$port){
  $exe=Join-Path $install 'resources\bin\notepad-server.exe';if(!(Test-Path $exe)){throw "Missing backend $exe"}
- $i=[Diagnostics.ProcessStartInfo]::new();$i.FileName=$exe;$i.WorkingDirectory=$install;$i.UseShellExecute=$false;$i.CreateNoWindow=$true;$i.RedirectStandardInput=$true;$i.RedirectStandardError=$true
+ $i=[Diagnostics.ProcessStartInfo]::new();$i.FileName=$exe;$i.WorkingDirectory=$install;$i.UseShellExecute=$false;$i.CreateNoWindow=$true;$i.RedirectStandardInput=$true
  $i.Environment['NOTEPAD_DATA']=$data;$i.Environment['NOTEPAD_PARENT_STDIN']='1';$i.Environment['PORT']=[string]$port
- $p=[Diagnostics.Process]::new();$p.StartInfo=$i;$err=[Text.StringBuilder]::new();$null=$p.add_ErrorDataReceived({if($_.Data){[void]$err.AppendLine($_.Data)}})
- if(!$p.Start()){throw 'Backend process failed to start.'};$p.BeginErrorReadLine();$base="http://127.0.0.1:$port";$deadline=[DateTime]::UtcNow.AddSeconds(15)
- while([DateTime]::UtcNow -lt $deadline){if($p.HasExited){throw "Backend exited $($p.ExitCode): $($err.ToString())"};try{$h=Invoke-RestMethod "$base/api/health" -TimeoutSec 2;if($h.code -eq 0){return @{p=$p;base=$base;err=$err}}}catch{Start-Sleep -Milliseconds 150}}
+ $p=[Diagnostics.Process]::new();$p.StartInfo=$i
+ if(!$p.Start()){throw 'Backend process failed to start.'};$base="http://127.0.0.1:$port";$deadline=[DateTime]::UtcNow.AddSeconds(15)
+ while([DateTime]::UtcNow -lt $deadline){if($p.HasExited){throw "Backend exited $($p.ExitCode) during startup."};try{$h=Invoke-RestMethod "$base/api/health" -TimeoutSec 2;if($h.code -eq 0){return @{p=$p;base=$base}}}catch{Start-Sleep -Milliseconds 150}}
  $p.StandardInput.Close();$null=$p.WaitForExit(10000);throw 'Backend health check timed out.'
 }
-function Stop-Api($x){if(!$x.p.HasExited){$x.p.StandardInput.Close()};if(!$x.p.WaitForExit(15000)){throw 'Backend did not close on parent-stdin EOF.'};$r.backendExitCodes.Add([int]$x.p.ExitCode);if($x.p.ExitCode -ne 0){throw "Backend exit $($x.p.ExitCode): $($x.err.ToString())"}}
+function Stop-Api($x){if(!$x.p.HasExited){$x.p.StandardInput.Close()};if(!$x.p.WaitForExit(15000)){throw 'Backend did not close on parent-stdin EOF.'};$r.backendExitCodes.Add([int]$x.p.ExitCode);if($x.p.ExitCode -ne 0){throw "Backend exit code $($x.p.ExitCode)."}}
 function Read-Note($x,$id){$v=Invoke-RestMethod "$($x.base)/api/files/$id" -TimeoutSec 5;if($v.code -ne 0 -or !$v.data){throw "Cannot read retained note $id"};return $v.data}
 function Check-Db($x){$v=Invoke-RestMethod "$($x.base)/api/diagnostics" -TimeoutSec 5;if($v.code -ne 0 -or $v.data.integrity -ne 'ok'){throw 'SQLite integrity diagnostic failed.'}}
 try{
