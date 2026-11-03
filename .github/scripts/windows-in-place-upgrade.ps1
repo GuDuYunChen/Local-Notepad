@@ -115,5 +115,5 @@ finally{
  $r.cleanupComplete=$safeCleanup
  $r|ConvertTo-Json -Depth 8|Set-Content (Join-Path $out 'upgrade-report.json') -Encoding utf8
 }
-if(!$r.complete){throw 'In-place upgrade acceptance incomplete.'}
+if(!$r.complete -or !$r.cleanupComplete){throw 'In-place upgrade acceptance or isolated runner cleanup incomplete.'}
 Write-Host ($r|ConvertTo-Json -Depth 8)
