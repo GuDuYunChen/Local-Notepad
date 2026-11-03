@@ -1,7 +1,7 @@
 import { compressImage, uploadFile } from './fileUpload'
 
 export const IMAGE_UPLOAD_TIMEOUT_MS = 30000
-export const IMAGE_UPLOAD_MAX_BYTES = 100 * 1024 * 1024
+export const IMAGE_UPLOAD_MAX_BYTES = 10 * 1024 * 1024
 const cancelled = () => new DOMException('图片上传已取消', 'AbortError')
 
 function uploadOnce(file, { signal, isCurrent }) {
@@ -43,7 +43,7 @@ export async function uploadImage(file, { signal, isCurrent = () => true } = {})
     webp: 'image/webp', svg: 'image/svg+xml', bmp: 'image/bmp', ico: 'image/x-icon' }[extension]
   const type = file?.type?.toLowerCase() || extensionType || ''
   if (!file || !type.startsWith('image/')) throw new Error('请选择图片文件')
-  if (file.size > IMAGE_UPLOAD_MAX_BYTES) throw new Error('单张图片不能超过 100 MB')
+  if (file.size > IMAGE_UPLOAD_MAX_BYTES) throw new Error('单张图片不能超过 10 MB')
   let compressed = null, originalOnly = false
   const skipCompression = ['image/png', 'image/gif', 'image/svg+xml'].includes(type)
   if (!skipCompression && file.size > 2 * 1024 * 1024) {
@@ -65,5 +65,5 @@ export async function uploadImage(file, { signal, isCurrent = () => true } = {})
 export function imageFailureMessage(inserted, failures, entry) {
   const names = failures.slice(0, 3).map(name => String(name || '未命名图片').slice(0, 60)).join('、')
   const more = failures.length > 3 ? '等' : ''
-  return `已插入 ${inserted} 张图片，${failures.length} 张失败：${names}${more}。请重新${entry}失败的图片（单张不超过 100 MB）。`
+  return `已插入 ${inserted} 张图片，${failures.length} 张失败：${names}${more}。请重新${entry}失败的图片（单张不超过 10 MB）。`
 }
