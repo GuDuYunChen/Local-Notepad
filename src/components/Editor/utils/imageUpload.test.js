@@ -42,7 +42,7 @@ describe('single-attempt image upload and optional preview recovery', () => {
   })
   it('rejects non-images and oversized images before any transport', async () => {
     await expect(uploadImage(new File(['text'], 'x.txt', { type: 'text/plain' }))).rejects.toThrow('请选择图片')
-    await expect(uploadImage({ name: 'x.png', type: 'image/png', size: 100 * 1024 * 1024 + 1 })).rejects.toThrow('100 MB')
+    await expect(uploadImage({ name: 'x.png', type: 'image/png', size: 10 * 1024 * 1024 + 1 })).rejects.toThrow('10 MB')
     expect(mocks.uploadFile).not.toHaveBeenCalled()
   })
   it('pre-cancelled operations never read or upload files', async () => {
