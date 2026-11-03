@@ -1,0 +1,1 @@
+This file exists only to trigger the already reviewed patch-assembly workflow after all exact patch segments are staged. It is removed when the workflow resets the working tree to the accepted master before applying the frozen patch.
