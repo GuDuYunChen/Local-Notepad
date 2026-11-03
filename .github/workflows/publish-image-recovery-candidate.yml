@@ -4,6 +4,7 @@ on:
     branches: [fix/local-image-upload-recovery-4-248-1]
     paths:
       - .github/workflows/publish-image-recovery-candidate.yml
+      - .github/automation/image-repair-trigger.txt
 permissions:
   contents: write
 concurrency:
