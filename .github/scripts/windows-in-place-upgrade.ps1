@@ -92,8 +92,19 @@ try{
  $guiNote=Invoke-RestMethod "$guiBase/api/files/$id" -TimeoutSec 5
  if($guiNote.code -ne 0 -or $guiNote.data.content -ne $updated){throw 'The launched upgraded desktop did not read the retained upgraded note.'}
  $r.checks.Add('4.248.1-installed-electron-window-loads-retained-note')
- if(-not $gui.CloseMainWindow()){throw 'Could not request a normal close of the upgraded Electron window.'}
- if(-not $gui.WaitForExit(20000)){throw 'Upgraded Electron app did not exit normally after WM_CLOSE.'}
+ # Electron may not expose a Win32 MainWindowHandle on a hosted runner. Request the
+ # supported Chromium Browser.close command over its loopback DevTools endpoint.
+ $versionInfo=Invoke-RestMethod 'http://127.0.0.1:27164/json/version' -TimeoutSec 5
+ $browserSocket=[string]$versionInfo.webSocketDebuggerUrl
+ if([string]::IsNullOrWhiteSpace($browserSocket)){throw 'Electron DevTools browser WebSocket endpoint is missing.'}
+ $ws=[System.Net.WebSockets.ClientWebSocket]::new()
+ try{
+   $ws.ConnectAsync([Uri]$browserSocket,[Threading.CancellationToken]::None).GetAwaiter().GetResult()
+   $command=[Text.Encoding]::UTF8.GetBytes('{"id":1,"method":"Browser.close"}')
+   $segment=[ArraySegment[byte]]::new($command)
+   $ws.SendAsync($segment,[System.Net.WebSockets.WebSocketMessageType]::Text,$true,[Threading.CancellationToken]::None).GetAwaiter().GetResult()
+ }finally{$ws.Dispose()}
+ if(-not $gui.WaitForExit(20000)){throw 'Upgraded Electron app did not exit after CDP Browser.close.'}
  $stopped=$false;$stopDeadline=[DateTime]::UtcNow.AddSeconds(10)
  while([DateTime]::UtcNow -lt $stopDeadline){
    try{$null=Invoke-RestMethod "$guiBase/api/health" -TimeoutSec 1;Start-Sleep -Milliseconds 200}catch{$stopped=$true;break}
