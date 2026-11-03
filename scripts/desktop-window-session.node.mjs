@@ -30,7 +30,7 @@ function mock({ ready = true, response, replyDelay = 0, holdExit = false } = {})
   const child = new EventEmitter(), calls = [], commands = [], events = []
   let ended = false, killed = 0
   const exit = (code, signal = null) => {
-    if (ended) return; ended = true; child.emit('exit', code, signal)
+    if (ended) return; ended = true; child.emit('exit', code, signal); child.emit('close', code, signal)
   }
   child.pid = 800; child.stdout = new PassThrough(); child.stderr = new PassThrough()
   const send = value => child.stdout.write(JSON.stringify(value) + '\r\n')

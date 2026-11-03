@@ -101,21 +101,42 @@ export function createExportDirectorySession({ ownedRoot, spawnWorker = spawn,
   args.splice(1, 0, '-Mta')
   assert.ok(['powershell.exe', ...args].map(value => '"' + value + '"').join(' ').length + 1 < 32767)
   let child, state = 'starting', pending, sequence = 0, buffer = '', disposed = false, streamFailed = false
-  let resolveReady, rejectReady, resolveExit, startupTimer, disposal
+  let resolveReady, rejectReady, resolveClosed, startupTimer, disposal
   const ready = new Promise((resolve, reject) => { resolveReady = resolve; rejectReady = reject })
   ready.catch(() => {})
-  const exited = new Promise(resolve => { resolveExit = resolve })
+  const closed = new Promise(resolve => { resolveClosed = resolve })
   const events = [], started = Date.now()
+  // An error is not an exit, and exit is not stdio closure. Keep bounded
+  // diagnostics without raw command arguments, paths, stderr or exception text.
+  const lifecycle = { schemaVersion: 1, startupMs, requestMs, disposeMs: 2000,
+    pid: null, ready: false, eofRequested: false, failureCode: null,
+    stdoutBytes: 0, stderrBytes: 0, errors: {}, exit: null, close: null,
+    termination: null }
+  const errorCode = error => ['EPIPE', 'EIO', 'ENOENT', 'EACCES', 'EPERM', 'ESRCH', 'EINVAL', 'ETIMEDOUT'].includes(error?.code) ? error.code : 'OTHER'
+  const recordError = (source, error) => {
+    const previous = lifecycle.errors[source]
+    lifecycle.errors[source] = { count: Math.min((previous?.count || 0) + 1, 1000000), code: errorCode(error) }
+  }
+  const terminal = (code, signal) => ({ code: Number.isInteger(code) ? code : null,
+    signal: typeof signal === 'string' && /^SIG[A-Z0-9]{1,16}$/.test(signal) ? signal : null,
+    elapsedMs: Math.max(0, Date.now() - started) })
+  const terminate = reason => {
+    if (!child || lifecycle.close || lifecycle.termination) return
+    lifecycle.termination = { reason, requested: true, accepted: false, elapsedMs: Math.max(0, Date.now() - started) }
+    try { lifecycle.termination.accepted = child.kill() === true }
+    catch (error) { recordError('termination', error) }
+  }
+  const diagnostics = () => structuredClone({ ...lifecycle, state })
   const event = record => {
     const value = { ...record, elapsedMs: Date.now() - started }; events.push(structuredClone(value))
     try { onEvent(structuredClone(value)) } catch {}
   }
   const fail = (code, detail = {}) => {
     if (state === 'failed' || state === 'closed') return
-    state = 'failed'; clearTimeout(startupTimer); const error = failure(code)
+    state = 'failed'; lifecycle.failureCode ??= code; clearTimeout(startupTimer); const error = failure(code)
     rejectReady(error)
     if (pending) { clearTimeout(pending.timer); pending.reject(error); pending = undefined }
-    event({ type: 'failed', code, ...detail }); try { child?.kill() } catch {}
+    event({ type: 'failed', code, ...detail }); terminate(code)
   }
   const pipeError = () => {
     if (state === 'closed') return
@@ -130,7 +151,7 @@ export function createExportDirectorySession({ ownedRoot, spawnWorker = spawn,
           ? startupDiagnostic(value.diagnostic) : null
         fail('STARTUP_REFUSED', { startupDiagnostic: diagnostic }); return
       }
-      state = 'ready'; clearTimeout(startupTimer); event({ type: 'ready', pid: child.pid }); resolveReady(); return
+      state = 'ready'; lifecycle.ready = true; clearTimeout(startupTimer); event({ type: 'ready', pid: child.pid }); resolveReady(); return
     }
     if (state !== 'ready' || disposed) return
     if (!pending || value?.id !== pending.id || value.ok !== true) {
@@ -154,9 +175,14 @@ export function createExportDirectorySession({ ownedRoot, spawnWorker = spawn,
   try {
     child = spawnWorker('powershell.exe', args, { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true })
     event({ type: 'spawn', pid: child.pid })
-    for (const stream of [child.stdin, child.stdout, child.stderr]) stream.on('error', pipeError)
+    lifecycle.pid = integer(child.pid) ? child.pid : null
+    for (const source of ['stdin', 'stdout', 'stderr']) child[source].on('error', error => {
+      if (state !== 'closed') recordError(source, error)
+      pipeError()
+    })
     child.stdout.setEncoding('utf8')
     child.stdout.on('data', chunk => {
+      lifecycle.stdoutBytes = Math.min(lifecycle.stdoutBytes + Buffer.byteLength(chunk), Number.MAX_SAFE_INTEGER)
       if (disposed || state === 'failed' || state === 'closed') return
       buffer += chunk
       if (Buffer.byteLength(buffer) > 256 * 1024) { fail('REPLY_LIMIT'); return }
@@ -166,11 +192,14 @@ export function createExportDirectorySession({ ownedRoot, spawnWorker = spawn,
         buffer = buffer.slice(index + 1); if (line) receive(line)
       }
     })
-    child.stderr.on('data', () => {})
-    child.on('error', () => { fail('SPAWN_ERROR'); resolveExit({ code: null, signal: null }) })
-    child.on('exit', (code, signal) => { resolveExit({ code, signal }); if (!disposed) fail('EARLY_EXIT') })
+    child.stderr.on('data', chunk => { lifecycle.stderrBytes = Math.min(lifecycle.stderrBytes + Buffer.byteLength(chunk), Number.MAX_SAFE_INTEGER) })
+    child.on('error', error => { recordError('process', error); fail('SPAWN_ERROR') })
+    child.on('close', (code, signal) => {
+      lifecycle.close = terminal(code, signal); resolveClosed({ code, signal })
+    })
+    child.on('exit', (code, signal) => { lifecycle.exit = terminal(code, signal); if (!disposed) fail('EARLY_EXIT') })
     startupTimer = setTimeout(() => fail('STARTUP_TIMEOUT'), startupMs)
-  } catch { fail('SPAWN_ERROR'); resolveExit({ code: null, signal: null }) }
+  } catch (error) { recordError('spawn', error); fail('SPAWN_ERROR'); if (!child) resolveClosed(null) }
   const request = async (op, binding, directory) => {
     assertExportDirectoryBinding(binding)
     if (op === 'choose') assertExportOwnedDirectory(ownedRoot, directory)
@@ -195,6 +224,7 @@ export function createExportDirectorySession({ ownedRoot, spawnWorker = spawn,
     choose: (binding, directory) => request('choose', binding, directory),
     cancel: binding => request('cancel', binding),
     events: () => structuredClone(events),
+    diagnostics,
     dispose() {
       if (disposal) return disposal
       disposed = true; clearTimeout(startupTimer)
@@ -203,10 +233,13 @@ export function createExportDirectorySession({ ownedRoot, spawnWorker = spawn,
       disposal = (async () => {
         let timeout
         try {
-          try { child?.stdin.end() } catch { streamFailed = true }
-          const result = await Promise.race([exited, new Promise(resolve => { timeout = setTimeout(() => resolve(null), 2000) })])
-          if (result === null) { try { child?.kill() } catch {}; event({ type: 'dispose', clean: false }); state = 'closed'; return false }
-          const clean = state !== 'failed' && !streamFailed && result.code === 0 && result.signal === null
+          lifecycle.eofRequested = true
+          try { child?.stdin.end() } catch (error) { streamFailed = true; recordError('stdin', error) }
+          const result = await Promise.race([closed, new Promise(resolve => { timeout = setTimeout(() => resolve(null), 2000) })])
+          if (result === null) { terminate('DISPOSE_TIMEOUT'); event({ type: 'dispose', clean: false }); state = 'closed'; return false }
+          const clean = state !== 'failed' && !streamFailed && lifecycle.failureCode === null && lifecycle.termination === null
+            && Object.keys(lifecycle.errors).length === 0 && lifecycle.exit?.code === 0 && lifecycle.exit?.signal === null
+            && result.code === 0 && result.signal === null
           state = 'closed'; event({ type: 'dispose', clean }); return clean
         } finally { clearTimeout(timeout) }
       })()

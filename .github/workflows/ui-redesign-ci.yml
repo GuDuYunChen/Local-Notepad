@@ -50,6 +50,7 @@ jobs:
         run: |
           node scripts/build-local-export-fixture.mjs
           node --test scripts/block-references-evidence.node.mjs scripts/block-references-installed-evidence.node.mjs
+          node --test scripts/native-helper-lifecycle.node.mjs
 
       - name: Verify editor cache and save receipt regressions
         run: |

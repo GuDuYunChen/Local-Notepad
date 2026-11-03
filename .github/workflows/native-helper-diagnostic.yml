@@ -1,0 +1,63 @@
+name: Native helper lifecycle verification
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - scripts/desktop-window-session.mjs
+      - scripts/local-export-directory-session.mjs
+      - scripts/desktop-window-worker.ps1
+      - scripts/local-export-directory-worker.ps1
+      - scripts/native-helper-lifecycle.node.mjs
+      - scripts/check-native-helper-lifecycle.mjs
+      - .github/workflows/native-helper-diagnostic.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: native-helper-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  native-helper-lifecycle:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24.22.2'
+      - name: Verify committed lock and current acceptance versions
+        shell: pwsh
+        run: |
+          node scripts/verify-dependency-lock.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/check-acceptance-versions.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Install only locked verifier dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Refuse dependency drift and prepare original canonical fixtures
+        shell: pwsh
+        run: |
+          git diff --exit-code -- package.json package-lock.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/build-reading-mode-fixture.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/build-local-export-fixture.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Run retained contracts and new event-order counterexamples
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force test-results/native-helper-lifecycle | Out-Null
+          node --test --test-reporter=tap --test-reporter-destination=test-results/native-helper-lifecycle/contracts.tap scripts/reading-mode-desktop-evidence.node.mjs scripts/reading-mode-installed-evidence.node.mjs scripts/reading-mode-native-input.node.mjs scripts/desktop-window-session.node.mjs scripts/shortcut-management-desktop-evidence.node.mjs scripts/shortcut-management-installed-evidence.node.mjs scripts/local-export-desktop-evidence.node.mjs scripts/local-export-installed-evidence.node.mjs scripts/block-references-evidence.node.mjs scripts/block-references-installed-evidence.node.mjs scripts/native-helper-lifecycle.node.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Prove real PowerShell readiness and EOF with independent exit and close receipts
+        run: node scripts/check-native-helper-lifecycle.mjs
+      - name: Preserve complete or failed original evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-helper-lifecycle-${{ github.sha }}
+          path: test-results/native-helper-lifecycle/*
+          if-no-files-found: error
+          retention-days: 14

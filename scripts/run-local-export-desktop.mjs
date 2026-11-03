@@ -149,7 +149,11 @@ export async function runLocalExportLifecycle({ executablePath, out, productComm
       blob(readFileSync(new URL('./' + name, import.meta.url), 'utf8').replace(/\r\n/g, '\n'))])),
   }
   writeFileSync(reportPath, JSON.stringify(report, null, 2), { flag: 'wx' })
-  const save = () => writeFileSync(reportPath, JSON.stringify(report, null, 2))
+  const save = () => {
+    if (windowSession) report.windowHelper.lifecycle = windowSession.diagnostics()
+    if (directorySession) report.directoryHelper.lifecycle = directorySession.diagnostics()
+    writeFileSync(reportPath, JSON.stringify(report, null, 2))
+  }
   const mark = name => { assert.equal(name, LOCAL_EXPORT_CHECKS[report.checks.length]); report.checks.push(name); save() }
   let child, exited, cdp, windowSession, directorySession, trace = ''
   const requests = [], pendingRequests = new Map(), environment = { ...process.env }
@@ -260,6 +264,7 @@ export async function runLocalExportLifecycle({ executablePath, out, productComm
       await Promise.race([exited.catch(() => {}), sleep(3000)])
     }
     await directorySession?.dispose(); await windowSession?.dispose()
+    save() // Preserve actual terminal observations even when startup/business failed.
     writeFileSync(path.join(out, 'local-export-desktop.log'), trace)
   }
 }
