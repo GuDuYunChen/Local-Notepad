@@ -470,7 +470,7 @@ jobs:
         with:
           name: local-notepad-in-place-upgrade-${{ github.sha }}
           path: test-results/in-place-upgrade/*
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 90
 
       - name: Upload NSIS installer
