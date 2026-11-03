@@ -102,6 +102,21 @@ describe('image insertion recovery through the actual editor entry points', () =
     expect(images()).toHaveLength(0)
     expect(host.querySelector('[role="status"]')).toBeNull()
   })
+  it('toolbar and paste share one editor-wide upload session and cancellation control', async () => {
+    let finish
+    mocks.uploadFile.mockImplementation(() => new Promise(resolve => { finish = resolve }))
+    await start('paste')
+    expect(mocks.uploadFile).toHaveBeenCalledTimes(1)
+    await selectAgain()
+    expect(mocks.uploadFile).toHaveBeenCalledTimes(1)
+    expect(host.querySelector('[aria-label="图片上传进度"]')).not.toBeNull()
+    expect(feedback.some(t => t.type === 'warning' && t.content.includes('正在处理中'))).toBe(true)
+    const cancel = [...host.querySelectorAll('button')].find(button => button.textContent === '取消图片上传')
+    await act(async () => cancel.click())
+    expect(mocks.uploadFile.mock.calls[0][1].signal.aborted).toBe(true)
+    await act(async () => finish({ url: '/uploads/late-paste.jpg' }))
+    expect(images()).toHaveLength(0)
+  })
   it('toolbar allows explicitly selecting the same failed file again', async () => {
     mocks.uploadFile.mockRejectedValueOnce(new Error('offline')).mockResolvedValue({ url: '/uploads/retried.jpg' })
     await start('toolbar')
