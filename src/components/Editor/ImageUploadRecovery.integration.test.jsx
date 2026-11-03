@@ -153,11 +153,11 @@ describe('image insertion recovery through the actual editor entry points', () =
   })
   it('pasted oversized images are rejected visibly before any upload', async () => {
     file = new File([], 'oversized.png', { type: 'image/png' })
-    Object.defineProperty(file, 'size', { value: 100 * 1024 * 1024 + 1 })
+    Object.defineProperty(file, 'size', { value: 10 * 1024 * 1024 + 1 })
     await start('paste')
     expect(mocks.uploadFile).not.toHaveBeenCalled()
     expect(images()).toHaveLength(0)
-    expect(feedback.some(t => t.type === 'error' && t.content.includes('100 MB'))).toBe(true)
+    expect(feedback.some(t => t.type === 'error' && t.content.includes('10 MB'))).toBe(true)
   })
 
   it('pending toolbar insertion closes its menu and focuses the persistent cancellation control', async () => {
