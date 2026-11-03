@@ -20,7 +20,7 @@ assert.ok(!fs.existsSync(path.join(out, 'report.json')), 'Refuse stale UI report
 const owned = fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-image-ui-'))
 app.setPath('userData', path.join(owned, 'profile'))
 const report = { complete: false, productVersion: require('../package.json').version,
-  platform: process.platform, electron: process.versions.electron, windowsAcceptance: false,
+  platform: process.platform, electron: process.versions.electron, windowsAcceptance: process.platform === 'win32',
   installationTested: false, realBuiltRenderer: true, realBackend: true, syntheticDataOnly: true,
   checks: [], screenshots: [], uploads: [], notes: [], backendExit: null }
 const binding = file => {
