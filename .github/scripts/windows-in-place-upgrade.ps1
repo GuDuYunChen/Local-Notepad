@@ -14,7 +14,7 @@ New-Item -ItemType Directory -Force $out|Out-Null
 if(Test-Path $install){Remove-Item $install -Recurse -Force}
 if(Test-Path $data){throw "Refusing to overwrite existing profile data: $data"}
 $r=[ordered]@{complete=$false;status='running';versions=@('4.248.0','4.248.1');installerSha256=@{old=$oldHash;new=$newHash};checks=[System.Collections.Generic.List[string]]::new();backendExitCodes=[System.Collections.Generic.List[int]]::new();startedAt=[DateTime]::UtcNow.ToString('o')}
-$http=[Net.Http.HttpClient]::new();$s=$null;$gui=$null;$safeCleanup=$true
+$http=[System.Net.Http.HttpClient]::new();$s=$null;$gui=$null;$safeCleanup=$true
 function Install-App($exe){$p=Start-Process $exe -ArgumentList @('/S',"/D=$install") -PassThru -Wait;if($p.ExitCode -ne 0){throw "Installer exit $($p.ExitCode): $exe"}}
 function Start-Api([int]$port){
  $exe=Join-Path $install 'resources\bin\notepad-server.exe';if(!(Test-Path $exe)){throw "Missing backend $exe"}
