@@ -1,0 +1,56 @@
+name: Publish exact verified 4.248.1 image recovery candidate
+on:
+  push:
+    branches: [fix/local-image-upload-recovery-4-248-1]
+    paths:
+      - .github/workflows/publish-image-recovery-candidate.yml
+      - .github/automation/image-repair-patch-*.b64
+permissions:
+  contents: write
+concurrency:
+  group: image-recovery-candidate-publication
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: true
+      - name: Verify transport, exact accepted base, and candidate tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = GuDuYunChen/Local-Notepad
+          test "$GITHUB_REF" = refs/heads/fix/local-image-upload-recovery-4-248-1
+          base=f989a5d74a81875311d9ab09dab4c062237889ca
+          expected_tree=0f66adea9bea56df414ecb307fcc4c6c5fbd0501
+          patch="$RUNNER_TEMP/image-recovery.patch"
+          encoded="$RUNNER_TEMP/image-recovery.patch.gz.b64"
+          cat .github/automation/image-repair-patch-{01,02,03,04,05,06}.b64 > "$encoded"
+          base64 --decode "$encoded" | gzip -dc > "$patch"
+          printf '%s  %s\n' 0c749bcb556d401810ac0a9d6775e0a5278bce2cf785bbedf2d79d3d11ffdeb9 "$patch" | sha256sum -c -
+          git fetch --no-tags origin master
+          test "$(git rev-parse origin/master)" = "$base"
+          test "$(git ls-remote origin refs/heads/master | cut -f1)" = "$base"
+          git reset --hard "$base"
+          git clean -fdx
+          git apply --check --index "$patch"
+          git apply --index "$patch"
+          git diff --cached --check "$base"
+          test "$(git write-tree)" = "$expected_tree"
+          test -z "$(git diff --cached --name-only "$base" -- electron server)"
+          git config user.name 'Verified image recovery candidate'
+          git config user.email 'image-recovery@users.noreply.github.com'
+          git commit -m "fix: recover local image insertion after upload and compression failures" -m "Exact candidate tree $expected_tree from the locally frozen and verified 4.248.1 source. Preserve original editor insertion/save path, backend API, database schema and dependency graph. Candidate tests and Linux UI evidence are recorded in the accompanying handoff; current Windows packaging, PR CI and native install acceptance remain required. No main/master writes or force push."
+          candidate="$(git rev-parse HEAD)"
+          git push origin "$candidate:refs/heads/fix/local-image-upload-recovery-4-248-1"
+          test "$(git ls-remote origin refs/heads/fix/local-image-upload-recovery-4-248-1 | cut -f1)" = "$candidate"
+          printf 'candidate_commit=%s\ncandidate_tree=%s\nbase=%s\n' "$candidate" "$expected_tree" "$base" > "$RUNNER_TEMP/publication-receipt.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: image-recovery-candidate-publication
+          path: ${{ runner.temp }}/publication-receipt.txt
+          if-no-files-found: error
+          retention-days: 14
