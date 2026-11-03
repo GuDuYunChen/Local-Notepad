@@ -1,0 +1,247 @@
++完整728项保留合同首轮695通过、33失败。失败来自master合成夹具仍绑定4.247.1及旧导入源码摘要，而生产验证器已经要求4.248.0；不是辅助进程修补造成正文或安装器回归。仅同步两份合成测试的当前版本与三份实际导入源码摘要，原旧版拒绝、反向源码证明、LF/CRLF以及29安装门槛不减。真实reading-mode-installer-pin.json的历史安装包身份保持原字节；合成绑定不用于下载或伪造新安装验收。原失败日志保留。
+diff --git a/scripts/check-native-helper-lifecycle.mjs b/scripts/check-native-helper-lifecycle.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..9858e125b292ec1b47bf3e7e0aafcc43e098da66
+--- /dev/null
++++ b/scripts/check-native-helper-lifecycle.mjs
+@@ -0,0 +1,80 @@
++import assert from 'node:assert/strict'
++import { spawn, execFileSync } from 'node:child_process'
++import { createHash } from 'node:crypto'
++import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs'
++import { tmpdir, release } from 'node:os'
++import path from 'node:path'
++import { fileURLToPath } from 'node:url'
++import { createDesktopWindowSession } from './desktop-window-session.mjs'
++import { createExportDirectorySession } from './local-export-directory-session.mjs'
++
++// Exercise the real unchanged PowerShell workers. Independent ChildProcess
++// listeners must corroborate the session's own clean-disposal claim.
++export async function verifyNativeHelperLifecycle() {
++  assert.equal(process.platform, 'win32', 'Native helper verification requires Windows')
++  const root = fileURLToPath(new URL('../', import.meta.url))
++  const output = path.join(root, 'test-results/native-helper-lifecycle')
++  mkdirSync(output, { recursive: true })
++  const filename = path.join(output, 'native-helper-lifecycle.json')
++  const sourceCommit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8', timeout: 10000 }).trim()
++  const sourceTree = execFileSync('git', ['rev-parse', 'HEAD^{tree}'], { cwd: root, encoding: 'utf8', timeout: 10000 }).trim()
++  assert.match(sourceCommit, /^[a-f0-9]{40}$/); assert.match(sourceTree, /^[a-f0-9]{40}$/)
++  const report = { schemaVersion: 1, complete: false, helperLifecycleOnly: true, productAcceptance: false,
++    sourceCommit, sourceTree, node: process.version, platform: process.platform, osRelease: release(),
++    noWindowCommands: true, originalBudgets: true, processes: {}, sessions: {}, sources: {} }
++  writeFileSync(filename, JSON.stringify(report, null, 2), { flag: 'wx' })
++  const save = () => writeFileSync(filename, JSON.stringify(report, null, 2))
++  const observedSpawn = name => (...args) => {
++    const child = spawn(...args), start = Date.now()
++    const record = report.processes[name] = { pid: child.pid ?? null, exit: null, close: null, errors: 0 }
++    child.on('error', () => { record.errors++; save() })
++    child.on('exit', (code, signal) => { record.exit = { code, signal, elapsedMs: Date.now() - start }; save() })
++    child.on('close', (code, signal) => { record.close = { code, signal, elapsedMs: Date.now() - start }; save() })
++    return child
++  }
++  const ownedRoot = mkdtempSync(path.join(process.env.RUNNER_TEMP || tmpdir(), 'native-helper-lifecycle-'))
++  const sessions = []
++  try {
++    for (const name of ['desktop-window-session.mjs', 'desktop-window-worker.ps1', 'local-export-directory-session.mjs', 'local-export-directory-worker.ps1', 'check-native-helper-lifecycle.mjs']) {
++      const data = readFileSync(new URL(name, import.meta.url)), canonical = data.toString('utf8').replace(/\r\n/g, '\n')
++      report.sources[name] = { sha256: createHash('sha256').update(data).digest('hex'),
++        gitBlob: createHash('sha1').update('blob ' + Buffer.byteLength(canonical) + '\0').update(canonical).digest('hex') }
++      const expected = execFileSync('git', ['rev-parse', 'HEAD:scripts/' + name], { cwd: root, encoding: 'utf8', timeout: 10000 }).trim()
++      assert.equal(report.sources[name].gitBlob, expected, 'Native helper source differs from actual checkout: ' + name)
++    }
++    for (const [name, factory, options] of [['window', createDesktopWindowSession, {}], ['directory', createExportDirectorySession, { ownedRoot }]]) {
++      const entry = report.sessions[name] = { events: [], ready: false, clean: false }
++      const session = factory({ ...options, spawnWorker: observedSpawn(name), onEvent: event => { entry.events.push(event); save() } })
++      sessions.push([name, session])
++    }
++    await Promise.all(sessions.map(async ([name, session]) => { await session.ready; report.sessions[name].ready = true; save() }))
++  } catch (error) {
++    report.errorCode = /^[A-Z_]{1,80}$/.test(error?.code || '') ? error.code : 'NATIVE_HELPER_FAILED'
++  } finally {
++    for (const [name, session] of sessions.reverse()) {
++      report.sessions[name].clean = await session.dispose()
++      report.sessions[name].lifecycle = session.diagnostics()
++      save()
++    }
++    rmSync(ownedRoot, { recursive: true, force: false })
++  }
++  assert.equal(report.errorCode, undefined)
++  assert.equal(sessions.length, 2)
++  for (const name of ['window', 'directory']) {
++    const s = report.sessions[name], p = report.processes[name], d = s.lifecycle
++    assert.equal(s.ready, true); assert.equal(s.clean, true)
++    assert.equal(p.errors, 0); assert.equal(p.pid, d.pid)
++    assert.equal(p.exit?.code, 0); assert.equal(p.exit?.signal, null)
++    assert.equal(p.close?.code, 0); assert.equal(p.close?.signal, null)
++    assert.equal(d.exit?.code, 0); assert.equal(d.close?.code, 0)
++    assert.equal(d.eofRequested, true); assert.equal(d.failureCode, null); assert.equal(d.termination, null)
++    assert.deepEqual(d.errors, {})
++    assert.equal(d.startupMs, 30000); assert.equal(d.requestMs, 10000)
++    assert.equal(d.disposeMs, name === 'window' ? 3000 : 2000)
++    assert.deepEqual(s.events.map(e => e.type), ['spawn', 'ready', name === 'window' ? 'disposed' : 'dispose'])
++  }
++  report.complete = true; save()
++  console.log(JSON.stringify({ helperLifecycleVerified: true, productAcceptance: false, sourceCommit, sourceTree }))
++  return report
++}
++if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await verifyNativeHelperLifecycle()
+diff --git a/scripts/desktop-window-session.mjs b/scripts/desktop-window-session.mjs
+index 5905369c693500e6b68e506bbf1dac0601922449..d298f7163131df889a1df491338457e17531d42f 100644
+--- a/scripts/desktop-window-session.mjs
++++ b/scripts/desktop-window-session.mjs
+@@ -44,12 +44,33 @@ export function createDesktopWindowSession({
+   }
+   const workerArguments = desktopWindowWorkerArguments(readFileSync(new URL('./desktop-window-worker.ps1', import.meta.url)))
+   let child, state = 'starting', buffer = '', pending = null, sequence = 0, startupTimer
+-  let resolveReady, rejectReady, resolveExit, disposed = false, disposal, streamFailed = false
++  let resolveReady, rejectReady, resolveClosed, disposed = false, disposal, streamFailed = false
+   const ready = new Promise((resolve, reject) => { resolveReady = resolve; rejectReady = reject })
+   // Avoid an unhandled rejection if startup fails before the caller awaits it.
+   ready.catch(() => {})
+-  const exited = new Promise(resolve => { resolveExit = resolve })
++  const closed = new Promise(resolve => { resolveClosed = resolve })
+   const started = Date.now()
++  // An error is not an exit, and exit is not stdio closure. Keep bounded
++  // diagnostics without raw command arguments, paths, stderr or exception text.
++  const lifecycle = { schemaVersion: 1, startupMs, requestMs, disposeMs: 3000,
++    pid: null, ready: false, eofRequested: false, failureCode: null,
++    stdoutBytes: 0, stderrBytes: 0, errors: {}, exit: null, close: null,
++    termination: null }
++  const errorCode = error => ['EPIPE', 'EIO', 'ENOENT', 'EACCES', 'EPERM', 'ESRCH', 'EINVAL', 'ETIMEDOUT'].includes(error?.code) ? error.code : 'OTHER'
++  const recordError = (source, error) => {
++    const previous = lifecycle.errors[source]
++    lifecycle.errors[source] = { count: Math.min((previous?.count || 0) + 1, 1000000), code: errorCode(error) }
++  }
++  const terminal = (code, signal) => ({ code: Number.isInteger(code) ? code : null,
++    signal: typeof signal === 'string' && /^SIG[A-Z0-9]{1,16}$/.test(signal) ? signal : null,
++    elapsedMs: Math.max(0, Date.now() - started) })
++  const terminate = reason => {
++    if (!child || lifecycle.close || lifecycle.termination) return
++    lifecycle.termination = { reason, requested: true, accepted: false, elapsedMs: Math.max(0, Date.now() - started) }
++    try { lifecycle.termination.accepted = child.kill() === true }
++    catch (error) { recordError('termination', error) }
++  }
++  const diagnostics = () => structuredClone({ ...lifecycle, state })
+   const journal = []
+   const event = value => {
+     const entry = structuredClone({ ...value, elapsedMs: Date.now() - started })
+@@ -58,13 +79,13 @@ export function createDesktopWindowSession({
+   }
+   const fail = (code, details = {}) => {
+     if (state === 'failed' || state === 'closed') return
+-    state = 'failed'; clearTimeout(startupTimer)
++    state = 'failed'; lifecycle.failureCode ??= code; clearTimeout(startupTimer)
+     const error = failure(code)
+     rejectReady(error)
+     if (pending) { clearTimeout(pending.timer); pending.reject(error); pending = null }
+     event({ type: 'failed', code, ...details })
+     // Terminate only the owned helper. Never retry a potentially posted close.
+-    try { child?.kill() } catch {}
++    terminate(code)
+   }
+   // Pipe errors are EventEmitter errors, not promise rejections. Keep listeners
+   // attached through teardown so a late error cannot terminate the test runner.
+@@ -82,7 +103,7 @@ export function createDesktopWindowSession({
+         fail(message.error, { diagnostic: message.diagnostic }); return
+       }
+       if (message?.protocol !== 1 || message.ready !== true) { fail('INVALID_READY'); return }
+-      state = 'ready'; clearTimeout(startupTimer)
++      state = 'ready'; lifecycle.ready = true; clearTimeout(startupTimer)
+       event({ type: 'ready', pid: child.pid }); resolveReady(); return
+     }
+     if (state !== 'ready') return
+@@ -124,11 +145,14 @@ export function createDesktopWindowSession({
+       stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true,
+     })
+     event({ type: 'spawn', pid: child.pid })
+-    child.stdin.on('error', pipeError)
+-    child.stdout.on('error', pipeError)
+-    child.stderr.on('error', pipeError)
++    lifecycle.pid = validPID(child.pid) ? child.pid : null
++    for (const source of ['stdin', 'stdout', 'stderr']) child[source].on('error', error => {
++      if (state !== 'closed') recordError(source, error)
++      pipeError()
++    })
+     child.stdout.setEncoding('utf8')
+     child.stdout.on('data', chunk => {
++      lifecycle.stdoutBytes = Math.min(lifecycle.stdoutBytes + Buffer.byteLength(chunk), Number.MAX_SAFE_INTEGER)
+       if (disposed || state === 'failed' || state === 'closed') return
+       buffer += chunk
+       if (Buffer.byteLength(buffer, 'utf8') > MAX_REPLY) { fail('REPLY_LIMIT'); return }
+@@ -140,14 +164,17 @@ export function createDesktopWindowSession({
+       }
+     })
+     // Drain stderr to avoid pipe deadlock; never dump an encoded command/stack.
+-    child.stderr.on('data', () => {})
+-    child.on('error', () => { fail('SPAWN_ERROR'); resolveExit({ code: null, signal: null }) })
++    child.stderr.on('data', chunk => { lifecycle.stderrBytes = Math.min(lifecycle.stderrBytes + Buffer.byteLength(chunk), Number.MAX_SAFE_INTEGER) })
++    child.on('error', error => { recordError('process', error); fail('SPAWN_ERROR') })
++    child.on('close', (code, signal) => {
++      lifecycle.close = terminal(code, signal); resolveClosed({ code, signal })
++    })
+     child.on('exit', (code, signal) => {
+-      resolveExit({ code, signal })
++      lifecycle.exit = terminal(code, signal)
+       if (!disposed) fail('EARLY_EXIT')
+     })
+     startupTimer = setTimeout(() => fail('STARTUP_TIMEOUT'), startupMs)
+-  } catch { fail('SPAWN_ERROR'); resolveExit({ code: null, signal: null }) }
++  } catch (error) { recordError('spawn', error); fail('SPAWN_ERROR'); if (!child) resolveClosed(null) }
+ 
+   async function request(op, payload) {
+     if (!validPID(payload.pid)) throw failure('INVALID_PID')
+@@ -182,6 +209,7 @@ export function createDesktopWindowSession({
+       selectDesktopUnappliedDialog([window], window?.pid, executablePath)
+       return request('dismiss-unapplied', { pid: window.pid, handle: window.handle, executablePath })
+     },
++    diagnostics,
+     dispose() {
+       if (disposal) return disposal
+       disposed = true
+@@ -190,13 +218,17 @@ export function createDesktopWindowSession({
+         clearTimeout(pending.timer); pending.reject(failure('DISPOSED')); pending = null
+       }
+       disposal = (async () => {
+-        try { child?.stdin.end() } catch {}
++        lifecycle.eofRequested = true
++        try { child?.stdin.end() } catch (error) { streamFailed = true; recordError('stdin', error) }
+         let timer
+-        const end = await Promise.race([exited, new Promise(resolve => {
+-          timer = setTimeout(() => { try { child?.kill() } catch {} ; resolve(null) }, 3000)
++        const end = await Promise.race([closed, new Promise(resolve => {
++          timer = setTimeout(() => { terminate('DISPOSE_TIMEOUT'); resolve(null) }, 3000)
+         })])
+-        clearTimeout(timer); state = 'closed'
+-        const clean = !streamFailed && end?.code === 0 && end?.signal === null
++        clearTimeout(timer)
++        const clean = state !== 'failed' && !streamFailed && lifecycle.failureCode === null && lifecycle.termination === null
++          && Object.keys(lifecycle.errors).length === 0 && lifecycle.exit?.code === 0 && lifecycle.exit?.signal === null
++          && end?.code === 0 && end?.signal === null
++        state = 'closed'
+         event({ type: 'disposed', clean })
+         return clean
+       })()
+diff --git a/scripts/desktop-window-session.node.mjs b/scripts/desktop-window-session.node.mjs
+index f5a900c6402a6917691b8dc69aa198f0e6b4d361..1cdab4bd4ea7443d278fe3410c85ab7513186a41 100644
+--- a/scripts/desktop-window-session.node.mjs
++++ b/scripts/desktop-window-session.node.mjs
+@@ -30,7 +30,7 @@ function mock({ ready = true, response, replyDelay = 0, holdExit = false } = {})
+   const child = new EventEmitter(), calls = [], commands = [], events = []
+   let ended = false, killed = 0
+   const exit = (code, signal = null) => {
+-    if (ended) return; ended = true; child.emit('exit', code, signal)
++    if (ended) return; ended = true; child.emit('exit', code, signal); child.emit('close', code, signal)
+   }
+   child.pid = 800; child.stdout = new PassThrough(); child.stderr = new PassThrough()
+   const send = value => child.stdout.write(JSON.stringify(value) + '\r\n')
+diff --git a/scripts/local-export-desktop-evidence.node.mjs b/scripts/local-export-desktop-evidence.node.mjs
+index ab3e96f5c6c3b6a80a93473050969f99dcf42aed..166eab9253b66ced41cf34fdd3c5dc1d98bd2e6a 100644
+--- a/scripts/local-export-desktop-evidence.node.mjs
++++ b/scripts/local-export-desktop-evidence.node.mjs
+@@ -155,7 +155,7 @@ test('native picker requires exactly one action and a closed original dialog', (
+ function fakeWorker({ response, ready = true, holdExit = false } = {}) {
+   const child = new EventEmitter(), commands = [], spawns = []; let ended = false, kills = 0
+   child.pid = 991; child.stdout = new PassThrough(); child.stderr = new PassThrough()
+-  const exit = (code, signal = null) => { if (!ended) { ended = true; child.emit('exit', code, signal) } }
++  const exit = (code, signal = null) => { if (!ended) { ended = true; child.emit('exit', code, signal); child.emit('close', code, signal) } }
+   const send = value => child.stdout.write(JSON.stringify(value) + '\r\n')

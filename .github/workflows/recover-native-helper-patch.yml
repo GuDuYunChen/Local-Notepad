@@ -1,0 +1,33 @@
+name: Recover existing native helper checkpoint
+on:
+  push:
+    branches: [fix/native-helper-lifecycle-4-248]
+    paths: [.github/workflows/recover-native-helper-patch.yml]
+permissions:
+  contents: read
+jobs:
+  recover-reviewed-patch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Reassemble already uploaded plaintext patch with exact identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = GuDuYunChen/Local-Notepad
+          test "$GITHUB_REF" = refs/heads/fix/native-helper-lifecycle-4-248
+          out="$RUNNER_TEMP/native-helper-checkpoint"
+          mkdir -p "$out"
+          cat .github/automation/native-helper-part-{1,2,3,4}.diff > "$out/reviewed.patch"
+          printf '%s  %s\n' e8d0cb69ac73f5f7c85af5787d9757cdae3312c2a17d2423cbc5a50d9c735e05 "$out/reviewed.patch" | sha256sum -c -
+          printf 'baseline=8538e3f41729f245721ef6dff531c6431182a14d\nexpected_tree=9fcb62bd1a865782cabe28d39dcf6baafa5910bf\nworkflow=%s\nrun=%s\nno_tests_executed=true\nno_product_refs_changed=true\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" > "$out/recovery.txt"
+          (cd "$out" && sha256sum reviewed.patch recovery.txt > SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: recovered-native-helper-checkpoint
+          path: ${{ runner.temp }}/native-helper-checkpoint/*
+          if-no-files-found: error
+          retention-days: 14

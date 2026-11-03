@@ -1,0 +1,115 @@
++    assert.equal(f.calls.writes, 0); f.exit(1); f.close(1)
++  })
++}
++
++// Real isolated Node children validate the OS pipe/event boundary. They do not
++// compile PowerShell or exercise a Windows window, which requires native CI.
++import { spawn } from 'node:child_process'
++for (const kind of ['window', 'directory']) {
++  test(`${kind}: actual child process EOF proves both exit and stdio close`, async () => {
++    let child
++    const factory = kind === 'window' ? createDesktopWindowSession : createExportDirectorySession
++    const session = factory({ ownedRoot: 'C:\\owned-real-child', spawnWorker: () => {
++      child = spawn(process.execPath, ['--input-type=module', '-e',
++        `process.stdout.write('{"protocol":1,"ready":true}\\n');process.stdin.resume();process.stdin.on('end',()=>process.exit(0));`],
++        { stdio: ['pipe', 'pipe', 'pipe'] })
++      return child
++    } })
++    try {
++      await session.ready; assert.equal(await session.dispose(), true)
++      const d = session.diagnostics()
++      assert.equal(d.pid, child.pid); assert.equal(d.eofRequested, true)
++      assert.equal(d.exit.code, 0); assert.equal(d.close.code, 0)
++      assert.ok(d.close.elapsedMs >= d.exit.elapsedMs); assert.equal(d.termination, null)
++      assert.deepEqual(d.errors, {})
++    } finally { await session.dispose(); if (child.exitCode === null && child.signalCode === null) child.kill() }
++  })
++}
+diff --git a/scripts/reading-mode-installed-evidence.node.mjs b/scripts/reading-mode-installed-evidence.node.mjs
+index 68df5fe465bbd414cb9f55f89b27d318e9baccc7..4176d42e1078ff0b982070c47d429eb56552f7a5 100644
+--- a/scripts/reading-mode-installed-evidence.node.mjs
++++ b/scripts/reading-mode-installed-evidence.node.mjs
+@@ -22,7 +22,7 @@ function fixture() {
+     previousArtifactMetadata: { headSha: 'f'.repeat(40), branch: 'ci/rebuild-legacy-seed-4-232',
+       repositoryId: 1105107817, archiveBytes: 100, archiveSha256: createHash('sha256').update('synthetic archive').digest('hex'),
+       productSourceSha: ACCEPTED_READING_SEED_SOURCE.productSourceCommit },
+-    current: { version: '4.247.1', bytes: 1001, sha256: createHash('sha256').update('synthetic-reading-mode-contract-input').digest('hex') },
++    current: { version: '4.248.0', bytes: 1001, sha256: createHash('sha256').update('synthetic-reading-mode-contract-input').digest('hex') },
+     currentSource: { run: 100, artifact: 200, name: 'local-notepad-windows-' + 'a'.repeat(40),
+       headSha: 'c'.repeat(40), branch: 'feature/local-export-2f102-closure', repositoryId: 1105107817,
+       archiveBytes: 100, archiveSha256: createHash('sha256').update('synthetic archive').digest('hex') } }
+@@ -123,11 +123,11 @@ test('all generated import copies retain exact inverse source identity', () => {
+ })
+ const importCheckoutSources = [
+   { source: 'local-import-desktop-evidence.mjs', pin: 'importEvidenceBlob', hash: '6fc3c3d069384fc2bd7c671987ace423d004ddf8',
+-    old: "assert.equal(report.appVersion, '4.232.0')", current: "assert.equal(report.appVersion, '4.247.1')" },
++    old: "assert.equal(report.appVersion, '4.232.0')", current: "assert.equal(report.appVersion, '4.248.0')" },
+   { source: 'check-local-import-desktop.mjs', pin: 'importBlob', hash: '6f0bfd54c7b7e1ea673e80b55a91be82244dfcef',
+-    old: "assert.equal(diagnostics.version, '4.232.0')", current: "assert.equal(diagnostics.version, '4.247.1')" },
++    old: "assert.equal(diagnostics.version, '4.232.0')", current: "assert.equal(diagnostics.version, '4.248.0')" },
+   { source: 'local-import-desktop-evidence.node.mjs', pin: 'importEvidenceTestsBlob', hash: '12cc53ff2ff11d2aa8d6508feadd2a4734077bb3',
+-    old: "appVersion: '4.232.0'", current: "appVersion: '4.247.1'" },
++    old: "appVersion: '4.232.0'", current: "appVersion: '4.248.0'" },
+ ]
+ for (const lineEnding of ['LF', 'CRLF']) {
+   const checkout = text => lineEnding === 'CRLF' ? text.replace(/\n/g, '\r\n') : text
+@@ -168,7 +168,7 @@ for (const lineEnding of ['LF', 'CRLF']) {
+         error => error.code === 'ERR_ASSERTION' && error.message.startsWith('Original verifier source identity changed: ' + spec.source))
+     })
+     test(lineEnding + ' refuses unsupported product import version even with a matching replacement pin: ' + spec.source, () => {
+-      const { pin } = fixture(), changed = current(spec.source).replace(spec.current, spec.current.replace('4.247.1', '4.234.0'))
++      const { pin } = fixture(), changed = current(spec.source).replace(spec.current, spec.current.replace('4.248.0', '4.234.0'))
+       pin[spec.pin] = blob(changed)
+       assert.throws(() => prepareReadingModeVerifierSources(pin, name => checkout(name === spec.source ? changed : current(name))),
+         /Original verifier anchor missing or ambiguous/)
+@@ -297,7 +297,7 @@ for (const lineEnding of ['LF', 'CRLF']) test('offline complete ' + lineEnding +
+     assert.equal(final.script.match(/await verifyLocalImportRestart\(/g).length, 1)
+     assert.ok(final.script.indexOf('await verifyReadingModeDesktop(') > final.script.indexOf('await verifyLocalImportRestart('))
+     assert.equal(final.core.match(/'installed-app-reading-mode-workflow'/g).length, 1)
+-    assert.ok(final.core.includes('4.247.1')); assert.ok(final.core.includes('4.232.0'))
++    assert.ok(final.core.includes('4.248.0')); assert.ok(final.core.includes('4.232.0'))
+     for (const marker of REQUIRED_CHECKS) assert.ok(final.core.includes(marker), marker)
+     assert.ok(final.core.includes(LEGACY_DEFECT.sha256))
+     assert.ok(final.script.includes("assert.equal(observedDirectory,legacyTarget.split(' ')[0],'Old directory truncation was not reproduced')"))
+diff --git a/scripts/run-local-export-desktop.mjs b/scripts/run-local-export-desktop.mjs
+index ffde8b2684e79327db84e64e58e7ecd5dd37edfd..1d7a20cdfce4cf48334556e803709e6b2f9a3d12 100644
+--- a/scripts/run-local-export-desktop.mjs
++++ b/scripts/run-local-export-desktop.mjs
+@@ -149,7 +149,11 @@ export async function runLocalExportLifecycle({ executablePath, out, productComm
+       blob(readFileSync(new URL('./' + name, import.meta.url), 'utf8').replace(/\r\n/g, '\n'))])),
+   }
+   writeFileSync(reportPath, JSON.stringify(report, null, 2), { flag: 'wx' })
+-  const save = () => writeFileSync(reportPath, JSON.stringify(report, null, 2))
++  const save = () => {
++    if (windowSession) report.windowHelper.lifecycle = windowSession.diagnostics()
++    if (directorySession) report.directoryHelper.lifecycle = directorySession.diagnostics()
++    writeFileSync(reportPath, JSON.stringify(report, null, 2))
++  }
+   const mark = name => { assert.equal(name, LOCAL_EXPORT_CHECKS[report.checks.length]); report.checks.push(name); save() }
+   let child, exited, cdp, windowSession, directorySession, trace = ''
+   const requests = [], pendingRequests = new Map(), environment = { ...process.env }
+@@ -260,6 +264,7 @@ export async function runLocalExportLifecycle({ executablePath, out, productComm
+       await Promise.race([exited.catch(() => {}), sleep(3000)])
+     }
+     await directorySession?.dispose(); await windowSession?.dispose()
++    save() // Preserve actual terminal observations even when startup/business failed.
+     writeFileSync(path.join(out, 'local-export-desktop.log'), trace)
+   }
+ }
+diff --git a/scripts/shortcut-management-installed-evidence.node.mjs b/scripts/shortcut-management-installed-evidence.node.mjs
+index a5436e2982de61880057caa41fa766928e20633b..b71e326bd014512589fbbd75557887d27c36b6a4 100644
+--- a/scripts/shortcut-management-installed-evidence.node.mjs
++++ b/scripts/shortcut-management-installed-evidence.node.mjs
+@@ -27,9 +27,9 @@ function pinFixture() {
+   Object.assign(pin, { product, previous: { ...ACCEPTED_READING_SEED }, previousSource: { ...ACCEPTED_READING_SEED_SOURCE },
+     current: { version: SHORTCUT_MANAGEMENT_VERSION, bytes: 1001, sha256: sha('synthetic shortcut installer contract input') },
+     currentSource: { run: 100, artifact: 200, name: 'local-notepad-windows-' + product },
+-    importBlob: 'e4b79484a7cb7010294b62e2558c7038a757f5ad',
+-    importEvidenceBlob: '5fc8018ae3d6a93a3c45d1fddbc52fa19d2d0d15',
+-    importEvidenceTestsBlob: '36208525b839ef50a22f9d1e14ea78720490b039',
++    importBlob: '1e071bbc9370e993858369eed712703413c37072',
++    importEvidenceBlob: 'c6ba9deaea17cfcad69ca92ae530c2f831451345',
++    importEvidenceTestsBlob: '4e28a1ed041e5406c682e0ebdd73adaa2985c628',
+     readingEvidenceBlob: blob(source('reading-mode-desktop-evidence.mjs')),
+     historyDriverBlob: blob(source('check-version-history-desktop.mjs')) })
+   for (const [file, key] of Object.entries(SHORTCUT_INSTALLATION_SOURCES)) pin[key] = blob(source(file))
