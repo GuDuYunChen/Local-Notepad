@@ -43,8 +43,9 @@ jobs:
           test -z "$(git diff --cached --name-only "$base" -- electron server)"
           git config user.name 'Verified image recovery candidate'
           git config user.email 'image-recovery@users.noreply.github.com'
-          git commit -m "fix: recover local image insertion after upload and compression failures" -m "Exact candidate tree $expected_tree from the locally frozen and verified 4.248.1 source. Preserve original editor insertion/save path, backend API, database schema and dependency graph. Candidate tests and Linux UI evidence are recorded in the accompanying handoff; current Windows packaging, PR CI and native install acceptance remain required. No main/master writes or force push."
-          candidate="$(git rev-parse HEAD)"
+          git cat-file -e "$GITHUB_SHA^{commit}"
+          test "$(git ls-remote origin "$GITHUB_REF" | cut -f1)" = "$GITHUB_SHA"
+          candidate="$(printf '%s\\n\\n%s\\n' 'fix: recover local image insertion after upload and compression failures' 'Exact candidate tree from the locally frozen and verified 4.248.1 source. Preserve original editor insertion/save path, backend API, database schema and dependency graph. Candidate tests and Linux UI evidence are recorded in the handoff; current Windows packaging, PR CI and native install acceptance remain required. No main/master writes or force push.' | git commit-tree "$expected_tree" -p "$GITHUB_SHA")"
           git push origin "$candidate:refs/heads/fix/local-image-upload-recovery-4-248-1"
           test "$(git ls-remote origin refs/heads/fix/local-image-upload-recovery-4-248-1 | cut -f1)" = "$candidate"
           printf 'candidate_commit=%s\ncandidate_tree=%s\nbase=%s\n' "$candidate" "$expected_tree" "$base" > "$RUNNER_TEMP/publication-receipt.txt"
