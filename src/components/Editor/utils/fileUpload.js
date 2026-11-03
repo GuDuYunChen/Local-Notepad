@@ -1,47 +1,68 @@
 
-export const compressImage = (file) => {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = (event) => {
-            const img = new Image();
-            img.src = event.target.result;
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                const MAX_WIDTH = 1920; 
-                const MAX_HEIGHT = 1080;
-                let width = img.width;
-                let height = img.height;
-
-                if (width > height) {
-                    if (width > MAX_WIDTH) {
-                        height *= MAX_WIDTH / width;
-                        width = MAX_WIDTH;
-                    }
-                } else {
-                    if (height > MAX_HEIGHT) {
-                        width *= MAX_HEIGHT / height;
-                        height = MAX_HEIGHT;
-                    }
-                }
-                canvas.width = width;
-                canvas.height = height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, width, height);
-                canvas.toBlob((blob) => {
-                    if (blob) {
-                        const newFile = new File([blob], file.name, { type: 'image/jpeg' });
-                        resolve(newFile);
-                    } else {
-                        reject(new Error('Canvas to Blob failed'));
-                    }
+// Compression is optional: every browser callback must settle, including
+// canvas/decoder failures. Callers can then safely retain the original image.
+export const IMAGE_COMPRESSION_TIMEOUT_MS = 15000;
+export const compressImage = (file, { signal } = {}) => new Promise((resolve, reject) => {
+    let reader, image, canvas, timer, settled = false;
+    const abortError = () => new DOMException('图片处理已取消', 'AbortError');
+    const finish = (error, result) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        signal?.removeEventListener('abort', onAbort);
+        if (reader) {
+            reader.onload = reader.onerror = reader.onabort = null;
+            if (reader.readyState === 1) { try { reader.abort(); } catch {} }
+        }
+        if (image) { image.onload = image.onerror = null; try { image.src = ''; } catch {} }
+        if (canvas) { try { canvas.width = 0; canvas.height = 0; } catch {} }
+        if (error) reject(error); else resolve(result);
+    };
+    const onAbort = () => finish(abortError());
+    if (signal?.aborted) { onAbort(); return; }
+    signal?.addEventListener('abort', onAbort, { once: true });
+    timer = setTimeout(() => finish(new Error('图片处理超时，改用原图')), IMAGE_COMPRESSION_TIMEOUT_MS);
+    try {
+        reader = new FileReader();
+        image = new Image();
+        reader.onerror = () => finish(new Error('无法读取图片'));
+        reader.onabort = onAbort;
+        image.onerror = () => finish(new Error('无法解码图片'));
+        image.onload = () => {
+            if (settled) return;
+            try {
+                const width = image.naturalWidth || image.width;
+                const height = image.naturalHeight || image.height;
+                if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) throw new Error('图片尺寸无效');
+                const ratio = Math.min(1, 1920 / width, 1080 / height);
+                canvas = document.createElement('canvas');
+                canvas.width = Math.max(1, Math.floor(width * ratio));
+                canvas.height = Math.max(1, Math.floor(height * ratio));
+                const context = canvas.getContext('2d');
+                if (!context) throw new Error('图片处理不可用');
+                context.drawImage(image, 0, 0, canvas.width, canvas.height);
+                canvas.toBlob(blob => {
+                    if (settled) return;
+                    try {
+                        if (!blob || blob.size === 0 || blob.type !== 'image/jpeg') throw new Error('无法生成压缩图片');
+                        const name = (file.name || 'image').replace(/\.[^./\\]+$/, '') + '.jpg';
+                        finish(null, new File([blob], name, { type: 'image/jpeg' }));
+                    } catch (error) { finish(error); }
                 }, 'image/jpeg', 0.7);
-            };
-            img.onerror = (err) => reject(err);
+            } catch (error) { finish(error); }
         };
-        reader.onerror = (err) => reject(err);
-    });
-};
+        reader.onload = event => {
+            if (settled) return;
+            try {
+                if (typeof event.target?.result !== 'string') throw new Error('无法读取图片');
+                image.src = event.target.result;
+            } catch (error) { finish(error); }
+        };
+        // Register callbacks before either operation: cached/synchronous mock
+        // completions must follow the same path as asynchronous browser events.
+        reader.readAsDataURL(file);
+    } catch (error) { finish(error); }
+});
 
 export const generateVideoMetadata = (file) => {
     return new Promise((resolve, reject) => {
@@ -87,7 +108,7 @@ export const loadXLSX = () => {
   return xlsxPromise;
 };
 
-export const uploadFile = async (file) => {
+export const uploadFile = async (file, { signal } = {}) => {
     const formData = new FormData();
     formData.append('file', file);
     try {
@@ -95,9 +116,12 @@ export const uploadFile = async (file) => {
         const res = await fetch(`${baseUrl}/api/upload`, {
             method: 'POST',
             body: formData,
+            ...(signal ? { signal } : {}),
         });
+        if (!res.ok) throw new Error('上传失败，请重试');
         const json = await res.json();
-        if (json.code !== 0) throw new Error(json.message);
+        if (json.code !== 0) throw new Error(json.message || '上传失败');
+        if (typeof json.data?.url !== 'string' || !/^\/uploads\/[^/\\?#]+$/.test(json.data.url)) throw new Error('上传结果无效，请重试');
         return { url: `${baseUrl}${json.data.url}`, name: json.data.filename };
     } catch (e) {
         console.error('Upload failed', e);

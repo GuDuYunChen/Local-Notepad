@@ -1,1 +1,0 @@
-Final trigger after correcting the base64 segment ordering. Temporary transport file only; removed before patch application.

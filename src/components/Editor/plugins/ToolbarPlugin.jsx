@@ -47,7 +47,9 @@ import { $createToggleNode } from '../nodes/ToggleNode'
 import { $createEmbedNode } from '../nodes/EmbedNode'
 import { $createAttachmentNode } from '../nodes/AttachmentNode'
 import { $createFormulaNode } from '../nodes/FormulaNode'
-import { compressImage, generateVideoMetadata, loadXLSX, uploadFile } from '../utils/fileUpload'
+import { generateVideoMetadata, loadXLSX, uploadFile } from '../utils/fileUpload'
+import { uploadImage, imageFailureMessage } from '../utils/imageUpload'
+import { useImageUploadSession } from '../hooks/useImageUploadSession'
 import { toast } from '~/services/toast'
 import TableMenu from './TableMenu'
 import { normalizeLinkUrl } from '../utils/linkUtils'
@@ -101,6 +103,7 @@ export default function ToolbarPlugin({ documentId } = {}) {
   const [editor] = useLexicalComposerContext()
   const { bindings } = useLocalShortcuts()
   const captureWrite = useEditorWriteScope(editor, documentId)
+  const imageUploads = useImageUploadSession(editor, documentId)
   const [canUndo, setCanUndo] = useState(false)
   const [canRedo, setCanRedo] = useState(false)
   const [fontSize, setFontSize] = useState('16px')
@@ -392,74 +395,46 @@ export default function ToolbarPlugin({ documentId } = {}) {
   }
 
   const handleImage = async (event) => {
-    const canWrite = captureWrite()
-    if (!canWrite()) return
-    const files = Array.from(event.target.files || [])
+    const input = event.target
+    const files = Array.from(input.files || [])
+    input.value = '' // Selecting the same failed image again must dispatch change.
     if (!files.length) return
-
-    if (files.some(file => file.size > 10 * 1024 * 1024)) {
-      toast.warning('单张图片不能超过 10 MB')
-      event.target.value = ''
-      return
-    }
-
-    setIsUploading(true)
+    const task = imageUploads.begin()
+    if (!task) { toast.warning('图片正在处理中，请先完成或取消当前上传'); return }
+    setInsertOpen(false)
+    const items = []
+    let failed = [], originalOnly = 0
     try {
-      const uploads = await Promise.all(files.map(async file => {
-        const type = file.type || ''
-        const skipCompress = type.includes('gif') || type.includes('png')
-
-        if (!skipCompress && file.size > 2 * 1024 * 1024) {
-          try {
-            const compressedFile = await compressImage(file)
-            if (!canWrite()) return null
-            const [compressed, original] = await Promise.all([
-              uploadFileSafe(compressedFile),
-              uploadFileSafe(file),
-            ])
-            if (compressed && original) {
-              return {
-                src: compressed.url,
-                originalSrc: original.url,
-                alt: file.name,
-              }
-            }
-          } catch {
-            // Fall back to the original file below.
-          }
+      // Preserve selection order, bound simultaneous work and retain successful
+      // items when a different file fails. Never retry an upload implicitly.
+      for (const file of files) {
+        if (!task.current()) break
+        try {
+          const item = await uploadImage(file, { signal: task.signal, isCurrent: task.current })
+          items.push(item)
+          if (item.originalOnly) originalOnly++
+        } catch (error) {
+          if (!task.current() || error?.name === 'AbortError') break
+          failed.push(file.name)
         }
-
-        if (!canWrite()) return null
-        const result = await uploadFileSafe(file)
-        return result
-          ? { src: result.url, originalSrc: result.url, alt: file.name }
-          : null
-      }))
-
-      const items = uploads.filter(Boolean)
-      if (!items.length || !canWrite()) return
-
-      editor.update(() => {
-        if (!canWrite()) return
+      }
+      if (!task.current()) return
+      if (items.length) editor.update(() => {
+        if (!task.current()) return
         if (items.length === 1) {
           const item = items[0]
-          $insertNodes([
-            $createImageNode({
-              src: item.src,
-              originalSrc: item.originalSrc,
-              alt: item.alt,
-              caption: item.alt,
-              width: 640,
-            }),
-          ])
+          $insertNodes([$createImageNode({ src: item.src, originalSrc: item.originalSrc,
+            alt: item.alt, caption: item.alt, width: 640 })])
         } else {
-          $insertNodes([$createImageGridNode({ items, columns: 3, gap: 8 })])
+          $insertNodes([$createImageGridNode({ items: items.map(({ src, originalSrc, alt }) => ({ src, originalSrc, alt })), columns: 3, gap: 8 })])
         }
       })
-    } finally {
-      setIsUploading(false)
-      event.target.value = ''
-    }
+      if (failed.length) toast.error(imageFailureMessage(items.length, failed, '选择'))
+      else if (originalOnly) toast.warning('压缩预览不可用，已插入原图')
+      else if (items.length) toast.success(`已插入 ${items.length} 张图片`)
+    } catch {
+      if (task.current()) toast.error('图片插入失败，请重试')
+    } finally { task.finish() }
   }
 
   const handleVideo = async (event) => {
@@ -763,7 +738,11 @@ export default function ToolbarPlugin({ documentId } = {}) {
       </button>
 
       <span className="toolbar-slash-hint">输入 / 快速插入</span>
-      {isUploading && <span className="toolbar-progress">处理中…</span>}
+      {isUploading && <span className="toolbar-progress" role="status">处理中…</span>}
+      {imageUploads.busy && <div className="editor-image-upload-status" role="status" aria-label="图片上传进度">
+        <span className="toolbar-progress">正在插入图片…</span>
+        <button type="button" className="btn small" autoFocus onClick={() => { imageUploads.cancel(); toast.warning('已取消上传，未插入图片') }}>取消图片上传</button>
+      </div>}
 
       <div className="toolbar-more-wrap" ref={insertMenuRef}>
         <button
@@ -790,7 +769,7 @@ export default function ToolbarPlugin({ documentId } = {}) {
                 </label>
                 <label className="btn toolbar-menu-action">
                   图片
-                  <input type="file" accept="image/*" multiple hidden onChange={handleImage} />
+                  <input type="file" accept="image/*" multiple hidden disabled={imageUploads.busy} onChange={handleImage} />
                 </label>
                 <label className="btn toolbar-menu-action">
                   视频
