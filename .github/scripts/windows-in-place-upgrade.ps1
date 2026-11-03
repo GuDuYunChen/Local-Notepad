@@ -18,7 +18,7 @@ $http=[Net.Http.HttpClient]::new();$s=$null
 function Install-App($exe){$p=Start-Process $exe -ArgumentList @('/S',"/D=$install") -PassThru -Wait;if($p.ExitCode -ne 0){throw "Installer exit $($p.ExitCode): $exe"}}
 function Start-Api([int]$port){
  $exe=Join-Path $install 'resources\bin\notepad-server.exe';if(!(Test-Path $exe)){throw "Missing backend $exe"}
- $i=[Diagnostics.ProcessStartInfo]::new();$i.FileName=$exe;$i.WorkingDirectory=$install;$i.UseShellExecute=$false;$i.CreateNoWindow=$true;$i.RedirectStandardInput=$true;$i.RedirectStandardOutput=$true;$i.RedirectStandardError=$true
+ $i=[Diagnostics.ProcessStartInfo]::new();$i.FileName=$exe;$i.WorkingDirectory=$install;$i.UseShellExecute=$false;$i.CreateNoWindow=$true;$i.RedirectStandardInput=$true;$i.RedirectStandardError=$true
  $i.Environment['NOTEPAD_DATA']=$data;$i.Environment['NOTEPAD_PARENT_STDIN']='1';$i.Environment['PORT']=[string]$port
  $p=[Diagnostics.Process]::new();$p.StartInfo=$i;$err=[Text.StringBuilder]::new();$null=$p.add_ErrorDataReceived({if($_.Data){[void]$err.AppendLine($_.Data)}})
  if(!$p.Start()){throw 'Backend process failed to start.'};$p.BeginErrorReadLine();$base="http://127.0.0.1:$port";$deadline=[DateTime]::UtcNow.AddSeconds(15)
@@ -75,6 +75,31 @@ try{
  if($hash -ne $fixtureHash){throw 'Attachment did not survive upgraded backend restart.'}
  $r.checks.Add('4.248.1-restart-retains-note-and-attachment')
  Stop-Api $s;$s=$null
+
+ # Launch the actual upgraded Electron executable against the normal default backend port/profile.
+ $gui=Start-Process -FilePath $app.FullName -ArgumentList @('--remote-debugging-port=27164') -PassThru
+ $guiBase='http://127.0.0.1:27121';$cdp='http://127.0.0.1:27164/json/list';$deadline=[DateTime]::UtcNow.AddSeconds(30);$page=$null
+ while([DateTime]::UtcNow -lt $deadline){
+   if($gui.HasExited){throw "Upgraded desktop exited during startup: $($gui.ExitCode)"}
+   try{
+     $health=Invoke-RestMethod "$guiBase/api/health" -TimeoutSec 2
+     $targets=Invoke-RestMethod $cdp -TimeoutSec 2
+     $page=$targets|Where-Object{$_.type -eq 'page' -and $_.url -match 'dist/index\\.html'}|Select-Object -First 1
+     if($health.code -eq 0 -and $page){break}
+   }catch{Start-Sleep -Milliseconds 250}
+ }
+ if(!$page){throw 'Upgraded Electron window did not load the packaged renderer and local backend.'}
+ $guiNote=Invoke-RestMethod "$guiBase/api/files/$id" -TimeoutSec 5
+ if($guiNote.code -ne 0 -or $guiNote.data.content -ne $updated){throw 'The launched upgraded desktop did not read the retained upgraded note.'}
+ $r.checks.Add('4.248.1-installed-electron-window-loads-retained-note')
+ if(-not $gui.CloseMainWindow()){throw 'Could not request a normal close of the upgraded Electron window.'}
+ if(-not $gui.WaitForExit(20000)){throw 'Upgraded Electron app did not exit normally after WM_CLOSE.'}
+ $stopped=$false;$stopDeadline=[DateTime]::UtcNow.AddSeconds(10)
+ while([DateTime]::UtcNow -lt $stopDeadline){
+   try{$null=Invoke-RestMethod "$guiBase/api/health" -TimeoutSec 1;Start-Sleep -Milliseconds 200}catch{$stopped=$true;break}
+ }
+ if(-not $stopped){throw 'Bundled backend remained alive after the upgraded desktop exited.'}
+ $r.checks.Add('4.248.1-desktop-normal-exit-stops-owned-backend')
  $r.complete=$true;$r.status='passed';$r.finishedAt=[DateTime]::UtcNow.ToString('o')
 }catch{$r.status='failed';$r.error=$_.Exception.Message;$r.finishedAt=[DateTime]::UtcNow.ToString('o');throw}
 finally{
