@@ -193,6 +193,9 @@ jobs:
       - name: Run editor tests
         run: npm run test:editor
 
+      - name: Run Node-based UI control audit tests
+        run: npm run test:ui-audit
+
       - name: Run complete unfiltered Vitest suite
         run: npx vitest run --root=.
 
