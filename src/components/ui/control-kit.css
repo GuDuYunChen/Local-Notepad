@@ -1,0 +1,26 @@
+/* Application-wide Ant Design component tokens. Avoid decorative nested borders/shadows. */
+:root {
+  --app-control-height: 40px;
+  --app-control-radius: 8px;
+}
+.app-ui-button.ant-btn,
+.app-ui-input.ant-input,
+.app-ui-input.ant-input-affix-wrapper,
+.app-ui-select.ant-select .ant-select-selector {
+  min-height: var(--app-control-height);
+  border-radius: var(--app-control-radius);
+  box-shadow: none;
+}
+.app-ui-button.ant-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.app-ui-input.ant-input,
+.app-ui-input.ant-input-affix-wrapper,
+.app-ui-select.ant-select .ant-select-selector { border-color: var(--control-border, var(--line-strong, var(--line))); }
+.app-ui-input.ant-input:focus,
+.app-ui-input.ant-input-affix-wrapper-focused,
+.app-ui-select.ant-select-focused .ant-select-selector {
+  border-color: var(--clay) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--clay) 16%, transparent) !important;
+}
+.app-ui-select.ant-select { min-width: 0; }
+.app-ui-select.ant-select .ant-select-selection-item,
+.app-ui-select.ant-select .ant-select-selection-placeholder { line-height: 38px; }
