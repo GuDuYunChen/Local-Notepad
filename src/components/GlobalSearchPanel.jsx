@@ -1,5 +1,6 @@
 import ResearchTasksPanel from './ResearchTasksPanel'
 import React, { useEffect, useRef, useState } from 'react'
+import { UiSelect } from './ui/ControlKit'
 import { UiInput } from './ui/ControlKit'
 import { UiButton } from './ui/ControlKit'
 import useBackupDialogFocus from '~/hooks/useBackupDialogFocus'
@@ -249,20 +250,20 @@ export default function GlobalSearchPanel({ open, onClose, onOpenFile, seed, onO
       <UiButton type="button" className="primary" onClick={retry}>搜索 / 刷新</UiButton>
     </div>
     <div className="global-search-filters">
-      <label>查找范围<select aria-label="检索目录范围" value={filters.folderId} onChange={event => update({ folderId: event.target.value })}>
+      <label>查找范围<UiSelect aria-label="检索目录范围" value={filters.folderId} onChange={event => update({ folderId: event.target.value })}>
         <option value="">全部目录与项目</option>
         {folders.map(folder => <option key={folder.id} value={folder.id}>{folder.label}</option>)}
         {filters.folderId && !folders.some(folder => folder.id === filters.folderId) && <option value={filters.folderId}>原目录不可用</option>}
-      </select></label>
-      <label>命中位置<select aria-label="检索命中位置" value={filters.source} onChange={event => update({ source: event.target.value })}>
+      </UiSelect></label>
+      <label>命中位置<UiSelect aria-label="检索命中位置" value={filters.source} onChange={event => update({ source: event.target.value })}>
         {Object.entries(SEARCH_SOURCES).map(([id, label]) => <option key={id} value={id}>{label}</option>)}
-      </select></label>
-      <label>修改时间<select aria-label="检索修改时间" value={filters.days} onChange={event => update({ days: event.target.value, since: Number(event.target.value) ? Math.floor(Date.now() / 1000) - Number(event.target.value) * 86400 : 0 })}>
+      </UiSelect></label>
+      <label>修改时间<UiSelect aria-label="检索修改时间" value={filters.days} onChange={event => update({ days: event.target.value, since: Number(event.target.value) ? Math.floor(Date.now() / 1000) - Number(event.target.value) * 86400 : 0 })}>
         <option value="0">不限时间</option><option value="7">最近 7 天</option><option value="30">最近 30 天</option><option value="90">最近 90 天</option>
-      </select></label>
-      <label>排序<select aria-label="检索结果排序" value={filters.sort} onChange={event => update({ sort: event.target.value })}>
+      </UiSelect></label>
+      <label>排序<UiSelect aria-label="检索结果排序" value={filters.sort} onChange={event => update({ sort: event.target.value })}>
         <option value="relevance">标题优先</option><option value="updated">最近修改</option><option value="title">标题顺序</option>
-      </select></label>
+      </UiSelect></label>
       <label className="check"><input type="checkbox" checked={filters.pinned} onChange={event => update({ pinned: event.target.checked })} />仅置顶</label>
       <label className="check"><input type="checkbox" checked={filters.matchCase} onChange={event => update({ matchCase: event.target.checked })} />区分大小写</label>
       <UiButton type="button" onClick={() => { setFilters(defaults()); setOpenError('') }}>重置</UiButton>
