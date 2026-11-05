@@ -1,4 +1,5 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { UiInput } from './ui/ControlKit'
 import { UiButton } from './ui/ControlKit'
 import { createPortal } from 'react-dom'
 import { api } from '~/services/api'
