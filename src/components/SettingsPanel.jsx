@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { UiButton } from './ui/ControlKit'
 import ThemeToggle from './ThemeToggle'
 import AppearanceCenter from './AppearanceCenter'
 import TagWorkspace from './TagWorkspace'
@@ -181,7 +182,7 @@ export default function SettingsPanel({
           <p>常用选项和本地数据都集中在这里。</p>
         </div>
         <div className="settings-toolbar-actions">
-          <button className="icon-btn" onClick={onClose} title="返回笔记" aria-label="返回笔记">×</button>
+          <UiButton className="icon-btn" onClick={onClose} title="返回笔记" aria-label="返回笔记">×</UiButton>
         </div>
       </header>
 
@@ -199,27 +200,27 @@ export default function SettingsPanel({
           </div>
           <div className="settings-row">
             <div><strong>主题方案</strong><span>本地自定义强调色，支持预览、导入导出和恢复默认。</span></div>
-            <button type="button" className="btn" onClick={() => setAppearanceOpen(true)}>管理主题方案</button>
+            <UiButton type="button" className="btn" onClick={() => setAppearanceOpen(true)}>管理主题方案</UiButton>
           </div>
           {appearanceOpen && <AppearanceCenter onClose={() => setAppearanceOpen(false)} />}
         </section>
 
         <section className="settings-card consumer-settings-section">
           <div className="settings-card-header"><h3>标签与分类</h3></div>
-          {onOpenLocalActions && <div className="settings-row"><div><strong>快捷操作</strong><span>查找并打开本地功能，跳转沿用原保存保护。</span></div><button type="button" className="btn" onClick={onOpenLocalActions}>打开快捷操作</button></div>}
-          <div className="settings-row"><div><strong>本地标签工作台</strong><span>查看关联笔记，集中创建、重命名、合并和删除标签。</span></div><button type="button" className="btn" onClick={() => setTagWorkspaceOpen(true)}>打开标签工作台</button></div>
+          {onOpenLocalActions && <div className="settings-row"><div><strong>快捷操作</strong><span>查找并打开本地功能，跳转沿用原保存保护。</span></div><UiButton type="button" className="btn" onClick={onOpenLocalActions}>打开快捷操作</UiButton></div>}
+          <div className="settings-row"><div><strong>本地标签工作台</strong><span>查看关联笔记，集中创建、重命名、合并和删除标签。</span></div><UiButton type="button" className="btn" onClick={() => setTagWorkspaceOpen(true)}>打开标签工作台</UiButton></div>
           {tagWorkspaceOpen && <TagWorkspace onClose={() => setTagWorkspaceOpen(false)} onOpenFile={onOpenFile} />}
-          <div className="settings-row"><div><strong>本地文件夹整理</strong><span>浏览目录、批量移动、新建改名与空目录回收；确认冲突，不改正文。</span></div><button type="button" className="btn" onClick={() => setFolderWorkspaceOpen(true)}>打开文件夹整理</button></div>
+          <div className="settings-row"><div><strong>本地文件夹整理</strong><span>浏览目录、批量移动、新建改名与空目录回收；确认冲突，不改正文。</span></div><UiButton type="button" className="btn" onClick={() => setFolderWorkspaceOpen(true)}>打开文件夹整理</UiButton></div>
           {folderWorkspaceOpen && <FolderWorkspace onClose={() => setFolderWorkspaceOpen(false)} onOpenFile={onOpenFile} />}
-          <div className="settings-row"><div><strong>笔记库统计</strong><span>只读查看数量、字符、标签覆盖和日期分布，筛选定位并导出统计。</span></div><button type="button" className="btn" onClick={() => setStatisticsOpen(true)}>打开笔记库统计</button></div>
+          <div className="settings-row"><div><strong>笔记库统计</strong><span>只读查看数量、字符、标签覆盖和日期分布，筛选定位并导出统计。</span></div><UiButton type="button" className="btn" onClick={() => setStatisticsOpen(true)}>打开笔记库统计</UiButton></div>
           {statisticsOpen && <LibraryStatistics onClose={() => setStatisticsOpen(false)} onOpenFile={onOpenFile} />}
-          <div className="settings-row"><div><strong>双笔记比较</strong><span>明确选择两篇保存笔记、逐行比较、回访原文和私密报告；不合并或改写。</span></div><button type="button" className="btn" onClick={() => setNoteComparisonOpen(true)}>打开双笔记比较</button></div>
+          <div className="settings-row"><div><strong>双笔记比较</strong><span>明确选择两篇保存笔记、逐行比较、回访原文和私密报告；不合并或改写。</span></div><UiButton type="button" className="btn" onClick={() => setNoteComparisonOpen(true)}>打开双笔记比较</UiButton></div>
           {noteComparisonOpen && <NoteComparison onClose={() => setNoteComparisonOpen(false)} onOpenFile={onOpenFile} />}
-          <div className="settings-row"><div><strong>历史检索与对照</strong><span>从全库选取笔记、浏览保留快照，对照当前保存正文并确认导出；不自动恢复。</span></div><button type="button" className="btn" onClick={() => setHistoryReviewOpen(true)}>打开历史中心</button></div>
+          <div className="settings-row"><div><strong>历史检索与对照</strong><span>从全库选取笔记、浏览保留快照，对照当前保存正文并确认导出；不自动恢复。</span></div><UiButton type="button" className="btn" onClick={() => setHistoryReviewOpen(true)}>打开历史中心</UiButton></div>
           {historyReviewOpen && <HistoryReview onClose={() => setHistoryReviewOpen(false)} onOpenFile={onOpenFile} />}
-          <div className="settings-row"><div><strong>重复笔记检查</strong><span>只读分组完全相同的保存正文，回访来源并导出；不自动删除。</span></div><button type="button" className="btn" onClick={() => setDuplicateNotesOpen(true)}>打开重复笔记检查</button></div>
+          <div className="settings-row"><div><strong>重复笔记检查</strong><span>只读分组完全相同的保存正文，回访来源并导出；不自动删除。</span></div><UiButton type="button" className="btn" onClick={() => setDuplicateNotesOpen(true)}>打开重复笔记检查</UiButton></div>
           {duplicateNotesOpen && <DuplicateNotes onClose={() => setDuplicateNotesOpen(false)} onOpenFile={onOpenFile} />}
-          <div className="settings-row"><div><strong>待办任务中心</strong><span>汇总已保存待办，筛选回访来源笔记；勾选和保存沿用原编辑器。</span></div><button type="button" className="btn" onClick={() => setTaskCenterOpen(true)}>打开待办任务中心</button></div>
+          <div className="settings-row"><div><strong>待办任务中心</strong><span>汇总已保存待办，筛选回访来源笔记；勾选和保存沿用原编辑器。</span></div><UiButton type="button" className="btn" onClick={() => setTaskCenterOpen(true)}>打开待办任务中心</UiButton></div>
           {taskCenterOpen && <TaskCenter onClose={() => setTaskCenterOpen(false)} onOpenFile={onOpenFile} />}
         </section>
 
@@ -229,10 +230,10 @@ export default function SettingsPanel({
             <StatusPill tone={dataStatusTone}>{dataStatusLabel}</StatusPill>
           </div>
 
-          <div className="settings-row"><div><strong>附件检查中心</strong><span>只读检查附件与候选引用，定位缺失文件；不自动清理或修改正文。</span></div><button type="button" className="btn" onClick={() => setAttachmentAuditOpen(true)}>打开附件检查中心</button></div>
+          <div className="settings-row"><div><strong>附件检查中心</strong><span>只读检查附件与候选引用，定位缺失文件；不自动清理或修改正文。</span></div><UiButton type="button" className="btn" onClick={() => setAttachmentAuditOpen(true)}>打开附件检查中心</UiButton></div>
           {attachmentAuditOpen && <AttachmentAudit onClose={() => setAttachmentAuditOpen(false)} onOpenFile={onOpenFile} />}
 
-          <div className="settings-row"><div><strong>回收站恢复工作台</strong><span>预览整批恢复、选择原位置或现存目录；拒绝覆盖，保留未确认记录。</span></div><button type="button" className="btn" onClick={() => setTrashRecoveryOpen(true)}>打开回收站恢复</button></div>
+          <div className="settings-row"><div><strong>回收站恢复工作台</strong><span>预览整批恢复、选择原位置或现存目录；拒绝覆盖，保留未确认记录。</span></div><UiButton type="button" className="btn" onClick={() => setTrashRecoveryOpen(true)}>打开回收站恢复</UiButton></div>
           {trashRecoveryOpen && <TrashRecovery onClose={() => setTrashRecoveryOpen(false)} onOpenFile={onOpenFile} />}
 
           <div className="consumer-data-summary">
@@ -246,7 +247,7 @@ export default function SettingsPanel({
               <strong>最近备份</strong>
               <span>{formatTimestamp(server?.latest_backup_at)}</span>
             </div>
-            <button className="btn" onClick={onOpenBackup}>备份与恢复</button>
+            <UiButton className="btn" onClick={onOpenBackup}>备份与恢复</UiButton>
           </div>
 
           <div className="settings-path-row">
@@ -254,18 +255,18 @@ export default function SettingsPanel({
               <strong>数据位置</strong>
               <code title={server?.data_dir || ''}>{server?.data_dir || '—'}</code>
             </div>
-            <button className="btn small" disabled={!server?.data_dir} onClick={() => void openFolder('data')}>
+            <UiButton className="btn small" disabled={!server?.data_dir} onClick={() => void openFolder('data')}>
               打开
-            </button>
+            </UiButton>
           </div>
 
           <div className="settings-action-row consumer-settings-actions">
-            <button className="btn" onClick={() => void openFolder('backups')} disabled={!server?.backup_dir}>
+            <UiButton className="btn" onClick={() => void openFolder('backups')} disabled={!server?.backup_dir}>
               打开备份文件夹
-            </button>
-            <button className="btn" onClick={() => void openFolder('uploads')} disabled={!server?.upload_dir}>
+            </UiButton>
+            <UiButton className="btn" onClick={() => void openFolder('uploads')} disabled={!server?.upload_dir}>
               打开附件文件夹
-            </button>
+            </UiButton>
           </div>
         </section>
 
@@ -298,10 +299,10 @@ export default function SettingsPanel({
               <strong>快捷键</strong>
               <span>查找常用操作，自定义快捷键并保存到本机。</span>
             </div>
-            <button className="btn" onClick={onOpenShortcuts}>管理</button>
+            <UiButton className="btn" onClick={onOpenShortcuts}>管理</UiButton>
           </div>
 
-          <button
+          <UiButton
             type="button"
             className="settings-advanced-toggle"
             aria-expanded={advancedOpen}
@@ -309,7 +310,7 @@ export default function SettingsPanel({
           >
             <span>{advancedOpen ? '收起高级诊断' : '高级诊断'}</span>
             <span aria-hidden="true">{advancedOpen ? '⌃' : '⌄'}</span>
-          </button>
+          </UiButton>
 
           {advancedOpen && (
             <div className="settings-advanced-panel">
@@ -319,10 +320,10 @@ export default function SettingsPanel({
                   <span>仅用于排查问题，不会上传。</span>
                 </div>
                 <div className="settings-toolbar-actions">
-                  <button className="btn small" onClick={() => void refresh()} disabled={loading}>
+                  <UiButton className="btn small" onClick={() => void refresh()} disabled={loading}>
                     {loading ? '刷新中…' : '刷新'}
-                  </button>
-                  <button className="btn small" onClick={() => void copyDiagnostics()}>复制诊断信息</button>
+                  </UiButton>
+                  <UiButton className="btn small" onClick={() => void copyDiagnostics()}>复制诊断信息</UiButton>
                 </div>
               </div>
 
