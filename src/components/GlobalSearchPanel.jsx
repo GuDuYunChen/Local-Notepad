@@ -1,5 +1,6 @@
 import ResearchTasksPanel from './ResearchTasksPanel'
 import React, { useEffect, useRef, useState } from 'react'
+import { UiInput } from './ui/ControlKit'
 import { UiButton } from './ui/ControlKit'
 import useBackupDialogFocus from '~/hooks/useBackupDialogFocus'
 import { evidenceNavigation } from '~/services/evidenceNavigation'
