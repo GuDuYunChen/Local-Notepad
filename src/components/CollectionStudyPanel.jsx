@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { UiSelect } from './ui/ControlKit'
 import { UiInput } from './ui/ControlKit'
 import { UiButton } from './ui/ControlKit'
 import useCollectionStudy from '~/hooks/useCollectionStudy'
@@ -83,7 +84,7 @@ function StudyPanel({ entry, onResume, focusRequest, disabled, sourceStore, stud
         }}>确认替换已存阅读记录</UiButton>
       </div>}
       <div className="collection-study-filters">
-        <label>阅读状态<select aria-label="资料集阅读筛选" value={status} onChange={event => { setStatus(event.target.value); setPage(1) }}><option value="all">全部阅读状态</option>{Object.entries(STUDY_STATUS_LABELS).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
+        <label>阅读状态<UiSelect aria-label="资料集阅读筛选" value={status} onChange={event => { setStatus(event.target.value); setPage(1) }}><option value="all">全部阅读状态</option>{Object.entries(STUDY_STATUS_LABELS).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</UiSelect></label>
         <label>检索批注<input type="search" maxLength={512} aria-label="搜索资料批注" value={query} onChange={event => { setQuery(event.target.value); setPage(1) }} placeholder="标题、笔记 ID 或已存批注" /></label>
       </div>
       <div className="collection-study-list">{rows.slice((currentPage - 1) * 8, currentPage * 8).map(item => <article key={item.id}>
