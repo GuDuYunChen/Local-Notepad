@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { UiButton } from './ui/ControlKit'
 import { collectionStudyHub, selectCollectionStudyHub } from '~/services/collectionStudyHub'
 import { collectionStudy, COLLECTION_STUDY_PREFIX, STUDY_STATUS_LABELS } from '~/services/collectionStudy'
 import { searchCollections, SEARCH_COLLECTION_PREFIX } from '~/services/searchCollections'
@@ -56,10 +57,10 @@ export default function CollectionStudyHub({ active, onLocate, service = collect
   })
   return <section className="collection-study-hub" aria-label="跨资料集阅读批注工作台">
     <header><h3>阅读批注工作台</h3><p>集中查找各资料集的已存批注和待复看资料。相同笔记在不同资料集中分别显示，不合并批注；人工已读不代表正文已核验。</p></header>
-    <div className="study-hub-actions"><button type="button" disabled={!active || loading} onClick={() => void refresh()}>刷新阅读工作台</button>
-      {loading && <button type="button" onClick={() => { operation.current?.abort(); operation.current = null; setLoading(false); setStale(true); setMessage('已取消读取，原记录未改动。') }}>取消工作台读取</button>}
-      <button type="button" disabled={disabled || !view.total || model?.issues.length > 0} onClick={() => exportReport('markdown')}>导出筛选批注 Markdown</button>
-      <button type="button" disabled={disabled || !view.total || model?.issues.length > 0} onClick={() => exportReport('json')}>导出筛选批注 JSON</button>
+    <div className="study-hub-actions"><UiButton type="button" disabled={!active || loading} onClick={() => void refresh()}>刷新阅读工作台</UiButton>
+      {loading && <UiButton type="button" onClick={() => { operation.current?.abort(); operation.current = null; setLoading(false); setStale(true); setMessage('已取消读取，原记录未改动。') }}>取消工作台读取</UiButton>}
+      <UiButton type="button" disabled={disabled || !view.total || model?.issues.length > 0} onClick={() => exportReport('markdown')}>导出筛选批注 Markdown</UiButton>
+      <UiButton type="button" disabled={disabled || !view.total || model?.issues.length > 0} onClick={() => exportReport('json')}>导出筛选批注 JSON</UiButton>
     </div>
     {loading && <p role="status">正在读取本地资料集与阅读记录…</p>}
     {error && <p className="study-hub-notice" role="alert">{error}</p>}
@@ -83,7 +84,7 @@ export default function CollectionStudyHub({ active, onLocate, service = collect
         <label>人工状态<select aria-label="阅读工作台状态筛选" value={filters.status} onChange={e => update({ status: e.target.value })}><option value="all">全部阅读状态</option>{Object.entries(STUDY_STATUS_LABELS).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
         <label>排序<select aria-label="阅读工作台排序" value={filters.sort} onChange={e => update({ sort: e.target.value })}><option value="updated">批注最近保存</option><option value="collection">资料集与原条目顺序</option></select></label>
         <label className="study-hub-check"><input type="checkbox" checked={filters.notesOnly} onChange={e => update({ notesOnly: e.target.checked })} />只看有批注</label>
-        <button type="button" onClick={() => setFilters(defaults())}>重置阅读筛选</button>
+        <UiButton type="button" onClick={() => setFilters(defaults())}>重置阅读筛选</UiButton>
       </div>
       <p role="status">符合筛选 {view.total} 条 · 每页 12 条{stale ? '（旧快照）' : ''}</p>
       <CollectionStudyBatchPanel batch={batch} disabled={disabled || model.issues.length > 0} rows={view.rows} />
@@ -95,10 +96,10 @@ export default function CollectionStudyHub({ active, onLocate, service = collect
         <p className="study-hub-caption">{row.collectionName} · 原第 {row.ordinal} 条 · {row.folderPath || '根目录'}</p>
         <p className="study-hub-note">{row.note || '（无已存批注）'}</p>
         <small>笔记 ID：{row.id} · {row.updatedAt ? '保存于 ' + new Date(row.updatedAt).toLocaleString('zh-CN') : '未保存人工标记'}</small>
-        <button type="button" disabled={disabled || !onLocate} onClick={() => run(() => onLocate(service.locate(model, row.key)))}>查看并编辑此批注</button>
+        <UiButton type="button" disabled={disabled || !onLocate} onClick={() => run(() => onLocate(service.locate(model, row.key)))}>查看并编辑此批注</UiButton>
       </article>)}</div>
       {!view.total && <p className="study-hub-empty">当前筛选没有条目。可取消“只看有批注”查看未读和待复看资料；未删除任何记录。</p>}
-      <nav className="study-hub-actions" aria-label="阅读工作台分页"><button type="button" disabled={view.page <= 1} onClick={() => setFilters(previous => ({ ...previous, page: view.page - 1 }))}>批注上一页</button><span>第 {view.page} / {view.pages} 页</span><button type="button" disabled={view.page >= view.pages} onClick={() => setFilters(previous => ({ ...previous, page: view.page + 1 }))}>批注下一页</button></nav>
+      <nav className="study-hub-actions" aria-label="阅读工作台分页"><UiButton type="button" disabled={view.page <= 1} onClick={() => setFilters(previous => ({ ...previous, page: view.page - 1 }))}>批注上一页</UiButton><span>第 {view.page} / {view.pages} 页</span><UiButton type="button" disabled={view.page >= view.pages} onClick={() => setFilters(previous => ({ ...previous, page: view.page + 1 }))}>批注下一页</UiButton></nav>
     </>}
     <footer>仅汇总已存记录，不检索正文或未保存批注。导出覆盖当前筛选全部分页，最多 8 MiB；清单不是可恢复备份。批量操作仅改变已存人工状态；修改批注文字仍需进入对应资料集后明确保存。</footer>
   </section>
