@@ -1,4 +1,5 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { UiSelect } from './ui/ControlKit'
 import { UiInput } from './ui/ControlKit'
 import { UiButton } from './ui/ControlKit'
 import { createPortal } from 'react-dom'
@@ -106,7 +107,7 @@ export default function NoteComparison({ onClose, onOpenFile }) {
         </>}
         {snapshot && <>
           <div className="note-comparison-selection">{snapshot.notes.map((n, i) => <div key={n.id}><strong>{i ? '右侧' : '左侧'}</strong><span>{n.title || '未命名笔记'}</span><small>{n.folder} · {n.content_bytes} 字节</small><UiButton type="button" disabled={blocked || !onOpenFile} onClick={() => void open(i)}>{i ? '打开右侧原文' : '打开左侧原文'}</UiButton></div>)}</div>
-          <div className="note-comparison-options"><label>比较模式<select aria-label="笔记比较模式" disabled={blocked} value={mode} onChange={e => { setMode(e.target.value); setRowPage(0); setChangeIndex(0); setError(''); setMessage('') }}><option value="text">正文文本投影</option><option value="raw">保存正文原文</option></select></label><UiButton type="button" disabled={blocked} onClick={clearResult}>返回选择</UiButton></div>
+          <div className="note-comparison-options"><label>比较模式<UiSelect aria-label="笔记比较模式" disabled={blocked} value={mode} onChange={e => { setMode(e.target.value); setRowPage(0); setChangeIndex(0); setError(''); setMessage('') }}><option value="text">正文文本投影</option><option value="raw">保存正文原文</option></UiSelect></label><UiButton type="button" disabled={blocked} onClick={clearResult}>返回选择</UiButton></div>
           <p className="note-comparison-scope">文本投影不包含格式或链接目标；图片、公式或未知节点不会伪装成空文本。原文模式比较完整保存字符串，富文本可能为 JSON。均不执行 HTML。</p>
           <p className="note-comparison-result" role="note" data-comparison-state={model.state}>{model.message}{stale ? ' 当前结果已过时。' : ''}</p>
           {model.counts && <p>左侧独有 {model.counts.leftOnly} 行 · 右侧独有 {model.counts.rightOnly} 行 · {model.changes.length} 处差异</p>}
