@@ -1,4 +1,4 @@
-import React, { forwardRef } from 'react'
+import React, { forwardRef, Children } from 'react'
 import { Button, Input, Select } from 'antd'
 
 /** Shared Ant Design adapters. Keep DOM event semantics for existing form handlers. */
@@ -19,6 +19,12 @@ export const UiTextarea = forwardRef(function UiTextarea({ className = '', onCha
   return <Input.TextArea ref={ref} className={['app-ui-input', className].filter(Boolean).join(' ')} onChange={onChange} {...props} />
 })
 
-export const UiSelect = forwardRef(function UiSelect({ className = '', onChange, options, ...props }, ref) {
-  return <Select ref={ref} className={['app-ui-select', className].filter(Boolean).join(' ')} options={options} onChange={(value, option) => onChange?.({ target: { value }, currentTarget: { value }, nativeEvent: null, option })} {...props} />
+export const UiSelect = forwardRef(function UiSelect({ className = '', onChange, options, children, ...props }, ref) {
+  const childOptions = Children.toArray(children).flatMap(child => {
+    if (!React.isValidElement(child) || child.type !== 'option') return []
+    const label = child.props.children
+    return [{ value: child.props.value ?? label, label, disabled: Boolean(child.props.disabled), title: child.props.title }]
+  })
+  const resolvedOptions = options ?? (childOptions.length ? childOptions : undefined)
+  return <Select ref={ref} className={['app-ui-select', className].filter(Boolean).join(' ')} options={resolvedOptions} onChange={(value, option) => onChange?.({ target: { value }, currentTarget: { value }, nativeEvent: null, option })} {...props} />
 })
