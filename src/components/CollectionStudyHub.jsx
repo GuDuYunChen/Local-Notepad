@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { UiSelect } from './ui/ControlKit'
 import { UiInput } from './ui/ControlKit'
 import { UiButton } from './ui/ControlKit'
 import { collectionStudyHub, selectCollectionStudyHub } from '~/services/collectionStudyHub'
@@ -78,12 +79,12 @@ export default function CollectionStudyHub({ active, onLocate, service = collect
       </details>}
       <div className="study-hub-filters">
         <label>搜索批注<input type="search" aria-label="跨资料集批注关键词" maxLength={512} placeholder="批注、标题、目录、笔记 ID 或资料集名" value={filters.query} onChange={e => update({ query: e.target.value })} /></label>
-        <label>资料集<select aria-label="阅读工作台资料集筛选" value={filters.collectionKey} onChange={e => update({ collectionKey: e.target.value })}>
+        <label>资料集<UiSelect aria-label="阅读工作台资料集筛选" value={filters.collectionKey} onChange={e => update({ collectionKey: e.target.value })}>
           <option value="">全部可读取资料集</option>{model.collections.map(item => <option key={item.key} value={item.key}>{item.name} · {item.count} 篇</option>)}
           {filters.collectionKey && !model.collections.some(item => item.key === filters.collectionKey) && <option value={filters.collectionKey}>原资料集不可用</option>}
-        </select></label>
-        <label>人工状态<select aria-label="阅读工作台状态筛选" value={filters.status} onChange={e => update({ status: e.target.value })}><option value="all">全部阅读状态</option>{Object.entries(STUDY_STATUS_LABELS).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
-        <label>排序<select aria-label="阅读工作台排序" value={filters.sort} onChange={e => update({ sort: e.target.value })}><option value="updated">批注最近保存</option><option value="collection">资料集与原条目顺序</option></select></label>
+        </UiSelect></label>
+        <label>人工状态<UiSelect aria-label="阅读工作台状态筛选" value={filters.status} onChange={e => update({ status: e.target.value })}><option value="all">全部阅读状态</option>{Object.entries(STUDY_STATUS_LABELS).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</UiSelect></label>
+        <label>排序<UiSelect aria-label="阅读工作台排序" value={filters.sort} onChange={e => update({ sort: e.target.value })}><option value="updated">批注最近保存</option><option value="collection">资料集与原条目顺序</option></UiSelect></label>
         <label className="study-hub-check"><input type="checkbox" checked={filters.notesOnly} onChange={e => update({ notesOnly: e.target.checked })} />只看有批注</label>
         <UiButton type="button" onClick={() => setFilters(defaults())}>重置阅读筛选</UiButton>
       </div>
