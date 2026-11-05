@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { UiButton, UiPassword, UiSelect } from './ui/ControlKit'
 import { api } from '~/services/api'
 import { toast } from '~/services/toast'
 import { createSyncStatusReader, mergeSyncDraft, syncHealthLabel, syncStatusLabel } from '~/services/syncStatusReader.mjs'
@@ -305,7 +306,7 @@ export default function SyncCenterPanel() {
     <div className="sync-health" aria-label="同步健康状态" data-sync-section="health" tabIndex={-1} role="group">
       <div className="sync-health-heading">
         <strong role="status">{syncHealthLabel(settings, status, health.error)}</strong>
-        <button className="btn small" disabled={!!busy || health.loading} onClick={() => void refresh()}>{health.loading ? '刷新中…' : '刷新状态'}</button>
+        <UiButton className="btn small" disabled={!!busy || health.loading} onClick={() => void refresh()}>{health.loading ? '刷新中…' : '刷新状态'}</UiButton>
       </div>
       <span>最近同步尝试：{timeLabel(Number(status?.last_sync_at) * 1000)} · {syncStatusLabel(status?.last_status)}</span>
       <span>状态读取时间：{timeLabel(health.lastReadAt)}</span>
@@ -337,37 +338,35 @@ export default function SyncCenterPanel() {
     <div className="sync-provider-grid" data-sync-section="connection" tabIndex={-1} role="group" aria-label="同步连接配置">
       <div className={'sync-provider-card ' + (enabled && isLab ? 'active' : '')}>
         <strong>本地实验室</strong><span>用于离线验证同步协议，不连接云端。</span>
-        <button className="btn" disabled={!!busy || !settings} onClick={() => void enableLab()}>{busy === 'settings' ? '更新中…' : (enabled && isLab ? '已启用' : '启用本地实验室')}</button>
+        <UiButton className="btn" disabled={!!busy || !settings} onClick={() => void enableLab()}>{busy === 'settings' ? '更新中…' : (enabled && isLab ? '已启用' : '启用本地实验室')}</UiButton>
       </div>
       <div className={'sync-provider-card ' + (enabled && isWebDAV ? 'active' : '')}>
         <strong>WebDAV</strong><span>支持自建 WebDAV、NAS 与兼容服务。公网端点必须使用 HTTPS。</span>
         <label>端点<input aria-label="WebDAV 端点" value={webdav.endpoint} disabled={!!busy} placeholder="https://dav.example.com/local-notepad" onChange={event => editDraft('endpoint', event.target.value)}/></label>
         <label>用户名<input aria-label="WebDAV 用户名" value={webdav.username} disabled={!!busy} autoComplete="username" onChange={event => editDraft('username', event.target.value)}/></label>
-        <label>密码<input aria-label="WebDAV 密码" type="password" value={webdav.password} disabled={!!busy} autoComplete="new-password" placeholder={hasAnySecret ? '已保存；留空保持不变' : '输入 WebDAV 密码'} onChange={event => editDraft('password', event.target.value)}/></label>
+        <label>密码<UiPassword aria-label="WebDAV 密码" value={webdav.password} disabled={!!busy} autoComplete="new-password" placeholder={hasAnySecret ? '已保存；留空保持不变' : '输入 WebDAV 密码'} onChange={event => editDraft('password', event.target.value)}/></label>
         {draftChanged && <small className="sync-draft-notice">有尚未保存的配置；状态刷新不会覆盖输入，请保存并验证后再测试连接。</small>}
         {hasSecureSecret && <small className="sync-secret-state secure">密码已由操作系统保护存储持有，不写入新的 SQLite / .lnw 工作区备份。</small>}
         {!hasSecureSecret && hasLegacySecret && <small className="sync-secret-state warning">检测到旧版工作区密码；留空保持不变。重新输入一次密码并保存，即可迁移到系统保护存储并清理 SQLite 明文。</small>}
         {!secretStatus?.available && typeof window.electronAPI?.webdavSecretStatus === 'function' && <small className="sync-secret-state warning">当前系统安全存储不可用；不会把新密码伪装成安全凭据。Linux basic_text 降级也会被拒绝。</small>}
         {secretStatus?.managed === false && typeof window.electronAPI?.webdavSecretStatus === 'function' && <small className="sync-secret-state warning">开发模式后端不由 Electron 管理；新密码需要兼容 DB 副本才能立即生效。</small>}
-        {hasAnySecret && <button className="btn small" disabled={!!busy} onClick={() => void clearWebDAVPassword()}>{busy === 'secret' ? '清除中…' : '清除已保存密码'}</button>}
-        {isWebDAV && settings?.sync_endpoint?.trim() && <button className="btn" disabled={!!busy || draftChanged} onClick={() => void checkConnection()}>{busy === 'check' ? '检查中…' : '测试连接（只读）'}</button>}
+        {hasAnySecret && <UiButton className="btn small" disabled={!!busy} onClick={() => void clearWebDAVPassword()}>{busy === 'secret' ? '清除中…' : '清除已保存密码'}</UiButton>}
+        {isWebDAV && settings?.sync_endpoint?.trim() && <UiButton className="btn" disabled={!!busy || draftChanged} onClick={() => void checkConnection()}>{busy === 'check' ? '检查中…' : '测试连接（只读）'}</UiButton>}
         {enabled && isWebDAV && <div className="sync-auto-controls">
           <div><strong>自动同步</strong><span>{settings?.sync_auto_enabled ? '已开启；有未处理冲突时会自动暂停。' : '关闭时仍可手动预演和同步。'}</span></div>
-          <label>间隔<select aria-label="自动同步间隔" value={settings?.sync_interval_minutes || 5} disabled={!!busy || draftChanged} onChange={event => void updateAuto(settings?.sync_auto_enabled === true, event.target.value)}>
-            {[1, 5, 15, 30, 60].map(value => <option key={value} value={value}>{value} 分钟</option>)}
-          </select></label>
-          <button className="btn" disabled={!!busy || (draftChanged && !settings?.sync_auto_enabled)} onClick={() => void updateAuto(settings?.sync_auto_enabled !== true)}>{busy === 'auto' ? '更新中…' : (settings?.sync_auto_enabled ? '暂停自动同步' : '开启自动同步')}</button>
+          <label>间隔<UiSelect aria-label="自动同步间隔" value={String(settings?.sync_interval_minutes || 5)} disabled={!!busy || draftChanged} onChange={event => void updateAuto(settings?.sync_auto_enabled === true, event.target.value)} options={[1,5,15,30,60].map(value=>({value:String(value),label:`${value} 分钟`}))}/></label>
+          <UiButton className="btn" disabled={!!busy || (draftChanged && !settings?.sync_auto_enabled)} onClick={() => void updateAuto(settings?.sync_auto_enabled !== true)}>{busy === 'auto' ? '更新中…' : (settings?.sync_auto_enabled ? '暂停自动同步' : '开启自动同步')}</UiButton>
         </div>}
-        <button className="btn primary" disabled={!!busy || !settings || !webdav.endpoint.trim()} onClick={() => void saveWebDAV()}>{busy === 'webdav' ? '验证中…' : (enabled && isWebDAV ? '保存并重新验证 WebDAV' : '保存、验证并启用 WebDAV')}</button>
+        <UiButton className="btn primary" disabled={!!busy || !settings || !webdav.endpoint.trim()} onClick={() => void saveWebDAV()}>{busy === 'webdav' ? '验证中…' : (enabled && isWebDAV ? '保存并重新验证 WebDAV' : '保存、验证并启用 WebDAV')}</UiButton>
       </div>
     </div>
     <div className="settings-row">
       <div><strong>设备身份</strong><span className="sync-device-id">{status?.device_id || '正在读取…'}</span></div>
-      {enabled && <button className="btn" disabled={!!busy} onClick={() => void pause()}>{busy === 'settings' ? '更新中…' : '暂停同步'}</button>}
+      {enabled && <UiButton className="btn" disabled={!!busy} onClick={() => void pause()}>{busy === 'settings' ? '更新中…' : '暂停同步'}</UiButton>}
     </div>
     {status?.base_items > 0 && <div className="sync-rebind-notice">
       <div><strong>切换 provider 或 WebDAV 地址？</strong><span>先重新绑定，避免把旧远端身份误带到新目标。此操作只重置同步元数据，并会暂停自动同步直到你重新开启。</span></div>
-      <button className="btn" disabled={!!busy} onClick={() => void rebind()}>{busy === 'rebind' ? '重置中…' : '重新绑定远端'}</button>
+      <UiButton className="btn" disabled={!!busy} onClick={() => void rebind()}>{busy === 'rebind' ? '重置中…' : '重新绑定远端'}</UiButton>
     </div>}
     {enabled && <>
       <div className="sync-center-metrics">
@@ -376,10 +375,10 @@ export default function SyncCenterPanel() {
         <div><strong>{syncStatusLabel(status?.last_status)}</strong><span>最近状态</span></div>
       </div>
       <div className="settings-action-row consumer-settings-actions" data-sync-section="execution" tabIndex={-1} role="group" aria-label="预演与执行区域">
-        <button className="btn" disabled={!!busy || draftChanged} onClick={() => void preview()}>{busy === 'plan' ? '预演中…' : '预演同步'}</button>
-        {busy === 'plan' && <button type="button" className="btn" onClick={() => planRead.current?.abort()}>停止等待预演</button>}
-        <button className="btn primary" disabled={!!busy} onClick={() => void synchronize()}>{busy === 'run' ? '同步中…' : '执行同步'}</button>
-        {isLab && <button className="btn" disabled={!!busy || typeof window.electronAPI?.openAppFolder !== 'function'} onClick={() => void openLab()}>打开模拟远端</button>}
+        <UiButton className="btn" disabled={!!busy || draftChanged} onClick={() => void preview()}>{busy === 'plan' ? '预演中…' : '预演同步'}</UiButton>
+        {busy === 'plan' && <UiButton type="button" className="btn" onClick={() => planRead.current?.abort()}>停止等待预演</UiButton>}
+        <UiButton className="btn primary" disabled={!!busy} onClick={() => void synchronize()}>{busy === 'run' ? '同步中…' : '执行同步'}</UiButton>
+        {isLab && <UiButton className="btn" disabled={!!busy || typeof window.electronAPI?.openAppFolder !== 'function'} onClick={() => void openLab()}>打开模拟远端</UiButton>}
       </div>
       <SyncPlanPanel snapshot={plan} disabled={!!busy || draftChanged} onPreview={() => void preview()}/>
       {status?.last_error && <p className="sync-center-error" role="alert">{status.last_error}</p>}
@@ -387,6 +386,6 @@ export default function SyncCenterPanel() {
         scope={conflictScope(settings, status)} disabled={!!busy || !!health.error || draftChanged}
         onResolve={resolve} onRefresh={refresh}/></div>}
     </>}
-    <div className="sync-overview-return"><button type="button" className="btn small" onClick={() => navigateSection('overview')}>返回同步总览</button></div>
+    <div className="sync-overview-return"><UiButton type="button" className="btn small" onClick={() => navigateSection('overview')}>返回同步总览</UiButton></div>
   </section>
 }
