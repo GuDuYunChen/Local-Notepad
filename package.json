@@ -30,7 +30,8 @@
     "test:brand-render": "electron scripts/check-brand-theme-render.cjs",
     "version:check": "node scripts/check-app-version.mjs",
     "version:patch": "npm version patch --no-git-tag-version --ignore-scripts",
-    "version:minor": "npm version minor --no-git-tag-version --ignore-scripts"
+    "version:minor": "npm version minor --no-git-tag-version --ignore-scripts",
+    "test:ui-audit": "node --test scripts/audit-ui-controls.node.mjs"
   },
   "dependencies": {
     "@lexical/clipboard": "0.51.0",
