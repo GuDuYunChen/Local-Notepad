@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { UiInput } from './ui/ControlKit'
 import { UiButton } from './ui/ControlKit'
 import useCollectionStudy from '~/hooks/useCollectionStudy'
 import { collectionStudy, summarizeCollectionStudy, STUDY_STATUS_LABELS, MAX_STUDY_BYTES } from '~/services/collectionStudy'
