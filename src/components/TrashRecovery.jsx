@@ -1,4 +1,5 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { UiSelect } from './ui/ControlKit'
 import { UiInput } from './ui/ControlKit'
 import { UiButton } from './ui/ControlKit'
 import { createPortal } from 'react-dom'
@@ -102,7 +103,7 @@ export default function TrashRecovery({onClose,onOpenFile}) {
         {snapshot&&<>
           <fieldset className="trash-recovery-tools" disabled={busy||opening||!!confirmation}>
             <label>查找<input aria-label="恢复项目查找" maxLength={128} value={query} onChange={e=>{setQuery(e.target.value);setPage(0);quiet()}}/></label>
-            <label>类型<select aria-label="恢复项目类型" value={type} onChange={e=>{setType(e.target.value);setPage(0);quiet()}}><option value="all">全部</option><option value="note">笔记</option><option value="folder">文件夹</option></select></label>
+            <label>类型<UiSelect aria-label="恢复项目类型" value={type} onChange={e=>{setType(e.target.value);setPage(0);quiet()}}><option value="all">全部</option><option value="note">笔记</option><option value="folder">文件夹</option></UiSelect></label>
             <UiButton type="button" disabled={!selected.length} onClick={()=>{setSelected([]);quiet()}}>清空选择</UiButton>
           </fieldset>
           <div className="trash-recovery-items" aria-label="回收站恢复来源">{rows.slice(page*50,(page+1)*50).map(row=><article key={row.id} data-recovery-item={row.id}><label><input type="checkbox" aria-label={`选择恢复 ${row.title}`} checked={selected.includes(row.id)} disabled={blocked||!!confirmation} onChange={()=>toggle(row.id)}/><strong>{row.title||'未命名'}</strong></label><small>{row.is_folder?'文件夹':'笔记'} · 原位置：{row.parent_id?(byID.get(row.parent_id)?.title||'已缺失目录'):'根目录'}{row.parent_id&&byID.get(row.parent_id)?.is_deleted?'（也在回收站）':''}</small></article>)}</div>
@@ -111,11 +112,11 @@ export default function TrashRecovery({onClose,onOpenFile}) {
           {!!selected.length&&<details><summary>已选择 {selected.length} 个来源（跨页保留）</summary><ul>{selected.map(id=><li key={id}>{byID.get(id)?.title||id}</li>)}</ul></details>}
           <fieldset className="trash-recovery-destination" disabled={blocked||!!confirmation}>
             <legend>恢复位置</legend><label><input type="radio" name="recovery-mode" checked={mode==='original'} onChange={()=>{setMode('original');quiet()}}/>各自原位置</label><label><input type="radio" name="recovery-mode" checked={mode==='target'} onChange={()=>{setMode('target');quiet()}}/>指定现存目录</label>
-            {mode==='target'&&<label>目标<select aria-label="恢复目标文件夹" value={parent} onChange={e=>{setParent(e.target.value);quiet()}}><option value="">根目录</option>{targets.map(r=><option key={r.id} value={r.id}>{r.title||'未命名'} · {r.id}</option>)}</select></label>}
+            {mode==='target'&&<label>目标<UiSelect aria-label="恢复目标文件夹" value={parent} onChange={e=>{setParent(e.target.value);quiet()}}><option value="">根目录</option>{targets.map(r=><option key={r.id} value={r.id}>{r.title||'未命名'} · {r.id}</option>)}</UiSelect></label>}
             <p>原父目录不可用时，可指定根目录或现存普通文件夹。不会自动重建、合并或改名。</p>
           </fieldset>
           {confirmation?.kind==='restore'&&<details open><summary>本次恢复明细（{confirmation.intent.expected.length} 项）</summary><ol>{confirmation.intent.expected.map(row=><li key={row.id}>{row.is_folder?'目录':'笔记'} · {row.title||'未命名'}</li>)}</ol></details>}
-          {!!restored.length&&<fieldset className="trash-recovery-result" disabled={loading||busy||opening||stale||!!confirmation}><legend>已恢复 / 当前核对相符的笔记</legend><select aria-label="打开已恢复笔记" value={resultID} onChange={e=>setResultID(e.target.value)}>{restored.map(row=><option key={row.id} value={row.id}>{row.title||'未命名'} · {row.id}</option>)}</select><UiButton type="button" disabled={!onOpenFile||!resultID} onClick={()=>void openRestored()}>通过原保存保护打开</UiButton></fieldset>}
+          {!!restored.length&&<fieldset className="trash-recovery-result" disabled={loading||busy||opening||stale||!!confirmation}><legend>已恢复 / 当前核对相符的笔记</legend><UiSelect aria-label="打开已恢复笔记" value={resultID} onChange={e=>setResultID(e.target.value)}>{restored.map(row=><option key={row.id} value={row.id}>{row.title||'未命名'} · {row.id}</option>)}</UiSelect><UiButton type="button" disabled={!onOpenFile||!resultID} onClick={()=>void openRestored()}>通过原保存保护打开</UiButton></fieldset>}
         </>}
       </div>
       <div className="trash-recovery-feedback" aria-label="恢复操作反馈">
