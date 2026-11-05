@@ -24,8 +24,8 @@ export default function SearchCollectionsPanel({ model, onOpenFile }) {
   return <section className="search-collections" aria-label="本地检索资料集">
     <header><h3>本地资料集</h3><p>保存的是当时的笔记清单，不是正文备份。重开查看历史元数据；复查按原来的固定检索范围读取当前数据。</p></header>
     <div className="search-collections-tools">
-      <label>已保存资料集<UiSelect className="ui-control" ref={selectRef} aria-label="已保存资料集" value={selected?.key || undefined} disabled={locked} onChange={event => model.choose(event.target.value)} options={[{value:"",label:"选择资料集",disabled:true},...shelf.entries.map((entry,index)=>({value:entry.key,label:entry.collection?`${entry.collection.name} · ${entry.collection.report.count} 篇`:`不可读取的资料集 ${index+1}`}))]}/>{/* collection choices are rendered by the shared Select */}<select hidden aria-hidden="true" tabIndex={-1} value={selected?.key||""} readOnly>
-        </select></label>
+      <label>已保存资料集<UiSelect className="ui-control" ref={selectRef} aria-label="已保存资料集" value={selected?.key || undefined} disabled={locked} onChange={event => model.choose(event.target.value)} options={[{value:"",label:"选择资料集",disabled:true},...shelf.entries.map((entry,index)=>({value:entry.key,label:entry.collection?`${entry.collection.name} · ${entry.collection.report.count} 篇`:`不可读取的资料集 ${index+1}`}))]}/>{/* collection choices are rendered by the shared Select */}<UiSelect hidden aria-hidden="true" tabIndex={-1} value={selected?.key||""} readOnly>
+        </UiSelect></label>
       <UiButton type="button" onClick={model.refresh} disabled={locked}>刷新资料集</UiButton>
       <UiButton type="button" disabled={locked || !collection || !!shelf.error} onClick={() => void model.inspect()}>检查当前变化</UiButton>
       <UiButton type="button" disabled={locked || !collection || !!shelf.error} onClick={model.export}>备份此资料集 JSON</UiButton>
@@ -76,10 +76,10 @@ export default function SearchCollectionsPanel({ model, onOpenFile }) {
       </div>
       <div className="search-collections-tools">
         <label>筛选条目<input type="search" maxLength={512} aria-label="搜索资料集条目" value={model.query} onChange={event => model.setQuery(event.target.value)} placeholder="标题、目录或笔记 ID" /></label>
-        <label>变化状态<select aria-label="资料集变化筛选" value={model.status} onChange={event => model.setStatus(event.target.value)}>
+        <label>变化状态<UiSelect aria-label="资料集变化筛选" value={model.status} onChange={event => model.setStatus(event.target.value)}>
           <option value="all">全部条目</option>
           {Object.entries(labels).map(([id, label]) => <option key={id} value={id}>{label}</option>)}
-        </select></label>
+        </UiSelect></label>
       </div>
       <p role="status">显示 {matching.length} / {rows.length} 篇历史条目</p>
       <div className="search-collections-rows" ref={rowsRef}>
