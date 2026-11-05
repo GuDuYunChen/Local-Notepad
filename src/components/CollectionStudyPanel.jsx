@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { UiButton } from './ui/ControlKit'
 import useCollectionStudy from '~/hooks/useCollectionStudy'
 import { collectionStudy, summarizeCollectionStudy, STUDY_STATUS_LABELS, MAX_STUDY_BYTES } from '~/services/collectionStudy'
 import { downloadCollectionReviewReport } from '~/services/collectionReviewReport'
@@ -57,28 +58,28 @@ function StudyPanel({ entry, onResume, focusRequest, disabled, sourceStore, stud
     {model.error && <p role="alert">{model.error}</p>}
     {message && <p role="status">{message}</p>}
     {model.loading && <p role="status">正在读取阅读记录…</p>}
-    <button type="button" disabled={locked} onClick={() => void model.refresh()}>重新读取阅读记录</button>
+    <UiButton type="button" disabled={locked} onClick={() => void model.refresh()}>重新读取阅读记录</UiButton>
     {snapshot && <>
       <p role="status">未读 {counts.unread} · 已读 {counts.read} · 待复看 {counts.revisit} · 有批注 {counts.notes}</p>
       <div className="collection-study-actions">
-        <button type="button" disabled={locked || !bookmarked || !onResume} onClick={() => void onResume(bookmarked, { unfiltered: true })}>从上次位置继续（全部条目）</button>
-        <button type="button" disabled={locked} onClick={() => {
+        <UiButton type="button" disabled={locked || !bookmarked || !onResume} onClick={() => void onResume(bookmarked, { unfiltered: true })}>从上次位置继续（全部条目）</UiButton>
+        <UiButton type="button" disabled={locked} onClick={() => {
           try { const text = studyStore.export(snapshot, sourceStore); downloadCollectionReviewReport({ text, filename: `Local-Notepad-阅读记录-${snapshot.collection.id}.json`, type: 'application/json;charset=utf-8' }); setMessage('已发起阅读记录下载，仅包含已保存的状态与批注；未存草稿不在其中。') }
           catch (failure) { setMessage(failure.message) }
-        }}>备份阅读记录 JSON</button>
+        }}>备份阅读记录 JSON</UiButton>
       </div>
       {bookmarked && <p>上次手动保存位置：{bookmarked.title || bookmarked.id}。继续阅读使用全部历史条目，读取当前正文，不自动恢复旧复查筛选。</p>}
       <details><summary>导入阅读记录</summary><p>先导入对应资料集，再选择本功能导出的阅读记录。预检只接受完全相同的历史检索结果；确认会替换当前已存进度与批注，不创建或改写正文。</p>
         <input type="file" accept=".json,application/json" aria-label="选择阅读记录备份" disabled={locked || !!preview} onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; void importFile(file) }} />
       </details>
-      {reading && <button type="button" onClick={() => { operation.current++; setReading(false); setMessage('已取消读取，原记录保留。') }}>取消读取阅读备份</button>}
+      {reading && <UiButton type="button" onClick={() => { operation.current++; setReading(false); setMessage('已取消读取，原记录保留。') }}>取消读取阅读备份</UiButton>}
       {preview && <div role="group" aria-label="阅读记录导入预检">
         <p>将替换本资料集已存阅读记录，共 {preview.value.data.records.length} 篇有状态或批注。未存批注草稿不会删除，保存时会再次检查冲突。请先备份当前记录。</p>
-        <button type="button" disabled={locked} onClick={() => setPreview(null)}>取消阅读记录导入</button>
-        <button type="button" disabled={locked} onClick={async () => {
+        <UiButton type="button" disabled={locked} onClick={() => setPreview(null)}>取消阅读记录导入</UiButton>
+        <UiButton type="button" disabled={locked} onClick={async () => {
           const result = await model.write((base, options) => studyStore.import(base, preview.value, options), preview.snapshot)
           if (result && live.current) { setPreview(null); setMessage('阅读记录已导入，历史资料集与正文未改动。') }
-        }}>确认替换已存阅读记录</button>
+        }}>确认替换已存阅读记录</UiButton>
       </div>}
       <div className="collection-study-filters">
         <label>阅读状态<select aria-label="资料集阅读筛选" value={status} onChange={event => { setStatus(event.target.value); setPage(1) }}><option value="all">全部阅读状态</option>{Object.entries(STUDY_STATUS_LABELS).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select></label>
@@ -87,10 +88,10 @@ function StudyPanel({ entry, onResume, focusRequest, disabled, sourceStore, stud
       <div className="collection-study-list">{rows.slice((currentPage - 1) * 8, currentPage * 8).map(item => <article key={item.id}>
         <strong>{item.title || '未命名'}</strong><span>{STUDY_STATUS_LABELS[byId.get(item.id)?.status || 'unread']}</span>
         {byId.get(item.id)?.note && <p className="collection-study-note">{byId.get(item.id).note}</p>}
-        <button type="button" disabled={locked} onClick={() => setEditing(item.id)}>编辑批注：{item.title || item.id}</button>
+        <UiButton type="button" disabled={locked} onClick={() => setEditing(item.id)}>编辑批注：{item.title || item.id}</UiButton>
       </article>)}</div>
       {!rows.length && <p>没有符合条件的已存阅读记录；未删除任何条目。</p>}
-      <nav className="collection-study-actions" aria-label="阅读记录分页"><button type="button" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>阅读记录上一页</button><span>第 {currentPage} / {pages} 页 · {rows.length} 篇</span><button type="button" disabled={currentPage >= pages} onClick={() => setPage(currentPage + 1)}>阅读记录下一页</button></nav>
+      <nav className="collection-study-actions" aria-label="阅读记录分页"><UiButton type="button" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>阅读记录上一页</UiButton><span>第 {currentPage} / {pages} 页 · {rows.length} 篇</span><UiButton type="button" disabled={currentPage >= pages} onClick={() => setPage(currentPage + 1)}>阅读记录下一页</UiButton></nav>
       {editing && <div ref={editorRef} tabIndex={-1} key={editing} aria-label="工作台定位的批注编辑器"><h4>编辑：{snapshot.collection.report.items.find(item => item.id === editing)?.title || editing}</h4><CollectionStudyEditor model={model} documentId={editing} disabled={locked || !!preview} /></div>}
     </>}
   </details>
