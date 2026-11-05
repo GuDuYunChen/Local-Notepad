@@ -23,7 +23,7 @@ export default function SearchCollectionsPanel({ model, onOpenFile }) {
   return <section className="search-collections" aria-label="本地检索资料集">
     <header><h3>本地资料集</h3><p>保存的是当时的笔记清单，不是正文备份。重开查看历史元数据；复查按原来的固定检索范围读取当前数据。</p></header>
     <div className="search-collections-tools">
-      <label>已保存资料集<select ref={selectRef} aria-label="已保存资料集" value={selected?.key || ''} disabled={locked} onChange={event => model.choose(event.target.value)}>
+      <label>已保存资料集<select className="ui-control" ref={selectRef} aria-label="已保存资料集" value={selected?.key || ''} disabled={locked} onChange={event => model.choose(event.target.value)}>
         <option value="">选择资料集</option>
         {shelf.entries.map((entry, index) => <option key={entry.key} value={entry.key}>{entry.collection ? `${entry.collection.name} · ${entry.collection.report.count} 篇` : `不可读取的资料集 ${index + 1}`}</option>)}
       </select></label>
@@ -46,7 +46,7 @@ export default function SearchCollectionsPanel({ model, onOpenFile }) {
     </details>
     <details className="search-collections-import"><summary>导入资料集备份</summary>
       <p>只接受本功能导出的单份资料集 JSON，最多 2 MiB。确认后新增独立副本，不覆盖同名记录，不导入或创建正文。</p>
-      <input type="file" accept=".json,application/json" aria-label="选择资料集备份" disabled={locked} onChange={event => {
+      <input className="ui-file-control" type="file" accept=".json,application/json" aria-label="选择资料集备份" disabled={locked} onChange={event => {
         const file = event.target.files?.[0]; event.target.value = ''; void model.prepareImport(file)
       }} />
     </details>
