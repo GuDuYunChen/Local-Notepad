@@ -8,6 +8,13 @@
 .app-ui-input.ant-input-affix-wrapper-sm { box-sizing:border-box; padding:5px 10px; }
 .app-ui-input.ant-input-affix-wrapper-lg { box-sizing:border-box; padding:10px 12px; }
 .app-ui-input.ant-input-affix-wrapper > input.ant-input { padding:0; }
+/* One deliberate focus treatment; suppress the library's extra glow. */
+.app-ui-input.ant-input:focus,
+.app-ui-input.ant-input-affix-wrapper:focus-within { box-shadow:none; }
+.app-ui-input.ant-input:focus-visible,
+.app-ui-input.ant-input-affix-wrapper:has(input:focus-visible) { outline:2px solid var(--clay); outline-offset:2px; }
+.app-ui-select-host .ant-select-focused .ant-select-selector { box-shadow:none; }
+.app-ui-select-host .ant-select-focused:has([role="combobox"]:focus-visible) .ant-select-selector { outline:2px solid var(--clay); outline-offset:2px; }
 .app-ui-select-host .ant-select-selector { box-sizing:border-box; }
 .app-ui-select-host .ant-select-single:not(.ant-select-customize-input):not(.ant-select-sm):not(.ant-select-lg) .ant-select-selector { min-height:40px; align-items:center; }
 .app-ui-select-host .ant-select-single.ant-select-sm .ant-select-selector { min-height:28px; align-items:center; }
