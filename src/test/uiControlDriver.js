@@ -38,6 +38,7 @@ export function openUiSelect(node) {
   if(trigger.getAttribute('aria-expanded')!=='true') {
    const surface=trigger.closest('.ant-select')?.querySelector('.ant-select-selector') || trigger
    flushSync(()=>{
+    surface.dispatchEvent(new Event('pointerdown',{bubbles:true,cancelable:true}))
     surface.dispatchEvent(new MouseEvent('mousedown',{bubbles:true,button:0,cancelable:true}))
     surface.dispatchEvent(new MouseEvent('click',{bubbles:true,button:0,cancelable:true}))
    })
