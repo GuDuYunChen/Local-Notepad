@@ -120,7 +120,7 @@ export const UiSelect = forwardRef(function UiSelect({ className = '', style, si
     const result = normalValue(next)
     if (!controlled) setLocal(result)
     const chosen = flat.filter(option => Array.isArray(result) ? result.includes(option.value) : result === option.value)
-    const target = { value: Array.isArray(result) ? result[0] ?? '' : result, name: name ?? '', id: id ?? '', selectedIndex: flat.findIndex(option => option.value === result), options: flat, selectedOptions: chosen }
+    const target = { value: Array.isArray(result) ? result[0] ?? '' : result, name: name ?? '', id: id ?? '', selectedIndex: flat.findIndex(option => option.value === (Array.isArray(result) ? result[0] : result)), options: flat, selectedOptions: chosen }
     const nativeEvent = new Event('change', { bubbles: true })
     const event = { type: 'change', target, currentTarget: target, nativeEvent, preventDefault: () => nativeEvent.preventDefault(), stopPropagation: () => nativeEvent.stopPropagation() }
     onInput?.({ ...event, type: 'input' }); onChange?.(event)
