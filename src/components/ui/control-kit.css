@@ -38,6 +38,7 @@ input[data-ui-native="checkbox"], input[data-ui-native="radio"], input[data-ui-n
 :where([class$="-tools"], [class$="-filter"], [class$="-filters"], [class$="-controls"]) > label:has(> [data-ui-control]) { display:flex; flex-direction:column; gap:6px; min-width:0; }
 :where([class$="-tools"], [class$="-filter"], [class$="-filters"], [class$="-controls"]) > label > :where([data-ui-control="input"], [data-ui-control="select"], [data-ui-control="password"]) { width:100%; }
 :where([class$="-tools"], [class$="-filter"], [class$="-filters"], [class$="-controls"]) > [data-ui-control="button"] { align-self:flex-end; }
+:where([class$="-tools"], [class$="-filter"], [class$="-filters"], [class$="-controls"]) > [data-ui-control="button"][data-ui-layout="action"] { min-height:40px; }
 :where(.pinned-tools, .search-collections-tools, .sync-auto-controls) { align-items:end; gap:12px; }
 :where(.settings-card, .consumer-settings-section, .sync-provider-card, .backup-section) { box-shadow:none; }
 @media(max-width:760px) {
