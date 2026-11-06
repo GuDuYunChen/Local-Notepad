@@ -9,7 +9,7 @@
 .attachment-audit input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
 .attachment-audit select:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { font:inherit; color:var(--ink); background:var(--surface); border:1px solid var(--line); border-radius:7px; padding:7px 10px; }
 .attachment-audit button { cursor:pointer; overflow-wrap:anywhere; }
-.attachment-audit button:disabled { cursor:default; opacity:.5; }
+.attachment-audit button:disabled:where(:not([data-ui-control], .ant-btn)) { cursor:default; opacity:.5; }
 .attachment-audit :focus-visible { outline:2px solid var(--clay); outline-offset:2px; }
 .attachment-audit-scroll { min-height:0; flex:1 1 auto; overflow:auto; padding:16px 22px; overscroll-behavior:contain; }
 .attachment-audit-scope { color:var(--ink-soft); }
