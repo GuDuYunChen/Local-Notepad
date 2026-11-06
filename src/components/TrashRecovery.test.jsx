@@ -14,7 +14,7 @@ const button = (text) => [...uiQueryAll(document, 'button')].find((n) => uiText(
 const click = async (text) => act(async () => {const n = typeof text === 'string' ? button(text) : text;expect(n, String(text)).toBeTruthy();n.focus();n.click();await drain();});
 const field = async (value, label = '恢复项目查找') => act(async () => {const n = uiQuery(document, `input[aria-label="${label}"]`);setUiValue(n, value);n.dispatchEvent(new Event('input', { bubbles: true }));await drain();});
 const choose = async (id) => click(uiQuery(document, `[data-recovery-item="${id}"] input`));
-const select = async (label, value) => act(async () => {const n = uiQuery(document, `select[aria-label="${label}"]`);setUiValue(n, value);n.dispatchEvent(new Event('change', { bubbles: true }));await drain();});
+const select = async (label, value) => act(async () => {const n = uiQuery(document, `select[aria-label="${label}"]`);setUiValue(n, value);await drain();});
 const posts = () => api.mock.calls.filter(([, init]) => init?.method === 'POST');
 const render = async () => {host = document.createElement('div');document.body.append(host);root = createRoot(host);await act(async () => {root.render(<TrashRecovery onClose={close} onOpenFile={open} />);await drain();});};
 const unmount = async () => {await act(async () => root.unmount());host.remove();};
