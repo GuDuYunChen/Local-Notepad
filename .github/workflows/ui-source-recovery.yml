@@ -13,23 +13,24 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - name: Export exact accepted source without modifying product
+      - name: Export exact current UI candidate for offline recovery (not acceptance)
         shell: bash
         run: |
           set -euo pipefail
           previous=8538e3f41729f245721ef6dff531c6431182a14d
-          accepted=1c8ec5689847a580ce307b9157fbbc8c1ac43a8f
-          test "$(git rev-parse "$accepted^{tree}")" = 0265d23dfd314fa0e11e57a676ecdcfe8b03a69f
+          candidate=fa3b35ecec34c43048679175e925b0e04b16d8ea
+          test "$(git rev-parse "$previous^{tree}")" = d0a9f8eea51db5eb546361be161e595e56901f95
+          test "$(git rev-parse "$candidate^{tree}")" = 94d945b195e19c17d2785218d319f9053f7f761b
           mkdir -p source-recovery
-          git diff --binary --full-index "$previous" "$accepted" > source-recovery/accepted.patch
-          git ls-tree -rz "$accepted" > source-recovery/accepted-tree.zlist
-          git cat-file commit "$accepted" > source-recovery/accepted-commit.raw
-          git diff --name-status "$accepted" HEAD > source-recovery/diagnostic-only.diffstat
-          printf 'previous=%s\naccepted=%s\nworkflow=%s\nrun=%s\n' "$previous" "$accepted" "$GITHUB_SHA" "$GITHUB_RUN_ID" > source-recovery/provenance.txt
-          (cd source-recovery && sha256sum accepted.patch accepted-tree.zlist accepted-commit.raw diagnostic-only.diffstat provenance.txt > SHA256SUMS)
+          git diff --binary --full-index "$previous" "$candidate" > source-recovery/candidate.patch
+          git ls-tree -rz "$candidate" > source-recovery/candidate-tree.zlist
+          git cat-file commit "$candidate" > source-recovery/candidate-commit.raw
+          git diff --name-status "$previous" "$candidate" > source-recovery/candidate.diffstat
+          printf 'previous=%s\ncandidate=%s\nworkflow=%s\nrun=%s\naccepted=false\n' "$previous" "$candidate" "$GITHUB_SHA" "$GITHUB_RUN_ID" > source-recovery/provenance.txt
+          (cd source-recovery && sha256sum candidate.patch candidate-tree.zlist candidate-commit.raw candidate.diffstat provenance.txt > SHA256SUMS)
       - uses: actions/upload-artifact@v4
         with:
-          name: ui-accepted-source-delta
+          name: ui-candidate-source-delta-fa3b35e
           path: source-recovery/
           retention-days: 14
           if-no-files-found: error
