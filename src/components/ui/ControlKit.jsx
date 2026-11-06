@@ -15,7 +15,7 @@ const hasClass = (value, token) => String(value || '').split(/\s+/).includes(tok
 const cleanClass = value => String(value || '').split(/\s+/).filter(token => token && true).join(' ')
 // Legacy presentation utility classes must not restyle Ant Design internals.
 const cleanControlClass = value => cleanClass(value).split(' ').filter(token => !['btn','input','select','textarea','small','primary','secondary','danger','ghost','outline'].includes(token)).join(' ')
-const controlSize = (size, density) => ['small', 'middle', 'large'].includes(size) ? size : density === 'compact' ? 'small' : 'middle'
+const controlSize = (size, density, classes) => ['small', 'middle', 'large'].includes(size) ? size : density === 'compact' || hasClass(classes, 'small') ? 'small' : 'middle'
 const errorStatus = props => props.status || (props['aria-invalid'] === true || props['aria-invalid'] === 'true' ? 'error' : undefined)
 
 // A custom Select's trigger is not disabled by HTML fieldset inheritance. Preserve
@@ -50,21 +50,21 @@ export const UiButton = forwardRef(function UiButton({ type, htmlType, variant, 
   const buttonType = kind === 'primary' ? 'primary' : ['text', 'link', 'dashed'].includes(kind) ? kind : 'default'
   const guard = handler => event => { if (props.disabled || fieldsetDisabled(event.currentTarget)) { event.preventDefault(); event.stopPropagation(); return } handler?.(event) }
   return <ConfigProvider wave={quietWave} theme={controlTheme}><Button {...props} ref={nativeRef(ref)} htmlType={nativeType} type={buttonType} danger={danger ?? hasClass(className, 'danger')} autoInsertSpace={false}
-    size={controlSize(size, density)} data-ui-control="button" data-ui-layout={structural ? 'content' : 'action'}
+    size={controlSize(size, density, className)} data-ui-control="button" data-ui-layout={structural ? 'content' : 'action'}
     className={['app-ui-button', cleanControlClass(className)].filter(Boolean).join(' ')} onClick={guard(onClick)} onMouseDown={guard(onMouseDown)}>{children}</Button></ConfigProvider>
 })
 
 export const UiInput = forwardRef(function UiInput({ className = '', size, density, type = 'text', ...props }, ref) {
   if (nativeTypes.has(type)) return <input {...props} ref={ref} type={type} className={className} data-ui-native={type} />
-  return <ConfigProvider theme={controlTheme}><Input {...props} ref={nativeRef(ref)} type={type} size={controlSize(size, density)} status={errorStatus(props)}
+  return <ConfigProvider theme={controlTheme}><Input {...props} ref={nativeRef(ref)} type={type} size={controlSize(size, density, className)} status={errorStatus(props)}
     data-ui-control="input" className={['app-ui-input', cleanControlClass(className)].filter(Boolean).join(' ')} /></ConfigProvider>
 })
 export const UiPassword = forwardRef(function UiPassword({ className = '', size, density, type: _type, ...props }, ref) {
-  return <ConfigProvider theme={controlTheme}><Input.Password {...props} ref={nativeRef(ref)} size={controlSize(size, density)} status={errorStatus(props)}
+  return <ConfigProvider theme={controlTheme}><Input.Password {...props} ref={nativeRef(ref)} size={controlSize(size, density, className)} status={errorStatus(props)}
     data-ui-control="password" className={['app-ui-input', cleanControlClass(className)].filter(Boolean).join(' ')} /></ConfigProvider>
 })
 export const UiTextarea = forwardRef(function UiTextarea({ className = '', size, density, ...props }, ref) {
-  return <ConfigProvider theme={controlTheme}><Input.TextArea {...props} ref={nativeRef(ref)} size={controlSize(size, density)} status={errorStatus(props)}
+  return <ConfigProvider theme={controlTheme}><Input.TextArea {...props} ref={nativeRef(ref)} size={controlSize(size, density, className)} status={errorStatus(props)}
     data-ui-control="textarea" className={['app-ui-input', cleanControlClass(className)].filter(Boolean).join(' ')} /></ConfigProvider>
 })
 
@@ -141,7 +141,7 @@ export const UiSelect = forwardRef(function UiSelect({ className = '', style, si
   return <ConfigProvider theme={controlTheme}><span ref={setNode} data-ui-control="select" data-ui-value={JSON.stringify(selected)} className={['app-ui-select-host', cleanControlClass(className)].filter(Boolean).join(' ')} style={style}
     onMouseDown={activate} onClick={activate} onKeyDown={activate}>
     <Select {...props} virtual={false} optionRender={option => <span data-ui-option-value={String(option.value)}>{option.label}</span>} ref={api} id={id} aria-required={required || undefined} value={selected} options={resolved} disabled={blocked}
-      mode={multiple ? 'multiple' : undefined} size={controlSize(size, density)} status={errorStatus(props)} className="app-ui-select"
+      mode={multiple ? 'multiple' : undefined} size={controlSize(size, density, className)} status={errorStatus(props)} className="app-ui-select"
       showSearch={showSearch ?? flat.length > 12} optionFilterProp="label" open={blocked ? false : open} onOpenChange={changeOpen} onChange={change} onInputKeyDown={key}
       getPopupContainer={getPopupContainer || (trigger => trigger.closest('[role="dialog"], [role="alertdialog"]') || trigger.ownerDocument.body)} />
     {name && values.map((item, index) => <input key={index} type="hidden" data-ui-native="form-value" name={name} form={form} value={item} disabled={blocked} />)}
