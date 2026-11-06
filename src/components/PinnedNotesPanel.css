@@ -6,10 +6,8 @@
 .pinned-tools { display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; margin:20px 0 12px; }
 .pinned-tools label { display:flex; flex-direction:column; gap:6px; min-width:0; font-size:12px; }
 .pinned-tools label:first-child { flex:1 1 280px; }
-.pinned-tools .pinned-control { box-sizing:border-box; min-width:0; width:100%; }\n.pinned-tools > label { flex:1 1 180px; }\n.pinned-tools .pinned-clear { height:40px; }
+.pinned-tools .pinned-control { box-sizing:border-box; min-width:0; width:100%; }\n.pinned-tools .ant-select { min-height:40px; }\n.pinned-tools .ant-input-affix-wrapper { min-height:40px; }\n.pinned-tools > label { flex:1 1 180px; }\n.pinned-tools .pinned-clear { height:40px; }
 .pinned-tools .pinned-clear { align-self:end; white-space:nowrap; }
-html[data-theme=dark] .pinned-tools select.pinned-control { color-scheme:dark; }
-html:not([data-theme=dark]) .pinned-tools select.pinned-control { color-scheme:light; }
 .pinned-count,.pinned-workspace footer { color:var(--ink-soft,#697180); font-size:12px; line-height:1.8; }
 .pinned-content { display:grid; grid-template-columns:minmax(0,1fr) minmax(210px,280px); gap:20px; align-items:start; }
 .pinned-list { display:flex; flex-direction:column; gap:8px; }
