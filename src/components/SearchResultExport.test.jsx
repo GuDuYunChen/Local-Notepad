@@ -2,6 +2,7 @@ import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { beforeEach, afterEach, expect, it, vi } from 'vitest'
 import GlobalSearchPanel from './GlobalSearchPanel'
+import { setUiValue } from '~/test/uiControlDriver'
 import { searchLibrary } from '~/services/globalSearch'
 import { collectSearchResultReport, downloadSearchResultReport } from '~/services/searchResultExport'
 vi.mock('~/services/globalSearch', async original => ({ ...(await original()), searchLibrary: vi.fn() }))
@@ -68,7 +69,7 @@ it('all-result export explicitly requests the entire scope rather than the visib
 })
 it('requires opt-in before including snippets and supports JSON format',async()=>{
  await render();await click(container.querySelector('.search-result-export input[type=checkbox]'))
- await act(async()=>{const el=label('检索清单导出格式');el.value='json';el.dispatchEvent(new Event('change',{bubbles:true}))})
+ await act(async()=>{const el=label('检索清单导出格式');setUiValue(el,'json')})
  await click(button('导出全部 43 篇结果'))
  expect(collectSearchResultReport.mock.calls[0][2].includeSnippets).toBe(true);expect(downloadSearchResultReport.mock.calls[0][1]).toBe('json')
 })
