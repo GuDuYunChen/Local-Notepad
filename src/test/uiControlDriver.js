@@ -20,10 +20,12 @@ function popupFor(node) {
  if(linked)return linked
  // rc-select may mount its portal one render after aria-controls is assigned.
  // Resolve the visible real popup in the configured dialog/body container.
- const scope=trigger?.closest?.('[role="dialog"],[role="alertdialog"]') || trigger?.ownerDocument
- const candidates=[...(scope?.querySelectorAll?.('.ant-select-dropdown') || [])]
+ const owner=trigger?.ownerDocument
+ const scope=trigger?.closest?.('[role="dialog"],[role="alertdialog"]') || owner
+ const visible=container=>[...(container?.querySelectorAll?.('.ant-select-dropdown') || [])]
    .filter(popup=>!popup.classList.contains('ant-select-dropdown-hidden') && popup.getAttribute('aria-hidden')!=='true' && popup.querySelector('[data-ui-option-value]'))
- return candidates.at(-1) || null
+ const candidates=visible(scope)
+ return candidates.at(-1) || (scope!==owner ? visible(owner).at(-1) : null) || null
 }
 export function openUiSelect(node) {
  const trigger=triggerFor(node)
