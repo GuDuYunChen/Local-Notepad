@@ -1,4 +1,4 @@
-import { setUiValue, uiDisabled, uiQuery, uiQueryAll, uiText, uiValue } from "~/test/uiControlDriver";import React, { act } from 'react';
+import { isUiSelect, setUiValue, uiDisabled, uiQuery, uiQueryAll, uiText, uiValue } from "~/test/uiControlDriver";import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
 import SearchPresetsPanel from './SearchPresetsPanel';
@@ -8,7 +8,7 @@ const filters = { query: '关关', source: 'body', folderId: 'p', days: '7', sor
 const label = (text) => uiQuery(container, '[aria-label="' + text + '"]');
 const button = (text) => [...uiQueryAll(container, 'button')].find((e) => uiText(e) === text);
 const click = async (e) => {expect(e).toBeTruthy();await act(async () => e.click());};
-const change = async (e, value) => {await act(async () => {const p = e.tagName === 'SELECT' ? HTMLSelectElement.prototype : HTMLInputElement.prototype;setUiValue(e, value);e.dispatchEvent(new Event('input', { bubbles: true }));e.dispatchEvent(new Event('change', { bubbles: true }));});};
+const change = async (e, value) => {await act(async () => {setUiValue(e, value);if(!isUiSelect(e)){e.dispatchEvent(new Event('input', { bubbles: true }));e.dispatchEvent(new Event('change', { bubbles: true }));}});};
 const render = async (p = {}) => {await act(async () => root.render(<SearchPresetsPanel filters={filters} onApply={onApply} store={store} {...p} />));};
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);values = new Map();let i = 0;
