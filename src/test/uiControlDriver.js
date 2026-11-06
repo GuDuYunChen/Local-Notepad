@@ -5,7 +5,7 @@ import { flushSync } from 'react-dom'
 const hostFor = node => node?.closest?.('[data-ui-control="select"]') || null
 export const isUiSelect = node => Boolean(hostFor(node))
 const triggerFor = node => hostFor(node)?.querySelector('[role="combobox"]') || node
-const normalize = selector => String(selector).replace(/(^|[\\s>,+~(])select(?=[$\\s.#[:>,+~)]|$)/g, '$1:is(select,[role="combobox"],[data-ui-control="select"])')
+const normalize = selector => String(selector).replace(/(^|[\s>,+~(])select(?=[$\s.#[:>,+~)]|$)/g, '$1:is(select,[role="combobox"],[data-ui-control="select"])')
 const resolve = node => {
  if(!node)return node
  if(node.matches?.('.ant-select,[data-ui-control="select"]')) return node.querySelector('[role="combobox"]') || node
