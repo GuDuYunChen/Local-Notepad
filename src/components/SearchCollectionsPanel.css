@@ -27,7 +27,8 @@
 @media (max-height: 650px) { .global-search-mode { flex: 1 0 400px; } }
 
 /* Collection form controls: one shared height and baseline across the toolbar. */
-.search-collections-tools{align-items:end;gap:10px}\n.search-collections-tools .ant-select,.search-collections-tools .ant-input-affix-wrapper{min-height:40px}
+.search-collections-tools{align-items:end;gap:10px}
+.search-collections-tools .ant-select,.search-collections-tools .ant-input-affix-wrapper{min-height:40px}
 .search-collections-tools label{min-width:0}
 .search-collections-tools :is(input:not([type=file]),[data-ui-control="input"],[data-ui-control="select"]){width:100%;min-width:0;box-sizing:border-box}
 .search-collections-tools > button{box-sizing:border-box;align-self:end;white-space:nowrap}
