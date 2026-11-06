@@ -30,19 +30,11 @@ export function openUiSelect(node) {
  if(!trigger || !hostFor(trigger)) throw Error('Expected a rendered UI selector')
  if(trigger.disabled) return null
  if(trigger.getAttribute('aria-expanded')!=='true') {
-  // Ant Design handles pointer opening on the selector surface, not the
-  // nested combobox input. Flush the real bubbling event before reading portal.
-  // Keyboard opening is the same supported interaction users rely on and
-  // avoids depending on rc-select's pointer implementation details in JSDOM.
-  act(()=>trigger.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true,cancelable:true})))
-  if(trigger.getAttribute('aria-expanded')!=='true') {
-   const surface=trigger.closest('.ant-select')?.querySelector('.ant-select-selector') || trigger
-   act(()=>{
-    surface.dispatchEvent(new Event('pointerdown',{bubbles:true,cancelable:true}))
-    surface.dispatchEvent(new MouseEvent('mousedown',{bubbles:true,button:0,cancelable:true}))
-    surface.dispatchEvent(new MouseEvent('click',{bubbles:true,button:0,cancelable:true}))
-   })
-  }
+  const surface=trigger.closest('.ant-select')?.querySelector('.ant-select-selector') || trigger
+  trigger.focus()
+  // A single real click opens both rc-select and the adapter's controlled state.
+  // Do not synthesize keydown + mousedown + click together: that can toggle closed.
+  act(()=>surface.dispatchEvent(new MouseEvent('click',{bubbles:true,button:0,cancelable:true})))
  }
  const popup=popupFor(trigger)
  if(!popup) {
