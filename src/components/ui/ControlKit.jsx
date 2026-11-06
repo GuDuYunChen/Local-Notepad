@@ -2,8 +2,7 @@ import React, { Children, Fragment, forwardRef, isValidElement, useCallback, use
 import { Button, Input, Select, ConfigProvider } from 'antd'
 const quietWave = { disabled: true }
 const controlTheme = { components: {
-  Input: { paddingBlock: 8, paddingInline: 10, paddingBlockSM: 5, paddingInlineSM: 10 },
-  Select: { optionHeight: 32, controlHeight: 40, controlHeightSM: 28 },
+  Select: { optionHeight: 32, zIndexPopup: 1600 },
   Button: { primaryShadow: 'none', defaultShadow: 'none', dangerShadow: 'none' }
 } }
 
