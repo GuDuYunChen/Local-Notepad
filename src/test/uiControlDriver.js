@@ -29,21 +29,17 @@ function popupFor(node) {
 }
 export function openUiSelect(node) {
  const trigger=triggerFor(node)
- if(!trigger || !hostFor(trigger)) throw Error('Expected a rendered UI selector')
+ const host=hostFor(trigger)
+ if(!trigger || !host) throw Error('Expected a rendered UI selector')
  if(trigger.disabled) return null
  if(trigger.getAttribute('aria-expanded')!=='true') {
   const surface=trigger.closest('.ant-select')?.querySelector('.ant-select-selector') || trigger
-  trigger.focus()
-  // A single real click opens both rc-select and the adapter's controlled state.
-  // Do not synthesize keydown + mousedown + click together: that can toggle closed.
-  act(()=>surface.dispatchEvent(new MouseEvent('click',{bubbles:true,button:0,cancelable:true})))
+  // The shared adapter owns opening at its wrapper boundary. Dispatch one
+  // bubbling mousedown on the real selector surface; do not double-toggle it.
+  act(()=>surface.dispatchEvent(new MouseEvent('mousedown',{bubbles:true,button:0,cancelable:true})))
  }
  const popup=popupFor(trigger)
- if(!popup) {
-  const document=trigger.ownerDocument
-  const dropdowns=[...document.querySelectorAll('.ant-select-dropdown')].map(item=>({className:item.className,ariaHidden:item.getAttribute('aria-hidden'),options:item.querySelectorAll('[data-ui-option-value]').length,html:item.outerHTML.slice(0,260)}))
-  throw Error('Select menu did not open: '+(trigger.getAttribute('aria-label')||trigger.id)+'; expanded='+trigger.getAttribute('aria-expanded')+'; controls='+trigger.getAttribute('aria-controls')+'; host='+hostFor(trigger)?.className+'; dropdowns='+JSON.stringify(dropdowns)+'; body='+document.body.innerHTML.slice(-1800))
- }
+ if(!popup)throw Error('Select menu did not open: '+(trigger.getAttribute('aria-label')||trigger.id))
  return popup
 }
 export function uiOptions(node) {
