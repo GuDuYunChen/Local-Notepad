@@ -13,6 +13,9 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
       - name: Export exact current UI candidate for offline recovery (not acceptance)
         shell: bash
         run: |
@@ -27,7 +30,24 @@ jobs:
           git cat-file commit "$candidate" > source-recovery/candidate-commit.raw
           git diff --name-status "$previous" "$candidate" > source-recovery/candidate.diffstat
           printf 'previous=%s\ncandidate=%s\nworkflow=%s\nrun=%s\naccepted=false\n' "$previous" "$candidate" "$GITHUB_SHA" "$GITHUB_RUN_ID" > source-recovery/provenance.txt
-          (cd source-recovery && sha256sum candidate.patch candidate-tree.zlist candidate-commit.raw candidate.diffstat provenance.txt > SHA256SUMS)
+      - name: Recover the one updated dependency from its exact lockfile URL
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs'
+          import { createHash } from 'node:crypto'
+          const lock=JSON.parse(fs.readFileSync('package-lock.json','utf8'))
+          const entry=lock.packages['node_modules/@rc-component/util']
+          if(entry.version!=='1.14.1')throw Error('Unexpected dependency version; do not recover another graph')
+          const response=await fetch(entry.resolved,{signal:AbortSignal.timeout(30000)})
+          if(!response.ok)throw Error('Dependency download failed: '+response.status)
+          const bytes=Buffer.from(await response.arrayBuffer())
+          if('sha512-'+createHash('sha512').update(bytes).digest('base64')!==entry.integrity)throw Error('Lockfile integrity mismatch')
+          fs.writeFileSync('source-recovery/rc-util-1.14.1.tgz',bytes)
+          fs.writeFileSync('source-recovery/dependency-provenance.json',JSON.stringify({name:'@rc-component/util',...entry},null,2)+'\n')
+          NODE
+          (cd source-recovery && sha256sum candidate.patch candidate-tree.zlist candidate-commit.raw candidate.diffstat provenance.txt rc-util-1.14.1.tgz dependency-provenance.json > SHA256SUMS)
       - uses: actions/upload-artifact@v4
         with:
           name: ui-candidate-source-delta-fa3b35e
