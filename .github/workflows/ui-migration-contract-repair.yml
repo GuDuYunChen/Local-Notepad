@@ -2,7 +2,7 @@ name: Repair complete UI migration contracts
 on:
   push:
     branches: [fix/local-ui-consistency-2f116]
-    paths: [.github/workflows/ui-migration-contract-repair.yml, scripts/repair-ui-migration-contracts.mjs, scripts/finalize-ui-contract-repair.mjs]
+    paths: [.github/workflows/ui-migration-contract-repair.yml, scripts/repair-ui-migration-contracts.mjs, scripts/finalize-ui-contract-repair.mjs, scripts/normalize-ui-contract-whitespace.mjs]
 permissions:
   contents: write
 concurrency:
@@ -11,7 +11,7 @@ concurrency:
 jobs:
   repair-and-verify-complete-candidate:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
         with:
@@ -20,6 +20,10 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.24.11'
+          cache-dependency-path: server/go.sum
       - name: Install exact dependencies and accepted source for comparison
         run: |
           npm ci --no-audit --no-fund
@@ -45,6 +49,8 @@ jobs:
           text=text.replace('onMouseDown={guard(onMouseDown)}>{children}</Button>', 'onMouseDown={guard(onMouseDown)}>{children}</Button></ConfigProvider>')
           fs.writeFileSync(kit,text)
           NODE
+      - name: Remove generated trailing whitespace with AST equivalence checks
+        run: node scripts/normalize-ui-contract-whitespace.mjs
       - name: Publish repaired candidate without a force push
         shell: bash
         run: |
@@ -54,35 +60,21 @@ jobs:
           git diff --exit-code -- package.json package-lock.json
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add src scripts/s3-local-overview-cases.mjs docs/quality/ui-migration-contract-repair.json
-          git commit -m 'fix(ui): preserve semantic controls and migrate real dropdown regression drivers'
+          git add src scripts/s3-local-overview-cases.mjs scripts/repair-ui-migration-contracts.mjs docs/quality/ui-migration-contract-repair.json
+          git commit -m 'fix(ui): preserve shared control semantics, real dropdown drivers and legacy paint isolation'
           git push origin HEAD:refs/heads/fix/local-ui-consistency-2f116
           mkdir -p test-results/ui-contract-repair
           git rev-parse HEAD > test-results/ui-contract-repair/commit.txt
-      - name: Run complete original test suites and builds
-        shell: bash
-        run: |
-          set +e
-          failed=0
-          run_check() { label="$1"; shift; "$@" > "test-results/ui-contract-repair/$label.log" 2>&1; code=$?; printf '%s\t%s\n' "$label" "$code" | tee -a test-results/ui-contract-repair/results.tsv; if [ "$code" -ne 0 ]; then failed=1; tail -n 16 "test-results/ui-contract-repair/$label.log"; fi; }
-          run_check build-main npm run build:main
-          run_check build-renderer npm run build:renderer
-          run_check full-vitest npx vitest run --root=. --reporter=json --outputFile=test-results/ui-contract-repair/full-vitest.json
-          run_check original-ui npm run test:ui
-          run_check electron npm run test:electron
-          run_check editor npm run test:editor
-          node --input-type=module <<'NODE'
-          import fs from 'node:fs'
-          const file='test-results/ui-contract-repair/full-vitest.json'
-          if(fs.existsSync(file)){const report=JSON.parse(fs.readFileSync(file));console.log('FULL_COUNTS',JSON.stringify({files:report.numTotalTestSuites,tests:report.numTotalTests,passed:report.numPassedTests,failed:report.numFailedTests,pending:report.numPendingTests}));for(const suite of report.testResults||[]){const fails=suite.assertionResults.filter(t=>t.status==='failed');if(fails.length)console.log('FAIL_GROUP',JSON.stringify({file:suite.name.replace(process.cwd()+'/',''),count:fails.length,examples:fails.slice(0,2).map(t=>({name:t.fullName,error:t.failureMessages?.[0]?.slice(0,1000)}))}))}}
-          NODE
-          exit "$failed"
+      - name: Run all original suites and builds on the published complete candidate
+        run: node scripts/run-ui-complete-regression.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: ui-contract-repair-${{ github.sha }}
           path: |
             test-results/ui-contract-repair/
+            test-results/ui-complete-regression/*.json
+            test-results/ui-complete-regression/*.log
             docs/quality/ui-migration-contract-repair.json
           retention-days: 30
           if-no-files-found: warn
