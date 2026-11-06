@@ -1,11 +1,17 @@
 /* Only layout adapters live here. Appearance belongs to Ant Design theme tokens. */
 /* Shared field geometry: keep ordinary text and password fields on one
    baseline even when a page still carries legacy utility class names. */
-.app-ui-input.ant-input { box-sizing:border-box; padding:8px 10px; }
-.app-ui-input.ant-input-affix-wrapper { box-sizing:border-box; padding:8px 10px; }
+.app-ui-input.ant-input:not(.ant-input-sm):not(.ant-input-lg) { box-sizing:border-box; padding:8px 10px; }
+.app-ui-input.ant-input-sm { box-sizing:border-box; padding:5px 10px; }
+.app-ui-input.ant-input-lg { box-sizing:border-box; padding:10px 12px; }
+.app-ui-input.ant-input-affix-wrapper:not(.ant-input-affix-wrapper-sm):not(.ant-input-affix-wrapper-lg) { box-sizing:border-box; padding:8px 10px; }
+.app-ui-input.ant-input-affix-wrapper-sm { box-sizing:border-box; padding:5px 10px; }
+.app-ui-input.ant-input-affix-wrapper-lg { box-sizing:border-box; padding:10px 12px; }
 .app-ui-input.ant-input-affix-wrapper > input.ant-input { padding:0; }
 .app-ui-select-host .ant-select-selector { box-sizing:border-box; }
-.app-ui-select-host .ant-select-single:not(.ant-select-customize-input) .ant-select-selector { min-height:40px; align-items:center; }
+.app-ui-select-host .ant-select-single:not(.ant-select-customize-input):not(.ant-select-sm):not(.ant-select-lg) .ant-select-selector { min-height:40px; align-items:center; }
+.app-ui-select-host .ant-select-single.ant-select-sm .ant-select-selector { min-height:28px; align-items:center; }
+.app-ui-select-host .ant-select-single.ant-select-lg .ant-select-selector { min-height:44px; align-items:center; }
 
 .app-ui-select-host { display:inline-flex; min-width:0; vertical-align:middle; position:relative; }
 .app-ui-select-host > .app-ui-select { width:100%; min-width:0; }
