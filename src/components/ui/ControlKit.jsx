@@ -131,7 +131,13 @@ export const UiSelect = forwardRef(function UiSelect({ className = '', style, si
   }
   // Native form participation only: no hidden select or test-only interaction path.
   const values = Array.isArray(selected) ? selected : [selected]
-  return <ConfigProvider theme={controlTheme}><span ref={setNode} data-ui-control="select" data-ui-value={JSON.stringify(selected)} className={['app-ui-select-host', cleanClass(className)].filter(Boolean).join(' ')} style={style}>
+  const activate = event => {
+    if (blocked || requestedOpen !== undefined) return
+    if (event.type === 'mousedown' && event.target.closest?.('.ant-select-selector')) changeOpen(true)
+    if (event.type === 'keydown' && (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ') && !open) changeOpen(true)
+  }
+  return <ConfigProvider theme={controlTheme}><span ref={setNode} data-ui-control="select" data-ui-value={JSON.stringify(selected)} className={['app-ui-select-host', cleanClass(className)].filter(Boolean).join(' ')} style={style}
+    onMouseDown={activate} onKeyDown={activate}>
     <Select {...props} virtual={false} optionRender={option => <span data-ui-option-value={String(option.value)}>{option.label}</span>} ref={api} id={id} aria-required={required || undefined} value={selected} options={resolved} disabled={blocked}
       mode={multiple ? 'multiple' : undefined} size={controlSize(size, density)} status={errorStatus(props)} className="app-ui-select"
       showSearch={showSearch ?? flat.length > 12} optionFilterProp="label" open={blocked ? false : open} onOpenChange={changeOpen} onChange={change} onInputKeyDown={key}
