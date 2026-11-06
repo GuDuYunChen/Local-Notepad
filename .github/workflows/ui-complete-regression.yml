@@ -1,0 +1,44 @@
+name: Full migrated UI regression
+on:
+  push:
+    branches: [fix/local-ui-consistency-2f116]
+    paths:
+      - .github/workflows/ui-complete-regression.yml
+      - scripts/run-ui-complete-regression.mjs
+permissions:
+  contents: read
+concurrency:
+  group: full-migrated-ui-regression
+  cancel-in-progress: false
+jobs:
+  all-original-suites:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.24.11'
+          cache-dependency-path: server/go.sum
+      - name: Install committed dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Verify manifest and lock unchanged
+        run: git diff --exit-code -- package.json package-lock.json
+      - name: Run full migrated candidate without filtering or stopping after first failure
+        run: node scripts/run-ui-complete-regression.mjs
+      - name: Preserve original results and source identity
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-migrated-ui-regression-${{ github.sha }}
+          path: |
+            test-results/ui-complete-regression/*.json
+            test-results/ui-complete-regression/*.log
+          if-no-files-found: warn
+          retention-days: 30
