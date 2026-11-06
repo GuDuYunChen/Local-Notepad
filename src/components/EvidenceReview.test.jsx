@@ -116,7 +116,7 @@ describe('review continuation and return', () => {
       intelligence={data.model} projectMeta={data.meta} onOpenFile={vi.fn()} /></React.StrictMode>))
     await flush()
     expect(uiValue(labeled('实体证据来源筛选'))).toBe('alias')
-    expect(uiValue(labeled('实体证据卷筛选'))).toBe(JSON.stringify(''))
+    expect(uiValue(labeled('实体证据卷筛选'))).toBe('')
     expect(labeled('实体证据分页').textContent).toContain('第 3 / 3 页')
     expect(document.activeElement.getAttribute('aria-label')).toBe('打开证据章节 第13章')
     expect(evidenceReview.getReturn()).toBeNull()
