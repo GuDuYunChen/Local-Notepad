@@ -2,7 +2,7 @@ import React, { Children, Fragment, forwardRef, isValidElement, useEffect, useIm
 import { Button, Input, Select, ConfigProvider } from 'antd'
 import './control-kit.css'
 const quietWave = { disabled: true }
-const controlTheme = { components: {
+const controlTheme = { token: { motion: false }, components: {
   Select: { optionHeight: 32, zIndexPopup: 1600 },
   Button: { primaryShadow: 'none', defaultShadow: 'none', dangerShadow: 'none' }
 } }
