@@ -126,7 +126,15 @@ export const UiSelect = forwardRef(function UiSelect({ className = '', style, si
     onInput?.({ ...event, type: 'input' }); onChange?.(event)
   }
   const open = requestedOpen ?? expanded
-  const changeOpen = next => { const allowed = next && !disabled && !fieldsetDisabled(node); setExpanded(allowed); onOpenChange?.(allowed); onDropdownVisibleChange?.(allowed) }
+  const openRef = useRef(open); openRef.current = open
+  const changeOpen = next => {
+    const allowed = next && !disabled && !fieldsetDisabled(node)
+    if (openRef.current === allowed) return
+    openRef.current = allowed
+    setExpanded(allowed)
+    onOpenChange?.(allowed)
+    onDropdownVisibleChange?.(allowed)
+  }
   const key = event => {
     onInputKeyDown?.(event); onKeyDown?.(event)
     if (event.key === 'Escape' && open && !event.nativeEvent?.isComposing) { event.stopPropagation(); changeOpen(false) }
