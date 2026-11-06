@@ -1,4 +1,4 @@
-import { act } from 'react'
+import { flushSync } from 'react-dom'
 
 // Explicit interaction helpers for the real Ant Design DOM. Nothing overrides
 // document APIs, renders a substitute select, or calls application handlers.
@@ -36,7 +36,7 @@ export function openUiSelect(node) {
   const surface=trigger.closest('.ant-select')?.querySelector('.ant-select-selector') || trigger
   // The shared adapter owns opening at its wrapper boundary. Dispatch one
   // bubbling mousedown on the real selector surface; do not double-toggle it.
-  act(()=>surface.dispatchEvent(new MouseEvent('mousedown',{bubbles:true,button:0,cancelable:true})))
+  flushSync(()=>surface.dispatchEvent(new MouseEvent('mousedown',{bubbles:true,button:0,cancelable:true})))
  }
  const popup=popupFor(trigger)
  if(!popup)throw Error('Select menu did not open: '+(trigger.getAttribute('aria-label')||trigger.id))
