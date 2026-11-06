@@ -29,7 +29,7 @@
 .version-history pre:focus-visible,
 .version-history button:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
 .version-history input:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { outline: 2px solid var(--clay, #9a6a4b); outline-offset: 3px; }
-.version-history button:disabled { opacity: .55; cursor: default; }
+.version-history button:disabled:not(.ant-btn):not([data-ui-control]) { opacity: .55; cursor: default; }
 
 /* This module replaces the old compact history layout; leave the inspector
    body as the scroll owner and preserve room for the real reference notice. */
