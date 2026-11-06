@@ -1,6 +1,11 @@
 import React, { Children, Fragment, forwardRef, isValidElement, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Button, Input, Select, ConfigProvider } from 'antd'
 const quietWave = { disabled: true }
+const controlTheme = { components: {
+  Input: { paddingBlock: 8, paddingInline: 10, paddingBlockSM: 5, paddingInlineSM: 10 },
+  Select: { optionHeight: 32, controlHeight: 40, controlHeightSM: 28 },
+  Button: { primaryShadow: 'none', defaultShadow: 'none', dangerShadow: 'none' }
+} }
 
 const nativeTypes = new Set(['checkbox', 'radio', 'file', 'range', 'color', 'hidden', 'image', 'button', 'submit', 'reset'])
 const writeRef = (ref, value) => { if (typeof ref === 'function') ref(value); else if (ref) ref.current = value }
@@ -42,23 +47,23 @@ export const UiButton = forwardRef(function UiButton({ type, htmlType, variant, 
   const nativeType = htmlType || (['button', 'submit', 'reset'].includes(type) ? type : type === undefined ? 'submit' : 'button')
   const buttonType = kind === 'primary' ? 'primary' : ['text', 'link', 'dashed'].includes(kind) ? kind : 'default'
   const guard = handler => event => { if (props.disabled || fieldsetDisabled(event.currentTarget)) { event.preventDefault(); event.stopPropagation(); return } handler?.(event) }
-  return <ConfigProvider wave={quietWave}><Button {...props} ref={nativeRef(ref)} htmlType={nativeType} type={buttonType} danger={danger ?? hasClass(className, 'danger')} autoInsertSpace={false}
+  return <ConfigProvider wave={quietWave} theme={controlTheme}><Button {...props} ref={nativeRef(ref)} htmlType={nativeType} type={buttonType} danger={danger ?? hasClass(className, 'danger')} autoInsertSpace={false}
     size={controlSize(size, density, className)} data-ui-control="button" data-ui-layout={structural ? 'content' : 'action'}
     className={['app-ui-button', cleanClass(className)].filter(Boolean).join(' ')} onClick={guard(onClick)} onMouseDown={guard(onMouseDown)}>{children}</Button></ConfigProvider>
 })
 
 export const UiInput = forwardRef(function UiInput({ className = '', size, density, type = 'text', ...props }, ref) {
   if (nativeTypes.has(type)) return <input {...props} ref={ref} type={type} className={className} data-ui-native={type} />
-  return <Input {...props} ref={nativeRef(ref)} type={type} size={controlSize(size, density, className)} status={errorStatus(props)}
-    data-ui-control="input" className={['app-ui-input', cleanClass(className)].filter(Boolean).join(' ')} />
+  return <ConfigProvider theme={controlTheme}><Input {...props} ref={nativeRef(ref)} type={type} size={controlSize(size, density, className)} status={errorStatus(props)}
+    data-ui-control="input" className={['app-ui-input', cleanClass(className)].filter(Boolean).join(' ')} /></ConfigProvider>
 })
 export const UiPassword = forwardRef(function UiPassword({ className = '', size, density, type: _type, ...props }, ref) {
-  return <Input.Password {...props} ref={nativeRef(ref)} size={controlSize(size, density, className)} status={errorStatus(props)}
-    data-ui-control="password" className={['app-ui-input', cleanClass(className)].filter(Boolean).join(' ')} />
+  return <ConfigProvider theme={controlTheme}><Input.Password {...props} ref={nativeRef(ref)} size={controlSize(size, density, className)} status={errorStatus(props)}
+    data-ui-control="password" className={['app-ui-input', cleanClass(className)].filter(Boolean).join(' ')} /></ConfigProvider>
 })
 export const UiTextarea = forwardRef(function UiTextarea({ className = '', size, density, ...props }, ref) {
-  return <Input.TextArea {...props} ref={nativeRef(ref)} size={controlSize(size, density, className)} status={errorStatus(props)}
-    data-ui-control="textarea" className={['app-ui-input', cleanClass(className)].filter(Boolean).join(' ')} />
+  return <ConfigProvider theme={controlTheme}><Input.TextArea {...props} ref={nativeRef(ref)} size={controlSize(size, density, className)} status={errorStatus(props)}
+    data-ui-control="textarea" className={['app-ui-input', cleanClass(className)].filter(Boolean).join(' ')} /></ConfigProvider>
 })
 
 function textOf(node) {
@@ -126,7 +131,7 @@ export const UiSelect = forwardRef(function UiSelect({ className = '', style, si
   }
   // Native form participation only: no hidden select or test-only interaction path.
   const values = Array.isArray(selected) ? selected : [selected]
-  return <span ref={setNode} data-ui-control="select" data-ui-value={JSON.stringify(selected)} className={['app-ui-select-host', cleanClass(className)].filter(Boolean).join(' ')} style={style}>
+  return <ConfigProvider theme={controlTheme}><span ref={setNode} data-ui-control="select" data-ui-value={JSON.stringify(selected)} className={['app-ui-select-host', cleanClass(className)].filter(Boolean).join(' ')} style={style}>
     <Select {...props} virtual={false} optionRender={option => <span data-ui-option-value={String(option.value)}>{option.label}</span>} ref={api} id={id} aria-required={required || undefined} value={selected} options={resolved} disabled={blocked}
       mode={multiple ? 'multiple' : undefined} size={controlSize(size, density, className)} status={errorStatus(props)} className="app-ui-select"
       showSearch={showSearch ?? flat.length > 12} optionFilterProp="label" open={blocked ? false : open} onOpenChange={changeOpen} onChange={change} onInputKeyDown={key}
@@ -135,5 +140,5 @@ export const UiSelect = forwardRef(function UiSelect({ className = '', style, si
     {required && <input className="app-ui-validation-field" data-ui-native="form-validation" type="text" aria-hidden="true" tabIndex={-1} form={form}
       value={values.some(item => item !== '') ? 'selected' : ''} readOnly={false} required disabled={blocked} onChange={() => {}}
       onInvalid={event => { event.preventDefault(); api.current?.focus() }} />}
-  </span>
+  </span></ConfigProvider>
 })
