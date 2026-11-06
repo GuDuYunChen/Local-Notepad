@@ -54,7 +54,7 @@
 .local-shortcuts-recorder-panel p { margin: 0; color: var(--ink-soft); font-size: 12px; line-height: 1.65; }
 .local-shortcuts-recorder-panel .local-shortcuts-inline-error { padding: 7px 10px; border-left: 3px solid var(--clay); color: var(--ink); background: var(--surface); }
 .local-shortcuts-recorder-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
-.local-shortcuts-recorder-actions .app-ui-button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { min-height: 34px; }
+.local-shortcuts-recorder-actions .btn:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { min-height: 34px; }
 .local-shortcuts-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 40px 10px; color: var(--ink-soft); font-size: 12px; text-align: center; }
 .local-shortcuts-empty strong { font-size: 14px; color: var(--ink); }
 
@@ -67,13 +67,13 @@
 .local-shortcuts-reference kbd { color: var(--ink); }
 .local-shortcuts-notice { display: flex; flex: none; align-items: center; justify-content: space-between; gap: 12px; margin: 0 24px 14px; padding: 10px 12px; border: 1px solid var(--clay-medium); border-radius: 8px; color: var(--ink); background: var(--clay-light); font-size: 12px; line-height: 1.65; }
 .local-shortcuts-notice > .btn { flex: none; }
-.local-shortcuts-notice > .app-ui-button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { font-size: 12px; }
+.local-shortcuts-notice > .btn:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { font-size: 12px; }
 .local-shortcuts-footer { flex: none; border-top: 1px solid var(--line); padding: 12px 24px 18px; background: var(--surface); }
 .local-shortcuts-status { min-height: 18px; margin-bottom: 8px; color: var(--ink-soft); font-size: 12px; line-height: 1.5; }
 .local-shortcuts-footer-actions { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .local-shortcuts-footer-actions > div { display: flex; gap: 8px; }
 .local-shortcuts-footer .btn { min-width: 72px; }
-.local-shortcuts-footer .app-ui-button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { min-height: 36px; font-size: 12px; }
+.local-shortcuts-footer .btn:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { min-height: 36px; font-size: 12px; }
 .local-shortcuts-error { margin-bottom: 10px; padding: 9px 11px; border-left: 3px solid var(--clay); border-radius: 3px; color: var(--ink); background: var(--clay-light); font-size: 12px; line-height: 1.6; }
 .local-shortcuts-confirmation { display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
 .local-shortcuts-confirmation > span { color: var(--ink-soft); font-size: 12px; }
