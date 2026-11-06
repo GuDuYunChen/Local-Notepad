@@ -43,13 +43,13 @@ function useInheritedDisabled(node) {
   return disabled
 }
 
-export const UiButton = forwardRef(function UiButton({ type, htmlType, variant, danger, size, density, className = '', onClick, onMouseDown, children, ...props }, ref) {
+export const UiButton = forwardRef(function UiButton({ type, htmlType, variant, danger, size, density, className = '', onClick, onMouseDown, ghost, children, ...props }, ref) {
   const structural = /(?:row|item|nav|menu|tab|swatch|handle|close|toggle|icon|chip|pill)/i.test(className) || ['tab', 'menuitem', 'option', 'treeitem'].includes(props.role)
   const kind = variant || (hasClass(className, 'primary') || type === 'primary' ? 'primary' : structural ? 'text' : 'secondary')
   const nativeType = htmlType || (['button', 'submit', 'reset'].includes(type) ? type : type === undefined ? 'submit' : 'button')
   const buttonType = kind === 'primary' ? 'primary' : ['text', 'link', 'dashed'].includes(kind) ? kind : 'default'
   const guard = handler => event => { if (props.disabled || fieldsetDisabled(event.currentTarget)) { event.preventDefault(); event.stopPropagation(); return } handler?.(event) }
-  return <ConfigProvider wave={quietWave} theme={controlTheme}><Button {...props} ref={nativeRef(ref)} htmlType={nativeType} type={buttonType} danger={danger ?? hasClass(className, 'danger')} autoInsertSpace={false}
+  return <ConfigProvider wave={quietWave} theme={controlTheme}><Button {...props} ref={nativeRef(ref)} htmlType={nativeType} type={buttonType} danger={danger ?? hasClass(className, 'danger')} ghost={ghost ?? hasClass(className, 'ghost')} autoInsertSpace={false}
     size={controlSize(size, density, className)} data-ui-control="button" data-ui-layout={structural ? 'content' : 'action'}
     className={['app-ui-button', cleanControlClass(className)].filter(Boolean).join(' ')} onClick={guard(onClick)} onMouseDown={guard(onMouseDown)}>{children}</Button></ConfigProvider>
 })
