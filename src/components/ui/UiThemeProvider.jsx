@@ -27,7 +27,10 @@ export default function UiThemeProvider({ children }) {
     token: { colorPrimary: appearance.primary, colorText: appearance.text, colorTextSecondary: appearance.muted, colorBgContainer: appearance.background,
       colorBgElevated: appearance.background, colorBgLayout: appearance.paper, colorBorder: appearance.border, colorError: appearance.danger,
       fontFamily: appearance.font, fontSize: 14, controlHeight: 40, controlHeightSM: 28, controlHeightLG: 44, borderRadius: 8, motion: false },
-    components: { Button: { primaryShadow: 'none', defaultShadow: 'none', dangerShadow: 'none' },
-      Select: { optionHeight: 32, zIndexPopup: 1600 } } }), [appearance])
+    components: {
+      Button: { primaryShadow: 'none', defaultShadow: 'none', dangerShadow: 'none' },
+      Input: { paddingBlock: 8, paddingInline: 10, paddingBlockSM: 5, paddingInlineSM: 10 },
+      Select: { optionHeight: 32, zIndexPopup: 1600 }
+    } }), [appearance])
   return <ConfigProvider locale={zhCN} componentSize="middle" theme={configuration} button={{ autoInsertSpace: false }} wave={{ disabled: true }}>{children}</ConfigProvider>
 }
