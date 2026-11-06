@@ -116,7 +116,7 @@ describe('review continuation and return', () => {
       intelligence={data.model} projectMeta={data.meta} onOpenFile={vi.fn()} /></React.StrictMode>))
     await flush()
     expect(uiValue(labeled('实体证据来源筛选'))).toBe('alias')
-    expect(uiValue(labeled('实体证据卷筛选'))).toBe('')
+    expect(uiValue(labeled('实体证据卷筛选'))).toBe(JSON.stringify(''))
     expect(labeled('实体证据分页').textContent).toContain('第 3 / 3 页')
     expect(document.activeElement.getAttribute('aria-label')).toBe('打开证据章节 第13章')
     expect(evidenceReview.getReturn()).toBeNull()
@@ -148,7 +148,7 @@ describe('review continuation and return', () => {
     const data = fixture(); const session = evidenceReview.start(context, chapters, 'c12'); evidenceReview.requestReturn(session.id)
     await act(async () => root.render(<ProjectEntityEvidencePanel projectId="p2" entityId="index:a"
       intelligence={data.model} projectMeta={data.meta} />))
-    expect(labeled('实体证据来源筛选').value).toBe('all')
+    expect(uiValue(labeled('实体证据来源筛选'))).toBe('all')
     expect(evidenceReview.getReturn('p1')).not.toBeNull()
   })
   it('does not silently resume a different project when the source project was deleted', async () => {
