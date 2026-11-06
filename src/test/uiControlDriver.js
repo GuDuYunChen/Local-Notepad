@@ -45,7 +45,11 @@ export function openUiSelect(node) {
   }
  }
  const popup=popupFor(trigger)
- if(!popup)throw Error('Select menu did not open: '+(trigger.getAttribute('aria-label')||trigger.id))
+ if(!popup) {
+  const document=trigger.ownerDocument
+  const dropdowns=[...document.querySelectorAll('.ant-select-dropdown')].map(item=>({className:item.className,ariaHidden:item.getAttribute('aria-hidden'),options:item.querySelectorAll('[data-ui-option-value]').length,html:item.outerHTML.slice(0,260)}))
+  throw Error('Select menu did not open: '+(trigger.getAttribute('aria-label')||trigger.id)+'; expanded='+trigger.getAttribute('aria-expanded')+'; controls='+trigger.getAttribute('aria-controls')+'; host='+hostFor(trigger)?.className+'; dropdowns='+JSON.stringify(dropdowns))
+ }
  return popup
 }
 export function uiOptions(node) {
