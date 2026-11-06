@@ -56,16 +56,16 @@ export const UiButton = forwardRef(function UiButton({ type, htmlType, variant, 
 
 export const UiInput = forwardRef(function UiInput({ className = '', size, density, type = 'text', ...props }, ref) {
   if (nativeTypes.has(type)) return <input {...props} ref={ref} type={type} className={className} data-ui-native={type} />
-  return <ConfigProvider theme={controlTheme}><Input {...props} ref={nativeRef(ref)} type={type} size={controlSize(size, density, className)} status={errorStatus(props)}
-    data-ui-control="input" className={['app-ui-input', cleanControlClass(className)].filter(Boolean).join(' ')} /></ConfigProvider>
+  return <Input {...props} ref={nativeRef(ref)} type={type} size={controlSize(size, density, className)} status={errorStatus(props)}
+    data-ui-control="input" className={['app-ui-input', cleanControlClass(className)].filter(Boolean).join(' ')} />
 })
 export const UiPassword = forwardRef(function UiPassword({ className = '', size, density, type: _type, ...props }, ref) {
-  return <ConfigProvider theme={controlTheme}><Input.Password {...props} ref={nativeRef(ref)} size={controlSize(size, density, className)} status={errorStatus(props)}
-    data-ui-control="password" className={['app-ui-input', cleanControlClass(className)].filter(Boolean).join(' ')} /></ConfigProvider>
+  return <Input.Password {...props} ref={nativeRef(ref)} size={controlSize(size, density, className)} status={errorStatus(props)}
+    data-ui-control="password" className={['app-ui-input', cleanControlClass(className)].filter(Boolean).join(' ')} />
 })
 export const UiTextarea = forwardRef(function UiTextarea({ className = '', size, density, ...props }, ref) {
-  return <ConfigProvider theme={controlTheme}><Input.TextArea {...props} ref={nativeRef(ref)} size={controlSize(size, density, className)} status={errorStatus(props)}
-    data-ui-control="textarea" className={['app-ui-input', cleanControlClass(className)].filter(Boolean).join(' ')} /></ConfigProvider>
+  return <Input.TextArea {...props} ref={nativeRef(ref)} size={controlSize(size, density, className)} status={errorStatus(props)}
+    data-ui-control="textarea" className={['app-ui-input', cleanControlClass(className)].filter(Boolean).join(' ')} />
 })
 
 function textOf(node) {
