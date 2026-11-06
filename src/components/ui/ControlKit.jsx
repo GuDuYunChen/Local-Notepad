@@ -147,7 +147,7 @@ export const UiSelect = forwardRef(function UiSelect({ className = '', style, si
     if (event.type === 'keydown' && (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ') && !open) changeOpen(true)
   }
   return <ConfigProvider theme={controlTheme}><span ref={setNode} data-ui-control="select" data-ui-value={JSON.stringify(selected)} className={['app-ui-select-host', cleanControlClass(className)].filter(Boolean).join(' ')} style={style}
-    onMouseDown={activate} onClick={activate} onKeyDown={activate}>
+    onMouseDownCapture={activate} onClickCapture={activate} onKeyDownCapture={activate}>
     <Select {...props} virtual={false} optionRender={option => <span data-ui-option-value={String(option.value)}>{option.label}</span>} ref={api} id={id} aria-required={required || undefined} value={selected} options={resolved} disabled={blocked}
       mode={multiple ? 'multiple' : undefined} size={controlSize(size, density, className)} status={errorStatus(props)} className="app-ui-select"
       showSearch={showSearch ?? flat.length > 12} optionFilterProp="label" open={blocked ? false : open} onOpenChange={changeOpen} onChange={change} onInputKeyDown={key}
