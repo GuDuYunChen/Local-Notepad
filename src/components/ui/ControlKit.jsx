@@ -45,7 +45,7 @@ function useInheritedDisabled(node) {
 
 export const UiButton = forwardRef(function UiButton({ type, htmlType, variant, danger, size, density, className = '', onClick, onMouseDown, ghost, children, ...props }, ref) {
   const structural = /(?:row|item|nav|menu|tab|swatch|handle|close|toggle|icon|chip|pill)/i.test(className) || ['tab', 'menuitem', 'option', 'treeitem'].includes(props.role)
-  const kind = variant || (hasClass(className, 'primary') || type === 'primary' ? 'primary' : hasClass(className, 'link') ? 'link' : hasClass(className, 'dashed') ? 'dashed' : hasClass(className, 'text') || structural ? 'text' : 'secondary')
+  const kind = variant || (hasClass(className, 'primary') || type === 'primary' ? 'primary' : hasClass(className, 'link') || type === 'link' ? 'link' : hasClass(className, 'dashed') || type === 'dashed' ? 'dashed' : hasClass(className, 'text') || type === 'text' || structural ? 'text' : 'secondary')
   const nativeType = htmlType || (['button', 'submit', 'reset'].includes(type) ? type : type === undefined ? 'submit' : 'button')
   const buttonType = kind === 'primary' ? 'primary' : ['text', 'link', 'dashed'].includes(kind) ? kind : 'default'
   const guard = handler => event => { if (props.disabled || fieldsetDisabled(event.currentTarget)) { event.preventDefault(); event.stopPropagation(); return } handler?.(event) }
