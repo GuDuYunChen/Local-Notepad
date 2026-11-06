@@ -5,7 +5,6 @@
 .global-search-panel select:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { font: inherit; font-size: 13px; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 8px; min-height: 36px; padding: 7px 11px; }
 .global-search-panel button { cursor: pointer; }
 .global-search-panel button:disabled { cursor: default; opacity: .45; }
-.global-search-panel button.primary:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { background: var(--clay); color: var(--paper); border-color: var(--clay); }
 .global-search-panel :is(button, input, select):focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { outline: 2px solid var(--clay); outline-offset: 2px; }
 .global-search-panel mark { color: var(--ink); background: var(--clay-light); border-radius: 2px; padding: 0 1px; }
 .global-search-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 22px 24px 12px; }
@@ -96,5 +95,4 @@
 .search-result-export-tools input[type=checkbox]:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { height: 16px; min-height: auto; }
 .search-result-export progress { max-width: 100%; accent-color: var(--clay); }
 .global-search-panel .search-result-collect { margin: 6px 0 0 8px; }
-.global-search-panel .search-result-collect[aria-pressed=true]:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { background: var(--clay-light); border-color: var(--clay); }
 @media (max-width: 640px) { .search-result-export { margin: 0 10px 8px; max-height: 190px; } .search-result-export-tools label { flex-basis: 100%; } }

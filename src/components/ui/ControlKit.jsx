@@ -1,12 +1,13 @@
 import React, { Children, Fragment, forwardRef, isValidElement, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { Button, Input, Select } from 'antd'
+import { Button, Input, Select, ConfigProvider } from 'antd'
+const quietWave = { disabled: true }
 
 const nativeTypes = new Set(['checkbox', 'radio', 'file', 'range', 'color', 'hidden', 'image', 'button', 'submit', 'reset'])
 const writeRef = (ref, value) => { if (typeof ref === 'function') ref(value); else if (ref) ref.current = value }
 const inputNode = value => value?.input || value?.resizableTextArea?.textArea || value?.nativeElement || value
 const nativeRef = ref => value => writeRef(ref, inputNode(value))
 const hasClass = (value, token) => String(value || '').split(/\s+/).includes(token)
-const cleanClass = value => String(value || '').split(/\s+/).filter(token => token && !['btn', 'input', 'primary', 'secondary', 'danger', 'small'].includes(token)).join(' ')
+const cleanClass = value => String(value || '').split(/\s+/).filter(token => token && true).join(' ')
 const controlSize = (size, density, classes) => ['small', 'middle', 'large'].includes(size) ? size : density === 'compact' || hasClass(classes, 'small') ? 'small' : 'middle'
 const errorStatus = props => props.status || (props['aria-invalid'] === true || props['aria-invalid'] === 'true' ? 'error' : undefined)
 
@@ -41,9 +42,9 @@ export const UiButton = forwardRef(function UiButton({ type, htmlType, variant, 
   const nativeType = htmlType || (['button', 'submit', 'reset'].includes(type) ? type : type === undefined ? 'submit' : 'button')
   const buttonType = kind === 'primary' ? 'primary' : ['text', 'link', 'dashed'].includes(kind) ? kind : 'default'
   const guard = handler => event => { if (props.disabled || fieldsetDisabled(event.currentTarget)) { event.preventDefault(); event.stopPropagation(); return } handler?.(event) }
-  return <Button {...props} ref={nativeRef(ref)} htmlType={nativeType} type={buttonType} danger={danger ?? hasClass(className, 'danger')} autoInsertSpace={false}
+  return <ConfigProvider wave={quietWave}><Button {...props} ref={nativeRef(ref)} htmlType={nativeType} type={buttonType} danger={danger ?? hasClass(className, 'danger')} autoInsertSpace={false}
     size={controlSize(size, density, className)} data-ui-control="button" data-ui-layout={structural ? 'content' : 'action'}
-    className={['app-ui-button', cleanClass(className)].filter(Boolean).join(' ')} onClick={guard(onClick)} onMouseDown={guard(onMouseDown)}>{children}</Button>
+    className={['app-ui-button', cleanClass(className)].filter(Boolean).join(' ')} onClick={guard(onClick)} onMouseDown={guard(onMouseDown)}>{children}</Button></ConfigProvider>
 })
 
 export const UiInput = forwardRef(function UiInput({ className = '', size, density, type = 'text', ...props }, ref) {
@@ -125,8 +126,8 @@ export const UiSelect = forwardRef(function UiSelect({ className = '', style, si
   }
   // Native form participation only: no hidden select or test-only interaction path.
   const values = Array.isArray(selected) ? selected : [selected]
-  return <span ref={setNode} data-ui-control="select" className={['app-ui-select-host', cleanClass(className)].filter(Boolean).join(' ')} style={style}>
-    <Select {...props} ref={api} id={id} aria-required={required || undefined} value={selected} options={resolved} disabled={blocked}
+  return <span ref={setNode} data-ui-control="select" data-ui-value={JSON.stringify(selected)} className={['app-ui-select-host', cleanClass(className)].filter(Boolean).join(' ')} style={style}>
+    <Select {...props} virtual={false} optionRender={option => <span data-ui-option-value={String(option.value)}>{option.label}</span>} ref={api} id={id} aria-required={required || undefined} value={selected} options={resolved} disabled={blocked}
       mode={multiple ? 'multiple' : undefined} size={controlSize(size, density, className)} status={errorStatus(props)} className="app-ui-select"
       showSearch={showSearch ?? flat.length > 12} optionFilterProp="label" open={blocked ? false : open} onOpenChange={changeOpen} onChange={change} onInputKeyDown={key}
       getPopupContainer={getPopupContainer || (trigger => trigger.closest('[role="dialog"], [role="alertdialog"]') || trigger.ownerDocument.body)} />

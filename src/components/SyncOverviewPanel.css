@@ -14,10 +14,8 @@
 .sync-overview-metrics .sync-overview-time dd{font-size:13px;line-height:1.7}
 .sync-overview-nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0}
 .sync-overview-link{display:flex;flex-direction:column;gap:7px;text-align:left;min-width:0;cursor:pointer;overflow-wrap:anywhere}
-.sync-overview-link:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)){background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:12px;font:inherit}
 .sync-overview-link strong{color:var(--ink);font-size:13px;line-height:1.7}
 .sync-overview-link>span{color:var(--ink-soft);font-size:12px;line-height:1.65}
-.sync-overview-link:not(:disabled):hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)){border-color:var(--clay)}
 .sync-overview-link:disabled{cursor:not-allowed;opacity:.65}
 .sync-overview-note{font-size:12px;line-height:1.7;color:var(--ink-soft);margin:8px 0 0;overflow-wrap:anywhere}
 .sync-overview-warning{font-size:13px;line-height:1.7;color:var(--ink);border-left:3px solid var(--warning);padding:8px 10px;background:var(--paper)}

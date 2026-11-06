@@ -364,16 +364,6 @@
   cursor: pointer;
 }
 
-.focus-session-review-edit:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  padding: 3px 5px;
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  background: var(--surface);
-  color: var(--ink-muted);
-  font: inherit;
-  font-size: 7px;
-}
-
 .focus-session-review-list p {
   margin: 5px 0 0;
   color: var(--ink-soft);
@@ -440,12 +430,6 @@
   color: var(--ink-soft);
   font: inherit;
   font-size: 7px;
-}
-
-.focus-session-review-editor button.primary:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  border-color: var(--clay);
-  background: var(--clay);
-  color: #fff;
 }
 
 .focus-session-analytics-empty {

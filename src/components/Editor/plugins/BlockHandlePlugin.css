@@ -55,21 +55,6 @@
   transition: background-color 0.15s ease;
 }
 
-.block-menu-item:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  padding: 8px 16px;
-  font-size: 14px;
-  color: var(--fg, #1f2d3d);
-}
-
-.block-menu-item:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  background-color: var(--toolbar-btn-hover, rgba(0,0,0,0.04));
-}
-
-.block-menu-item.active:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  background-color: var(--accent, rgba(126,91,239,0.1));
-  color: var(--accent, #7e5bef);
-}
-
 .block-menu-divider {
   height: 1px;
   background: var(--border-color, rgba(0,0,0,0.08));
@@ -115,13 +100,6 @@
   min-width: 210px;
 }
 
-.block-menu-item:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  min-height: 34px;
-  padding: 6px 9px;
-  border-radius: 7px;
-  font-size: 11px;
-}
-
 .block-menu-label {
   padding: 7px 9px 4px;
   font-size: 9px;
@@ -138,26 +116,4 @@
 .block-menu .block-menu-item {
   width: 100%;
   text-align: left;
-}
-
-
-.block-menu .block-menu-item:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  border: 0;
-  background: transparent;
-  font: inherit;
-}
-
-.block-menu .block-menu-item:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  outline: 0;
-  background: var(--toolbar-btn-hover, rgba(0,0,0,.05));
-}
-
-.block-menu .block-menu-item.danger:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  color: var(--red, #c7433c);
-}
-
-.block-menu .block-menu-item.danger:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
-.block-menu .block-menu-item.danger:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  background: var(--red-light, rgba(199,67,60,.1));
-  color: var(--red, #c7433c);
 }

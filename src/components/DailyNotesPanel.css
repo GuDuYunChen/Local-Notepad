@@ -28,12 +28,6 @@
   gap: 4px;
 }
 
-.close-panel-btn:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  font-size: 18px !important;
-  line-height: 1;
-  padding: 2px 6px !important;
-}
-
 .calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -124,15 +118,6 @@
   cursor: pointer;
   transition: background 0.15s;
   list-style: none;
-}
-
-.daily-note-item:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  padding: 8px;
-  border-radius: 4px;
-}
-
-.daily-note-item:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  background: var(--hover);
 }
 
 .daily-note-title {

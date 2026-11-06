@@ -254,10 +254,6 @@
   text-align: left;
 }
 
-.library-reference-diagnosis-main:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  padding: 4px;
-}
-
 .library-reference-diagnosis-main strong,
 .library-reference-diagnosis-main span {
   display: block;

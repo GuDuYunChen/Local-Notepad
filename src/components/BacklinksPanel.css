@@ -9,8 +9,6 @@
 .local-backlinks input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { padding:8px 9px; border:1px solid var(--line,#d2d7df); border-radius:6px; background:var(--surface,#fff); color:inherit; font:inherit; font-size:13px; }
 .inspector-panel .local-backlinks .backlinks-list { max-height:280px !important; overflow:auto; display:flex; flex-direction:column; gap:6px; }
 .local-backlinks .backlink-source-select { display:flex; flex-direction:column; align-items:flex-start; gap:5px; text-align:left; width:100%; min-width:0; cursor:pointer; }
-.local-backlinks .backlink-source-select:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { padding:10px; border:1px solid var(--line,#d2d7df); border-radius:6px; font:inherit; color:inherit; background:transparent; }
-.local-backlinks .backlink-source-select[aria-pressed=true]:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { border-color:var(--clay,#9a6a4b); box-shadow:inset 3px 0 var(--clay,#9a6a4b); }
 .local-backlinks .backlink-source-select strong { font-size:13px; overflow-wrap:anywhere; }
 .local-backlinks .backlink-source-select span { font-size:12px; color:var(--ink-soft,#646e7d); overflow-wrap:anywhere; }
 .local-backlinks .backlink-detail { margin-top:18px; border-top:1px solid var(--line,#d2d7df); min-width:0; }

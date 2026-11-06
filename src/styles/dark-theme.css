@@ -136,25 +136,6 @@ html[data-theme="dark"] :is(button, a[href], input, select, textarea, [tabindex]
   outline: 2px solid var(--clay) !important;
   outline-offset: 2px;
 }
-html[data-theme="dark"] .btn:not(.primary):not(.danger):where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  color: var(--ink-soft);
-  border-color: var(--control-border);
-}
-html[data-theme="dark"] .btn:not(.primary):not(.danger):hover:not(:disabled):where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  background: var(--surface-hover);
-  color: var(--ink);
-}
-html[data-theme="dark"] :is(.btn.primary, .file-new-btn):where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  background: var(--action-fill) !important;
-  color: var(--on-accent) !important;
-  border-color: var(--action-fill) !important;
-  box-shadow: none;
-}
-html[data-theme="dark"] :is(.btn.primary, .file-new-btn):hover:not(:disabled):where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  background: var(--action-hover) !important;
-  color: var(--on-accent) !important;
-  border-color: var(--action-hover) !important;
-}
 html[data-theme="dark"] .btn.danger:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   background: var(--danger-light);
   color: var(--danger);
@@ -241,12 +222,6 @@ html[data-theme="dark"] .project-entity-alias-conflicts span {
 }
 
 /* The brand asset is identical on both themes, including the collapsed sidebar. */
-html .workspace-sidebar .workspace-brand-mark:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  background: transparent !important;
-  border: 0;
-  box-shadow: none !important;
-  padding: 0;
-}
 html .workspace-sidebar .workspace-brand-mark img {
   display: block;
   width: 100%;
@@ -256,11 +231,6 @@ html .workspace-sidebar .workspace-brand-mark img {
 }
 
 @media (forced-colors: active) {
-  html[data-theme="dark"] :is(.btn.primary, .file-new-btn):where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-    background: ButtonFace !important;
-    color: ButtonText !important;
-    border: 1px solid ButtonText !important;
-  }
   html[data-theme="dark"] .editor-shell .code-preview {
     background: Canvas !important;
     color: CanvasText !important;

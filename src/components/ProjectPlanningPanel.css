@@ -308,14 +308,6 @@
   cursor: pointer;
 }
 
-.project-queue-open:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  padding: 1px 2px;
-  border: 0;
-  background: transparent;
-  color: var(--ink-soft);
-  font: inherit;
-}
-
 .project-queue-open strong,
 .project-queue-open small {
   display: block;

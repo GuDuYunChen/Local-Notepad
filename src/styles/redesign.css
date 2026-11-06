@@ -187,25 +187,6 @@ body {
   cursor: pointer;
 }
 
-.icon-btn:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  height: 32px;
-  padding: 0;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--ink-soft);
-}
-
-.icon-btn:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  color: var(--ink);
-  background: var(--surface-hover);
-}
-
-.icon-btn.active:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  color: var(--clay);
-  background: var(--clay-light);
-}
-
 .workspace-frame {
   min-height: 0;
   flex: 1;
@@ -523,12 +504,6 @@ body {
   margin-bottom: 3px;
 }
 
-.workspace-content > .daily-notes-panel .daily-note-item:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  min-height: 42px;
-  padding: 8px 10px;
-  border-radius: 8px;
-}
-
 .editor-shell {
   background: var(--surface) !important;
 }
@@ -609,14 +584,6 @@ body {
   cursor: pointer;
 }
 
-.status-retry-btn:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--red);
-  font: inherit;
-}
-
 .status-right {
   display: inline-flex;
   align-items: center;
@@ -687,13 +654,6 @@ body {
   opacity: 0.84;
 }
 
-.focus-exit-floating:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  padding: 7px 10px !important;
-  border-radius: 8px !important;
-  background: var(--ink) !important;
-  box-shadow: var(--shadow-raised) !important;
-}
-
 .focus-exit-floating:hover {
   opacity: 1;
 }
@@ -750,11 +710,6 @@ body {
 
 .compact-toolbar .icon-only {
   width: 30px;
-}
-
-.compact-toolbar .icon-only:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  padding: 0 !important;
-  font-size: 17px;
 }
 
 .compact-toolbar .compact-format .btn {
@@ -954,13 +909,6 @@ body {
   gap: 5px !important;
 }
 
-.file-new-btn:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  height: 30px !important;
-  padding: 0 9px !important;
-  border-radius: 7px !important;
-  font-size: 11px !important;
-}
-
 .file-more-wrap,
 .file-new-wrap {
   position: relative;
@@ -995,23 +943,6 @@ body {
   gap: 8px;
 }
 
-.file-action-menu .menu-item:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  min-height: 32px;
-  padding: 6px 8px !important;
-  border-radius: 6px;
-  color: var(--ink-soft);
-  font-size: 11px;
-}
-
-.file-action-menu .menu-item:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  color: var(--ink);
-  background: var(--surface-hover);
-}
-
-.file-action-menu .menu-item.danger:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  color: var(--red);
-}
-
 .file-action-menu kbd {
   margin-left: auto;
   padding: 2px 5px;
@@ -1044,32 +975,6 @@ body {
   width: 100%;
 }
 
-.file-search-input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  height: 32px;
-  padding: 0 30px 0 29px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  outline: none;
-  background: var(--surface);
-  color: var(--ink);
-  font: inherit;
-  font-size: 11px;
-  box-shadow: none;
-}
-
-.file-search-input:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  border-color: var(--line-strong);
-}
-
-.file-search-input:focus:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  border-color: var(--line-strong);
-  box-shadow: 0 0 0 2px var(--clay-light);
-}
-
-.file-search-input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *))::placeholder {
-  color: var(--ink-muted);
-}
-
 .file-search-clear {
   position: absolute;
   top: 50%;
@@ -1077,23 +982,6 @@ body {
   z-index: 4;
   width: 20px;
   cursor: pointer;
-}
-
-.file-search-clear:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  height: 20px;
-  padding: 0;
-  transform: translateY(-50%);
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  color: var(--ink-muted);
-  font-size: 14px;
-  line-height: 1;
-}
-
-.file-search-clear:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  background: var(--surface-hover);
-  color: var(--ink);
 }
 
 .file-sidebar .tree-list {
@@ -1270,20 +1158,6 @@ body {
   gap: 10px;
   text-align: left;
   cursor: pointer;
-}
-
-.daily-recent-card .daily-note-item:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  min-height: 48px !important;
-  padding: 7px 8px !important;
-  border: 0;
-  border-top: 1px solid var(--line);
-  border-radius: 0 !important;
-  background: transparent;
-  color: var(--ink);
-}
-
-.daily-recent-card .daily-note-item:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  background: var(--surface-hover);
 }
 
 .daily-note-date {
@@ -1598,13 +1472,6 @@ body {
   cursor: pointer;
 }
 
-.version-select-action:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  padding: 5px 6px;
-  border: 0;
-  background: transparent;
-  color: inherit;
-}
-
 .version-item-main {
   min-width: 0;
   display: flex;
@@ -1629,21 +1496,6 @@ body {
 .version-restore-action {
   min-width: 42px;
   cursor: pointer;
-}
-
-.version-restore-action:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  height: 26px;
-  padding: 0 7px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--surface);
-  color: var(--ink-soft);
-  font-size: 9px;
-}
-
-.version-restore-action:hover:not(:disabled):where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  border-color: var(--line-strong);
-  color: var(--clay);
 }
 
 .version-restore-action:disabled {
@@ -2314,37 +2166,10 @@ body {
   cursor: text;
 }
 
-.workspace-title-button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  padding: 3px 5px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--ink);
-  font: inherit;
-  font-size: 13px;
-}
-
-.workspace-title-button:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  background: var(--surface-hover);
-}
-
 .workspace-title-input {
   width: min(52vw, 560px);
   min-width: 180px;
   font-weight: 650;
-}
-
-.workspace-title-input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  height: 30px;
-  padding: 0 7px;
-  border: 1px solid var(--line-strong);
-  border-radius: 7px;
-  outline: 0;
-  background: var(--surface);
-  color: var(--ink);
-  font: inherit;
-  font-size: 13px;
-  box-shadow: 0 0 0 2px var(--clay-light);
 }
 
 .workspace-save-chip {
@@ -2417,29 +2242,6 @@ body {
   justify-content: center;
   gap: 6px;
   cursor: pointer;
-}
-
-.inspector-action-btn:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  min-height: 34px;
-  padding: 6px 8px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface);
-  color: var(--ink-soft);
-  font: inherit;
-  font-size: 10px;
-}
-
-.inspector-action-btn:hover:not(:disabled):where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  border-color: var(--line-strong);
-  background: var(--surface-hover);
-  color: var(--ink);
-}
-
-.inspector-action-btn.active:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  border-color: var(--clay-medium);
-  background: var(--clay-light);
-  color: var(--clay);
 }
 
 .inspector-action-btn:disabled {
@@ -2779,16 +2581,6 @@ body {
   color: var(--red);
 }
 
-.btn.danger.subtle:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  border-color: transparent;
-  background: transparent;
-}
-
-.btn.danger.subtle:hover:not(:disabled):where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  border-color: var(--red);
-  background: var(--red-light);
-}
-
 .trash-empty {
   min-height: 60vh;
 }
@@ -3074,12 +2866,6 @@ body {
   font-weight: 600;
 }
 
-.settings-card .theme-toggle:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  border: 1px solid var(--line) !important;
-  background: var(--surface) !important;
-  color: var(--ink-soft) !important;
-}
-
 @media (max-width: 760px) {
   .settings-content {
     padding: 12px;
@@ -3333,21 +3119,6 @@ body {
   cursor: pointer;
 }
 
-.settings-advanced-toggle:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  min-height: 44px;
-  padding: 0 2px;
-  border: 0;
-  border-top: 1px solid var(--line);
-  background: transparent;
-  color: var(--ink-soft);
-  font: inherit;
-  font-size: 12px;
-}
-
-.settings-advanced-toggle:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  color: var(--ink);
-}
-
 .settings-advanced-panel {
   padding-top: 10px;
   border-top: 1px solid var(--line);
@@ -3430,20 +3201,8 @@ body {
   font-weight: 680;
 }
 
-.workspace-title-button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  padding: 5px 7px;
-  border-radius: 8px;
-  font-size: 14px !important;
-}
-
 .workspace-title-input {
   width: min(58vw, 720px);
-}
-
-.workspace-title-input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  height: 34px;
-  font-size: 14px;
-  border-radius: 9px;
 }
 
 .workspace-save-chip {
@@ -3483,14 +3242,6 @@ body {
   font-weight: 650 !important;
 }
 
-.file-new-btn:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  height: 34px !important;
-  padding: 0 11px !important;
-  border-radius: 9px !important;
-  font-size: 12px !important;
-  box-shadow: 0 5px 14px var(--clay-medium);
-}
-
 .file-more-btn {
   width: 34px;
   height: 34px;
@@ -3499,14 +3250,6 @@ body {
 
 .file-search-row {
   margin-top: 12px;
-}
-
-.file-search-input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  height: 36px;
-  padding-left: 31px;
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--surface) 88%, var(--paper));
-  font-size: 12px;
 }
 
 .file-sidebar .tree-list {
@@ -3729,16 +3472,6 @@ body {
   flex: 1;
 }
 
-.name-dialog-input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  height: 40px !important;
-  padding: 0 12px !important;
-  border: 0 !important;
-  outline: 0 !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  font-size: 14px !important;
-}
-
 .name-dialog .static-ext {
   flex: 0 0 auto;
   margin-right: 11px;
@@ -3756,20 +3489,6 @@ body {
   align-items: center;
   justify-content: space-between;
   cursor: pointer;
-}
-
-.name-dialog-options-toggle:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  min-height: 36px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--ink-muted);
-  font: inherit;
-  font-size: 11px;
-}
-
-.name-dialog-options-toggle:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  color: var(--ink);
 }
 
 .name-dialog-options {
@@ -3817,16 +3536,6 @@ body {
 
 .name-dialog-option-row .select {
   max-width: 164px;
-}
-
-.name-dialog-option-row .select:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  min-height: 32px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface);
-  color: var(--ink);
-  font: inherit;
-  font-size: 11px;
 }
 
 .consumer-modal .modal-error {
@@ -4413,23 +4122,12 @@ body {
   font-weight: 620;
 }
 
-.consumer-document-header .workspace-title-button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  padding: 4px 5px;
-  font-size: 13px !important;
-}
-
 .consumer-document-header .workspace-header-actions {
   gap: 2px;
 }
 
 .consumer-document-header .icon-btn {
   width: 30px;
-}
-
-.consumer-document-header .icon-btn:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  height: 30px;
-  border-radius: 8px;
-  color: var(--ink-muted);
 }
 
 .workspace-save-chip {
@@ -4527,20 +4225,6 @@ body {
 .file-library-title {
   font-size: 14px;
   font-weight: 680;
-}
-
-.file-new-btn:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  box-shadow: none !important;
-}
-
-.file-search-input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  border-color: transparent;
-  background: var(--surface);
-}
-
-.file-search-input:focus:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  border-color: var(--line-strong);
-  box-shadow: 0 0 0 2px var(--paper-deep);
 }
 
 .file-sidebar .list-item.active {
@@ -4642,10 +4326,6 @@ body {
   min-width: 32px !important;
 }
 
-.rail-more-theme .theme-toggle:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  height: 32px !important;
-}
-
 
 /* -------------------------------------------------------------------------- */
 /* Consumer v4 — finished workspace layout                                     */
@@ -4741,27 +4421,10 @@ body {
   min-width: 30px !important;
 }
 
-.product-editor-toolbar .btn.icon-only:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  padding: 0 !important;
-}
-
 .product-editor-toolbar .toolbar-block-select {
   width: 104px;
   min-width: 104px;
   font-weight: 620;
-}
-
-.product-editor-toolbar .toolbar-block-select:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  padding-left: 9px !important;
-  padding-right: 24px !important;
-  border-color: transparent !important;
-  background-color: transparent !important;
-}
-
-.product-editor-toolbar .toolbar-block-select:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
-.product-editor-toolbar .toolbar-block-select:focus:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  border-color: var(--line) !important;
-  background-color: var(--surface) !important;
 }
 
 .product-editor-toolbar .toolbar-text-btn {
@@ -4804,12 +4467,6 @@ body {
   min-width: 0;
 }
 
-.toolbar-link-popover .input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  height: 32px;
-  border-radius: 8px;
-  font-size: 11px;
-}
-
 .toolbar-more-trigger {
   min-width: 62px !important;
 }
@@ -4849,20 +4506,12 @@ body {
     position: relative;
   }
 
-  .product-editor-toolbar .toolbar-structure .toolbar-text-btn:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-    padding: 0 !important;
-  }
-
   .product-editor-toolbar .toolbar-structure .toolbar-text-btn::after {
     position: absolute;
     inset: 0;
     display: grid;
     place-items: center;
     text-indent: 0;
-  }
-
-  .product-editor-toolbar .toolbar-structure .toolbar-text-btn:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *))::after {
-    font-size: 12px;
   }
 
   .product-editor-toolbar .toolbar-structure .toolbar-text-btn:nth-child(1)::after {
@@ -4948,14 +4597,6 @@ body {
   cursor: pointer;
 }
 
-.workspace-brand-mark:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  height: 34px;
-  padding: 0;
-  border: 0;
-  border-radius: 10px;
-  background: transparent;
-}
-
 .workspace-brand-mark img {
   width: 34px;
   height: 34px;
@@ -4992,31 +4633,10 @@ body {
   cursor: pointer;
 }
 
-.workspace-sidebar-collapse:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
-.workspace-sidebar-expand:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
-.workspace-sidebar-icon-btn:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  border: 0;
-  background: transparent;
-  color: var(--ink-muted);
-}
-
 .workspace-sidebar-collapse {
   width: 28px;
   display: grid;
   place-items: center;
-}
-
-.workspace-sidebar-collapse:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  height: 28px;
-  border-radius: 8px;
-  font-size: 18px;
-}
-
-.workspace-sidebar-collapse:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
-.workspace-sidebar-expand:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
-.workspace-sidebar-icon-btn:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  background: var(--surface-hover);
-  color: var(--ink);
 }
 
 .workspace-sidebar-search {
@@ -5026,23 +4646,6 @@ body {
   align-items: center;
   gap: 8px;
   cursor: pointer;
-}
-
-.workspace-sidebar-search:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  height: 36px;
-  padding: 0 9px;
-  border: 1px solid transparent;
-  border-radius: 9px;
-  background: color-mix(in srgb, var(--surface) 78%, transparent);
-  color: var(--ink-muted);
-  font: inherit;
-  font-size: 11px;
-}
-
-.workspace-sidebar-search:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  border-color: var(--line);
-  background: var(--surface);
-  color: var(--ink-soft);
 }
 
 .workspace-sidebar-search span {
@@ -5190,11 +4793,6 @@ body {
   min-width: 30px !important;
 }
 
-.workspace-sidebar-theme .theme-toggle:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  height: 30px !important;
-  padding: 0 !important;
-}
-
 .workspace-sidebar.collapsed {
   width: 52px !important;
   min-width: 52px !important;
@@ -5217,22 +4815,12 @@ body {
   flex-basis: 34px;
 }
 
-.workspace-sidebar.collapsed .workspace-brand-mark:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  height: 34px;
-}
-
 .workspace-sidebar-icon-btn,
 .workspace-sidebar-expand {
   width: 38px;
   margin: 5px auto 0;
   display: grid;
   place-items: center;
-}
-
-.workspace-sidebar-icon-btn:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
-.workspace-sidebar-expand:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  height: 38px;
-  border-radius: 9px;
 }
 
 .workspace-sidebar.collapsed .workspace-sidebar-nav {
@@ -5342,40 +4930,6 @@ body {
   gap: 9px;
   text-align: left;
   cursor: pointer;
-}
-
-.file-action-menu .menu-item:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
-.file-context-menu .menu-item:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  min-height: 38px;
-  padding: 7px 9px !important;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--ink-soft);
-  font: inherit;
-  font-size: 11px;
-}
-
-.file-action-menu .menu-item:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
-.file-action-menu .menu-item:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
-.file-context-menu .menu-item:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
-.file-context-menu .menu-item:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  outline: 0;
-  background: var(--surface-hover);
-  color: var(--ink);
-}
-
-.file-action-menu .menu-item.danger:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
-.file-context-menu .menu-item.danger:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  color: var(--red);
-}
-
-.file-action-menu .menu-item.danger:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
-.file-action-menu .menu-item.danger:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
-.file-context-menu .menu-item.danger:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
-.file-context-menu .menu-item.danger:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  background: var(--red-light);
-  color: var(--red);
 }
 
 .menu-item-icon {
@@ -5646,20 +5200,6 @@ body {
   display: grid !important;
   place-items: center !important;
   cursor: pointer !important;
-}
-
-.selector-tree-toggle:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  height: 22px !important;
-  padding: 0 !important;
-  border: 0 !important;
-  border-radius: 6px !important;
-  background: transparent !important;
-  color: var(--ink-muted) !important;
-}
-
-.selector-tree-toggle:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  background: var(--surface-hover) !important;
-  color: var(--ink) !important;
 }
 
 .selector-tree input[type="checkbox"] {

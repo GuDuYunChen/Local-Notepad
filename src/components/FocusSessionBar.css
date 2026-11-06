@@ -106,12 +106,6 @@
   color: var(--ink);
 }
 
-.focus-session-actions button.primary:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  border-color: var(--clay);
-  background: var(--clay);
-  color: #fff;
-}
-
 .focus-session-active .editor-toolbar,
 .focus-session-active .editor-status-bar {
   display: none !important;

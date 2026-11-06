@@ -1,14 +1,12 @@
 /* Scoped controls reuse the app's palette, including dark and high-contrast modes. */
 .sync-clock-controls{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:12px 0 8px;min-width:0;color:var(--ink);font-size:12px;line-height:1.7}
 .sync-overview .sync-clock-controls .btn.sync-clock-button:not(.primary):not(.danger){white-space:normal}
-.sync-overview .sync-clock-controls .btn.sync-clock-button:not(.primary):not(.danger):where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)){color:var(--ink);min-height:44px}
 .sync-clock-controls .sync-clock-button[aria-pressed="true"]{font-weight:600}
-.sync-clock-controls .sync-clock-button[aria-pressed="true"]:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)){border-color:var(--clay);box-shadow:inset 0 -2px 0 var(--clay)}
 .sync-clock-zone{overflow-wrap:anywhere;color:var(--ink-soft);min-width:0}
 .sync-clock-note{margin:0 0 12px;color:var(--ink-soft);font-size:12px;line-height:1.7;overflow-wrap:anywhere}
 .sync-clock-fallback{color:var(--ink);font-size:13px;line-height:1.7;overflow-wrap:anywhere}
 .sync-overview-time time{overflow-wrap:anywhere}
-@media(forced-colors:active){.sync-clock-controls .sync-clock-button[aria-pressed="true"]:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)){outline:2px solid Highlight;outline-offset:2px}}
+@media(forced-colors:active){}
 
 .sync-clock-preference{margin:0 0 12px;min-width:0;color:var(--ink);font-size:12px;line-height:1.7}
 .sync-clock-preference>summary{padding:8px 0;cursor:pointer;min-height:36px;box-sizing:border-box;overflow-wrap:anywhere}
@@ -16,7 +14,6 @@
 .sync-clock-preference>summary:focus-visible{outline:2px solid var(--clay);outline-offset:2px}
 .sync-clock-preference-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:4px 0}
 .sync-overview .sync-clock-preference .btn.sync-clock-preference-button:not(.primary):not(.danger){white-space:normal}
-.sync-overview .sync-clock-preference .btn.sync-clock-preference-button:not(.primary):not(.danger):where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)){color:var(--ink);min-height:44px}
 .sync-clock-preference-summary{flex-basis:100%;color:var(--ink-soft);overflow-wrap:anywhere}
 .sync-clock-preference-error{margin:0 0 12px;color:var(--ink);font-size:13px;line-height:1.7;overflow-wrap:anywhere}
 
@@ -24,7 +21,4 @@
 .sync-clock-preference-receipt{margin:0 0 12px;color:var(--ink);font-size:13px;line-height:1.7;overflow-wrap:anywhere}
 
 /* Keep keyboard focus on the operated control, not on the advisory live region. */
-.sync-overview .sync-clock-button:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
-.sync-overview .sync-clock-preference-button:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)){outline:2px solid var(--clay);outline-offset:2px}
-@media(forced-colors:active){.sync-overview .sync-clock-button:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
-.sync-overview .sync-clock-preference-button:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)){outline-color:Highlight}}
+@media(forced-colors:active){}

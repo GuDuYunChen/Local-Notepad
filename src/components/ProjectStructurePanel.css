@@ -614,18 +614,6 @@
   cursor: pointer;
 }
 
-.project-storyline-event .remove:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  border: 0;
-  border-left: 1px solid var(--line);
-  background: transparent;
-  color: var(--ink-muted);
-  font: inherit;
-}
-
-.project-storyline-event .remove:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  color: #a63b3b;
-}
-
 .project-storyline-lane-empty {
   padding: 7px;
   color: var(--ink-muted);
@@ -883,10 +871,6 @@
   border-color: var(--line);
 }
 
-.project-storyline-rhythm-list button.attention:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  border-color: color-mix(in srgb, #b97820 20%, var(--line));
-}
-
 .project-storyline-rhythm-list button > span {
   min-width: 0;
   flex: 1;
@@ -962,11 +946,6 @@
   color: var(--ink-soft);
   font: inherit;
   font-size: 7px;
-}
-
-.project-storyline-hotspots button.overloaded:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  border-color: color-mix(in srgb, #b97820 28%, var(--line));
-  background: color-mix(in srgb, #b97820 5%, var(--paper));
 }
 
 .project-storyline-hotspots button b {

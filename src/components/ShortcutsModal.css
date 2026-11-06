@@ -42,14 +42,10 @@
 .local-shortcuts-command small { display: block; margin-top: 3px; color: var(--ink-soft); font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
 .local-shortcuts-changed { display: inline-block; padding: 1px 5px; border-radius: 5px; color: var(--clay); background: var(--clay-light); font-size: 10px; font-weight: 500; }
 .local-shortcuts-binding { display: flex; justify-content: space-between; align-items: center; gap: 8px; min-width: 0; }
-.local-shortcuts-binding:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { min-height: 36px; padding: 7px 9px; border: 1px solid var(--line-strong); border-radius: 7px; color: var(--ink); background: var(--paper); font: inherit; }
-.local-shortcuts-binding:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { border-color: var(--clay); background: var(--surface-hover); }
 .local-shortcuts-binding kbd { font-size: 12px; overflow-wrap: anywhere; text-align: left; }
 .local-shortcuts-binding > span { flex: none; color: var(--ink-soft); font-size: 10px; }
 .local-shortcuts-row-actions { display: flex; justify-content: flex-end; gap: 5px; }
 .local-shortcuts-text-button { white-space: nowrap; }
-.local-shortcuts-text-button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { border: 0; border-radius: 5px; padding: 4px; color: var(--ink-soft); background: transparent; font: inherit; font-size: 11px; }
-.local-shortcuts-text-button:hover:not(:disabled):where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { color: var(--clay); background: var(--clay-light); }
 
 .local-shortcuts-recorder-panel { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 8px; margin: 4px -2px 0; padding: 14px; border: 1px solid var(--clay-medium); border-radius: 8px; background: var(--paper); }
 .local-shortcuts-recorder-panel > label { font-size: 12px; font-weight: 600; }
@@ -75,7 +71,6 @@
 .local-shortcuts-footer { flex: none; border-top: 1px solid var(--line); padding: 12px 24px 18px; background: var(--surface); }
 .local-shortcuts-status { min-height: 18px; margin-bottom: 8px; color: var(--ink-soft); font-size: 12px; line-height: 1.5; }
 .local-shortcuts-footer-actions { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-.local-shortcuts-footer-actions > .local-shortcuts-text-button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { font-size: 12px; }
 .local-shortcuts-footer-actions > div { display: flex; gap: 8px; }
 .local-shortcuts-footer .btn { min-width: 72px; }
 .local-shortcuts-footer .btn:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { min-height: 36px; font-size: 12px; }

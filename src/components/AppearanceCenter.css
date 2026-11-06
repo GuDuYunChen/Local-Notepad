@@ -40,8 +40,6 @@
 .appearance-confirm button + button { margin-left: 8px; }
 .appearance-footer { border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 14px 24px; }
 .appearance-footer > span { margin-right: auto; color: var(--ink-soft); font-size: 13px; }
-.appearance-center .appearance-apply:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { background: var(--clay); color: var(--on-accent, #fff); border-color: var(--clay); }
-.appearance-center .appearance-apply:hover:not(:disabled):where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { background: var(--clay-hover); }
 @media (max-width: 600px) {
   .appearance-overlay { padding: 8px; }
   .appearance-center { max-height: calc(100dvh - 16px); }

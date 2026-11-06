@@ -736,14 +736,6 @@
   width: auto;
 }
 
-.project-volume-export .project-volume-manage:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  padding: 0 7px;
-}
-
-.project-volume-export .project-volume-create:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  font-size: 11px;
-}
-
 .project-volume-export button {
   width: 25px;
   cursor: pointer;
@@ -988,14 +980,6 @@
   flex: 1;
   text-align: left;
   cursor: pointer;
-}
-
-.project-chapter-open:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  padding: 3px 4px;
-  border: 0;
-  background: transparent;
-  color: var(--ink);
-  font: inherit;
 }
 
 .project-chapter-open strong,
@@ -1447,20 +1431,6 @@
   cursor: text;
 }
 
-.project-chapter-summary:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--ink-muted);
-  font: inherit;
-  font-size: 7px;
-  line-height: 1.45;
-}
-
-.project-chapter-summary:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  color: var(--ink-soft);
-}
-
 .project-chapter-summary-editor {
   margin: 3px 4px 4px;
 }
@@ -1576,10 +1546,6 @@
 
   .project-workspace-toolbar-actions select {
     max-width: min(42vw, 150px);
-  }
-
-  .project-actions-trigger:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-    padding-inline: 7px !important;
   }
 
   .project-actions-trigger span {
@@ -1704,10 +1670,6 @@
   .project-chapter-quick-actions {
     opacity: 1;
     transform: none;
-  }
-
-  .project-volume-export .project-volume-manage:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-    padding-inline: 6px;
   }
 }
 

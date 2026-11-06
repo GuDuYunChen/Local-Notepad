@@ -264,27 +264,6 @@ body {
   transition: background-color 0.15s, color 0.15s;
 }
 
-.header-btn:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  height: 30px;
-  padding: 0 8px;
-  font-size: 12px;
-  border-radius: var(--radius-sm);
-  border: none;
-  background: transparent;
-  color: var(--ink-soft);
-}
-
-.header-btn:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  background: var(--hover-bg);
-  color: var(--ink);
-}
-
-.header-btn.active:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  color: var(--clay);
-  background: var(--clay-light);
-  box-shadow: inset 0 0 0 1px rgba(110, 89, 217, 0.08);
-}
-
 .app.focus-mode .app-header,
 .app.focus-mode .sidebar,
 .app.focus-mode .resizer { display: none; }
@@ -303,16 +282,6 @@ body {
   cursor: pointer;
   backdrop-filter: blur(14px);
   transition: opacity 0.2s;
-}
-
-.focus-exit-floating:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  padding: 8px 14px;
-  background: rgba(72, 54, 145, 0.82);
-  color: #fff;
-  border: none;
-  border-radius: var(--radius-sm);
-  font-size: 12px;
-  box-shadow: var(--shadow-pop);
 }
 
 .focus-exit-floating:hover { opacity: 0.85; }
@@ -523,18 +492,6 @@ body {
   transform: scale(0.97);
 }
 
-.btn.primary:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  background: var(--clay);
-  color: #fff;
-  border-color: var(--clay);
-}
-
-.btn.primary:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  background: var(--clay-hover);
-  border-color: var(--clay-hover);
-  box-shadow: 0 14px 26px rgba(74, 54, 156, 0.18);
-}
-
 .btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
@@ -555,12 +512,6 @@ body {
   color: #fff;
 }
 
-.btn.small:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  height: 26px;
-  padding: 0 8px;
-  font-size: 12px;
-}
-
 .btn:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   outline: 2px solid var(--clay);
   outline-offset: 2px;
@@ -568,22 +519,6 @@ body {
 
 .input {
   transition: border-color 0.2s, box-shadow 0.2s;
-}
-
-.input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  height: 34px;
-  padding: 0 10px;
-  font-size: 13px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--paper);
-  color: var(--ink);
-  outline: none;
-}
-
-.input:focus:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  border-color: var(--clay);
-  box-shadow: 0 0 0 3px var(--clay-light);
 }
 
 /* ===================== TOOLBAR ===================== */
@@ -805,20 +740,6 @@ body {
   gap: 8px;
 }
 
-.menu-item:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  padding: 7px 14px;
-  font-size: 13px;
-  color: var(--ink);
-}
-
-.menu-item:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  background: var(--clay);
-  color: #fff;
-}
-
-.menu-item.danger:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { color: var(--red); }
-.menu-item.danger:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { background: var(--red); color: #fff; }
-
 /* ===================== MISC ===================== */
 
 .error-boundary {
@@ -902,20 +823,6 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.close-btn:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  height: 28px;
-  border: none;
-  background: transparent;
-  font-size: 18px;
-  color: var(--ink-muted);
-  border-radius: var(--radius-sm);
-}
-
-.close-btn:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  background: var(--hover-bg);
-  color: var(--ink);
 }
 
 .shortcut-group { margin-bottom: 16px; }

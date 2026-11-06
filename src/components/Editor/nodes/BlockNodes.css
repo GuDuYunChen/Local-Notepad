@@ -16,10 +16,6 @@
   text-decoration: line-through;
 }
 
-.todo-block.checked .todo-text:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  color: var(--muted, #6b7280);
-}
-
 .todo-checkbox {
   width: 18px;
   height: 18px;
@@ -33,28 +29,8 @@
   cursor: text;
 }
 
-.todo-text:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  font-size: 14px;
-  color: var(--fg, #1f2d3d);
-  min-height: 20px;
-}
-
 .todo-input {
   flex: 1;
-}
-
-.todo-input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  font-size: 14px;
-  padding: 4px 8px;
-  border: 1px solid var(--border-color, rgba(0,0,0,0.12));
-  border-radius: 4px;
-  background: var(--panel, #fff);
-  color: var(--fg, #1f2d3d);
-  outline: none;
-}
-
-.todo-input:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  border-color: var(--accent, #7e5bef);
 }
 
 .divider-block {
@@ -87,18 +63,6 @@
   justify-content: center;
   cursor: pointer;
   transition: background-color 0.15s ease;
-}
-
-.callout-icon-btn:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  height: 32px;
-  background: transparent;
-  border: none;
-  border-radius: 6px;
-  font-size: 18px;
-}
-
-.callout-icon-btn:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  background-color: var(--toolbar-btn-hover, rgba(0,0,0,0.06));
 }
 
 .callout-icon-picker {
@@ -137,18 +101,6 @@
   transition: background-color 0.15s ease;
 }
 
-.callout-icon-option:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  height: 32px;
-  background: transparent;
-  border: none;
-  border-radius: 4px;
-  font-size: 16px;
-}
-
-.callout-icon-option:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  background-color: var(--toolbar-btn-hover, rgba(0,0,0,0.06));
-}
-
 .callout-content {
   flex: 1;
   min-width: 0;
@@ -157,22 +109,6 @@
 .callout-textarea {
   width: 100%;
   resize: vertical;
-}
-
-.callout-textarea:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  min-height: 60px;
-  padding: 8px;
-  border: none;
-  background: transparent;
-  color: var(--fg, #1f2d3d);
-  font-size: 14px;
-  line-height: 1.6;
-  outline: none;
-  font-family: inherit;
-}
-
-.callout-textarea:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *))::placeholder {
-  color: var(--muted, #6b7280);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -246,23 +182,6 @@
   resize: vertical;
 }
 
-.toggle-textarea:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  min-height: 80px;
-  padding: 8px;
-  border: 1px solid var(--border-color, rgba(0,0,0,0.12));
-  border-radius: 4px;
-  background: transparent;
-  color: var(--fg, #1f2d3d);
-  font-size: 14px;
-  line-height: 1.6;
-  outline: none;
-  font-family: inherit;
-}
-
-.toggle-textarea:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  border-color: var(--accent, #7e5bef);
-}
-
 .embed-block {
   margin: 12px 0;
   border: 1px solid var(--border-color, rgba(0,0,0,0.12));
@@ -282,38 +201,11 @@
   width: 100%;
 }
 
-.embed-input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  padding: 10px 12px;
-  border: 1px solid var(--border-color, rgba(0,0,0,0.12));
-  border-radius: 6px;
-  background: var(--bg, #faf9f7);
-  color: var(--fg, #1f2d3d);
-  font-size: 14px;
-  outline: none;
-}
-
-.embed-input:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  border-color: var(--accent, #7e5bef);
-}
-
 .embed-save-btn {
   align-self: flex-end;
   font-weight: 500;
   cursor: pointer;
   transition: background-color 0.15s ease;
-}
-
-.embed-save-btn:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  padding: 8px 16px;
-  background: var(--accent, #7e5bef);
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  font-size: 14px;
-}
-
-.embed-save-btn:hover:not(:disabled):where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  background: var(--accent-hover, #6b4bd6);
 }
 
 .embed-save-btn:disabled {
@@ -350,19 +242,6 @@
   transition: background-color 0.15s ease;
 }
 
-.embed-edit-btn:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  padding: 8px;
-  background: transparent;
-  border: none;
-  border-top: 1px solid var(--border-color, rgba(0,0,0,0.08));
-  color: var(--muted, #6b7280);
-  font-size: 13px;
-}
-
-.embed-edit-btn:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  background: var(--toolbar-btn-hover, rgba(0,0,0,0.04));
-}
-
 @media (prefers-reduced-motion: reduce) {
   .toggle-arrow {
     transition-duration: 0.01ms !important;
@@ -377,22 +256,9 @@
   text-align: left;
   cursor: text;
 }
-.todo-text-button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  padding: 2px 0;
-  border: 0;
-  background: transparent;
-  color: var(--fg, #1f2d3d);
-  font: inherit;
-  font-size: 14px;
-  line-height: 1.55;
-}
 
 .todo-block.checked .todo-text-button {
   text-decoration: line-through;
-}
-
-.todo-block.checked .todo-text-button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  color: var(--muted, #6b7280);
 }
 
 .toggle-header {
@@ -407,32 +273,10 @@
   cursor: pointer;
 }
 
-.toggle-arrow-button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  height: 28px;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--muted, #6b7280);
-}
-
-.toggle-arrow-button:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  background: var(--toolbar-btn-hover, rgba(0,0,0,0.06));
-}
-
 .toggle-title-input {
   min-width: 0;
   flex: 1;
   font-weight: 600;
-}
-
-.toggle-title-input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  padding: 3px 2px;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--fg, #1f2d3d);
-  font: inherit;
-  font-size: 14px;
 }
 
 .toggle-content {
@@ -518,22 +362,6 @@
   cursor: pointer;
 }
 
-.attachment-download:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  height: 32px;
-  padding: 0 10px;
-  border: 1px solid var(--border-color, rgba(0,0,0,.1));
-  border-radius: 8px;
-  background: var(--panel, #fff);
-  color: var(--fg, #1f2d3d);
-  font: inherit;
-  font-size: 10px;
-}
-
-.attachment-download:hover:not(:disabled):where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  border-color: var(--border-strong, rgba(0,0,0,.18));
-  background: var(--toolbar-btn-hover, rgba(0,0,0,.04));
-}
-
 .attachment-download:disabled {
   opacity: .45;
   cursor: default;
@@ -554,27 +382,6 @@
 .attachment-delete-button {
   min-width: 58px;
   cursor: pointer;
-}
-
-.attachment-replace-button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
-.attachment-preview-button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
-.attachment-download:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
-.attachment-delete-button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  height: 32px;
-  padding: 0 10px;
-  border: 1px solid var(--border-color, rgba(0,0,0,.1));
-  border-radius: 8px;
-  background: var(--panel, #fff);
-  color: var(--fg, #1f2d3d);
-  font: inherit;
-  font-size: 10px;
-}
-
-.attachment-replace-button:hover:not(:disabled):where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
-.attachment-preview-button:hover:not(:disabled):where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
-.attachment-download:hover:not(:disabled):where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  border-color: var(--border-strong, rgba(0,0,0,.18));
-  background: var(--toolbar-btn-hover, rgba(0,0,0,.04));
 }
 
 .attachment-replace-button:disabled,
@@ -663,11 +470,6 @@
   width: 32px;
 }
 
-.attachment-preview-close:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  padding: 0 !important;
-  font-size: 18px !important;
-}
-
 .attachment-preview-body {
   min-height: 0;
   flex: 1;
@@ -718,11 +520,6 @@
   .attachment-preview-button,
   .attachment-download {
     min-width: 52px;
-  }
-
-  .attachment-preview-button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
-.attachment-download:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-    padding-inline: 8px;
   }
 }
 
@@ -937,17 +734,4 @@
   place-items: center;
   color: var(--muted, #8b8791);
   font-size: 11px;
-}
-
-
-.attachment-delete-button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
-.attachment-preview-delete:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  color: var(--red, #c7433c) !important;
-}
-
-.attachment-delete-button:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
-.attachment-preview-delete:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  border-color: color-mix(in srgb, var(--red, #c7433c) 28%, var(--border-color, rgba(0,0,0,.1))) !important;
-  background: var(--red-light, rgba(199,67,60,.08)) !important;
-  color: var(--red, #c7433c) !important;
 }

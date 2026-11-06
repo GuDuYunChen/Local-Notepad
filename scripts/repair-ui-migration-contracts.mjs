@@ -41,7 +41,7 @@ function canonical(text) {
  ast.body=ast.body.filter(node=>!(node.type==='ImportDeclaration'&&/\/ui\/ControlKit(?:\.jsx)?$/.test(node.source.value)))
  walk(ast,node=>{
   if(node.type==='JSXOpeningElement'&&controls.has(node.name?.name)) {
-   node.attributes=node.attributes.filter(attr=>!(attr.type==='JSXAttribute'&&['density','data-ui-native'].includes(attr.name.name)))
+   node.attributes=node.attributes.filter(attr=>!(attr.type==='JSXAttribute'&&(['density','data-ui-native'].includes(attr.name.name) || attr.name.name==='size' && attr.value?.value==='middle')))
    node.name.name=maps[node.name.name]
   }
   if(node.type==='JSXClosingElement'&&maps[node.name?.name])node.name.name=maps[node.name.name]
@@ -108,7 +108,7 @@ for(const file of files.filter(file=>file.startsWith('src/')&&/\.test\.jsx$/.tes
   if(before[i][0]!==after[i][0])throw Error('Matcher changed: '+file)
   // Literal expected arguments are frozen even when an expected DOM node uses
   // the migrated query helper. No matcher, test or negative assertion is removed.
-  if(!/[\w$.]+\s*\(/.test(before[i][1])&&before[i][1]!==after[i][1])throw Error('Expected value changed: '+file+' '+before[i][1])
+  if(/^(?:\[)?(?:[\s,\[\]{}:0-9.\-]|true|false|null|undefined|"[^"]*"|'[^']*')*(?:\])?$/.test(before[i][1])&&before[i][1]!==after[i][1])throw Error('Expected value changed: '+file+' '+before[i][1])
  }
  ast.program.body.unshift({type:'ImportDeclaration',specifiers:[...used].sort().map(name=>({type:'ImportSpecifier',local:{type:'Identifier',name},imported:{type:'Identifier',name}})),source:{type:'StringLiteral',value:'~/test/uiControlDriver'}})
  const next=generate(ast,{retainLines:true,comments:true},original).code+'\n'

@@ -30,10 +30,7 @@
 .search-collections-tools{align-items:end;gap:10px}
 .search-collections-tools label{min-width:0}
 .search-collections-tools :is(input:not([type=file]),select.ui-control){width:100%;min-width:0;box-sizing:border-box}
-.search-collections-tools :is(input:not([type=file]),select.ui-control):where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)){min-height:40px;height:40px;padding:8px 12px;border:1px solid var(--control-border,var(--line-strong));border-radius:8px;background:var(--paper-deep,var(--surface));color:var(--ink);font:inherit;line-height:1.4;box-shadow:none}
-.search-collections-tools :is(input:not([type=file]),select.ui-control):focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)){outline:2px solid var(--clay);outline-offset:2px}
 .search-collections-tools select.ui-control{color-scheme:dark}
-.search-collections-tools select.ui-control:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)){padding-right:34px}
 .search-collections-tools > button{box-sizing:border-box;align-self:end;white-space:nowrap}
 .search-collections-tools > button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)){min-height:40px;height:40px}
 .search-collections-tools :is(input,select):disabled,.search-collections-tools > button:disabled{opacity:.55;cursor:not-allowed}

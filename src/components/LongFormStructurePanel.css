@@ -105,15 +105,6 @@
   cursor: pointer;
 }
 
-.long-structure-expand:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  height: 22px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--ink-muted);
-  font: inherit;
-}
-
 .long-structure-expand:disabled {
   cursor: default;
   opacity: .35;

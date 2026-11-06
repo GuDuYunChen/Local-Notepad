@@ -644,18 +644,6 @@
   cursor: pointer;
 }
 
-.project-relation-evolution-list .remove:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  border: 0;
-  border-left: 1px solid var(--line);
-  background: transparent;
-  color: var(--ink-muted);
-  font: inherit;
-}
-
-.project-relation-evolution-list .remove:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  color: #a63b3b;
-}
-
 .project-relation-evolution-list > em {
   color: var(--ink-muted);
   font-size: 7px;
@@ -734,15 +722,6 @@
   display: block;
   text-align: left;
   cursor: pointer;
-}
-
-.project-relation-timeline-chapter:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  padding: 5px;
-  border: 0;
-  border-radius: 6px;
-  background: var(--paper);
-  color: var(--ink-soft);
-  font: inherit;
 }
 
 .project-relation-timeline-chapter b,

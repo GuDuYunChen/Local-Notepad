@@ -345,15 +345,6 @@
   cursor: pointer;
 }
 
-.project-foreshadow-title:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
-  padding: 3px 2px;
-  border: 0;
-  background: transparent;
-  color: var(--ink-soft);
-  font: inherit;
-  font-size: 8px;
-}
-
 .project-foreshadow-state {
   flex: 0 0 auto;
   padding: 2px 6px;

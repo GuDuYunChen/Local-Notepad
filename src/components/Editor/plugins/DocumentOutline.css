@@ -1,6 +1,5 @@
 /* Scoped specificity wins the old compact outline without changing editor CSS. */
 .editor-shell .local-outline .document-outline-toggle { opacity:1; }
-.editor-shell .local-outline .document-outline-toggle:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { font-size:12px; }
 .editor-shell .local-outline .document-outline-panel { width:min(320px,calc(100vw - 40px)); max-height:min(70vh,620px); overflow:auto; }
 .editor-shell .local-outline .document-outline-header { display:flex; align-items:center; flex-direction:row; gap:10px; }
 .editor-shell .local-outline .document-outline-header small { display:block; margin-top:4px; }
@@ -18,7 +17,6 @@
 .editor-shell .local-outline .document-outline-list { max-height:300px; min-height:40px; flex:0 1 auto; overflow:auto; }
 .editor-shell .local-outline .document-outline-anchor { opacity:1; }
 .editor-shell .local-outline .document-outline-item { white-space:normal; overflow-wrap:anywhere; }
-.editor-shell .local-outline .document-outline-item:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { font-size:13px; }
 .editor-shell .local-outline button:disabled { opacity:.5; cursor:default; }
 .editor-shell .local-outline button:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
 .editor-shell .local-outline input:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { outline:2px solid var(--clay); outline-offset:2px; }
