@@ -1,0 +1,88 @@
+name: Repair complete UI migration contracts
+on:
+  push:
+    branches: [fix/local-ui-consistency-2f116]
+    paths: [.github/workflows/ui-migration-contract-repair.yml, scripts/repair-ui-migration-contracts.mjs, scripts/finalize-ui-contract-repair.mjs]
+permissions:
+  contents: write
+concurrency:
+  group: repair-ui-migration-2f116
+  cancel-in-progress: false
+jobs:
+  repair-and-verify-complete-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Install exact dependencies and accepted source for comparison
+        run: |
+          npm ci --no-audit --no-fund
+          git fetch --depth=1 origin 1c8ec5689847a580ce307b9157fbbc8c1ac43a8f
+      - name: Normalize migration-only AST attributes in the contract verifier
+        run: node scripts/finalize-ui-contract-repair.mjs
+      - name: Repair DOM integration while preserving original test assertions
+        run: node scripts/repair-ui-migration-contracts.mjs
+      - name: Preserve same-turn race boundaries and shared interaction policy
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs'
+          const file='src/components/SyncConflictBrowseGuard.test.jsx'
+          let text=fs.readFileSync(file,'utf8')
+          text="import { openUiSelect } from '~/test/uiControlDriver'\n"+text
+          text=text.replaceAll('const oldConfirm = await ready();', "const oldConfirm = await ready(); await act(async () => { for (const label of ['冲突查看顺序','冲突对象类型','冲突关注项']) openUiSelect(field(label)) });")
+          text=text.replace(/const confirm = await ready\(\),\s*selector = field\('冲突查看顺序'\);/, "$& await act(async () => openUiSelect(selector));")
+          fs.writeFileSync(file,text)
+          const kit='src/components/ui/ControlKit.jsx'
+          text=fs.readFileSync(kit,'utf8').replace("import { Button, Input, Select } from 'antd'", "import { Button, Input, Select, ConfigProvider } from 'antd'\nconst quietWave = { disabled: true }")
+          text=text.replace('return <Button {...props}', 'return <ConfigProvider wave={quietWave}><Button {...props}')
+          text=text.replace('onMouseDown={guard(onMouseDown)}>{children}</Button>', 'onMouseDown={guard(onMouseDown)}>{children}</Button></ConfigProvider>')
+          fs.writeFileSync(kit,text)
+          NODE
+      - name: Publish repaired candidate without a force push
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git ls-remote origin refs/heads/fix/local-ui-consistency-2f116 | cut -f1)" = "$GITHUB_SHA"
+          git diff --check
+          git diff --exit-code -- package.json package-lock.json
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src scripts/s3-local-overview-cases.mjs docs/quality/ui-migration-contract-repair.json
+          git commit -m 'fix(ui): preserve semantic controls and migrate real dropdown regression drivers'
+          git push origin HEAD:refs/heads/fix/local-ui-consistency-2f116
+          mkdir -p test-results/ui-contract-repair
+          git rev-parse HEAD > test-results/ui-contract-repair/commit.txt
+      - name: Run complete original test suites and builds
+        shell: bash
+        run: |
+          set +e
+          failed=0
+          run_check() { label="$1"; shift; "$@" > "test-results/ui-contract-repair/$label.log" 2>&1; code=$?; printf '%s\t%s\n' "$label" "$code" | tee -a test-results/ui-contract-repair/results.tsv; if [ "$code" -ne 0 ]; then failed=1; tail -n 16 "test-results/ui-contract-repair/$label.log"; fi; }
+          run_check build-main npm run build:main
+          run_check build-renderer npm run build:renderer
+          run_check full-vitest npx vitest run --root=. --reporter=json --outputFile=test-results/ui-contract-repair/full-vitest.json
+          run_check original-ui npm run test:ui
+          run_check electron npm run test:electron
+          run_check editor npm run test:editor
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs'
+          const file='test-results/ui-contract-repair/full-vitest.json'
+          if(fs.existsSync(file)){const report=JSON.parse(fs.readFileSync(file));console.log('FULL_COUNTS',JSON.stringify({files:report.numTotalTestSuites,tests:report.numTotalTests,passed:report.numPassedTests,failed:report.numFailedTests,pending:report.numPendingTests}));for(const suite of report.testResults||[]){const fails=suite.assertionResults.filter(t=>t.status==='failed');if(fails.length)console.log('FAIL_GROUP',JSON.stringify({file:suite.name.replace(process.cwd()+'/',''),count:fails.length,examples:fails.slice(0,2).map(t=>({name:t.fullName,error:t.failureMessages?.[0]?.slice(0,1000)}))}))}}
+          NODE
+          exit "$failed"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ui-contract-repair-${{ github.sha }}
+          path: |
+            test-results/ui-contract-repair/
+            docs/quality/ui-migration-contract-repair.json
+          retention-days: 30
+          if-no-files-found: warn
