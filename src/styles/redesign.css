@@ -4425,6 +4425,20 @@ body {
   font-weight: 620;
 }
 
+.product-editor-toolbar [data-ui-control="button"],
+.product-editor-toolbar [data-ui-control="select"] {
+  min-height:32px;
+  height:32px;
+  border-radius:8px;
+  font-size:11px;
+}
+.product-editor-toolbar [data-ui-control="select"] > .ant-select {
+  height:32px;
+}
+.product-editor-toolbar [data-ui-control="select"] .ant-select-selector {
+  min-height:32px;
+  height:32px;
+}
 .product-editor-toolbar .toolbar-text-btn {
   white-space: nowrap;
 }
