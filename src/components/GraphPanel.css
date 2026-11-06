@@ -39,7 +39,7 @@
 .local-graph-feedback { margin:8px 16px; padding:9px 12px; border-left:3px solid var(--clay,#9a6a4b); background:var(--paper,#f6f6f4); font-size:13px; line-height:1.6; overflow-wrap:anywhere; }
 .local-graph-feedback.error { border-left-color:var(--danger,#af3b35); }
 .local-graph-stop { margin:8px 16px; align-self:flex-start; }
-.local-graph button:disabled { opacity:.5; cursor:default; }
+.local-graph button:disabled:not(.ant-btn):not([data-ui-control]) { opacity:.5; cursor:default; }
 .local-graph button:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
 .local-graph input:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
 .local-graph select:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { outline:2px solid var(--clay,#9a6a4b); outline-offset:2px; }
