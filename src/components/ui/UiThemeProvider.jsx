@@ -24,7 +24,7 @@ export default function UiThemeProvider({ children }) {
     return () => { observer.disconnect(); cancelAnimationFrame(frame) }
   }, [])
   const configuration = useMemo(() => ({ algorithm: appearance.dark ? theme.darkAlgorithm : theme.defaultAlgorithm,
-    token: { colorPrimary: appearance.primary, colorText: appearance.text, colorTextSecondary: appearance.muted, colorBgContainer: appearance.background,
+    token: { colorPrimary: appearance.primary, colorText: appearance.text, colorTextSecondary: appearance.muted, colorTextPlaceholder: appearance.muted, colorBgContainer: appearance.background,
       colorBgElevated: appearance.background, colorBgLayout: appearance.paper, colorBorder: appearance.border, colorError: appearance.danger,
       fontFamily: appearance.font, fontSize: 14, controlHeight: 40, controlHeightSM: 28, controlHeightLG: 44, borderRadius: 8, motion: false },
     components: {
