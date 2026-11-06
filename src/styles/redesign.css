@@ -1213,8 +1213,8 @@ body {
 }
 
 .graph-search-wrap:focus-within {
-  border-color: var(--line-strong);
-  box-shadow: 0 0 0 2px var(--clay-light);
+  border-color: var(--clay);
+  box-shadow: none;
 }
 
 .graph-search-wrap input {
@@ -3464,7 +3464,7 @@ body {
 
 .name-dialog-input-wrap:focus-within {
   border-color: var(--clay);
-  box-shadow: 0 0 0 3px var(--clay-light);
+  box-shadow: none;
 }
 
 .name-dialog-input {
