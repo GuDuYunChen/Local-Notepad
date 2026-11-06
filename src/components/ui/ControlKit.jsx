@@ -14,7 +14,7 @@ const nativeRef = ref => value => writeRef(ref, inputNode(value))
 const hasClass = (value, token) => String(value || '').split(/\s+/).includes(token)
 const cleanClass = value => String(value || '').split(/\s+/).filter(token => token && true).join(' ')
 // Legacy presentation utility classes must not restyle Ant Design internals.
-const cleanControlClass = value => cleanClass(value).split(' ').filter(token => !['btn','input','select','textarea','small','primary','secondary','danger','ghost','outline'].includes(token)).join(' ')
+const cleanControlClass = value => cleanClass(value).split(' ').filter(token => !['btn','input','select','textarea','small','primary','secondary','danger','ghost','outline','link','dashed','text'].includes(token)).join(' ')
 const controlSize = (size, density, classes) => ['small', 'middle', 'large'].includes(size) ? size : density === 'compact' || hasClass(classes, 'small') ? 'small' : 'middle'
 const errorStatus = props => props.status || (props['aria-invalid'] === true || props['aria-invalid'] === 'true' ? 'error' : undefined)
 
@@ -45,7 +45,7 @@ function useInheritedDisabled(node) {
 
 export const UiButton = forwardRef(function UiButton({ type, htmlType, variant, danger, size, density, className = '', onClick, onMouseDown, ghost, children, ...props }, ref) {
   const structural = /(?:row|item|nav|menu|tab|swatch|handle|close|toggle|icon|chip|pill)/i.test(className) || ['tab', 'menuitem', 'option', 'treeitem'].includes(props.role)
-  const kind = variant || (hasClass(className, 'primary') || type === 'primary' ? 'primary' : structural ? 'text' : 'secondary')
+  const kind = variant || (hasClass(className, 'primary') || type === 'primary' ? 'primary' : hasClass(className, 'link') ? 'link' : hasClass(className, 'dashed') ? 'dashed' : hasClass(className, 'text') || structural ? 'text' : 'secondary')
   const nativeType = htmlType || (['button', 'submit', 'reset'].includes(type) ? type : type === undefined ? 'submit' : 'button')
   const buttonType = kind === 'primary' ? 'primary' : ['text', 'link', 'dashed'].includes(kind) ? kind : 'default'
   const guard = handler => event => { if (props.disabled || fieldsetDisabled(event.currentTarget)) { event.preventDefault(); event.stopPropagation(); return } handler?.(event) }
