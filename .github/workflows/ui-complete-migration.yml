@@ -23,6 +23,10 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.24.11'
+          cache-dependency-path: server/go.sum
       - name: Refuse stale or unrelated source
         shell: bash
         run: |
@@ -35,6 +39,8 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Migrate every tracked production control and isolate legacy paint
         run: node scripts/migrate-ui-2f116.mjs
+      - name: Normalize JSX syntax whitespace without changing handler expressions
+        run: node scripts/ui-migration/normalize-jsx-space.mjs
       - name: Publish one complete source candidate, never force push
         shell: bash
         run: |
@@ -72,6 +78,8 @@ jobs:
           run_check editor npm run test:editor
           run_check full-vitest npx vitest run --root=.
           run_check ui-audit npm run test:ui-audit
+          run_check go-tests go -C server test ./...
+          run_check go-build go -C server build ./cmd/notepad-server
           exit "$failed"
       - name: Preserve full candidate and failed regression evidence
         if: always()
