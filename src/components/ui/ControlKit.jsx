@@ -14,7 +14,7 @@ const nativeRef = ref => value => writeRef(ref, inputNode(value))
 const hasClass = (value, token) => String(value || '').split(/\s+/).includes(token)
 const cleanClass = value => String(value || '').split(/\s+/).filter(token => token && true).join(' ')
 // Legacy presentation utility classes must not restyle Ant Design internals.
-const cleanControlClass = value => cleanClass(value).split(' ').filter(token => !['btn','input','select','textarea','small','primary','secondary','danger','ghost','outline','link','dashed','text'].includes(token)).join(' ')
+const cleanControlClass = value => cleanClass(value).split(' ').filter(token => !['small','primary','secondary','danger','ghost','outline','link','dashed','text'].includes(token)).join(' ')
 const controlSize = (size, density, classes) => ['small', 'middle', 'large'].includes(size) ? size : density === 'compact' || hasClass(classes, 'small') ? 'small' : 'middle'
 const errorStatus = props => props.status || (props['aria-invalid'] === true || props['aria-invalid'] === 'true' ? 'error' : undefined)
 
