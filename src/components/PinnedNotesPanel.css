@@ -29,5 +29,5 @@
 .pinned-workspace button:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
 .pinned-workspace input:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
 .pinned-workspace select:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { outline:2px solid var(--clay,#9a6a4b); outline-offset:3px; }
-.pinned-workspace button:disabled { opacity:.55; cursor:default; }
+.pinned-workspace button:disabled:not(.ant-btn):not([data-ui-control]) { opacity:.55; cursor:default; }
 @media(max-width:760px){.pinned-workspace{padding:16px;}.pinned-content{grid-template-columns:minmax(0,1fr);}.pinned-detail{order:-1}.pinned-tools{align-items:stretch;gap:10px}.pinned-tools label{flex:1 1 160px;min-width:0}.pinned-tools label:first-child{flex:1 1 100%}.pinned-tools .pinned-clear{width:100%}.pinned-header h2{font-size:21px;}}
