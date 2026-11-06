@@ -25,6 +25,9 @@
 .app-ui-button[data-ui-layout="content"] { height:auto; min-height:28px; white-space:normal; text-align:inherit; justify-content:inherit; }
 .app-ui-button[data-ui-layout="content"] > .ant-btn-content { display:contents; }
 .app-ui-validation-field { position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; inset-inline-start:0; bottom:0; }
+/* Toolbar toggle state is semantic state, not a second custom button skin. */
+.app-ui-button.active { color:var(--clay); border-color:var(--clay); background:var(--clay-light); }
+.app-ui-button.active:hover { color:var(--clay); border-color:var(--clay); background:var(--clay-light); }
 /* Real native picker and editor controls retain their browser semantics. */
 input[data-ui-native="file"]::file-selector-button { font:inherit; padding:6px 12px; border:1px solid var(--line-strong); border-radius:6px; color:var(--ink); background:var(--surface); cursor:pointer; }
 input[data-ui-native="file"]:disabled::file-selector-button { cursor:not-allowed; opacity:.55; }
