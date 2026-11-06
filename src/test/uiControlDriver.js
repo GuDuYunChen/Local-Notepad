@@ -32,8 +32,16 @@ export function openUiSelect(node) {
  if(trigger.getAttribute('aria-expanded')!=='true') {
   // Ant Design handles pointer opening on the selector surface, not the
   // nested combobox input. Flush the real bubbling event before reading portal.
-  const surface=trigger.closest('.ant-select')?.querySelector('.ant-select-selector') || trigger
-  flushSync(()=>surface.dispatchEvent(new MouseEvent('mousedown',{bubbles:true,button:0})))
+  // Keyboard opening is the same supported interaction users rely on and
+  // avoids depending on rc-select's pointer implementation details in JSDOM.
+  flushSync(()=>trigger.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true,cancelable:true})))
+  if(trigger.getAttribute('aria-expanded')!=='true') {
+   const surface=trigger.closest('.ant-select')?.querySelector('.ant-select-selector') || trigger
+   flushSync(()=>{
+    surface.dispatchEvent(new MouseEvent('mousedown',{bubbles:true,button:0,cancelable:true}))
+    surface.dispatchEvent(new MouseEvent('click',{bubbles:true,button:0,cancelable:true}))
+   })
+  }
  }
  const popup=popupFor(trigger)
  if(!popup)throw Error('Select menu did not open: '+(trigger.getAttribute('aria-label')||trigger.id))
