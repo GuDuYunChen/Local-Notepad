@@ -50,6 +50,7 @@ export const UiButton = forwardRef(function UiButton({ type, htmlType, variant, 
   const guard = handler => event => { if (props.disabled || fieldsetDisabled(event.currentTarget)) { event.preventDefault(); event.stopPropagation(); return } handler?.(event) }
   return <ConfigProvider wave={quietWave} theme={controlTheme}><Button {...props} ref={nativeRef(ref)} htmlType={nativeType} type={buttonType} danger={danger ?? hasClass(className, 'danger')} ghost={ghost ?? hasClass(className, 'ghost')} autoInsertSpace={false}
     size={controlSize(size, density, className)} data-ui-control="button" data-ui-layout={structural ? 'content' : 'action'}
+    aria-pressed={props['aria-pressed'] ?? (hasClass(className, 'active') ? true : undefined)}
     className={['app-ui-button', cleanControlClass(className)].filter(Boolean).join(' ')} onClick={guard(onClick)} onMouseDown={guard(onMouseDown)}>{children}</Button></ConfigProvider>
 })
 
