@@ -257,7 +257,7 @@ export default function TableReorderPlugin() {
 
   return (
     <>
-      <button
+      <button data-ui-native="editor-pointer-handle"
         type="button"
         className="table-reorder-handle row"
         draggable
@@ -269,7 +269,7 @@ export default function TableReorderPlugin() {
         ⋮⋮
       </button>
 
-      <button
+      <button data-ui-native="editor-pointer-handle"
         type="button"
         className="table-reorder-handle col"
         draggable={handle.colSpan === 1}

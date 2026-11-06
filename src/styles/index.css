@@ -223,14 +223,7 @@ body {
 .app-header .spacer { flex: 1; }
 
 .app-header .btn {
-  height: 30px;
-  padding: 0 8px;
-  font-size: 12px;
   font-weight: 500;
-  border: none;
-  background: transparent;
-  color: var(--ink-soft);
-  border-radius: var(--radius-sm);
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -238,42 +231,55 @@ body {
   transition: background-color 0.15s, color 0.15s, transform 0.15s;
 }
 
-.app-header .btn:hover {
+.app-header .btn:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
+  height: 30px;
+  padding: 0 8px;
+  font-size: 12px;
+  border: none;
+  background: transparent;
+  color: var(--ink-soft);
+  border-radius: var(--radius-sm);
+}
+
+.app-header .btn:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   background: var(--hover-bg);
   color: var(--ink);
 }
 
-.app-header .btn:active {
+.app-header .btn:active:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   transform: scale(0.96);
 }
 
-.app-header .btn.active {
+.app-header .btn.active:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   color: var(--clay);
   background: var(--clay-light);
   box-shadow: inset 0 0 0 1px rgba(110, 89, 217, 0.08);
 }
 
 .header-btn {
-  height: 30px;
-  padding: 0 8px;
-  font-size: 12px;
-  border-radius: var(--radius-sm);
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  border: none;
-  background: transparent;
-  color: var(--ink-soft);
   cursor: pointer;
   transition: background-color 0.15s, color 0.15s;
 }
 
-.header-btn:hover {
+.header-btn:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
+  height: 30px;
+  padding: 0 8px;
+  font-size: 12px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--ink-soft);
+}
+
+.header-btn:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   background: var(--hover-bg);
   color: var(--ink);
 }
 
-.header-btn.active {
+.header-btn.active:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   color: var(--clay);
   background: var(--clay-light);
   box-shadow: inset 0 0 0 1px rgba(110, 89, 217, 0.08);
@@ -294,16 +300,19 @@ body {
   top: 16px;
   right: 16px;
   z-index: 1000;
+  cursor: pointer;
+  backdrop-filter: blur(14px);
+  transition: opacity 0.2s;
+}
+
+.focus-exit-floating:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   padding: 8px 14px;
   background: rgba(72, 54, 145, 0.82);
   color: #fff;
   border: none;
   border-radius: var(--radius-sm);
   font-size: 12px;
-  cursor: pointer;
   box-shadow: var(--shadow-pop);
-  backdrop-filter: blur(14px);
-  transition: opacity 0.2s;
 }
 
 .focus-exit-floating:hover { opacity: 0.85; }
@@ -487,14 +496,7 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 34px;
-  padding: 0 12px;
-  font-size: 13px;
   font-weight: 500;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  color: var(--ink);
   cursor: pointer;
   user-select: none;
   transition: background-color 0.15s, border-color 0.15s, transform 0.15s, box-shadow 0.15s;
@@ -502,22 +504,32 @@ body {
   gap: 6px;
 }
 
-.btn:hover {
+.btn:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
+  height: 34px;
+  padding: 0 12px;
+  font-size: 13px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.btn:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   background: var(--surface-hover);
   border-color: var(--line-strong);
 }
 
-.btn:active {
+.btn:active:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   transform: scale(0.97);
 }
 
-.btn.primary {
+.btn.primary:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   background: var(--clay);
   color: #fff;
   border-color: var(--clay);
 }
 
-.btn.primary:hover {
+.btn.primary:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   background: var(--clay-hover);
   border-color: var(--clay-hover);
   box-shadow: 0 14px 26px rgba(74, 54, 156, 0.18);
@@ -526,32 +538,39 @@ body {
 .btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.btn:disabled:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   transform: none;
 }
 
-.btn.danger {
+.btn.danger:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-color: var(--red);
   color: var(--red);
   background: var(--red-light);
 }
 
-.btn.danger:hover {
+.btn.danger:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   background: var(--red);
   color: #fff;
 }
 
-.btn.small {
+.btn.small:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   height: 26px;
   padding: 0 8px;
   font-size: 12px;
 }
 
-.btn:focus-visible {
+.btn:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   outline: 2px solid var(--clay);
   outline-offset: 2px;
 }
 
 .input {
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   height: 34px;
   padding: 0 10px;
   font-size: 13px;
@@ -560,10 +579,9 @@ body {
   background: var(--paper);
   color: var(--ink);
   outline: none;
-  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
-.input:focus {
+.input:focus:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-color: var(--clay);
   box-shadow: 0 0 0 3px var(--clay-light);
 }
@@ -687,7 +705,7 @@ body {
   animation: fadeIn 0.15s;
 }
 
-.list-item .actions .btn {
+.list-item .actions .btn:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   height: 22px;
   padding: 0 6px;
   font-size: 11px;
@@ -695,7 +713,7 @@ body {
   border-color: transparent;
 }
 
-.list-item .actions .btn:hover {
+.list-item .actions .btn:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   background: var(--surface);
   border-color: var(--line);
   color: var(--clay);
@@ -780,23 +798,26 @@ body {
 }
 
 .menu-item {
-  padding: 7px 14px;
-  font-size: 13px;
   cursor: pointer;
-  color: var(--ink);
   transition: background 0.1s;
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.menu-item:hover {
+.menu-item:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
+  padding: 7px 14px;
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.menu-item:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   background: var(--clay);
   color: #fff;
 }
 
-.menu-item.danger { color: var(--red); }
-.menu-item.danger:hover { background: var(--red); color: #fff; }
+.menu-item.danger:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { color: var(--red); }
+.menu-item.danger:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { background: var(--red); color: #fff; }
 
 /* ===================== MISC ===================== */
 
@@ -877,19 +898,22 @@ body {
 
 .close-btn {
   width: 28px;
-  height: 28px;
-  border: none;
-  background: transparent;
-  font-size: 18px;
   cursor: pointer;
-  color: var(--ink-muted);
-  border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.close-btn:hover {
+.close-btn:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
+  height: 28px;
+  border: none;
+  background: transparent;
+  font-size: 18px;
+  color: var(--ink-muted);
+  border-radius: var(--radius-sm);
+}
+
+.close-btn:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   background: var(--hover-bg);
   color: var(--ink);
 }

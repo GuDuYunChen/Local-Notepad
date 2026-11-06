@@ -8,6 +8,8 @@ import {
 } from '~/services/evidenceReviewComparison'
 import { toast } from '~/services/toast'
 import './EvidenceReviewArchiveComparison.css'
+import { UiButton, UiInput, UiSelect } from '~/components/ui/ControlKit'
+
 
 function optionLabel(entry) {
   const archive = entry.archive
@@ -82,23 +84,23 @@ export default function EvidenceReviewArchiveComparison({ entries = [], storageE
     <div className="review-compare-content">
       <p>按所选 A → B 对比同一项目、同一实体的历史记录；不读取正文，不修改存档或当前核对。</p>
       <div className="review-compare-selectors">
-        <label>基准 A<select aria-label="对比基准存档" value={baseKey} onChange={event => {
+        <label>基准 A<UiSelect aria-label="对比基准存档" value={baseKey} onChange={event => {
           setBaseKey(event.target.value); setTargetKey(''); resetResult()
         }}><option value="">选择基准存档</option>
           {readable.map(entry => <option key={entry.key} value={entry.key}>{optionLabel(entry)}</option>)}
-        </select></label>
-        <label>对照 B<select aria-label="对比目标存档" value={targetKey} disabled={!base} onChange={event => {
+        </UiSelect></label>
+        <label>对照 B<UiSelect aria-label="对比目标存档" value={targetKey} disabled={!base} onChange={event => {
           setTargetKey(event.target.value); resetResult()
         }}><option value="">选择同一实体的另一份存档</option>
           {targets.map(entry => <option key={entry.key} value={entry.key}>{optionLabel(entry)}</option>)}
-        </select></label>
+        </UiSelect></label>
       </div>
       <div className="review-compare-actions">
-        <button type="button" disabled={!base || !target || Boolean(storageError)} onClick={compare}>开始对比</button>
-        <button type="button" disabled={!base || !target || Boolean(storageError)} onClick={() => {
+        <UiButton size="middle" type="button" disabled={!base || !target || Boolean(storageError)} onClick={compare}>开始对比</UiButton>
+        <UiButton size="middle" type="button" disabled={!base || !target || Boolean(storageError)} onClick={() => {
           setBaseKey(targetKey); setTargetKey(baseKey); resetResult()
-        }}>交换 A / B</button>
-        <button type="button" disabled={!comparison} onClick={exportReport}>导出完整对比</button>
+        }}>交换 A / B</UiButton>
+        <UiButton size="middle" type="button" disabled={!comparison} onClick={exportReport}>导出完整对比</UiButton>
       </div>
       {readable.length < 2 && <p>当前查看范围内至少需要两份同一项目、同一实体的有效存档。</p>}
       {base && !targets.length && readable.length >= 2 && <p>此基准没有可对比的同项目、同实体存档。</p>}
@@ -118,10 +120,10 @@ export default function EvidenceReviewArchiveComparison({ entries = [], storageE
         </p>
         <p>共同章节：新增待修改 {comparison.totals.issueAdded} · 取消待修改 {comparison.totals.issueCleared} · 仍待修改 {comparison.totals.issueRetained} · 备注变化 {comparison.totals.noteChanged}。各维度可重叠。</p>
         <div className="review-compare-filters">
-          <label>变化类型<select aria-label="存档对比变化筛选" value={filters.state} onChange={event => updateFilter({ state: event.target.value })}>
+          <label>变化类型<UiSelect size="middle" aria-label="存档对比变化筛选" value={filters.state} onChange={event => updateFilter({ state: event.target.value })}>
             {REVIEW_COMPARISON_FILTERS.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
-          </select></label>
-          <label>搜索<input type="search" aria-label="搜索存档对比" placeholder="章节名、ID 或两侧备注" value={filters.query}
+          </UiSelect></label>
+          <label>搜索<UiInput size="middle" type="search" aria-label="搜索存档对比" placeholder="章节名、ID 或两侧备注" value={filters.query}
             onChange={event => updateFilter({ query: event.target.value })} /></label>
         </div>
         <p aria-live="polite">当前筛选 {view.total} 章；导出始终包含全部 {comparison.totals.total} 章并集。</p>
@@ -137,9 +139,9 @@ export default function EvidenceReviewArchiveComparison({ entries = [], storageE
         </div>
         {!view.total && <p>当前筛选没有章节，可切换“全部章节”或清空搜索。</p>}
         {view.total > 0 && <nav aria-label="存档对比分页">
-          <button type="button" disabled={view.page <= 1} onClick={() => setFilters(previous => ({ ...previous, page: view.page - 1 }))}>上一页对比</button>
+          <UiButton type="button" disabled={view.page <= 1} onClick={() => setFilters(previous => ({ ...previous, page: view.page - 1 }))}>上一页对比</UiButton>
           <span>{view.page} / {view.pageCount}</span>
-          <button type="button" disabled={view.page >= view.pageCount} onClick={() => setFilters(previous => ({ ...previous, page: view.page + 1 }))}>下一页对比</button>
+          <UiButton type="button" disabled={view.page >= view.pageCount} onClick={() => setFilters(previous => ({ ...previous, page: view.page + 1 }))}>下一页对比</UiButton>
         </nav>}
       </>}
     </div>

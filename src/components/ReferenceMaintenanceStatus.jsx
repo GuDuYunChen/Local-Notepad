@@ -4,6 +4,8 @@ import { api } from '~/services/api'
 import { editorQuit } from '~/services/editorQuit.mjs'
 import { boundedEditorRequest } from '~/services/editorSaveTransaction.mjs'
 import { maintainSavedReferences } from '~/services/referenceMaintenance.mjs'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 export default function ReferenceMaintenanceStatus() {
   const [status, setStatus] = useState(null)
@@ -41,6 +43,6 @@ export default function ReferenceMaintenanceStatus() {
   }, [])
   return status ? <aside className="reference-maintenance-status" aria-label="引用维护状态">
     <span role="status">{status}</span>
-    <button type="button" className="btn small" onClick={() => { void startRef.current?.(true) }}>重试引用更新</button>
+    <UiButton type="button" className="btn small" onClick={() => { void startRef.current?.(true) }}>重试引用更新</UiButton>
   </aside> : null
 }

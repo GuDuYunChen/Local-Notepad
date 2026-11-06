@@ -101,14 +101,17 @@
 
 .long-structure-expand {
   width: 18px;
-  height: 22px;
   flex: 0 0 18px;
+  cursor: pointer;
+}
+
+.long-structure-expand:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
+  height: 22px;
   padding: 0;
   border: 0;
   background: transparent;
   color: var(--ink-muted);
   font: inherit;
-  cursor: pointer;
 }
 
 .long-structure-expand:disabled {
@@ -184,6 +187,10 @@
 
 .long-structure-actions button {
   min-width: 22px;
+  cursor: pointer;
+}
+
+.long-structure-actions button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   height: 23px;
   padding: 0 4px;
   border: 1px solid transparent;
@@ -192,10 +199,9 @@
   color: var(--ink-muted);
   font: inherit;
   font-size: 8px;
-  cursor: pointer;
 }
 
-.long-structure-actions button:hover:not(:disabled) {
+.long-structure-actions button:hover:not(:disabled):where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-color: var(--line);
   background: var(--surface);
   color: var(--ink);

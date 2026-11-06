@@ -5,6 +5,8 @@ import { selectCollectionRows, COLLECTION_STATUS_LABELS as labels } from '~/serv
 import CollectionStudyPanel from './CollectionStudyPanel'
 import CollectionPackageTransfer from './CollectionPackageTransfer'
 import './SearchCollectionsPanel.css'
+import { UiInput } from '~/components/ui/ControlKit'
+
 
 const date = value => new Date(value).toLocaleString('zh-CN')
 export default function SearchCollectionsPanel({ model, onOpenFile }) {
@@ -24,12 +26,11 @@ export default function SearchCollectionsPanel({ model, onOpenFile }) {
   return <section className="search-collections" aria-label="本地检索资料集">
     <header><h3>本地资料集</h3><p>保存的是当时的笔记清单，不是正文备份。重开查看历史元数据；复查按原来的固定检索范围读取当前数据。</p></header>
     <div className="search-collections-tools">
-      <label>已保存资料集<UiSelect className="ui-control" ref={selectRef} aria-label="已保存资料集" value={selected?.key || undefined} disabled={locked} onChange={event => model.choose(event.target.value)} options={[{value:"",label:"选择资料集",disabled:true},...shelf.entries.map((entry,index)=>({value:entry.key,label:entry.collection?`${entry.collection.name} · ${entry.collection.report.count} 篇`:`不可读取的资料集 ${index+1}`}))]}/>{/* collection choices are rendered by the shared Select */}<UiSelect hidden aria-hidden="true" tabIndex={-1} value={selected?.key||""} readOnly>
-        </UiSelect></label>
-      <UiButton type="button" onClick={model.refresh} disabled={locked}>刷新资料集</UiButton>
-      <UiButton type="button" disabled={locked || !collection || !!shelf.error} onClick={() => void model.inspect()}>检查当前变化</UiButton>
-      <UiButton type="button" disabled={locked || !collection || !!shelf.error} onClick={model.export}>备份此资料集 JSON</UiButton>
-      <UiButton type="button" disabled={locked || !selected || !!shelf.error} onClick={model.requestDelete}>删除此资料集</UiButton>
+      <label>已保存资料集<UiSelect size="middle" className="ui-control" ref={selectRef} aria-label="已保存资料集" value={selected?.key || ''} disabled={locked} onChange={event => model.choose(event.target.value)} options={[{value:"",label:"选择资料集",disabled:true},...shelf.entries.map((entry,index)=>({value:entry.key,label:entry.collection?`${entry.collection.name} · ${entry.collection.report.count} 篇`:`不可读取的资料集 ${index+1}`}))]}/>{/* collection choices are rendered by the shared Select */}</label>
+      <UiButton size="middle" type="button" onClick={model.refresh} disabled={locked}>刷新资料集</UiButton>
+      <UiButton size="middle" type="button" disabled={locked || !collection || !!shelf.error} onClick={() => void model.inspect()}>检查当前变化</UiButton>
+      <UiButton size="middle" type="button" disabled={locked || !collection || !!shelf.error} onClick={model.export}>备份此资料集 JSON</UiButton>
+      <UiButton size="middle" type="button" disabled={locked || !selected || !!shelf.error} onClick={model.requestDelete}>删除此资料集</UiButton>
     </div>
     <CollectionPackageTransfer entry={selected} disabled={locked || !!shelf.error} onImported={value => {
       model.refresh(); model.choose('localNotepad.searchCollection.v1:' + value.id)
@@ -38,14 +39,14 @@ export default function SearchCollectionsPanel({ model, onOpenFile }) {
     <details className="search-collections-review-report"><summary>复查报告与阅读说明</summary>
       <p>导出前会重新读取原范围的全部当前结果。报告包含全部历史条目与当前额外匹配，不受下面的筛选、分页限制；不含正文或节选，不会更新或覆盖资料集。</p>
       <div className="search-collections-tools">
-        <UiButton type="button" disabled={locked || !collection || !!shelf.error} onClick={() => void model.exportReview('markdown')}>重新复查并导出 Markdown</UiButton>
-        <UiButton type="button" disabled={locked || !collection || !!shelf.error} onClick={() => void model.exportReview('json')}>重新复查并导出 JSON</UiButton>
+        <UiButton size="middle" type="button" disabled={locked || !collection || !!shelf.error} onClick={() => void model.exportReview('markdown')}>重新复查并导出 Markdown</UiButton>
+        <UiButton size="middle" type="button" disabled={locked || !collection || !!shelf.error} onClick={() => void model.exportReview('json')}>重新复查并导出 JSON</UiButton>
       </div>
       <p>打开任一条目后可沿本次筛选连续阅读，并返回原页原条目。切换笔记仍经过保存确认，不自动跳过打不开的笔记。</p>
     </details>
     <details className="search-collections-import"><summary>导入资料集备份</summary>
       <p>只接受本功能导出的单份资料集 JSON，最多 2 MiB。确认后新增独立副本，不覆盖同名记录，不导入或创建正文。</p>
-      <input className="ui-file-control" type="file" accept=".json,application/json" aria-label="选择资料集备份" disabled={locked} onChange={event => {
+      <input data-ui-native="file" className="ui-file-control" type="file" accept=".json,application/json" aria-label="选择资料集备份" disabled={locked} onChange={event => {
         const file = event.target.files?.[0]; event.target.value = ''; void model.prepareImport(file)
       }} />
     </details>
@@ -75,8 +76,8 @@ export default function SearchCollectionsPanel({ model, onOpenFile }) {
           {check.currentReport.scope.unsupported > 0 && <p>当前有 {check.currentReport.scope.unsupported} 篇正文格式未能解析，正文匹配可能不完整。</p>}</>}
       </div>
       <div className="search-collections-tools">
-        <label>筛选条目<input type="search" maxLength={512} aria-label="搜索资料集条目" value={model.query} onChange={event => model.setQuery(event.target.value)} placeholder="标题、目录或笔记 ID" /></label>
-        <label>变化状态<UiSelect aria-label="资料集变化筛选" value={model.status} onChange={event => model.setStatus(event.target.value)}>
+        <label>筛选条目<UiInput size="middle" type="search" maxLength={512} aria-label="搜索资料集条目" value={model.query} onChange={event => model.setQuery(event.target.value)} placeholder="标题、目录或笔记 ID" /></label>
+        <label>变化状态<UiSelect size="middle" aria-label="资料集变化筛选" value={model.status} onChange={event => model.setStatus(event.target.value)}>
           <option value="all">全部条目</option>
           {Object.entries(labels).map(([id, label]) => <option key={id} value={id}>{label}</option>)}
         </UiSelect></label>

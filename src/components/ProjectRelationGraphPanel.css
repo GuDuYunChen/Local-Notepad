@@ -85,6 +85,9 @@
 .project-relation-search input {
   min-width: 0;
   flex: 1;
+}
+
+.project-relation-search input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border: 0;
   outline: 0;
   background: transparent;
@@ -97,6 +100,11 @@
 .project-relation-create-grid select,
 .project-relation-create-grid input {
   min-width: 0;
+}
+
+.project-relation-controls select:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.project-relation-create-grid select:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.project-relation-create-grid input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   height: 29px;
   padding: 0 7px;
   border: 1px solid var(--line);
@@ -108,9 +116,9 @@
   font-size: 7px;
 }
 
-.project-relation-controls select:focus,
-.project-relation-create-grid select:focus,
-.project-relation-create-grid input:focus {
+.project-relation-controls select:focus:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.project-relation-create-grid select:focus:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.project-relation-create-grid input:focus:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-color: var(--clay);
   box-shadow: 0 0 0 2px var(--clay-light);
 }
@@ -193,9 +201,12 @@
 
 .project-relation-direction input {
   width: 12px !important;
+  margin: 0;
+}
+
+.project-relation-direction input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   height: 12px !important;
   padding: 0 !important;
-  margin: 0;
   box-shadow: none !important;
 }
 
@@ -396,15 +407,18 @@
 
 .project-relation-neighbors button {
   width: 100%;
-  padding: 5px 6px;
   display: block;
+  text-align: left;
+  cursor: pointer;
+}
+
+.project-relation-neighbors button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
+  padding: 5px 6px;
   border: 1px solid var(--line);
   border-radius: 7px;
   background: var(--surface);
   color: var(--ink-soft);
   font: inherit;
-  text-align: left;
-  cursor: pointer;
 }
 
 .project-relation-neighbors button span,
@@ -430,7 +444,7 @@
   line-height: 1.5;
 }
 
-.project-relation-detail .btn.danger {
+.project-relation-detail .btn.danger:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-color: color-mix(in srgb, #b84444 28%, var(--line));
   color: #a63b3b;
 }
@@ -530,6 +544,10 @@
 .project-relation-evolution-form select,
 .project-relation-evolution-form input {
   min-width: 0;
+}
+
+.project-relation-evolution-form select:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.project-relation-evolution-form input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   height: 28px;
   padding: 0 7px;
   border: 1px solid var(--line);
@@ -545,8 +563,8 @@
   grid-column: span 2;
 }
 
-.project-relation-evolution-form select:focus,
-.project-relation-evolution-form input:focus {
+.project-relation-evolution-form select:focus:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.project-relation-evolution-form input:focus:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-color: var(--clay);
   box-shadow: 0 0 0 2px var(--clay-light);
 }
@@ -577,12 +595,15 @@
 .project-relation-evolution-list > div > button:first-child {
   min-width: 0;
   flex: 1;
+  text-align: left;
+}
+
+.project-relation-evolution-list > div > button:first-child:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   padding: 5px 6px;
   border: 0;
   background: transparent;
   color: var(--ink-soft);
   font: inherit;
-  text-align: left;
 }
 
 .project-relation-evolution-list > div > button:first-child:not(:disabled) {
@@ -620,15 +641,18 @@
 .project-relation-evolution-list .remove {
   width: 24px;
   flex: 0 0 24px;
+  cursor: pointer;
+}
+
+.project-relation-evolution-list .remove:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border: 0;
   border-left: 1px solid var(--line);
   background: transparent;
   color: var(--ink-muted);
   font: inherit;
-  cursor: pointer;
 }
 
-.project-relation-evolution-list .remove:hover {
+.project-relation-evolution-list .remove:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   color: #a63b3b;
 }
 
@@ -707,15 +731,18 @@
 }
 
 .project-relation-timeline-chapter {
-  padding: 5px;
   display: block;
+  text-align: left;
+  cursor: pointer;
+}
+
+.project-relation-timeline-chapter:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
+  padding: 5px;
   border: 0;
   border-radius: 6px;
   background: var(--paper);
   color: var(--ink-soft);
   font: inherit;
-  text-align: left;
-  cursor: pointer;
 }
 
 .project-relation-timeline-chapter b,
@@ -753,15 +780,18 @@
 
 .project-relation-timeline-track article > div > button {
   min-width: 145px;
-  padding: 5px 6px;
   display: block;
+  text-align: left;
+  cursor: pointer;
+}
+
+.project-relation-timeline-track article > div > button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
+  padding: 5px 6px;
   border: 1px solid var(--line);
   border-radius: 7px;
   background: var(--paper);
   color: var(--ink-soft);
   font: inherit;
-  text-align: left;
-  cursor: pointer;
 }
 
 .project-relation-timeline-track article > div > button span,

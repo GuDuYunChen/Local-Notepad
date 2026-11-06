@@ -6,6 +6,8 @@ import {
   FORMAT_TEXT_COMMAND,
 } from 'lexical'
 import { $patchStyleText } from '@lexical/selection'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 export default function FloatingTextToolbarPlugin() {
   const [editor] = useLexicalComposerContext()
@@ -124,7 +126,7 @@ export default function FloatingTextToolbarPlugin() {
       aria-label="选中文本格式"
       onMouseDown={preventBlur}
     >
-      <button
+      <UiButton density="compact"
         type="button"
         className={formats.bold ? 'active' : ''}
         onClick={() => toggleFormat('bold')}
@@ -132,8 +134,8 @@ export default function FloatingTextToolbarPlugin() {
         title="加粗"
       >
         <strong>B</strong>
-      </button>
-      <button
+      </UiButton>
+      <UiButton density="compact"
         type="button"
         className={formats.italic ? 'active' : ''}
         onClick={() => toggleFormat('italic')}
@@ -141,8 +143,8 @@ export default function FloatingTextToolbarPlugin() {
         title="斜体"
       >
         <em>I</em>
-      </button>
-      <button
+      </UiButton>
+      <UiButton density="compact"
         type="button"
         className={formats.underline ? 'active' : ''}
         onClick={() => toggleFormat('underline')}
@@ -150,8 +152,8 @@ export default function FloatingTextToolbarPlugin() {
         title="下划线"
       >
         <span className="floating-underline">U</span>
-      </button>
-      <button
+      </UiButton>
+      <UiButton density="compact"
         type="button"
         className={formats.strikethrough ? 'active' : ''}
         onClick={() => toggleFormat('strikethrough')}
@@ -159,24 +161,24 @@ export default function FloatingTextToolbarPlugin() {
         title="删除线"
       >
         <span className="floating-strike">S</span>
-      </button>
+      </UiButton>
       <span className="floating-toolbar-divider" />
-      <button
+      <UiButton density="compact"
         type="button"
         onClick={toggleHighlight}
         aria-label="高亮"
         title="高亮"
       >
         <span className="floating-highlight">A</span>
-      </button>
-      <button
+      </UiButton>
+      <UiButton density="compact"
         type="button"
         onClick={() => window.dispatchEvent(new Event('editor:open-link'))}
         aria-label="添加链接"
         title="添加链接"
       >
         ↗
-      </button>
+      </UiButton>
     </div>
   )
 }

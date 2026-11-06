@@ -14,6 +14,9 @@
 
 .todo-block.checked .todo-text {
   text-decoration: line-through;
+}
+
+.todo-block.checked .todo-text:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   color: var(--muted, #6b7280);
 }
 
@@ -27,14 +30,20 @@
 
 .todo-text {
   flex: 1;
+  cursor: text;
+}
+
+.todo-text:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   font-size: 14px;
   color: var(--fg, #1f2d3d);
-  cursor: text;
   min-height: 20px;
 }
 
 .todo-input {
   flex: 1;
+}
+
+.todo-input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   font-size: 14px;
   padding: 4px 8px;
   border: 1px solid var(--border-color, rgba(0,0,0,0.12));
@@ -44,7 +53,7 @@
   outline: none;
 }
 
-.todo-input:focus-visible {
+.todo-input:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-color: var(--accent, #7e5bef);
 }
 
@@ -73,19 +82,22 @@
 
 .callout-icon-btn {
   width: 32px;
-  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: transparent;
-  border: none;
-  border-radius: 6px;
   cursor: pointer;
-  font-size: 18px;
   transition: background-color 0.15s ease;
 }
 
-.callout-icon-btn:hover {
+.callout-icon-btn:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
+  height: 32px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  font-size: 18px;
+}
+
+.callout-icon-btn:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   background-color: var(--toolbar-btn-hover, rgba(0,0,0,0.06));
 }
 
@@ -118,19 +130,22 @@
 
 .callout-icon-option {
   width: 32px;
-  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: transparent;
-  border: none;
-  border-radius: 4px;
   cursor: pointer;
-  font-size: 16px;
   transition: background-color 0.15s ease;
 }
 
-.callout-icon-option:hover {
+.callout-icon-option:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
+  height: 32px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  font-size: 16px;
+}
+
+.callout-icon-option:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   background-color: var(--toolbar-btn-hover, rgba(0,0,0,0.06));
 }
 
@@ -141,6 +156,10 @@
 
 .callout-textarea {
   width: 100%;
+  resize: vertical;
+}
+
+.callout-textarea:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   min-height: 60px;
   padding: 8px;
   border: none;
@@ -148,12 +167,11 @@
   color: var(--fg, #1f2d3d);
   font-size: 14px;
   line-height: 1.6;
-  resize: vertical;
   outline: none;
   font-family: inherit;
 }
 
-.callout-textarea::placeholder {
+.callout-textarea:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *))::placeholder {
   color: var(--muted, #6b7280);
 }
 
@@ -225,6 +243,10 @@
 
 .toggle-textarea {
   width: 100%;
+  resize: vertical;
+}
+
+.toggle-textarea:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   min-height: 80px;
   padding: 8px;
   border: 1px solid var(--border-color, rgba(0,0,0,0.12));
@@ -233,12 +255,11 @@
   color: var(--fg, #1f2d3d);
   font-size: 14px;
   line-height: 1.6;
-  resize: vertical;
   outline: none;
   font-family: inherit;
 }
 
-.toggle-textarea:focus-visible {
+.toggle-textarea:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-color: var(--accent, #7e5bef);
 }
 
@@ -259,6 +280,9 @@
 
 .embed-input {
   width: 100%;
+}
+
+.embed-input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   padding: 10px 12px;
   border: 1px solid var(--border-color, rgba(0,0,0,0.12));
   border-radius: 6px;
@@ -268,24 +292,27 @@
   outline: none;
 }
 
-.embed-input:focus-visible {
+.embed-input:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-color: var(--accent, #7e5bef);
 }
 
 .embed-save-btn {
   align-self: flex-end;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.embed-save-btn:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   padding: 8px 16px;
   background: var(--accent, #7e5bef);
   color: #fff;
   border: none;
   border-radius: 6px;
   font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background-color 0.15s ease;
 }
 
-.embed-save-btn:hover:not(:disabled) {
+.embed-save-btn:hover:not(:disabled):where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   background: var(--accent-hover, #6b4bd6);
 }
 
@@ -319,17 +346,20 @@
 .embed-edit-btn {
   display: block;
   width: 100%;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.embed-edit-btn:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   padding: 8px;
   background: transparent;
   border: none;
   border-top: 1px solid var(--border-color, rgba(0,0,0,0.08));
   color: var(--muted, #6b7280);
   font-size: 13px;
-  cursor: pointer;
-  transition: background-color 0.15s ease;
 }
 
-.embed-edit-btn:hover {
+.embed-edit-btn:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   background: var(--toolbar-btn-hover, rgba(0,0,0,0.04));
 }
 
@@ -344,6 +374,10 @@
 .todo-text-button {
   min-width: 0;
   flex: 1;
+  text-align: left;
+  cursor: text;
+}
+.todo-text-button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   padding: 2px 0;
   border: 0;
   background: transparent;
@@ -351,12 +385,13 @@
   font: inherit;
   font-size: 14px;
   line-height: 1.55;
-  text-align: left;
-  cursor: text;
 }
 
 .todo-block.checked .todo-text-button {
   text-decoration: line-through;
+}
+
+.todo-block.checked .todo-text-button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   color: var(--muted, #6b7280);
 }
 
@@ -366,24 +401,31 @@
 
 .toggle-arrow-button {
   width: 28px;
-  height: 28px;
   flex: 0 0 28px;
   display: grid;
   place-items: center;
+  cursor: pointer;
+}
+
+.toggle-arrow-button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
+  height: 28px;
   border: 0;
   border-radius: 7px;
   background: transparent;
   color: var(--muted, #6b7280);
-  cursor: pointer;
 }
 
-.toggle-arrow-button:hover {
+.toggle-arrow-button:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   background: var(--toolbar-btn-hover, rgba(0,0,0,0.06));
 }
 
 .toggle-title-input {
   min-width: 0;
   flex: 1;
+  font-weight: 600;
+}
+
+.toggle-title-input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   padding: 3px 2px;
   border: 0;
   outline: 0;
@@ -391,7 +433,6 @@
   color: var(--fg, #1f2d3d);
   font: inherit;
   font-size: 14px;
-  font-weight: 600;
 }
 
 .toggle-content {
@@ -404,8 +445,8 @@
   gap: 8px;
 }
 
-.embed-edit-actions .btn,
-.embed-save-btn {
+.embed-edit-actions .btn:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.embed-save-btn:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   min-height: 34px;
   border-radius: 8px;
 }
@@ -474,6 +515,10 @@
 
 .attachment-download {
   min-width: 58px;
+  cursor: pointer;
+}
+
+.attachment-download:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   height: 32px;
   padding: 0 10px;
   border: 1px solid var(--border-color, rgba(0,0,0,.1));
@@ -482,10 +527,9 @@
   color: var(--fg, #1f2d3d);
   font: inherit;
   font-size: 10px;
-  cursor: pointer;
 }
 
-.attachment-download:hover:not(:disabled) {
+.attachment-download:hover:not(:disabled):where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-color: var(--border-strong, rgba(0,0,0,.18));
   background: var(--toolbar-btn-hover, rgba(0,0,0,.04));
 }
@@ -509,6 +553,13 @@
 .attachment-download,
 .attachment-delete-button {
   min-width: 58px;
+  cursor: pointer;
+}
+
+.attachment-replace-button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.attachment-preview-button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.attachment-download:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.attachment-delete-button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   height: 32px;
   padding: 0 10px;
   border: 1px solid var(--border-color, rgba(0,0,0,.1));
@@ -517,12 +568,11 @@
   color: var(--fg, #1f2d3d);
   font: inherit;
   font-size: 10px;
-  cursor: pointer;
 }
 
-.attachment-replace-button:hover:not(:disabled),
-.attachment-preview-button:hover:not(:disabled),
-.attachment-download:hover:not(:disabled) {
+.attachment-replace-button:hover:not(:disabled):where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.attachment-preview-button:hover:not(:disabled):where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.attachment-download:hover:not(:disabled):where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-color: var(--border-strong, rgba(0,0,0,.18));
   background: var(--toolbar-btn-hover, rgba(0,0,0,.04));
 }
@@ -595,6 +645,10 @@
 }
 
 .attachment-preview-header-actions button {
+  cursor: pointer;
+}
+
+.attachment-preview-header-actions button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   height: 32px;
   padding: 0 10px;
   border: 1px solid var(--border-color, rgba(0,0,0,.1));
@@ -603,11 +657,13 @@
   color: var(--fg, #1f2d3d);
   font: inherit;
   font-size: 10px;
-  cursor: pointer;
 }
 
 .attachment-preview-close {
   width: 32px;
+}
+
+.attachment-preview-close:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   padding: 0 !important;
   font-size: 18px !important;
 }
@@ -662,6 +718,10 @@
   .attachment-preview-button,
   .attachment-download {
     min-width: 52px;
+  }
+
+  .attachment-preview-button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.attachment-download:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
     padding-inline: 8px;
   }
 }
@@ -725,9 +785,12 @@
 
 .formula-editor textarea {
   width: 100%;
+  resize: vertical;
+}
+
+.formula-editor textarea:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   min-height: 40px;
   padding: 8px 10px;
-  resize: vertical;
   border: 1px solid var(--border-color, rgba(0,0,0,.1));
   border-radius: 8px;
   outline: 0;
@@ -738,7 +801,7 @@
   line-height: 1.55;
 }
 
-.formula-editor textarea:focus {
+.formula-editor textarea:focus:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-color: var(--accent, #7e5bef);
   box-shadow: 0 0 0 2px var(--accent-light, rgba(126,91,239,.1));
 }
@@ -751,6 +814,10 @@
 }
 
 .formula-editor-actions button {
+  cursor: pointer;
+}
+
+.formula-editor-actions button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   min-height: 31px;
   padding: 0 9px;
   border: 1px solid var(--border-color, rgba(0,0,0,.1));
@@ -759,17 +826,16 @@
   color: var(--fg, #1f2d3d);
   font: inherit;
   font-size: 9px;
-  cursor: pointer;
 }
 
-.formula-editor-actions button:hover,
-.formula-editor-actions button.active {
+.formula-editor-actions button:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.formula-editor-actions button.active:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-color: var(--accent, #7e5bef);
   background: var(--accent-light, rgba(126,91,239,.1));
   color: var(--accent, #7e5bef);
 }
 
-.formula-editor-actions button.danger {
+.formula-editor-actions button.danger:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   color: var(--red, #c7433c);
 }
 
@@ -874,13 +940,13 @@
 }
 
 
-.attachment-delete-button,
-.attachment-preview-delete {
+.attachment-delete-button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.attachment-preview-delete:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   color: var(--red, #c7433c) !important;
 }
 
-.attachment-delete-button:hover,
-.attachment-preview-delete:hover {
+.attachment-delete-button:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.attachment-preview-delete:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-color: color-mix(in srgb, var(--red, #c7433c) 28%, var(--border-color, rgba(0,0,0,.1))) !important;
   background: var(--red-light, rgba(199,67,60,.08)) !important;
   color: var(--red, #c7433c) !important;

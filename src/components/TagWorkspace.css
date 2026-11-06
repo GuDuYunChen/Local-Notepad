@@ -3,16 +3,20 @@
 .tag-workspace header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 18px 22px; border-bottom: 1px solid var(--line); }
 .tag-workspace h2 { margin: 0; font-size: 22px; } .tag-workspace h3 { margin: 0 0 8px; font-size: 18px; overflow-wrap: anywhere; } .tag-workspace h4 { margin: 16px 0 8px; }
 .tag-workspace p { margin: 8px 0; line-height: 1.5; overflow-wrap: anywhere; } .tag-workspace header p { color: var(--ink-soft); }
-.tag-workspace button { padding: 7px 11px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--ink); cursor: pointer; font: inherit; overflow-wrap: anywhere; }
-.tag-workspace button:hover:not(:disabled) { border-color: var(--clay); } .tag-workspace button:disabled { opacity: .5; cursor: default; } .tag-workspace :focus-visible { outline: 2px solid var(--clay); outline-offset: 2px; }
-.tag-workspace input:not([type=checkbox]), .tag-workspace select { min-width: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); font: inherit; width: 100%; box-sizing: border-box; }
+.tag-workspace button { cursor: pointer; overflow-wrap: anywhere; }
+.tag-workspace button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { padding: 7px 11px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--ink); font: inherit; }
+.tag-workspace button:hover:not(:disabled):where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { border-color: var(--clay); } .tag-workspace button:disabled { opacity: .5; cursor: default; } .tag-workspace :focus-visible { outline: 2px solid var(--clay); outline-offset: 2px; }
+.tag-workspace input:not([type=checkbox]), .tag-workspace select { min-width: 0; width: 100%; box-sizing: border-box; }
+.tag-workspace input:not([type=checkbox]):where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.tag-workspace select:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); font: inherit; }
 .tag-workspace fieldset { border: 0; padding: 0; margin: 0; min-width: 0; } .tag-workspace label { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .tag-workspace-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 18px 22px; overscroll-behavior: contain; }
 .tag-workspace-filter { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 16px !important; } .tag-workspace-filter > label:first-child { flex: 1; min-width: 180px; } .tag-workspace-filter > label:first-child input { width: 150px; flex: 1; } .tag-workspace-filter > span { color: var(--ink-soft); }
 .tag-workspace-columns { display: grid; grid-template-columns: minmax(180px,1fr) minmax(0,2fr); gap: 20px; }
 .tag-workspace-list { display: flex; flex-direction: column; gap: 8px; align-self: start; max-height: 420px; overflow-y: auto; padding: 2px; }
-.tag-workspace-list > button { display: flex; text-align: left; gap: 10px; align-items: center; min-height: 50px; flex-shrink: 0; }
-.tag-workspace-list > button[aria-pressed=true] { border-color: var(--clay); background: var(--clay-light,var(--surface)); }
+.tag-workspace-list > button { display: flex; text-align: left; gap: 10px; align-items: center; flex-shrink: 0; }
+.tag-workspace-list > button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { min-height: 50px; }
+.tag-workspace-list > button[aria-pressed=true]:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { border-color: var(--clay); background: var(--clay-light,var(--surface)); }
 .tag-workspace-list i { flex: 0 0 10px; height: 10px; border: 1px solid var(--line); border-radius: 50%; } .tag-workspace-list span { min-width: 0; overflow-wrap: anywhere; } .tag-workspace-list small { display: block; color: var(--ink-soft); margin-top: 5px; }
 .tag-workspace-actions { display: flex; gap: 8px; flex-wrap: wrap; } .tag-workspace-actions label { flex-basis: 100%; } .tag-workspace-actions select { flex: 1; }
 .tag-workspace-notes { display: flex; flex-direction: column; align-items: stretch; gap: 6px; } .tag-workspace-notes button { text-align: left; }

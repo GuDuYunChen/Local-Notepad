@@ -7,6 +7,8 @@ import { analyzeMarkdownSourceCompatibility } from '~/services/markdownSource'
 import { editorQuit, EditorQuitError } from '~/services/editorQuit.mjs'
 import ConfirmDialog from '../../ConfirmDialog'
 import { useEditorPendingDraft } from '../hooks/useEditorPendingDraft'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 export default function MarkdownSourcePlugin({ readOnly = false }) {
   const [editor] = useLexicalComposerContext()
@@ -119,16 +121,16 @@ export default function MarkdownSourcePlugin({ readOnly = false }) {
           </div>
           <div className="markdown-source-actions">
             {canEdit && (
-              <button type="button" onClick={applySource} disabled={!dirty}>
+              <UiButton density="compact" type="button" onClick={applySource} disabled={!dirty}>
                 应用更改
-              </button>
+              </UiButton>
             )}
-            <button
+            <UiButton density="compact"
               type="button"
               onClick={closeSource}
             >
               关闭
-            </button>
+            </UiButton>
           </div>
         </header>
 
@@ -139,7 +141,7 @@ export default function MarkdownSourcePlugin({ readOnly = false }) {
           </div>
         )}
 
-        <textarea
+        <textarea data-ui-native="code-editor-textarea"
           ref={textareaRef}
           value={source}
           onChange={event => { if (canEdit && editor.isEditable()) setSource(event.target.value) }}

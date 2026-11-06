@@ -6,10 +6,11 @@
 .evidence-review-archives p { color: var(--ink-muted); margin: 6px 0; overflow-wrap: anywhere; }
 .evidence-review-archives-tools, .evidence-review-archives-actions, .evidence-review-archives nav { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .evidence-review-archives label { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.evidence-review-archives :is(button, select) { min-height: 36px; max-width: 100%; padding: 6px 10px; border: 1px solid var(--line); border-radius: 7px; color: var(--ink); background: var(--paper); font: inherit; cursor: pointer; }
+.evidence-review-archives :is(button, select) { max-width: 100%; cursor: pointer; }
+.evidence-review-archives :is(button, select):where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { min-height: 36px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 7px; color: var(--ink); background: var(--paper); font: inherit; }
 .evidence-review-archives button:disabled { opacity: .5; cursor: default; }
-.evidence-review-archives button:hover:not(:disabled) { border-color: var(--clay); background: var(--clay-light); }
-.evidence-review-archives :is(button, select, summary):focus-visible { outline: 2px solid var(--clay); outline-offset: 2px; }
+.evidence-review-archives button:hover:not(:disabled):where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { border-color: var(--clay); background: var(--clay-light); }
+.evidence-review-archives :is(button, select, summary):focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { outline: 2px solid var(--clay); outline-offset: 2px; }
 .evidence-review-archives ul { margin: 10px 0; padding: 0; list-style: none; }
 .evidence-review-archives li { padding: 10px 0; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
 .evidence-review-archives time { display: block; color: var(--ink-soft); }

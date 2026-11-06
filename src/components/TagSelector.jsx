@@ -3,6 +3,8 @@ import {api} from '../services/api'
 import ConfirmDialog from './ConfirmDialog'
 import {createNoteTagJournal, noteTagIntent, noteTagName, readNoteTags, sendNoteTagIntent, intentMatchesCurrent, tagColor} from '../services/noteTags.mjs'
 import './TagSelector.css'
+import { UiButton, UiInput } from '~/components/ui/ControlKit'
+
 
 // A separate lifetime for every note: an old completion never becomes the next
 // note's tag state. The parent no longer supplies a silent-error empty list.
@@ -66,28 +68,28 @@ function NoteTags({fileId,onChange}) {
     <div className="note-tags-summary" aria-label="当前笔记标签">
       {status==='loading'&&!snapshot?<span role="status">正在读取标签…</span>:snapshot?.tags.map(t=><span className="note-tag-chip" key={t.id}><i style={{backgroundColor:tagColor(t.color)}} aria-hidden="true"/>{t.name}</span>)}
       {status==='ready'&&snapshot?.tags.length===0&&<span className="note-tag-muted">暂无标签</span>}
-      <button ref={entry} type="button" className="btn small" aria-label="管理标签" aria-expanded={expanded} onClick={()=>{if(expanded)close();else setExpanded(true)}}>管理标签</button>
+      <UiButton ref={entry} type="button" className="btn small" aria-label="管理标签" aria-expanded={expanded} onClick={()=>{if(expanded)close();else setExpanded(true)}}>管理标签</UiButton>
     </div>
     {!expanded&&(status==='error'||pending||corrupt)&&<p className="note-tag-warning" role="status">{pending||corrupt?'有待核对的标签操作，打开管理标签继续。':'标签读取失败，打开管理标签可重试。'}</p>}
     {expanded&&<section className="note-tag-panel" aria-label="笔记标签整理">
-      <header><strong>整理这篇笔记的标签</strong><button type="button" className="icon-btn" aria-label="关闭标签管理" onClick={close}>×</button></header>
+      <header><strong>整理这篇笔记的标签</strong><UiButton type="button" className="icon-btn" aria-label="关闭标签管理" onClick={close}>×</UiButton></header>
       <p className="note-tag-muted">只修改标签关联，不保存或改写正文。移除不会删除共享标签。</p>
       {feedback&&<p role="status" className="note-tag-feedback">{feedback}</p>}
       {message&&<p role="alert" className="note-tag-warning">{message}</p>}
       {(pending||corrupt)&&<div className="note-tag-recovery"><strong>{corrupt?'操作记录损坏':'标签操作待核对'}</strong>{pending&&<p>{pending.kind==='create'?'创建并分配':pending.attached?'添加':'移除'}：{pending.name}</p>}
-        {!corrupt&&<button type="button" className="btn small" disabled={busy||status==='loading'} onClick={()=>void load(true)}>核对当前标签</button>}
-        <button type="button" className="btn small" disabled={busy||(!corrupt&&!reviewed)} onClick={()=>setConfirm({kind:'clear'})}>{corrupt?'清除损坏记录':'结束这条操作记录'}</button>
+        {!corrupt&&<UiButton type="button" className="btn small" disabled={busy||status==='loading'} onClick={()=>void load(true)}>核对当前标签</UiButton>}
+        <UiButton type="button" className="btn small" disabled={busy||(!corrupt&&!reviewed)} onClick={()=>setConfirm({kind:'clear'})}>{corrupt?'清除损坏记录':'结束这条操作记录'}</UiButton>
       </div>}
-      <div className="note-tag-toolbar"><button type="button" className="btn small" disabled={busy||status==='loading'} onClick={()=>void load(!!pending)}>重新读取标签</button>{busy&&<button type="button" className="btn small" onClick={()=>writeOwner.current?.abort()}>停止等待</button>}</div>
+      <div className="note-tag-toolbar"><UiButton type="button" className="btn small" disabled={busy||status==='loading'} onClick={()=>void load(!!pending)}>重新读取标签</UiButton>{busy&&<UiButton type="button" className="btn small" onClick={()=>writeOwner.current?.abort()}>停止等待</UiButton>}</div>
       {status==='loading'&&<p role="status">正在读取完整标签列表…</p>}
       {status==='ready'&&<>
-        <label className="note-tag-field">查找标签<input aria-label="查找标签" value={search} disabled={busy} onCompositionStart={()=>{composing.current=true}} onCompositionEnd={e=>{composing.current=false;setQuery(e.currentTarget.value)}} onChange={e=>{setSearch(e.target.value);if(!composing.current)setQuery(e.target.value)}} placeholder="输入标签名称"/></label>
+        <label className="note-tag-field">查找标签<UiInput aria-label="查找标签" value={search} disabled={busy} onCompositionStart={()=>{composing.current=true}} onCompositionEnd={e=>{composing.current=false;setQuery(e.currentTarget.value)}} onChange={e=>{setSearch(e.target.value);if(!composing.current)setQuery(e.target.value)}} placeholder="输入标签名称"/></label>
         <p className="note-tag-muted">已分配 {snapshot.tags.length} 项 · 显示 {rows.length} / {snapshot.available.length} 个标签</p>
-        <div className="note-tag-options" role="group" aria-label="可用标签">{rows.map(t=><button key={t.id} type="button" data-note-tag-id={t.id} className="note-tag-option" disabled={blocked} aria-pressed={snapshot.tags.some(x=>x.id===t.id)} onClick={()=>requestTag(t)}><i style={{backgroundColor:tagColor(t.color)}} aria-hidden="true"/><span>{t.name}</span><span aria-hidden="true">{snapshot.tags.some(x=>x.id===t.id)?'✓':'＋'}</span></button>)}</div>
+        <div className="note-tag-options" role="group" aria-label="可用标签">{rows.map(t=><UiButton key={t.id} type="button" data-note-tag-id={t.id} className="note-tag-option" disabled={blocked} aria-pressed={snapshot.tags.some(x=>x.id===t.id)} onClick={()=>requestTag(t)}><i style={{backgroundColor:tagColor(t.color)}} aria-hidden="true"/><span>{t.name}</span><span aria-hidden="true">{snapshot.tags.some(x=>x.id===t.id)?'✓':'＋'}</span></UiButton>)}</div>
         {!rows.length&&<p className="note-tag-muted">{snapshot.available.length?'没有匹配的标签。':'标签库为空，可以新建第一个标签。'}</p>}
         <form className="note-tag-create" onSubmit={e=>{e.preventDefault();create()}}>
-          <label className="note-tag-field">新标签名称<input aria-label="新标签名称" value={name} disabled={blocked} onChange={e=>setName(e.target.value)} onCompositionStart={()=>{composing.current=true}} onCompositionEnd={()=>{composing.current=false}} onKeyDown={e=>{if(e.key==='Enter'&&(e.nativeEvent.isComposing||e.keyCode===229))e.preventDefault()}} placeholder="同名标签会复用"/></label>
-          <button type="submit" className="btn primary" disabled={blocked||!name.trim()}>新建并分配</button>
+          <label className="note-tag-field">新标签名称<UiInput aria-label="新标签名称" value={name} disabled={blocked} onChange={e=>setName(e.target.value)} onCompositionStart={()=>{composing.current=true}} onCompositionEnd={()=>{composing.current=false}} onKeyDown={e=>{if(e.key==='Enter'&&(e.nativeEvent.isComposing||e.keyCode===229))e.preventDefault()}} placeholder="同名标签会复用"/></label>
+          <UiButton type="submit" className="btn primary" disabled={blocked||!name.trim()}>新建并分配</UiButton>
         </form>
       </>}
     </section>}

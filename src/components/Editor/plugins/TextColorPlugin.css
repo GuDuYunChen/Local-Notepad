@@ -13,15 +13,18 @@
   align-items: center;
   justify-content: center;
   width: 32px;
-  height: 32px;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 4px;
   cursor: pointer;
   transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
-.text-color-btn:hover {
+.text-color-btn:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
+  height: 32px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+}
+
+.text-color-btn:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   background-color: var(--toolbar-btn-hover, rgba(0,0,0,0.04));
   border-color: var(--border-color, rgba(0,0,0,0.12));
 }
@@ -68,15 +71,18 @@
   align-items: center;
   justify-content: center;
   width: 32px;
-  height: 32px;
-  background: transparent;
-  border: 1px solid var(--border-color, rgba(0,0,0,0.08));
-  border-radius: 6px;
   cursor: pointer;
   transition: background-color 0.15s ease, transform 0.15s ease;
 }
 
-.color-option:hover {
+.color-option:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
+  height: 32px;
+  background: transparent;
+  border: 1px solid var(--border-color, rgba(0,0,0,0.08));
+  border-radius: 6px;
+}
+
+.color-option:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   background-color: var(--toolbar-btn-hover, rgba(0,0,0,0.04));
   transform: scale(1.1);
 }

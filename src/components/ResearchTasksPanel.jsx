@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { researchTasks, RESEARCH_TASK_PREFIX, RESEARCH_PHASES } from '~/services/researchTasks'
 import { downloadCollectionReviewReport } from '~/services/collectionReviewReport'
 import './StudyCompilationPanel.css'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 export default function ResearchTasksPanel({ active, onReceipt, service = researchTasks }) {
   const [entries, setEntries] = useState([]), [selection, setSelection] = useState(null)
@@ -84,16 +86,16 @@ export default function ResearchTasksPanel({ active, onReceipt, service = resear
   return <details className="study-compilation research-tasks" aria-label="研究草稿与创建记录">
     <summary>研究草稿与创建记录 · {entries.length} / 10</summary>
     <p>保存过的研究预览和创建任务在本机保留。查回只读取结果；创建或重试必须明确确认，始终使用同一任务身份。</p>
-    <button type="button" disabled={!active || busy} onClick={() => { setError(''); refresh(); setSelection(null); setConfirmed(false); setRemoving(false) }}>刷新研究任务</button>
+    <UiButton type="button" disabled={!active || busy} onClick={() => { setError(''); refresh(); setSelection(null); setConfirmed(false); setRemoving(false) }}>刷新研究任务</UiButton>
     {error && <p role="alert" className="study-hub-notice">{error}</p>}
     {message && <p role="status">{message}</p>}
     {!entries.length && !error && <p>暂无已保存研究任务。请先生成研究预览，再保存草稿或确认创建。</p>}
-    <div className="research-task-list">{entries.map(entry => <button type="button" key={entry.key} disabled={!active || busy}
+    <div className="research-task-list">{entries.map(entry => <UiButton type="button" key={entry.key} disabled={!active || busy}
       aria-pressed={selection?.entry.key === entry.key} onClick={() => select(entry)}>
       <strong>{entry.task?.preview.title || '不可读取的研究任务'}</strong>
       <span>{entry.task ? RESEARCH_PHASES[entry.task.phase] + ' · ' + entry.task.preview.count + ' 条批注' : entry.error}</span>
       <small>{entry.task ? new Date(entry.task.updatedAt).toLocaleString('zh-CN') : entry.key}</small>
-    </button>)}</div>
+    </UiButton>)}</div>
     {selection && <section aria-label="已存研究任务预览" className="study-compilation-preview">
       {task && <>
         <h4>{task.preview.title}</h4><p className="study-compilation-boundary">任务：{task.id}<br />源快照：{task.preview.loadedAt} · 目标目录 ID：{task.preview.parentId || '根目录'}</p>
@@ -106,17 +108,17 @@ export default function ResearchTasksPanel({ active, onReceipt, service = resear
           <h4>我的结论与下一步</h4><p>（创建后在新笔记中自行填写，未自动生成结论。）</p>
         </div>
         {stale && <p role="status">此任务记录已变化，请重新选择列表中的最新记录；旧预览不能提交。</p>}
-        {!task.receipt && <label className="research-task-confirm"><input type="checkbox" checked={confirmed} disabled={!active || busy || stale} onChange={e => setConfirmed(e.target.checked)} />我已核对完整历史草稿及目录，明确以此内容创建或重试，不使用当前未保存批注。</label>}
+        {!task.receipt && <label className="research-task-confirm"><input data-ui-native="checkbox" type="checkbox" checked={confirmed} disabled={!active || busy || stale} onChange={e => setConfirmed(e.target.checked)} />我已核对完整历史草稿及目录，明确以此内容创建或重试，不使用当前未保存批注。</label>}
         <div className="study-hub-actions">
-          <button type="button" disabled={!active || busy || stale} onClick={() => void perform(false)}>查回此任务创建结果</button>
-          {!task.receipt && <button type="button" disabled={!active || busy || stale || !confirmed} onClick={() => void perform(true)}>以同一任务创建或重试</button>}
-          <button type="button" disabled={busy || stale} onClick={download}>下载已存研究草稿</button>
+          <UiButton size="middle" type="button" disabled={!active || busy || stale} onClick={() => void perform(false)}>查回此任务创建结果</UiButton>
+          {!task.receipt && <UiButton size="middle" type="button" disabled={!active || busy || stale || !confirmed} onClick={() => void perform(true)}>以同一任务创建或重试</UiButton>}
+          <UiButton size="middle" type="button" disabled={busy || stale} onClick={download}>下载已存研究草稿</UiButton>
         </div>
       </>}
       {busy && <p role="status">正在处理研究任务，关闭面板不等于回滚已发出的写入。</p>}
-      <button type="button" disabled={!active || busy || stale} onClick={() => setRemoving(true)}>移除本地研究任务记录</button>
+      <UiButton type="button" disabled={!active || busy || stale} onClick={() => setRemoving(true)}>移除本地研究任务记录</UiButton>
       {removing && <div className="study-hub-notice" role="alert"><p>移除后将失去此任务的本地草稿和查回入口；不会删除正文。结果不确定的任务应先查回，避免重新整理成另一个任务后重复创建。</p>
-        <button type="button" disabled={busy} onClick={() => void remove()}>确认只移除本地任务</button><button type="button" disabled={busy} onClick={() => setRemoving(false)}>取消移除研究任务</button>
+        <UiButton type="button" disabled={busy} onClick={() => void remove()}>确认只移除本地任务</UiButton><UiButton type="button" disabled={busy} onClick={() => setRemoving(false)}>取消移除研究任务</UiButton>
       </div>}
     </section>}
     <p className="study-compilation-boundary">本地任务最多 10 份、每份 3 MiB，不自动清理；文件和存储未加密。前后端须配套升级。防重复限同一任务和同一数据库历史；更换或回退数据库、丢失任务身份后不能保证。任务不包含在正文数据库备份中。</p>

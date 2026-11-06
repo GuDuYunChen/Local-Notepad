@@ -1,5 +1,7 @@
 import React, { useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { LOCAL_REPORT_NOTICE, localOverviewClipboard, requestLocalOverviewDownload } from '../services/s3LocalOverviewReport.mjs'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 const messages = Object.freeze({
   copying: '正在等待剪贴板确认…', copied: '本次统计摘要已复制；不会重新读取本地数据。',
@@ -39,8 +41,8 @@ export default function S3LocalOverviewReport({ summary }) {
   return <div data-local-report>
     <p id={hint} className="local-inventory-note">{LOCAL_REPORT_NOTICE} 数量和容量也可能透露使用规模，分享前请检查。</p>
     <div className="local-inventory-actions">
-      <button type="button" className="btn small" data-local-report-copy disabled={!summary || code === 'copying'} aria-describedby={hint} onClick={copy}>复制统计摘要</button>
-      <button type="button" className="btn small" data-local-report-download disabled={!summary || code === 'copying'} aria-describedby={hint} onClick={download}>导出统计报告（JSON）</button>
+      <UiButton size="middle" type="button" className="btn small" data-local-report-copy disabled={!summary || code === 'copying'} aria-describedby={hint} onClick={copy}>复制统计摘要</UiButton>
+      <UiButton size="middle" type="button" className="btn small" data-local-report-download disabled={!summary || code === 'copying'} aria-describedby={hint} onClick={download}>导出统计报告（JSON）</UiButton>
     </div>
     <p role="status" aria-live="polite" aria-atomic="true" className="local-inventory-note" data-local-report-status={code}>{messages[code] || ''}</p>
   </div>

@@ -1,3 +1,4 @@
+import UiThemeProvider from './components/ui/UiThemeProvider'
 import React from 'react'
 import { createRoot } from 'react-dom/client'
 import { DndProvider } from 'react-dnd'
@@ -5,9 +6,7 @@ import { HTML5Backend } from 'react-dnd-html5-backend'
 import App from './App'
 import { initializeThemeFromStorage } from './services/themePreference'
 import { installAppearanceRuntime } from './services/localAppearance'
-import 'antd/dist/reset.css'
 import './styles/index.css'
-import './components/ui/control-kit.css'
 import './styles/redesign.css'
 import './styles/editor-document.css'
 import './styles/dark-theme.css'
@@ -25,8 +24,10 @@ const el = document.getElementById('root')
 if (el) {
   const root = createRoot(el)
   root.render(
-    <DndProvider backend={HTML5Backend}>
+    <UiThemeProvider><DndProvider backend={HTML5Backend}>
       <App />
-    </DndProvider>
+    </DndProvider></UiThemeProvider>
   )
 }
+
+import './components/ui/control-kit.css'

@@ -10,8 +10,11 @@
 .trash-workspace-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 14px; margin: 20px 0 16px; }
 .trash-workspace-filters label, .trash-workspace-typed { display: grid; gap: 7px; font-size: 13px; line-height: 1.6; }
 .trash-workspace-filters label:first-child { flex: 1 1 240px; }
-.trash-workspace input[type=search], .trash-workspace select, .trash-workspace-typed input { min-height: 38px; min-width: 0; max-width: 100%; box-sizing: border-box; border: 1px solid var(--line, #d2d7df); border-radius: 7px; background: var(--surface, #fff); color: inherit; padding: 8px 10px; font: inherit; font-size: 14px; }
-.trash-workspace :is(button,input,select):focus-visible { outline: 2px solid var(--clay, #4568c7); outline-offset: 3px; }
+.trash-workspace input[type=search], .trash-workspace select, .trash-workspace-typed input { min-width: 0; max-width: 100%; box-sizing: border-box; }
+.trash-workspace input[type=search]:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.trash-workspace select:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.trash-workspace-typed input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { min-height: 38px; border: 1px solid var(--line, #d2d7df); border-radius: 7px; background: var(--surface, #fff); color: inherit; padding: 8px 10px; font: inherit; font-size: 14px; }
+.trash-workspace :is(button,input,select):focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { outline: 2px solid var(--clay, #4568c7); outline-offset: 3px; }
 .trash-workspace .trash-bulkbar { padding: 12px 0; flex-wrap: wrap; gap: 12px; }
 .trash-workspace .trash-bulk-actions { flex-wrap: wrap; gap: 8px; }
 .trash-workspace .trash-select-all { max-width: 100%; line-height: 1.65; }
@@ -59,7 +62,8 @@
 .trash-workspace-history h3 { margin: 0 0 10px; font-size: 16px; }
 .trash-workspace-history-list { list-style: none; margin: 12px 0 0; padding: 0; max-height: 420px; overflow: auto; }
 .trash-workspace-history-list > li { border-top: 1px solid var(--line, #d2d7df); padding: 8px 0; }
-.trash-workspace-history-toggle { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; width: 100%; padding: 9px 4px; text-align: left; border: 0; background: transparent; color: inherit; font: inherit; font-size: 13px; cursor: pointer; }
+.trash-workspace-history-toggle { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; width: 100%; text-align: left; cursor: pointer; }
+.trash-workspace-history-toggle:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { padding: 9px 4px; border: 0; background: transparent; color: inherit; font: inherit; font-size: 13px; }
 .trash-workspace-history-toggle span { color: var(--ink-soft, #606877); line-height: 1.65; }
 .trash-workspace-history-detail { font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
 .trash-workspace-history-remove { margin-top: 12px; padding: 12px; border: 1px solid var(--line, #d2d7df); border-radius: 8px; }

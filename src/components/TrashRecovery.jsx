@@ -102,16 +102,16 @@ export default function TrashRecovery({onClose,onOpenFile}) {
         {loading&&<p>正在读取完整回收站…可以取消。</p>}
         {snapshot&&<>
           <fieldset className="trash-recovery-tools" disabled={busy||opening||!!confirmation}>
-            <label>查找<input aria-label="恢复项目查找" maxLength={128} value={query} onChange={e=>{setQuery(e.target.value);setPage(0);quiet()}}/></label>
-            <label>类型<UiSelect aria-label="恢复项目类型" value={type} onChange={e=>{setType(e.target.value);setPage(0);quiet()}}><option value="all">全部</option><option value="note">笔记</option><option value="folder">文件夹</option></UiSelect></label>
-            <UiButton type="button" disabled={!selected.length} onClick={()=>{setSelected([]);quiet()}}>清空选择</UiButton>
+            <label>查找<UiInput size="middle" aria-label="恢复项目查找" maxLength={128} value={query} onChange={e=>{setQuery(e.target.value);setPage(0);quiet()}}/></label>
+            <label>类型<UiSelect size="middle" aria-label="恢复项目类型" value={type} onChange={e=>{setType(e.target.value);setPage(0);quiet()}}><option value="all">全部</option><option value="note">笔记</option><option value="folder">文件夹</option></UiSelect></label>
+            <UiButton size="middle" type="button" disabled={!selected.length} onClick={()=>{setSelected([]);quiet()}}>清空选择</UiButton>
           </fieldset>
-          <div className="trash-recovery-items" aria-label="回收站恢复来源">{rows.slice(page*50,(page+1)*50).map(row=><article key={row.id} data-recovery-item={row.id}><label><input type="checkbox" aria-label={`选择恢复 ${row.title}`} checked={selected.includes(row.id)} disabled={blocked||!!confirmation} onChange={()=>toggle(row.id)}/><strong>{row.title||'未命名'}</strong></label><small>{row.is_folder?'文件夹':'笔记'} · 原位置：{row.parent_id?(byID.get(row.parent_id)?.title||'已缺失目录'):'根目录'}{row.parent_id&&byID.get(row.parent_id)?.is_deleted?'（也在回收站）':''}</small></article>)}</div>
+          <div className="trash-recovery-items" aria-label="回收站恢复来源">{rows.slice(page*50,(page+1)*50).map(row=><article key={row.id} data-recovery-item={row.id}><label><input data-ui-native="checkbox" type="checkbox" aria-label={`选择恢复 ${row.title}`} checked={selected.includes(row.id)} disabled={blocked||!!confirmation} onChange={()=>toggle(row.id)}/><strong>{row.title||'未命名'}</strong></label><small>{row.is_folder?'文件夹':'笔记'} · 原位置：{row.parent_id?(byID.get(row.parent_id)?.title||'已缺失目录'):'根目录'}{row.parent_id&&byID.get(row.parent_id)?.is_deleted?'（也在回收站）':''}</small></article>)}</div>
           {!rows.length&&<p>{query?'没有匹配的普通回收站项目。':'当前没有此类型的普通回收站项目。模板不在本工作台恢复范围。'}</p>}
           <nav aria-label="恢复来源分页"><span>{rows.length} 项 · 第 {page+1}/{pages} 页</span><UiButton type="button" disabled={page===0||busy||opening||!!confirmation} onClick={()=>setPage(p=>p-1)}>上一页</UiButton><UiButton type="button" disabled={page+1>=pages||busy||opening||!!confirmation} onClick={()=>setPage(p=>p+1)}>下一页</UiButton></nav>
           {!!selected.length&&<details><summary>已选择 {selected.length} 个来源（跨页保留）</summary><ul>{selected.map(id=><li key={id}>{byID.get(id)?.title||id}</li>)}</ul></details>}
           <fieldset className="trash-recovery-destination" disabled={blocked||!!confirmation}>
-            <legend>恢复位置</legend><label><input type="radio" name="recovery-mode" checked={mode==='original'} onChange={()=>{setMode('original');quiet()}}/>各自原位置</label><label><input type="radio" name="recovery-mode" checked={mode==='target'} onChange={()=>{setMode('target');quiet()}}/>指定现存目录</label>
+            <legend>恢复位置</legend><label><input data-ui-native="radio" type="radio" name="recovery-mode" checked={mode==='original'} onChange={()=>{setMode('original');quiet()}}/>各自原位置</label><label><input data-ui-native="radio" type="radio" name="recovery-mode" checked={mode==='target'} onChange={()=>{setMode('target');quiet()}}/>指定现存目录</label>
             {mode==='target'&&<label>目标<UiSelect aria-label="恢复目标文件夹" value={parent} onChange={e=>{setParent(e.target.value);quiet()}}><option value="">根目录</option>{targets.map(r=><option key={r.id} value={r.id}>{r.title||'未命名'} · {r.id}</option>)}</UiSelect></label>}
             <p>原父目录不可用时，可指定根目录或现存普通文件夹。不会自动重建、合并或改名。</p>
           </fieldset>

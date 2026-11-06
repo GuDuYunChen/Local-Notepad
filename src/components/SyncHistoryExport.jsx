@@ -1,6 +1,8 @@
 import { HISTORY_TIME_ALL } from '~/services/syncHistoryTime.mjs'
 import React, { useId, useLayoutEffect, useState } from 'react'
 import { HISTORY_EXPORT_LIMIT, prepareHistoryExport, requestHistoryDownload } from '~/services/syncHistoryExport.mjs'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 export default function SyncHistoryExport({ snapshot, query, kind, outcome, phase, composing, matched, timeFilter = HISTORY_TIME_ALL }) {
   const timeKey = `${timeFilter.mode}:${timeFilter.from}:${timeFilter.to}`
@@ -36,8 +38,8 @@ export default function SyncHistoryExport({ snapshot, query, kind, outcome, phas
   }
   return <div className="sync-history-export" data-history-export>
     <p id={hintID} className="sync-conflict-history-note">导出 JSON 只含当前显示记录的标题、对象与记录标识、时间和处理结果，不含正文或查找词。可能包含私人标题，分享前请检查；不是笔记备份。</p>
-    <button type="button" className="btn small" data-history-export-button aria-disabled={!!reason} aria-describedby={hintID + (reason ? ' ' + reasonID : '')}
-      onClick={download}>导出当前显示记录（JSON）</button>
+    <UiButton type="button" className="btn small" data-history-export-button aria-disabled={!!reason} aria-describedby={hintID + (reason ? ' ' + reasonID : '')}
+      onClick={download}>导出当前显示记录（JSON）</UiButton>
     {reason && <span id={reasonID} className="sync-history-export-reason" data-history-export-reason>{reason}</span>}
     <p className="sync-conflict-history-feedback" data-history-export-feedback role="status" aria-live="polite">{message}</p>
   </div>

@@ -5,6 +5,8 @@ import katex from 'katex'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useEditorPendingDraft } from '../hooks/useEditorPendingDraft'
 import 'katex/dist/katex.min.css'
+import { UiButton, UiTextarea } from '~/components/ui/ControlKit'
+
 
 const FORMULA_HISTORY_KEY = 'localNotepad.formulaHistory.v1'
 const FORMULA_FAVORITES_KEY = 'localNotepad.formulaFavorites.v1'
@@ -240,7 +242,7 @@ function FormulaComponent({ nodeKey, expression, displayMode }) {
           )}
         </span>
 
-        <textarea
+        <UiTextarea density="compact"
           value={draft}
           onChange={event => { if (editor.isEditable()) setDraft(event.target.value) }}
           placeholder="例如：E = mc^2"
@@ -264,14 +266,14 @@ function FormulaComponent({ nodeKey, expression, displayMode }) {
             <span className="formula-library-label">常用</span>
             <div className="formula-library-items">
               {COMMON_FORMULAS.map(item => (
-                <button
+                <UiButton density="compact"
                   type="button"
                   key={item.label}
                   onClick={() => { if (editor.isEditable()) setDraft(item.expression) }}
                   title={item.expression}
                 >
                   {item.label}
-                </button>
+                </UiButton>
               ))}
             </div>
           </div>
@@ -281,14 +283,14 @@ function FormulaComponent({ nodeKey, expression, displayMode }) {
               <span className="formula-library-label">收藏</span>
               <div className="formula-library-items favorites">
                 {favoriteFormulas.map(item => (
-                  <button
+                  <UiButton density="compact"
                     type="button"
                     key={item}
                     onClick={() => { if (editor.isEditable()) setDraft(item) }}
                     title={item}
                   >
                     ★ {item}
-                  </button>
+                  </UiButton>
                 ))}
               </div>
             </div>
@@ -299,14 +301,14 @@ function FormulaComponent({ nodeKey, expression, displayMode }) {
               <span className="formula-library-label">最近</span>
               <div className="formula-library-items recent">
                 {recentFormulas.map(item => (
-                  <button
+                  <UiButton density="compact"
                     type="button"
                     key={item}
                     onClick={() => { if (editor.isEditable()) setDraft(item) }}
                     title={item}
                   >
                     {item}
-                  </button>
+                  </UiButton>
                 ))}
               </div>
             </div>
@@ -314,31 +316,31 @@ function FormulaComponent({ nodeKey, expression, displayMode }) {
         </div>
 
         <span className="formula-editor-actions">
-          <button
+          <UiButton density="compact"
             type="button"
             className={blockMode ? 'active' : ''}
             onClick={() => { if (editor.isEditable()) setBlockMode(true) }}
           >
             独立公式
-          </button>
-          <button
+          </UiButton>
+          <UiButton density="compact"
             type="button"
             className={!blockMode ? 'active' : ''}
             onClick={() => { if (editor.isEditable()) setBlockMode(false) }}
           >
             行内公式
-          </button>
-          <button
+          </UiButton>
+          <UiButton density="compact"
             type="button"
             className={favoriteFormulas.includes(draft.trim()) ? 'active' : ''}
             onClick={toggleFavorite}
             disabled={!draft.trim()}
           >
             {favoriteFormulas.includes(draft.trim()) ? '取消收藏' : '收藏'}
-          </button>
-          <button type="button" onClick={discardDraft}>取消</button>
-          <button type="button" onClick={save}>完成</button>
-          <button type="button" className="danger" onClick={remove}>删除</button>
+          </UiButton>
+          <UiButton density="compact" type="button" onClick={discardDraft}>取消</UiButton>
+          <UiButton density="compact" type="button" onClick={save}>完成</UiButton>
+          <UiButton density="compact" type="button" className="danger" onClick={remove}>删除</UiButton>
         </span>
       </span>
     )

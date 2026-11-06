@@ -87,6 +87,10 @@
 }
 
 .focus-session-actions button {
+  cursor: pointer;
+}
+
+.focus-session-actions button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   height: 30px;
   padding: 0 9px;
   border: 1px solid var(--line);
@@ -95,15 +99,14 @@
   color: var(--ink-soft);
   font: inherit;
   font-size: 8px;
-  cursor: pointer;
 }
 
-.focus-session-actions button:hover {
+.focus-session-actions button:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-color: var(--line-strong);
   color: var(--ink);
 }
 
-.focus-session-actions button.primary {
+.focus-session-actions button.primary:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-color: var(--clay);
   background: var(--clay);
   color: #fff;

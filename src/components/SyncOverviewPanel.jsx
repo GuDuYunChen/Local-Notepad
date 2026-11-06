@@ -9,6 +9,8 @@ import './SyncHelpReturn.css'
 import SyncOverviewTimes from './SyncOverviewTimes'
 import SyncConflictHistoryPanel from './SyncConflictHistoryPanel'
 import SyncHistoryFileViewer from './SyncHistoryFileViewer'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 export default function SyncOverviewPanel({ onNavigate, ...input }) {
   const root = useRef(null)
@@ -33,26 +35,26 @@ export default function SyncOverviewPanel({ onNavigate, ...input }) {
     <div className={'sync-overview-status state-' + view.state} data-sync-guidance tabIndex={-1} role="region" aria-labelledby={guidanceTitleID}>
       <strong id={guidanceTitleID} role="status">{view.title}</strong><p>{view.detail}</p>
       {view.recoveryNotice && <p className="sync-overview-warning">{view.recoveryNotice}</p>}
-      <button type="button" className="btn small" disabled={!recommended?.available || typeof onNavigate !== 'function'}
-        onClick={() => navigate(view.target)}>定位建议区域：{recommended?.label}</button>
-      <button type="button" className="btn small sync-help-shortcut" data-sync-help-shortcut
-        onClick={() => setHelpFailed(!focusSyncHelpTopic(root.current, help.key))}>查看相关帮助：{help.label}</button>
+      <UiButton type="button" className="btn small" disabled={!recommended?.available || typeof onNavigate !== 'function'}
+        onClick={() => navigate(view.target)}>定位建议区域：{recommended?.label}</UiButton>
+      <UiButton type="button" className="btn small sync-help-shortcut" data-sync-help-shortcut
+        onClick={() => setHelpFailed(!focusSyncHelpTopic(root.current, help.key))}>查看相关帮助：{help.label}</UiButton>
       {helpFailed && <p role="status">暂时无法定位帮助，请手动展开下方“操作帮助”；没有执行同步操作。</p>}
     </div>
     <SyncOverviewTimes view={view}/>
     <nav className="sync-overview-nav" aria-label="同步中心分区导航">
-      {view.destinations.map(item => <button key={item.key} type="button" className="sync-overview-link"
+      {view.destinations.map(item => <UiButton key={item.key} type="button" className="sync-overview-link"
         aria-label={'定位' + item.label} disabled={!item.available || typeof onNavigate !== 'function'}
         onClick={() => navigate(item.key)}>
         <strong>{item.label}<span aria-hidden="true"> →</span></strong>
         <span>{item.available ? item.detail : item.unavailableReason}</span>
-      </button>)}
+      </UiButton>)}
     </nav>
     <p className="sync-overview-note">导航只定位区域，不读取、不保存、不启用或执行同步；也不会清除草稿或代替冲突确认。</p>
     <SyncHelpPanel/>
     <div className="sync-help-return">
-      <button type="button" className="btn small sync-help-return-button" data-sync-help-return
-        onClick={() => setReturnFailed(!focusSyncCurrentGuidance(root.current))}>返回当前状态提示</button>
+      <UiButton type="button" className="btn small sync-help-return-button" data-sync-help-return
+        onClick={() => setReturnFailed(!focusSyncCurrentGuidance(root.current))}>返回当前状态提示</UiButton>
       <span className="sync-help-return-note">只定位，不刷新、不执行同步；保留已展开的帮助。</span>
       {returnFailed && <p className="sync-help-return-error" role="status">暂时无法返回状态提示，请向上查看当前页面；没有刷新或执行同步。</p>}
     </div>

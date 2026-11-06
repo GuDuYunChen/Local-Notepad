@@ -1,5 +1,6 @@
 .global-search-tabs { display: flex; gap: 8px; padding: 0 24px 12px; flex-shrink: 0; }
-.global-search-tabs button[aria-selected=true] { background: var(--clay-light); border-color: var(--clay); font-weight: 600; }
+.global-search-tabs button[aria-selected=true] { font-weight: 600; }
+.global-search-tabs button[aria-selected=true]:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { background: var(--clay-light); border-color: var(--clay); }
 .global-search-mode { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .global-search-panel [hidden] { display: none !important; }
 .search-collections { flex: 1; min-height: 0; overflow: auto; padding: 0 24px 24px; font-size: 13px; line-height: 1.7; overscroll-behavior: contain; }
@@ -28,10 +29,13 @@
 /* Collection form controls: one shared height and baseline across the toolbar. */
 .search-collections-tools{align-items:end;gap:10px}
 .search-collections-tools label{min-width:0}
-.search-collections-tools :is(input:not([type=file]),select.ui-control){width:100%;min-width:0;min-height:40px;height:40px;box-sizing:border-box;padding:8px 12px;border:1px solid var(--control-border,var(--line-strong));border-radius:8px;background:var(--paper-deep,var(--surface));color:var(--ink);font:inherit;line-height:1.4;box-shadow:none}
-.search-collections-tools :is(input:not([type=file]),select.ui-control):focus-visible{outline:2px solid var(--clay);outline-offset:2px}
-.search-collections-tools select.ui-control{padding-right:34px;color-scheme:dark}
-.search-collections-tools > button{min-height:40px;height:40px;box-sizing:border-box;align-self:end;white-space:nowrap}
+.search-collections-tools :is(input:not([type=file]),select.ui-control){width:100%;min-width:0;box-sizing:border-box}
+.search-collections-tools :is(input:not([type=file]),select.ui-control):where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)){min-height:40px;height:40px;padding:8px 12px;border:1px solid var(--control-border,var(--line-strong));border-radius:8px;background:var(--paper-deep,var(--surface));color:var(--ink);font:inherit;line-height:1.4;box-shadow:none}
+.search-collections-tools :is(input:not([type=file]),select.ui-control):focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)){outline:2px solid var(--clay);outline-offset:2px}
+.search-collections-tools select.ui-control{color-scheme:dark}
+.search-collections-tools select.ui-control:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)){padding-right:34px}
+.search-collections-tools > button{box-sizing:border-box;align-self:end;white-space:nowrap}
+.search-collections-tools > button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)){min-height:40px;height:40px}
 .search-collections-tools :is(input,select):disabled,.search-collections-tools > button:disabled{opacity:.55;cursor:not-allowed}
 .search-collections-import .ui-file-control{display:block;max-width:100%;margin-top:8px}
 @media(max-width:640px){.search-collections-tools{align-items:stretch}.search-collections-tools label{flex:1 1 100%}.search-collections-tools > button{width:100%}}

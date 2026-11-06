@@ -28,7 +28,7 @@
   gap: 4px;
 }
 
-.close-panel-btn {
+.close-panel-btn:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   font-size: 18px !important;
   line-height: 1;
   padding: 2px 6px !important;
@@ -121,14 +121,17 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px;
-  border-radius: 4px;
   cursor: pointer;
   transition: background 0.15s;
   list-style: none;
 }
 
-.daily-note-item:hover {
+.daily-note-item:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
+  padding: 8px;
+  border-radius: 4px;
+}
+
+.daily-note-item:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   background: var(--hover);
 }
 
@@ -158,10 +161,12 @@
 .daily-notes-panel .daily-jump { display: flex; align-items: end; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
 .daily-notes-panel .daily-jump label, .daily-notes-panel .daily-search { display: flex; flex-direction: column; gap: 6px; font-size: 12px; min-width: 0; }
 .daily-notes-panel .daily-search { margin: 12px 0; }
-.daily-notes-panel input { box-sizing: border-box; min-width: 0; max-width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); color: var(--ink); font: inherit; }
+.daily-notes-panel input { box-sizing: border-box; min-width: 0; max-width: 100%; }
+.daily-notes-panel input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); color: var(--ink); font: inherit; }
 .daily-notes-panel .daily-scope, .daily-notes-panel .daily-unconfirmed { margin: 12px 0; color: var(--ink-soft); font-size: 12px; line-height: 1.7; }
 .daily-notes-panel .daily-unconfirmed button { margin: 6px 8px 0 0; }
 .daily-notes-panel .daily-pagination { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-top: 16px; font-size: 12px; }
 .daily-notes-panel button:disabled { opacity: .55; cursor: default; }
-.daily-notes-panel button:focus-visible, .daily-notes-panel input:focus-visible { outline: 2px solid var(--clay); outline-offset: 3px; }
+.daily-notes-panel button:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.daily-notes-panel input:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { outline: 2px solid var(--clay); outline-offset: 3px; }
 .daily-notes-panel .daily-note-title, .daily-notes-panel .daily-note-date { overflow-wrap: anywhere; min-width: 0; }

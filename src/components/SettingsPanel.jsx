@@ -182,7 +182,7 @@ export default function SettingsPanel({
           <p>常用选项和本地数据都集中在这里。</p>
         </div>
         <div className="settings-toolbar-actions">
-          <UiButton className="icon-btn" onClick={onClose} title="返回笔记" aria-label="返回笔记">×</UiButton>
+          <UiButton size="middle" className="icon-btn" onClick={onClose} title="返回笔记" aria-label="返回笔记">×</UiButton>
         </div>
       </header>
 
@@ -261,10 +261,10 @@ export default function SettingsPanel({
           </div>
 
           <div className="settings-action-row consumer-settings-actions">
-            <UiButton className="btn" onClick={() => void openFolder('backups')} disabled={!server?.backup_dir}>
+            <UiButton size="middle" className="btn" onClick={() => void openFolder('backups')} disabled={!server?.backup_dir}>
               打开备份文件夹
             </UiButton>
-            <UiButton className="btn" onClick={() => void openFolder('uploads')} disabled={!server?.upload_dir}>
+            <UiButton size="middle" className="btn" onClick={() => void openFolder('uploads')} disabled={!server?.upload_dir}>
               打开附件文件夹
             </UiButton>
           </div>
@@ -320,10 +320,10 @@ export default function SettingsPanel({
                   <span>仅用于排查问题，不会上传。</span>
                 </div>
                 <div className="settings-toolbar-actions">
-                  <UiButton className="btn small" onClick={() => void refresh()} disabled={loading}>
+                  <UiButton size="middle" className="btn small" onClick={() => void refresh()} disabled={loading}>
                     {loading ? '刷新中…' : '刷新'}
                   </UiButton>
-                  <UiButton className="btn small" onClick={() => void copyDiagnostics()}>复制诊断信息</UiButton>
+                  <UiButton size="middle" className="btn small" onClick={() => void copyDiagnostics()}>复制诊断信息</UiButton>
                 </div>
               </div>
 

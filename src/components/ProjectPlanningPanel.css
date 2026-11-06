@@ -138,20 +138,23 @@
 
 .project-plan-fields input {
   width: 100%;
+  box-sizing: border-box;
+}
+
+.project-plan-fields input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   height: 28px;
   padding: 0 6px;
   border: 1px solid var(--line);
   border-radius: 6px;
   outline: 0;
-  box-sizing: border-box;
   background: var(--paper);
   color: var(--ink);
   font: inherit;
   font-size: 8px;
 }
 
-.project-plan-fields input:focus,
-.project-milestone-row input:focus {
+.project-plan-fields input:focus:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.project-milestone-row input:focus:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-color: var(--clay);
   box-shadow: 0 0 0 2px var(--clay-light);
 }
@@ -250,6 +253,9 @@
 .project-milestone-row input {
   min-width: 0;
   width: 100%;
+}
+
+.project-milestone-row input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   height: 25px;
   padding: 0 4px;
   border: 1px solid var(--line);
@@ -298,13 +304,16 @@
 .project-queue-open {
   min-width: 0;
   flex: 1;
+  text-align: left;
+  cursor: pointer;
+}
+
+.project-queue-open:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   padding: 1px 2px;
   border: 0;
   background: transparent;
   color: var(--ink-soft);
   font: inherit;
-  text-align: left;
-  cursor: pointer;
 }
 
 .project-queue-open strong,
@@ -339,6 +348,10 @@
 
 .project-queue-actions button {
   width: 22px;
+  cursor: pointer;
+}
+
+.project-queue-actions button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   height: 22px;
   padding: 0;
   border: 1px solid transparent;
@@ -347,10 +360,9 @@
   color: var(--ink-muted);
   font: inherit;
   font-size: 7px;
-  cursor: pointer;
 }
 
-.project-queue-actions button:hover:not(:disabled) {
+.project-queue-actions button:hover:not(:disabled):where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-color: var(--line);
   background: var(--surface);
   color: var(--ink);

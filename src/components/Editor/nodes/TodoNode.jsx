@@ -2,6 +2,8 @@ import { $getNodeByKey, DecoratorNode } from 'lexical'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { useLexicalEditable } from '@lexical/react/useLexicalEditable'
 import React, { useEffect, useState } from 'react'
+import { UiButton, UiInput } from '~/components/ui/ControlKit'
+
 
 export class TodoNode extends DecoratorNode {
   __checked
@@ -118,7 +120,7 @@ function TodoComponent({ nodeKey, checked, text }) {
 
   return (
     <div className={`todo-block${isChecked ? ' checked' : ''}`}>
-      <input
+      <input data-ui-native="checkbox"
         type="checkbox"
         checked={isChecked}
         disabled={!isEditable}
@@ -128,7 +130,7 @@ function TodoComponent({ nodeKey, checked, text }) {
       />
 
       {isEditing ? (
-        <input
+        <UiInput density="compact"
           type="text"
           value={editText}
           readOnly={!isEditable}
@@ -151,7 +153,7 @@ function TodoComponent({ nodeKey, checked, text }) {
           autoFocus={isEditable}
         />
       ) : (
-        <button
+        <UiButton density="compact"
           type="button"
           className="todo-text todo-text-button"
           onClick={() => { if (editor.isEditable()) setIsEditing(true) }}
@@ -159,7 +161,7 @@ function TodoComponent({ nodeKey, checked, text }) {
           title={isEditable ? '点击编辑' : undefined}
         >
           {editText || '待办事项'}
-        </button>
+        </UiButton>
       )}
     </div>
   )

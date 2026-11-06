@@ -1,6 +1,8 @@
 import React, { useEffect, useId, useRef, useState } from 'react'
 import { filterLocalActions, LOCAL_ACTION_CATEGORIES, LOCAL_ACTION_QUERY_LIMIT } from '../services/localActions.mjs'
 import './LocalActions.css'
+import { UiButton, UiInput, UiSelect } from '~/components/ui/ControlKit'
+
 
 export default function LocalActions({ open, onClose, onExecute, contextVersion }) {
   const [query, setQuery] = useState(''), [category, setCategory] = useState('全部')
@@ -60,17 +62,17 @@ export default function LocalActions({ open, onClose, onExecute, contextVersion 
   if (!open) return null
   return <div className="local-actions-overlay" data-running={busy} onMouseDown={event => { if (event.target === event.currentTarget && !busy) close() }}>
     <section ref={panel} className="local-actions" role="dialog" aria-modal="true" aria-labelledby={uid + '-title'} onKeyDownCapture={keyboard}>
-      <header><div><p className="local-actions-eyebrow">仅本机 · 功能导航</p><h2 id={uid + '-title'}>快捷操作</h2></div><button type="button" className="btn" aria-label="关闭快捷操作" onClick={close}>关闭</button></header>
+      <header><div><p className="local-actions-eyebrow">仅本机 · 功能导航</p><h2 id={uid + '-title'}>快捷操作</h2></div><UiButton size="middle" type="button" className="btn" aria-label="关闭快捷操作" onClick={close}>关闭</UiButton></header>
       <div className="local-actions-controls">
-        <label className="local-actions-query">查找功能<input ref={input} value={query} maxLength={LOCAL_ACTION_QUERY_LIMIT} disabled={busy} role="combobox" aria-label="查找本地功能" aria-expanded="true" aria-controls={uid + '-list'} aria-activedescendant={active ? uid + '-' + active.id : undefined} autoComplete="off" placeholder="例如：待办、附件、备份…" onCompositionStart={() => { composing.current = true }} onCompositionEnd={() => { composing.current = false }} onChange={e => { setQuery(e.target.value); setIndex(0); setNotice(''); setError('') }} /></label>
-        <label>分类<select aria-label="本地功能分类" value={category} disabled={busy} onChange={e => { setCategory(e.target.value); setIndex(0); setNotice(''); setError('') }}>{LOCAL_ACTION_CATEGORIES.map(c => <option key={c}>{c}</option>)}</select></label>
+        <label className="local-actions-query">查找功能<UiInput size="middle" ref={input} value={query} maxLength={LOCAL_ACTION_QUERY_LIMIT} disabled={busy} role="combobox" aria-label="查找本地功能" aria-expanded="true" aria-controls={uid + '-list'} aria-activedescendant={active ? uid + '-' + active.id : undefined} autoComplete="off" placeholder="例如：待办、附件、备份…" onCompositionStart={() => { composing.current = true }} onCompositionEnd={() => { composing.current = false }} onChange={e => { setQuery(e.target.value); setIndex(0); setNotice(''); setError('') }} /></label>
+        <label>分类<UiSelect size="middle" aria-label="本地功能分类" value={category} disabled={busy} onChange={e => { setCategory(e.target.value); setIndex(0); setNotice(''); setError('') }}>{LOCAL_ACTION_CATEGORIES.map(c => <option key={c}>{c}</option>)}</UiSelect></label>
       </div>
       <div className="local-actions-feedback" aria-live="polite">{error ? <p role="alert">{error}</p> : <p role="status">{notice || `${rows.length} 个本地入口；只打开功能，不自动修改、恢复或删除资料。`}</p>}</div>
       <div id={uid + '-list'} className="local-actions-results" role="listbox" aria-label="本地功能" aria-busy={busy}>
-        {rows.map((a, i) => <button key={a.id} id={uid + '-' + a.id} role="option" aria-selected={active?.id === a.id} tabIndex={-1} type="button" disabled={busy} data-local-action={a.id} onMouseMove={() => setIndex(i)} onClick={() => void run(a)}><span className="local-actions-category">{a.category}</span><span><strong>{a.label}</strong><small>{a.description}</small></span><span aria-hidden="true">↗</span></button>)}
+        {rows.map((a, i) => <UiButton size="middle" key={a.id} id={uid + '-' + a.id} role="option" aria-selected={active?.id === a.id} tabIndex={-1} type="button" disabled={busy} data-local-action={a.id} onMouseMove={() => setIndex(i)} onClick={() => void run(a)}><span className="local-actions-category">{a.category}</span><span><strong>{a.label}</strong><small>{a.description}</small></span><span aria-hidden="true">↗</span></UiButton>)}
         {!rows.length && <p className="local-actions-empty">没有匹配的本地功能，请修改关键词或分类。</p>}
       </div>
-      <footer><span>↑ ↓ 选择 · Enter 打开 · Esc 取消<br />不占用已有全局快捷键</span><button type="button" className="btn primary" disabled={busy || !active} onClick={() => void run(active)}>{busy ? '等待原入口确认…' : '打开所选功能'}</button></footer>
+      <footer><span>↑ ↓ 选择 · Enter 打开 · Esc 取消<br />不占用已有全局快捷键</span><UiButton size="middle" type="button" className="btn primary" disabled={busy || !active} onClick={() => void run(active)}>{busy ? '等待原入口确认…' : '打开所选功能'}</UiButton></footer>
     </section>
   </div>
 }
