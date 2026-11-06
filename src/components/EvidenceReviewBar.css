@@ -27,7 +27,7 @@
 .evidence-review-actions button[aria-pressed="true"]:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
 .evidence-review-actions .evidence-review-return:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { border-color: var(--clay); background: var(--clay-light); }
 .evidence-review-actions button:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { outline: 2px solid var(--clay); outline-offset: 2px; }
-.evidence-review-actions button:disabled { opacity: .5; cursor: default; }
+.evidence-review-actions button:disabled:where(:not([data-ui-control], .ant-btn)) { opacity: .5; cursor: default; }
 @media (max-width: 560px) {
   .evidence-review-bar { padding: 10px 12px; }
   .evidence-review-actions { width: 100%; }
