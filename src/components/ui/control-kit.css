@@ -37,6 +37,10 @@ input[data-ui-native="checkbox"], input[data-ui-native="radio"], input[data-ui-n
 /* The complete field, not its label alone, owns wrapping in filter/action rows. */
 :where([class$="-tools"], [class$="-filter"], [class$="-filters"], [class$="-controls"]) > label:has(> [data-ui-control]) { display:flex; flex-direction:column; gap:6px; min-width:0; }
 :where([class$="-tools"], [class$="-filter"], [class$="-filters"], [class$="-controls"]) > label > :where([data-ui-control="input"], [data-ui-control="select"], [data-ui-control="password"]) { width:100%; }
+:where([class$="-tools"], [class$="-filter"], [class$="-filters"], [class$="-controls"]) > label > :where([data-ui-control="input"], [data-ui-control="password"]) { min-height:40px; }
+:where([class$="-tools"], [class$="-filter"], [class$="-filters"], [class$="-controls"]) > label > [data-ui-control="select"] { min-height:40px; }
+:where([class$="-tools"], [class$="-filter"], [class$="-filters"], [class$="-controls"]) > label > [data-ui-control="select"] > .ant-select { height:40px; }
+:where([class$="-tools"], [class$="-filter"], [class$="-filters"], [class$="-controls"]) > label > [data-ui-control="select"] > .ant-select .ant-select-selector { min-height:40px; }
 :where([class$="-tools"], [class$="-filter"], [class$="-filters"], [class$="-controls"]) > [data-ui-control="button"] { align-self:flex-end; }
 :where([class$="-tools"], [class$="-filter"], [class$="-filters"], [class$="-controls"]) > [data-ui-control="button"][data-ui-layout="action"] { min-height:40px; }
 :where(.pinned-tools, .search-collections-tools, .sync-auto-controls) { align-items:end; gap:12px; }
