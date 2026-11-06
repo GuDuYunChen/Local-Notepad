@@ -532,13 +532,12 @@ body {
   display: none;
 }
 
-.editor-toolbar .btn,
-.editor-toolbar .select {
+.editor-toolbar [data-ui-control="button"],
+.editor-toolbar [data-ui-control="select"] {
   min-width: 30px !important;
 }
 
-.editor-toolbar .btn:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
-.editor-toolbar .select:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
+
   height: 30px !important;
   border-radius: 7px !important;
 }
@@ -794,8 +793,7 @@ body {
   margin-top: 7px;
 }
 
-.toolbar-more-menu .select:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
-.toolbar-more-menu .btn:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
+
   height: 32px !important;
 }
 
@@ -3534,7 +3532,7 @@ body {
   white-space: nowrap;
 }
 
-.name-dialog-option-row .select {
+.name-dialog-option-row [data-ui-control="select"] {
   max-width: 164px;
 }
 
@@ -3666,7 +3664,7 @@ body {
     padding: 10px 0;
   }
 
-  .name-dialog-option-row .select {
+  .name-dialog-option-row [data-ui-control="select"] {
     width: 100%;
     max-width: none;
   }
@@ -4463,7 +4461,7 @@ body {
   box-shadow: var(--shadow-pop);
 }
 
-.toolbar-link-popover .input {
+.toolbar-link-popover [data-ui-control="input"] {
   min-width: 0;
 }
 
