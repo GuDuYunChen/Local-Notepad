@@ -27,7 +27,7 @@ async function open(text = raw(), wait = true) {await act(async () => {
     if (wait) await uiValue(readHistoryFile.mock.results.at(-1)).catch(() => {});
   });}
 async function click(node) {await act(async () => node.click());}
-async function choose(node, value) {await act(async () => {setUiValue(node, value);node.dispatchEvent(new Event('change', { bubbles: true }));});}
+async function choose(node, value) {await act(async () => {await setUiValue(node, value);node.dispatchEvent(new Event('change', { bubbles: true }));});}
 async function fill(node, value) {await act(async () => {
     setUiValue(node, value);
     node.dispatchEvent(new Event('input', { bubbles: true }));node.dispatchEvent(new Event('change', { bubbles: true }));
