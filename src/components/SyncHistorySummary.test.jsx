@@ -20,10 +20,10 @@ async function render() {await act(async () => root.render(<Panel />));await act
 async function click(name) {await act(async () => {control(name).click();await Promise.resolve();});}
 async function read() {await render();await click('read');}
 async function input(value, composing = false) {await act(async () => {
-    const n = control('query');setUiValue(n, value);
+    const n = control('query');await setUiValue(n, value);
     n.dispatchEvent(new InputEvent('input', { bubbles: true, isComposing: composing }));
   });}
-async function choose(name, value) {await act(async () => {const n = control(name);setUiValue(n, value);n.dispatchEvent(new Event('change', { bubbles: true }));});}
+async function choose(name, value) {await act(async () => {const n = control(name);await setUiValue(n, value);n.dispatchEvent(new Event('change', { bubbles: true }));});}
 beforeEach(() => {oldAct = globalThis.IS_REACT_ACT_ENVIRONMENT;globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   api.mockReset();api.mockResolvedValue(historyPage(items()));host = document.createElement('div');document.body.append(host);root = createRoot(host);});
 afterEach(async () => {await act(async () => root.unmount());host.remove();vi.restoreAllMocks();globalThis.IS_REACT_ACT_ENVIRONMENT = oldAct;});
@@ -66,7 +66,7 @@ it('stop preserves counts with provenance and late response cannot replace them'
 });
 it('server-filter changes remove incompatible old counts while unread and after failure', async () => {
   await read();api.mockRejectedValueOnce(Error('failed'));
-  await act(async () => {const n = uiQuery(host, 'select');setUiValue(n, 'superseded');n.dispatchEvent(new Event('change', { bubbles: true }));});
+  await act(async () => {const n = uiQuery(host, 'select');await setUiValue(n, 'superseded');n.dispatchEvent(new Event('change', { bubbles: true }));});
   expect(summaries()).toBeNull();expect(uiText(host)).toContain('尚无可核实');
 });
 it('composition uses the committed query until completion and does not fetch', async () => {
