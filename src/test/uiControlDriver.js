@@ -38,6 +38,8 @@ export async function openUiSelect(node) {
   // Dispatch one real bubbling pointer-start event through the adapter boundary.
   flushSync(()=>surface.dispatchEvent(new MouseEvent('mousedown',{bubbles:true,button:0,cancelable:true})))
  }
+ // aria-expanded changes before rc-trigger's portal has committed its option list.
+ // Wait for the actual visible popup instead of treating trigger state as readiness.
  return vi.waitFor(() => {
   const popup=popupFor(trigger)
   if(!popup) throw Error('Select popup portal has not mounted yet')
