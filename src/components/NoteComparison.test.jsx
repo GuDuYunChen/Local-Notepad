@@ -11,7 +11,7 @@ const drain = async () => {for (let i = 0; i < 30; i++) await Promise.resolve();
 const button = (text, owner = document) => [...uiQueryAll(owner, 'button')].find((n) => uiText(n).trim() === text || n.getAttribute('aria-label') === text);
 const click = async (text, owner = document) => act(async () => {const n = button(text, owner);expect(n, text).toBeTruthy();expect(uiDisabled(n), text).toBe(false);n.focus();n.click();await drain();});
 const select = async (id, side) => click(side === 'left' ? '设为左侧' : '设为右侧', uiQuery(document, '[data-compare-note="' + id + '"]'));
-const change = async (selector, value) => act(async () => {const n = uiQuery(document, selector);expect(n).toBeTruthy();const proto = n.tagName === 'SELECT' ? HTMLSelectElement.prototype : HTMLInputElement.prototype;setUiValue(n, value);n.dispatchEvent(new Event(n.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true }));await drain();});
+const change = async (selector, value) => act(async () => {const n = uiQuery(document, selector);expect(n).toBeTruthy();const proto = n.tagName === 'SELECT' ? HTMLSelectElement.prototype : HTMLInputElement.prototype;await setUiValue(n, value);n.dispatchEvent(new Event(n.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true }));await drain();});
 const compare = async () => {await select('a', 'left');await select('b', 'right');await click('开始比较');await awaitComparisonResult();};
 function Harness() {const [show, setShow] = useState(true);return <>{show && <NoteComparison onClose={() => {closed();setShow(false);}} onOpenFile={opened} />}</>;}
 beforeEach(async () => {
