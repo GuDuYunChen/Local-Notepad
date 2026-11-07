@@ -16,7 +16,7 @@ async function render(patch = {}) {await act(async () => root.render(<GlobalSear
 async function change(element, value) {
   await act(async () => {
     const proto = element.tagName === 'SELECT' ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
-    setUiValue(element, value);
+    await setUiValue(element, value);
     element.dispatchEvent(new Event('input', { bubbles: true }));element.dispatchEvent(new Event('change', { bubbles: true }));
   });
   await advance();
