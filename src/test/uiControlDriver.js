@@ -38,6 +38,9 @@ export async function openUiSelect(node) {
   // Dispatch one real bubbling pointer-start event through the adapter boundary.
   flushSync(()=>surface.dispatchEvent(new MouseEvent('mousedown',{bubbles:true,button:0,cancelable:true})))
  }
+ // rc-trigger defers its portal creation to an animation-frame turn. Tests using
+ // fake timers must advance that turn explicitly before polling the real DOM.
+ if(vi.isFakeTimers()) await vi.advanceTimersByTimeAsync(50)
  // aria-expanded changes before rc-trigger's portal has committed its option list.
  // Wait for the actual visible popup instead of treating trigger state as readiness.
  return vi.waitFor(() => {
