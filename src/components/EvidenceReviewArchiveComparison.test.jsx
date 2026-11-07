@@ -25,7 +25,7 @@ async function click(node) {expect(node).toBeTruthy();await act(async () => node
 async function change(node, value) {
   await act(async () => {
     const proto = node.tagName === 'SELECT' ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
-    setUiValue(node, value);
+    await setUiValue(node, value);
     node.dispatchEvent(new Event('input', { bubbles: true }));node.dispatchEvent(new Event('change', { bubbles: true }));
   });
 }
@@ -71,7 +71,7 @@ describe('read-only review archive comparison', () => {
   });
   it('can select all saved snapshots across the archive manager page boundary', async () => {
     const pairs = [savePair(), savePair(), savePair()];await render();
-    expect(uiOptions(byLabel('对比基准存档')).length).toBe(7);
+    expect((await uiOptions(byLabel('对比基准存档'))).length).toBe(7);
     await compare([pairs[0][0], pairs[2][1]]);
     expect(uiText(panel())).toContain('共同 3 章');
   });
@@ -82,8 +82,8 @@ describe('read-only review archive comparison', () => {
     localStorage.setItem(REVIEW_ARCHIVE_PREFIX + 'broken', 'invalid');
     await render();await change(byLabel('存档查看范围'), 'all');
     await change(byLabel('对比基准存档'), REVIEW_ARCHIVE_PREFIX + pair[0].id);
-    expect(uiOptions(byLabel('对比目标存档')).length).toBe(2);
-    expect(uiOptions(byLabel('对比基准存档')).length).toBe(5);
+    expect((await uiOptions(byLabel('对比目标存档'))).length).toBe(2);
+    expect((await uiOptions(byLabel('对比基准存档'))).length).toBe(5);
   });
   it('compares without changing the active review or writing to persistent storage', async () => {
     const pair = savePair();evidenceReview.restoreArchive(data());
