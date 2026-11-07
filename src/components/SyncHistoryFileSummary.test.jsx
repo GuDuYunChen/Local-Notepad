@@ -46,8 +46,8 @@ it('an off-page match updates both dimensions and does not fabricate a missing t
   expect(uiText(s('no-time'))).toContain('全部缺失');expect(s('earliest')).toBeNull();expect(document.activeElement).toBe(c('query'));
 });
 it('combined filters remain the same intersection as the file list', async () => {
-  await open();await act(async () => {setUiValue(c('kind'), 'tag');c('kind').dispatchEvent(new Event('change', { bubbles: true }));});
-  await act(async () => {setUiValue(c('outcome'), 'local');c('outcome').dispatchEvent(new Event('change', { bubbles: true }));});
+  await open();await act(async () => {await setUiValue(c('kind'), 'tag');c('kind').dispatchEvent(new Event('change', { bubbles: true }));});
+  await act(async () => {await setUiValue(c('outcome'), 'local');c('outcome').dispatchEvent(new Event('change', { bubbles: true }));});
   expect(counts('outcome')).toEqual([10, 0, 0, 0]);expect(counts('kind')).toEqual([0, 10, 0, 0]);
 });
 it('no matches produce zeros and no invented date range', async () => {
