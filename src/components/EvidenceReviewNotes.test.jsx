@@ -37,7 +37,7 @@ async function click(el) {expect(el).toBeTruthy();await act(async () => {el.clic
 async function change(el, value) {
   await act(async () => {
     const proto = el.tagName === 'SELECT' ? HTMLSelectElement.prototype : el.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
-    setUiValue(el, value);
+    await setUiValue(el, value);
     el.dispatchEvent(new Event('input', { bubbles: true }));el.dispatchEvent(new Event('change', { bubbles: true }));
   });
 }
