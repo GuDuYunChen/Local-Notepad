@@ -23,7 +23,7 @@ it('diagnoses actual Select open, portal ownership and option event timing', asy
   await act(async()=>{root.render(<Fixture/>);await new Promise(r=>setTimeout(r,20))})
   snapshot('mounted')
   const input=host.querySelector('[role="combobox"]');expect(input).not.toBeNull()
-  try { await act(async()=>{openUiSelect(input)}) } catch(error) {console.log('SELECT_PROBE_SYNC_ERROR',error.message)}
+  try { await act(async()=>{await openUiSelect(input)}) } catch(error) {console.log('SELECT_PROBE_DRIVER_ERROR',error.message)}
   snapshot('after-synchronous-driver')
   await act(async()=>{await new Promise(r=>setTimeout(r,30))})
   snapshot('after-asynchronous-portal-turn')
