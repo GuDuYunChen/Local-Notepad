@@ -1,4 +1,5 @@
 import { flushSync } from 'react-dom'
+import { vi } from 'vitest'
 
 // Explicit interaction helpers for the real Ant Design DOM. Nothing overrides
 // document APIs, renders a substitute select, or calls application handlers.
@@ -17,7 +18,7 @@ function popupFor(node) {
  const trigger=triggerFor(node), id=trigger?.getAttribute('aria-controls')
  const list=id ? trigger.ownerDocument.getElementById(id) : null
  const linked=list?.closest('.ant-select-dropdown')
- if(linked)return linked
+ if(linked && !linked.classList.contains('ant-select-dropdown-hidden') && linked.getAttribute('aria-hidden')!=='true') return linked
  // rc-select may mount its portal one render after aria-controls is assigned.
  // Resolve the visible real popup in the configured dialog/body container.
  const owner=trigger?.ownerDocument
@@ -27,29 +28,30 @@ function popupFor(node) {
  const candidates=visible(scope)
  return candidates.at(-1) || (scope!==owner ? visible(owner).at(-1) : null) || null
 }
-export function openUiSelect(node) {
+export async function openUiSelect(node) {
  const trigger=triggerFor(node)
  const host=hostFor(trigger)
  if(!trigger || !host) throw Error('Expected a rendered UI selector')
  if(trigger.disabled) return null
  if(trigger.getAttribute('aria-expanded')!=='true') {
   const surface=trigger.closest('.ant-select')?.querySelector('.ant-select-selector') || trigger
-  // The shared adapter owns opening at its wrapper boundary. Dispatch one
-  // bubbling mousedown on the real selector surface; do not double-toggle it.
+  // Dispatch one real bubbling pointer-start event through the adapter boundary.
   flushSync(()=>surface.dispatchEvent(new MouseEvent('mousedown',{bubbles:true,button:0,cancelable:true})))
  }
- const popup=popupFor(trigger)
- if(!popup)throw Error('Select menu did not open: '+(trigger.getAttribute('aria-label')||trigger.id))
- return popup
+ return vi.waitFor(() => {
+  const popup=popupFor(trigger)
+  if(!popup) throw Error('Select popup portal has not mounted yet')
+  return popup
+ }, { timeout: 1500, interval: 10 })
 }
-export function uiOptions(node) {
+export async function uiOptions(node) {
  if(!isUiSelect(node))return node.options
- const popup=openUiSelect(node)
+ const popup=await openUiSelect(node)
  return popup ? [...popup.querySelectorAll('[data-ui-option-value]')] : []
 }
-export function uiSelectedOptions(node) {
+export async function uiSelectedOptions(node) {
  if(!isUiSelect(node))return node.selectedOptions
- return uiOptions(node).filter(option=>option.closest('.ant-select-item-option-selected'))
+ return (await uiOptions(node)).filter(option=>option.closest('.ant-select-item-option-selected'))
 }
 export function uiValue(node) {
  if(node?.matches?.('[data-ui-option-value]'))return node.getAttribute('data-ui-option-value')
@@ -58,22 +60,24 @@ export function uiValue(node) {
 }
 export function uiDisabled(node) { return isUiSelect(node) ? Boolean(triggerFor(node).disabled) : node.disabled }
 export function uiText(node) {
- if(isUiSelect(node))return uiOptions(node).map(option=>option.textContent).join('')
+ if(isUiSelect(node))return hostFor(node)?.querySelector('.ant-select-content')?.textContent || ''
  return node.textContent
 }
 export function setUiValue(node,value) {
- if(isUiSelect(node)) {
-  const trigger=triggerFor(node)
-  if(trigger.disabled)return value
-  const popup=openUiSelect(trigger)
-  const option=[...popup.querySelectorAll('[data-ui-option-value]')].find(item=>item.getAttribute('data-ui-option-value')===String(value))
-  if(!option)throw Error('Requested option is not available: '+String(value))
-  if(option.closest('.ant-select-item-option-disabled'))return value
-  option.click()
-  return value
- }
+ if(isUiSelect(node)) return setUiSelectValue(node,value)
  const prototype=node instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : node instanceof HTMLSelectElement ? HTMLSelectElement.prototype : node instanceof HTMLInputElement ? HTMLInputElement.prototype : null
  if(prototype)Object.getOwnPropertyDescriptor(prototype,'value').set.call(node,value)
  else node.value=value
+ return value
+}
+async function setUiSelectValue(node,value) {
+ const trigger=triggerFor(node)
+ if(trigger.disabled)return value
+ const popup=await openUiSelect(trigger)
+ const option=[...popup.querySelectorAll('[data-ui-option-value]')].find(item=>item.getAttribute('data-ui-option-value')===String(value))
+ if(!option)throw Error('Requested option is not available: '+String(value))
+ if(option.closest('.ant-select-item-option-disabled'))return value
+ option.click()
+ await Promise.resolve()
  return value
 }
