@@ -10,7 +10,7 @@ const drain = async () => {for (let i = 0; i < 30; i++) await Promise.resolve();
 const panel = () => uiQuery(document, '.library-statistics');
 const button = (text) => [...uiQueryAll(panel(), 'button')].find((b) => uiText(b).trim() === text || b.getAttribute('aria-label') === text);
 const click = async (text) => act(async () => {const b = button(text);expect(b, text).toBeTruthy();b.focus();b.click();await drain();});
-const input = async (label, value, tag = 'input') => act(async () => {const n = uiQuery(panel(), `${tag}[aria-label="${label}"]`);setUiValue(n, value);n.dispatchEvent(new Event(tag === 'select' ? 'change' : 'input', { bubbles: true }));await drain();});
+const input = async (label, value, tag = 'input') => act(async () => {const n = uiQuery(panel(), `${tag}[aria-label="${label}"]`);await setUiValue(n, value);n.dispatchEvent(new Event(tag === 'select' ? 'change' : 'input', { bubbles: true }));await drain();});
 const mount = async () => act(async () => {root.render(<LibraryStatistics onClose={onClose} onOpenFile={onOpen} />);await drain();});
 beforeEach(() => {vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);localStorage.clear();snapshot = fixture(60);api.mockReset().mockResolvedValue(snapshot);onClose = vi.fn();onOpen = vi.fn(async () => false);opener = document.createElement('button');document.body.append(opener);opener.focus();host = document.createElement('div');document.body.append(host);root = createRoot(host);});
 afterEach(async () => {await act(async () => root.unmount());host.remove();opener.remove();vi.useRealTimers();vi.restoreAllMocks();vi.unstubAllGlobals();});
