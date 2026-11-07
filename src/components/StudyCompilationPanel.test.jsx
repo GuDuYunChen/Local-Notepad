@@ -17,7 +17,7 @@ const button = (name) => [...uiQueryAll(host, 'button')].find((el) => uiText(el)
 const label = (name) => uiQuery(host, `[aria-label="${name}"]`);
 const click = (name) => act(async () => {expect(button(name)).toBeTruthy();button(name).click();});
 const render = (props) => act(async () => root.render(<CollectionStudyHub active sourceStore={source} studyStore={study} service={hub} onCompilationReceipt={onReceipt} {...props} />));
-async function change(name, value) {await act(async () => {const el = label(name);const type = el.tagName === 'TEXTAREA' ? HTMLTextAreaElement : el.tagName === 'SELECT' ? HTMLSelectElement : HTMLInputElement;setUiValue(el, value);el.dispatchEvent(new Event('input', { bubbles: true }));el.dispatchEvent(new Event('change', { bubbles: true }));});}
+async function change(name, value) {await act(async () => {const el = label(name);const type = el.tagName === 'TEXTAREA' ? HTMLTextAreaElement : el.tagName === 'SELECT' ? HTMLSelectElement : HTMLInputElement;await setUiValue(el, value);el.dispatchEvent(new Event('input', { bubbles: true }));el.dispatchEvent(new Event('change', { bubbles: true }));});}
 async function seed(number = 1) {for (let i = 0; i < number; i++) await study.saveNote(await study.load(entry, source), 'n' + i, 'revisit', '批注原文 ' + i + '\n😀', { sourceStore: source });}
 async function prepare() {await click('选择本页批注');await click('预览所选批注研究笔记');}
 beforeEach(() => {
