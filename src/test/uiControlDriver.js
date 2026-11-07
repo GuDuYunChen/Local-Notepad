@@ -41,6 +41,11 @@ export async function openUiSelect(node) {
  // rc-trigger defers its portal creation to an animation-frame turn. Tests using
  // fake timers must advance that turn explicitly before polling the real DOM.
  if(vi.isFakeTimers()) await vi.advanceTimersByTimeAsync(50)
+ else await new Promise(resolve => setTimeout(resolve, 32))
+ // rc-trigger schedules its portal after the trigger state update. Flush that
+ // queued React work after the frame turn, including when callers have an outer
+ // async act scope; polling alone cannot commit the deferred portal render.
+ flushSync(() => {})
  // aria-expanded changes before rc-trigger's portal has committed its option list.
  // Wait for the actual visible popup instead of treating trigger state as readiness.
  return vi.waitFor(() => {
