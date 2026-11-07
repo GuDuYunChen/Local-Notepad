@@ -19,7 +19,7 @@ async function click(node) {expect(node).toBeTruthy();await act(async () => {nod
 async function change(label, value) {
   await act(async () => {
     const node = field(label),proto = node.tagName === 'SELECT' ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
-    setUiValue(node, value);
+    await setUiValue(node, value);
     node.dispatchEvent(new Event('input', { bubbles: true }));node.dispatchEvent(new Event('change', { bubbles: true }));await flush();
   });
 }
