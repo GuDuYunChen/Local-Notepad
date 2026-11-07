@@ -22,7 +22,7 @@ async function change(label, value) {
   await act(async () => {
     const node = uiQuery(container, '[aria-label="' + label + '"]');
     const proto = node.tagName === 'SELECT' ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
-    setUiValue(node, value);
+    await setUiValue(node, value);
     node.dispatchEvent(new Event('input', { bubbles: true }));node.dispatchEvent(new Event('change', { bubbles: true }));
   });
 }
