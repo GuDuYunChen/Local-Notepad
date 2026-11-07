@@ -101,7 +101,7 @@ async function focusEditor() {
 async function field(element, value) {
   expect(element).toBeTruthy();
   await act(async () => {
-    setUiValue(element, value);
+    await setUiValue(element, value);
     element.dispatchEvent(new Event('input', { bubbles: true }));
   });
   await settle();
