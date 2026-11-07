@@ -13,7 +13,7 @@ const label = (name) => uiQuery(container, '[aria-label="' + name + '"]');
 const button = (text) => [...uiQueryAll(container, 'button')].find((el) => uiText(el) === text);
 const click = async (el) => {expect(el).toBeTruthy();await act(async () => el.click());};
 const advance = async () => act(async () => vi.advanceTimersByTimeAsync(220));
-async function change(el, value) {await act(async () => {setUiValue(el, value);el.dispatchEvent(new Event('input', { bubbles: true }));el.dispatchEvent(new Event('change', { bubbles: true }));});}
+async function change(el, value) {await act(async () => {await setUiValue(el, value);el.dispatchEvent(new Event('input', { bubbles: true }));el.dispatchEvent(new Event('change', { bubbles: true }));});}
 async function render(props = {}) {await act(async () => root.render(<GlobalSearchPanel open onClose={onClose} onOpenFile={onOpenFile} onOpened={onOpened} {...props} />));await advance();}
 const makeReport = () => collectSearchResultReport({ query: '' }, data(), { mode: 'all', request: async (f) => data(f.page) });
 async function seed(name = '设定资料') {let value;await act(async () => {value = searchCollections.save(name, await makeReport());});return SEARCH_COLLECTION_PREFIX + value.id;}
