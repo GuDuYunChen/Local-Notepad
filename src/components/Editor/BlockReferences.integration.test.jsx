@@ -130,7 +130,7 @@ describe('entry, saved source, review, insertion and exception lifecycle', () =>
 describe('block embedding and reload boundaries', () => {
   test('reviewed embedded insertion is a real block node and retains identity after reopen', async () => {
     await mount();await input(blockLocator('source', id));await click('读取来源块');
-    await act(async () => {const select = uiQuery(host, 'select');setUiValue(select, 'embed');select.dispatchEvent(new Event('change', { bubbles: true }));});
+    await act(async () => {const select = uiQuery(host, 'select');await setUiValue(select, 'embed');select.dispatchEvent(new Event('change', { bubbles: true }));});
     await click('确认插入嵌入');await flush();const state = JSON.parse(json(liveEditor));expect(state.root.children.some((n) => n.type === 'wiki-link' && n.embedded && n.blockId === id)).toBe(true);
     expect(uiQuery(host, '.block-reference-embed pre')?.textContent).toBe('来源正文');
     const e = editor();e.setEditorState(e.parseEditorState(state));expect(json(e)).toBe(JSON.stringify(state));
