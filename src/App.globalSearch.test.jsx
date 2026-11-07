@@ -88,7 +88,7 @@ async function openSavedCollection() {
   await click('打开全局检索入口');await settle();await click('本地资料集');
   await act(async () => {
     const el = uiQuery(container, '[aria-label="已保存资料集"]');
-    setUiValue(el, searchCollections.list().entries[0].key);
+    await setUiValue(el, searchCollections.list().entries[0].key);
     el.dispatchEvent(new Event('change', { bubbles: true }));
   });
 }
