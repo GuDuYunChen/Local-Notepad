@@ -7,7 +7,7 @@ let host, root, readers;
 const flush = async () => {for (let i = 0; i < 12; i++) await Promise.resolve();};
 const click = (selector) => act(async () => {uiQuery(host, selector).click();await flush();});
 const change = (selector, value) => act(async () => {
-  const select = uiQuery(host, selector);setUiValue(select, value);
+  const select = uiQuery(host, selector);await setUiValue(select, value);
   select.dispatchEvent(new Event('change', { bubbles: true }));await flush();
 });
 const rows = () => [...uiQueryAll(host, '[data-offline-result] tbody tr')];
@@ -47,7 +47,7 @@ it('offline scope UI requires confirmed comparison and enabled difference filter
 });
 it('offline scope UI offers exactly three labelled native options and valid control references', async () => {
   await start();const select = uiQuery(host, '[data-offline-scope]');
-  expect([...uiOptions(select)].map((n) => uiValue(n))).toEqual(['all', 'counts', 'bytes']);
+  expect([...await uiOptions(select)].map((n) => uiValue(n))).toEqual(['all', 'counts', 'bytes']);
   expect(uiText(select.closest('label'))).toContain('差异指标类型');
   for (const attr of ['aria-controls', 'aria-describedby']) expect(document.getElementById(select.getAttribute(attr))).not.toBeNull();
 });
