@@ -45,7 +45,7 @@ export async function openUiSelect(node) {
  // Wait for the actual visible popup instead of treating trigger state as readiness.
  return vi.waitFor(() => {
   const popup=popupFor(trigger)
-  if(!popup) throw Error('Select popup portal has not mounted yet')
+  if(!popup) throw Error('Select option listbox portal has not mounted yet')
   return popup
  }, { timeout: 1500, interval: 10 })
 }
