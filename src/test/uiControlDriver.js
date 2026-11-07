@@ -1,4 +1,4 @@
-import { flushSync } from 'react-dom'
+import { act } from 'react'
 import { vi } from 'vitest'
 
 // Explicit interaction helpers for the real Ant Design DOM. Nothing overrides
@@ -33,26 +33,20 @@ export async function openUiSelect(node) {
  const host=hostFor(trigger)
  if(!trigger || !host) throw Error('Expected a rendered UI selector')
  if(trigger.disabled) return null
- if(trigger.getAttribute('aria-expanded')!=='true') {
-  const surface=trigger.closest('.ant-select')?.querySelector('.ant-select-selector') || trigger
-  // Dispatch one real bubbling pointer-start event through the adapter boundary.
-  flushSync(()=>surface.dispatchEvent(new MouseEvent('mousedown',{bubbles:true,button:0,cancelable:true})))
- }
- // rc-trigger defers its portal creation to an animation-frame turn. Tests using
- // fake timers must advance that turn explicitly before polling the real DOM.
- if(vi.isFakeTimers()) await vi.advanceTimersByTimeAsync(50)
- else await new Promise(resolve => setTimeout(resolve, 32))
- // rc-trigger schedules its portal after the trigger state update. Flush that
- // queued React work after the frame turn, including when callers have an outer
- // async act scope; polling alone cannot commit the deferred portal render.
- flushSync(() => {})
- // aria-expanded changes before rc-trigger's portal has committed its option list.
- // Wait for the actual visible popup instead of treating trigger state as readiness.
- return vi.waitFor(() => {
-  const popup=popupFor(trigger)
-  if(!popup) throw Error('Select option listbox portal has not mounted yet')
-  return popup
- }, { timeout: 1500, interval: 10 })
+ // rc-trigger first updates aria-expanded, then schedules its portal commit.
+ // Keep the real pointer event and the deferred React render in one async act
+ // scope so the listbox is queried only after the actual DOM has committed.
+ await act(async () => {
+  if(trigger.getAttribute('aria-expanded')!=='true') {
+   const surface=trigger.closest('.ant-select')?.querySelector('.ant-select-selector') || trigger
+   surface.dispatchEvent(new MouseEvent('mousedown',{bubbles:true,button:0,cancelable:true}))
+  }
+  if(vi.isFakeTimers()) await vi.advanceTimersByTimeAsync(50)
+  else await new Promise(resolve => setTimeout(resolve,32))
+ })
+ const popup=popupFor(trigger)
+ if(!popup) throw Error('Select opened but its real option listbox did not mount')
+ return popup
 }
 export async function uiOptions(node) {
  if(!isUiSelect(node))return node.options
