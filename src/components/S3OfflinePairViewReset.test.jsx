@@ -14,7 +14,7 @@ const report = (files = 12, tags = 2) => ({ generatedAtUTC: '2026-10-01T00:00:00
     kinds: ['file', 'tag', 'file-tag', 'attachment'].map((kind, i) => ({ kind, records: [files, tags, 0, 0][i], record_bytes: [files * 64, tags * 64, 0, 0][i] })) } });
 const flush = async () => {for (let i = 0; i < 12; i++) await Promise.resolve();};
 const click = (selector) => act(async () => {uiQuery(host, selector).click();await flush();});
-const select = (selector, value) => act(async () => {const el = uiQuery(host, selector);setUiValue(el, value);el.dispatchEvent(new Event('change', { bubbles: true }));await flush();});
+const select = (selector, value) => act(async () => {const el = uiQuery(host, selector);await setUiValue(el, value);el.dispatchEvent(new Event('change', { bubbles: true }));await flush();});
 const choose = (side, value) => act(async () => {
   const el = uiQuery(host, `[data-offline-side="${side}"] input[type=file]`);
   if (value) read.mockResolvedValueOnce(value);
