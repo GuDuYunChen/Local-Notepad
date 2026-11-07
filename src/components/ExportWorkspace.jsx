@@ -1,3 +1,4 @@
+import { Button, Input } from './ui/Controls'
 import React, { useEffect, useRef, useState } from 'react'
 import { exportResult, exportStatusLabels, localExportBridge, localExportRequest, nativeExportFailure, validateExportSelection } from '../services/localExport.mjs'
 import './ExportWorkspace.css'
@@ -217,20 +218,20 @@ export default function ExportWorkspace({ ids, onClose, onReselect }) {
         onCompositionStart={() => { composing.current = true }} onCompositionEnd={() => { composing.current = false }}>
         <header className="export-workspace-header">
           <div><p className="export-eyebrow">本地文档</p><h2 id="local-export-title">导出笔记</h2></div>
-          <button type="button" className="icon-btn" aria-label="关闭导出工作台" disabled={busy || uncertain} onClick={close}>×</button>
+          <Button variant="icon" type="button" className="icon-btn" aria-label="关闭导出工作台" disabled={busy || uncertain} onClick={close}>×</Button>
         </header>
         <div className="export-workspace-body">
           <p id="local-export-source" className="export-source">导出已保存的笔记正文，不会保存或改动当前编辑草稿。预览就绪后，本批正文固定；附件会在导出时读取。每批创建独立文件夹，已有文件保留。</p>
           {!native.current && <p role="alert" className="export-error">本地文档导出需要桌面客户端。当前没有可用的桌面文件接口，未读取或写入任何导出文件。</p>}
-          <div className="export-selection"><span>已选择 {selection.current.length} 个笔记或文件夹</span>{!begun && <button type="button" className="btn small" onClick={reselect} disabled={busy || uncertain || unavailable}>更改选择</button>}</div>
+          <div className="export-selection"><span>已选择 {selection.current.length} 个笔记或文件夹</span>{!begun && <Button type="button" className="btn small" onClick={reselect} disabled={busy || uncertain || unavailable}>更改选择</Button>}</div>
           <fieldset className="export-format" disabled={busy || uncertain || unavailable || Boolean(begun)}>
             <legend>导出格式</legend>
-            <label><input type="radio" name="local-export-format" value="markdown" checked={format === 'markdown'} onChange={() => changeFormat('markdown')} />Markdown <small>正文和本地附件放在一起</small></label>
-            <label><input type="radio" name="local-export-format" value="docx" checked={format === 'docx'} onChange={() => changeFormat('docx')} />Word 文档 <small>可用 Word 或兼容软件打开</small></label>
+            <label><Input type="radio" name="local-export-format" value="markdown" checked={format === 'markdown'} onChange={() => changeFormat('markdown')} />Markdown <small>正文和本地附件放在一起</small></label>
+            <label><Input type="radio" name="local-export-format" value="docx" checked={format === 'docx'} onChange={() => changeFormat('docx')} />Word 文档 <small>可用 Word 或兼容软件打开</small></label>
           </fieldset>
-          {!plan && <button type="button" className="btn primary" data-local-export-prepare disabled={busy || unavailable || !native.current} onClick={() => void prepare()}>{working === 'prepare' ? '正在读取预览…' : uncertain && prepareId.current ? '查回预览' : '读取导出预览'}</button>}
+          {!plan && <Button type="button" className="btn primary" data-local-export-prepare disabled={busy || unavailable || !native.current} onClick={() => void prepare()}>{working === 'prepare' ? '正在读取预览…' : uncertain && prepareId.current ? '查回预览' : '读取导出预览'}</Button>}
           {plan && <>
-            <div className="export-destination"><div><strong>导出位置</strong><p>{plan.destination || '尚未选择文件夹'}</p></div><button type="button" className="btn" data-local-export-choose disabled={busy || uncertain || unavailable || Boolean(begun) || plan.canChooseDirectory === false} onClick={() => void act('choose', value => native.current.exportWorkspaceChooseDirectory({ planId: value.planId }))}>{plan.destination ? '更换文件夹' : '选择导出文件夹'}</button></div>
+            <div className="export-destination"><div><strong>导出位置</strong><p>{plan.destination || '尚未选择文件夹'}</p></div><Button type="button" className="btn" data-local-export-choose disabled={busy || uncertain || unavailable || Boolean(begun) || plan.canChooseDirectory === false} onClick={() => void act('choose', value => native.current.exportWorkspaceChooseDirectory({ planId: value.planId }))}>{plan.destination ? '更换文件夹' : '选择导出文件夹'}</Button></div>
             <section className="export-results" aria-label="导出预览与结果">
               <div className="export-results-heading"><h3>{unavailable ? '最近确认的记录' : begun ? '导出结果' : '内容预览'}</h3><span data-local-export-counts>共 {plan.counts.total} 项 · 已导出 {plan.counts.succeeded} · 失败 {plan.counts.failed} · 已停止 {plan.counts.cancelled}</span></div>
               {plan.busy && !unavailable && <progress aria-label="导出进度" max={plan.counts.total} value={completed} />}
@@ -250,16 +251,16 @@ export default function ExportWorkspace({ ids, onClose, onReselect }) {
         </div>}
         <footer className="export-workspace-footer">
           <div className="export-secondary-actions">
-            {plan && <button type="button" className="btn" data-local-export-status disabled={Boolean(working) || unavailable} onClick={() => void readStatus()}>查回结果</button>}
-            {plan?.canReveal && <button type="button" className="btn" data-local-export-reveal disabled={Boolean(working) || unavailable} onClick={() => void act('reveal', value => native.current.exportWorkspaceReveal({ planId: value.planId }))}>打开导出文件夹</button>}
+            {plan && <Button type="button" className="btn" data-local-export-status disabled={Boolean(working) || unavailable} onClick={() => void readStatus()}>查回结果</Button>}
+            {plan?.canReveal && <Button type="button" className="btn" data-local-export-reveal disabled={Boolean(working) || unavailable} onClick={() => void act('reveal', value => native.current.exportWorkspaceReveal({ planId: value.planId }))}>打开导出文件夹</Button>}
           </div>
           <div className="export-primary-actions">
-            {(working === 'prepare' || working === 'cancel-prepare' || (uncertain && !plan && prepareId.current)) && <button type="button" className="btn" data-local-export-cancel disabled={working === 'cancel-prepare'} onClick={cancelPreparation}>{working === 'cancel-prepare' ? '正在停止读取…' : working === 'prepare' ? '停止读取' : '请求停止读取'}</button>}
-            {!unavailable && (plan?.busy || (uncertain && plan)) ? <button type="button" className="btn" data-local-export-cancel disabled={Boolean(working)} onClick={() => void cancel()}>{plan?.phase === 'cancelling' ? '正在停止…' : '停止导出'}</button> : null}
-            {!begun && plan && <button type="button" className="btn primary" data-local-export-start disabled={busy || uncertain || unavailable || !plan.canStart || !plan.destination} onClick={() => void start(false)}>开始导出</button>}
-            {canContinue && <button type="button" className="btn primary" data-local-export-continue onClick={() => void start(false)}>继续未完成项（{remaining}）</button>}
-            {plan?.counts.failed > 0 && <button type="button" className="btn primary" data-local-export-retry disabled={busy || uncertain || unavailable || !plan.canRetry} onClick={() => void start(true)}>仅重试失败项（{plan.counts.failed}）</button>}
-            <button type="button" className="btn" disabled={busy || uncertain} onClick={close}>{plan?.state === 'completed' ? '完成' : '关闭'}</button>
+            {(working === 'prepare' || working === 'cancel-prepare' || (uncertain && !plan && prepareId.current)) && <Button type="button" className="btn" data-local-export-cancel disabled={working === 'cancel-prepare'} onClick={cancelPreparation}>{working === 'cancel-prepare' ? '正在停止读取…' : working === 'prepare' ? '停止读取' : '请求停止读取'}</Button>}
+            {!unavailable && (plan?.busy || (uncertain && plan)) ? <Button type="button" className="btn" data-local-export-cancel disabled={Boolean(working)} onClick={() => void cancel()}>{plan?.phase === 'cancelling' ? '正在停止…' : '停止导出'}</Button> : null}
+            {!begun && plan && <Button type="button" className="btn primary" data-local-export-start disabled={busy || uncertain || unavailable || !plan.canStart || !plan.destination} onClick={() => void start(false)}>开始导出</Button>}
+            {canContinue && <Button type="button" className="btn primary" data-local-export-continue onClick={() => void start(false)}>继续未完成项（{remaining}）</Button>}
+            {plan?.counts.failed > 0 && <Button type="button" className="btn primary" data-local-export-retry disabled={busy || uncertain || unavailable || !plan.canRetry} onClick={() => void start(true)}>仅重试失败项（{plan.counts.failed}）</Button>}
+            <Button type="button" className="btn" disabled={busy || uncertain} onClick={close}>{plan?.state === 'completed' ? '完成' : '关闭'}</Button>
           </div>
         </footer>
       </section>
