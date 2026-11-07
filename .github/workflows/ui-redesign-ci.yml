@@ -61,6 +61,19 @@ jobs:
           node --test scripts/editor-cache-regression.node.mjs
           npx vitest run --root=. src/components/TextEditor.test.jsx src/components/TextEditorLoad.test.jsx
 
+      - name: Diagnose real Ant Design Select popup lifecycle
+        continue-on-error: true
+        run: node scripts/probe-ui-select-runtime.mjs
+
+      - name: Upload Select lifecycle diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-select-lifecycle-${{ github.sha }}
+          path: test-results/ui-select-runtime/probe.log
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Run redesign smoke tests
         run: npm run test:ui
 
