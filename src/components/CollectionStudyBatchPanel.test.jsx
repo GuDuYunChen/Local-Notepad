@@ -14,7 +14,7 @@ const button = (text) => [...uiQueryAll(host, 'button')].find((el) => uiText(el)
 const label = (text) => uiQuery(host, `[aria-label="${text}"]`);
 async function click(text) {await act(async () => {const el = button(text);expect(el).toBeTruthy();el.click();});}
 async function toggle(name) {await act(async () => {expect(label(name)).toBeTruthy();label(name).click();});}
-async function change(name, value) {await act(async () => {const el = label(name);await setUiValue(el, value);el.dispatchEvent(new Event('input', { bubbles: true }));el.dispatchEvent(new Event('change', { bubbles: true }));});}
+async function change(name, value) {const el = label(name);await setUiValue(el, value);await act(async () => {el.dispatchEvent(new Event('input', { bubbles: true }));el.dispatchEvent(new Event('change', { bubbles: true }));});}
 const render = (props = {}) => act(async () => root.render(<CollectionStudyHub active service={hub} sourceStore={source} studyStore={study} onLocate={locate} {...props} />));
 function add(count = 23, name = '资料集') {const c = source.save(name, collectionReport(count));return source.list().entries.find((e) => e.collection.id === c.id);}
 const snapshot = (e) => study.load(e, source);
