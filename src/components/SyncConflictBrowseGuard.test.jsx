@@ -23,7 +23,7 @@ async function render(strict = false) {
   });
 }
 async function click(node) {expect(node).toBeTruthy();await act(async () => {node.click();await flush();});}
-async function change(label, value) {await act(async () => {dispatchChange(field(label), value);await flush();});}
+async function change(label, value) {await act(async () => {const node=field(label);await setUiValue(node,value);node.dispatchEvent(new Event('input',{bubbles:true}));node.dispatchEvent(new Event('change',{bubbles:true}));await flush();});}
 async function ready() {
   await click(button('保留本机'));await click(uiQuery(container, 'input[type="checkbox"]'));
   expect(uiDisabled(button('确认处理此冲突'))).toBe(false);
@@ -52,7 +52,7 @@ const changes = [
 
 for (const [name, setup, browse] of changes) it(`REGRESSION_BROWSE: ${name} first must revoke old confirmation before React commits`, async () => {
   conflicts[0].local_record.file.is_deleted = true;
-  await render();await setup?.();const oldConfirm = await ready(); await act(async () => { for (const label of ['冲突查看顺序','冲突对象类型','冲突关注项']) openUiSelect(field(label)) });
+  await render();await setup?.();const oldConfirm = await ready(); await act(async () => { for (const label of ['冲突查看顺序','冲突对象类型','冲突关注项']) await openUiSelect(field(label)) });
   // Deliberately no flush between the two real DOM events.
   await act(async () => {browse();oldConfirm.click();await flush();});
   expect(resolve, 'REGRESSION_BROWSE: a revoked old card reached the resolver').not.toHaveBeenCalled();
