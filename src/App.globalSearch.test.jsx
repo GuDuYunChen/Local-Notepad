@@ -120,7 +120,7 @@ async function startCollectionReading(target = 'n7', prepare = true) {
   await click('打开全局检索入口');await settle();await click('本地资料集');
   const select = uiQuery(container, '[aria-label="已保存资料集"]');
   await act(async () => {
-    setUiValue(select, searchCollections.list().entries[0].key);
+    await setUiValue(select, searchCollections.list().entries[0].key);
     select.dispatchEvent(new Event('change', { bubbles: true }));
   });
   const row = uiQuery(container, '[aria-label="资料集条目 ' + target + '"]');
