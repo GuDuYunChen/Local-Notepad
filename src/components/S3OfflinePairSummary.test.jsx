@@ -78,7 +78,7 @@ it('offline summary production pair requires both reads and explicit comparison'
 it('offline summary production pair stays complete while differences and direction hide table rows', async () => {
   await mountPair();await readPair();await click('[data-offline-compare]');await click('[data-offline-differences]');
   expect(uiQueryAll(host, '[data-offline-result] tbody tr')).toHaveLength(4);expect(counts()).toEqual([4, 0, 8]);
-  await act(async () => {const select = uiQuery(host, '[data-offline-direction]');setUiValue(select, 'decrease');select.dispatchEvent(new Event('change', { bubbles: true }));await flush();});
+  await act(async () => {const select = uiQuery(host, '[data-offline-direction]');await setUiValue(select, 'decrease');select.dispatchEvent(new Event('change', { bubbles: true }));await flush();});
   expect(uiQueryAll(host, '[data-offline-result] tbody tr')).toHaveLength(0);expect(counts()).toEqual([4, 0, 8]);
   await click('[data-offline-differences]');expect(uiQueryAll(host, '[data-offline-result] tbody tr')).toHaveLength(12);
   expect(counts()).toEqual([4, 0, 8]);expect(readers).toHaveLength(2);
