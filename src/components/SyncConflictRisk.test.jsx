@@ -18,7 +18,7 @@ function dispatchChange(node, value) {
   setUiValue(node, value);
   node.dispatchEvent(new Event('input', { bubbles: true }));node.dispatchEvent(new Event('change', { bubbles: true }));
 }
-async function change(label, value) {await act(async () => {dispatchChange(field(label), value);await flush();});}
+async function change(label, value) {await act(async () => {const node=field(label);await setUiValue(node,value);node.dispatchEvent(new Event('input',{bubbles:true}));node.dispatchEvent(new Event('change',{bubbles:true}));await flush();});}
 beforeEach(() => {
   actEnvironment = globalThis.IS_REACT_ACT_ENVIRONMENT;globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   container = document.createElement('div');document.body.appendChild(container);root = createRoot(container);
