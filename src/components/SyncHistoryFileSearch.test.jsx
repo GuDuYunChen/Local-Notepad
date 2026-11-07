@@ -37,7 +37,7 @@ async function type(value, composing = false) {
   });
 }
 async function click(key) {await act(async () => c(key).click());}
-async function choose(key, value) {await act(async () => {setUiValue(c(key), value);c(key).dispatchEvent(new Event('change', { bubbles: true }));});}
+async function choose(key, value) {await act(async () => {await setUiValue(c(key), value);c(key).dispatchEvent(new Event('change', { bubbles: true }));});}
 async function compose(typeName, value) {
   await act(async () => {
     if (value !== undefined) setUiValue(c('query'), value);
