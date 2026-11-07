@@ -13,7 +13,7 @@ const label = (name) => uiQuery(container, '[aria-label="' + name + '"]');
 const button = (text) => [...uiQueryAll(container, 'button')].find((el) => uiText(el) === text);
 const click = async (el) => {expect(el).toBeTruthy();await act(async () => el.click());};
 const advance = async () => act(async () => vi.advanceTimersByTimeAsync(220));
-async function change(el, value) {await act(async () => {setUiValue(el, value);el.dispatchEvent(new Event('input', { bubbles: true }));el.dispatchEvent(new Event('change', { bubbles: true }));});}
+async function change(el, value) {await act(async () => {await setUiValue(el, value);el.dispatchEvent(new Event('input', { bubbles: true }));el.dispatchEvent(new Event('change', { bubbles: true }));});}
 async function render(props = {}) {await act(async () => root.render(<GlobalSearchPanel open onClose={onClose} onOpenFile={onOpenFile} onOpened={onOpened} {...props} />));await advance();}
 const makeReport = () => collectSearchResultReport({ query: '' }, data(), { mode: 'all', request: async (f) => data(f.page) });
 async function seed(name = '设定资料') {let value;await act(async () => {value = searchCollections.save(name, await makeReport());});return SEARCH_COLLECTION_PREFIX + value.id;}
@@ -89,7 +89,7 @@ it('opening the workbench neither initiates manuscript searches nor clears an ex
   await click(button('阅读批注'));await advance();const searches = searchLibrary.mock.calls.length;
   await click(button('查看并编辑此批注'));await advance();
   const input = label('当前资料批注');
-  await act(async () => {setUiValue(input, '未保存的重要草稿');input.dispatchEvent(new Event('input', { bubbles: true }));input.dispatchEvent(new Event('change', { bubbles: true }));});
+  await act(async () => {await setUiValue(input, '未保存的重要草稿');input.dispatchEvent(new Event('input', { bubbles: true }));input.dispatchEvent(new Event('change', { bubbles: true }));});
   await click(button('阅读批注'));await advance();
   expect(searchLibrary.mock.calls.length).toBe(searches);
   expect(uiText(uiQuery(container, '.study-hub-note'))).toBe('集中查看末页批注');
@@ -123,7 +123,7 @@ it('batch preflight from the real search workspace leaves an existing editor dra
   await seedHubNote();await render();await click(button('阅读批注'));await advance();
   await click(button('查看并编辑此批注'));await advance();
   const input = label('当前资料批注');
-  await act(async () => {setUiValue(input, '批量时也不能丢的草稿');input.dispatchEvent(new Event('input', { bubbles: true }));input.dispatchEvent(new Event('change', { bubbles: true }));});
+  await act(async () => {await setUiValue(input, '批量时也不能丢的草稿');input.dispatchEvent(new Event('input', { bubbles: true }));input.dispatchEvent(new Event('change', { bubbles: true }));});
   await click(button('阅读批注'));await advance();await click(button('选择本页批注'));
   await change(label('批量阅读目标状态'), 'read');await click(button('预检批量标记'));
   expect(uiText(container)).toContain('所选条目有未保存批注');expect(label('批量标记预检')).toBeNull();
