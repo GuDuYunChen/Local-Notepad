@@ -14,7 +14,7 @@ const button = (text) => [...uiQueryAll(host, 'button')].find((el) => uiText(el)
 const label = (text) => uiQuery(host, `[aria-label="${text}"]`);
 const cards = () => uiQueryAll(host, '.study-hub-rows article');
 const click = (text) => act(async () => {expect(button(text)).toBeTruthy();button(text).click();});
-async function change(text, value) {await act(async () => {const el = label(text);await setUiValue(el, value);el.dispatchEvent(new Event('input', { bubbles: true }));el.dispatchEvent(new Event('change', { bubbles: true }));});}
+async function change(text, value) {const el = label(text);await setUiValue(el, value);await act(async () => {el.dispatchEvent(new Event('input', { bubbles: true }));el.dispatchEvent(new Event('change', { bubbles: true }));});}
 const render = (props = {}) => act(async () => root.render(<CollectionStudyHub active service={service} sourceStore={source} studyStore={study} onLocate={target} {...props} />));
 function add(name = '关关资料') {const value = source.save(name, collectionReport(23));return source.list().entries.find((row) => row.collection.id === value.id);}
 const save = async (entry, id = 'n22', status = 'revisit', note = '待复看批注') => study.saveNote(await study.load(entry, source), id, status, note, { sourceStore: source });
