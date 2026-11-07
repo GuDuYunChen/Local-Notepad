@@ -1,3 +1,4 @@
+import { Button, Input, Select, Textarea } from './ui/Controls'
 import React, { useEffect, useRef, useState } from 'react'
 import { api, listAllFiles } from '../services/api'
 import { normalizeImportedContent } from '../services/importContent'
@@ -326,19 +327,19 @@ export default function ImportWorkspace({ initialPaths = [], onClose, onChanged,
     <section ref={panel} tabIndex={-1} className="local-import-workspace" role="dialog" aria-modal="true" aria-label="本地文档导入工作台" data-local-import-workspace="" onKeyDown={onKeyDown}>
       <header>
         <div><span className="local-import-eyebrow">本地文档</span><h2>导入工作台</h2><p>先预览，再选择标题和位置。确认后逐项创建独立笔记。</p></div>
-        <div className="local-import-actions"><button type="button" className="btn" data-local-import-stop="" aria-label="停止当前导入操作" onClick={() => stop()} disabled={!busy}>停止</button><button type="button" className="btn" data-local-import-close="" aria-label="关闭本地文档导入工作台" onClick={close}>关闭</button></div>
+        <div className="local-import-actions"><Button type="button" className="btn" data-local-import-stop="" aria-label="停止当前导入操作" onClick={() => stop()} disabled={!busy}>停止</Button><Button type="button" className="btn" data-local-import-close="" aria-label="关闭本地文档导入工作台" onClick={close}>关闭</Button></div>
       </header>
       <div className="local-import-intro">
-        <label className="local-import-picker">选择本地文件<input type="file" multiple accept={accept} data-local-import-input="" aria-label="选择要导入的本地文档" onChange={chooseFiles} disabled={!bridge() || blocked || rows.length > 0} /></label>
+        <label className="local-import-picker">选择本地文件<Input type="file" multiple accept={accept} data-local-import-input="" aria-label="选择要导入的本地文档" onChange={chooseFiles} disabled={!bridge() || blocked || rows.length > 0} /></label>
         <p>支持 Markdown、TXT、Word 和 Excel。每批最多20个文件，每个文件最多50 MiB；转换后单项及本批正文最多2 MiB。Excel包含全部受支持的工作表；转换差异会逐项提示。</p>
         <p>确认后先保存整批内容，再逐项写入。关闭后已保存的确认记录会保留；尚未确认或尚未保存的预览需重新选择。源文件不会被修改。</p>
       </div>
       {message && <p className="local-import-notice" role="status">{message}</p>}
-      {(storageError || corrupt.length > 0) && <div className="local-import-fault" role="alert"><strong>本地记录需要处理，当前禁止提交。</strong>{storageError && <p>{storageError}</p>}{corrupt.map(entry => <div key={entry.key} data-local-import-corrupt={entry.key}><p>{entry.error}</p><details><summary>导出原记录或从同一请求的备份恢复</summary><p>请先保留原记录。粘贴完整JSON备份并确认恢复；请求标识及正文指纹必须一致。恢复后先查回，不会自动发送。</p><button type="button" className="btn" data-local-import-export-record={entry.key} aria-label="导出损坏的本地导入记录" onClick={() => exportRecord(entry)}>导出原记录</button><label>该记录的完整备份<textarea data-local-import-recovery-input={entry.key} aria-label="粘贴同一导入请求的完整备份" value={recovery[entry.key] || ''} onChange={event => setRecovery(current => ({ ...current, [entry.key]: event.target.value }))} disabled={busy}/></label><button type="button" className="btn" data-local-import-restore-record={entry.key} aria-label="校验并恢复该导入记录" disabled={busy || recordLoading || !recovery[entry.key]} onClick={() => restoreRecord(entry)}>校验并恢复该记录</button></details></div>)}<p>原记录未被静默删除；结果未知的项目不能清理或换标识重建。</p></div>}
+      {(storageError || corrupt.length > 0) && <div className="local-import-fault" role="alert"><strong>本地记录需要处理，当前禁止提交。</strong>{storageError && <p>{storageError}</p>}{corrupt.map(entry => <div key={entry.key} data-local-import-corrupt={entry.key}><p>{entry.error}</p><details><summary>导出原记录或从同一请求的备份恢复</summary><p>请先保留原记录。粘贴完整JSON备份并确认恢复；请求标识及正文指纹必须一致。恢复后先查回，不会自动发送。</p><Button type="button" className="btn" data-local-import-export-record={entry.key} aria-label="导出损坏的本地导入记录" onClick={() => exportRecord(entry)}>导出原记录</Button><label>该记录的完整备份<Textarea data-local-import-recovery-input={entry.key} aria-label="粘贴同一导入请求的完整备份" value={recovery[entry.key] || ''} onChange={event => setRecovery(current => ({ ...current, [entry.key]: event.target.value }))} disabled={busy}/></label><Button type="button" className="btn" data-local-import-restore-record={entry.key} aria-label="校验并恢复该导入记录" disabled={busy || recordLoading || !recovery[entry.key]} onClick={() => restoreRecord(entry)}>校验并恢复该记录</Button></details></div>)}<p>原记录未被静默删除；结果未知的项目不能清理或换标识重建。</p></div>}
       <div className="local-import-toolbar">
         <span role="status">{folderState === 'loading' ? '正在完整读取导入目录…' : folderState === 'ready' ? `已读取${folders.length}个可选位置` : '导入目录尚未完整读取'}</span>
-        <button type="button" className="btn" data-local-import-folders-refresh="" aria-label="重新读取全部导入目录" disabled={busy || folderState === 'loading'} onClick={loadFolders}>刷新目录</button>
-        <button type="button" className="btn" data-local-import-ledger-refresh="" aria-label="重新读取本地导入记录" disabled={busy || recordLoading} onClick={() => readRecords()}>{recordLoading ? '正在校验本地记录…' : '重读本地记录'}</button>
+        <Button type="button" className="btn" data-local-import-folders-refresh="" aria-label="重新读取全部导入目录" disabled={busy || folderState === 'loading'} onClick={loadFolders}>刷新目录</Button>
+        <Button type="button" className="btn" data-local-import-ledger-refresh="" aria-label="重新读取本地导入记录" disabled={busy || recordLoading} onClick={() => readRecords()}>{recordLoading ? '正在校验本地记录…' : '重读本地记录'}</Button>
       </div>
       {folderError && <p role="alert" className="local-import-fault">{folderError}</p>}
       {hasRecord && <p className="local-import-notice">已发送的项目会冻结标题、正文和位置。查回只读取结果；“使用原请求继续”会先查回，再按同一标识和内容提交。{pendingRecords && ' 结果未知或身份冲突的记录不能清理。'}</p>}
@@ -349,23 +350,23 @@ export default function ImportWorkspace({ initialPaths = [], onClose, onChanged,
           const destination = folders.find(folder => folder.id === row.parentId)
           const canRevise = row.status === 'rejected' && canClearImport(row.entry)
           return <article key={row.sourceId} data-local-import-row={id} data-local-import-state={row.status} data-local-import-request-id={row.entry?.value.requestId || ''} className={'local-import-row local-import-' + row.status}>
-            <div className="local-import-row-heading"><label className="local-import-check"><input type="checkbox" data-local-import-selected={id} aria-label={'选择导入 ' + row.sourceTitle} checked={row.selected} disabled={!editable || busy} onChange={event => updateRow(id, { selected: event.target.checked })}/><strong>{row.sourceTitle}</strong></label><span className="local-import-badge">{label}</span></div>
+            <div className="local-import-row-heading"><label className="local-import-check"><Input type="checkbox" data-local-import-selected={id} aria-label={'选择导入 ' + row.sourceTitle} checked={row.selected} disabled={!editable || busy} onChange={event => updateRow(id, { selected: event.target.checked })}/><strong>{row.sourceTitle}</strong></label><span className="local-import-badge">{label}</span></div>
             {(editable || frozen) && <div className="local-import-fields">
-              <label>笔记标题<input value={row.title} data-local-import-title={id} aria-label={'导入标题 ' + row.sourceTitle} disabled={!editable || busy} onChange={event => updateRow(id, { title: event.target.value, message: '' })} onCompositionStart={() => { composing.current.add(id); setIme(true) }} onCompositionEnd={event => { updateRow(id, { title: event.currentTarget.value }); composing.current.delete(id); setIme(composing.current.size > 0) }} /></label>
-              <label>导入位置<select value={row.parentId} data-local-import-destination={id} aria-label={'导入目录 ' + row.sourceTitle} disabled={!editable || busy || folderState !== 'ready'} onChange={event => updateRow(id, { parentId: event.target.value, message: '' })}>{!destination && <option value={row.parentId}>{folderState === 'ready' ? '原目录已不可用，请重新选择' : '等待完整读取目录'}</option>}{folders.map(folder => <option key={folder.id} value={folder.id}>{folder.label}</option>)}</select></label>
+              <label>笔记标题<Input value={row.title} data-local-import-title={id} aria-label={'导入标题 ' + row.sourceTitle} disabled={!editable || busy} onChange={event => updateRow(id, { title: event.target.value, message: '' })} onCompositionStart={() => { composing.current.add(id); setIme(true) }} onCompositionEnd={event => { updateRow(id, { title: event.currentTarget.value }); composing.current.delete(id); setIme(composing.current.size > 0) }} /></label>
+              <label>导入位置<Select value={row.parentId} data-local-import-destination={id} aria-label={'导入目录 ' + row.sourceTitle} disabled={!editable || busy || folderState !== 'ready'} onChange={event => updateRow(id, { parentId: event.target.value, message: '' })}>{!destination && <option value={row.parentId}>{folderState === 'ready' ? '原目录已不可用，请重新选择' : '等待完整读取目录'}</option>}{folders.map(folder => <option key={folder.id} value={folder.id}>{folder.label}</option>)}</Select></label>
             </div>}
             {row.warnings?.length > 0 && <ul className="local-import-warnings">{row.warnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul>}
             {row.preview !== undefined && row.content && <details open={rows.length === 1} className="local-import-preview"><summary>查看转换内容 · {(row.bytes / 1024).toFixed(1)} KiB</summary><pre data-local-import-preview={id} aria-label={'导入正文预览 ' + row.sourceTitle}>{row.preview || '（空文档）'}</pre></details>}
             {row.message && <p className="local-import-row-message" role={row.status === 'error' || row.status === 'rejected' ? 'alert' : 'status'}>{row.message}</p>}
             {row.storageError && <p role="alert">{row.storageError} 已收到的确认结果仍保留在当前窗口，请重读记录后查回。</p>}
             {frozen && <div className="local-import-actions">
-              <button type="button" className="btn" data-local-import-refresh={id} aria-label={'查回导入结果 ' + row.title} disabled={blocked} onClick={() => reconcile(row, false)}>查回结果</button>
-              {!row.entry.value.outcome && <button type="button" className="btn" data-local-import-retry={id} aria-label={'使用原请求继续导入 ' + row.title} disabled={blocked || !bridge()} onClick={() => reconcile(row, true)}>使用原请求继续</button>}
-              {canCancelImport(row.entry) && <button type="button" className="btn" data-local-import-cancel={id} aria-label={'取消尚未开始的导入 ' + row.title} disabled={blocked} onClick={() => cancelUnstarted(row)}>取消未开始项</button>}
-              {canRevise && <button type="button" className="btn" data-local-import-revise={id} aria-label={'返回预检修改 ' + row.title} disabled={blocked} onClick={() => revise(row)}>返回预检修改</button>}
-              {row.receipt?.state === 'available' && <button type="button" className="btn primary" data-local-import-open={id} aria-label={'打开已导入笔记 ' + row.title} disabled={busy} onClick={() => openNote(row)}>打开笔记</button>}
-              {canClearImport(row.entry) && <button type="button" className="btn" data-local-import-clear-row={id} aria-label={'清理已确认导入记录 ' + row.title} disabled={blocked} onClick={() => clearRows(id)}>清理记录</button>}
-              <button type="button" className="btn" data-local-import-export-record={id} aria-label={'导出本项恢复记录 ' + row.title} disabled={busy || recordLoading} onClick={() => exportRecord(row.entry)}>导出本项恢复记录</button>
+              <Button type="button" className="btn" data-local-import-refresh={id} aria-label={'查回导入结果 ' + row.title} disabled={blocked} onClick={() => reconcile(row, false)}>查回结果</Button>
+              {!row.entry.value.outcome && <Button type="button" className="btn" data-local-import-retry={id} aria-label={'使用原请求继续导入 ' + row.title} disabled={blocked || !bridge()} onClick={() => reconcile(row, true)}>使用原请求继续</Button>}
+              {canCancelImport(row.entry) && <Button type="button" className="btn" data-local-import-cancel={id} aria-label={'取消尚未开始的导入 ' + row.title} disabled={blocked} onClick={() => cancelUnstarted(row)}>取消未开始项</Button>}
+              {canRevise && <Button type="button" className="btn" data-local-import-revise={id} aria-label={'返回预检修改 ' + row.title} disabled={blocked} onClick={() => revise(row)}>返回预检修改</Button>}
+              {row.receipt?.state === 'available' && <Button type="button" className="btn primary" data-local-import-open={id} aria-label={'打开已导入笔记 ' + row.title} disabled={busy} onClick={() => openNote(row)}>打开笔记</Button>}
+              {canClearImport(row.entry) && <Button type="button" className="btn" data-local-import-clear-row={id} aria-label={'清理已确认导入记录 ' + row.title} disabled={blocked} onClick={() => clearRows(id)}>清理记录</Button>}
+              <Button type="button" className="btn" data-local-import-export-record={id} aria-label={'导出本项恢复记录 ' + row.title} disabled={busy || recordLoading} onClick={() => exportRecord(row.entry)}>导出本项恢复记录</Button>
             </div>}
             {row.receipt && row.receipt.state !== 'available' && <p>笔记{row.receipt.state === 'deleted' ? '已删除' : '已不在当前数据库'}，不会重新创建。</p>}
           </article>
@@ -374,9 +375,9 @@ export default function ImportWorkspace({ initialPaths = [], onClose, onChanged,
       {!rows.length && !busy && <div className="local-import-empty">选择文件后，在这里逐项预览和确认。</div>}
       {busy && <p role="status" className="local-import-notice">{operation.current?.kind === 'parse' ? '正在本机转换文件，请等待或停止…' : operation.current?.kind === 'open' ? '正在读取笔记并等待原编辑器的保存决定…' : '正在逐项核对导入结果，请等待或停止…'}</p>}
       <footer><div><strong>{rows.length}项 · 已选{selectedCount}项</strong><p>清理仅移除本地处理记录，不会删除已导入的笔记。</p></div><div className="local-import-actions">
-        <button type="button" className="btn" data-local-import-reset="" aria-label="清空未确认的导入预览" disabled={busy || !rows.some(row => !row.entry)} onClick={() => { updateRows(current => current.filter(row => row.entry)); composing.current.clear(); setIme(false); setMessage('未确认预览已清空，已发送的本地记录保留。') }}>清空未确认预览</button>
-        <button type="button" className="btn" data-local-import-clear="" aria-label="清理全部已确认导入记录" disabled={blocked || !hasClearable} onClick={() => clearRows()}>清理已确认记录</button>
-        <button type="button" className="btn primary" data-local-import-confirm="" aria-label="确认导入所选文档" disabled={blocked || ime || folderState !== 'ready' || !selectedCount} onClick={confirm}>确认导入所选文档（{selectedCount}）</button>
+        <Button type="button" className="btn" data-local-import-reset="" aria-label="清空未确认的导入预览" disabled={busy || !rows.some(row => !row.entry)} onClick={() => { updateRows(current => current.filter(row => row.entry)); composing.current.clear(); setIme(false); setMessage('未确认预览已清空，已发送的本地记录保留。') }}>清空未确认预览</Button>
+        <Button type="button" className="btn" data-local-import-clear="" aria-label="清理全部已确认导入记录" disabled={blocked || !hasClearable} onClick={() => clearRows()}>清理已确认记录</Button>
+        <Button type="button" className="btn primary" data-local-import-confirm="" aria-label="确认导入所选文档" disabled={blocked || ime || folderState !== 'ready' || !selectedCount} onClick={confirm}>确认导入所选文档（{selectedCount}）</Button>
       </div></footer>
     </section>
   </div>
