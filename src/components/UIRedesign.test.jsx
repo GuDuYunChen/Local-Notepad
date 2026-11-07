@@ -573,7 +573,7 @@ describe('UI redesign smoke tests', () => {
 
     const moveTarget = uiQuery(bulkbar, 'select[aria-label="批量移动目标卷"]');
     await act(async () => {
-      setUiValue(moveTarget, 'volume-2');
+      await setUiValue(moveTarget, 'volume-2');
       moveTarget.dispatchEvent(new Event('change', { bubbles: true }));
       await Promise.resolve();
     });
@@ -708,7 +708,7 @@ describe('UI redesign smoke tests', () => {
 
     const createTarget = uiQuery(createbar, 'select[aria-label="新建目标卷"]');
     await act(async () => {
-      setUiValue(createTarget, 'volume-1');
+      await setUiValue(createTarget, 'volume-1');
       createTarget.dispatchEvent(new Event('change', { bubbles: true }));
       await Promise.resolve();
     });
@@ -739,7 +739,7 @@ describe('UI redesign smoke tests', () => {
         HTMLTextAreaElement.prototype,
         'value'
       ).set;
-      setUiValue(titleTextarea, '番外一\n番外二');
+      await setUiValue(titleTextarea, '番外一\n番外二');
       titleTextarea.dispatchEvent(new Event('input', { bubbles: true }));
       await Promise.resolve();
     });
@@ -988,11 +988,11 @@ describe('UI redesign smoke tests', () => {
     ).toBe('volume-1');
 
     const presetSelect = uiQuery(createbar, 'select[aria-label="章节模板"]');
-    expect(Array.from(uiOptions(presetSelect)).map((option) => uiText(option))).
+    expect(Array.from(await uiOptions(presetSelect)).map((option) => uiText(option))).
     toEqual(['标准章节', '冲突推进', '信息揭示', '空白']);
 
     await act(async () => {
-      setUiValue(presetSelect, 'conflict');
+      await setUiValue(presetSelect, 'conflict');
       presetSelect.dispatchEvent(new Event('change', { bubbles: true }));
       await Promise.resolve();
     });
@@ -1217,7 +1217,7 @@ describe('UI redesign smoke tests', () => {
         HTMLInputElement.prototype,
         'value'
       ).set;
-      setUiValue(nameInput, '开篇卷');
+      await setUiValue(nameInput, '开篇卷');
       nameInput.dispatchEvent(new Event('input', { bubbles: true }));
       await Promise.resolve();
     });
@@ -1230,7 +1230,7 @@ describe('UI redesign smoke tests', () => {
         HTMLInputElement.prototype,
         'value'
       ).set;
-      setUiValue(targetInput, '50000');
+      await setUiValue(targetInput, '50000');
       targetInput.dispatchEvent(new Event('input', { bubbles: true }));
       await Promise.resolve();
     });
@@ -1363,7 +1363,7 @@ describe('UI redesign smoke tests', () => {
     'select[aria-label="选择卷拆分起点"]');
 
     await act(async () => {
-      setUiValue(splitStart, 'chapter-2');
+      await setUiValue(splitStart, 'chapter-2');
       splitStart.dispatchEvent(new Event('change', { bubbles: true }));
       await Promise.resolve();
     });
@@ -1400,7 +1400,7 @@ describe('UI redesign smoke tests', () => {
     'select[aria-label="合并目标卷"]');
 
     await act(async () => {
-      setUiValue(mergeTarget, 'volume-2');
+      await setUiValue(mergeTarget, 'volume-2');
       mergeTarget.dispatchEvent(new Event('change', { bubbles: true }));
       await Promise.resolve();
     });
@@ -1647,7 +1647,7 @@ describe('UI redesign smoke tests', () => {
         HTMLInputElement.prototype,
         'value'
       ).set;
-      setUiValue(search, '青崖镇');
+      await setUiValue(search, '青崖镇');
       search.dispatchEvent(new Event('input', { bubbles: true }));
       await Promise.resolve();
     });
@@ -1664,7 +1664,7 @@ describe('UI redesign smoke tests', () => {
     'select[aria-label="故事地图索引筛选"]');
 
     await act(async () => {
-      setUiValue(markerFilter, 'foreshadows');
+      await setUiValue(markerFilter, 'foreshadows');
       markerFilter.dispatchEvent(new Event('change', { bubbles: true }));
       await Promise.resolve();
     });
@@ -1755,7 +1755,7 @@ describe('UI redesign smoke tests', () => {
     expect(typeSelect).toBeTruthy();
 
     await act(async () => {
-      setUiValue(typeSelect, 'character');
+      await setUiValue(typeSelect, 'character');
       typeSelect.dispatchEvent(new Event('change', { bubbles: true }));
       await Promise.resolve();
     });
@@ -1765,7 +1765,7 @@ describe('UI redesign smoke tests', () => {
 
     expect(sourceSelect).toBeTruthy();
     await act(async () => {
-      setUiValue(sourceSelect, 'chapter-1');
+      await setUiValue(sourceSelect, 'chapter-1');
       sourceSelect.dispatchEvent(new Event('change', { bubbles: true }));
       await Promise.resolve();
     });
@@ -1776,7 +1776,7 @@ describe('UI redesign smoke tests', () => {
         HTMLInputElement.prototype,
         'value'
       ).set;
-      setUiValue(trackTitle, '关关弧光');
+      await setUiValue(trackTitle, '关关弧光');
       trackTitle.dispatchEvent(new Event('input', { bubbles: true }));
       await Promise.resolve();
     });
@@ -1790,7 +1790,7 @@ describe('UI redesign smoke tests', () => {
     'select[aria-label="轨迹节点章节"]');
 
     await act(async () => {
-      setUiValue(chapterSelect, 'chapter-1');
+      await setUiValue(chapterSelect, 'chapter-1');
       chapterSelect.dispatchEvent(new Event('change', { bubbles: true }));
       await Promise.resolve();
     });
@@ -1801,7 +1801,7 @@ describe('UI redesign smoke tests', () => {
         HTMLInputElement.prototype,
         'value'
       ).set;
-      setUiValue(noteInput, '初次登场并建立核心欲望');
+      await setUiValue(noteInput, '初次登场并建立核心欲望');
       noteInput.dispatchEvent(new Event('input', { bubbles: true }));
       await Promise.resolve();
     });
@@ -1829,7 +1829,7 @@ describe('UI redesign smoke tests', () => {
     );
 
     await act(async () => {
-      setUiValue(typeSelect, 'foreshadow');
+      await setUiValue(typeSelect, 'foreshadow');
       typeSelect.dispatchEvent(new Event('change', { bubbles: true }));
       await Promise.resolve();
     });
@@ -1838,7 +1838,7 @@ describe('UI redesign smoke tests', () => {
     'select[aria-label="关联现有索引"]');
 
     await act(async () => {
-      setUiValue(sourceSelect, 'chapter-2');
+      await setUiValue(sourceSelect, 'chapter-2');
       sourceSelect.dispatchEvent(new Event('change', { bubbles: true }));
       await Promise.resolve();
     });
@@ -1849,7 +1849,7 @@ describe('UI redesign smoke tests', () => {
         HTMLInputElement.prototype,
         'value'
       ).set;
-      setUiValue(trackTitle, '黑铁副印');
+      await setUiValue(trackTitle, '黑铁副印');
       trackTitle.dispatchEvent(new Event('input', { bubbles: true }));
       await Promise.resolve();
     });
@@ -1863,7 +1863,7 @@ describe('UI redesign smoke tests', () => {
     'select[aria-label="轨迹节点章节"]');
 
     await act(async () => {
-      setUiValue(chapterSelect, 'chapter-2');
+      await setUiValue(chapterSelect, 'chapter-2');
       chapterSelect.dispatchEvent(new Event('change', { bubbles: true }));
       await Promise.resolve();
     });
@@ -1872,7 +1872,7 @@ describe('UI redesign smoke tests', () => {
     'select[aria-label="轨迹生命周期阶段"]');
 
     await act(async () => {
-      setUiValue(stageSelect, 'payoff');
+      await setUiValue(stageSelect, 'payoff');
       stageSelect.dispatchEvent(new Event('change', { bubbles: true }));
       await Promise.resolve();
     });
@@ -2094,7 +2094,7 @@ describe('UI redesign smoke tests', () => {
     'select[aria-label="自定义实体类型"]');
 
     await act(async () => {
-      setUiValue(entityType, 'faction');
+      await setUiValue(entityType, 'faction');
       entityType.dispatchEvent(new Event('change', { bubbles: true }));
       await Promise.resolve();
     });
@@ -2107,7 +2107,7 @@ describe('UI redesign smoke tests', () => {
         HTMLInputElement.prototype,
         'value'
       ).set;
-      setUiValue(entityName, '青莲剑宗');
+      await setUiValue(entityName, '青莲剑宗');
       entityName.dispatchEvent(new Event('input', { bubbles: true }));
       await Promise.resolve();
     });
@@ -2129,16 +2129,16 @@ describe('UI redesign smoke tests', () => {
     const relationType = uiQuery(container,
     'select[aria-label="新建关系类型"]');
 
-    const factionOption = Array.from(uiOptions(target)).
+    const factionOption = Array.from(await uiOptions(target)).
     find((option) => uiText(option).includes('青莲剑宗'));
     expect(factionOption).toBeTruthy();
 
     await act(async () => {
-      setUiValue(source, 'index:chapter-1');
+      await setUiValue(source, 'index:chapter-1');
       source.dispatchEvent(new Event('change', { bubbles: true }));
-      setUiValue(relationType, 'belongs');
+      await setUiValue(relationType, 'belongs');
       relationType.dispatchEvent(new Event('change', { bubbles: true }));
-      setUiValue(target, uiValue(factionOption));
+      await setUiValue(target, uiValue(factionOption));
       target.dispatchEvent(new Event('change', { bubbles: true }));
       await Promise.resolve();
     });
@@ -2151,7 +2151,7 @@ describe('UI redesign smoke tests', () => {
         HTMLInputElement.prototype,
         'value'
       ).set;
-      setUiValue(relationLabel, '宗门弟子');
+      await setUiValue(relationLabel, '宗门弟子');
       relationLabel.dispatchEvent(new Event('input', { bubbles: true }));
       await Promise.resolve();
     });
@@ -2334,17 +2334,17 @@ describe('UI redesign smoke tests', () => {
     expect(chapterSelect).toBeTruthy();
 
     await act(async () => {
-      setUiValue(chapterSelect, 'chapter-2');
+      await setUiValue(chapterSelect, 'chapter-2');
       chapterSelect.dispatchEvent(new Event('change', { bubbles: true }));
-      setUiValue(eventType, 'break');
+      await setUiValue(eventType, 'break');
       eventType.dispatchEvent(new Event('change', { bubbles: true }));
-      setUiValue(resultingType, 'rival');
+      await setUiValue(resultingType, 'rival');
       resultingType.dispatchEvent(new Event('change', { bubbles: true }));
       const setter = Object.getOwnPropertyDescriptor(
         HTMLInputElement.prototype,
         'value'
       ).set;
-      setUiValue(eventNote, '立场冲突导致决裂');
+      await setUiValue(eventNote, '立场冲突导致决裂');
       eventNote.dispatchEvent(new Event('input', { bubbles: true }));
       await Promise.resolve();
     });
@@ -2387,11 +2387,11 @@ describe('UI redesign smoke tests', () => {
     'select[aria-label="变化后的关系类型"]');
 
     await act(async () => {
-      setUiValue(chapterSelect, 'chapter-3');
+      await setUiValue(chapterSelect, 'chapter-3');
       chapterSelect.dispatchEvent(new Event('change', { bubbles: true }));
-      setUiValue(eventType, 'repair');
+      await setUiValue(eventType, 'repair');
       eventType.dispatchEvent(new Event('change', { bubbles: true }));
-      setUiValue(resultingType, 'ally');
+      await setUiValue(resultingType, 'ally');
       resultingType.dispatchEvent(new Event('change', { bubbles: true }));
       await Promise.resolve();
     });
@@ -2569,7 +2569,7 @@ describe('UI redesign smoke tests', () => {
     'select[aria-label^="候选关系类型"]');
 
     await act(async () => {
-      setUiValue(typeSelect, 'located');
+      await setUiValue(typeSelect, 'located');
       typeSelect.dispatchEvent(new Event('change', { bubbles: true }));
       await Promise.resolve();
     });
@@ -2716,7 +2716,7 @@ describe('UI redesign smoke tests', () => {
     'select[aria-label="选择实体别名对象"]');
 
     await act(async () => {
-      setUiValue(entitySelect, 'index:character-note');
+      await setUiValue(entitySelect, 'index:character-note');
       entitySelect.dispatchEvent(new Event('change', { bubbles: true }));
       await Promise.resolve();
     });
@@ -2729,7 +2729,7 @@ describe('UI redesign smoke tests', () => {
         HTMLInputElement.prototype,
         'value'
       ).set;
-      setUiValue(aliasInput, '关姑娘');
+      await setUiValue(aliasInput, '关姑娘');
       aliasInput.dispatchEvent(new Event('input', { bubbles: true }));
       await Promise.resolve();
     });
@@ -2778,7 +2778,7 @@ describe('UI redesign smoke tests', () => {
     'select[aria-label="关系建议最低置信度"]');
 
     await act(async () => {
-      setUiValue(confidenceFilter, 'high');
+      await setUiValue(confidenceFilter, 'high');
       confidenceFilter.dispatchEvent(new Event('change', { bubbles: true }));
       await Promise.resolve();
     });
@@ -2793,7 +2793,7 @@ describe('UI redesign smoke tests', () => {
     'select[aria-label="关系建议最低置信度"]');
 
     await act(async () => {
-      setUiValue(confidenceFilterAgain, 'medium');
+      await setUiValue(confidenceFilterAgain, 'medium');
       confidenceFilterAgain.dispatchEvent(new Event('change', { bubbles: true }));
       await Promise.resolve();
     });
@@ -2812,7 +2812,7 @@ describe('UI redesign smoke tests', () => {
     'select[aria-label^="候选关系类型"]');
 
     await act(async () => {
-      setUiValue(typeSelect, 'located');
+      await setUiValue(typeSelect, 'located');
       typeSelect.dispatchEvent(new Event('change', { bubbles: true }));
       await Promise.resolve();
     });
@@ -3330,7 +3330,7 @@ describe('UI redesign smoke tests', () => {
         HTMLTextAreaElement.prototype,
         'value'
       ).set;
-      setUiValue(
+      await setUiValue(
         textarea,
         '上午进入状态很快，下次继续从冲突段直接开始。');
 
@@ -3757,7 +3757,7 @@ describe('UI redesign smoke tests', () => {
     expect(api.mock.calls.filter(([, init]) => init?.method === 'DELETE')).toHaveLength(0);
     await act(async () => {
       const input = uiQuery(dialog, 'input[aria-label="输入永久删除确认"]');
-      setUiValue(input, '永久删除');
+      await setUiValue(input, '永久删除');
       input.dispatchEvent(new Event('input', { bubbles: true }));
     });
     expect(uiDisabled(confirmButton)).toBe(false);
