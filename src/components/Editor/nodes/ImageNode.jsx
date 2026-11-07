@@ -3,6 +3,8 @@ import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext
 import { useLexicalEditable } from '@lexical/react/useLexicalEditable'
 import React, { useEffect, useRef, useState } from 'react'
 import { uploadFile } from '../utils/fileUpload'
+import { UiButton, UiInput } from '~/components/ui/ControlKit'
+
 
 export class ImageNode extends DecoratorNode {
   __src
@@ -304,7 +306,7 @@ function ImageComponent({ nodeKey, src, alt, width, height, originalSrc, caption
                 ['720', '大'],
                 ['100%', '全宽'],
               ].map(([value, label]) => (
-                <button
+                <UiButton density="compact"
                   type="button"
                   key={value}
                   className={String(currentWidth) === value ? 'active' : ''}
@@ -314,7 +316,7 @@ function ImageComponent({ nodeKey, src, alt, width, height, originalSrc, caption
                   }}
                 >
                   {label}
-                </button>
+                </UiButton>
               ))}
             </div>
 
@@ -326,7 +328,7 @@ function ImageComponent({ nodeKey, src, alt, width, height, originalSrc, caption
                 ['center', '中'],
                 ['right', '右'],
               ].map(([value, label]) => (
-                <button
+                <UiButton density="compact"
                   type="button"
                   key={value}
                   className={currentAlign === value ? 'active' : ''}
@@ -337,13 +339,13 @@ function ImageComponent({ nodeKey, src, alt, width, height, originalSrc, caption
                   aria-label={`${label}对齐`}
                 >
                   {label}
-                </button>
+                </UiButton>
               ))}
             </div>
 
             <span className="editor-image-toolbar-divider" />
 
-            <button
+            <UiButton density="compact"
               type="button"
               onClick={(event) => {
                 event.stopPropagation()
@@ -353,8 +355,8 @@ function ImageComponent({ nodeKey, src, alt, width, height, originalSrc, caption
               disabled={replacing}
             >
               {replacing ? '替换中…' : '替换'}
-            </button>
-            <input
+            </UiButton>
+            <input data-ui-native="file"
               ref={replaceInputRef}
               type="file"
               accept="image/*"
@@ -363,8 +365,8 @@ function ImageComponent({ nodeKey, src, alt, width, height, originalSrc, caption
               onChange={handleReplace}
             />
             </>}
-            <button type="button" onClick={handleDownload}>下载</button>
-            {isEditable && <button
+            <UiButton density="compact" type="button" onClick={handleDownload}>下载</UiButton>
+            {isEditable && <UiButton density="compact"
               type="button"
               className="danger"
               onClick={(event) => {
@@ -373,13 +375,13 @@ function ImageComponent({ nodeKey, src, alt, width, height, originalSrc, caption
               }}
             >
               删除
-            </button>}
+            </UiButton>}
           </div>
         )}
       </div>
 
       {(selected || captionText) && (
-        <input
+        <UiInput density="compact"
           className="editor-image-caption-input"
           value={captionText}
           readOnly={!isEditable}

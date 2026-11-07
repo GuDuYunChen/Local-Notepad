@@ -7,6 +7,8 @@ import { SEARCH_LIMITS, assertSearchString } from '~/services/documentSearch.mjs
 import { isShortcutContextBlocked, matchShortcut } from '~/services/localShortcuts'
 import { $readDocumentSearch, $replaceDocumentMatches, searchTopLevelKey, searchDOMRange } from './documentSearchLexical'
 import './DocumentSearch.css'
+import { UiButton, UiInput } from '~/components/ui/ControlKit'
+
 export { findTextMatchOffsets } from '~/services/documentSearch.mjs'
 export { $findAllSearchMatches } from './documentSearchLexical'
 
@@ -157,15 +159,15 @@ export default function SearchPlugin({ documentId = '' }) {
   return <section ref={panelRef} className="search-panel document-search" aria-label="文内查找与安全替换" onKeyDown={e=>{
     if(e.key==='Escape'&&!composingEvent(e)&&!review){e.preventDefault();e.stopPropagation();close()}
   }}>
-    <header className="search-panel-header"><strong>{replaceOpen?'文内查找与替换':'文内查找'}</strong><button type="button" className="search-btn close-btn" aria-label="关闭文内查找" onClick={close}>×</button></header>
-    <div className="search-row"><input ref={inputRef} className="search-input" aria-label="查找内容" placeholder="输入要查找的文字" value={input}
+    <header className="search-panel-header"><strong>{replaceOpen?'文内查找与替换':'文内查找'}</strong><UiButton density="compact" type="button" className="search-btn close-btn" aria-label="关闭文内查找" onClick={close}>×</UiButton></header>
+    <div className="search-row"><UiInput density="compact" ref={inputRef} className="search-input" aria-label="查找内容" placeholder="输入要查找的文字" value={input}
       onCompositionStart={composeStart} onCompositionEnd={e=>{composeEnd();reset();setQuery(e.currentTarget.value)}}
       onChange={e=>{setInput(e.target.value);reset();if(!compose.current)setQuery(e.target.value)}}
       onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();if(!composingEvent(e))move(e.shiftKey?-1:1)}}}/>
       <span className="search-count" role="status">{composing?'输入中':count?`${index+1}/${count}`:query?'0 处':'待查找'}</span>
-      <button type="button" className="search-btn" aria-label="上一个匹配" disabled={blocked} onClick={()=>move(-1)}>↑</button><button type="button" className="search-btn" aria-label="下一个匹配" disabled={blocked} onClick={()=>move(1)}>↓</button></div>
-    <div className="search-options"><button type="button" className="search-option-chip" aria-pressed={matchCase} disabled={composing} onClick={()=>{reset();setMatchCase(v=>!v)}}>区分大小写</button><button type="button" className="search-option-chip" aria-pressed={wholeWord} disabled={composing} onClick={()=>{reset();setWholeWord(v=>!v)}}>整词</button><button type="button" className="search-option-chip" aria-pressed={replaceOpen} disabled={!editable||composing} onClick={()=>{reset();setReplaceOpen(v=>!v)}}>显示替换</button><button type="button" className="search-option-chip" disabled={composing} onClick={()=>{reset();setRevision(v=>v+1)}}>重新查找</button></div>
-    {replaceOpen&&editable&&<div className="search-row"><input className="search-input" aria-label="替换内容" placeholder="留空表示删除匹配文字" value={replacement} onCompositionStart={composeStart} onCompositionEnd={composeEnd} onChange={e=>{reset();setReplacement(e.target.value)}} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();if(!composingEvent(e))consent(e.shiftKey)}}}/><button type="button" className="search-btn" disabled={blocked} onClick={()=>consent(false)}>替换当前</button><button type="button" className="search-btn" disabled={blocked} onClick={()=>consent(true)}>全部替换…</button></div>}
+      <UiButton density="compact" type="button" className="search-btn" aria-label="上一个匹配" disabled={blocked} onClick={()=>move(-1)}>↑</UiButton><UiButton density="compact" type="button" className="search-btn" aria-label="下一个匹配" disabled={blocked} onClick={()=>move(1)}>↓</UiButton></div>
+    <div className="search-options"><UiButton density="compact" type="button" className="search-option-chip" aria-pressed={matchCase} disabled={composing} onClick={()=>{reset();setMatchCase(v=>!v)}}>区分大小写</UiButton><UiButton density="compact" type="button" className="search-option-chip" aria-pressed={wholeWord} disabled={composing} onClick={()=>{reset();setWholeWord(v=>!v)}}>整词</UiButton><UiButton density="compact" type="button" className="search-option-chip" aria-pressed={replaceOpen} disabled={!editable||composing} onClick={()=>{reset();setReplaceOpen(v=>!v)}}>显示替换</UiButton><UiButton density="compact" type="button" className="search-option-chip" disabled={composing} onClick={()=>{reset();setRevision(v=>v+1)}}>重新查找</UiButton></div>
+    {replaceOpen&&editable&&<div className="search-row"><UiInput density="compact" className="search-input" aria-label="替换内容" placeholder="留空表示删除匹配文字" value={replacement} onCompositionStart={composeStart} onCompositionEnd={composeEnd} onChange={e=>{reset();setReplacement(e.target.value)}} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();if(!composingEvent(e))consent(e.shiftKey)}}}/><UiButton density="compact" type="button" className="search-btn" disabled={blocked} onClick={()=>consent(false)}>替换当前</UiButton><UiButton density="compact" type="button" className="search-btn" disabled={blocked} onClick={()=>consent(true)}>全部替换…</UiButton></div>}
     {error&&<p role="alert" className="document-search-error">{error}</p>}
     {feedback&&<p role="status" className="document-search-feedback">{feedback}</p>}
     {!error&&query&&!composing&&!count&&<p role="status">未找到匹配；正文未改动。</p>}

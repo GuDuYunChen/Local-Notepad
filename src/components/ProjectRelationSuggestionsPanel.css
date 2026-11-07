@@ -79,8 +79,8 @@
   margin-left: auto;
 }
 
-.project-relation-suggestion-controls select,
-.project-relation-suggestion-actions select {
+.project-relation-suggestion-controls select:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.project-relation-suggestion-actions select:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   height: 28px;
   padding: 0 22px 0 7px;
   border: 1px solid var(--line);
@@ -193,20 +193,23 @@
 
 .project-relation-suggestion-evidence button {
   min-width: 0;
-  padding: 3px 5px;
   display: flex;
   align-items: center;
   gap: 3px;
+  cursor: pointer;
+}
+
+.project-relation-suggestion-evidence button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
+  padding: 3px 5px;
   border: 1px solid var(--line);
   border-radius: 6px;
   background: var(--paper);
   color: var(--ink-soft);
   font: inherit;
   font-size: 6px;
-  cursor: pointer;
 }
 
-.project-relation-suggestion-evidence button:hover {
+.project-relation-suggestion-evidence button:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-color: color-mix(in srgb, var(--clay) 35%, var(--line));
   color: var(--clay);
 }

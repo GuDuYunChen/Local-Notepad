@@ -9,6 +9,8 @@ import {
   recordProjectAnalyticsSnapshot,
 } from './projectAnalyticsUtils'
 import './ProjectAnalyticsPanel.css'
+import { UiButton, UiInput } from '~/components/ui/ControlKit'
+
 
 function formatNumber(value) {
   const number = Number(value) || 0
@@ -100,13 +102,13 @@ export default function ProjectAnalyticsPanel({
             写作增量从 4.26 第一次打开项目后开始按天记录；不会伪造此前历史。
           </span>
         </div>
-        <button
+        <UiButton
           type="button"
           className="btn small"
           onClick={() => onNavigateView?.('insights')}
         >
           查看洞察
-        </button>
+        </UiButton>
       </div>
 
       <div className="project-analytics-grid">
@@ -145,7 +147,7 @@ export default function ProjectAnalyticsPanel({
             <strong>章节篇幅</strong>
             <label>
               <span>单章目标</span>
-              <input
+              <UiInput
                 type="number"
                 min="0"
                 aria-label="单章目标字数"
@@ -169,7 +171,7 @@ export default function ProjectAnalyticsPanel({
           <div className="project-analysis-list compact">
             {chapterLengths.alerts.length ? (
               chapterLengths.alerts.slice(0, 5).map(item => (
-                <button
+                <UiButton
                   key={item.id}
                   type="button"
                   onClick={() => onOpenFile?.(item.id)}
@@ -181,7 +183,7 @@ export default function ProjectAnalyticsPanel({
                   <em className={item.type}>
                     {item.type === 'short' ? '偏短' : '偏长'} · {item.wordCount.toLocaleString()}
                   </em>
-                </button>
+                </UiButton>
               ))
             ) : (
               <div className="project-analysis-empty">
@@ -201,7 +203,7 @@ export default function ProjectAnalyticsPanel({
           <div className="project-analysis-list compact">
             {staleChapters.length ? (
               staleChapters.slice(0, 5).map(note => (
-                <button
+                <UiButton
                   key={note.id}
                   type="button"
                   onClick={() => onOpenFile?.(note.id)}
@@ -211,7 +213,7 @@ export default function ProjectAnalyticsPanel({
                     <small>{note.volumeTitle || '未分卷'}</small>
                   </span>
                   <em>{note.idleDays} 天</em>
-                </button>
+                </UiButton>
               ))
             ) : (
               <div className="project-analysis-empty">
@@ -253,28 +255,28 @@ export default function ProjectAnalyticsPanel({
             <div>
               <strong>角色</strong>
               {(frequencies.characters || []).slice(0, 5).map(item => (
-                <button
+                <UiButton
                   key={item.id}
                   type="button"
                   onClick={() => onOpenFile?.(item.id)}
                 >
                   <span>{stripExtension(item.title)}</span>
                   <em>{item.count}</em>
-                </button>
+                </UiButton>
               ))}
               {!frequencies.characters?.length && <small>暂无角色索引</small>}
             </div>
             <div>
               <strong>地点</strong>
               {(frequencies.locations || []).slice(0, 5).map(item => (
-                <button
+                <UiButton
                   key={item.id}
                   type="button"
                   onClick={() => onOpenFile?.(item.id)}
                 >
                   <span>{stripExtension(item.title)}</span>
                   <em>{item.count}</em>
-                </button>
+                </UiButton>
               ))}
               {!frequencies.locations?.length && <small>暂无地点索引</small>}
             </div>
@@ -290,20 +292,20 @@ export default function ProjectAnalyticsPanel({
             {foreshadows.items.length ? (
               foreshadows.items.slice(0, 8).map(item => (
                 <div key={item.id}>
-                  <button
+                  <UiButton
                     type="button"
                     className="project-foreshadow-title"
                     onClick={() => onOpenFile?.(item.id)}
                   >
                     {stripExtension(item.title)}
-                  </button>
-                  <button
+                  </UiButton>
+                  <UiButton
                     type="button"
                     className={'project-foreshadow-state ' + item.state}
                     onClick={() => toggleForeshadow(item)}
                   >
                     {item.state === 'recovered' ? '已回收' : '待回收'}
-                  </button>
+                  </UiButton>
                 </div>
               ))
             ) : (

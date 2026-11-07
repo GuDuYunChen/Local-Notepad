@@ -44,6 +44,8 @@ import ProjectInsightsPanel from './ProjectInsightsPanel'
 import ProjectStructurePanel from './ProjectStructurePanel'
 import { evidenceReview } from '~/services/evidenceReviewSession'
 import './ProjectWorkspacePanel.css'
+import { UiButton, UiInput, UiSelect, UiTextarea } from '~/components/ui/ControlKit'
+
 
 const LAST_PROJECT_KEY = 'localNotepad.projectWorkspace.lastProject'
 const PROJECT_VIEW_KEY = 'localNotepad.projectWorkspace.activeView'
@@ -1540,13 +1542,13 @@ export default function ProjectWorkspacePanel({
             <strong>项目工作台</strong>
             <span>把文件夹作为小说或剧本项目来管理。</span>
           </div>
-          <button type="button" className="icon-btn" onClick={onClose} aria-label="返回笔记">×</button>
+          <UiButton type="button" className="icon-btn" onClick={onClose} aria-label="返回笔记">×</UiButton>
         </header>
         <div className="project-workspace-empty">
           <div className="project-workspace-empty-mark">▤</div>
           <strong>还没有项目文件夹</strong>
           <span>先在“笔记”里创建一个根文件夹，再把卷 / 幕与章节笔记放进去。</span>
-          <button type="button" className="btn primary" onClick={onClose}>返回笔记</button>
+          <UiButton type="button" className="btn primary" onClick={onClose}>返回笔记</UiButton>
         </div>
       </div>
     )
@@ -1555,7 +1557,7 @@ export default function ProjectWorkspacePanel({
   if (!workspace) return evidenceReturn ? (
     <div className="project-workspace-panel">
       <p role="alert">原项目已不存在，未恢复到其他项目。</p>
-      <button type="button" className="btn" onClick={onClose}>返回笔记</button>
+      <UiButton type="button" className="btn" onClick={onClose}>返回笔记</UiButton>
     </div>
   ) : null
 
@@ -1573,7 +1575,7 @@ export default function ProjectWorkspacePanel({
         </div>
 
         <div className="project-workspace-toolbar-actions">
-          <select
+          <UiSelect size="middle"
             value={selectedProjectId}
             onChange={event => {
               setSelectedProjectId(event.target.value)
@@ -1586,13 +1588,13 @@ export default function ProjectWorkspacePanel({
                 {project.title} · {project.noteCount} 篇
               </option>
             ))}
-          </select>
+          </UiSelect>
 
           <div
             className="project-actions-menu-wrap"
             ref={projectActionsRef}
           >
-            <button
+            <UiButton size="middle"
               type="button"
               className="btn small project-actions-trigger"
               onClick={() => setProjectActionsOpen(value => !value)}
@@ -1601,14 +1603,14 @@ export default function ProjectWorkspacePanel({
             >
               项目操作
               <span aria-hidden="true">⌄</span>
-            </button>
+            </UiButton>
 
             {projectActionsOpen && (
               <div className="project-actions-menu" role="menu">
                 <div className="project-actions-menu-section">
                   <span>项目类型</span>
                   <div className="project-actions-type-switch">
-                    <button
+                    <UiButton size="middle"
                       type="button"
                       className={workspace.project.type === 'novel' ? 'active' : ''}
                       onClick={() => {
@@ -1617,8 +1619,8 @@ export default function ProjectWorkspacePanel({
                       }}
                     >
                       小说
-                    </button>
-                    <button
+                    </UiButton>
+                    <UiButton size="middle"
                       type="button"
                       className={workspace.project.type === 'script' ? 'active' : ''}
                       onClick={() => {
@@ -1627,11 +1629,11 @@ export default function ProjectWorkspacePanel({
                       }}
                     >
                       剧本
-                    </button>
+                    </UiButton>
                   </div>
                 </div>
 
-                <button
+                <UiButton size="middle"
                   type="button"
                   role="menuitem"
                   disabled={templateBusy}
@@ -1641,9 +1643,9 @@ export default function ProjectWorkspacePanel({
                   }}
                 >
                   {templateBusy ? '正在初始化模板…' : '初始化项目模板'}
-                </button>
+                </UiButton>
 
-                <button
+                <UiButton size="middle"
                   type="button"
                   role="menuitem"
                   disabled={!projectIds.length || Boolean(exportingKey)}
@@ -1658,9 +1660,9 @@ export default function ProjectWorkspacePanel({
                   }}
                 >
                   合并导出 Markdown
-                </button>
+                </UiButton>
 
-                <button
+                <UiButton size="middle"
                   type="button"
                   role="menuitem"
                   disabled={!projectIds.length || Boolean(exportingKey)}
@@ -1675,9 +1677,9 @@ export default function ProjectWorkspacePanel({
                   }}
                 >
                   合并导出 Word
-                </button>
+                </UiButton>
 
-                <button
+                <UiButton size="middle"
                   type="button"
                   role="menuitem"
                   onClick={() => {
@@ -1686,12 +1688,12 @@ export default function ProjectWorkspacePanel({
                   }}
                 >
                   刷新项目数据
-                </button>
+                </UiButton>
               </div>
             )}
           </div>
 
-          <button type="button" className="icon-btn" onClick={onClose} title="返回笔记" aria-label="返回笔记">×</button>
+          <UiButton size="middle" type="button" className="icon-btn" onClick={onClose} title="返回笔记" aria-label="返回笔记">×</UiButton>
         </div>
       </header>
 
@@ -1721,7 +1723,7 @@ export default function ProjectWorkspacePanel({
 
       <nav className="project-workspace-view-tabs" aria-label="项目工作台视图">
         {PROJECT_VIEWS.map(view => (
-          <button
+          <UiButton
             key={view.id}
             type="button"
             className={activeView === view.id ? 'active' : ''}
@@ -1735,7 +1737,7 @@ export default function ProjectWorkspacePanel({
           >
             <strong>{view.label}</strong>
             <span>{view.description}</span>
-          </button>
+          </UiButton>
         ))}
       </nav>
 
@@ -1767,7 +1769,7 @@ export default function ProjectWorkspacePanel({
 
           <label className="project-target-input">
             <span>目标字数</span>
-            <input
+            <UiInput
               type="number"
               min="0"
               step="1000"
@@ -1818,7 +1820,7 @@ export default function ProjectWorkspacePanel({
           </div>
           <div className="project-activity-list">
             {recentActivity.length ? recentActivity.map(note => (
-              <button
+              <UiButton
                 key={note.id}
                 type="button"
                 onClick={() => onOpenFile?.(note.id)}
@@ -1828,7 +1830,7 @@ export default function ProjectWorkspacePanel({
                   <small>{note.volumeTitle || labels.ungrouped}</small>
                 </span>
                 <em>{formatUpdated(note.updated_at)}</em>
-              </button>
+              </UiButton>
             )) : (
               <div className="project-console-empty">还没有写作活动。</div>
             )}
@@ -1857,14 +1859,14 @@ export default function ProjectWorkspacePanel({
                 </div>
                 <div className="project-index-items">
                   {(projectIndexes[key] || []).slice(0, 4).map(item => (
-                    <button
+                    <UiButton
                       key={item.id}
                       type="button"
                       onClick={() => onOpenFile?.(item.id)}
                       title={item.title}
                     >
                       {displayTitle(item.title)}
-                    </button>
+                    </UiButton>
                   ))}
                   {(projectIndexes[key] || []).length === 0 && (
                     <small>给项目笔记添加“{label}”标签后会出现在这里。</small>
@@ -1948,7 +1950,7 @@ export default function ProjectWorkspacePanel({
             可以先初始化项目模板，或返回笔记创建卷 / 章节后再回来管理。
           </span>
           <div>
-            <button
+            <UiButton
               type="button"
               className="btn primary"
               disabled={chapterCreateBusy}
@@ -1961,26 +1963,26 @@ export default function ProjectWorkspacePanel({
               }}
             >
               {chapterCreateBusy ? '新建中…' : '新建第一个' + labels.chapter}
-            </button>
-            <button
+            </UiButton>
+            <UiButton
               type="button"
               className="btn"
               disabled={Boolean(volumeBusy)}
               onClick={() => void createProjectVolume()}
             >
               {volumeBusy === 'create' ? '新建中…' : '新建' + labels.volume}
-            </button>
-            <button
+            </UiButton>
+            <UiButton
               type="button"
               className="btn"
               disabled={templateBusy}
               onClick={() => void applyProjectTemplate()}
             >
               {templateBusy ? '初始化中…' : '初始化项目模板'}
-            </button>
-            <button type="button" className="btn" onClick={onClose}>
+            </UiButton>
+            <UiButton type="button" className="btn" onClick={onClose}>
               返回笔记
-            </button>
+            </UiButton>
           </div>
         </div>
       ) : (
@@ -1988,7 +1990,7 @@ export default function ProjectWorkspacePanel({
       <section className="project-board-toolbar" aria-label="项目章节筛选">
         <div className="project-board-search">
           <span aria-hidden="true">⌕</span>
-          <input
+          <UiInput
             type="search"
             value={projectBoardQuery}
             onChange={event => setProjectBoardQuery(event.target.value)}
@@ -1996,7 +1998,7 @@ export default function ProjectWorkspacePanel({
             aria-label="搜索项目章节"
           />
         </div>
-        <select
+        <UiSelect
           value={projectBoardStatus}
           onChange={event => setProjectBoardStatus(event.target.value)}
           aria-label="按章节状态筛选"
@@ -2005,8 +2007,8 @@ export default function ProjectWorkspacePanel({
           <option value="draft">草稿</option>
           <option value="review">修订</option>
           <option value="done">完成</option>
-        </select>
-        <select
+        </UiSelect>
+        <UiSelect
           value={projectBoardVolume}
           onChange={event => setProjectBoardVolume(event.target.value)}
           aria-label="按卷筛选"
@@ -2020,13 +2022,13 @@ export default function ProjectWorkspacePanel({
               {volume.title}
             </option>
           ))}
-        </select>
+        </UiSelect>
         <div className="project-board-filter-summary">
           <strong>{filteredProjectChapterCount}</strong>
           <span>{labels.chapter} · {formatCount(filteredProjectWordCount)} 字</span>
         </div>
         {projectBoardFilterActive && (
-          <button
+          <UiButton
             type="button"
             className="btn small"
             onClick={() => {
@@ -2036,18 +2038,18 @@ export default function ProjectWorkspacePanel({
             }}
           >
             清除筛选
-          </button>
+          </UiButton>
         )}
-        <button
+        <UiButton
           type="button"
           className="btn small"
           disabled={Boolean(volumeBusy)}
           onClick={() => void createProjectVolume()}
         >
           {volumeBusy === 'create' ? '新建中…' : '新增' + labels.volume}
-        </button>
+        </UiButton>
 
-        <button
+        <UiButton
           type="button"
           className={'btn small project-board-create-toggle' + (chapterCreateOpen ? ' active' : '')}
           aria-pressed={chapterCreateOpen}
@@ -2068,9 +2070,9 @@ export default function ProjectWorkspacePanel({
           }}
         >
           {chapterCreateOpen ? '收起新增' : '新增' + labels.chapter}
-        </button>
+        </UiButton>
 
-        <button
+        <UiButton
           type="button"
           className={'btn small project-board-select-toggle' + (selectionMode ? ' active' : '')}
           aria-pressed={selectionMode}
@@ -2088,7 +2090,7 @@ export default function ProjectWorkspacePanel({
           }}
         >
           {selectionMode ? '结束多选' : '批量选择'}
-        </button>
+        </UiButton>
       </section>
 
       {chapterCreateOpen && (
@@ -2098,7 +2100,7 @@ export default function ProjectWorkspacePanel({
             <span>快速新建会自动命名；批量创建时每行输入一个标题，最多 50 个。</span>
           </div>
 
-          <select
+          <UiSelect
             value={chapterCreateTarget}
             onChange={event => setChapterCreateTarget(event.target.value)}
             aria-label={'新建目标' + labels.volume}
@@ -2109,9 +2111,9 @@ export default function ProjectWorkspacePanel({
                 {volume.title}
               </option>
             ))}
-          </select>
+          </UiSelect>
 
-          <select
+          <UiSelect
             value={chapterCreateTemplate}
             onChange={event => setChapterCreateTemplate(event.target.value)}
             aria-label={labels.chapter + '模板'}
@@ -2121,9 +2123,9 @@ export default function ProjectWorkspacePanel({
                 {preset.label}
               </option>
             ))}
-          </select>
+          </UiSelect>
 
-          <textarea
+          <UiTextarea
             value={chapterCreateDraft}
             onChange={event => setChapterCreateDraft(event.target.value)}
             placeholder={'每行一个标题，例如：\n' + suggestProjectChapterTitle(workspace).replace(/\.md$/, '')}
@@ -2131,15 +2133,15 @@ export default function ProjectWorkspacePanel({
             rows={2}
           />
 
-          <button
+          <UiButton
             type="button"
             className="btn small"
             disabled={chapterCreateBusy}
             onClick={() => void createProjectChapters({ quick: true })}
           >
             {chapterCreateBusy ? '创建中…' : '快速新建'}
-          </button>
-          <button
+          </UiButton>
+          <UiButton
             type="button"
             className="btn small"
             disabled={chapterCreateBusy || !continuationSource}
@@ -2153,15 +2155,15 @@ export default function ProjectWorkspacePanel({
               : '当前目标卷还没有可续建的章节'}
           >
             从上一章续建
-          </button>
-          <button
+          </UiButton>
+          <UiButton
             type="button"
             className="btn small primary"
             disabled={chapterCreateBusy || !chapterCreateDraft.trim()}
             onClick={() => void createProjectChapters()}
           >
             批量创建
-          </button>
+          </UiButton>
         </section>
       )}
 
@@ -2181,17 +2183,17 @@ export default function ProjectWorkspacePanel({
             </span>
           </div>
 
-          <button
+          <UiButton
             type="button"
             className="btn small"
             disabled={!visibleProjectNoteIds.length}
             onClick={toggleVisibleSelection}
           >
             {allVisibleSelected ? '取消当前结果' : '选择当前结果'}
-          </button>
+          </UiButton>
 
           <div className="project-board-bulk-group">
-            <select
+            <UiSelect
               value={batchStatusTarget}
               onChange={event => setBatchStatusTarget(event.target.value)}
               aria-label="批量设置章节状态"
@@ -2199,34 +2201,34 @@ export default function ProjectWorkspacePanel({
               <option value="draft">设为草稿</option>
               <option value="review">设为修订</option>
               <option value="done">设为完成</option>
-            </select>
-            <button
+            </UiSelect>
+            <UiButton
               type="button"
               className="btn small"
               disabled={!selectedNoteIds.length}
               onClick={applyBulkStatus}
             >
               应用状态
-            </button>
+            </UiButton>
           </div>
 
           <div className="project-board-bulk-group project-board-bulk-manage">
-            <button
+            <UiButton
               type="button"
               className="btn small"
               disabled={!selectedExportIds.length || duplicateBusy}
               onClick={() => void duplicateSelectedNotes()}
             >
               {duplicateBusy ? '复制中…' : '复制'}
-            </button>
-            <button
+            </UiButton>
+            <UiButton
               type="button"
               className="btn small"
               disabled={selectedExportIds.length !== 1 || splitBusy}
               onClick={previewSelectedSplit}
             >
               拆分
-            </button>
+            </UiButton>
           </div>
 
           <div
@@ -2234,7 +2236,7 @@ export default function ProjectWorkspacePanel({
             title="按项目阅读顺序合并导出选中章节"
           >
             <span>导出</span>
-            <button
+            <UiButton
               type="button"
               className="btn small"
               disabled={!selectedExportIds.length || Boolean(exportingKey)}
@@ -2246,8 +2248,8 @@ export default function ProjectWorkspacePanel({
               })}
             >
               {exportingKey === 'selection-md' ? '导出中…' : 'MD'}
-            </button>
-            <button
+            </UiButton>
+            <UiButton
               type="button"
               className="btn small"
               disabled={!selectedExportIds.length || Boolean(exportingKey)}
@@ -2259,11 +2261,11 @@ export default function ProjectWorkspacePanel({
               })}
             >
               {exportingKey === 'selection-docx' ? '导出中…' : 'Word'}
-            </button>
+            </UiButton>
           </div>
 
           <div className="project-board-bulk-group">
-            <select
+            <UiSelect
               value={batchMoveTarget}
               onChange={event => setBatchMoveTarget(event.target.value)}
               aria-label={'批量移动目标' + labels.volume}
@@ -2274,25 +2276,25 @@ export default function ProjectWorkspacePanel({
                   {volume.title}
                 </option>
               ))}
-            </select>
-            <button
+            </UiSelect>
+            <UiButton
               type="button"
               className="btn small"
               disabled={!selectedNoteIds.length || batchBusy}
               onClick={() => void moveSelectedNotes()}
             >
               {batchBusy ? '移动中…' : '移动'}
-            </button>
+            </UiButton>
           </div>
 
-          <button
+          <UiButton
             type="button"
             className="btn small"
             disabled={!selectedNoteIds.length}
             onClick={() => setSelectedNoteIds([])}
           >
             取消选择
-          </button>
+          </UiButton>
         </section>
       )}
 
@@ -2318,19 +2320,19 @@ export default function ProjectWorkspacePanel({
                     : ''}
                 </span>
               </div>
-              <button
+              <UiButton
                 type="button"
                 className="btn small"
                 onClick={() => setVolumeManageId('')}
               >
                 关闭
-              </button>
+              </UiButton>
             </div>
 
             <div className="project-volume-manager-grid">
               <label>
                 <span>{labels.volume}名称</span>
-                <input
+                <UiInput
                   value={volumeNameDraft}
                   onChange={event => setVolumeNameDraft(event.target.value)}
                   disabled={!volume.id}
@@ -2339,7 +2341,7 @@ export default function ProjectWorkspacePanel({
               </label>
               <label>
                 <span>目标字数</span>
-                <input
+                <UiInput
                   type="number"
                   min="0"
                   step="1000"
@@ -2349,52 +2351,52 @@ export default function ProjectWorkspacePanel({
                   aria-label={volume.title + '目标字数'}
                 />
               </label>
-              <button
+              <UiButton
                 type="button"
                 className="btn small primary"
                 disabled={Boolean(volumeBusy)}
                 onClick={() => void saveVolumeSettings(volume)}
               >
                 保存设置
-              </button>
+              </UiButton>
 
               {volume.id && (
                 <>
                   <div className="project-volume-manager-group">
                     <span>顺序</span>
-                    <button
+                    <UiButton
                       type="button"
                       className="btn small"
                       disabled={volumeIndex <= 0 || Boolean(volumeBusy)}
                       onClick={() => void moveVolume(volume.id, 'left')}
                     >
                       ← 前移
-                    </button>
-                    <button
+                    </UiButton>
+                    <UiButton
                       type="button"
                       className="btn small"
                       disabled={volumeIndex < 0 || volumeIndex >= realVolumes.length - 1 || Boolean(volumeBusy)}
                       onClick={() => void moveVolume(volume.id, 'right')}
                     >
                       后移 →
-                    </button>
+                    </UiButton>
                   </div>
 
                   <div className="project-volume-manager-group">
                     <span>复制</span>
-                    <button
+                    <UiButton
                       type="button"
                       className="btn small"
                       disabled={Boolean(volumeBusy)}
                       onClick={() => void duplicateVolume(volume)}
                     >
                       复制整{labels.volume}
-                    </button>
+                    </UiButton>
                   </div>
 
                   <div className="project-volume-manager-group split">
                     <span>拆分</span>
-                    <select
+                    <UiSelect
                       value={volumeSplitStartId}
                       onChange={event => setVolumeSplitStartId(event.target.value)}
                       aria-label={'选择' + labels.volume + '拆分起点'}
@@ -2406,20 +2408,20 @@ export default function ProjectWorkspacePanel({
                           从 {displayTitle(note.title)} 开始
                         </option>
                       ))}
-                    </select>
-                    <button
+                    </UiSelect>
+                    <UiButton
                       type="button"
                       className="btn small"
                       disabled={!volumeSplitStartId || Boolean(volumeBusy)}
                       onClick={() => void splitVolume(volume)}
                     >
                       拆为新{labels.volume}
-                    </button>
+                    </UiButton>
                   </div>
 
                   <div className="project-volume-manager-group merge">
                     <span>合并</span>
-                    <select
+                    <UiSelect
                       value={volumeMergeTarget}
                       onChange={event => setVolumeMergeTarget(event.target.value)}
                       aria-label={'合并目标' + labels.volume}
@@ -2432,15 +2434,15 @@ export default function ProjectWorkspacePanel({
                             {item.title}
                           </option>
                         ))}
-                    </select>
-                    <button
+                    </UiSelect>
+                    <UiButton
                       type="button"
                       className="btn small danger"
                       disabled={!volumeMergeTarget || Boolean(volumeBusy)}
                       onClick={() => void mergeVolume(volume)}
                     >
                       合并并删除当前{labels.volume}
-                    </button>
+                    </UiButton>
                   </div>
                 </>
               )}
@@ -2460,7 +2462,7 @@ export default function ProjectWorkspacePanel({
           </div>
           <label>
             <span>新章节标题</span>
-            <input
+            <UiInput
               value={splitPreview.newTitle}
               onChange={event => setSplitPreview(previous => ({
                 ...previous,
@@ -2469,22 +2471,22 @@ export default function ProjectWorkspacePanel({
               aria-label="拆分后的新章节标题"
             />
           </label>
-          <button
+          <UiButton
             type="button"
             className="btn small"
             onClick={() => setSplitPreview(null)}
             disabled={splitBusy}
           >
             取消
-          </button>
-          <button
+          </UiButton>
+          <UiButton
             type="button"
             className="btn small primary"
             onClick={() => void confirmSplitChapter()}
             disabled={splitBusy || !splitPreview.newTitle.trim()}
           >
             {splitBusy ? '拆分中…' : '确认拆分'}
-          </button>
+          </UiButton>
         </section>
       )}
 
@@ -2549,15 +2551,15 @@ export default function ProjectWorkspacePanel({
                   })()}
                 </div>
                 <div className="project-volume-export">
-                  <button
+                  <UiButton
                     type="button"
                     className="project-volume-settings"
                     onClick={() => openVolumeManager(volume)}
                     title={labels.volume + '设置'}
                   >
                     设置
-                  </button>
-                  <button
+                  </UiButton>
+                  <UiButton
                     type="button"
                     className="project-volume-manage"
                     disabled={!volume.notes.length}
@@ -2565,8 +2567,8 @@ export default function ProjectWorkspacePanel({
                     title={'批量管理本' + labels.volume + '章节'}
                   >
                     批量
-                  </button>
-                  <button
+                  </UiButton>
+                  <UiButton
                     type="button"
                     className="project-volume-create"
                     disabled={chapterCreateBusy}
@@ -2580,8 +2582,8 @@ export default function ProjectWorkspacePanel({
                     title={'在本' + labels.volume + '新增' + labels.chapter}
                   >
                     ＋
-                  </button>
-                  <button
+                  </UiButton>
+                  <UiButton
                     type="button"
                     disabled={!exportIds.length || Boolean(exportingKey)}
                     onClick={() => void exportCombined({
@@ -2593,8 +2595,8 @@ export default function ProjectWorkspacePanel({
                     title="合并导出 Markdown"
                   >
                     MD
-                  </button>
-                  <button
+                  </UiButton>
+                  <UiButton
                     type="button"
                     disabled={!exportIds.length || Boolean(exportingKey)}
                     onClick={() => void exportCombined({
@@ -2606,7 +2608,7 @@ export default function ProjectWorkspacePanel({
                     title="合并导出 Word"
                   >
                     W
-                  </button>
+                  </UiButton>
                 </div>
               </header>
 
@@ -2670,7 +2672,7 @@ export default function ProjectWorkspacePanel({
                           className="project-chapter-select"
                           title={'选择' + displayTitle(note.title)}
                         >
-                          <input
+                          <input data-ui-native="checkbox"
                             type="checkbox"
                             checked={selectedNoteIdSet.has(note.id)}
                             onChange={() => toggleNoteSelection(note.id)}
@@ -2681,7 +2683,7 @@ export default function ProjectWorkspacePanel({
                       )}
 
                       <div className="project-chapter-main">
-                        <button
+                        <UiButton
                           type="button"
                           className="project-chapter-open"
                           onClick={() => (
@@ -2694,11 +2696,11 @@ export default function ProjectWorkspacePanel({
                           <span>
                             {formatCount(note.wordCount)} 字 · {formatUpdated(note.updated_at)}
                           </span>
-                        </button>
+                        </UiButton>
 
                         {editingSummaryId === note.id ? (
                           <div className="project-chapter-summary-editor">
-                            <textarea
+                            <UiTextarea
                               value={summaryDraft}
                               onChange={event => setSummaryDraft(event.target.value)}
                               placeholder="一句话概括这一章的目标、冲突或推进…"
@@ -2706,8 +2708,8 @@ export default function ProjectWorkspacePanel({
                               autoFocus
                             />
                             <div>
-                              <button type="button" onClick={() => saveSummary(note.id)}>保存</button>
-                              <button
+                              <UiButton type="button" onClick={() => saveSummary(note.id)}>保存</UiButton>
+                              <UiButton
                                 type="button"
                                 onClick={() => {
                                   setEditingSummaryId('')
@@ -2715,11 +2717,11 @@ export default function ProjectWorkspacePanel({
                                 }}
                               >
                                 取消
-                              </button>
+                              </UiButton>
                             </div>
                           </div>
                         ) : (
-                          <button
+                          <UiButton
                             type="button"
                             className="project-chapter-summary"
                             onClick={() => (
@@ -2730,32 +2732,32 @@ export default function ProjectWorkspacePanel({
                             title={selectionMode ? '选择章节' : '编辑章节摘要'}
                           >
                             {getProjectChapterSummary(note, projectMeta)}
-                          </button>
+                          </UiButton>
                         )}
                       </div>
 
                       {!selectionMode && (
                         <div className="project-chapter-quick-actions">
-                          <button
+                          <UiButton size="middle"
                             type="button"
                             onClick={() => void createChapterRelative(note, 'before')}
                             disabled={Boolean(relativeCreateBusy)}
                             title={'在此' + labels.chapter + '前插入'}
                           >
                             前插
-                          </button>
-                          <button
+                          </UiButton>
+                          <UiButton size="middle"
                             type="button"
                             onClick={() => void createChapterRelative(note, 'after')}
                             disabled={Boolean(relativeCreateBusy)}
                             title={'在此' + labels.chapter + '后续建'}
                           >
                             后插
-                          </button>
+                          </UiButton>
                         </div>
                       )}
 
-                      <button
+                      <UiButton
                         type="button"
                         className={'project-chapter-status ' + note.status}
                         onClick={() => (
@@ -2766,7 +2768,7 @@ export default function ProjectWorkspacePanel({
                         title={selectionMode ? '选择章节' : '点击切换章节状态'}
                       >
                         {statusCopy(note.status)}
-                      </button>
+                      </UiButton>
                     </article>
                   )
                 })}
@@ -2785,7 +2787,7 @@ export default function ProjectWorkspacePanel({
         <div className="project-board-filter-empty">
           <strong>没有匹配的章节</strong>
           <span>换一个关键词、状态或{labels.volume}筛选条件。</span>
-          <button
+          <UiButton size="middle"
             type="button"
             className="btn"
             onClick={() => {
@@ -2795,7 +2797,7 @@ export default function ProjectWorkspacePanel({
             }}
           >
             清除筛选
-          </button>
+          </UiButton>
         </div>
       )}
       </>

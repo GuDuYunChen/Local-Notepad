@@ -111,11 +111,6 @@
 .project-today-task-open {
   min-width: 0;
   flex: 1;
-  padding: 1px 2px;
-  border: 0;
-  background: transparent;
-  color: var(--ink-soft);
-  font: inherit;
   text-align: left;
   cursor: pointer;
 }
@@ -145,6 +140,10 @@
 
 .project-today-focus-actions button {
   min-width: 26px;
+  cursor: pointer;
+}
+
+.project-today-focus-actions button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   height: 24px;
   padding: 0 4px;
   border: 1px solid var(--line);
@@ -153,10 +152,9 @@
   color: var(--ink-muted);
   font: inherit;
   font-size: 7px;
-  cursor: pointer;
 }
 
-.project-today-focus-actions button:hover {
+.project-today-focus-actions button:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-color: var(--clay);
   color: var(--clay);
 }
@@ -226,6 +224,10 @@
 
 .project-today-review-state button {
   flex: 0 0 auto;
+  cursor: pointer;
+}
+
+.project-today-review-state button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   padding: 4px 6px;
   border: 1px solid var(--line);
   border-radius: 5px;
@@ -233,25 +235,27 @@
   color: var(--ink-soft);
   font: inherit;
   font-size: 7px;
-  cursor: pointer;
 }
 
 .project-today-history-list > button {
   min-width: 0;
-  padding: 5px;
   display: flex;
   align-items: center;
   gap: 7px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.project-today-history-list > button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
+  padding: 5px;
   border: 0;
   border-radius: 6px;
   background: transparent;
   color: var(--ink-soft);
   font: inherit;
-  text-align: left;
-  cursor: pointer;
 }
 
-.project-today-history-list > button:hover {
+.project-today-history-list > button:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   background: var(--surface-hover);
 }
 
@@ -324,6 +328,10 @@
 }
 
 .project-today-empty-action button {
+  cursor: pointer;
+}
+
+.project-today-empty-action button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   min-height: 24px;
   padding: 0 6px;
   border: 1px solid var(--line);
@@ -332,7 +340,6 @@
   color: var(--ink-soft);
   font: inherit;
   font-size: 7px;
-  cursor: pointer;
 }
 
 @media (max-width: 1180px) {
@@ -367,8 +374,11 @@
   }
 
   .project-today-center-actions .btn {
+    white-space: nowrap;
+  }
+
+  .project-today-center-actions .btn:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
     min-height: 28px;
     padding-inline: 7px;
-    white-space: nowrap;
   }
 }

@@ -1,5 +1,8 @@
 import ResearchTasksPanel from './ResearchTasksPanel'
 import React, { useEffect, useRef, useState } from 'react'
+import { UiSelect } from './ui/ControlKit'
+import { UiInput } from './ui/ControlKit'
+import { UiButton } from './ui/ControlKit'
 import useBackupDialogFocus from '~/hooks/useBackupDialogFocus'
 import { evidenceNavigation } from '~/services/evidenceNavigation'
 import { toast } from '~/services/toast'
@@ -213,19 +216,19 @@ export default function GlobalSearchPanel({ open, onClose, onOpenFile, seed, onO
   return <DialogFrame onClose={close} inputRef={mode === 'search' ? inputRef : mode === 'collections' ? collectionTabRef : studyTabRef}>
     <header className="global-search-header">
       <div><h2 id="global-search-title">全局检索</h2><p>在所有已保存笔记中查找，先看上下文，再回到正文。</p></div>
-      <button type="button" onClick={close} aria-label="关闭全局检索">×</button>
+      <UiButton type="button" onClick={close} aria-label="关闭全局检索">×</UiButton>
     </header>
     {compilationReceipt && <section className="study-compilation-result" aria-label="研究笔记创建结果">
       <p role="status">{compilationReceipt.status === 'confirmed' ? '研究笔记已保存：' + compilationReceipt.title : compilationReceipt.status === 'pending' ? '研究笔记正在创建；关闭检索不撤销已发出的请求。' : compilationReceipt.message}</p>
-      {compilationReceipt.status === 'confirmed' && <button type="button" disabled={!onOpenFile} onClick={() => void openResearchNote()}>打开新研究笔记</button>}
-      {compilationReceipt.draft && compilationReceipt.status !== 'pending' && <button type="button" onClick={() => {
+      {compilationReceipt.status === 'confirmed' && <UiButton type="button" disabled={!onOpenFile} onClick={() => void openResearchNote()}>打开新研究笔记</UiButton>}
+      {compilationReceipt.draft && compilationReceipt.status !== 'pending' && <UiButton type="button" onClick={() => {
         try { downloadCollectionReviewReport(compilationReceipt.draft) } catch (failure) { setOpenError('研究草稿下载未完成：' + failure.message) }
-      }}>下载保留的研究草稿</button>}
+      }}>下载保留的研究草稿</UiButton>}
       {openError && <p role="alert">{openError}</p>}
     </section>}
     <div className="global-search-tabs" role="tablist" aria-label="检索工作区">
       {tabs.map(([id, title, ref]) =>
-        <button key={id} ref={ref} type="button" role="tab" id={'search-tab-' + id} aria-selected={mode === id}
+        <UiButton key={id} ref={ref} type="button" role="tab" id={'search-tab-' + id} aria-selected={mode === id}
           aria-controls={'search-mode-' + id} tabIndex={mode === id ? 0 : -1}
           onClick={() => setMode(id)} onKeyDown={event => {
             if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key) || event.nativeEvent?.isComposing || event.keyCode === 229) return
@@ -233,37 +236,37 @@ export default function GlobalSearchPanel({ open, onClose, onOpenFile, seed, onO
             const index = tabs.findIndex(item => item[0] === mode)
             const target = event.key === 'Home' ? tabs[0] : event.key === 'End' ? tabs.at(-1) : tabs[(index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length]
             setMode(target[0]); target[2].current?.focus()
-          }}>{title}</button>)}
+          }}>{title}</UiButton>)}
     </div>
     <div className="global-search-mode" role="tabpanel" id="search-mode-search" aria-labelledby="search-tab-search" hidden={mode !== 'search'}>
     <div className="global-search-query">
-      <input ref={inputRef} aria-label="全局检索关键词" placeholder="输入词语或完整短语；留空浏览笔记" value={filters.query}
+      <UiInput ref={inputRef} aria-label="全局检索关键词" placeholder="输入词语或完整短语；留空浏览笔记" value={filters.query}
         onChange={event => update({ query: event.target.value })}
         onKeyDown={event => {
           if (event.nativeEvent?.isComposing || event.keyCode === 229) return
           if (event.key === 'Enter') { event.preventDefault(); retry() }
           if (event.key === 'ArrowDown' && ready && response.items.length) { event.preventDefault(); selectResult(response.items[0], true) }
         }} />
-      <button type="button" className="primary" onClick={retry}>搜索 / 刷新</button>
+      <UiButton type="button" className="primary" onClick={retry}>搜索 / 刷新</UiButton>
     </div>
     <div className="global-search-filters">
-      <label>查找范围<select aria-label="检索目录范围" value={filters.folderId} onChange={event => update({ folderId: event.target.value })}>
+      <label>查找范围<UiSelect size="middle" aria-label="检索目录范围" value={filters.folderId} onChange={event => update({ folderId: event.target.value })}>
         <option value="">全部目录与项目</option>
         {folders.map(folder => <option key={folder.id} value={folder.id}>{folder.label}</option>)}
         {filters.folderId && !folders.some(folder => folder.id === filters.folderId) && <option value={filters.folderId}>原目录不可用</option>}
-      </select></label>
-      <label>命中位置<select aria-label="检索命中位置" value={filters.source} onChange={event => update({ source: event.target.value })}>
+      </UiSelect></label>
+      <label>命中位置<UiSelect size="middle" aria-label="检索命中位置" value={filters.source} onChange={event => update({ source: event.target.value })}>
         {Object.entries(SEARCH_SOURCES).map(([id, label]) => <option key={id} value={id}>{label}</option>)}
-      </select></label>
-      <label>修改时间<select aria-label="检索修改时间" value={filters.days} onChange={event => update({ days: event.target.value, since: Number(event.target.value) ? Math.floor(Date.now() / 1000) - Number(event.target.value) * 86400 : 0 })}>
+      </UiSelect></label>
+      <label>修改时间<UiSelect size="middle" aria-label="检索修改时间" value={filters.days} onChange={event => update({ days: event.target.value, since: Number(event.target.value) ? Math.floor(Date.now() / 1000) - Number(event.target.value) * 86400 : 0 })}>
         <option value="0">不限时间</option><option value="7">最近 7 天</option><option value="30">最近 30 天</option><option value="90">最近 90 天</option>
-      </select></label>
-      <label>排序<select aria-label="检索结果排序" value={filters.sort} onChange={event => update({ sort: event.target.value })}>
+      </UiSelect></label>
+      <label>排序<UiSelect size="middle" aria-label="检索结果排序" value={filters.sort} onChange={event => update({ sort: event.target.value })}>
         <option value="relevance">标题优先</option><option value="updated">最近修改</option><option value="title">标题顺序</option>
-      </select></label>
-      <label className="check"><input type="checkbox" checked={filters.pinned} onChange={event => update({ pinned: event.target.checked })} />仅置顶</label>
-      <label className="check"><input type="checkbox" checked={filters.matchCase} onChange={event => update({ matchCase: event.target.checked })} />区分大小写</label>
-      <button type="button" onClick={() => { setFilters(defaults()); setOpenError('') }}>重置</button>
+      </UiSelect></label>
+      <label className="check"><input data-ui-native="checkbox" type="checkbox" checked={filters.pinned} onChange={event => update({ pinned: event.target.checked })} />仅置顶</label>
+      <label className="check"><input data-ui-native="checkbox" type="checkbox" checked={filters.matchCase} onChange={event => update({ matchCase: event.target.checked })} />区分大小写</label>
+      <UiButton size="middle" type="button" onClick={() => { setFilters(defaults()); setOpenError('') }}>重置</UiButton>
     </div>
     <SearchPresetsPanel filters={filters} onApply={next => { update(next); setRefresh(value => value + 1) }} />
     <SearchResultExportPanel collection={collection} response={response} ready={ready} />
@@ -272,7 +275,7 @@ export default function GlobalSearchPanel({ open, onClose, onOpenFile, seed, onO
         `${response.total} 篇笔记${response.query ? ' · 正文共 ' + response.total_occurrences + ' 处命中' : ''} · 当前范围 ${response.scanned} 篇`}
       {ready && Number.isSafeInteger(response.cache_hits) && Number.isSafeInteger(response.parsed) && <small> · 本次复用 {response.cache_hits} 篇解析，新解析 {response.parsed} 篇（仍核验当前正文）</small>}
     </div>
-    {error && <div className="global-search-notice" role="alert"><p>{error}</p><button type="button" onClick={retry}>重新检索</button></div>}
+    {error && <div className="global-search-notice" role="alert"><p>{error}</p><UiButton type="button" onClick={retry}>重新检索</UiButton></div>}
     {returnNotice && <div className="global-search-notice" role="status">{returnNotice}</div>}
     {openError && <div className="global-search-notice" role="alert">{openError}</div>}
     {ready && response.unsupported > 0 && <div className="global-search-notice" role="status">有 {response.unsupported} 篇正文格式未能解析；标题仍可检索，正文结果可能不完整。原文未修改。</div>}
@@ -286,34 +289,34 @@ export default function GlobalSearchPanel({ open, onClose, onOpenFile, seed, onO
             const next = event.key === 'Home' ? 0 : event.key === 'End' ? response.items.length - 1 : Math.max(0, Math.min(response.items.length - 1, index + (event.key === 'ArrowDown' ? 1 : -1)))
             selectResult(response.items[next], true)
           }}>
-          {ready && response.items.map(item => <button type="button" data-search-result key={item.id} role="option" aria-selected={item.id === selectedId}
+          {ready && response.items.map(item => <UiButton type="button" data-search-result key={item.id} role="option" aria-selected={item.id === selectedId}
             tabIndex={item.id === selectedId ? 0 : -1} onClick={() => selectResult(item)}>
             <span className="global-search-result-title">{collection.selectedIds.has(item.id) && <span aria-label="已加入导出清单">✓ </span>}{item.is_pinned && <span aria-label="已置顶">★ </span>}<Highlight title={item.title} query={response.query} matchCase={filters.matchCase} /></span>
             <span className="global-search-result-path">{item.folder_path}</span>
             <span className="global-search-result-meta">{item.title_match ? '标题命中 · ' : ''}{item.body_count ? '正文 ' + item.body_count + ' 处 · ' : ''}{date(item.updated_at)}</span>
-          </button>)}
+          </UiButton>)}
           {ready && !response.total && <div className="global-search-empty"><strong>当前范围没有匹配的笔记</strong><p>试试缩短关键词，或重置目录、时间和置顶筛选。</p></div>}
           {!ready && status !== 'error' && <div className="global-search-empty">正在准备结果…</div>}
         </div>
         {ready && response.total > 0 && <nav className="global-search-pagination" aria-label="全局检索分页">
-          <button type="button" disabled={response.page <= 1} onClick={() => changePage(response.page - 1)}>上一页</button>
+          <UiButton type="button" disabled={response.page <= 1} onClick={() => changePage(response.page - 1)}>上一页</UiButton>
           <span>第 {response.page} / {response.pages} 页 · 每页 {response.page_size} 篇</span>
-          <button type="button" disabled={response.page >= response.pages} onClick={() => changePage(response.page + 1)}>下一页</button>
+          <UiButton type="button" disabled={response.page >= response.pages} onClick={() => changePage(response.page + 1)}>下一页</UiButton>
         </nav>}
       </div>
       <section className="global-search-preview" aria-label="检索上下文预览">
         {selected ? <>
           <nav className="global-search-result-navigation" aria-label="连续查看检索结果">
-            <button type="button" disabled={response.page === 1 && selectedIndex === 0} onClick={() => moveResult(-1)}>上一结果</button>
+            <UiButton type="button" disabled={response.page === 1 && selectedIndex === 0} onClick={() => moveResult(-1)}>上一结果</UiButton>
             <span>第 {(response.page - 1) * response.page_size + selectedIndex + 1} / {response.total} 篇</span>
-            <button type="button" disabled={response.page === response.pages && selectedIndex === response.items.length - 1} onClick={() => moveResult(1)}>下一结果</button>
+            <UiButton type="button" disabled={response.page === response.pages && selectedIndex === response.items.length - 1} onClick={() => moveResult(1)}>下一结果</UiButton>
           </nav>
           <header><small>{selected.folder_path}</small><h3><Highlight title={selected.title} query={response.query} matchCase={filters.matchCase} /></h3>
-            <button type="button" className="primary" disabled={!onOpenFile} onClick={() => void openResult(selected)}>打开笔记</button>
-            <button type="button" className="search-result-collect" disabled={collection.busy} aria-pressed={collection.selectedIds.has(selected.id)} onClick={() => collection.toggle(selected)}>{collection.selectedIds.has(selected.id) ? '移出导出清单' : '加入导出清单'}</button></header>
+            <UiButton type="button" className="primary" disabled={!onOpenFile} onClick={() => void openResult(selected)}>打开笔记</UiButton>
+            <UiButton type="button" className="search-result-collect" disabled={collection.busy} aria-pressed={collection.selectedIds.has(selected.id)} onClick={() => collection.toggle(selected)}>{collection.selectedIds.has(selected.id) ? '移出导出清单' : '加入导出清单'}</UiButton></header>
           {selected.snippets.map((snippet, index) => <article className="global-search-snippet" key={selected.id + ':' + index}>
             <small>{SEARCH_KINDS[snippet.kind]} · 节选 {index + 1}</small><SnippetText value={snippet} />
-            {snippet.kind === 'body' ? <button type="button" disabled={!onOpenFile} onClick={() => void openResult(selected, snippet)}>定位第 {index + 1} 处</button> : <small>打开笔记后查看此类内容；不模拟字符定位。</small>}
+            {snippet.kind === 'body' ? <UiButton type="button" disabled={!onOpenFile} onClick={() => void openResult(selected, snippet)}>定位第 {index + 1} 处</UiButton> : <small>打开笔记后查看此类内容；不模拟字符定位。</small>}
           </article>)}
           {selected.body_count > selected.snippets.length && <p className="global-search-help">另有 {selected.body_count - selected.snippets.length} 处命中，打开笔记后可用 Ctrl + F 继续查找。</p>}
           {!selected.snippets.length && <p className="global-search-help">{response.query ? '此笔记仅标题命中。' : '输入关键词后，这里会展示正文上下文。'}</p>}

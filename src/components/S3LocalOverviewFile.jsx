@@ -3,6 +3,8 @@ import './S3LocalOverviewFile.css'
 import { hasLocalReportFileDrag, selectLocalReportDrop, LOCAL_REPORT_DROP_MESSAGES } from '../services/s3LocalReportDrop.mjs'
 import S3LocalOverviewComparison from './S3LocalOverviewComparison.jsx'
 import { LOCAL_REPORT_FILE_NOTICE, readLocalOverviewFile } from '../services/s3LocalOverviewFile.mjs'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 const labels = { file: '笔记与文件夹（含回收站）', tag: '标签', 'file-tag': '笔记与标签关联', attachment: '附件' }
 const initial = { state: 'idle', report: null, message: '选择已导出的统计 JSON 文件即可查看；不需要先读取当前工作区。' }
@@ -70,8 +72,8 @@ export default function S3LocalOverviewFile({ currentSummary = null }) {
       <p id={`${id}-drop-label`}><strong>{dragging ? '松开以查看这份报告' : '将单个统计 JSON 报告拖到这里'}</strong></p>
       <p>也可使用下方文件选择按钮。只查看统计，不导入笔记；仍按 4 KiB 上限完整校验。</p>
       <div className="local-inventory-actions">
-        <label>选择统计报告 <input ref={input} type="file" accept=".json,application/json" aria-describedby={id} aria-label="选择统计 JSON 报告" onChange={choose} /></label>
-        <button type="button" className="btn small" onClick={clear} disabled={view.state === 'idle' && !dropCode}>{view.state === 'reading' ? '停止读取文件' : '清除文件视图'}</button>
+        <label>选择统计报告 <input data-ui-native="file" ref={input} type="file" accept=".json,application/json" aria-describedby={id} aria-label="选择统计 JSON 报告" onChange={choose} /></label>
+        <UiButton size="middle" type="button" className="btn small" onClick={clear} disabled={view.state === 'idle' && !dropCode}>{view.state === 'reading' ? '停止读取文件' : '清除文件视图'}</UiButton>
       </div>
     </div>
     <p role="status" aria-live="polite" aria-atomic="true" data-local-report-drop-status={dropCode}>{LOCAL_REPORT_DROP_MESSAGES[dropCode] || ''}</p>

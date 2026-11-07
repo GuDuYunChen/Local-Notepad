@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { formatBackupSize } from './backupCenterUtils'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 function normalizePackage(result) {
   const value = result?.package
@@ -152,10 +154,10 @@ export default function WorkspacePackagePanel() {
     </div>
     <p>把<strong>经过 SQLite 完整性校验的数据库快照</strong>与当前 <code>uploads</code> 附件放进一个可搬运文件。每个条目和清单都使用 SHA-256 校验；不会读取符号链接，也不会静默跳过异常附件。</p>
     <div className="backup-center-actions">
-      <button type="button" className="btn primary" disabled={task.busy || !!restorePreview || typeof window.electronAPI?.workspaceExport !== 'function'} onClick={() => void run('workspaceExport')}>导出工作区便携包</button>
-      <button type="button" className="btn" disabled={task.busy || !!restorePreview || typeof window.electronAPI?.workspaceInspect !== 'function'} onClick={() => void run('workspaceInspect')}>校验已有 .lnw</button>
-      <button type="button" className="btn" disabled={task.busy || !!restorePreview || !desktopRestore} onClick={() => void prepareRestore()}>预检恢复 .lnw</button>
-      <button type="button" className="btn" disabled={task.busy || !!restorePreview || typeof window.electronAPI?.openAppFolder !== 'function'} onClick={() => void openUploads()}>打开附件目录</button>
+      <UiButton size="middle" type="button" className="btn primary" disabled={task.busy || !!restorePreview || typeof window.electronAPI?.workspaceExport !== 'function'} onClick={() => void run('workspaceExport')}>导出工作区便携包</UiButton>
+      <UiButton size="middle" type="button" className="btn" disabled={task.busy || !!restorePreview || typeof window.electronAPI?.workspaceInspect !== 'function'} onClick={() => void run('workspaceInspect')}>校验已有 .lnw</UiButton>
+      <UiButton size="middle" type="button" className="btn" disabled={task.busy || !!restorePreview || !desktopRestore} onClick={() => void prepareRestore()}>预检恢复 .lnw</UiButton>
+      <UiButton size="middle" type="button" className="btn" disabled={task.busy || !!restorePreview || typeof window.electronAPI?.openAppFolder !== 'function'} onClick={() => void openUploads()}>打开附件目录</UiButton>
     </div>
     <p className="backup-center-safety-hint">导出会先留下一个手动数据库快照，目标文件已存在时绝不覆盖。恢复采用两步确认：先只读预检和暂存，确认后自动重启，在后端启动前替换数据；恢复前的数据库、WAL、SHM 与附件目录会永久保留。</p>
     <p className="backup-center-safety-hint">若恢复后的数据库无法通过本地服务启动验证，应用会自动切回恢复前数据。未保存的编辑器草稿、窗口临时状态以及“核对存档”仍需分别保存。</p>
@@ -167,8 +169,8 @@ export default function WorkspacePackagePanel() {
       <p>附件：{restorePreview.attachments.count} 个 · {formatBackupSize(restorePreview.attachments.totalBytes)}</p>
       <p><strong>确认后应用会自动重启。</strong>请先保存当前编辑器草稿；草稿不在 .lnw 中。原工作区会移动到独立保留目录，不会被删除。</p>
       <div className="backup-center-actions">
-        <button type="button" className="btn" disabled={task.busy} onClick={() => void cancelRestore()}>取消恢复预检</button>
-        <button type="button" className="btn danger" disabled={task.busy} onClick={() => void confirmRestore()}>确认恢复并重启</button>
+        <UiButton size="middle" type="button" className="btn" disabled={task.busy} onClick={() => void cancelRestore()}>取消恢复预检</UiButton>
+        <UiButton size="middle" type="button" className="btn danger" disabled={task.busy} onClick={() => void confirmRestore()}>确认恢复并重启</UiButton>
       </div>
     </div>}
 

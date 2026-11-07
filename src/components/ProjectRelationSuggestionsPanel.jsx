@@ -7,6 +7,8 @@ import {
   getProjectRelationTypes,
 } from './projectRelationsUtils'
 import './ProjectRelationSuggestionsPanel.css'
+import { UiButton, UiSelect } from '~/components/ui/ControlKit'
+
 
 function stripExtension(value) {
   return String(value || '未命名').replace(/\.[^.]+$/, '')
@@ -140,7 +142,7 @@ export default function ProjectRelationSuggestionsPanel({
       <div className="project-relation-suggestion-controls">
         <label>
           <span>至少共同出现</span>
-          <select
+          <UiSelect size="middle"
             value={minChapters}
             onChange={event => setMinChapters(Number(event.target.value))}
             aria-label="关系建议最少共现章节"
@@ -149,11 +151,11 @@ export default function ProjectRelationSuggestionsPanel({
             <option value="3">3 章</option>
             <option value="4">4 章</option>
             <option value="5">5 章</option>
-          </select>
+          </UiSelect>
         </label>
         <label>
           <span>最低置信度</span>
-          <select
+          <UiSelect size="middle"
             value={minConfidence}
             onChange={event => setMinConfidence(event.target.value)}
             aria-label="关系建议最低置信度"
@@ -161,7 +163,7 @@ export default function ProjectRelationSuggestionsPanel({
             <option value="exploratory">探索及以上</option>
             <option value="medium">中置信及以上</option>
             <option value="high">仅高置信</option>
-          </select>
+          </UiSelect>
         </label>
         <span>
           已扫描 {model.stats.chapters} 章 ·
@@ -169,13 +171,13 @@ export default function ProjectRelationSuggestionsPanel({
           {' '}{model.stats.chaptersWithCooccurrence} 个共现章节
         </span>
         {model.stats.ignoredCount > 0 && (
-          <button
+          <UiButton size="middle"
             type="button"
             className="btn small"
             onClick={restoreIgnored}
           >
             恢复 {model.stats.ignoredCount} 个已忽略候选
-          </button>
+          </UiButton>
         )}
       </div>
 
@@ -234,7 +236,7 @@ export default function ProjectRelationSuggestionsPanel({
                   <strong>证据章节</strong>
                   <div>
                     {suggestion.evidence.slice(0, 8).map(item => (
-                      <button
+                      <UiButton
                         key={item.chapterId}
                         type="button"
                         onClick={() => onOpenFile?.(item.chapterId)}
@@ -248,7 +250,7 @@ export default function ProjectRelationSuggestionsPanel({
                         <small>
                           {item.leftSourceLabel} × {item.rightSourceLabel}
                         </small>
-                      </button>
+                      </UiButton>
                     ))}
                     {suggestion.evidence.length > 8 && (
                       <em>另有 {suggestion.evidence.length - 8} 章</em>
@@ -257,7 +259,7 @@ export default function ProjectRelationSuggestionsPanel({
                 </div>
 
                 <div className="project-relation-suggestion-actions">
-                  <select
+                  <UiSelect size="middle"
                     value={draft.type}
                     onChange={event => updateDraft(
                       suggestion.signature,
@@ -275,10 +277,10 @@ export default function ProjectRelationSuggestionsPanel({
                         {item.label}
                       </option>
                     ))}
-                  </select>
+                  </UiSelect>
 
                   {selectedType?.directed && (
-                    <button
+                    <UiButton size="middle"
                       type="button"
                       className="btn small"
                       onClick={() => updateDraft(
@@ -287,23 +289,23 @@ export default function ProjectRelationSuggestionsPanel({
                       )}
                     >
                       调换方向
-                    </button>
+                    </UiButton>
                   )}
 
-                  <button
+                  <UiButton size="middle"
                     type="button"
                     className="btn small primary"
                     onClick={() => acceptSuggestion(suggestion)}
                   >
                     接受建议
-                  </button>
-                  <button
+                  </UiButton>
+                  <UiButton size="middle"
                     type="button"
                     className="btn small"
                     onClick={() => ignoreSuggestion(suggestion)}
                   >
                     忽略
-                  </button>
+                  </UiButton>
                 </div>
               </article>
             )

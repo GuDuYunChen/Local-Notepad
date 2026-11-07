@@ -161,21 +161,28 @@
 
 .library-reference-file-card header button,
 .library-reference-diagnosis-main {
+  cursor: pointer;
+}
+
+.library-reference-file-card header button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.library-reference-diagnosis-main:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border: 0;
   background: transparent;
   color: var(--ink-soft);
   font: inherit;
-  cursor: pointer;
 }
 
 .library-reference-file-card header button {
   flex: 0 0 auto;
+}
+
+.library-reference-file-card header button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   padding: 4px 6px;
   border-radius: 6px;
   font-size: 8px;
 }
 
-.library-reference-file-card header button:hover {
+.library-reference-file-card header button:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   background: var(--surface-hover);
   color: var(--ink);
 }
@@ -244,7 +251,6 @@
 .library-reference-diagnosis-main {
   min-width: 0;
   flex: 1;
-  padding: 4px;
   text-align: left;
 }
 

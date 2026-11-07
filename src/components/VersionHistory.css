@@ -3,27 +3,33 @@
 .version-header h3 { margin: 3px 0; }
 .version-explanation, .version-meta, .version-block { font-size: 12px; line-height: 1.7; color: var(--ink-soft, #626b78); overflow-wrap: anywhere; }
 .version-search { display: flex; flex-direction: column; gap: 8px; margin: 16px 0 8px; font-size: 13px; }
-.version-search input { box-sizing: border-box; width: 100%; min-width: 0; padding: 9px 10px; font: inherit; color: inherit; border: 1px solid var(--line, #d1d6df); border-radius: 6px; background: var(--surface, #fff); }
+.version-search input { box-sizing: border-box; width: 100%; min-width: 0; }
+.version-search input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { padding: 9px 10px; font: inherit; color: inherit; border: 1px solid var(--line, #d1d6df); border-radius: 6px; background: var(--surface, #fff); }
 .version-list { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow: auto; }
 .version-item { border: 1px solid var(--line, #d1d6df); border-radius: 7px; min-width: 0; }
 .version-item.selected { border-color: var(--clay, #9a6a4b); box-shadow: inset 3px 0 var(--clay, #9a6a4b); }
-.version-select-action { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; width: 100%; text-align: left; padding: 12px; border: 0; color: inherit; background: transparent; cursor: pointer; font: inherit; }
+.version-select-action { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; width: 100%; text-align: left; cursor: pointer; }
 .version-select-action strong { font-size: 13px; }
 .version-select-action small, .version-select-action span { max-width: 100%; font-size: 12px; line-height: 1.6; color: var(--ink-soft, #626b78); overflow-wrap: anywhere; }
 .version-preview { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line, #d1d6df); }
 .version-preview-header, .version-pagination, .version-preview-switch { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 12px; }
 .version-preview-header strong { font-size: 14px; }
 .version-preview-switch { margin: 12px 0; justify-content: flex-start; }
-.version-preview-switch button, .version-pagination button { padding: 7px 10px; border: 1px solid var(--line, #d1d6df); border-radius: 5px; background: var(--surface, #fff); color: inherit; font: inherit; cursor: pointer; }
-.version-preview-switch button[aria-pressed="true"] { font-weight: 700; border-color: var(--clay, #9a6a4b); }
+.version-preview-switch button, .version-pagination button { cursor: pointer; }
+.version-preview-switch button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.version-pagination button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { padding: 7px 10px; border: 1px solid var(--line, #d1d6df); border-radius: 5px; background: var(--surface, #fff); color: inherit; font: inherit; }
+.version-preview-switch button[aria-pressed="true"] { font-weight: 700; }
+.version-preview-switch button[aria-pressed="true"]:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { border-color: var(--clay, #9a6a4b); }
 .version-preview pre { margin: 10px 0; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 360px; overflow: auto; padding: 12px; border-radius: 6px; border: 1px solid var(--line, #d1d6df); background: var(--paper, #f7f7f5); font-family: inherit; font-size: 13px; line-height: 1.8; }
 .version-restore-action { display: block; margin-top: 12px; width: 100%; }
 .version-feedback, .version-error, .version-empty { margin: 14px 0; padding: 12px; border: 1px solid var(--line, #d1d6df); border-radius: 7px; font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
 .version-feedback.error, .version-error { border-inline-start: 3px solid var(--danger, #b23b35); }
 .version-feedback.success { border-inline-start: 3px solid var(--success, #277347); }
 .version-block { padding: 10px; border-inline-start: 3px solid var(--warning, #986620); }
-.version-history button:focus-visible, .version-history input:focus-visible, .version-history pre:focus-visible { outline: 2px solid var(--clay, #9a6a4b); outline-offset: 3px; }
-.version-history button:disabled { opacity: .55; cursor: default; }
+.version-history pre:focus-visible,
+.version-history button:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.version-history input:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { outline: 2px solid var(--clay, #9a6a4b); outline-offset: 3px; }
+.version-history button:disabled:not(.ant-btn):not([data-ui-control]) { opacity: .55; cursor: default; }
 
 /* This module replaces the old compact history layout; leave the inspector
    body as the scroll owner and preserve room for the real reference notice. */

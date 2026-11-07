@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react'
 import { api } from '~/services/api'
 import { queueBlockReference } from '../../../services/blockReferences.mjs'
 import '../plugins/BlockReferences.css'
+import { UiButton } from '~/components/ui/ControlKit'
+
 export default function BlockEmbedView({ id, blockId, title }) {
   return <Embed key={JSON.stringify([id, blockId])} id={id} blockId={blockId} title={title} />
 }
@@ -26,7 +28,7 @@ function Embed({ id, blockId, title }) {
     {phase === 'stopped' && <p role="status">读取已停止，未修改源笔记。</p>}
     {error && <p role="alert">{error}</p>}
     {result && <><pre>{result.text}</pre><small>来源更新于 {new Date(result.updatedAt * 1000).toLocaleString()}。嵌套引用仅显示标识，不递归展开。</small></>}
-    <footer>{phase === 'loading' ? <button type="button" onClick={stop}>停止读取</button> : <button type="button" onClick={() => void load()}>刷新来源</button>}
-      <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('wikiLink:open', { detail: { id, title: result?.title || title, blockId } }))}>打开来源块</button></footer>
+    <footer>{phase === 'loading' ? <UiButton density="compact" type="button" onClick={stop}>停止读取</UiButton> : <UiButton density="compact" type="button" onClick={() => void load()}>刷新来源</UiButton>}
+      <UiButton density="compact" type="button" onClick={() => window.dispatchEvent(new CustomEvent('wikiLink:open', { detail: { id, title: result?.title || title, blockId } }))}>打开来源块</UiButton></footer>
   </section>
 }

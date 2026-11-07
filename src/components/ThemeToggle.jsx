@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { UiButton, UiInput, UiSelect } from './ui/ControlKit'
 import { api } from '~/services/api'
 import {
   applyTheme,
@@ -75,7 +76,7 @@ export default function ThemeToggle() {
   }
 
   return (
-    <button
+    <UiButton
       type="button"
       className="btn header-btn theme-toggle"
       onClick={toggle}
@@ -99,6 +100,6 @@ export default function ThemeToggle() {
           <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
         </svg>
       )}
-    </button>
+    </UiButton>
   )
 }

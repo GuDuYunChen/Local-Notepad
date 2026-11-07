@@ -1,0 +1,57 @@
+/* Only layout adapters live here. Appearance belongs to Ant Design theme tokens. */
+/* Shared field geometry: keep ordinary text and password fields on one
+   baseline even when a page still carries legacy utility class names. */
+.app-ui-input.ant-input:not(.ant-input-sm):not(.ant-input-lg) { box-sizing:border-box; padding:8px 10px; }
+/* Ant Design may place the adapter class on a wrapper; keep the real native input geometry identical. */
+.app-ui-input :where(input.ant-input:not(.ant-input-sm):not(.ant-input-lg)) { box-sizing:border-box; padding:8px 10px; }
+[data-ui-control="input"] :where(input.ant-input:not(.ant-input-sm):not(.ant-input-lg)) { box-sizing:border-box; padding:8px 10px; }
+[data-ui-control="input"]:where(input.ant-input:not(.ant-input-sm):not(.ant-input-lg)) { box-sizing:border-box; padding:8px 10px; }
+.app-ui-input.ant-input-sm { box-sizing:border-box; padding:5px 10px; }
+.app-ui-input.ant-input-lg { box-sizing:border-box; padding:10px 12px; }
+.app-ui-input.ant-input-affix-wrapper:not(.ant-input-affix-wrapper-sm):not(.ant-input-affix-wrapper-lg) { box-sizing:border-box; padding:8px 10px; }
+.app-ui-input.ant-input-affix-wrapper-sm { box-sizing:border-box; padding:5px 10px; }
+.app-ui-input.ant-input-affix-wrapper-lg { box-sizing:border-box; padding:10px 12px; }
+.app-ui-input.ant-input-affix-wrapper > input.ant-input { padding:0; }
+/* One deliberate focus treatment; suppress the library's extra glow. */
+.app-ui-input.ant-input:focus,
+.app-ui-input.ant-input-affix-wrapper:focus-within { box-shadow:none; }
+.app-ui-input.ant-input:focus-visible,
+.app-ui-input.ant-input-affix-wrapper:has(input:focus-visible) { outline:2px solid var(--clay); outline-offset:2px; }
+.app-ui-select-host .ant-select-focused .ant-select-selector { box-shadow:none; }
+.app-ui-select-host .ant-select-focused:has([role="combobox"]:focus-visible) .ant-select-selector { outline:2px solid var(--clay); outline-offset:2px; }
+.app-ui-select-host .ant-select-selector { box-sizing:border-box; }
+.app-ui-select-host .ant-select-single:not(.ant-select-customize-input):not(.ant-select-sm):not(.ant-select-lg) .ant-select-selector { min-height:40px; align-items:center; }
+.app-ui-select-host .ant-select-single.ant-select-sm .ant-select-selector { min-height:28px; align-items:center; }
+.app-ui-select-host .ant-select-single.ant-select-lg .ant-select-selector { min-height:44px; align-items:center; }
+
+.app-ui-select-host { display:inline-flex; min-width:0; vertical-align:middle; position:relative; }
+.app-ui-select-host > .app-ui-select { width:100%; min-width:0; }
+.app-ui-button[data-ui-layout="content"] { height:auto; min-height:28px; white-space:normal; text-align:inherit; justify-content:inherit; }
+.app-ui-button[data-ui-layout="content"] > .ant-btn-content { display:contents; }
+.app-ui-validation-field { position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; inset-inline-start:0; bottom:0; }
+.app-ui-button:focus-visible { outline:2px solid var(--clay); outline-offset:2px; box-shadow:none; }
+.app-ui-button:focus:not(:focus-visible) { box-shadow:none; }
+/* Toolbar toggle state is semantic state, not a second custom button skin. */
+.app-ui-button.active { color:var(--clay); border-color:var(--clay); background:var(--clay-light); }
+.app-ui-button.active:hover { color:var(--clay); border-color:var(--clay); background:var(--clay-light); }
+.app-ui-button[aria-pressed="true"] { color:var(--clay); border-color:var(--clay); background:var(--clay-light); }
+.app-ui-button[aria-pressed="true"]:hover { color:var(--clay); border-color:var(--clay); background:var(--clay-light); }
+/* Real native picker and editor controls retain their browser semantics. */
+input[data-ui-native="file"]::file-selector-button { font:inherit; padding:6px 12px; border:1px solid var(--line-strong); border-radius:6px; color:var(--ink); background:var(--surface); cursor:pointer; }
+input[data-ui-native="file"]:disabled::file-selector-button { cursor:not-allowed; opacity:.55; }
+input[data-ui-native="checkbox"], input[data-ui-native="radio"], input[data-ui-native="range"] { accent-color:var(--clay); }
+/* The complete field, not its label alone, owns wrapping in filter/action rows. */
+:where([class$="-tools"], [class$="-filter"], [class$="-filters"], [class$="-controls"]) > label:has(> [data-ui-control]) { display:flex; flex-direction:column; gap:6px; min-width:0; }
+:where([class$="-tools"], [class$="-filter"], [class$="-filters"], [class$="-controls"]) > label > :where([data-ui-control="input"], [data-ui-control="select"], [data-ui-control="password"]) { width:100%; }
+:where([class$="-tools"], [class$="-filter"], [class$="-filters"], [class$="-controls"]) > label > :where([data-ui-control="input"], [data-ui-control="password"]) { min-height:40px; }
+:where([class$="-tools"], [class$="-filter"], [class$="-filters"], [class$="-controls"]) > label > [data-ui-control="select"] { min-height:40px; }
+:where([class$="-tools"], [class$="-filter"], [class$="-filters"], [class$="-controls"]) > label > [data-ui-control="select"] > .ant-select { height:40px; }
+:where([class$="-tools"], [class$="-filter"], [class$="-filters"], [class$="-controls"]) > label > [data-ui-control="select"] > .ant-select .ant-select-selector { min-height:40px; }
+:where([class$="-tools"], [class$="-filter"], [class$="-filters"], [class$="-controls"]) > [data-ui-control="button"] { align-self:flex-end; }
+:where([class$="-tools"], [class$="-filter"], [class$="-filters"], [class$="-controls"]) > [data-ui-control="button"][data-ui-layout="action"] { min-height:40px; }
+:where(.pinned-tools, .search-collections-tools, .sync-auto-controls) { align-items:end; gap:12px; }
+:where(.settings-card, .consumer-settings-section, .sync-provider-card, .backup-section) { box-shadow:none; }
+@media(max-width:760px) {
+  :where([class$="-tools"], [class$="-filter"], [class$="-filters"]) { flex-wrap:wrap; }
+  :where([class$="-tools"], [class$="-filter"], [class$="-filters"]) > label:has(> [data-ui-control]) { flex:1 1 160px; }
+}
