@@ -5,6 +5,7 @@
 /* Ant Design may place the adapter class on a wrapper; keep the real native input geometry identical. */
 .app-ui-input :where(input.ant-input:not(.ant-input-sm):not(.ant-input-lg)) { box-sizing:border-box; padding:8px 10px; }
 [data-ui-control="input"] :where(input.ant-input:not(.ant-input-sm):not(.ant-input-lg)) { box-sizing:border-box; padding:8px 10px; }
+[data-ui-control="input"]:where(input.ant-input:not(.ant-input-sm):not(.ant-input-lg)) { box-sizing:border-box; padding:8px 10px; }
 .app-ui-input.ant-input-sm { box-sizing:border-box; padding:5px 10px; }
 .app-ui-input.ant-input-lg { box-sizing:border-box; padding:10px 12px; }
 .app-ui-input.ant-input-affix-wrapper:not(.ant-input-affix-wrapper-sm):not(.ant-input-affix-wrapper-lg) { box-sizing:border-box; padding:8px 10px; }
