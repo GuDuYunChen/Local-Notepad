@@ -12,7 +12,7 @@ const button = (text) => [...uiQueryAll(document, 'button')].find((b) => uiText(
 const wait = async (fn) => vi.waitFor(async () => {await act(drain);fn();}, { timeout: 2500, interval: 10 });
 const click = async (text) => act(async () => {const b = button(text);expect(b, text).toBeTruthy();expect(uiDisabled(b), text).toBe(false);b.focus();b.click();await drain();});
 const tap = async (selector) => act(async () => {const b = uiQuery(document, selector);expect(b, selector).toBeTruthy();expect(uiDisabled(b)).toBe(false);b.focus();b.click();await drain();});
-const change = async (selector, value) => act(async () => {const e = uiQuery(document, selector);setUiValue(e, value);e.dispatchEvent(new Event(e.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true }));await drain();});
+const change = async (selector, value) => act(async () => {const e = uiQuery(document, selector);await setUiValue(e, value);e.dispatchEvent(new Event(e.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true }));await drain();});
 const selectNote = async () => {await tap('[data-history-file="a"]');await wait(() => expect(uiQuery(document, '[data-history-version]')).not.toBeNull());};
 const compare = async () => {await selectNote();await tap('[data-history-version="3"]');await wait(() => expect(uiQuery(document, '[data-history-state]')).not.toBeNull());};
 function Harness() {const [show, setShow] = useState(true);return show && <HistoryReview onClose={() => {closed();setShow(false);}} onOpenFile={opened} />;}
