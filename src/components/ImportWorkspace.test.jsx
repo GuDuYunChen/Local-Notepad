@@ -29,7 +29,7 @@ async function click(name, scope = host, wait = true) {
 async function fill(name, value, scope = host) {
   const input = control(name, scope);expect(input).toBeTruthy();
   const proto = input.tagName === 'SELECT' ? HTMLSelectElement.prototype : input.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
-  await act(async () => {setUiValue(input, value);input.dispatchEvent(new Event(input.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true }));});
+  await act(async () => {await setUiValue(input, value);input.dispatchEvent(new Event(input.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true }));});
 }
 async function mount(props = {}) {
   await act(async () => root.render(<React.StrictMode><ImportWorkspace onClose={onClose} onChanged={onChanged} onOpenNote={onOpenNote} {...props} /></React.StrictMode>));
@@ -118,7 +118,7 @@ test('explicit confirmation freezes the whole batch first, uses edited title and
     return original(path, init);
   });
   await mount();await choose([source('/tmp/一.txt'), source('/tmp/同名.txt')]);
-  const one = findRow('一.txt');expect([...uiOptions(control('destination', one))].map((option) => uiText(option))).toContain('我的笔记 / 工作 / 项目');
+  const one = findRow('一.txt');expect([...await uiOptions(control('destination', one))].map((option) => uiText(option))).toContain('我的笔记 / 工作 / 项目');
   await fill('title', '修改后的标题', one);await fill('destination', childId, one);await click('confirm');
   expect(state(findRow('一.txt'))).toBe('committed');expect(state(findRow('同名.txt'))).toBe('rejected');
   expect(JSON.parse(writes()[0][1].body)).toMatchObject({ title: '修改后的标题', parent_id: childId });
