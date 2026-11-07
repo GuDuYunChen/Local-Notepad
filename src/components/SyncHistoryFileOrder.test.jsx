@@ -29,7 +29,7 @@ async function type(value, key = 'jump-input') {await act(async () => {
     setUiValue(c(key), value);
     c(key).dispatchEvent(new InputEvent('input', { bubbles: true }));
   });}
-async function order(value) {await act(async () => {setUiValue(c('order'), value);c('order').dispatchEvent(new Event('change', { bubbles: true }));});}
+async function order(value) {await act(async () => {await setUiValue(c('order'), value);c('order').dispatchEvent(new Event('change', { bubbles: true }));});}
 const loaded = async () => {await mount();await open();};
 beforeEach(async () => {
   oldAct = globalThis.IS_REACT_ACT_ENVIRONMENT;globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -40,7 +40,7 @@ afterEach(async () => {await act(async () => root.unmount());host.remove();vi.re
 it('has no order control or read before a file is loaded; defaults to file order afterwards', async () => {
   await mount();expect(c('order')).toBeNull();expect(readHistoryFile).not.toHaveBeenCalled();
   await open();expect(uiValue(c('order'))).toBe('file');expect(ids()).toEqual(Array.from({ length: 25 }, (_, i) => 'r' + i));
-  expect([...uiOptions(c('order'))].map((n) => uiValue(n))).toEqual(['file', 'completed-desc', 'completed-asc', 'created-desc', 'created-asc']);
+  expect([...await uiOptions(c('order'))].map((n) => uiValue(n))).toEqual(['file', 'completed-desc', 'completed-asc', 'created-desc', 'created-asc']);
 });
 for (const value of ['completed-asc', 'created-desc']) it(value + ' orders all matches before paging, with missing time last', async () => {
   await loaded();await order(value);expect(ids()).toEqual(Array.from({ length: 25 }, (_, i) => 'r' + (59 - i)));
@@ -107,7 +107,7 @@ it('clearing the viewer removes order state; a later file starts in its original
 });
 it('sorting preserves an unapplied UTC date draft and applies it only on explicit confirmation', async () => {
   await loaded();const d = (key) => uiQuery(c('date-filter'), '[data-history-time-' + key + ']');
-  await act(async () => {setUiValue(d('mode'), 'range');d('mode').dispatchEvent(new Event('change', { bubbles: true }));});
+  await act(async () => {await setUiValue(d('mode'), 'range');d('mode').dispatchEvent(new Event('change', { bubbles: true }));});
   await act(async () => {
     setUiValue(d('from'), '2026-10-02');
     d('from').dispatchEvent(new Event('input', { bubbles: true }));d('from').dispatchEvent(new Event('change', { bubbles: true }));
