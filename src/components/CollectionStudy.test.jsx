@@ -17,7 +17,7 @@ const click = (name) => act(async () => {expect(button(name)).toBeTruthy();butto
 async function change(name, value) {
   await act(async () => {
     const node = label(name),prototype = node.tagName === 'SELECT' ? HTMLSelectElement.prototype : node.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
-    setUiValue(node, value);
+    await setUiValue(node, value);
     node.dispatchEvent(new Event('input', { bubbles: true }));node.dispatchEvent(new Event('change', { bubbles: true }));
   });
 }
