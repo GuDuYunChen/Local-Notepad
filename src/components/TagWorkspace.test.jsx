@@ -13,7 +13,7 @@ const disabled = (button) => uiDisabled(button) || Boolean(button.closest('field
 const button = (text) => [...uiQueryAll(panel(), 'button')].find((b) => uiText(b).trim() === text || b.getAttribute('aria-label') === text);
 const drain = async () => {for (let i = 0; i < 30; i++) await Promise.resolve();};
 const click = async (text) => act(async () => {const b = button(text);expect(b, text).toBeTruthy();expect(disabled(b), text).toBe(false);b.focus();b.click();await drain();});
-const input = async (label, value) => act(async () => {const el = uiQuery(panel(), `[aria-label="${label}"]`);const proto = el.tagName === 'SELECT' ? window.HTMLSelectElement.prototype : window.HTMLInputElement.prototype;setUiValue(el, value);el.dispatchEvent(new Event('input', { bubbles: true }));el.dispatchEvent(new Event('change', { bubbles: true }));await drain();});
+const input = async (label, value) => act(async () => {const el = uiQuery(panel(), `[aria-label="${label}"]`);const proto = el.tagName === 'SELECT' ? window.HTMLSelectElement.prototype : window.HTMLInputElement.prototype;await setUiValue(el, value);el.dispatchEvent(new Event('input', { bubbles: true }));el.dispatchEvent(new Event('change', { bubbles: true }));await drain();});
 const writes = () => api.mock.calls.filter(([, init]) => init?.method === 'POST');
 const mount = async () => act(async () => {root.render(<TagWorkspace onClose={close} onOpenFile={open} />);await drain();});
 beforeEach(async () => {
