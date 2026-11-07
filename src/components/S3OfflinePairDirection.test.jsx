@@ -26,7 +26,7 @@ const choose = (side, value) => act(async () => {
   input.dispatchEvent(new Event('change', { bubbles: true }));await flush();
 });
 const direction = (value) => act(async () => {
-  const select = uiQuery(host, '[data-offline-direction]');setUiValue(select, value);
+  const select = uiQuery(host, '[data-offline-direction]');await setUiValue(select, value);
   select.dispatchEvent(new Event('change', { bubbles: true }));await flush();
 });
 const rows = () => [...uiQueryAll(host, '[data-offline-result] tbody tr')];
@@ -102,7 +102,7 @@ it('offline direction UI exposes a labelled native select and matching status co
   expect(uiText(select.closest('label'))).toContain('差异方向（B − A）');
   expect(document.getElementById(select.getAttribute('aria-controls'))).not.toBeNull();
   expect(document.getElementById(select.getAttribute('aria-describedby')).getAttribute('aria-live')).toBe('polite');
-  expect([...uiOptions(select)].map((o) => uiValue(o))).toEqual(['all', 'increase', 'decrease']);
+  expect([...await uiOptions(select)].map((o) => uiValue(o))).toEqual(['all', 'increase', 'decrease']);
 });
 it('offline direction UI JSON export retains twelve metrics while only negatives are visible', async () => {
   await compare();await click('[data-offline-differences]');await direction('decrease');expect(rows()).toHaveLength(2);
