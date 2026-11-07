@@ -1,3 +1,4 @@
+import { Button } from './ui/Controls'
 import React from 'react'
 
 export default function ConfirmDialog({ title, message, actions, onClose }) {
@@ -45,7 +46,7 @@ export default function ConfirmDialog({ title, message, actions, onClose }) {
             const disabled = action.disabled || isAnyLoading
 
             return (
-              <button
+              <Button
                 key={`${action.label}-${index}`}
                 ref={isPrimary ? primaryRef : undefined}
                 type="button"
@@ -62,7 +63,7 @@ export default function ConfirmDialog({ title, message, actions, onClose }) {
                     <span>处理中…</span>
                   </span>
                 ) : action.label}
-              </button>
+              </Button>
             )
           })}
         </div>
