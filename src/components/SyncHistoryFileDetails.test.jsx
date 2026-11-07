@@ -29,7 +29,7 @@ async function type(value, key = 'jump-input') {await act(async () => {
     setUiValue(c(key), value);
     c(key).dispatchEvent(new InputEvent('input', { bubbles: true }));
   });}
-async function order(value) {await act(async () => {setUiValue(c('order'), value);c('order').dispatchEvent(new Event('change', { bubbles: true }));});}
+async function order(value) {await act(async () => {await setUiValue(c('order'), value);c('order').dispatchEvent(new Event('change', { bubbles: true }));});}
 const loaded = async () => {await mount();await open();};
 beforeEach(async () => {
   oldAct = globalThis.IS_REACT_ACT_ENVIRONMENT;globalThis.IS_REACT_ACT_ENVIRONMENT = true;
