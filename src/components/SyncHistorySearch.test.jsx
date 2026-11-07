@@ -18,8 +18,8 @@ const initial = () => [
 
 async function render() {await act(async () => root.render(<Panel />));await act(async () => {uiQuery(host, 'details').open = true;});}
 async function click(node) {expect(node).toBeTruthy();await act(async () => {node.click();await Promise.resolve();});}
-async function choose(name, value) {await act(async () => {const n = button(name);setUiValue(n, value);n.dispatchEvent(new Event('change', { bubbles: true }));});}
-async function type(value) {await act(async () => {const n = button('query');setUiValue(n, value);n.dispatchEvent(new Event('input', { bubbles: true }));n.dispatchEvent(new Event('change', { bubbles: true }));});}
+async function choose(name, value) {await act(async () => {const n = button(name);await setUiValue(n, value);n.dispatchEvent(new Event('change', { bubbles: true }));});}
+async function type(value) {await act(async () => {const n = button('query');await setUiValue(n, value);n.dispatchEvent(new Event('input', { bubbles: true }));n.dispatchEvent(new Event('change', { bubbles: true }));});}
 async function read() {await render();await click(button('read'));}
 beforeEach(() => {
   oldAct = globalThis.IS_REACT_ACT_ENVIRONMENT;globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -68,7 +68,7 @@ it('filtering during a pending page does not pull focus away from the search inp
 });
 it('clearing local filters returns keyboard focus and never changes the server record type', async () => {
   api.mockResolvedValue(historyPage([make('c', 'attachment', 'remote-rebind')], 'superseded'));
-  await render();await act(async () => {const n = uiQuery(host, 'select');setUiValue(n, 'superseded');n.dispatchEvent(new Event('change', { bubbles: true }));});
+  await render();await act(async () => {const n = uiQuery(host, 'select');await setUiValue(n, 'superseded');n.dispatchEvent(new Event('change', { bubbles: true }));});
   await type('zzz');await choose('kind', 'tag');await choose('outcome', 'unknown');
   button('clear').focus();await click(button('clear'));
   expect(uiValue(uiQuery(host, 'select'))).toBe('superseded');expect(displayed()).toHaveLength(1);expect(document.activeElement).toBe(button('query'));expect(api).toHaveBeenCalledTimes(1);
@@ -85,7 +85,7 @@ it('a later successful refresh still applies local choices to the replacement sn
 it('late old-filter responses cannot reintroduce matching but wrong-scope rows', async () => {
   let done;api.mockImplementationOnce(() => new Promise((r) => {done = r;})).mockResolvedValueOnce(historyPage([make('c', 'attachment', 'remote-rebind')], 'superseded'));
   await render();await click(button('read'));await type('note-a');
-  await act(async () => {const n = uiQuery(host, 'select');setUiValue(n, 'superseded');n.dispatchEvent(new Event('change', { bubbles: true }));});
+  await act(async () => {const n = uiQuery(host, 'select');await setUiValue(n, 'superseded');n.dispatchEvent(new Event('change', { bubbles: true }));});
   await act(async () => done(historyPage(initial())));
   expect(displayed()).toHaveLength(0);expect(status()).toContain('已读取 1 条');expect(uiValue(button('query'))).toBe('note-a');
 });
