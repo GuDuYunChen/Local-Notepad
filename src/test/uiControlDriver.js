@@ -63,8 +63,20 @@ export function uiText(node) {
  if(isUiSelect(node))return hostFor(node)?.querySelector('.ant-select-content')?.textContent || ''
  return node.textContent
 }
+function chooseUiOption(popup,value) {
+ const option=[...popup.querySelectorAll('[data-ui-option-value]')].find(item=>item.getAttribute('data-ui-option-value')===String(value))
+ if(!option)throw Error('Requested option is not available: '+String(value))
+ if(option.closest('.ant-select-item-option-disabled'))return value
+ option.click()
+ return value
+}
 export function setUiValue(node,value) {
- if(isUiSelect(node)) return setUiSelectValue(node,value)
+ if(isUiSelect(node)) {
+  const trigger=triggerFor(node)
+  if(trigger.disabled)return value
+  const popup=popupFor(trigger)
+  return popup ? chooseUiOption(popup,value) : setUiSelectValue(node,value)
+ }
  const prototype=node instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : node instanceof HTMLSelectElement ? HTMLSelectElement.prototype : node instanceof HTMLInputElement ? HTMLInputElement.prototype : null
  if(prototype)Object.getOwnPropertyDescriptor(prototype,'value').set.call(node,value)
  else node.value=value
@@ -72,12 +84,6 @@ export function setUiValue(node,value) {
 }
 async function setUiSelectValue(node,value) {
  const trigger=triggerFor(node)
- if(trigger.disabled)return value
  const popup=await openUiSelect(trigger)
- const option=[...popup.querySelectorAll('[data-ui-option-value]')].find(item=>item.getAttribute('data-ui-option-value')===String(value))
- if(!option)throw Error('Requested option is not available: '+String(value))
- if(option.closest('.ant-select-item-option-disabled'))return value
- option.click()
- await Promise.resolve()
- return value
+ return chooseUiOption(popup,value)
 }
