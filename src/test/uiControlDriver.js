@@ -15,18 +15,18 @@ const resolve = node => {
 export function uiQuery(root,selector) { return resolve(root.querySelector(normalize(selector))) }
 export function uiQueryAll(root,selector) { return [...root.querySelectorAll(normalize(selector))].map(resolve).filter((node,index,array)=>array.indexOf(node)===index) }
 function popupFor(node) {
- const trigger=triggerFor(node), id=trigger?.getAttribute('aria-controls')
- const list=id ? trigger.ownerDocument.getElementById(id) : null
- const linked=list?.closest('.ant-select-dropdown')
- if(linked && !linked.classList.contains('ant-select-dropdown-hidden') && linked.getAttribute('aria-hidden')!=='true') return linked
- // rc-select may mount its portal one render after aria-controls is assigned.
- // Resolve the visible real popup in the configured dialog/body container.
- const owner=trigger?.ownerDocument
- const scope=trigger?.closest?.('[role="dialog"],[role="alertdialog"]') || owner
- const visible=container=>[...(container?.querySelectorAll?.('.ant-select-dropdown') || [])]
-   .filter(popup=>!popup.classList.contains('ant-select-dropdown-hidden') && popup.getAttribute('aria-hidden')!=='true' && popup.querySelector('[data-ui-option-value]'))
- const candidates=visible(scope)
- return candidates.at(-1) || (scope!==owner ? visible(owner).at(-1) : null) || null
+ const trigger=triggerFor(node), owner=trigger?.ownerDocument
+ if(trigger?.getAttribute('aria-expanded')!=='true')return null
+ const id=trigger.getAttribute('aria-controls')
+ const linked=id ? owner.getElementById(id) : null
+ if(linked?.getAttribute('role')==='listbox' && linked.querySelector('[data-ui-option-value]'))return linked
+ // Ant Design renders the actual option list as a role=listbox portal. Do not
+ // depend on a visual wrapper class: its parent is intentionally unclassed.
+ const scope=trigger.closest?.('[role="dialog"],[role="alertdialog"]') || owner
+ const lists=container=>[...(container?.querySelectorAll?.('[role="listbox"]') || [])]
+   .filter(list=>list.querySelector('[data-ui-option-value]'))
+ const candidates=lists(scope)
+ return candidates.at(-1) || (scope!==owner ? lists(owner).at(-1) : null) || null
 }
 export async function openUiSelect(node) {
  const trigger=triggerFor(node)
