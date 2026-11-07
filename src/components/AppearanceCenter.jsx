@@ -1,3 +1,4 @@
+import { Button, Input } from './ui/Controls'
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
@@ -156,26 +157,26 @@ export default function AppearanceCenter({ onClose }) {
       <section className="appearance-center" ref={dialog} role="dialog" aria-modal="true" aria-label="本地主题方案中心" aria-describedby="appearance-scope" onKeyDown={onKeyDown}>
         <header className="appearance-header">
           <div><h2>本地主题方案</h2><p id="appearance-scope">浅色与深色各有强调色；不改写正文颜色，不加载外部 CSS 或字体。</p></div>
-          <button type="button" data-appearance-close aria-label="关闭主题方案中心" disabled={Boolean(confirmation)} onClick={close}>×</button>
+          <Button variant="icon" type="button" data-appearance-close aria-label="关闭主题方案中心" disabled={Boolean(confirmation)} onClick={close}>×</Button>
         </header>
         <div className="appearance-scroll">
           <fieldset disabled={Boolean(confirmation)} className="appearance-fields">
             <legend>选择方案</legend>
             <div className="appearance-schemes" role="group" aria-label="主题方案列表">
-              {[...BUILTIN_SCHEMES, ...draft.schemes].map(scheme => <button type="button" key={scheme.id} aria-pressed={draft.activeId === scheme.id} onClick={() => select(scheme.id)}>
+              {[...BUILTIN_SCHEMES, ...draft.schemes].map(scheme => <Button variant="plain" type="button" key={scheme.id} aria-pressed={draft.activeId === scheme.id} onClick={() => select(scheme.id)}>
                 <span className="appearance-swatch" style={{ background: /^#[0-9a-f]{6}$/i.test(scheme.lightAccent) ? scheme.lightAccent : '#7057d9' }} aria-hidden="true" />
                 <span>{scheme.name || '未命名方案'}</span><small>{scheme.id.startsWith('custom-') ? '自定义' : '内置'}</small>
-              </button>)}
+              </Button>)}
             </div>
             <div className="appearance-tools">
-              <button type="button" onClick={create} disabled={draft.schemes.length >= MAX_CUSTOM_SCHEMES || Boolean(invalid)}>复制为自定义方案</button>
-              <button type="button" onClick={() => setConfirmation({ kind: 'delete', id: selected.id })} disabled={!custom}>删除方案</button>
+              <Button type="button" onClick={create} disabled={draft.schemes.length >= MAX_CUSTOM_SCHEMES || Boolean(invalid)}>复制为自定义方案</Button>
+              <Button type="button" onClick={() => setConfirmation({ kind: 'delete', id: selected.id })} disabled={!custom}>删除方案</Button>
               <span>{draft.schemes.length} / {MAX_CUSTOM_SCHEMES} 个自定义方案</span>
             </div>
             <div className="appearance-edit">
-              <label>方案名称<input aria-label="方案名称" value={selected.name} disabled={!custom} maxLength={32} onChange={event => edit('name', event.target.value)} /></label>
-              <label>浅色强调色<input aria-label="浅色强调色" value={selected.lightAccent} disabled={!custom} spellCheck="false" maxLength={7} onChange={event => edit('lightAccent', event.target.value)} /></label>
-              <label>深色强调色<input aria-label="深色强调色" value={selected.darkAccent} disabled={!custom} spellCheck="false" maxLength={7} onChange={event => edit('darkAccent', event.target.value)} /></label>
+              <label>方案名称<Input aria-label="方案名称" value={selected.name} disabled={!custom} maxLength={32} onChange={event => edit('name', event.target.value)} /></label>
+              <label>浅色强调色<Input aria-label="浅色强调色" value={selected.lightAccent} disabled={!custom} spellCheck="false" maxLength={7} onChange={event => edit('lightAccent', event.target.value)} /></label>
+              <label>深色强调色<Input aria-label="深色强调色" value={selected.darkAccent} disabled={!custom} spellCheck="false" maxLength={7} onChange={event => edit('darkAccent', event.target.value)} /></label>
             </div>
             <p className="appearance-hint">内置方案不能改写，复制后可编辑。强调色须与对应界面背景达到 4.5:1 的对比度；此检查不代表整个界面的无障碍认证。</p>
             <div className="appearance-examples" aria-label="浅深色方案示例">
@@ -185,32 +186,32 @@ export default function AppearanceCenter({ onClose }) {
               </article>)}
             </div>
             <div className="appearance-tools">
-              <input ref={fileInput} type="file" accept=".json,application/json" hidden onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void importFile(file) }} />
-              <button type="button" onClick={() => fileInput.current.click()} disabled={reading || draft.schemes.length >= MAX_CUSTOM_SCHEMES}>导入主题文件</button>
-              <button type="button" onClick={exportSelected} disabled={Boolean(invalid)}>导出当前方案</button>
-              <button type="button" onClick={() => setConfirmation({ kind: 'reset' })}>恢复默认方案</button>
-              {reading && <button type="button" onClick={() => { cancelRead(); setMessage('导入已取消，现有方案未改变。') }}>取消导入</button>}
+              <Input ref={fileInput} type="file" accept=".json,application/json" hidden onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void importFile(file) }} />
+              <Button type="button" onClick={() => fileInput.current.click()} disabled={reading || draft.schemes.length >= MAX_CUSTOM_SCHEMES}>导入主题文件</Button>
+              <Button type="button" onClick={exportSelected} disabled={Boolean(invalid)}>导出当前方案</Button>
+              <Button type="button" onClick={() => setConfirmation({ kind: 'reset' })}>恢复默认方案</Button>
+              {reading && <Button type="button" onClick={() => { cancelRead(); setMessage('导入已取消，现有方案未改变。') }}>取消导入</Button>}
             </div>
           </fieldset>
           {confirmation && <div className="appearance-confirm" role="alertdialog" aria-modal="true" aria-label="确认主题方案操作">
             <p>{confirmationText[confirmation.kind]}</p>
-            <button type="button" onClick={cancelConfirmation}>继续编辑</button>
-            <button type="button" onClick={confirm}>确认</button>
+            <Button type="button" onClick={cancelConfirmation}>继续编辑</Button>
+            <Button type="button" onClick={confirm}>确认</Button>
           </div>}
         </div>
         <div className="appearance-feedback-area" aria-label="主题操作反馈">
-          {baseline.error && <div role="alert" className="appearance-warning"><p>{baseline.error}</p>{baseline.raw !== undefined && !repair && <button type="button" disabled={Boolean(confirmation)} onClick={() => setConfirmation({ kind: 'repair' })}>确认修复配置</button>}</div>}
+          {baseline.error && <div role="alert" className="appearance-warning"><p>{baseline.error}</p>{baseline.raw !== undefined && !repair && <Button type="button" disabled={Boolean(confirmation)} onClick={() => setConfirmation({ kind: 'repair' })}>确认修复配置</Button>}</div>}
           {externalChanged && <p role="alert" className="appearance-warning">外部配置已变化，预览已撤销。重新载入前不能应用。</p>}
           {invalid && <p role="alert" className="appearance-warning">{invalid}</p>}
           {error && !externalChanged && error !== baseline.error && <p role="alert" className="appearance-warning">{error}</p>}
           <p role="status" aria-live="polite" className="appearance-feedback">{reading ? '正在读取主题文件…' : message || (dirty ? '有尚未应用的方案更改。' : '当前方案已应用；预览和编辑不会自动保存。')}</p>
         </div>
         <footer className="appearance-footer">
-          <button type="button" disabled={Boolean(confirmation)} onClick={reload}>重新载入</button>
+          <Button type="button" disabled={Boolean(confirmation)} onClick={reload}>重新载入</Button>
           <span>{previewing ? '预览中 · 未保存' : '仅本机配置'}</span>
-          <button type="button" onClick={() => { clearPreview(); setMessage('预览已取消，已恢复当前应用的外观；尚未应用的编辑仍保留。') }} disabled={!previewing || Boolean(confirmation)}>取消预览</button>
-          <button type="button" onClick={preview} disabled={Boolean(invalid) || externalChanged || Boolean(confirmation)}>预览当前方案</button>
-          <button type="button" className="appearance-apply" onClick={apply} disabled={!dirty || Boolean(invalid) || externalChanged || reading || Boolean(confirmation) || (Boolean(baseline.error) && !repair)}>应用并保存</button>
+          <Button type="button" onClick={() => { clearPreview(); setMessage('预览已取消，已恢复当前应用的外观；尚未应用的编辑仍保留。') }} disabled={!previewing || Boolean(confirmation)}>取消预览</Button>
+          <Button type="button" onClick={preview} disabled={Boolean(invalid) || externalChanged || Boolean(confirmation)}>预览当前方案</Button>
+          <Button variant="primary" type="button" className="appearance-apply" onClick={apply} disabled={!dirty || Boolean(invalid) || externalChanged || reading || Boolean(confirmation) || (Boolean(baseline.error) && !repair)}>应用并保存</Button>
         </footer>
       </section>
     </div>, document.body,

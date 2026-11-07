@@ -1,3 +1,15 @@
+# Current handoff: local UI consistency / 2F.116 candidate
+
+The next scope is now user-confirmed: repair input/button alignment, reuse common controls instead of per-screen implementations, and simplify redundant borders/shadows. Baseline master is `1c8ec5689847a580ce307b9157fbbc8c1ac43a8f`; PR27's historical upgrade acceptance must not be counted as acceptance of these new UI changes. See `LOCAL_UI_CONSISTENCY_2F116.md` for the complete scope and release gates.
+
+Candidate changes cover 19 local workspaces/dialogs and 297 native control sites, with common Button/Input/Select/Textarea components, shared geometry and compound-field styling. Existing business/state/event expressions are preserved; original test files are not edited. Unrelated global header/sidebar/focus layout is explicitly checked against baseline. Source and locked tools were recovered from SHA-256-verified archives; this is not a fresh clone or npm ci. Current front-end product/test changes from PR26 were restored by exact Git blob identity before regression runs. Other historical native-verifier sources have not all been refreshed, so local results are not a claim of a fully reconstructed current repository or all current native gates.
+
+The current GitHub tool set does not expose branch/code/PR/merge writes. Real browser navigation was explicitly blocked by ERR_BLOCKED_BY_ADMINISTRATOR and was stopped. No new Windows run, release version, remote commit, PR, independent approval or merge exists for this UI candidate. Final local logs, source identities, retained failures and a UI-only patch are kept in the delivery checkpoint. Reuse that checkpoint, re-read actual remote HEAD, apply the patch to a normal branch based on current master, and obtain the missing real visual/native/release/CI/review gates before merging. Do not send the user execution chores or repeat an unchanged denied operation.
+
+The earlier handoffs below are preserved as historical records.
+
+---
+
 # Current handoff: local image insertion recovery, 4.248.1 candidate
 
 PR25 is merged in master f989a5d74a81875311d9ab09dab4c062237889ca. A new existing branch fix/local-image-upload-recovery-4-248-1 was created at that exact commit before interruption; at recovery it had no new commits or open PR. Continue the scoped repair in LOCAL_IMAGE_UPLOAD_RECOVERY_4_248_1.md, not the already accepted helper repair. Baseline image-insertion checks reproduce 8 failures in 12 cases; preserve their original logs. Current local source was restored from SHA256-verified archives and matched full accepted tree9fcb62bd before edits. It is not the user's Windows workspace or remote Git history.

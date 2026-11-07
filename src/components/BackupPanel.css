@@ -20,7 +20,6 @@
 .backup-center-active > strong { font-size: 14px; }
 .backup-center-active small { display: block; margin-top: 8px; font-size: 12px; line-height: 1.7; color: var(--ink-soft); }
 .backup-center-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.backup-center-modal .btn { min-height: 38px; font-size: 12px; }
 .backup-center-modal .backup-list { max-height: none; overflow: visible; }
 .backup-center-modal .backup-name { overflow-wrap: anywhere; }
 .backup-center-modal .backup-meta { font-size: 12px; }
@@ -50,7 +49,7 @@
 .backup-center-database .backup-item { display:block; }
 .backup-center-database .backup-item .backup-center-actions { margin-top:8px; }
 
-.backup-center-workspace { margin: 0 0 20px; padding: 16px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow-soft); }
+.backup-center-workspace { margin: 0 0 20px; padding: 0 0 16px; border: 0; border-radius: 12px; background: var(--surface); box-shadow: none; }
 .backup-center-workspace .backup-center-section-heading { margin-bottom: 8px; }
 .backup-center-workspace > p code { font-size: 12px; color: var(--clay); }
 .backup-center-workspace + .backup-center-section-heading { padding-top: 4px; border-top: 1px solid var(--line); }

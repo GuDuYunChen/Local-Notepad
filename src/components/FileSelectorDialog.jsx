@@ -1,3 +1,4 @@
+import { Button, Input } from './ui/Controls'
 import React, { useState, useEffect, useMemo } from 'react';
 
 const Icon = ({ children, size = 16 }) => (
@@ -408,7 +409,7 @@ export default function FileSelectorDialog({
                         style={{ paddingLeft: level * 20 + 10 }}
                         onClick={(e) => handleSelect(node, true, e)}
                     >
-                        <button
+                        <Button variant="plain"
                             type="button"
                             className="toggle selector-tree-toggle"
                             onClick={(e) => { e.stopPropagation(); node.is_folder && handleExpand(node.id, e); }}
@@ -416,7 +417,7 @@ export default function FileSelectorDialog({
                             aria-label={isExpanded ? '收起文件夹' : '展开文件夹'}
                         >
                             <ChevronIcon expanded={isExpanded} />
-                        </button>
+                        </Button>
                         <span className="icon"><FolderIcon expanded={isExpanded} /></span>
                         <span className="title">{node.title}</span>
                     </div>
@@ -478,7 +479,7 @@ export default function FileSelectorDialog({
                     style={{ paddingLeft: level * 20 + 10 }}
                     title={tooltip}
                 >
-                    <button
+                    <Button variant="plain"
                         type="button"
                         className="toggle selector-tree-toggle"
                         onClick={(e) => { e.stopPropagation(); node.is_folder && handleExpand(node.id, e); }}
@@ -486,8 +487,8 @@ export default function FileSelectorDialog({
                         aria-label={isExpanded ? '收起文件夹' : '展开文件夹'}
                     >
                         <ChevronIcon expanded={isExpanded} />
-                    </button>
-                    <input 
+                    </Button>
+                    <Input 
                         type="checkbox" 
                         checked={allChildrenSelected}
                         disabled={isDisabled}
@@ -531,7 +532,7 @@ export default function FileSelectorDialog({
                                     : '选择需要处理的内容。'}
                         </div>
                     </div>
-                    <button
+                    <Button variant="icon"
                         type="button"
                         className="icon-btn selector-close-btn"
                         onClick={onClose}
@@ -540,7 +541,7 @@ export default function FileSelectorDialog({
                         title="关闭"
                     >
                         ×
-                    </button>
+                    </Button>
                 </header>
 
                 {showDeleteWarning && (
@@ -551,9 +552,9 @@ export default function FileSelectorDialog({
 
                 <div className="selector-toolbar">
                     {mode !== 'single-folder' ? (
-                        <button type="button" className="btn small" onClick={handleSelectAll} disabled={processing}>
+                        <Button type="button" className="btn small" onClick={handleSelectAll} disabled={processing}>
                             {isAllSelected ? '取消全选' : '全选'}
-                        </button>
+                        </Button>
                     ) : (
                         <span>保存位置</span>
                     )}
@@ -583,15 +584,15 @@ export default function FileSelectorDialog({
                         {processing ? processingText : ''}
                     </span>
                     <div className="btn-group">
-                        <button type="button" className="btn" onClick={onClose} disabled={processing}>取消</button>
-                        <button
+                        <Button type="button" className="btn" onClick={onClose} disabled={processing}>取消</Button>
+                        <Button
                             type="button"
                             className="btn primary"
                             onClick={handleConfirmAction}
                             disabled={processing || (mode !== 'single-folder' && selectedIds.size === 0)}
                         >
                             {processing ? processingText : confirmText}
-                        </button>
+                        </Button>
                     </div>
                 </footer>
             </section>

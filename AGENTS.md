@@ -1,3 +1,13 @@
+# Current module: local UI consistency / 2F.116 (unpublished candidate)
+
+The user has explicitly selected input/button alignment, reuse of common UI controls, and removal of redundant borders/shadows. Read `docs/LOCAL_UI_CONSISTENCY_2F116.md` before editing. The verified accepted baseline is master `1c8ec5689847a580ce307b9157fbbc8c1ac43a8f` (PR27 merged); the older active headers below are history, not instructions to redevelop image upload or helper lifecycle work.
+
+Reuse the project's `.btn`, `.input`, theme variables and native element semantics through `src/components/ui/Controls.jsx`. No third-party general UI library is present in the baseline. Do not introduce a new dependency or another visual system without an explicit decision. Keep save/draft/quit, API calls, schema14, handlers, disabled/validation semantics, focus ownership and all original tests intact. Preserve semantic focus/selection/error/difference indicators when removing decorative shadows.
+
+The current working container is a source reconstruction, not the user's Windows checkout or remote Git history. Never force-push it. Current connector discovery exposes read/download operations only. A Chromium navigation received ERR_BLOCKED_BY_ADMINISTRATOR; do not bypass that denial with another browser or transport. Local tests, CSS-cascade assertions, real visual checks, Windows acceptance and remote merge are distinct. The UI candidate is not accepted and may not advance to another module. Final release version/active acceptance bindings must be updated together before publication; do not reuse 4.248.1's historical native green as acceptance of the new UI.
+
+---
+
 # Current repair: local image insertion recovery / 4.248.1 candidate
 
 Accepted master is f989a5d74a81875311d9ab09dab4c062237889ca (PR25 merged). Continue existing fix/local-image-upload-recovery-4-248-1. Read docs/LOCAL_IMAGE_UPLOAD_RECOVERY_4_248_1.md and actual remote HEAD before writes. Repair toolbar/paste image recovery together; preserve existing save/draft/reading/quit policy, node serialization, upload API and schema14. No new business module/cloud work. Current session may lack GitHub write/PR/merge tools; record actual capabilities without disguising local changes as remote commits. A retained merged branch is maintenance, not a product blocker. The older Active headers below are historical context.
