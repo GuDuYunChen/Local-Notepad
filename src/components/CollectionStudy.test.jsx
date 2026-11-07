@@ -15,11 +15,8 @@ const label = (name) => uiQuery(host, `[aria-label="${name}"]`);
 const button = (name) => [...uiQueryAll(host, 'button')].find((node) => uiText(node) === name);
 const click = (name) => act(async () => {expect(button(name)).toBeTruthy();button(name).click();});
 async function change(name, value) {
-  await act(async () => {
-    const node = label(name),prototype = node.tagName === 'SELECT' ? HTMLSelectElement.prototype : node.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
-    await setUiValue(node, value);
-    node.dispatchEvent(new Event('input', { bubbles: true }));node.dispatchEvent(new Event('change', { bubbles: true }));
-  });
+  const node = label(name);await setUiValue(node, value);
+  await act(async () => {node.dispatchEvent(new Event('input', { bubbles: true }));node.dispatchEvent(new Event('change', { bubbles: true }));});
 }
 const panel = (props = {}) => act(async () => root.render(<CollectionStudyPanel entry={f.entry} sourceStore={f.store} studyStore={study} onResume={onResume} {...props} />));
 const bar = (props = {}) => act(async () => root.render(<CollectionReadingBar origin={origin} documentId={origin.documentId} store={f.store} studyStore={study} onOpenFile={onOpenFile} onMove={onMove} {...props} />));
