@@ -46,9 +46,8 @@ async function click(element) {
   await act(async () => element.dispatchEvent(new MouseEvent('click', { bubbles: true })));
 }
 async function change(element, value) {
+  await setUiValue(element, value);
   await act(async () => {
-    const prototype = element.tagName === 'SELECT' ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
-    await setUiValue(element, value);
     element.dispatchEvent(new Event('input', { bubbles: true }));
     element.dispatchEvent(new Event('change', { bubbles: true }));
   });
