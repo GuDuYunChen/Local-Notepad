@@ -39,6 +39,24 @@ export async function openUiSelect(node) {
  const host=hostFor(trigger)
  if(!trigger || !host) throw Error('Expected a rendered UI selector')
  if(trigger.disabled) return null
+
+ // Native <select> controls can be assigned while their disclosure is
+ // collapsed. A custom popup cannot: a user must first reveal the real
+ // disclosure before its trigger can receive pointer/keyboard interaction.
+ // Reproduce that user action instead of opening a hidden popup or querying a
+ // stale listbox left by another selector.
+ const disclosures=[]
+ for(let parent=host.parentElement;parent;parent=parent.parentElement) {
+  if(parent.tagName==='DETAILS' && !parent.open) disclosures.push(parent)
+ }
+ if(disclosures.length) await act(async () => {
+  for(const disclosure of disclosures.reverse()) {
+   const summary=disclosure.querySelector(':scope > summary')
+   if(!summary) throw Error('Collapsed details has no summary control')
+   summary.click()
+  }
+ })
+
  await act(async () => {
   if(trigger.getAttribute('aria-expanded')!=='true') {
    // Ant Design's current trigger is .ant-select-content. Keep the older
