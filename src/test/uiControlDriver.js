@@ -18,11 +18,16 @@ export function uiQueryAll(root,selector) { return [...root.querySelectorAll(nor
 function popupFor(node) {
  const trigger=triggerFor(node), owner=trigger?.ownerDocument
  if(trigger?.getAttribute('aria-expanded')!=='true')return null
- const id=trigger.getAttribute('aria-controls')
- const linked=id ? owner.getElementById(id) : null
- if(linked?.getAttribute('role')==='listbox' && linked.querySelector('[data-ui-option-value]'))return linked
- // Ant Design renders the actual option list as a role=listbox portal. Do not
- // depend on a visual wrapper class: its parent is intentionally unclassed.
+ const id=trigger.getAttribute('aria-controls') || trigger.getAttribute('aria-owns')
+ if(id) {
+  const linked=owner.getElementById(id)
+  const list=linked?.getAttribute('role')==='listbox' ? linked : linked?.querySelector?.('[role="listbox"]')
+  // A different Select may leave its old portal mounted during close motion.
+  // Never borrow that listbox when this trigger already identifies its own.
+  return list?.querySelector('[data-ui-option-value]') ? list : null
+ }
+ // Older compatible markup may omit aria-controls. Only then use the scoped
+ // fallback; the current Ant Design trigger normally exposes a stable id.
  const scope=trigger.closest?.('[role="dialog"],[role="alertdialog"]') || owner
  const lists=container=>[...(container?.querySelectorAll?.('[role="listbox"]') || [])]
    .filter(list=>list.querySelector('[data-ui-option-value]'))
