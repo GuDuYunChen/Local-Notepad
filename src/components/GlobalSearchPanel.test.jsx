@@ -14,9 +14,8 @@ const click = async (element) => {expect(element).toBeTruthy();await act(async (
 async function advance() {await act(async () => {await vi.advanceTimersByTimeAsync(220);});}
 async function render(patch = {}) {await act(async () => root.render(<GlobalSearchPanel open onClose={onClose} onOpenFile={onOpenFile} {...patch} />));await advance();}
 async function change(element, value) {
+  await setUiValue(element, value);
   await act(async () => {
-    const proto = element.tagName === 'SELECT' ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
-    await setUiValue(element, value);
     element.dispatchEvent(new Event('input', { bubbles: true }));element.dispatchEvent(new Event('change', { bubbles: true }));
   });
   await advance();
