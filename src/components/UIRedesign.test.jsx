@@ -64,6 +64,10 @@ async function flushPromises() {
   });
 }
 
+async function chooseSelect(element, value) {
+  await setUiValue(element, value);
+}
+
 describe('UI redesign smoke tests', () => {
   let container;
   let root;
