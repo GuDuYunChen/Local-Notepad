@@ -69,7 +69,7 @@ it('all-result export explicitly requests the entire scope rather than the visib
 })
 it('requires opt-in before including snippets and supports JSON format',async()=>{
  await render();await click(container.querySelector('.search-result-export input[type=checkbox]'))
- await act(async()=>{const el=label('检索清单导出格式');await setUiValue(el,'json')})
+ await setUiValue(label('检索清单导出格式'),'json')
  await click(button('导出全部 43 篇结果'))
  expect(collectSearchResultReport.mock.calls[0][2].includeSnippets).toBe(true);expect(downloadSearchResultReport.mock.calls[0][1]).toBe('json')
 })
