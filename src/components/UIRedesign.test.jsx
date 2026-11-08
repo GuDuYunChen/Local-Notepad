@@ -572,11 +572,7 @@ describe('UI redesign smoke tests', () => {
     );
 
     const moveTarget = uiQuery(bulkbar, 'select[aria-label="批量移动目标卷"]');
-    await act(async () => {
-      await setUiValue(moveTarget, 'volume-2');
-      moveTarget.dispatchEvent(new Event('change', { bubbles: true }));
-      await Promise.resolve();
-    });
+    await chooseSelect(moveTarget, 'volume-2');
 
     const move = Array.from(uiQueryAll(bulkbar, 'button')).
     find((button) => uiText(button) === '移动');
@@ -707,11 +703,7 @@ describe('UI redesign smoke tests', () => {
     expect(createbar).toBeTruthy();
 
     const createTarget = uiQuery(createbar, 'select[aria-label="新建目标卷"]');
-    await act(async () => {
-      await setUiValue(createTarget, 'volume-1');
-      createTarget.dispatchEvent(new Event('change', { bubbles: true }));
-      await Promise.resolve();
-    });
+    await chooseSelect(createTarget, 'volume-1');
 
     const quickCreate = Array.from(uiQueryAll(createbar, 'button')).
     find((button) => uiText(button) === '快速新建');
@@ -991,11 +983,7 @@ describe('UI redesign smoke tests', () => {
     expect(Array.from(await uiOptions(presetSelect)).map((option) => uiText(option))).
     toEqual(['标准章节', '冲突推进', '信息揭示', '空白']);
 
-    await act(async () => {
-      await setUiValue(presetSelect, 'conflict');
-      presetSelect.dispatchEvent(new Event('change', { bubbles: true }));
-      await Promise.resolve();
-    });
+    await chooseSelect(presetSelect, 'conflict');
 
     const quickCreate = Array.from(uiQueryAll(createbar, 'button')).
     find((button) => uiText(button) === '快速新建');
@@ -1362,11 +1350,7 @@ describe('UI redesign smoke tests', () => {
     const splitStart = uiQuery(manager,
     'select[aria-label="选择卷拆分起点"]');
 
-    await act(async () => {
-      await setUiValue(splitStart, 'chapter-2');
-      splitStart.dispatchEvent(new Event('change', { bubbles: true }));
-      await Promise.resolve();
-    });
+    await chooseSelect(splitStart, 'chapter-2');
     const splitButton = Array.from(uiQueryAll(manager, 'button')).
     find((button) => uiText(button) === '拆为新卷');
     await click(splitButton);
@@ -1399,11 +1383,7 @@ describe('UI redesign smoke tests', () => {
     const mergeTarget = uiQuery(manager,
     'select[aria-label="合并目标卷"]');
 
-    await act(async () => {
-      await setUiValue(mergeTarget, 'volume-2');
-      mergeTarget.dispatchEvent(new Event('change', { bubbles: true }));
-      await Promise.resolve();
-    });
+    await chooseSelect(mergeTarget, 'volume-2');
     const mergeButton = Array.from(uiQueryAll(manager, 'button')).
     find((button) => uiText(button) === '合并并删除当前卷');
     await click(mergeButton);
@@ -1663,11 +1643,7 @@ describe('UI redesign smoke tests', () => {
     const markerFilter = uiQuery(container,
     'select[aria-label="故事地图索引筛选"]');
 
-    await act(async () => {
-      await setUiValue(markerFilter, 'foreshadows');
-      markerFilter.dispatchEvent(new Event('change', { bubbles: true }));
-      await Promise.resolve();
-    });
+    await chooseSelect(markerFilter, 'foreshadows');
     expect(uiQueryAll(container, '.project-story-node')).toHaveLength(1);
   });
 
@@ -1754,21 +1730,13 @@ describe('UI redesign smoke tests', () => {
 
     expect(typeSelect).toBeTruthy();
 
-    await act(async () => {
-      await setUiValue(typeSelect, 'character');
-      typeSelect.dispatchEvent(new Event('change', { bubbles: true }));
-      await Promise.resolve();
-    });
+    await chooseSelect(typeSelect, 'character');
 
     let sourceSelect = uiQuery(container,
     'select[aria-label="关联现有索引"]');
 
     expect(sourceSelect).toBeTruthy();
-    await act(async () => {
-      await setUiValue(sourceSelect, 'chapter-1');
-      sourceSelect.dispatchEvent(new Event('change', { bubbles: true }));
-      await Promise.resolve();
-    });
+    await chooseSelect(sourceSelect, 'chapter-1');
 
     let trackTitle = uiQuery(container, 'input[aria-label="轨迹名称"]');
     await act(async () => {
@@ -1789,11 +1757,7 @@ describe('UI redesign smoke tests', () => {
     let chapterSelect = uiQuery(container,
     'select[aria-label="轨迹节点章节"]');
 
-    await act(async () => {
-      await setUiValue(chapterSelect, 'chapter-1');
-      chapterSelect.dispatchEvent(new Event('change', { bubbles: true }));
-      await Promise.resolve();
-    });
+    await chooseSelect(chapterSelect, 'chapter-1');
 
     let noteInput = uiQuery(container, 'input[aria-label="轨迹节点说明"]');
     await act(async () => {
@@ -1828,20 +1792,12 @@ describe('UI redesign smoke tests', () => {
     })]
     );
 
-    await act(async () => {
-      await setUiValue(typeSelect, 'foreshadow');
-      typeSelect.dispatchEvent(new Event('change', { bubbles: true }));
-      await Promise.resolve();
-    });
+    await chooseSelect(typeSelect, 'foreshadow');
 
     sourceSelect = uiQuery(container,
     'select[aria-label="关联现有索引"]');
 
-    await act(async () => {
-      await setUiValue(sourceSelect, 'chapter-2');
-      sourceSelect.dispatchEvent(new Event('change', { bubbles: true }));
-      await Promise.resolve();
-    });
+    await chooseSelect(sourceSelect, 'chapter-2');
 
     trackTitle = uiQuery(container, 'input[aria-label="轨迹名称"]');
     await act(async () => {
@@ -1862,20 +1818,12 @@ describe('UI redesign smoke tests', () => {
     chapterSelect = uiQuery(container,
     'select[aria-label="轨迹节点章节"]');
 
-    await act(async () => {
-      await setUiValue(chapterSelect, 'chapter-2');
-      chapterSelect.dispatchEvent(new Event('change', { bubbles: true }));
-      await Promise.resolve();
-    });
+    await chooseSelect(chapterSelect, 'chapter-2');
 
     const stageSelect = uiQuery(container,
     'select[aria-label="轨迹生命周期阶段"]');
 
-    await act(async () => {
-      await setUiValue(stageSelect, 'payoff');
-      stageSelect.dispatchEvent(new Event('change', { bubbles: true }));
-      await Promise.resolve();
-    });
+    await chooseSelect(stageSelect, 'payoff');
 
     addNode = Array.from(uiQueryAll(container, 'button')).
     find((button) => uiText(button) === '添加节点');
@@ -2093,11 +2041,7 @@ describe('UI redesign smoke tests', () => {
     const entityType = uiQuery(relationPanel,
     'select[aria-label="自定义实体类型"]');
 
-    await act(async () => {
-      await setUiValue(entityType, 'faction');
-      entityType.dispatchEvent(new Event('change', { bubbles: true }));
-      await Promise.resolve();
-    });
+    await chooseSelect(entityType, 'faction');
 
     const entityName = uiQuery(relationPanel,
     'input[aria-label="自定义实体名称"]');
@@ -2133,15 +2077,9 @@ describe('UI redesign smoke tests', () => {
     find((option) => uiText(option).includes('青莲剑宗'));
     expect(factionOption).toBeTruthy();
 
-    await act(async () => {
-      await setUiValue(source, 'index:chapter-1');
-      source.dispatchEvent(new Event('change', { bubbles: true }));
-      await setUiValue(relationType, 'belongs');
-      relationType.dispatchEvent(new Event('change', { bubbles: true }));
-      await setUiValue(target, uiValue(factionOption));
-      target.dispatchEvent(new Event('change', { bubbles: true }));
-      await Promise.resolve();
-    });
+    await chooseSelect(source, 'index:chapter-1');
+    await chooseSelect(relationType, 'belongs');
+    await chooseSelect(target, uiValue(factionOption));
 
     const relationLabel = uiQuery(container,
     'input[aria-label="自定义关系标签"]');
@@ -2386,15 +2324,9 @@ describe('UI redesign smoke tests', () => {
     resultingType = uiQuery(container,
     'select[aria-label="变化后的关系类型"]');
 
-    await act(async () => {
-      await setUiValue(chapterSelect, 'chapter-3');
-      chapterSelect.dispatchEvent(new Event('change', { bubbles: true }));
-      await setUiValue(eventType, 'repair');
-      eventType.dispatchEvent(new Event('change', { bubbles: true }));
-      await setUiValue(resultingType, 'ally');
-      resultingType.dispatchEvent(new Event('change', { bubbles: true }));
-      await Promise.resolve();
-    });
+    await chooseSelect(chapterSelect, 'chapter-3');
+    await chooseSelect(eventType, 'repair');
+    await chooseSelect(resultingType, 'ally');
 
     recordChange = Array.from(uiQueryAll(
       container, '.project-relation-detail button')
@@ -2568,11 +2500,7 @@ describe('UI redesign smoke tests', () => {
     const typeSelect = uiQuery(primarySuggestion,
     'select[aria-label^="候选关系类型"]');
 
-    await act(async () => {
-      await setUiValue(typeSelect, 'located');
-      typeSelect.dispatchEvent(new Event('change', { bubbles: true }));
-      await Promise.resolve();
-    });
+    await chooseSelect(typeSelect, 'located');
 
     const accept = Array.from(uiQueryAll(primarySuggestion, 'button')).
     find((button) => uiText(button) === '接受建议');
@@ -2715,11 +2643,7 @@ describe('UI redesign smoke tests', () => {
     const entitySelect = uiQuery(intelligence,
     'select[aria-label="选择实体别名对象"]');
 
-    await act(async () => {
-      await setUiValue(entitySelect, 'index:character-note');
-      entitySelect.dispatchEvent(new Event('change', { bubbles: true }));
-      await Promise.resolve();
-    });
+    await chooseSelect(entitySelect, 'index:character-note');
 
     const aliasInput = uiQuery(intelligence,
     'input[aria-label="新增实体别名"]');
@@ -2777,11 +2701,7 @@ describe('UI redesign smoke tests', () => {
     const confidenceFilter = uiQuery(suggestionPanel,
     'select[aria-label="关系建议最低置信度"]');
 
-    await act(async () => {
-      await setUiValue(confidenceFilter, 'high');
-      confidenceFilter.dispatchEvent(new Event('change', { bubbles: true }));
-      await Promise.resolve();
-    });
+    await chooseSelect(confidenceFilter, 'high');
     expect(uiQueryAll(
       container,
       '.project-relation-suggestion-list article')
@@ -2792,11 +2712,7 @@ describe('UI redesign smoke tests', () => {
     const confidenceFilterAgain = uiQuery(suggestionPanel,
     'select[aria-label="关系建议最低置信度"]');
 
-    await act(async () => {
-      await setUiValue(confidenceFilterAgain, 'medium');
-      confidenceFilterAgain.dispatchEvent(new Event('change', { bubbles: true }));
-      await Promise.resolve();
-    });
+    await chooseSelect(confidenceFilterAgain, 'medium');
 
     suggestion = Array.from(uiQueryAll(
       container,
@@ -2811,11 +2727,7 @@ describe('UI redesign smoke tests', () => {
     const typeSelect = uiQuery(suggestion,
     'select[aria-label^="候选关系类型"]');
 
-    await act(async () => {
-      await setUiValue(typeSelect, 'located');
-      typeSelect.dispatchEvent(new Event('change', { bubbles: true }));
-      await Promise.resolve();
-    });
+    await chooseSelect(typeSelect, 'located');
     const accept = Array.from(uiQueryAll(suggestion, 'button')).
     find((button) => uiText(button) === '接受建议');
     await click(accept);
