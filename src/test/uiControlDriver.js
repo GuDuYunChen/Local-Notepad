@@ -1,4 +1,5 @@
 import { act } from 'react'
+import { flushSync } from 'react-dom'
 import { vi } from 'vitest'
 
 // Explicit interaction helpers for the real Ant Design DOM. Nothing overrides
@@ -34,13 +35,13 @@ export async function openUiSelect(node) {
  if(!trigger || !host) throw Error('Expected a rendered UI selector')
  if(trigger.disabled) return null
  let popup = null
- // rc-trigger may update aria-expanded before its portal is committed. Keep
- // the real pointer event, deferred render and listbox observation inside one
- // async act scope; a fixed sleep is not evidence that the popup is ready.
  await act(async () => {
   if(trigger.getAttribute('aria-expanded')!=='true') {
-   const surface=trigger.closest('.ant-select')?.querySelector('.ant-select-selector') || trigger
-   surface.dispatchEvent(new MouseEvent('mousedown',{bubbles:true,button:0,cancelable:true}))
+   // Ant Design's current trigger is .ant-select-content. Keep the older
+   // selector fallback for compatible library markup, but never dispatch to
+   // the readonly combobox input when the real surface is present.
+   const surface=trigger.closest('.ant-select')?.querySelector('.ant-select-content, .ant-select-selector') || trigger
+   flushSync(() => surface.dispatchEvent(new MouseEvent('mousedown',{bubbles:true,button:0,cancelable:true})))
   }
   if(vi.isFakeTimers()) await vi.advanceTimersByTimeAsync(50)
   popup = await vi.waitFor(() => {
