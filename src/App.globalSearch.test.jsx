@@ -86,11 +86,9 @@ async function openSavedCollection() {
   const report = await collectSearchResultReport({ query: '' }, result(), { mode: 'all', request: async () => result() });
   await act(async () => searchCollections.save('App资料集', report));
   await click('打开全局检索入口');await settle();await click('本地资料集');
-  await act(async () => {
-    const el = uiQuery(container, '[aria-label="已保存资料集"]');
-    await setUiValue(el, searchCollections.list().entries[0].key);
-    el.dispatchEvent(new Event('change', { bubbles: true }));
-  });
+  const el = uiQuery(container, '[aria-label="已保存资料集"]');
+  await setUiValue(el, searchCollections.list().entries[0].key);
+  await act(async () => el.dispatchEvent(new Event('change', { bubbles: true })));
 }
 it('saved collection uses the real App draft confirmation and cancelling preserves its view', async () => {
   await click('编辑测试正文');await openSavedCollection();await click('打开当前笔记');await click('取消');await settle();
@@ -119,10 +117,8 @@ async function startCollectionReading(target = 'n7', prepare = true) {
   }
   await click('打开全局检索入口');await settle();await click('本地资料集');
   const select = uiQuery(container, '[aria-label="已保存资料集"]');
-  await act(async () => {
-    await setUiValue(select, searchCollections.list().entries[0].key);
-    select.dispatchEvent(new Event('change', { bubbles: true }));
-  });
+  await setUiValue(select, searchCollections.list().entries[0].key);
+  await act(async () => select.dispatchEvent(new Event('change', { bubbles: true })));
   const row = uiQuery(container, '[aria-label="资料集条目 ' + target + '"]');
   await act(async () => uiQuery(row, 'button').click());await settle();
 }
