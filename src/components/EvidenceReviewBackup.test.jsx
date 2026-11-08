@@ -40,10 +40,8 @@ async function fileInput(file) {
 }
 async function choose(raw = bundle()) {await fileInput({ size: raw.length, text: async () => raw });}
 async function scope(value) {
-  await act(async () => {
-    const el = label('存档查看范围');await setUiValue(el, value);
-    el.dispatchEvent(new Event('change', { bubbles: true }));
-  });
+  const el = label('存档查看范围');await setUiValue(el, value);
+  await act(async () => el.dispatchEvent(new Event('change', { bubbles: true })));
 }
 
 describe('review backup workflow', () => {
