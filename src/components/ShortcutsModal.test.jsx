@@ -265,7 +265,8 @@ describe('complete local shortcut settings workflow', () => {
     await type('表格');
     expect(uiQueryAll(container, '[data-shortcut-command]').length).toBe(2);
     const select = query('select[aria-label="操作分类"]');
-    await act(async () => {await setUiValue(select, '全局');select.dispatchEvent(new Event('change', { bubbles: true }));});
+    await setUiValue(select, '全局');
+    await act(async () => select.dispatchEvent(new Event('change', { bubbles: true })));
     expect(uiText(container)).toContain('没有匹配的操作');
     await click(query('[aria-label="清除搜索"]'));
     expect(uiQueryAll(container, '[data-shortcut-command]').length).toBe(4);
