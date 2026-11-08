@@ -67,11 +67,11 @@ export function uiText(node) {
  if(isUiSelect(node))return hostFor(node)?.querySelector('.ant-select-content')?.textContent || ''
  return node.textContent
 }
-function chooseUiOption(popup,value) {
+async function chooseUiOption(popup,value) {
  const option=[...popup.querySelectorAll('[data-ui-option-value]')].find(item=>item.getAttribute('data-ui-option-value')===String(value))
  if(!option)throw Error('Requested option is not available: '+String(value))
  if(option.closest('.ant-select-item-option-disabled'))return value
- option.click()
+ await act(async () => option.click())
  return value
 }
 export function setUiValue(node,value) {
