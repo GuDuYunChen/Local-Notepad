@@ -34,23 +34,29 @@ export async function openUiSelect(node) {
  const host=hostFor(trigger)
  if(!trigger || !host) throw Error('Expected a rendered UI selector')
  if(trigger.disabled) return null
- let popup = null
  await act(async () => {
   if(trigger.getAttribute('aria-expanded')!=='true') {
    // Ant Design's current trigger is .ant-select-content. Keep the older
-   // selector fallback for compatible library markup, but never dispatch to
-   // the readonly combobox input when the real surface is present.
+   // selector fallback for compatible markup; never dispatch to the readonly
+   // combobox input when the real clickable surface is present.
    const surface=trigger.closest('.ant-select')?.querySelector('.ant-select-content, .ant-select-selector') || trigger
    flushSync(() => surface.dispatchEvent(new MouseEvent('mousedown',{bubbles:true,button:0,cancelable:true})))
   }
   if(vi.isFakeTimers()) await vi.advanceTimersByTimeAsync(50)
-  popup = await vi.waitFor(() => {
-   const mounted = popupFor(trigger)
-   if(!mounted) throw Error('Select opened but its real option listbox did not mount')
-   return mounted
-  }, { timeout:1500, interval:10 })
  })
- return popup
+ // rc-trigger commits the portal after the event's React act scope closes.
+ // Poll the actual listbox, yielding through short act scopes so deferred
+ // timers/animation-frame work is flushed before each DOM observation.
+ const deadline = Date.now() + 1500
+ while(Date.now() <= deadline) {
+  const popup = popupFor(trigger)
+  if(popup) return popup
+  await act(async () => {
+   if(vi.isFakeTimers()) await vi.advanceTimersByTimeAsync(10)
+   else await new Promise(resolve => setTimeout(resolve,10))
+  })
+ }
+ throw Error('Select opened but its real option listbox did not mount')
 }
 export async function uiOptions(node) {
  if(!isUiSelect(node))return node.options
