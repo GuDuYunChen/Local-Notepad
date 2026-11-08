@@ -23,9 +23,8 @@ const byLabel = (text) => uiQuery(container, '[aria-label="' + text + '"]');
 const panel = () => uiQuery(container, '.review-archive-comparison');
 async function click(node) {expect(node).toBeTruthy();await act(async () => node.dispatchEvent(new MouseEvent('click', { bubbles: true })));}
 async function change(node, value) {
+  await setUiValue(node, value);
   await act(async () => {
-    const proto = node.tagName === 'SELECT' ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
-    await setUiValue(node, value);
     node.dispatchEvent(new Event('input', { bubbles: true }));node.dispatchEvent(new Event('change', { bubbles: true }));
   });
 }
