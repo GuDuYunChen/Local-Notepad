@@ -33,19 +33,22 @@ export async function openUiSelect(node) {
  const host=hostFor(trigger)
  if(!trigger || !host) throw Error('Expected a rendered UI selector')
  if(trigger.disabled) return null
- // rc-trigger first updates aria-expanded, then schedules its portal commit.
- // Keep the real pointer event and the deferred React render in one async act
- // scope so the listbox is queried only after the actual DOM has committed.
+ let popup = null
+ // rc-trigger may update aria-expanded before its portal is committed. Keep
+ // the real pointer event, deferred render and listbox observation inside one
+ // async act scope; a fixed sleep is not evidence that the popup is ready.
  await act(async () => {
   if(trigger.getAttribute('aria-expanded')!=='true') {
    const surface=trigger.closest('.ant-select')?.querySelector('.ant-select-selector') || trigger
    surface.dispatchEvent(new MouseEvent('mousedown',{bubbles:true,button:0,cancelable:true}))
   }
   if(vi.isFakeTimers()) await vi.advanceTimersByTimeAsync(50)
-  else await new Promise(resolve => setTimeout(resolve,32))
+  popup = await vi.waitFor(() => {
+   const mounted = popupFor(trigger)
+   if(!mounted) throw Error('Select opened but its real option listbox did not mount')
+   return mounted
+  }, { timeout:1500, interval:10 })
  })
- const popup=popupFor(trigger)
- if(!popup) throw Error('Select opened but its real option listbox did not mount')
  return popup
 }
 export async function uiOptions(node) {
