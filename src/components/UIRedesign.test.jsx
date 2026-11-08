@@ -2271,18 +2271,12 @@ describe('UI redesign smoke tests', () => {
 
     expect(chapterSelect).toBeTruthy();
 
+    await chooseSelect(chapterSelect, 'chapter-2');
+    await chooseSelect(eventType, 'break');
+    await chooseSelect(resultingType, 'rival');
     await act(async () => {
-      await setUiValue(chapterSelect, 'chapter-2');
-      chapterSelect.dispatchEvent(new Event('change', { bubbles: true }));
-      await setUiValue(eventType, 'break');
-      eventType.dispatchEvent(new Event('change', { bubbles: true }));
-      await setUiValue(resultingType, 'rival');
-      resultingType.dispatchEvent(new Event('change', { bubbles: true }));
-      const setter = Object.getOwnPropertyDescriptor(
-        HTMLInputElement.prototype,
-        'value'
-      ).set;
-      await setUiValue(eventNote, '立场冲突导致决裂');
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+      setter.call(eventNote, '立场冲突导致决裂');
       eventNote.dispatchEvent(new Event('input', { bubbles: true }));
       await Promise.resolve();
     });
