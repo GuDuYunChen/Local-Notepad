@@ -35,9 +35,8 @@ const note = () => label('本章核对备注内容');
 async function render(props = {}) {await act(async () => root.render(<EvidenceReviewBar documentId="c0" {...props} />));}
 async function click(el) {expect(el).toBeTruthy();await act(async () => {el.click();await Promise.resolve();});}
 async function change(el, value) {
+  await setUiValue(el, value);
   await act(async () => {
-    const proto = el.tagName === 'SELECT' ? HTMLSelectElement.prototype : el.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
-    await setUiValue(el, value);
     el.dispatchEvent(new Event('input', { bubbles: true }));el.dispatchEvent(new Event('change', { bubbles: true }));
   });
 }
