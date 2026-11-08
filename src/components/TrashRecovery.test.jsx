@@ -67,7 +67,7 @@ describe('cancellation, stale scopes, ownership and keyboard', () => {
 // Cascade-only regression. Real Windows acceptance separately measures radio/text bounds.
 describe('restore destination controls retain compact native radio geometry', () => {
   let style;
-  beforeEach(() => {style = document.createElement('style');style.textContent = readFileSync('src/components/TrashRecovery.css', 'utf8');document.head.append(style);});
+  beforeEach(() => {style = document.createElement('style');style.textContent = readFileSync('src/components/ui/control-kit.css', 'utf8') + '\n' + readFileSync('src/components/TrashRecovery.css', 'utf8');document.head.append(style);});
   afterEach(() => style.remove());
   for (const mode of ['original', 'target']) for (const index of [0, 1]) it(`${mode} selection keeps radio ${index + 1} compact and non-growing`, async () => {
     if (mode === 'target') await click(uiQueryAll(document, 'input[name="recovery-mode"]')[1]);
