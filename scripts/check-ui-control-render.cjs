@@ -15,6 +15,78 @@ const BUDGET_MS = 90000
 const TOLERANCE = 0.6
 const hash = bytes => createHash('sha256').update(bytes).digest('hex')
 
+// Runs in the actual fixture page. Preserve the original toolbar geometry and
+// additionally observe the precise painted targets at the PNG boundary.
+function toolbarSnapshot() {
+  const roots = document.querySelectorAll('#long-toolbar')
+  if (roots.length !== 1) throw Error('Actual toolbar root missing or ambiguous')
+  const root = roots[0], bounds = node => {
+    const r = node.getBoundingClientRect()
+    return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width, height: r.height }
+  }
+  const observe = node => {
+    const box = bounds(node)
+    let visible = box.width > 0 && box.height > 0
+    let inViewport = box.left >= -1 && box.top >= -1 && box.right <= innerWidth + 1 && box.bottom <= innerHeight + 1
+    for (let owner = node; owner; owner = owner.parentElement) {
+      const css = getComputedStyle(owner), clip = bounds(owner)
+      visible &&= css.display !== 'none' && css.visibility === 'visible' && Number(css.opacity) > 0
+      if (owner !== node && /hidden|auto|scroll|clip/.test(css.overflowY)) inViewport &&= box.top >= clip.top - 1 && box.bottom <= clip.bottom + 1
+      if (owner !== node && /hidden|auto|scroll|clip/.test(css.overflowX)) inViewport &&= box.left >= clip.left - 1 && box.right <= clip.right + 1
+    }
+    const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)
+    return { ...box, owned: root.contains(node), visible, inViewport, hit: hit === node || node.contains(hit) }
+  }
+  const r = bounds(root)
+  return { viewport: { width: innerWidth, height: innerHeight }, theme: document.documentElement.dataset.theme,
+    left: r.left, right: r.right, rootBounds: r,
+    fields: ['long-input', 'long-select', 'long-clear'].map(id => {
+      const field = document.getElementById(id)
+      if (!field) throw Error('Actual toolbar control missing: ' + id)
+      const control = field.closest('.ant-select') || field
+      return { id, ...observe(control) }
+    }),
+    labels: [...root.querySelectorAll('label')].map((node, index) => ({ index, ...observe(node) })),
+    overflow: document.documentElement.scrollWidth - innerWidth,
+    longLabelLength: root.querySelector('label').textContent.trim().length }
+}
+
+function verifyToolbarSnapshot(sample, expected) {
+  assert.deepEqual(sample?.viewport, expected.viewport, 'Toolbar capture viewport changed')
+  assert.equal(sample.theme, expected.theme, 'Toolbar capture theme changed')
+  assert.ok(sample.overflow <= 1 && sample.longLabelLength > 20)
+  assert.deepEqual(sample.fields.map(field => field.id), ['long-input', 'long-select', 'long-clear'])
+  assert.equal(sample.labels.length, 2, 'Both original long toolbar labels are required')
+  for (const item of [...sample.fields, ...sample.labels]) {
+    for (const key of ['owned', 'visible', 'inViewport', 'hit']) assert.equal(item[key], true, 'Toolbar PNG target must remain visible and unobscured: ' + key)
+    assert.ok(item.width > 20 && item.height > 0)
+    assert.ok(item.left >= -1 && item.top >= -1 && item.right <= expected.viewport.width + 1 && item.bottom <= expected.viewport.height + 1, 'Toolbar PNG target is outside viewport')
+  }
+  for (const field of sample.fields) assert.ok(Math.abs(field.height - 40) <= TOLERANCE, 'Toolbar PNG control height changed')
+  return sample
+}
+
+function verifyToolbarContinuity(before, after, expected) {
+  verifyToolbarSnapshot(before, expected); verifyToolbarSnapshot(after, expected)
+  const previous = [before.rootBounds, ...before.fields, ...before.labels]
+  const current = [after.rootBounds, ...after.fields, ...after.labels]
+  for (let i = 0; i < previous.length; i++) for (const key of ['left', 'top', 'right', 'bottom', 'width', 'height']) {
+    assert.ok(Number.isFinite(current[i][key]) && Math.abs(current[i][key] - previous[i][key]) <= TOLERANCE, 'Toolbar target moved across PNG capture')
+  }
+}
+
+async function captureToolbarEvidence({ record, read, capture, persist, expected }) {
+  const proof = record.capture = { complete: false }; persist()
+  proof.image = await capture(async () => {
+    proof.before = await read(); persist()
+    verifyToolbarContinuity(record, proof.before, expected)
+  })
+  assert.ok(proof.before, 'Toolbar PNG omitted its fresh pre-capture target guard')
+  proof.after = await read(); persist()
+  verifyToolbarContinuity(proof.before, proof.after, expected)
+  proof.complete = true; persist(); return proof.image
+}
+
 function verifyGeometry(sample) {
   assert.equal(sample.controls.length, 12, 'All four controls in all three densities are required')
   assert.ok(sample.overflow <= 1, 'Fixture must not overflow horizontally')
@@ -163,6 +235,10 @@ function verifyScenes(scenes) {
     assert.equal(scene.form.complete, true)
     assert.equal(scene.modal.complete, true)
     assert.equal(scene.toolbar.complete, true)
+    assert.equal(scene.toolbar.capture?.complete, true, 'Toolbar PNG requires fresh target proof')
+    verifyToolbarContinuity(scene.toolbar, scene.toolbar.capture.before, scene)
+    verifyToolbarContinuity(scene.toolbar.capture.before, scene.toolbar.capture.after, scene)
+    assert.deepEqual(scene.toolbar.capture.image, scene.images.find(image => image.name === scene.name + '-toolbar.png'))
     assert.equal(scene.images.length, 7)
     for (const image of scene.images) {
       assert.ok(image.bytes > 100 && /^[a-f0-9]{64}$/.test(image.sha256))
@@ -421,7 +497,9 @@ async function main() {
       await click(selector)
       await until(() => selectState(id), state => !state.expanded && state.value === value, id + ' selected value')
     }
-    const capture = async (scene, suffix, diagnostic = false) => {
+    const capture = async (scene, suffix, diagnostic = false, beforeCapture) => {
+      await evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve(true)))))
+      if (beforeCapture) await beforeCapture()
       const image = await win.capturePage(), bytes = image.toPNG(), decoded = nativeImage.createFromBuffer(bytes)
       assert.ok(!decoded.isEmpty() && bytes.length > 100, 'Native PNG required')
       const name = scene.name + '-' + suffix + '.png'
@@ -490,22 +568,16 @@ async function main() {
         repeatedPointerClosed: true, escapePreservedValueAndFocus: true, changes: committed.changes.ordinary }
 
       await click('#long-clear')
-      scene.toolbar = await evaluate(() => {
-        const root = document.getElementById('long-toolbar'), r = root.getBoundingClientRect()
-        const fields = ['long-input', 'long-select', 'long-clear'].map(id => {
-          const node = document.getElementById(id), control = node.closest('.ant-select') || node
-          const box = control.getBoundingClientRect()
-          return { id, height: box.height, top: box.top, bottom: box.bottom, left: box.left, right: box.right }
-        })
-        return { fields, left: r.left, right: r.right, overflow: document.documentElement.scrollWidth - innerWidth,
-          longLabelLength: root.querySelector('label').textContent.trim().length }
-      })
+      await evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve(true)))))
+      scene.toolbar = await evaluate(toolbarSnapshot)
       assert.ok(scene.toolbar.overflow <= 1 && scene.toolbar.longLabelLength > 20)
       for (const field of scene.toolbar.fields) assert.ok(Math.abs(field.height - 40) <= TOLERANCE && field.left >= 0 && field.right <= width + 1, 'Toolbar height and bounds')
       const tops = scene.toolbar.fields.map(field => field.top)
       if (width === 704) assert.ok(Math.max(...tops) - Math.min(...tops) > 40, 'Narrow toolbar must wrap complete controls')
       else assert.ok(Math.max(...scene.toolbar.fields.map(field => field.bottom)) - Math.min(...scene.toolbar.fields.map(field => field.bottom)) <= TOLERANCE, 'Wide toolbar must align bottoms')
-      scene.toolbar.complete = true; await capture(scene, 'toolbar')
+      scene.toolbar.complete = true
+      await captureToolbarEvidence({ record: scene.toolbar, read: () => evaluate(toolbarSnapshot),
+        capture: guard => capture(scene, 'toolbar', false, guard), persist, expected: scene })
 
       await click('#native-title'); await inputKey('a', 2)
       await win.webContents.debugger.sendCommand('Input.insertText', { text: 'edited' })
@@ -552,7 +624,7 @@ async function main() {
   } catch (error) { fail(error) }
 }
 
-module.exports = { verifyGeometry, verifyFocus, verifyScenes, hasVisibleBoxShadow, HEIGHTS, VIEWPORTS, BUDGET_MS, failureDetails, recordFocusEvidence, captureMatchedFocusStyles, selectStateSnapshot, paintedPopupReader }
+module.exports = { verifyGeometry, verifyFocus, verifyScenes, hasVisibleBoxShadow, HEIGHTS, VIEWPORTS, BUDGET_MS, failureDetails, recordFocusEvidence, captureMatchedFocusStyles, selectStateSnapshot, paintedPopupReader, toolbarSnapshot, verifyToolbarSnapshot, verifyToolbarContinuity, captureToolbarEvidence }
 // Electron 31's ESM default_app imports the CLI file, so require.main does not
 // identify it. Only the actual browser-process CLI entry may start this runner;
 // importing the exported evidence helpers must remain side-effect free.

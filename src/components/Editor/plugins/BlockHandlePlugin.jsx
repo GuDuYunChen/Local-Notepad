@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useLayoutEffect, useState, useRef, useCallback } from 'react'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { $createNodeSelection, $createParagraphNode, $createTextNode, $getNodeByKey, $getRoot, $getSelection, $isRangeSelection } from 'lexical'
 import { $isHeadingNode } from '@lexical/rich-text'
@@ -9,6 +9,7 @@ import { blockRegistry, getBlockByType } from '../utils/blockRegistry'
 import { $getNearestBlockElementAncestorOrThrow } from '@lexical/utils'
 import { $generateJSONFromSelectedNodes, $generateNodesFromSerializedNodes } from '@lexical/clipboard'
 import './BlockHandlePlugin.css'
+import { getBlockHandleLayout, getBlockMenuPosition } from '../utils/blockHandleLayout.mjs'
 import { removeCopiedBlockIds } from '../../../services/blockReferenceModel.mjs'
 import { $blockId, $setBlockId } from '../utils/blockReferenceState.js'
 import { BLOCK_TYPES } from '../../../services/blockReferenceModel.mjs'
@@ -70,11 +71,43 @@ export default function BlockHandlePlugin() {
   const [showMenu, setShowMenu] = useState(false)
   const menuRef = useRef(null)
   const handleRef = useRef(null)
+  const activeBlockRef = useRef(null)
+
+  const readLayout = useCallback((element) => {
+    const editorRoot = editor.getRootElement()
+    const owner = editorRoot?.closest('.editor-container')
+    if (!owner || !element?.isConnected || element.parentElement !== editorRoot) return null
+    const ownerRect = owner.getBoundingClientRect()
+    return getBlockHandleLayout({
+      block: element.getBoundingClientRect(),
+      port: { left: ownerRect.left + owner.clientLeft, top: ownerRect.top + owner.clientTop,
+        width: owner.clientWidth, height: owner.clientHeight },
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+      scrollTop: owner.scrollTop, scrollLeft: owner.scrollLeft,
+    })
+  }, [editor])
+
+  const placeControls = useCallback((layout) => {
+    if (layout) setPosition(layout)
+    setIsVisible(Boolean(layout))
+    if (!layout) setShowMenu(false)
+  }, [])
+
+  useLayoutEffect(() => {
+    const menu = menuRef.current
+    if (!menu) return
+    // offset dimensions exclude the existing entrance animation's transform.
+    const next = getBlockMenuPosition(position, { width: menu.offsetWidth, height: menu.offsetHeight })
+    if (!next) { setShowMenu(false); return }
+    menu.style.top = `${next.top}px`
+    menu.style.left = `${next.left}px`
+  }, [position, showMenu])
 
   const updatePosition = useCallback(() => {
     const selection = window.getSelection()
     if (!selection || selection.rangeCount === 0) {
-      setIsVisible(false)
+      activeBlockRef.current = null
+      placeControls(null)
       return
     }
 
@@ -82,8 +115,9 @@ export default function BlockHandlePlugin() {
     const container = range.commonAncestorContainer
     let element = container.nodeType === Node.ELEMENT_NODE ? container : container.parentElement
 
-    if (!element || !element.closest('.editor-input')) {
-      setIsVisible(false)
+    if (!element || element.closest('.editor-input') !== editor.getRootElement()) {
+      activeBlockRef.current = null
+      placeControls(null)
       return
     }
 
@@ -92,15 +126,16 @@ export default function BlockHandlePlugin() {
     }
 
     if (!element) {
-      setIsVisible(false)
+      activeBlockRef.current = null
+      placeControls(null)
       return
     }
 
-    const rect = element.getBoundingClientRect()
-    const editorRect = element.closest('.editor-container')?.getBoundingClientRect()
+    const layout = readLayout(element)
 
-    if (!editorRect) {
-      setIsVisible(false)
+    if (!layout) {
+      activeBlockRef.current = null
+      placeControls(null)
       return
     }
 
@@ -115,13 +150,10 @@ export default function BlockHandlePlugin() {
       setBlockKey(blockNode.getKey())
     })
 
-    setPosition({
-      top: rect.top - editorRect.top,
-      left: -36,
-    })
-    setIsVisible(true)
+    activeBlockRef.current = element
+    placeControls(layout)
     setShowMenu(false)
-  }, [editor])
+  }, [editor, readLayout, placeControls])
 
   useEffect(() => {
     const removeUpdateListener = editor.registerUpdateListener(() => {
@@ -129,17 +161,21 @@ export default function BlockHandlePlugin() {
     })
 
     const handleMouseMove = (e) => {
-      const editorContainer = e.target.closest('.editor-container')
+      // An open menu owns pointer travel until the existing outside-mousedown
+      // handler closes it; moving to a menu item must not unmount that item.
+      if (menuRef.current || handleRef.current?.contains(e.target)) return
+      const editorContainer = e.target.closest?.('.editor-container')
       if (!editorContainer) {
         setIsVisible(false)
         return
       }
 
-      const rect = e.target.getBoundingClientRect()
       const editorRect = editorContainer.getBoundingClientRect()
       const relativeX = e.clientX - editorRect.left
+      const blockLeft = activeBlockRef.current?.getBoundingClientRect().left ?? editorRect.left
+      const gutterEnd = Math.max(40, blockLeft - editorRect.left)
 
-      if (relativeX < 40 && relativeX > 0) {
+      if (relativeX < gutterEnd && relativeX > 0) {
         updatePosition()
       } else {
         setIsVisible(false)
@@ -152,15 +188,27 @@ export default function BlockHandlePlugin() {
       }
     }
 
+    const handleViewportChange = (event) => {
+      const block = activeBlockRef.current
+      if (!block) return
+      if (event.type === 'scroll' && event.target !== document
+        && !event.target.contains?.(block)) return
+      placeControls(readLayout(block))
+    }
+
+    document.addEventListener('scroll', handleViewportChange, true)
+    window.addEventListener('resize', handleViewportChange)
     document.addEventListener('mousemove', handleMouseMove)
     document.addEventListener('mousedown', handleClickOutside)
 
     return () => {
       removeUpdateListener()
+      document.removeEventListener('scroll', handleViewportChange, true)
+      window.removeEventListener('resize', handleViewportChange)
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [editor, updatePosition])
+  }, [editor, updatePosition, readLayout, placeControls])
 
   const getBlockNode = () => {
     if (!blockKey) return null
@@ -299,7 +347,7 @@ export default function BlockHandlePlugin() {
       </div>
 
       {showMenu && (
-        <div className="block-menu" ref={menuRef} role="menu">
+        <div className="block-menu" ref={menuRef} role="menu" style={position.menu}>
           <UiButton density="compact" type="button" className="block-menu-item" onClick={() => insertSibling('before')} role="menuitem">
             <span className="block-menu-icon">↑</span>
             <span>上方插入空白块</span>

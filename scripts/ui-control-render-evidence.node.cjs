@@ -403,3 +403,66 @@ test('a paint completed during an in-flight DOM read cannot certify that earlier
   delayRead = false
   assert.equal((await read()).popup.paintFrames, 2)
 })
+
+const { verifyToolbarSnapshot, verifyToolbarContinuity, captureToolbarEvidence } = require('./check-ui-control-render.cjs')
+function visibleToolbar() {
+  const box = (top, height) => ({ left: 16, right: 684, top, bottom: top + height, width: 668, height, owned: true, visible: true, inViewport: true, hit: true })
+  return { viewport: { width: 704, height: 455 }, theme: 'dark', overflow: 0, longLabelLength: 45,
+    rootBounds: box(30, 210), fields: ['long-input', 'long-select', 'long-clear'].map((id, index) => ({ id, ...box(70 + index * 70, 40) })),
+    labels: [0, 1].map(index => ({ index, ...box(40 + index * 70, 65) })) }
+}
+const toolbarImage = { name: 'dark-704x455-toolbar.png', bytes: 1200, sha256: 'a'.repeat(64), width: 704, height: 455 }
+
+test('toolbar PNG targets require all original controls and both complete visible labels', () => {
+  const expected = { viewport: { width: 704, height: 455 }, theme: 'dark' }
+  verifyToolbarSnapshot(visibleToolbar(), expected)
+  for (const mutate of [s => { s.fields[0].inViewport = false }, s => { s.fields[1].hit = false },
+    s => { s.fields[2].owned = false }, s => { s.labels[0].visible = false }, s => { s.labels.pop() },
+    s => { s.fields[0].top = -20 }, s => { s.theme = 'light' }, s => { s.fields[0].height = 28 }]) {
+    const sample = visibleToolbar(); mutate(sample); assert.throws(() => verifyToolbarSnapshot(sample, expected))
+  }
+})
+
+test('toolbar evidence rejects target movement across the actual capture boundary', () => {
+  for (const owner of ['fields', 'labels']) {
+    const before = visibleToolbar(), after = structuredClone(before)
+    after[owner][0].left += 3; after[owner][0].right += 3
+    assert.throws(() => verifyToolbarContinuity(before, after, before), /moved/)
+  }
+})
+
+test('toolbar capture reads after the runner paint wait and independently after the PNG', async () => {
+  const record = visibleToolbar(), order = [], expected = structuredClone(record)
+  const image = await captureToolbarEvidence({ record, expected, persist() {},
+    read: async () => { order.push('read'); return structuredClone(expected) },
+    capture: async guard => { order.push('paint'); await guard(); order.push('png'); return toolbarImage } })
+  assert.deepEqual(order, ['paint', 'read', 'png', 'read'])
+  assert.deepEqual(image, toolbarImage); assert.equal(record.capture.complete, true)
+  assert.deepEqual(record.capture.before, expected); assert.deepEqual(record.capture.after, expected)
+})
+
+test('toolbar capture refuses disappearing targets before or after a real image', async () => {
+  for (const phase of ['before', 'after']) {
+    const record = visibleToolbar(), expected = structuredClone(record); let current = structuredClone(record), captures = 0
+    await assert.rejects(() => captureToolbarEvidence({ record, expected, persist() {}, read: async () => structuredClone(current),
+      capture: async guard => {
+        if (phase === 'before') current.fields[0].inViewport = false
+        await guard(); captures++
+        if (phase === 'after') current.fields[0].visible = false
+        return toolbarImage
+      } }), /target.*visible/)
+    assert.equal(captures, phase === 'before' ? 0 : 1); assert.equal(record.capture.complete, false)
+    if (phase === 'after') assert.deepEqual(record.capture.image, toolbarImage)
+  }
+})
+
+test('toolbar capture refuses an omitted guard and preserves original native capture failures', async () => {
+  let record = visibleToolbar(), expected = structuredClone(record)
+  await assert.rejects(() => captureToolbarEvidence({ record, expected, persist() {}, read: async () => expected,
+    capture: async () => toolbarImage }), /omitted.*guard/)
+  assert.equal(record.capture.complete, false)
+  record = visibleToolbar(); expected = structuredClone(record); const failure = Error('native PNG failed')
+  await assert.rejects(() => captureToolbarEvidence({ record, expected, persist() {}, read: async () => expected,
+    capture: async guard => { await guard(); throw failure } }), error => error === failure)
+  assert.equal(record.capture.complete, false); assert.equal(record.capture.after, undefined)
+})
