@@ -20,6 +20,9 @@ export default function SyncActivityPanel({ wakeKey = '', onSettled = () => {} }
   const cancelRequest = useRef(null)
   const requestedID = useRef('')
   const stopCancelWait = useRef(null)
+  // Keep ownership of the delivery timeout outside the async continuation so
+  // unmount can synchronously clear it even when the HTTP client ignores abort.
+  const cancelTimeout = useRef(null)
   wake.current = wakeKey
   settled.current = onSettled
 
@@ -50,6 +53,9 @@ export default function SyncActivityPanel({ wakeKey = '', onSettled = () => {} }
       live.current = false
       monitor.dispose()
       if (reader.current === monitor) reader.current = null
+      // Clear synchronously: a pending cancel request is allowed to ignore abort.
+      if (cancelTimeout.current !== null) clearTimeout(cancelTimeout.current)
+      cancelTimeout.current = null
       cancelRequest.current?.abort()
       stopCancelWait.current?.()
     }
@@ -62,10 +68,13 @@ export default function SyncActivityPanel({ wakeKey = '', onSettled = () => {} }
     const controller = new AbortController()
     cancelRequest.current = controller
     setSending(true)
-    let timer
     try {
       const timeout = new Promise((_, reject) => {
-        timer = setTimeout(() => { controller.abort(); reject(new Error('取消结果尚未确认')) }, 5_000)
+        cancelTimeout.current = setTimeout(() => {
+          cancelTimeout.current = null
+          controller.abort()
+          reject(new Error('取消结果尚未确认'))
+        }, 5_000)
       })
       const stopped = new Promise((_, reject) => { stopCancelWait.current = () => reject(new Error('面板已关闭')) })
       const receipt = await Promise.race([
@@ -89,7 +98,8 @@ export default function SyncActivityPanel({ wakeKey = '', onSettled = () => {} }
         void reader.current?.refresh()
       }
     } finally {
-      clearTimeout(timer)
+      if (cancelTimeout.current !== null) clearTimeout(cancelTimeout.current)
+      cancelTimeout.current = null
       stopCancelWait.current = null
       if (cancelRequest.current === controller) cancelRequest.current = null
       if (live.current) setSending(false)
