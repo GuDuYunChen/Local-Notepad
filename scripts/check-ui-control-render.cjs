@@ -406,7 +406,12 @@ async function main() {
 }
 
 module.exports = { verifyGeometry, verifyFocus, verifyScenes, hasVisibleBoxShadow, HEIGHTS, VIEWPORTS, BUDGET_MS }
-if (require.main === module) main().catch(error => {
+// Electron 31's ESM default_app imports the CLI file, so require.main does not
+// identify it. Only the actual browser-process CLI entry may start this runner;
+// importing the exported evidence helpers must remain side-effect free.
+const electronEntry = process.versions.electron && process.type === 'browser' && process.defaultApp === true &&
+  process.argv[1] && path.resolve(process.argv[1]) === __filename
+if (require.main === module || electronEntry) main().catch(error => {
   console.error(error)
   if (process.versions.electron) require('electron').app.exit(1)
   else process.exitCode = 1
