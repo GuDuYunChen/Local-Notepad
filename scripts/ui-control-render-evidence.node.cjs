@@ -168,3 +168,46 @@ test('helper imports in Node, another Electron entry or a renderer remain inert'
   const main = loadCheckerEntry({ defaultApp: false, argv: ['electron', 'ordinary-cjs-entry'] }, true)
   assert.equal(main.electronLoads, 1); assert.equal(main.readyCalls, 1); assert.equal(main.timers[0].ms, 90000)
 })
+
+const { failureDetails, recordFocusEvidence } = require('./check-ui-control-render.cjs')
+test('persists the original failed focus sample before capture and still rejects after a valid later observation', async () => {
+  const sample = focus(); sample.outlines = []
+  const scene = { complete: false, focus: [], images: [] }, writes = [], order = []
+  const persist = () => { order.push('persist'); writes.push(JSON.parse(JSON.stringify(scene))) }
+  await assert.rejects(recordFocusEvidence(scene, sample, persist, async () => {
+    order.push('capture')
+    assert.equal(writes[0].focus[0].outlines.length, 0)
+    assert.equal(writes.at(-1).focusFailure.error.actual, 0)
+    assert.equal(writes.at(-1).focusFailure.error.expected, 1)
+    scene.focusFailure.afterCapture = focus()
+    return { name: 'focus-failure.png', bytes: 200, sha256: 'a'.repeat(64) }
+  }), error => error.actual === 0 && error.expected === 1 && /exactly one/.test(error.message))
+  assert.equal(scene.focus[0], sample); assert.equal(scene.focus[0].outlines.length, 0)
+  assert.equal(scene.focusFailure.afterCapture.outlines.length, 1)
+  assert.equal(scene.complete, false); assert.deepEqual(scene.images, [])
+  assert.equal(writes.at(-1).focusFailure.image.name, 'focus-failure.png')
+  assert.deepEqual(order, ['persist', 'persist', 'capture', 'persist'])
+})
+
+test('capture failure cannot mask the original assertion or discard its actual and expected values', async () => {
+  const sample = focus(); sample.outlines.push({ owner: 'span:1', width: 2 })
+  const scene = { complete: false, focus: [], images: [] }, writes = []
+  await assert.rejects(recordFocusEvidence(scene, sample, () => writes.push(JSON.parse(JSON.stringify(scene))),
+    async () => { throw Error('Native capture unavailable') }),
+  error => error.name === 'AssertionError' && error.actual === 2 && error.expected === 1 && error.operator === 'strictEqual')
+  assert.equal(writes[0].focus[0].outlines.length, 2)
+  assert.equal(scene.focusFailure.error.actual, 2); assert.equal(scene.focusFailure.error.expected, 1)
+  assert.equal(scene.focusFailure.error.operator, 'strictEqual'); assert.match(scene.focusFailure.error.stack, /AssertionError/)
+  assert.equal(scene.focusFailure.captureError.message, 'Native capture unavailable')
+  assert.equal(scene.complete, false); assert.deepEqual(scene.images, [])
+  const plain = failureDetails(Error('An ordinary runtime error'))
+  assert.equal(plain.name, 'Error'); assert.equal(plain.message, 'An ordinary runtime error'); assert.equal('actual' in plain, false)
+})
+
+test('successful focus recording preserves the sample and adds no failure screenshot', async () => {
+  const sample = focus(), scene = { complete: false, focus: [], images: [] }
+  let writes = 0, captures = 0
+  await recordFocusEvidence(scene, sample, () => writes++, async () => { captures++; return {} })
+  assert.equal(scene.focus[0], sample); assert.equal(writes, 1); assert.equal(captures, 0)
+  assert.equal('focusFailure' in scene, false); assert.deepEqual(scene.images, [])
+})

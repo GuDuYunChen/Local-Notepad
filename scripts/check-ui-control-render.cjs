@@ -52,6 +52,27 @@ function verifyFocus(sample) {
   assert.equal(sample.inViewport, true, `${sample.id}: focused control must be visible`)
 }
 
+function failureDetails(error) {
+  const details = { name: String(error?.name || 'Error'), message: String(error?.message || error), stack: error?.stack || null }
+  for (const key of ['actual', 'expected', 'operator']) if (error != null && key in Object(error)) {
+    try { details[key] = JSON.parse(JSON.stringify(error[key])) }
+    catch { details[key] = String(error[key]) }
+  }
+  return details
+}
+
+async function recordFocusEvidence(scene, sample, persist, captureFailure) {
+  scene.focus.push(sample); persist()
+  try { verifyFocus(sample) }
+  catch (error) {
+    scene.focusFailure = { id: sample.id, error: failureDetails(error) }; persist()
+    try { scene.focusFailure.image = await captureFailure() }
+    catch (captureError) { scene.focusFailure.captureError = failureDetails(captureError) }
+    persist()
+    throw error
+  }
+}
+
 // Computed CSS can retain a colored zero-size shadow when an official token
 // disables its outline. Ignore only definitely unpainted layers; unknown or
 // nonzero geometry remains evidence, so a real second cue cannot pass silently.
@@ -146,9 +167,22 @@ function focusSnapshot(id, shadowIsVisible) {
   if (!element) throw new Error('Missing focus control ' + id)
   const root = element.closest('.ant-input-affix-wrapper, .ant-select') || element
   const rect = root.getBoundingClientRect(), hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)
-  const outlines = [], shadows = [], shadowStyles = []
+  const outlines = [], shadows = [], shadowStyles = [], nodes = []
+  const identity = node => node ? { tag: node.tagName.toLowerCase(), id: node.id,
+    class: node.getAttribute('class'), style: node.getAttribute('style'),
+    control: node.getAttribute('data-ui-control'), layout: node.getAttribute('data-ui-layout') } : null
   for (const [index, node] of [root, ...root.querySelectorAll('*')].entries()) {
     const bounds = node.getBoundingClientRect(), css = getComputedStyle(node)
+    nodes.push({ owner: index === 0 ? 'root' : node.tagName.toLowerCase() + ':' + index, ...identity(node),
+      focused: document.activeElement === node, focusVisible: node.matches(':focus-visible'), focusWithin: node.matches(':focus-within'),
+      rect: { left: bounds.left, top: bounds.top, right: bounds.right, bottom: bounds.bottom, width: bounds.width, height: bounds.height },
+      clientRects: [...node.getClientRects()].map(box => ({ left: box.left, top: box.top, width: box.width, height: box.height })),
+      excluded: [bounds.width <= 0 && 'nonpositive-width', bounds.height <= 0 && 'nonpositive-height',
+        css.visibility === 'hidden' && 'hidden', css.opacity === '0' && 'zero-opacity'].filter(Boolean),
+      computed: Object.fromEntries(['outline', 'outline-style', 'outline-width', 'outline-color', 'outline-offset',
+        'box-shadow', 'display', 'visibility', 'opacity', 'appearance', 'color', 'background-color',
+        'border-top-width', 'border-top-color', '--clay', '--ant-line-width-focus', '--ant-color-primary-border',
+        '--ant-color-primary', '--ant-control-outline', '--ant-control-outline-width'].map(name => [name, css.getPropertyValue(name)])) })
     if (bounds.width <= 0 || bounds.height <= 0 || css.visibility === 'hidden' || css.opacity === '0') continue
     const owner = index === 0 ? 'root' : node.tagName.toLowerCase() + ':' + index
     if (css.outlineStyle !== 'none' && parseFloat(css.outlineWidth) > 0) outlines.push({ owner, width: parseFloat(css.outlineWidth), color: css.outlineColor })
@@ -159,6 +193,8 @@ function focusSnapshot(id, shadowIsVisible) {
     }
   }
   return { id, focused: document.activeElement === element, focusVisible: element.matches(':focus-visible'), outlines, shadows, shadowStyles,
+    diagnostics: { activeElement: identity(document.activeElement), documentHasFocus: document.hasFocus(),
+      visibilityState: document.visibilityState, nodes },
     hit: hit === root || root.contains(hit),
     inViewport: rect.top >= -1 && rect.left >= -1 && rect.bottom <= innerHeight + 1 && rect.right <= innerWidth + 1 }
 }
@@ -181,7 +217,8 @@ async function main() {
   const persist = () => fs.writeFileSync(reportFile, JSON.stringify({ ...report, elapsedMs: Date.now() - started }, null, 2))
   const fail = error => {
     if (quitting) return
-    quitting = true; report.status = 'failed'; report.error = String(error.message || error); persist()
+    quitting = true; report.status = 'failed'; report.error = String(error.message || error)
+    report.errorDetails = failureDetails(error); persist()
     // Failure is never reported as a clean successful lifecycle.
     app.exit(1)
   }
@@ -291,12 +328,14 @@ async function main() {
       await click(selector)
       await until(() => selectState(id), state => !state.expanded && state.value === value, id + ' selected value')
     }
-    const capture = async (scene, suffix) => {
+    const capture = async (scene, suffix, diagnostic = false) => {
       const image = await win.capturePage(), bytes = image.toPNG(), decoded = nativeImage.createFromBuffer(bytes)
       assert.ok(!decoded.isEmpty() && bytes.length > 100, 'Native PNG required')
       const name = scene.name + '-' + suffix + '.png'
       fs.writeFileSync(path.join(output, name), bytes, { flag: 'wx' })
-      scene.images.push({ name, bytes: bytes.length, sha256: hash(bytes), ...decoded.getSize() }); persist()
+      const receipt = { name, bytes: bytes.length, sha256: hash(bytes), ...decoded.getSize() }
+      if (!diagnostic) scene.images.push(receipt)
+      persist(); return receipt
     }
     for (const theme of ['light', 'dark']) for (const [width, height] of VIEWPORTS) {
       const scene = { name: `${theme}-${width}x${height}`, theme, requested: [width, height], complete: false,
@@ -321,7 +360,14 @@ async function main() {
           if (passwordIcon) { assert.equal(kind, 'select'); await inputKey('Tab') }
           const id = `${density}-${kind}`
           const focused = await until(() => readFocus(id), sample => sample.focused && sample.focusVisible, id + ' keyboard focus')
-          verifyFocus(focused); scene.focus.push(focused)
+          await recordFocusEvidence(scene, focused, persist, async () => {
+            const image = await capture(scene, id + '-focus-failure', true)
+            // A later paint observation is diagnostic only. The first sample
+            // and its failed assertion remain authoritative and still throw.
+            try { scene.focusFailure.afterCapture = await readFocus(id) }
+            catch (error) { scene.focusFailure.afterCaptureError = failureDetails(error) }
+            return image
+          })
         }
         await capture(scene, density + '-focus')
       }
@@ -405,7 +451,7 @@ async function main() {
   } catch (error) { fail(error) }
 }
 
-module.exports = { verifyGeometry, verifyFocus, verifyScenes, hasVisibleBoxShadow, HEIGHTS, VIEWPORTS, BUDGET_MS }
+module.exports = { verifyGeometry, verifyFocus, verifyScenes, hasVisibleBoxShadow, HEIGHTS, VIEWPORTS, BUDGET_MS, failureDetails, recordFocusEvidence }
 // Electron 31's ESM default_app imports the CLI file, so require.main does not
 // identify it. Only the actual browser-process CLI entry may start this runner;
 // importing the exported evidence helpers must remain side-effect free.
