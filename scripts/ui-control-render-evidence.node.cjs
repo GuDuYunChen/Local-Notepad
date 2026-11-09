@@ -211,3 +211,61 @@ test('successful focus recording preserves the sample and adds no failure screen
   assert.equal(scene.focus[0], sample); assert.equal(writes, 1); assert.equal(captures, 0)
   assert.equal('focusFailure' in scene, false); assert.deepEqual(scene.images, [])
 })
+
+const { captureMatchedFocusStyles } = require('./check-ui-control-render.cjs')
+test('queries only the failing node through the existing debugger and preserves complete CSS responses', async () => {
+  const calls = [], saved = []
+  const matched = { matchedCSSRules: [{ matchingSelectors: [0], rule: { origin: 'regular', selectorList: { text: '.button:focus-visible' },
+    style: { cssProperties: [{ name: 'outline', value: 'var(--focus)', parsedOk: false, important: true, disabled: false, implicit: false },
+      { name: 'color', value: 'red' }], shorthandEntries: [{ name: 'outline', value: 'var(--focus)' }] }, layers: [{ text: 'controls' }] } }],
+    inherited: [{ matchedCSSRules: [], inlineStyle: { cssProperties: [{ name: '--focus', value: '3px solid red' }] } }] }
+  const computed = { computedStyle: [{ name: 'outline-width', value: '0px' }, { name: 'transition-duration', value: '0s' }] }
+  const session = { async sendCommand(method, parameters) {
+    calls.push({ method, parameters })
+    if (method === 'DOM.getDocument') return { root: { nodeId: 1 } }
+    if (method === 'DOM.querySelector') return { nodeId: 7 }
+    return method === 'CSS.getMatchedStylesForNode' ? matched : method === 'CSS.getComputedStyleForNode' ? computed : {}
+  } }
+  const result = await captureMatchedFocusStyles(session, 'ordinary-button', (kind, value) => { saved.push({ kind, value }); return { name: kind + '.json' } })
+  assert.deepEqual(calls, [{ method: 'DOM.enable', parameters: undefined }, { method: 'CSS.enable', parameters: undefined },
+    { method: 'DOM.getDocument', parameters: { depth: 0 } }, { method: 'DOM.querySelector', parameters: { nodeId: 1, selector: '[id="ordinary-button"]' } },
+    { method: 'CSS.getMatchedStylesForNode', parameters: { nodeId: 7 } }, { method: 'CSS.getComputedStyleForNode', parameters: { nodeId: 7 } }])
+  assert.equal(saved[0].value.response, matched); assert.equal(saved[1].value.response, computed)
+  assert.equal(result.nodeId, 7); assert.deepEqual(result.errors, [])
+  assert.deepEqual(Object.keys(result.artifacts), ['matched', 'computed'])
+})
+
+test('a failed CSS diagnostic preserves the original focus assertion and still retains the independent computed response', async () => {
+  const sample = focus(); sample.outlines = []
+  const scene = { complete: false, focus: [], images: [] }, calls = []
+  const session = { async sendCommand(method) {
+    calls.push(method)
+    if (method === 'DOM.getDocument') return { root: { nodeId: 1 } }
+    if (method === 'DOM.querySelector') return { nodeId: 7 }
+    if (method === 'CSS.getMatchedStylesForNode') throw Error('CSS diagnostic unavailable')
+    return { computedStyle: [] }
+  } }
+  await assert.rejects(recordFocusEvidence(scene, sample, () => {}, async () => {
+    scene.focusFailure.styles = await captureMatchedFocusStyles(session, sample.id, kind => ({ name: kind + '.json' }))
+    return { name: 'original-failure.png' }
+  }), error => error.actual === 0 && error.expected === 1 && /exactly one/.test(error.message))
+  assert.equal(calls.at(-1), 'CSS.getComputedStyleForNode')
+  assert.equal(scene.focusFailure.styles.errors[0].command, 'CSS.getMatchedStylesForNode')
+  assert.equal(scene.focusFailure.styles.errors[0].message, 'CSS diagnostic unavailable')
+  assert.equal(scene.focusFailure.styles.artifacts.computed.name, 'computed.json')
+  assert.equal(scene.focusFailure.image.name, 'original-failure.png'); assert.equal(scene.complete, false)
+})
+
+test('missing focus nodes or artifact write failures remain separate diagnostics with no CSS mutation', async () => {
+  const calls = []
+  const missing = await captureMatchedFocusStyles({ async sendCommand(method) {
+    calls.push(method); return method === 'DOM.getDocument' ? { root: { nodeId: 1 } } : { nodeId: 0 }
+  } }, 'ordinary-button', () => { throw Error('Must not write for a missing node') })
+  assert.equal(calls.at(-1), 'DOM.querySelector'); assert.deepEqual(missing.artifacts, {})
+  assert.match(missing.errors[0].message, /no longer present/)
+  const failedWrite = await captureMatchedFocusStyles({ async sendCommand(method) {
+    return method === 'DOM.getDocument' ? { root: { nodeId: 1 } } : { nodeId: 7 }
+  } }, 'ordinary-button', () => { throw Error('Diagnostic write failed') })
+  assert.deepEqual(failedWrite.errors.map(error => error.stage), ['write', 'write'])
+  assert.deepEqual(failedWrite.artifacts, {})
+})

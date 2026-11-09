@@ -73,6 +73,45 @@ async function recordFocusEvidence(scene, sample, persist, captureFailure) {
   }
 }
 
+async function captureMatchedFocusStyles(debuggerSession, id, writeArtifact) {
+  const result = { id, selector: '[id=' + JSON.stringify(id) + ']', nodeId: null, artifacts: {}, errors: [] }
+  let command = 'DOM.enable'
+  try {
+    await debuggerSession.sendCommand(command)
+    command = 'CSS.enable'; await debuggerSession.sendCommand(command)
+    command = 'DOM.getDocument'; const { root } = await debuggerSession.sendCommand(command, { depth: 0 })
+    command = 'DOM.querySelector'
+    const { nodeId } = await debuggerSession.sendCommand(command, { nodeId: root.nodeId, selector: result.selector })
+    if (!nodeId) throw Error('Original failing focus node is no longer present')
+    result.nodeId = nodeId
+  } catch (error) { result.errors.push({ command, ...failureDetails(error) }); return result }
+  // One failing node only. Preserve the complete responses, including parsedOk,
+  // shorthand, priority and inherited rules, without fetching whole stylesheets.
+  for (const [kind, method] of [['matched', 'CSS.getMatchedStylesForNode'], ['computed', 'CSS.getComputedStyleForNode']]) {
+    let stage = 'read'
+    try {
+      const response = await debuggerSession.sendCommand(method, { nodeId: result.nodeId })
+      stage = 'write'
+      result.artifacts[kind] = writeArtifact(kind, { id, nodeId: result.nodeId, method, response })
+    } catch (error) { result.errors.push({ command: method, stage, ...failureDetails(error) }) }
+  }
+  return result
+}
+
+function focusAnimationSnapshot(id) {
+  const element = document.getElementById(id)
+  if (!element) throw Error('Original failing focus node is no longer present')
+  const css = getComputedStyle(element)
+  return { id, activeElement: document.activeElement?.id, sampledAt: performance.now(),
+    computed: Object.fromEntries(['outline', 'outline-width', 'outline-style', 'outline-color', 'outline-offset',
+      'transition-property', 'transition-duration', 'transition-delay', 'transition-timing-function',
+      'animation-name', 'animation-duration', 'animation-delay', 'animation-fill-mode', 'animation-play-state'].map(name => [name, css.getPropertyValue(name)])),
+    animations: element.getAnimations().map(animation => ({ type: animation.constructor.name, id: animation.id,
+      playState: animation.playState, pending: animation.pending, currentTime: animation.currentTime, startTime: animation.startTime,
+      playbackRate: animation.playbackRate, transitionProperty: animation.transitionProperty, animationName: animation.animationName,
+      timing: animation.effect?.getComputedTiming(), keyframes: animation.effect?.getKeyframes() })) }
+}
+
 // Computed CSS can retain a colored zero-size shadow when an official token
 // disables its outline. Ignore only definitely unpainted layers; unknown or
 // nonzero geometry remains evidence, so a real second cue cannot pass silently.
@@ -361,6 +400,14 @@ async function main() {
           const id = `${density}-${kind}`
           const focused = await until(() => readFocus(id), sample => sample.focused && sample.focusVisible, id + ' keyboard focus')
           await recordFocusEvidence(scene, focused, persist, async () => {
+            scene.focusFailure.styles = await captureMatchedFocusStyles(win.webContents.debugger, id, (kind, response) => {
+              const name = `${scene.name}-${id}-focus-${kind}.json`, bytes = Buffer.from(JSON.stringify(response))
+              fs.writeFileSync(path.join(output, name), bytes, { flag: 'wx' })
+              return { name, bytes: bytes.length, sha256: hash(bytes) }
+            }); persist()
+            try { scene.focusFailure.animations = await evaluate(focusAnimationSnapshot, id) }
+            catch (error) { scene.focusFailure.animationError = failureDetails(error) }
+            persist()
             const image = await capture(scene, id + '-focus-failure', true)
             // A later paint observation is diagnostic only. The first sample
             // and its failed assertion remain authoritative and still throw.
@@ -451,7 +498,7 @@ async function main() {
   } catch (error) { fail(error) }
 }
 
-module.exports = { verifyGeometry, verifyFocus, verifyScenes, hasVisibleBoxShadow, HEIGHTS, VIEWPORTS, BUDGET_MS, failureDetails, recordFocusEvidence }
+module.exports = { verifyGeometry, verifyFocus, verifyScenes, hasVisibleBoxShadow, HEIGHTS, VIEWPORTS, BUDGET_MS, failureDetails, recordFocusEvidence, captureMatchedFocusStyles }
 // Electron 31's ESM default_app imports the CLI file, so require.main does not
 // identify it. Only the actual browser-process CLI entry may start this runner;
 // importing the exported evidence helpers must remain side-effect free.
