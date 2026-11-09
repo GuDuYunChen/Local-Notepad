@@ -1,4 +1,4 @@
-import React, { Children, Fragment, forwardRef, isValidElement, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import React, { Children, Fragment, forwardRef, isValidElement, useEffect, useId, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Button, Input, Select, ConfigProvider } from 'antd'
 import './control-kit.css'
 const quietWave = { disabled: true }
@@ -94,6 +94,11 @@ const normalValue = value => Array.isArray(value) ? value.map(String) : value ==
 export const UiSelect = forwardRef(function UiSelect({ className = '', style, size, density, onChange, onInput, options, children, multiple = false,
   value, defaultValue, disabled = false, name, form, required = false, id, onKeyDown, onInputKeyDown, onOpenChange, onDropdownVisibleChange,
   open: requestedOpen, showSearch, getPopupContainer, ...props }, forwardedRef) {
+  // Own the ARIA identity instead of inheriting rc-util's shared test-id.
+  // This is the same real React identity in every environment, not a test path.
+  // Explicit caller IDs remain authoritative; IDs survive ordinary rerenders.
+  const generatedId = useId()
+  const selectId = id || `app-select-${generatedId}`
   const resolved = useMemo(() => normalOptions(options ?? selectOptions(children)), [options, children])
   const flat = useMemo(() => flatOptions(resolved), [resolved])
   const initial = () => normalValue(defaultValue ?? (multiple ? flat.filter(option => option.selected).map(option => option.value) : flat.find(option => option.selected)?.value ?? flat[0]?.value ?? ''))
@@ -149,7 +154,7 @@ export const UiSelect = forwardRef(function UiSelect({ className = '', style, si
   }
   return <ConfigProvider theme={controlTheme}><span ref={setNode} data-ui-control="select" data-ui-value={JSON.stringify(selected)} className={['app-ui-select-host', cleanControlClass(className)].filter(Boolean).join(' ')} style={style}
     onMouseDownCapture={activate} onClickCapture={activate} onKeyDownCapture={activate}>
-    <Select {...props} virtual={false} optionRender={option => <span data-ui-option-value={String(option.value)}>{option.label}</span>} ref={api} id={id} aria-required={required || undefined} value={selected} options={resolved} disabled={blocked}
+    <Select {...props} virtual={false} optionRender={option => <span data-ui-option-value={String(option.value)}>{option.label}</span>} ref={api} id={selectId} aria-required={required || undefined} value={selected} options={resolved} disabled={blocked}
       mode={multiple ? 'multiple' : undefined} size={controlSize(size, density, className)} status={errorStatus(props)} className="app-ui-select"
       showSearch={showSearch ?? flat.length > 12} optionFilterProp="label" open={blocked ? false : open} onOpenChange={changeOpen} onChange={change} onInputKeyDown={key}
       getPopupContainer={getPopupContainer || (trigger => trigger.closest('[role="dialog"], [role="alertdialog"]') || trigger.ownerDocument.body)} />

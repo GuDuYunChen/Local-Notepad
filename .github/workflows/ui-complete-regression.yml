@@ -18,6 +18,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}
+          fetch-depth: 2
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
@@ -30,7 +31,47 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Verify manifest and lock unchanged
         run: git diff --exit-code -- package.json package-lock.json
+      - name: Preserve exact source and installed tooling for offline reproduction
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p test-results/ui-reproduction
+          git archive --format=tar HEAD | gzip > test-results/ui-reproduction/source.tar.gz
+          git rev-parse HEAD > test-results/ui-reproduction/commit.txt
+          git rev-parse HEAD^{tree} > test-results/ui-reproduction/tree.txt
+          cp package.json package-lock.json test-results/ui-reproduction/
+          tar -czf test-results/ui-reproduction/node-modules.tar.gz node_modules
+          node -e "console.log(JSON.stringify({node:process.version,platform:process.platform,arch:process.arch,antd:require('antd/package.json').version}))" > test-results/ui-reproduction/tooling.json
+          (cd test-results/ui-reproduction && sha256sum source.tar.gz node-modules.tar.gz package.json package-lock.json tooling.json commit.txt tree.txt > SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ui-reproduction-${{ github.sha }}
+          path: test-results/ui-reproduction/
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 7
+      - name: Prove the new ownership tests reject the previous shared identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p test-results/ui-complete-regression
+          baseline=985a891519b9be32a033b3ee1bb888f4825169a5
+          git cat-file -e "$baseline" 2>/dev/null || git fetch --depth=1 origin "$baseline"
+          file=src/components/ui/ControlKit.jsx
+          backup=$(mktemp)
+          cp "$file" "$backup"
+          trap 'cp "$backup" "$file"; rm -f "$backup"' EXIT
+          git show "$baseline:$file" > "$file"
+          set +e
+          npx --no-install vitest run --root=. src/components/ui/ControlKit.identity.test.jsx --reporter=json --outputFile=test-results/ui-complete-regression/identity-negative.json > test-results/ui-complete-regression/identity-negative.log 2>&1
+          result=$?
+          set -e
+          test "$result" -eq 1
+          node --input-type=module -e "import fs from 'node:fs';const r=JSON.parse(fs.readFileSync('test-results/ui-complete-regression/identity-negative.json'));if(r.numTotalTests!==4||r.numFailedTests<1||r.numPendingTests!==0)throw Error('Expected a complete, failing four-test negative control');console.log(JSON.stringify({negativeControl:true,tests:r.numTotalTests,failed:r.numFailedTests}));"
+          cp "$backup" "$file"
+          git diff --exit-code -- "$file"
       - name: Run full migrated candidate without filtering or stopping after first failure
+        if: ${{ !cancelled() }}
         run: node scripts/run-ui-complete-regression.mjs
       - name: Preserve original results and source identity
         if: always()

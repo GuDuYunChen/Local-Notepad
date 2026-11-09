@@ -100,7 +100,7 @@ describe('explicit local review archives', () => {
     await act(async () => root.render(<ProjectEntityEvidencePanel projectId="p1" entityId="index:char-a" intelligence={data.intelligence} projectMeta={data.meta} onOpenFile={vi.fn()} />))
     await click(button('恢复此存档')); await click(button('恢复并重新核对'))
     expect(uiValue(byLabel('实体证据来源筛选'))).toBe('alias')
-    expect(byLabel('实体证据卷筛选').value).toBe(JSON.stringify(''))
+    expect(uiValue(byLabel('实体证据卷筛选'))).toBe(JSON.stringify(''))
     expect(byLabel('正文证据章节 13')).toBeTruthy()
     expect(container.querySelector('.project-entity-evidence-pagination').textContent).toContain('第 3 / 3 页')
   })
