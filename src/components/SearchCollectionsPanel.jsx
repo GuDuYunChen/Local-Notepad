@@ -26,7 +26,7 @@ export default function SearchCollectionsPanel({ model, onOpenFile }) {
   return <section className="search-collections" aria-label="本地检索资料集">
     <header><h3>本地资料集</h3><p>保存的是当时的笔记清单，不是正文备份。重开查看历史元数据；复查按原来的固定检索范围读取当前数据。</p></header>
     <div className="search-collections-tools">
-      <label>已保存资料集<UiSelect size="middle" className="ui-control" ref={selectRef} aria-label="已保存资料集" value={selected?.key || ''} disabled={locked} onChange={event => model.choose(event.target.value)} options={[{value:"",label:"选择资料集",disabled:true},...shelf.entries.map((entry,index)=>({value:entry.key,label:entry.collection?`${entry.collection.name} · ${entry.collection.report.count} 篇`:`不可读取的资料集 ${index+1}`}))]}/>{/* collection choices are rendered by the shared Select */}</label>
+      <label>已保存资料集<UiSelect size="middle" className="ui-control" ref={selectRef} aria-label="已保存资料集" value={selected?.key || ''} disabled={locked} onChange={event => model.choose(event.target.value)} options={[{value:"",label:"选择资料集"},...shelf.entries.map((entry,index)=>({value:entry.key,label:entry.collection?`${entry.collection.name} · ${entry.collection.report.count} 篇`:`不可读取的资料集 ${index+1}`}))]}/>{/* collection choices are rendered by the shared Select */}</label>
       <UiButton size="middle" type="button" onClick={model.refresh} disabled={locked}>刷新资料集</UiButton>
       <UiButton size="middle" type="button" disabled={locked || !collection || !!shelf.error} onClick={() => void model.inspect()}>检查当前变化</UiButton>
       <UiButton size="middle" type="button" disabled={locked || !collection || !!shelf.error} onClick={model.export}>备份此资料集 JSON</UiButton>

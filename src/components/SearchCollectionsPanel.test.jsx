@@ -5,6 +5,7 @@ import GlobalSearchPanel from './GlobalSearchPanel';
 import { searchLibrary } from '~/services/globalSearch';
 import { collectSearchResultReport } from '~/services/searchResultExport';
 import { searchCollections, SEARCH_COLLECTION_PREFIX } from '~/services/searchCollections';
+import { openUiSelect } from '~/test/uiControlDriver';
 vi.mock('~/services/globalSearch', async (original) => ({ ...(await original()), searchLibrary: vi.fn() }));
 const item = (i) => ({ id: 'n' + i, title: '章节 ' + i, folder_path: '旧卷', updated_at: 1, is_pinned: false, title_match: false, body_count: 0, content_sha256: 'a'.repeat(64), snippets: [] });
 const data = (number = 1, rows = Array.from({ length: 23 }, (_, i) => item(i)), patch = {}) => ({ query: '', items: rows.slice((number - 1) * 20, number * 20), folders: [], total: rows.length, total_occurrences: 0, scanned: rows.length, unsupported: 0, page: number, pages: Math.max(1, Math.ceil(rows.length / 20)), page_size: 20, revision: 'b'.repeat(64), ...patch });
@@ -196,4 +197,34 @@ it('opening guard revalidates the source after the user has been shown save conf
   onOpenFile.mockImplementation(() => new Promise((resolve) => finish = resolve));await click(uiQuery(label('资料集条目 n0'), 'button'));
   const options = onOpenFile.mock.calls[0][1];expect(options.shouldSelect()).toBe(true);localStorage.removeItem(key);
   expect(options.shouldSelect()).toBe(false);await act(async () => finish(false));expect(onOpened).not.toHaveBeenCalled();
+});
+
+it('choosing the empty collection option clears the selection and filters without changing stored bytes', async () => {
+  const key = await seed();localStorage.setItem('unrelated-collection-preference', 'retain these bytes');
+  await render();await select(key);
+  await change(label('搜索资料集条目'), '章节 1');
+  await change(label('资料集变化筛选'), 'historical');
+  await click(button('资料集下一页'));expect(label('资料集条目 n17')).toBeTruthy();
+  const storageBytes = () => Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index)).sort()
+    .map(name => [name, localStorage.getItem(name)]);
+  const before = storageBytes();
+
+  const popup = await openUiSelect(label('已保存资料集'));
+  const emptyOption = popup.querySelector('[data-ui-option-value=""]');
+  expect(emptyOption).toBeTruthy();await click(emptyOption);
+  expect(uiValue(label('已保存资料集'))).toBe('');
+  expect(label('搜索资料集条目')).toBeNull();expect(label('资料集变化筛选')).toBeNull();
+  expect(label('资料集条目 n17')).toBeNull();expect(label('资料集分页')).toBeNull();
+  expect(uiDisabled(button('检查当前变化'))).toBe(true);
+  expect(uiDisabled(button('备份此资料集 JSON'))).toBe(true);
+  expect(uiDisabled(button('删除此资料集'))).toBe(true);
+  expect(storageBytes()).toEqual(before);expect(onOpenFile).not.toHaveBeenCalled();
+
+  await change(label('已保存资料集'), key);
+  expect(uiValue(label('已保存资料集'))).toBe(key);
+  expect(uiValue(label('搜索资料集条目'))).toBe('');
+  expect(uiValue(label('资料集变化筛选'))).toBe('all');
+  expect(uiText(label('资料集分页'))).toContain('第 1 / 3 页');
+  expect(label('资料集条目 n0')).toBeTruthy();
+  expect(storageBytes()).toEqual(before);expect(onOpenFile).not.toHaveBeenCalled();
 });
