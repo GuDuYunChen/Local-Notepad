@@ -16,7 +16,30 @@ const selectors = {
   pinned: ['.pinned-tools input[aria-label="查找置顶笔记"]', '.pinned-tools [role="combobox"][aria-label="置顶显示范围"]', '.pinned-tools [role="combobox"][aria-label="置顶笔记排序"]', '.pinned-tools button.pinned-clear'],
 }
 
-function focusObservation(selector, shadowVisible) {
+// CSS Overflow 3 viewport propagation is distinct from an element's own clip.
+// Keep this helper self-contained: the real page executes its serialized bytes.
+export function uiScreenViewportOverflow() {
+  const root = document.documentElement, body = document.body
+  const rootCss = getComputedStyle(root), bodyCss = body && getComputedStyle(body)
+  const htmlNamespace = 'http://www.w3.org/1999/xhtml'
+  const firstBody = [...root.children].find(node => node.namespaceURI === htmlNamespace && node.localName === 'body')
+  const uncontained = css => css?.contain === 'none' && css.contentVisibility === 'visible'
+  const bodyPropagated = root.namespaceURI === htmlNamespace && root.localName === 'html' && body && body === firstBody &&
+    rootCss.display !== 'none' && bodyCss.display !== 'none' && rootCss.overflowX === 'visible' && rootCss.overflowY === 'visible' &&
+    uncontained(rootCss) && uncontained(bodyCss)
+  const width = root.clientWidth, height = root.clientHeight
+  if (!Number.isFinite(width) || width <= 0 || !Number.isFinite(height) || height <= 0) throw Error('Actual viewport client dimensions are required')
+  return { width, height, clip(node) {
+    if (node === root || (bodyPropagated && node === body)) return null
+    for (const name of ['clientLeft', 'clientTop', 'clientWidth', 'clientHeight']) {
+      if (!Number.isFinite(node[name]) || node[name] < 0) throw Error('Actual clipping client dimensions are required')
+    }
+    const bounds = node.getBoundingClientRect(), left = bounds.left + node.clientLeft, top = bounds.top + node.clientTop
+    return { left, top, right: left + node.clientWidth, bottom: top + node.clientHeight }
+  } }
+}
+
+export function focusObservation(selector, shadowVisible, readViewportOverflow) {
   const elements = [...document.querySelectorAll(selector)].filter(node => node.getBoundingClientRect().width > 0)
   if (elements.length !== 1) throw Error('Expected one visible focus target')
   const field = elements[0], root = field.closest('.ant-input-affix-wrapper, .ant-select') || field
@@ -31,32 +54,33 @@ function focusObservation(selector, shadowVisible) {
       if (entry.visible) shadows.push(entry)
     }
   }
-  let visible = rect.top >= -1 && rect.left >= -1 && rect.bottom <= innerHeight + 1 && rect.right <= innerWidth + 1
+  const viewport = readViewportOverflow()
+  let visible = rect.top >= -1 && rect.left >= -1 && rect.bottom <= viewport.height + 1 && rect.right <= viewport.width + 1
   for (let parent = root.parentElement; parent; parent = parent.parentElement) {
-    const css = getComputedStyle(parent), box = parent.getBoundingClientRect()
-    if (/hidden|auto|scroll|clip/.test(css.overflowY)) visible &&= rect.top >= box.top - 1 && rect.bottom <= box.bottom + 1
-    if (/hidden|auto|scroll|clip/.test(css.overflowX)) visible &&= rect.left >= box.left - 1 && rect.right <= box.right + 1
+    const css = getComputedStyle(parent), box = viewport.clip(parent)
+    if (box && /hidden|auto|scroll|clip/.test(css.overflowY)) visible &&= rect.top >= box.top - 1 && rect.bottom <= box.bottom + 1
+    if (box && /hidden|auto|scroll|clip/.test(css.overflowX)) visible &&= rect.left >= box.left - 1 && rect.right <= box.right + 1
   }
   const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)
   return { selector, focused: document.activeElement === field, focusVisible: field.matches(':focus-visible'),
     inViewport: visible, hit: hit === root || root.contains(hit), outlines, shadows, shadowStyles }
 }
 
-function pageObservation({ page, definitions, region }) {
+export function pageObservation({ page, definitions, region }, readViewportOverflow) {
   const areas = [...document.querySelectorAll(region)]
   if (areas.length !== 1) throw Error('Actual page region missing or ambiguous')
-  const area = areas[0]
+  const area = areas[0], viewport = readViewportOverflow()
   const controls = definitions.map(({ id, selector, kind }) => {
     const elements = [...document.querySelectorAll(selector)].filter(node => node.getBoundingClientRect().width > 0)
     if (elements.length !== 1) throw Error('Missing or ambiguous actual page control: ' + id)
     const field = elements[0], root = field.closest('.ant-input-affix-wrapper, .ant-select') || field
     const box = root.getBoundingClientRect(), ancestors = []
-    let inViewport = box.left >= -1 && box.top >= -1 && box.right <= innerWidth + 1 && box.bottom <= innerHeight + 1
+    let inViewport = box.left >= -1 && box.top >= -1 && box.right <= viewport.width + 1 && box.bottom <= viewport.height + 1
     for (let node = root; node; node = node.parentElement) {
-      const css = getComputedStyle(node), bounds = node.getBoundingClientRect()
+      const css = getComputedStyle(node), bounds = viewport.clip(node)
       ancestors.push({ tag: node.tagName, className: String(node.className), display: css.display, visibility: css.visibility, opacity: css.opacity })
-      if (node !== root && /hidden|auto|scroll|clip/.test(css.overflowY)) inViewport &&= box.top >= bounds.top - 1 && box.bottom <= bounds.bottom + 1
-      if (node !== root && /hidden|auto|scroll|clip/.test(css.overflowX)) inViewport &&= box.left >= bounds.left - 1 && box.right <= bounds.right + 1
+      if (node !== root && bounds && /hidden|auto|scroll|clip/.test(css.overflowY)) inViewport &&= box.top >= bounds.top - 1 && box.bottom <= bounds.bottom + 1
+      if (node !== root && bounds && /hidden|auto|scroll|clip/.test(css.overflowX)) inViewport &&= box.left >= bounds.left - 1 && box.right <= bounds.right + 1
     }
     const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)
     const sample = { id, kind, selector, owner: region, fieldTag: field.tagName, fieldId: field.id, rootTag: root.tagName, rootId: root.id,
@@ -203,7 +227,7 @@ export async function verifyUiScreensDesktop({ evaluate, click, cdp, until, api,
     assert.equal(reached, true, 'Native Tab did not reach the actual control')
     await frame()
     const sample = await until(async () => {
-      const observation = await evaluate(`(${focusObservation.toString()})(${q(selector)},${hasVisibleBoxShadow.toString()})`)
+      const observation = await evaluate(`(${focusObservation.toString()})(${q(selector)},${hasVisibleBoxShadow.toString()},${uiScreenViewportOverflow.toString()})`)
       return observation.focused && observation.focusVisible && observation
     }, 'Keyboard focus observation')
     validateUiScreenFocus(sample)
@@ -316,7 +340,7 @@ export async function verifyUiScreensDesktop({ evaluate, click, cdp, until, api,
               { id: 'endpoint', kind: 'input', selector: 'input[aria-label="WebDAV 端点"]' },
               { id: 'username', kind: 'input', selector: 'input[aria-label="WebDAV 用户名"]' },
               { id: 'password', kind: 'password', selector: selectors.password },
-            ] })})`)
+            ] })},${uiScreenViewportOverflow.toString()})`)
             Object.assign(scene, await readPage()); scene.capture = {}
             scene.screenshot = await captureUiScreenPage({ capture, filename: scene.name + '.png', read: readPage, observed: scene, record: scene.capture })
             await closeSettings()
@@ -325,7 +349,7 @@ export async function verifyUiScreensDesktop({ evaluate, click, cdp, until, api,
             const [first, second] = ui.setup.collections
             await select.choose(selectors.collection, first.key)
             scene.focus.push(await nativeFocus(selectors.collection))
-            Object.assign(scene, await evaluate(`(${pageObservation.toString()})(${q({ page, region: '.search-collections', definitions: [{ id: 'saved-collection', kind: 'select', selector: selectors.collection }] })})`))
+            Object.assign(scene, await evaluate(`(${pageObservation.toString()})(${q({ page, region: '.search-collections', definitions: [{ id: 'saved-collection', kind: 'select', selector: selectors.collection }] })},${uiScreenViewportOverflow.toString()})`))
             const control = await select.inspect(selectors.collection)
             const target = '[data-ui-control="select"]:has([role="combobox"][id=' + q(control.inputId) + '])'
             await click(target)
@@ -392,7 +416,7 @@ export async function verifyUiScreensDesktop({ evaluate, click, cdp, until, api,
             for (const selector of selectors.pinned) scene.focus.push(await nativeFocus(selector))
             await evaluate("document.querySelector('.pinned-tools').scrollIntoView({block:'center',inline:'nearest',behavior:'instant'})")
             await frame()
-            const readPage = () => evaluate(`(${pageObservation.toString()})(${q({ page, region: '.pinned-workspace', definitions: selectors.pinned.map((selector, index) => ({ id: ['query', 'scope', 'order', 'clear'][index], kind: ['input', 'select', 'select', 'button'][index], selector })) })})`)
+            const readPage = () => evaluate(`(${pageObservation.toString()})(${q({ page, region: '.pinned-workspace', definitions: selectors.pinned.map((selector, index) => ({ id: ['query', 'scope', 'order', 'clear'][index], kind: ['input', 'select', 'select', 'button'][index], selector })) })},${uiScreenViewportOverflow.toString()})`)
             Object.assign(scene, await readPage()); scene.capture = {}
             scene.screenshot = await captureUiScreenPage({ capture, filename: scene.name + '.png', read: readPage, observed: scene, record: scene.capture })
             await click({ selector: '.pinned-header button', text: '返回笔记' })

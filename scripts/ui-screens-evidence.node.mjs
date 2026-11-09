@@ -316,3 +316,107 @@ test('ordinary capture refuses an omitted guard and preserves the original captu
     capture: async (filename, guard) => { await guard(); throw failure } }), error => error === failure)
   assert.equal(record.complete, false); assert.equal(record.after, undefined)
 })
+
+// Execute the exact browser-serialized observers with explicit geometry. This
+// is a pure observation contract, not a substitute for installed native pages.
+import vm from 'node:vm'
+import * as pageObservers from './check-ui-screens-desktop.mjs'
+
+function overflowObservationFixture(options = {}) {
+  const rect = (left, top, width, height) => ({ left, top, right: left + width, bottom: top + height, width, height })
+  const style = extra => ({ display: 'block', visibility: 'visible', opacity: '1', overflowX: 'visible', overflowY: 'visible',
+    contain: 'none', contentVisibility: 'visible', outlineStyle: 'none', outlineWidth: '0px', outlineColor: 'rgb(0, 0, 0)', boxShadow: 'none', ...extra })
+  const node = (tag, bounds, css = {}, metrics = {}) => ({ tagName: tag.toUpperCase(), localName: tag, namespaceURI: 'http://www.w3.org/1999/xhtml',
+    className: '', id: '', children: [], parentElement: null, dataset: {}, css: style(css),
+    clientLeft: 0, clientTop: 0, clientWidth: bounds.width, clientHeight: bounds.height, scrollWidth: bounds.width,
+    ...metrics, getBoundingClientRect: () => ({ ...bounds }), closest: () => null, querySelectorAll: () => [],
+    contains(other) { for (let current = other; current; current = current.parentElement) if (current === this) return true; return false },
+    matches(selector) { return selector === ':focus-visible' } })
+  const root = node('html', options.rootBounds || rect(0, -700, 704, 455), options.rootStyle,
+    { clientWidth: options.clientWidth ?? 696, clientHeight: 455, scrollWidth: options.clientWidth ?? 696 })
+  const body = node('body', options.bodyBounds || rect(0, -700, 696, 455), { overflowX: 'auto', overflowY: 'auto', ...options.bodyStyle })
+  const area = node('section', rect(16, 40, 664, 240))
+  const clip = node('div', options.clipBounds || rect(0, 0, 696, 455), options.clipStyle, options.clipMetrics)
+  const field = node('input', options.fieldBounds || rect(16, 82.5, 664, 40), { outlineStyle: 'solid', outlineWidth: '2px' })
+  field.id = 'observed-input'
+  for (const [parent, child] of [[root, body], [body, area], [area, clip], [clip, field]]) { parent.children.push(child); child.parentElement = parent }
+  if (options.rootNamespace) root.namespaceURI = options.rootNamespace
+  if (options.firstBodyIsDifferent) {
+    const first = node('body', rect(0, 0, 696, 455)); first.parentElement = root; root.children.unshift(first)
+  }
+  root.dataset.theme = 'light'
+  const document = { documentElement: root, body, compatMode: 'CSS1Compat', activeElement: field,
+    querySelectorAll: selector => selector === '.observed-page' ? [area] : selector === '#observed-input' ? [field] : [],
+    elementFromPoint: () => field }
+  return { document, getComputedStyle: element => element.css, innerWidth: 704, innerHeight: 455, devicePixelRatio: 1 }
+}
+
+function readSerializedOverflowObservation(kind, options) {
+  const context = overflowObservationFixture(options)
+  const viewport = pageObservers.uiScreenViewportOverflow?.toString() || 'undefined'
+  const expression = kind === 'page'
+    ? `(${pageObservers.pageObservation.toString()})({page:'webdav',region:'.observed-page',definitions:[{id:'endpoint',kind:'input',selector:'#observed-input'}]},${viewport})`
+    : `(${pageObservers.focusObservation.toString()})('#observed-input',()=>false,${viewport})`
+  const result = vm.runInNewContext(expression, context)
+  return kind === 'page' ? result.controls[0] : result
+}
+
+test('serialized page and focus observers do not clip a scrolled viewport-propagated body box', () => {
+  for (const overflow of ['auto', 'hidden']) for (const kind of ['page', 'focus']) {
+    const observed = readSerializedOverflowObservation(kind, { bodyStyle: { overflowX: overflow, overflowY: overflow } })
+    assert.equal(observed.inViewport, true, kind + ' with viewport-owned body ' + overflow)
+    assert.equal(observed.hit, true)
+  }
+})
+
+test('serialized page and focus observers apply root overflow to the viewport instead of its scrolled box', () => {
+  for (const kind of ['page', 'focus']) for (const overflow of ['auto', 'hidden']) {
+    const observed = readSerializedOverflowObservation(kind, {
+      rootStyle: { overflowX: overflow, overflowY: overflow }, bodyStyle: { overflowX: 'visible', overflowY: 'visible' },
+    })
+    assert.equal(observed.inViewport, true, kind + ' with root ' + overflow)
+  }
+})
+
+test('a body whose overflow was not propagated still clips its descendants', () => {
+  for (const kind of ['page', 'focus']) for (const rootStyle of [{ overflowX: 'hidden' }, { overflowY: 'auto' }]) {
+    assert.equal(readSerializedOverflowObservation(kind, { rootStyle }).inViewport, false)
+  }
+})
+
+test('containment and nonvisible or unknown content visibility preserve the actual body clipping box', () => {
+  for (const kind of ['page', 'focus']) for (const options of [
+    { rootStyle: { contain: 'paint' } }, { bodyStyle: { contain: 'layout' } },
+    { rootStyle: { contentVisibility: 'auto' } }, { bodyStyle: { contentVisibility: 'hidden' } },
+    { rootStyle: { contain: '' } }, { bodyStyle: { contentVisibility: '' } },
+  ]) assert.equal(readSerializedOverflowObservation(kind, options).inViewport, false)
+})
+
+test('the body propagation exception requires the actual first HTML body child', () => {
+  for (const kind of ['page', 'focus']) for (const options of [
+    { rootNamespace: 'http://www.w3.org/2000/svg' }, { firstBodyIsDifferent: true }, { bodyStyle: { display: 'none' } },
+  ]) assert.equal(readSerializedOverflowObservation(kind, options).inViewport, false)
+})
+
+test('serialized observers still reject real nested clipping at the client edge despite a center hit', () => {
+  for (const kind of ['page', 'focus']) {
+    const observed = readSerializedOverflowObservation(kind, {
+      rootBounds: { left: 0, top: 0, right: 704, bottom: 455, width: 704, height: 455 },
+      bodyBounds: { left: 0, top: 0, right: 696, bottom: 455, width: 696, height: 455 },
+      clipStyle: { overflowX: 'hidden', overflowY: 'hidden' }, clipMetrics: { clientLeft: 8, clientWidth: 660 },
+    })
+    assert.equal(observed.inViewport, false, kind + ' must include the clipped input edge')
+    assert.equal(observed.hit, true)
+  }
+})
+
+test('serialized observers use the actual viewport client area excluding its scrollbar strip', () => {
+  for (const kind of ['page', 'focus']) {
+    const observed = readSerializedOverflowObservation(kind, {
+      rootBounds: { left: 0, top: 0, right: 704, bottom: 455, width: 704, height: 455 },
+      bodyBounds: { left: 0, top: 0, right: 704, bottom: 455, width: 704, height: 455 },
+      fieldBounds: { left: 16, top: 82.5, right: 700, bottom: 122.5, width: 684, height: 40 },
+    })
+    assert.equal(observed.inViewport, false, kind + ' must not count scrollbar pixels as visible control pixels')
+  }
+})

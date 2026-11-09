@@ -16,6 +16,41 @@ export function withinActualClientPort(rect, bounds, metrics, overflowX, overflo
     (!/hidden|auto|scroll|clip/.test(overflowY) || (rect.top >= top - tolerance && rect.bottom <= top + metrics.clientHeight + tolerance))
 }
 
+// CSS Overflow viewport propagation changes the used clipping owner, while
+// getComputedStyle still reports the root/body declarations. Read that owner
+// once per native observation; real nested client ports remain independent.
+export function observeFullAppOverflowViewport() {
+  const root = document.documentElement, body = document.body
+  const read = node => {
+    if (!node) return null
+    const css = getComputedStyle(node), box = node.getBoundingClientRect()
+    return { tag: node.tagName, namespace: node.namespaceURI, display: css.display,
+      overflowX: css.overflowX, overflowY: css.overflowY, contain: css.contain, contentVisibility: css.contentVisibility,
+      rect: { left: box.left, top: box.top, right: box.right, bottom: box.bottom, width: box.width, height: box.height },
+      clientLeft: node.clientLeft, clientTop: node.clientTop, clientWidth: node.clientWidth, clientHeight: node.clientHeight }
+  }
+  const rootStyle = read(root), bodyStyle = read(body)
+  if (![root?.clientWidth, root?.clientHeight, innerWidth, innerHeight].every(value => Number.isFinite(value) && value > 0)) throw Error('Actual layout viewport metrics are required')
+  const html = node => node?.namespaceURI === 'http://www.w3.org/1999/xhtml'
+  const firstBody = [...root.children].find(node => html(node) && node.localName === 'body' && getComputedStyle(node).display !== 'none')
+  const rootPropagates = Boolean(rootStyle.display && rootStyle.display !== 'none')
+  const bodyPropagates = Boolean(rootPropagates && html(root) && root.localName === 'html' && body &&
+    body === firstBody && body.parentElement === root && bodyStyle.display && bodyStyle.display !== 'none' &&
+    rootStyle.overflowX === 'visible' && rootStyle.overflowY === 'visible' &&
+    rootStyle.contain === 'none' && bodyStyle.contain === 'none' &&
+    rootStyle.contentVisibility === 'visible' && bodyStyle.contentVisibility === 'visible')
+  const width = Math.min(innerWidth, root.clientWidth), height = Math.min(innerHeight, root.clientHeight)
+  const bounds = { left: 0, top: 0, right: width, bottom: height, width, height }
+  const propagated = node => (node === root && rootPropagates) || (node === body && bodyPropagates)
+  const usedViewport = value => value === 'visible' ? 'auto' : value === 'clip' ? 'hidden' : value
+  const source = bodyPropagates ? bodyStyle : rootStyle
+  return { bounds, record: { bounds, root: rootStyle, body: bodyStyle, rootPropagates, bodyPropagates,
+      viewportOverflowX: usedViewport(source.overflowX), viewportOverflowY: usedViewport(source.overflowY), compatMode: document.compatMode },
+    propagated, isViewportScroller: node => rootPropagates && node === document.scrollingElement,
+    viewportOverflowY: usedViewport(source.overflowY),
+    local: (node, css) => propagated(node) ? { x: 'visible', y: 'visible', viewportApplied: true } : { x: css.overflowX, y: css.overflowY, viewportApplied: false } }
+}
+
 export function finiteOwnerMotionActive(sample) {
   if (!sample || typeof sample.root !== 'string' || !Array.isArray(sample.animations)) throw Error('Actual owner motion sample is required')
   return sample.animations.some(animation => {
@@ -58,7 +93,8 @@ export async function waitForFiniteOwnerMotion(read, until, receipt = {}) {
 
 // This runs in the real App renderer. It observes existing nodes and CSS; it
 // does not mount a fixture, assign field values or alter application styling.
-export function observeFullAppPage({ root, anchors = [], editorExceptions = [], onlySelectors = [] }, withinClientPort) {
+export function observeFullAppPage({ root, anchors = [], editorExceptions = [], onlySelectors = [] }, withinClientPort, readOverflowViewport) {
+  const overflowViewport = readOverflowViewport(), viewport = overflowViewport.bounds
   const bounds = node => {
     const box = node.getBoundingClientRect()
     return { left: box.left, top: box.top, right: box.right, bottom: box.bottom, width: box.width, height: box.height }
@@ -90,14 +126,17 @@ export function observeFullAppPage({ root, anchors = [], editorExceptions = [], 
     return 'html > ' + parts.join(' > ')
   }
   const observe = node => {
-    const box = bounds(node), visible = painted(node)
-    let inViewport = box.left >= -1 && box.top >= -1 && box.right <= innerWidth + 1 && box.bottom <= innerHeight + 1
+    const box = bounds(node), visible = painted(node), clippingAncestors = []
+    let inViewport = box.left >= -1 && box.top >= -1 && box.right <= viewport.right + 1 && box.bottom <= viewport.bottom + 1
     for (let parent = node.parentElement; parent; parent = parent.parentElement) {
-      const css = getComputedStyle(parent), clip = bounds(parent)
-      inViewport &&= withinClientPort(box, clip, parent, css.overflowX, css.overflowY)
+      const css = getComputedStyle(parent), clip = bounds(parent), applied = overflowViewport.local(parent, css)
+      inViewport &&= withinClientPort(box, clip, parent, applied.x, applied.y)
+      clippingAncestors.push({ tag: parent.tagName, id: parent.id, bounds: clip,
+        clientPort: { left: clip.left + parent.clientLeft, top: clip.top + parent.clientTop, width: parent.clientWidth, height: parent.clientHeight },
+        overflowX: css.overflowX, overflowY: css.overflowY, appliedOverflowX: applied.x, appliedOverflowY: applied.y, viewportApplied: applied.viewportApplied })
     }
     const hit = visible && inViewport ? document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2) : null
-    return { ...box, visible, inViewport, hit: Boolean(hit && (hit === node || node.contains(hit))) }
+    return { ...box, visible, inViewport, hit: Boolean(hit && (hit === node || node.contains(hit))), clippingAncestors: inViewport ? [] : clippingAncestors }
   }
   const controls = [], owners = new Set(), controlSelector = '[data-ui-control], button, input, select, textarea'
   const candidates = [...(area.matches(controlSelector) ? [area] : []), ...area.querySelectorAll(controlSelector)]
@@ -142,19 +181,22 @@ export function observeFullAppPage({ root, anchors = [], editorExceptions = [], 
   for (let owner = area.parentElement; owner; owner = owner.parentElement) scrollOwners.add(owner)
   const scrollAreas = []
   for (const owner of scrollOwners) {
-    const css = getComputedStyle(owner)
-    if (!rendered(owner) || !/auto|scroll/.test(css.overflowY) || owner.scrollHeight <= owner.clientHeight + 1) continue
-    const box = bounds(owner), page = bounds(area), maximum = owner.scrollHeight - owner.clientHeight
+    const css = getComputedStyle(owner), viewportScrollOwner = overflowViewport.isViewportScroller(owner)
+    if (overflowViewport.propagated(owner) && !viewportScrollOwner) continue
+    const overflowY = viewportScrollOwner ? overflowViewport.viewportOverflowY : css.overflowY
+    const clientHeight = viewportScrollOwner ? viewport.height : owner.clientHeight
+    if ((!viewportScrollOwner && !rendered(owner)) || !/auto|scroll/.test(overflowY) || owner.scrollHeight <= clientHeight + 1) continue
+    const ownerBounds = bounds(owner), box = viewportScrollOwner ? viewport : ownerBounds, page = bounds(area), maximum = owner.scrollHeight - clientHeight
     const ancestor = owner !== area && owner.contains(area)
-    const contentTop = box.top + owner.clientTop
+    const contentTop = viewportScrollOwner ? 0 : box.top + owner.clientTop
     const requiredContentStart = ancestor ? Math.max(0, Math.min(owner.scrollHeight, owner.scrollTop + page.top - contentTop)) : 0
     const requiredContentEnd = ancestor ? Math.max(requiredContentStart, Math.min(owner.scrollHeight, owner.scrollTop + page.bottom - contentTop)) : owner.scrollHeight
     const start = Math.max(0, Math.min(maximum, requiredContentStart))
-    const end = Math.max(start, Math.min(maximum, requiredContentEnd - owner.clientHeight))
-    let visibleTop = Math.max(0, contentTop), visibleBottom = Math.min(innerHeight, contentTop + owner.clientHeight)
+    const end = Math.max(start, Math.min(maximum, requiredContentEnd - clientHeight))
+    let visibleTop = Math.max(0, contentTop), visibleBottom = Math.min(viewport.bottom, contentTop + clientHeight)
     for (let parent = owner.parentElement; parent; parent = parent.parentElement) {
-      const clipCss = getComputedStyle(parent)
-      if (/hidden|auto|scroll|clip/.test(clipCss.overflowY)) {
+      const clipCss = getComputedStyle(parent), applied = overflowViewport.local(parent, clipCss)
+      if (/hidden|auto|scroll|clip/.test(applied.y)) {
         const clip = bounds(parent), top = clip.top + parent.clientTop
         visibleTop = Math.max(visibleTop, top); visibleBottom = Math.min(visibleBottom, top + parent.clientHeight)
       }
@@ -162,16 +204,17 @@ export function observeFullAppPage({ root, anchors = [], editorExceptions = [], 
     const visibleHeight = painted(owner) ? Math.max(0, visibleBottom - visibleTop) : 0
     const visibleContentStart = Math.max(0, Math.min(owner.scrollHeight, owner.scrollTop + visibleTop - contentTop))
     const visibleContentEnd = Math.max(visibleContentStart, Math.min(owner.scrollHeight, visibleContentStart + visibleHeight))
-    scrollAreas.push({ selector: selector(owner), clientHeight: owner.clientHeight, scrollHeight: owner.scrollHeight, scrollTop: owner.scrollTop,
+    scrollAreas.push({ selector: selector(owner), clientHeight, scrollHeight: owner.scrollHeight, scrollTop: owner.scrollTop,
       rangeStart: start, rangeEnd: end, ancestor, bounds: box, requiredContentStart, requiredContentEnd,
-      visibleHeight, visibleContentStart, visibleContentEnd })
+      visibleHeight, visibleContentStart, visibleContentEnd, viewportScrollOwner, ownerBounds })
   }
   return { root, viewport: { width: innerWidth, height: innerHeight }, devicePixelRatio, theme: document.documentElement.dataset.theme,
-    rootBounds: bounds(area), controls, anchors: measuredAnchors, text: area.innerText, scrollAreas,
+    rootBounds: bounds(area), controls, anchors: measuredAnchors, text: area.innerText, scrollAreas, overflowViewport: overflowViewport.record,
     overflow: { document: Math.max(0, document.documentElement.scrollWidth - innerWidth), root: Math.max(0, area.scrollWidth - area.clientWidth), allowed: [] } }
 }
 
-export function observeFullAppFocus(selector, visibleShadow, withinClientPort) {
+export function observeFullAppFocus(selector, visibleShadow, withinClientPort, readOverflowViewport) {
+  const overflowViewport = readOverflowViewport(), viewport = overflowViewport.bounds
   const nodes = [...document.querySelectorAll(selector)].filter(node => node.getBoundingClientRect().width > 0)
   if (nodes.length !== 1) throw Error('Expected one native focus target: ' + selector)
   const field = nodes[0], root = field.closest('.ant-input-affix-wrapper, .app-ui-select') || field
@@ -182,14 +225,33 @@ export function observeFullAppFocus(selector, visibleShadow, withinClientPort) {
     if (css.outlineStyle !== 'none' && Number.parseFloat(css.outlineWidth) > 0 && visibleShadow('0 0 0 ' + css.outlineWidth + ' ' + css.outlineColor)) outlines.push({ owner: index ? node.tagName.toLowerCase() + ':' + index : 'root', width: Number.parseFloat(css.outlineWidth), color: css.outlineColor })
     if (visibleShadow(css.boxShadow)) shadows.push({ owner: index ? node.tagName.toLowerCase() + ':' + index : 'root', value: css.boxShadow })
   }
-  let inViewport = box.left >= -1 && box.top >= -1 && box.right <= innerWidth + 1 && box.bottom <= innerHeight + 1
+  const clippingAncestors = []
+  let inViewport = box.left >= -1 && box.top >= -1 && box.right <= viewport.right + 1 && box.bottom <= viewport.bottom + 1
   for (let parent = root.parentElement; parent; parent = parent.parentElement) {
-    const css = getComputedStyle(parent), clip = parent.getBoundingClientRect()
-    inViewport &&= withinClientPort(box, clip, parent, css.overflowX, css.overflowY)
+    const css = getComputedStyle(parent), clip = parent.getBoundingClientRect(), applied = overflowViewport.local(parent, css)
+    inViewport &&= withinClientPort(box, clip, parent, applied.x, applied.y)
+    clippingAncestors.push({ tag: parent.tagName, id: parent.id,
+      bounds: { left: clip.left, top: clip.top, right: clip.right, bottom: clip.bottom, width: clip.width, height: clip.height },
+      clientPort: { left: clip.left + parent.clientLeft, top: clip.top + parent.clientTop, width: parent.clientWidth, height: parent.clientHeight },
+      overflowX: css.overflowX, overflowY: css.overflowY, appliedOverflowX: applied.x, appliedOverflowY: applied.y, viewportApplied: applied.viewportApplied })
   }
   const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)
   return { selector, focused: document.activeElement === field, focusVisible: field.matches(':focus-visible'), inViewport,
-    hit: Boolean(hit && (hit === root || root.contains(hit))), outlines, shadows }
+    hit: Boolean(hit && (hit === root || root.contains(hit))), outlines, shadows, overflowViewport: overflowViewport.record, clippingAncestors }
+}
+
+export function ensureFullAppTargetVisible(selector, withinClientPort, readOverflowViewport) {
+  const overflowViewport = readOverflowViewport(), viewport = overflowViewport.bounds
+  const nodes = [...document.querySelectorAll(selector)].filter(node => node.getBoundingClientRect().width > 0 && node.getBoundingClientRect().height > 0)
+  if (nodes.length !== 1) throw Error('Missing or ambiguous actual scroll target')
+  const node = nodes[0], box = node.getBoundingClientRect()
+  let fits = box.left >= 0 && box.top >= 0 && box.right <= viewport.right && box.bottom <= viewport.bottom
+  for (let parent = node.parentElement; parent; parent = parent.parentElement) {
+    const css = getComputedStyle(parent), clip = parent.getBoundingClientRect(), applied = overflowViewport.local(parent, css)
+    fits &&= withinClientPort(box, clip, parent, applied.x, applied.y, 0)
+  }
+  if (!fits) node.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'instant' })
+  return true
 }
 
 export function observeFullAppPopup(selector) {
@@ -335,7 +397,7 @@ export function createFullAppUiShared(ctx) {
     for (const type of ['rawKeyDown', 'keyUp']) await cdp.send('Input.dispatchKeyEvent', { type, key: name, windowsVirtualKeyCode: code, nativeVirtualKeyCode: code, modifiers })
   }
   const ensureVisible = async selector => {
-    await evaluate(`(() => { const withinClientPort=${withinActualClientPort.toString()};const nodes=[...document.querySelectorAll(${q(selector)})].filter(node=>node.getBoundingClientRect().width>0&&node.getBoundingClientRect().height>0); if(nodes.length!==1)throw Error('Missing or ambiguous actual scroll target');const node=nodes[0],box=node.getBoundingClientRect();let fits=box.left>=0&&box.top>=0&&box.right<=innerWidth&&box.bottom<=innerHeight;for(let parent=node.parentElement;parent;parent=parent.parentElement){const css=getComputedStyle(parent),clip=parent.getBoundingClientRect();fits&&=withinClientPort(box,clip,parent,css.overflowX,css.overflowY,0);}if(!fits)node.scrollIntoView({block:'center',inline:'nearest',behavior:'instant'});return true })()`)
+    await evaluate(`(${ensureFullAppTargetVisible.toString()})(${q(selector)},${withinActualClientPort.toString()},${observeFullAppOverflowViewport.toString()})`)
     await frame()
   }
   const text = async (selector, value) => {
@@ -369,7 +431,7 @@ export function createFullAppUiShared(ctx) {
     ;(ui.fileInputs ||= []).push(receipt); save(); return receipt
   }
   const nameFor = (meta, suffix) => `${slug(meta.group)}-${slug(meta.theme)}-${meta.viewport.width}x${meta.viewport.height}-${slug(meta.routeId)}-${slug(meta.stateId)}-${suffix}.png`
-  const samplePage = (route, root, anchors, onlySelectors = []) => evaluate(`(${observeFullAppPage.toString()})(${q({ root, anchors, onlySelectors, editorExceptions: route.editorExceptions || [] })},${withinActualClientPort.toString()})`)
+  const samplePage = (route, root, anchors, onlySelectors = []) => evaluate(`(${observeFullAppPage.toString()})(${q({ root, anchors, onlySelectors, editorExceptions: route.editorExceptions || [] })},${withinActualClientPort.toString()},${observeFullAppOverflowViewport.toString()})`)
   const captureState = async ({ routeId, stateId, root, anchors = [], requiredText = [], allowHorizontalScroll = [], coverageMode = 'route-controls', onlySelectors = [] }) => {
     const route = routeFor(routeId), registeredRoot = route.stateRoots?.[stateId] || route.root
     root ||= registeredRoot
@@ -506,7 +568,7 @@ export function createFullAppUiShared(ctx) {
       if (await evaluate(`document.activeElement===document.querySelector(${q(selector)})`)) { reached = true; break }
     }
     assert.equal(reached, true, 'Actual Tab order never reached control: ' + selector)
-    const sample = { ...binding(meta), ...await evaluate(`(${observeFullAppFocus.toString()})(${q(selector)},${hasVisibleBoxShadow.toString()},${withinActualClientPort.toString()})`) }
+    const sample = { ...binding(meta), ...await evaluate(`(${observeFullAppFocus.toString()})(${q(selector)},${hasVisibleBoxShadow.toString()},${withinActualClientPort.toString()},${observeFullAppOverflowViewport.toString()})`) }
     sample.events = await events(first); sample.trustedTab = sample.events.some(event => event.type === 'keydown' && event.key === 'Tab' && event.trusted)
     ui.focus.push(sample); save()
     assert.ok(sample.trustedTab && sample.focused && sample.focusVisible && sample.inViewport && sample.hit, 'Actual keyboard focus was not visible and reachable')

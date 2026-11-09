@@ -196,3 +196,143 @@ test('unfinished finite motion preserves the original deadline failure and canno
   assert.equal(calls, 1); assert.equal(receipt.complete, false); assert.equal(receipt.latest, sample)
   assert.throws(() => finiteOwnerMotionActive({ root: '.actual-menu', animations: [{ playState: 'running', pending: false, duration: null, iterations: 1, endTime: 150 }] }), /timing/)
 })
+
+// The following are serialized observer contracts with explicit DOM geometry,
+// not a native rendering fixture or a claim that these objects were screenshots.
+const { runInNewContext } = await import('node:vm')
+const viewportObservers = await import('./full-app-ui-shared.mjs')
+function overflowFixture() {
+  const all = [], namespaceURI = 'http://www.w3.org/1999/xhtml'
+  const rectangle = (left, top, width, height) => ({ left, top, right: left + width, bottom: top + height, width, height })
+  const make = (tag, id, box, parent = null) => {
+    const node = { tagName: tag.toUpperCase(), localName: tag, namespaceURI, id, className: '', dataset: {}, parentElement: parent, children: [],
+      isConnected: true, textContent: id, innerText: id, clientLeft: 0, clientTop: 0, clientWidth: box.width, clientHeight: box.height,
+      scrollWidth: box.width, scrollHeight: box.height, scrollTop: 0, disabled: false, type: tag === 'input' ? 'text' : '', scrollCalls: [], box,
+      css: { display: 'block', visibility: 'visible', opacity: '1', overflowX: 'visible', overflowY: 'visible',
+        contain: 'none', contentVisibility: 'visible', outlineStyle: 'none', outlineWidth: '0px', boxShadow: 'none' },
+      getBoundingClientRect() { return { ...this.box } }, getClientRects() { return [this.box] },
+      getAttribute(name) { return name === 'id' ? this.id : name === 'aria-label' ? this.id : null },
+      contains(other) { return other === this || this.children.some(child => child.contains(other)) },
+      matches(selector) {
+        return selector.split(',').some(value => {
+          const part = value.trim()
+          if (part === '*') return true
+          if (part === ':disabled') return this.disabled
+          if (part === ':focus-visible') return this === control
+          if (part === '[data-ui-control]') return Boolean(this.dataset.uiControl)
+          if (part.startsWith('#')) return this.id === part.slice(1)
+          if (part.startsWith('[id=')) return this.id === JSON.parse(part.slice(4, -1))
+          if (part.startsWith('.')) return this.className.split(' ').includes(part.slice(1))
+          return this.localName === part
+        })
+      },
+      closest(selector) { for (let item = this; item; item = item.parentElement) if (item.matches(selector)) return item; return null },
+      querySelectorAll(selector) { return all.filter(item => item !== this && this.contains(item) && item.matches(selector)) },
+      querySelector(selector) { return this.querySelectorAll(selector)[0] || null },
+      scrollIntoView(options) { this.scrollCalls.push(options) }, classList: { contains() { return false } },
+    }
+    if (parent) parent.children.push(node)
+    all.push(node); return node
+  }
+  const html = make('html', '', rectangle(0, -600, 704, 1200))
+  html.clientHeight = 455; html.scrollHeight = 1200; html.scrollTop = 600; html.dataset.theme = 'light'
+  const body = make('body', 'body', rectangle(0, -600, 704, 455), html)
+  body.css.overflowX = 'auto'; body.css.overflowY = 'auto'; body.scrollHeight = 1200
+  const page = make('section', 'page', rectangle(10, 20, 400, 200), body); page.className = 'actual-page'
+  const control = make('input', 'control', rectangle(20, 40, 160, 40), page)
+  control.className = 'ant-input app-ui-input'; control.dataset.uiControl = 'input'
+  const document = { documentElement: html, body, scrollingElement: html, activeElement: control, compatMode: 'CSS1Compat',
+    querySelectorAll(selector) { return all.filter(item => item.matches(selector)) },
+    querySelector(selector) { return this.querySelectorAll(selector)[0] || null },
+    elementFromPoint() { return control },
+  }
+  return { html, body, page, control, make, rectangle, document,
+    globals: { document, innerWidth: 704, innerHeight: 455, devicePixelRatio: 1,
+      getComputedStyle: node => node.css, requestAnimationFrame: callback => callback() } }
+}
+function serializedOverflowObservation(fixture, kind) {
+  const helper = viewportObservers.observeFullAppOverflowViewport.toString(), port = withinActualClientPort.toString()
+  const source = kind === 'page'
+    ? `(${viewportObservers.observeFullAppPage.toString()})({root:'.actual-page',anchors:['#control']},${port},${helper})`
+    : `(${viewportObservers.observeFullAppFocus.toString()})('#control',()=>false,${port},${helper})`
+  return JSON.parse(JSON.stringify(runInNewContext(source, fixture.globals)))
+}
+async function serializedEnsureVisible(fixture) {
+  const shared = createFullAppUiShared({ evaluate: async source => runInNewContext(source, fixture.globals), click() {},
+    cdp: { send() {} }, until: async check => check(), capture() {}, save() {}, report: { fullAppUi: {} }, routes: [], matrix })
+  await shared.ensureVisible('#control')
+}
+
+test('serialized page, focus and actual ensureVisible do not clip against a body overflow propagated to the viewport', async () => {
+  for (const overflow of ['auto', 'scroll', 'hidden', 'clip']) {
+    const fixture = overflowFixture(); fixture.body.css.overflowX = overflow; fixture.body.css.overflowY = overflow
+    const page = serializedOverflowObservation(fixture, 'page'), focus = serializedOverflowObservation(fixture, 'focus')
+    assert.equal(page.controls[0].inViewport, true); assert.equal(page.controls[0].hit, true)
+    assert.equal(page.overflowViewport.bodyPropagates, true)
+    assert.equal(page.anchors[0].inViewport, true); assert.equal(focus.inViewport, true); assert.equal(focus.hit, true)
+    await serializedEnsureVisible(fixture); assert.equal(fixture.control.scrollCalls.length, 0)
+  }
+})
+
+test('serialized root clipping remains at the client viewport even with root containment, while body clipping stays local', async () => {
+  const fixture = overflowFixture()
+  fixture.html.css.overflowX = 'auto'; fixture.html.css.overflowY = 'auto'; fixture.html.css.contain = 'paint'
+  fixture.body.css.overflowX = 'visible'; fixture.body.css.overflowY = 'visible'
+  assert.equal(serializedOverflowObservation(fixture, 'page').controls[0].inViewport, true)
+  assert.equal(serializedOverflowObservation(fixture, 'focus').inViewport, true)
+  await serializedEnsureVisible(fixture); assert.equal(fixture.control.scrollCalls.length, 0)
+  fixture.body.css.overflowY = 'hidden'
+  const clipped = serializedOverflowObservation(fixture, 'page')
+  assert.equal(clipped.overflowViewport.bodyPropagates, false); assert.equal(clipped.controls[0].inViewport, false)
+  assert.equal(serializedOverflowObservation(fixture, 'focus').inViewport, false)
+  await serializedEnsureVisible(fixture); assert.equal(fixture.control.scrollCalls.length, 1)
+})
+
+test('serialized observers refuse body propagation under containment, content visibility, wrong HTML ownership or unknown values', async () => {
+  const cases = [
+    f => { f.html.css.contain = 'layout' }, f => { f.body.css.contain = 'paint' }, f => { f.body.css.contain = '' },
+    f => { f.html.css.contentVisibility = 'auto' }, f => { f.body.css.contentVisibility = 'hidden' },
+    f => { f.body.css.contentVisibility = undefined }, f => { f.html.namespaceURI = 'urn:other' },
+    f => { f.body.namespaceURI = 'urn:other' },
+    f => { const first = f.make('body', 'earlier-body', f.rectangle(0, 0, 704, 455), f.html); f.html.children.splice(0, 0, f.html.children.pop()); assert.equal(f.html.children[0], first) },
+  ]
+  for (const change of cases) {
+    const fixture = overflowFixture(); change(fixture)
+    const page = serializedOverflowObservation(fixture, 'page')
+    assert.equal(page.overflowViewport.bodyPropagates, false); assert.equal(page.controls[0].inViewport, false)
+    assert.equal(serializedOverflowObservation(fixture, 'focus').inViewport, false)
+    await serializedEnsureVisible(fixture); assert.equal(fixture.control.scrollCalls.length, 1)
+  }
+})
+
+test('serialized observers still reject true nested client-port clipping, viewport scrollbars, hidden or covered controls', async () => {
+  const fixture = overflowFixture()
+  fixture.page.box = fixture.rectangle(0, 0, 200, 120); fixture.page.clientLeft = 1; fixture.page.clientTop = 1
+  fixture.page.clientWidth = 181; fixture.page.clientHeight = 101; fixture.page.css.overflowX = 'auto'
+  fixture.control.box = fixture.rectangle(100, 10, 98, 40)
+  assert.equal(serializedOverflowObservation(fixture, 'page').controls[0].inViewport, false)
+  assert.equal(serializedOverflowObservation(fixture, 'focus').inViewport, false)
+  await serializedEnsureVisible(fixture); assert.equal(fixture.control.scrollCalls.length, 1)
+  const scrollbar = overflowFixture(); scrollbar.html.clientWidth = 688; scrollbar.control.box = scrollbar.rectangle(680, 40, 21, 40)
+  assert.equal(serializedOverflowObservation(scrollbar, 'page').controls[0].inViewport, false)
+  assert.equal(serializedOverflowObservation(scrollbar, 'focus').inViewport, false)
+  const hidden = overflowFixture(); hidden.page.css.visibility = 'hidden'
+  assert.equal(serializedOverflowObservation(hidden, 'page').controls[0].visible, false)
+  const covered = overflowFixture(); covered.document.elementFromPoint = () => covered.body
+  assert.equal(serializedOverflowObservation(covered, 'page').controls[0].hit, false)
+  assert.equal(serializedOverflowObservation(covered, 'focus').hit, false)
+})
+
+test('serialized scroll coverage uses the actual viewport scroller once and retains genuine nested/body client-port clipping', () => {
+  const fixture = overflowFixture(); fixture.page.css.overflowY = 'auto'; fixture.page.scrollHeight = 600
+  const page = serializedOverflowObservation(fixture, 'page'), surface = page.scrollAreas.find(item => item.selector === 'html')
+  assert.equal(surface.viewportScrollOwner, true); assert.equal(surface.bounds.top, 0); assert.equal(surface.clientHeight, 455)
+  assert.equal(surface.ownerBounds.top, -600); assert.equal(surface.visibleHeight, 455)
+  assert.equal(surface.visibleContentStart, 600); assert.equal(surface.visibleContentEnd, 1055)
+  assert.equal(page.scrollAreas.some(item => item.selector === '[id="body"]'), false)
+  assert.equal(page.scrollAreas.find(item => item.selector === '[id="page"]').visibleHeight, 200)
+  fixture.body.css.contain = 'layout'; fixture.body.box = fixture.rectangle(0, 0, 704, 90); fixture.body.clientHeight = 90
+  const nested = serializedOverflowObservation(fixture, 'page')
+  assert.equal(nested.scrollAreas.find(item => item.selector === '[id="body"]').viewportScrollOwner, false)
+  assert.equal(nested.scrollAreas.find(item => item.selector === '[id="page"]').visibleHeight, 70)
+})
