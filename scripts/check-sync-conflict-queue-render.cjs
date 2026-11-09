@@ -26,23 +26,30 @@ function inspectQueue() {
   const luminance = rgb => rgb.map(n => { n /= 255; return n <= .04045 ? n / 12.92 : ((n + .055) / 1.055) ** 2.4 })
     .reduce((sum, n, i) => sum + n * [.2126, .7152, .0722][i], 0)
   const colors = []
-  for (const [selector, token] of [
+  for (const [selector, token, actionLabel] of [
     ['.sync-conflict-heading>strong', '--ink'], ['.sync-queue-hint', '--ink-soft'],
     ['.sync-queue-search', '--ink'], ['.sync-queue-tools input', '--ink'],
     ['.sync-queue-tools [data-ui-control="select"] .ant-select-content', '--ink'], ['.sync-queue-count', '--ink'],
     ['.sync-queue-identifiers', '--ink-soft'], ['.sync-conflict-item>div>strong', '--ink'],
     ['.sync-conflict-item>div>span', '--ink-soft'],
+    // Exercise all three real enabled action labels, not only the description.
+    ['.sync-conflict-actions>[data-ui-control="button"]:nth-child(1)>.ant-btn-content', '--ink', '对照版本'],
+    ['.sync-conflict-actions>[data-ui-control="button"]:nth-child(2)>.ant-btn-content', '--ink', '采用远端'],
+    ['.sync-conflict-actions>[data-ui-control="button"]:nth-child(3)>.ant-btn-content', '--on-accent', '保留本机'],
   ]) {
     const el = queue.querySelector(selector)
     if (!el) return { ready: false, missing: selector }
+    if (actionLabel && (el.textContent.trim() !== actionLabel || el.closest('button')?.disabled))
+      return { ready: false, missing: 'enabled action label: ' + selector }
     const style = getComputedStyle(el), chain = []
     for (let node = el; node; node = node.parentElement) chain.unshift(node)
     ctx.clearRect(0, 0, 1, 1); paint('#fff')
     for (const node of chain) paint(getComputedStyle(node).backgroundColor)
     const background = pixel(); paint(style.color); const foreground = pixel()
     const a = luminance(foreground), b = luminance(background)
-    ctx.clearRect(0, 0, 1, 1); paint(style.getPropertyValue(token).trim()); const expected = pixel()
+    ctx.clearRect(0, 0, 1, 1); paint(style.getPropertyValue(token).trim() || (token === '--on-accent' ? '#ffffff' : '')); const expected = pixel()
     colors.push({ selector, foreground, background, ratio: (Math.max(a, b) + .05) / (Math.min(a, b) + .05),
+      actionLabel: actionLabel || null, fontSize: actionLabel ? Number.parseFloat(style.fontSize) : null,
       finalColor: foreground.every((n, i) => n === expected[i]) })
   }
   const rect = queue.getBoundingClientRect()
@@ -78,7 +85,8 @@ app.whenReady().then(async () => {
     for (let i = 0; i < 40; i++) {
       await delay(100); data = await inspect(win)
       const valid = data.ready && data.count === expectedRows && data.overflow <= 1 && data.writes === 0 && data.activeMarkup === 0 &&
-        data.colors.every(c => c.finalColor && Number.isFinite(c.ratio) && c.ratio >= 4.5)
+        data.colors.every(c => c.finalColor && Number.isFinite(c.ratio) && c.ratio >= 4.5 &&
+          (!c.actionLabel || (Number.isFinite(c.fontSize) && c.fontSize >= 13)))
       const signature = JSON.stringify(data)
       samples = valid ? (signature === previous ? samples + 1 : 1) : 0; previous = signature
       if (samples >= 3) break
