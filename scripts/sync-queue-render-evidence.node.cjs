@@ -11,7 +11,7 @@ const fixture = () => ({ complete: true, platform: 'win32', syntheticRecords: tr
   reports: scenes.map(([name, width, count, label]) => ({ name, ready: true, stableSamples: 3, count, label,
     bounds: [20, width - 40, 600], viewport: [width,900], imageSize: [width,900], overflow: 0, writes: 0, activeMarkup: 0,
     colors: selectors.map((selector, i) => ({ selector, finalColor: true, foreground: [36,34,42], background: [255,255,255], ratio: 15.7,
-      ...(i >= 9 ? { actionLabel: actionLabels[i-9], enabled: true, fontSize: 14 } : {}) })) })) })
+      ...(i >= 9 ? { actionLabel: actionLabels[i-9], enabled: true, antControl: true, fontSize: 14 } : {}) })) })) })
 function evidence(t, report = fixture()) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'queue-evidence-'))
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }))
@@ -56,6 +56,8 @@ test('all three actual queue action labels must stay readable, enabled and theme
       color => { color.actionLabel = 'wrong' },
       color => { color.enabled = false },
       color => { delete color.enabled },
+      color => { color.antControl = false },
+      color => { delete color.antControl },
       color => { color.fontSize = 12 },
       color => { color.fontSize = NaN },
       color => { delete color.fontSize },
@@ -107,4 +109,9 @@ test('screen-clamped native windows are checked against actual viewport rather t
   const r=fixture();r.reports[0].viewport=[1008,681];r.reports[0].imageSize=[1008,681];r.reports[0].bounds=[37,862,1506.5]
   verifyQueueReport(r,sha)
   r.reports[0].imageSize=[1180,900];assert.throws(()=>verifyQueueReport(r,sha))
+})
+
+test('native queue action probes anchor the real Ant Design button, not an optional label span', () => {
+  assert.deepEqual(selectors.slice(9), [1, 2, 3].map(index =>
+    '.sync-conflict-actions>[data-ui-control="button"]:nth-child(' + index + ')'))
 })

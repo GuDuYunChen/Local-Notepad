@@ -33,23 +33,30 @@ function inspectQueue() {
     ['.sync-queue-identifiers', '--ink-soft'], ['.sync-conflict-item>div>strong', '--ink'],
     ['.sync-conflict-item>div>span', '--ink-soft'],
     // Exercise all three real enabled action labels, not only the description.
-    ['.sync-conflict-actions>[data-ui-control="button"]:nth-child(1)>.ant-btn-content', '--ink', '对照版本'],
-    ['.sync-conflict-actions>[data-ui-control="button"]:nth-child(2)>.ant-btn-content', '--ink', '采用远端'],
-    ['.sync-conflict-actions>[data-ui-control="button"]:nth-child(3)>.ant-btn-content', '--on-accent', '保留本机'],
+    ['.sync-conflict-actions>[data-ui-control="button"]:nth-child(1)', '--ink', '对照版本'],
+    ['.sync-conflict-actions>[data-ui-control="button"]:nth-child(2)', '--ink', '采用远端'],
+    ['.sync-conflict-actions>[data-ui-control="button"]:nth-child(3)', '--on-accent', '保留本机'],
   ]) {
     const el = queue.querySelector(selector)
     if (!el) return { ready: false, missing: selector }
-    if (actionLabel && (el.textContent.trim() !== actionLabel || el.closest('button')?.disabled))
-      return { ready: false, missing: 'enabled action label: ' + selector }
-    const style = getComputedStyle(el), chain = []
-    for (let node = el; node; node = node.parentElement) chain.unshift(node)
+    if (actionLabel && (el.tagName !== 'BUTTON' || !el.classList.contains('ant-btn') ||
+        el.textContent.trim() !== actionLabel || el.disabled))
+      return { ready: false, missing: 'enabled Ant Design action label: ' + selector }
+    // Ant Design may render its label as a plain span rather than .ant-btn-content.
+    // Probe the real label's computed color, not an optional wrapper class.
+    const text = actionLabel ? (el.querySelector('.ant-btn-content') ||
+      [...el.querySelectorAll('span')].find(node => node.textContent.trim() === actionLabel &&
+        ![...node.children].some(child => child.textContent.trim() === actionLabel)) || el) : el
+    const style = getComputedStyle(text), chain = []
+    for (let node = text; node; node = node.parentElement) chain.unshift(node)
     ctx.clearRect(0, 0, 1, 1); paint('#fff')
     for (const node of chain) paint(getComputedStyle(node).backgroundColor)
     const background = pixel(); paint(style.color); const foreground = pixel()
     const a = luminance(foreground), b = luminance(background)
     ctx.clearRect(0, 0, 1, 1); paint(style.getPropertyValue(token).trim() || (token === '--on-accent' ? '#ffffff' : '')); const expected = pixel()
     colors.push({ selector, foreground, background, ratio: (Math.max(a, b) + .05) / (Math.min(a, b) + .05),
-      actionLabel: actionLabel || null, enabled: actionLabel ? !el.closest('button')?.disabled : null,
+      actionLabel: actionLabel || null, enabled: actionLabel ? !el.disabled : null,
+      antControl: actionLabel ? el.classList.contains('ant-btn') : null,
       fontSize: actionLabel ? Number.parseFloat(style.fontSize) : null,
       finalColor: foreground.every((n, i) => n === expected[i]) })
   }

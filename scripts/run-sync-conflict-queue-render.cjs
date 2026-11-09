@@ -13,9 +13,9 @@ const scenes = Object.freeze([
 const selectors = ['.sync-conflict-heading>strong', '.sync-queue-hint', '.sync-queue-search',
   '.sync-queue-tools input', '.sync-queue-tools [data-ui-control="select"] .ant-select-content', '.sync-queue-count', '.sync-queue-identifiers',
   '.sync-conflict-item>div>strong', '.sync-conflict-item>div>span',
-  '.sync-conflict-actions>[data-ui-control="button"]:nth-child(1)>.ant-btn-content',
-  '.sync-conflict-actions>[data-ui-control="button"]:nth-child(2)>.ant-btn-content',
-  '.sync-conflict-actions>[data-ui-control="button"]:nth-child(3)>.ant-btn-content']
+  '.sync-conflict-actions>[data-ui-control="button"]:nth-child(1)',
+  '.sync-conflict-actions>[data-ui-control="button"]:nth-child(2)',
+  '.sync-conflict-actions>[data-ui-control="button"]:nth-child(3)']
 const expectedActionLabels = ['对照版本', '采用远端', '保留本机']
 const rgb = v => Array.isArray(v) && v.length === 3 && v.every(n => Number.isInteger(n) && n >= 0 && n <= 255)
 function verifyQueueReport(report, expectedCommit = null) {
@@ -38,7 +38,7 @@ function verifyQueueReport(report, expectedCommit = null) {
     if (!Array.isArray(r.colors) || r.colors.length !== selectors.length || r.colors.some((c, n) =>
       c?.selector !== selectors[n] || c.finalColor !== true || !rgb(c.foreground) || !rgb(c.background) ||
       !Number.isFinite(c.ratio) || c.ratio < 4.5 ||
-      (n >= 9 && (c.actionLabel !== expectedActionLabels[n - 9] || c.enabled !== true || !Number.isFinite(c.fontSize) || c.fontSize < 13)))) throw new Error('Queue render contrast evidence is incomplete: ' + name)
+      (n >= 9 && (c.actionLabel !== expectedActionLabels[n - 9] || c.enabled !== true || c.antControl !== true || !Number.isFinite(c.fontSize) || c.fontSize < 13)))) throw new Error('Queue render contrast evidence is incomplete: ' + name)
   })
   return report
 }
