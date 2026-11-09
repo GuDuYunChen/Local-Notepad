@@ -129,8 +129,22 @@ try{
    $command=[Text.Encoding]::UTF8.GetBytes('{"id":1,"method":"Browser.close"}')
    $segment=[ArraySegment[byte]]::new($command)
    $ws.SendAsync($segment,[System.Net.WebSockets.WebSocketMessageType]::Text,$true,[Threading.CancellationToken]::None).GetAwaiter().GetResult()
+ # Keep the CDP connection alive while Chromium dispatches Browser.close. Closing
+ # the client socket immediately after SendAsync can race delivery on Windows.
+ # This still requires the original real process exit within 20 seconds.
+ if(-not $gui.WaitForExit(20000)){
+   $r.quitDiagnostics=[ordered]@{cdpCommand='Browser.close';sent=$true;nativeProcessId=$gui.Id;webSocketState=[string]$ws.State}
+   try{
+     $targetsAfter=Invoke-RestMethod $cdp -TimeoutSec 3
+     $r.quitDiagnostics.cdpTargetsAfter=@($targetsAfter|ForEach-Object{@{type=$_.type;url=$_.url}})
+   }catch{$r.quitDiagnostics.cdpAfterError=$_.Exception.Message}
+   try{
+     $healthAfter=Invoke-RestMethod "$guiBase/api/health" -TimeoutSec 2
+     $r.quitDiagnostics.backendHealthCode=$healthAfter.code
+   }catch{$r.quitDiagnostics.backendHealthError=$_.Exception.Message}
+   throw 'Upgraded Electron app did not exit after CDP Browser.close.'
+ }
  }finally{$ws.Dispose()}
- if(-not $gui.WaitForExit(20000)){throw 'Upgraded Electron app did not exit after CDP Browser.close.'}
  $stopped=$false;$stopDeadline=[DateTime]::UtcNow.AddSeconds(10)
  while([DateTime]::UtcNow -lt $stopDeadline){
    try{$null=Invoke-RestMethod "$guiBase/api/health" -TimeoutSec 1;Start-Sleep -Milliseconds 200}catch{$stopped=$true;break}
