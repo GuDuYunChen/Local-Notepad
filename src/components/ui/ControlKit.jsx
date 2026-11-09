@@ -31,51 +31,127 @@ const nativeTypes = new Set(['checkbox', 'radio', 'file', 'range', 'color', 'hid
 const writeRef = (ref, value) => { if (typeof ref === 'function') ref(value); else if (ref) ref.current = value }
 const inputNode = value => value?.input || value?.resizableTextArea?.textArea || value?.nativeElement || value
 const nativeRef = ref => value => writeRef(ref, inputNode(value))
-
-// AntD text inputs keep their own uncontrolled state. The browser's form.reset()
-// restores native DOM values, but a subsequent React commit can repaint the
-// pre-reset value. Only an uncancelled native reset remounts that field with its
-// original default; controlled values stay owned by their caller. No change or
-// input event is emitted on reset.
-function useNativeTextReset(forwardedRef, controlled, formId) {
-  const [resetKey, setResetKey] = useState(0)
-  const input = useRef(null)
-  const restoreFocus = useRef(false)
-  const assign = useCallback(component => {
-    const native = inputNode(component)
-    input.current = native
-    writeRef(forwardedRef, native)
-  }, [forwardedRef])
-  useEffect(() => {
-    if (controlled) return undefined
-    const owner = input.current?.form || (formId ? document.getElementById(formId) : null)
-    if (!owner) return undefined
-    let mounted = true
-    const onReset = event => {
-      // Check cancellation after the form's own React onReset handlers run.
-      // The browser has completed its native reset before this microtask.
-      queueMicrotask(() => {
-        if (!mounted || event.defaultPrevented) return
-        restoreFocus.current = document.activeElement === input.current
-        setResetKey(key => key + 1)
-      })
-    }
-    owner.addEventListener('reset', onReset)
-    return () => { mounted = false; owner.removeEventListener('reset', onReset) }
-  }, [controlled, formId, resetKey])
-  useLayoutEffect(() => {
-    if (!restoreFocus.current) return
-    restoreFocus.current = false
-    input.current?.focus({ preventScroll: true })
-  }, [resetKey])
-  return [resetKey, assign]
-}
 const hasClass = (value, token) => String(value || '').split(/\s+/).includes(token)
 const cleanClass = value => String(value || '').split(/\s+/).filter(token => token && true).join(' ')
 // Legacy presentation utility classes must not restyle Ant Design internals.
 const cleanControlClass = value => cleanClass(value)
 const controlSize = (size, density, classes) => ['small', 'middle', 'large'].includes(size) ? size : density === 'compact' || hasClass(classes, 'small') ? 'small' : 'middle'
 const errorStatus = props => props.status || (props['aria-invalid'] === true || props['aria-invalid'] === 'true' ? 'error' : undefined)
+
+// Prepare the browser's synchronous default action, then observe its final
+// cancellation result after all reset listeners have run. A microtask can run
+// between listeners of a trusted event, so completion uses a cancellable task.
+function useFormReset(nodeRef, owner, prepare) {
+  const latest = useRef(null); latest.current = { owner, prepare }
+  useLayoutEffect(() => {
+    const document = nodeRef.current?.ownerDocument
+    if (!document) return
+    const pending = new Set()
+    const reset = event => {
+      const node = nodeRef.current
+      if (!node || latest.current.owner(node) !== event.target) return
+      const complete = latest.current.prepare(node, event)
+      if (!complete) return
+      const task = setTimeout(() => {
+        pending.delete(task)
+        if (nodeRef.current === node) complete(!event.defaultPrevented && latest.current.owner(node) === event.target)
+      }, 0)
+      pending.add(task)
+    }
+    document.addEventListener('reset', reset, true)
+    return () => { document.removeEventListener('reset', reset, true); pending.forEach(clearTimeout) }
+  }, [nodeRef])
+}
+
+function prepareInputDefault(input, value) {
+  const current = input.value, start = input.selectionStart, end = input.selectionEnd, direction = input.selectionDirection
+  input.defaultValue = value
+  if (input.value !== current) {
+    input.value = current
+    if (typeof start === 'number') input.setSelectionRange(start, end, direction)
+  }
+}
+function removePasswordDefault(input) {
+  if (input?.type !== 'password') return
+  const current = input.value
+  input.removeAttribute('value')
+  if (input.value !== current) input.value = current
+}
+
+function useTextInput(props, forwardedRef, textarea = false) {
+  const controlled = props.value !== undefined
+  const initialDefault = useRef(props.defaultValue == null ? '' : String(props.defaultValue))
+  const resetDefault = useRef(initialDefault.current), previousDefault = useRef(props.defaultValue)
+  const defaultChanged = previousDefault.current !== props.defaultValue, oldDefault = resetDefault.current
+  const nextDefault = !defaultChanged ? oldDefault : props.defaultValue != null ? String(props.defaultValue) :
+    !textarea && Object.hasOwn(props, 'defaultValue') ? initialDefault.current : oldDefault
+  const [local, setLocal] = useState(initialDefault.current)
+  const node = useRef(null), generation = useRef(0), pending = useRef([]), latest = useRef(null)
+  const pristine = useRef(false), passwordCleanup = useRef(false)
+  latest.current = { controlled, value: props.value }
+  const ref = useCallback(value => {
+    node.current = inputNode(value)
+    if (passwordCleanup.current) removePasswordDefault(node.current)
+    writeRef(forwardedRef, node.current)
+  }, [forwardedRef])
+  useFormReset(node, input => input.form, (input, event) => {
+    const version = generation.current
+    const value = controlled ? String(props.value ?? '') : resetDefault.current
+    const password = input.type === 'password', removedPasswordValue = password && !input.hasAttribute('value')
+    // rc-input controls its native element even for defaultValue callers. Its
+    // current value therefore became the DOM default; restore the real default
+    // before the UA reset algorithm, without changing a cancelled reset's value.
+    prepareInputDefault(input, value)
+    const operation = { event, version, form: event.target, value, node: input }
+    pending.current.push(operation)
+    return accepted => {
+      const index = pending.current.indexOf(operation)
+      if (index !== -1) {
+        pending.current.splice(index, 1)
+        if (accepted && !latest.current.controlled && generation.current === version) { pristine.current = true; setLocal(operation.value) }
+      }
+      // Preserve Ant Design's password-attribute cleanup; removing an attribute
+      // after reset must not clear the browser's now-pristine live value.
+      if (removedPasswordValue) {
+        passwordCleanup.current = true
+        removePasswordDefault(input)
+      }
+    }
+  })
+  useLayoutEffect(() => {
+    previousDefault.current = props.defaultValue; resetDefault.current = nextDefault
+    const input = node.current
+    if (!input) return
+    if (!controlled && defaultChanged) {
+      // After reset the native value is pristine: a new default also updates
+      // that value, until another edit. Dirty values retain their current text.
+      if (pristine.current && input.value === oldDefault) {
+        input.value = resetDefault.current; setLocal(input.value)
+      }
+      if (input.type !== 'password') prepareInputDefault(input, resetDefault.current)
+    }
+    if (passwordCleanup.current) removePasswordDefault(input)
+    const active = pending.current.findLast(operation => operation.node === input && operation.event.eventPhase !== 0)
+    if (active) {
+      // An onReset handler may synchronously render its parent before the UA
+      // default action. rc-input must not replace the prepared default then.
+      active.value = controlled ? String(props.value ?? '') : resetDefault.current
+      prepareInputDefault(input, active.value)
+    }
+  })
+  const operation = pending.current.findLast(operation => operation.event.eventPhase === 0 && !operation.event.defaultPrevented &&
+    operation.version === generation.current && operation.node === node.current && node.current?.form === operation.form)
+  const onChange = event => {
+    generation.current += 1; pending.current = []; pristine.current = false; setLocal(event.target.value)
+    props.onChange?.(event)
+  }
+  return { ...props, ref, value: controlled ? props.value : operation ? operation.value : local, onChange: controlled ? props.onChange : onChange }
+}
+
+const TextInput = forwardRef(function TextInput(props, ref) {
+  const inputProps = useTextInput(props, ref)
+  return <Input {...inputProps}/>
+})
 
 // A custom Select's trigger is not disabled by HTML fieldset inheritance. Preserve
 // that browser rule explicitly, including the first-legend exception and nesting.
@@ -118,19 +194,18 @@ export const UiButton = forwardRef(function UiButton({ type, htmlType, variant, 
 })
 
 export const UiInput = forwardRef(function UiInput({ className = '', size, density, type = 'text', ...props }, ref) {
-  const [resetKey, resetRef] = useNativeTextReset(ref, nativeTypes.has(type) || props.value !== undefined, props.form)
   if (nativeTypes.has(type)) return <input {...props} ref={ref} type={type} className={className} data-ui-native={type} />
-  return <Input key={resetKey} {...props} ref={resetRef} type={type} size={controlSize(size, density, className)} status={errorStatus(props)}
+  return <TextInput {...props} ref={ref} type={type} size={controlSize(size, density, className)} status={errorStatus(props)}
     data-ui-control="input" className={['app-ui-input', cleanControlClass(className)].filter(Boolean).join(' ')} />
 })
 export const UiPassword = forwardRef(function UiPassword({ className = '', size, density, type: _type, ...props }, ref) {
-  const [resetKey, resetRef] = useNativeTextReset(ref, props.value !== undefined, props.form)
-  return <Input.Password key={resetKey} {...props} ref={resetRef} size={controlSize(size, density, className)} status={errorStatus(props)}
+  const inputProps = useTextInput(props, ref)
+  return <Input.Password {...inputProps} size={controlSize(size, density, className)} status={errorStatus(props)}
     data-ui-control="password" className={['app-ui-input', cleanControlClass(className)].filter(Boolean).join(' ')} />
 })
 export const UiTextarea = forwardRef(function UiTextarea({ className = '', size, density, ...props }, ref) {
-  const [resetKey, resetRef] = useNativeTextReset(ref, props.value !== undefined, props.form)
-  return <Input.TextArea key={resetKey} {...props} ref={resetRef} size={controlSize(size, density, className)} status={errorStatus(props)}
+  const inputProps = useTextInput(props, ref, true)
+  return <Input.TextArea {...inputProps} size={controlSize(size, density, className)} status={errorStatus(props)}
     data-ui-control="textarea" className={['app-ui-input', cleanControlClass(className)].filter(Boolean).join(' ')} />
 })
 
@@ -172,7 +247,8 @@ export const UiSelect = forwardRef(function UiSelect({ className = '', style, si
   const controlled = value !== undefined
   const [local, setLocal] = useState(initial)
   const selected = controlled ? normalValue(value) : local
-  const [node, setNode] = useState(null), api = useRef(null)
+  const [node, setNode] = useState(null), api = useRef(null), resetNode = useRef(null), changeGeneration = useRef(0)
+  const setSelectNode = useCallback(value => { resetNode.current = value; setNode(value) }, [])
   const inherited = useInheritedDisabled(node), blocked = disabled || inherited
   const [expanded, setExpanded] = useState(false)
   const latest = useRef(null); latest.current = { selected, controlled }
@@ -182,15 +258,18 @@ export const UiSelect = forwardRef(function UiSelect({ className = '', style, si
   useEffect(() => {
     if (!controlled && !multiple && !flat.some(option => option.value === local)) setLocal(flat[0]?.value ?? '')
   }, [controlled, multiple, flat, local])
-  useEffect(() => {
-    const owner = form ? document.getElementById(form) : node?.closest('form')
-    if (!owner || controlled) return
-    const reset = () => { setLocal(initial()); setExpanded(false) }
-    owner.addEventListener('reset', reset); return () => owner.removeEventListener('reset', reset)
-  }, [node, form, controlled, defaultValue, resolved])
+  useFormReset(resetNode, node => node.querySelector('[data-ui-native="form-value"], [data-ui-native="form-validation"]')?.form ??
+    (form !== undefined ? node.ownerDocument.getElementById(form) : node.closest('form')), () => {
+    if (controlled) return
+    const version = changeGeneration.current, value = initial()
+    return accepted => {
+      if (accepted && !latest.current.controlled && changeGeneration.current === version) { setLocal(value); setExpanded(false) }
+    }
+  })
   const change = next => {
     if (disabled || fieldsetDisabled(node)) return
     const result = normalValue(next)
+    changeGeneration.current += 1
     if (!controlled) setLocal(result)
     const chosen = flat.filter(option => Array.isArray(result) ? result.includes(option.value) : result === option.value)
     const target = { value: Array.isArray(result) ? result[0] ?? '' : result, name: name ?? '', id: id ?? '', selectedIndex: flat.findIndex(option => option.value === (Array.isArray(result) ? result[0] : result)), options: flat, selectedOptions: chosen }
@@ -216,7 +295,7 @@ export const UiSelect = forwardRef(function UiSelect({ className = '', style, si
   const values = Array.isArray(selected) ? selected : [selected]
   // The library owns pointer and keyboard activation. A second wrapper click
   // handler would reopen the popup just closed by Select's mousedown handler.
-  const control = <span ref={setNode} data-ui-control="select" data-ui-value={JSON.stringify(selected)} className={['app-ui-select-host', cleanControlClass(className)].filter(Boolean).join(' ')} style={style}>
+  const control = <span ref={setSelectNode} data-ui-control="select" data-ui-value={JSON.stringify(selected)} className={['app-ui-select-host', cleanControlClass(className)].filter(Boolean).join(' ')} style={style}>
     <Select {...props} virtual={false} optionRender={option => <span data-ui-option-value={String(option.value)}>{option.label}</span>} ref={api} id={selectId} aria-required={required || undefined} value={selected} options={resolved} disabled={blocked}
       mode={multiple ? 'multiple' : undefined} size={controlSize(size, density, className)} status={errorStatus(props)} className="app-ui-select"
       showSearch={showSearch ?? flat.length > 12} optionFilterProp="label" open={blocked ? false : open} onOpenChange={changeOpen} onChange={change} onInputKeyDown={key}

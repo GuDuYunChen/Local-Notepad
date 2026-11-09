@@ -238,6 +238,58 @@ function focusSnapshot(id, shadowIsVisible) {
     inViewport: rect.top >= -1 && rect.left >= -1 && rect.bottom <= innerHeight + 1 && rect.right <= innerWidth + 1 }
 }
 
+function selectStateSnapshot(id) {
+  const node = document.getElementById(id), owner = node.closest('[data-ui-control="select"]')
+  const listId = node.getAttribute('aria-controls') || node.getAttribute('aria-owns'), list = listId && document.getElementById(listId)
+  const state = { expanded: node.getAttribute('aria-expanded') === 'true', optionsAvailable: !!list?.querySelector('[data-ui-option-value]'),
+    value: JSON.parse(owner.dataset.uiValue), focused: document.activeElement === node, popup: null }
+  // virtual=false binds aria-controls to the actual option list, including in dialogs.
+  const popup = list?.getAttribute('role') === 'listbox' && list.closest('.ant-select-dropdown')
+  const option = popup && [...list.querySelectorAll('[role="option"]')].find(item =>
+    item.getAttribute('aria-disabled') !== 'true' && item.querySelector('[data-ui-option-value]'))
+  if (!popup || !option) return state
+  const bounds = element => {
+    const rect = element.getBoundingClientRect()
+    return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, width: rect.width, height: rect.height }
+  }
+  const root = bounds(popup), content = bounds(list), item = bounds(option), ancestors = []
+  for (let element = option; element; element = element.parentElement) {
+    const css = getComputedStyle(element)
+    ancestors.push({ tag: element.tagName.toLowerCase(), id: element.id, class: element.getAttribute('class'),
+      display: css.display, visibility: css.visibility, opacity: css.opacity, pointerEvents: css.pointerEvents })
+  }
+  const positive = rect => Object.values(rect).every(Number.isFinite) && rect.width > 0 && rect.height > 0 &&
+    rect.right > 0 && rect.bottom > 0 && rect.left < innerWidth && rect.top < innerHeight
+  const visible = option.isConnected && [root, content, item].every(positive) &&
+    ancestors.every(css => css.display !== 'none' && css.visibility === 'visible' && Number(css.opacity) > 0)
+  const inViewport = item.left >= 0 && item.top >= 0 && item.right <= innerWidth + 1 && item.bottom <= innerHeight + 1
+  const point = { x: item.left + item.width / 2, y: item.top + item.height / 2 }
+  const hit = visible && inViewport ? document.elementFromPoint(point.x, point.y) : null
+  const ownedHit = !!hit && (hit === option || option.contains(hit))
+  state.popup = { listId, class: popup.getAttribute('class'), optionId: option.id,
+    optionValue: option.querySelector('[data-ui-option-value]').getAttribute('data-ui-option-value'),
+    root, content, item, ancestors, visible, inViewport, point, ownedHit,
+    hit: hit ? { tag: hit.tagName.toLowerCase(), id: hit.id, class: hit.getAttribute('class') } : null,
+    ready: state.expanded && state.optionsAvailable && visible && inViewport && ownedHit }
+  return state
+}
+
+function paintedPopupReader(read, paint) {
+  let pending = null
+  return async () => {
+    const previous = pending, paintedBeforeRead = previous?.complete === true
+    const sample = await read()
+    if (!sample.expanded || !sample.optionsAvailable || !sample.popup?.ready) { pending = null; return sample }
+    if (!pending) {
+      const cycle = { complete: false }; pending = cycle
+      // Do not await a renderer frame here: the original until deadline must keep advancing.
+      Promise.resolve().then(paint).then(() => { cycle.complete = true }, error => { cycle.error = error })
+    }
+    if ('error' in pending) throw pending.error
+    return { ...sample, popup: { ...sample.popup, paintFrames: pending === previous && paintedBeforeRead ? 2 : 0 } }
+  }
+}
+
 async function main() {
   const { app, BrowserWindow, nativeImage } = require('electron')
   const root = path.resolve(__dirname, '..'), output = path.join(root, 'test-results/ui-controls-render')
@@ -349,13 +401,15 @@ async function main() {
       if (!disabled) await until(events, list => list.slice(before).some(item => item.type === 'click' && item.trusted), 'trusted pointer click')
       else await pause(40)
     }
-    const selectState = id => evaluate(id => {
-      const node = document.getElementById(id), owner = node.closest('[data-ui-control="select"]')
-      const listId = node.getAttribute('aria-controls') || node.getAttribute('aria-owns'), list = listId && document.getElementById(listId)
-      return { expanded: node.getAttribute('aria-expanded') === 'true', optionsAvailable: !!list?.querySelector('[data-ui-option-value]'),
-        value: JSON.parse(owner.dataset.uiValue), focused: document.activeElement === node }
-    }, id)
-    const opened = id => until(() => selectState(id), state => state.expanded && state.optionsAvailable, id + ' real popup')
+    const selectState = id => evaluate(selectStateSnapshot, id)
+    const opened = async id => {
+      const receipt = { id, complete: false }; report.scenes.at(-1).popups.push(receipt)
+      const read = paintedPopupReader(() => selectState(id), () => evaluate(() =>
+        new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve(true))))))
+      const state = await until(async () => { receipt.sample = await read(); return receipt.sample },
+        sample => sample.expanded && sample.optionsAvailable && sample.popup?.ready && sample.popup.paintFrames === 2, id + ' rendered popup')
+      receipt.complete = true; persist(); return state
+    }
     const closed = id => until(() => selectState(id), state => !state.expanded, id + ' collapsed')
     const choose = async (id, value) => {
       await click('#' + id + ''); await opened(id)
@@ -378,7 +432,7 @@ async function main() {
     }
     for (const theme of ['light', 'dark']) for (const [width, height] of VIEWPORTS) {
       const scene = { name: `${theme}-${width}x${height}`, theme, requested: [width, height], complete: false,
-        focus: [], images: [], interaction: {}, form: {}, modal: {}, toolbar: {}, errors: [] }
+        focus: [], images: [], popups: [], interaction: {}, form: {}, modal: {}, toolbar: {}, errors: [] }
       report.scenes.push(scene); report.status = 'running'; persist()
       win.setContentSize(width, height)
       await win.loadFile(path.join(fixture, 'fixture.html'), { query: { theme } })
@@ -498,7 +552,7 @@ async function main() {
   } catch (error) { fail(error) }
 }
 
-module.exports = { verifyGeometry, verifyFocus, verifyScenes, hasVisibleBoxShadow, HEIGHTS, VIEWPORTS, BUDGET_MS, failureDetails, recordFocusEvidence, captureMatchedFocusStyles }
+module.exports = { verifyGeometry, verifyFocus, verifyScenes, hasVisibleBoxShadow, HEIGHTS, VIEWPORTS, BUDGET_MS, failureDetails, recordFocusEvidence, captureMatchedFocusStyles, selectStateSnapshot, paintedPopupReader }
 // Electron 31's ESM default_app imports the CLI file, so require.main does not
 // identify it. Only the actual browser-process CLI entry may start this runner;
 // importing the exported evidence helpers must remain side-effect free.

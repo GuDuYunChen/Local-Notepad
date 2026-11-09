@@ -269,3 +269,137 @@ test('missing focus nodes or artifact write failures remain separate diagnostics
   assert.deepEqual(failedWrite.errors.map(error => error.stage), ['write', 'write'])
   assert.deepEqual(failedWrite.artifacts, {})
 })
+
+const { selectStateSnapshot, paintedPopupReader } = require('./check-ui-control-render.cjs')
+// Inert DOM boundary for the exact function serialized into Electron. Geometry
+// and computed styles are explicit observations, not native rendering evidence.
+function popupPage() {
+  const nodes = new Map(), queries = []
+  const element = (tag, id, parent = null, attributes = {}) => {
+    const node = { tagName: tag.toUpperCase(), id, attributes: { id, ...attributes }, parentElement: parent,
+      children: [], dataset: {}, isConnected: true,
+      rect: { left: 200, top: 100, right: 380, bottom: 228, width: 180, height: 128 },
+      css: { display: 'block', visibility: 'visible', opacity: '1', pointerEvents: 'auto' },
+      getAttribute(name) { return this.attributes[name] ?? null },
+      getBoundingClientRect() { return this.rect },
+      contains(other) { for (let current = other; current; current = current.parentElement) if (current === this) return true; return false },
+      closest(selector) {
+        for (let current = this; current; current = current.parentElement) {
+          if (selector === '[data-ui-control="select"]' && current.attributes['data-ui-control'] === 'select') return current
+          if (selector === '.ant-select-dropdown' && String(current.attributes.class).split(/\s+/).includes('ant-select-dropdown')) return current
+        }
+        return null
+      },
+      querySelectorAll(selector) {
+        const descendants = this.children.flatMap(child => [child, ...child.querySelectorAll('*')])
+        return descendants.filter(child => selector === '*' || selector === '[role="option"]' && child.attributes.role === 'option' ||
+          selector === '[data-ui-option-value]' && Object.hasOwn(child.attributes, 'data-ui-option-value'))
+      },
+      querySelector(selector) { return this.querySelectorAll(selector)[0] || null },
+    }
+    parent?.children.push(node); nodes.set(id, node); return node
+  }
+  const html = element('html', 'html'), body = element('body', 'body', html)
+  const host = element('span', 'host', body, { 'data-ui-control': 'select' }); host.dataset.uiValue = '"alpha"'
+  const trigger = element('input', 'ordinary-select', host, { 'aria-controls': 'owned-list', 'aria-expanded': 'true' })
+  const popup = element('div', 'popup', body, { class: 'ant-select-dropdown' })
+  const list = element('div', 'owned-list', popup, { role: 'listbox' })
+  const option = element('div', 'alpha-option', list, { role: 'option', 'aria-disabled': 'false' })
+  option.rect = { left: 204, top: 104, right: 376, bottom: 136, width: 172, height: 32 }
+  const marker = element('span', 'alpha-marker', option, { 'data-ui-option-value': 'alpha' })
+  const page = { html, body, host, trigger, popup, list, option, marker, hit: marker, queries }
+  const document = { activeElement: trigger,
+    getElementById(id) { queries.push(id); return nodes.get(id) || null },
+    elementFromPoint() { return page.hit },
+    querySelector() { throw Error('A global popup query cannot establish ownership') },
+  }
+  page.observe = () => vm.runInNewContext(`(${selectStateSnapshot.toString()})('ordinary-select')`,
+    { document, getComputedStyle: node => node.css, innerWidth: 704, innerHeight: 455 })
+  return page
+}
+
+test('serialized popup observation follows its real aria owner and records an enabled option hit', () => {
+  const page = popupPage(), sample = page.observe()
+  assert.equal(sample.expanded, true); assert.equal(sample.optionsAvailable, true)
+  assert.equal(sample.value, 'alpha'); assert.equal(sample.focused, true)
+  assert.equal(sample.popup.ready, true); assert.equal(sample.popup.ownedHit, true)
+  assert.equal(sample.popup.listId, 'owned-list'); assert.equal(sample.popup.optionValue, 'alpha')
+  assert.equal(sample.popup.item.height, 32); assert.equal(sample.popup.ancestors.at(-1).tag, 'html')
+  assert.deepEqual(page.queries, ['ordinary-select', 'owned-list'])
+  page.trigger.attributes['aria-controls'] = 'unrelated-list'
+  assert.equal(page.observe().popup, null, 'A different visible popup must not substitute for the aria owner')
+})
+
+test('expanded DOM and option markers cannot qualify a hidden, zero-size, clipped or covered popup', () => {
+  const cases = [
+    page => { page.popup.css.opacity = '0' },
+    page => { page.body.css.opacity = '0' },
+    page => { page.list.css.display = 'none' },
+    page => { page.option.css.visibility = 'hidden' },
+    page => { page.popup.rect.height = 0; page.popup.rect.bottom = page.popup.rect.top },
+    page => { page.list.rect.width = 0; page.list.rect.right = page.list.rect.left },
+    page => { page.option.rect.left = 700; page.option.rect.right = 872 },
+    page => { page.hit = page.body },
+  ]
+  for (const mutate of cases) {
+    const page = popupPage(); mutate(page); const sample = page.observe()
+    assert.equal(sample.expanded, true); assert.equal(sample.optionsAvailable, true)
+    assert.equal(sample.popup.ready, false)
+  }
+})
+
+test('popup readiness refuses disabled-only options, a missing popup owner, wrong roles and detached content', () => {
+  for (const mutate of [page => { page.option.attributes['aria-disabled'] = 'true' },
+    page => { page.popup.attributes.class = 'unrelated-overlay' }, page => { page.list.attributes.role = 'presentation' },
+    page => { page.option.isConnected = false }]) {
+    const page = popupPage(); mutate(page)
+    assert.notEqual(page.observe().popup?.ready, true)
+  }
+})
+
+test('paint readiness requires a completed frame boundary and a fresh visible observation after it', async () => {
+  const page = popupPage(), frames = []
+  const read = paintedPopupReader(() => page.observe(), () => new Promise(resolve => frames.push(resolve)))
+  assert.equal((await read()).popup.paintFrames, 0)
+  assert.equal((await read()).popup.paintFrames, 0); assert.equal(frames.length, 1)
+  // Losing visibility invalidates the old cycle, even if that pending frame later completes.
+  page.popup.css.opacity = '0'; assert.equal((await read()).popup.ready, false)
+  frames[0](); await new Promise(resolve => setImmediate(resolve))
+  page.popup.css.opacity = '1'; assert.equal((await read()).popup.paintFrames, 0)
+  assert.equal(frames.length, 2); assert.equal((await read()).popup.paintFrames, 0)
+  frames[1](); await new Promise(resolve => setImmediate(resolve))
+  page.hit = page.body; assert.equal((await read()).popup.ready, false, 'A previously painted but now covered popup cannot pass')
+  page.hit = page.marker; assert.equal((await read()).popup.paintFrames, 0)
+  frames[2](); await new Promise(resolve => setImmediate(resolve))
+  const sample = await read(); assert.equal(sample.popup.ready, true); assert.equal(sample.popup.paintFrames, 2)
+})
+
+test('a pending renderer frame does not block the existing polling deadline and frame errors remain failures', async () => {
+  const page = popupPage(), neverPainted = paintedPopupReader(() => page.observe(), () => new Promise(() => {}))
+  let observed = false
+  const pending = neverPainted().then(sample => { observed = true; return sample })
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(observed, true); assert.equal((await pending).popup.paintFrames, 0)
+  assert.equal((await neverPainted()).popup.paintFrames, 0)
+  const failure = Error('Renderer paint unavailable')
+  const failed = paintedPopupReader(() => page.observe(), async () => { throw failure })
+  assert.equal((await failed()).popup.paintFrames, 0)
+  await new Promise(resolve => setImmediate(resolve))
+  await assert.rejects(failed, error => error === failure)
+})
+
+test('a paint completed during an in-flight DOM read cannot certify that earlier sample', async () => {
+  const page = popupPage()
+  let finishPaint, deliverRead, delayRead = false
+  const read = paintedPopupReader(() => {
+    const sample = page.observe()
+    return delayRead ? new Promise(resolve => { deliverRead = () => resolve(sample) }) : sample
+  }, () => new Promise(resolve => { finishPaint = resolve }))
+  assert.equal((await read()).popup.paintFrames, 0)
+  delayRead = true
+  const earlierSample = read()
+  finishPaint(); await new Promise(resolve => setImmediate(resolve)); deliverRead()
+  assert.equal((await earlierSample).popup.paintFrames, 0)
+  delayRead = false
+  assert.equal((await read()).popup.paintFrames, 2)
+})
