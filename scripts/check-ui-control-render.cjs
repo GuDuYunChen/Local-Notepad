@@ -24,22 +24,46 @@ function toolbarSnapshot() {
     const r = node.getBoundingClientRect()
     return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width, height: r.height }
   }
+  const html = document.documentElement, body = document.body, htmlCSS = getComputedStyle(html)
+  const htmlNamespace = 'http://www.w3.org/1999/xhtml'
+  const firstBody = [...html.children].find(node => node.namespaceURI === htmlNamespace && node.localName === 'body')
+  const bodyCSS = body ? getComputedStyle(body) : null
+  // CSS Overflow 3 §3.3: propagated root/body overflow clips at the viewport,
+  // not a second time at that element's scrolled box. Containment disables the
+  // body special case; unknown or implicit containment stays conservative.
+  const bodyPropagated = html.namespaceURI === htmlNamespace && html.localName === 'html' && htmlCSS.display !== 'none' &&
+    htmlCSS.overflowX === 'visible' && htmlCSS.overflowY === 'visible' && firstBody === body && body?.parentElement === html &&
+    bodyCSS?.display !== 'none' && htmlCSS.contain === 'none' && bodyCSS?.contain === 'none' &&
+    htmlCSS.contentVisibility === 'visible' && bodyCSS?.contentVisibility === 'visible'
+  const viewportOwner = bodyPropagated ? body : htmlCSS.display !== 'none' ? html : null
+  const viewportClip = { left: 0, top: 0, right: Math.min(innerWidth, html.clientWidth), bottom: Math.min(innerHeight, html.clientHeight) }
+  const identity = node => node ? { tag: node.localName, id: node.id || null } : null
   const observe = node => {
     const box = bounds(node)
     let visible = box.width > 0 && box.height > 0
-    let inViewport = box.left >= -1 && box.top >= -1 && box.right <= innerWidth + 1 && box.bottom <= innerHeight + 1
+    let inViewport = box.left >= -1 && box.top >= -1 && box.right <= viewportClip.right + 1 && box.bottom <= viewportClip.bottom + 1
+    const ancestors = []
     for (let owner = node; owner; owner = owner.parentElement) {
-      const css = getComputedStyle(owner), clip = bounds(owner)
+      const css = getComputedStyle(owner), rect = bounds(owner)
+      const clip = { left: rect.left + owner.clientLeft, top: rect.top + owner.clientTop,
+        right: rect.left + owner.clientLeft + owner.clientWidth, bottom: rect.top + owner.clientTop + owner.clientHeight }
+      const propagated = owner === html && htmlCSS.display !== 'none' || owner === viewportOwner
+      const clipY = owner !== node && !propagated && /hidden|auto|scroll|clip/.test(css.overflowY)
+      const clipX = owner !== node && !propagated && /hidden|auto|scroll|clip/.test(css.overflowX)
       visible &&= css.display !== 'none' && css.visibility === 'visible' && Number(css.opacity) > 0
-      if (owner !== node && /hidden|auto|scroll|clip/.test(css.overflowY)) inViewport &&= box.top >= clip.top - 1 && box.bottom <= clip.bottom + 1
-      if (owner !== node && /hidden|auto|scroll|clip/.test(css.overflowX)) inViewport &&= box.left >= clip.left - 1 && box.right <= clip.right + 1
+      if (clipY) inViewport &&= box.top >= clip.top - 1 && box.bottom <= clip.bottom + 1
+      if (clipX) inViewport &&= box.left >= clip.left - 1 && box.right <= clip.right + 1
+      ancestors.push({ ...identity(owner), rect, clientClip: clip, viewportOverflow: propagated,
+        appliedClipX: clipX, appliedClipY: clipY, computed: { display: css.display, visibility: css.visibility, opacity: css.opacity,
+          overflowX: css.overflowX, overflowY: css.overflowY, contain: css.contain, contentVisibility: css.contentVisibility } })
     }
     const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)
-    return { ...box, owned: root.contains(node), visible, inViewport, hit: hit === node || node.contains(hit) }
+    return { ...box, owned: root.contains(node), visible, inViewport, hit: hit === node || node.contains(hit), ancestors }
   }
   const r = bounds(root)
   return { viewport: { width: innerWidth, height: innerHeight }, theme: document.documentElement.dataset.theme,
     left: r.left, right: r.right, rootBounds: r,
+    viewportOverflow: { owner: identity(viewportOwner), bodyPropagated, clip: viewportClip },
     fields: ['long-input', 'long-select', 'long-clear'].map(id => {
       const field = document.getElementById(id)
       if (!field) throw Error('Actual toolbar control missing: ' + id)
