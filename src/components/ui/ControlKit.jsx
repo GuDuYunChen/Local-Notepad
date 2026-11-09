@@ -1,4 +1,4 @@
-import React, { Children, Fragment, forwardRef, isValidElement, useContext, useEffect, useId, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import React, { Children, Fragment, forwardRef, isValidElement, useCallback, useContext, useEffect, useId, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import Button from 'antd/es/button'
 import Input from 'antd/es/input'
 import Select from 'antd/es/select'
@@ -31,6 +31,45 @@ const nativeTypes = new Set(['checkbox', 'radio', 'file', 'range', 'color', 'hid
 const writeRef = (ref, value) => { if (typeof ref === 'function') ref(value); else if (ref) ref.current = value }
 const inputNode = value => value?.input || value?.resizableTextArea?.textArea || value?.nativeElement || value
 const nativeRef = ref => value => writeRef(ref, inputNode(value))
+
+// AntD text inputs keep their own uncontrolled state. The browser's form.reset()
+// restores native DOM values, but a subsequent React commit can repaint the
+// pre-reset value. Only an uncancelled native reset remounts that field with its
+// original default; controlled values stay owned by their caller. No change or
+// input event is emitted on reset.
+function useNativeTextReset(forwardedRef, controlled, formId) {
+  const [resetKey, setResetKey] = useState(0)
+  const input = useRef(null)
+  const restoreFocus = useRef(false)
+  const assign = useCallback(component => {
+    const native = inputNode(component)
+    input.current = native
+    writeRef(forwardedRef, native)
+  }, [forwardedRef])
+  useEffect(() => {
+    if (controlled) return undefined
+    const owner = input.current?.form || (formId ? document.getElementById(formId) : null)
+    if (!owner) return undefined
+    let mounted = true
+    const onReset = event => {
+      // Check cancellation after the form's own React onReset handlers run.
+      // The browser has completed its native reset before this microtask.
+      queueMicrotask(() => {
+        if (!mounted || event.defaultPrevented) return
+        restoreFocus.current = document.activeElement === input.current
+        setResetKey(key => key + 1)
+      })
+    }
+    owner.addEventListener('reset', onReset)
+    return () => { mounted = false; owner.removeEventListener('reset', onReset) }
+  }, [controlled, formId, resetKey])
+  useLayoutEffect(() => {
+    if (!restoreFocus.current) return
+    restoreFocus.current = false
+    input.current?.focus({ preventScroll: true })
+  }, [resetKey])
+  return [resetKey, assign]
+}
 const hasClass = (value, token) => String(value || '').split(/\s+/).includes(token)
 const cleanClass = value => String(value || '').split(/\s+/).filter(token => token && true).join(' ')
 // Legacy presentation utility classes must not restyle Ant Design internals.
@@ -79,16 +118,19 @@ export const UiButton = forwardRef(function UiButton({ type, htmlType, variant, 
 })
 
 export const UiInput = forwardRef(function UiInput({ className = '', size, density, type = 'text', ...props }, ref) {
+  const [resetKey, resetRef] = useNativeTextReset(ref, nativeTypes.has(type) || props.value !== undefined, props.form)
   if (nativeTypes.has(type)) return <input {...props} ref={ref} type={type} className={className} data-ui-native={type} />
-  return <Input {...props} ref={nativeRef(ref)} type={type} size={controlSize(size, density, className)} status={errorStatus(props)}
+  return <Input key={resetKey} {...props} ref={resetRef} type={type} size={controlSize(size, density, className)} status={errorStatus(props)}
     data-ui-control="input" className={['app-ui-input', cleanControlClass(className)].filter(Boolean).join(' ')} />
 })
 export const UiPassword = forwardRef(function UiPassword({ className = '', size, density, type: _type, ...props }, ref) {
-  return <Input.Password {...props} ref={nativeRef(ref)} size={controlSize(size, density, className)} status={errorStatus(props)}
+  const [resetKey, resetRef] = useNativeTextReset(ref, props.value !== undefined, props.form)
+  return <Input.Password key={resetKey} {...props} ref={resetRef} size={controlSize(size, density, className)} status={errorStatus(props)}
     data-ui-control="password" className={['app-ui-input', cleanControlClass(className)].filter(Boolean).join(' ')} />
 })
 export const UiTextarea = forwardRef(function UiTextarea({ className = '', size, density, ...props }, ref) {
-  return <Input.TextArea {...props} ref={nativeRef(ref)} size={controlSize(size, density, className)} status={errorStatus(props)}
+  const [resetKey, resetRef] = useNativeTextReset(ref, props.value !== undefined, props.form)
+  return <Input.TextArea key={resetKey} {...props} ref={resetRef} size={controlSize(size, density, className)} status={errorStatus(props)}
     data-ui-control="textarea" className={['app-ui-input', cleanControlClass(className)].filter(Boolean).join(' ')} />
 })
 
