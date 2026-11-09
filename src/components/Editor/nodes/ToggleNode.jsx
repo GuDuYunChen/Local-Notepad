@@ -2,6 +2,8 @@ import { $getNodeByKey, DecoratorNode } from 'lexical'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { useLexicalEditable } from '@lexical/react/useLexicalEditable'
 import React, { useEffect, useState } from 'react'
+import { UiButton, UiInput, UiTextarea } from '~/components/ui/ControlKit'
+
 
 export class ToggleNode extends DecoratorNode {
   __title
@@ -122,7 +124,7 @@ function ToggleComponent({ nodeKey, title, content, collapsed }) {
   return (
     <div className="toggle-block">
       <div className="toggle-header">
-        <button
+        <UiButton density="compact"
           type="button"
           className="toggle-arrow-button"
           onClick={toggleCollapsed}
@@ -130,9 +132,9 @@ function ToggleComponent({ nodeKey, title, content, collapsed }) {
           aria-expanded={!isCollapsed}
         >
           <span className={`toggle-arrow${isCollapsed ? '' : ' open'}`}>▶</span>
-        </button>
+        </UiButton>
 
-        <input
+        <UiInput density="compact"
           className="toggle-title-input"
           value={editTitle}
           readOnly={!isEditable}
@@ -149,7 +151,7 @@ function ToggleComponent({ nodeKey, title, content, collapsed }) {
 
       {!isCollapsed && (
         <div className="toggle-content">
-          <textarea
+          <UiTextarea density="compact"
             value={editContent}
             readOnly={!isEditable}
             onChange={(event) => {

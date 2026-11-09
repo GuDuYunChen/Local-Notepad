@@ -1,4 +1,5 @@
 import React, { useId, useLayoutEffect, useRef, useState } from 'react'
+import { UiButton, UiInput, UiPassword } from './ui/ControlKit.jsx'
 import useS3ReadProbe from '../hooks/useS3ReadProbe.js'
 import { S3_PROBE_LIMITATION } from '../services/s3ReadProbe.mjs'
 import { emptyInspectionDraft, prepareS3Inspection, inspectionNextStep, INSPECTION_PRIVACY, INSPECTION_STOP_NOTICE } from '../services/s3ReadInspection.mjs'
@@ -87,7 +88,8 @@ function InspectionForm({ id, onClose }) {
     const fieldID = id + '-' + name, error = errors[name]
     return h('div', { className: 's3-inspection-field' + (opts.wide ? ' s3-inspection-wide' : ''), key: name },
       h('label', { htmlFor: fieldID }, label),
-      h('input', { id: fieldID, name, type: opts.secret ? 'password' : 'text', value: draft[name],
+      h(opts.secret ? UiPassword : UiInput, { id: fieldID, name, type: opts.secret ? 'password' : 'text', value: draft[name],
+        ...(opts.secret ? { visibilityToggle: false } : {}),
         ref: element => { fields.current[name] = element }, onChange: e => edit(name, e.target.value),
         autoComplete: opts.secret ? 'new-password' : 'off', autoCapitalize: 'none', autoCorrect: 'off', spellCheck: false,
         inputMode: opts.numeric ? 'numeric' : undefined, maxLength: opts.maxLength || 65536,
@@ -120,16 +122,16 @@ function InspectionForm({ id, onClose }) {
     h('fieldset', { className: 's3-inspection-fieldset' }, h('legend', null, '3 · 确认边界并检查'),
       field('maxBytes', '读取上限（字节）', '1–1048576 字节，最多 1 MiB；超限不接受部分对象。', { required: true, numeric: true, maxLength: 7 }),
       h('label', { className: 's3-inspection-consent', htmlFor: id + '-consent' },
-        h('input', { id: id + '-consent', type: 'checkbox', checked: draft.consent,
+        h('input', { id: id + '-consent', type: 'checkbox', 'data-ui-native': 'checkbox', checked: draft.consent,
           ref: el => { fields.current.consent = el }, onChange: e => edit('consent', e.target.checked),
           'aria-invalid': !!errors.consent, 'aria-describedby': errors.consent ? id + '-consent-error' : undefined }),
         h('span', null, '我确认只读取指定对象，不上传、不删除、不启动同步。')),
       errors.consent && h('p', { id: id + '-consent-error', className: 's3-inspection-error' }, errors.consent),
       h('div', { className: 's3-inspection-actions' },
-        h('button', { type: 'button', className: 'btn primary', disabled: pending || !available, onClick: () => void inspect() }, pending ? '正在检查…' : result.state === 'idle' ? '开始只读检查' : '重新检查'),
-        pending && h('button', { type: 'button', className: 'btn', onClick: stop }, '停止采用'),
-        h('button', { type: 'button', className: 'btn', onClick: clear }, '清空全部输入'),
-        h('button', { type: 'button', className: 'btn', onClick: close }, '关闭并清空')),
+        h(UiButton, { type: 'button', className: 'btn primary', disabled: pending || !available, onClick: () => void inspect() }, pending ? '正在检查…' : result.state === 'idle' ? '开始只读检查' : '重新检查'),
+        pending && h(UiButton, { type: 'button', className: 'btn', onClick: stop }, '停止采用'),
+        h(UiButton, { type: 'button', className: 'btn', onClick: clear }, '清空全部输入'),
+        h(UiButton, { type: 'button', className: 'btn', onClick: close }, '关闭并清空')),
       h('p', { className: 's3-inspection-shortcuts' }, 'Ctrl / ⌘ + Enter 检查，Esc 关闭并清空。修改输入立即使旧结果失效。')),
     h('section', { className: 's3-inspection-result', 'data-state': result.state, 'aria-labelledby': id + '-result-title' },
       h('h4', { id: id + '-result-title' }, TITLES[result.state] || '检查状态'),
@@ -155,7 +157,7 @@ export default function S3ReadInspectionPanel() {
       h('span', { className: 's3-inspection-badge' }, '只读工具')),
     !open && h('div', { className: 's3-inspection-entry' },
       h('p', null, '手动检查指定对象能否完整读取。不会保存凭据、列举文件或改动本地及云端内容。')),
-    h('button', { type: 'button', ref: opener, className: 'btn s3-inspection-opener', 'aria-expanded': open,
+    h(UiButton, { type: 'button', ref: opener, className: 'btn s3-inspection-opener', 'aria-expanded': open,
       'aria-controls': id + '-body', disabled: open, onClick: () => setOpen(true) }, open ? '检查面板已打开' : '打开云端只读检查'),
     open && h(InspectionForm, { id, onClose: close }))
 }

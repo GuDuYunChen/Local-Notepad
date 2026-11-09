@@ -14,7 +14,6 @@
 
 .todo-block.checked .todo-text {
   text-decoration: line-through;
-  color: var(--muted, #6b7280);
 }
 
 .todo-checkbox {
@@ -27,25 +26,11 @@
 
 .todo-text {
   flex: 1;
-  font-size: 14px;
-  color: var(--fg, #1f2d3d);
   cursor: text;
-  min-height: 20px;
 }
 
 .todo-input {
   flex: 1;
-  font-size: 14px;
-  padding: 4px 8px;
-  border: 1px solid var(--border-color, rgba(0,0,0,0.12));
-  border-radius: 4px;
-  background: var(--panel, #fff);
-  color: var(--fg, #1f2d3d);
-  outline: none;
-}
-
-.todo-input:focus-visible {
-  border-color: var(--accent, #7e5bef);
 }
 
 .divider-block {
@@ -73,20 +58,11 @@
 
 .callout-icon-btn {
   width: 32px;
-  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: transparent;
-  border: none;
-  border-radius: 6px;
   cursor: pointer;
-  font-size: 18px;
   transition: background-color 0.15s ease;
-}
-
-.callout-icon-btn:hover {
-  background-color: var(--toolbar-btn-hover, rgba(0,0,0,0.06));
 }
 
 .callout-icon-picker {
@@ -118,20 +94,11 @@
 
 .callout-icon-option {
   width: 32px;
-  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: transparent;
-  border: none;
-  border-radius: 4px;
   cursor: pointer;
-  font-size: 16px;
   transition: background-color 0.15s ease;
-}
-
-.callout-icon-option:hover {
-  background-color: var(--toolbar-btn-hover, rgba(0,0,0,0.06));
 }
 
 .callout-content {
@@ -141,20 +108,7 @@
 
 .callout-textarea {
   width: 100%;
-  min-height: 60px;
-  padding: 8px;
-  border: none;
-  background: transparent;
-  color: var(--fg, #1f2d3d);
-  font-size: 14px;
-  line-height: 1.6;
   resize: vertical;
-  outline: none;
-  font-family: inherit;
-}
-
-.callout-textarea::placeholder {
-  color: var(--muted, #6b7280);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -225,21 +179,7 @@
 
 .toggle-textarea {
   width: 100%;
-  min-height: 80px;
-  padding: 8px;
-  border: 1px solid var(--border-color, rgba(0,0,0,0.12));
-  border-radius: 4px;
-  background: transparent;
-  color: var(--fg, #1f2d3d);
-  font-size: 14px;
-  line-height: 1.6;
   resize: vertical;
-  outline: none;
-  font-family: inherit;
-}
-
-.toggle-textarea:focus-visible {
-  border-color: var(--accent, #7e5bef);
 }
 
 .embed-block {
@@ -259,34 +199,13 @@
 
 .embed-input {
   width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--border-color, rgba(0,0,0,0.12));
-  border-radius: 6px;
-  background: var(--bg, #faf9f7);
-  color: var(--fg, #1f2d3d);
-  font-size: 14px;
-  outline: none;
-}
-
-.embed-input:focus-visible {
-  border-color: var(--accent, #7e5bef);
 }
 
 .embed-save-btn {
   align-self: flex-end;
-  padding: 8px 16px;
-  background: var(--accent, #7e5bef);
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  font-size: 14px;
   font-weight: 500;
   cursor: pointer;
   transition: background-color 0.15s ease;
-}
-
-.embed-save-btn:hover:not(:disabled) {
-  background: var(--accent-hover, #6b4bd6);
 }
 
 .embed-save-btn:disabled {
@@ -319,18 +238,8 @@
 .embed-edit-btn {
   display: block;
   width: 100%;
-  padding: 8px;
-  background: transparent;
-  border: none;
-  border-top: 1px solid var(--border-color, rgba(0,0,0,0.08));
-  color: var(--muted, #6b7280);
-  font-size: 13px;
   cursor: pointer;
   transition: background-color 0.15s ease;
-}
-
-.embed-edit-btn:hover {
-  background: var(--toolbar-btn-hover, rgba(0,0,0,0.04));
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -344,20 +253,12 @@
 .todo-text-button {
   min-width: 0;
   flex: 1;
-  padding: 2px 0;
-  border: 0;
-  background: transparent;
-  color: var(--fg, #1f2d3d);
-  font: inherit;
-  font-size: 14px;
-  line-height: 1.55;
   text-align: left;
   cursor: text;
 }
 
 .todo-block.checked .todo-text-button {
   text-decoration: line-through;
-  color: var(--muted, #6b7280);
 }
 
 .toggle-header {
@@ -366,31 +267,15 @@
 
 .toggle-arrow-button {
   width: 28px;
-  height: 28px;
   flex: 0 0 28px;
   display: grid;
   place-items: center;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--muted, #6b7280);
   cursor: pointer;
-}
-
-.toggle-arrow-button:hover {
-  background: var(--toolbar-btn-hover, rgba(0,0,0,0.06));
 }
 
 .toggle-title-input {
   min-width: 0;
   flex: 1;
-  padding: 3px 2px;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--fg, #1f2d3d);
-  font: inherit;
-  font-size: 14px;
   font-weight: 600;
 }
 
@@ -404,8 +289,8 @@
   gap: 8px;
 }
 
-.embed-edit-actions .btn,
-.embed-save-btn {
+.embed-edit-actions .btn:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.embed-save-btn:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   min-height: 34px;
   border-radius: 8px;
 }
@@ -474,20 +359,7 @@
 
 .attachment-download {
   min-width: 58px;
-  height: 32px;
-  padding: 0 10px;
-  border: 1px solid var(--border-color, rgba(0,0,0,.1));
-  border-radius: 8px;
-  background: var(--panel, #fff);
-  color: var(--fg, #1f2d3d);
-  font: inherit;
-  font-size: 10px;
   cursor: pointer;
-}
-
-.attachment-download:hover:not(:disabled) {
-  border-color: var(--border-strong, rgba(0,0,0,.18));
-  background: var(--toolbar-btn-hover, rgba(0,0,0,.04));
 }
 
 .attachment-download:disabled {
@@ -509,22 +381,7 @@
 .attachment-download,
 .attachment-delete-button {
   min-width: 58px;
-  height: 32px;
-  padding: 0 10px;
-  border: 1px solid var(--border-color, rgba(0,0,0,.1));
-  border-radius: 8px;
-  background: var(--panel, #fff);
-  color: var(--fg, #1f2d3d);
-  font: inherit;
-  font-size: 10px;
   cursor: pointer;
-}
-
-.attachment-replace-button:hover:not(:disabled),
-.attachment-preview-button:hover:not(:disabled),
-.attachment-download:hover:not(:disabled) {
-  border-color: var(--border-strong, rgba(0,0,0,.18));
-  background: var(--toolbar-btn-hover, rgba(0,0,0,.04));
 }
 
 .attachment-replace-button:disabled,
@@ -595,6 +452,10 @@
 }
 
 .attachment-preview-header-actions button {
+  cursor: pointer;
+}
+
+.attachment-preview-header-actions button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   height: 32px;
   padding: 0 10px;
   border: 1px solid var(--border-color, rgba(0,0,0,.1));
@@ -603,13 +464,10 @@
   color: var(--fg, #1f2d3d);
   font: inherit;
   font-size: 10px;
-  cursor: pointer;
 }
 
 .attachment-preview-close {
   width: 32px;
-  padding: 0 !important;
-  font-size: 18px !important;
 }
 
 .attachment-preview-body {
@@ -662,7 +520,6 @@
   .attachment-preview-button,
   .attachment-download {
     min-width: 52px;
-    padding-inline: 8px;
   }
 }
 
@@ -725,9 +582,12 @@
 
 .formula-editor textarea {
   width: 100%;
+  resize: vertical;
+}
+
+.formula-editor textarea:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   min-height: 40px;
   padding: 8px 10px;
-  resize: vertical;
   border: 1px solid var(--border-color, rgba(0,0,0,.1));
   border-radius: 8px;
   outline: 0;
@@ -738,7 +598,7 @@
   line-height: 1.55;
 }
 
-.formula-editor textarea:focus {
+.formula-editor textarea:focus:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-color: var(--accent, #7e5bef);
   box-shadow: 0 0 0 2px var(--accent-light, rgba(126,91,239,.1));
 }
@@ -751,6 +611,10 @@
 }
 
 .formula-editor-actions button {
+  cursor: pointer;
+}
+
+.formula-editor-actions button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   min-height: 31px;
   padding: 0 9px;
   border: 1px solid var(--border-color, rgba(0,0,0,.1));
@@ -759,17 +623,16 @@
   color: var(--fg, #1f2d3d);
   font: inherit;
   font-size: 9px;
-  cursor: pointer;
 }
 
-.formula-editor-actions button:hover,
-.formula-editor-actions button.active {
+.formula-editor-actions button:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.formula-editor-actions button.active:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-color: var(--accent, #7e5bef);
   background: var(--accent-light, rgba(126,91,239,.1));
   color: var(--accent, #7e5bef);
 }
 
-.formula-editor-actions button.danger {
+.formula-editor-actions button.danger:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   color: var(--red, #c7433c);
 }
 
@@ -871,17 +734,4 @@
   place-items: center;
   color: var(--muted, #8b8791);
   font-size: 11px;
-}
-
-
-.attachment-delete-button,
-.attachment-preview-delete {
-  color: var(--red, #c7433c) !important;
-}
-
-.attachment-delete-button:hover,
-.attachment-preview-delete:hover {
-  border-color: color-mix(in srgb, var(--red, #c7433c) 28%, var(--border-color, rgba(0,0,0,.1))) !important;
-  background: var(--red-light, rgba(199,67,60,.08)) !important;
-  color: var(--red, #c7433c) !important;
 }

@@ -190,6 +190,10 @@
 }
 
 .focus-trend-switch button {
+  cursor: pointer;
+}
+
+.focus-trend-switch button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   height: 23px;
   padding: 0 6px;
   border: 1px solid transparent;
@@ -198,10 +202,9 @@
   color: var(--ink-muted);
   font: inherit;
   font-size: 7px;
-  cursor: pointer;
 }
 
-.focus-trend-switch button.active {
+.focus-trend-switch button.active:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-color: var(--line);
   background: var(--paper);
   color: var(--clay);
@@ -260,20 +263,23 @@
 
 .focus-chapter-efficiency-list button {
   min-width: 0;
-  padding: 5px;
   display: flex;
   align-items: center;
   gap: 8px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.focus-chapter-efficiency-list button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
+  padding: 5px;
   border: 0;
   border-radius: 6px;
   background: var(--paper);
   color: var(--ink-soft);
   font: inherit;
-  text-align: left;
-  cursor: pointer;
 }
 
-.focus-chapter-efficiency-list button:hover {
+.focus-chapter-efficiency-list button:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   background: var(--surface-hover);
 }
 
@@ -323,13 +329,16 @@
 .focus-session-review-head > button:first-child {
   min-width: 0;
   flex: 1;
+  text-align: left;
+  cursor: pointer;
+}
+
+.focus-session-review-head > button:first-child:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   padding: 0;
   border: 0;
   background: transparent;
   color: var(--ink-soft);
   font: inherit;
-  text-align: left;
-  cursor: pointer;
 }
 
 .focus-session-review-head strong,
@@ -352,13 +361,6 @@
 
 .focus-session-review-edit {
   flex: 0 0 auto;
-  padding: 3px 5px;
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  background: var(--surface);
-  color: var(--ink-muted);
-  font: inherit;
-  font-size: 7px;
   cursor: pointer;
 }
 
@@ -379,13 +381,16 @@
 
 .focus-session-review-editor textarea {
   width: 100%;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.focus-session-review-editor textarea:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   min-height: 58px;
   padding: 6px;
-  resize: vertical;
   border: 1px solid var(--line);
   border-radius: 6px;
   outline: 0;
-  box-sizing: border-box;
   background: var(--surface);
   color: var(--ink);
   font: inherit;
@@ -393,7 +398,7 @@
   line-height: 1.45;
 }
 
-.focus-session-review-editor textarea:focus {
+.focus-session-review-editor textarea:focus:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-color: var(--clay);
   box-shadow: 0 0 0 2px var(--clay-light);
 }
@@ -413,6 +418,10 @@
 }
 
 .focus-session-review-editor button {
+  cursor: pointer;
+}
+
+.focus-session-review-editor button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   min-height: 23px;
   padding: 0 6px;
   border: 1px solid var(--line);
@@ -421,13 +430,6 @@
   color: var(--ink-soft);
   font: inherit;
   font-size: 7px;
-  cursor: pointer;
-}
-
-.focus-session-review-editor button.primary {
-  border-color: var(--clay);
-  background: var(--clay);
-  color: #fff;
 }
 
 .focus-session-analytics-empty {

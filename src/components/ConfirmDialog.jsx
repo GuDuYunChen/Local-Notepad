@@ -1,4 +1,6 @@
 import React from 'react'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 export default function ConfirmDialog({ title, message, actions, onClose }) {
   const isAnyLoading = actions.some(action => action.loading)
@@ -45,7 +47,7 @@ export default function ConfirmDialog({ title, message, actions, onClose }) {
             const disabled = action.disabled || isAnyLoading
 
             return (
-              <button
+              <UiButton size="middle"
                 key={`${action.label}-${index}`}
                 ref={isPrimary ? primaryRef : undefined}
                 type="button"
@@ -62,7 +64,7 @@ export default function ConfirmDialog({ title, message, actions, onClose }) {
                     <span>处理中…</span>
                   </span>
                 ) : action.label}
-              </button>
+              </UiButton>
             )
           })}
         </div>

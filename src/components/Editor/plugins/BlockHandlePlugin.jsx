@@ -12,6 +12,8 @@ import './BlockHandlePlugin.css'
 import { removeCopiedBlockIds } from '../../../services/blockReferenceModel.mjs'
 import { $blockId, $setBlockId } from '../utils/blockReferenceState.js'
 import { BLOCK_TYPES } from '../../../services/blockReferenceModel.mjs'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 let internalBlockClipboard = null
 
@@ -298,21 +300,21 @@ export default function BlockHandlePlugin() {
 
       {showMenu && (
         <div className="block-menu" ref={menuRef} role="menu">
-          <button type="button" className="block-menu-item" onClick={() => insertSibling('before')} role="menuitem">
+          <UiButton density="compact" type="button" className="block-menu-item" onClick={() => insertSibling('before')} role="menuitem">
             <span className="block-menu-icon">↑</span>
             <span>上方插入空白块</span>
-          </button>
-          <button type="button" className="block-menu-item" onClick={() => insertSibling('after')} role="menuitem">
+          </UiButton>
+          <UiButton density="compact" type="button" className="block-menu-item" onClick={() => insertSibling('after')} role="menuitem">
             <span className="block-menu-icon">↓</span>
             <span>下方插入空白块</span>
-          </button>
+          </UiButton>
 
           <div className="block-menu-divider" />
-          <button type="button" className="block-menu-item" onClick={copyBlock} role="menuitem">
+          <UiButton density="compact" type="button" className="block-menu-item" onClick={copyBlock} role="menuitem">
             <span className="block-menu-icon">⧉</span>
             <span>复制当前块</span>
-          </button>
-          <button
+          </UiButton>
+          <UiButton density="compact"
             type="button"
             className="block-menu-item"
             onClick={pasteBlockAfter}
@@ -321,17 +323,17 @@ export default function BlockHandlePlugin() {
           >
             <span className="block-menu-icon">⇣</span>
             <span>粘贴复制块到下方</span>
-          </button>
-          <button type="button" className="block-menu-item" onClick={duplicateBlock} role="menuitem">
+          </UiButton>
+          <UiButton density="compact" type="button" className="block-menu-item" onClick={duplicateBlock} role="menuitem">
             <span className="block-menu-icon">＋</span>
             <span>重复当前块</span>
-          </button>
+          </UiButton>
 
           <div className="block-menu-divider" />
           <div className="block-menu-label">转换为</div>
 
           {blockRegistry.slice(0, 8).map((block) => (
-            <button
+            <UiButton density="compact"
               type="button"
               key={block.type}
               className={`block-menu-item${block.type === blockType ? ' active' : ''}`}
@@ -340,14 +342,14 @@ export default function BlockHandlePlugin() {
             >
               <span className="block-menu-icon">{block.icon}</span>
               <span>{block.label}</span>
-            </button>
+            </UiButton>
           ))}
 
           <div className="block-menu-divider" />
-          <button type="button" className="block-menu-item danger" onClick={deleteBlock} role="menuitem">
+          <UiButton density="compact" type="button" className="block-menu-item danger" onClick={deleteBlock} role="menuitem">
             <span className="block-menu-icon">⌫</span>
             <span>删除当前块</span>
-          </button>
+          </UiButton>
         </div>
       )}
     </>

@@ -48,6 +48,12 @@ test('missing low-contrast or not-final color probes are rejected', () => {
   }
   const r=fixture();r.reports[0].colors.pop();assert.throws(()=>verifyQueueReport(r,sha))
 })
+test('a removed native Select probe cannot stand in for actual shared Select text', () => {
+  const r=fixture(),probe=r.reports[0].colors.find(color=>color.selector.includes('[data-ui-control="select"]'))
+  assert.ok(probe)
+  probe.selector='.sync-queue-tools select'
+  assert.throws(()=>verifyQueueReport(r,sha),/contrast evidence is incomplete/)
+})
 test('unverified focus search writes or wrong platform cannot pass', () => {
   for(const field of ['complete','realComponents','navigationFocus','nativeSearch','syntheticRecords']){
     const r=fixture();r[field]=false;assert.throws(()=>verifyQueueReport(r,sha))

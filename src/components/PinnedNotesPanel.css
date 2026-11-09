@@ -3,17 +3,18 @@
 .pinned-header h2 { margin:0 0 7px; font-size:23px; }
 .pinned-header p,.pinned-detail p { margin:0; color:var(--ink-soft,#697180); line-height:1.8; }
 .pinned-header > div:last-child { display:flex; gap:8px; }
-.pinned-tools { display:flex; flex-wrap:wrap; gap:14px; align-items:flex-end; margin:20px 0 12px; }
-.pinned-tools label { display:flex; flex-direction:column; gap:7px; font-size:12px; }
-.pinned-tools label:first-child { flex:1 1 220px; }
-.pinned-tools input,.pinned-tools select { box-sizing:border-box; min-width:0; width:100%; padding:10px 12px; border:1px solid var(--line,#d8d9df); border-radius:7px; background:var(--surface,#fff); color:inherit; font:inherit; font-size:14px; }
+.pinned-tools { display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; margin:20px 0 12px; }
+.pinned-tools label { display:flex; flex-direction:column; gap:6px; min-width:0; font-size:12px; }
+.pinned-tools label:first-child { flex:1 1 280px; }
+.pinned-tools .pinned-control { box-sizing:border-box; min-width:0; width:100%; }
+.pinned-tools > label { flex:1 1 180px; }
+.pinned-tools .pinned-clear { align-self:end; white-space:nowrap; }
 .pinned-count,.pinned-workspace footer { color:var(--ink-soft,#697180); font-size:12px; line-height:1.8; }
 .pinned-content { display:grid; grid-template-columns:minmax(0,1fr) minmax(210px,280px); gap:20px; align-items:start; }
 .pinned-list { display:flex; flex-direction:column; gap:8px; }
-.pinned-row { display:flex; gap:12px; align-items:center; width:100%; min-width:0; text-align:left; padding:16px; border:1px solid var(--line,#d8d9df); background:var(--surface,#fff); color:inherit; border-radius:8px; cursor:pointer; }
+.pinned-row { display:flex; gap:12px; align-items:center; width:100%; min-width:0; text-align:left; cursor:pointer; }
 .pinned-row strong { flex:1; min-width:0; overflow-wrap:anywhere; font-size:14px; line-height:1.65; }
 .pinned-row small { color:var(--ink-soft,#697180); white-space:nowrap; }
-.pinned-row[aria-pressed=true] { border-color:var(--clay,#9a6a4b); box-shadow:inset 3px 0 var(--clay,#9a6a4b); }
 .pinned-detail { min-width:0; border:1px solid var(--line,#d8d9df); border-radius:10px; padding:20px; background:var(--surface,#fff); }
 .pinned-detail h3 { margin:0 0 14px; overflow-wrap:anywhere; line-height:1.6; }
 .pinned-detail .btn { display:block; width:100%; margin:12px 0; white-space:normal; }
@@ -25,6 +26,8 @@
 .pinned-empty { padding:30px 20px; text-align:center; border:1px dashed var(--line,#d8d9df); border-radius:9px; line-height:1.8; }
 .pinned-empty p { color:var(--ink-soft,#697180); }
 .pinned-workspace footer { border-top:1px solid var(--line,#d8d9df); margin-top:24px; padding-top:16px; }
-.pinned-workspace button:focus-visible,.pinned-workspace input:focus-visible,.pinned-workspace select:focus-visible { outline:2px solid var(--clay,#9a6a4b); outline-offset:3px; }
-.pinned-workspace button:disabled { opacity:.55; cursor:default; }
-@media(max-width:760px){.pinned-workspace{padding:16px;}.pinned-content{grid-template-columns:minmax(0,1fr);}.pinned-detail{order:-1}.pinned-tools label{flex:1 1 150px;}.pinned-header h2{font-size:21px;}}
+.pinned-workspace button:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.pinned-workspace input:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.pinned-workspace select:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { outline:2px solid var(--clay,#9a6a4b); outline-offset:3px; }
+.pinned-workspace button:disabled:not(.ant-btn):not([data-ui-control]) { opacity:.55; cursor:default; }
+@media(max-width:760px){.pinned-workspace{padding:16px;}.pinned-content{grid-template-columns:minmax(0,1fr);}.pinned-detail{order:-1}.pinned-tools{align-items:stretch;gap:10px}.pinned-tools label{flex:1 1 160px;min-width:0}.pinned-tools label:first-child{flex:1 1 100%}.pinned-tools .pinned-clear{width:100%}.pinned-header h2{font-size:21px;}}

@@ -4,10 +4,11 @@ import { readFileSync, lstatSync } from 'node:fs'
 import path from 'node:path'
 import { BLOCK_REFERENCE_CHECKS } from './block-references-desktop-driver.mjs'
 import { blockLocator, findReferenceBlock, validBlockId } from '../src/services/blockReferenceModel.mjs'
-export const BLOCK_REFERENCE_VERSION = '4.248.1'
+export const BLOCK_REFERENCE_VERSION = '4.249.0'
 export const BLOCK_REFERENCE_REPORT = 'block-references.json'
 export const BLOCK_REFERENCE_SOURCES = Object.freeze([
   'scripts/block-references-desktop-driver.mjs', 'scripts/run-block-references-desktop.mjs', 'scripts/block-references-evidence.mjs',
+  'scripts/native-ui-select.mjs',
   'src/services/blockReferenceModel.mjs', 'src/services/blockReferences.mjs',
   'src/components/Editor/plugins/BlockReferencePlugin.jsx', 'src/components/Editor/plugins/BlockReferences.css',
   'src/components/Editor/utils/blockReferenceState.js', 'src/components/Editor/nodes/BlockEmbedView.jsx',

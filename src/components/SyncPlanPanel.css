@@ -8,8 +8,10 @@
 .sync-plan-tools { display: flex; gap: 12px; flex-wrap: wrap; margin: 16px 0 12px; }
 .sync-plan-tools label { display: flex; flex-direction: column; gap: 6px; min-width: 0; font-size: 12px; }
 .sync-plan-search { flex: 1 1 220px; }
-.sync-plan-tools input, .sync-plan-tools select { box-sizing: border-box; width: 100%; min-height: 36px; min-width: 0; border: 1px solid var(--line); border-radius: 7px; padding: 7px 10px; background: var(--surface, var(--panel)); color: inherit; font: inherit; }
-.sync-plan-view :is(input, select, button, summary):focus-visible { outline: 2px solid var(--clay, var(--accent)); outline-offset: 3px; }
+.sync-plan-tools input, .sync-plan-tools select { box-sizing: border-box; width: 100%; min-width: 0; }
+.sync-plan-tools input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.sync-plan-tools select:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { min-height: 36px; border: 1px solid var(--line); border-radius: 7px; padding: 7px 10px; background: var(--surface, var(--panel)); color: inherit; font: inherit; }
+.sync-plan-view :is(input, select, button, summary):focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { outline: 2px solid var(--clay, var(--accent)); outline-offset: 3px; }
 .sync-plan-items { list-style: none; margin: 0; padding: 0; }
 .sync-plan-items > li { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); align-items: start; }
 .sync-plan-direction { font-size: 12px; line-height: 1.5; border: 1px solid var(--line); border-radius: 5px; padding: 3px 5px; text-align: center; }

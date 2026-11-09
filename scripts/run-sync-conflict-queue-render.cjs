@@ -11,7 +11,7 @@ const scenes = Object.freeze([
   ['dark-560-search', 560, 1, '匹配 1 / 当前列表 25 条 · 显示 1–1'],
 ].map(Object.freeze))
 const selectors = ['.sync-conflict-heading>strong', '.sync-queue-hint', '.sync-queue-search',
-  '.sync-queue-tools input', '.sync-queue-tools select', '.sync-queue-count', '.sync-queue-identifiers',
+  '.sync-queue-tools input', '.sync-queue-tools [data-ui-control="select"] .ant-select-content', '.sync-queue-count', '.sync-queue-identifiers',
   '.sync-conflict-item>div>strong', '.sync-conflict-item>div>span']
 const rgb = v => Array.isArray(v) && v.length === 3 && v.every(n => Number.isInteger(n) && n >= 0 && n <= 255)
 function verifyQueueReport(report, expectedCommit = null) {

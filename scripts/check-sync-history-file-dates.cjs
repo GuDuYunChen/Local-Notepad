@@ -16,7 +16,7 @@ if(!process.versions.electron){
  const watchdog=setTimeout(()=>app.exit(1),100000)
  const report={commit:process.env.GITHUB_SHA||'',platform:process.platform,complete:false,actualFileReader:true,syntheticRecords:true,sourceFilesUnchanged:false,scenes:[]}
  const save=()=>fs.writeFileSync(path.join(out,'checks.json'),JSON.stringify(report,null,2))
- function inspect(){
+ function inspect(readSelect){
   const p=document.querySelector('[data-history-file-viewer]'),d=p.querySelector('[data-history-file-date-filter]'),q=k=>d.querySelector('[data-history-time-'+k+']')
   const r=d.getBoundingClientRect(),canvas=document.createElement('canvas');canvas.width=canvas.height=1
   const ctx=canvas.getContext('2d',{willReadFrequently:true}),paint=c=>{ctx.fillStyle=c;ctx.fillRect(0,0,1,1)},rgb=()=>[...ctx.getImageData(0,0,1,1).data].slice(0,3)
@@ -29,13 +29,15 @@ if(!process.versions.electron){
   return{ids:[...p.querySelectorAll('[data-history-file-row]')].map(n=>n.querySelectorAll('code')[1].textContent),
    outcomes:[...p.querySelectorAll('[data-file-summary-outcome]')].map(n=>Number(n.textContent)),
    total:Number(p.querySelector('[data-history-file-matches]').textContent.match(/文件内共 (\d+) 条/)[1]),
-   dateOpen:q('controls').open,pending:!!q('pending'),invalid:!!q('error'),mode:q('mode').value,applied:q('applied')?.textContent||'',
+   dateOpen:q('controls').open,pending:!!q('pending'),invalid:!!q('error'),mode:readSelect('[data-history-file-date-filter] [data-history-time-mode]').value,applied:q('applied')?.textContent||'',
    stale:!!p.querySelector('[data-history-file-stale]'),filename:p.querySelector('[data-history-file-name]').textContent,page:p.querySelector('[data-history-file-page]').textContent,
    reads:window.__fileReads,requests:window.__requests.length,mutations:window.__mutations,network:window.__networkRequests,navigation:window.__navigationCalls,
    liveUnchanged:document.querySelector('[data-sync-conflict-history]').textContent===window.__liveHistory,privateText:p.textContent.includes('PRIVATE_'),
    visible:r.top>=0&&r.bottom<=innerHeight&&r.left>=0&&r.right<=innerWidth,focusInside:p.contains(document.activeElement),overflow:document.documentElement.scrollWidth-innerWidth,colors,width:innerWidth,height:innerHeight}
  }
  app.whenReady().then(async()=>{
+  const {createNativeUiSelect,inspectNativeUiSelect}=await import('./native-ui-select.mjs')
+  const inspectSource='('+inspect.toString()+')('+inspectNativeUiSelect.toString()+')'
   fs.mkdirSync(out,{recursive:true});save()
   const {prepareHistoryExport}=await import(pathToFileURL(path.join(root,'src/services/syncHistoryExport.mjs')).href)
   const seconds=s=>Date.parse(s)/1000
@@ -50,10 +52,15 @@ if(!process.versions.electron){
    const scene={name,frames:[]};report.scenes.push(scene);let downloads=0
    const onDownload=()=>downloads++;win.webContents.session.on('will-download',onDownload)
    const exec=code=>win.webContents.executeJavaScript(code),cdp=(method,params)=>win.webContents.debugger.sendCommand(method,params)
-   const wait=async code=>{for(let i=0;i<80;i++){if(await exec(code))return;await delay(60)}throw Error('Date view not ready: '+code)}
+   const wait=async(code,label)=>{for(let i=0;i<80;i++){const result=await(typeof code==='function'?code():exec(code));if(result)return result;await delay(60)}throw Error(label||'Date view not ready: '+code)}
+   const nativeClick=async selector=>{
+    const point=await wait(()=>exec(`(()=>{const nodes=[...document.querySelectorAll(${JSON.stringify(selector)})];if(nodes.length!==1)return null;const n=nodes[0];n.scrollIntoView({block:'center',behavior:'instant'});const r=n.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2,hit=document.elementFromPoint(x,y);return r.width>0&&r.height>0&&hit&&n.contains(hit)?{x,y}:null})()`),'Select control missing, ambiguous or occluded: '+selector)
+    for(const type of ['mousePressed','mouseReleased'])await cdp('Input.dispatchMouseEvent',{type,...point,button:'left',clickCount:1})
+   }
+   const select=createNativeUiSelect({evaluate:exec,click:nativeClick,cdp:{send:cdp},until:wait})
    const fileControl=k=>'[data-history-file-'+k+']',dateControl=k=>'[data-history-file-date-filter] [data-history-time-'+k+']'
    const click=sel=>exec(`(()=>{const n=document.querySelector(${JSON.stringify(sel)});n.focus({preventScroll:true});n.click();return true})()`)
-   const change=(sel,value)=>exec(`(()=>{const n=document.querySelector(${JSON.stringify(sel)});n.focus({preventScroll:true});if(n.tagName==='INPUT')Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(n,${JSON.stringify(value)});else n.value=${JSON.stringify(value)};n.dispatchEvent(new Event('input',{bubbles:true}));n.dispatchEvent(new Event('change',{bubbles:true}));return true})()`)
+   const change=(sel,value)=>exec(`(()=>{const n=document.querySelector(${JSON.stringify(sel)});if(n?.tagName!=='INPUT'||n.getAttribute('role')==='combobox')throw Error('Expected an original text/date input');n.focus({preventScroll:true});Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(n,${JSON.stringify(value)});n.dispatchEvent(new Event('input',{bubbles:true}));n.dispatchEvent(new Event('change',{bubbles:true}));return true})()`)
    const choose=async file=>{
     await exec(`document.querySelector('[data-history-file-choose]').focus({preventScroll:true});true`)
     const {root:doc}=await cdp('DOM.getDocument',{depth:0}),{nodeId}=await cdp('DOM.querySelector',{nodeId:doc.nodeId,selector:fileControl('input')})
@@ -62,14 +69,14 @@ if(!process.versions.electron){
    const capture=async phase=>{
     await exec(`document.querySelector('[data-history-file-date-filter]').scrollIntoView({block:'center',behavior:'instant'});true`)
     let frame,last='',stable=0
-    for(let i=0;i<40;i++){await delay(70);frame=await exec('('+inspect.toString()+')()');const s=JSON.stringify(frame);stable=s===last?stable+1:0;last=s;if(stable>=2)break}
+    for(let i=0;i<40;i++){await delay(70);frame=await exec(inspectSource);const s=JSON.stringify(frame);stable=s===last?stable+1:0;last=s;if(stable>=2)break}
     if(stable<2)throw Error('Unstable file-date DOM')
     const code=names.indexOf(name)*phases.length+phases.indexOf(phase)+1
     await exec(`(()=>{let s=document.getElementById('date-raster');if(!s){s=document.createElement('div');s.id='date-raster';s.setAttribute('aria-hidden','true');document.body.append(s)}s.style.cssText='position:fixed;left:0;top:0;width:32px;height:4px;display:flex;z-index:2147483647;pointer-events:none;contain:strict';s.replaceChildren();for(let i=0;i<8;i++){const c=document.createElement('span');c.style.cssText='display:block;flex:none;width:4px;height:4px;background:'+(((${code}>>>i)&1)?'rgb(221,238,255)':'rgb(17,34,51)');s.append(c)}return true})()`)
     let bytes,prior='',samples=0
     for(let i=0;i<40;i++){await delay(70);const b=(await win.capturePage()).toPNG(),hash=createHash('sha256').update(b).digest('hex');let valid=false;try{valid=verifyRasterWitness(b,code)}catch{}
      samples=valid?(prior===hash?samples+1:1):0;prior=hash;if(samples>=2){bytes=b;break}}
-    if(!bytes||JSON.stringify(await exec('('+inspect.toString()+')()'))!==JSON.stringify(frame))throw Error('File-date raster/DOM mismatch')
+    if(!bytes||JSON.stringify(await exec(inspectSource))!==JSON.stringify(frame))throw Error('File-date raster/DOM mismatch')
     const png=name+'-'+phase+'.png';fs.writeFileSync(path.join(out,png),bytes);scene.frames.push({phase,...frame,downloads,stable,samples,code,png,bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')});save()
    }
    try{
@@ -78,11 +85,11 @@ if(!process.versions.electron){
     await wait(`!!document.querySelector('[data-history-file-input]')`);await exec('document.fonts.ready.then(()=>true)')
     await exec(`(()=>{window.__liveHistory=document.querySelector('[data-sync-conflict-history]').textContent;window.__fileReads=0;const read=FileReader.prototype.readAsArrayBuffer;FileReader.prototype.readAsArrayBuffer=function(...a){window.__fileReads++;return read.apply(this,a)};document.querySelector('[data-history-file-viewer]').open=true;return true})()`)
     await choose('history.json');await wait(`!!document.querySelector('[data-history-file-date-filter]')`)
-    await click(dateControl('controls')+'>summary');await click(fileControl('next'));await change(dateControl('mode'),'range')
+    await click(dateControl('controls')+'>summary');await click(fileControl('next'));await select.choose(dateControl('mode'),'range')
     await change(dateControl('from'),'2026-09-30');await change(dateControl('to'),'2026-09-30');await capture('draft')
     await click(dateControl('apply'));await capture('applied')
     await change(dateControl('from'),'2026-10-02');await click(dateControl('apply'));await capture('invalid')
-    await change(dateControl('mode'),'missing');await click(dateControl('apply'));await capture('missing')
+    await select.choose(dateControl('mode'),'missing');await click(dateControl('apply'));await capture('missing')
     await choose('bad.json');await wait(`!!document.querySelector('[data-history-file-stale]')`);await capture('stale')
     await click(fileControl('filter-clear'));await capture('cleared')
     await choose('replacement.json');await wait(`document.querySelector('[data-history-file-name]').textContent==='replacement.json'`);await capture('replacement')

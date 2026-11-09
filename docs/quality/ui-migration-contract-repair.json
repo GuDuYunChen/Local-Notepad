@@ -1,0 +1,1065 @@
+{
+  "binding": {
+    "file": "src/components/TextEditor.jsx",
+    "old": "f9ae29dcb35bd11b9a8fad1a0fff4e61f534a1b70e476324992c69bcef2dba04",
+    "current": "403e77f72a20a40ea42e350fea3f34e3bd4c86957869e119327f9a1cefac4e9a",
+    "verification": "Entire normalized AST equal; only ControlKit import and JSX tags removed by normalization"
+  },
+  "tests": [
+    {
+      "file": "src/App.globalSearch.test.jsx",
+      "assertions": 89,
+      "testNames": 17,
+      "helpers": [
+        "setUiValue",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText"
+      ]
+    },
+    {
+      "file": "src/App.localActions.test.jsx",
+      "assertions": 49,
+      "testNames": 12,
+      "helpers": [
+        "uiQuery",
+        "uiQueryAll",
+        "uiText"
+      ]
+    },
+    {
+      "file": "src/App.quickSwitcher.test.jsx",
+      "assertions": 12,
+      "testNames": 3,
+      "helpers": [
+        "uiQuery",
+        "uiQueryAll",
+        "uiText"
+      ]
+    },
+    {
+      "file": "src/App.recentNotes.test.jsx",
+      "assertions": 24,
+      "testNames": 6,
+      "helpers": [
+        "uiQuery",
+        "uiQueryAll",
+        "uiText"
+      ]
+    },
+    {
+      "file": "src/App.shortcuts.test.jsx",
+      "assertions": 30,
+      "testNames": 7,
+      "helpers": [
+        "uiQuery",
+        "uiQueryAll",
+        "uiText"
+      ]
+    },
+    {
+      "file": "src/App.wikiNavigation.test.jsx",
+      "assertions": 110,
+      "testNames": 23,
+      "helpers": [
+        "uiQuery",
+        "uiQueryAll",
+        "uiText"
+      ]
+    },
+    {
+      "file": "src/components/AttachmentAudit.test.jsx",
+      "assertions": 62,
+      "testNames": 15,
+      "helpers": [
+        "setUiValue",
+        "uiDisabled",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText"
+      ]
+    },
+    {
+      "file": "src/components/BacklinksPanel.legacy-safety.test.jsx",
+      "assertions": 5,
+      "testNames": 3,
+      "helpers": [
+        "uiQuery",
+        "uiText"
+      ]
+    },
+    {
+      "file": "src/components/BacklinksPanel.test.jsx",
+      "assertions": 49,
+      "testNames": 18,
+      "helpers": [
+        "setUiValue",
+        "uiDisabled",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText"
+      ]
+    },
+    {
+      "file": "src/components/CollectionStudy.test.jsx",
+      "assertions": 51,
+      "testNames": 22,
+      "helpers": [
+        "setUiValue",
+        "uiDisabled",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText",
+        "uiValue"
+      ]
+    },
+    {
+      "file": "src/components/CollectionStudyBatchPanel.test.jsx",
+      "assertions": 55,
+      "testNames": 20,
+      "helpers": [
+        "setUiValue",
+        "uiDisabled",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText"
+      ]
+    },
+    {
+      "file": "src/components/CollectionStudyHub.test.jsx",
+      "assertions": 40,
+      "testNames": 16,
+      "helpers": [
+        "setUiValue",
+        "uiDisabled",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText",
+        "uiValue"
+      ]
+    },
+    {
+      "file": "src/components/DuplicateNotes.test.jsx",
+      "assertions": 64,
+      "testNames": 20,
+      "helpers": [
+        "setUiValue",
+        "uiDisabled",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText"
+      ]
+    },
+    {
+      "file": "src/components/Editor/BlockReferences.integration.test.jsx",
+      "assertions": 66,
+      "testNames": 21,
+      "helpers": [
+        "setUiValue",
+        "uiDisabled",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText",
+        "uiValue"
+      ]
+    },
+    {
+      "file": "src/components/Editor/nodes/MediaReadingMode.test.jsx",
+      "assertions": 47,
+      "testNames": 3,
+      "helpers": [
+        "setUiValue",
+        "uiDisabled",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText",
+        "uiValue"
+      ]
+    },
+    {
+      "file": "src/components/Editor/plugins/DocumentOutline.legacy-safety.test.jsx",
+      "assertions": 4,
+      "testNames": 3,
+      "helpers": [
+        "uiQuery",
+        "uiText"
+      ]
+    },
+    {
+      "file": "src/components/Editor/plugins/EditorShortcutPreferences.integration.test.jsx",
+      "assertions": 85,
+      "testNames": 14,
+      "helpers": [
+        "setUiValue",
+        "uiOptions",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText",
+        "uiValue"
+      ]
+    },
+    {
+      "file": "src/components/EvidenceReviewArchiveComparison.test.jsx",
+      "assertions": 51,
+      "testNames": 18,
+      "helpers": [
+        "setUiValue",
+        "uiDisabled",
+        "uiOptions",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText",
+        "uiValue"
+      ]
+    },
+    {
+      "file": "src/components/EvidenceReviewBackup.test.jsx",
+      "assertions": 68,
+      "testNames": 21,
+      "helpers": [
+        "setUiValue",
+        "uiDisabled",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText"
+      ]
+    },
+    {
+      "file": "src/components/EvidenceReviewNotes.test.jsx",
+      "assertions": 51,
+      "testNames": 16,
+      "helpers": [
+        "setUiValue",
+        "uiDisabled",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText",
+        "uiValue"
+      ]
+    },
+    {
+      "file": "src/components/FileList.shortcuts.test.jsx",
+      "assertions": 40,
+      "testNames": 7,
+      "helpers": [
+        "uiQuery",
+        "uiQueryAll",
+        "uiText"
+      ]
+    },
+    {
+      "file": "src/components/FileListRefreshOwnership.test.jsx",
+      "assertions": 18,
+      "testNames": 6,
+      "helpers": [
+        "uiQuery",
+        "uiText"
+      ]
+    },
+    {
+      "file": "src/components/FileSelectorDialog.selection.test.jsx",
+      "assertions": 47,
+      "testNames": 7,
+      "helpers": [
+        "uiDisabled",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText"
+      ]
+    },
+    {
+      "file": "src/components/GlobalSearchPanel.test.jsx",
+      "assertions": 73,
+      "testNames": 29,
+      "helpers": [
+        "setUiValue",
+        "uiDisabled",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText",
+        "uiValue"
+      ]
+    },
+    {
+      "file": "src/components/GlobalSearchStudyIntegration.test.jsx",
+      "assertions": 34,
+      "testNames": 8,
+      "helpers": [
+        "setUiValue",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText",
+        "uiValue"
+      ]
+    },
+    {
+      "file": "src/components/GraphPanel.test.jsx",
+      "assertions": 58,
+      "testNames": 20,
+      "helpers": [
+        "setUiValue",
+        "uiDisabled",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText",
+        "uiValue"
+      ]
+    },
+    {
+      "file": "src/components/HistoryReview.test.jsx",
+      "assertions": 102,
+      "testNames": 20,
+      "helpers": [
+        "setUiValue",
+        "uiDisabled",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText",
+        "uiValue"
+      ]
+    },
+    {
+      "file": "src/components/ImportWorkspace.test.jsx",
+      "assertions": 235,
+      "testNames": 34,
+      "helpers": [
+        "setUiValue",
+        "uiDisabled",
+        "uiOptions",
+        "uiQuery",
+        "uiQueryAll",
+        "uiSelectedOptions",
+        "uiText",
+        "uiValue"
+      ]
+    },
+    {
+      "file": "src/components/LibraryStatistics.test.jsx",
+      "assertions": 49,
+      "testNames": 13,
+      "helpers": [
+        "setUiValue",
+        "uiDisabled",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText"
+      ]
+    },
+    {
+      "file": "src/components/LocalGraphCanvas.test.jsx",
+      "assertions": 10,
+      "testNames": 4,
+      "helpers": [
+        "uiQuery",
+        "uiQueryAll"
+      ]
+    },
+    {
+      "file": "src/components/NoteComparison.test.jsx",
+      "assertions": 101,
+      "testNames": 33,
+      "helpers": [
+        "setUiValue",
+        "uiDisabled",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText"
+      ]
+    },
+    {
+      "file": "src/components/PinnedNotesPanel.test.jsx",
+      "assertions": 71,
+      "testNames": 21,
+      "helpers": [
+        "setUiValue",
+        "uiDisabled",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText",
+        "uiValue"
+      ]
+    },
+    {
+      "file": "src/components/ProjectEntityEvidencePanel.test.jsx",
+      "assertions": 41,
+      "testNames": 10,
+      "helpers": [
+        "setUiValue",
+        "uiDisabled",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText",
+        "uiValue"
+      ]
+    },
+    {
+      "file": "src/components/RecentNotesPanel.test.jsx",
+      "assertions": 61,
+      "testNames": 19,
+      "helpers": [
+        "setUiValue",
+        "uiDisabled",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText",
+        "uiValue"
+      ]
+    },
+    {
+      "file": "src/components/ResearchTasksPanel.test.jsx",
+      "assertions": 35,
+      "testNames": 12,
+      "helpers": [
+        "uiDisabled",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText"
+      ]
+    },
+    {
+      "file": "src/components/S3LocalOverviewComparison.test.jsx",
+      "assertions": 45,
+      "testNames": 13,
+      "helpers": [
+        "uiDisabled",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText"
+      ]
+    },
+    {
+      "file": "src/components/S3LocalOverviewFile.test.jsx",
+      "assertions": 42,
+      "testNames": 13,
+      "helpers": [
+        "uiQuery",
+        "uiQueryAll",
+        "uiText",
+        "uiValue"
+      ]
+    },
+    {
+      "file": "src/components/S3OfflinePairBatch.test.jsx",
+      "assertions": 61,
+      "testNames": 12,
+      "helpers": [
+        "uiDisabled",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText"
+      ]
+    },
+    {
+      "file": "src/components/S3OfflinePairDirection.test.jsx",
+      "assertions": 50,
+      "testNames": 14,
+      "helpers": [
+        "setUiValue",
+        "uiOptions",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText",
+        "uiValue"
+      ]
+    },
+    {
+      "file": "src/components/S3OfflinePairExport.test.jsx",
+      "assertions": 42,
+      "testNames": 12,
+      "helpers": [
+        "uiDisabled",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText"
+      ]
+    },
+    {
+      "file": "src/components/S3OfflinePairFilter.test.jsx",
+      "assertions": 50,
+      "testNames": 11,
+      "helpers": [
+        "uiQuery",
+        "uiQueryAll",
+        "uiText"
+      ]
+    },
+    {
+      "file": "src/components/S3OfflinePairOrder.test.jsx",
+      "assertions": 43,
+      "testNames": 12,
+      "helpers": [
+        "setUiValue",
+        "uiOptions",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText",
+        "uiValue"
+      ]
+    },
+    {
+      "file": "src/components/S3OfflinePairScope.test.jsx",
+      "assertions": 47,
+      "testNames": 12,
+      "helpers": [
+        "setUiValue",
+        "uiOptions",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText",
+        "uiValue"
+      ]
+    },
+    {
+      "file": "src/components/S3OfflinePairSummary.test.jsx",
+      "assertions": 39,
+      "testNames": 10,
+      "helpers": [
+        "setUiValue",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText"
+      ]
+    },
+    {
+      "file": "src/components/S3OfflinePairViewReset.test.jsx",
+      "assertions": 40,
+      "testNames": 12,
+      "helpers": [
+        "setUiValue",
+        "uiDisabled",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText",
+        "uiValue"
+      ]
+    },
+    {
+      "file": "src/components/S3OfflineReportPair.test.jsx",
+      "assertions": 57,
+      "testNames": 15,
+      "helpers": [
+        "uiDisabled",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText"
+      ]
+    },
+    {
+      "file": "src/components/SearchCollectionsPanel.test.jsx",
+      "assertions": 96,
+      "testNames": 30,
+      "helpers": [
+        "setUiValue",
+        "uiDisabled",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText",
+        "uiValue"
+      ]
+    },
+    {
+      "file": "src/components/SearchPresetsPanel.test.jsx",
+      "assertions": 22,
+      "testNames": 11,
+      "helpers": [
+        "setUiValue",
+        "uiDisabled",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText",
+        "uiValue"
+      ]
+    },
+    {
+      "file": "src/components/ShortcutsModal.test.jsx",
+      "assertions": 201,
+      "testNames": 36,
+      "helpers": [
+        "setUiValue",
+        "uiDisabled",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText",
+        "uiValue"
+      ]
+    },
+    {
+      "file": "src/components/StudyCompilationPanel.test.jsx",
+      "assertions": 36,
+      "testNames": 14,
+      "helpers": [
+        "setUiValue",
+        "uiDisabled",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText"
+      ]
+    },
+    {
+      "file": "src/components/SyncConflictBrowseGuard.test.jsx",
+      "assertions": 26,
+      "testNames": 6,
+      "helpers": [
+        "setUiValue",
+        "uiDisabled",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText",
+        "uiValue"
+      ]
+    },
+    {
+      "file": "src/components/SyncConflictHistoryPanel.test.jsx",
+      "assertions": 49,
+      "testNames": 17,
+      "helpers": [
+        "setUiValue",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText",
+        "uiValue"
+      ]
+    },
+    {
+      "file": "src/components/SyncConflictOrder.test.jsx",
+      "assertions": 71,
+      "testNames": 14,
+      "helpers": [
+        "setUiValue",
+        "uiDisabled",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText",
+        "uiValue"
+      ]
+    },
+    {
+      "file": "src/components/SyncConflictQueue.test.jsx",
+      "assertions": 70,
+      "testNames": 16,
+      "helpers": [
+        "setUiValue",
+        "uiDisabled",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText",
+        "uiValue"
+      ]
+    },
+    {
+      "file": "src/components/SyncConflictRisk.test.jsx",
+      "assertions": 96,
+      "testNames": 18,
+      "helpers": [
+        "setUiValue",
+        "uiDisabled",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText",
+        "uiValue"
+      ]
+    },
+    {
+      "file": "src/components/SyncHistoryFileDates.test.jsx",
+      "assertions": 76,
+      "testNames": 16,
+      "helpers": [
+        "setUiValue",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText",
+        "uiValue"
+      ]
+    },
+    {
+      "file": "src/components/SyncHistoryFileDetails.test.jsx",
+      "assertions": 48,
+      "testNames": 12,
+      "helpers": [
+        "setUiValue",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText",
+        "uiValue"
+      ]
+    },
+    {
+      "file": "src/components/SyncHistoryFileIdentifiers.test.jsx",
+      "assertions": 39,
+      "testNames": 15,
+      "helpers": [
+        "uiQuery",
+        "uiQueryAll",
+        "uiText"
+      ]
+    },
+    {
+      "file": "src/components/SyncHistoryFileOrder.test.jsx",
+      "assertions": 70,
+      "testNames": 12,
+      "helpers": [
+        "setUiValue",
+        "uiOptions",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText",
+        "uiValue"
+      ]
+    },
+    {
+      "file": "src/components/SyncHistoryFileSearch.test.jsx",
+      "assertions": 82,
+      "testNames": 21,
+      "helpers": [
+        "setUiValue",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText",
+        "uiValue"
+      ]
+    },
+    {
+      "file": "src/components/SyncHistoryFileSummary.test.jsx",
+      "assertions": 44,
+      "testNames": 12,
+      "helpers": [
+        "setUiValue",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText",
+        "uiValue"
+      ]
+    },
+    {
+      "file": "src/components/SyncHistorySearch.test.jsx",
+      "assertions": 73,
+      "testNames": 16,
+      "helpers": [
+        "setUiValue",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText",
+        "uiValue"
+      ]
+    },
+    {
+      "file": "src/components/SyncHistorySummary.test.jsx",
+      "assertions": 58,
+      "testNames": 14,
+      "helpers": [
+        "setUiValue",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText"
+      ]
+    },
+    {
+      "file": "src/components/SyncPlanPanel.test.jsx",
+      "assertions": 45,
+      "testNames": 11,
+      "helpers": [
+        "setUiValue",
+        "uiDisabled",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText"
+      ]
+    },
+    {
+      "file": "src/components/TagWorkspace.test.jsx",
+      "assertions": 113,
+      "testNames": 29,
+      "helpers": [
+        "setUiValue",
+        "uiDisabled",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText",
+        "uiValue"
+      ]
+    },
+    {
+      "file": "src/components/TaskCenter.test.jsx",
+      "assertions": 58,
+      "testNames": 18,
+      "helpers": [
+        "setUiValue",
+        "uiDisabled",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText"
+      ]
+    },
+    {
+      "file": "src/components/TrashRecovery.test.jsx",
+      "assertions": 125,
+      "testNames": 33,
+      "helpers": [
+        "setUiValue",
+        "uiDisabled",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText",
+        "uiValue"
+      ]
+    },
+    {
+      "file": "src/components/UIRedesign.test.jsx",
+      "assertions": 391,
+      "testNames": 40,
+      "helpers": [
+        "setUiValue",
+        "uiDisabled",
+        "uiOptions",
+        "uiQuery",
+        "uiQueryAll",
+        "uiText",
+        "uiValue"
+      ]
+    }
+  ],
+  "css": [
+    {
+      "file": "src/components/AppearanceCenter.css",
+      "removedPaintRules": 2,
+      "bytesBefore": 6400,
+      "bytesAfter": 5927
+    },
+    {
+      "file": "src/components/BacklinksPanel.css",
+      "removedPaintRules": 2,
+      "bytesBefore": 4135,
+      "bytesAfter": 3568
+    },
+    {
+      "file": "src/components/DailyNotesPanel.css",
+      "removedPaintRules": 3,
+      "bytesBefore": 5157,
+      "bytesAfter": 4556
+    },
+    {
+      "file": "src/components/Editor/Editor.css",
+      "removedPaintRules": 56,
+      "bytesBefore": 94648,
+      "bytesAfter": 78472
+    },
+    {
+      "file": "src/components/Editor/nodes/BlockNodes.css",
+      "removedPaintRules": 31,
+      "bytesBefore": 24376,
+      "bytesAfter": 14904
+    },
+    {
+      "file": "src/components/Editor/plugins/BlockHandlePlugin.css",
+      "removedPaintRules": 8,
+      "bytesBefore": 4160,
+      "bytesAfter": 2141
+    },
+    {
+      "file": "src/components/Editor/plugins/DocumentOutline.css",
+      "removedPaintRules": 2,
+      "bytesBefore": 3603,
+      "bytesAfter": 3201
+    },
+    {
+      "file": "src/components/Editor/plugins/DocumentSearch.css",
+      "removedPaintRules": 2,
+      "bytesBefore": 2405,
+      "bytesAfter": 1802
+    },
+    {
+      "file": "src/components/Editor/plugins/TextColorPlugin.css",
+      "removedPaintRules": 4,
+      "bytesBefore": 2407,
+      "bytesAfter": 1373
+    },
+    {
+      "file": "src/components/EvidenceReviewBackup.css",
+      "removedPaintRules": 1,
+      "bytesBefore": 2136,
+      "bytesAfter": 1921
+    },
+    {
+      "file": "src/components/FocusSessionAnalyticsPanel.css",
+      "removedPaintRules": 2,
+      "bytesBefore": 10089,
+      "bytesAfter": 9514
+    },
+    {
+      "file": "src/components/FocusSessionBar.css",
+      "removedPaintRules": 1,
+      "bytesBefore": 3361,
+      "bytesAfter": 3119
+    },
+    {
+      "file": "src/components/GlobalSearchPanel.css",
+      "removedPaintRules": 2,
+      "bytesBefore": 11796,
+      "bytesAfter": 11302
+    },
+    {
+      "file": "src/components/LibraryReferenceHealthPanel.css",
+      "removedPaintRules": 1,
+      "bytesBefore": 7165,
+      "bytesAfter": 6982
+    },
+    {
+      "file": "src/components/LongFormStructurePanel.css",
+      "removedPaintRules": 1,
+      "bytesBefore": 4423,
+      "bytesAfter": 4153
+    },
+    {
+      "file": "src/components/PinnedNotesPanel.css",
+      "removedPaintRules": 6,
+      "bytesBefore": 5367,
+      "bytesAfter": 3829
+    },
+    {
+      "file": "src/components/ProjectAnalyticsPanel.css",
+      "removedPaintRules": 1,
+      "bytesBefore": 7553,
+      "bytesAfter": 7273
+    },
+    {
+      "file": "src/components/ProjectPlanningPanel.css",
+      "removedPaintRules": 1,
+      "bytesBefore": 7940,
+      "bytesAfter": 7684
+    },
+    {
+      "file": "src/components/ProjectRelationGraphPanel.css",
+      "removedPaintRules": 3,
+      "bytesBefore": 19355,
+      "bytesAfter": 18571
+    },
+    {
+      "file": "src/components/ProjectStructurePanel.css",
+      "removedPaintRules": 4,
+      "bytesBefore": 32371,
+      "bytesAfter": 31349
+    },
+    {
+      "file": "src/components/ProjectTodayCenter.css",
+      "removedPaintRules": 1,
+      "bytesBefore": 7858,
+      "bytesAfter": 7597
+    },
+    {
+      "file": "src/components/ProjectWorkspacePanel.css",
+      "removedPaintRules": 7,
+      "bytesBefore": 37808,
+      "bytesAfter": 36269
+    },
+    {
+      "file": "src/components/RecentNotesPanel.css",
+      "removedPaintRules": 2,
+      "bytesBefore": 3686,
+      "bytesAfter": 3197
+    },
+    {
+      "file": "src/components/SearchCollectionsPanel.css",
+      "removedPaintRules": 3,
+      "bytesBefore": 4820,
+      "bytesAfter": 3936
+    },
+    {
+      "file": "src/components/ShortcutsModal.css",
+      "removedPaintRules": 5,
+      "bytesBefore": 11045,
+      "bytesAfter": 9778
+    },
+    {
+      "file": "src/components/SyncHelpNavigation.css",
+      "removedPaintRules": 2,
+      "bytesBefore": 748,
+      "bytesAfter": 280
+    },
+    {
+      "file": "src/components/SyncHelpReturn.css",
+      "removedPaintRules": 1,
+      "bytesBefore": 1175,
+      "bytesAfter": 924
+    },
+    {
+      "file": "src/components/SyncOverviewPanel.css",
+      "removedPaintRules": 2,
+      "bytesBefore": 3264,
+      "bytesAfter": 2805
+    },
+    {
+      "file": "src/components/SyncOverviewTimes.css",
+      "removedPaintRules": 6,
+      "bytesBefore": 3693,
+      "bytesAfter": 1893
+    },
+    {
+      "file": "src/components/TagSelector.css",
+      "removedPaintRules": 2,
+      "bytesBefore": 3318,
+      "bytesAfter": 2844
+    },
+    {
+      "file": "src/components/TemplateLibrary.css",
+      "removedPaintRules": 2,
+      "bytesBefore": 5265,
+      "bytesAfter": 4843
+    },
+    {
+      "file": "src/components/TrashWorkspacePanel.css",
+      "removedPaintRules": 1,
+      "bytesBefore": 7232,
+      "bytesAfter": 6966
+    },
+    {
+      "file": "src/components/VersionHistory.css",
+      "removedPaintRules": 1,
+      "bytesBefore": 4944,
+      "bytesAfter": 4707
+    },
+    {
+      "file": "src/styles/dark-theme.css",
+      "removedPaintRules": 6,
+      "bytesBefore": 11130,
+      "bytesAfter": 9345
+    },
+    {
+      "file": "src/styles/index.css",
+      "removedPaintRules": 15,
+      "bytesBefore": 28470,
+      "bytesAfter": 24893
+    },
+    {
+      "file": "src/styles/redesign.css",
+      "removedPaintRules": 68,
+      "bytesBefore": 121596,
+      "bytesAfter": 101969
+    }
+  ],
+  "edits": [
+    {
+      "file": "src/components/ui/ControlKit.jsx",
+      "reason": "!['btn', 'input', 'primary', 'secondary', 'danger', 'small'].includes(token)"
+    },
+    {
+      "file": "src/components/ui/ControlKit.jsx",
+      "reason": "data-ui-control=\"select\" className="
+    },
+    {
+      "file": "src/components/ui/ControlKit.jsx",
+      "reason": "<Select {...props} ref={api}"
+    },
+    {
+      "file": "scripts/s3-local-overview-cases.mjs",
+      "reason": "f9ae29dcb35bd11b9a8fad1a0fff4e61f534a1b70e476324992c69bcef2dba04"
+    }
+  ],
+  "originalAssertionsRemoved": 0,
+  "syntaxWhitespace": [
+    {
+      "file": "src/components/UIRedesign.test.jsx",
+      "whitespaceEdits": 2,
+      "normalizedAstUnchanged": true
+    }
+  ]
+}

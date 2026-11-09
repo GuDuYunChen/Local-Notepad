@@ -29,7 +29,7 @@ function inspectQueue() {
   for (const [selector, token] of [
     ['.sync-conflict-heading>strong', '--ink'], ['.sync-queue-hint', '--ink-soft'],
     ['.sync-queue-search', '--ink'], ['.sync-queue-tools input', '--ink'],
-    ['.sync-queue-tools select', '--ink'], ['.sync-queue-count', '--ink'],
+    ['.sync-queue-tools [data-ui-control="select"] .ant-select-content', '--ink'], ['.sync-queue-count', '--ink'],
     ['.sync-queue-identifiers', '--ink-soft'], ['.sync-conflict-item>div>strong', '--ink'],
     ['.sync-conflict-item>div>span', '--ink-soft'],
   ]) {
@@ -60,11 +60,12 @@ app.whenReady().then(async () => {
       import React from 'react'; import { createRoot } from 'react-dom/client';
       import './src/components/SyncCenterPanel.css';
       import Queue from './src/components/SyncConflictQueue.jsx';
+      import UiThemeProvider from './src/components/ui/UiThemeProvider.jsx';
       import { queueFixture, queueAttachment } from './scripts/fixtures/sync-conflict-queue.mjs';
       window.__queueWrites = 0;
       const conflicts = [...queueFixture(24), queueAttachment()];
       conflicts[0].local_record.file.title = '保持纯文本：<img src=x onerror=alert(1)>';
-      createRoot(document.getElementById('root')).render(<div className="settings-card consumer-settings-section sync-center-card"><Queue conflicts={conflicts} scope="synthetic" onResolve={() => { window.__queueWrites++; return false }}/></div>);
+      createRoot(document.getElementById('root')).render(<UiThemeProvider><div className="settings-card consumer-settings-section sync-center-card"><Queue conflicts={conflicts} scope="synthetic" onResolve={() => { window.__queueWrites++; return false }}/></div></UiThemeProvider>);
     ` } })
   const index = fs.readFileSync(path.join(root, 'dist/index.html'), 'utf8')
   const styles = [...index.matchAll(/<link\b[^>]*href="([^"]+\.css)"[^>]*>/g)]

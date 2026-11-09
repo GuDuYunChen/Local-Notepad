@@ -5,6 +5,8 @@ import {
 } from '~/services/syncConflictReview.mjs'
 import SyncConflictDiff from './SyncConflictDiff'
 import './SyncConflictReview.css'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 function Version({ record, side }) {
   const version = useMemo(() => conflictVersionSummary(record), [record])
@@ -91,15 +93,15 @@ export default function SyncConflictReview({ conflict, scope, disabled = false, 
       <span>本机：{conflictRecordLabel(conflict.local_record, '不存在')} · 远端：{conflictRecordLabel(conflict.remote_record, '不存在')}</span>
     </div>
     <div className="sync-conflict-actions">
-      <button className="btn small" disabled={locked} onClick={event => show('', event)}>对照版本</button>
-      <button className="btn small" disabled={locked} onClick={event => show('remote', event)}>采用远端</button>
-      <button className="btn small primary" disabled={locked} onClick={event => show('local', event)}>保留本机</button>
+      <UiButton size="middle" className="btn small" disabled={locked} onClick={event => show('', event)}>对照版本</UiButton>
+      <UiButton size="middle" className="btn small" disabled={locked} onClick={event => show('remote', event)}>采用远端</UiButton>
+      <UiButton size="middle" className="btn small primary" disabled={locked} onClick={event => show('local', event)}>保留本机</UiButton>
     </div>
     {done && <p className="sync-review-message" role="status">处理请求已完成，以刷新后的同步状态为准。</p>}
     {error && <p className="sync-center-error sync-review-message" role="alert">{error}</p>}
     {review && <section className="sync-conflict-review" aria-label="冲突版本对照" aria-busy={pending}>
       <div className="sync-review-heading"><h4 ref={heading} tabIndex={-1}>先对照，再确认处理</h4>
-        <button className="btn small" disabled={pending} onClick={close}>收起对照</button></div>
+        <UiButton className="btn small" disabled={pending} onClick={close}>收起对照</UiButton></div>
       <p>差异项：{changes.length ? changes.join('、') : '已展示字段相同，版本摘要仍不同；请核对完整内容'}。</p>
       <p className="sync-review-caption">这是冲突产生时的两端快照，不是实时编辑器。确认时会重读冲突；后台仍会校验基线和两端内容，不会自动合并或猜测版本。</p>
       <div className="sync-review-columns"><Version record={review.local_record} side="本机"/><Version record={review.remote_record} side="远端"/></div>
@@ -107,18 +109,18 @@ export default function SyncConflictReview({ conflict, scope, disabled = false, 
       {stale && <p className="sync-review-warning" role="alert">冲突或同步目标已变化，旧对照不能提交。即使内容恢复原样，也需重新对照并确认。</p>}
       <fieldset disabled={locked || stale} className="sync-review-choice">
         <legend>选择要采用的版本</legend>
-        <label><input type="radio" name={choiceGroup} checked={choice === 'local'} disabled={!review.local_record} onChange={() => choose('local')}/>保留本机版本 → 更新远端</label>
-        <label><input type="radio" name={choiceGroup} checked={choice === 'remote'} disabled={!review.remote_record} onChange={() => choose('remote')}/>采用远端版本 → 更新本机</label>
+        <label><input data-ui-native="radio" type="radio" name={choiceGroup} checked={choice === 'local'} disabled={!review.local_record} onChange={() => choose('local')}/>保留本机版本 → 更新远端</label>
+        <label><input data-ui-native="radio" type="radio" name={choiceGroup} checked={choice === 'remote'} disabled={!review.remote_record} onChange={() => choose('remote')}/>采用远端版本 → 更新本机</label>
       </fieldset>
       {chosen && <p className={'sync-review-direction' + (conflictVersionSummary(chosen).destructive ? ' sync-review-warning' : '')}>
         {choice === 'local' ? '将以本机版本更新远端。' : '将以远端版本更新本机。'}
         {conflictVersionSummary(chosen).destructive ? '所选版本是删除状态，请特别核对。' : '未选中的版本不会被自动合并。'}
       </p>}
-      <label className="sync-review-ack"><input type="checkbox" checked={acknowledged} disabled={locked || stale || !chosen} onChange={event => setAcknowledged(true === event.target.checked)}/>我已核对两端版本和更新方向，确认处理这个冲突</label>
+      <label className="sync-review-ack"><input data-ui-native="checkbox" type="checkbox" checked={acknowledged} disabled={locked || stale || !chosen} onChange={event => setAcknowledged(true === event.target.checked)}/>我已核对两端版本和更新方向，确认处理这个冲突</label>
       <div className="sync-review-footer">
-        <button className="btn" disabled={pending || disabled} onClick={() => { setAcknowledged(false); void onRefresh?.() }}>刷新冲突状态</button>
-        {stale && <button className="btn" disabled={locked} onClick={() => show()}>重新对照</button>}
-        <button className="btn primary" disabled={locked || stale || !chosen || !acknowledged} onClick={() => void submit()}>{pending ? '核对并提交中…' : '确认处理此冲突'}</button>
+        <UiButton className="btn" disabled={pending || disabled} onClick={() => { setAcknowledged(false); void onRefresh?.() }}>刷新冲突状态</UiButton>
+        {stale && <UiButton className="btn" disabled={locked} onClick={() => show()}>重新对照</UiButton>}
+        <UiButton className="btn primary" disabled={locked || stale || !chosen || !acknowledged} onClick={() => void submit()}>{pending ? '核对并提交中…' : '确认处理此冲突'}</UiButton>
       </div>
       <small className="sync-review-caption">提交失败或响应中断时不会自动重试。请先刷新并核查结果；收起界面不代表已撤销发送的请求。</small>
     </section>}

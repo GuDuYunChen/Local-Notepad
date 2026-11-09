@@ -1,0 +1,33 @@
+name: Inspect complete UI migration failures
+on:
+  push:
+    branches: [fix/local-ui-consistency-2f116]
+    paths: [.github/workflows/ui-migration-failure-inspection.yml, scripts/inspect-ui-migration-failures.mjs]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  inspect-original-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 42183541578
+          name: complete-ui-migration-75a663aba9358da335f127e45d67f26134e9a1cc
+          path: prior-evidence
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Read original failures and source drivers without re-running tests
+        run: node scripts/inspect-ui-migration-failures.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ui-migration-failure-inspection-${{ github.sha }}
+          path: test-results/ui-failure-inspection/
+          retention-days: 30
+          if-no-files-found: error

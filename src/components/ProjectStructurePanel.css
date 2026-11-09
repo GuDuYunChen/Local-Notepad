@@ -39,7 +39,7 @@
   gap: 5px;
 }
 
-.project-structure-head .btn.active {
+.project-structure-head .btn.active:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-color: color-mix(in srgb, var(--clay) 35%, var(--line));
   background: var(--clay-light);
   color: var(--clay);
@@ -117,6 +117,9 @@
 .project-structure-search input {
   min-width: 0;
   flex: 1;
+}
+
+.project-structure-search input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border: 0;
   outline: 0;
   background: transparent;
@@ -125,7 +128,7 @@
   font-size: 8px;
 }
 
-.project-structure-controls select {
+.project-structure-controls select:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   height: 30px;
   padding: 0 24px 0 8px;
   border: 1px solid var(--line);
@@ -260,12 +263,19 @@
 .project-storyline-event-form select,
 .project-storyline-event-form input {
   min-width: 0;
+  box-sizing: border-box;
+}
+
+.project-storyline-create select:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.project-storyline-create input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.project-storyline-fields input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.project-storyline-event-form select:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.project-storyline-event-form input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   height: 30px;
   padding: 0 8px;
   border: 1px solid var(--line);
   border-radius: 7px;
   outline: 0;
-  box-sizing: border-box;
   background: var(--paper);
   color: var(--ink);
   font: inherit;
@@ -281,11 +291,11 @@
   flex: 1;
 }
 
-.project-storyline-create select:focus,
-.project-storyline-create input:focus,
-.project-storyline-fields input:focus,
-.project-storyline-event-form select:focus,
-.project-storyline-event-form input:focus {
+.project-storyline-create select:focus:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.project-storyline-create input:focus:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.project-storyline-fields input:focus:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.project-storyline-event-form select:focus:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.project-storyline-event-form input:focus:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-color: var(--clay);
   box-shadow: 0 0 0 2px var(--clay-light);
 }
@@ -312,32 +322,35 @@
 
 .project-storyline-list > button {
   width: 100%;
-  padding: 6px 7px;
   display: block;
+  text-align: left;
+  cursor: pointer;
+}
+
+.project-storyline-list > button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
+  padding: 6px 7px;
   border: 1px solid transparent;
   border-left-width: 3px;
   border-radius: 7px;
   background: transparent;
   color: var(--ink-soft);
   font: inherit;
-  text-align: left;
-  cursor: pointer;
 }
 
-.project-storyline-list > button.type-plot {
+.project-storyline-list > button.type-plot:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-left-color: var(--clay);
 }
 
-.project-storyline-list > button.type-character {
+.project-storyline-list > button.type-character:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-left-color: #725f9c;
 }
 
-.project-storyline-list > button.type-foreshadow {
+.project-storyline-list > button.type-foreshadow:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-left-color: #95621c;
 }
 
-.project-storyline-list > button:hover,
-.project-storyline-list > button.active {
+.project-storyline-list > button:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.project-storyline-list > button.active:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-top-color: var(--line);
   border-right-color: var(--line);
   border-bottom-color: var(--line);
@@ -457,7 +470,7 @@
   font-size: 6px;
 }
 
-.project-storyline-fields .btn.danger {
+.project-storyline-fields .btn.danger:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-color: color-mix(in srgb, #b84444 28%, var(--line));
   color: #a63b3b;
 }
@@ -552,12 +565,15 @@
 .project-storyline-event > button:first-child {
   min-width: 0;
   flex: 1;
+  text-align: left;
+}
+
+.project-storyline-event > button:first-child:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   padding: 5px 6px;
   border: 0;
   background: transparent;
   color: var(--ink-soft);
   font: inherit;
-  text-align: left;
 }
 
 .project-storyline-event > button:first-child:not(:disabled) {
@@ -595,16 +611,7 @@
 .project-storyline-event .remove {
   width: 22px;
   flex: 0 0 22px;
-  border: 0;
-  border-left: 1px solid var(--line);
-  background: transparent;
-  color: var(--ink-muted);
-  font: inherit;
   cursor: pointer;
-}
-
-.project-storyline-event .remove:hover {
-  color: #a63b3b;
 }
 
 .project-storyline-lane-empty {
@@ -782,29 +789,37 @@
 .project-storyline-matrix-row > span,
 .project-storyline-matrix-row > b {
   min-width: 0;
-  min-height: 27px;
-  padding: 5px;
   display: grid;
   place-items: center;
+  text-align: center;
+}
+
+.project-storyline-matrix-row > span,
+.project-storyline-matrix-row > b,
+.project-storyline-matrix-row > button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
+  min-height: 27px;
+  padding: 5px;
   border: 0;
   border-right: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
   background: transparent;
   color: var(--ink-muted);
   font: inherit;
   font-size: 7px;
-  text-align: center;
 }
 
 .project-storyline-matrix-row > button {
   place-items: center start;
-  color: var(--ink-soft);
   cursor: pointer;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.project-storyline-matrix-row > button:hover {
+.project-storyline-matrix-row > button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
+  color: var(--ink-soft);
+}
+
+.project-storyline-matrix-row > button:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   color: var(--clay);
 }
 
@@ -834,26 +849,26 @@
 .project-storyline-stage-list button {
   width: 100%;
   min-width: 0;
-  padding: 6px;
   display: flex;
   align-items: center;
   gap: 6px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.project-storyline-rhythm-list button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.project-storyline-stage-list button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
+  padding: 6px;
   border: 1px solid transparent;
   border-radius: 7px;
   background: var(--surface);
   color: var(--ink-soft);
   font: inherit;
-  text-align: left;
-  cursor: pointer;
 }
 
-.project-storyline-rhythm-list button:hover,
-.project-storyline-stage-list button:hover {
+.project-storyline-rhythm-list button:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.project-storyline-stage-list button:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-color: var(--line);
-}
-
-.project-storyline-rhythm-list button.attention {
-  border-color: color-mix(in srgb, #b97820 20%, var(--line));
 }
 
 .project-storyline-rhythm-list button > span {
@@ -917,22 +932,20 @@
 
 .project-storyline-hotspots button {
   min-width: 0;
-  padding: 4px 6px;
   display: flex;
   align-items: center;
   gap: 5px;
+  cursor: pointer;
+}
+
+.project-storyline-hotspots button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
+  padding: 4px 6px;
   border: 1px solid var(--line);
   border-radius: 7px;
   background: var(--paper);
   color: var(--ink-soft);
   font: inherit;
   font-size: 7px;
-  cursor: pointer;
-}
-
-.project-storyline-hotspots button.overloaded {
-  border-color: color-mix(in srgb, #b97820 28%, var(--line));
-  background: color-mix(in srgb, #b97820 5%, var(--paper));
 }
 
 .project-storyline-hotspots button b {
@@ -1243,20 +1256,23 @@
 
 .project-structure-indexes button {
   max-width: 100%;
-  padding: 3px 6px;
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.project-structure-indexes button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
+  padding: 3px 6px;
   border: 1px solid var(--line);
   border-radius: 6px;
   background: var(--paper);
   color: var(--ink-soft);
   font: inherit;
   font-size: 7px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  cursor: pointer;
 }
 
-.project-structure-indexes button:hover {
+.project-structure-indexes button:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-color: color-mix(in srgb, var(--clay) 35%, var(--line));
   color: var(--clay);
 }

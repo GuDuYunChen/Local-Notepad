@@ -1,6 +1,6 @@
 {
   "name": "notepad-desktop",
-  "version": "4.248.1",
+  "version": "4.249.0",
   "private": true,
   "type": "module",
   "main": "out/electron/main.cjs",
@@ -30,7 +30,8 @@
     "test:brand-render": "electron scripts/check-brand-theme-render.cjs",
     "version:check": "node scripts/check-app-version.mjs",
     "version:patch": "npm version patch --no-git-tag-version --ignore-scripts",
-    "version:minor": "npm version minor --no-git-tag-version --ignore-scripts"
+    "version:minor": "npm version minor --no-git-tag-version --ignore-scripts",
+    "test:ui-audit": "node --test scripts/audit-ui-controls.node.mjs"
   },
   "dependencies": {
     "@lexical/clipboard": "0.51.0",
@@ -54,6 +55,7 @@
     "@lexical/text": "0.51.0",
     "@lexical/utils": "0.51.0",
     "@lexical/yjs": "0.51.0",
+    "antd": "6.6.8",
     "d3": "^7.9.0",
     "docx": "^9.5.1",
     "highlight.js": "^11.11.1",

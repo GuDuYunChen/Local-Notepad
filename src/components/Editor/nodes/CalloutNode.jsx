@@ -2,6 +2,8 @@ import { $getNodeByKey, DecoratorNode } from 'lexical'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { useLexicalEditable } from '@lexical/react/useLexicalEditable'
 import React, { useEffect, useState } from 'react'
+import { UiButton, UiTextarea } from '~/components/ui/ControlKit'
+
 
 const CALLOUT_ICONS = ['💡', '⚠️', 'ℹ️', '✅', '❌', '📌', '🔔', '💬']
 
@@ -110,7 +112,7 @@ function CalloutComponent({ nodeKey, icon, text }) {
   return (
     <div className="callout-block">
       <div className="callout-header">
-        <button
+        <UiButton density="compact"
           type="button"
           className="callout-icon-btn"
           onClick={() => { if (editor.isEditable()) setShowIconPicker(prev => !prev) }}
@@ -119,12 +121,12 @@ function CalloutComponent({ nodeKey, icon, text }) {
           aria-expanded={showIconPicker && isEditable}
         >
           {currentIcon}
-        </button>
+        </UiButton>
 
         {showIconPicker && isEditable && (
           <div className="callout-icon-picker">
             {CALLOUT_ICONS.map(item => (
-              <button
+              <UiButton density="compact"
                 type="button"
                 key={item}
                 className="callout-icon-option"
@@ -132,14 +134,14 @@ function CalloutComponent({ nodeKey, icon, text }) {
                 aria-label={`选择图标 ${item}`}
               >
                 {item}
-              </button>
+              </UiButton>
             ))}
           </div>
         )}
       </div>
 
       <div className="callout-content">
-        <textarea
+        <UiTextarea density="compact"
           value={editText}
           readOnly={!isEditable}
           onChange={handleTextChange}
