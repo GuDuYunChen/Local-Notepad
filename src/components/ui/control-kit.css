@@ -12,7 +12,8 @@
 .app-ui-button[data-ui-layout="content"] { height:auto; min-height:28px; white-space:normal; text-align:inherit; justify-content:inherit; }
 .app-ui-button[data-ui-layout="content"] > .ant-btn-content { display:contents; }
 .app-ui-validation-field { position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; inset-inline-start:0; bottom:0; }
-.app-ui-button:focus-visible { outline:2px solid var(--clay); outline-offset:2px; box-shadow:none; }
+/* Ant Design's hashed focus selectors are more specific; the app-owned cue must win after its runtime styles are injected. */
+.app-ui-button.ant-btn:focus-visible { outline:2px solid var(--clay); outline-offset:2px; box-shadow:none; }
 .app-ui-button:focus:not(:focus-visible) { box-shadow:none; }
 /* Toolbar toggle state is semantic state, not a second custom button skin. */
 .app-ui-button.active { color:var(--clay); border-color:var(--clay); background:var(--clay-light); }
