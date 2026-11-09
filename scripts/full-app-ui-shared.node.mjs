@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { build } from 'esbuild'
-import { captureActualFullAppPopup, validateFullAppCaptureContinuity, measureFullAppScrollCoverage, createFullAppUiShared } from './full-app-ui-shared.mjs'
+import { captureActualFullAppPopup, validateFullAppCaptureContinuity, measureFullAppScrollCoverage, createFullAppUiShared, withinActualClientPort, finiteOwnerMotionActive, waitForFiniteOwnerMotion } from './full-app-ui-shared.mjs'
 import { buildResearchImportFixtures, researchRoutes } from './full-app-ui-research.mjs'
 
 const clone = value => structuredClone(value)
@@ -162,4 +162,37 @@ test('research routes declare every actual module once and retain the empty-sele
   assert.ok(researchRoutes.find(route => route.id === 'research-collections').requiredStates.includes('empty-selection'))
   assert.ok(researchRoutes.find(route => route.id === 'research-batch').requiredStates.includes('undone'))
   assert.ok(researchRoutes.find(route => route.id === 'research-reading').requiredStates.includes('annotation'))
+})
+
+test('a center-hit control clipped by a real client scrollbar cannot qualify as fully visible', () => {
+  const parent = { left: 0, top: 0, right: 200, bottom: 120 }, metrics = { clientLeft: 1, clientTop: 1, clientWidth: 181, clientHeight: 101 }
+  const clipped = { left: 100, right: 198, top: 10, bottom: 50 }
+  assert.ok(clipped.right <= parent.right && (clipped.left + clipped.right) / 2 < metrics.clientWidth, 'Counterexample fits the old outer rectangle and center hit')
+  assert.equal(withinActualClientPort(clipped, parent, metrics, 'auto', 'visible'), false)
+  assert.equal(withinActualClientPort({ ...clipped, right: 181 }, parent, metrics, 'auto', 'visible'), true)
+  assert.equal(withinActualClientPort({ left: 10, right: 100, top: 80, bottom: 119 }, parent, metrics, 'visible', 'auto'), false)
+  assert.equal(withinActualClientPort(clipped, parent, metrics, 'visible', 'visible'), true)
+  assert.throws(() => withinActualClientPort(clipped, parent, {}, 'auto', 'auto'), /client-port metrics/)
+})
+
+test('finite owner motion settles naturally under one original until call while infinite animation is ignored', async () => {
+  const entrance = { root: '.actual-menu', animations: [{ playState: 'running', pending: false, duration: 150, iterations: 1, endTime: 150 }] }
+  const settled = { root: '.actual-menu', animations: [{ playState: 'running', pending: false, duration: 1000, iterations: 'infinite', endTime: 'infinite' }] }
+  const samples = [entrance, settled]; let untilCalls = 0
+  const receipt = await waitForFiniteOwnerMotion(async () => samples.shift(), async check => {
+    untilCalls++; assert.equal(await check(), false); return await check()
+  })
+  assert.equal(untilCalls, 1); assert.equal(receipt.polls, 2); assert.equal(receipt.first, entrance)
+  assert.equal(receipt.settled, settled); assert.equal(receipt.complete, true)
+  assert.equal(finiteOwnerMotionActive({ root: '.actual-menu', animations: [{ ...entrance.animations[0], playState: 'finished' }] }), false)
+  assert.equal(finiteOwnerMotionActive({ root: '.actual-menu', animations: [{ ...entrance.animations[0], playState: 'paused' }] }), false)
+  assert.equal(finiteOwnerMotionActive({ root: '.actual-menu', animations: [{ ...entrance.animations[0], playState: 'idle', pending: true }] }), true)
+})
+
+test('unfinished finite motion preserves the original deadline failure and cannot mark the image ready', async () => {
+  const sample = { root: '.actual-menu', animations: [{ playState: 'running', pending: true, duration: 150, iterations: 1, endTime: 150 }] }
+  const failure = new Error('original fifteen-second readiness deadline'), receipt = {}; let calls = 0
+  await assert.rejects(waitForFiniteOwnerMotion(async () => sample, async check => { calls++; assert.equal(await check(), false); throw failure }, receipt), error => error === failure)
+  assert.equal(calls, 1); assert.equal(receipt.complete, false); assert.equal(receipt.latest, sample)
+  assert.throws(() => finiteOwnerMotionActive({ root: '.actual-menu', animations: [{ playState: 'running', pending: false, duration: null, iterations: 1, endTime: 150 }] }), /timing/)
 })

@@ -14,8 +14,10 @@ import { assertHostedWindows, requireOwnedPath, nsisArgs, verifyInstaller, valid
 import { createDesktopWindowSession, desktopWindowWorkerArguments } from './desktop-window-session.mjs'
 import { selectDesktopMainWindow, assertDesktopWindowImage } from './desktop-window-target.mjs'
 import { verifyFullAppUiDesktop } from './check-full-app-ui-desktop.mjs'
+import { verifyLocalSyncLabDesktop } from './check-local-sync-lab-desktop.mjs'
+import { prepareLocalSyncLabNotes, seedLocalSyncLab, snapshotLocalSyncLab } from './full-app-ui-local-sync-seed.mjs'
 import { verifyUiScreensFiles } from './ui-screens-evidence.mjs'
-import { FULL_APP_GROUPS, FULL_APP_MATRIX, FULL_APP_PRODUCT_SOURCE_FILES, FULL_APP_VERIFIER_SOURCE_FILES, validateFullAppUiLedger, verifyFullAppUiFiles, validateFullAppInstalledReport, validateFullAppPrerequisites, validateNativeWindowResize, validateFullAppFixtureFile } from './full-app-ui-evidence.mjs'
+import { FULL_APP_GROUPS, FULL_APP_MATRIX, FULL_APP_PRODUCT_SOURCE_FILES, FULL_APP_RUNTIME_SOURCE_FILES, FULL_APP_VERIFIER_SOURCE_FILES, fullAppProductPageSources, validateFullAppUiLedger, validateFullAppLedgerSourceIdentity, verifyFullAppUiFiles, validateFullAppInstalledReport, validateFullAppPrerequisites, validateNativeWindowResize, validateFullAppFixtureFile, validateLocalSyncLabBackendProcess, validateLocalSyncLabBackendExit } from './full-app-ui-evidence.mjs'
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url))
 const VERSION = '4.249.0'
@@ -65,6 +67,9 @@ export function validateFullAppOriginalInstallation({ pin, original, accepted, s
 
 function sourceIdentity(pin, sourceProof, ledger) {
   assert.equal(git('rev-parse', '--verify', 'HEAD'), process.env.GITHUB_SHA)
+  const productTree = git('rev-parse', pin.product + '^{tree}')
+  assert.equal(ledger.productSource.commit, pin.product); assert.equal(ledger.productSource.tree, productTree)
+  assert.equal(ledger.productSource.dirty, false)
   const applicationPaths = ['src', 'electron', 'server', 'package.json', 'package-lock.json', 'vite.config.js']
   const productPaths = Object.fromEntries(applicationPaths.map(file => {
     const expected = git('rev-parse', pin.product + ':' + file)
@@ -99,18 +104,29 @@ function sourceIdentity(pin, sourceProof, ledger) {
     assert.equal(blob(canonical(path.join(ROOT, file))), expected, 'Verifier-owned source changed after checkout: ' + file)
     return [file, expected]
   }))
-  const pageSources = [...new Set(Object.values(ledger.groups).flatMap(group => group.routes.map(route => route.source))
-    .concat(ledger.sourceCoverage.map(entry => entry.file)))].sort()
+  const pageSources = fullAppProductPageSources(ledger)
+  const actualPageDetails = {}
   const actualPages = Object.fromEntries(pageSources.map(file => {
-    assert.match(file, /^src\/[a-zA-Z0-9_./-]+\.(jsx?|tsx?|css)$/)
-    assert.ok(!file.split('/').includes('..'))
     const expected = git('rev-parse', pin.product + ':' + file)
-    assert.equal(blob(canonical(path.join(ROOT, file))), expected, 'Actual application page source differs from pinned product: ' + file)
+    const filename = path.join(ROOT, file), workspaceBytes = readFileSync(filename)
+    // Match the exact Git object bytes, whether Git stores LF or original CRLF.
+    // A Windows checkout may only use its existing newline canonicalization;
+    // neither candidate is accepted unless its complete Git blob matches P.
+    const bytes = blob(workspaceBytes) === expected ? workspaceBytes : Buffer.from(canonical(filename), 'utf8')
+    assert.equal(blob(bytes), expected, 'Actual application page source differs from pinned product: ' + file)
+    actualPageDetails[file] = { blob: expected, bytes: bytes.length, sha256: sha(bytes) }
     return [file, expected]
   }))
-  return { productCommit: pin.product, productTree: git('rev-parse', pin.product + '^{tree}'), productPaths,
-    product: supplement.sourceFiles, actualPages, verifierCommit: process.env.GITHUB_SHA,
+  const runtime = Object.fromEntries(FULL_APP_RUNTIME_SOURCE_FILES.map(file => {
+    const expected = git('rev-parse', pin.product + ':' + file)
+    assert.equal(blob(canonical(path.join(ROOT, file))), expected, 'Typed fixture parser or schema differs from pinned product: ' + file)
+    return [file, expected]
+  }))
+  const identity = { productCommit: pin.product, productTree, productPaths,
+    product: supplement.sourceFiles, actualPages, actualPageDetails, runtime, verifierCommit: process.env.GITHUB_SHA,
     verifier, generatedLifecycleCore: sourceProof.preparedCore }
+  validateFullAppLedgerSourceIdentity(ledger, identity)
+  return identity
 }
 
 function snapshot(directory) {
@@ -235,7 +251,7 @@ export async function runFullAppUiInstalled({ group, pin, installerPath, origina
     checks: [], screenshots: [], windowSizes: [], commands: [], runtimeErrors: [], fixtureInputs: [], fixtureInputsVerified: false,
     windowHelper: { events: [] }, resizeCommands: [] }
   const reportPath = path.join(out, REPORT)
-  let app, exited, cdp, windowSession, trace = '', closeRequested = false, uninstalled = false
+  let app, exited, cdp, windowSession, trace = '', closeRequested = false, uninstalled = false, activeLabBackend
   const liveCommands = new Set()
   const save = () => {
     if (windowSession) report.windowHelper.lifecycle = windowSession.diagnostics()
@@ -279,6 +295,27 @@ export async function runFullAppUiInstalled({ group, pin, installerPath, origina
   }
   const ps = async source => command('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand',
     Buffer.from("$ErrorActionPreference='Stop';[Console]::OutputEncoding=[Text.UTF8Encoding]::new();" + source, 'utf16le').toString('base64')], { timeout: 20000 })
+  const labBackendProcesses = async ({ parentPid, pid, timeout }) => {
+    assert.equal(group, 'local-sync-lab')
+    assert.ok(Number.isInteger(timeout) && timeout > 0 && timeout <= 5000)
+    assert.equal((parentPid === undefined) !== (pid === undefined), true, 'An exact parent or process PID is required')
+    const queryPID = parentPid ?? pid
+    assert.ok(Number.isSafeInteger(queryPID) && queryPID > 0)
+    const filter = parentPid === undefined ? `ProcessId = ${pid}` : `ParentProcessId = ${parentPid} AND Name = 'notepad-server.exe'`
+    const source = `$ErrorActionPreference='Stop';[Console]::OutputEncoding=[Text.UTF8Encoding]::new();` +
+      `$items=@(Get-CimInstance Win32_Process -Filter "${filter}" -ErrorAction Stop | ForEach-Object {` +
+      `@{pid=[long]$_.ProcessId;parentPid=[long]$_.ParentProcessId;executable=[string]$_.ExecutablePath;` +
+      `createdAt=$_.CreationDate.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ss.fffffffZ');source='Win32_Process'}});` +
+      `ConvertTo-Json -InputObject @($items) -Compress`
+    const processes = JSON.parse(await command('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand',
+      Buffer.from(source, 'utf16le').toString('base64')], { timeout }))
+    assert.ok(Array.isArray(processes)); return processes
+  }
+  const identifyLabBackend = async () => {
+    const processes = await labBackendProcesses({ parentPid: report.pid, timeout: 5000 })
+    assert.equal(processes.length, 1, 'The actual installed App must own exactly one backend process')
+    return validateLocalSyncLabBackendProcess(processes[0], report.pid, path.join(installDirectory, 'resources/bin/notepad-server.exe'))
+  }
   const registrations = async () => JSON.parse(await ps("$all=@();foreach($scope in @('HKCU','HKLM')){foreach($tail in @('Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall','Software\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall')){Get-ItemProperty ($scope+':\\'+$tail+'\\*') -ErrorAction SilentlyContinue | Where-Object {($_.DisplayName -eq '记事本' -or $_.DisplayName -like '记事本 *')} | ForEach-Object {$all+=@{scope=$scope;key=$_.PSChildName;version=$_.DisplayVersion;location=$_.InstallLocation;uninstall=$_.UninstallString}}}};ConvertTo-Json -InputObject @($all) -Compress"))
   const links = async () => JSON.parse(await ps("$links=@();foreach($folder in @([Environment]::GetFolderPath('DesktopDirectory'),[Environment]::GetFolderPath('Programs'))){$p=Join-Path $folder '记事本.lnk';if(Test-Path -LiteralPath $p){$links+=@{path=$p}}};ConvertTo-Json -InputObject @($links) -Compress"))
   const evaluate = async expression => {
@@ -361,6 +398,8 @@ export async function runFullAppUiInstalled({ group, pin, installerPath, origina
   const closeNormally = async () => {
     if (!app || app.exitCode !== null) return
     assert.equal(closeRequested, false, 'An uncertain native close must never be replayed')
+    const closingBackend = group === 'local-sync-lab'
+      ? validateLocalSyncLabBackendProcess(activeLabBackend, report.pid, path.join(installDirectory, 'resources/bin/notepad-server.exe')) : null
     const window = await mainWindow(); closeRequested = true
     await windowSession.close(window)
     const closeRequest = structuredClone(windowSession.events().at(-1)); let timer
@@ -369,7 +408,25 @@ export async function runFullAppUiInstalled({ group, pin, installerPath, origina
       assert.deepEqual(result, { code: 0, signal: null })
       report.exit = { pid: report.pid, ...result, nativeClose: true, window, closeRequest }
       app = null; cdp.close(); cdp = null
-      await until(async () => { try { await freePort(27121); return true } catch { return false } }, 'Full application UI backend remained alive', 5000)
+      if (closingBackend) {
+        const deadline = performance.now() + 5000
+        await until(async () => {
+          const remaining = Math.floor(deadline - performance.now())
+          assert.ok(remaining > 0, 'The original backend-close deadline has elapsed')
+          const processes = await labBackendProcesses({ pid: closingBackend.pid, timeout: remaining })
+          if (processes.length) {
+            assert.deepEqual(processes, [closingBackend], 'The recorded backend PID was replaced; no foreign process may be acted on')
+            return false
+          }
+          try { await freePort(27121) } catch { return false }
+          assert.ok(performance.now() <= deadline, 'The original backend-close deadline has elapsed')
+          report.exit.backendExit = { pid: closingBackend.pid, source: 'Win32_Process', processes, portClosed: true, complete: true }
+          validateLocalSyncLabBackendExit(report.exit.backendExit, closingBackend)
+          return true
+        }, 'Local lab backend PID or port remained alive', 5000)
+      } else {
+        await until(async () => { try { await freePort(27121); return true } catch { return false } }, 'Full application UI backend remained alive', 5000)
+      }
       report.backendStopped = true; save()
     } finally { clearTimeout(timer) }
   }
@@ -424,11 +481,73 @@ export async function runFullAppUiInstalled({ group, pin, installerPath, origina
     report.app = { ...appIdentity, version: diagnostics.version, packaged: diagnostics.packaged }
     const backend = await api('/api/diagnostics'); assert.ok(samePath(backend.data_dir, data), 'Additional process must use its isolated synthetic data')
     report.backendDataVerified = true; save()
-    await verifyFullAppUiDesktop({ evaluate, click, cdp, until, api, readAsset, writeFixtureFile, capture, resize, report, save, group,
+    if (group === 'local-sync-lab') {
+      // Only this separate job prepares typed local conflict/history inputs.
+      // Both app lifetimes use this newly installed, hash-verified executable.
+      activeLabBackend = await identifyLabBackend()
+      const files = await prepareLocalSyncLabNotes({ api })
+      assert.equal(files.length, 21)
+      report.localSyncLabLifecycle = { schemaVersion: 1, complete: false,
+        bootstrap: { pid: report.pid, app: structuredClone(report.app), dataDir: data, profile, backendDataVerified: report.backendDataVerified,
+          backendProcess: structuredClone(activeLabBackend), noteCount: files.length } }
+      await closeNormally()
+      assert.equal(app, null); assert.equal(cdp, null); assert.equal(report.backendStopped, true)
+      assert.deepEqual({ code: report.exit.code, signal: report.exit.signal, nativeClose: report.exit.nativeClose }, { code: 0, signal: null, nativeClose: true })
+      await freePort(27121)
+      const bootstrapClosed = { appExit: structuredClone(report.exit), backendStopped: true, portClosed: true,
+        backendProcess: structuredClone(activeLabBackend), backendProcessExited: true }
+      report.localSyncLabLifecycle.bootstrap.closed = bootstrapClosed; save()
+      report.localSyncLabSeed = seedLocalSyncLab({ dataDir: data, ownedRoot: scratch, bootstrapClosed, files })
+      assert.deepEqual(snapshotLocalSyncLab({ dataDir: data, ownedRoot: scratch }), report.localSyncLabSeed.after)
+      report.localSyncLabLifecycle.seededWhileStopped = true
+      assert.deepEqual(snapshot(defaultData), defaultBefore)
+      for (const [key, filename] of [['executableSHA256', executablePath], ['asarSHA256', path.join(installDirectory, 'resources/app.asar')], ['backendSHA256', path.join(installDirectory, 'resources/bin/notepad-server.exe')]]) {
+        assert.equal(sha(readFileSync(filename)), appIdentity[key], 'Local lab cannot replace the accepted installed binary')
+      }
+      // The previous close is proven complete. This flag belongs to the new
+      // process lifetime; an uncertain prior close is never replayed.
+      closeRequested = false; report.backendStopped = false; delete report.exit
+      const labPort = await freePort()
+      app = spawn(executablePath, [`--user-data-dir=${profile}`, '--remote-debugging-address=127.0.0.1', `--remote-debugging-port=${labPort}`],
+        { cwd: installDirectory, env: { ...cleanEnvironment, NOTEPAD_DATA: data, PORT: '27121' }, stdio: ['ignore', 'pipe', 'pipe'] })
+      exited = new Promise((resolve, reject) => { app.once('error', reject); app.once('exit', (code, signal) => resolve({ code, signal })) }); exited.catch(() => {})
+      for (const stream of [app.stdout, app.stderr]) { stream.on('data', traceData); stream.on('error', traceData) }
+      report.pid = app.pid; assert.ok(Number.isSafeInteger(report.pid) && report.pid > 0)
+      const labPage = await until(async () => {
+        assert.equal(app.exitCode, null, 'Seeded installed application exited before readiness')
+        try {
+          const response = await fetch(`http://127.0.0.1:${labPort}/json/list`, { signal: AbortSignal.timeout(800) })
+          const matches = (await response.json()).filter(item => item.type === 'page' && item.url.startsWith('file:') && item.url.includes('index.html'))
+          return matches.length === 1 && matches[0]
+        } catch { return false }
+      }, 'Seeded installed renderer did not become available')
+      cdp = await connect(labPage.webSocketDebuggerUrl)
+      cdp.onEvent(event => { if (event.method === 'Runtime.exceptionThrown') { report.runtimeErrors.push(event.params.exceptionDetails?.text || 'Runtime exception'); save() } })
+      for (const domain of ['Runtime', 'Page', 'Network']) await cdp.send(domain + '.enable')
+      await until(() => evaluate("Boolean(document.querySelector('.workspace-sidebar'))"), 'Seeded installed application shell did not initialize')
+      const labDiagnostics = await evaluate('window.electronAPI.appDiagnostics()')
+      assert.equal(labDiagnostics.version, VERSION); assert.equal(labDiagnostics.packaged, true)
+      const labBackend = await api('/api/diagnostics'); assert.ok(samePath(labBackend.data_dir, data), 'Seeded process left its isolated synthetic data')
+      activeLabBackend = await identifyLabBackend()
+      report.localSyncLabLifecycle.restarted = { pid: report.pid, app: structuredClone(report.app), dataDir: data, profile, backendDataVerified: true,
+        backendProcess: structuredClone(activeLabBackend) }
+      save()
+    }
+    const verifyDesktop = group === 'local-sync-lab' ? verifyLocalSyncLabDesktop : verifyFullAppUiDesktop
+    await verifyDesktop({ evaluate, click, cdp, until, api, readAsset, writeFixtureFile, capture, resize, report, save, group,
       processID: report.pid, applicationIdentity: report.app })
     await verifyFullAppUiFiles(report.fullAppUi, out, ledger)
     assert.deepEqual(report.runtimeErrors, [])
     await closeNormally()
+    if (group === 'local-sync-lab') {
+      assert.equal(report.backendStopped, true)
+      const logicalAfter = snapshotLocalSyncLab({ dataDir: data, ownedRoot: scratch })
+      report.localSyncLabLifecycle.after = logicalAfter
+      assert.deepEqual(logicalAfter, report.localSyncLabSeed.after, 'Actual local lab page observations changed protected logical database, uploads or remote absence')
+      report.localSyncLabLifecycle.logicalUnchanged = true
+      report.localSyncLabLifecycle.finalExit = structuredClone(report.exit)
+      report.localSyncLabLifecycle.complete = true; save()
+    }
     await uninstall()
   } catch (error) {
     failure = error; report.error = String(error?.stack || error); report.complete = false; save()

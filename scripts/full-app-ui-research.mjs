@@ -17,7 +17,7 @@ export const researchRoutes = [
   { id: 'research-hub', title: '跨资料集阅读工作台', source: source('CollectionStudyHub'), root: '.collection-study-hub', requiredStates: ['populated', 'collection-popup', 'status-popup', 'sort-popup', 'empty-filter'] },
   { id: 'research-batch', title: '批量阅读标记与撤销', source: source('CollectionStudyBatchPanel'), root: '.study-hub-batch', requiredStates: ['selected', 'status-popup', 'preflight', 'applied', 'undone'] },
   { id: 'research-compilation', title: '批注整理成研究笔记', source: source('StudyCompilationPanel'), root: '.study-compilation[aria-label="批注整理成研究笔记"]', requiredStates: ['form', 'directory-popup', 'group-popup', 'long-goal', 'preview'] },
-  { id: 'research-tasks', title: '研究草稿与创建记录', source: source('ResearchTasksPanel'), root: '.research-tasks', requiredStates: ['populated', 'draft-preview', 'confirmation', 'remove-confirmation', 'confirmed-preview', 'checked-receipt'] },
+  { id: 'research-tasks', title: '研究草稿与创建记录', source: source('ResearchTasksPanel'), root: '.research-tasks', requiredStates: ['populated', 'draft-preview', 'confirmation', 'remove-confirmation', 'confirmed-preview', 'checked-receipt'], stateRoots: { 'checked-receipt': '.study-compilation-result' } },
   { id: 'research-return', title: '从实际检索返回', source: source('SearchReturnBar'), root: '.search-return-bar[aria-label="检索返回导航"]', requiredStates: ['opened'] },
   { id: 'research-reading', title: '资料集连续阅读与批注', source: source('CollectionReadingBar'), root: '.collection-reading-bar', requiredStates: ['opened', 'next', 'annotation'] },
 ]
@@ -362,7 +362,7 @@ export async function verifyResearchPages(ctx) {
   await ui.press('.research-tasks', '查回此任务创建结果')
   await ui.text('.research-tasks', '已查回此任务对应的笔记')
   await ui.present('.study-compilation-result')
-  await shot('research-tasks', 'checked-receipt', ['.research-tasks > summary'])
+  await shot('research-tasks', 'checked-receipt', ['.study-compilation-result > [role="status"]'])
   const taskAfter = await ui.entries('tasks')
   const semanticTasks = rows => rows.map(row => { const { updatedAt, ...value } = JSON.parse(row.raw); return { key: row.key, value } })
   assert.deepEqual(semanticTasks(taskAfter), semanticTasks(taskBefore), 'Checking an existing research receipt changed its task payload or identity')
@@ -391,6 +391,8 @@ export async function verifyResearchPages(ctx) {
   // The embedded editor's Select is observed without changing its saved record.
   await shared.selectPreview('.collection-reading-study ' + field('当前资料阅读状态'), { routeId: 'research-reading', stateId: 'annotation', captureScene: false })
   await ui.press('.collection-reading-bar', '返回资料集'); await ui.present('.global-search-panel'); await shared.closeSearch()
+  await ui.press('.collection-reading-bar', '结束资料集阅读'); await ui.absent('.collection-reading-bar')
+  records.readingOriginEndedThroughActualUi = true
 
   const after = await ui.snapshot()
   for (const name of ['presets', 'collections']) assert.deepEqual(after.filter(item => item.key.startsWith(PREFIX[name])), before.filter(item => item.key.startsWith(PREFIX[name])), 'Read/cancel UI changed ' + name)

@@ -7,15 +7,31 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-export const FULL_APP_GROUPS = Object.freeze(['settings', 'projects', 'research', 'editor'])
+export const FULL_APP_GROUPS = Object.freeze(['settings', 'projects', 'research', 'editor', 'local-sync-lab'])
 export const FULL_APP_PRODUCT_SOURCE_FILES = Object.freeze([
   'scripts/native-ui-select.mjs', 'scripts/check-ui-control-render.cjs', 'scripts/desktop-save-fixture.mjs',
   'scripts/desktop-window-session.mjs', 'scripts/desktop-window-target.mjs', 'scripts/desktop-window-worker.ps1',
   'scripts/local-export-directory-session.mjs', 'scripts/local-export-directory-worker.ps1', 'scripts/installer-lifecycle-core.mjs',
 ])
+// These pure product parsers are imported by the verifier's owned offline
+// fixture setup. They remain pinned application sources, not verifier copies.
+export const FULL_APP_RUNTIME_SOURCE_FILES = Object.freeze([
+  'electron/s3-local-overview-codec.js',
+  'src/services/s3LocalOverviewComparison.mjs', 'src/services/s3LocalOverviewFile.mjs', 'src/services/s3LocalOverviewReport.mjs',
+  'src/services/s3OfflinePairDirection.mjs', 'src/services/s3OfflinePairOrder.mjs', 'src/services/s3OfflinePairScope.mjs',
+  'src/services/s3OfflinePairView.mjs', 'src/services/s3OfflineReportPair.mjs',
+  'src/services/syncClockPreference.mjs', 'src/services/syncConflictHistory.mjs', 'src/services/syncHistoryExport.mjs',
+  'src/services/syncHistoryFile.mjs', 'src/services/syncHistoryFileOrder.mjs', 'src/services/syncHistoryFileSelection.mjs',
+  'src/services/syncHistorySearch.mjs', 'src/services/syncHistorySummary.mjs', 'src/services/syncHistoryTime.mjs',
+  'server/cmd/notepad-server/main.go', 'server/internal/backup/backup.go', 'server/internal/model/file.go',
+  'server/internal/syncengine/engine.go', 'server/internal/syncengine/recovery_runner.go',
+  'server/internal/syncengine/conflict_history.go', 'server/internal/syncjob/policy.go',
+  'src/services/syncConflictReview.mjs', 'src/services/syncConflictQueue.mjs', 'src/services/syncConflictDiff.mjs', 'src/services/syncPlanView.mjs',
+])
 export const FULL_APP_VERIFIER_SOURCE_FILES = Object.freeze([
   'scripts/run-full-app-ui-installed.mjs', 'scripts/check-full-app-ui-desktop.mjs', 'scripts/full-app-ui-shared.mjs', 'scripts/full-app-ui-shared.node.mjs',
   'scripts/full-app-ui-projects.mjs', 'scripts/full-app-ui-settings.mjs', 'scripts/full-app-ui-offline-settings.mjs', 'scripts/full-app-ui-research.mjs', 'scripts/full-app-ui-main-editor.mjs', 'scripts/full-app-ui-navigation.mjs',
+  'scripts/full-app-ui-local-sync-lab.mjs', 'scripts/check-local-sync-lab-desktop.mjs', 'scripts/full-app-ui-local-sync-seed.mjs', 'scripts/full-app-ui-local-sync-seed.node.mjs',
   'scripts/full-app-ui-evidence.mjs', 'scripts/full-app-ui-evidence.node.mjs', 'scripts/full-app-ui-window-worker.ps1',
   'scripts/full-app-ui-routes.json', 'scripts/ui-screens-product-sources.json',
   'scripts/run-ui-screens-installed.mjs', 'scripts/check-ui-screens-desktop.mjs',
@@ -51,8 +67,20 @@ const fileIdentity = file => {
 }
 const sameImage = (actual, expected) => assert.deepEqual(actual, expected, 'Screenshot record is not bound to the actual captured image')
 
+export function fullAppProductPageSources(ledger) {
+  const files = [...new Set(Object.values(ledger.groups).flatMap(group => group.routes.map(route => route.source))
+    .concat(ledger.sourceCoverage.map(entry => entry.file)))].sort()
+  for (const file of files) {
+    assert.match(file, /^src\/[a-zA-Z0-9_./-]+\.(jsx?|tsx?|mjs|css)$/)
+    assert.ok(!file.split('/').some(part => part === '..' || part === '.' || part === ''), 'Product source path must not escape or alias its pinned location')
+  }
+  return files
+}
+
 export function validateFullAppUiLedger(ledger) {
   assert.equal(ledger?.schemaVersion, 1); assert.equal(ledger.scope, SCOPE)
+  commit(ledger.productSource?.commit); commit(ledger.productSource.tree)
+  assert.equal(ledger.productSource.dirty, false, 'Route ledger must describe an immutable clean product')
   exactSet(Object.keys(ledger.groups), FULL_APP_GROUPS, 'application group')
   assert.deepEqual(ledger.matrix, FULL_APP_MATRIX, 'The declared light/dark and exact three native sizes must not be reduced')
   const allRoutes = []
@@ -88,12 +116,28 @@ export function validateFullAppUiLedger(ledger) {
   for (const entry of ledger.sourceCoverage) {
     assert.match(entry.file, /^src\/[a-zA-Z0-9_./-]+\.(jsx?|tsx?|mjs|css)$/)
     assert.ok(!entry.file.split('/').includes('..')); nonempty(entry.classification); nonempty(entry.reason)
+    commit(entry.blob); digest(entry.sha256); assert.ok(Number.isSafeInteger(entry.bytes) && entry.bytes > 0)
     assert.ok(Array.isArray(entry.routeIds)); assert.equal(new Set(entry.routeIds).size, entry.routeIds.length)
     for (const id of entry.routeIds) assert.ok(allRoutes.some(route => route.id === id), 'Coverage refers to an undeclared route')
   }
   assert.equal(new Set(ledger.sourceCoverage.map(entry => entry.file)).size, ledger.sourceCoverage.length)
   for (const route of allRoutes) assert.ok(ledger.sourceCoverage.some(entry => entry.file === route.source && entry.routeIds.includes(route.id)), 'Route source is not independently mapped: ' + route.id)
   assert.ok(Array.isArray(ledger.openCoverage))
+  return ledger
+}
+
+export function validateFullAppLedgerSourceIdentity(ledger, sources) {
+  validateFullAppUiLedger(ledger)
+  assert.equal(ledger.productSource.commit, sources.productCommit, 'Route ledger belongs to a different immutable product commit')
+  assert.equal(ledger.productSource.tree, sources.productTree, 'Route ledger belongs to a different immutable product tree')
+  assert.equal(ledger.productSource.dirty, false)
+  exactSet(Object.keys(sources.actualPages), fullAppProductPageSources(ledger), 'ledger-bound actual source')
+  exactSet(Object.keys(sources.actualPageDetails), fullAppProductPageSources(ledger), 'ledger-bound actual source bytes')
+  for (const entry of ledger.sourceCoverage) {
+    assert.equal(entry.blob, sources.actualPages[entry.file], 'Route ledger blob differs from the pinned actual product: ' + entry.file)
+    assert.deepEqual(sources.actualPageDetails[entry.file], { blob: entry.blob, bytes: entry.bytes, sha256: entry.sha256 },
+      'Route ledger byte/hash provenance differs from the pinned Git source: ' + entry.file)
+  }
   return ledger
 }
 
@@ -290,6 +334,40 @@ export function validateFullAppUiEvidence(ui, ledger) {
             assert.ok(gap > 0 && gap <= maximumStep + 1, 'Long page has an unphotographed scroll gap')
           }
         }
+        // Recompute covered content from the two raw reads surrounding each
+        // actual PNG. Nominal client height and scroll positions alone cannot
+        // prove coverage when an ancestor clips most of the scroll surface.
+        const start = surface.requiredContentStart, end = surface.requiredContentEnd
+        assert.ok(Number.isFinite(start) && Number.isFinite(end) && start >= 0 && end > start && end <= surface.scrollHeight)
+        assert.equal(surface.contentStart, start); assert.equal(surface.contentEnd, end)
+        const intervals = []
+        for (const image of scene.images) {
+          const pair = ['before-capture', 'after-capture'].map(phase => scene.rawSamples.find(sample => sample.phase === phase && sample.image === image.filename)
+            ?.scrollAreas.filter(item => item.selector === surface.selector))
+          if (pair.some(matches => !matches?.length)) continue
+          pair.forEach(matches => assert.equal(matches.length, 1, 'Ambiguous actual scroll-surface owner at PNG boundary'))
+          const [before, after] = pair.map(matches => matches[0])
+          for (const actual of [before, after]) {
+            assert.equal(actual.scrollHeight, surface.scrollHeight); assert.equal(actual.clientHeight, surface.clientHeight)
+            assert.ok(Math.abs(actual.requiredContentStart - start) <= 1 && Math.abs(actual.requiredContentEnd - end) <= 1, 'Actual content extent changed across PNG captures')
+            assert.ok(Number.isFinite(actual.visibleHeight) && actual.visibleHeight >= 0 && actual.visibleHeight <= Math.min(surface.clientHeight, scene.viewport.height) + 1)
+            assert.ok(Number.isFinite(actual.visibleContentStart) && Number.isFinite(actual.visibleContentEnd) && actual.visibleContentStart >= 0 &&
+              actual.visibleContentEnd >= actual.visibleContentStart && actual.visibleContentEnd <= surface.scrollHeight &&
+              actual.visibleContentEnd - actual.visibleContentStart <= actual.visibleHeight + 1, 'Raw content interval exceeds its actual clipped viewport')
+          }
+          const from = Math.max(start, before.visibleContentStart, after.visibleContentStart), to = Math.min(end, before.visibleContentEnd, after.visibleContentEnd)
+          if (to > from) intervals.push({ from, to, image: image.filename })
+        }
+        intervals.sort((a, b) => a.from - b.from || a.to - b.to)
+        assert.deepEqual(surface.observedIntervals, intervals, 'Scroll coverage must bind the actual PNG before/after interval intersections')
+        const gaps = []; let cursor = start
+        for (const interval of intervals) {
+          if (interval.from > cursor + 1) gaps.push({ from: cursor, to: interval.from })
+          cursor = Math.max(cursor, interval.to)
+        }
+        if (cursor < end - 1) gaps.push({ from: cursor, to: end })
+        assert.deepEqual(surface.gaps, gaps, 'Reported content gaps differ from raw PNG intervals')
+        assert.ok(intervals.length > 0 && gaps.length === 0, 'Actual long-page content has an unphotographed interval')
       }
     }
   }
@@ -388,6 +466,171 @@ export function validateFullAppPrerequisites({ pin, original, accepted, sourcePr
   return true
 }
 
+export function validateLocalSyncLabUi(ui, seed) {
+  assert.equal(ui.group, 'local-sync-lab')
+  const lab = ui.localSyncLab
+  assert.equal(lab?.seedDigest, seed.seedDigest); assert.equal(lab.initialTheme, seed.settingsBefore.theme)
+  for (const key of ['themeRestored', 'logicalSnapshotRequiredAfterNormalExit', 'noSyncExecution']) assert.equal(lab[key], true)
+  assert.equal(ui.setup.notesBeforeSHA256, sha(JSON.stringify(seed.files)))
+  assert.equal(ui.notesAfterSHA256, ui.setup.notesBeforeSHA256)
+  assert.equal(ui.syncBeforeSHA256, sha(JSON.stringify(ui.setup.localSyncLab.settings)))
+  assert.equal(ui.syncAfterSHA256, ui.syncBeforeSHA256)
+  const settings = ui.setup.localSyncLab.settings
+  assert.equal(settings.theme, seed.settingsBefore.theme); assert.equal(settings.sync_enabled, true)
+  assert.equal(settings.sync_provider, 'local-lab'); assert.equal(settings.sync_auto_enabled, false)
+  for (const key of ['sync_endpoint', 'sync_username', 'sync_password', 'sync_password_set']) assert.ok(!settings[key])
+  const readPaths = new Set(['/api/settings', '/api/diagnostics', '/api/files', '/api/tags', '/api/folders',
+    '/api/sync/status', '/api/sync/activity', '/api/sync/conflicts', '/api/sync/conflicts/history'])
+  assert.ok(Array.isArray(lab.requests)); assert.ok(Array.isArray(lab.allowedPlanRequests))
+  for (const request of lab.requests) {
+    nonempty(request.requestId); nonempty(request.pathname); assert.equal(typeof request.search, 'string')
+    if (request.kind === 'asset') {
+      assert.equal(request.method, 'GET'); assert.ok(!request.pathname.startsWith('/api/'))
+    } else if (request.kind === 'read') {
+      assert.equal(request.method, 'GET'); assert.ok(readPaths.has(request.pathname) || /^\/api\/files\/[A-Za-z0-9_-]{1,128}$/.test(request.pathname), 'Unapproved local-lab read path')
+    } else if (request.kind === 'theme') {
+      assert.equal(request.method, 'PUT'); assert.equal(request.pathname, '/api/settings'); assert.equal(request.search, '')
+      const body = JSON.parse(request.body); assert.deepEqual(Object.keys(body), ['theme']); assert.ok(['light', 'dark'].includes(body.theme))
+    } else {
+      assert.equal(request.kind, 'plan', 'Unapproved local-lab request kind')
+      assert.equal(request.method, 'POST'); assert.equal(request.pathname, '/api/sync/plan'); assert.equal(request.search, '')
+      assert.deepEqual(JSON.parse(request.body), {}, 'The only sync POST must be the exact read-only empty plan request')
+    }
+  }
+  assert.equal(lab.allowedPlanRequests.length, FULL_APP_MATRIX.length)
+  exactSet(lab.requests.filter(request => request.kind === 'plan').map(request => request.requestId), lab.allowedPlanRequests.map(request => request.requestId), 'actual local plan request')
+  for (const plan of lab.allowedPlanRequests) {
+    const request = lab.requests.find(item => item.requestId === plan.requestId)
+    assert.deepEqual(request, plan, 'A plan response is detached from its actual renderer request')
+    assert.equal(plan.complete, true); assert.equal(plan.error, undefined)
+    const bytes = Buffer.from(plan.responseText, 'utf8')
+    assert.equal(bytes.length, plan.responseBytes); assert.ok(bytes.length > 0 && bytes.length <= 1024 * 1024)
+    assert.equal(sha(bytes), plan.responseSHA256, 'Actual local plan response bytes/hash differ')
+    const envelope = JSON.parse(plan.responseText); assert.equal(envelope.code, 0); assert.deepEqual(envelope.data, plan.response)
+    const data = plan.response, expectedCounts = { uploads: 21, downloads: 0, conflicts: 0, noops: 0 }
+    for (const [key, value] of Object.entries(expectedCounts)) assert.equal(data[key], value)
+    assert.equal(data.store_id, ''); assert.equal(data.revision, ''); assert.equal(data.generation, 0); assert.equal(data.needs_init, true)
+    exactSet(data.items.map(item => item.id), seed.noteIDs, 'actual plan owned item')
+    for (const item of data.items) {
+      assert.equal(item.action, 'upload'); assert.equal(item.base_hash, ''); assert.equal(item.remote_hash, '')
+      assert.equal(item.local_hash, seed.records.find(record => record.itemID === item.id).local)
+    }
+    const snapshot = plan.snapshot
+    assert.equal(snapshot.source, 'preview'); assert.equal(snapshot.stale, false); assert.equal(snapshot.detailState, 'complete')
+    assert.equal(snapshot.needsInit, true); assert.equal(snapshot.generation, 0); assert.deepEqual(snapshot.counts, expectedCounts)
+    exactSet(snapshot.items.map(item => item.id), seed.noteIDs, 'displayed plan owned item')
+    assert.ok(snapshot.items.every(item => item.action === 'upload'))
+  }
+  assert.ok(Array.isArray(lab.viewReceipts)); exactSet(lab.viewReceipts.map(matrixKey), FULL_APP_MATRIX.map(matrixKey), 'local-lab matrix view')
+  exactSet(lab.viewReceipts.map(view => view.planRequestId), lab.allowedPlanRequests.map(plan => plan.requestId), 'matrix-bound plan response')
+  for (const view of lab.viewReceipts) {
+    for (const key of ['openConflictsUnchanged', 'previewOnly', 'choiceCancelled']) assert.equal(view[key], true)
+    assert.equal(view.historyRead, 26); assert.equal(view.resolveCalled, false)
+  }
+  assert.ok(Array.isArray(ui.events))
+  const previews = ui.events.filter(event => event.type === 'click' && event.buttonText === '预演同步')
+  assert.equal(previews.length, FULL_APP_MATRIX.length); assert.deepEqual(lab.trustedPreviewClicks, previews)
+  assert.ok(previews.every(event => event.trusted === true), 'Each real local plan requires its trusted UI click')
+  assert.equal(ui.events.some(event => event.type === 'click' && ['执行同步', '确认处理此冲突', '检查连接', '重新绑定远端'].includes(event.buttonText)), false)
+  return lab
+}
+
+export function validateLocalSyncLabBackendProcess(process, appPID, executable) {
+  assert.equal(process?.source, 'Win32_Process')
+  assert.ok(Number.isSafeInteger(process.pid) && process.pid > 0)
+  assert.ok(Number.isSafeInteger(appPID) && appPID > 0)
+  assert.equal(process.parentPid, appPID, 'The local-lab backend must be the actual App main process direct child')
+  assert.notEqual(process.pid, appPID)
+  assert.ok(path.win32.isAbsolute(process.executable) && path.win32.isAbsolute(executable))
+  assert.equal(path.win32.resolve(process.executable).toLowerCase(), path.win32.resolve(executable).toLowerCase(),
+    'The local-lab backend must be the exact current installed executable')
+  assert.equal(typeof process.createdAt, 'string'); assert.ok(Number.isFinite(Date.parse(process.createdAt)))
+  return process
+}
+
+export function validateLocalSyncLabBackendExit(exit, process) {
+  assert.equal(exit?.source, 'Win32_Process'); assert.equal(exit.pid, process.pid)
+  assert.deepEqual(exit.processes, [], 'A closed port alone cannot prove the owned backend PID exited')
+  assert.equal(exit.portClosed, true); assert.equal(exit.complete, true)
+  return exit
+}
+
+export function validateLocalSyncLabLifecycle(report) {
+  assert.equal(report.group, 'local-sync-lab')
+  const lab = report.localSyncLabLifecycle, seed = report.localSyncLabSeed
+  assert.equal(lab?.schemaVersion, 1); assert.equal(lab.complete, true)
+  assert.equal(lab.seededWhileStopped, true); assert.equal(lab.logicalUnchanged, true)
+  assert.equal(seed?.schemaVersion, 1); assert.equal(seed.complete, true)
+  assert.deepEqual(seed.expectedCounts, { notes: 21, open: 21, history: 26 })
+  const expectedData = path.win32.join(report.dataIsolation.ownedRoot, 'data')
+  const backendExecutable = path.win32.join(path.win32.dirname(report.app.executable), 'resources', 'bin', 'notepad-server.exe')
+  assert.equal(report.dataIsolation.data, expectedData)
+  for (const phase of [lab.bootstrap, lab.restarted]) {
+    assert.ok(Number.isSafeInteger(phase?.pid) && phase.pid > 0)
+    assert.equal(phase.dataDir, expectedData); assert.equal(phase.profile, report.dataIsolation.profile)
+    assert.equal(phase.backendDataVerified, true); assert.deepEqual(phase.app, report.app, 'Local lab used a different installed application lifetime')
+    validateLocalSyncLabBackendProcess(phase.backendProcess, phase.pid, backendExecutable)
+  }
+  assert.equal(lab.bootstrap.noteCount, 21); assert.equal(lab.restarted.pid, report.pid)
+  const closed = lab.bootstrap.closed
+  assert.equal(closed?.backendStopped, true); assert.equal(closed.portClosed, true)
+  assert.equal(closed.appExit.pid, lab.bootstrap.pid); assert.equal(closed.appExit.nativeClose, true)
+  assert.equal(closed.appExit.code, 0); assert.equal(closed.appExit.signal, null)
+  assert.deepEqual(closed.backendProcess, lab.bootstrap.backendProcess)
+  assert.equal(closed.backendProcessExited, true)
+  validateLocalSyncLabBackendExit(closed.appExit.backendExit, lab.bootstrap.backendProcess)
+  assert.deepEqual(seed.bootstrapClosed, closed, 'Seed is detached from the actual normal bootstrap shutdown')
+  assert.deepEqual(lab.finalExit, report.exit, 'Local lab final shutdown differs from the real installed process exit')
+  validateLocalSyncLabBackendExit(lab.finalExit.backendExit, lab.restarted.backendProcess)
+  assert.equal(seed.noteIDs?.length, 21); assert.equal(new Set(seed.noteIDs).size, 21)
+  exactSet(report.fullAppUi.setup.noteIDs, seed.noteIDs, 'seeded owned UI note')
+  assert.deepEqual(seed.files?.map(file => file.id), seed.noteIDs)
+  assert.deepEqual(seed.records?.map(record => record.itemID), seed.noteIDs)
+  const table = (snapshot, name) => {
+    const matches = snapshot.logical?.tables.filter(item => item.name === name)
+    assert.equal(matches?.length, 1, 'Local lab logical table missing or ambiguous: ' + name)
+    return matches[0]
+  }
+  for (const snapshot of [seed.before, seed.after, lab.after]) {
+    assert.equal(snapshot?.schemaVersion, 14)
+    assert.equal(snapshot.database, path.win32.join(expectedData, 'data.db'))
+    assert.equal(snapshot.remote?.path, path.win32.join(expectedData, 'sync-lab-remote')); assert.equal(snapshot.remote.exists, false)
+    assert.equal(table(snapshot, 'files').rows.length, 21)
+    exactSet(table(snapshot, 'files').rows.map(file => file.id), seed.noteIDs, 'owned database note')
+    assert.deepEqual(table(snapshot, 'schema_migrations').rows.map(row => row.version).sort((a, b) => Number(a.integer) - Number(b.integer)),
+      Array.from({ length: 14 }, (_, index) => ({ integer: String(index + 1) })), 'The actual complete schema14 is required')
+  }
+  assert.equal(table(seed.before, 'sync_conflicts').rows.length, 0, 'Bootstrap must not import unrelated conflicts')
+  const conflicts = table(seed.after, 'sync_conflicts').rows
+  assert.equal(conflicts.length, 47); assert.equal(new Set(conflicts.map(row => row.id)).size, 47)
+  exactSet(conflicts.filter(row => row.status === 'open').map(row => row.item_id), seed.noteIDs, 'one actual open conflict per owned note')
+  assert.equal(conflicts.filter(row => ['resolved', 'superseded'].includes(row.status)).length, 26)
+  for (const row of conflicts) {
+    assert.ok(seed.noteIDs.includes(row.item_id)); assert.equal(row.base_hash, '')
+    const record = seed.records.find(item => item.itemID === row.item_id)
+    digest(record.local); digest(record.remote); assert.notEqual(record.local, record.remote)
+    for (const side of ['local', 'remote']) {
+      assert.equal(row[side + '_hash'], record[side]); assert.equal(sha(row[side + '_record']), record[side], 'Actual synthetic Record bytes do not match their declared hash')
+      const value = JSON.parse(row[side + '_record'])
+      assert.equal(value.format, 'local-notepad-sync-record'); assert.equal(value.version, 1)
+      assert.equal(value.kind, 'file'); assert.equal(value.state, 'present'); assert.equal(value.id, row.item_id); assert.equal(value.file.id, row.item_id)
+    }
+  }
+  const expected = clone(seed.before.logical), settings = expected.tables.find(item => item.name === 'settings')
+  assert.equal(settings?.rows.length, 1); assert.deepEqual(seed.settingsBefore, settings.rows[0])
+  for (const key of ['sync_enabled', 'sync_auto_enabled']) assert.ok(settings.rows[0][key] === null || settings.rows[0][key]?.integer === '0')
+  for (const key of ['sync_provider', 'sync_endpoint', 'sync_username', 'sync_password']) assert.ok(settings.rows[0][key] === null || settings.rows[0][key] === '')
+  Object.assign(settings.rows[0], { sync_enabled: { integer: '1' }, sync_provider: 'local-lab', sync_endpoint: '', sync_username: '', sync_password: '',
+    sync_auto_enabled: { integer: '0' }, sync_interval_minutes: { integer: '5' } })
+  expected.tables.find(item => item.name === 'sync_conflicts').rows = clone(conflicts)
+  assert.deepEqual(seed.after.logical, expected, 'Local fixture seeding changed undeclared logical data or schema')
+  assert.deepEqual(seed.after.uploads, seed.before.uploads)
+  assert.equal(seed.seedDigest, sha(JSON.stringify({ after: seed.after, records: seed.records })), 'Seed logical/Record digest mismatch')
+  assert.deepEqual(lab.after, seed.after, 'Real local-lab UI or app lifetimes changed the full protected logical snapshot')
+  validateLocalSyncLabUi(report.fullAppUi, seed)
+  return lab
+}
+
 export function validateFullAppInstalledReport(report, ledger) {
   assert.equal(report.schemaVersion, 1); assert.equal(report.scope, SCOPE + '-group')
   assert.equal(report.complete, true); assert.equal(report.cleanupComplete, true)
@@ -439,13 +682,19 @@ export function validateFullAppInstalledReport(report, ledger) {
   exactSet(Object.keys(report.sourceFiles.productPaths), ['src', 'electron', 'server', 'package.json', 'package-lock.json', 'vite.config.js'], 'immutable application tree/path')
   Object.values(report.sourceFiles.productPaths).forEach(commit)
   assert.equal(report.sourceFiles.verifierCommit, report.verifierCommit)
-  for (const map of [report.sourceFiles.product, report.sourceFiles.verifier, report.sourceFiles.actualPages]) {
+  for (const map of [report.sourceFiles.product, report.sourceFiles.verifier, report.sourceFiles.actualPages, report.sourceFiles.runtime]) {
     assert.ok(Object.keys(map).length > 0); Object.values(map).forEach(commit)
   }
   exactSet(Object.keys(report.sourceFiles.product), FULL_APP_PRODUCT_SOURCE_FILES, 'bound product helper')
+  exactSet(Object.keys(report.sourceFiles.runtime), FULL_APP_RUNTIME_SOURCE_FILES, 'bound runtime product source')
   exactSet(Object.keys(report.sourceFiles.verifier), FULL_APP_VERIFIER_SOURCE_FILES, 'bound verifier source')
-  exactSet(Object.keys(report.sourceFiles.actualPages), [...new Set(ledger.sourceCoverage.map(entry => entry.file)
-    .concat(Object.values(ledger.groups).flatMap(group => group.routes.map(route => route.source))))], 'bound actual page source')
+  exactSet(Object.keys(report.sourceFiles.actualPages), fullAppProductPageSources(ledger), 'bound actual page source')
+  validateFullAppLedgerSourceIdentity(ledger, report.sourceFiles)
+  if (report.group === 'local-sync-lab') validateLocalSyncLabLifecycle(report)
+  else {
+    assert.equal(report.localSyncLabLifecycle, undefined, 'Ordinary groups cannot claim local-lab preparation')
+    assert.equal(report.localSyncLabSeed, undefined, 'Ordinary groups cannot receive seeded sync data')
+  }
   validateFullAppUiEvidence(report.fullAppUi, ledger)
   return report
 }

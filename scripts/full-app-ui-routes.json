@@ -831,7 +831,10 @@
             "remove-confirmation",
             "confirmed-preview",
             "checked-receipt"
-          ]
+          ],
+          "stateRoots": {
+            "checked-receipt": ".study-compilation-result"
+          }
         },
         {
           "id": "research-return",
@@ -1179,8 +1182,14 @@
           "root": ".editor-command-palette",
           "requiredStates": [
             "default",
-            "empty"
-          ]
+            "empty",
+            "block-menu",
+            "wiki-completion"
+          ],
+          "stateRoots": {
+            "block-menu": ".block-menu",
+            "wiki-completion": ".wiki-link-menu"
+          }
         },
         {
           "id": "editor-view",
@@ -1323,8 +1332,12 @@
           "source": "src/components/Editor/plugins/TableActionMenuPlugin.jsx",
           "root": ".table-action-menu",
           "requiredStates": [
-            "actions"
-          ]
+            "actions",
+            "selection-mode"
+          ],
+          "stateRoots": {
+            "selection-mode": ".table-selection-modebar"
+          }
         },
         {
           "id": "editor-resources",
@@ -1460,6 +1473,61 @@
             "selection",
             "markdown-preview",
             "word-preview"
+          ]
+        }
+      ]
+    },
+    "local-sync-lab": {
+      "routes": [
+        {
+          "id": "lab-sync-plan",
+          "title": "本机只读同步计划",
+          "source": "src/components/SyncPlanPanel.jsx",
+          "root": ".sync-plan-view",
+          "requiredStates": [
+            "controls",
+            "next-page"
+          ]
+        },
+        {
+          "id": "lab-sync-queue",
+          "title": "合成待处理冲突队列",
+          "source": "src/components/SyncConflictQueue.jsx",
+          "root": ".sync-conflict-queue",
+          "requiredStates": [
+            "controls",
+            "next-page"
+          ]
+        },
+        {
+          "id": "lab-sync-review",
+          "title": "合成冲突两端对照与取消",
+          "source": "src/components/SyncConflictReview.jsx",
+          "root": ".sync-conflict-review",
+          "requiredStates": [
+            "open",
+            "unsubmitted-choice"
+          ]
+        },
+        {
+          "id": "lab-sync-diff",
+          "title": "合成正文差异定位",
+          "source": "src/components/SyncConflictDiff.jsx",
+          "root": ".sync-conflict-diff",
+          "requiredStates": [
+            "first-group",
+            "next-page",
+            "next-group"
+          ]
+        },
+        {
+          "id": "lab-sync-history",
+          "title": "实际本机合成历史读取",
+          "source": "src/components/SyncConflictHistoryPanel.jsx",
+          "root": ".sync-conflict-history-body",
+          "requiredStates": [
+            "loaded",
+            "earlier-records"
           ]
         }
       ]
@@ -1982,9 +2050,11 @@
       "bytes": 11717,
       "sha256": "92a0b6c685884ebb34db4fda797d8ccafe564d21b191b1c244f5e3df14cfa76e",
       "blob": "85a0100d88dd449f717e4c34c2a440f09676ab11",
-      "classification": "active-route-gap",
-      "reason": "Production import path exists, but no currently authored route declares this active control source. It must be assigned a genuine entry or reviewed special boundary before aggregate completion.",
-      "routeIds": [],
+      "classification": "planned-nested-controls",
+      "reason": "Production controls are rendered within the declared actual route. Scope is the listed route states; unvisited conditional child panels remain explicit gaps below.",
+      "routeIds": [
+        "editor-commands"
+      ],
       "importPath": [
         "src/main.jsx",
         "src/App.jsx",
@@ -1994,7 +2064,12 @@
       ],
       "jsxControlPositions": 7,
       "createElementPositions": 0,
-      "programmaticCandidates": 0
+      "programmaticCandidates": 0,
+      "stateBindings": {
+        "editor-commands": [
+          "block-menu"
+        ]
+      }
     },
     {
       "file": "src/components/Editor/plugins/BlockReferencePlugin.jsx",
@@ -2211,8 +2286,8 @@
       "bytes": 6778,
       "sha256": "a8710b7b9dc3433177e94e60f24af79bdfd830d8325e12f570213c8b02b8b305",
       "blob": "7cf1b8bb663ccb396c7ab3b791ccc6e5a09ae93f",
-      "classification": "active-route-gap",
-      "reason": "Production import path exists, but no currently authored route declares this active control source. It must be assigned a genuine entry or reviewed special boundary before aggregate completion.",
+      "classification": "shared-or-browser-semantic-helper",
+      "reason": "Existing data-ui-native=editor-pointer-handle button implements direct mouse column resizing and double-click width calculation. It is an intentionally native editor pointer surface, not an ordinary migrated form button; this read/cancel matrix does not claim a resize gesture.",
       "routeIds": [],
       "importPath": [
         "src/main.jsx",
@@ -2252,8 +2327,8 @@
       "bytes": 8906,
       "sha256": "5f89100258287598b31be329fc37759d6c2ab3c374960ea6796e5c7e3041ede6",
       "blob": "5ef30986b72f367a87ec4a9229290fa9911a2b01",
-      "classification": "active-route-gap",
-      "reason": "Production import path exists, but no currently authored route declares this active control source. It must be assigned a genuine entry or reviewed special boundary before aggregate completion.",
+      "classification": "shared-or-browser-semantic-helper",
+      "reason": "Existing data-ui-native=editor-pointer-handle draggable row/column buttons retain real HTML drag-and-drop and colspan disabling semantics. They are documented native editor pointer handles, not unmigrated ordinary controls or an independent settings page; no drag acceptance is claimed here.",
       "routeIds": [],
       "importPath": [
         "src/main.jsx",
@@ -2271,9 +2346,11 @@
       "bytes": 39521,
       "sha256": "81aec56bcef7c77eb02ff5c695d2f14ec2d3dd7f95bfdf7bf3e5f28dc8cb6fc1",
       "blob": "5f0b5dfeee2fca6338ff2be35711562d6b0f178b",
-      "classification": "active-route-gap",
-      "reason": "Production import path exists, but no currently authored route declares this active control source. It must be assigned a genuine entry or reviewed special boundary before aggregate completion.",
-      "routeIds": [],
+      "classification": "planned-nested-controls",
+      "reason": "Production controls are rendered within the declared actual route. Scope is the listed route states; unvisited conditional child panels remain explicit gaps below.",
+      "routeIds": [
+        "editor-table-actions"
+      ],
       "importPath": [
         "src/main.jsx",
         "src/App.jsx",
@@ -2283,7 +2360,12 @@
       ],
       "jsxControlPositions": 13,
       "createElementPositions": 0,
-      "programmaticCandidates": 1
+      "programmaticCandidates": 1,
+      "stateBindings": {
+        "editor-table-actions": [
+          "selection-mode"
+        ]
+      }
     },
     {
       "file": "src/components/Editor/plugins/TextColorPlugin.jsx",
@@ -2327,9 +2409,11 @@
       "bytes": 11874,
       "sha256": "274bbd0cdbc2dfc6387230c228c1db573ecf76046587efe2c078a4ff77ea33bd",
       "blob": "23ab8a58644b31a040cda3024411bc3b2d41490b",
-      "classification": "active-route-gap",
-      "reason": "Production import path exists, but no currently authored route declares this active control source. It must be assigned a genuine entry or reviewed special boundary before aggregate completion.",
-      "routeIds": [],
+      "classification": "planned-nested-controls",
+      "reason": "Production controls are rendered within the declared actual route. Scope is the listed route states; unvisited conditional child panels remain explicit gaps below.",
+      "routeIds": [
+        "editor-commands"
+      ],
       "importPath": [
         "src/main.jsx",
         "src/App.jsx",
@@ -2339,7 +2423,12 @@
       ],
       "jsxControlPositions": 1,
       "createElementPositions": 0,
-      "programmaticCandidates": 0
+      "programmaticCandidates": 0,
+      "stateBindings": {
+        "editor-commands": [
+          "wiki-completion"
+        ]
+      }
     },
     {
       "file": "src/components/Editor/utils/blockRegistry.js",
@@ -2418,7 +2507,12 @@
       ],
       "jsxControlPositions": 1,
       "createElementPositions": 0,
-      "programmaticCandidates": 0
+      "programmaticCandidates": 0,
+      "stateBindings": {
+        "projects-evidence": [
+          "populated"
+        ]
+      }
     },
     {
       "file": "src/components/EvidenceReviewArchiveComparison.jsx",
@@ -3664,9 +3758,11 @@
       "bytes": 5002,
       "sha256": "fd21f60a72908e5d717148903ef7b81452b1de90c9e52cedd0755f7ea61c67ef",
       "blob": "d0c646d423af22e3de7c8481f19b34dac46a55d8",
-      "classification": "active-route-gap",
-      "reason": "Production import path exists, but no currently authored route declares this active control source. It must be assigned a genuine entry or reviewed special boundary before aggregate completion.",
-      "routeIds": [],
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "lab-sync-diff"
+      ],
       "importPath": [
         "src/main.jsx",
         "src/App.jsx",
@@ -3695,7 +3791,8 @@
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [
-        "local-sync-history"
+        "local-sync-history",
+        "lab-sync-history"
       ],
       "importPath": [
         "src/main.jsx",
@@ -3714,9 +3811,11 @@
       "bytes": 7916,
       "sha256": "a4e34105956050c058b199bf2215adc7f229064795394d761e212cb1c2c6d7a6",
       "blob": "cd00bd42c46fdd580d9db06e2cb79cab2e75d327",
-      "classification": "active-route-gap",
-      "reason": "Production import path exists, but no currently authored route declares this active control source. It must be assigned a genuine entry or reviewed special boundary before aggregate completion.",
-      "routeIds": [],
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "lab-sync-queue"
+      ],
       "importPath": [
         "src/main.jsx",
         "src/App.jsx",
@@ -3740,9 +3839,11 @@
       "bytes": 9118,
       "sha256": "b41b69b3f2f2e0cb7998112e993b08a5065c55cefad5c3ebde77835117aea151",
       "blob": "ec9082720c96609b85de5016d19c814669073d7b",
-      "classification": "active-route-gap",
-      "reason": "Production import path exists, but no currently authored route declares this active control source. It must be assigned a genuine entry or reviewed special boundary before aggregate completion.",
-      "routeIds": [],
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "lab-sync-review"
+      ],
       "importPath": [
         "src/main.jsx",
         "src/App.jsx",
@@ -3940,9 +4041,11 @@
       "bytes": 5046,
       "sha256": "c4d5ab9a454f8bdd4c52f10d0e647cb46eb45db66bfd9b6a0906551db4b6c3a1",
       "blob": "e15384040d7ce495a74159e5b7bb9127fbeafa13",
-      "classification": "active-route-gap",
-      "reason": "Production import path exists, but no currently authored route declares this active control source. It must be assigned a genuine entry or reviewed special boundary before aggregate completion.",
-      "routeIds": [],
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "lab-sync-plan"
+      ],
       "importPath": [
         "src/main.jsx",
         "src/App.jsx",
@@ -4267,145 +4370,5 @@
       "programmaticCandidates": 1
     }
   ],
-  "openCoverage": [
-    {
-      "source": "src/components/Editor/plugins/BlockHandlePlugin.jsx",
-      "kind": "unassigned-active-entry",
-      "reason": "Production import path exists, but no currently authored route declares this active control source. It must be assigned a genuine entry or reviewed special boundary before aggregate completion.",
-      "importPath": [
-        "src/main.jsx",
-        "src/App.jsx",
-        "src/components/TextEditor.jsx",
-        "src/components/Editor/Editor.jsx",
-        "src/components/Editor/plugins/BlockHandlePlugin.jsx"
-      ],
-      "existingFunctionalDrivers": []
-    },
-    {
-      "source": "src/components/Editor/plugins/TableColumnResizePlugin.jsx",
-      "kind": "unassigned-active-entry",
-      "reason": "Production import path exists, but no currently authored route declares this active control source. It must be assigned a genuine entry or reviewed special boundary before aggregate completion.",
-      "importPath": [
-        "src/main.jsx",
-        "src/App.jsx",
-        "src/components/TextEditor.jsx",
-        "src/components/Editor/Editor.jsx",
-        "src/components/Editor/plugins/TableColumnResizePlugin.jsx"
-      ],
-      "existingFunctionalDrivers": []
-    },
-    {
-      "source": "src/components/Editor/plugins/TableReorderPlugin.jsx",
-      "kind": "unassigned-active-entry",
-      "reason": "Production import path exists, but no currently authored route declares this active control source. It must be assigned a genuine entry or reviewed special boundary before aggregate completion.",
-      "importPath": [
-        "src/main.jsx",
-        "src/App.jsx",
-        "src/components/TextEditor.jsx",
-        "src/components/Editor/Editor.jsx",
-        "src/components/Editor/plugins/TableReorderPlugin.jsx"
-      ],
-      "existingFunctionalDrivers": []
-    },
-    {
-      "source": "src/components/Editor/plugins/TableSelectionPlugin.jsx",
-      "kind": "unassigned-active-entry",
-      "reason": "Production import path exists, but no currently authored route declares this active control source. It must be assigned a genuine entry or reviewed special boundary before aggregate completion.",
-      "importPath": [
-        "src/main.jsx",
-        "src/App.jsx",
-        "src/components/TextEditor.jsx",
-        "src/components/Editor/Editor.jsx",
-        "src/components/Editor/plugins/TableSelectionPlugin.jsx"
-      ],
-      "existingFunctionalDrivers": []
-    },
-    {
-      "source": "src/components/Editor/plugins/WikiLinkPlugin.jsx",
-      "kind": "unassigned-active-entry",
-      "reason": "Production import path exists, but no currently authored route declares this active control source. It must be assigned a genuine entry or reviewed special boundary before aggregate completion.",
-      "importPath": [
-        "src/main.jsx",
-        "src/App.jsx",
-        "src/components/TextEditor.jsx",
-        "src/components/Editor/Editor.jsx",
-        "src/components/Editor/plugins/WikiLinkPlugin.jsx"
-      ],
-      "existingFunctionalDrivers": []
-    },
-    {
-      "source": "src/components/SyncConflictDiff.jsx",
-      "kind": "unassigned-active-entry",
-      "reason": "Production import path exists, but no currently authored route declares this active control source. It must be assigned a genuine entry or reviewed special boundary before aggregate completion.",
-      "importPath": [
-        "src/main.jsx",
-        "src/App.jsx",
-        "src/components/SettingsPanel.jsx",
-        "src/components/SyncCenterPanel.jsx",
-        "src/components/SyncConflictQueue.jsx",
-        "src/components/SyncConflictReview.jsx",
-        "src/components/SyncConflictDiff.jsx"
-      ],
-      "existingFunctionalDrivers": [
-        {
-          "file": "scripts/check-sync-conflict-diff-render.cjs",
-          "present": true,
-          "scope": "isolated native component fixture; not an actual App page visit or complete six-scene matrix"
-        }
-      ]
-    },
-    {
-      "source": "src/components/SyncConflictQueue.jsx",
-      "kind": "unassigned-active-entry",
-      "reason": "Production import path exists, but no currently authored route declares this active control source. It must be assigned a genuine entry or reviewed special boundary before aggregate completion.",
-      "importPath": [
-        "src/main.jsx",
-        "src/App.jsx",
-        "src/components/SettingsPanel.jsx",
-        "src/components/SyncCenterPanel.jsx",
-        "src/components/SyncConflictQueue.jsx"
-      ],
-      "existingFunctionalDrivers": [
-        {
-          "file": "scripts/check-sync-conflict-queue-render.cjs",
-          "present": true,
-          "scope": "isolated native component fixture; not an actual App page visit or complete six-scene matrix"
-        }
-      ]
-    },
-    {
-      "source": "src/components/SyncConflictReview.jsx",
-      "kind": "unassigned-active-entry",
-      "reason": "Production import path exists, but no currently authored route declares this active control source. It must be assigned a genuine entry or reviewed special boundary before aggregate completion.",
-      "importPath": [
-        "src/main.jsx",
-        "src/App.jsx",
-        "src/components/SettingsPanel.jsx",
-        "src/components/SyncCenterPanel.jsx",
-        "src/components/SyncConflictQueue.jsx",
-        "src/components/SyncConflictReview.jsx"
-      ],
-      "existingFunctionalDrivers": []
-    },
-    {
-      "source": "src/components/SyncPlanPanel.jsx",
-      "kind": "unassigned-active-entry",
-      "reason": "Production import path exists, but no currently authored route declares this active control source. It must be assigned a genuine entry or reviewed special boundary before aggregate completion.",
-      "importPath": [
-        "src/main.jsx",
-        "src/App.jsx",
-        "src/components/SettingsPanel.jsx",
-        "src/components/SyncCenterPanel.jsx",
-        "src/components/SyncPlanPanel.jsx"
-      ],
-      "existingFunctionalDrivers": []
-    },
-    {
-      "source": "src/components/SyncOverviewPanel.jsx",
-      "routeId": "sync-presentation",
-      "kind": "conditional-entry-not-yet-authored",
-      "state": "expanded time/plan/history subpanels",
-      "reason": "Parent/default visibility is not evidence of this child state; preserve the gap until an actual route is authored."
-    }
-  ]
+  "openCoverage": []
 }

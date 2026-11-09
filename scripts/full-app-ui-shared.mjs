@@ -9,9 +9,56 @@ const keyCodes = { Tab: 9, Enter: 13, Escape: 27, Backspace: 8, Delete: 46, Home
   ArrowLeft: 37, ArrowUp: 38, ArrowRight: 39, ArrowDown: 40, ' ': 32, a: 65 }
 const slug = value => String(value).replace(/[^a-zA-Z0-9_-]+/g, '-').slice(0, 90)
 
+export function withinActualClientPort(rect, bounds, metrics, overflowX, overflowY, tolerance = 1) {
+  for (const name of ['clientLeft', 'clientTop', 'clientWidth', 'clientHeight']) if (!Number.isFinite(metrics[name]) || metrics[name] < 0) throw Error('Actual client-port metrics are required')
+  const left = bounds.left + metrics.clientLeft, top = bounds.top + metrics.clientTop
+  return (!/hidden|auto|scroll|clip/.test(overflowX) || (rect.left >= left - tolerance && rect.right <= left + metrics.clientWidth + tolerance)) &&
+    (!/hidden|auto|scroll|clip/.test(overflowY) || (rect.top >= top - tolerance && rect.bottom <= top + metrics.clientHeight + tolerance))
+}
+
+export function finiteOwnerMotionActive(sample) {
+  if (!sample || typeof sample.root !== 'string' || !Array.isArray(sample.animations)) throw Error('Actual owner motion sample is required')
+  return sample.animations.some(animation => {
+    if (!animation.pending && animation.playState !== 'running') return false
+    if ([animation.duration, animation.iterations, animation.endTime].includes('infinite')) return false
+    if (![animation.duration, animation.iterations, animation.endTime].every(value => Number.isFinite(value) && value >= 0)) throw Error('Finite owner animation timing is unavailable')
+    return true
+  })
+}
+
+function observeFullAppOwnerMotion(root) {
+  const matches = [...document.querySelectorAll(root)].filter(node => node.getClientRects().length && node.getBoundingClientRect().width > 0 && node.getBoundingClientRect().height > 0)
+  if (matches.length !== 1) throw Error('Actual motion owner missing or ambiguous: ' + root)
+  const animations = [], owners = [], scalar = value => value === Infinity ? 'infinite' : value
+  for (let node = matches[0]; node; node = node.parentElement) {
+    if (owners.length >= 64) throw Error('Actual animation owner chain exceeds its bounded depth')
+    const owner = { tag: node.tagName, id: node.id, className: String(node.className) }; owners.push(owner)
+    // Only each owner itself. Descendant spinners and unrelated toast portals
+    // are not a prerequisite for this page's real entrance geometry.
+    for (const animation of node.getAnimations({ subtree: false })) {
+      if (animations.length >= 128) throw Error('Actual owner animations exceed the bounded observation')
+      const timing = animation.effect?.getComputedTiming()
+      animations.push({ owner, playState: animation.playState, pending: animation.pending,
+        animationName: animation.animationName || null, transitionProperty: animation.transitionProperty || null,
+        duration: scalar(timing?.duration), iterations: scalar(timing?.iterations), endTime: scalar(timing?.endTime) })
+    }
+  }
+  return { root, owners, animations }
+}
+
+export async function waitForFiniteOwnerMotion(read, until, receipt = {}) {
+  Object.assign(receipt, { polls: 0, complete: false })
+  receipt.settled = await until(async () => {
+    const sample = await read(); receipt.polls++; receipt.first ||= sample; receipt.latest = sample
+    if (sample.root !== receipt.first.root) throw Error('Actual animation owner changed while waiting')
+    return !finiteOwnerMotionActive(sample) && sample
+  }, 'Actual page entrance animation did not finish within the original readiness budget')
+  receipt.complete = true; return receipt
+}
+
 // This runs in the real App renderer. It observes existing nodes and CSS; it
 // does not mount a fixture, assign field values or alter application styling.
-export function observeFullAppPage({ root, anchors = [], editorExceptions = [], onlySelectors = [] }) {
+export function observeFullAppPage({ root, anchors = [], editorExceptions = [], onlySelectors = [] }, withinClientPort) {
   const bounds = node => {
     const box = node.getBoundingClientRect()
     return { left: box.left, top: box.top, right: box.right, bottom: box.bottom, width: box.width, height: box.height }
@@ -47,8 +94,7 @@ export function observeFullAppPage({ root, anchors = [], editorExceptions = [], 
     let inViewport = box.left >= -1 && box.top >= -1 && box.right <= innerWidth + 1 && box.bottom <= innerHeight + 1
     for (let parent = node.parentElement; parent; parent = parent.parentElement) {
       const css = getComputedStyle(parent), clip = bounds(parent)
-      if (/hidden|auto|scroll|clip/.test(css.overflowX)) inViewport &&= box.left >= clip.left - 1 && box.right <= clip.right + 1
-      if (/hidden|auto|scroll|clip/.test(css.overflowY)) inViewport &&= box.top >= clip.top - 1 && box.bottom <= clip.bottom + 1
+      inViewport &&= withinClientPort(box, clip, parent, css.overflowX, css.overflowY)
     }
     const hit = visible && inViewport ? document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2) : null
     return { ...box, visible, inViewport, hit: Boolean(hit && (hit === node || node.contains(hit))) }
@@ -125,7 +171,7 @@ export function observeFullAppPage({ root, anchors = [], editorExceptions = [], 
     overflow: { document: Math.max(0, document.documentElement.scrollWidth - innerWidth), root: Math.max(0, area.scrollWidth - area.clientWidth), allowed: [] } }
 }
 
-export function observeFullAppFocus(selector, visibleShadow) {
+export function observeFullAppFocus(selector, visibleShadow, withinClientPort) {
   const nodes = [...document.querySelectorAll(selector)].filter(node => node.getBoundingClientRect().width > 0)
   if (nodes.length !== 1) throw Error('Expected one native focus target: ' + selector)
   const field = nodes[0], root = field.closest('.ant-input-affix-wrapper, .app-ui-select') || field
@@ -139,8 +185,7 @@ export function observeFullAppFocus(selector, visibleShadow) {
   let inViewport = box.left >= -1 && box.top >= -1 && box.right <= innerWidth + 1 && box.bottom <= innerHeight + 1
   for (let parent = root.parentElement; parent; parent = parent.parentElement) {
     const css = getComputedStyle(parent), clip = parent.getBoundingClientRect()
-    if (/hidden|auto|scroll|clip/.test(css.overflowX)) inViewport &&= box.left >= clip.left - 1 && box.right <= clip.right + 1
-    if (/hidden|auto|scroll|clip/.test(css.overflowY)) inViewport &&= box.top >= clip.top - 1 && box.bottom <= clip.bottom + 1
+    inViewport &&= withinClientPort(box, clip, parent, css.overflowX, css.overflowY)
   }
   const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)
   return { selector, focused: document.activeElement === field, focusVisible: field.matches(':focus-visible'), inViewport,
@@ -290,7 +335,7 @@ export function createFullAppUiShared(ctx) {
     for (const type of ['rawKeyDown', 'keyUp']) await cdp.send('Input.dispatchKeyEvent', { type, key: name, windowsVirtualKeyCode: code, nativeVirtualKeyCode: code, modifiers })
   }
   const ensureVisible = async selector => {
-    await evaluate(`(() => { const nodes=[...document.querySelectorAll(${q(selector)})].filter(node=>node.getBoundingClientRect().width>0&&node.getBoundingClientRect().height>0); if(nodes.length!==1)throw Error('Missing or ambiguous actual scroll target');const node=nodes[0],box=node.getBoundingClientRect();let fits=box.left>=0&&box.top>=0&&box.right<=innerWidth&&box.bottom<=innerHeight;for(let parent=node.parentElement;parent;parent=parent.parentElement){const css=getComputedStyle(parent),clip=parent.getBoundingClientRect();if(/hidden|auto|scroll|clip/.test(css.overflowX))fits&&=box.left>=clip.left&&box.right<=clip.right;if(/hidden|auto|scroll|clip/.test(css.overflowY))fits&&=box.top>=clip.top&&box.bottom<=clip.bottom;}if(!fits)node.scrollIntoView({block:'center',inline:'nearest',behavior:'instant'});return true })()`)
+    await evaluate(`(() => { const withinClientPort=${withinActualClientPort.toString()};const nodes=[...document.querySelectorAll(${q(selector)})].filter(node=>node.getBoundingClientRect().width>0&&node.getBoundingClientRect().height>0); if(nodes.length!==1)throw Error('Missing or ambiguous actual scroll target');const node=nodes[0],box=node.getBoundingClientRect();let fits=box.left>=0&&box.top>=0&&box.right<=innerWidth&&box.bottom<=innerHeight;for(let parent=node.parentElement;parent;parent=parent.parentElement){const css=getComputedStyle(parent),clip=parent.getBoundingClientRect();fits&&=withinClientPort(box,clip,parent,css.overflowX,css.overflowY,0);}if(!fits)node.scrollIntoView({block:'center',inline:'nearest',behavior:'instant'});return true })()`)
     await frame()
   }
   const text = async (selector, value) => {
@@ -324,7 +369,7 @@ export function createFullAppUiShared(ctx) {
     ;(ui.fileInputs ||= []).push(receipt); save(); return receipt
   }
   const nameFor = (meta, suffix) => `${slug(meta.group)}-${slug(meta.theme)}-${meta.viewport.width}x${meta.viewport.height}-${slug(meta.routeId)}-${slug(meta.stateId)}-${suffix}.png`
-  const samplePage = (route, root, anchors, onlySelectors = []) => evaluate(`(${observeFullAppPage.toString()})(${q({ root, anchors, onlySelectors, editorExceptions: route.editorExceptions || [] })})`)
+  const samplePage = (route, root, anchors, onlySelectors = []) => evaluate(`(${observeFullAppPage.toString()})(${q({ root, anchors, onlySelectors, editorExceptions: route.editorExceptions || [] })},${withinActualClientPort.toString()})`)
   const captureState = async ({ routeId, stateId, root, anchors = [], requiredText = [], allowHorizontalScroll = [], coverageMode = 'route-controls', onlySelectors = [] }) => {
     const route = routeFor(routeId), registeredRoot = route.stateRoots?.[stateId] || route.root
     root ||= registeredRoot
@@ -335,11 +380,13 @@ export function createFullAppUiShared(ctx) {
     assert.equal(ctx.windowReceipt?.nativeWindow, true, 'Actual owned native window receipt is required before a scene')
     assert.deepEqual(ctx.windowReceipt.viewport, ctx.matrix.viewport)
     const scene = { ...meta, requested: { ...ctx.windowReceipt.requested }, nativeWindow: ctx.windowReceipt.nativeWindow, root, coverageMode, complete: false,
-      controls: [], anchors: [], images: [], geometry: { valid: false, failures: [] }, rawSamples: [], scrollCoverage: [], disclosures: [] }
+      controls: [], anchors: [], images: [], geometry: { valid: false, failures: [] }, rawSamples: [], scrollCoverage: [], disclosures: [], motionReadiness: [] }
     ui.scenes.push(scene); save()
     const seen = new Map(), wanted = new Map(), capturedAnchors = new Map()
     let index = 0
     const snap = async targetAnchors => {
+      const motion = { complete: false }; scene.motionReadiness.push(motion)
+      await waitForFiniteOwnerMotion(() => evaluate(`(${observeFullAppOwnerMotion.toString()})(${q(root)})`), until, motion)
       const before = await samplePage(route, root, targetAnchors, onlySelectors)
       assert.deepEqual(before.viewport, meta.viewport); assert.equal(before.theme, meta.theme)
       for (const text of requiredText) assert.ok(before.text.includes(text), 'Actual visible page text missing: ' + text)
@@ -351,6 +398,7 @@ export function createFullAppUiShared(ctx) {
       scene.rawSamples.push({ ...before, text: undefined }); save()
       let afterCapture
       const filename = nameFor(meta, 'part-' + (++index))
+      motion.image = filename
       const image = await capture(filename, async () => {
         const fresh = await samplePage(route, root, targetAnchors, onlySelectors)
         scene.rawSamples.push({ ...fresh, text: undefined, phase: 'before-capture', image: filename }); save()
@@ -458,7 +506,7 @@ export function createFullAppUiShared(ctx) {
       if (await evaluate(`document.activeElement===document.querySelector(${q(selector)})`)) { reached = true; break }
     }
     assert.equal(reached, true, 'Actual Tab order never reached control: ' + selector)
-    const sample = { ...binding(meta), ...await evaluate(`(${observeFullAppFocus.toString()})(${q(selector)},${hasVisibleBoxShadow.toString()})`) }
+    const sample = { ...binding(meta), ...await evaluate(`(${observeFullAppFocus.toString()})(${q(selector)},${hasVisibleBoxShadow.toString()},${withinActualClientPort.toString()})`) }
     sample.events = await events(first); sample.trustedTab = sample.events.some(event => event.type === 'keydown' && event.key === 'Tab' && event.trusted)
     ui.focus.push(sample); save()
     assert.ok(sample.trustedTab && sample.focused && sample.focusVisible && sample.inViewport && sample.hit, 'Actual keyboard focus was not visible and reachable')

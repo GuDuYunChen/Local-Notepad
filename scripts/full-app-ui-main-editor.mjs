@@ -219,7 +219,18 @@ export async function verifyMainEditorPages(ctx) {
   await shot('editor-commands', 'empty', ['[aria-label="搜索编辑器命令"]']); await shared.key('Escape'); await absent('.editor-command-palette')
   await hit('.editor-input > p:first-of-type'); await present('.block-handle')
   await hit('.block-handle'); await present('.block-menu')
+  const blockCopy = '.block-menu button:nth-of-type(3)', blockPaste = '.block-menu button:nth-of-type(4)'
+  const beforeBlockCopy = await evaluate(`document.querySelector(${q(blockPaste)}).disabled`)
+  if (ctx.matrix.theme === 'light' && ctx.matrix.viewport.width === 704) assert.equal(beforeBlockCopy, true, 'The fresh actual App must start without an internal block clipboard')
+  const firstBlockEvent = await evaluate('window.__fullAppUiEvents.length')
+  await shared.hover(blockCopy); await present(blockCopy)
   await shot('editor-commands', 'block-menu', ['.block-menu .block-menu-item:first-child'], { root: '.block-menu' })
+  await hit(blockCopy); await absent('.block-menu')
+  await hit('.editor-input > p:first-of-type'); await present('.block-handle'); await hit('.block-handle'); await present(blockPaste)
+  assert.equal(await evaluate(`document.querySelector(${q(blockPaste)}).disabled`), false, 'The actual copy action did not populate the original internal block clipboard')
+  const blockEvents = await evaluate(`window.__fullAppUiEvents.slice(${firstBlockEvent})`)
+  assert.ok(blockEvents.some(event => event.type === 'mouseover' && event.trusted) && blockEvents.some(event => event.type === 'click' && event.trusted))
+  ;(ctx.report.fullAppUi.blockMenuInteractions ||= []).push({ ...ctx.matrix, routeId: 'editor-commands', stateId: 'block-menu', initiallyPasteDisabled: beforeBlockCopy, pasteAvailableAfterCopy: true, nativePointerRetainedMenu: true, events: blockEvents }); ctx.save()
   await hit('.editor-input > p:first-of-type'); await absent('.block-menu')
   await openNote('菜单草稿撤销')
   const menuNote = fixture.notes['菜单草稿撤销']

@@ -112,7 +112,7 @@ jobs:
       fail-fast: false
       max-parallel: 4
       matrix:
-        group: [settings, projects, research, editor]
+        group: [settings, projects, research, editor, local-sync-lab]
     steps:
       - uses: actions/checkout@v7
         with:
@@ -120,6 +120,11 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
+      - name: Use the product Go version for exact record-byte contracts
+        uses: actions/setup-go@v7
+        with:
+          go-version: '1.24.11'
+          cache: false
       - name: Verify the unchanged dependency lock
         run: node scripts/verify-dependency-lock.mjs
       - name: Install exact verifier dependencies
@@ -164,7 +169,7 @@ jobs:
           node scripts/run-reading-mode-installer.mjs prepare
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Refuse incomplete routes, screenshots, native bounds and cross-runner identity claims
-        run: node --test scripts/full-app-ui-evidence.node.mjs scripts/full-app-ui-shared.node.mjs
+        run: node --test scripts/full-app-ui-evidence.node.mjs scripts/full-app-ui-shared.node.mjs scripts/full-app-ui-local-sync-seed.node.mjs
       - name: Fresh install and actual application page matrix
         run: node scripts/run-full-app-ui-installed.mjs ${{ matrix.group }}
       - name: Retain successful or failed page-matrix evidence
@@ -203,6 +208,10 @@ jobs:
         with:
           name: local-notepad-full-app-ui-editor-${{ github.sha }}
           path: test-results/full-app-ui/editor
+      - uses: actions/download-artifact@v4
+        with:
+          name: local-notepad-full-app-ui-local-sync-lab-${{ github.sha }}
+          path: test-results/full-app-ui/local-sync-lab
       - name: Require all original prerequisites, all groups, and zero unmapped pages
         run: node scripts/full-app-ui-evidence.mjs aggregate
       - name: Retain the aggregate receipt without replacing original artifacts
