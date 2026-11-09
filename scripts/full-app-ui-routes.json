@@ -1,0 +1,4411 @@
+{
+  "schemaVersion": 1,
+  "scope": "installed-actual-app-page-matrix",
+  "sourceScope": "control-source entry coverage with declared states; not every possible failure combination",
+  "productSource": {
+    "commit": "a9b7ed298db2a7be446021fe0c49deea4ef8ef54",
+    "tree": "c33650c869d60b485fa9b6f6a33d2d01ce46009a",
+    "dirty": false
+  },
+  "inventory": {
+    "file": "evidence/ci-42642716395/clean-source-inventory/inventory.json",
+    "sha256": "1ef36642ddb3d80f6912859c8e92650ff11f4628bc39399a9deb78d0c332a339",
+    "originalDirty": false,
+    "currentCodeFilesHashRevalidated": 346,
+    "currentControlsFiles": 137
+  },
+  "matrix": [
+    {
+      "theme": "light",
+      "viewport": {
+        "width": 704,
+        "height": 455
+      }
+    },
+    {
+      "theme": "light",
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      }
+    },
+    {
+      "theme": "light",
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      }
+    },
+    {
+      "theme": "dark",
+      "viewport": {
+        "width": 704,
+        "height": 455
+      }
+    },
+    {
+      "theme": "dark",
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      }
+    },
+    {
+      "theme": "dark",
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      }
+    }
+  ],
+  "groups": {
+    "settings": {
+      "routes": [
+        {
+          "id": "settings-main",
+          "title": "设置主页",
+          "source": "src/components/SettingsPanel.jsx",
+          "root": ".settings-panel",
+          "requiredStates": [
+            "default",
+            "diagnostics"
+          ]
+        },
+        {
+          "id": "appearance",
+          "title": "本地主题方案",
+          "source": "src/components/AppearanceCenter.jsx",
+          "root": ".appearance-center",
+          "stateRoots": {
+            "discard-confirmation": ".appearance-center .appearance-confirm"
+          },
+          "requiredStates": [
+            "default",
+            "long-draft",
+            "invalid-color",
+            "discard-confirmation"
+          ]
+        },
+        {
+          "id": "tags",
+          "title": "标签工作台",
+          "source": "src/components/TagWorkspace.jsx",
+          "root": ".tag-workspace",
+          "stateRoots": {
+            "draft-confirmation": ".tag-workspace [aria-label=\"确认标签工作台操作\"]"
+          },
+          "requiredStates": [
+            "populated",
+            "merge-popup",
+            "empty",
+            "draft-confirmation"
+          ]
+        },
+        {
+          "id": "folders",
+          "title": "文件夹整理",
+          "source": "src/components/FolderWorkspace.jsx",
+          "root": ".folder-workspace",
+          "stateRoots": {
+            "name-confirmation": ".folder-workspace [aria-label=\"确认目录操作\"]"
+          },
+          "requiredStates": [
+            "populated",
+            "empty",
+            "name-confirmation"
+          ]
+        },
+        {
+          "id": "statistics",
+          "title": "笔记库统计",
+          "source": "src/components/LibraryStatistics.jsx",
+          "root": ".library-statistics",
+          "stateRoots": {
+            "export-confirmation": ".library-statistics [aria-label=\"确认统计导出\"]"
+          },
+          "requiredStates": [
+            "populated",
+            "scope-popup",
+            "empty",
+            "export-confirmation"
+          ]
+        },
+        {
+          "id": "comparison",
+          "title": "双笔记比较",
+          "source": "src/components/NoteComparison.jsx",
+          "root": ".note-comparison",
+          "stateRoots": {
+            "export-confirmation": ".note-comparison [aria-label=\"确认笔记比较导出\"]"
+          },
+          "requiredStates": [
+            "sources",
+            "empty",
+            "comparison",
+            "mode-popup",
+            "export-confirmation"
+          ]
+        },
+        {
+          "id": "history",
+          "title": "历史中心",
+          "source": "src/components/HistoryReview.jsx",
+          "root": ".history-review",
+          "stateRoots": {
+            "export-confirmation": ".history-review [aria-label=\"确认导出历史对照\"]"
+          },
+          "requiredStates": [
+            "sources",
+            "snapshot",
+            "mode-popup",
+            "empty",
+            "export-confirmation"
+          ]
+        },
+        {
+          "id": "duplicates",
+          "title": "重复笔记检查",
+          "source": "src/components/DuplicateNotes.jsx",
+          "root": ".duplicate-notes",
+          "stateRoots": {
+            "export-confirmation": ".duplicate-notes [aria-label=\"确认重复报告导出\"]"
+          },
+          "requiredStates": [
+            "groups",
+            "members",
+            "sort-popup",
+            "empty",
+            "export-confirmation"
+          ]
+        },
+        {
+          "id": "tasks",
+          "title": "待办任务中心",
+          "source": "src/components/TaskCenter.jsx",
+          "root": ".task-center",
+          "stateRoots": {
+            "export-confirmation": ".task-center [aria-label=\"确认待办报告导出\"]"
+          },
+          "requiredStates": [
+            "populated",
+            "status-popup",
+            "empty",
+            "export-confirmation"
+          ]
+        },
+        {
+          "id": "attachments",
+          "title": "附件检查中心",
+          "source": "src/components/AttachmentAudit.jsx",
+          "root": ".attachment-audit",
+          "stateRoots": {
+            "export-confirmation": ".attachment-audit [aria-label=\"确认附件报告导出\"]"
+          },
+          "requiredStates": [
+            "populated",
+            "scope-popup",
+            "empty",
+            "export-confirmation"
+          ]
+        },
+        {
+          "id": "trash-recovery",
+          "title": "回收站恢复",
+          "source": "src/components/TrashRecovery.jsx",
+          "root": ".trash-recovery",
+          "stateRoots": {
+            "restore-confirmation": ".trash-recovery [aria-label=\"确认恢复操作\"]"
+          },
+          "requiredStates": [
+            "populated",
+            "type-popup",
+            "destination-popup",
+            "empty",
+            "restore-confirmation"
+          ]
+        },
+        {
+          "id": "reference-health",
+          "title": "全库引用体检",
+          "source": "src/components/LibraryReferenceHealthPanel.jsx",
+          "root": ".library-reference-health",
+          "requiredStates": [
+            "default",
+            "diagnosis",
+            "repair-preview"
+          ]
+        },
+        {
+          "id": "sync-presentation",
+          "title": "同步本地设置展示",
+          "source": "src/components/SyncCenterPanel.jsx",
+          "root": ".sync-center-card",
+          "requiredStates": [
+            "default",
+            "long-draft",
+            "restored"
+          ]
+        },
+        {
+          "id": "s3-read",
+          "title": "S3 检查输入展示",
+          "source": "src/components/S3ReadInspectionPanel.js",
+          "root": ".s3-inspection",
+          "requiredStates": [
+            "default",
+            "long-draft",
+            "cleared"
+          ]
+        },
+        {
+          "id": "s3-overview",
+          "title": "本地只读盘点",
+          "source": "src/components/S3LocalOverviewPanel.jsx",
+          "root": ".local-inventory",
+          "requiredStates": [
+            "default",
+            "populated",
+            "offline-tools"
+          ]
+        },
+        {
+          "id": "local-sync-clock",
+          "title": "同步时间显示与只读偏好",
+          "source": "src/components/SyncOverviewTimes.jsx",
+          "root": ".sync-clock-controls",
+          "stateRoots": {
+            "preference": "[data-sync-clock-preference]",
+            "restored": "[data-sync-clock-feedback]"
+          },
+          "requiredStates": [
+            "utc",
+            "local",
+            "preference",
+            "restored"
+          ]
+        },
+        {
+          "id": "local-sync-activity",
+          "title": "本机当前任务空态",
+          "source": "src/components/SyncActivityPanel.jsx",
+          "root": ".sync-activity",
+          "requiredStates": [
+            "idle",
+            "refreshed"
+          ]
+        },
+        {
+          "id": "local-sync-diagnostic",
+          "title": "本机诊断摘要",
+          "source": "src/components/SyncDiagnosticPanel.jsx",
+          "root": ".sync-diagnostic-panel",
+          "requiredStates": [
+            "default",
+            "generated",
+            "selected"
+          ]
+        },
+        {
+          "id": "local-sync-history",
+          "title": "本机冲突历史空态",
+          "source": "src/components/SyncConflictHistoryPanel.jsx",
+          "root": "[data-sync-conflict-history]",
+          "requiredStates": [
+            "unread",
+            "empty",
+            "type-popup"
+          ]
+        },
+        {
+          "id": "local-sync-history-export",
+          "title": "本机历史导出拒绝条件",
+          "source": "src/components/SyncHistoryExport.jsx",
+          "root": "[data-sync-conflict-history] [data-history-export]",
+          "requiredStates": [
+            "unread",
+            "empty"
+          ]
+        },
+        {
+          "id": "offline-history-file",
+          "title": "离线历史文件查看",
+          "source": "src/components/SyncHistoryFileViewer.jsx",
+          "root": "[data-history-file-viewer]",
+          "requiredStates": [
+            "default",
+            "populated-filtered",
+            "kind-popup",
+            "outcome-popup",
+            "order-popup",
+            "query-empty",
+            "object-filtered",
+            "record-filtered",
+            "invalid-retained",
+            "version-two",
+            "cleared"
+          ]
+        },
+        {
+          "id": "offline-history-identifiers",
+          "title": "离线历史完整标识",
+          "source": "src/components/SyncHistoryFileIdentifiers.jsx",
+          "root": "[data-history-file-row]:first-child [data-history-file-identifiers]",
+          "requiredStates": [
+            "expanded",
+            "selected-object",
+            "selected-record"
+          ]
+        },
+        {
+          "id": "offline-history-pagination",
+          "title": "离线历史分页和跳页",
+          "source": "src/components/SyncHistoryFilePagination.jsx",
+          "root": ".sync-history-file-pages",
+          "requiredStates": [
+            "first",
+            "second",
+            "invalid-jump",
+            "restored"
+          ]
+        },
+        {
+          "id": "offline-history-dates",
+          "title": "离线历史日期筛选",
+          "source": "src/components/SyncHistoryTimeFilter.jsx",
+          "root": "[data-history-file-date-filter] [data-history-time-filter]",
+          "requiredStates": [
+            "default",
+            "mode-popup",
+            "range-draft",
+            "invalid-range",
+            "missing-applied",
+            "restored"
+          ]
+        },
+        {
+          "id": "local-inventory-report",
+          "title": "真实本机统计报告控件",
+          "source": "src/components/S3LocalOverviewReport.jsx",
+          "root": "[data-local-report]",
+          "requiredStates": [
+            "available"
+          ]
+        },
+        {
+          "id": "offline-inventory-file",
+          "title": "离线统计文件查看",
+          "source": "src/components/S3LocalOverviewFile.jsx",
+          "root": "[data-local-report-file]",
+          "requiredStates": [
+            "default",
+            "invalid",
+            "populated",
+            "cleared"
+          ]
+        },
+        {
+          "id": "offline-inventory-comparison",
+          "title": "文件与本次本机统计比较",
+          "source": "src/components/S3LocalOverviewComparison.jsx",
+          "root": "[data-local-comparison]",
+          "requiredStates": [
+            "ready",
+            "compared",
+            "differences",
+            "cleared"
+          ]
+        },
+        {
+          "id": "offline-inventory-export",
+          "title": "完整本机统计比较导出控件",
+          "source": "src/components/S3LocalOverviewComparison.jsx",
+          "root": "[data-local-compare-export-panel]",
+          "requiredStates": [
+            "formats"
+          ]
+        },
+        {
+          "id": "offline-report-pair",
+          "title": "两份离线统计报告比较",
+          "source": "src/components/S3OfflineReportPair.jsx",
+          "root": "[data-offline-pair]",
+          "requiredStates": [
+            "default",
+            "one-report",
+            "both-ready",
+            "compared",
+            "direction-popup",
+            "scope-popup",
+            "order-popup",
+            "empty-filter",
+            "restored",
+            "swapped",
+            "invalid-replacement",
+            "reset"
+          ]
+        },
+        {
+          "id": "offline-report-export",
+          "title": "双报告完整概览与导出控件",
+          "source": "src/components/S3OfflinePairExport.jsx",
+          "root": "[data-offline-export]",
+          "requiredStates": [
+            "formats",
+            "filtered",
+            "swapped"
+          ]
+        }
+      ]
+    },
+    "projects": {
+      "routes": [
+        {
+          "id": "projects-picker",
+          "title": "项目选择与操作",
+          "source": "src/components/ProjectWorkspacePanel.jsx",
+          "root": ".project-workspace-toolbar",
+          "requiredStates": [
+            "primary-project",
+            "alternate-project",
+            "actions"
+          ]
+        },
+        {
+          "id": "projects-today",
+          "title": "今日创作与冲刺",
+          "source": "src/components/ProjectTodayCenter.jsx",
+          "root": ".view-today",
+          "requiredStates": [
+            "today",
+            "calendar-review"
+          ]
+        },
+        {
+          "id": "projects-board",
+          "title": "项目卷章看板",
+          "source": "src/components/ProjectWorkspacePanel.jsx",
+          "root": ".view-project",
+          "requiredStates": [
+            "board",
+            "empty-filter",
+            "chapter-form",
+            "bulk-controls",
+            "volume-manager"
+          ]
+        },
+        {
+          "id": "projects-planning",
+          "title": "项目计划",
+          "source": "src/components/ProjectPlanningPanel.jsx",
+          "root": ".project-planning-panel",
+          "requiredStates": [
+            "goals",
+            "milestones-queue"
+          ]
+        },
+        {
+          "id": "projects-analysis",
+          "title": "创作与 Session 分析",
+          "source": "src/components/ProjectAnalyticsPanel.jsx",
+          "root": ".view-analysis",
+          "requiredStates": [
+            "analytics",
+            "session-empty"
+          ]
+        },
+        {
+          "id": "projects-insights",
+          "title": "创作洞察与复盘",
+          "source": "src/components/ProjectInsightsPanel.jsx",
+          "root": ".project-insights-panel",
+          "requiredStates": [
+            "overview",
+            "report"
+          ]
+        },
+        {
+          "id": "projects-structure",
+          "title": "故事地图与索引",
+          "source": "src/components/ProjectStructurePanel.jsx",
+          "root": ".project-structure-panel",
+          "requiredStates": [
+            "map",
+            "empty-filter",
+            "storyline-indexes"
+          ]
+        },
+        {
+          "id": "projects-storylines",
+          "title": "轨迹编辑与生命周期诊断",
+          "source": "src/components/ProjectStructurePanel.jsx",
+          "root": ".project-storyline-system",
+          "requiredStates": [
+            "selected-track",
+            "lifecycle",
+            "diagnostics"
+          ]
+        },
+        {
+          "id": "projects-relation-create",
+          "title": "实体与关系表单",
+          "source": "src/components/ProjectRelationGraphPanel.jsx",
+          "root": ".project-relation-create-grid",
+          "requiredStates": [
+            "entity-form",
+            "relation-form"
+          ]
+        },
+        {
+          "id": "projects-relations",
+          "title": "实体关系详情与演化",
+          "source": "src/components/ProjectRelationGraphPanel.jsx",
+          "root": ".project-relation-workspace",
+          "requiredStates": [
+            "entity-detail",
+            "relation-detail",
+            "evolution"
+          ],
+          "stateRoots": {
+            "evolution": ".project-relation-timeline"
+          }
+        },
+        {
+          "id": "projects-entities",
+          "title": "实际实体别名",
+          "source": "src/components/ProjectEntityIntelligencePanel.jsx",
+          "root": ".project-entity-alias-editor",
+          "requiredStates": [
+            "aliases",
+            "empty-selection"
+          ]
+        },
+        {
+          "id": "projects-entity-heatmap",
+          "title": "真实正文实体热力图",
+          "source": "src/components/ProjectEntityIntelligencePanel.jsx",
+          "root": ".project-entity-heatmap-card",
+          "requiredStates": [
+            "populated"
+          ]
+        },
+        {
+          "id": "projects-relation-suggestions",
+          "title": "真实共现候选",
+          "source": "src/components/ProjectRelationSuggestionsPanel.jsx",
+          "root": ".project-relation-suggestions",
+          "requiredStates": [
+            "candidates",
+            "empty-filter"
+          ]
+        },
+        {
+          "id": "projects-evidence",
+          "title": "实体正文证据",
+          "source": "src/components/ProjectEntityEvidencePanel.jsx",
+          "root": ".project-entity-evidence-browser",
+          "requiredStates": [
+            "populated",
+            "empty-filter"
+          ]
+        },
+        {
+          "id": "projects-review",
+          "title": "真实证据连续核对",
+          "source": "src/components/EvidenceReviewBar.jsx",
+          "root": ".evidence-review-bar",
+          "requiredStates": [
+            "current",
+            "notes",
+            "end-confirmation"
+          ],
+          "stateRoots": {
+            "end-confirmation": ".consumer-confirm-modal"
+          }
+        },
+        {
+          "id": "projects-archives",
+          "title": "实际核对存档",
+          "source": "src/components/EvidenceReviewArchives.jsx",
+          "root": ".evidence-review-archives",
+          "requiredStates": [
+            "populated",
+            "restore-confirmation",
+            "delete-confirmation"
+          ],
+          "stateRoots": {
+            "restore-confirmation": ".consumer-confirm-modal",
+            "delete-confirmation": ".consumer-confirm-modal"
+          }
+        },
+        {
+          "id": "projects-archive-comparison",
+          "title": "两份实际核对存档比较",
+          "source": "src/components/EvidenceReviewArchiveComparison.jsx",
+          "root": ".review-archive-comparison",
+          "requiredStates": [
+            "comparison",
+            "empty-filter"
+          ]
+        },
+        {
+          "id": "projects-archive-backup",
+          "title": "实际核对备份预检",
+          "source": "src/components/EvidenceReviewBackup.jsx",
+          "root": ".evidence-review-backup",
+          "requiredStates": [
+            "preflight",
+            "invalid-file"
+          ]
+        },
+        {
+          "id": "projects-focus-session",
+          "title": "实际专注 Session",
+          "source": "src/components/FocusSessionBar.jsx",
+          "root": ".focus-session-bar",
+          "requiredStates": [
+            "focused",
+            "ordinary-view"
+          ]
+        },
+        {
+          "id": "projects-session-history",
+          "title": "已手动结束的真实 Session 分析",
+          "source": "src/components/FocusSessionAnalyticsPanel.jsx",
+          "root": ".focus-session-analytics-panel",
+          "requiredStates": [
+            "completed"
+          ]
+        }
+      ]
+    },
+    "research": {
+      "routes": [
+        {
+          "id": "research-search",
+          "title": "全局检索与上下文",
+          "source": "src/components/GlobalSearchPanel.jsx",
+          "root": "#search-mode-search",
+          "requiredStates": [
+            "populated",
+            "source-popup",
+            "sort-popup",
+            "preview",
+            "empty"
+          ]
+        },
+        {
+          "id": "research-presets",
+          "title": "常用检索",
+          "source": "src/components/SearchPresetsPanel.jsx",
+          "root": ".search-presets",
+          "requiredStates": [
+            "populated",
+            "choice-popup",
+            "invalid-name",
+            "delete-confirmation"
+          ]
+        },
+        {
+          "id": "research-preset-transfer",
+          "title": "常用检索备份预检",
+          "source": "src/components/SearchPresetTransfer.jsx",
+          "root": ".search-preset-transfer",
+          "requiredStates": [
+            "default",
+            "invalid-file",
+            "preflight"
+          ]
+        },
+        {
+          "id": "research-export",
+          "title": "结果清单与导出",
+          "source": "src/components/SearchResultExportPanel.jsx",
+          "root": ".search-result-export",
+          "requiredStates": [
+            "default",
+            "selected",
+            "format-popup",
+            "long-name"
+          ]
+        },
+        {
+          "id": "research-collections",
+          "title": "已保存资料集",
+          "source": "src/components/SearchCollectionsPanel.jsx",
+          "root": ".search-collections",
+          "requiredStates": [
+            "populated",
+            "choice-popup",
+            "empty-selection",
+            "status-popup",
+            "empty-filter",
+            "delete-confirmation",
+            "review",
+            "invalid-import",
+            "import-preflight"
+          ]
+        },
+        {
+          "id": "research-package",
+          "title": "资料集与阅读记录便携备份",
+          "source": "src/components/CollectionPackageTransfer.jsx",
+          "root": ".collection-package-transfer",
+          "requiredStates": [
+            "default",
+            "invalid-file",
+            "preflight"
+          ]
+        },
+        {
+          "id": "research-study",
+          "title": "资料集阅读进度",
+          "source": "src/components/CollectionStudyPanel.jsx",
+          "root": ".collection-study-panel",
+          "requiredStates": [
+            "populated",
+            "status-popup",
+            "empty-filter",
+            "import-preflight"
+          ]
+        },
+        {
+          "id": "research-annotation",
+          "title": "已存批注与未存草稿",
+          "source": "src/components/CollectionStudyEditor.jsx",
+          "root": ".collection-study-editor",
+          "requiredStates": [
+            "saved",
+            "status-popup",
+            "long-draft",
+            "discard-confirmation"
+          ]
+        },
+        {
+          "id": "research-hub",
+          "title": "跨资料集阅读工作台",
+          "source": "src/components/CollectionStudyHub.jsx",
+          "root": ".collection-study-hub",
+          "requiredStates": [
+            "populated",
+            "collection-popup",
+            "status-popup",
+            "sort-popup",
+            "empty-filter"
+          ]
+        },
+        {
+          "id": "research-batch",
+          "title": "批量阅读标记与撤销",
+          "source": "src/components/CollectionStudyBatchPanel.jsx",
+          "root": ".study-hub-batch",
+          "requiredStates": [
+            "selected",
+            "status-popup",
+            "preflight",
+            "applied",
+            "undone"
+          ]
+        },
+        {
+          "id": "research-compilation",
+          "title": "批注整理成研究笔记",
+          "source": "src/components/StudyCompilationPanel.jsx",
+          "root": ".study-compilation[aria-label=\"批注整理成研究笔记\"]",
+          "requiredStates": [
+            "form",
+            "directory-popup",
+            "group-popup",
+            "long-goal",
+            "preview"
+          ]
+        },
+        {
+          "id": "research-tasks",
+          "title": "研究草稿与创建记录",
+          "source": "src/components/ResearchTasksPanel.jsx",
+          "root": ".research-tasks",
+          "requiredStates": [
+            "populated",
+            "draft-preview",
+            "confirmation",
+            "remove-confirmation",
+            "confirmed-preview",
+            "checked-receipt"
+          ]
+        },
+        {
+          "id": "research-return",
+          "title": "从实际检索返回",
+          "source": "src/components/SearchReturnBar.jsx",
+          "root": ".search-return-bar[aria-label=\"检索返回导航\"]",
+          "requiredStates": [
+            "opened"
+          ]
+        },
+        {
+          "id": "research-reading",
+          "title": "资料集连续阅读与批注",
+          "source": "src/components/CollectionReadingBar.jsx",
+          "root": ".collection-reading-bar",
+          "requiredStates": [
+            "opened",
+            "next",
+            "annotation"
+          ]
+        }
+      ]
+    },
+    "editor": {
+      "routes": [
+        {
+          "id": "nav-sidebar",
+          "title": "主导航侧栏",
+          "source": "src/components/WorkspaceSidebar.jsx",
+          "root": ".workspace-sidebar",
+          "requiredStates": [
+            "expanded",
+            "collapsed"
+          ]
+        },
+        {
+          "id": "nav-library",
+          "title": "实际笔记列表和工具栏",
+          "source": "src/components/FileList.jsx",
+          "root": ".file-list",
+          "requiredStates": [
+            "populated",
+            "long-title-filter",
+            "empty-filter"
+          ]
+        },
+        {
+          "id": "nav-file-menus",
+          "title": "新建、资料库和右键菜单",
+          "source": "src/components/FileListMenus.jsx",
+          "root": ".file-list [role=\"menu\"]",
+          "requiredStates": [
+            "new",
+            "library",
+            "context"
+          ]
+        },
+        {
+          "id": "nav-template-picker",
+          "title": "新建的真实模板入口",
+          "source": "src/components/TemplateSelector.jsx",
+          "root": ".template-selector",
+          "requiredStates": [
+            "default"
+          ]
+        },
+        {
+          "id": "nav-template-library",
+          "title": "我的模板库只读入口",
+          "source": "src/components/TemplateLibrary.jsx",
+          "root": ".template-library",
+          "requiredStates": [
+            "default",
+            "empty-filter"
+          ]
+        },
+        {
+          "id": "nav-naming",
+          "title": "命名与保存选项",
+          "source": "src/components/NameDialog.jsx",
+          "root": ".name-dialog",
+          "requiredStates": [
+            "new-note",
+            "format-popup",
+            "invalid-name",
+            "long-name",
+            "rename-note",
+            "new-folder"
+          ]
+        },
+        {
+          "id": "nav-reference-refactor",
+          "title": "改名前的真实引用影响检查",
+          "source": "src/components/ReferenceRefactorDialog.jsx",
+          "root": ".reference-refactor-dialog",
+          "requiredStates": [
+            "rename-impact"
+          ]
+        },
+        {
+          "id": "nav-file-selector",
+          "title": "导出、保存位置和批量选择",
+          "source": "src/components/FileSelectorDialog.jsx",
+          "root": ".selector-modal",
+          "requiredStates": [
+            "export",
+            "save-location",
+            "batch-delete"
+          ]
+        },
+        {
+          "id": "nav-confirm",
+          "title": "原有安全确认与取消",
+          "source": "src/components/ConfirmDialog.jsx",
+          "root": ".consumer-confirm-modal",
+          "requiredStates": [
+            "move-to-trash",
+            "unpin",
+            "remove-recent",
+            "clear-recent"
+          ]
+        },
+        {
+          "id": "nav-daily",
+          "title": "每日笔记",
+          "source": "src/components/DailyNotesPanel.jsx",
+          "root": ".daily-notes-panel",
+          "requiredStates": [
+            "populated",
+            "previous-month",
+            "empty-filter"
+          ]
+        },
+        {
+          "id": "nav-recent",
+          "title": "最近访问",
+          "source": "src/components/RecentNotesPanel.jsx",
+          "root": ".recent-workspace",
+          "requiredStates": [
+            "populated",
+            "selected",
+            "empty-filter"
+          ]
+        },
+        {
+          "id": "nav-pinned",
+          "title": "置顶笔记",
+          "source": "src/components/PinnedNotesPanel.jsx",
+          "root": ".pinned-workspace",
+          "requiredStates": [
+            "populated",
+            "selected",
+            "scope-popup",
+            "order-popup",
+            "empty-filter"
+          ]
+        },
+        {
+          "id": "nav-graph",
+          "title": "本地图谱及关系",
+          "source": "src/components/GraphPanel.jsx",
+          "root": ".local-graph",
+          "requiredStates": [
+            "populated",
+            "selected",
+            "scope-popup",
+            "one-hop",
+            "empty-filter",
+            "zoomed"
+          ]
+        },
+        {
+          "id": "nav-trash",
+          "title": "回收站主页面",
+          "source": "src/components/TrashWorkspacePanel.jsx",
+          "root": ".trash-workspace",
+          "requiredStates": [
+            "populated",
+            "type-popup",
+            "order-popup",
+            "empty-filter",
+            "selected"
+          ]
+        },
+        {
+          "id": "nav-trash-confirm",
+          "title": "回收站恢复和删除确认",
+          "source": "src/components/TrashWorkspacePanel.jsx",
+          "root": ".trash-workspace-dialog",
+          "requiredStates": [
+            "restore",
+            "delete-locked"
+          ]
+        },
+        {
+          "id": "nav-more-menu",
+          "title": "更多功能入口",
+          "source": "src/components/WorkspaceSidebar.jsx",
+          "root": ".workspace-sidebar-more-menu",
+          "requiredStates": [
+            "default"
+          ]
+        },
+        {
+          "id": "nav-backup",
+          "title": "备份中心和核对存档入口",
+          "source": "src/components/BackupPanel.jsx",
+          "root": ".backup-center-modal",
+          "requiredStates": [
+            "database",
+            "restore-guide",
+            "review-shelf",
+            "review-tools"
+          ]
+        },
+        {
+          "id": "nav-workspace-package",
+          "title": "工作区便携包的真实入口",
+          "source": "src/components/WorkspacePackagePanel.jsx",
+          "root": ".backup-center-workspace",
+          "requiredStates": [
+            "available"
+          ]
+        },
+        {
+          "id": "nav-shortcuts",
+          "title": "快捷键设置",
+          "source": "src/components/ShortcutsModal.jsx",
+          "root": ".local-shortcuts-settings",
+          "stateRoots": {
+            "discard-confirmation": ".local-shortcuts-confirmation"
+          },
+          "requiredStates": [
+            "default",
+            "category-popup",
+            "empty-filter",
+            "recording",
+            "invalid-recording",
+            "draft",
+            "discard-confirmation"
+          ]
+        },
+        {
+          "id": "nav-local-actions",
+          "title": "快捷操作",
+          "source": "src/components/LocalActions.jsx",
+          "root": ".local-actions",
+          "requiredStates": [
+            "default",
+            "category-popup",
+            "empty-filter",
+            "filtered"
+          ]
+        },
+        {
+          "id": "nav-quick-switcher",
+          "title": "快速搜索和切换",
+          "source": "src/components/QuickSwitcher.jsx",
+          "root": ".quick-switcher",
+          "requiredStates": [
+            "default",
+            "title-results",
+            "body-results",
+            "empty-filter"
+          ]
+        },
+        {
+          "id": "editor-toolbar",
+          "title": "编辑工具栏",
+          "source": "src/components/Editor/plugins/ToolbarPlugin.jsx",
+          "root": ".editor-toolbar",
+          "requiredStates": [
+            "default",
+            "paragraph-popup",
+            "insert-menu",
+            "format-menu",
+            "font-popup",
+            "size-popup",
+            "text-color",
+            "highlight"
+          ],
+          "stateRoots": {
+            "insert-menu": ".toolbar-insert-menu",
+            "format-menu": ".toolbar-format-menu",
+            "text-color": "[aria-label=\"文本颜色选择\"]",
+            "highlight": "[aria-label=\"高亮颜色选择\"]"
+          }
+        },
+        {
+          "id": "editor-table-insert",
+          "title": "表格插入选择",
+          "source": "src/components/Editor/plugins/TableMenu.jsx",
+          "root": ".product-table-insert-menu",
+          "requiredStates": [
+            "picker"
+          ]
+        },
+        {
+          "id": "editor-floating",
+          "title": "选中文本格式",
+          "source": "src/components/Editor/plugins/FloatingTextToolbarPlugin.jsx",
+          "root": ".floating-text-toolbar",
+          "requiredStates": [
+            "selection"
+          ]
+        },
+        {
+          "id": "editor-link",
+          "title": "链接操作",
+          "source": "src/components/Editor/plugins/LinkInteractionPlugin.jsx",
+          "root": ".editor-link-popover",
+          "requiredStates": [
+            "existing",
+            "invalid"
+          ]
+        },
+        {
+          "id": "editor-link-create",
+          "title": "添加链接",
+          "source": "src/components/Editor/plugins/ToolbarPlugin.jsx",
+          "root": ".toolbar-link-popover",
+          "requiredStates": [
+            "draft"
+          ]
+        },
+        {
+          "id": "editor-search",
+          "title": "文内查找与替换",
+          "source": "src/components/Editor/plugins/SearchPlugin.jsx",
+          "root": ".document-search",
+          "requiredStates": [
+            "matches",
+            "empty",
+            "replacement",
+            "confirmation"
+          ],
+          "stateRoots": {
+            "confirmation": ".consumer-confirm-modal"
+          }
+        },
+        {
+          "id": "editor-commands",
+          "title": "编辑器命令",
+          "source": "src/components/Editor/plugins/CommandPalettePlugin.jsx",
+          "root": ".editor-command-palette",
+          "requiredStates": [
+            "default",
+            "empty"
+          ]
+        },
+        {
+          "id": "editor-view",
+          "title": "写作视图设置",
+          "source": "src/components/Editor/plugins/EditorViewSettingsPlugin.jsx",
+          "root": ".editor-view-settings",
+          "requiredStates": [
+            "default",
+            "font-popup"
+          ]
+        },
+        {
+          "id": "editor-source",
+          "title": "Markdown 源码",
+          "source": "src/components/Editor/plugins/MarkdownSourcePlugin.jsx",
+          "root": ".markdown-source-panel",
+          "requiredStates": [
+            "default",
+            "draft",
+            "discard"
+          ],
+          "stateRoots": {
+            "discard": ".consumer-confirm-modal"
+          },
+          "editorExceptions": [
+            {
+              "selector": ".markdown-source-textarea",
+              "source": "src/components/Editor/plugins/MarkdownSourcePlugin.jsx",
+              "reason": "Existing production code editor textarea; retains raw source editing and native selection semantics."
+            }
+          ]
+        },
+        {
+          "id": "editor-outline",
+          "title": "文档目录",
+          "source": "src/components/Editor/plugins/DocumentOutlinePlugin.jsx",
+          "root": ".document-outline-panel",
+          "requiredStates": [
+            "headings",
+            "empty"
+          ]
+        },
+        {
+          "id": "editor-properties",
+          "title": "笔记详情与标签",
+          "source": "src/components/InspectorPanel.jsx",
+          "root": ".inspector-panel",
+          "requiredStates": [
+            "properties",
+            "tags",
+            "tag-empty"
+          ]
+        },
+        {
+          "id": "editor-history",
+          "title": "笔记版本历史",
+          "source": "src/components/VersionHistory.jsx",
+          "root": ".version-history",
+          "requiredStates": [
+            "snapshots",
+            "preview",
+            "empty",
+            "restore-confirmation"
+          ],
+          "stateRoots": {
+            "restore-confirmation": ".consumer-confirm-modal"
+          }
+        },
+        {
+          "id": "editor-backlinks",
+          "title": "反向来源",
+          "source": "src/components/BacklinksPanel.jsx",
+          "root": ".backlinks-panel",
+          "requiredStates": [
+            "sources",
+            "preview",
+            "empty"
+          ]
+        },
+        {
+          "id": "editor-reference-health",
+          "title": "当前笔记引用",
+          "source": "src/components/ReferenceHealthPanel.jsx",
+          "root": ".reference-health-panel",
+          "requiredStates": [
+            "references"
+          ]
+        },
+        {
+          "id": "editor-structure",
+          "title": "长文结构",
+          "source": "src/components/LongFormStructurePanel.jsx",
+          "root": ".long-structure-panel",
+          "requiredStates": [
+            "sections"
+          ]
+        },
+        {
+          "id": "editor-block-reference",
+          "title": "块引用与嵌入",
+          "source": "src/components/Editor/plugins/BlockReferencePlugin.jsx",
+          "root": ".block-reference-panel",
+          "requiredStates": [
+            "default",
+            "display-popup",
+            "preview",
+            "invalid"
+          ]
+        },
+        {
+          "id": "editor-wiki-preview",
+          "title": "Wiki 引用预览",
+          "source": "src/components/Editor/nodes/WikiLinkView.jsx",
+          "root": ".wiki-link-preview",
+          "requiredStates": [
+            "preview"
+          ]
+        },
+        {
+          "id": "editor-wiki-navigation",
+          "title": "不存在的本地引用提示",
+          "source": "src/components/WikiNavigationStatus.jsx",
+          "root": ".wiki-navigation-status",
+          "requiredStates": [
+            "missing-source"
+          ]
+        },
+        {
+          "id": "editor-block-embed",
+          "title": "块内容嵌入",
+          "source": "src/components/Editor/nodes/BlockEmbedView.jsx",
+          "root": ".block-reference-embed",
+          "requiredStates": [
+            "loaded"
+          ]
+        },
+        {
+          "id": "editor-table-actions",
+          "title": "表格单元格操作",
+          "source": "src/components/Editor/plugins/TableActionMenuPlugin.jsx",
+          "root": ".table-action-menu",
+          "requiredStates": [
+            "actions"
+          ]
+        },
+        {
+          "id": "editor-resources",
+          "title": "当前笔记资源",
+          "source": "src/components/Editor/plugins/ResourceManagerPlugin.jsx",
+          "root": ".editor-resource-panel",
+          "requiredStates": [
+            "populated",
+            "empty"
+          ]
+        },
+        {
+          "id": "editor-image",
+          "title": "图片工具",
+          "source": "src/components/Editor/nodes/ImageNode.jsx",
+          "root": ".editor-image-block",
+          "requiredStates": [
+            "selected"
+          ]
+        },
+        {
+          "id": "editor-image-grid",
+          "title": "图片组工具",
+          "source": "src/components/Editor/nodes/ImageGridNode.jsx",
+          "root": ".editor-image-grid-block",
+          "requiredStates": [
+            "selected"
+          ]
+        },
+        {
+          "id": "editor-attachment",
+          "title": "附件与预览",
+          "source": "src/components/Editor/nodes/AttachmentNode.jsx",
+          "root": ".attachment-block",
+          "requiredStates": [
+            "default",
+            "preview"
+          ],
+          "stateRoots": {
+            "preview": ".attachment-preview-dialog"
+          }
+        },
+        {
+          "id": "editor-todo",
+          "title": "待办内容",
+          "source": "src/components/Editor/nodes/TodoNode.jsx",
+          "root": ".todo-block",
+          "requiredStates": [
+            "default",
+            "edit"
+          ]
+        },
+        {
+          "id": "editor-formula",
+          "title": "公式编辑",
+          "source": "src/components/Editor/nodes/FormulaNode.jsx",
+          "root": ".formula-editor",
+          "requiredStates": [
+            "default",
+            "draft"
+          ]
+        },
+        {
+          "id": "editor-embed",
+          "title": "嵌入属性",
+          "source": "src/components/Editor/nodes/EmbedNode.jsx",
+          "root": ".embed-block",
+          "requiredStates": [
+            "default",
+            "draft"
+          ]
+        },
+        {
+          "id": "editor-code",
+          "title": "代码块语言",
+          "source": "src/components/Editor/nodes/CodeBlockNode.jsx",
+          "root": ".code-block-wrapper",
+          "requiredStates": [
+            "default",
+            "languages",
+            "empty"
+          ],
+          "stateRoots": {
+            "languages": ".language-selector-dropdown",
+            "empty": ".language-selector-dropdown"
+          },
+          "editorExceptions": [
+            {
+              "selector": ".code-textarea",
+              "source": "src/components/Editor/nodes/CodeBlockNode.jsx",
+              "reason": "Existing production code editor textarea; retains raw source editing and native selection semantics."
+            }
+          ]
+        },
+        {
+          "id": "editor-callout",
+          "title": "提示块",
+          "source": "src/components/Editor/nodes/CalloutNode.jsx",
+          "root": ".callout-block",
+          "requiredStates": [
+            "default",
+            "icons"
+          ]
+        },
+        {
+          "id": "editor-toggle",
+          "title": "折叠块",
+          "source": "src/components/Editor/nodes/ToggleNode.jsx",
+          "root": ".toggle-block",
+          "requiredStates": [
+            "expanded",
+            "collapsed"
+          ]
+        },
+        {
+          "id": "editor-file-import",
+          "title": "本地文档导入预检",
+          "source": "src/components/ImportWorkspace.jsx",
+          "root": ".local-import-workspace",
+          "requiredStates": [
+            "empty",
+            "prepared",
+            "destination-popup",
+            "long-title"
+          ]
+        },
+        {
+          "id": "editor-file-export",
+          "title": "本地文档导出预览",
+          "source": "src/components/ExportWorkspace.jsx",
+          "root": ".export-workspace",
+          "requiredStates": [
+            "selection",
+            "markdown-preview",
+            "word-preview"
+          ]
+        }
+      ]
+    }
+  },
+  "sourceCoverage": [
+    {
+      "file": "src/App.jsx",
+      "bytes": 57456,
+      "sha256": "bab57f87cae4816fb4f721e9e64093a71dde5863a901abe81e9b2c7b54749b61",
+      "blob": "61dc2f9b53b3bebec18973015d367da4d0b9ce61",
+      "classification": "planned-nested-controls",
+      "reason": "Production controls are rendered within the declared actual route. Scope is the listed route states; unvisited conditional child panels remain explicit gaps below.",
+      "routeIds": [
+        "nav-sidebar",
+        "editor-toolbar"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx"
+      ],
+      "jsxControlPositions": 5,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/AppearanceCenter.jsx",
+      "bytes": 15287,
+      "sha256": "6fdc37842e3bda938a0634ad2da915679bbae8338973dd932fcbf59e60ced08f",
+      "blob": "42ec3e06f85d1a83da01be19e1c7b9be7db5b670",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "appearance"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/SettingsPanel.jsx",
+        "src/components/AppearanceCenter.jsx"
+      ],
+      "jsxControlPositions": 19,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/AttachmentAudit.jsx",
+      "bytes": 12782,
+      "sha256": "9678e35dc9a54ebb595742f90ec8bcbc4f7351e36dd812c9c92ae836ca1c89db",
+      "blob": "e578449256e4279ec4e02dd760ad83588b3d086f",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "attachments"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/SettingsPanel.jsx",
+        "src/components/AttachmentAudit.jsx"
+      ],
+      "jsxControlPositions": 18,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/BacklinksPanel.jsx",
+      "bytes": 11012,
+      "sha256": "177c89b3f1b863ae165ecbc44ffc9d2740c0510ace84aab1ca9c88290e1ad0bb",
+      "blob": "66175000b32271d1c4eaac4b9377f2d60e0aa44a",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "editor-backlinks"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/InspectorPanel.jsx",
+        "src/components/BacklinksPanel.jsx"
+      ],
+      "jsxControlPositions": 11,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/BackupPanel.jsx",
+      "bytes": 17003,
+      "sha256": "f10cda1c69abf540f61e7a2f926c47065b5037637456c6da65f7b3420130a2bf",
+      "blob": "cb545d85fc9359ddf7ed58b1da576d1b9c3fe573",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "nav-backup"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/BackupPanel.jsx"
+      ],
+      "jsxControlPositions": 9,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/CollectionPackageTransfer.jsx",
+      "bytes": 6813,
+      "sha256": "60cd3d6b3e25969cd01a0f828032116eabde1311e30a0e8796a42b61af6ca55a",
+      "blob": "b1823081537ed7c36a9dcb633b174fd2c332d85c",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "research-package"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/GlobalSearchPanel.jsx",
+        "src/components/SearchCollectionsPanel.jsx",
+        "src/components/CollectionPackageTransfer.jsx"
+      ],
+      "jsxControlPositions": 5,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/CollectionReadingBar.jsx",
+      "bytes": 6586,
+      "sha256": "20163d65312a3e33ce28bf0e5ab56a6712eb632893d4c8f5f3dd187f05260337",
+      "blob": "e5f696d8e68be5be36ce66485e41f41e219599b8",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "research-reading"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/CollectionReadingBar.jsx"
+      ],
+      "jsxControlPositions": 7,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/CollectionStudyBatchPanel.jsx",
+      "bytes": 8330,
+      "sha256": "43a661aa5e1fcec261435e7893cfb69f47d21309529432297a67dd65dd7f04c6",
+      "blob": "d19fd0aa8155c53b958e2220cb1b583836eb2559",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "research-batch"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/GlobalSearchPanel.jsx",
+        "src/components/CollectionStudyHub.jsx",
+        "src/components/CollectionStudyBatchPanel.jsx"
+      ],
+      "jsxControlPositions": 9,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/CollectionStudyEditor.jsx",
+      "bytes": 4524,
+      "sha256": "b36353988810943979bb75eb67856cff30d48af7ffc25da94915036adc35f3df",
+      "blob": "b9055c4a5e83970be2594e9e33d10d1cb8a49f4e",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "research-annotation"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/CollectionReadingBar.jsx",
+        "src/components/CollectionStudyEditor.jsx"
+      ],
+      "jsxControlPositions": 7,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/CollectionStudyHub.jsx",
+      "bytes": 11153,
+      "sha256": "2caf4bda094dd23ba8b1c7179e2ddc218bb4c54f367275abbd53a115b94ee5c7",
+      "blob": "f4612599513116b40ccbb6ce12970799a879327d",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "research-hub"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/GlobalSearchPanel.jsx",
+        "src/components/CollectionStudyHub.jsx"
+      ],
+      "jsxControlPositions": 14,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/CollectionStudyPanel.jsx",
+      "bytes": 9531,
+      "sha256": "80e63f193021f4e571ac09d4d3973c708d0e63d31eb5da67b7551f619cc6b72b",
+      "blob": "12e99627e5f7239d752b89fca2bc907816d60bd7",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "research-study"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/GlobalSearchPanel.jsx",
+        "src/components/SearchCollectionsPanel.jsx",
+        "src/components/CollectionStudyPanel.jsx"
+      ],
+      "jsxControlPositions": 12,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/ConfirmDialog.jsx",
+      "bytes": 2657,
+      "sha256": "75ad09853b50604a7769ddcc8483f8d72f00f491f1089e8fee4a0a4594dfc698",
+      "blob": "78a931f73bdb6133d51a1520a3637e807e91455b",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "nav-confirm"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/ConfirmDialog.jsx"
+      ],
+      "jsxControlPositions": 1,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/DailyNotesPanel.jsx",
+      "bytes": 12684,
+      "sha256": "0aa65fc6e95b7da90766ec92285e5f8d66880e5028817464c2d524651db8bdfe",
+      "blob": "c3c5cb30898ee3627c2b2d44e37fa20734732c09",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "nav-daily"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/DailyNotesPanel.jsx"
+      ],
+      "jsxControlPositions": 18,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/DuplicateNotes.jsx",
+      "bytes": 13766,
+      "sha256": "05315f1a854c336bb2504cd4bd29586cc6874e0a8320721922ff61bbe50976f3",
+      "blob": "f857f81e1bb095d41b6e7addb4e76890e06f6083",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "duplicates"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/SettingsPanel.jsx",
+        "src/components/DuplicateNotes.jsx"
+      ],
+      "jsxControlPositions": 16,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/Editor/nodes/AttachmentNode.jsx",
+      "bytes": 14700,
+      "sha256": "d2694929361d3eb278aecf62e0db69652fa4a60dc83436d81ea73dcdf48e4c70",
+      "blob": "fe62b63cb6ea6ef89fd6a7497161bbc359b6e963",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "editor-attachment"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/TextEditor.jsx",
+        "src/components/Editor/Editor.jsx",
+        "src/components/Editor/nodes/AttachmentNode.jsx"
+      ],
+      "jsxControlPositions": 8,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/Editor/nodes/BlockEmbedView.jsx",
+      "bytes": 2525,
+      "sha256": "d9117a2711db63ab764b7314f0da9a9a674d20ff14d291d37ee441707ebd6e39",
+      "blob": "d25234ea4b6ae32ef9075869883033adff60129e",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "editor-block-embed"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/TextEditor.jsx",
+        "src/components/Editor/Editor.jsx",
+        "src/components/Editor/nodes/WikiLinkNode.jsx",
+        "src/components/Editor/nodes/BlockEmbedView.jsx"
+      ],
+      "jsxControlPositions": 3,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/Editor/nodes/CalloutNode.jsx",
+      "bytes": 4148,
+      "sha256": "e6512a9dbdfae05bebdb14a1ce5a6b13ff6fe36ec49f2ee767cea567b4e6f8bf",
+      "blob": "2b17a7df4a9809eeed7f833ddb59d9a4d6ca413e",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "editor-callout"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/TextEditor.jsx",
+        "src/components/Editor/Editor.jsx",
+        "src/components/Editor/nodes/CalloutNode.jsx"
+      ],
+      "jsxControlPositions": 3,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/Editor/nodes/CodeBlockNode.jsx",
+      "bytes": 19301,
+      "sha256": "d0bed965bbef31abfe6ae577413453b7cd97a72b8bebea5ab9db591ab15939c7",
+      "blob": "c441fda099f91dc669cc81dd4f00350398cdb285",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "editor-code"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/TextEditor.jsx",
+        "src/components/Editor/Editor.jsx",
+        "src/components/Editor/nodes/CodeBlockNode.jsx"
+      ],
+      "jsxControlPositions": 7,
+      "createElementPositions": 0,
+      "programmaticCandidates": 1
+    },
+    {
+      "file": "src/components/Editor/nodes/EmbedNode.jsx",
+      "bytes": 6160,
+      "sha256": "a78ca6903e505d90e7251e7fca32c5152f158a9b09458d162b8de10ca27b34db",
+      "blob": "c158a5f30e08d289d00548523095b9f6a1022be9",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "editor-embed"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/TextEditor.jsx",
+        "src/components/Editor/Editor.jsx",
+        "src/components/Editor/nodes/EmbedNode.jsx"
+      ],
+      "jsxControlPositions": 5,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/Editor/nodes/FormulaNode.jsx",
+      "bytes": 12069,
+      "sha256": "ddd444389da48acec99582c52cc10eb22ca28784f769f32063137141b6459975",
+      "blob": "29216482c6a9b61bc7a58064b8d698368b049e65",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "editor-formula"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/TextEditor.jsx",
+        "src/components/Editor/Editor.jsx",
+        "src/components/Editor/nodes/FormulaNode.jsx"
+      ],
+      "jsxControlPositions": 10,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/Editor/nodes/ImageGridNode.jsx",
+      "bytes": 21757,
+      "sha256": "a95131873f9deca6414e4170ebbb48624009f282100cf8963d1eef8f38eb3cdc",
+      "blob": "94d094f5725e79b97203e6eb5ba23e7c470f0190",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "editor-image-grid"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/TextEditor.jsx",
+        "src/components/Editor/Editor.jsx",
+        "src/components/Editor/nodes/ImageGridNode.jsx"
+      ],
+      "jsxControlPositions": 11,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/Editor/nodes/ImageNode.jsx",
+      "bytes": 11576,
+      "sha256": "a5bc8d0d0ad8c8da59e874805bc255dbccdf2198b64a59de5e07717e7ee31209",
+      "blob": "1f850a707432077404e8262324c3e5b0376725ea",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "editor-image"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/TextEditor.jsx",
+        "src/components/Editor/Editor.jsx",
+        "src/components/Editor/nodes/ImageNode.jsx"
+      ],
+      "jsxControlPositions": 7,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/Editor/nodes/TodoNode.jsx",
+      "bytes": 4323,
+      "sha256": "0a862a3fddd97fa156a2eba500f34dc3f0dd7d66dc708d9073507ad56d09170f",
+      "blob": "ad17d68f9ad3ec24c0b0c732588ad10965a51791",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "editor-todo"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/TextEditor.jsx",
+        "src/components/Editor/Editor.jsx",
+        "src/components/Editor/nodes/TodoNode.jsx"
+      ],
+      "jsxControlPositions": 3,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/Editor/nodes/ToggleNode.jsx",
+      "bytes": 4751,
+      "sha256": "24420edd1c32ad0f13a276286a98554f44a5d4d4695ffd0a6a91637e3f475dfb",
+      "blob": "94bf078464c802feba5f811b80855bc2508f1b58",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "editor-toggle"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/TextEditor.jsx",
+        "src/components/Editor/Editor.jsx",
+        "src/components/Editor/nodes/ToggleNode.jsx"
+      ],
+      "jsxControlPositions": 3,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/Editor/nodes/WikiLinkView.jsx",
+      "bytes": 5503,
+      "sha256": "56da98a5f39975252497f3fe2d1d5841fd9a53e9bed2f4d989dfee1018baeee4",
+      "blob": "cc3b8c821e764e3f1b184da09d19d94bdc73379d",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "editor-wiki-preview"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/TextEditor.jsx",
+        "src/components/Editor/Editor.jsx",
+        "src/components/Editor/nodes/WikiLinkNode.jsx",
+        "src/components/Editor/nodes/WikiLinkView.jsx"
+      ],
+      "jsxControlPositions": 1,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/Editor/plugins/BlockHandlePlugin.jsx",
+      "bytes": 11717,
+      "sha256": "92a0b6c685884ebb34db4fda797d8ccafe564d21b191b1c244f5e3df14cfa76e",
+      "blob": "85a0100d88dd449f717e4c34c2a440f09676ab11",
+      "classification": "active-route-gap",
+      "reason": "Production import path exists, but no currently authored route declares this active control source. It must be assigned a genuine entry or reviewed special boundary before aggregate completion.",
+      "routeIds": [],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/TextEditor.jsx",
+        "src/components/Editor/Editor.jsx",
+        "src/components/Editor/plugins/BlockHandlePlugin.jsx"
+      ],
+      "jsxControlPositions": 7,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/Editor/plugins/BlockReferencePlugin.jsx",
+      "bytes": 16209,
+      "sha256": "53f2892afc5635f4848a95709bdd140acd2265f1c7e6825cbc2b71f448ed4355",
+      "blob": "c24a21528168ceba50c09db3dc0f8bf745ad2181",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "editor-block-reference"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/TextEditor.jsx",
+        "src/components/Editor/Editor.jsx",
+        "src/components/Editor/plugins/BlockReferencePlugin.jsx"
+      ],
+      "jsxControlPositions": 11,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/Editor/plugins/CommandPalettePlugin.jsx",
+      "bytes": 8162,
+      "sha256": "ff19234fd6655053cd006fe507412d22c5cb3bc5bddd701687a71e1c1503c6cf",
+      "blob": "f05d3837b5f76646918b84b47176ea84125e6c51",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "editor-commands"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/TextEditor.jsx",
+        "src/components/Editor/Editor.jsx",
+        "src/components/Editor/plugins/CommandPalettePlugin.jsx"
+      ],
+      "jsxControlPositions": 2,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/Editor/plugins/DocumentOutlinePlugin.jsx",
+      "bytes": 20950,
+      "sha256": "26c55762f9f2bfa217ee55d23ab7e622ec06d9cba23785c89fbf03b44fa58f54",
+      "blob": "8977fff7adea4b770dcec76a5fc596bf6179ef4d",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "editor-outline"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/TextEditor.jsx",
+        "src/components/Editor/Editor.jsx",
+        "src/components/Editor/plugins/DocumentOutlinePlugin.jsx"
+      ],
+      "jsxControlPositions": 14,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/Editor/plugins/EditorViewSettingsPlugin.jsx",
+      "bytes": 12143,
+      "sha256": "2fdecacaa372ca0b8b1a1f3b2ee50c7a1c22a29c1f0e5a94a06f9c83254defb0",
+      "blob": "43dbe2747048b7bc4ed548dc08fe370f148071ce",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "editor-view"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/TextEditor.jsx",
+        "src/components/Editor/Editor.jsx",
+        "src/components/Editor/plugins/EditorViewSettingsPlugin.jsx"
+      ],
+      "jsxControlPositions": 7,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/Editor/plugins/FloatingTextToolbarPlugin.jsx",
+      "bytes": 5225,
+      "sha256": "76a2dc8778ecf6d4d4d734b95199d48a7f8ef9d4beb559dac35c5f72ef858167",
+      "blob": "69e979a3f4ca8993d84d98672bb45061ec672f04",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "editor-floating"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/TextEditor.jsx",
+        "src/components/Editor/Editor.jsx",
+        "src/components/Editor/plugins/FloatingTextToolbarPlugin.jsx"
+      ],
+      "jsxControlPositions": 6,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/Editor/plugins/LinkInteractionPlugin.jsx",
+      "bytes": 8079,
+      "sha256": "8e002d0d244fba6820afbea590b6cd78a850c077c1881a56da0bdc984c7f709a",
+      "blob": "4ce4662015ae5786011b0df198b1ccd588474084",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "editor-link"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/TextEditor.jsx",
+        "src/components/Editor/Editor.jsx",
+        "src/components/Editor/plugins/LinkInteractionPlugin.jsx"
+      ],
+      "jsxControlPositions": 5,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/Editor/plugins/MarkdownSourcePlugin.jsx",
+      "bytes": 6129,
+      "sha256": "75b5d6e1db6037b95c74cbaaed2bb3a737bc7a0200b295269701c7113566e393",
+      "blob": "a1f5ecd3e0eb5d5d4c4af97eecb9f66bbd0b7124",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "editor-source"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/TextEditor.jsx",
+        "src/components/Editor/Editor.jsx",
+        "src/components/Editor/plugins/MarkdownSourcePlugin.jsx"
+      ],
+      "jsxControlPositions": 3,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/Editor/plugins/ResourceManagerPlugin.jsx",
+      "bytes": 7770,
+      "sha256": "49dd45295a285c590d33f67cde5ee0690fbdb227564f84a91c5853bbd34d5d9e",
+      "blob": "770314d82096d6a6ebb2fcaf4aa7f73f770fdae5",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "editor-resources"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/TextEditor.jsx",
+        "src/components/Editor/Editor.jsx",
+        "src/components/Editor/plugins/ResourceManagerPlugin.jsx"
+      ],
+      "jsxControlPositions": 7,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/Editor/plugins/SearchPlugin.jsx",
+      "bytes": 14970,
+      "sha256": "b79a621ccdd611539d11ea5365c1a9c2a33477a09014fd64b405597bdd5f9894",
+      "blob": "4882ffa80bfc27067271fc092bbcfe46a9c08c43",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "editor-search"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/TextEditor.jsx",
+        "src/components/Editor/Editor.jsx",
+        "src/components/Editor/plugins/SearchPlugin.jsx"
+      ],
+      "jsxControlPositions": 11,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/Editor/plugins/TableActionMenuPlugin.jsx",
+      "bytes": 8966,
+      "sha256": "93331fe57a8bb0ddac48526911174d6f2dab4b4779c4676aa76d251f7e3520e6",
+      "blob": "b4504601cb9460066be3d1b04e9ad9d1f5d9cb77",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "editor-table-actions"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/TextEditor.jsx",
+        "src/components/Editor/Editor.jsx",
+        "src/components/Editor/plugins/TableActionMenuPlugin.jsx"
+      ],
+      "jsxControlPositions": 6,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/Editor/plugins/TableColumnResizePlugin.jsx",
+      "bytes": 6778,
+      "sha256": "a8710b7b9dc3433177e94e60f24af79bdfd830d8325e12f570213c8b02b8b305",
+      "blob": "7cf1b8bb663ccb396c7ab3b791ccc6e5a09ae93f",
+      "classification": "active-route-gap",
+      "reason": "Production import path exists, but no currently authored route declares this active control source. It must be assigned a genuine entry or reviewed special boundary before aggregate completion.",
+      "routeIds": [],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/TextEditor.jsx",
+        "src/components/Editor/Editor.jsx",
+        "src/components/Editor/plugins/TableColumnResizePlugin.jsx"
+      ],
+      "jsxControlPositions": 1,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/Editor/plugins/TableMenu.jsx",
+      "bytes": 3249,
+      "sha256": "1ae79d0dc9b528cad03167d0a240e8de7301349f665e0be01f24189fd04e3297",
+      "blob": "7b70d960490c9293c50da06ee17a3e88be1d94e4",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "editor-table-insert"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/TextEditor.jsx",
+        "src/components/Editor/Editor.jsx",
+        "src/components/Editor/plugins/ToolbarPlugin.jsx",
+        "src/components/Editor/plugins/TableMenu.jsx"
+      ],
+      "jsxControlPositions": 2,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/Editor/plugins/TableReorderPlugin.jsx",
+      "bytes": 8906,
+      "sha256": "5f89100258287598b31be329fc37759d6c2ab3c374960ea6796e5c7e3041ede6",
+      "blob": "5ef30986b72f367a87ec4a9229290fa9911a2b01",
+      "classification": "active-route-gap",
+      "reason": "Production import path exists, but no currently authored route declares this active control source. It must be assigned a genuine entry or reviewed special boundary before aggregate completion.",
+      "routeIds": [],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/TextEditor.jsx",
+        "src/components/Editor/Editor.jsx",
+        "src/components/Editor/plugins/TableReorderPlugin.jsx"
+      ],
+      "jsxControlPositions": 2,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/Editor/plugins/TableSelectionPlugin.jsx",
+      "bytes": 39521,
+      "sha256": "81aec56bcef7c77eb02ff5c695d2f14ec2d3dd7f95bfdf7bf3e5f28dc8cb6fc1",
+      "blob": "5f0b5dfeee2fca6338ff2be35711562d6b0f178b",
+      "classification": "active-route-gap",
+      "reason": "Production import path exists, but no currently authored route declares this active control source. It must be assigned a genuine entry or reviewed special boundary before aggregate completion.",
+      "routeIds": [],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/TextEditor.jsx",
+        "src/components/Editor/Editor.jsx",
+        "src/components/Editor/plugins/TableSelectionPlugin.jsx"
+      ],
+      "jsxControlPositions": 13,
+      "createElementPositions": 0,
+      "programmaticCandidates": 1
+    },
+    {
+      "file": "src/components/Editor/plugins/TextColorPlugin.jsx",
+      "bytes": 4710,
+      "sha256": "6a00328be934bc8464d3e72ce01aab72b9332ec04760189e77eeaffaa70e3b99",
+      "blob": "33652a711d723bd3c227036cfd6660a905bc341b",
+      "classification": "not-reachable-from-production-entry",
+      "reason": "No static or lazy import path from src/main.jsx in the complete current Git-tracked production source graph; no native page visit is claimed.",
+      "routeIds": [
+        "editor-toolbar"
+      ],
+      "importPath": [],
+      "jsxControlPositions": 4,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/Editor/plugins/ToolbarPlugin.jsx",
+      "bytes": 34894,
+      "sha256": "c64d13129fa5b7228c67860b4852abe5ecc1b5d5f6c2d7c37bb30039b9262aaa",
+      "blob": "0976b1f0f6d1ddd432c35b5415df22285a49ee02",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "editor-toolbar",
+        "editor-link-create"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/TextEditor.jsx",
+        "src/components/Editor/Editor.jsx",
+        "src/components/Editor/plugins/ToolbarPlugin.jsx"
+      ],
+      "jsxControlPositions": 43,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/Editor/plugins/WikiLinkPlugin.jsx",
+      "bytes": 11874,
+      "sha256": "274bbd0cdbc2dfc6387230c228c1db573ecf76046587efe2c078a4ff77ea33bd",
+      "blob": "23ab8a58644b31a040cda3024411bc3b2d41490b",
+      "classification": "active-route-gap",
+      "reason": "Production import path exists, but no currently authored route declares this active control source. It must be assigned a genuine entry or reviewed special boundary before aggregate completion.",
+      "routeIds": [],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/TextEditor.jsx",
+        "src/components/Editor/Editor.jsx",
+        "src/components/Editor/plugins/WikiLinkPlugin.jsx"
+      ],
+      "jsxControlPositions": 1,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/Editor/utils/blockRegistry.js",
+      "bytes": 8003,
+      "sha256": "b78a509d9d320e082d033ec0def479afee4b60392c83598e752a1303ffd4120e",
+      "blob": "e7fa0c0c0f023f80653b0bfed1d4ef8dde740d21",
+      "classification": "shared-or-browser-semantic-helper",
+      "reason": "Programmatic temporary inputs support clipboard/native editor identity handling; not persistent ordinary application form controls.",
+      "routeIds": [],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/TextEditor.jsx",
+        "src/components/Editor/Editor.jsx",
+        "src/components/Editor/plugins/SlashMenuPlugin.jsx",
+        "src/components/Editor/utils/blockRegistry.js"
+      ],
+      "jsxControlPositions": 0,
+      "createElementPositions": 0,
+      "programmaticCandidates": 2
+    },
+    {
+      "file": "src/components/EditorSaveConflictDialog.jsx",
+      "bytes": 3396,
+      "sha256": "fadeb63a785a7e9afe214bcce746ea526c9f8a416e6d470a64cc2f2ab969d6a7",
+      "blob": "0fef34daf154181849838aa5efa0a04183064cec",
+      "classification": "guard-only-widget",
+      "reason": "Only mounts for a real concurrent-save conflict. src/components/EditorSaveConflict.test.jsx provides the explicit component regression; this read/cancel page matrix does not manufacture a conflict or claim a six-scene visual proof.",
+      "routeIds": [],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/TextEditor.jsx",
+        "src/components/EditorSaveConflictDialog.jsx"
+      ],
+      "jsxControlPositions": 3,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/ErrorBoundary.jsx",
+      "bytes": 1139,
+      "sha256": "8749c951705520c386b27b43f315bb1223ebb73fa41d5fdda8d43f987ada334a",
+      "blob": "cfa831ea93b56d8f44610dd192d230b462562e92",
+      "classification": "guard-only-widget",
+      "reason": "Only mounts after a child throws; production component source and ordinary shared Button are covered, but this matrix does not deliberately crash the app. This is a guarded error widget, not a separate ordinary navigation page.",
+      "routeIds": [],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/ErrorBoundary.jsx"
+      ],
+      "jsxControlPositions": 1,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/EvidenceLocateButton.jsx",
+      "bytes": 1519,
+      "sha256": "6b287b25824ef2eec8b051b22c34fa2bc015f9e44db2fb6de0e16c9e64e488a5",
+      "blob": "5751476baf48760a579c1340df7c2899dfbb2fff",
+      "classification": "planned-nested-controls",
+      "reason": "Production controls are rendered within the declared actual route. Scope is the listed route states; unvisited conditional child panels remain explicit gaps below.",
+      "routeIds": [
+        "projects-evidence"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/ProjectWorkspacePanel.jsx",
+        "src/components/ProjectStructurePanel.jsx",
+        "src/components/ProjectRelationGraphPanel.jsx",
+        "src/components/ProjectEntityIntelligencePanel.jsx",
+        "src/components/ProjectEntityEvidencePanel.jsx",
+        "src/components/EvidenceLocateButton.jsx"
+      ],
+      "jsxControlPositions": 1,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/EvidenceReviewArchiveComparison.jsx",
+      "bytes": 10039,
+      "sha256": "d28f30f222a4e1911aa2c2a9db2da081fb4f0126a5c2e4e670de3ebcc8b4bac8",
+      "blob": "58ccbcfc08bd27dabfc0dab9bf3f74b23da6da08",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "projects-archive-comparison"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/BackupPanel.jsx",
+        "src/components/EvidenceReviewArchives.jsx",
+        "src/components/EvidenceReviewArchiveComparison.jsx"
+      ],
+      "jsxControlPositions": 9,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/EvidenceReviewArchives.jsx",
+      "bytes": 11634,
+      "sha256": "9e422b230fc1c779e205cbfcd5da0e04c472a336d15bed94490ffcf63b8d05a4",
+      "blob": "7a62c342dfb946972e2ff7554199611e4929da6a",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "projects-archives"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/BackupPanel.jsx",
+        "src/components/EvidenceReviewArchives.jsx"
+      ],
+      "jsxControlPositions": 11,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/EvidenceReviewBackup.jsx",
+      "bytes": 7903,
+      "sha256": "663e99ddfd1bc8853e13cdd1e236a11701d99f6666db81b25a99c93147aed356",
+      "blob": "e6d7db71b1fc98292ea75c75053d8b6a6162ebf5",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "projects-archive-backup"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/BackupPanel.jsx",
+        "src/components/EvidenceReviewArchives.jsx",
+        "src/components/EvidenceReviewBackup.jsx"
+      ],
+      "jsxControlPositions": 8,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/EvidenceReviewBar.jsx",
+      "bytes": 4622,
+      "sha256": "02e0ec522c2024311b7858f185c71fca3111b10f624ace558a31f32c695bb3f5",
+      "blob": "65800833faf19fba53bf9dc420906478ccca20b7",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "projects-review"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/EvidenceReviewBar.jsx"
+      ],
+      "jsxControlPositions": 5,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/EvidenceReviewRecords.jsx",
+      "bytes": 9102,
+      "sha256": "998e5dc976c50779e5fc5be202b005b3b1a853420b9ff697cfcee79e4b1a1e44",
+      "blob": "46f6868c5d298fd73786a86fdfe4ccd00d826e56",
+      "classification": "planned-nested-controls",
+      "reason": "Production controls are rendered within the declared actual route. Scope is the listed route states; unvisited conditional child panels remain explicit gaps below.",
+      "routeIds": [
+        "projects-review"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/EvidenceReviewBar.jsx",
+        "src/components/EvidenceReviewRecords.jsx"
+      ],
+      "jsxControlPositions": 10,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/ExportWorkspace.jsx",
+      "bytes": 20898,
+      "sha256": "afcba7cc173862dd18764b6d70a2dffa22548ba117a09dd5309df501c6a068a7",
+      "blob": "79a062ec2c724ed74e208f4f77954f214a676cd6",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "editor-file-export"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/FileList.jsx",
+        "src/components/ExportWorkspace.jsx"
+      ],
+      "jsxControlPositions": 14,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0,
+      "existingFunctionalDrivers": [
+        {
+          "file": "scripts/check-local-export-desktop.mjs",
+          "present": true,
+          "scope": "existing real-App functional/native entry; current immutable report must be validated separately; not a complete six-scene matrix"
+        }
+      ]
+    },
+    {
+      "file": "src/components/FileList.jsx",
+      "bytes": 70800,
+      "sha256": "9ede6f53453c70fd66cdd2139152b38800b0e5310cef1ba863431e57f09c5311",
+      "blob": "154410b666a7f6d0b1752acecdac0db24e1d08ca",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "nav-library"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/FileList.jsx"
+      ],
+      "jsxControlPositions": 8,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/FileListMenus.jsx",
+      "bytes": 5940,
+      "sha256": "567f3ef1832b3562a237b26a8bca40f324fbb7f5a63a6638038f789ca5a357bd",
+      "blob": "28d7da0a5049556835f23def8d0c99064e4bfd09",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "nav-file-menus"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/FileList.jsx",
+        "src/components/FileListMenus.jsx"
+      ],
+      "jsxControlPositions": 11,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/FileSelectorDialog.jsx",
+      "bytes": 24604,
+      "sha256": "42e2ff5eff190c2f56289de5b0b81bb4a43e5edf0b1d8b6a6d0fbab97da20d66",
+      "blob": "ac041d50fb40289e416253e25bad99b663c67c35",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "nav-file-selector"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/FileList.jsx",
+        "src/components/FileSelectorDialog.jsx"
+      ],
+      "jsxControlPositions": 7,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/FileToolbar.jsx",
+      "bytes": 1537,
+      "sha256": "f6f5b9cae1fcbd3586ebea03759a0ee121019a52f02791c7707856e8077e7543",
+      "blob": "5f002b0fc7331ab57071685fa4b40ca94e05f923",
+      "classification": "not-reachable-from-production-entry",
+      "reason": "No static or lazy import path from src/main.jsx in the complete current Git-tracked production source graph; no native page visit is claimed.",
+      "routeIds": [],
+      "importPath": [],
+      "jsxControlPositions": 6,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/FileTreeItem.jsx",
+      "bytes": 4005,
+      "sha256": "56307cfc3a2da2c8618b44e4e1b361b7fe95923d9ba7de245a05e1ae2c4e23af",
+      "blob": "a7f2f869272ec7f64f8777e5c84303f5589c9fcc",
+      "classification": "not-reachable-from-production-entry",
+      "reason": "No static or lazy import path from src/main.jsx in the complete current Git-tracked production source graph; no native page visit is claimed.",
+      "routeIds": [
+        "nav-library"
+      ],
+      "importPath": [],
+      "jsxControlPositions": 4,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/FileUndoRedo.jsx",
+      "bytes": 661,
+      "sha256": "0151c74b5c12f633acf580128890d04147c36750ebd8a873812ef975cb6f5d57",
+      "blob": "df79a639bc47bbebf5a7145092aa7af00a219c64",
+      "classification": "not-reachable-from-production-entry",
+      "reason": "No static or lazy import path from src/main.jsx in the complete current Git-tracked production source graph; no native page visit is claimed.",
+      "routeIds": [],
+      "importPath": [],
+      "jsxControlPositions": 2,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/FocusSessionAnalyticsPanel.jsx",
+      "bytes": 12952,
+      "sha256": "8c0dfb87d23449d89a2347e083c21a92bc6643cd8bde421fda46c170f9d54a5d",
+      "blob": "039055930b29683f1fd7c39677253b9040737233",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "projects-session-history",
+        "projects-analysis"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/ProjectWorkspacePanel.jsx",
+        "src/components/FocusSessionAnalyticsPanel.jsx"
+      ],
+      "jsxControlPositions": 7,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/FocusSessionBar.jsx",
+      "bytes": 2397,
+      "sha256": "7e842cd964e7c61bef3c28c65d09bcb321766055eda76aef2451d0c5145138c8",
+      "blob": "9493d44328bf79ac8e2b6b5001e9b34f135acad4",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "projects-focus-session"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/FocusSessionBar.jsx"
+      ],
+      "jsxControlPositions": 2,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/FolderWorkspace.jsx",
+      "bytes": 19601,
+      "sha256": "cb9ad847f014b70ed75a8dd68aaf44d6886aa71cfeb8522b6de9d16559c1af39",
+      "blob": "687e9211377e01edb1569980139c8b34b678c9d4",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "folders"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/SettingsPanel.jsx",
+        "src/components/FolderWorkspace.jsx"
+      ],
+      "jsxControlPositions": 22,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/GlobalSearchPanel.jsx",
+      "bytes": 26405,
+      "sha256": "ffb4096c07e2152d1e1e3caf36f9b5284d434ea680d5b2c32c15d15cb7b1712a",
+      "blob": "f7d7b224ca1017c58788db3c6c944e3c54ace123",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "research-search"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/GlobalSearchPanel.jsx"
+      ],
+      "jsxControlPositions": 22,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/GraphPanel.jsx",
+      "bytes": 10955,
+      "sha256": "e382032c266d3ba3086a85941a67f18a775ede214e80e16671200e782115e5bc",
+      "blob": "ffb8c94b73976dc347a08846368380a3a6a9572f",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "nav-graph"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/GraphPanel.jsx"
+      ],
+      "jsxControlPositions": 16,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/HistoryReview.jsx",
+      "bytes": 18601,
+      "sha256": "f3aba2419ddeb501fc3b00aadd8ce5f3f057eadcfd82e8a9fba44425a0a5c0e7",
+      "blob": "4886cb9965411f09700a02dae6e5647abd00f40e",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "history"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/SettingsPanel.jsx",
+        "src/components/HistoryReview.jsx"
+      ],
+      "jsxControlPositions": 24,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/ImportWorkspace.jsx",
+      "bytes": 34116,
+      "sha256": "c0afb37be53dae4e6ba4cc2dff571ee11aa59c249e4e6af9bfc0fea300f565bb",
+      "blob": "c44caa160a99e077fde4403c84dd083c267c2643",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "editor-file-import"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/FileList.jsx",
+        "src/components/ImportWorkspace.jsx"
+      ],
+      "jsxControlPositions": 21,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0,
+      "existingFunctionalDrivers": [
+        {
+          "file": "scripts/check-local-import-desktop.mjs",
+          "present": true,
+          "scope": "existing real-App functional/native entry; current immutable report must be validated separately; not a complete six-scene matrix"
+        }
+      ]
+    },
+    {
+      "file": "src/components/InspectorPanel.jsx",
+      "bytes": 7785,
+      "sha256": "c9c152c56f0fd5d6c0c51b4d03b3ab704132a53c3e6f7b1743ea9fe53427df5a",
+      "blob": "997781fd9adfc353012e4fed2d326afa7ca18de3",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "editor-properties"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/InspectorPanel.jsx"
+      ],
+      "jsxControlPositions": 4,
+      "createElementPositions": 0,
+      "programmaticCandidates": 1
+    },
+    {
+      "file": "src/components/LibraryReferenceHealthPanel.jsx",
+      "bytes": 12371,
+      "sha256": "2a23ed161360996465b04f6f33b394fe8da7768317f62e293baf2cce87e6ea29",
+      "blob": "f009a3a3d82d9a90169a8f40aa703637cd3cde0f",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "reference-health"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/SettingsPanel.jsx",
+        "src/components/LibraryReferenceHealthPanel.jsx"
+      ],
+      "jsxControlPositions": 5,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/LibraryStatistics.jsx",
+      "bytes": 11175,
+      "sha256": "451ac2f2f9ae5d7e041668d0931a20b98b3e408a26fa88f6c0d3e4b1f69b5074",
+      "blob": "10180f8726cb818ac48e3eab38b7ddc79cc38951",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "statistics"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/SettingsPanel.jsx",
+        "src/components/LibraryStatistics.jsx"
+      ],
+      "jsxControlPositions": 14,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/LocalActions.jsx",
+      "bytes": 7708,
+      "sha256": "6992a800d75ddef3e418ee62000b50ad037b2f5a4995af6dd56f7ecdc1b362fa",
+      "blob": "39dc754c1ab849b2df278ccaf90b00c32257c42d",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "nav-local-actions"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/LocalActions.jsx"
+      ],
+      "jsxControlPositions": 5,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/LongFormStructurePanel.jsx",
+      "bytes": 8247,
+      "sha256": "8ede6174c61385766c8df7897e1a41262c5e11857846940de466345c86a72a69",
+      "blob": "ad0b8969a9b8e4629b36f57925e4f8964c3c7040",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "editor-structure"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/InspectorPanel.jsx",
+        "src/components/LongFormStructurePanel.jsx"
+      ],
+      "jsxControlPositions": 5,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/NameDialog.jsx",
+      "bytes": 6384,
+      "sha256": "ec6bfa8483744e0a79b66d64fcf84d786b3f70f7d8962a5e0f035e4cfc8f178c",
+      "blob": "c3f51a394f9a0bf83b3f39d7c2171fe04499ab66",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "nav-naming"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/FileList.jsx",
+        "src/components/NameDialog.jsx"
+      ],
+      "jsxControlPositions": 6,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/NoteComparison.jsx",
+      "bytes": 17095,
+      "sha256": "c42dfaaa00930e122bd8b693490c09dc3bbcd0057d59f0f6063df444c4c39b60",
+      "blob": "1df78bba9baec47b70ced2edd023c54330960001",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "comparison"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/SettingsPanel.jsx",
+        "src/components/NoteComparison.jsx"
+      ],
+      "jsxControlPositions": 23,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/PinnedNotesPanel.jsx",
+      "bytes": 13799,
+      "sha256": "b527586af1dfc618763fbcf0e8521bb8e1468860d81aaf8ee44cd85e1a06848d",
+      "blob": "c65c5abe1274a04d17d00a56c4abdd4403ca9c74",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "nav-pinned"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/PinnedNotesPanel.jsx"
+      ],
+      "jsxControlPositions": 16,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/ProjectAnalyticsPanel.jsx",
+      "bytes": 10787,
+      "sha256": "58f4a38aace784b426e8e95d5c5a11e7bc5d81fa182e8386940f2c887af5a930",
+      "blob": "7d0a86af72982ab7d11b21deebfdb36b703952cd",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "projects-analysis"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/ProjectWorkspacePanel.jsx",
+        "src/components/ProjectAnalyticsPanel.jsx"
+      ],
+      "jsxControlPositions": 8,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/ProjectEntityEvidencePanel.jsx",
+      "bytes": 12910,
+      "sha256": "0e8cfeddf13c6f74a0ba00ede376fe59676638b07140fe0638e07b04f79e1a3f",
+      "blob": "550cfbc46952ae9111515687baf3c20f4309326d",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "projects-evidence"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/ProjectWorkspacePanel.jsx",
+        "src/components/ProjectStructurePanel.jsx",
+        "src/components/ProjectRelationGraphPanel.jsx",
+        "src/components/ProjectEntityIntelligencePanel.jsx",
+        "src/components/ProjectEntityEvidencePanel.jsx"
+      ],
+      "jsxControlPositions": 9,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/ProjectEntityIntelligencePanel.jsx",
+      "bytes": 13628,
+      "sha256": "21cf96e408d5143804e2fc74276e3136843ee5545c1001c5ca80efafa9cfdbdf",
+      "blob": "f44c67347914210a7c3a5359ee9d37917d0ff397",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "projects-entities",
+        "projects-entity-heatmap"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/ProjectWorkspacePanel.jsx",
+        "src/components/ProjectStructurePanel.jsx",
+        "src/components/ProjectRelationGraphPanel.jsx",
+        "src/components/ProjectEntityIntelligencePanel.jsx"
+      ],
+      "jsxControlPositions": 8,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/ProjectInsightsPanel.jsx",
+      "bytes": 10973,
+      "sha256": "b5660fdcc219568e07382829038e0e33364ff311317e342932261dc3c512782c",
+      "blob": "90a3008f3f9ae676b7755bc9047bec707fb062d4",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "projects-insights"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/ProjectWorkspacePanel.jsx",
+        "src/components/ProjectInsightsPanel.jsx"
+      ],
+      "jsxControlPositions": 7,
+      "createElementPositions": 0,
+      "programmaticCandidates": 1
+    },
+    {
+      "file": "src/components/ProjectPlanningPanel.jsx",
+      "bytes": 10956,
+      "sha256": "b6bbdd73627c2ebdf37e599a41d01f3c2c6a4fddf9d18de25529e11e72caaa15",
+      "blob": "bd817cd56fb2565044b6d0dee53c4f0dc4d8e013",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "projects-planning"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/ProjectWorkspacePanel.jsx",
+        "src/components/ProjectPlanningPanel.jsx"
+      ],
+      "jsxControlPositions": 10,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/ProjectRelationGraphPanel.jsx",
+      "bytes": 31738,
+      "sha256": "734c506af40a11f784e333ba820c7ce9ccf1a10d1042253214043bf4eec42b1e",
+      "blob": "b9e1e9b11c300df7534a70d1da6430865f498963",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "projects-relation-create",
+        "projects-relations"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/ProjectWorkspacePanel.jsx",
+        "src/components/ProjectStructurePanel.jsx",
+        "src/components/ProjectRelationGraphPanel.jsx"
+      ],
+      "jsxControlPositions": 30,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/ProjectRelationSuggestionsPanel.jsx",
+      "bytes": 11185,
+      "sha256": "b58f7786a2a87859602889ff26d1895e750c65e88166ad6809e38f892bda441b",
+      "blob": "1dc5dec64d76dd8c62586711cfee902beb671a21",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "projects-relation-suggestions"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/ProjectWorkspacePanel.jsx",
+        "src/components/ProjectStructurePanel.jsx",
+        "src/components/ProjectRelationGraphPanel.jsx",
+        "src/components/ProjectRelationSuggestionsPanel.jsx"
+      ],
+      "jsxControlPositions": 8,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/ProjectSprintPanel.jsx",
+      "bytes": 14668,
+      "sha256": "5da1f18d61411c7372559c253e9d25b5803e34ff93c1912c5b5829ffdf6ab4ba",
+      "blob": "ef583cd041d36d421ae50cdf59df9fadb331a0ed",
+      "classification": "planned-nested-controls",
+      "reason": "Production controls are rendered within the declared actual route. Scope is the listed route states; unvisited conditional child panels remain explicit gaps below.",
+      "routeIds": [
+        "projects-today"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/ProjectWorkspacePanel.jsx",
+        "src/components/ProjectSprintPanel.jsx"
+      ],
+      "jsxControlPositions": 10,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/ProjectStructurePanel.jsx",
+      "bytes": 37241,
+      "sha256": "5633d4fec4196d38d49a73317520731e35801978268d01a70d48c135c9418753",
+      "blob": "73201073b79ed95944c05a749b4a845bb9cec96b",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "projects-structure",
+        "projects-storylines"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/ProjectWorkspacePanel.jsx",
+        "src/components/ProjectStructurePanel.jsx"
+      ],
+      "jsxControlPositions": 27,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/ProjectTodayCenter.jsx",
+      "bytes": 7963,
+      "sha256": "2529f8de768af3923adebfb4a11ae05608bf64d5025fd55228ed00facd67d0b8",
+      "blob": "6b10c449d6173c737fd5b0022d1b5afe89792632",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "projects-today"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/ProjectWorkspacePanel.jsx",
+        "src/components/ProjectTodayCenter.jsx"
+      ],
+      "jsxControlPositions": 10,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/ProjectWorkspacePanel.jsx",
+      "bytes": 96828,
+      "sha256": "b8d8a04f4585bdef14a503b32d7cf85714dd54bb8eb9cb04213080f0ad326643",
+      "blob": "76aafed2084cb51d1d387928128e227348340db0",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "projects-picker",
+        "projects-board"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/ProjectWorkspacePanel.jsx"
+      ],
+      "jsxControlPositions": 72,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/QuickSwitcher.jsx",
+      "bytes": 14587,
+      "sha256": "8065d8b43c6672dabcf0efb3190026fbdf4899f94cf64c79c740698e701a97b5",
+      "blob": "14694f875b542465ee39838fc43dc50dda90995b",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "nav-quick-switcher"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/QuickSwitcher.jsx"
+      ],
+      "jsxControlPositions": 6,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/RecentNotesPanel.jsx",
+      "bytes": 9955,
+      "sha256": "ea8fb433bd7d5d65a607e6d11acd84ec72f21e231bc72d56a7508e786428e834",
+      "blob": "0f94d7399a9422ae8c16370b9614d8742e02c93d",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "nav-recent"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/RecentNotesPanel.jsx"
+      ],
+      "jsxControlPositions": 13,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/ReferenceHealthPanel.jsx",
+      "bytes": 7852,
+      "sha256": "a5f75c08cc1fe5421810b5d55bdfa43c0cad7d615aa306dedca1f4aabdec8b9f",
+      "blob": "b9a995f8bc89f4da367d3234eb4fa7833f424d58",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "editor-reference-health"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/InspectorPanel.jsx",
+        "src/components/ReferenceHealthPanel.jsx"
+      ],
+      "jsxControlPositions": 2,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/ReferenceMaintenanceStatus.jsx",
+      "bytes": 2501,
+      "sha256": "6004f21e103e333c7ee90b9871ba4b2a7efc123631b64a1c9f36cea75b567ba6",
+      "blob": "45d276db2d10874258a51217f298e0cdf68c47e8",
+      "classification": "guard-only-widget",
+      "reason": "Only mounts for pending or failed background reference maintenance. Existing reference-maintenance/save regressions are separate; no healthy route is re-labelled as this widget.",
+      "routeIds": [],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/ReferenceMaintenanceStatus.jsx"
+      ],
+      "jsxControlPositions": 1,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/ReferenceRefactorDialog.jsx",
+      "bytes": 8422,
+      "sha256": "646f87738aa3d2154f17afd6c72c91aeaa24602cc29419dee05288d86024ecd8",
+      "blob": "fa568d7d290b018d2d50a3c2b9d799b8c9dffcff",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "nav-reference-refactor"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/ReferenceRefactorDialog.jsx"
+      ],
+      "jsxControlPositions": 4,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/ResearchTasksPanel.jsx",
+      "bytes": 10056,
+      "sha256": "c5e08ed2429d0386c42eb7657fea755228fc369ddfd8d241b101c7cb0c48997a",
+      "blob": "8a55fea0ec472780085551727880653ef8229fcd",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "research-tasks"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/GlobalSearchPanel.jsx",
+        "src/components/ResearchTasksPanel.jsx"
+      ],
+      "jsxControlPositions": 9,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/S3LocalOverviewComparison.jsx",
+      "bytes": 7495,
+      "sha256": "2280da2cbabc219c98f5fb47c4aa9647b2cb90d391622753724c529421f8953e",
+      "blob": "77e2bd064bfd03ae4e27307b002ee7cc0f18f0f3",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "offline-inventory-comparison",
+        "offline-inventory-export"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/SettingsPanel.jsx",
+        "src/components/S3LocalOverviewPanel.jsx",
+        "src/components/S3LocalOverviewFile.jsx",
+        "src/components/S3LocalOverviewComparison.jsx"
+      ],
+      "jsxControlPositions": 6,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/S3LocalOverviewFile.jsx",
+      "bytes": 6084,
+      "sha256": "19cc912260e0b941b517f00c5b33411013521cf97b41aa5f7bd9094568c20635",
+      "blob": "677f2c36e328b2fb29c8672c2020c09b5be1b57a",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "offline-inventory-file",
+        "s3-overview"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/SettingsPanel.jsx",
+        "src/components/S3LocalOverviewPanel.jsx",
+        "src/components/S3LocalOverviewFile.jsx"
+      ],
+      "jsxControlPositions": 2,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/S3LocalOverviewPanel.jsx",
+      "bytes": 5105,
+      "sha256": "9aaff6a70bb0c3a9db527dab83598081226f1464c7a84bbd9fe4c3a512ad3d48",
+      "blob": "ad39256e8cd82ad892df88f04fe1bda1102fe675",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "s3-overview"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/SettingsPanel.jsx",
+        "src/components/S3LocalOverviewPanel.jsx"
+      ],
+      "jsxControlPositions": 2,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/S3LocalOverviewReport.jsx",
+      "bytes": 3050,
+      "sha256": "c43e6de8ba2a7704d084056308b3f598a50eb69d219b7c5587188df5101c70fe",
+      "blob": "187538ca614e22b5eec164b948f19a6dee93883f",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "local-inventory-report",
+        "s3-overview"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/SettingsPanel.jsx",
+        "src/components/S3LocalOverviewPanel.jsx",
+        "src/components/S3LocalOverviewReport.jsx"
+      ],
+      "jsxControlPositions": 2,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/S3OfflinePairExport.jsx",
+      "bytes": 1792,
+      "sha256": "a533105de8e29a2654040cea2a0fada130d9b7a3dbe2922883b08568ad2aa2a3",
+      "blob": "f9bbed3df6f50cc2bc490d7e4d3e31963f861683",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "offline-report-export"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/SettingsPanel.jsx",
+        "src/components/S3LocalOverviewPanel.jsx",
+        "src/components/S3OfflineReportPair.jsx",
+        "src/components/S3OfflinePairExport.jsx"
+      ],
+      "jsxControlPositions": 1,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/S3OfflineReportPair.jsx",
+      "bytes": 18257,
+      "sha256": "801ad8319115281a22da8c827c1a45bfa694445a517f165ba773cc29d90751bd",
+      "blob": "1e026c3b897821986e2851db2213ddf0eee1720b",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "offline-report-pair"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/SettingsPanel.jsx",
+        "src/components/S3LocalOverviewPanel.jsx",
+        "src/components/S3OfflineReportPair.jsx"
+      ],
+      "jsxControlPositions": 13,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/S3PreviewPanel.jsx",
+      "bytes": 5225,
+      "sha256": "2b2d2bd60b2d79b3bb74bdb1c851f802d3b1bcc8bc723fa2f1edaae7e7c4a217",
+      "blob": "646ac77bfdc2ef6f8623229a20a9745360cab6ee",
+      "classification": "not-reachable-from-production-entry",
+      "reason": "No static or lazy import path from src/main.jsx in the complete current Git-tracked production source graph; no native page visit is claimed.",
+      "routeIds": [],
+      "importPath": [],
+      "jsxControlPositions": 0,
+      "createElementPositions": 2,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/S3ReadInspectionPanel.js",
+      "bytes": 12028,
+      "sha256": "f29e533700d99123d85be4bf4dd671be614c41c7270eb92151ea1666804bb3b4",
+      "blob": "28e64316b1d4fe3449fc60f09803a102d2f4b92b",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "s3-read"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/SettingsPanel.jsx",
+        "src/components/S3ReadInspectionPanel.js"
+      ],
+      "jsxControlPositions": 0,
+      "createElementPositions": 7,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/SearchCollectionsPanel.jsx",
+      "bytes": 10770,
+      "sha256": "8b8c2aeb9d9059477e1a9e6bac6e64bd12d089af55522931e85ceee8ba3674e2",
+      "blob": "759fc0204f0d0f1f4341f4afe02706536fcf665d",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "research-collections"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/GlobalSearchPanel.jsx",
+        "src/components/SearchCollectionsPanel.jsx"
+      ],
+      "jsxControlPositions": 18,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/SearchPresetTransfer.jsx",
+      "bytes": 4082,
+      "sha256": "b3e68a207aca93317eb028d55f0ea85c64dd0b8dac79f309786fa05d959f2872",
+      "blob": "fd7c53c2c507852046a3c34664f40193d0f6ac4f",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "research-preset-transfer"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/GlobalSearchPanel.jsx",
+        "src/components/SearchPresetsPanel.jsx",
+        "src/components/SearchPresetTransfer.jsx"
+      ],
+      "jsxControlPositions": 4,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/SearchPresetsPanel.jsx",
+      "bytes": 4382,
+      "sha256": "6cd6a29be488845749f872ac3be48f338534c6dbaadeb30fca393b99cc5cf96e",
+      "blob": "77189a15c4509624e38070555c27ade4011487db",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "research-presets"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/GlobalSearchPanel.jsx",
+        "src/components/SearchPresetsPanel.jsx"
+      ],
+      "jsxControlPositions": 8,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/SearchResultExportPanel.jsx",
+      "bytes": 3886,
+      "sha256": "0f8d451d4a7823d9f1a77253b1eee0e2537bfeee1078c40565987ad8ba36beb5",
+      "blob": "0bb84ef61bc12eee7aaebb821c02cf29535c725a",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "research-export"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/GlobalSearchPanel.jsx",
+        "src/components/SearchResultExportPanel.jsx"
+      ],
+      "jsxControlPositions": 11,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/SearchReturnBar.jsx",
+      "bytes": 976,
+      "sha256": "1b578459cfada5766e7203871dba1519662f2d357b5f607cc3792f8ecfdba050",
+      "blob": "6ead81d55ad18fae323cbfdd3c2b50d322f04f44",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "research-return"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/SearchReturnBar.jsx"
+      ],
+      "jsxControlPositions": 2,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/SettingsPanel.jsx",
+      "bytes": 18091,
+      "sha256": "84a32c9c3b0a32747ccd3161cacffc63a314b282114613217b4fafaa383e6010",
+      "blob": "ff8fee4771dc07bdff37ec5f551ed630e3997378",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "settings-main"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/SettingsPanel.jsx"
+      ],
+      "jsxControlPositions": 20,
+      "createElementPositions": 0,
+      "programmaticCandidates": 1
+    },
+    {
+      "file": "src/components/ShortcutsModal.jsx",
+      "bytes": 23283,
+      "sha256": "734778d80d4999c17a210cb94fcdf4e30b623a38698e41d22716ffb9e5a22096",
+      "blob": "04cf0fb820a5bed5b18d22b04dd68d1229fcd47b",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "nav-shortcuts"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/ShortcutsModal.jsx"
+      ],
+      "jsxControlPositions": 18,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/StudyCompilationPanel.jsx",
+      "bytes": 9447,
+      "sha256": "03d2a257c2e0fbd69a341db3023af5204f0a5dc500822e759f24e3226e7d0975",
+      "blob": "24c64d2a63d36e5c138819d7ecf469e1a0fd6ea7",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "research-compilation"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/GlobalSearchPanel.jsx",
+        "src/components/CollectionStudyHub.jsx",
+        "src/components/StudyCompilationPanel.jsx"
+      ],
+      "jsxControlPositions": 9,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/SyncActivityPanel.jsx",
+      "bytes": 6189,
+      "sha256": "acae220adb4f6a98a4369d60415ceeb117d05f5d9e85f32b8c421ea738dddef4",
+      "blob": "d6f402fe5a2ee72190bd68fa9710f55d43a83bbd",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "local-sync-activity",
+        "sync-presentation"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/SettingsPanel.jsx",
+        "src/components/SyncCenterPanel.jsx",
+        "src/components/SyncActivityPanel.jsx"
+      ],
+      "jsxControlPositions": 2,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/SyncCenterPanel.jsx",
+      "bytes": 25620,
+      "sha256": "6800f61d8f1d5a0a30fcd0c8c0a6633d9a28e1ccd48b81cad5944846eaf94bec",
+      "blob": "5d064a7e0a5bdce8dafad02927a549c261a7cb32",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "sync-presentation"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/SettingsPanel.jsx",
+        "src/components/SyncCenterPanel.jsx"
+      ],
+      "jsxControlPositions": 16,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/SyncConflictDiff.jsx",
+      "bytes": 5002,
+      "sha256": "fd21f60a72908e5d717148903ef7b81452b1de90c9e52cedd0755f7ea61c67ef",
+      "blob": "d0c646d423af22e3de7c8481f19b34dac46a55d8",
+      "classification": "active-route-gap",
+      "reason": "Production import path exists, but no currently authored route declares this active control source. It must be assigned a genuine entry or reviewed special boundary before aggregate completion.",
+      "routeIds": [],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/SettingsPanel.jsx",
+        "src/components/SyncCenterPanel.jsx",
+        "src/components/SyncConflictQueue.jsx",
+        "src/components/SyncConflictReview.jsx",
+        "src/components/SyncConflictDiff.jsx"
+      ],
+      "jsxControlPositions": 5,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0,
+      "existingFunctionalDrivers": [
+        {
+          "file": "scripts/check-sync-conflict-diff-render.cjs",
+          "present": true,
+          "scope": "isolated native component fixture; not an actual App page visit or complete six-scene matrix"
+        }
+      ]
+    },
+    {
+      "file": "src/components/SyncConflictHistoryPanel.jsx",
+      "bytes": 13009,
+      "sha256": "e57188297dd8b8ec497f3b8517b5aed3a438a782f030726a554aecbf5d0980a5",
+      "blob": "f49785bb2a8713766a416c2cda1ca419dc07f805",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "local-sync-history"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/SettingsPanel.jsx",
+        "src/components/SyncCenterPanel.jsx",
+        "src/components/SyncOverviewPanel.jsx",
+        "src/components/SyncConflictHistoryPanel.jsx"
+      ],
+      "jsxControlPositions": 8,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/SyncConflictQueue.jsx",
+      "bytes": 7916,
+      "sha256": "a4e34105956050c058b199bf2215adc7f229064795394d761e212cb1c2c6d7a6",
+      "blob": "cd00bd42c46fdd580d9db06e2cb79cab2e75d327",
+      "classification": "active-route-gap",
+      "reason": "Production import path exists, but no currently authored route declares this active control source. It must be assigned a genuine entry or reviewed special boundary before aggregate completion.",
+      "routeIds": [],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/SettingsPanel.jsx",
+        "src/components/SyncCenterPanel.jsx",
+        "src/components/SyncConflictQueue.jsx"
+      ],
+      "jsxControlPositions": 9,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0,
+      "existingFunctionalDrivers": [
+        {
+          "file": "scripts/check-sync-conflict-queue-render.cjs",
+          "present": true,
+          "scope": "isolated native component fixture; not an actual App page visit or complete six-scene matrix"
+        }
+      ]
+    },
+    {
+      "file": "src/components/SyncConflictReview.jsx",
+      "bytes": 9118,
+      "sha256": "b41b69b3f2f2e0cb7998112e993b08a5065c55cefad5c3ebde77835117aea151",
+      "blob": "ec9082720c96609b85de5016d19c814669073d7b",
+      "classification": "active-route-gap",
+      "reason": "Production import path exists, but no currently authored route declares this active control source. It must be assigned a genuine entry or reviewed special boundary before aggregate completion.",
+      "routeIds": [],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/SettingsPanel.jsx",
+        "src/components/SyncCenterPanel.jsx",
+        "src/components/SyncConflictQueue.jsx",
+        "src/components/SyncConflictReview.jsx"
+      ],
+      "jsxControlPositions": 10,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/SyncDiagnosticPanel.jsx",
+      "bytes": 3745,
+      "sha256": "8cfdf095ce0731de819010c25ad95df2b0c079ad67a3cf6b81bb9aa5053badb8",
+      "blob": "b0d07f4090943b904629e33805fe4e81519843c9",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "local-sync-diagnostic",
+        "settings-main",
+        "sync-presentation"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/SettingsPanel.jsx",
+        "src/components/SyncCenterPanel.jsx",
+        "src/components/SyncDiagnosticPanel.jsx"
+      ],
+      "jsxControlPositions": 5,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/SyncHistoryExport.jsx",
+      "bytes": 3076,
+      "sha256": "3f9642ee17dd13a747ca2e35e2a3fdd041e71c492898806c751ba09b7c3ebd4f",
+      "blob": "fa909b5fc989b54b7a85e7e43687312cd159f547",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "local-sync-history-export"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/SettingsPanel.jsx",
+        "src/components/SyncCenterPanel.jsx",
+        "src/components/SyncOverviewPanel.jsx",
+        "src/components/SyncConflictHistoryPanel.jsx",
+        "src/components/SyncHistoryExport.jsx"
+      ],
+      "jsxControlPositions": 1,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/SyncHistoryFileIdentifiers.jsx",
+      "bytes": 1967,
+      "sha256": "01c68590c2b0fa4712b1028dc959ae4d21f8449f7087bf3839fc15e36a3712df",
+      "blob": "8bf20a0c1f4da88ebd35d562c5227930f452336d",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "offline-history-identifiers"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/SettingsPanel.jsx",
+        "src/components/SyncCenterPanel.jsx",
+        "src/components/SyncOverviewPanel.jsx",
+        "src/components/SyncHistoryFileViewer.jsx",
+        "src/components/SyncHistoryFileIdentifiers.jsx"
+      ],
+      "jsxControlPositions": 2,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/SyncHistoryFilePagination.jsx",
+      "bytes": 3647,
+      "sha256": "606e8f233ae99e2e8a74017fbb8c7e41dc3b3b12a8aad8a9f226624eb9742783",
+      "blob": "3cb267fd0398ec931564f040143723c74e3722ce",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "offline-history-pagination"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/SettingsPanel.jsx",
+        "src/components/SyncCenterPanel.jsx",
+        "src/components/SyncOverviewPanel.jsx",
+        "src/components/SyncHistoryFileViewer.jsx",
+        "src/components/SyncHistoryFilePagination.jsx"
+      ],
+      "jsxControlPositions": 6,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/SyncHistoryFileViewer.jsx",
+      "bytes": 18211,
+      "sha256": "201c746abc6366ec714a2e067a1c69cd9857a18e38e88d1d0beae8d5cf3afec9",
+      "blob": "490fe3cfd039ca42ab96d4abe9700d8ee1093bdd",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "offline-history-file"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/SettingsPanel.jsx",
+        "src/components/SyncCenterPanel.jsx",
+        "src/components/SyncOverviewPanel.jsx",
+        "src/components/SyncHistoryFileViewer.jsx"
+      ],
+      "jsxControlPositions": 15,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/SyncHistoryTimeFilter.jsx",
+      "bytes": 4387,
+      "sha256": "1df5d4bc86be85562e836de63d987a0181b7be75b204bc3248abce96ba8c891c",
+      "blob": "c00697273d154e43d3301f030b7fea8bf76c8af5",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "offline-history-dates"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/SettingsPanel.jsx",
+        "src/components/SyncCenterPanel.jsx",
+        "src/components/SyncOverviewPanel.jsx",
+        "src/components/SyncConflictHistoryPanel.jsx",
+        "src/components/SyncHistoryTimeFilter.jsx"
+      ],
+      "jsxControlPositions": 4,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/SyncOverviewPanel.jsx",
+      "bytes": 4224,
+      "sha256": "0929bb425efc289f8ce62217f1aaa2430e15dbf65c57d226c0fe5fab4c5fcd4a",
+      "blob": "e66b199ecf869b8cacadfdaecf36859a830e5848",
+      "classification": "planned-nested-controls",
+      "reason": "Production controls are rendered within the declared actual route. Scope is the listed route states; unvisited conditional child panels remain explicit gaps below.",
+      "routeIds": [
+        "sync-presentation"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/SettingsPanel.jsx",
+        "src/components/SyncCenterPanel.jsx",
+        "src/components/SyncOverviewPanel.jsx"
+      ],
+      "jsxControlPositions": 4,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/SyncOverviewTimes.jsx",
+      "bytes": 7513,
+      "sha256": "67013dfb11922cf28e9e7bc6112bcafa89d9167968f9b06e159674f03f83827f",
+      "blob": "c0304ae905d85eb4e946eb80ffb6bd390be6b0d3",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "local-sync-clock"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/SettingsPanel.jsx",
+        "src/components/SyncCenterPanel.jsx",
+        "src/components/SyncOverviewPanel.jsx",
+        "src/components/SyncOverviewTimes.jsx"
+      ],
+      "jsxControlPositions": 5,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/SyncPlanPanel.jsx",
+      "bytes": 5046,
+      "sha256": "c4d5ab9a454f8bdd4c52f10d0e647cb46eb45db66bfd9b6a0906551db4b6c3a1",
+      "blob": "e15384040d7ce495a74159e5b7bb9127fbeafa13",
+      "classification": "active-route-gap",
+      "reason": "Production import path exists, but no currently authored route declares this active control source. It must be assigned a genuine entry or reviewed special boundary before aggregate completion.",
+      "routeIds": [],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/SettingsPanel.jsx",
+        "src/components/SyncCenterPanel.jsx",
+        "src/components/SyncPlanPanel.jsx"
+      ],
+      "jsxControlPositions": 5,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/TagSelector.jsx",
+      "bytes": 10684,
+      "sha256": "86fede818fe877039f203facc58618f8e62e674b3933912d3499a67bd1829eeb",
+      "blob": "1d7272ffaefaadb58ac83f1ad2e575ad9f0243e0",
+      "classification": "planned-nested-controls",
+      "reason": "Production controls are rendered within the declared actual route. Scope is the listed route states; unvisited conditional child panels remain explicit gaps below.",
+      "routeIds": [
+        "editor-properties"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/InspectorPanel.jsx",
+        "src/components/TagSelector.jsx"
+      ],
+      "jsxControlPositions": 10,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/TagWorkspace.jsx",
+      "bytes": 21182,
+      "sha256": "39db42084b498795aafd0574ce58cba582e6f4dec7cbe9d9fba11104eb2533d7",
+      "blob": "f3e8d9e23d6883e4703b74523eff10deb07ef042",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "tags"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/SettingsPanel.jsx",
+        "src/components/TagWorkspace.jsx"
+      ],
+      "jsxControlPositions": 22,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/TaskCenter.jsx",
+      "bytes": 13083,
+      "sha256": "97bc189562199d3c194ad0f8e0d727830a7f931654597f891350456d68ca1c00",
+      "blob": "8957bbe6f19c630d1d4e420eeed120dbb85d2f1d",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "tasks"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/SettingsPanel.jsx",
+        "src/components/TaskCenter.jsx"
+      ],
+      "jsxControlPositions": 16,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/TemplateLibrary.jsx",
+      "bytes": 19312,
+      "sha256": "79fe52c63a3e742651020476ed2e0a9e11478d99e1a1b2100976fcf817abbfd8",
+      "blob": "ddbdb0fc67292f243fa1b770681281d74aad5e7d",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "nav-template-library"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/FileList.jsx",
+        "src/components/TemplateSelector.jsx",
+        "src/components/TemplateLibrary.jsx"
+      ],
+      "jsxControlPositions": 21,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0,
+      "existingFunctionalDrivers": [
+        {
+          "file": "scripts/check-template-library-desktop.mjs",
+          "present": true,
+          "scope": "existing real-App functional/native entry; current immutable report must be validated separately; not a complete six-scene matrix"
+        }
+      ]
+    },
+    {
+      "file": "src/components/TemplateSelector.jsx",
+      "bytes": 5800,
+      "sha256": "7606b4bc9a7cd763f46f42cb33762826c8a9eff9662c29a9b6c5a4a6624765de",
+      "blob": "505a691f58d4389689ab3c6b3f7e1579ebf2ac1a",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "nav-template-picker"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/FileList.jsx",
+        "src/components/TemplateSelector.jsx"
+      ],
+      "jsxControlPositions": 3,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/TextEditor.jsx",
+      "bytes": 42701,
+      "sha256": "403e77f72a20a40ea42e350fea3f34e3bd4c86957869e119327f9a1cefac4e9a",
+      "blob": "57d4cf575192292ca2cdfd0fa1623ac6070efeac",
+      "classification": "planned-nested-controls",
+      "reason": "Production controls are rendered within the declared actual route. Scope is the listed route states; unvisited conditional child panels remain explicit gaps below.",
+      "routeIds": [
+        "editor-toolbar",
+        "editor-source"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/TextEditor.jsx"
+      ],
+      "jsxControlPositions": 8,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/ThemeToggle.jsx",
+      "bytes": 3185,
+      "sha256": "682a1dd9a1f07ad65004123002e5b6d22f0db9b117221c0784c11a493274331c",
+      "blob": "b59192666ccf9c4f86476faecfe9115e49fb48d1",
+      "classification": "planned-nested-controls",
+      "reason": "Production controls are rendered within the declared actual route. Scope is the listed route states; unvisited conditional child panels remain explicit gaps below.",
+      "routeIds": [
+        "settings-main"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/WorkspaceSidebar.jsx",
+        "src/components/ThemeToggle.jsx"
+      ],
+      "jsxControlPositions": 1,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/TrashRecovery.jsx",
+      "bytes": 18516,
+      "sha256": "24c3035a4e1bea78b09aa9d8e0eeaad65918d0cb85a00b9ffa5af1024a3daa57",
+      "blob": "7a3a6c7272972549dcf845ba99eebe260eb2abe5",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "trash-recovery"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/SettingsPanel.jsx",
+        "src/components/TrashRecovery.jsx"
+      ],
+      "jsxControlPositions": 21,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/TrashWorkspacePanel.jsx",
+      "bytes": 21628,
+      "sha256": "440f3d59f2e7343a6e41b20e2bebb790131c436baa1024ed15616804ce2b41da",
+      "blob": "1d6eecbeefbbbf4f66817ba7aa72e92162575053",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "nav-trash",
+        "nav-trash-confirm"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/TrashPanel.jsx",
+        "src/components/TrashWorkspacePanel.jsx"
+      ],
+      "jsxControlPositions": 28,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/VersionHistory.jsx",
+      "bytes": 12878,
+      "sha256": "164099bdea5545b75a3a4ee5eb1bc75f995f1cedf31a7cd381d9f5a12a1929b3",
+      "blob": "7d8a74544e19c2b19138edb218eac01ce36d87fc",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "editor-history"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/InspectorPanel.jsx",
+        "src/components/VersionHistory.jsx"
+      ],
+      "jsxControlPositions": 10,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/WikiNavigationStatus.jsx",
+      "bytes": 1261,
+      "sha256": "62f92019d5c61fa55fe2ebef9a6126f71463c6c3878a031b66022f27f4bf169d",
+      "blob": "4fe77fe3aa0e9d713d53d59f9c0524e4284f5ad3",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "editor-wiki-navigation"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/WikiNavigationStatus.jsx"
+      ],
+      "jsxControlPositions": 4,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0,
+      "existingFunctionalDrivers": [
+        {
+          "file": "scripts/check-wiki-navigation-desktop.mjs",
+          "present": true,
+          "scope": "existing real-App functional/native entry; current immutable report must be validated separately; not a complete six-scene matrix"
+        }
+      ]
+    },
+    {
+      "file": "src/components/WorkspacePackagePanel.jsx",
+      "bytes": 11380,
+      "sha256": "3eb662d0b8d9cd4b4e661921de78e905d2d6475884dbfbc4a3e49466624b4862",
+      "blob": "8186773fbce80aec471ea2c1431e7c888b8b133c",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "nav-workspace-package"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/BackupPanel.jsx",
+        "src/components/WorkspacePackagePanel.jsx"
+      ],
+      "jsxControlPositions": 6,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/WorkspaceSidebar.jsx",
+      "bytes": 7883,
+      "sha256": "891b2ba5d5a048dfbb071ca4b55aa31fac924239e4011fe09f110697940f71b6",
+      "blob": "be8d8f0c3206ad50d885225809ded79637995cd7",
+      "classification": "planned-actual-route",
+      "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
+      "routeIds": [
+        "nav-sidebar",
+        "nav-more-menu"
+      ],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/WorkspaceSidebar.jsx"
+      ],
+      "jsxControlPositions": 12,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/components/ui/ControlKit.jsx",
+      "bytes": 20751,
+      "sha256": "cb792b7da860b0c1040469f1f618351a5bce8bae451633c282c83620edd55d4c",
+      "blob": "e13ff259d903008564af654f6a2a52462ea3779e",
+      "classification": "shared-or-browser-semantic-helper",
+      "reason": "Shared adapter implementation and form/validation semantics; source-bound native control fixture verifies six scenes separately. It is not an application page.",
+      "routeIds": [],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/ui/ControlKit.jsx"
+      ],
+      "jsxControlPositions": 8,
+      "createElementPositions": 0,
+      "programmaticCandidates": 0
+    },
+    {
+      "file": "src/services/documentOutline.mjs",
+      "bytes": 6140,
+      "sha256": "3e535f2afa0a3ce03203e2116c7c11c7c42e5282a162272c9c14a2cc8a3daae9",
+      "blob": "38fd3642914f2e7ad963647ff154bd69afe6ee65",
+      "classification": "shared-or-browser-semantic-helper",
+      "reason": "Temporary clipboard textarea fallback is an editor/browser semantic helper, not a navigable application page.",
+      "routeIds": [],
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/TextEditor.jsx",
+        "src/components/Editor/Editor.jsx",
+        "src/components/Editor/plugins/DocumentOutlinePlugin.jsx",
+        "src/services/documentOutline.mjs"
+      ],
+      "jsxControlPositions": 0,
+      "createElementPositions": 0,
+      "programmaticCandidates": 1
+    }
+  ],
+  "openCoverage": [
+    {
+      "source": "src/components/Editor/plugins/BlockHandlePlugin.jsx",
+      "kind": "unassigned-active-entry",
+      "reason": "Production import path exists, but no currently authored route declares this active control source. It must be assigned a genuine entry or reviewed special boundary before aggregate completion.",
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/TextEditor.jsx",
+        "src/components/Editor/Editor.jsx",
+        "src/components/Editor/plugins/BlockHandlePlugin.jsx"
+      ],
+      "existingFunctionalDrivers": []
+    },
+    {
+      "source": "src/components/Editor/plugins/TableColumnResizePlugin.jsx",
+      "kind": "unassigned-active-entry",
+      "reason": "Production import path exists, but no currently authored route declares this active control source. It must be assigned a genuine entry or reviewed special boundary before aggregate completion.",
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/TextEditor.jsx",
+        "src/components/Editor/Editor.jsx",
+        "src/components/Editor/plugins/TableColumnResizePlugin.jsx"
+      ],
+      "existingFunctionalDrivers": []
+    },
+    {
+      "source": "src/components/Editor/plugins/TableReorderPlugin.jsx",
+      "kind": "unassigned-active-entry",
+      "reason": "Production import path exists, but no currently authored route declares this active control source. It must be assigned a genuine entry or reviewed special boundary before aggregate completion.",
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/TextEditor.jsx",
+        "src/components/Editor/Editor.jsx",
+        "src/components/Editor/plugins/TableReorderPlugin.jsx"
+      ],
+      "existingFunctionalDrivers": []
+    },
+    {
+      "source": "src/components/Editor/plugins/TableSelectionPlugin.jsx",
+      "kind": "unassigned-active-entry",
+      "reason": "Production import path exists, but no currently authored route declares this active control source. It must be assigned a genuine entry or reviewed special boundary before aggregate completion.",
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/TextEditor.jsx",
+        "src/components/Editor/Editor.jsx",
+        "src/components/Editor/plugins/TableSelectionPlugin.jsx"
+      ],
+      "existingFunctionalDrivers": []
+    },
+    {
+      "source": "src/components/Editor/plugins/WikiLinkPlugin.jsx",
+      "kind": "unassigned-active-entry",
+      "reason": "Production import path exists, but no currently authored route declares this active control source. It must be assigned a genuine entry or reviewed special boundary before aggregate completion.",
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/TextEditor.jsx",
+        "src/components/Editor/Editor.jsx",
+        "src/components/Editor/plugins/WikiLinkPlugin.jsx"
+      ],
+      "existingFunctionalDrivers": []
+    },
+    {
+      "source": "src/components/SyncConflictDiff.jsx",
+      "kind": "unassigned-active-entry",
+      "reason": "Production import path exists, but no currently authored route declares this active control source. It must be assigned a genuine entry or reviewed special boundary before aggregate completion.",
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/SettingsPanel.jsx",
+        "src/components/SyncCenterPanel.jsx",
+        "src/components/SyncConflictQueue.jsx",
+        "src/components/SyncConflictReview.jsx",
+        "src/components/SyncConflictDiff.jsx"
+      ],
+      "existingFunctionalDrivers": [
+        {
+          "file": "scripts/check-sync-conflict-diff-render.cjs",
+          "present": true,
+          "scope": "isolated native component fixture; not an actual App page visit or complete six-scene matrix"
+        }
+      ]
+    },
+    {
+      "source": "src/components/SyncConflictQueue.jsx",
+      "kind": "unassigned-active-entry",
+      "reason": "Production import path exists, but no currently authored route declares this active control source. It must be assigned a genuine entry or reviewed special boundary before aggregate completion.",
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/SettingsPanel.jsx",
+        "src/components/SyncCenterPanel.jsx",
+        "src/components/SyncConflictQueue.jsx"
+      ],
+      "existingFunctionalDrivers": [
+        {
+          "file": "scripts/check-sync-conflict-queue-render.cjs",
+          "present": true,
+          "scope": "isolated native component fixture; not an actual App page visit or complete six-scene matrix"
+        }
+      ]
+    },
+    {
+      "source": "src/components/SyncConflictReview.jsx",
+      "kind": "unassigned-active-entry",
+      "reason": "Production import path exists, but no currently authored route declares this active control source. It must be assigned a genuine entry or reviewed special boundary before aggregate completion.",
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/SettingsPanel.jsx",
+        "src/components/SyncCenterPanel.jsx",
+        "src/components/SyncConflictQueue.jsx",
+        "src/components/SyncConflictReview.jsx"
+      ],
+      "existingFunctionalDrivers": []
+    },
+    {
+      "source": "src/components/SyncPlanPanel.jsx",
+      "kind": "unassigned-active-entry",
+      "reason": "Production import path exists, but no currently authored route declares this active control source. It must be assigned a genuine entry or reviewed special boundary before aggregate completion.",
+      "importPath": [
+        "src/main.jsx",
+        "src/App.jsx",
+        "src/components/SettingsPanel.jsx",
+        "src/components/SyncCenterPanel.jsx",
+        "src/components/SyncPlanPanel.jsx"
+      ],
+      "existingFunctionalDrivers": []
+    },
+    {
+      "source": "src/components/SyncOverviewPanel.jsx",
+      "routeId": "sync-presentation",
+      "kind": "conditional-entry-not-yet-authored",
+      "state": "expanded time/plan/history subpanels",
+      "reason": "Parent/default visibility is not evidence of this child state; preserve the gap until an actual route is authored."
+    }
+  ]
+}

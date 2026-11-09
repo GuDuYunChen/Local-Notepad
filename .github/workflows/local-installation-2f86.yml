@@ -61,7 +61,7 @@ jobs:
           path: .installer-input/previous
       - name: Restore unchanged old path-failure counterexample
         run: node scripts/prepare-legacy-installer.mjs
-      - name: Download source-bound 4.235.0 installer
+      - name: Download source-bound 4.249.0 installer
         uses: actions/download-artifact@v4
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -80,11 +80,135 @@ jobs:
         run: node --test scripts/reading-import-desktop-validator.node.mjs
       - name: Actual installed modules upgrade overwrite uninstall reinstall and data retention
         run: node scripts/run-reading-mode-installer.mjs run
+      # Add after the existing "Actual installed modules upgrade overwrite uninstall
+      # reinstall and data retention" step and before its existing always-upload.
+      # No original lifecycle command, pin, inverse proof or gate is replaced.
+      - name: Verify the three original UI screens in the current installed application
+        shell: pwsh
+        run: |
+          node --test scripts/ui-screens-evidence.node.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/run-ui-screens-installed.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Retain complete or failed original evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: local-notepad-install-lifecycle-${{ github.sha }}
           path: test-results/installer-lifecycle/
+          if-no-files-found: error
+          retention-days: 14
+  # Merge ONLY these additional jobs under the existing workflow's jobs mapping.
+  # The existing install-upgrade-uninstall job keeps its timeout-minutes: 20,
+  # every original step, and the separately reviewed original-three-page step.
+  # These groups begin only AFTER that job (including all 12 three-page scenes)
+  # succeeds. Each group gets a DIFFERENT hosted runner and independent data baseline.
+  full-application-ui:
+    name: Actual application UI / ${{ matrix.group }}
+    needs: install-upgrade-uninstall
+    runs-on: windows-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        group: [settings, projects, research, editor]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Verify the unchanged dependency lock
+        run: node scripts/verify-dependency-lock.mjs
+      - name: Install exact verifier dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Ensure package inputs were not modified
+        run: git diff --exit-code -- package.json package-lock.json
+      - name: Download the preceding original installed acceptance evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: local-notepad-install-lifecycle-${{ github.sha }}
+          path: .accepted-installation
+      - name: Resolve the exact existing binary and source pin
+        id: reading-pin
+        run: node scripts/pin-reading-mode-installer.mjs outputs
+      - name: Verify current and retained historical artifact identities
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/pin-reading-mode-installer.mjs verify-artifacts
+      - name: Download the exact accepted old installer for original source preparation
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ steps.reading-pin.outputs.previous-run }}
+          name: ${{ steps.reading-pin.outputs.previous-name }}
+          path: .installer-input/previous
+      - name: Download the same accepted current installer
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ steps.reading-pin.outputs.current-run }}
+          name: ${{ steps.reading-pin.outputs.current-name }}
+          path: .installer-input/current
+      - name: Reproduce the original verified serializer and lifecycle source preparation
+        shell: pwsh
+        run: |
+          node scripts/build-reading-mode-fixture.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/build-local-export-fixture.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/pin-reading-mode-installer.mjs prepare
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/run-reading-mode-installer.mjs prepare
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Refuse incomplete routes, screenshots, native bounds and cross-runner identity claims
+        run: node --test scripts/full-app-ui-evidence.node.mjs scripts/full-app-ui-shared.node.mjs
+      - name: Fresh install and actual application page matrix
+        run: node scripts/run-full-app-ui-installed.mjs ${{ matrix.group }}
+      - name: Retain successful or failed page-matrix evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-notepad-full-app-ui-${{ matrix.group }}-${{ github.sha }}
+          path: |
+            test-results/full-app-ui/${{ matrix.group }}/
+          if-no-files-found: error
+          retention-days: 14
+
+  full-application-ui-acceptance:
+    name: Validate the complete actual application matrix
+    needs: [install-upgrade-uninstall, full-application-ui]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@v4
+        with:
+          name: local-notepad-full-app-ui-settings-${{ github.sha }}
+          path: test-results/full-app-ui/settings
+      - uses: actions/download-artifact@v4
+        with:
+          name: local-notepad-full-app-ui-projects-${{ github.sha }}
+          path: test-results/full-app-ui/projects
+      - uses: actions/download-artifact@v4
+        with:
+          name: local-notepad-full-app-ui-research-${{ github.sha }}
+          path: test-results/full-app-ui/research
+      - uses: actions/download-artifact@v4
+        with:
+          name: local-notepad-full-app-ui-editor-${{ github.sha }}
+          path: test-results/full-app-ui/editor
+      - name: Require all original prerequisites, all groups, and zero unmapped pages
+        run: node scripts/full-app-ui-evidence.mjs aggregate
+      - name: Retain the aggregate receipt without replacing original artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-notepad-full-app-ui-accepted-${{ github.sha }}
+          path: test-results/full-app-ui/full-app-ui-accepted.json
           if-no-files-found: error
           retention-days: 14

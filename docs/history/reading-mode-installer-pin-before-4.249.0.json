@@ -1,0 +1,73 @@
+{
+  "product": "ed277f9c49516d29ced8dabe6fb773715cbc227c",
+  "quickBlob": "c1e8f40862b770f82af47c26a455b57efc853700",
+  "tagsBlob": "54bb56864e58e2aa3f5ed08aedb52a00de5f0769",
+  "templateBlob": "42378f13f71a03c3e91cdfdcb6dec44dbbb05f33",
+  "backlinksBlob": "1d2092c29521962556e8f69e1a44ce693a71f544",
+  "searchBlob": "260743d8676cfc4f896e5a80ad4705337f8ccbde",
+  "outlineBlob": "0b8bc518c9d34102528c75ffdbd39d53d1394c2a",
+  "graphBlob": "70014eb8fc8d94c08898d62faa49e92e547bce4e",
+  "pinsBlob": "7abf0331d1b3a7c1b626e7c2e2b5f68d6a77c588",
+  "recentBlob": "cbe5a8897c082210363357fd33f2cb0f3d7bd1cc",
+  "wikiBlob": "8cb64e31bf79c3ec2b17d5b8c152eccc0f2de6ca",
+  "importBlob": "f7001589494d6ae81b51275512ed406f6892974c",
+  "importFixtureBlob": "022e484ef96e8a2dd6b2f57601bda8af29869666",
+  "importEvidenceBlob": "6984a22dba599d4026769de34a76c0aa8e01229f",
+  "importEvidenceTestsBlob": "12ceb52310ca16bb964661f7894d76c920a47779",
+  "current": {
+    "version": "4.235.0",
+    "bytes": 104348576,
+    "sha256": "62f0909a3a31956ede44bcdc8a62828dab485b986c66e36f104639e2d1ea36cb"
+  },
+  "previous": {
+    "version": "4.232.0",
+    "bytes": 104335117,
+    "sha256": "d3a152a1e4c36eba88513cc8748cee81eb68178470cf209bb21aa98de6fd7754"
+  },
+  "previousSource": {
+    "run": 40184977753,
+    "artifact": 12596021406,
+    "name": "local-notepad-historical-4.232.0-seed",
+    "productSourceCommit": "1a8e17ba775312c359f4ac23851c8c365b57a9cb"
+  },
+  "currentSource": {
+    "run": 39996106211,
+    "artifact": 12520023127,
+    "name": "local-notepad-windows-ed277f9c49516d29ced8dabe6fb773715cbc227c",
+    "headSha": "03f5495330e2fe0d418f1727e7921e10a13f240f",
+    "branch": "feature/local-export-2f102-closure",
+    "repositoryId": 1105107817,
+    "archiveBytes": 104351631,
+    "archiveSha256": "c717b923bc4bfd7c8038a6eccb9eeb80e6c0e485a81b14a808b98a25bf04e6e3"
+  },
+  "readingDriverBlob": "6924b128c1125424c91f71dbd1ecc415762e2f77",
+  "readingFixtureBlob": "0c7ffadbb187dd33a7bc6b5aa8c69427eec5cc34",
+  "readingEvidenceBlob": "be131f7c79bdbdc1937ba892b1ce7d98704f55e1",
+  "readingBuilderBlob": "fbc7ead7bf8a6f765c00619920778b9aac1c8c8a",
+  "readingInputBlob": "b69a1d282926cb7cc40375d58feeea7970a33a4d",
+  "readingWindowSessionBlob": "5905369c693500e6b68e506bbf1dac0601922449",
+  "readingWindowTargetBlob": "a5e0f1e055fddb632723baec67ec09610e58a04d",
+  "readingWindowWorkerBlob": "95f9ced7a00787536606e4bc846bf8ceeaf5fee0",
+  "historyDriverBlob": "cca9480ce41883f1f64fc37bbc655e5f5c51582b",
+  "shortcutManagementDriverBlob": "a728dd1e03bc75eecec1aa85df5d33085066751d",
+  "shortcutManagementRunnerBlob": "0fada01b2c802b0299c2c606a0004c4657f0e1c2",
+  "shortcutManagementEvidenceBlob": "8ab05f8ece3900f26cab0130e21d0fbafd63c99b",
+  "shortcutManagementFixtureBlob": "eb49f859eb9c9b51f8c31d3354f81231c647fb87",
+  "shortcutManagementCanonicalFixtureBlob": "f86598e0d552a5d884eff9e30739617366c685c9",
+  "localExportDriverBlob": "154b4552317cedf9c0e94c3fbbebeffb6b025f1b",
+  "localExportRunnerBlob": "ffde8b2684e79327db84e64e58e7ecd5dd37edfd",
+  "localExportEvidenceBlob": "55f3a5dcd15d4cd4d55f0ea354ae78bf76dcd6a4",
+  "localExportValuesBlob": "8c2af4276b34c42e5b346b666c08adc402470672",
+  "localExportFixtureBlob": "802be649735c7ce56dab17bc15647934c036662c",
+  "localExportBuilderBlob": "20e6d532a30689ed221b2ce184b13e337f2a5a4c",
+  "localExportDirectorySessionBlob": "14c920126e12b5c8282020df55dd61119c757c25",
+  "localExportDirectoryWorkerBlob": "690929d434c14b317ef8e5cc4d6b468895d4f37c",
+  "previousArtifactMetadata": {
+    "headSha": "7280b794814eb282a1f882adf39179eb5c47b519",
+    "branch": "ci/rebuild-legacy-seed-4-232",
+    "repositoryId": 1105107817,
+    "archiveBytes": 104338160,
+    "archiveSha256": "8bdaba7b79eb81fa0c793bb56050145764ddd2da573f0f301bcf9e3ac9ec776d",
+    "productSourceSha": "1a8e17ba775312c359f4ac23851c8c365b57a9cb"
+  }
+}
