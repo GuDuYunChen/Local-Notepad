@@ -102,7 +102,8 @@ test('quit observation never reports a result, freezes the UI or changes the rea
 })
 
 test('the concurrent transport repair and the original 20-second process gates remain intact', () => {
-  const source = readFileSync(new URL('../.github/scripts/windows-in-place-upgrade.ps1', import.meta.url), 'utf8')
+  // Compare source structure using Git's line endings, including Windows CRLF checkouts.
+  const source = readFileSync(new URL('../.github/scripts/windows-in-place-upgrade.ps1', import.meta.url), 'utf8').replace(/\r\n/g, '\n')
   const historical = source.slice(source.indexOf(' }else{\n $ws=[System.Net.WebSockets.ClientWebSocket]::new()'))
   assert.ok(historical.includes('$ws.SendAsync($segment,[System.Net.WebSockets.WebSocketMessageType]::Text,$true,[Threading.CancellationToken]::None).GetAwaiter().GetResult()'))
   assert.ok(historical.indexOf('$gui.WaitForExit(20000)') < historical.indexOf('}finally{$ws.Dispose()}'))
