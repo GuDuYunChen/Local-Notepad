@@ -38,7 +38,7 @@ function verifyQueueReport(report, expectedCommit = null) {
     if (!Array.isArray(r.colors) || r.colors.length !== selectors.length || r.colors.some((c, n) =>
       c?.selector !== selectors[n] || c.finalColor !== true || !rgb(c.foreground) || !rgb(c.background) ||
       !Number.isFinite(c.ratio) || c.ratio < 4.5 ||
-      (n >= 9 && (c.actionLabel !== expectedActionLabels[n - 9] || !Number.isFinite(c.fontSize) || c.fontSize < 13)))) throw new Error('Queue render contrast evidence is incomplete: ' + name)
+      (n >= 9 && (c.actionLabel !== expectedActionLabels[n - 9] || c.enabled !== true || !Number.isFinite(c.fontSize) || c.fontSize < 13)))) throw new Error('Queue render contrast evidence is incomplete: ' + name)
   })
   return report
 }

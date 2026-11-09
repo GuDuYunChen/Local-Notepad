@@ -5,11 +5,13 @@ const path = require('node:path')
 const os = require('node:os')
 const { verifyQueueReport, verifyQueueEvidence, requireCompletedRender, scenes, selectors } = require('./run-sync-conflict-queue-render.cjs')
 const sha = 'a'.repeat(40)
+const actionLabels = ['对照版本', '采用远端', '保留本机']
 const fixture = () => ({ complete: true, platform: 'win32', syntheticRecords: true, realComponents: true,
   backendExercised: false, navigationFocus: true, nativeSearch: true, writes: 0, commit: sha,
   reports: scenes.map(([name, width, count, label]) => ({ name, ready: true, stableSamples: 3, count, label,
     bounds: [20, width - 40, 600], viewport: [width,900], imageSize: [width,900], overflow: 0, writes: 0, activeMarkup: 0,
-    colors: selectors.map(selector => ({ selector, finalColor: true, foreground: [36,34,42], background: [255,255,255], ratio: 15.7 })) })) })
+    colors: selectors.map((selector, i) => ({ selector, finalColor: true, foreground: [36,34,42], background: [255,255,255], ratio: 15.7,
+      ...(i >= 9 ? { actionLabel: actionLabels[i-9], enabled: true, fontSize: 14 } : {}) })) })) })
 function evidence(t, report = fixture()) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'queue-evidence-'))
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }))
@@ -47,6 +49,22 @@ test('missing low-contrast or not-final color probes are rejected', () => {
     const r=fixture();mutate(r.reports[0].colors[i]);assert.throws(()=>verifyQueueReport(r,sha))
   }
   const r=fixture();r.reports[0].colors.pop();assert.throws(()=>verifyQueueReport(r,sha))
+})
+test('all three actual queue action labels must stay readable, enabled and theme-owned', () => {
+  for(let index = 9; index < selectors.length; index++) {
+    for(const mutate of [
+      color => { color.actionLabel = 'wrong' },
+      color => { color.enabled = false },
+      color => { delete color.enabled },
+      color => { color.fontSize = 12 },
+      color => { color.fontSize = NaN },
+      color => { delete color.fontSize },
+    ]) {
+      const report = fixture()
+      mutate(report.reports[0].colors[index])
+      assert.throws(() => verifyQueueReport(report, sha), /contrast evidence is incomplete/)
+    }
+  }
 })
 test('a removed native Select probe cannot stand in for actual shared Select text', () => {
   const r=fixture(),probe=r.reports[0].colors.find(color=>color.selector.includes('[data-ui-control="select"]'))

@@ -49,7 +49,8 @@ function inspectQueue() {
     const a = luminance(foreground), b = luminance(background)
     ctx.clearRect(0, 0, 1, 1); paint(style.getPropertyValue(token).trim() || (token === '--on-accent' ? '#ffffff' : '')); const expected = pixel()
     colors.push({ selector, foreground, background, ratio: (Math.max(a, b) + .05) / (Math.min(a, b) + .05),
-      actionLabel: actionLabel || null, fontSize: actionLabel ? Number.parseFloat(style.fontSize) : null,
+      actionLabel: actionLabel || null, enabled: actionLabel ? !el.closest('button')?.disabled : null,
+      fontSize: actionLabel ? Number.parseFloat(style.fontSize) : null,
       finalColor: foreground.every((n, i) => n === expected[i]) })
   }
   const rect = queue.getBoundingClientRect()
