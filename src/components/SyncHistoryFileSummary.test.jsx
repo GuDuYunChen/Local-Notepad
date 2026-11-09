@@ -1,3 +1,5 @@
+import UiThemeProvider from './ui/UiThemeProvider'
+import { changeUiValue } from '~/test/uiControlDriver'
 import { setUiValue, uiQuery, uiQueryAll, uiText, uiValue } from "~/test/uiControlDriver";import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
@@ -28,7 +30,7 @@ beforeEach(async () => {
   previous = globalThis.IS_REACT_ACT_ENVIRONMENT;globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   readHistoryFile.mockReset().mockImplementation((await vi.importActual('~/services/syncHistoryFile.mjs')).readHistoryFile);
   host = document.createElement('div');document.body.append(host);root = createRoot(host);
-  await act(async () => root.render(<Viewer />));
+  await act(async () => root.render(<UiThemeProvider><Viewer /></UiThemeProvider>));
 });
 afterEach(async () => {await act(async () => root.unmount());host.remove();vi.restoreAllMocks();globalThis.IS_REACT_ACT_ENVIRONMENT = previous;});
 it('does not invent a file summary before an explicit successful read', () => {expect(c('summary')).toBeNull();expect(readHistoryFile).not.toHaveBeenCalled();});
@@ -46,8 +48,12 @@ it('an off-page match updates both dimensions and does not fabricate a missing t
   expect(uiText(s('no-time'))).toContain('全部缺失');expect(s('earliest')).toBeNull();expect(document.activeElement).toBe(c('query'));
 });
 it('combined filters remain the same intersection as the file list', async () => {
-  await open();await act(async () => {await setUiValue(c('kind'), 'tag');c('kind').dispatchEvent(new Event('change', { bubbles: true }));});
-  await act(async () => {await setUiValue(c('outcome'), 'local');c('outcome').dispatchEvent(new Event('change', { bubbles: true }));});
+  await open();await (async () => {
+  await changeUiValue(c('kind'), 'tag', ['change']);
+})();
+  await (async () => {
+  await changeUiValue(c('outcome'), 'local', ['change']);
+})();
   expect(counts('outcome')).toEqual([10, 0, 0, 0]);expect(counts('kind')).toEqual([0, 10, 0, 0]);
 });
 it('no matches produce zeros and no invented date range', async () => {
@@ -79,6 +85,6 @@ it('expanding, filtering and paging cause no network, storage writes, downloads 
   expect(uiQuery(c('summary'), 'button,input,select,a')).toBeNull();
 });
 it('invalid summary data fails without partial counts or raw private errors', async () => {
-  await act(async () => root.render(<Summary report={{ records: [{ id: 'PRIVATE_BAD' }] }} filters={{}} phase="ready" />));
+  await act(async () => root.render(<UiThemeProvider><Summary report={{ records: [{ id: 'PRIVATE_BAD' }] }} filters={{}} phase="ready" /></UiThemeProvider>));
   expect(counts('outcome')).toEqual([]);expect(uiText(s('scope'))).toContain('未生成部分统计');expect(uiText(host)).not.toContain('PRIVATE_BAD');
 });

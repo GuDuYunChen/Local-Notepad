@@ -1,3 +1,4 @@
+import { changeUiValue } from '~/test/uiControlDriver'
 import { setUiValue, uiOptions, uiQuery, uiQueryAll, uiText, uiValue } from "~/test/uiControlDriver";import React, { act, StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -14,7 +15,11 @@ const report = (files = 12, tags = 2) => ({ generatedAtUTC: '2026-10-01T00:00:00
     kinds: ['file', 'tag', 'file-tag', 'attachment'].map((kind, i) => ({ kind, records: [files, tags, 0, 0][i], record_bytes: [files * 64, tags * 64, 0, 0][i] })) } });
 const flush = async () => {for (let i = 0; i < 12; i++) await Promise.resolve();};
 const click = (selector) => act(async () => {uiQuery(host, selector).click();await flush();});
-const select = (selector, value) => act(async () => {const el = uiQuery(host, selector);await setUiValue(el, value);el.dispatchEvent(new Event('change', { bubbles: true }));await flush();});
+const select = (selector, value) => (async () => {
+  const el = uiQuery(host, selector);
+  await changeUiValue(el, value, ['change']);
+  await act(flush);
+})();
 const choose = (side, value) => act(async () => {
   const el = uiQuery(host, `[data-offline-side="${side}"] input[type=file]`);
   if (value) read.mockResolvedValueOnce(value);
@@ -76,7 +81,7 @@ it('offline order UI clear and fresh comparison never restore old sort', async (
   await setup();await select('[data-offline-order]', 'largest');await click('[data-offline-reset]');expect(uiQuery(host, '[data-offline-order]')).toBeNull();
   await setup();expect(uiValue(uiQuery(host, '[data-offline-order]'))).toBe('original');
 });
-it('offline order UI exposes native options status and absolute-value explanation', async () => {
+it('offline order UI exposes component options status and absolute-value explanation', async () => {
   await setup();const el = uiQuery(host, '[data-offline-order]');expect(uiText(el.closest('label'))).toContain('同单位差异排序');
   expect([...await uiOptions(el)].map((o) => uiValue(o))).toEqual(['original', 'largest', 'smallest']);expect(document.getElementById(el.getAttribute('aria-controls'))).not.toBeNull();
   for (const id of el.getAttribute('aria-describedby').split(' ')) expect(document.getElementById(id)).not.toBeNull();
@@ -84,13 +89,17 @@ it('offline order UI exposes native options status and absolute-value explanatio
 });
 it('offline order UI leaves summary and complete export bytes unchanged', async () => {
   await setup();const overview = uiText(uiQuery(host, '[data-offline-summary]'));
-  vi.useFakeTimers();const blobs = [];vi.stubGlobal('Blob', class {constructor(parts) {this.raw = parts.join('');}});
+  vi.useFakeTimers();const exportAt = Date.now();const blobs = [];vi.stubGlobal('Blob', class {constructor(parts) {this.raw = parts.join('');}});
   const a = Object.getOwnPropertyDescriptor(URL, 'createObjectURL'),b = Object.getOwnPropertyDescriptor(URL, 'revokeObjectURL');
   Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: vi.fn((blob) => {blobs.push(blob.raw);return 'blob:sort-test';}) });
   Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() });vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
   try {
     for (const format of ['json', 'csv', 'html']) await click(`[data-offline-export-format=${format}]`);
-    await select('[data-offline-order]', 'largest');for (const format of ['json', 'csv', 'html']) await click(`[data-offline-export-format=${format}]`);
+    await select('[data-offline-order]', 'largest');
+    // Real popup interaction advances the fake clock. Compare complete export
+    // bytes at the same generation instant, without removing timestamp fields.
+    vi.setSystemTime(exportAt);
+    for (const format of ['json', 'csv', 'html']) await click(`[data-offline-export-format=${format}]`);
     expect(blobs.slice(3)).toEqual(blobs.slice(0, 3));expect(JSON.parse(blobs[3]).metrics).toHaveLength(12);
     expect(uiText(uiQuery(host, '[data-offline-summary]'))).toBe(overview);expect(read).toHaveBeenCalledTimes(2);
     await act(async () => {vi.advanceTimersByTime(1000);await flush();});

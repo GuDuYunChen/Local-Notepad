@@ -1,3 +1,4 @@
+import { changeUiValue } from '~/test/uiControlDriver'
 import { setUiValue, uiQuery, uiQueryAll, uiText, uiValue } from "~/test/uiControlDriver";import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
@@ -12,7 +13,9 @@ const rows = () => uiQueryAll(host, '[data-history-row]');
 const feedback = () => uiText(uiQuery(host, '.sync-conflict-history-feedback'));
 async function render() {await act(async () => root.render(<Panel />));}
 async function click(node) {expect(node).toBeTruthy();await act(async () => node.click());}
-async function choose(value) {await act(async () => {setUiValue(select(), value);select().dispatchEvent(new Event('change', { bubbles: true }));});}
+async function choose(value) {await (async () => {
+  await changeUiValue(select(), value, ['change']);
+})();}
 beforeEach(() => {
   previousAct = globalThis.IS_REACT_ACT_ENVIRONMENT;globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   api.mockReset();api.mockResolvedValue(historyPage());host = document.createElement('div');document.body.append(host);root = createRoot(host);

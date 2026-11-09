@@ -42,6 +42,9 @@ jobs:
       - name: Verify install preserved manifest and lock
         run: git diff --exit-code -- package.json package-lock.json
 
+      - name: Verify real-control drivers and current upgrade identity refusals
+        run: node --test scripts/fixture-antd-node-imports.node.mjs scripts/current-upgrade-input.node.mjs scripts/native-ui-select.node.mjs scripts/ui-control-render-evidence.node.cjs
+
       - name: Build Electron main/preload
         run: npm run build:main
 
@@ -330,6 +333,28 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Verify native shared control geometry and keyboard ownership
+        id: ui_controls
+        shell: pwsh
+        run: |
+          node scripts/build-ui-control-render-fixture.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npx --no-install electron scripts/check-ui-control-render.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Upload native shared control evidence
+        # The native checker records both success and failure. A skipped checker
+        # must not add an unrelated missing-artifact error.
+        if: always() && hashFiles('test-results/ui-controls-render/checks.json') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-notepad-ui-controls-${{ github.sha }}
+          path: |
+            test-results/ui-controls-render/*.json
+            test-results/ui-controls-render/*.png
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Verify real Windows image insertion and recovery UI
         shell: pwsh
         run: |
@@ -486,6 +511,19 @@ jobs:
         with:
           name: local-notepad-in-place-upgrade-${{ github.sha }}
           path: test-results/in-place-upgrade/*
+          if-no-files-found: warn
+          retention-days: 90
+
+      - name: Verify accepted 4.248.1 to actual current package in-place upgrade
+        shell: pwsh
+        run: .\.github\scripts\windows-in-place-upgrade.ps1 -CurrentCandidate
+
+      - name: Upload current-package upgrade evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-notepad-current-in-place-upgrade-${{ github.sha }}
+          path: test-results/current-in-place-upgrade/*
           if-no-files-found: warn
           retention-days: 90
 

@@ -2,6 +2,7 @@ import React, { useEffect, useId, useRef, useState } from 'react'
 import { filterLocalActions, LOCAL_ACTION_CATEGORIES, LOCAL_ACTION_QUERY_LIMIT } from '../services/localActions.mjs'
 import './LocalActions.css'
 import { UiButton, UiInput, UiSelect } from '~/components/ui/ControlKit'
+import { selectOwnsEscape } from '~/components/ui/keyboard'
 
 
 export default function LocalActions({ open, onClose, onExecute, contextVersion }) {
@@ -46,6 +47,7 @@ export default function LocalActions({ open, onClose, onExecute, contextVersion 
     if (event.isComposing || event.nativeEvent?.isComposing || event.keyCode === 229 || composing.current || event.repeat) return
     // A nested save decision owns its input. Never dismiss it from here.
     if ([...document.querySelectorAll('[role="dialog"][aria-modal="true"]')].some(n => n !== panel.current)) return
+    if (selectOwnsEscape(event, panel.current)) return
     if ((event.ctrlKey || event.metaKey) && String(event.key).toLowerCase() === 's') { event.preventDefault(); event.stopPropagation(); return }
     if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); return }
     if (event.key === 'Tab') {

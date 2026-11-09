@@ -15,7 +15,7 @@ export function blockPinFixture(){
  pin.currentSource={run:100,artifact:200,name:'local-notepad-windows-'+product,headSha:'c'.repeat(40),branch:'feature/test',repositoryId:1105107817,archiveBytes:5000,archiveSha256:blockReferenceHash('synthetic archive')}
  const names={...LOCAL_EXPORT_INSTALLATION_SOURCES,...SHORTCUT_INSTALLATION_SOURCES,
  'check-local-import-desktop.mjs':'importBlob','local-import-desktop-evidence.mjs':'importEvidenceBlob','local-import-desktop-evidence.node.mjs':'importEvidenceTestsBlob',
- 'check-version-history-desktop.mjs':'historyDriverBlob','reading-mode-desktop-evidence.mjs':'readingEvidenceBlob'}
+ 'native-ui-select.mjs':'nativeUiSelectBlob','check-version-history-desktop.mjs':'historyDriverBlob','reading-mode-desktop-evidence.mjs':'readingEvidenceBlob'}
  for(const [file,key] of Object.entries(names))pin[key]=blockReferenceBlob(source('scripts/'+file))
  for(const key of READING_SOURCE_KEYS)if(!pin[key])throw Error('fixture key missing '+key)
  pin.blockReferenceSources=Object.fromEntries(BLOCK_REFERENCE_SOURCES.map(name=>[name,blockReferenceBlob(source(name))]))

@@ -1,3 +1,4 @@
+import { changeUiValue } from '~/test/uiControlDriver'
 import { setUiValue, uiDisabled, uiOptions, uiQuery, uiQueryAll, uiSelectedOptions, uiText, uiValue } from "~/test/uiControlDriver";import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
@@ -29,7 +30,7 @@ async function click(name, scope = host, wait = true) {
 async function fill(name, value, scope = host) {
   const input = control(name, scope);expect(input).toBeTruthy();
   const proto = input.tagName === 'SELECT' ? HTMLSelectElement.prototype : input.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
-  await act(async () => {await setUiValue(input, value);input.dispatchEvent(new Event(input.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true }));});
+  await changeUiValue(input, value, [input.tagName === 'SELECT' ? 'change' : 'input']);
 }
 async function mount(props = {}) {
   await act(async () => root.render(<React.StrictMode><ImportWorkspace onClose={onClose} onChanged={onChanged} onOpenNote={onOpenNote} {...props} /></React.StrictMode>));
@@ -152,7 +153,7 @@ test('a disappeared selected folder is a definite rejection; revision retains pr
   await mount();await choose([source('/tmp/失效目录.txt', '保留全部正文')]);await fill('destination', childId);await click('confirm');
   const oldId = uiQuery(control('workspace'), '[data-local-import-row]').getAttribute('data-local-import-request-id');
   expect(state(findRow('失效目录.txt'))).toBe('rejected');await click('revise');expect(uiText(control('preview'))).toBe('保留全部正文');expect(records()).toHaveLength(0);
-  folders = folders.filter((folder) => folder.id !== childId);await click('folders-refresh');expect(uiText(uiSelectedOptions(control('destination'))[0])).toContain('原目录已不可用');
+  folders = folders.filter((folder) => folder.id !== childId);await click('folders-refresh');expect(uiText((await uiSelectedOptions(control('destination')))[0])).toContain('原目录已不可用');
   await fill('destination', folderId);missing = false;await click('confirm');
   expect(state(findRow('失效目录.txt'))).toBe('committed');expect(writes()).toHaveLength(2);expect(writes()[1][0].endsWith(oldId)).toBe(false);
   expect(JSON.parse(writes()[1][1].body).content).toBe(JSON.parse(writes()[0][1].body).content);

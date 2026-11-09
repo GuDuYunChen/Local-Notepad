@@ -1,3 +1,4 @@
+import { fixtureAntdNodeImports } from './fixture-antd-node-imports.mjs'
 import { build } from 'esbuild'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
@@ -10,7 +11,7 @@ export async function buildReadingModeFixture() {
     // Match application path resolution without making Node load ~/ as a package.
     alias: { '~': fileURLToPath(new URL('../src', import.meta.url)) },
     metafile: true,
-    plugins: [{ name: 'fixture-no-rendered-css', setup(builder) {
+    plugins: [fixtureAntdNodeImports(), { name: 'fixture-no-rendered-css', setup(builder) {
       builder.onResolve({ filter: /\.css$/ }, () => ({ path: 'empty-style', namespace: 'fixture-style' }))
       builder.onLoad({ filter: /.*/, namespace: 'fixture-style' }, () => ({ contents: '', loader: 'js' }))
     } }],

@@ -1,3 +1,4 @@
+import { changeUiValue } from '~/test/uiControlDriver'
 import { setUiValue, uiDisabled, uiQuery, uiQueryAll, uiText, uiValue } from "~/test/uiControlDriver";import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { beforeEach, afterEach, describe, it, expect, vi } from 'vitest';
@@ -17,11 +18,12 @@ const rows = () => [...uiQueryAll(container, '[data-conflict-id]')];
 const checkbox = () => uiQuery(container, 'input[type="checkbox"]');
 async function click(node) {expect(node).toBeTruthy();await act(async () => {node.click();await flush();});}
 async function change(label, value) {
-  await act(async () => {
-    const node = field(label),proto = node.tagName === 'SELECT' ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
-    await setUiValue(node, value);
-    node.dispatchEvent(new Event('input', { bubbles: true }));node.dispatchEvent(new Event('change', { bubbles: true }));await flush();
-  });
+  await (async () => {
+  const node = field(label),
+    proto = node.tagName === 'SELECT' ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
+  await changeUiValue(node, value, ['input', 'change']);
+  await act(flush);
+})();
 }
 async function render(props = {}) {
   await act(async () => {root.render(<SyncConflictQueue conflicts={conflicts} scope={scope} onResolve={resolve} onRefresh={refresh} {...props} />);await flush();});

@@ -1,3 +1,5 @@
+import UiThemeProvider from './ui/UiThemeProvider'
+import { changeUiValue } from '~/test/uiControlDriver'
 import { setUiValue, uiQuery, uiQueryAll, uiText, uiValue } from "~/test/uiControlDriver";import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
@@ -21,7 +23,7 @@ const records = () => Array.from({ length: 61 }, (_, i) => ({
 const raw = (rows = records(), extra = {}) => prepareHistoryExport({ snapshot: { items: rows, filter: 'all', hasMore: true }, phase: 'ready', ...extra }, new Date('2026-09-30T10:00:00Z')).raw;
 const c = (key) => uiQuery(host, '[data-history-file-' + key + ']');
 const ids = () => [...uiQueryAll(host, '[data-history-file-row]')].map((n) => uiText(uiQueryAll(n, 'code')[1]));
-async function mount() {await act(async () => root.render(<Viewer />));uiQuery(host, 'details').open = true;}
+async function mount() {await act(async () => root.render(<UiThemeProvider><Viewer /></UiThemeProvider>));uiQuery(host, 'details').open = true;}
 async function select(file, wait = true) {
   await act(async () => {
     Object.defineProperty(c('input'), 'files', { configurable: true, value: file ? [file] : [] });
@@ -37,7 +39,9 @@ async function type(value, composing = false) {
   });
 }
 async function click(key) {await act(async () => c(key).click());}
-async function choose(key, value) {await act(async () => {await setUiValue(c(key), value);c(key).dispatchEvent(new Event('change', { bubbles: true }));});}
+async function choose(key, value) {await (async () => {
+  await changeUiValue(c(key), value, ['change']);
+})();}
 async function compose(typeName, value) {
   await act(async () => {
     if (value !== undefined) setUiValue(c('query'), value);
@@ -131,7 +135,7 @@ it('stopping a replacement preserves filters, rejects late results and allows fu
 });
 it('cancelled picker and parent rerender preserve current file criteria and page', async () => {
   await loaded();await type('笔记');await click('next');const input = c('query'),before = ids();
-  await select(null);await act(async () => root.render(<Viewer />));
+  await select(null);await act(async () => root.render(<UiThemeProvider><Viewer /></UiThemeProvider>));
   expect(c('query')).toBe(input);expect(ids()).toEqual(before);expect(uiValue(c('query'))).toBe('笔记');
 });
 it('a late older file cannot overwrite new file filters after a newer read succeeds', async () => {
@@ -165,7 +169,7 @@ it('the current file keeps original v2 date/source declarations while the local 
 });
 it('searching an offline file never changes live history filters, summary or export metadata', async () => {
   api.mockResolvedValue(historyPage([{ ...historyRow('live'), current_title: '本机历史' }]));
-  const navigate = vi.fn();await act(async () => root.render(<Overview {...overviewFixture()} onNavigate={navigate} />));
+  const navigate = vi.fn();await act(async () => root.render(<UiThemeProvider><Overview {...overviewFixture()} onNavigate={navigate} /></UiThemeProvider>));
   uiQuery(host, '[data-sync-conflict-history]').open = true;uiQuery(host, '[data-history-file-viewer]').open = true;
   await act(async () => uiQuery(host, '[data-history-read]').click());
   const live = uiText(uiQuery(host, '[data-sync-conflict-history]')),guidance = uiText(uiQuery(host, '[data-sync-guidance]'));

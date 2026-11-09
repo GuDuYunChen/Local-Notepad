@@ -1,3 +1,6 @@
+import { prepareUiSelectChange } from '~/test/uiControlDriver'
+import { uiOptionsText } from '~/test/uiControlDriver'
+import { changeUiValue } from '~/test/uiControlDriver'
 import { setUiValue, uiDisabled, uiQuery, uiQueryAll, uiText, uiValue } from "~/test/uiControlDriver";import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
@@ -13,12 +16,11 @@ const field = (label) => uiQuery(container, '[aria-label="' + label + '"]');
 const cards = () => [...uiQueryAll(container, '[data-conflict-id]')].map((node) => node.dataset.conflictId);
 async function render() {await act(async () => {root.render(<Queue conflicts={conflicts} scope={scope} onResolve={resolve} onRefresh={refresh} {...props} />);await flush();});}
 async function click(node) {expect(node).toBeTruthy();await act(async () => {node.click();await flush();});}
-function dispatchChange(node, value) {
-  const proto = node.tagName === 'SELECT' ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
-  setUiValue(node, value);
-  node.dispatchEvent(new Event('input', { bubbles: true }));node.dispatchEvent(new Event('change', { bubbles: true }));
-}
-async function change(label, value) {await act(async () => {const node=field(label);await setUiValue(node,value);node.dispatchEvent(new Event('input',{bubbles:true}));node.dispatchEvent(new Event('change',{bubbles:true}));await flush();});}
+async function change(label, value) {await (async () => {
+  const node = field(label);
+  await changeUiValue(node, value, ['input', 'change']);
+  await act(flush);
+})();}
 beforeEach(() => {
   actEnvironment = globalThis.IS_REACT_ACT_ENVIRONMENT;globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   container = document.createElement('div');document.body.appendChild(container);root = createRoot(container);
@@ -36,12 +38,12 @@ it('labels side-specific deletion, recycling and missing snapshots before openin
   expect(resolve).not.toHaveBeenCalled();expect(refresh).not.toHaveBeenCalled();
 });
 it('shows overlapping counts with an explicit caveat and combines all three filters', async () => {
-  await render();expect(uiText(field('冲突关注项'))).toContain('含永久删除（3）');
-  expect(uiText(field('冲突关注项'))).toContain('含回收站（2）');
+  await render();expect(await uiOptionsText(field('冲突关注项'))).toContain('含永久删除（3）');
+  expect(await uiOptionsText(field('冲突关注项'))).toContain('含回收站（2）');
   expect(uiText(container)).toContain('各类关注项可能重叠');
   await change('冲突关注项', 'permanent');await change('冲突对象类型', 'attachment');await change('搜索冲突', '资料😀');
   expect(cards()).toEqual(['attachment-conflict']);
-  expect(uiText(field('冲突关注项'))).toContain('含永久删除（3）');
+  expect(await uiOptionsText(field('冲突关注项'))).toContain('含永久删除（3）');
   expect(resolve).not.toHaveBeenCalled();expect(refresh).not.toHaveBeenCalled();
 });
 it('clears every condition together and resets page without handling a conflict', async () => {
@@ -68,7 +70,8 @@ it('pending submission blocks a same-turn risk-filter change and preserves the o
   let finish;resolve.mockImplementation(() => new Promise((r) => {finish = r;}));
   conflicts = [riskFixture()[1]];await render();await click(button('保留本机'));await click(uiQuery(container, 'input[type="checkbox"]'));
   const selector = field('冲突关注项');
-  await act(async () => {button('确认处理此冲突').click();dispatchChange(selector, 'missing');await flush();});
+  const selectOption = await prepareUiSelectChange(selector, 'missing');
+  await act(async () => {button('确认处理此冲突').click();selectOption();await flush();});
   expect(resolve).toHaveBeenCalledTimes(1);expect(uiValue(selector)).toBe('all');expect(uiDisabled(selector)).toBe(true);
   expect(cards()).toEqual(['conflict-002']);
   await act(async () => {finish(false);await flush();});
@@ -93,7 +96,7 @@ it('filtered pagination reaches the final risky record and resets on another fil
 it('refreshed metadata recomputes concern counts and cannot resurrect a missing review', async () => {
   conflicts = queueFixture(1);await render();await change('冲突关注项', 'permanent');expect(cards()).toHaveLength(0);
   conflicts = [{ ...conflicts[0], remote_record: tombstone(conflicts[0].remote_record) }];await render();
-  expect(cards()).toHaveLength(1);expect(uiText(field('冲突关注项'))).toContain('含永久删除（1）');
+  expect(cards()).toHaveLength(1);expect(await uiOptionsText(field('冲突关注项'))).toContain('含永久删除（1）');
   expect(uiQuery(container, '[aria-label="冲突版本对照"]')).toBeNull();expect(resolve).not.toHaveBeenCalled();
 });
 it('unknown lifecycle status remains non-actionable even through concern filtering', async () => {
@@ -119,8 +122,8 @@ it('inconsistent tombstone kinds enter unverified concerns rather than permanent
   conflicts = queueFixture(1);
   conflicts[0].remote_record = { ...tombstone(conflicts[0].remote_record), kind: 'tag' };
   await render();
-  expect(uiText(field('冲突关注项'))).toContain('状态待核实（1）');
-  expect(uiText(field('冲突关注项'))).toContain('含永久删除（0）');
+  expect(await uiOptionsText(field('冲突关注项'))).toContain('状态待核实（1）');
+  expect(await uiOptionsText(field('冲突关注项'))).toContain('含永久删除（0）');
   expect(uiText(uiQuery(container, '[aria-label="删除与缺失提示"]'))).toBe('远端：状态待核实');
   await change('冲突关注项', 'permanent');expect(cards()).toHaveLength(0);
   await change('冲突关注项', 'unknown');expect(cards()).toEqual(['conflict-001']);
@@ -138,7 +141,7 @@ it('a mismatched attachment name is discoverable by unverified concern and canno
 });
 it('valid exact Unicode attachment identity preserves the explicit resolver flow', async () => {
   conflicts = [attachmentIdentityFixture('unicode-attachment', '\ufeff资料😀.pdf')];
-  await render();expect(uiText(field('冲突关注项'))).toContain('状态待核实（0）');
+  await render();expect(await uiOptionsText(field('冲突关注项'))).toContain('状态待核实（0）');
   await click(button('保留本机'));expect(resolve).not.toHaveBeenCalled();
   await click(uiQuery(container, 'input[type="checkbox"]'));await click(button('确认处理此冲突'));
   expect(resolve).toHaveBeenCalledTimes(1);
@@ -150,7 +153,7 @@ it('a corrected reread updates the concern filter without selecting or resolving
   conflicts[0].local_record.attachment.name = 'wrong.pdf';
   await render();await change('冲突关注项', 'unknown');expect(cards()).toHaveLength(1);
   conflicts = good;await render();expect(cards()).toHaveLength(0);
-  expect(uiText(field('冲突关注项'))).toContain('状态待核实（0）');
+  expect(await uiOptionsText(field('冲突关注项'))).toContain('状态待核实（0）');
   await change('冲突关注项', 'all');expect(cards()).toHaveLength(1);
   expect(uiQuery(container, '[aria-label="冲突版本对照"]')).toBeNull();
   expect(resolve).not.toHaveBeenCalled();expect(refresh).not.toHaveBeenCalled();
@@ -160,10 +163,10 @@ it('an observed identity mismatch revokes an existing confirmation even when the
   await render();await click(button('保留本机'));await click(uiQuery(container, 'input[type="checkbox"]'));
   expect(uiDisabled(button('确认处理此冲突'))).toBe(false);
   conflicts = structuredClone(good);conflicts[0].local_record.attachment.name = 'wrong.pdf';await render();
-  expect(uiText(field('冲突关注项'))).toContain('状态待核实（1）');
+  expect(await uiOptionsText(field('冲突关注项'))).toContain('状态待核实（1）');
   expect(uiDisabled(button('确认处理此冲突'))).toBe(true);
   conflicts = structuredClone(good);await render();
-  expect(uiText(field('冲突关注项'))).toContain('状态待核实（0）');
+  expect(await uiOptionsText(field('冲突关注项'))).toContain('状态待核实（0）');
   expect(uiDisabled(button('确认处理此冲突'))).toBe(true);
   expect(uiQuery(container, 'input[type="checkbox"]').checked).toBe(false);
   expect(resolve).not.toHaveBeenCalled();
@@ -175,7 +178,7 @@ it('all invalid-identity records remain reachable in the unverified filter witho
     return c;
   });
   await render();await change('冲突关注项', 'unknown');
-  expect(uiText(field('冲突关注项'))).toContain('状态待核实（25）');
+  expect(await uiOptionsText(field('冲突关注项'))).toContain('状态待核实（25）');
   await click(button('下一页冲突'));await click(button('下一页冲突'));
   expect(cards()).toEqual(['identity-20', 'identity-21', 'identity-22', 'identity-23', 'identity-24']);
   expect(resolve).not.toHaveBeenCalled();expect(refresh).not.toHaveBeenCalled();

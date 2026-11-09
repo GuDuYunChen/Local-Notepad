@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useDrag, useDrop } from 'react-dnd'
-import { Input, message } from 'antd'
+import Input from 'antd/es/input'
+import message from 'antd/es/message'
 import {
   FileOutlined,
   FolderOutlined,

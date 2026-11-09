@@ -76,7 +76,13 @@ describe('restore destination controls retain compact native radio geometry', ()
     expect(css.width).toBe('16px');expect(css.height).toBe('16px');expect(css.padding).toBe('0px');
     expect(radios[mode === 'original' ? 0 : 1].checked).toBe(true);expect(posts()).toHaveLength(0);
   });
-  it('keeps the search text control flexible and padded', () => {const css = getComputedStyle(uiQuery(document, 'input[aria-label="恢复项目查找"]'));expect(css.flexGrow).toBe('1');expect(css.padding).toBe('8px 10px');});
-  it('does not apply the search control growth rule to row checkboxes', () => {const css = getComputedStyle(uiQuery(document, '[data-recovery-item] input'));expect(css.flexGrow).not.toBe('1');expect(css.padding).not.toBe('8px 10px');});
+  it('keeps the shared search control flexible with a 40px minimum and official padding', () => {
+    const input = uiQuery(document, 'input[aria-label="恢复项目查找"]'),css = getComputedStyle(input);
+    expect(input.dataset.uiControl).toBe('input');expect(css.flexGrow).toBe('1');expect(css.minHeight).toBe('40px');
+    // This isolated cascade test uses Ant Design's default tokens; the app theme
+    // derives its own padding from controlHeight, without a second legacy rule.
+    expect(css.padding).toBe('4px 11px');
+  });
+  it('does not apply the search control growth rule to row checkboxes', () => {const css = getComputedStyle(uiQuery(document, '[data-recovery-item] input')),searchCss = getComputedStyle(uiQuery(document, 'input[aria-label="恢复项目查找"]'));expect(css.flexGrow).not.toBe('1');expect(css.padding).not.toBe('8px 10px');expect(css.padding).not.toBe(searchCss.padding);});
   it('keeps each radio next to its own label with the existing inline gap', () => {for (const radio of uiQueryAll(document, 'input[name="recovery-mode"]')) {const label = radio.closest('label'),css = getComputedStyle(label);expect(css.display).toBe('flex');expect(css.alignItems).toBe('center');expect(css.gap).toBe('8px');expect(uiQueryAll(label, 'input')).toHaveLength(1);expect(uiText(label).trim()).toMatch(/^(各自原位置|指定现存目录)$/);}});
 });

@@ -1,3 +1,4 @@
+import { changeUiValue } from '~/test/uiControlDriver'
 import { setUiValue, uiOptions, uiQuery, uiQueryAll, uiText, uiValue } from "~/test/uiControlDriver";import React, { act, StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
@@ -6,10 +7,11 @@ import { reportFixture } from '../../scripts/s3-local-overview-file-cases.mjs';
 let host, root, readers;
 const flush = async () => {for (let i = 0; i < 12; i++) await Promise.resolve();};
 const click = (selector) => act(async () => {uiQuery(host, selector).click();await flush();});
-const change = (selector, value) => act(async () => {
-  const select = uiQuery(host, selector);await setUiValue(select, value);
-  select.dispatchEvent(new Event('change', { bubbles: true }));await flush();
-});
+const change = (selector, value) => (async () => {
+  const select = uiQuery(host, selector);
+  await changeUiValue(select, value, ['change']);
+  await act(flush);
+})();
 const rows = () => [...uiQueryAll(host, '[data-offline-result] tbody tr')];
 const summary = () => [...uiQueryAll(host, '[data-offline-summary-count]')].map((n) => Number(uiText(n)));
 const mount = async () => {

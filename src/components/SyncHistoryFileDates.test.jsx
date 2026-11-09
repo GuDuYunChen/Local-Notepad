@@ -1,3 +1,5 @@
+import UiThemeProvider from './ui/UiThemeProvider'
+import { changeUiValue } from '~/test/uiControlDriver'
 import { setUiValue, uiQuery, uiQueryAll, uiText, uiValue } from "~/test/uiControlDriver";import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
@@ -27,22 +29,23 @@ async function open(text = raw(), wait = true) {await act(async () => {
     if (wait) await uiValue(readHistoryFile.mock.results.at(-1)).catch(() => {});
   });}
 async function click(node) {await act(async () => node.click());}
-async function choose(node, value) {await act(async () => {await setUiValue(node, value);node.dispatchEvent(new Event('change', { bubbles: true }));});}
-async function fill(node, value) {await act(async () => {
-    setUiValue(node, value);
-    node.dispatchEvent(new Event('input', { bubbles: true }));node.dispatchEvent(new Event('change', { bubbles: true }));
-  });}
+async function choose(node, value) {await (async () => {
+  await changeUiValue(node, value, ['change']);
+})();}
+async function fill(node, value) {await (async () => {
+  await changeUiValue(node, value, ['input', 'change']);
+})();}
 async function range(from = '2026-09-30', to = '2026-09-30') {
   await choose(d('mode'), 'range');await fill(d('from'), from);await fill(d('to'), to);
 }
-async function ready() {await act(async () => root.render(<Viewer />));await open();}
+async function ready() {await act(async () => root.render(<UiThemeProvider><Viewer /></UiThemeProvider>));await open();}
 beforeEach(async () => {actMode = globalThis.IS_REACT_ACT_ENVIRONMENT;globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   const module = await vi.importActual('~/services/syncHistoryFile.mjs');readHistoryFile.mockReset().mockImplementation(module.readHistoryFile);api.mockReset();
   host = document.createElement('div');document.body.append(host);root = createRoot(host);
 });
 afterEach(async () => {await act(async () => root.unmount());host.remove();vi.restoreAllMocks();globalThis.IS_REACT_ACT_ENVIRONMENT = actMode;});
 it('date controls appear only after a file read and initially remain collapsed', async () => {
-  await act(async () => root.render(<Viewer />));expect(c('date-filter')).toBeNull();expect(readHistoryFile).not.toHaveBeenCalled();
+  await act(async () => root.render(<UiThemeProvider><Viewer /></UiThemeProvider>));expect(c('date-filter')).toBeNull();expect(readHistoryFile).not.toHaveBeenCalled();
   await open();expect(d('controls').open).toBe(false);expect(uiValue(d('mode'))).toBe('all');expect(d('applied')).toBeNull();
   expect(uiText(c('date-filter'))).toContain('仅作用于本文件全部记录');
 });
@@ -116,14 +119,14 @@ it('editing text while dates are pending does not apply the draft or alter the s
 });
 it('local date and summary operations cause no new IO, storage or download and do not modify v2 declarations', async () => {
   const network = vi.spyOn(globalThis, 'fetch'),storage = vi.spyOn(Storage.prototype, 'setItem'),download = vi.spyOn(HTMLAnchorElement.prototype, 'click');
-  await act(async () => root.render(<Viewer />));await open(raw(rows(), { phase: 'error', timeFilter: { mode: 'range', from: '2026-09-29', to: '2026-10-01' } }));
+  await act(async () => root.render(<UiThemeProvider><Viewer /></UiThemeProvider>));await open(raw(rows(), { phase: 'error', timeFilter: { mode: 'range', from: '2026-09-29', to: '2026-10-01' } }));
   const declared = uiText(c('dates')),scope = uiText(c('scope'));
   await range();await click(d('apply'));expect(uiText(c('dates'))).toBe(declared);expect(uiText(c('scope'))).toBe(scope);expect(uiText(c('source'))).toContain('读取失败');
   expect(uiText(c('matches'))).toContain('2 条 / 文件内共 29 条');expect(readHistoryFile).toHaveBeenCalledTimes(1);
   expect(network).not.toHaveBeenCalled();expect(storage).not.toHaveBeenCalled();expect(download).not.toHaveBeenCalled();
 });
 it('file-date operations do not change live workspace-history controls or guidance', async () => {
-  await act(async () => root.render(<Overview {...overviewFixture()} />));const live = uiQuery(host, '[data-sync-conflict-history]'),before = uiText(live),guidance = uiText(uiQuery(host, '[data-sync-guidance]'));
+  await act(async () => root.render(<UiThemeProvider><Overview {...overviewFixture()} /></UiThemeProvider>));const live = uiQuery(host, '[data-sync-conflict-history]'),before = uiText(live),guidance = uiText(uiQuery(host, '[data-sync-guidance]'));
   await open();await range();await click(d('apply'));await click(c('filter-clear'));
   expect(uiText(live)).toBe(before);expect(uiText(uiQuery(host, '[data-sync-guidance]'))).toBe(guidance);expect(api).not.toHaveBeenCalled();
 });

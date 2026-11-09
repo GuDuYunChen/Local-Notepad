@@ -1,4 +1,4 @@
-import { setUiValue, uiDisabled, uiQuery, uiQueryAll, uiText, uiValue } from "~/test/uiControlDriver"; // @vitest-environment happy-dom
+import { openUiSelect, setUiValue, uiDisabled, uiQuery, uiQueryAll, uiText, uiValue } from "~/test/uiControlDriver"; // @vitest-environment happy-dom
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -255,6 +255,37 @@ describe('complete local shortcut settings workflow', () => {
     expect(uiDisabled(applyButton())).toBe(true);
     expect(document.activeElement).toBe(query('[data-shortcut-search]'));
     expect(write).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])('Escape closes the category popup before applying the original dirty=%s close policy', async dirty => {
+    await mount();
+    if (dirty) await record('focusMode');
+    const write = vi.spyOn(localStorage, 'setItem');
+    const select = query('select[aria-label="操作分类"]');
+    await openUiSelect(select);await act(async () => select.focus());
+    await key(select, { key: 'Escape', isComposing: true, keyCode: 229 });
+    expect(onClose).not.toHaveBeenCalled();expect(select.getAttribute('aria-expanded')).toBe('true');
+    await key(select, { key: 'Escape', code: 'Escape', keyCode: 27 });
+    expect(onClose).not.toHaveBeenCalled();expect(select.getAttribute('aria-expanded')).toBe('false');
+    expect(document.activeElement).toBe(select);expect(query('[role="alertdialog"]')).toBeNull();
+    expect(binding('focusMode')).toBe(dirty ? formatShortcut('Mod+Alt+J') : 'F11');
+    await key(select, { key: 'Escape', code: 'Escape', keyCode: 27 });
+    if (dirty) {
+      expect(onClose).not.toHaveBeenCalled();expect(button('放弃修改并关闭')).toBeTruthy();
+      await click(button('继续编辑'));
+      expect(binding('focusMode')).toBe(formatShortcut('Mod+Alt+J'));
+    } else {
+      expect(onClose).toHaveBeenCalledTimes(1);expect(query('[data-shortcut-settings]')).toBeNull();
+      expect(document.activeElement).toBe(opener);
+    }
+    expect(write).not.toHaveBeenCalled();expect(savedBindings()).toBeNull();
+  });
+
+  it('Escape from the ordinary search input still closes an unchanged dialog', async () => {
+    await mount();
+    await key(query('[data-shortcut-search]'), { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(1);expect(query('[data-shortcut-settings]')).toBeNull();
+    expect(document.activeElement).toBe(opener);expect(savedBindings()).toBeNull();
   });
 
   it('finds Chinese names and English keywords and combines them with categories', async () => {

@@ -537,11 +537,6 @@ body {
   min-width: 30px !important;
 }
 
-
-  height: 30px !important;
-  border-radius: 7px !important;
-}
-
 .editor-container,
 .editor-scroller {
   background: var(--surface) !important;
@@ -791,10 +786,6 @@ body {
 
 .toolbar-menu-row + .toolbar-menu-row {
   margin-top: 7px;
-}
-
-
-  height: 32px !important;
 }
 
 .toolbar-wide-select {
@@ -4425,20 +4416,6 @@ body {
   font-weight: 620;
 }
 
-.product-editor-toolbar [data-ui-control="button"],
-.product-editor-toolbar [data-ui-control="select"] {
-  min-height:32px;
-  height:32px;
-  border-radius:8px;
-  font-size:11px;
-}
-.product-editor-toolbar [data-ui-control="select"] > .ant-select {
-  height:32px;
-}
-.product-editor-toolbar [data-ui-control="select"] .ant-select-selector {
-  min-height:32px;
-  height:32px;
-}
 .product-editor-toolbar .toolbar-text-btn {
   white-space: nowrap;
 }

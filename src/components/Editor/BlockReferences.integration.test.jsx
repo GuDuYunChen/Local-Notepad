@@ -1,3 +1,4 @@
+import { changeUiValue } from '~/test/uiControlDriver'
 import { setUiValue, uiDisabled, uiQuery, uiQueryAll, uiText, uiValue } from "~/test/uiControlDriver";import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
@@ -72,7 +73,9 @@ function Harness({ documentId = 'destination', content = body(paragraph('当前�
 const button = (label) => [...uiQueryAll(host, 'button')].find((b) => uiText(b) === label || b.getAttribute('aria-label') === label);
 async function click(label) {const b = button(label);expect(b, label).toBeTruthy();await act(async () => b.click());}
 async function flush() {await act(async () => {await new Promise((r) => setTimeout(r, 0));});}
-async function input(value) {const field = uiQuery(host, 'input[placeholder="notepad://block/…"]');await act(async () => {setUiValue(field, value);field.dispatchEvent(new Event('input', { bubbles: true }));field.dispatchEvent(new Event('change', { bubbles: true }));});}
+async function input(value) {const field = uiQuery(host, 'input[placeholder="notepad://block/…"]');await (async () => {
+  await changeUiValue(field, value, ['input', 'change']);
+})();}
 async function mount(props = {}) {await act(async () => root.render(<Harness {...props} />));await flush();await act(async () => change(liveEditor, () => {$getRoot().getFirstChild().selectEnd();}));await click('块引用');}
 beforeEach(() => {globalThis.IS_REACT_ACT_ENVIRONMENT = true;vi.clearAllMocks();host = document.createElement('div');document.body.append(host);root = createRoot(host);saveClipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard');Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: vi.fn().mockResolvedValue() } });api.mockResolvedValue(file());});
 afterEach(async () => {await act(async () => root.unmount());host.remove();if (saveClipboard) Object.defineProperty(navigator, 'clipboard', saveClipboard);else delete navigator.clipboard;delete globalThis.IS_REACT_ACT_ENVIRONMENT;});
@@ -130,7 +133,10 @@ describe('entry, saved source, review, insertion and exception lifecycle', () =>
 describe('block embedding and reload boundaries', () => {
   test('reviewed embedded insertion is a real block node and retains identity after reopen', async () => {
     await mount();await input(blockLocator('source', id));await click('读取来源块');
-    await act(async () => {const select = uiQuery(host, 'select');await setUiValue(select, 'embed');select.dispatchEvent(new Event('change', { bubbles: true }));});
+    await (async () => {
+  const select = uiQuery(host, 'select');
+  await changeUiValue(select, 'embed', ['change']);
+})();
     await click('确认插入嵌入');await flush();const state = JSON.parse(json(liveEditor));expect(state.root.children.some((n) => n.type === 'wiki-link' && n.embedded && n.blockId === id)).toBe(true);
     expect(uiQuery(host, '.block-reference-embed pre')?.textContent).toBe('来源正文');
     const e = editor();e.setEditorState(e.parseEditorState(state));expect(json(e)).toBe(JSON.stringify(state));

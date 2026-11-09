@@ -38,6 +38,7 @@ if(!process.versions.electron){
       privateText:time.textContent.includes('PRIVATE_'),overflow:document.documentElement.scrollWidth-innerWidth,width:innerWidth,height:innerHeight}
   }
   app.whenReady().then(async()=>{
+    const {createNativeUiSelect}=await import('./native-ui-select.mjs')
     fs.mkdirSync(out,{recursive:true});save()
     const file=path.join(root,'test-results','sync-history-search','fixture.html')
     if(!fs.existsSync(file))throw Error('Run the production history search check first')
@@ -61,10 +62,15 @@ if(!process.versions.electron){
       const win=new BrowserWindow({show:true,width:name==='date-narrow'?560:1000,height:900,useContentSize:true,
         webPreferences:{session:isolated,sandbox:true,contextIsolation:true,nodeIntegration:false,backgroundThrottling:false}})
       const exec=code=>win.webContents.executeJavaScript(code)
-      const wait=async code=>{for(let i=0;i<80;i++){if(await exec(code))return;await delay(50)}throw Error('Export wait failed: '+code)}
+      const wait=async(code,label)=>{for(let i=0;i<80;i++){const result=await(typeof code==='function'?code():exec(code));if(result)return result;await delay(50)}throw Error(label||'Export wait failed: '+code)}
+      const nativeClick=async selector=>{
+        const point=await wait(()=>exec(`(()=>{const nodes=[...document.querySelectorAll(${JSON.stringify(selector)})];if(nodes.length!==1)return null;const n=nodes[0];n.scrollIntoView({block:'center',behavior:'instant'});const r=n.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2,hit=document.elementFromPoint(x,y);return r.width>0&&r.height>0&&hit&&n.contains(hit)?{x,y}:null})()`),'Select control missing, ambiguous or occluded: '+selector)
+        for(const type of ['mousePressed','mouseReleased'])await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent',{type,...point,button:'left',clickCount:1})
+      }
+      const select=createNativeUiSelect({evaluate:exec,click:nativeClick,cdp:{send:(method,params)=>win.webContents.debugger.sendCommand(method,params)},until:wait})
       const click=key=>exec(`(()=>{const n=document.querySelector('[data-history-${key}]');n.focus({preventScroll:true});n.click();return true})()`)
       const type=(key,text)=>exec(`(()=>{const n=document.querySelector('[data-history-${key}]');n.focus({preventScroll:true});Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(n,${JSON.stringify(text)});n.dispatchEvent(new Event('input',{bubbles:true}));return true})()`)
-      const choose=(key,value)=>exec(`(()=>{const n=document.querySelector('[data-history-${key}]');n.focus({preventScroll:true});n.value=${JSON.stringify(value)};n.dispatchEvent(new Event('change',{bubbles:true}));return true})()`)
+      const choose=(key,value)=>select.choose('[data-history-'+key+']',value)
       const download=async()=>{
         let timer
         const done=new Promise((resolve,reject)=>{waiting={resolve,reject};timer=setTimeout(()=>{waiting=null;reject(Error('Download event timeout'))},8000)})
@@ -86,7 +92,7 @@ if(!process.versions.electron){
         scene.frames.push({phase,...frame,downloads:scene.downloads.length,stable,rasterSamples:matches,rasterCode:code,filename,bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')});save()
       }
       try{
-        win.setMenu(null);await win.loadFile(file,{query:{scene:name==='date-light'?'search-light':'search-dark'}})
+        win.setMenu(null);win.webContents.debugger.attach('1.3');await win.loadFile(file,{query:{scene:name==='date-light'?'search-light':'search-dark'}})
         await wait('!!document.querySelector("[data-history-export-button]")');await exec('document.fonts.ready.then(()=>true)')
         await exec(`(()=>{window.__guidance=document.querySelector('[data-sync-guidance]').textContent;document.querySelector('[data-sync-conflict-history]').open=true;return true})()`)
         await exec(`(()=>{

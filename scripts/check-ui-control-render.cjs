@@ -1,0 +1,413 @@
+// Native Electron regression for shared controls only. No backend or user data.
+// Build first: node scripts/build-ui-control-render-fixture.mjs
+// Run: npx --no-install electron scripts/check-ui-control-render.cjs
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const path = require('node:path')
+const os = require('node:os')
+const { createHash } = require('node:crypto')
+const { execFileSync } = require('node:child_process')
+const { fileURLToPath } = require('node:url')
+const HEIGHTS = Object.freeze({ ordinary: 40, compact: 28, large: 44 })
+const KINDS = Object.freeze(['button', 'input', 'password', 'select'])
+const VIEWPORTS = Object.freeze([[704, 455], [1280, 800], [1920, 1080]])
+const BUDGET_MS = 90000
+const TOLERANCE = 0.6
+const hash = bytes => createHash('sha256').update(bytes).digest('hex')
+
+function verifyGeometry(sample) {
+  assert.equal(sample.controls.length, 12, 'All four controls in all three densities are required')
+  assert.ok(sample.overflow <= 1, 'Fixture must not overflow horizontally')
+  const seen = new Set()
+  for (const control of sample.controls) {
+    const key = `${control.density}-${control.kind}`
+    assert.ok(!seen.has(key) && HEIGHTS[control.density] && KINDS.includes(control.kind), 'Exact control matrix')
+    seen.add(key)
+    assert.ok(Number.isFinite(control.height) && Math.abs(control.height - HEIGHTS[control.density]) <= TOLERANCE,
+      `${key}: expected ${HEIGHTS[control.density]}px, observed ${control.height}px`)
+    assert.equal(control.context, control.density === 'compact' ? 'product-editor-toolbar' : 'standalone',
+      `${key}: production editor toolbar context is required for compact controls`)
+    assert.ok(control.width > 10 && control.left >= -1 && control.right <= sample.viewport.width + 1, `${key}: horizontal bounds`)
+    if (control.kind === 'password') {
+      assert.deepEqual(control.innerPadding, [0, 0, 0, 0], `${key}: affix child must not be padded twice`)
+      assert.ok(control.innerHeight > 0 && control.innerHeight < control.height, `${key}: inner line is bounded by wrapper`)
+    }
+  }
+  for (const density of Object.keys(HEIGHTS)) {
+    const row = sample.controls.filter(control => control.density === density)
+    assert.equal(row.length, 4)
+    assert.ok(Math.max(...row.map(control => control.top)) - Math.min(...row.map(control => control.top)) <= TOLERANCE,
+      `${density}: control tops must align`)
+  }
+}
+
+function verifyFocus(sample) {
+  assert.equal(sample.focused, true, `${sample.id}: native focus owner`)
+  assert.equal(sample.focusVisible, true, `${sample.id}: keyboard focus must be visible`)
+  assert.equal(sample.outlines.length, 1, `${sample.id}: exactly one focus outline`)
+  assert.equal(sample.outlines[0].owner, 'root', `${sample.id}: outer control owns the outline`)
+  assert.ok(sample.outlines[0].width >= 1.5, `${sample.id}: visible outline width`)
+  assert.equal(sample.shadows.length, 0, `${sample.id}: duplicate focus glow refused`)
+  assert.equal(sample.hit, true, `${sample.id}: focused control must be hit-testable`)
+  assert.equal(sample.inViewport, true, `${sample.id}: focused control must be visible`)
+}
+
+// Computed CSS can retain a colored zero-size shadow when an official token
+// disables its outline. Ignore only definitely unpainted layers; unknown or
+// nonzero geometry remains evidence, so a real second cue cannot pass silently.
+// Keep this function self-contained: the same source runs in Electron's page.
+function hasVisibleBoxShadow(value) {
+  const text = String(value || '').trim().toLowerCase()
+  if (!text || text === 'none') return false
+  const layers = []
+  let depth = 0, start = 0
+  for (let index = 0; index < text.length; index++) {
+    if (text[index] === '(') depth++
+    else if (text[index] === ')') depth--
+    else if (text[index] === ',' && depth === 0) { layers.push(text.slice(start, index)); start = index + 1 }
+  }
+  layers.push(text.slice(start))
+  return layers.some(layer => {
+    if (/\btransparent\b/.test(layer)) return false
+    const color = layer.match(/\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\(([^()]*)\)/)
+    if (color) {
+      const channels = color[1]
+      const alpha = channels.includes('/') ? channels.split('/').at(-1).trim()
+        : /^rgba?\(|^hsla?\(/.test(color[0]) && channels.split(',').length === 4 ? channels.split(',').at(-1).trim() : null
+      if (alpha !== null && /^[-+]?(?:\d*\.)?\d+%?$/.test(alpha) && parseFloat(alpha) <= 0) return false
+      layer = layer.replace(color[0], '')
+    } else {
+      const hex = layer.match(/#[\da-f]+\b/)?.[0]
+      if ((hex?.length === 5 && hex.endsWith('0')) || (hex?.length === 9 && hex.endsWith('00'))) return false
+    }
+    const lengths = layer.trim().split(/\s+/)
+      .filter(token => /^[-+]?(?:\d*\.)?\d+(?:e[-+]?\d+)?(?:px)?$/.test(token)).map(parseFloat)
+    if (lengths.length < 2 || lengths.length > 4) return true
+    return lengths.some(length => length !== 0)
+  })
+}
+
+function verifyScenes(scenes) {
+  assert.equal(scenes.length, 6, 'Both themes and every viewport must complete')
+  const names = new Set()
+  for (const scene of scenes) {
+    assert.ok(!names.has(scene.name)); names.add(scene.name)
+    assert.ok(['light', 'dark'].includes(scene.theme))
+    assert.ok(VIEWPORTS.some(size => size[0] === scene.requested[0] && size[1] === scene.requested[1]))
+    assert.deepEqual(scene.viewport, { width: scene.requested[0], height: scene.requested[1] }, 'Actual viewport must match requested size')
+    verifyGeometry(scene.geometry)
+    assert.equal(scene.focus.length, 12)
+    assert.equal(new Set(scene.focus.map(sample => sample.id)).size, 12)
+    scene.focus.forEach(verifyFocus)
+    assert.equal(scene.interaction.complete, true)
+    assert.equal(scene.form.complete, true)
+    assert.equal(scene.modal.complete, true)
+    assert.equal(scene.toolbar.complete, true)
+    assert.equal(scene.images.length, 7)
+    for (const image of scene.images) {
+      assert.ok(image.bytes > 100 && /^[a-f0-9]{64}$/.test(image.sha256))
+      assert.ok(image.width > 0 && image.height > 0)
+    }
+    assert.equal(scene.errors.length, 0)
+    assert.ok(scene.events.some(event => event.type === 'click' && event.trusted), 'Trusted pointer activation required')
+    for (const key of ['Tab', 'ArrowDown', 'Enter', 'Escape']) {
+      assert.ok(scene.events.some(event => event.type === 'keydown' && event.key === key && event.trusted), 'Trusted native key required: ' + key)
+    }
+    assert.equal(scene.complete, true)
+  }
+  for (const theme of ['light', 'dark']) for (const [width, height] of VIEWPORTS) {
+    assert.ok(names.has(`${theme}-${width}x${height}`), 'Missing scene')
+  }
+}
+
+function geometrySnapshot() {
+  const controls = []
+  for (const row of document.querySelectorAll('[data-density]')) for (const holder of row.querySelectorAll('[data-probe]')) {
+    const kind = holder.dataset.kind
+    const control = holder.querySelector(kind === 'select' ? '.ant-select' : kind === 'password' ? '.ant-input-affix-wrapper' : kind === 'button' ? 'button' : 'input')
+    if (!control) throw new Error('Missing real control ' + holder.dataset.probe)
+    const rect = control.getBoundingClientRect()
+    const item = { density: row.dataset.density, kind, left: rect.left, right: rect.right,
+      top: rect.top, width: rect.width, height: rect.height,
+      context: control.closest('.product-editor-toolbar') ? 'product-editor-toolbar' : 'standalone' }
+    if (kind === 'password') {
+      const inner = control.querySelector('input'), css = getComputedStyle(inner)
+      item.innerPadding = ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft'].map(key => parseFloat(css[key]))
+      item.innerHeight = inner.getBoundingClientRect().height
+    }
+    controls.push(item)
+  }
+  return { controls, viewport: { width: innerWidth, height: innerHeight },
+    overflow: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - innerWidth }
+}
+
+function focusSnapshot(id, shadowIsVisible) {
+  const element = document.getElementById(id)
+  if (!element) throw new Error('Missing focus control ' + id)
+  const root = element.closest('.ant-input-affix-wrapper, .ant-select') || element
+  const rect = root.getBoundingClientRect(), hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)
+  const outlines = [], shadows = [], shadowStyles = []
+  for (const [index, node] of [root, ...root.querySelectorAll('*')].entries()) {
+    const bounds = node.getBoundingClientRect(), css = getComputedStyle(node)
+    if (bounds.width <= 0 || bounds.height <= 0 || css.visibility === 'hidden' || css.opacity === '0') continue
+    const owner = index === 0 ? 'root' : node.tagName.toLowerCase() + ':' + index
+    if (css.outlineStyle !== 'none' && parseFloat(css.outlineWidth) > 0) outlines.push({ owner, width: parseFloat(css.outlineWidth), color: css.outlineColor })
+    if (css.boxShadow !== 'none') {
+      const sample = { owner, value: css.boxShadow, visible: shadowIsVisible(css.boxShadow) }
+      shadowStyles.push(sample)
+      if (sample.visible) shadows.push(sample)
+    }
+  }
+  return { id, focused: document.activeElement === element, focusVisible: element.matches(':focus-visible'), outlines, shadows, shadowStyles,
+    hit: hit === root || root.contains(hit),
+    inViewport: rect.top >= -1 && rect.left >= -1 && rect.bottom <= innerHeight + 1 && rect.right <= innerWidth + 1 }
+}
+
+async function main() {
+  const { app, BrowserWindow, nativeImage } = require('electron')
+  const root = path.resolve(__dirname, '..'), output = path.join(root, 'test-results/ui-controls-render')
+  const fixture = path.join(output, 'fixture'), reportFile = path.join(output, 'checks.json')
+  fs.mkdirSync(output, { recursive: true })
+  if (fs.existsSync(reportFile)) throw new Error('Refusing to overwrite previous native control evidence')
+  const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'notepad-ui-controls-'))
+  app.setPath('userData', profile); app.setPath('sessionData', profile)
+  const started = Date.now()
+  const report = { schema: 1, scope: 'shared-controls-only', complete: false, status: 'starting',
+    platform: process.platform, electron: process.versions.electron, chromium: process.versions.chrome,
+    nativeInput: 'Electron sendInputEvent and Input.dispatchKeyEvent', backendExercised: false,
+    syntheticRecords: true, isolatedProfile: true, cleanQuit: false, budgetMs: BUDGET_MS,
+    runId: process.env.GITHUB_RUN_ID || null, attempt: process.env.GITHUB_RUN_ATTEMPT || null, scenes: [] }
+  let win, quitting = false, verified = false
+  const persist = () => fs.writeFileSync(reportFile, JSON.stringify({ ...report, elapsedMs: Date.now() - started }, null, 2))
+  const fail = error => {
+    if (quitting) return
+    quitting = true; report.status = 'failed'; report.error = String(error.message || error); persist()
+    // Failure is never reported as a clean successful lifecycle.
+    app.exit(1)
+  }
+  const watchdog = setTimeout(() => {
+    report.status = 'timeout'; report.complete = false; report.cleanQuit = false; persist()
+    app.exit(1)
+  }, BUDGET_MS)
+  app.on('window-all-closed', () => {})
+  app.once('quit', (_event, exitCode) => {
+    clearTimeout(watchdog)
+    report.cleanQuit = verified && quitting && exitCode === 0
+    report.complete = verified && exitCode === 0
+    report.status = report.complete ? 'passed' : report.status === 'starting' ? 'incomplete' : report.status
+    persist()
+    if (!report.complete) process.exitCode = 1
+  })
+  persist()
+  try {
+    const manifest = JSON.parse(fs.readFileSync(path.join(fixture, 'manifest.json'), 'utf8'))
+    assert.equal(manifest.schema, 1); assert.equal(manifest.scope, report.scope)
+    const verifyFiles = (base, files) => {
+      for (const [name, digest] of Object.entries(files)) {
+        const filename = path.resolve(base, name)
+        assert.ok(filename.startsWith(base + path.sep), 'Manifest path must remain inside its source root')
+        assert.equal(hash(fs.readFileSync(filename)), digest, 'Stale fixture source or bundle: ' + name)
+      }
+    }
+    verifyFiles(root, manifest.sources); verifyFiles(fixture, manifest.artifacts)
+    report.version = manifest.version; report.identity = manifest
+    report.manifestSha256 = hash(fs.readFileSync(path.join(fixture, 'manifest.json')))
+    report.commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()
+    assert.equal(report.commit, manifest.commit, 'Build and native execution must use the same commit')
+    assert.equal(process.versions.electron, manifest.dependencies.electron, 'Use the committed Electron runtime')
+    persist()
+    await app.whenReady()
+    win = new BrowserWindow({ width: 704, height: 455, useContentSize: true, show: false,
+      autoHideMenuBar: true, webPreferences: { sandbox: true, contextIsolation: true,
+        nodeIntegration: false, backgroundThrottling: false, partition: 'ui-controls-' + process.pid } })
+    win.setMenu(null)
+    win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+    win.webContents.session.webRequest.onBeforeRequest((details, callback) => {
+      let allowed = details.url.startsWith('data:')
+      try { allowed ||= details.url.startsWith('file:') && path.resolve(fileURLToPath(details.url)).startsWith(fixture + path.sep) } catch {}
+      callback({ cancel: !allowed })
+    })
+    win.webContents.on('render-process-gone', () => fail(Error('Renderer process ended before evidence completed')))
+    win.webContents.on('did-fail-load', (_event, code, _description, _url, mainFrame) => {
+      if (mainFrame) fail(Error('Fixture main-frame load failed: ' + code))
+    })
+    win.webContents.debugger.attach('1.3')
+    const evaluate = (fn, value) => win.webContents.executeJavaScript(`(${fn.toString()})(${JSON.stringify(value) ?? ''})`)
+    const readFocus = id => win.webContents.executeJavaScript(`(${focusSnapshot.toString()})(${JSON.stringify(id)}, ${hasVisibleBoxShadow.toString()})`)
+    const pause = ms => new Promise(resolve => setTimeout(resolve, ms))
+    const until = async (read, accept, label) => {
+      const deadline = Date.now() + 2500
+      do { if (quitting) throw Error('Native run already failed'); const value = await read(); if (accept(value)) return value; await pause(25) } while (Date.now() < deadline)
+      throw Error('Timed out waiting for ' + label)
+    }
+    const events = () => evaluate(() => window.__uiControlEvents || [])
+    const inputKey = async (key, modifiers = 0) => {
+      const definitions = { Tab: ['Tab', 9], Enter: ['Enter', 13], Escape: ['Escape', 27],
+        ArrowDown: ['ArrowDown', 40], a: ['KeyA', 65] }
+      const [code, virtual] = definitions[key], before = (await events()).length
+      const event = { key, code, modifiers, windowsVirtualKeyCode: virtual, nativeVirtualKeyCode: virtual }
+      await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyDown', ...event,
+        ...(key === 'Enter' ? { text: '\r', unmodifiedText: '\r' } : {}) })
+      await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyUp', ...event })
+      await until(events, list => list.slice(before).some(item => item.type === 'keydown' && item.key === key && item.trusted), 'trusted ' + key)
+    }
+    const click = async (selector, disabled = false) => {
+      await evaluate(selector => {
+        let node = document.querySelector(selector); if (!node) throw Error('Missing ' + selector)
+        if (node.matches('[role="combobox"]')) node = node.closest('.ant-select').querySelector('.ant-select-content') || node.closest('.ant-select')
+        node.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'instant' })
+      }, selector)
+      const point = await evaluate(selector => {
+        let node = document.querySelector(selector)
+        if (node.matches('[role="combobox"]')) node = node.closest('.ant-select').querySelector('.ant-select-content') || node.closest('.ant-select')
+        const rect = node.getBoundingClientRect()
+        const x = Math.round(rect.left + rect.width / 2), y = Math.round(rect.top + rect.height / 2), hit = document.elementFromPoint(x, y)
+        return { x, y, visible: rect.width > 0 && rect.height > 0 && rect.top >= 0 && rect.bottom <= innerHeight + 1 && rect.left >= 0 && rect.right <= innerWidth + 1,
+          hit: hit === node || node.contains(hit) }
+      }, selector)
+      assert.ok(point.visible && point.hit, 'Pointer target must be visible and unobscured: ' + selector)
+      const before = (await events()).length
+      win.webContents.sendInputEvent({ type: 'mouseMove', x: point.x, y: point.y })
+      win.webContents.sendInputEvent({ type: 'mouseDown', x: point.x, y: point.y, button: 'left', clickCount: 1 })
+      win.webContents.sendInputEvent({ type: 'mouseUp', x: point.x, y: point.y, button: 'left', clickCount: 1 })
+      if (!disabled) await until(events, list => list.slice(before).some(item => item.type === 'click' && item.trusted), 'trusted pointer click')
+      else await pause(40)
+    }
+    const selectState = id => evaluate(id => {
+      const node = document.getElementById(id), owner = node.closest('[data-ui-control="select"]')
+      const listId = node.getAttribute('aria-controls') || node.getAttribute('aria-owns'), list = listId && document.getElementById(listId)
+      return { expanded: node.getAttribute('aria-expanded') === 'true', optionsAvailable: !!list?.querySelector('[data-ui-option-value]'),
+        value: JSON.parse(owner.dataset.uiValue), focused: document.activeElement === node }
+    }, id)
+    const opened = id => until(() => selectState(id), state => state.expanded && state.optionsAvailable, id + ' real popup')
+    const closed = id => until(() => selectState(id), state => !state.expanded, id + ' collapsed')
+    const choose = async (id, value) => {
+      await click('#' + id + ''); await opened(id)
+      const selector = await evaluate(({ id, value }) => {
+        const node = document.getElementById(id), listId = node.getAttribute('aria-controls') || node.getAttribute('aria-owns')
+        if (!listId || !document.getElementById(listId)) throw Error('Select must own its real listbox')
+        return '#' + CSS.escape(listId) + ' [data-ui-option-value="' + value + '"]'
+      }, { id, value })
+      await click(selector)
+      await until(() => selectState(id), state => !state.expanded && state.value === value, id + ' selected value')
+    }
+    const capture = async (scene, suffix) => {
+      const image = await win.capturePage(), bytes = image.toPNG(), decoded = nativeImage.createFromBuffer(bytes)
+      assert.ok(!decoded.isEmpty() && bytes.length > 100, 'Native PNG required')
+      const name = scene.name + '-' + suffix + '.png'
+      fs.writeFileSync(path.join(output, name), bytes, { flag: 'wx' })
+      scene.images.push({ name, bytes: bytes.length, sha256: hash(bytes), ...decoded.getSize() }); persist()
+    }
+    for (const theme of ['light', 'dark']) for (const [width, height] of VIEWPORTS) {
+      const scene = { name: `${theme}-${width}x${height}`, theme, requested: [width, height], complete: false,
+        focus: [], images: [], interaction: {}, form: {}, modal: {}, toolbar: {}, errors: [] }
+      report.scenes.push(scene); report.status = 'running'; persist()
+      win.setContentSize(width, height)
+      await win.loadFile(path.join(fixture, 'fixture.html'), { query: { theme } })
+      win.show(); win.focus(); win.webContents.focus()
+      await until(() => evaluate(() => document.documentElement.dataset.uiControlReady), value => value === 'true', 'real components mounted')
+      await evaluate(() => document.fonts.ready.then(() => true))
+      await evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve(true)))))
+      scene.geometry = await evaluate(geometrySnapshot); scene.viewport = scene.geometry.viewport
+      assert.deepEqual(scene.viewport, { width, height }, 'Requested native viewport was clamped')
+      verifyGeometry(scene.geometry); persist()
+      await click('#focus-start')
+      for (const density of Object.keys(HEIGHTS)) {
+        for (const kind of KINDS) {
+          await inputKey('Tab')
+          // The real Password includes its own keyboard-accessible eye button.
+          // Traverse it normally instead of changing the component's tab order.
+          const passwordIcon = await evaluate(() => document.activeElement?.matches('.ant-input-password-icon'))
+          if (passwordIcon) { assert.equal(kind, 'select'); await inputKey('Tab') }
+          const id = `${density}-${kind}`
+          const focused = await until(() => readFocus(id), sample => sample.focused && sample.focusVisible, id + ' keyboard focus')
+          verifyFocus(focused); scene.focus.push(focused)
+        }
+        await capture(scene, density + '-focus')
+      }
+
+      await choose('ordinary-select', 'beta')
+      const selected = await evaluate(() => JSON.parse(document.getElementById('selection-output').textContent))
+      assert.equal(selected.values.ordinary, 'beta'); assert.equal(selected.changes.ordinary, 1)
+      await click('#ordinary-select'); await opened('ordinary-select'); await capture(scene, 'popup')
+      await click('#ordinary-select'); await closed('ordinary-select')
+      await inputKey('ArrowDown'); await opened('ordinary-select')
+      await inputKey('Escape'); const escaped = await closed('ordinary-select')
+      assert.equal(escaped.value, 'beta'); assert.equal(escaped.focused, true)
+      await inputKey('ArrowDown'); await opened('ordinary-select'); await inputKey('ArrowDown'); await inputKey('Enter')
+      const keyboardChoice = await closed('ordinary-select')
+      assert.equal(keyboardChoice.value, 'gamma'); assert.equal(keyboardChoice.focused, true)
+      const committed = await evaluate(() => JSON.parse(document.getElementById('selection-output').textContent))
+      assert.equal(committed.changes.ordinary, 2, 'One change per real selection')
+      scene.interaction = { complete: true, pointerValue: 'beta', keyboardValue: keyboardChoice.value,
+        repeatedPointerClosed: true, escapePreservedValueAndFocus: true, changes: committed.changes.ordinary }
+
+      await click('#long-clear')
+      scene.toolbar = await evaluate(() => {
+        const root = document.getElementById('long-toolbar'), r = root.getBoundingClientRect()
+        const fields = ['long-input', 'long-select', 'long-clear'].map(id => {
+          const node = document.getElementById(id), control = node.closest('.ant-select') || node
+          const box = control.getBoundingClientRect()
+          return { id, height: box.height, top: box.top, bottom: box.bottom, left: box.left, right: box.right }
+        })
+        return { fields, left: r.left, right: r.right, overflow: document.documentElement.scrollWidth - innerWidth,
+          longLabelLength: root.querySelector('label').textContent.trim().length }
+      })
+      assert.ok(scene.toolbar.overflow <= 1 && scene.toolbar.longLabelLength > 20)
+      for (const field of scene.toolbar.fields) assert.ok(Math.abs(field.height - 40) <= TOLERANCE && field.left >= 0 && field.right <= width + 1, 'Toolbar height and bounds')
+      const tops = scene.toolbar.fields.map(field => field.top)
+      if (width === 704) assert.ok(Math.max(...tops) - Math.min(...tops) > 40, 'Narrow toolbar must wrap complete controls')
+      else assert.ok(Math.max(...scene.toolbar.fields.map(field => field.bottom)) - Math.min(...scene.toolbar.fields.map(field => field.bottom)) <= TOLERANCE, 'Wide toolbar must align bottoms')
+      scene.toolbar.complete = true; await capture(scene, 'toolbar')
+
+      await click('#native-title'); await inputKey('a', 2)
+      await win.webContents.debugger.sendCommand('Input.insertText', { text: 'edited' })
+      await choose('native-mode', 'beta'); await choose('legend-mode', 'gamma')
+      const disabled = await evaluate(() => ({ input: document.getElementById('blocked-title').matches(':disabled'),
+        select: document.getElementById('blocked-mode').disabled, button: document.getElementById('blocked-submit').matches(':disabled'),
+        legend: document.getElementById('legend-mode').disabled }))
+      assert.deepEqual(disabled, { input: true, select: true, button: true, legend: false })
+      await click('#blocked-submit', true)
+      assert.equal(await evaluate(() => JSON.parse(document.getElementById('form-output').textContent).submissions.length), 0)
+      await click('#native-submit')
+      const form = await until(() => evaluate(() => JSON.parse(document.getElementById('form-output').textContent)), value => value.submissions.length === 1, 'real form submit')
+      assert.deepEqual(form.submissions[0], { title: 'edited', mode: 'beta', legendMode: 'gamma' })
+      await click('#native-reset')
+      await until(() => selectState('native-mode'), value => value.value === 'alpha', 'native form reset')
+      assert.equal(await evaluate(() => document.getElementById('native-title').value), 'original')
+      await click('#native-submit')
+      const reset = await until(() => evaluate(() => JSON.parse(document.getElementById('form-output').textContent)), value => value.submissions.length === 2, 'submit after reset')
+      assert.deepEqual(reset.submissions[1], { title: 'original', mode: 'alpha', legendMode: 'alpha' }); assert.equal(reset.resets, 1)
+      const colors = await evaluate(() => ({ normal: getComputedStyle(document.getElementById('native-title')).borderTopColor,
+        input: getComputedStyle(document.getElementById('error-input')).borderTopColor,
+        select: getComputedStyle(document.getElementById('error-select').closest('.ant-select')).borderTopColor }))
+      assert.notEqual(colors.input, colors.normal); assert.equal(colors.input, colors.select)
+      scene.form = { complete: true, disabled, colors, ...reset }; await capture(scene, 'form')
+
+      await click('#open-modal')
+      await until(() => evaluate(() => !!document.getElementById('probe-modal')), Boolean, 'real focus hook dialog')
+      await click('#modal-select'); await opened('modal-select'); await capture(scene, 'modal-popup')
+      await inputKey('Escape'); await closed('modal-select')
+      assert.equal(await evaluate(() => !!document.getElementById('probe-modal')), true, 'First Escape belongs to expanded Select')
+      await inputKey('Escape')
+      await until(() => evaluate(() => !document.getElementById('probe-modal')), Boolean, 'second Escape closes dialog')
+      assert.equal(await evaluate(() => document.activeElement?.id), 'open-modal', 'Native modal cleanup returns trigger focus')
+      assert.equal(await evaluate(() => Number(document.getElementById('modal-output').textContent)), 1)
+      scene.modal = { complete: true, firstEscapeKeptDialog: true, secondEscapeClosed: true, focusReturned: true, closeCount: 1 }
+      scene.events = await events(); scene.errors = await evaluate(() => window.__uiControlErrors)
+      assert.equal(scene.errors.length, 0)
+      scene.complete = true; persist()
+    }
+    verifyScenes(report.scenes)
+    verified = true; quitting = true; report.status = 'quitting'; persist()
+    win.webContents.debugger.detach()
+    app.quit()
+  } catch (error) { fail(error) }
+}
+
+module.exports = { verifyGeometry, verifyFocus, verifyScenes, hasVisibleBoxShadow, HEIGHTS, VIEWPORTS, BUDGET_MS }
+if (require.main === module) main().catch(error => {
+  console.error(error)
+  if (process.versions.electron) require('electron').app.exit(1)
+  else process.exitCode = 1
+})

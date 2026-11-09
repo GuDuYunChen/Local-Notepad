@@ -13,6 +13,7 @@ import {
 } from '../services/localShortcuts'
 import './ShortcutsModal.css'
 import { UiButton, UiInput, UiSelect } from '~/components/ui/ControlKit'
+import { selectOwnsEscape } from '~/components/ui/keyboard'
 
 
 const gestures = [
@@ -289,6 +290,7 @@ function ShortcutSettingsSession({ onClose }) {
 
   function handleDialogKey(event) {
     if (eventIsComposing(event) || event.repeat) return
+    if (selectOwnsEscape(event, dialogRef.current)) return
     if (event.key === 'Escape') {
       event.preventDefault()
       event.stopPropagation()

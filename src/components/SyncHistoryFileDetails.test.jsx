@@ -1,3 +1,5 @@
+import UiThemeProvider from './ui/UiThemeProvider'
+import { changeUiValue } from '~/test/uiControlDriver'
 import { setUiValue, uiQuery, uiQueryAll, uiText, uiValue } from "~/test/uiControlDriver";import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { beforeEach, afterEach, it, expect, vi } from 'vitest';
@@ -16,7 +18,7 @@ const rows = (count = 61) => Array.from({ length: count }, (_, i) => ({ id: 'r' 
 const raw = (records = rows()) => prepareHistoryExport({ snapshot: { items: records, filter: 'all', hasMore: true }, phase: 'ready' }, new Date('2026-10-01T10:00:00Z')).raw;
 const c = (key) => uiQuery(host, '[data-history-file-' + key + ']');
 const ids = () => [...uiQueryAll(host, '[data-history-file-row]')].map((n) => uiText(uiQueryAll(n, 'code')[1]));
-async function mount() {await act(async () => root.render(<Viewer />));uiQuery(host, 'details').open = true;}
+async function mount() {await act(async () => root.render(<UiThemeProvider><Viewer /></UiThemeProvider>));uiQuery(host, 'details').open = true;}
 async function open(text = raw(), name = 'history.json', wait = true) {
   await act(async () => {
     Object.defineProperty(c('input'), 'files', { configurable: true, value: [new File([text], name, { type: 'application/json' })] });
@@ -29,7 +31,9 @@ async function type(value, key = 'jump-input') {await act(async () => {
     setUiValue(c(key), value);
     c(key).dispatchEvent(new InputEvent('input', { bubbles: true }));
   });}
-async function order(value) {await act(async () => {await setUiValue(c('order'), value);c('order').dispatchEvent(new Event('change', { bubbles: true }));});}
+async function order(value) {await (async () => {
+  await changeUiValue(c('order'), value, ['change']);
+})();}
 const loaded = async () => {await mount();await open();};
 beforeEach(async () => {
   oldAct = globalThis.IS_REACT_ACT_ENVIRONMENT;globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -72,10 +76,13 @@ for (const context of ['page', 'order', 'filter', 'file']) it(context + ' change
   if (context === 'file') await open(raw(), 'new-with-same-ids.json');
   expect(opened()).toBe(0);
 });
-it('manual expansion, jump draft and focus survive ordinary rerender and same-order selection', async () => {
+it('ordinary rerender retains focus; intentional same-order selection retains draft and expansion', async () => {
   await loaded();details()[0].open = true;await type('2');c('jump-input').focus();
-  await act(async () => root.render(<Viewer />));await order('file');
-  expect(opened()).toBe(1);expect(uiValue(c('jump-input'))).toBe('2');expect(document.activeElement).toBe(c('jump-input'));
+  await act(async () => root.render(<UiThemeProvider><Viewer /></UiThemeProvider>));
+  expect(document.activeElement).toBe(c('jump-input'));
+  await order('file');
+  expect(opened()).toBe(1);expect(uiValue(c('jump-input'))).toBe('2');
+  expect(document.activeElement).toBe(c('order'));
 });
 it('failed replacement and picker cancellation retain expanded identifiers and jump error', async () => {
   await loaded();await click('expand-identifiers');await type('99');await click('jump');
@@ -98,7 +105,7 @@ it('empty results retain disabled, focusable no-op controls and honest page-only
 });
 it('bulk display keeps full-match summary, file declarations, live history and IO counts unchanged', async () => {
   const fetch = vi.spyOn(globalThis, 'fetch'),store = vi.spyOn(Storage.prototype, 'setItem'),download = vi.spyOn(HTMLAnchorElement.prototype, 'click');
-  await act(async () => root.render(<Overview {...overviewFixture()} />));uiQuery(host, '[data-history-file-viewer]').open = true;await open();
+  await act(async () => root.render(<UiThemeProvider><Overview {...overviewFixture()} /></UiThemeProvider>));uiQuery(host, '[data-history-file-viewer]').open = true;await open();
   const live = uiText(uiQuery(host, '[data-sync-conflict-history]')),scope = uiText(c('scope')),summary = uiText(uiQuery(host, '[data-file-summary-scope]'));
   await click('expand-identifiers');await click('collapse-identifiers');
   expect(uiText(uiQuery(host, '[data-sync-conflict-history]'))).toBe(live);expect(uiText(c('scope'))).toBe(scope);expect(uiText(uiQuery(host, '[data-file-summary-scope]'))).toBe(summary);

@@ -1,3 +1,4 @@
+import { changeUiValue } from '~/test/uiControlDriver'
 import { setUiValue, uiDisabled, uiQuery, uiQueryAll, uiText } from "~/test/uiControlDriver";import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
@@ -19,12 +20,11 @@ const button = (label) => [...uiQueryAll(container, 'button')].find((node) => ui
 async function click(node) {expect(node).toBeTruthy();await act(async () => node.dispatchEvent(new MouseEvent('click', { bubbles: true })));}
 async function render(snapshot, props = {}) {await act(async () => root.render(<SyncPlanPanel snapshot={snapshot} {...props} />));}
 async function change(label, value) {
-  await act(async () => {
-    const node = uiQuery(container, '[aria-label="' + label + '"]');
-    const proto = node.tagName === 'SELECT' ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
-    await setUiValue(node, value);
-    node.dispatchEvent(new Event('input', { bubbles: true }));node.dispatchEvent(new Event('change', { bubbles: true }));
-  });
+  await (async () => {
+  const node = uiQuery(container, '[aria-label="' + label + '"]');
+  const proto = node.tagName === 'SELECT' ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
+  await changeUiValue(node, value, ['input', 'change']);
+})();
 }
 it('is absent without a snapshot and never calls the supplied action on mount', async () => {
   const onPreview = vi.fn();await render(null, { onPreview });expect(uiText(container)).toBe('');expect(onPreview).not.toHaveBeenCalled();

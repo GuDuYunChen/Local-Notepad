@@ -1,3 +1,4 @@
+import { changeUiValue } from '~/test/uiControlDriver'
 import { setUiValue, uiOptions, uiQuery, uiQueryAll, uiText, uiValue } from "~/test/uiControlDriver";import React, { act, StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -25,10 +26,11 @@ const choose = (side, value) => act(async () => {
   Object.defineProperty(input, 'files', { configurable: true, value: value ? [file] : [] });
   input.dispatchEvent(new Event('change', { bubbles: true }));await flush();
 });
-const direction = (value) => act(async () => {
-  const select = uiQuery(host, '[data-offline-direction]');await setUiValue(select, value);
-  select.dispatchEvent(new Event('change', { bubbles: true }));await flush();
-});
+const direction = (value) => (async () => {
+  const select = uiQuery(host, '[data-offline-direction]');
+  await changeUiValue(select, value, ['change']);
+  await act(flush);
+})();
 const rows = () => [...uiQueryAll(host, '[data-offline-result] tbody tr')];
 const deltas = () => rows().map((row) => Number(uiText(row.cells[3])));
 const compare = async (a = report(), b = report(2, 1)) => {
@@ -97,12 +99,13 @@ it('offline direction UI failed replacement removes old rows and direction', asy
   read.mockRejectedValueOnce(Error('PRIVATE_READ'));await choose('a', report());
   expect(rows()).toHaveLength(0);expect(uiQuery(host, '[data-offline-direction]')).toBeNull();expect(uiText(host)).not.toContain('PRIVATE_READ');
 });
-it('offline direction UI exposes a labelled native select and matching status controls', async () => {
+it('offline direction UI exposes a labelled component selector and matching popup/status controls', async () => {
   await compare();await click('[data-offline-differences]');const select = uiQuery(host, '[data-offline-direction]');
   expect(uiText(select.closest('label'))).toContain('差异方向（B − A）');
+  const options = await uiOptions(select);
   expect(document.getElementById(select.getAttribute('aria-controls'))).not.toBeNull();
   expect(document.getElementById(select.getAttribute('aria-describedby')).getAttribute('aria-live')).toBe('polite');
-  expect([...await uiOptions(select)].map((o) => uiValue(o))).toEqual(['all', 'increase', 'decrease']);
+  expect([...options].map((o) => uiValue(o))).toEqual(['all', 'increase', 'decrease']);
 });
 it('offline direction UI JSON export retains twelve metrics while only negatives are visible', async () => {
   await compare();await click('[data-offline-differences]');await direction('decrease');expect(rows()).toHaveLength(2);

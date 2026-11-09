@@ -1,11 +1,31 @@
-import React, { Children, Fragment, forwardRef, isValidElement, useEffect, useId, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { Button, Input, Select, ConfigProvider } from 'antd'
+import React, { Children, Fragment, forwardRef, isValidElement, useContext, useEffect, useId, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import Button from 'antd/es/button'
+import Input from 'antd/es/input'
+import Select from 'antd/es/select'
+import ConfigProvider from 'antd/es/config-provider'
+import { StyleContext } from '@ant-design/cssinjs'
+import UiControlDefaultsContext from './UiControlDefaultsContext'
 import './control-kit.css'
 const quietWave = { disabled: true }
 const controlTheme = { token: { motion: false }, components: {
-  Select: { optionHeight: 32, zIndexPopup: 1600 },
+  Select: { optionHeight: 32, zIndexPopup: 1600, controlOutlineWidth: 0 },
   Button: { primaryShadow: 'none', defaultShadow: 'none', dangerShadow: 'none' }
 } }
+const standaloneControlTheme = { ...controlTheme, cssVar: { key: 'css-var-local-notepad-default-controls' } }
+const defaultStyleKeys = new Set(['cache', 'defaultCache', 'hashPriority', 'autoPrefix'])
+
+// Identical standalone defaults can share one CSS-variable sheet. Other theme,
+// namespace, CSP or style-cache owners retain Ant Design's unique scope keys.
+function useFallbackControlTheme() {
+  const config = useContext(ConfigProvider.ConfigContext)
+  const style = useContext(StyleContext)
+  const styleKeys = Object.keys(style)
+  const defaultStyle = style.defaultCache === true && style.hashPriority === 'low' && style.autoPrefix === false &&
+    styleKeys.length === defaultStyleKeys.size && styleKeys.every(key => defaultStyleKeys.has(key))
+  const defaultConfig = config.theme === undefined && config.csp === undefined &&
+    config.getPrefixCls('') === 'ant' && config.iconPrefixCls === 'anticon'
+  return defaultConfig && defaultStyle ? standaloneControlTheme : controlTheme
+}
 
 const nativeTypes = new Set(['checkbox', 'radio', 'file', 'range', 'color', 'hidden', 'image', 'button', 'submit', 'reset'])
 const writeRef = (ref, value) => { if (typeof ref === 'function') ref(value); else if (ref) ref.current = value }
@@ -44,15 +64,18 @@ function useInheritedDisabled(node) {
 }
 
 export const UiButton = forwardRef(function UiButton({ type, htmlType, variant, danger, size, density, className = '', onClick, onMouseDown, ghost, children, ...props }, ref) {
+  const inheritedDefaults = useContext(UiControlDefaultsContext)
+  const fallbackTheme = useFallbackControlTheme()
   const structural = /(?:row|item|nav|menu|tab|swatch|handle|close|toggle|icon|chip|pill)/i.test(className) || ['tab', 'menuitem', 'option', 'treeitem'].includes(props.role)
   const kind = variant || (hasClass(className, 'primary') || type === 'primary' ? 'primary' : hasClass(className, 'link') || type === 'link' ? 'link' : hasClass(className, 'dashed') || type === 'dashed' ? 'dashed' : hasClass(className, 'text') || type === 'text' || structural ? 'text' : 'secondary')
   const nativeType = htmlType || (['button', 'submit', 'reset'].includes(type) ? type : type === undefined ? 'submit' : 'button')
   const buttonType = kind === 'primary' ? 'primary' : ['text', 'link', 'dashed'].includes(kind) ? kind : 'default'
   const guard = handler => event => { if (props.disabled || fieldsetDisabled(event.currentTarget)) { event.preventDefault(); event.stopPropagation(); return } handler?.(event) }
-  return <ConfigProvider wave={quietWave} theme={controlTheme}><Button {...props} ref={nativeRef(ref)} htmlType={nativeType} type={buttonType} danger={danger ?? hasClass(className, 'danger')} ghost={ghost ?? hasClass(className, 'ghost')} autoInsertSpace={false}
+  const control = <Button {...props} ref={nativeRef(ref)} htmlType={nativeType} type={buttonType} danger={danger ?? hasClass(className, 'danger')} ghost={ghost ?? hasClass(className, 'ghost')} autoInsertSpace={false}
     size={controlSize(size, density, className)} data-ui-control="button" data-ui-layout={structural ? 'content' : 'action'}
     aria-pressed={props['aria-pressed'] ?? (hasClass(className, 'active') ? true : undefined)}
-    className={['app-ui-button', cleanControlClass(className)].filter(Boolean).join(' ')} onClick={guard(onClick)} onMouseDown={guard(onMouseDown)}>{children}</Button></ConfigProvider>
+    className={['app-ui-button', cleanControlClass(className)].filter(Boolean).join(' ')} onClick={guard(onClick)} onMouseDown={guard(onMouseDown)}>{children}</Button>
+  return inheritedDefaults ? control : <ConfigProvider wave={quietWave} theme={fallbackTheme}>{control}</ConfigProvider>
 })
 
 export const UiInput = forwardRef(function UiInput({ className = '', size, density, type = 'text', ...props }, ref) {
@@ -94,6 +117,8 @@ const normalValue = value => Array.isArray(value) ? value.map(String) : value ==
 export const UiSelect = forwardRef(function UiSelect({ className = '', style, size, density, onChange, onInput, options, children, multiple = false,
   value, defaultValue, disabled = false, name, form, required = false, id, onKeyDown, onInputKeyDown, onOpenChange, onDropdownVisibleChange,
   open: requestedOpen, showSearch, getPopupContainer, ...props }, forwardedRef) {
+  const inheritedDefaults = useContext(UiControlDefaultsContext)
+  const fallbackTheme = useFallbackControlTheme()
   // Own the ARIA identity instead of inheriting rc-util's shared test-id.
   // This is the same real React identity in every environment, not a test path.
   // Explicit caller IDs remain authoritative; IDs survive ordinary rerenders.
@@ -147,13 +172,9 @@ export const UiSelect = forwardRef(function UiSelect({ className = '', style, si
   }
   // Native form participation only: no hidden select or test-only interaction path.
   const values = Array.isArray(selected) ? selected : [selected]
-  const activate = event => {
-    if (blocked || requestedOpen !== undefined) return
-    if (!open && (event.type === 'mousedown' || event.type === 'click') && event.target.closest?.('.ant-select-selector, .ant-select-content')) changeOpen(true)
-    if (event.type === 'keydown' && (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ') && !open) changeOpen(true)
-  }
-  return <ConfigProvider theme={controlTheme}><span ref={setNode} data-ui-control="select" data-ui-value={JSON.stringify(selected)} className={['app-ui-select-host', cleanControlClass(className)].filter(Boolean).join(' ')} style={style}
-    onMouseDownCapture={activate} onClickCapture={activate} onKeyDownCapture={activate}>
+  // The library owns pointer and keyboard activation. A second wrapper click
+  // handler would reopen the popup just closed by Select's mousedown handler.
+  const control = <span ref={setNode} data-ui-control="select" data-ui-value={JSON.stringify(selected)} className={['app-ui-select-host', cleanControlClass(className)].filter(Boolean).join(' ')} style={style}>
     <Select {...props} virtual={false} optionRender={option => <span data-ui-option-value={String(option.value)}>{option.label}</span>} ref={api} id={selectId} aria-required={required || undefined} value={selected} options={resolved} disabled={blocked}
       mode={multiple ? 'multiple' : undefined} size={controlSize(size, density, className)} status={errorStatus(props)} className="app-ui-select"
       showSearch={showSearch ?? flat.length > 12} optionFilterProp="label" open={blocked ? false : open} onOpenChange={changeOpen} onChange={change} onInputKeyDown={key}
@@ -162,5 +183,6 @@ export const UiSelect = forwardRef(function UiSelect({ className = '', style, si
     {required && <input className="app-ui-validation-field" data-ui-native="form-validation" type="text" aria-hidden="true" tabIndex={-1} form={form}
       value={values.some(item => item !== '') ? 'selected' : ''} readOnly={false} required disabled={blocked} onChange={() => {}}
       onInvalid={event => { event.preventDefault(); api.current?.focus() }} />}
-  </span></ConfigProvider>
+  </span>
+  return inheritedDefaults ? control : <ConfigProvider theme={fallbackTheme}>{control}</ConfigProvider>
 })

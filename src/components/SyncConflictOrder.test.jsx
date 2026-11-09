@@ -1,3 +1,6 @@
+import { prepareUiSelectChange } from '~/test/uiControlDriver'
+import { uiOptionsText } from '~/test/uiControlDriver'
+import { changeUiValue } from '~/test/uiControlDriver'
 import { setUiValue, uiDisabled, uiQuery, uiQueryAll, uiText, uiValue } from "~/test/uiControlDriver";import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
@@ -13,12 +16,11 @@ const field = (label) => uiQuery(container, '[aria-label="' + label + '"]');
 const cards = () => [...uiQueryAll(container, '[data-conflict-id]')].map((node) => node.dataset.conflictId);
 async function render() {await act(async () => {root.render(<Queue conflicts={conflicts} scope={scope} onResolve={resolve} onRefresh={refresh} {...props} />);await flush();});}
 async function click(node) {expect(node).toBeTruthy();await act(async () => {node.click();await flush();});}
-function dispatchChange(node, value) {
-  const proto = node.tagName === 'SELECT' ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
-  setUiValue(node, value);
-  node.dispatchEvent(new Event('input', { bubbles: true }));node.dispatchEvent(new Event('change', { bubbles: true }));
-}
-async function change(label, value) {await act(async () => {const node=field(label);await setUiValue(node,value);node.dispatchEvent(new Event('input',{bubbles:true}));node.dispatchEvent(new Event('change',{bubbles:true}));await flush();});}
+async function change(label, value) {await (async () => {
+  const node = field(label);
+  await changeUiValue(node, value, ['input', 'change']);
+  await act(flush);
+})();}
 beforeEach(() => {
   actEnvironment = globalThis.IS_REACT_ACT_ENVIRONMENT;globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   container = document.createElement('div');document.body.appendChild(container);root = createRoot(container);
@@ -39,7 +41,7 @@ it('attention-first brings flagged records forward but preserves all records and
   conflicts[24].local_record.file.is_deleted = true;
   await render();await change('冲突查看顺序', 'attention');
   expect(cards().slice(0, 3)).toEqual(['conflict-013', 'conflict-025', 'conflict-001']);
-  expect(uiText(container)).toContain('当前列表 25 条');expect(uiText(field('冲突关注项'))).toContain('含回收站（1）');
+  expect(uiText(container)).toContain('当前列表 25 条');expect(await uiOptionsText(field('冲突关注项'))).toContain('含回收站（1）');
   expect(resolve).not.toHaveBeenCalled();expect(refresh).not.toHaveBeenCalled();
 });
 it('newest and oldest are selectable without turning timestamp order into version choice', async () => {
@@ -74,7 +76,8 @@ it('a same-turn sort after submission is blocked before React rerenders', async 
   let finish;resolve.mockImplementation(() => new Promise((r) => {finish = r;}));
   await render();await click(button('保留本机'));await click(uiQuery(container, 'input[type="checkbox"]'));
   const selector = field('冲突查看顺序');
-  await act(async () => {button('确认处理此冲突').click();dispatchChange(selector, 'oldest');await flush();});
+  const selectOption = await prepareUiSelectChange(selector, 'oldest');
+  await act(async () => {button('确认处理此冲突').click();selectOption();await flush();});
   expect(uiValue(selector)).toBe('server');expect(uiDisabled(selector)).toBe(true);expect(uiDisabled(button('末页冲突'))).toBe(true);
   expect(resolve).toHaveBeenCalledTimes(1);expect(resolve.mock.calls[0][0].id).toBe('conflict-001');
   await act(async () => {finish(false);await flush();});

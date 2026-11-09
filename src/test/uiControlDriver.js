@@ -124,3 +124,27 @@ async function setUiSelectValue(node,value) {
  const popup=await openUiSelect(trigger)
  return chooseUiOption(popup,value)
 }
+
+// This helper owns its act scopes. Call it directly, not inside another act:
+// the Select portal must commit before its real option can be clicked.
+export async function changeUiValue(node, value, events = ['input', 'change']) {
+ if (!node) throw Error('Expected a rendered control before changing its value')
+ if (isUiSelect(node)) return setUiValue(node, value)
+ await act(async () => {
+  setUiValue(node, value)
+  for (const type of events) node.dispatchEvent(new Event(type, { bubbles: true }))
+ })
+ return value
+}
+export async function uiOptionsText(node) {
+ return [...await uiOptions(node)].map(option => option.textContent).join('')
+}
+// Resolve the real option before a same-turn race, then dispatch its click
+// synchronously inside the caller's batch. Do not invoke component callbacks.
+export async function prepareUiSelectChange(node, value) {
+ const popup = await openUiSelect(node)
+ const option = [...(popup?.querySelectorAll('[data-ui-option-value]') || [])]
+  .find(item => item.getAttribute('data-ui-option-value') === String(value))
+ if (!option) throw Error('Requested option is not available: ' + String(value))
+ return () => option.click()
+}

@@ -1,4 +1,4 @@
-import { setUiValue, uiDisabled, uiQuery, uiQueryAll, uiText, uiValue } from "~/test/uiControlDriver";import React, { act } from 'react';
+import { openUiSelect, setUiValue, uiDisabled, uiQuery, uiQueryAll, uiText, uiValue } from "~/test/uiControlDriver";import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import GlobalSearchPanel from './GlobalSearchPanel';
@@ -100,6 +100,30 @@ describe('global search workbench', () => {
     await act(async () => document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })));
     expect(uiText(find('检索上下文预览'))).toContain('笔记 b');
     await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));expect(onClose).toHaveBeenCalledOnce();expect(onOpenFile).not.toHaveBeenCalled();
+  });
+  it('lets an expanded Select consume the first Escape before the real modal owner closes', async () => {
+    await render();
+    const selector = find('检索目录范围');
+    await openUiSelect(selector);
+    await act(async () => selector.focus());
+    expect(selector.getAttribute('aria-expanded')).toBe('true');
+    const escape = () => selector.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27, bubbles: true, cancelable: true }));
+    await act(async () => escape());
+    expect(onClose).not.toHaveBeenCalled();
+    expect(selector.getAttribute('aria-expanded')).toBe('false');
+    expect(document.activeElement).toBe(selector);
+    expect(onOpenFile).not.toHaveBeenCalled();
+    await act(async () => escape());
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(onOpenFile).not.toHaveBeenCalled();
+  });
+  it('does not close the modal for an IME Escape from a selector', async () => {
+    await render();
+    const selector = find('检索目录范围');
+    await openUiSelect(selector);
+    await act(async () => selector.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', isComposing: true, bubbles: true, cancelable: true })));
+    expect(onClose).not.toHaveBeenCalled();
+    expect(onOpenFile).not.toHaveBeenCalled();
   });
 });
 

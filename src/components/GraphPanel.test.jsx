@@ -1,3 +1,4 @@
+import { changeUiValue } from '~/test/uiControlDriver'
 import { setUiValue, uiDisabled, uiQuery, uiQueryAll, uiText, uiValue } from "~/test/uiControlDriver";import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { beforeEach, afterEach, test, expect, vi } from 'vitest';
@@ -13,7 +14,10 @@ const flush = async () => act(async () => {for (let i = 0; i < 12; i++) await Pr
 const button = (text) => [...uiQueryAll(host, 'button')].find((n) => uiText(n) === text || n.getAttribute('aria-label') === text);
 async function click(text) {expect(button(text), 'missing ' + text).toBeTruthy();await act(async () => button(text).click());await flush();}
 async function mount(onSelect = select) {await act(async () => root.render(<GraphPanel onSelectFile={onSelect} onClose={close} />));await flush();}
-async function input(text) {await act(async () => {const el = uiQuery(host, 'input');setUiValue(el, text);el.dispatchEvent(new Event('input', { bubbles: true }));});await flush();}
+async function input(text) {await (async () => {
+  const el = uiQuery(host, 'input');
+  await changeUiValue(el, text, ['input']);
+})();await flush();}
 async function choose(id = '甲') {await act(async () => uiQuery(host, `[data-graph-note-id="${id}"]`).click());await flush();}
 beforeEach(() => {globalThis.IS_REACT_ACT_ENVIRONMENT = true;vi.useFakeTimers();api.mockReset();current = data();close = vi.fn();adopted = vi.fn();api.mockImplementation(async (p) => p === '/api/local-graph' ? current : { id: decodeURIComponent(p.split('/').pop()), title: decodeURIComponent(p.split('/').pop()), content: 'latest-body', is_folder: false, is_deleted: false });select = vi.fn(async (id, options) => {const file = await options.readFile(id, { signal: options.signal });if (!options.shouldSelect()) return false;adopted(file);return false;});host = document.createElement('div');document.body.append(host);root = createRoot(host);});
 afterEach(async () => {await act(async () => root.unmount());host.remove();vi.restoreAllMocks();vi.useRealTimers();delete globalThis.IS_REACT_ACT_ENVIRONMENT;});
@@ -25,7 +29,10 @@ test('literal filter and clear restore complete results without backend requests
 test('overlong query cannot leave an old actionable selection behind', async () => {await mount();await choose();await input('字'.repeat(101));expect(uiQuery(host, '[role=alert]')).toBeTruthy();expect(uiQuery(host, '[aria-label="选中笔记关系"]')).toBeNull();expect(uiQueryAll(host, '[data-graph-note-id]')).toHaveLength(0);await click('清除筛选');expect(uiQueryAll(host, '[data-graph-note-id]')).toHaveLength(3);});
 test('IME composition delays filtering and cannot start an open', async () => {await mount();await choose();const field = uiQuery(host, 'input');await act(async () => field.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true })));await input('无匹配');expect(uiText(host)).toContain('3 个匹配结果');expect(select).not.toHaveBeenCalled();await act(async () => field.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true })));expect(uiText(host)).toContain('0 个匹配结果');});
 test('focused one-hop graph excludes nonneighbors and retains relationship direction', async () => {await mount();await choose();await click('查看一跳关联');expect(uiText(host)).toContain('聚焦一跳关系');expect(uiQueryAll(host, '[data-graph-note-id]')).toHaveLength(2);await click('清除筛选');expect(uiQueryAll(host, '[data-graph-note-id]')).toHaveLength(3);});
-test('relation range selects only actual isolated notes', async () => {await mount();await act(async () => {const s = uiQuery(host, 'select');await setUiValue(s, 'isolated');s.dispatchEvent(new Event('change', { bubbles: true }));});expect(uiQueryAll(host, '[data-graph-note-id]')).toHaveLength(1);expect(uiText(uiQuery(host, '[data-graph-note-id]'))).toContain('孤立');});
+test('relation range selects only actual isolated notes', async () => {await mount();await (async () => {
+  const s = uiQuery(host, 'select');
+  await changeUiValue(s, 'isolated', ['change']);
+})();expect(uiQueryAll(host, '[data-graph-note-id]')).toHaveLength(1);expect(uiText(uiQuery(host, '[data-graph-note-id]'))).toContain('孤立');});
 test('list pagination exposes all nodes rather than hiding overflow', async () => {current = { scope: current.scope, complete: true, nodes: Array.from({ length: 21 }, (_, i) => n(String(i))), edges: [] };await mount();expect(uiQueryAll(host, '[data-graph-note-id]')).toHaveLength(20);await click('下一页');expect(uiQueryAll(host, '[data-graph-note-id]')).toHaveLength(1);await click('上一页');expect(uiQueryAll(host, '[data-graph-note-id]')).toHaveLength(20);});
 test('opening goes through latest target read and original decision, cancellation retains query', async () => {await mount();await input('甲');await choose();await click('打开选中笔记');expect(select).toHaveBeenCalledTimes(1);expect(adopted.mock.calls[0][0].content).toBe('latest-body');expect(uiText(host)).toContain('当前查询、关系选择和草稿已保留');expect(uiValue(uiQuery(host, 'input'))).toBe('甲');expect(close).not.toHaveBeenCalled();expect(api.mock.calls.every(([, i]) => !i.method)).toBe(true);});
 test('renamed or deleted target is not passed into the original selection', async () => {await mount();await choose();api.mockResolvedValue({ id: '甲', title: '改名', content: 'latest-body' });await click('打开选中笔记');expect(uiText(host)).toContain('已经更名');expect(adopted).not.toHaveBeenCalled();api.mockResolvedValue({ id: '甲', title: '甲', content: 'x', is_deleted: true });await click('打开选中笔记');expect(adopted).not.toHaveBeenCalled();});

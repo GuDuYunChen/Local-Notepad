@@ -10,6 +10,16 @@ let root, host, closed, opened, current, bodyData, indexData, held, readError, d
 const drain = async () => {for (let i = 0; i < 30; i++) await Promise.resolve();await new Promise((r) => setTimeout(r, 8));for (let i = 0; i < 20; i++) await Promise.resolve();};
 const button = (text, owner = document) => [...uiQueryAll(owner, 'button')].find((n) => uiText(n).trim() === text || n.getAttribute('aria-label') === text);
 const click = async (text, owner = document) => act(async () => {const n = button(text, owner);expect(n, text).toBeTruthy();expect(uiDisabled(n), text).toBe(false);n.focus();n.click();await drain();});
+// Body verification and source reads can outlive a click's render drain. Wait
+// for the active operation's visible cancel control to leave before inspecting
+// its result. Held-read and cancellation tests intentionally keep plain click.
+const clickAndWaitForCompletion = async (text, owner = document) => {
+  await click(text, owner);
+  await vi.waitFor(async () => {
+    await act(drain);
+    expect(button('取消读取') ?? button('停止核对') ?? button('取消打开'), uiQuery(document, '.note-comparison-feedback')?.textContent).toBeUndefined();
+  }, { timeout: 2000, interval: 10 });
+};
 const select = async (id, side) => click(side === 'left' ? '设为左侧' : '设为右侧', uiQuery(document, '[data-compare-note="' + id + '"]'));
 const change = async (selector, value) => {const n = uiQuery(document, selector);expect(n).toBeTruthy();await setUiValue(n, value);await act(async () => {n.dispatchEvent(new Event(n.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true }));await drain();});};
 const compare = async () => {await select('a', 'left');await select('b', 'right');await click('开始比较');await awaitComparisonResult();};
@@ -30,14 +40,14 @@ describe('whole note comparison workflow', () => {
   it('renders raw hostile markup as plain text, not image or script', async () => {bodyData = comparisonFixture(['<img src="x" onerror="alert(1)">', '<script>danger()</script>']);await compare();expect(uiQuery(document, '.note-comparison img')).toBeNull();expect(uiQuery(document, '.note-comparison script')).toBeNull();expect(uiText(uiQuery(document, '.note-comparison-lines'))).toContain('<script>danger()</script>');});
   it('pages all differences and navigates distant change groups', async () => {bodyData = comparisonFixture(['left\n' + 'same\n'.repeat(100) + 'last-a\n', 'right\n' + 'same\n'.repeat(100) + 'last-b\n']);await compare();expect(uiQueryAll(document, '[data-diff-kind]')).toHaveLength(60);await click('下一处差异');expect(uiText(uiQuery(document, '[data-change-target=true] pre'))).toBe('last-a');expect(uiText(document.body)).toContain('第 2/2 页');await click('上一处差异');expect(uiText(uiQuery(document, '[data-change-target=true] pre'))).toBe('left');});
   it('does not download without explicit consent, resets opt-in on reopen', async () => {await compare();await click('导出比较报告');expect(uiQuery(document, 'input[type=checkbox]').checked).toBe(false);await act(async () => {uiQuery(document, 'input[type=checkbox]').click();await drain();});await click('取消导出');expect(downloads).toHaveLength(0);await click('导出比较报告');expect(uiQuery(document, 'input[type=checkbox]').checked).toBe(false);});
-  it('downloads private summary only after fresh pair revalidation', async () => {await compare();const before = api.mock.calls.filter(([p]) => p.startsWith('/api/note-comparison')).length;await click('导出比较报告');await click('确认导出');await vi.waitFor(() => expect(downloads).toHaveLength(1), { timeout: 5000, interval: 20 });const v = JSON.parse(await downloads[0].text());expect(v.notes).toBeUndefined();expect(v.contains_contents).toBe(false);expect(api.mock.calls.filter(([p]) => p.startsWith('/api/note-comparison')).length).toBe(before + 1);expect(uiText(uiQuery(document, '[role=status]'))).toContain('已发起比较报告下载');});
-  it('explicit detailed export contains both full sources in the chosen direction', async () => {await compare();await click('导出比较报告');await act(async () => {uiQuery(document, 'input[type=checkbox]').click();await drain();});await click('确认导出');const v = JSON.parse(await downloads[0].text());expect(v.notes).toEqual(bodyData.notes);expect(v.rows.some((n) => n.kind === 'right')).toBe(true);});
-  it('rejects a changed body before export even when server revision is reused', async () => {await compare();await click('导出比较报告');bodyData = { ...comparisonFixture(['new', 'other']), revision: bodyData.revision };await click('确认导出');expect(downloads).toHaveLength(0);expect(uiText(uiQuery(document, '[role=alert]'))).toContain('资料库已变化');expect(uiDisabled(button('导出比较报告'))).toBe(true);});
-  it('rejects a renamed source since selection instead of mislabeling the pair', async () => {await select('a', 'left');await select('b', 'right');bodyData.notes[0].title = 'renamed';await click('开始比较');expect(uiQuery(document, '[data-comparison-state]')).toBeNull();expect(uiText(uiQuery(document, '[role=alert]'))).toContain('资料库已变化');});
-  it('keeps original source guard and remains mounted on cancel', async () => {await compare();await click('打开左侧原文');expect(opened).toHaveBeenCalledTimes(1);expect(uiQuery(document, '.note-comparison')).not.toBeNull();expect(uiText(uiQuery(document, '[role=status]'))).toContain('打开已取消');expect(api.mock.calls.some(([p]) => p === '/api/files/a')).toBe(true);});
-  it('closes only when original source owner accepts a fresh read', async () => {opened.mockImplementation(async (id, opts) => {await opts.readFile(id, { signal: opts.signal });return opts.shouldSelect();});await compare();await click('打开左侧原文');expect(closed).toHaveBeenCalledTimes(1);expect(uiQuery(document, '.note-comparison')).toBeNull();});
-  it('refuses changed source navigation', async () => {await compare();current = { ...current, content: 'changed' };await click('打开左侧原文');expect(closed).not.toHaveBeenCalled();expect(uiText(uiQuery(document, '[role=alert]'))).toContain('资料库已变化');});
-  it('read errors discard results and allow explicit complete retry', async () => {await select('a', 'left');await select('b', 'right');readError = true;await click('开始比较');expect(uiQuery(document, '[role=alert]')).not.toBeNull();expect(uiQuery(document, '[data-comparison-state]')).toBeNull();readError = false;await click('开始比较');await awaitComparisonResult();expect(uiQuery(document, '[data-comparison-state]')).not.toBeNull();});
+  it('downloads private summary only after fresh pair revalidation', async () => {await compare();const before = api.mock.calls.filter(([p]) => p.startsWith('/api/note-comparison')).length;await click('导出比较报告');await clickAndWaitForCompletion('确认导出');await vi.waitFor(() => expect(downloads).toHaveLength(1), { timeout: 5000, interval: 20 });const v = JSON.parse(await downloads[0].text());expect(v.notes).toBeUndefined();expect(v.contains_contents).toBe(false);expect(api.mock.calls.filter(([p]) => p.startsWith('/api/note-comparison')).length).toBe(before + 1);expect(uiText(uiQuery(document, '[role=status]'))).toContain('已发起比较报告下载');});
+  it('explicit detailed export contains both full sources in the chosen direction', async () => {await compare();await click('导出比较报告');await act(async () => {uiQuery(document, 'input[type=checkbox]').click();await drain();});await clickAndWaitForCompletion('确认导出');const v = JSON.parse(await downloads[0].text());expect(v.notes).toEqual(bodyData.notes);expect(v.rows.some((n) => n.kind === 'right')).toBe(true);});
+  it('rejects a changed body before export even when server revision is reused', async () => {await compare();await click('导出比较报告');bodyData = { ...comparisonFixture(['new', 'other']), revision: bodyData.revision };await clickAndWaitForCompletion('确认导出');expect(downloads).toHaveLength(0);expect(uiText(uiQuery(document, '[role=alert]'))).toContain('资料库已变化');expect(uiDisabled(button('导出比较报告'))).toBe(true);});
+  it('rejects a renamed source since selection instead of mislabeling the pair', async () => {await select('a', 'left');await select('b', 'right');bodyData.notes[0].title = 'renamed';await clickAndWaitForCompletion('开始比较');expect(uiQuery(document, '[data-comparison-state]')).toBeNull();expect(uiText(uiQuery(document, '[role=alert]'))).toContain('资料库已变化');});
+  it('keeps original source guard and remains mounted on cancel', async () => {await compare();await clickAndWaitForCompletion('打开左侧原文');expect(opened).toHaveBeenCalledTimes(1);expect(uiQuery(document, '.note-comparison')).not.toBeNull();expect(uiText(uiQuery(document, '[role=status]'))).toContain('打开已取消');expect(api.mock.calls.some(([p]) => p === '/api/files/a')).toBe(true);});
+  it('closes only when original source owner accepts a fresh read', async () => {opened.mockImplementation(async (id, opts) => {await opts.readFile(id, { signal: opts.signal });return opts.shouldSelect();});await compare();await clickAndWaitForCompletion('打开左侧原文');expect(closed).toHaveBeenCalledTimes(1);expect(uiQuery(document, '.note-comparison')).toBeNull();});
+  it('refuses changed source navigation', async () => {await compare();current = { ...current, content: 'changed' };await clickAndWaitForCompletion('打开左侧原文');expect(closed).not.toHaveBeenCalled();expect(uiText(uiQuery(document, '[role=alert]'))).toContain('资料库已变化');});
+  it('read errors discard results and allow explicit complete retry', async () => {await select('a', 'left');await select('b', 'right');readError = true;await clickAndWaitForCompletion('开始比较');expect(uiQuery(document, '[role=alert]')).not.toBeNull();expect(uiQuery(document, '[data-comparison-state]')).toBeNull();readError = false;await click('开始比较');await awaitComparisonResult();expect(uiQuery(document, '[data-comparison-state]')).not.toBeNull();});
 });
 const defer = () => {let resolve;return { promise: new Promise((r) => {resolve = r;}), resolve: (v) => resolve(v) };};
 describe('cancellation and ownership', () => {
@@ -48,7 +58,7 @@ describe('cancellation and ownership', () => {
   it('duplicate activation has only one network request', async () => {await select('a', 'left');await select('b', 'right');held = defer();await act(async () => {const b = button('开始比较');b.click();b.click();await drain();});expect(api.mock.calls.filter(([p]) => p.startsWith('/api/note-comparison'))).toHaveLength(1);await click('取消读取');});
   it('IME Escape is ignored, regular Escape closes, and save shortcut is suppressed', async () => {const p = uiQuery(document, '.note-comparison');await act(async () => {const save = new KeyboardEvent('keydown', { key: 's', ctrlKey: true, bubbles: true, cancelable: true });p.dispatchEvent(save);expect(save.defaultPrevented).toBe(true);p.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', isComposing: true, bubbles: true }));await drain();});expect(closed).not.toHaveBeenCalled();await act(async () => {p.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));await drain();});expect(closed).toHaveBeenCalledTimes(1);});
   it('confirmation owns Tab/Escape and never propagates to page navigation', async () => {await compare();await click('导出比较报告');const box = uiQuery(document, '[role=alertdialog]'),last = button('确认导出', box);last.focus();await act(async () => {box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }));await drain();});expect(document.activeElement).toBe(uiQuery(box, 'input'));await act(async () => {box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));await drain();});expect(uiQuery(document, '[role=alertdialog]')).toBeNull();expect(document.activeElement).toBe(button('导出比较报告'));expect(closed).not.toHaveBeenCalled();});
-  it('all product interactions use GET-only requests and no saved comparison state', async () => {await compare();await click('导出比较报告');await click('确认导出');expect(api.mock.calls.every(([, o]) => !o.method)).toBe(true);expect(localStorage.length).toBe(0);});
+  it('all product interactions use GET-only requests and no saved comparison state', async () => {await compare();await click('导出比较报告');await clickAndWaitForCompletion('确认导出');expect(api.mock.calls.every(([, o]) => !o.method)).toBe(true);expect(localStorage.length).toBe(0);});
 });
 
 // Crypto verification crosses the actual Node/WebCrypto boundary. Wait for the
@@ -123,16 +133,13 @@ describe('explicit current-change relocation', () => {
   });
 });
 
-it('locates exact first-change page at both sides of each 60-row boundary', async () => {
-  for (const prefixLength of [59, 60, 61, 119, 120, 180]) {
-    if (uiQuery(document, '[data-comparison-state]')) await click('返回选择');
-    bodyData = comparisonFixture(['same\n'.repeat(prefixLength) + 'BOUNDARY-LEFT\n', 'same\n'.repeat(prefixLength) + 'BOUNDARY-RIGHT\n']);
-    // Returning preserves the original explicit source selection.
-    if (!uiText(uiQuery(document, '[data-comparison-selection="0"]')).includes('a.md')) {await select('a', 'left');await select('b', 'right');}
-    await click('开始比较');await awaitComparisonResult();
-    expect(uiQuery(document, '[data-change-target=true] pre')?.textContent).toBe('BOUNDARY-LEFT');
-    expect(uiText(uiQuery(document, '[aria-label="笔记差异分页"]'))).toContain('第 ' + (Math.floor(prefixLength / 60) + 1) + '/');
-  }
+// Each independent boundary owns the original renderer setup/cleanup and test
+// budget. Six complete Ant Design workflows must not share one test deadline.
+it.each([59, 60, 61, 119, 120, 180])('locates exact first-change page at both sides of each 60-row boundary (%i unchanged lines)', async (prefixLength) => {
+  bodyData = comparisonFixture(['same\n'.repeat(prefixLength) + 'BOUNDARY-LEFT\n', 'same\n'.repeat(prefixLength) + 'BOUNDARY-RIGHT\n']);
+  await compareSettled();
+  expect(uiQuery(document, '[data-change-target=true] pre')?.textContent).toBe('BOUNDARY-LEFT');
+  expect(uiText(uiQuery(document, '[aria-label="笔记差异分页"]'))).toContain('第 ' + (Math.floor(prefixLength / 60) + 1) + '/');
 });
 
 // Exercise the real WebCrypto implementation with an intentionally slow boundary.
@@ -149,4 +156,11 @@ it('waits for both real body digests before treating comparison as complete', as
   expect(uiQuery(document, '[data-comparison-state]')?.dataset.comparisonState).toBe('same');
   expect(uiText(document.body)).toContain('文本投影相同，但保存正文不同');
   expect(digest).toHaveBeenCalledTimes(2);
+  await click('导出比较报告');
+  bodyData = { ...comparisonFixture(['new', 'other']), revision: bodyData.revision };
+  await clickAndWaitForCompletion('确认导出');
+  expect(downloads).toHaveLength(0);
+  expect(uiText(uiQuery(document, '[role=alert]'))).toContain('资料库已变化');
+  expect(uiDisabled(button('导出比较报告'))).toBe(true);
+  expect(digest).toHaveBeenCalledTimes(4);
 });
