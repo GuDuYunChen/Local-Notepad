@@ -38,3 +38,12 @@ input[data-ui-native="checkbox"], input[data-ui-native="radio"], input[data-ui-n
   :where([class$="-tools"], [class$="-filter"], [class$="-filters"]) { flex-wrap:wrap; }
   :where([class$="-tools"], [class$="-filter"], [class$="-filters"]) > label:has(> [data-ui-control]) { flex:1 1 160px; }
 }
+
+/* The legacy 0.01ms reduced-motion rule must not animate immediate shared-control focus. */
+@media (prefers-reduced-motion: reduce) {
+  .app-ui-button,
+  .app-ui-input,
+  .app-ui-select-host > .app-ui-select {
+    transition-duration: 0s !important;
+  }
+}
