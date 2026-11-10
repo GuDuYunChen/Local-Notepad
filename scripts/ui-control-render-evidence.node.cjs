@@ -403,3 +403,168 @@ test('a paint completed during an in-flight DOM read cannot certify that earlier
   delayRead = false
   assert.equal((await read()).popup.paintFrames, 2)
 })
+
+const { verifyToolbarSnapshot, verifyToolbarContinuity, captureToolbarEvidence } = require('./check-ui-control-render.cjs')
+function visibleToolbar() {
+  const box = (top, height) => ({ left: 16, right: 684, top, bottom: top + height, width: 668, height, owned: true, visible: true, inViewport: true, hit: true })
+  return { viewport: { width: 704, height: 455 }, theme: 'dark', overflow: 0, longLabelLength: 45,
+    rootBounds: box(30, 210), fields: ['long-input', 'long-select', 'long-clear'].map((id, index) => ({ id, ...box(70 + index * 70, 40) })),
+    labels: [0, 1].map(index => ({ index, ...box(40 + index * 70, 65) })) }
+}
+const toolbarImage = { name: 'dark-704x455-toolbar.png', bytes: 1200, sha256: 'a'.repeat(64), width: 704, height: 455 }
+
+test('toolbar PNG targets require all original controls and both complete visible labels', () => {
+  const expected = { viewport: { width: 704, height: 455 }, theme: 'dark' }
+  verifyToolbarSnapshot(visibleToolbar(), expected)
+  for (const mutate of [s => { s.fields[0].inViewport = false }, s => { s.fields[1].hit = false },
+    s => { s.fields[2].owned = false }, s => { s.labels[0].visible = false }, s => { s.labels.pop() },
+    s => { s.fields[0].top = -20 }, s => { s.theme = 'light' }, s => { s.fields[0].height = 28 }]) {
+    const sample = visibleToolbar(); mutate(sample); assert.throws(() => verifyToolbarSnapshot(sample, expected))
+  }
+})
+
+test('toolbar evidence rejects target movement across the actual capture boundary', () => {
+  for (const owner of ['fields', 'labels']) {
+    const before = visibleToolbar(), after = structuredClone(before)
+    after[owner][0].left += 3; after[owner][0].right += 3
+    assert.throws(() => verifyToolbarContinuity(before, after, before), /moved/)
+  }
+})
+
+test('toolbar capture reads after the runner paint wait and independently after the PNG', async () => {
+  const record = visibleToolbar(), order = [], expected = structuredClone(record)
+  const image = await captureToolbarEvidence({ record, expected, persist() {},
+    read: async () => { order.push('read'); return structuredClone(expected) },
+    capture: async guard => { order.push('paint'); await guard(); order.push('png'); return toolbarImage } })
+  assert.deepEqual(order, ['paint', 'read', 'png', 'read'])
+  assert.deepEqual(image, toolbarImage); assert.equal(record.capture.complete, true)
+  assert.deepEqual(record.capture.before, expected); assert.deepEqual(record.capture.after, expected)
+})
+
+test('toolbar capture refuses disappearing targets before or after a real image', async () => {
+  for (const phase of ['before', 'after']) {
+    const record = visibleToolbar(), expected = structuredClone(record); let current = structuredClone(record), captures = 0
+    await assert.rejects(() => captureToolbarEvidence({ record, expected, persist() {}, read: async () => structuredClone(current),
+      capture: async guard => {
+        if (phase === 'before') current.fields[0].inViewport = false
+        await guard(); captures++
+        if (phase === 'after') current.fields[0].visible = false
+        return toolbarImage
+      } }), /target.*visible/)
+    assert.equal(captures, phase === 'before' ? 0 : 1); assert.equal(record.capture.complete, false)
+    if (phase === 'after') assert.deepEqual(record.capture.image, toolbarImage)
+  }
+})
+
+test('toolbar capture refuses an omitted guard and preserves original native capture failures', async () => {
+  let record = visibleToolbar(), expected = structuredClone(record)
+  await assert.rejects(() => captureToolbarEvidence({ record, expected, persist() {}, read: async () => expected,
+    capture: async () => toolbarImage }), /omitted.*guard/)
+  assert.equal(record.capture.complete, false)
+  record = visibleToolbar(); expected = structuredClone(record); const failure = Error('native PNG failed')
+  await assert.rejects(() => captureToolbarEvidence({ record, expected, persist() {}, read: async () => expected,
+    capture: async guard => { await guard(); throw failure } }), error => error === failure)
+  assert.equal(record.capture.complete, false); assert.equal(record.capture.after, undefined)
+})
+
+// Execute the exact page observer after serialization. These DOM-shaped inputs
+// model documented CSS viewport propagation; they do not claim native layout.
+const { toolbarSnapshot } = require('./check-ui-control-render.cjs')
+function serializedToolbarPage() {
+  const nodes = new Map(), rectangle = (left, top, width, height) => ({ left, top, right: left + width, bottom: top + height, width, height })
+  const element = (tag, id, parent, rect, css = {}) => {
+    const node = { tagName: tag.toUpperCase(), localName: tag, namespaceURI: 'http://www.w3.org/1999/xhtml',
+      id, parentElement: parent, children: [], rect, clientLeft: 0, clientTop: 0, clientWidth: rect.width, clientHeight: rect.height,
+      css: { display: 'block', visibility: 'visible', opacity: '1', overflowX: 'visible', overflowY: 'visible', contain: 'none', contentVisibility: 'visible', ...css },
+      getBoundingClientRect() { return this.rect },
+      contains(target) { for (let current = target; current; current = current.parentElement) if (current === this) return true; return false },
+      closest(selector) { for (let current = this; current; current = current.parentElement) if (selector === '.ant-select' && current.isSelect) return current; return null },
+    }
+    parent?.children.push(node); nodes.set(id, node); return node
+  }
+  // Reuse the five actual 704x455 target bounds with a synthetic scrolled
+  // 100%-height body box. The failed native receipt did not record body bounds;
+  // this fixture exercises the exact source's documented overflow semantics.
+  const html = element('html', 'html', null, rectangle(0, -420, 696, 455))
+  html.clientWidth = 696; html.clientHeight = 455; html.scrollWidth = 696; html.dataset = { theme: 'light' }
+  const body = element('body', 'body', html, rectangle(0, -420, 696, 455), { overflowX: 'auto', overflowY: 'auto' })
+  const wrapper = element('div', 'root', body, rectangle(0, -420, 696, 1200))
+  const toolbar = element('div', 'long-toolbar', wrapper, rectangle(16, 57.3125, 664, 190.375))
+  const labels = [element('label', 'label-one', toolbar, rectangle(16, 57.3125, 664, 65.1875)),
+    element('label', 'label-two', toolbar, rectangle(16, 132.5, 664, 65.1875))]
+  labels[0].textContent = '很长的检索标签，需要在窄窗口完整换行且不挤压相邻控件'
+  const input = element('input', 'long-input', labels[0], rectangle(16, 82.5, 664, 40))
+  const select = element('div', 'select-owner', labels[1], rectangle(16, 157.6875, 664, 40)); select.isSelect = true
+  element('input', 'long-select', select, rectangle(28, 159.6875, 640, 36))
+  const button = element('button', 'long-clear', toolbar, rectangle(16, 207.6875, 664, 40))
+  toolbar.querySelectorAll = selector => selector === 'label' ? labels : []
+  toolbar.querySelector = selector => toolbar.querySelectorAll(selector)[0] || null
+  const page = { html, body, wrapper, toolbar, labels, input, select, button, forceHit: undefined }
+  const document = { documentElement: html, body, getElementById: id => nodes.get(id),
+    querySelectorAll: selector => selector === '#long-toolbar' ? [toolbar] : [],
+    elementFromPoint(x, y) {
+      if (page.forceHit !== undefined) return page.forceHit
+      return [input, select, button, ...labels].find(node => x >= node.rect.left && x <= node.rect.right && y >= node.rect.top && y <= node.rect.bottom) || null
+    } }
+  page.observe = () => JSON.parse(JSON.stringify(vm.runInNewContext(`(${toolbarSnapshot.toString()})()`,
+    { document, getComputedStyle: node => node.css, innerWidth: 704, innerHeight: 455 })))
+  page.rectangle = rectangle
+  return page
+}
+
+test('serialized toolbar observation clips propagated HTML body overflow at the viewport after scroll', () => {
+  const page = serializedToolbarPage(), sample = page.observe()
+  verifyToolbarSnapshot(sample, { viewport: { width: 704, height: 455 }, theme: 'light' })
+  assert.ok(page.body.rect.bottom < sample.fields[0].top)
+  assert.equal(sample.viewportOverflow.bodyPropagated, true); assert.equal(sample.viewportOverflow.owner.tag, 'body')
+  const body = sample.fields[0].ancestors.find(item => item.tag === 'body')
+  assert.equal(body.computed.overflowY, 'auto'); assert.equal(body.rect.top, -420)
+  assert.equal(body.appliedClipY, false); assert.equal(body.viewportOverflow, true)
+  assert.deepEqual(sample.fields.map(item => [item.top, item.bottom]), [[82.5, 122.5], [157.6875, 197.6875], [207.6875, 247.6875]])
+})
+
+test('serialized toolbar observation applies root overflow to the viewport rather than its scrolled box', () => {
+  const page = serializedToolbarPage()
+  Object.assign(page.html.css, { overflowX: 'auto', overflowY: 'auto' })
+  Object.assign(page.body.css, { overflowX: 'visible', overflowY: 'visible' })
+  const sample = page.observe()
+  verifyToolbarSnapshot(sample, { viewport: { width: 704, height: 455 }, theme: 'light' })
+  assert.equal(sample.viewportOverflow.bodyPropagated, false); assert.equal(sample.viewportOverflow.owner.tag, 'html')
+  const html = sample.fields[0].ancestors.find(item => item.tag === 'html')
+  assert.equal(html.appliedClipY, false); assert.ok(html.rect.bottom < sample.fields[0].top)
+})
+
+test('serialized toolbar observation keeps non-propagated or contained body overflow as its own clip', () => {
+  for (const change of [page => { page.html.css.overflowX = 'auto'; page.html.css.overflowY = 'hidden' }, page => { page.html.css.contain = 'layout' },
+    page => { page.body.css.contain = 'paint' }, page => { page.html.css.contentVisibility = 'auto' },
+    page => { page.body.css.contentVisibility = 'hidden' }, page => { delete page.html.css.contentVisibility },
+    page => { delete page.body.css.contain }]) {
+    const page = serializedToolbarPage(); change(page)
+    const sample = page.observe()
+    assert.equal(sample.fields[0].inViewport, false)
+    assert.throws(() => verifyToolbarSnapshot(sample, { viewport: { width: 704, height: 455 }, theme: 'light' }), /inViewport/)
+  }
+})
+
+test('serialized toolbar observation preserves real nested client clipping including scrollbar and border insets', () => {
+  for (const change of [page => { page.wrapper.css.overflowX = 'auto'; page.wrapper.css.overflowY = 'auto'; page.wrapper.clientWidth = 650 },
+    page => { page.wrapper.css.overflowX = 'hidden'; page.wrapper.css.overflowY = 'auto'; page.wrapper.clientLeft = 24; page.wrapper.clientWidth = 660 },
+    page => { page.wrapper.css.overflowX = 'auto'; page.wrapper.css.overflowY = 'auto'; page.wrapper.clientHeight = 200 }]) {
+    const page = serializedToolbarPage()
+    page.body.rect = page.rectangle(0, 0, 696, 455)
+    page.wrapper.rect = page.rectangle(0, 0, 696, 455); page.wrapper.clientWidth = 696; page.wrapper.clientHeight = 455
+    change(page); const sample = page.observe()
+    assert.equal(sample.fields.every(item => item.inViewport), false)
+    assert.throws(() => verifyToolbarSnapshot(sample, { viewport: { width: 704, height: 455 }, theme: 'light' }), /inViewport/)
+    const nested = sample.fields[2].ancestors.find(item => item.id === 'root')
+    assert.ok(nested.appliedClipX || nested.appliedClipY)
+  }
+})
+
+test('serialized toolbar observation still requires viewport client bounds, ancestor visibility and actual hits', () => {
+  for (const change of [page => { page.html.clientWidth = 660 }, page => { page.wrapper.css.opacity = '0' },
+    page => { page.html.css.display = 'none' }, page => { page.forceHit = null }]) {
+    const page = serializedToolbarPage(); change(page)
+    assert.throws(() => verifyToolbarSnapshot(page.observe(), { viewport: { width: 704, height: 455 }, theme: 'light' }))
+  }
+})

@@ -22,7 +22,7 @@
   font-weight: 680;
 }
 
-.project-analytics-head span {
+.project-analytics-head > div > span {
   margin-top: 2px;
   color: var(--ink-muted);
   font-size: 8px;

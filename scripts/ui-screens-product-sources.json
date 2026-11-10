@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "productCommit": "a9b7ed298db2a7be446021fe0c49deea4ef8ef54",
+  "productCommit": "5ee0e095290691f66a232320fd06203652d1e54c",
   "sourceFiles": {
     "scripts/native-ui-select.mjs": "f657525153b5ce387421c91c134556a3c6e305ff",
-    "scripts/check-ui-control-render.cjs": "4eeef78a6e6824f44b400e7abd6496ba2283c3ed",
+    "scripts/check-ui-control-render.cjs": "f289ec146b2961b686f1df25897536499a1601cb",
     "scripts/desktop-save-fixture.mjs": "f86598e0d552a5d884eff9e30739617366c685c9",
     "scripts/desktop-window-session.mjs": "d298f7163131df889a1df491338457e17531d42f",
     "scripts/desktop-window-target.mjs": "a5e0f1e055fddb632723baec67ec09610e58a04d",

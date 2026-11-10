@@ -2746,7 +2746,7 @@ body {
   font-weight: 650;
 }
 
-.settings-row span {
+.settings-row > div:first-child > span {
   display: block;
   margin-top: 2px;
   color: var(--ink-muted);
@@ -3060,7 +3060,7 @@ body {
   font-size: 13px;
 }
 
-.consumer-settings-section .settings-row span,
+.consumer-settings-section .settings-row > div:first-child > span,
 .consumer-settings-section .settings-path-row code {
   margin-top: 4px;
   font-size: 11px;
@@ -3131,7 +3131,7 @@ body {
   color: var(--ink);
 }
 
-.settings-advanced-header span {
+.settings-advanced-header > div:first-child > span {
   display: block;
   margin-top: 2px;
   font-size: 10px;
@@ -3570,8 +3570,8 @@ body {
   font-weight: 700 !important;
 }
 
-.daily-section-heading span,
-.daily-notes-list-header span {
+.daily-section-heading > div > span,
+.daily-notes-list-header > div > span {
   display: block;
   margin-top: 3px;
   color: var(--ink-muted);
@@ -4579,10 +4579,7 @@ body {
 }
 
 .workspace-brand-mark {
-  width: 34px;
-  flex: 0 0 34px;
-  display: grid;
-  place-items: center;
+  flex: 0 0 auto;
   cursor: pointer;
 }
 
@@ -4637,7 +4634,7 @@ body {
   cursor: pointer;
 }
 
-.workspace-sidebar-search span {
+.workspace-sidebar-search span:where(:not(.ant-btn-icon)) {
   min-width: 0;
   flex: 1;
   text-align: left;
@@ -4799,17 +4796,15 @@ body {
   justify-content: center;
 }
 
-.workspace-sidebar.collapsed .workspace-brand-mark {
-  width: 34px;
-  flex-basis: 34px;
-}
-
 .workspace-sidebar-icon-btn,
 .workspace-sidebar-expand {
-  width: 38px;
   margin: 5px auto 0;
   display: grid;
   place-items: center;
+}
+
+.workspace-sidebar-icon-btn {
+  width: 38px;
 }
 
 .workspace-sidebar.collapsed .workspace-sidebar-nav {
@@ -4863,10 +4858,10 @@ body {
   .workspace-sidebar.collapsed {
     position: relative !important;
     inset: auto !important;
-    width: 46px !important;
-    min-width: 46px !important;
-    max-width: 46px !important;
-    flex: 0 0 46px !important;
+    width: 52px !important;
+    min-width: 52px !important;
+    max-width: 52px !important;
+    flex: 0 0 52px !important;
     overflow: visible !important;
     border-right: 1px solid var(--line) !important;
     box-shadow: none !important;
@@ -4877,11 +4872,9 @@ body {
     padding-inline: 4px;
   }
 
-  .workspace-sidebar.collapsed .workspace-brand-mark,
   .workspace-sidebar.collapsed .workspace-sidebar-nav-item,
   .workspace-sidebar.collapsed .workspace-sidebar-more,
-  .workspace-sidebar.collapsed .workspace-sidebar-icon-btn,
-  .workspace-sidebar.collapsed .workspace-sidebar-expand {
+  .workspace-sidebar.collapsed .workspace-sidebar-icon-btn {
     width: 36px !important;
     min-width: 36px !important;
   }
@@ -4892,6 +4885,36 @@ body {
 .workspace-sidebar.collapsed .workspace-sidebar-icon-btn:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
 .workspace-sidebar.collapsed .workspace-sidebar-expand:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
     height: 36px !important;
+  }
+}
+
+/* Keep the complete collapsed rail reachable in the minimum-height window.
+   Only surrounding spacing changes; controls retain their official sizes. */
+@media (max-height: 560px) {
+  .workspace-sidebar.collapsed .workspace-sidebar-top {
+    padding-block: 4px;
+  }
+
+  .workspace-sidebar.collapsed .workspace-sidebar-search {
+    margin-top: 4px;
+  }
+
+  .workspace-sidebar.collapsed .workspace-sidebar-nav {
+    margin-top: 4px;
+    gap: 0;
+  }
+
+  .workspace-sidebar.collapsed .workspace-sidebar-icon-btn,
+  .workspace-sidebar.collapsed .workspace-sidebar-expand {
+    margin-top: 0;
+  }
+
+  .workspace-sidebar.collapsed .workspace-sidebar-bottom {
+    padding-block: 4px;
+  }
+
+  .workspace-sidebar.collapsed .workspace-sidebar-more {
+    margin-bottom: 0;
   }
 }
 

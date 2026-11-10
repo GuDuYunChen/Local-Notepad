@@ -1,3 +1,4 @@
+import UiThemeProvider from './ui/UiThemeProvider';
 import { openUiSelect, setUiValue, uiDisabled, uiQuery, uiQueryAll, uiText, uiValue } from "~/test/uiControlDriver";import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
@@ -12,7 +13,7 @@ const find = (label) => uiQuery(container, '[aria-label="' + label + '"]');
 const button = (text) => [...uiQueryAll(container, 'button')].find((item) => uiText(item) === text);
 const click = async (element) => {expect(element).toBeTruthy();await act(async () => element.click());};
 async function advance() {await act(async () => {await vi.advanceTimersByTimeAsync(220);});}
-async function render(patch = {}) {await act(async () => root.render(<GlobalSearchPanel open onClose={onClose} onOpenFile={onOpenFile} {...patch} />));await advance();}
+async function render(patch = {}) {await act(async () => root.render(<UiThemeProvider><GlobalSearchPanel open onClose={onClose} onOpenFile={onOpenFile} {...patch} /></UiThemeProvider>));await advance();}
 async function change(element, value) {
   await setUiValue(element, value);
   await act(async () => {

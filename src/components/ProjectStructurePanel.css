@@ -26,7 +26,7 @@
   font-weight: 680;
 }
 
-.project-structure-head span {
+.project-structure-head > div:first-child > span {
   margin-top: 2px;
   color: var(--ink-muted);
   font-size: 8px;

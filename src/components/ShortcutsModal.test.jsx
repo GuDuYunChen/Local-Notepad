@@ -1,3 +1,4 @@
+import UiThemeProvider from './ui/UiThemeProvider';
 import { openUiSelect, setUiValue, uiDisabled, uiQuery, uiQueryAll, uiText, uiValue } from "~/test/uiControlDriver"; // @vitest-environment happy-dom
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -35,7 +36,7 @@ describe('complete local shortcut settings workflow', () => {
     container = document.createElement('div');
     document.body.append(container);
     root = createRoot(container);
-    onClose = vi.fn(() => root.render(<ShortcutsModal open={false} onClose={onClose} />));
+    onClose = vi.fn(() => root.render(<UiThemeProvider><ShortcutsModal open={false} onClose={onClose} /></UiThemeProvider>));
     cleanupListeners = [];
   });
 
@@ -61,7 +62,7 @@ describe('complete local shortcut settings workflow', () => {
   const focusKey = { key: 'j', code: 'KeyJ', ctrlKey: true, altKey: true };
 
   async function mount(open = true) {
-    await act(async () => root.render(<ShortcutsModal open={open} onClose={onClose} />));
+    await act(async () => root.render(<UiThemeProvider><ShortcutsModal open={open} onClose={onClose} /></UiThemeProvider>));
   }
 
   async function click(node) {
@@ -678,7 +679,7 @@ describe('complete local shortcut settings workflow', () => {
       }, [snapshot.revision]);
       return <ShortcutsModal open onClose={onClose} />;
     }
-    await act(async () => root.render(<BoundaryHarness />));
+    await act(async () => root.render(<UiThemeProvider><BoundaryHarness /></UiThemeProvider>));
     await record('focusMode');
     armed = true;
     await externalUpdate({ ...defaultBindings(), focusMode: 'Mod+Alt+G' });

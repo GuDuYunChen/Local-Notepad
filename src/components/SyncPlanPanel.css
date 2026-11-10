@@ -1,7 +1,7 @@
 .sync-plan-view { margin-top: 16px; padding: 18px; min-width: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface, var(--panel)); color: var(--ink, var(--fg)); }
 .sync-plan-view-heading { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
 .sync-plan-view h4 { margin: 0 0 6px; font-size: 15px; }
-.sync-plan-view small, .sync-plan-view-heading span, .sync-plan-boundary { color: var(--ink-muted, var(--muted)); font-size: 12px; line-height: 1.65; }
+.sync-plan-view small, .sync-plan-view-heading > div > span, .sync-plan-boundary { color: var(--ink-muted, var(--muted)); font-size: 12px; line-height: 1.65; }
 .sync-plan-view > small { display: block; }
 .sync-plan-counts { font-weight: 600; line-height: 1.7; }
 .sync-plan-notice { border-left: 3px solid var(--warning, var(--accent)); padding: 10px 12px; background: var(--surface-hover, var(--panel)); border-radius: 4px; line-height: 1.7; }

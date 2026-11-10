@@ -191,7 +191,11 @@ test('installed export must bind exact retained raw report bytes before interpre
 test('workflow adds export contracts without changing original preparation roster or time budget', () => {
   const normalized = readFileSync(new URL('../.github/workflows/local-installation-2f86.yml', import.meta.url), 'utf8').replace(/\r\n/g, '\n')
   for (const raw of [normalized, normalized.replace(/\n/g, '\r\n')]) {
-    const text = raw.replace(/\r\n/g, '\n')
+    const normalizedJobs = raw.replace(/\r\n/g, '\n').split(/^jobs:\n/m)
+    assert.equal(normalizedJobs.length, 2, 'Keep one explicit jobs mapping')
+    const declarations = [...normalizedJobs[1].matchAll(/^  ([a-z][a-z0-9-]*):[ \t]*$/gm)]
+    assert.deepEqual(declarations.map(match => match[1]), ['install-upgrade-uninstall', 'full-application-ui', 'full-application-ui-acceptance'])
+    const text = normalizedJobs[1].slice(declarations[0].index, declarations[1].index)
     assert.deepEqual(text.split('\n').filter(line => /^\s*timeout-minutes:/.test(line)), ['    timeout-minutes: 20'])
     const old = text.match(/preparation-contracts\.tap (scripts\/reading-mode[^\n]+)/)?.[1]
     assert.equal(old.split(/\s+/).length, 6)

@@ -1,3 +1,4 @@
+import UiThemeProvider from './ui/UiThemeProvider';
 import { setUiValue, uiDisabled, uiQuery, uiQueryAll, uiText } from "~/test/uiControlDriver";import React, { act, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { webcrypto } from 'node:crypto';
@@ -29,7 +30,7 @@ beforeEach(async () => {
   opened = vi.fn(async (id, opts) => {await opts.readFile(id, { signal: opts.signal });return false;});
   vi.spyOn(URL, 'createObjectURL').mockImplementation((blob) => {downloads.push(blob);return 'blob:comparison';});vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
   api.mockReset().mockImplementation(async (path, init) => {if (init?.method) throw Error('unexpected write');if (path === '/api/folder-workspace') return indexData;if (path.startsWith('/api/note-comparison?')) {if (readError) throw Error('injected');if (held) return held.promise;const u = new URL(path, 'http://local');if (u.searchParams.get('left') === 'b') return comparisonFixture([...bodyData.notes].reverse().map((n) => n.content), ['b', 'a']);return bodyData;}if (path.startsWith('/api/files/')) return { ...current, is_folder: false, is_deleted: false };throw Error('unexpected read ' + path);});
-  host = document.createElement('div');document.body.appendChild(host);root = createRoot(host);await act(async () => {root.render(<Harness />);await drain();});
+  host = document.createElement('div');document.body.appendChild(host);root = createRoot(host);await act(async () => {root.render(<UiThemeProvider><Harness /></UiThemeProvider>);await drain();});
 });
 afterEach(async () => {await act(async () => root.unmount());host.remove();vi.restoreAllMocks();vi.unstubAllGlobals();});
 describe('whole note comparison workflow', () => {

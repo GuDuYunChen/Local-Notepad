@@ -58,7 +58,7 @@
   font-weight: 650;
 }
 
-.project-sprint-card > header span {
+.project-sprint-card > header > div:first-child > span {
   margin-top: 2px;
   color: var(--ink-muted);
   font-size: 7px;
@@ -486,7 +486,7 @@
   gap: 8px;
 }
 
-.project-review-actions span {
+.project-review-actions > span {
   color: var(--ink-muted);
   font-size: 7px;
 }

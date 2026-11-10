@@ -99,13 +99,13 @@ export default function WorkspaceSidebar({
         <div className="workspace-sidebar-brand">
           <UiButton
             type="button"
+            variant="text"
             className="workspace-brand-mark"
+            icon={<img src={APP_ICON_DATA_URL} alt="" aria-hidden="true" />}
             onClick={() => navigate('notes')}
             aria-label="返回笔记"
             title="记事本"
-          >
-            <img src={APP_ICON_DATA_URL} alt="" aria-hidden="true" />
-          </UiButton>
+          />
 
           {!collapsed && (
             <>
@@ -115,13 +115,14 @@ export default function WorkspaceSidebar({
               </div>
               <UiButton
                 type="button"
+                density="compact"
+                variant="text"
                 className="workspace-sidebar-collapse"
+                icon={<span aria-hidden="true">‹</span>}
                 onClick={onToggleCollapsed}
                 aria-label="折叠侧边栏"
                 title="折叠侧边栏"
-              >
-                ‹
-              </UiButton>
+              />
             </>
           )}
         </div>
@@ -149,8 +150,9 @@ export default function WorkspaceSidebar({
           </UiButton>
         )}
 
-        {onOpenLocalActions && <UiButton type="button" className="workspace-sidebar-search" onClick={onOpenLocalActions} aria-label="打开快捷操作" title="查找本地功能">
-          <Icon size={16}><path d="m9 4-5 8 5 8M15 4l5 8-5 8" /></Icon>{!collapsed && <span>快捷操作</span>}
+        {onOpenLocalActions && <UiButton type="button" className="workspace-sidebar-search" onClick={onOpenLocalActions} aria-label="打开快捷操作" title="查找本地功能"
+          icon={collapsed ? <Icon size={16}><path d="m9 4-5 8 5 8M15 4l5 8-5 8" /></Icon> : undefined}>
+          {collapsed ? null : [<Icon key="icon" size={16}><path d="m9 4-5 8 5 8M15 4l5 8-5 8" /></Icon>, <span key="label">快捷操作</span>]}
         </UiButton>}
         <nav className="workspace-sidebar-nav" aria-label="主要功能">
           {navItems.map(item => (
@@ -193,13 +195,13 @@ export default function WorkspaceSidebar({
         {collapsed && (
           <UiButton
             type="button"
+            variant="text"
             className="workspace-sidebar-expand"
+            icon={<span aria-hidden="true">›</span>}
             onClick={onToggleCollapsed}
             aria-label="展开侧边栏"
             title="展开侧边栏"
-          >
-            ›
-          </UiButton>
+          />
         )}
 
         {moreOpen && (

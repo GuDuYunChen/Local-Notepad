@@ -1,5 +1,5 @@
 {
-  "product": "a9b7ed298db2a7be446021fe0c49deea4ef8ef54",
+  "product": "5ee0e095290691f66a232320fd06203652d1e54c",
   "quickBlob": "c1e8f40862b770f82af47c26a455b57efc853700",
   "tagsBlob": "54bb56864e58e2aa3f5ed08aedb52a00de5f0769",
   "templateBlob": "42378f13f71a03c3e91cdfdcb6dec44dbbb05f33",
@@ -16,8 +16,8 @@
   "importEvidenceTestsBlob": "5a46ce6dad5fe757b1d2714e485242aa79959559",
   "current": {
     "version": "4.249.0",
-    "bytes": 115592332,
-    "sha256": "4824f42c56fc19d23a92e53c63d724a11753be9d00683c9fe259144da8a171cf"
+    "bytes": 115581995,
+    "sha256": "831549c9d8e7c825726143bac35f4e6eb442abfdd9529a36e04118d42a85e9f5"
   },
   "previous": {
     "version": "4.232.0",
@@ -31,14 +31,14 @@
     "productSourceCommit": "1a8e17ba775312c359f4ac23851c8c365b57a9cb"
   },
   "currentSource": {
-    "run": 42642716395,
-    "artifact": 13687021934,
-    "name": "local-notepad-windows-a9b7ed298db2a7be446021fe0c49deea4ef8ef54",
-    "headSha": "17bf6fc52bc7702bcd2cfbeacb8bd9bdc857909f",
+    "run": 42791970991,
+    "artifact": 13753825512,
+    "name": "local-notepad-windows-5ee0e095290691f66a232320fd06203652d1e54c",
+    "headSha": "5935730746ac54e6ae6dbe3d053042434e5012b9",
     "branch": "fix/local-ui-consistency-2f116",
     "repositoryId": 1105107817,
-    "archiveBytes": 115598395,
-    "archiveSha256": "c5b7d61576d420db42f12bf3f966e2bf77cd1d3917d870b7ceade5167d5889b2"
+    "archiveBytes": 115588210,
+    "archiveSha256": "0cf1bd0990c0481f35dc655b260af2d063f1dd9a0555c7cc5a6436c76cc22426"
   },
   "readingDriverBlob": "6924b128c1125424c91f71dbd1ecc415762e2f77",
   "readingFixtureBlob": "0c7ffadbb187dd33a7bc6b5aa8c69427eec5cc34",
@@ -85,7 +85,7 @@
     "src/components/Editor/nodes/WikiLinkNode.jsx": "7764d6b5da9c464fa4bd7c35b292d784f5721f12",
     "src/components/Editor/nodes/WikiLinkView.jsx": "cc3b8c821e764e3f1b184da09d19d94bdc73379d",
     "src/components/Editor/nodes/CodeBlockNode.jsx": "c441fda099f91dc669cc81dd4f00350398cdb285",
-    "src/components/Editor/plugins/BlockHandlePlugin.jsx": "85a0100d88dd449f717e4c34c2a440f09676ab11",
+    "src/components/Editor/plugins/BlockHandlePlugin.jsx": "c4168c896f0f94d891a4e0c1551d171de51ceda1",
     "src/components/Editor/Editor.jsx": "08c6f8bb08d5f885b26ac97ad5f01bcb45265886",
     "src/services/wikiNavigation.mjs": "4ecc8c52880deb514cdb950c9432dcabd13da110",
     "src/hooks/useGuardedNoteOpener.js": "13c0ae3b56a7df0c8954ce9113c0b46352162d98",

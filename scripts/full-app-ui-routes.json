@@ -3,15 +3,15 @@
   "scope": "installed-actual-app-page-matrix",
   "sourceScope": "control-source entry coverage with declared states; not every possible failure combination",
   "productSource": {
-    "commit": "a9b7ed298db2a7be446021fe0c49deea4ef8ef54",
-    "tree": "c33650c869d60b485fa9b6f6a33d2d01ce46009a",
+    "commit": "5ee0e095290691f66a232320fd06203652d1e54c",
+    "tree": "6981cdaef189b13f08a65ebed69429affeea7238",
     "dirty": false
   },
   "inventory": {
-    "file": "evidence/ci-42642716395/clean-source-inventory/inventory.json",
-    "sha256": "1ef36642ddb3d80f6912859c8e92650ff11f4628bc39399a9deb78d0c332a339",
+    "file": "inventory.json",
+    "sha256": "1f088c325156d646abc77153c86de80f9b70659ea99c389dd247503db8e25310",
     "originalDirty": false,
-    "currentCodeFilesHashRevalidated": 346,
+    "currentCodeFilesHashRevalidated": 347,
     "currentControlsFiles": 137
   },
   "matrix": [
@@ -2047,9 +2047,9 @@
     },
     {
       "file": "src/components/Editor/plugins/BlockHandlePlugin.jsx",
-      "bytes": 11717,
-      "sha256": "92a0b6c685884ebb34db4fda797d8ccafe564d21b191b1c244f5e3df14cfa76e",
-      "blob": "85a0100d88dd449f717e4c34c2a440f09676ab11",
+      "bytes": 14139,
+      "sha256": "f07cabc38fc687865c92afc74fedb55a5832dcbd472800b6a038728362b7f756",
+      "blob": "c4168c896f0f94d891a4e0c1551d171de51ceda1",
       "classification": "planned-nested-controls",
       "reason": "Production controls are rendered within the declared actual route. Scope is the listed route states; unvisited conditional child panels remain explicit gaps below.",
       "routeIds": [
@@ -4187,9 +4187,9 @@
     },
     {
       "file": "src/components/ThemeToggle.jsx",
-      "bytes": 3185,
-      "sha256": "682a1dd9a1f07ad65004123002e5b6d22f0db9b117221c0784c11a493274331c",
-      "blob": "b59192666ccf9c4f86476faecfe9115e49fb48d1",
+      "bytes": 3175,
+      "sha256": "29f549ce6ddcad3c9caa5d598be1ca198e427e51dcba14e324fc5e00b037b14c",
+      "blob": "cdf39e614d35f2d04b2a0a5dcd558cf69c80ba21",
       "classification": "planned-nested-controls",
       "reason": "Production controls are rendered within the declared actual route. Scope is the listed route states; unvisited conditional child panels remain explicit gaps below.",
       "routeIds": [
@@ -4314,9 +4314,9 @@
     },
     {
       "file": "src/components/WorkspaceSidebar.jsx",
-      "bytes": 7883,
-      "sha256": "891b2ba5d5a048dfbb071ca4b55aa31fac924239e4011fe09f110697940f71b6",
-      "blob": "be8d8f0c3206ad50d885225809ded79637995cd7",
+      "bytes": 8155,
+      "sha256": "a0697c37d7e7f834be0e2f9795eb09efffc98fab494e4be8012ce27fb19e949b",
+      "blob": "8ced7cca61fd37167354e848372c81166cd4478a",
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [
@@ -4334,9 +4334,9 @@
     },
     {
       "file": "src/components/ui/ControlKit.jsx",
-      "bytes": 20751,
-      "sha256": "cb792b7da860b0c1040469f1f618351a5bce8bae451633c282c83620edd55d4c",
-      "blob": "e13ff259d903008564af654f6a2a52462ea3779e",
+      "bytes": 21373,
+      "sha256": "aa56d65d7b1e07bb3b8125d5104ae7426ecfe4ce1a765fa9f75d7e1f35e2ec86",
+      "blob": "4a3a722d3ebd961bce1fd55f692480deab46d81a",
       "classification": "shared-or-browser-semantic-helper",
       "reason": "Shared adapter implementation and form/validation semantics; source-bound native control fixture verifies six scenes separately. It is not an application page.",
       "routeIds": [],

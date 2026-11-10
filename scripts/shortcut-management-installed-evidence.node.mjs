@@ -240,7 +240,17 @@ test('installation binds the exact raw shortcut report bytes in addition to ever
 })
 
 function assertWorkflowContract(rawWorkflow) {
-  const workflow = rawWorkflow.replace(/\r\n/g, '\n')
+  const normalized = rawWorkflow.replace(/\r\n/g, '\n')
+  const sections = normalized.split(/^jobs:\n/m)
+  assert.equal(sections.length, 2, 'Keep one explicit jobs mapping')
+  const declarations = [...sections[1].matchAll(/^  ([a-z][a-z0-9-]*):[ \t]*$/gm)]
+  assert.deepEqual(declarations.map(match => match[1]), ['install-upgrade-uninstall', 'full-application-ui', 'full-application-ui-acceptance'])
+  const jobs = Object.fromEntries(declarations.map((match, index) => [match[1], sections[1].slice(match.index, declarations[index + 1]?.index)]))
+  const workflow = jobs['install-upgrade-uninstall']
+  assert.deepEqual(jobs['full-application-ui'].split('\n').filter(line => /^[ \t]*timeout-minutes:/.test(line)), ['    timeout-minutes: 25'])
+  assert.deepEqual(jobs['full-application-ui'].split('\n').filter(line => /^[ \t]*needs:/.test(line)), ['    needs: install-upgrade-uninstall'])
+  assert.deepEqual(jobs['full-application-ui-acceptance'].split('\n').filter(line => /^[ \t]*timeout-minutes:/.test(line)), ['    timeout-minutes: 5'])
+  assert.deepEqual(jobs['full-application-ui-acceptance'].split('\n').filter(line => /^[ \t]*needs:/.test(line)), ['    needs: [install-upgrade-uninstall, full-application-ui]'])
   assert.match(workflow, /timeout-minutes: 20\n/)
   assert.deepEqual(workflow.split('\n').filter(line => /^[ \t]*timeout-minutes:/.test(line)), ['    timeout-minutes: 20'])
   const preparation = workflow.match(/^          node --test --test-reporter=tap --test-reporter-destination=test-results\/installer-lifecycle\/preparation-contracts\.tap (.+)$/m)
@@ -282,5 +292,22 @@ test('workflow refuses missing changed or duplicated installation time budgets i
     '    timeout-minutes: 200\n', '    timeout-minutes: 20\n    timeout-minutes: 21\n']) {
     const changed = normalized.replace('    timeout-minutes: 20\n', replacement)
     for (const workflow of [changed, changed.replace(/\n/g, '\r\n')]) assert.throws(() => assertWorkflowContract(workflow))
+  }
+})
+
+test('workflow refuses missing changed or duplicated UI budgets and prerequisite jobs in both checkout formats', () => {
+  const normalized = readFileSync(new URL('../.github/workflows/local-installation-2f86.yml', import.meta.url), 'utf8').replace(/\r\n/g, '\n')
+  const fields = [
+    ['    timeout-minutes: 25\n', '    timeout-minutes: 26\n'],
+    ['    timeout-minutes: 5\n', '    timeout-minutes: 6\n'],
+    ['    needs: install-upgrade-uninstall\n', '    needs: full-application-ui-acceptance\n'],
+    ['    needs: [install-upgrade-uninstall, full-application-ui]\n', '    needs: [full-application-ui]\n'],
+  ]
+  for (const [original, changed] of fields) for (const replacement of ['', changed, original + original]) {
+    const altered = normalized.replace(original, replacement)
+    for (const workflow of [altered, altered.replace(/\n/g, '\r\n')]) assert.throws(() => assertWorkflowContract(workflow))
+  }
+  for (const altered of [normalized.replace('jobs:\n', ''), normalized + '\njobs:\n', normalized + '\n  install-upgrade-uninstall:\n', normalized.replace('  full-application-ui:\n', '  unexpected-ui-job:\n')]) {
+    for (const workflow of [altered, altered.replace(/\n/g, '\r\n')]) assert.throws(() => assertWorkflowContract(workflow))
   }
 })
