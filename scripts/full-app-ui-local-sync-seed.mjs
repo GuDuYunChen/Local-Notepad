@@ -106,14 +106,19 @@ export function buildLocalSyncLabRows(files) {
 function ownPaths({ dataDir, ownedRoot }) {
   assert.equal(typeof dataDir, 'string'); assert.equal(typeof ownedRoot, 'string')
   const owned = path.resolve(ownedRoot), data = path.resolve(dataDir)
-  // Windows realpathSync.native may use an 8.3 ancestor (RUNNER~1), even when
-  // mkdtempSync returns the same real directory through its long name.
-  // Compare canonical *identities*, not their differing lexical spellings.
+  // Callers canonicalize fresh roots before use. Keep the original lexical
+  // ownership checks as well as the independent filesystem identity checks.
   for (const entry of [owned, data]) { const info = lstatSync(entry); assert.ok(info.isDirectory() && !info.isSymbolicLink(), 'Owned directory must not be a link') }
   const actualOwned = realpathSync.native(owned), actualData = realpathSync.native(data)
-  const temporaryRoot = realpathSync.native(path.resolve(tmpdir()))
-  const relative = path.relative(temporaryRoot, actualOwned)
-  assert.ok(relative && relative !== '..' && !relative.startsWith('..' + path.sep) && !path.isAbsolute(relative), 'Owned root must stay within the actual runner temporary directory')
+  assert.equal(owned, actualOwned, 'Owned root must be its actual canonical path')
+  assert.equal(data, path.join(owned, 'data'), 'Only the fresh runner-owned data child may be opened')
+  // Hosted Actions uses RUNNER_TEMP for installed acceptance; pure contracts
+  // use os.tmpdir(). These may be on different Windows drives.
+  const temporaryRoots = [process.env.RUNNER_TEMP, tmpdir()].filter(Boolean).map(root => realpathSync.native(path.resolve(root)))
+  assert.ok(temporaryRoots.some(root => {
+    const relative = path.relative(root, actualOwned)
+    return relative && relative !== '..' && !relative.startsWith('..' + path.sep) && !path.isAbsolute(relative)
+  }), 'Owned root must stay within the actual runner temporary directory')
   assert.equal(actualData, path.join(actualOwned, 'data'), 'Only the fresh runner-owned data child may be opened')
   const defaults = [path.join(homedir(), 'AppData/Roaming/Notepad'), path.join(homedir(), '.notepad'), path.join(homedir(), 'Library/Application Support/Notepad')]
   assert.ok(!defaults.some(item => path.resolve(item).toLowerCase() === data.toLowerCase()), 'Default user data is forbidden')

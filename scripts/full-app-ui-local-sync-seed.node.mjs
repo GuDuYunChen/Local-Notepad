@@ -55,7 +55,7 @@ function actualProductMigrations(db) {
 }
 
 async function databaseFixture(callback) {
-  const ownedRoot = mkdtempSync(path.join(tmpdir(), 'local-sync-pure-')), dataDir = path.join(ownedRoot, 'data')
+  const ownedRoot = realpathSync.native(mkdtempSync(path.join(realpathSync.native(tmpdir()), 'local-sync-pure-'))), dataDir = path.join(ownedRoot, 'data')
   mkdirSync(dataDir); mkdirSync(path.join(dataDir, 'uploads'))
   const files = await filesFixture(), db = new DatabaseSync(path.join(dataDir, 'data.db'))
   try {
@@ -97,8 +97,8 @@ test('a missing or abnormal actual shutdown refuses seeding before SQLite writes
 
 test('owned path and absent remote checks refuse aliases and preexisting local stores', async () => {
   await databaseFixture(fixture => {
-    // Windows may expose the very same owned temp root as RUNNER~1; require
-    // canonical aliases to pass the unchanged read-only snapshot checks.
+    // The fresh fixture has a canonical root on every platform. Reading the
+    // same canonical identity must preserve the original snapshot checks.
     const baseline = snapshotLocalSyncLab(fixture)
     const canonical = snapshotLocalSyncLab({ ...fixture,
       ownedRoot: realpathSync.native(fixture.ownedRoot),
