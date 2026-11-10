@@ -241,7 +241,7 @@ export async function verifyUiScreensDesktop({ evaluate, click, cdp, until, api,
   }
   const closeSettings = async () => { await click('.settings-panel [aria-label="返回笔记"]'); await until(() => evaluate("!document.querySelector('.settings-panel')"), 'Settings did not close') }
   const openCollections = async () => {
-    await click('[aria-label="搜索笔记"]')
+    await click('.workspace-sidebar button[aria-label="搜索笔记"]')
     await until(() => evaluate("Boolean(document.querySelector('.global-search-panel'))"), 'Actual search dialog did not open')
     await click('#search-tab-collections')
     await until(() => evaluate(`Boolean(document.querySelector(${q(selectors.collection)}))`), 'Actual saved collection Select missing')
@@ -258,7 +258,7 @@ export async function verifyUiScreensDesktop({ evaluate, click, cdp, until, api,
     ui.setup.noteIDs = notes.map(note => note.id)
 
     await resize('wide')
-    await click('[aria-label="搜索笔记"]')
+    await click('.workspace-sidebar button[aria-label="搜索笔记"]')
     await until(() => evaluate("Boolean(document.querySelector('.global-search-panel'))"), 'Actual search did not open')
     await text('input[aria-label="全局检索关键词"]', 'UI249三页验收')
     await until(() => evaluate("document.querySelectorAll('[data-search-result]').length===2 && !document.querySelector('.global-search-loading')"), 'Synthetic search results not ready')
@@ -407,7 +407,7 @@ export async function verifyUiScreensDesktop({ evaluate, click, cdp, until, api,
             assert.equal(await evaluate("Boolean(document.querySelector('.global-search-panel'))"), true)
             await key('Escape', 27); await until(() => evaluate("!document.querySelector('.global-search-panel')"), 'Second Escape did not close the actual search dialog')
             scene.popup.secondEscapeClosedDialog = true
-            scene.popup.triggerFocusRestored = await evaluate("document.activeElement?.matches('[aria-label=\"搜索笔记\"]')===true")
+            scene.popup.triggerFocusRestored = await evaluate("document.activeElement?.matches('.workspace-sidebar button[aria-label=\"搜索笔记\"]')===true")
           } else {
             await click('.workspace-sidebar-nav-item[aria-label="置顶笔记"]')
             await until(() => evaluate("Boolean(document.querySelector('.pinned-tools input:not(:disabled)'))"), 'Actual Pinned workspace did not become ready')
