@@ -28,6 +28,19 @@ test('transport and malformed rows never masquerade as empty history; explicit r
  api.mockResolvedValue([version()]);await click('重试读取历史');expect(host.textContent).toContain('历史快照 #1')
 })
 test('first snapshot is restorable and never mislabeled as current version',async()=>{await mount();expect(host.textContent).not.toContain('当前版本');expect(button('恢复此快照正文').disabled).toBe(false);expect(bridge.restore).not.toHaveBeenCalled()})
+test('snapshot cards explicitly retain their complete multi-line content and selection action',async()=>{
+ api.mockResolvedValue([version(),version({id:2,title:'另一个完整标题.md',created_at:200})]);await mount()
+ const cards=[...host.querySelectorAll('button[data-version-id]')]
+ expect(cards).toHaveLength(2);expect(cards.every(card=>card.dataset.uiLayout==='content')).toBe(true)
+ const selected=host.querySelector('[data-version-id="2"]'),other=host.querySelector('[data-version-id="1"]')
+ expect(selected.querySelector('strong').textContent).toBe('历史快照 #2')
+ expect(selected.querySelector('small').textContent.length).toBeGreaterThan(0)
+ expect(selected.querySelector('span').textContent).toBe('另一个完整标题.md')
+ await act(async()=>other.click());await settled();expect(other.getAttribute('aria-pressed')).toBe('true')
+ await act(async()=>selected.click());await settled()
+ expect(selected.getAttribute('aria-pressed')).toBe('true');expect(other.getAttribute('aria-pressed')).toBe('false')
+ expect(bridge.restore).not.toHaveBeenCalled();expect(bridge.saveCurrent).not.toHaveBeenCalled()
+})
 test('in-app confirmation can cancel with zero restore calls',async()=>{await mount();await click('恢复此快照正文');await click('取消');expect(bridge.restore).not.toHaveBeenCalled();expect(host.querySelector('[role=dialog]')).toBeNull()})
 test('complete confirmation rereads exact snapshot then uses the editor bridge, not legacy POST',async()=>{
  await mount();const oldConfirm=vi.spyOn(window,'confirm').mockReturnValue(true);await confirm()

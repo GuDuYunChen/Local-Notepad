@@ -1,3 +1,4 @@
+import UiThemeProvider from './ui/UiThemeProvider'
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { beforeEach, afterEach, it, expect, vi } from 'vitest'
@@ -16,7 +17,7 @@ const raw=(rows=[row()],extra={})=>prepareHistoryExport({snapshot:{items:rows,fi
 const control=name=>host.querySelector('[data-history-file-'+name+']')
 const notice=()=>control('notice').textContent
 const until=fn=>vi.waitFor(async()=>{await act(async()=>{await Promise.resolve()});fn()},{timeout:2000,interval:10})
-async function mount(){await act(async()=>root.render(<Viewer/>));host.querySelector('details').open=true}
+async function mount(){await act(async()=>root.render(<UiThemeProvider><Viewer/></UiThemeProvider>));host.querySelector('details').open=true}
 async function choose(file, waitForRead = false){await act(async()=>{
  Object.defineProperty(control('input'),'files',{configurable:true,value:file?[file]:[]})
  control('input').dispatchEvent(new Event('change',{bubbles:true}));await Promise.resolve()
@@ -109,7 +110,7 @@ it('a fresh successful file replaces the previous metadata and resets to the fir
 })
 it('opening an offline file in the real overview leaves the live history selection untouched',async()=>{
  api.mockResolvedValue(historyPage([{...historyRow('live'),current_title:'本机历史'}]))
- await act(async()=>root.render(<Overview {...overviewFixture()}/>))
+ await act(async()=>root.render(<UiThemeProvider><Overview {...overviewFixture()}/></UiThemeProvider>))
  host.querySelector('[data-sync-conflict-history]').open=true;host.querySelector('[data-history-file-viewer]').open=true
  await act(async()=>host.querySelector('[data-history-read]').click())
  const live=host.querySelector('[data-history-row]').textContent,guidance=host.querySelector('[data-sync-guidance]').textContent

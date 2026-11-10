@@ -5,6 +5,8 @@ import { useLexicalEditable } from '@lexical/react/useLexicalEditable';
 import { $getNodeByKey } from 'lexical';
 
 import 'highlight.js/styles/atom-one-dark.css';
+import { UiButton, UiInput } from '~/components/ui/ControlKit'
+
 
 // Supported languages list
 export const SUPPORTED_LANGUAGES = [
@@ -210,7 +212,7 @@ function LanguageSelector({ value, onChange, disabled = false }) {
 
   return (
     <div className="language-selector" ref={dropdownRef}>
-      <button
+      <UiButton density="compact"
         className="language-selector-button"
         onClick={() => !disabled && setIsOpen(!isOpen)}
         type="button"
@@ -218,11 +220,11 @@ function LanguageSelector({ value, onChange, disabled = false }) {
       >
         {currentLanguageLabel}
         <span className="language-selector-arrow">{isOpen ? '▲' : '▼'}</span>
-      </button>
+      </UiButton>
       
       {isOpen && !disabled && (
         <div className="language-selector-dropdown">
-          <input
+          <UiInput density="compact"
             type="text"
             className="language-selector-search"
             placeholder="Search languages…"
@@ -498,18 +500,18 @@ const CodeBlockComponent = React.memo(function CodeBlockComponent({ code, langua
 
         <div className="code-block-toolbar" role="toolbar" aria-label="代码块工具">
           {showEnableButton && isEditable && (
-            <button type="button" onClick={handleEnableHighlight}>启用高亮</button>
+            <UiButton density="compact" type="button" onClick={handleEnableHighlight}>启用高亮</UiButton>
           )}
-          <button
+          <UiButton density="compact"
             type="button"
             className={wrapLines ? 'active' : ''}
             onClick={() => setWrapLines(value => !value)}
           >
             {wrapLines ? '取消换行' : '自动换行'}
-          </button>
-          <button type="button" onClick={copyCode}>{copied ? '已复制' : '复制'}</button>
+          </UiButton>
+          <UiButton density="compact" type="button" onClick={copyCode}>{copied ? '已复制' : '复制'}</UiButton>
           {isEditable && (
-            <button type="button" className="danger" onClick={removeCodeBlock}>删除</button>
+            <UiButton density="compact" type="button" className="danger" onClick={removeCodeBlock}>删除</UiButton>
           )}
         </div>
       </div>
@@ -522,7 +524,7 @@ const CodeBlockComponent = React.memo(function CodeBlockComponent({ code, langua
           ))}
         </div>
         <div className="code-editor-container">
-          <textarea
+          <textarea data-ui-native="code-editor-textarea"
             ref={textareaRef}
             value={code}
             onChange={handleTextareaChange}

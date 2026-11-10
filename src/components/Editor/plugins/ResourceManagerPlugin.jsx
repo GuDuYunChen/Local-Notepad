@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { useLexicalEditable } from '@lexical/react/useLexicalEditable'
 import { $getNodeByKey, $getRoot } from 'lexical'
+import { UiButton, UiInput } from '~/components/ui/ControlKit'
+
 
 export function describeSerializedResource(serialized, key = '') {
   if (!serialized?.type) return null
@@ -147,7 +149,7 @@ export default function ResourceManagerPlugin({ readOnly = false }) {
 
   return (
     <div className={`editor-resource-manager${open ? ' open' : ''}`}>
-      <button
+      <UiButton density="compact"
         type="button"
         className="editor-resource-toggle"
         onClick={() => setOpen(value => !value)}
@@ -156,7 +158,7 @@ export default function ResourceManagerPlugin({ readOnly = false }) {
       >
         <span>资源</span>
         <b>{resources.length}</b>
-      </button>
+      </UiButton>
 
       {open && (
         <section className="editor-resource-panel" aria-label="当前笔记资源">
@@ -165,11 +167,11 @@ export default function ResourceManagerPlugin({ readOnly = false }) {
               <strong>当前笔记资源</strong>
               <span>{resources.length} 个媒体或附件块</span>
             </div>
-            <button type="button" onClick={() => setOpen(false)} aria-label="关闭资源面板">×</button>
+            <UiButton density="compact" type="button" onClick={() => setOpen(false)} aria-label="关闭资源面板">×</UiButton>
           </header>
 
           <div className="editor-resource-controls">
-            <input
+            <UiInput density="compact"
               value={query}
               onChange={event => setQuery(event.target.value)}
               placeholder="搜索资源…"
@@ -177,14 +179,14 @@ export default function ResourceManagerPlugin({ readOnly = false }) {
             />
             <div className="editor-resource-filters">
               {FILTERS.map(([value, label]) => (
-                <button
+                <UiButton density="compact"
                   type="button"
                   key={value}
                   className={filter === value ? 'active' : ''}
                   onClick={() => setFilter(value)}
                 >
                   {label}
-                </button>
+                </UiButton>
               ))}
             </div>
           </div>
@@ -192,7 +194,7 @@ export default function ResourceManagerPlugin({ readOnly = false }) {
           <div className="editor-resource-list">
             {visible.length ? visible.map(resource => (
               <article key={resource.key} className="editor-resource-item">
-                <button
+                <UiButton density="compact"
                   type="button"
                   className="editor-resource-preview"
                   onClick={() => locate(resource)}
@@ -203,7 +205,7 @@ export default function ResourceManagerPlugin({ readOnly = false }) {
                   ) : (
                     <span>{resource.kind === 'video' ? '▶' : resource.kind === 'attachment' ? 'FILE' : 'IMG'}</span>
                   )}
-                </button>
+                </UiButton>
 
                 <div className="editor-resource-copy">
                   <strong title={resource.label}>{resource.label}</strong>
@@ -216,9 +218,9 @@ export default function ResourceManagerPlugin({ readOnly = false }) {
                 </div>
 
                 <div className="editor-resource-actions">
-                  <button type="button" onClick={() => locate(resource)}>定位</button>
+                  <UiButton density="compact" type="button" onClick={() => locate(resource)}>定位</UiButton>
                   {!readOnly && isEditable && (
-                    <button type="button" className="danger" onClick={() => remove(resource)}>删除</button>
+                    <UiButton density="compact" type="button" className="danger" onClick={() => remove(resource)}>删除</UiButton>
                   )}
                 </div>
               </article>

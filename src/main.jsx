@@ -1,3 +1,4 @@
+import UiThemeProvider from './components/ui/UiThemeProvider'
 import React from 'react'
 import { createRoot } from 'react-dom/client'
 import { DndProvider } from 'react-dnd'
@@ -23,8 +24,10 @@ const el = document.getElementById('root')
 if (el) {
   const root = createRoot(el)
   root.render(
-    <DndProvider backend={HTML5Backend}>
+    <UiThemeProvider><DndProvider backend={HTML5Backend}>
       <App />
-    </DndProvider>
+    </DndProvider></UiThemeProvider>
   )
 }
+
+import './components/ui/control-kit.css'

@@ -55,6 +55,8 @@ const GlobalSearchPanel = React.lazy(() => import('./components/GlobalSearchPane
 const TrashPanel = React.lazy(() => import('./components/TrashPanel'))
 const SettingsPanel = React.lazy(() => import('./components/SettingsPanel'))
 import ErrorBoundary from './components/ErrorBoundary'
+import { UiButton, UiInput } from '~/components/ui/ControlKit'
+
 
 function buildExtractedNoteTitle(files, sourceFile, sectionText) {
   const sourceTitle = String(sourceFile?.title || '')
@@ -1055,7 +1057,7 @@ export default function App() {
       {current && !current.is_folder ? (
         <div className="workspace-document-title">
           {titleEditing ? (
-            <input
+            <UiInput
               ref={titleInputRef}
               className="workspace-title-input"
               value={titleDraft}
@@ -1075,7 +1077,7 @@ export default function App() {
               aria-label="当前笔记标题"
             />
           ) : (
-            <button
+            <UiButton
               type="button"
               className="workspace-title-button"
               onClick={beginTitleEdit}
@@ -1083,7 +1085,7 @@ export default function App() {
               aria-label={`重命名 ${current.title || '未命名'}`}
             >
               {current.title || '未命名'}
-            </button>
+            </UiButton>
           )}
           {(editorStatus.saveError || editorStatus.saving || unsaved || editorStatus.dirty) && (
             <span
@@ -1107,7 +1109,7 @@ export default function App() {
     </div>
     <div className="workspace-header-actions">
       {workspace === 'notes' && current && (
-        <button
+        <UiButton size="middle"
           className={`icon-btn${inspectorOpen ? ' active' : ''}`}
           onClick={() => setInspectorOpen(prev => !prev)}
           title="笔记详情"
@@ -1118,14 +1120,14 @@ export default function App() {
             <circle cx="12" cy="12" r="9" />
             <path d="M12 11v5M12 8h.01" />
           </svg>
-        </button>
+        </UiButton>
       )}
       {workspace === 'notes' && (
-        <button className="icon-btn" onClick={() => setFocusMode(true)} title={`专注模式 (${shortcutLabel('focusMode', shortcutBindings)})`} aria-label="进入专注模式">
+        <UiButton size="middle" className="icon-btn" onClick={() => setFocusMode(true)} title={`专注模式 (${shortcutLabel('focusMode', shortcutBindings)})`} aria-label="进入专注模式">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3" />
           </svg>
-        </button>
+        </UiButton>
       )}
     </div>
   </header>
@@ -1141,9 +1143,9 @@ export default function App() {
 
 
         {focusMode && !focusSession?.active && (
-          <button className="focus-exit-floating" onClick={() => setFocusMode(false)} title={`退出专注模式 (${shortcutLabel('focusMode', shortcutBindings)})`} aria-label="退出专注模式">
+          <UiButton className="focus-exit-floating" onClick={() => setFocusMode(false)} title={`退出专注模式 (${shortcutLabel('focusMode', shortcutBindings)})`} aria-label="退出专注模式">
             ✕ 退出专注
-          </button>
+          </UiButton>
         )}
 
         {focusSession?.active && (

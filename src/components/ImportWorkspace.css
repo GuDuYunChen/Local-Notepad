@@ -8,8 +8,10 @@
 .local-import-eyebrow { font-size: 12px; color: var(--ink-soft, #5a626e); }
 .local-import-intro { margin: 20px 0 16px; padding: 16px; border: 1px solid var(--line, #d4d8df); border-radius: 10px; background: var(--paper, #f7f7f5); }
 .local-import-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; font-size: 14px; font-weight: 650; }
-.local-import-picker input { max-width: 100%; color: inherit; font: inherit; }
-.local-import-picker input::file-selector-button { border: 1px solid var(--line, #d4d8df); border-radius: 6px; margin-right: 12px; padding: 7px 12px; color: inherit; background: var(--surface, #fff); cursor: pointer; }
+.local-import-picker input { max-width: 100%; }
+.local-import-picker input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { color: inherit; font: inherit; }
+.local-import-picker input::file-selector-button { margin-right: 12px; cursor: pointer; }
+.local-import-picker input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *))::file-selector-button { border: 1px solid var(--line, #d4d8df); border-radius: 6px; padding: 7px 12px; color: inherit; background: var(--surface, #fff); }
 .local-import-toolbar, .local-import-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .local-import-toolbar { margin: 12px 0; font-size: 13px; color: var(--ink-soft, #5a626e); }
 .local-import-toolbar > span { margin-right: auto; }
@@ -18,7 +20,8 @@
 .local-import-fault details { margin: 12px 0; }
 .local-import-fault summary { cursor: pointer; }
 .local-import-fault label { display: block; margin: 10px 0; }
-.local-import-fault textarea { box-sizing: border-box; width: 100%; min-height: 110px; padding: 10px; resize: vertical; border: 1px solid var(--line, #d4d8df); border-radius: 6px; color: inherit; background: var(--paper, #f7f7f5); }
+.local-import-fault textarea { box-sizing: border-box; width: 100%; resize: vertical; }
+.local-import-fault textarea:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { min-height: 110px; padding: 10px; border: 1px solid var(--line, #d4d8df); border-radius: 6px; color: inherit; background: var(--paper, #f7f7f5); }
 .local-import-rows { display: flex; flex-direction: column; gap: 16px; margin: 18px 0; }
 .local-import-row { border: 1px solid var(--line, #d4d8df); border-radius: 10px; padding: 16px; min-width: 0; }
 .local-import-row-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
@@ -26,8 +29,10 @@
 .local-import-badge { padding: 4px 9px; border: 1px solid var(--line, #d4d8df); border-radius: 30px; font-size: 12px; white-space: nowrap; color: var(--ink-soft, #5a626e); }
 .local-import-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; margin: 14px 0; }
 .local-import-fields label { display: flex; flex-direction: column; gap: 6px; min-width: 0; font-size: 13px; font-weight: 600; }
-.local-import-fields input, .local-import-fields select { width: 100%; box-sizing: border-box; min-width: 0; padding: 8px 10px; border: 1px solid var(--line, #d4d8df); border-radius: 6px; font: inherit; background: var(--paper, #f7f7f5); color: inherit; }
-.local-import-fields input:disabled, .local-import-fields select:disabled { opacity: 0.8; }
+.local-import-fields input, .local-import-fields select { width: 100%; box-sizing: border-box; min-width: 0; }
+.local-import-fields input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.local-import-fields select:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { padding: 8px 10px; border: 1px solid var(--line, #d4d8df); border-radius: 6px; font: inherit; background: var(--paper, #f7f7f5); color: inherit; }
+.local-import-fields input:disabled:not([data-ui-control]):not(.ant-input), .local-import-fields select:disabled:not([data-ui-control]):not(.ant-select) { opacity: 0.8; }
 .local-import-preview { font-size: 13px; margin: 12px 0; }
 .local-import-preview summary { cursor: pointer; color: var(--ink-soft, #5a626e); }
 .local-import-preview pre { max-height: 280px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; padding: 14px; border: 1px solid var(--line, #d4d8df); border-radius: 8px; line-height: 1.7; font: inherit; background: var(--paper, #f7f7f5); }
@@ -37,5 +42,8 @@
 .local-import-workspace > footer { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line, #d4d8df); font-size: 13px; align-items: center; }
 .local-import-workspace > footer > div:first-child { min-width: 160px; }
 .local-import-empty { padding: 40px 20px; text-align: center; font-size: 14px; color: var(--ink-soft, #5a626e); }
-.local-import-workspace button:focus-visible, .local-import-workspace input:focus-visible, .local-import-workspace select:focus-visible, .local-import-workspace summary:focus-visible { outline: 2px solid var(--clay, #93633f); outline-offset: 3px; }
+.local-import-workspace summary:focus-visible,
+.local-import-workspace button:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.local-import-workspace input:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.local-import-workspace select:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { outline: 2px solid var(--clay, #93633f); outline-offset: 3px; }
 @media (max-width: 700px) { .local-import-overlay { padding: 10px; } .local-import-workspace { width: calc(100vw - 20px); max-height: calc(100vh - 20px); padding: 16px; } .local-import-fields { grid-template-columns: minmax(0, 1fr); gap: 10px; } .local-import-workspace > header, .local-import-workspace > footer { flex-wrap: wrap; gap: 10px; } .local-import-workspace > footer .local-import-actions { width: 100%; } }

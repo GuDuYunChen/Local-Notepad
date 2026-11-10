@@ -3,6 +3,8 @@ import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext
 import { useLexicalEditable } from '@lexical/react/useLexicalEditable'
 import React, { useEffect, useRef, useState } from 'react'
 import { uploadFile } from '../utils/fileUpload'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 export class AttachmentNode extends DecoratorNode {
   __src
@@ -338,7 +340,7 @@ function AttachmentComponent({ nodeKey, src, name, size, mime }) {
 
         <div className="attachment-actions">
           {isEditable && (
-            <button
+            <UiButton density="compact"
               type="button"
               className="attachment-replace-button"
               onClick={() => {
@@ -347,35 +349,35 @@ function AttachmentComponent({ nodeKey, src, name, size, mime }) {
               disabled={replacing}
             >
               {replacing ? '替换中…' : '替换'}
-            </button>
+            </UiButton>
           )}
-          <input ref={replaceInputRef} type="file" hidden disabled={!isEditable || replacing} onChange={replaceAttachment} />
+          <input data-ui-native="file" ref={replaceInputRef} type="file" hidden disabled={!isEditable || replacing} onChange={replaceAttachment} />
           {previewType && (
-            <button
+            <UiButton density="compact"
               type="button"
               className="attachment-preview-button"
               onClick={() => setPreviewOpen(true)}
               disabled={!src}
             >
               预览
-            </button>
+            </UiButton>
           )}
 
-          <button
+          <UiButton density="compact"
             type="button"
             className="attachment-download"
             onClick={download}
             disabled={!src || downloading}
           >
             {downloading ? '下载中…' : '下载'}
-          </button>
-          {isEditable && <button
+          </UiButton>
+          {isEditable && <UiButton density="compact"
             type="button"
             className="attachment-delete-button"
             onClick={removeAttachment}
           >
             删除
-          </button>}
+          </UiButton>}
         </div>
       </div>
 
@@ -400,13 +402,13 @@ function AttachmentComponent({ nodeKey, src, name, size, mime }) {
               </div>
 
               <div className="attachment-preview-header-actions">
-                <button type="button" onClick={download} disabled={downloading}>
+                <UiButton density="compact" type="button" onClick={download} disabled={downloading}>
                   {downloading ? '下载中…' : '下载'}
-                </button>
-                {isEditable && <button type="button" className="attachment-preview-delete" onClick={removeAttachment}>
+                </UiButton>
+                {isEditable && <UiButton density="compact" type="button" className="attachment-preview-delete" onClick={removeAttachment}>
                   删除
-                </button>}
-                <button
+                </UiButton>}
+                <UiButton density="compact"
                   type="button"
                   className="attachment-preview-close"
                   onClick={() => setPreviewOpen(false)}
@@ -414,7 +416,7 @@ function AttachmentComponent({ nodeKey, src, name, size, mime }) {
                   title="关闭"
                 >
                   ×
-                </button>
+                </UiButton>
               </div>
             </header>
 

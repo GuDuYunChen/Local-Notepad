@@ -58,7 +58,7 @@
   font-weight: 650;
 }
 
-.project-sprint-card > header span {
+.project-sprint-card > header > div:first-child > span {
   margin-top: 2px;
   color: var(--ink-muted);
   font-size: 7px;
@@ -72,6 +72,10 @@
 
 .project-calendar-nav button {
   min-width: 23px;
+  cursor: pointer;
+}
+
+.project-calendar-nav button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   height: 23px;
   padding: 0 5px;
   border: 1px solid transparent;
@@ -80,10 +84,9 @@
   color: var(--ink-muted);
   font: inherit;
   font-size: 8px;
-  cursor: pointer;
 }
 
-.project-calendar-nav button:hover {
+.project-calendar-nav button:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-color: var(--line);
   background: var(--paper);
   color: var(--ink);
@@ -312,21 +315,24 @@
 
 .project-today-queue > button {
   width: 100%;
-  min-height: 33px;
-  padding: 4px;
   display: flex;
   align-items: center;
   gap: 5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.project-today-queue > button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
+  min-height: 33px;
+  padding: 4px;
   border: 0;
   border-radius: 6px;
   background: transparent;
   color: var(--ink-soft);
   font: inherit;
-  text-align: left;
-  cursor: pointer;
 }
 
-.project-today-queue > button:hover {
+.project-today-queue > button:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   background: var(--surface-hover);
 }
 
@@ -374,16 +380,19 @@
 
 .project-sprint-starts button {
   min-width: 0;
+  cursor: pointer;
+}
+
+.project-sprint-starts button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   padding: 8px 5px;
   border: 1px solid var(--line);
   border-radius: 7px;
   background: var(--paper);
   color: var(--ink-soft);
   font: inherit;
-  cursor: pointer;
 }
 
-.project-sprint-starts button:hover {
+.project-sprint-starts button:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-color: var(--clay);
 }
 
@@ -417,6 +426,9 @@
 .project-sprint-goal input {
   min-width: 0;
   flex: 1;
+}
+
+.project-sprint-goal input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   height: 27px;
   padding: 0 6px;
   border: 1px solid var(--line);
@@ -443,13 +455,16 @@
 
 .review-card textarea {
   width: 100%;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.review-card textarea:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   min-height: 74px;
   padding: 8px;
-  resize: vertical;
   border: 1px solid var(--line);
   border-radius: 7px;
   outline: 0;
-  box-sizing: border-box;
   background: var(--paper);
   color: var(--ink);
   font: inherit;
@@ -457,8 +472,8 @@
   line-height: 1.55;
 }
 
-.review-card textarea:focus,
-.project-sprint-goal input:focus {
+.review-card textarea:focus:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.project-sprint-goal input:focus:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-color: var(--clay);
   box-shadow: 0 0 0 2px var(--clay-light);
 }
@@ -471,7 +486,7 @@
   gap: 8px;
 }
 
-.project-review-actions span {
+.project-review-actions > span {
   color: var(--ink-muted);
   font-size: 7px;
 }

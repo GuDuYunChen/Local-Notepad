@@ -137,11 +137,12 @@ app.whenReady().then(async () => {
     outfile: path.join(output, 'fixture.js'), stdin: { resolveDir: root, loader: 'jsx', contents: `
       import React from 'react'; import { createRoot } from 'react-dom/client';
       import Review from './src/components/SyncConflictReview.jsx';
+      import UiThemeProvider from './src/components/ui/UiThemeProvider.jsx';
       import './src/components/SyncCenterPanel.css';
       import { conflictFixture, fileRecord } from './scripts/fixtures/sync-conflict-review.mjs';
       window.__diffWrites = 0;
       const conflict = conflictFixture({local_record: fileRecord('开始核对\\n本机保留原有说明。\\n共同上下文。\\n本机第二处。\\n结束'), remote_record: fileRecord('开始核对\\n远端增加一条补充说明。\\n共同上下文。\\n远端第二处：<img src=x onerror=alert(1)> ' + 'longword'.repeat(80) + '\\n结束')});
-      createRoot(document.getElementById('root')).render(<div className="settings-card consumer-settings-section sync-center-card"><Review conflict={conflict} scope="synthetic-render-scope" onResolve={() => { window.__diffWrites++; return false }}/></div>);
+      createRoot(document.getElementById('root')).render(<UiThemeProvider><div className="settings-card consumer-settings-section sync-center-card"><Review conflict={conflict} scope="synthetic-render-scope" onResolve={() => { window.__diffWrites++; return false }}/></div></UiThemeProvider>);
     ` } })
   const index = fs.readFileSync(path.join(root, 'dist/index.html'), 'utf8')
   const styles = [...index.matchAll(/<link\b[^>]*href="([^"]+\.css)"[^>]*>/g)]
