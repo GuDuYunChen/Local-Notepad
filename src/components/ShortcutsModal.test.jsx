@@ -258,6 +258,72 @@ describe('complete local shortcut settings workflow', () => {
     expect(write).not.toHaveBeenCalled();
   });
 
+  it('keeps the search icon inside the official input affix and the native input stable through clearing', async () => {
+    const write = vi.spyOn(localStorage, 'setItem');
+    await mount();
+    const input = query('[data-shortcut-search]');
+    const search = input.closest('.local-shortcuts-search');
+    const affix = input.closest('.ant-input-affix-wrapper');
+    expect(input).toBeInstanceOf(HTMLInputElement);
+    expect(input.getAttribute('aria-label')).toBe('搜索快捷键');
+    expect(input.maxLength).toBe(120);
+    expect(search.tagName).toBe('DIV');
+    expect(search.parentElement.classList.contains('local-shortcuts-filters')).toBe(true);
+    expect(affix).toBeTruthy();
+    expect(affix.parentElement).toBe(search);
+    expect(affix.querySelector('.ant-input-prefix svg[aria-hidden="true"]')).toBeTruthy();
+    expect(document.activeElement).toBe(input);
+    expect(query('[aria-label="清除搜索"]')).toBeNull();
+
+    await type('formula');
+    expect(query('[data-shortcut-search]')).toBe(input);
+    expect(input.closest('.ant-input-affix-wrapper')).toBe(affix);
+    expect(row('formula')).toBeTruthy();
+    const clear = query('[aria-label="清除搜索"]');
+    expect(clear).toBeInstanceOf(HTMLButtonElement);
+    expect(clear.type).toBe('button');
+    expect(clear.parentElement).toBe(search);
+    expect(affix.contains(clear)).toBe(false);
+    clear.focus();
+    await click(clear);
+    expect(query('[data-shortcut-search]')).toBe(input);
+    expect(input.closest('.ant-input-affix-wrapper')).toBe(affix);
+    expect(input.value).toBe('');
+    expect(document.activeElement).toBe(input);
+    expect(query('[aria-label="清除搜索"]')).toBeNull();
+    expect(uiQueryAll(container, '[data-shortcut-command]')).toHaveLength(SHORTCUT_COMMANDS.length);
+    expect(write).not.toHaveBeenCalled();
+    expect(savedBindings()).toBeNull();
+  });
+
+  it('preserves the search input during IME composition and returns focus after clearing and closing', async () => {
+    const write = vi.spyOn(localStorage, 'setItem');
+    await mount();
+    const input = query('[data-shortcut-search]');
+    const affix = input.closest('.ant-input-affix-wrapper');
+    expect(affix).toBeTruthy();
+    await act(async () => input.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true })));
+    await type('专注');
+    expect(query('[data-shortcut-search]')).toBe(input);
+    expect(input.closest('.ant-input-affix-wrapper')).toBe(affix);
+    expect(uiQueryAll(container, '[data-shortcut-command]')).toHaveLength(SHORTCUT_COMMANDS.length);
+    await key(input, { key: 'Escape', isComposing: true, keyCode: 229 });
+    expect(onClose).not.toHaveBeenCalled();
+    await act(async () => input.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: '专注' })));
+    expect(uiQueryAll(container, '[data-shortcut-command]')).toHaveLength(1);
+    expect(row('focusMode')).toBeTruthy();
+    const clear = query('[aria-label="清除搜索"]');
+    clear.focus();
+    await click(clear);
+    expect(document.activeElement).toBe(input);
+    expect(input.value).toBe('');
+    await key(input, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(document.activeElement).toBe(opener);
+    expect(write).not.toHaveBeenCalled();
+    expect(savedBindings()).toBeNull();
+  });
+
   it.each([false, true])('Escape closes the category popup before applying the original dirty=%s close policy', async dirty => {
     await mount();
     if (dirty) await record('focusMode');

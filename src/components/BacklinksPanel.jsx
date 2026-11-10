@@ -93,7 +93,7 @@ function BacklinkWorkspace({fileId,onSelectFile}){
     <p className="backlink-explanation">匹配 {rows.length} / {snapshot.sources.length} 个来源；每页 {BACKLINK_PAGE} 项。</p>
     <div className="backlinks-list" role="list" aria-label="反向来源列表">
      {visible.map(row=><div className="backlink-source" key={row.source_id} role="listitem">
-      <UiButton type="button" className="backlink-source-select" data-backlink-source={row.source_id} disabled={opening} aria-pressed={selectedId===row.source_id}
+      <UiButton type="button" layout="content" className="backlink-source-select" data-backlink-source={row.source_id} disabled={opening} aria-pressed={selectedId===row.source_id}
        onClick={()=>{cancelOpen();setSelectedId(row.source_id);setPreviewPage(0);setProblem('');setNotice('')}}>
        <strong>{row.file?.title||'来源不可用'}</strong><span>{!row.available?'已删除、在回收站、模板或目录':row.analysis.state==='verified'?`${row.analysis.occurrences} 处引用` : row.analysis.state==='stale'?'索引待更新：已保存正文中未找到引用':'已索引：正文格式无法定位'}</span>
       </UiButton>

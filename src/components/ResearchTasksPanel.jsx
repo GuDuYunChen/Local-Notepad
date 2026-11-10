@@ -90,7 +90,7 @@ export default function ResearchTasksPanel({ active, onReceipt, service = resear
     {error && <p role="alert" className="study-hub-notice">{error}</p>}
     {message && <p role="status">{message}</p>}
     {!entries.length && !error && <p>暂无已保存研究任务。请先生成研究预览，再保存草稿或确认创建。</p>}
-    <div className="research-task-list">{entries.map(entry => <UiButton type="button" key={entry.key} disabled={!active || busy}
+    <div className="research-task-list">{entries.map(entry => <UiButton type="button" layout="content" key={entry.key} disabled={!active || busy}
       aria-pressed={selection?.entry.key === entry.key} onClick={() => select(entry)}>
       <strong>{entry.task?.preview.title || '不可读取的研究任务'}</strong>
       <span>{entry.task ? RESEARCH_PHASES[entry.task.phase] + ' · ' + entry.task.preview.count + ' 条批注' : entry.error}</span>

@@ -3,13 +3,13 @@
   "scope": "installed-actual-app-page-matrix",
   "sourceScope": "control-source entry coverage with declared states; not every possible failure combination",
   "productSource": {
-    "commit": "5ee0e095290691f66a232320fd06203652d1e54c",
-    "tree": "6981cdaef189b13f08a65ebed69429affeea7238",
+    "commit": "28eb44727fc4ace786c6bdabe74240edef830d60",
+    "tree": "ca704b76f3b3c4c62d7d26f1d52837091951303e",
     "dirty": false
   },
   "inventory": {
     "file": "inventory.json",
-    "sha256": "1f088c325156d646abc77153c86de80f9b70659ea99c389dd247503db8e25310",
+    "sha256": "cf659aafe3a969bff8f65509515b9c9dc4ce733f892e92193d0277e51e7a0597",
     "originalDirty": false,
     "currentCodeFilesHashRevalidated": 347,
     "currentControlsFiles": 137
@@ -1595,9 +1595,9 @@
     },
     {
       "file": "src/components/BacklinksPanel.jsx",
-      "bytes": 11012,
-      "sha256": "177c89b3f1b863ae165ecbc44ffc9d2740c0510ace84aab1ca9c88290e1ad0bb",
-      "blob": "66175000b32271d1c4eaac4b9377f2d60e0aa44a",
+      "bytes": 11029,
+      "sha256": "765c862a8e2105f2364f183bb0a520da04a7d3fb98370738f8fad8690ca98e34",
+      "blob": "7a5635d43ef0de7e95f719504293413dd7ba8c65",
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [
@@ -1775,9 +1775,9 @@
     },
     {
       "file": "src/components/DailyNotesPanel.jsx",
-      "bytes": 12684,
-      "sha256": "0aa65fc6e95b7da90766ec92285e5f8d66880e5028817464c2d524651db8bdfe",
-      "blob": "c3c5cb30898ee3627c2b2d44e37fa20734732c09",
+      "bytes": 12706,
+      "sha256": "1070b9d693e2528b69b7dc3734c3c9f4e862e7018a6e129a8731275a9cd136be",
+      "blob": "9695f62e2c346acf745c6b28f708f6af37084160",
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [
@@ -2823,9 +2823,9 @@
     },
     {
       "file": "src/components/GraphPanel.jsx",
-      "bytes": 10955,
-      "sha256": "e382032c266d3ba3086a85941a67f18a775ede214e80e16671200e782115e5bc",
-      "blob": "ffb8c94b73976dc347a08846368380a3a6a9572f",
+      "bytes": 10972,
+      "sha256": "12fc01ce44e9ef477f725b0aa539f23bedbb3bea0d099965b7046769caf9ff5d",
+      "blob": "e5b2d5416d870ee7c84f1a9770b6f10881a9aa25",
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [
@@ -2842,9 +2842,9 @@
     },
     {
       "file": "src/components/HistoryReview.jsx",
-      "bytes": 18601,
-      "sha256": "f3aba2419ddeb501fc3b00aadd8ce5f3f057eadcfd82e8a9fba44425a0a5c0e7",
-      "blob": "4886cb9965411f09700a02dae6e5647abd00f40e",
+      "bytes": 18635,
+      "sha256": "2b9f2560a099a20c9e57a1090a7e2b2d1d1a6e110ecc4dd93531d2efa608cd31",
+      "blob": "e12a7aca46c04d6c440a7403c121715ab1e0095f",
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [
@@ -3371,9 +3371,9 @@
     },
     {
       "file": "src/components/ResearchTasksPanel.jsx",
-      "bytes": 10056,
-      "sha256": "c5e08ed2429d0386c42eb7657fea755228fc369ddfd8d241b101c7cb0c48997a",
-      "blob": "8a55fea0ec472780085551727880653ef8229fcd",
+      "bytes": 10073,
+      "sha256": "dd98501b25e0d481a6b885e5549caf5723b0813d8cc7ec758a058ab809be0b91",
+      "blob": "89a2e56d9e36b87c74f4e9e1703d8dfe242870d0",
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [
@@ -3673,9 +3673,9 @@
     },
     {
       "file": "src/components/ShortcutsModal.jsx",
-      "bytes": 23283,
-      "sha256": "734778d80d4999c17a210cb94fcdf4e30b623a38698e41d22716ffb9e5a22096",
-      "blob": "04cf0fb820a5bed5b18d22b04dd68d1229fcd47b",
+      "bytes": 23627,
+      "sha256": "5d232924666a60c95f7489337e834b7933b3af747a8382e58dd9958c5c772aaa",
+      "blob": "286b5904c356091a907805afc5d16f61c5c9f62a",
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [
@@ -3995,9 +3995,9 @@
     },
     {
       "file": "src/components/SyncOverviewPanel.jsx",
-      "bytes": 4224,
-      "sha256": "0929bb425efc289f8ce62217f1aaa2430e15dbf65c57d226c0fe5fab4c5fcd4a",
-      "blob": "e66b199ecf869b8cacadfdaecf36859a830e5848",
+      "bytes": 4241,
+      "sha256": "643a6bda35779636c4a0173bcdb9e0789b8022237aa4d0c56fd956b607253b76",
+      "blob": "c15b7847b2305143a46c80fb578707e81aaa76a4",
       "classification": "planned-nested-controls",
       "reason": "Production controls are rendered within the declared actual route. Scope is the listed route states; unvisited conditional child panels remain explicit gaps below.",
       "routeIds": [
@@ -4079,9 +4079,9 @@
     },
     {
       "file": "src/components/TagWorkspace.jsx",
-      "bytes": 21182,
-      "sha256": "39db42084b498795aafd0574ce58cba582e6f4dec7cbe9d9fba11104eb2533d7",
-      "blob": "f3e8d9e23d6883e4703b74523eff10deb07ef042",
+      "bytes": 21199,
+      "sha256": "8edf08ccdf789643c9d95a55e21998e2919b5c2551e5273c0d851d1fca1b2542",
+      "blob": "82aab726768838e76d58321c9a8de4d6bb7e27a6",
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [
@@ -4248,9 +4248,9 @@
     },
     {
       "file": "src/components/VersionHistory.jsx",
-      "bytes": 12878,
-      "sha256": "164099bdea5545b75a3a4ee5eb1bc75f995f1cedf31a7cd381d9f5a12a1929b3",
-      "blob": "7d8a74544e19c2b19138edb218eac01ce36d87fc",
+      "bytes": 12895,
+      "sha256": "d14a52f169aca8143c050ce1c88d2e5340f4226eb733e2e4e16d9ae489af606d",
+      "blob": "ca1220869e6068ee84cf13d452a013714cc62246",
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [
@@ -4334,9 +4334,9 @@
     },
     {
       "file": "src/components/ui/ControlKit.jsx",
-      "bytes": 21373,
-      "sha256": "aa56d65d7b1e07bb3b8125d5104ae7426ecfe4ce1a765fa9f75d7e1f35e2ec86",
-      "blob": "4a3a722d3ebd961bce1fd55f692480deab46d81a",
+      "bytes": 21882,
+      "sha256": "713f656be110f6d06c6e3e5f3b807816a65e8cef6f670296c17e35489fb0beb9",
+      "blob": "2c5ca48eefa5b3b3a650b4ed80bd23f26863d484",
       "classification": "shared-or-browser-semantic-helper",
       "reason": "Shared adapter implementation and form/validation semantics; source-bound native control fixture verifies six scenes separately. It is not an application page.",
       "routeIds": [],

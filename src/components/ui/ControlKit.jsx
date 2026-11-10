@@ -1,6 +1,7 @@
 import React, { Children, Fragment, forwardRef, isValidElement, useCallback, useContext, useEffect, useId, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import Button from 'antd/es/button'
 import Input from 'antd/es/input'
+import theme from 'antd/es/theme'
 import Select from 'antd/es/select'
 import ConfigProvider from 'antd/es/config-provider'
 import { StyleContext } from '@ant-design/cssinjs'
@@ -150,7 +151,13 @@ function useTextInput(props, forwardedRef, textarea = false) {
 
 const TextInput = forwardRef(function TextInput(props, ref) {
   const inputProps = useTextInput(props, ref)
-  return <Input {...inputProps}/>
+  const { token } = theme.useToken()
+  // Native date segments can exceed Input's text-derived padding height.
+  // Keep the original picker and size its border box from the same theme.
+  const style = props.type === 'date' ? { boxSizing: 'border-box',
+    height: props.size === 'small' ? token.controlHeightSM : props.size === 'large' ? token.controlHeightLG : token.controlHeight,
+    ...inputProps.style } : inputProps.style
+  return <Input {...inputProps} style={style}/>
 })
 
 // A custom Select's trigger is not disabled by HTML fieldset inheritance. Preserve
@@ -178,7 +185,7 @@ function useInheritedDisabled(node) {
   return disabled
 }
 
-export const UiButton = forwardRef(function UiButton({ type, htmlType, variant, danger, size, density, className = '', onClick, onMouseDown, ghost, children, ...props }, ref) {
+export const UiButton = forwardRef(function UiButton({ type, htmlType, variant, danger, size, density, layout, className = '', onClick, onMouseDown, ghost, children, ...props }, ref) {
   const inheritedDefaults = useContext(UiControlDefaultsContext)
   const fallbackTheme = useFallbackControlTheme()
   // These existing classes explicitly mean an icon without a text caption.
@@ -195,7 +202,7 @@ export const UiButton = forwardRef(function UiButton({ type, htmlType, variant, 
   const buttonType = kind === 'primary' ? 'primary' : ['text', 'link', 'dashed'].includes(kind) ? kind : 'default'
   const guard = handler => event => { if (props.disabled || fieldsetDisabled(event.currentTarget)) { event.preventDefault(); event.stopPropagation(); return } handler?.(event) }
   const control = <Button {...props} icon={buttonIcon} ref={nativeRef(ref)} htmlType={nativeType} type={buttonType} danger={danger ?? hasClass(className, 'danger')} ghost={ghost ?? hasClass(className, 'ghost')} autoInsertSpace={false}
-    size={controlSize(size, density, className)} data-ui-control="button" data-ui-layout={iconOnly ? 'icon' : structural ? 'content' : 'action'}
+    size={controlSize(size, density, className)} data-ui-control="button" data-ui-layout={iconOnly ? 'icon' : layout === 'content' || structural ? 'content' : 'action'}
     aria-pressed={props['aria-pressed'] ?? (hasClass(className, 'active') ? true : undefined)}
     className={['app-ui-button', cleanControlClass(className)].filter(Boolean).join(' ')} onClick={guard(onClick)} onMouseDown={guard(onMouseDown)}>{buttonChildren}</Button>
   return inheritedDefaults ? control : <ConfigProvider wave={quietWave} theme={fallbackTheme}>{control}</ConfigProvider>

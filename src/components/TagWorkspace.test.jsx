@@ -43,6 +43,21 @@ beforeEach(async () => {
 });
 afterEach(async () => {await act(async () => root.unmount());host.remove();vi.restoreAllMocks();vi.unstubAllGlobals();vi.useRealTimers();});
 describe('local tag workspace entry to result and recovery', () => {
+  it('multi-line tag cards preserve counts, selection and confirmation locking', async () => {
+    const first = panel().querySelector('[data-workspace-tag="a"]');const second = panel().querySelector('[data-workspace-tag="b"]');
+    expect(first.querySelector('small').textContent).toBe('1 篇普通笔记 · 1 个其他关联');
+    expect(second.querySelector('small').textContent).toBe('0 篇普通笔记 · 0 个其他关联');
+    await act(async () => {second.click();await drain();});
+    expect(second.getAttribute('aria-pressed')).toBe('true');expect(first.getAttribute('aria-pressed')).toBe('false');
+    expect(panel().querySelector('.tag-workspace-detail h3').textContent).toBe('资料');expect(uiText(panel())).toContain('这个标签尚未关联普通笔记');
+    await click('删除标签');expect(disabled(first)).toBe(true);expect(disabled(second)).toBe(true);
+    await act(async () => {first.click();await drain();});expect(second.getAttribute('aria-pressed')).toBe('true');expect(writes()).toHaveLength(0);
+    await click('取消');await act(async () => {first.click();await drain();});
+    expect(first.getAttribute('aria-pressed')).toBe('true');expect(second.getAttribute('aria-pressed')).toBe('false');
+    expect(panel().querySelector('.tag-workspace-detail h3').textContent).toBe('写作');expect(uiText(panel())).toContain('笔记 A');
+    expect(writes()).toHaveLength(0);expect(open).not.toHaveBeenCalled();expect(tags).toHaveLength(2);
+    for (const card of [first, second]) expect(card.getAttribute('data-ui-layout')).toBe('content');
+  });
   it('reads complete counts and ordinary notes without reading bodies', () => {expect(uiText(panel())).toContain('1 篇普通笔记');expect(uiText(panel())).toContain('1 个其他关联');expect(uiText(panel())).toContain('笔记 A');expect(writes()).toHaveLength(0);expect(api.mock.calls.every(([path]) => path.startsWith('/api/tag-workspace'))).toBe(true);});
   it('creates only after confirmation and displays acknowledged result', async () => {await input('工作台标签名称', '新标签');await click('创建标签');expect(writes()).toHaveLength(0);await click('确认');expect(writes()).toHaveLength(1);expect(tags.some((t) => t.name === '新标签')).toBe(true);expect(localStorage.getItem(TAG_WORKSPACE_JOURNAL)).toBeNull();expect(uiText(uiQuery(panel(), '[role="status"]'))).toContain('数据库已确认');expect(oldBody).toBe('original note body');});
   it('rename keeps tag identity, counts and note body untouched', async () => {await click('编辑名称与颜色');await input('工作台标签名称', '写作资料');await input('工作台标签颜色', '#176b4a');await click('保存标签修改');await click('确认');expect(tags.find((t) => t.id === 'a')).toMatchObject({ name: '写作资料', active_count: 1, hidden_count: 1 });expect(links.a[0].id).toBe('note-a');expect(writes()[0][1].body).not.toContain('content');});

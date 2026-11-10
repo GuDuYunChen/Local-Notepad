@@ -1440,18 +1440,6 @@ body {
   gap: 5px;
   padding: 4px;
   margin: 0 !important;
-  border: 1px solid transparent !important;
-  border-radius: 8px !important;
-  background: transparent !important;
-}
-
-.inspector-panel .version-item:hover {
-  background: var(--surface-hover) !important;
-}
-
-.inspector-panel .version-item.selected {
-  border-color: var(--line) !important;
-  background: var(--clay-light) !important;
 }
 
 .version-select-action {

@@ -99,8 +99,8 @@ export default function DailyNotesPanel({ onSelectFile, onClose, session = share
     <div className="daily-workspace-body">
       <section className="calendar-card">
         <div className="daily-section-heading"><div><strong>选择日期</strong><span>已有记录直接打开；点击空日期创建一份根目录每日笔记。</span></div></div>
-        <div className="daily-jump"><label>跳转日期<UiInput type="date" aria-label="跳转日期" min="0001-01-01" max="9999-12-31" value={jump} disabled={busy} onChange={event => setJump(event.target.value)} /></label>
-          <UiButton type="button" className="btn small" disabled={busy} onClick={jumpToDate}>查看日期</UiButton></div>
+        <div className="daily-jump"><label>跳转日期<UiInput size="middle" type="date" aria-label="跳转日期" min="0001-01-01" max="9999-12-31" value={jump} disabled={busy} onChange={event => setJump(event.target.value)} /></label>
+          <UiButton size="middle" type="button" className="btn" disabled={busy} onClick={jumpToDate}>查看日期</UiButton></div>
         {problem && <div className="daily-feedback error" role="alert">{problem}</div>}
         {operation.message && <div className={'daily-feedback ' + operation.kind} role={['error', 'uncertain'].includes(operation.kind) ? 'alert' : 'status'}>
           <p>{operation.message}</p>
