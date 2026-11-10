@@ -22,7 +22,7 @@
   font-weight: 680;
 }
 
-.project-analytics-head span {
+.project-analytics-head > div > span {
   margin-top: 2px;
   color: var(--ink-muted);
   font-size: 8px;
@@ -76,6 +76,9 @@
 
 .project-analysis-card > header input {
   width: 78px;
+}
+
+.project-analysis-card > header input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   height: 25px;
   padding: 0 6px;
   border: 1px solid var(--line);
@@ -140,20 +143,23 @@
 
 .project-analysis-list button {
   min-width: 0;
-  padding: 4px 5px;
   display: flex;
   align-items: center;
   gap: 6px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.project-analysis-list button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
+  padding: 4px 5px;
   border: 0;
   border-radius: 6px;
   background: transparent;
   color: var(--ink);
   font: inherit;
-  text-align: left;
-  cursor: pointer;
 }
 
-.project-analysis-list button:hover {
+.project-analysis-list button:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   background: var(--surface-hover);
 }
 
@@ -283,15 +289,18 @@
 
 .project-frequency-columns button {
   width: 100%;
-  padding: 3px 2px;
   display: flex;
   gap: 6px;
+  cursor: pointer;
+}
+
+.project-frequency-columns button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
+  padding: 3px 2px;
   border: 0;
   background: transparent;
   color: var(--ink-soft);
   font: inherit;
   font-size: 7px;
-  cursor: pointer;
 }
 
 .project-frequency-columns button span {
@@ -329,13 +338,7 @@
 .project-foreshadow-title {
   min-width: 0;
   flex: 1;
-  padding: 3px 2px;
   overflow: hidden;
-  border: 0;
-  background: transparent;
-  color: var(--ink-soft);
-  font: inherit;
-  font-size: 8px;
   text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;

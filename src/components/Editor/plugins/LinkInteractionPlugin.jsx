@@ -16,6 +16,8 @@ import {
   normalizeLinkUrl,
   parseHeadingAnchor,
 } from '../utils/linkUtils'
+import { UiButton, UiInput } from '~/components/ui/ControlKit'
+
 
 function getLinkNodeFromDOM(anchor) {
   let node = $getNearestNodeFromDOMNode(anchor)
@@ -233,7 +235,7 @@ export default function LinkInteractionPlugin({ readOnly = false }) {
 
       {canEdit ? (
         <div className="editor-link-popover-input-row">
-          <input
+          <UiInput density="compact"
             value={draftUrl}
             onChange={event => {
               setDraftUrl(event.target.value)
@@ -249,7 +251,7 @@ export default function LinkInteractionPlugin({ readOnly = false }) {
             aria-label="链接地址"
             spellCheck={false}
           />
-          <button type="button" onClick={applyUrl}>应用</button>
+          <UiButton density="compact" type="button" onClick={applyUrl}>应用</UiButton>
         </div>
       ) : (
         <div className="editor-link-popover-url">{popover.url}</div>
@@ -262,12 +264,12 @@ export default function LinkInteractionPlugin({ readOnly = false }) {
       )}
 
       <div className="editor-link-popover-actions">
-        <button type="button" onClick={() => openUrl(actionUrl())}>
+        <UiButton density="compact" type="button" onClick={() => openUrl(actionUrl())}>
           {isHeadingAnchor(actionUrl()) ? '跳转' : '打开'}
-        </button>
-        <button type="button" onClick={() => void copyUrl()}>复制</button>
+        </UiButton>
+        <UiButton density="compact" type="button" onClick={() => void copyUrl()}>复制</UiButton>
         {canEdit && (
-          <button type="button" className="danger" onClick={removeLink}>移除</button>
+          <UiButton density="compact" type="button" className="danger" onClick={removeLink}>移除</UiButton>
         )}
       </div>
     </div>

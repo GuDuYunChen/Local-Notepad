@@ -126,11 +126,6 @@
   min-width: 0;
   flex: 1;
   overflow: hidden;
-  border: 0;
-  background: transparent;
-  color: var(--ink);
-  font: inherit;
-  font-size: 10px;
   font-weight: 650;
   text-align: left;
   text-overflow: ellipsis;
@@ -138,7 +133,15 @@
   cursor: pointer;
 }
 
-.reference-refactor-source > header span {
+.reference-refactor-source > header button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 10px;
+}
+
+.reference-refactor-source > header > span {
   flex: 0 0 auto;
   color: var(--ink-muted);
   font-size: 8px;

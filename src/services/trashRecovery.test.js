@@ -1,5 +1,6 @@
 import {webcrypto} from 'node:crypto'
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest'
+import {configDefaults} from 'vitest/config'
 import {RECOVERY_JOURNAL,createRecoveryJournal,validateRecoverySnapshot,recoveryView,recoveryTargetAvailable,recoveryPlan,recoveryIntent,validateRecoveryIntent,recoveryCurrentMatches,validateRecoveryTransition,readTrashRecovery,sendTrashRecovery} from './trashRecovery.mjs'
 import {recoveryFixture,recoveryRow,recoveryApply,recoveryReceipt} from '../test/trashRecoveryFixture.mjs'
 beforeEach(()=>vi.stubGlobal('crypto',webcrypto))
@@ -37,5 +38,28 @@ describe('bounded reads and one-shot POST receipts',()=>{
  it('only sends the strict metadata command once',async()=>{const s=recoveryFixture(),c=intent(s),load=vi.fn(async()=>recoveryReceipt(s,c));await sendTrashRecovery(load,s,c);expect(load).toHaveBeenCalledTimes(1);expect(JSON.parse(load.mock.calls[0][1].body)).toEqual({request_id:c.request_id,expected_revision:c.expected_revision,ids:c.ids,mode:c.mode,parent_id:c.parent_id})})
  it('rejects wrong receipt identity and restored IDs',async()=>{const s=recoveryFixture(),c=intent(s);for(const mutation of [r=>r.request_id='wrong',r=>r.applied_ids=[],r=>r.restored_ids=['gone'],r=>r.before_revision='wrong']){const r=recoveryReceipt(s,c);mutation(r);await expect(sendTrashRecovery(async()=>r,s,c)).rejects.toThrow()}})
  it('cancelled request is not sent',async()=>{const ctl=new AbortController();ctl.abort();const load=vi.fn();await expect(readTrashRecovery(load,ctl.signal)).rejects.toThrow();expect(load).not.toHaveBeenCalled()})
- it('times out without adopting a late response or automatically retrying',async()=>{vi.useFakeTimers();let release;const load=vi.fn(()=>new Promise(r=>{release=r}));const task=readTrashRecovery(load,undefined,20);const check=expect(task).rejects.toThrow('超时');await vi.advanceTimersByTimeAsync(21);await check;release(recoveryFixture());await Promise.resolve();expect(load).toHaveBeenCalledTimes(1)})
+ it('times out without adopting a late response or automatically retrying',async()=>{
+  // The request checks a monotonic deadline as well as its timeout. Both must
+  // use the same virtual clock before testing an already-sent late response.
+  vi.useFakeTimers({toFake:[...configDefaults.fakeTimers.toFake,'performance']})
+  let release
+  const load=vi.fn(()=>new Promise(r=>{release=r})),started=performance.now()
+  const task=readTrashRecovery(load,undefined,20),check=expect(task).rejects.toThrow('超时')
+  await Promise.resolve()
+  expect(load).toHaveBeenCalledTimes(1);expect(release).toBeTypeOf('function')
+  await vi.advanceTimersByTimeAsync(21)
+  expect(performance.now()-started).toBe(21)
+  await check;release(recoveryFixture());await Promise.resolve();expect(load).toHaveBeenCalledTimes(1)
+ })
+ it('refuses a request whose monotonic deadline expires before its send microtask',async()=>{
+  vi.useFakeTimers({toFake:[...configDefaults.fakeTimers.toFake,'performance']})
+  let now=0
+  const clock=vi.spyOn(performance,'now').mockImplementation(()=>now),load=vi.fn(async()=>recoveryFixture())
+  try {
+   const task=readTrashRecovery(load,undefined,20)
+   now=20
+   await expect(task).rejects.toThrow('超时')
+   expect(load).not.toHaveBeenCalled();expect(vi.getTimerCount()).toBe(0)
+  } finally {clock.mockRestore()}
+ })
 })

@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef } from 'react'
+import { selectOwnsEscape } from '~/components/ui/keyboard'
 
 const controls = 'button, a[href], input, select, textarea, summary, [tabindex], [contenteditable="true"]'
 function visible(element) {
@@ -52,6 +53,10 @@ export default function useBackupDialogFocus(overlayRef, dialogRef, headingRef, 
         event.preventDefault(); event.stopImmediatePropagation(); return
       }
       const scope = activeDialog()
+      // The capture owner must let an expanded field dismiss its own popup
+      // first. Once it is collapsed, the next Escape still closes this dialog.
+      // Only yield to the event's own control inside the active scope.
+      if (selectOwnsEscape(event, scope)) return
       if (event.key === 'Escape' && scope === dialog) {
         event.preventDefault(); event.stopImmediatePropagation(); close.current?.(); return
       }

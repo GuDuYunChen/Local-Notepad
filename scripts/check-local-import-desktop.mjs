@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto'
 import path from 'node:path'
 import { desktopNote } from './desktop-save-fixture.mjs'
 import { createLocalImportDesktopFixtures } from './local-import-desktop-fixture.mjs'
+import { createNativeUiSelect } from './native-ui-select.mjs'
 import { LOCAL_IMPORT_WORKBOOK_HEADINGS, LOCAL_IMPORT_WORKBOOK_CELLS, extractImportedWorkbookHeadings,
   extractImportedWorkbookCells, verifyLocalImportDesktopReport } from './local-import-desktop-evidence.mjs'
 
@@ -66,13 +67,8 @@ function helpers({ evaluate, click, cdp, until, api, out }, report) {
   const title = async (row, value) => fill(selector(row.id) + ' [data-local-import-title]', value)
   const destination = async (row, value) => {
     const control = selector(row.id) + ' [data-local-import-destination]'
-    await until(() => evaluate(`(()=>{const n=document.querySelector(${JSON.stringify(control)});return !!n&&!n.disabled&&Array.from(n.options).some(option=>option.value===${JSON.stringify(value)})})()`), 'Complete live destination choices have not loaded')
-    const index = await evaluate(`Array.from(document.querySelector(${JSON.stringify(control)}).options).findIndex(option=>option.value===${JSON.stringify(value)})`)
-    assert.ok(index >= 0, 'Requested live destination missing from original select')
-    await action(control); await keys('Home', 36)
-    for (let i = 0; i < index; i++) await keys('ArrowDown', 40)
-    await keys('Enter', 13)
-    await until(() => evaluate(`document.querySelector(${JSON.stringify(control)})?.value===${JSON.stringify(value)}`), 'Original destination select did not change')
+    await settle()
+    await createNativeUiSelect({ evaluate, click, cdp, until }).choose(control, value)
   }
   const choose = async files => {
     await until(() => evaluate("!!document.querySelector('[data-local-import-input]:not(:disabled)')"), 'Original file input is still waiting for durable records')
@@ -190,7 +186,7 @@ export async function verifyLocalImportDesktop(context) {
   }
   try {
     const diagnostics = await evaluate('window.electronAPI.appDiagnostics()')
-    assert.equal(diagnostics.packaged, true); assert.equal(diagnostics.version, '4.248.1')
+    assert.equal(diagnostics.packaged, true); assert.equal(diagnostics.version, '4.249.0')
     report.appVersion = diagnostics.version
     assert.equal(await evaluate("typeof window.electronAPI?.getPathForFile==='function'&&typeof window.electronAPI?.importPaths==='function'"), true)
     detachNetwork = cdp.onEvent(event => {
