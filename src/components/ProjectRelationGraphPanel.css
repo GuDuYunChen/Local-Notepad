@@ -375,8 +375,8 @@
   display: block;
 }
 
-.project-relation-detail header span,
-.project-relation-detail header small {
+.project-relation-detail header > div > span,
+.project-relation-detail header > div > small {
   color: var(--ink-muted);
   font-size: 6px;
 }
@@ -617,7 +617,7 @@
   display: block;
 }
 
-.project-relation-evolution-list span {
+.project-relation-evolution-list > div > button:not(.remove) > span {
   color: var(--clay);
   font-size: 6px;
   font-weight: 680;

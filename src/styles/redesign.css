@@ -2746,7 +2746,7 @@ body {
   font-weight: 650;
 }
 
-.settings-row span {
+.settings-row > div:first-child > span {
   display: block;
   margin-top: 2px;
   color: var(--ink-muted);
@@ -3060,7 +3060,7 @@ body {
   font-size: 13px;
 }
 
-.consumer-settings-section .settings-row span,
+.consumer-settings-section .settings-row > div:first-child > span,
 .consumer-settings-section .settings-path-row code {
   margin-top: 4px;
   font-size: 11px;
@@ -3131,7 +3131,7 @@ body {
   color: var(--ink);
 }
 
-.settings-advanced-header span {
+.settings-advanced-header > div:first-child > span {
   display: block;
   margin-top: 2px;
   font-size: 10px;
@@ -3570,8 +3570,8 @@ body {
   font-weight: 700 !important;
 }
 
-.daily-section-heading span,
-.daily-notes-list-header span {
+.daily-section-heading > div > span,
+.daily-notes-list-header > div > span {
   display: block;
   margin-top: 3px;
   color: var(--ink-muted);

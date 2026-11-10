@@ -19,7 +19,7 @@
 .sync-history-file-list dt,.sync-history-file-list dd{margin:0;font-size:12px;line-height:1.8}
 .sync-history-file-list details{font-size:12px}
 .sync-history-file-list code{font:inherit;white-space:normal;overflow-wrap:anywhere}
-.sync-history-file-pages span{font-size:12px;line-height:1.8}
+.sync-history-file-pages > span, .sync-history-file-page-jump > label > span, .sync-history-file-page-jump > span{font-size:12px;line-height:1.8}
 .sync-history-file :is(summary,button,input,select,.sync-history-file-list):focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)){outline:2px solid var(--ink);outline-offset:2px}
 @media(max-width:600px){.sync-history-file>summary>span{display:block;margin-left:0}.sync-history-file-list dl{grid-template-columns:1fr}.sync-history-file-list{max-height:280px}}
 
@@ -60,7 +60,7 @@
 
 
 .sync-history-file-object-filter{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:10px 0 0;padding-top:10px;border-top:1px solid var(--line);min-width:0}
-.sync-history-file-object-filter span{flex:1 1 260px;min-width:0;font-size:12px;line-height:1.8;color:var(--ink)}
+.sync-history-file-object-filter > span{flex:1 1 260px;min-width:0;font-size:12px;line-height:1.8;color:var(--ink)}
 .sync-history-file-object-filter code{font:inherit;overflow-wrap:anywhere}
 .sync-history-file-object-filter .btn{flex:none;white-space:normal}
 .sync-history-file-row-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
@@ -68,6 +68,6 @@
 
 
 .sync-history-file-record-filter{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:10px 0 0;padding-top:10px;border-top:1px solid var(--line);min-width:0}
-.sync-history-file-record-filter span{flex:1 1 260px;min-width:0;font-size:12px;line-height:1.8;color:var(--ink)}
+.sync-history-file-record-filter > span{flex:1 1 260px;min-width:0;font-size:12px;line-height:1.8;color:var(--ink)}
 .sync-history-file-record-filter code{font:inherit;overflow-wrap:anywhere}
 .sync-history-file-record-filter .btn{flex:none;white-space:normal}

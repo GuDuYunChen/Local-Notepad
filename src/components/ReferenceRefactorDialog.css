@@ -141,7 +141,7 @@
   font-size: 10px;
 }
 
-.reference-refactor-source > header span {
+.reference-refactor-source > header > span {
   flex: 0 0 auto;
   color: var(--ink-muted);
   font-size: 8px;

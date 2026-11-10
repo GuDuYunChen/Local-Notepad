@@ -26,7 +26,7 @@
 .tag-workspace-feedback [role=alert] { padding: 8px 10px; margin: 0 0 6px; border: 1px solid var(--warning,#996900); border-radius: 6px; background: var(--warning-light,var(--surface)); color: var(--ink); }
 .tag-workspace-confirm { padding: 8px 10px; border: 2px solid var(--clay); border-radius: 8px; } .tag-workspace-confirm p { margin-top: 0; } .tag-workspace-confirm button + button { margin-left: 8px; }
 .tag-workspace-recovery { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; } .tag-workspace-recovery span { overflow-wrap: anywhere; }
-.tag-workspace footer { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; padding: 12px 22px; border-top: 1px solid var(--line); } .tag-workspace footer span { margin-right: auto; color: var(--ink-soft); }
+.tag-workspace footer { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; padding: 12px 22px; border-top: 1px solid var(--line); } .tag-workspace footer > span { margin-right: auto; color: var(--ink-soft); }
 @media(max-width:600px) { .tag-workspace-overlay { padding: 8px; } .tag-workspace { height: calc(100dvh - 16px); border-radius: 10px; } .tag-workspace header,.tag-workspace-scroll,.tag-workspace-feedback,.tag-workspace footer { padding: 10px 12px; } .tag-workspace-columns { grid-template-columns: 1fr; gap: 16px; } .tag-workspace-list { max-height: 150px; } .tag-workspace footer { flex-wrap: wrap; } .tag-workspace footer span { flex-basis: 100%; } }
 
 /* Let the original save/discard decision remain above this workspace. */

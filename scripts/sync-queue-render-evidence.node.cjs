@@ -115,3 +115,126 @@ test('native queue action probes anchor the real Ant Design button, not an optio
   assert.deepEqual(selectors.slice(9), [1, 2, 3].map(index =>
     '.sync-conflict-actions>[data-ui-control="button"]:nth-child(' + index + ')'))
 })
+
+// Execute the actual serialized Chromium observer with explicit DOM-shaped
+// colors. This checks its observation boundary, not a browser layout or PNG.
+function inspectButtonText(options = {}) {
+  const vm = require('node:vm')
+  const source = fs.readFileSync(process.env.NOTEPAD_QUEUE_OBSERVER_SOURCE || path.join(__dirname, 'check-sync-conflict-queue-render.cjs'), 'utf8')
+  const start = source.indexOf('function inspectQueue() {'), end = source.indexOf('\napp.whenReady()', start)
+  assert.ok(start >= 0 && end > start)
+  const rgb = (r, g, b) => `rgb(${r}, ${g}, ${b})`
+  const dark = options.dark === true
+  const paper = dark ? rgb(27, 35, 48) : rgb(255, 255, 255)
+  const ink = dark ? rgb(234, 242, 255) : rgb(36, 34, 42)
+  const primary = dark ? rgb(102, 161, 220) : rgb(112, 87, 217)
+  const primaryInk = dark ? rgb(0, 0, 0) : rgb(255, 255, 255)
+  const css = (color = ink, backgroundColor = 'rgba(0, 0, 0, 0)', fontSize = '14px') => ({ color, backgroundColor, fontSize,
+    getPropertyValue: () => ink })
+  const root = { parentElement: null, style: css(ink, paper) }
+  const captions = selectors.slice(0, 9).map(selector => [selector, { parentElement: root, style: css(), textContent: 'caption' }])
+  const buttons = ['对照版本', '采用远端', '保留本机'].map((text, index) => {
+    const button = { tagName: options.ownerTag || 'BUTTON', parentElement: root, textContent: text, children: [],
+      classList: { contains: name => name === 'ant-btn' && options.antControl !== false },
+      disabled: options.disabled === true, matches: value => value === ':disabled' && options.fieldsetDisabled === true,
+      getAttribute: name => name === 'data-ui-control' ? (options.foreignOwner ? 'input' : 'button') : name === 'aria-disabled' && options.ariaDisabled ? 'true' : null,
+      style: css(index === 2 ? primaryInk : ink, index === 2 ? primary : paper) }
+    const leaked = options.captionColor === true && index === 2
+    const color = leaked ? (dark ? rgb(184, 199, 220) : rgb(111, 107, 120)) : button.style.color
+    const label = { tagName: options.leafTag || 'SPAN', parentElement: button, children: [],
+      classList: { contains: name => (name === 'ant-btn-icon' && options.iconLeaf === true) ||
+        (name === 'ant-btn-content' && options.forgedContentClass === true) },
+      style: css(color, 'rgba(0, 0, 0, 0)', options.captionFont && index === 2 ? '12px' : '14px'), textContent: text }
+    if (options.nestedTextLeaf) label.children = [{ ...label, children: [], parentElement: label }]
+    if (options.nestedLeaf) {
+      const wrapper = { tagName: 'DIV', parentElement: button, children: [label], textContent: text,
+        classList: { contains: () => false }, style: css() }
+      label.parentElement = wrapper; button.children = [wrapper]
+    } else button.children = options.missingLeaf ? [] : [label]
+    const descendants = node => node.children.flatMap(child => [child, ...descendants(child)])
+    button.querySelector = selector => selector === '.ant-btn-content' ? descendants(button).find(node => node.classList.contains('ant-btn-content')) || null : null
+    button.querySelectorAll = selector => selector === 'span' ? descendants(button).filter(node => node.tagName === 'SPAN') : []
+    return button
+  })
+  const targets = new Map([...captions, ...selectors.slice(9).map((selector, index) => [selector, buttons[index]])])
+  const queue = { querySelector: selector => selector === '.sync-queue-count' ? { ...targets.get(selector), textContent: '匹配 25 / 当前列表 25 条 · 显示 1–10' } : options.missingLabel && selector === selectors[11] ? null : targets.get(selector),
+    querySelectorAll: selector => selector === '[data-conflict-id]' ? Array(10).fill({}) : [],
+    getBoundingClientRect: () => ({ left: 20, width: 1140, height: 600 }) }
+  let current = [0, 0, 0, 0], fill = [0, 0, 0, 1]
+  const parse = value => {
+    if (value === '#fff') return [255, 255, 255, 1]
+    const match = /^rgba?\(([^)]+)\)$/.exec(value)
+    assert.ok(match, 'Explicit color fixture is missing: ' + value)
+    const values = match[1].split(',').map(Number); return [values[0], values[1], values[2], values[3] ?? 1]
+  }
+  const context = { set fillStyle(value) { fill = parse(value) }, clearRect() { current = [0, 0, 0, 0] },
+    fillRect() {
+      const alpha = fill[3] + current[3] * (1 - fill[3])
+      current = [...fill.slice(0, 3).map((n, i) => alpha ? (n * fill[3] + current[i] * current[3] * (1 - fill[3])) / alpha : 0), alpha]
+    }, getImageData() { return { data: [...current.slice(0, 3).map(Math.round), Math.round(current[3] * 255)] } } }
+  const document = { querySelector: selector => selector === '.sync-conflict-queue' ? queue : null,
+    documentElement: { scrollWidth: 1180 }, createElement: tag => { assert.equal(tag, 'canvas'); return { getContext: () => context } } }
+  return vm.runInNewContext('(' + source.slice(start, end).trim() + ')()', { document,
+    getComputedStyle: node => node.style, innerWidth: 1180, innerHeight: 900, window: { __queueWrites: 0 } }, { timeout: 1000 })
+}
+
+test('every conflict action label is a mandatory contrast probe after the original nine captions', () => {
+  assert.equal(selectors.length, 12)
+  for (let index = 0; index < 3; index++) assert.equal(selectors[9 + index],
+    `.sync-conflict-actions>[data-ui-control="button"]:nth-child(${index + 1})`)
+  const r = fixture(); r.reports[0].colors.splice(9)
+  assert.throws(() => verifyQueueReport(r, sha), /contrast evidence is incomplete/)
+})
+
+test('serialized observer measures enabled button labels against their own root and painted background', () => {
+  for (const dark of [false, true]) {
+    const sample = inspectButtonText({ dark })
+    assert.equal(sample.ready, true); assert.equal(sample.colors.length, 12)
+    const r = fixture(); r.reports[0].colors = sample.colors; verifyQueueReport(r, sha)
+    for (const probe of sample.colors.slice(9)) {
+      assert.equal(probe.button.enabled, true); assert.equal(probe.button.labelColor, probe.button.rootColor)
+      assert.equal(probe.button.labelFontSize, probe.button.rootFontSize); assert.ok(probe.ratio >= 4.5)
+    }
+  }
+})
+
+test('serialized observer rejects the actual light and dark caption-color leakage captured in run42665502026', () => {
+  for (const dark of [false, true]) {
+    const sample = inspectButtonText({ dark, captionColor: true, captionFont: true })
+    assert.equal(sample.ready, true)
+    const primary = sample.colors[11]
+    assert.equal(primary.finalColor, false)
+    assert.ok(primary.ratio > (dark ? 1.5 : .9) && primary.ratio < (dark ? 1.7 : 1.2))
+    const r = fixture(); r.reports[0].colors = sample.colors
+    assert.throws(() => verifyQueueReport(r, sha), /contrast evidence is incomplete/)
+  }
+})
+
+test('serialized observer rejects font-only metadata leakage even after text color is restored', () => {
+  const sample = inspectButtonText({ captionFont: true })
+  assert.ok(sample.colors[11].ratio >= 4.5); assert.equal(sample.colors[11].finalColor, false)
+  const r = fixture(); r.reports[0].colors = sample.colors
+  assert.throws(() => verifyQueueReport(r, sha), /contrast evidence is incomplete/)
+})
+
+test('serialized observer refuses missing, foreign, disabled and inherited-disabled button owners', () => {
+  for (const options of [{ missingLabel: true }, { ownerTag: 'DIV' }, { foreignOwner: true },
+    { disabled: true }, { fieldsetDisabled: true }, { ariaDisabled: true }]) assert.equal(inspectButtonText(options).ready, false)
+})
+
+
+test('serialized observer refuses non-Ant Design roots even with correct shared metadata and label text', () => {
+  assert.equal(inspectButtonText({ antControl: false }).ready, false)
+})
+
+test('serialized observer requires a real owned direct text leaf instead of substituting the root', () => {
+  const cases = [
+    ['missing leaf', { missingLeaf: true }],
+    ['icon span', { iconLeaf: true }],
+    ['nested span', { nestedLeaf: true }],
+    ['outer span instead of its text leaf', { nestedTextLeaf: true }],
+    ['non-span with optional content class', { leafTag: 'DIV', forgedContentClass: true }],
+  ]
+  const observed = cases.map(([name, options]) => [name, inspectButtonText(options).ready])
+  assert.deepEqual(observed, cases.map(([name]) => [name, false]))
+})

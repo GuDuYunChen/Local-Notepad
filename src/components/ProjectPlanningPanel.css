@@ -26,7 +26,7 @@
   font-weight: 680;
 }
 
-.project-planning-head span {
+.project-planning-head > div > span {
   margin-top: 2px;
   color: var(--ink-muted);
   font-size: 8px;

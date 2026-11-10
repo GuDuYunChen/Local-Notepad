@@ -1,3 +1,4 @@
+import UiThemeProvider from './ui/UiThemeProvider';
 import { setUiValue, uiDisabled, uiQuery, uiQueryAll, uiText } from "~/test/uiControlDriver";import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -33,7 +34,7 @@ afterEach(async () => {
 const button = (label) => [...uiQueryAll(container, 'button')].find((b) => uiText(b) === label);
 const label = (name) => uiQuery(container, '[aria-label="' + name + '"]');
 async function click(element) {expect(element).toBeTruthy();await act(async () => element.dispatchEvent(new MouseEvent('click', { bubbles: true })));}
-async function render(props = {}) {await act(async () => root.render(<EvidenceReviewBackup entries={reviewArchives.list().entries} {...props} />));}
+async function render(props = {}) {await act(async () => root.render(<UiThemeProvider><EvidenceReviewBackup entries={reviewArchives.list().entries} {...props} /></UiThemeProvider>));}
 async function fileInput(file) {
   const el = label('预检核对备份文件');Object.defineProperty(el, 'files', { configurable: true, value: file ? [file] : [] });
   await act(async () => el.dispatchEvent(new Event('change', { bubbles: true })));
@@ -48,7 +49,7 @@ describe('review backup workflow', () => {
   it('integrates into the archive manager and exports all pages of the selected range', async () => {
     for (let i = 1; i <= 7; i++) reviewArchives.importFile(JSON.stringify(archive(i)));
     const foreign = archive(8);foreign.data.projectId = 'p2';reviewArchives.importFile(JSON.stringify(foreign));
-    await act(async () => root.render(<EvidenceReviewArchives projectId="p1" entityId="e1" />));
+    await act(async () => root.render(<UiThemeProvider><EvidenceReviewArchives projectId="p1" entityId="e1" /></UiThemeProvider>));
     expect(uiText(container)).toContain('整包备份与导入预检');
     await click(button('备份当前范围全部存档'));
     expect(JSON.parse(await blob.text()).archives).toHaveLength(7);
@@ -181,7 +182,7 @@ describe('review backup workflow', () => {
   });
   it('switching the archive viewing scope drops a pending preview/read', async () => {
     let resolve;const pending = new Promise((r) => {resolve = r;});
-    await act(async () => root.render(<EvidenceReviewArchives projectId="p1" entityId="e1" />));
+    await act(async () => root.render(<UiThemeProvider><EvidenceReviewArchives projectId="p1" entityId="e1" /></UiThemeProvider>));
     await fileInput({ size: 10, text: () => pending });await scope('all');
     await act(async () => resolve(bundle()));
     expect(label('备份导入预检结果')).toBeNull();expect(reviewArchives.list().entries).toHaveLength(0);

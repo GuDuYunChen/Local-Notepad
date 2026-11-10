@@ -1,3 +1,4 @@
+import UiThemeProvider from './ui/UiThemeProvider';
 import { setUiValue, uiDisabled, uiOptions, uiQuery, uiQueryAll, uiText, uiValue } from "~/test/uiControlDriver";import React from 'react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { act } from 'react';
@@ -110,7 +111,7 @@ describe('UI redesign smoke tests', () => {
 
     await act(async () => {
       root.render(
-        <WorkspaceSidebar
+        <UiThemeProvider><WorkspaceSidebar
           activeWorkspace="notes"
           collapsed={false}
           onToggleCollapsed={onToggleCollapsed}
@@ -120,7 +121,7 @@ describe('UI redesign smoke tests', () => {
           onOpenShortcuts={onOpenShortcuts}>
 
           <div data-library="true">笔记资料库</div>
-        </WorkspaceSidebar>
+        </WorkspaceSidebar></UiThemeProvider>
       );
     });
 
@@ -167,7 +168,7 @@ describe('UI redesign smoke tests', () => {
   it('keeps the sidebar compact only after the user collapses it', async () => {
     await act(async () => {
       root.render(
-        <WorkspaceSidebar
+        <UiThemeProvider><WorkspaceSidebar
           activeWorkspace="notes"
           collapsed
           onToggleCollapsed={() => {}}
@@ -177,7 +178,7 @@ describe('UI redesign smoke tests', () => {
           onOpenShortcuts={() => {}}>
 
           <div data-library="true">笔记资料库</div>
-        </WorkspaceSidebar>
+        </WorkspaceSidebar></UiThemeProvider>
       );
     });
 
@@ -256,7 +257,7 @@ describe('UI redesign smoke tests', () => {
 
     await act(async () => {
       root.render(
-        <QuickSwitcher open onClose={onClose} onSelectFile={onSelectFile} />
+        <UiThemeProvider><QuickSwitcher open onClose={onClose} onSelectFile={onSelectFile} /></UiThemeProvider>
       );
     });
     await flushPromises();
@@ -322,9 +323,9 @@ describe('UI redesign smoke tests', () => {
 
     await act(async () => {
       root.render(
-        <ProjectWorkspacePanel
+        <UiThemeProvider><ProjectWorkspacePanel
           onOpenFile={onOpenFile}
-          onClose={() => {}} />
+          onClose={() => {}} /></UiThemeProvider>
 
       );
     });
@@ -523,9 +524,9 @@ describe('UI redesign smoke tests', () => {
 
     await act(async () => {
       root.render(
-        <ProjectWorkspacePanel
+        <UiThemeProvider><ProjectWorkspacePanel
           onOpenFile={() => {}}
-          onClose={() => {}} />
+          onClose={() => {}} /></UiThemeProvider>
 
       );
     });
@@ -690,9 +691,9 @@ describe('UI redesign smoke tests', () => {
     const onOpenFile = vi.fn();
     await act(async () => {
       root.render(
-        <ProjectWorkspacePanel
+        <UiThemeProvider><ProjectWorkspacePanel
           onOpenFile={onOpenFile}
-          onClose={() => {}} />
+          onClose={() => {}} /></UiThemeProvider>
 
       );
     });
@@ -946,9 +947,9 @@ describe('UI redesign smoke tests', () => {
     const onOpenFile = vi.fn();
     await act(async () => {
       root.render(
-        <ProjectWorkspacePanel
+        <UiThemeProvider><ProjectWorkspacePanel
           onOpenFile={onOpenFile}
-          onClose={() => {}} />
+          onClose={() => {}} /></UiThemeProvider>
 
       );
     });
@@ -1169,9 +1170,9 @@ describe('UI redesign smoke tests', () => {
 
     await act(async () => {
       root.render(
-        <ProjectWorkspacePanel
+        <UiThemeProvider><ProjectWorkspacePanel
           onOpenFile={() => {}}
-          onClose={() => {}} />
+          onClose={() => {}} /></UiThemeProvider>
 
       );
     });
@@ -1333,9 +1334,9 @@ describe('UI redesign smoke tests', () => {
 
     await act(async () => {
       root.render(
-        <ProjectWorkspacePanel
+        <UiThemeProvider><ProjectWorkspacePanel
           onOpenFile={() => {}}
-          onClose={() => {}} />
+          onClose={() => {}} /></UiThemeProvider>
 
       );
     });
@@ -1428,9 +1429,9 @@ describe('UI redesign smoke tests', () => {
 
     await act(async () => {
       root.render(
-        <ProjectWorkspacePanel
+        <UiThemeProvider><ProjectWorkspacePanel
           onOpenFile={() => {}}
-          onClose={() => {}} />
+          onClose={() => {}} /></UiThemeProvider>
 
       );
     });
@@ -1605,9 +1606,9 @@ describe('UI redesign smoke tests', () => {
     const onOpenFile = vi.fn();
     await act(async () => {
       root.render(
-        <ProjectWorkspacePanel
+        <UiThemeProvider><ProjectWorkspacePanel
           onOpenFile={onOpenFile}
-          onClose={() => {}} />
+          onClose={() => {}} /></UiThemeProvider>
 
       );
     });
@@ -1720,9 +1721,9 @@ describe('UI redesign smoke tests', () => {
 
     await act(async () => {
       root.render(
-        <ProjectWorkspacePanel
+        <UiThemeProvider><ProjectWorkspacePanel
           onOpenFile={() => {}}
-          onClose={() => {}} />
+          onClose={() => {}} /></UiThemeProvider>
 
       );
     });
@@ -1944,9 +1945,9 @@ describe('UI redesign smoke tests', () => {
     const onOpenFile = vi.fn();
     await act(async () => {
       root.render(
-        <ProjectWorkspacePanel
+        <UiThemeProvider><ProjectWorkspacePanel
           onOpenFile={onOpenFile}
-          onClose={() => {}} />
+          onClose={() => {}} /></UiThemeProvider>
 
       );
     });
@@ -2027,9 +2028,9 @@ describe('UI redesign smoke tests', () => {
     const onOpenFile = vi.fn();
     await act(async () => {
       root.render(
-        <ProjectWorkspacePanel
+        <UiThemeProvider><ProjectWorkspacePanel
           onOpenFile={onOpenFile}
-          onClose={() => {}} />
+          onClose={() => {}} /></UiThemeProvider>
 
       );
     });
@@ -2246,9 +2247,9 @@ describe('UI redesign smoke tests', () => {
     const onOpenFile = vi.fn();
     await act(async () => {
       root.render(
-        <ProjectWorkspacePanel
+        <UiThemeProvider><ProjectWorkspacePanel
           onOpenFile={onOpenFile}
-          onClose={() => {}} />
+          onClose={() => {}} /></UiThemeProvider>
 
       );
     });
@@ -2455,9 +2456,9 @@ describe('UI redesign smoke tests', () => {
     const onOpenFile = vi.fn();
     await act(async () => {
       root.render(
-        <ProjectWorkspacePanel
+        <UiThemeProvider><ProjectWorkspacePanel
           onOpenFile={onOpenFile}
-          onClose={() => {}} />
+          onClose={() => {}} /></UiThemeProvider>
 
       );
     });
@@ -2623,9 +2624,9 @@ describe('UI redesign smoke tests', () => {
 
     await act(async () => {
       root.render(
-        <ProjectWorkspacePanel
+        <UiThemeProvider><ProjectWorkspacePanel
           onOpenFile={() => {}}
-          onClose={() => {}} />
+          onClose={() => {}} /></UiThemeProvider>
 
       );
     });
@@ -2763,9 +2764,9 @@ describe('UI redesign smoke tests', () => {
 
     await act(async () => {
       root.render(
-        <ProjectWorkspacePanel
+        <UiThemeProvider><ProjectWorkspacePanel
           onOpenFile={() => {}}
-          onClose={() => {}} />
+          onClose={() => {}} /></UiThemeProvider>
 
       );
     });
@@ -2814,9 +2815,9 @@ describe('UI redesign smoke tests', () => {
     const onOpenFile = vi.fn();
     await act(async () => {
       root.render(
-        <ProjectWorkspacePanel
+        <UiThemeProvider><ProjectWorkspacePanel
           onOpenFile={onOpenFile}
-          onClose={() => {}} />
+          onClose={() => {}} /></UiThemeProvider>
 
       );
     });
@@ -2857,9 +2858,9 @@ describe('UI redesign smoke tests', () => {
 
     await act(async () => {
       root.render(
-        <ProjectWorkspacePanel
+        <UiThemeProvider><ProjectWorkspacePanel
           onOpenFile={() => {}}
-          onClose={() => {}} />
+          onClose={() => {}} /></UiThemeProvider>
 
       );
     });
@@ -2907,9 +2908,9 @@ describe('UI redesign smoke tests', () => {
 
     await act(async () => {
       root.render(
-        <ProjectWorkspacePanel
+        <UiThemeProvider><ProjectWorkspacePanel
           onOpenFile={() => {}}
-          onClose={() => {}} />
+          onClose={() => {}} /></UiThemeProvider>
 
       );
     });
@@ -3033,9 +3034,9 @@ describe('UI redesign smoke tests', () => {
 
     await act(async () => {
       root.render(
-        <ProjectWorkspacePanel
+        <UiThemeProvider><ProjectWorkspacePanel
           onOpenFile={() => {}}
-          onClose={() => {}} />
+          onClose={() => {}} /></UiThemeProvider>
 
       );
     });
@@ -3096,14 +3097,14 @@ describe('UI redesign smoke tests', () => {
 
     await act(async () => {
       root.render(
-        <ProjectTodayCenter
+        <UiThemeProvider><ProjectTodayCenter
           workspace={workspace}
           projectMeta={{
             chapterQueue: ['chapter-1', 'chapter-2'],
             dailyReviews: {}
           }}
           onOpenFile={onOpenFile}
-          onStartFocus={onStartFocus} />
+          onStartFocus={onStartFocus} /></UiThemeProvider>
 
       );
     });
@@ -3138,12 +3139,12 @@ describe('UI redesign smoke tests', () => {
 
     await act(async () => {
       root.render(
-        <FocusSessionBar
+        <UiThemeProvider><FocusSessionBar
           session={session}
           currentWords={1280}
           focused
           onToggleFocus={onToggleFocus}
-          onEnd={onEnd} />
+          onEnd={onEnd} /></UiThemeProvider>
 
       );
     });
@@ -3204,12 +3205,12 @@ describe('UI redesign smoke tests', () => {
 
     await act(async () => {
       root.render(
-        <FocusSessionAnalyticsPanel
+        <UiThemeProvider><FocusSessionAnalyticsPanel
           workspace={{
             project: { id: projectId, title: '长篇小说' },
             volumes: []
           }}
-          onOpenFile={() => {}} />
+          onOpenFile={() => {}} /></UiThemeProvider>
 
       );
     });
@@ -3388,7 +3389,7 @@ describe('UI redesign smoke tests', () => {
 
     await act(async () => {
       root.render(
-        <ProjectInsightsPanel
+        <UiThemeProvider><ProjectInsightsPanel
           workspace={workspace}
           projectMeta={{
             targetWords: 100000,
@@ -3410,7 +3411,7 @@ describe('UI redesign smoke tests', () => {
             { id: 'f5', title: '伏笔5.md' }]
 
           }}
-          onOpenFile={onOpenFile} />
+          onOpenFile={onOpenFile} /></UiThemeProvider>
 
       );
     });
@@ -3483,10 +3484,10 @@ describe('UI redesign smoke tests', () => {
 
     await act(async () => {
       root.render(
-        <LongFormStructurePanel
+        <UiThemeProvider><LongFormStructurePanel
           content={structuredContent}
           onApplyDraft={onApplyDraft}
-          onExtractSection={() => {}} />
+          onExtractSection={() => {}} /></UiThemeProvider>
 
       );
     });
@@ -3523,7 +3524,7 @@ describe('UI redesign smoke tests', () => {
 
     await act(async () => {
       root.render(
-        <ReferenceRefactorDialog
+        <UiThemeProvider><ReferenceRefactorDialog
           mode="rename"
           targetTitle="旧标题"
           nextTitle="新标题"
@@ -3549,7 +3550,7 @@ describe('UI redesign smoke tests', () => {
                 issues: ['title-stale', 'section-moved']
               }]
             }]
-          }} />
+          }} /></UiThemeProvider>
 
       );
     });
@@ -3600,7 +3601,7 @@ describe('UI redesign smoke tests', () => {
     });
 
     await act(async () => {
-      root.render(<TrashPanel onClose={() => {}} onRestored={onRestored} />);
+      root.render(<UiThemeProvider><TrashPanel onClose={() => {}} onRestored={onRestored} /></UiThemeProvider>);
     });
     await flushPromises();
 
@@ -3646,7 +3647,7 @@ describe('UI redesign smoke tests', () => {
     });
 
     await act(async () => {
-      root.render(<TrashPanel onClose={() => {}} onRestored={() => {}} />);
+      root.render(<UiThemeProvider><TrashPanel onClose={() => {}} onRestored={() => {}} /></UiThemeProvider>);
     });
     await flushPromises();
 
@@ -3685,14 +3686,14 @@ describe('UI redesign smoke tests', () => {
 
     await act(async () => {
       root.render(
-        <NameDialog
+        <UiThemeProvider><NameDialog
           defaultName="未命名"
           title="新建笔记"
           message="给这篇笔记起个名字："
           showFormatSelect
           currentPathLabel="我的笔记 / 项目"
           onConfirm={onConfirm}
-          onCancel={onCancel} />
+          onCancel={onCancel} /></UiThemeProvider>
 
       );
     });
@@ -3761,7 +3762,7 @@ describe('UI redesign smoke tests', () => {
 
   it('shows and closes lightweight loading toasts', async () => {
     await act(async () => {
-      root.render(<ToastViewport />);
+      root.render(<UiThemeProvider><ToastViewport /></UiThemeProvider>);
     });
 
     let closeToast;
@@ -3786,7 +3787,7 @@ describe('UI redesign smoke tests', () => {
 
     await act(async () => {
       root.render(
-        <TemplateSelector open onClose={onClose} onSelect={onSelect} />
+        <UiThemeProvider><TemplateSelector open onClose={onClose} onSelect={onSelect} /></UiThemeProvider>
       );
     });
 
@@ -3804,7 +3805,7 @@ describe('UI redesign smoke tests', () => {
 
     await act(async () => {
       root.render(
-        <TemplateSelector open onClose={onClose} onSelect={onSelect} />
+        <UiThemeProvider><TemplateSelector open onClose={onClose} onSelect={onSelect} /></UiThemeProvider>
       );
     });
 

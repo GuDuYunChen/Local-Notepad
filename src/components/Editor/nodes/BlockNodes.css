@@ -438,7 +438,7 @@
   white-space: nowrap;
 }
 
-.attachment-preview-header span {
+.attachment-preview-header > div:first-child > span {
   display: block;
   margin-top: 2px;
   color: var(--muted, #6b7280);

@@ -1,3 +1,4 @@
+import UiThemeProvider from './ui/UiThemeProvider';
 import { setUiValue, uiDisabled, uiQuery, uiQueryAll, uiText, uiValue } from "~/test/uiControlDriver";import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
@@ -15,7 +16,7 @@ const button = (text) => [...uiQueryAll(container, 'button')].find((el) => uiTex
 const click = async (el) => {expect(el).toBeTruthy();await act(async () => el.click());};
 const advance = async () => act(async () => vi.advanceTimersByTimeAsync(220));
 async function change(el, value) {await setUiValue(el, value);await act(async () => {el.dispatchEvent(new Event('input', { bubbles: true }));el.dispatchEvent(new Event('change', { bubbles: true }));});}
-async function render(props = {}) {await act(async () => root.render(<GlobalSearchPanel open onClose={onClose} onOpenFile={onOpenFile} onOpened={onOpened} {...props} />));await advance();}
+async function render(props = {}) {await act(async () => root.render(<UiThemeProvider><GlobalSearchPanel open onClose={onClose} onOpenFile={onOpenFile} onOpened={onOpened} {...props} /></UiThemeProvider>));await advance();}
 const makeReport = () => collectSearchResultReport({ query: '' }, data(), { mode: 'all', request: async (f) => data(f.page) });
 async function seed(name = '设定资料') {let value;await act(async () => {value = searchCollections.save(name, await makeReport());});return SEARCH_COLLECTION_PREFIX + value.id;}
 async function select(key) {await click(button('本地资料集'));await change(label('已保存资料集'), key);}

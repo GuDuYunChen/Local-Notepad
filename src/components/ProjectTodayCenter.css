@@ -26,7 +26,7 @@
   font-weight: 700;
 }
 
-.project-today-center-head span {
+.project-today-center-head > div:first-child > span {
   margin-top: 2px;
   color: var(--ink-muted);
   font-size: 8px;
@@ -213,7 +213,7 @@
   font-size: 8px;
 }
 
-.project-today-review-state span {
+.project-today-review-state > div > span {
   margin-top: 2px;
   overflow: hidden;
   color: var(--ink-muted);
@@ -315,7 +315,7 @@
   font-size: 8px;
 }
 
-.project-today-empty-action span {
+.project-today-empty-action > span {
   margin-top: 2px;
   color: var(--ink-muted);
   font-size: 7px;

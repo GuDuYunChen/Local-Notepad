@@ -1,3 +1,4 @@
+import UiThemeProvider from './components/ui/UiThemeProvider';
 import { setUiValue, uiQuery, uiQueryAll, uiText } from "~/test/uiControlDriver";import { researchReceipt, RESEARCH_FILE_ID, testLocks } from './test/researchFixtures';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -32,7 +33,7 @@ beforeEach(async () => {
     return anchor ? { ...result(), anchor_id: anchor, anchor_found: anchor === 'b' } : result();
   });
   container = document.createElement('div');document.body.append(container);root = createRoot(container);
-  await act(async () => root.render(<App />));await settle();
+  await act(async () => root.render(<UiThemeProvider><App /></UiThemeProvider>));await settle();
   await act(async () => mocks.selectFile({ id: 'a', title: '第一章.md', content: '已存正文' }));
 });
 afterEach(async () => {await act(async () => root.unmount());container.remove();evidenceNavigation.cancel();vi.useRealTimers();vi.unstubAllGlobals();});

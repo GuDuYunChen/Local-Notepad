@@ -32,33 +32,37 @@ function inspectQueue() {
     ['.sync-queue-tools [data-ui-control="select"] .ant-select-content', '--ink'], ['.sync-queue-count', '--ink'],
     ['.sync-queue-identifiers', '--ink-soft'], ['.sync-conflict-item>div>strong', '--ink'],
     ['.sync-conflict-item>div>span', '--ink-soft'],
-    // Exercise all three real enabled action labels, not only the description.
-    ['.sync-conflict-actions>[data-ui-control="button"]:nth-child(1)', '--ink', '对照版本'],
-    ['.sync-conflict-actions>[data-ui-control="button"]:nth-child(2)', '--ink', '采用远端'],
-    ['.sync-conflict-actions>[data-ui-control="button"]:nth-child(3)', '--on-accent', '保留本机'],
+    ['.sync-conflict-actions>[data-ui-control="button"]:nth-child(1)', '@button', '对照版本'],
+    ['.sync-conflict-actions>[data-ui-control="button"]:nth-child(2)', '@button', '采用远端'],
+    ['.sync-conflict-actions>[data-ui-control="button"]:nth-child(3)', '@button', '保留本机'],
   ]) {
     const el = queue.querySelector(selector)
     if (!el) return { ready: false, missing: selector }
-    if (actionLabel && (el.tagName !== 'BUTTON' || !el.classList.contains('ant-btn') ||
-        el.textContent.trim() !== actionLabel || el.disabled))
-      return { ready: false, missing: 'enabled Ant Design action label: ' + selector }
-    // Ant Design may render its label as a plain span rather than .ant-btn-content.
-    // Probe the real label's computed color, not an optional wrapper class.
-    const text = actionLabel ? (el.querySelector('.ant-btn-content') ||
-      [...el.querySelectorAll('span')].find(node => node.textContent.trim() === actionLabel &&
-        ![...node.children].some(child => child.textContent.trim() === actionLabel)) || el) : el
+    const button = token === '@button' ? el : null
+    if (token === '@button' && (button.tagName !== 'BUTTON' || button.getAttribute('data-ui-control') !== 'button' ||
+        !button.classList.contains('ant-btn') || button.disabled || button.matches(':disabled') || button.getAttribute('aria-disabled') === 'true')) return { ready: false, invalidButton: selector }
+    // The root locates the real control; its own color cannot stand in for the
+    // actual direct text span when an inherited caption rule changes that span.
+    const labels = button ? [...button.children].filter(node => node.tagName === 'SPAN' &&
+      !node.classList.contains('ant-btn-icon') && node.textContent.trim() === actionLabel) : null
+    if (button && (button.textContent.trim() !== actionLabel || labels.length !== 1 ||
+        labels[0].parentElement !== button || labels[0].children.length !== 0)) return { ready: false, missing: 'enabled action label: ' + selector }
+    const text = button ? labels[0] : el
+    const buttonStyle = button ? getComputedStyle(button) : null
     const style = getComputedStyle(text), chain = []
     for (let node = text; node; node = node.parentElement) chain.unshift(node)
     ctx.clearRect(0, 0, 1, 1); paint('#fff')
     for (const node of chain) paint(getComputedStyle(node).backgroundColor)
     const background = pixel(); paint(style.color); const foreground = pixel()
     const a = luminance(foreground), b = luminance(background)
-    ctx.clearRect(0, 0, 1, 1); paint(style.getPropertyValue(token).trim() || (token === '--on-accent' ? '#ffffff' : '')); const expected = pixel()
+    ctx.clearRect(0, 0, 1, 1); paint(buttonStyle ? buttonStyle.color : style.getPropertyValue(token).trim()); const expected = pixel()
     colors.push({ selector, foreground, background, ratio: (Math.max(a, b) + .05) / (Math.min(a, b) + .05),
-      actionLabel: actionLabel || null, enabled: actionLabel ? !el.disabled : null,
-      antControl: actionLabel ? el.classList.contains('ant-btn') : null,
+      actionLabel: actionLabel || null, enabled: actionLabel ? !button.disabled && !button.matches(':disabled') && button.getAttribute('aria-disabled') !== 'true' : null,
+      antControl: actionLabel ? button.classList.contains('ant-btn') : null,
       fontSize: actionLabel ? Number.parseFloat(style.fontSize) : null,
-      finalColor: foreground.every((n, i) => n === expected[i]) })
+      finalColor: foreground.every((n, i) => n === expected[i]) && (!buttonStyle || style.fontSize === buttonStyle.fontSize),
+      ...(buttonStyle ? { button: { enabled: true, rootColor: buttonStyle.color, rootFontSize: buttonStyle.fontSize,
+        labelColor: style.color, labelFontSize: style.fontSize, labelText: text.textContent } } : {}) })
   }
   const rect = queue.getBoundingClientRect()
   return { ready: true, colors, count: queue.querySelectorAll('[data-conflict-id]').length,
@@ -94,7 +98,7 @@ app.whenReady().then(async () => {
       await delay(100); data = await inspect(win)
       const valid = data.ready && data.count === expectedRows && data.overflow <= 1 && data.writes === 0 && data.activeMarkup === 0 &&
         data.colors.every(c => c.finalColor && Number.isFinite(c.ratio) && c.ratio >= 4.5 &&
-          (!c.actionLabel || (Number.isFinite(c.fontSize) && c.fontSize >= 13)))
+          (!c.actionLabel || (c.enabled === true && c.antControl === true && Number.isFinite(c.fontSize) && c.fontSize >= 13)))
       const signature = JSON.stringify(data)
       samples = valid ? (signature === previous ? samples + 1 : 1) : 0; previous = signature
       if (samples >= 3) break

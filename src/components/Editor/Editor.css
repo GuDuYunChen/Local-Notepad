@@ -947,7 +947,7 @@
   font-weight: 680;
 }
 
-.document-outline-header span {
+.document-outline-header > div > span {
   color: var(--ink-muted);
   font-size: 9px;
 }
@@ -2355,7 +2355,7 @@
   font-weight: 680;
 }
 
-.editor-resource-header span {
+.editor-resource-header > div > span {
   margin-top: 2px;
   color: var(--ink-muted);
   font-size: 8px;
@@ -2636,7 +2636,7 @@
   font-weight: 680;
 }
 
-.editor-view-settings > header span {
+.editor-view-settings > header > div > span {
   margin-top: 2px;
   color: var(--ink-muted);
   font-size: 8px;
@@ -2911,7 +2911,7 @@
   font-weight: 680;
 }
 
-.markdown-source-header span {
+.markdown-source-header > div:first-child > span {
   margin-top: 2px;
   color: var(--ink-muted);
   font-size: 8px;

@@ -58,7 +58,7 @@
   font-weight: 650;
 }
 
-.focus-analysis-card > header span {
+.focus-analysis-card > header > div:first-child > span {
   margin-top: 2px;
   color: var(--ink-muted);
   font-size: 7px;
@@ -411,7 +411,7 @@
   gap: 4px;
 }
 
-.focus-session-review-editor > div span {
+.focus-session-review-editor > div > span {
   margin-right: auto;
   color: var(--ink-muted);
   font-size: 7px;

@@ -124,8 +124,8 @@
   display: block;
 }
 
-.project-entity-alias-summary span,
-.project-entity-alias-summary small {
+.project-entity-alias-summary > div > span,
+.project-entity-alias-summary > div > small {
   color: var(--ink-muted);
   font-size: 6px;
 }
