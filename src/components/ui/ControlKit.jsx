@@ -181,15 +181,23 @@ function useInheritedDisabled(node) {
 export const UiButton = forwardRef(function UiButton({ type, htmlType, variant, danger, size, density, className = '', onClick, onMouseDown, ghost, children, ...props }, ref) {
   const inheritedDefaults = useContext(UiControlDefaultsContext)
   const fallbackTheme = useFallbackControlTheme()
+  // These existing classes explicitly mean an icon without a text caption.
+  // Ant Design only removes text padding when the content uses its icon slot.
+  // An explicit icon prop still owns the slot and may accompany real children.
+  const legacyIcon = !Object.hasOwn(props, 'icon') && children !== 0 &&
+    (hasClass(className, 'icon-btn') || hasClass(className, 'icon-only'))
+  const buttonIcon = legacyIcon ? children : props.icon
+  const buttonChildren = legacyIcon ? undefined : children
+  const iconOnly = Boolean(buttonIcon) && !buttonChildren && buttonChildren !== 0
   const structural = /(?:row|item|nav|menu|tab|swatch|handle|close|toggle|icon|chip|pill)/i.test(className) || ['tab', 'menuitem', 'option', 'treeitem'].includes(props.role)
   const kind = variant || (hasClass(className, 'primary') || type === 'primary' ? 'primary' : hasClass(className, 'link') || type === 'link' ? 'link' : hasClass(className, 'dashed') || type === 'dashed' ? 'dashed' : hasClass(className, 'text') || type === 'text' || structural ? 'text' : 'secondary')
   const nativeType = htmlType || (['button', 'submit', 'reset'].includes(type) ? type : type === undefined ? 'submit' : 'button')
   const buttonType = kind === 'primary' ? 'primary' : ['text', 'link', 'dashed'].includes(kind) ? kind : 'default'
   const guard = handler => event => { if (props.disabled || fieldsetDisabled(event.currentTarget)) { event.preventDefault(); event.stopPropagation(); return } handler?.(event) }
-  const control = <Button {...props} ref={nativeRef(ref)} htmlType={nativeType} type={buttonType} danger={danger ?? hasClass(className, 'danger')} ghost={ghost ?? hasClass(className, 'ghost')} autoInsertSpace={false}
-    size={controlSize(size, density, className)} data-ui-control="button" data-ui-layout={structural ? 'content' : 'action'}
+  const control = <Button {...props} icon={buttonIcon} ref={nativeRef(ref)} htmlType={nativeType} type={buttonType} danger={danger ?? hasClass(className, 'danger')} ghost={ghost ?? hasClass(className, 'ghost')} autoInsertSpace={false}
+    size={controlSize(size, density, className)} data-ui-control="button" data-ui-layout={iconOnly ? 'icon' : structural ? 'content' : 'action'}
     aria-pressed={props['aria-pressed'] ?? (hasClass(className, 'active') ? true : undefined)}
-    className={['app-ui-button', cleanControlClass(className)].filter(Boolean).join(' ')} onClick={guard(onClick)} onMouseDown={guard(onMouseDown)}>{children}</Button>
+    className={['app-ui-button', cleanControlClass(className)].filter(Boolean).join(' ')} onClick={guard(onClick)} onMouseDown={guard(onMouseDown)}>{buttonChildren}</Button>
   return inheritedDefaults ? control : <ConfigProvider wave={quietWave} theme={fallbackTheme}>{control}</ConfigProvider>
 })
 
