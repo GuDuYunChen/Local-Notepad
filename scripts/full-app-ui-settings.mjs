@@ -125,15 +125,24 @@ export async function verifySettingsPages(ctx) {
     trash: await api('/api/files/trash'), versions: await api(filePath(fixture.historyNote.id) + '/versions'),
     sync: sameConfiguration(await api('/api/settings')),
   })
+  // The production toggle has a decorative arrow span in its textContent.
+  // Bind the unique real button and assert its visible label and ARIA state;
+  // an exact whole-button text match would reject the valid control.
+  const toggleDiagnostics = async (label, expectedExpanded) => {
+    const selector = '.settings-panel .settings-advanced-toggle'
+    await until(() => evaluate(`(()=>{const b=document.querySelector(${json(selector)});return !!b&&!b.disabled&&b.querySelector('span:first-child')?.textContent.trim()===${json(label)}&&b.getAttribute('aria-expanded')===${json(String(!expectedExpanded))}})()`), 'Actual diagnostic toggle label or initial state mismatch: ' + label)
+    await click(selector)
+    await until(() => evaluate(`document.querySelector(${json(selector)})?.getAttribute('aria-expanded')===${json(String(expectedExpanded))}`), 'Actual diagnostic toggle did not change state: ' + label)
+  }
   const before = await untouched()
   assert.equal(Boolean(before.sync.sync_enabled), false, 'The synthetic Settings profile must have sync disabled')
   await shared.openSettings()
   await contains('.settings-panel', '本地数据正常')
   await shared.focus('.settings-toolbar [aria-label="返回笔记"]', { routeId: 'settings-main', stateId: 'default' })
   await shot('settings-main', 'default', ['.settings-toolbar [aria-label="返回笔记"]'], ['常用选项和本地数据都集中在这里。'])
-  await press('.settings-panel', '高级诊断'); await present('.settings-advanced-panel')
+  await toggleDiagnostics('高级诊断', true); await present('.settings-advanced-panel')
   await shot('settings-main', 'diagnostics', ['.settings-advanced-header'], ['本机诊断信息'])
-  await press('.settings-panel', '收起高级诊断'); await absent('.settings-advanced-panel')
+  await toggleDiagnostics('收起高级诊断', false); await absent('.settings-advanced-panel')
 
   // Theme editing stays in the original uncommitted draft, then is discarded.
   await open('appearance', '管理主题方案', '.appearance-center button[data-appearance-close]')
