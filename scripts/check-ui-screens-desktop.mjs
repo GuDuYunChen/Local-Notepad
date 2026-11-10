@@ -408,7 +408,7 @@ export async function verifyUiScreensDesktop({ evaluate, click, cdp, until, api,
             assert.equal(await evaluate("Boolean(document.querySelector('.global-search-panel'))"), true)
             await key('Escape', 27); await until(() => evaluate("!document.querySelector('.global-search-panel')"), 'Second Escape did not close the actual search dialog')
             scene.popup.secondEscapeClosedDialog = true
-            scene.popup.triggerFocusRestored = await evaluate("document.activeElement?.matches(${q(searchTrigger)})===true")
+            scene.popup.triggerFocusRestored = await evaluate(`document.activeElement?.matches(${q(searchTrigger)})===true`)
           } else {
             await click('.workspace-sidebar-nav-item[aria-label="置顶笔记"]')
             await until(() => evaluate("Boolean(document.querySelector('.pinned-tools input:not(:disabled)'))"), 'Actual Pinned workspace did not become ready')
