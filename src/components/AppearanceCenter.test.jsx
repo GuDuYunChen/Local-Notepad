@@ -89,6 +89,19 @@ describe('complete local appearance workflow', () => {
     await click('应用并保存')
     expect(readAppearance().value).toEqual(defaultAppearance())
   })
+  it('keeps a long custom scheme name accessible without spilling state into persistence', async () => {
+    await click('复制为自定义方案')
+    const longName = '梅子紫界面验收草稿中文长名称的换行和按钮操作区域保持可用'
+    await input('方案名称', longName)
+    const selectedButton = panel().querySelector('.appearance-schemes button[aria-pressed="true"]')
+    expect(selectedButton).toBeTruthy()
+    expect(selectedButton.getAttribute('title')).toBe(longName)
+    expect(selectedButton.textContent).toContain(longName)
+    expect(selectedButton.querySelector('.appearance-swatch')).toBeTruthy()
+    expect(selectedButton.querySelector('small').textContent).toBe('自定义')
+    expect(localStorage.getItem(APPEARANCE_KEY)).toBeNull()
+    expect(button('应用并保存').disabled).toBe(false)
+  })
   it('keeps built-in schemes immutable', () => {
     expect(panel().querySelector('[aria-label="方案名称"]').disabled).toBe(true)
     expect(button('删除方案').disabled).toBe(true)

@@ -8,6 +8,8 @@ import {
   repairWikiReferences,
 } from './Editor/utils/referenceUtils'
 import './ReferenceHealthPanel.css'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 const ISSUE_LABELS = {
   'target-missing': '目标不存在或已删除',
@@ -158,14 +160,14 @@ export default function ReferenceHealthPanel({
       </div>
 
       <div className="reference-health-actions">
-        <button
+        <UiButton size="middle"
           type="button"
           className="btn primary"
           disabled={repairing || unsaved || summary.repairable === 0}
           onClick={() => void repairAll()}
         >
           {repairing ? '修复中…' : '安全修复全部'}
-        </button>
+        </UiButton>
         {unsaved && <span>请先保存当前正文，再执行引用修复。</span>}
         {!unsaved && summary.broken > 0 && (
           <span>无法唯一判断的章节或已删除目标不会被自动修改。</span>
@@ -221,7 +223,7 @@ export default function ReferenceHealthPanel({
 
               <div className="reference-health-item-actions">
                 {item.target && (
-                  <button
+                  <UiButton size="middle"
                     type="button"
                     onClick={() => onSelectFile?.(item.target.id, {
                       headingPath: item.issues.includes('section-missing')
@@ -232,7 +234,7 @@ export default function ReferenceHealthPanel({
                     })}
                   >
                     打开目标
-                  </button>
+                  </UiButton>
                 )}
               </div>
             </article>

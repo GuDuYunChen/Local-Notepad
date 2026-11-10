@@ -1,3 +1,4 @@
+import { changeUiValue } from '~/test/uiControlDriver'
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { beforeEach, afterEach, it, expect, vi } from 'vitest'
@@ -31,10 +32,7 @@ afterEach(async()=>{await act(async()=>root.unmount());host.remove();vi.restoreA
 // Review regressions: an acknowledgement belongs to an action, not simply to
 // condition values that might reappear after A -> B -> A navigation.
 async function chooseLocal(name, value) {
-  await act(async () => {
-    const node = control(name); node.value = value
-    node.dispatchEvent(new Event('change', { bubbles: true }))
-  })
+  await changeUiValue(control(name), value)
 }
 for (const [name, change, restore] of [
   ['text query', () => input('another'), () => input('abc')],

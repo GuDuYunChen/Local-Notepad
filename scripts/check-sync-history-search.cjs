@@ -14,7 +14,7 @@ if(!process.versions.electron){
  const {app,BrowserWindow}=require('electron'),{build}=require('esbuild'),{pathToFileURL}=require('node:url')
  const userData=fs.mkdtempSync(path.join(os.tmpdir(),'notepad-history-search-'));app.setPath('userData',userData);app.on('window-all-closed',()=>{})
  const watchdog=setTimeout(()=>app.exit(1),105000),delay=ms=>new Promise(r=>setTimeout(r,ms))
- function inspect(){
+ function inspect(readSelect){
   const panel=document.querySelector('[data-sync-conflict-history]'),overview=document.querySelector('.sync-overview');if(!panel)return null
   const visible=n=>{const r=n.getBoundingClientRect();return n.getClientRects().length>0&&r.top>=0&&r.bottom<=innerHeight&&r.left>=0&&r.right<=innerWidth&&getComputedStyle(n).visibility!=='hidden'}
   const canvas=document.createElement('canvas');canvas.width=canvas.height=1;const c=canvas.getContext('2d',{willReadFrequently:true})
@@ -26,8 +26,8 @@ if(!process.versions.electron){
    return{ratio:(Math.max(a,b)+.05)/(Math.min(a,b)+.05)}
   })
   const rows=[...panel.querySelectorAll('[data-history-row]')]
-  return{scriptedCompositionEvents:window.__scriptedCompositionEvents||0,imeEvents:window.__imeEvents||[],query:panel.querySelector('[data-history-query]').value,kind:panel.querySelector('[data-history-kind]').value,outcome:panel.querySelector('[data-history-outcome]').value,
-   serverFilter:panel.querySelector('select').value,ids:rows.map(n=>n.querySelectorAll('code')[1].textContent),outcomes:rows.map(n=>n.querySelector('.sync-conflict-history-outcome').textContent).join(' / '),
+  return{scriptedCompositionEvents:window.__scriptedCompositionEvents||0,imeEvents:window.__imeEvents||[],query:panel.querySelector('[data-history-query]').value,kind:readSelect('[data-history-kind]').value,outcome:readSelect('[data-history-outcome]').value,
+   serverFilter:readSelect('[data-sync-conflict-history] [aria-label="冲突记录类型"]').value,ids:rows.map(n=>n.querySelectorAll('code')[1].textContent),outcomes:rows.map(n=>n.querySelector('.sync-conflict-history-outcome').textContent).join(' / '),
    searchFeedback:panel.querySelector('[data-history-search-feedback]').textContent,readFeedback:panel.querySelector('.sync-conflict-history-feedback').textContent,
    requests:window.__requests,mutations:window.__mutations,networkRequests:window.__networkRequests,navigationCalls:window.__navigationCalls,
    currentGuidanceUnchanged:overview.querySelector('[data-sync-guidance]').textContent===window.__guidance,
@@ -37,11 +37,14 @@ if(!process.versions.electron){
    hasMore:!!panel.querySelector('[data-history-more]'),colors,viewport:{width:innerWidth,height:innerHeight},overflow:document.documentElement.scrollWidth-innerWidth}
  }
  app.whenReady().then(async()=>{
+  const {createNativeUiSelect,inspectNativeUiSelect}=await import('./native-ui-select.mjs')
+  const inspectSource='('+inspect.toString()+')('+inspectNativeUiSelect.toString()+')'
   fs.mkdirSync(out,{recursive:true})
   await build({absWorkingDir:root,bundle:true,format:'iife',platform:'browser',alias:{'~':path.join(root,'src')},define:{'process.env.NODE_ENV':'"production"'},outfile:path.join(out,'fixture.js'),
    plugins:[{name:'synthetic-history-search',setup(b){b.onResolve({filter:/^~\/services\/api$/},()=>({path:'api',namespace:'history-search'}));b.onLoad({filter:/.*/,namespace:'history-search'},()=>({contents:'export const api=(...a)=>window.__historyLoad(...a)',loader:'js'}));b.onLoad({filter:/[\\/]src[\\/]services[\\/]api\.js$/},()=>({contents:'export const api=(...a)=>window.__historyLoad(...a)',loader:'js'}))}}],
    stdin:{resolveDir:root,loader:'jsx',contents:`
     import React from 'react';import{createRoot}from'react-dom/client';import Overview from './src/components/SyncOverviewPanel.jsx';
+    import UiThemeProvider from './src/components/ui/UiThemeProvider.jsx';
     import{overviewFixture}from'./scripts/fixtures/sync-overview.mjs';import{historyRow,historyPage}from'./scripts/fixtures/sync-conflict-history.mjs';import './src/components/SyncCenterPanel.css';
     document.documentElement.dataset.theme=new URLSearchParams(location.search).get('scene')==='search-light'?'light':'dark';
     window.__requests=[];window.__mutations=0;window.__networkRequests=0;window.__navigationCalls=0;
@@ -53,7 +56,7 @@ if(!process.versions.electron){
      if(n===2)return Promise.resolve(historyPage([row('h0','file','remote',1790586100,'晚章·未读取')]));
      return Promise.reject(Error('PRIVATE_SERVER_PASSWORD'));
     };
-    createRoot(document.getElementById('root')).render(<Overview {...overviewFixture()} onNavigate={()=>{window.__navigationCalls++;return true}}/>);
+    createRoot(document.getElementById('root')).render(<UiThemeProvider><Overview {...overviewFixture()} onNavigate={()=>{window.__navigationCalls++;return true}}/></UiThemeProvider>);
    `}})
   const index=fs.readFileSync(path.join(root,'dist/index.html'),'utf8'),styles=[...index.matchAll(/<link\b[^>]*href="([^"]+\.css)"[^>]*>/g)].map(m=>pathToFileURL(path.resolve(root,'dist',m[1].replace(/^\//,''))).href)
   if(!styles.length)throw Error('Missing production CSS')
@@ -69,14 +72,19 @@ if(!process.versions.electron){
     await win.webContents.debugger.sendCommand(method,params)
     cdpCommands.push({method,params:{...params},completed:true})
    }
-   const wait=async code=>{for(let i=0;i<70;i++){if(await exec(code))return;await delay(70)}throw Error('History search wait failed '+name+' '+code)}
+   const wait=async(code,label)=>{for(let i=0;i<70;i++){const result=await(typeof code==='function'?code():exec(code));if(result)return result;await delay(70)}throw Error(label||'History search wait failed '+name+' '+code)}
+   const nativeClick=async selector=>{
+    const point=await wait(()=>exec(`(()=>{const nodes=[...document.querySelectorAll(${JSON.stringify(selector)})];if(nodes.length!==1)return null;const n=nodes[0];n.scrollIntoView({block:'center',behavior:'instant'});const r=n.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2,hit=document.elementFromPoint(x,y);return r.width>0&&r.height>0&&hit&&n.contains(hit)?{x,y}:null})()`),'Select control missing, ambiguous or occluded: '+selector)
+    for(const type of ['mousePressed','mouseReleased'])await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent',{type,...point,button:'left',clickCount:1})
+   }
+   const select=createNativeUiSelect({evaluate:exec,click:nativeClick,cdp:{send:(method,params)=>win.webContents.debugger.sendCommand(method,params)},until:wait})
    const click=attr=>exec(`(()=>{const n=document.querySelector('[data-history-${attr}]');n.focus({preventScroll:true});n.click();return true})()`)
-   const choose=(attr,value)=>exec(`(()=>{const n=document.querySelector('[data-history-${attr}]');n.focus({preventScroll:true});n.value=${JSON.stringify(value)};n.dispatchEvent(new Event('change',{bubbles:true}));return true})()`)
+   const choose=(attr,value)=>select.choose('[data-history-'+attr+']',value)
    const type=value=>exec(`(()=>{const n=document.querySelector('[data-history-query]');n.focus({preventScroll:true});Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(n,${JSON.stringify(value)});n.dispatchEvent(new Event('input',{bubbles:true}));return true})()`)
    const capture=async phase=>{
     await exec(`document.querySelector('[data-sync-conflict-history]').scrollIntoView({block:'start',behavior:'instant'})`)
     let frame,last='',stable=0
-    for(let i=0;i<50;i++){await delay(80);frame=await exec('('+inspect.toString()+')()');const sig=JSON.stringify(frame);stable=sig===last?stable+1:0;last=sig;if(stable>=2)break}
+    for(let i=0;i<50;i++){await delay(80);frame=await exec(inspectSource);const sig=JSON.stringify(frame);stable=sig===last?stable+1:0;last=sig;if(stable>=2)break}
     if(stable<2)throw Error('Unstable history search frame '+name+' '+phase)
     const code=scenes.indexOf(name)*phases.length+phases.indexOf(phase)+1
     await exec(`(()=>{let s=document.getElementById('search-raster');if(!s){s=document.createElement('div');s.id='search-raster';s.setAttribute('aria-hidden','true');document.body.append(s)}s.style.cssText='position:fixed;left:0;top:0;width:32px;height:4px;display:flex;z-index:2147483647;pointer-events:none;contain:strict';s.replaceChildren();for(let i=0;i<8;i++){const c=document.createElement('span');c.style.cssText='display:block;flex:none;width:4px;height:4px;background:'+(((${code}>>>i)&1)?'rgb(221,238,255)':'rgb(17,34,51)');s.append(c)}return true})()`)
@@ -87,7 +95,7 @@ if(!process.versions.electron){
      rasterSamples=matches?(sha===lastHash?rasterSamples+1:1):0;lastHash=sha
      if(rasterSamples>=2){bytes=b;break}await delay(80)
     }
-    if(!bytes)throw Error('Missing current phase raster');if(JSON.stringify(await exec('('+inspect.toString()+')()'))!==JSON.stringify(frame))throw Error('DOM changed during capture')
+    if(!bytes)throw Error('Missing current phase raster');if(JSON.stringify(await exec(inspectSource))!==JSON.stringify(frame))throw Error('DOM changed during capture')
     const png=name+'-'+phase+'.png';fs.writeFileSync(path.join(out,png),bytes);scene.frames.push({phase,...frame,cdpCommands:cdpCommands.map(item=>({...item,params:{...item.params}})),stableSamples:stable,rasterSamples,rasterCode:code,png,bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')});save()
    }
    try{

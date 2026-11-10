@@ -54,6 +54,11 @@
 .project-entity-evidence-browser select,
 .project-entity-evidence-browser button {
   min-width: 0;
+}
+
+.project-entity-evidence-browser input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.project-entity-evidence-browser select:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.project-entity-evidence-browser button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   min-height: 36px;
   padding: 6px 10px;
   border: 1px solid var(--line);
@@ -68,12 +73,12 @@
   cursor: pointer;
 }
 
-.project-entity-evidence-browser button:hover:not(:disabled) {
+.project-entity-evidence-browser button:hover:not(:disabled):where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-color: var(--clay);
   background: var(--clay-light);
 }
 
-.project-entity-evidence-browser :is(button, input, select):focus-visible {
+.project-entity-evidence-browser :is(button, input, select):focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   outline: 2px solid var(--clay);
   outline-offset: 2px;
 }

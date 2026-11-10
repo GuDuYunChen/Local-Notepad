@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { createCollectionStudyBatch } from '~/services/collectionStudyBatch'
 import { MAX_STUDY_STATUS_BATCH, STUDY_STATUS_LABELS } from '~/services/collectionStudy'
+import { UiButton, UiSelect } from '~/components/ui/ControlKit'
+
 
 export function useStudyBatch({ active, disabled, model, filters, hub, sourceStore, studyStore, onCommitted }) {
   const service = useMemo(() => createCollectionStudyBatch({ hub, sourceStore, studyStore }), [hub, sourceStore, studyStore])
@@ -86,14 +88,14 @@ export default function CollectionStudyBatchPanel({ batch, disabled, rows }) {
   return <section className="study-hub-batch" aria-label="批量阅读标记">
     <header><h4>批量整理阅读状态</h4><p>跨页选择，先预检后确认。只改人工状态，保留批注文字和书签；不改正文。</p></header>
     <div className="study-hub-actions">
-      <button type="button" disabled={disabled || batch.busy || !rows.length} onClick={() => batch.selectPage(rows)}>选择本页批注</button>
-      <button type="button" disabled={batch.busy || !batch.selected.size} onClick={batch.clear}>清空批量选择</button>
+      <UiButton size="middle" type="button" disabled={disabled || batch.busy || !rows.length} onClick={() => batch.selectPage(rows)}>选择本页批注</UiButton>
+      <UiButton size="middle" type="button" disabled={batch.busy || !batch.selected.size} onClick={batch.clear}>清空批量选择</UiButton>
       <strong role="status">已选 {batch.selected.size} / 200 条</strong>
-      <label>标记为 <select aria-label="批量阅读目标状态" value={batch.status} disabled={batch.busy} onChange={e => batch.setStatus(e.target.value)}>
+      <label>标记为 <UiSelect size="middle" aria-label="批量阅读目标状态" value={batch.status} disabled={batch.busy} onChange={e => batch.setStatus(e.target.value)}>
         {Object.entries(STUDY_STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-      </select></label>
-      <button type="button" disabled={disabled || batch.busy || !batch.selected.size || !!batch.undoCount} onClick={batch.prepare}>预检批量标记</button>
-      {batch.busy && <button type="button" onClick={batch.cancel}>停止批量处理</button>}
+      </UiSelect></label>
+      <UiButton size="middle" type="button" disabled={disabled || batch.busy || !batch.selected.size || !!batch.undoCount} onClick={batch.prepare}>预检批量标记</UiButton>
+      {batch.busy && <UiButton size="middle" type="button" onClick={batch.cancel}>停止批量处理</UiButton>}
     </div>
     {batch.notice && <p className="study-hub-notice" role="status" aria-live="polite">{batch.notice}</p>}
     {batch.preview && <div className="study-hub-batch-preview" role="region" aria-label="批量标记预检">
@@ -102,13 +104,13 @@ export default function CollectionStudyBatchPanel({ batch, disabled, rows }) {
         {batch.preview.items.map(item => <li key={item.key}><strong>{item.title || '未命名'}</strong> · {item.collectionName}（{item.collectionId}） · {item.id}：{STUDY_STATUS_LABELS[item.previousStatus]} → {STUDY_STATUS_LABELS[item.status]}</li>)}
       </ol></details>
       <p>按资料集逐份保存，不是整批事务。失败或停止时保留已成功项；本轮可撤销，但后续已修改的资料集不会被覆盖。</p>
-      <div className="study-hub-actions"><button type="button" disabled={disabled || batch.busy || !batch.preview.changed} onClick={batch.apply}>确认批量标记</button>
-        <button type="button" disabled={batch.busy} onClick={batch.cancelPreview}>取消批量预检</button></div>
+      <div className="study-hub-actions"><UiButton size="middle" type="button" disabled={disabled || batch.busy || !batch.preview.changed} onClick={batch.apply}>确认批量标记</UiButton>
+        <UiButton size="middle" type="button" disabled={batch.busy} onClick={batch.cancelPreview}>取消批量预检</UiButton></div>
     </div>}
     {batch.result && <div className="study-hub-actions" aria-label="本轮标记结果">
       <span>本轮可尝试撤销 {batch.undoCount} 条</span>
-      <button type="button" disabled={batch.busy || !batch.undoCount} onClick={batch.undo}>撤销本轮标记</button>
-      <button type="button" disabled={batch.busy} onClick={batch.finish}>结束本轮并保留当前状态</button>
+      <UiButton size="middle" type="button" disabled={batch.busy || !batch.undoCount} onClick={batch.undo}>撤销本轮标记</UiButton>
+      <UiButton size="middle" type="button" disabled={batch.busy} onClick={batch.finish}>结束本轮并保留当前状态</UiButton>
     </div>}
     <p className="study-hub-caption">翻页保留选择；更换筛选、刷新或切换页签会清空选择。撤销记录仅在本次检索窗口内保留，关闭后不再可用。未保存批注草稿不参与批量标记。</p>
   </section>

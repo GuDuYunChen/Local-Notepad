@@ -13,6 +13,8 @@ import { toast } from '~/services/toast'
 import EvidenceReviewRecords from './EvidenceReviewRecords'
 import EvidenceReviewArchives from './EvidenceReviewArchives'
 import './ProjectEntityEvidencePanel.css'
+import { UiButton, UiInput, UiSelect } from '~/components/ui/ControlKit'
+
 
 function title(value) {
   return String(value || '未命名').replace(/\.[^.]+$/, '')
@@ -30,7 +32,7 @@ function ChapterEvidenceCard({ row, chapter, entity, termIndex, source, onOpenFi
           <strong>#{row.ordinal} {title(row.chapterTitle)}</strong>
           <small>{row.volumeTitle || '未分卷'} · 当前筛选 {row.matchCount} 次提及</small>
         </div>
-        <button
+        <UiButton
           type="button"
           disabled={!chapter || !onOpenFile}
           onClick={() => {
@@ -42,7 +44,7 @@ function ChapterEvidenceCard({ row, chapter, entity, termIndex, source, onOpenFi
           aria-label={'打开证据章节 ' + title(row.chapterTitle)}
         >
           打开章节
-        </button>
+        </UiButton>
       </header>
       <div className="project-entity-evidence-provenance" aria-label="本章证据来源">
         {ENTITY_EVIDENCE_SOURCES.filter(item => item.id !== 'all' && row.counts[item.id] > 0)
@@ -183,7 +185,7 @@ function EvidenceBrowser({ projectId, intelligence, entityId, projectMeta, onOpe
           <div className="project-entity-evidence-filters">
             <label>
               <span>搜索证据章节</span>
-              <input
+              <UiInput size="middle"
                 type="search"
                 aria-label="搜索实体证据章节"
                 placeholder="章节名、卷名或命中别名"
@@ -193,17 +195,17 @@ function EvidenceBrowser({ projectId, intelligence, entityId, projectMeta, onOpe
             </label>
             <label>
               <span>证据来源</span>
-              <select
+              <UiSelect size="middle"
                 aria-label="实体证据来源筛选"
                 value={filters.source}
                 onChange={event => updateFilters({ source: event.target.value })}
               >
                 {ENTITY_EVIDENCE_SOURCES.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
-              </select>
+              </UiSelect>
             </label>
             <label>
               <span>所在卷</span>
-              <select
+              <UiSelect size="middle"
                 aria-label="实体证据卷筛选"
                 value={JSON.stringify(filters.volumeId)}
                 onChange={event => updateFilters({ volumeId: JSON.parse(event.target.value) })}
@@ -213,9 +215,9 @@ function EvidenceBrowser({ projectId, intelligence, entityId, projectMeta, onOpe
                   <option key={volume.id} value={JSON.stringify(volume.id)}>{volume.label}</option>
                 ))}
                 {missingVolume && <option value={JSON.stringify(filters.volumeId)}>原筛选卷已移除</option>}
-              </select>
+              </UiSelect>
             </label>
-            <button type="button" onClick={resetFilters}>重置筛选</button>
+            <UiButton size="middle" type="button" onClick={resetFilters}>重置筛选</UiButton>
           </div>
           <p className="project-entity-evidence-summary" role="status" aria-live="polite">
             找到 {view.totalRows} 章 · 共 {view.totalMentions} 次{view.source === 'all' ? '' :
@@ -237,17 +239,17 @@ function EvidenceBrowser({ projectId, intelligence, entityId, projectMeta, onOpe
           {!view.totalRows && <p className="project-entity-evidence-note">没有符合当前筛选的证据。可重置筛选，或补充正文中的明确引用。</p>}
           {view.totalRows > 0 && (
             <nav className="project-entity-evidence-pagination" aria-label="实体证据分页">
-              <button
+              <UiButton
                 type="button"
                 disabled={view.page <= 1}
                 onClick={() => setFilters(previous => ({ ...previous, page: view.page - 1 }))}
-              >上一页</button>
+              >上一页</UiButton>
               <span>第 {view.page} / {view.pageCount} 页</span>
-              <button
+              <UiButton
                 type="button"
                 disabled={view.page >= view.pageCount}
                 onClick={() => setFilters(previous => ({ ...previous, page: view.page + 1 }))}
-              >下一页</button>
+              >下一页</UiButton>
             </nav>
           )}
         </>

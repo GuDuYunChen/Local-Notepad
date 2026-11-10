@@ -84,9 +84,9 @@
   line-height: 1.45;
 }
 
-.project-entity-alias-editor > select,
-.project-entity-heatmap-card > header select,
-.project-entity-alias-add input {
+.project-entity-alias-editor > select:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.project-entity-heatmap-card > header select:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.project-entity-alias-add input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   height: 29px;
   padding: 0 7px;
   border: 1px solid var(--line);
@@ -103,9 +103,9 @@
   margin-top: 7px;
 }
 
-.project-entity-alias-editor > select:focus,
-.project-entity-heatmap-card > header select:focus,
-.project-entity-alias-add input:focus {
+.project-entity-alias-editor > select:focus:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.project-entity-heatmap-card > header select:focus:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.project-entity-alias-add input:focus:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-color: var(--clay);
   box-shadow: 0 0 0 2px var(--clay-light);
 }
@@ -124,8 +124,8 @@
   display: block;
 }
 
-.project-entity-alias-summary span,
-.project-entity-alias-summary small {
+.project-entity-alias-summary > div > span,
+.project-entity-alias-summary > div > small {
   color: var(--ink-muted);
   font-size: 6px;
 }
@@ -166,6 +166,10 @@
 
 .project-entity-alias-list button {
   width: 13px;
+  cursor: pointer;
+}
+
+.project-entity-alias-list button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   height: 13px;
   padding: 0;
   border: 0;
@@ -175,10 +179,9 @@
   font: inherit;
   font-size: 8px;
   line-height: 1;
-  cursor: pointer;
 }
 
-.project-entity-alias-list button:hover {
+.project-entity-alias-list button:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   background: color-mix(in srgb, #b84444 8%, transparent);
   color: #a63b3b;
 }
@@ -212,21 +215,24 @@
 
 .project-entity-evidence-list button {
   width: 100%;
-  padding: 5px 6px;
   display: grid;
   grid-template-columns: 26px minmax(0, 1fr) auto;
   gap: 5px;
   align-items: center;
+  text-align: left;
+  cursor: pointer;
+}
+
+.project-entity-evidence-list button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
+  padding: 5px 6px;
   border: 1px solid var(--line);
   border-radius: 7px;
   background: var(--paper);
   color: var(--ink-soft);
   font: inherit;
-  text-align: left;
-  cursor: pointer;
 }
 
-.project-entity-evidence-list button:hover {
+.project-entity-evidence-list button:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-color: color-mix(in srgb, var(--clay) 35%, var(--line));
 }
 
@@ -322,19 +328,22 @@
 }
 
 .project-entity-heatmap-row > button:first-child {
-  padding: 4px 5px;
   display: block;
   overflow: hidden;
+  text-align: left;
+  cursor: pointer;
+}
+
+.project-entity-heatmap-row > button:first-child:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
+  padding: 4px 5px;
   border: 0;
   border-radius: 5px;
   background: transparent;
   color: var(--ink-soft);
   font: inherit;
-  text-align: left;
-  cursor: pointer;
 }
 
-.project-entity-heatmap-row > button:first-child:hover {
+.project-entity-heatmap-row > button:first-child:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   background: var(--paper);
 }
 

@@ -6,6 +6,8 @@ import { collectionStudy, nextUnreadCollectionItem, summarizeCollectionStudy } f
 import { createCollectionReadingContext } from '~/services/collectionReading'
 import CollectionStudyEditor from './CollectionStudyEditor'
 import './SearchReturnBar.css'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 export default function CollectionReadingBar({ origin, documentId, dirty, paused = false, onOpenFile, onMove, onReturn, onEnd, store = searchCollections, studyStore = collectionStudy }) {
   const [busy, setBusy] = useState(false), [error, setError] = useState('')
@@ -57,20 +59,20 @@ export default function CollectionReadingBar({ origin, documentId, dirty, paused
       {error && <p role="alert">{error}</p>}
       {busy && <small role="status">正在打开；请处理未保存确认，取消后不推进位置。</small>}
     </div>
-    <button type="button" disabled={busy || study.busy || paused || stale || origin.index <= 0 || !onOpenFile} onClick={() => void move(-1)}>上一资料</button>
-    <button type="button" disabled={busy || study.busy || paused || stale || origin.index >= origin.queue.length - 1 || !onOpenFile} onClick={() => void move(1)}>下一资料</button>
-    <button type="button" disabled={busy || study.busy || paused || stale || !onOpenFile || !study.snapshot || study.loading || !nextUnreadCollectionItem(study.snapshot, documentId, origin.queue)} onClick={() => void move('unread')}>下一未读资料</button>
-    <button type="button" disabled={busy || study.busy || paused} onClick={onReturn}>返回资料集</button>
-    <button type="button" disabled={busy || study.busy || paused} onClick={onEnd}>结束资料集阅读</button>
+    <UiButton type="button" disabled={busy || study.busy || paused || stale || origin.index <= 0 || !onOpenFile} onClick={() => void move(-1)}>上一资料</UiButton>
+    <UiButton type="button" disabled={busy || study.busy || paused || stale || origin.index >= origin.queue.length - 1 || !onOpenFile} onClick={() => void move(1)}>下一资料</UiButton>
+    <UiButton type="button" disabled={busy || study.busy || paused || stale || !onOpenFile || !study.snapshot || study.loading || !nextUnreadCollectionItem(study.snapshot, documentId, origin.queue)} onClick={() => void move('unread')}>下一未读资料</UiButton>
+    <UiButton type="button" disabled={busy || study.busy || paused} onClick={onReturn}>返回资料集</UiButton>
+    <UiButton type="button" disabled={busy || study.busy || paused} onClick={onEnd}>结束资料集阅读</UiButton>
     <details className="collection-reading-study"><summary>阅读进度与批注</summary>
       {study.error && <p role="alert">{study.error}</p>}
       {study.loading && <p role="status">正在读取阅读记录…</p>}
       {study.snapshot && <>
         <p>已读 {summarizeCollectionStudy(study.snapshot).read} / {study.snapshot.collection.report.count} 篇（整份资料集）；下一未读只遍历本次阅读队列，待复看也会保留。</p>
-        <button type="button" disabled={busy || study.busy || paused || stale || study.busy || study.loading} onClick={() => void study.write((snapshot, options) => studyStore.bookmark(snapshot, documentId, options))}>记住当前阅读位置</button>
+        <UiButton type="button" disabled={busy || study.busy || paused || stale || study.busy || study.loading} onClick={() => void study.write((snapshot, options) => studyStore.bookmark(snapshot, documentId, options))}>记住当前阅读位置</UiButton>
       </>}
       <CollectionStudyEditor key={origin.entry.key + documentId} model={study} documentId={documentId} disabled={busy || study.busy || paused} />
-      <button type="button" disabled={study.busy || study.loading || busy || paused} onClick={() => void study.refresh()}>重新读取阅读记录</button>
+      <UiButton type="button" disabled={study.busy || study.loading || busy || paused} onClick={() => void study.refresh()}>重新读取阅读记录</UiButton>
     </details>
   </section>
 }

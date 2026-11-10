@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { useDrag, useDrop } from 'react-dnd'
-import { Input, message } from 'antd'
+import Input from 'antd/es/input'
+import message from 'antd/es/message'
 import {
   FileOutlined,
   FolderOutlined,
   FolderOpenOutlined,
   PushpinOutlined,
 } from '@ant-design/icons'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 export function FileTreeItem({
   item,
@@ -109,30 +112,30 @@ export function FileTreeItem({
       <div className="file-actions">
         {!editing && (
           <>
-            <button
+            <UiButton size="middle"
               type="button"
               className="file-action-btn"
               onClick={(e) => { e.stopPropagation(); setEditing(true); }}
               aria-label={`重命名 ${item.title}`}
             >
               重命名
-            </button>
-            <button
+            </UiButton>
+            <UiButton size="middle"
               type="button"
               className="file-action-btn"
               onClick={(e) => { e.stopPropagation(); onPin(item.id, !item.is_pinned); }}
               aria-label={item.is_pinned ? `取消置顶 ${item.title}` : `置顶 ${item.title}`}
             >
               {item.is_pinned ? '取消置顶' : '置顶'}
-            </button>
-            <button
+            </UiButton>
+            <UiButton size="middle"
               type="button"
               className="file-action-btn file-action-btn--danger"
               onClick={(e) => { e.stopPropagation(); onDelete(item.id); }}
               aria-label={`删除 ${item.title}`}
             >
               删除
-            </button>
+            </UiButton>
           </>
         )}
       </div>

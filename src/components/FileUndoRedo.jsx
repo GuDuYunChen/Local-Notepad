@@ -1,4 +1,6 @@
-import { Button, Space, Tooltip } from 'antd'
+import Button from 'antd/es/button'
+import Space from 'antd/es/space'
+import Tooltip from 'antd/es/tooltip'
 import { UndoOutlined, RedoOutlined } from '@ant-design/icons'
 
 export function FileUndoRedo({ onUndo, onRedo, canUndo, canRedo }) {

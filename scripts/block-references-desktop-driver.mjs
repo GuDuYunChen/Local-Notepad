@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { refreshLocalExportLibrary } from './check-local-export-desktop.mjs'
+import { createNativeUiSelect } from './native-ui-select.mjs'
 
 export const BLOCK_REFERENCE_CHECKS = Object.freeze([
   'open-and-cancel-does-not-write', 'create-anchor-uses-original-save', 'copy-requires-saved-source',
@@ -82,6 +83,7 @@ export async function focusBlockReferenceParagraph({evaluate,cdp,until}, marker=
   return {method:'native-text-click',before,after}
 }
 export async function verifyBlockReferencesDesktop({api,evaluate,click,cdp,until,capture,report,save,resizeSmall}) {
+  const select = createNativeUiSelect({evaluate,click,cdp,until})
   const prefix='BLOCK103 '+randomUUID().slice(0,8)
   const source=await api('/api/files',{method:'POST',body:q({title:prefix+' Source.md',content:blockReferenceFixture('BLOCK103 source original')})})
   const destination=await api('/api/files',{method:'POST',body:q({title:prefix+' Destination.md',content:blockReferenceFixture('BLOCK103 destination')})})
@@ -131,7 +133,7 @@ export async function verifyBlockReferencesDesktop({api,evaluate,click,cdp,until
   mark('explicit-save-and-source-navigation');await capture('block103-exact-navigation.png')
   await open(destination,'BLOCK103 destination');await show();await address(locator);await action('读取来源块')
   await until(()=>evaluate("Boolean(document.querySelector('.block-reference-preview'))"),'Embed preview missing')
-  await click('.block-reference-panel select');await key('ArrowDown',40);await key('Enter',13)
+  await select.choose('.block-reference-panel [data-ui-control="select"], .block-reference-panel select', 'embed')
   await action('确认插入嵌入');await until(()=>evaluate("document.querySelector('.block-reference-embed pre')?.textContent==='BLOCK103 source original'"),'Inserted embed missing')
   await click('.editor-input[contenteditable="true"]');await key('s',83,2);await clean()
   const embeddedDestination=await api(destinationRoute);assert.ok(embeddedDestination.content.includes('"embedded":true'));mark('embed-is-created-by-reviewed-insertion');await capture('block103-embedded.png')
