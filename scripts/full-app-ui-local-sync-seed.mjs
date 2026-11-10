@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync } from 'node:fs'
-import { homedir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { desktopNote } from './desktop-save-fixture.mjs'
@@ -106,11 +106,17 @@ export function buildLocalSyncLabRows(files) {
 function ownPaths({ dataDir, ownedRoot }) {
   assert.equal(typeof dataDir, 'string'); assert.equal(typeof ownedRoot, 'string')
   const owned = path.resolve(ownedRoot), data = path.resolve(dataDir)
-  assert.equal(owned, realpathSync.native(owned), 'Owned root must be its actual canonical path')
-  assert.equal(data, path.join(owned, 'data'), 'Only the fresh runner-owned data child may be opened')
+  // Windows realpathSync.native may use an 8.3 ancestor (RUNNER~1), even when
+  // mkdtempSync returns the same real directory through its long name.
+  // Compare canonical *identities*, not their differing lexical spellings.
+  for (const entry of [owned, data]) { const info = lstatSync(entry); assert.ok(info.isDirectory() && !info.isSymbolicLink(), 'Owned directory must not be a link') }
+  const actualOwned = realpathSync.native(owned), actualData = realpathSync.native(data)
+  const temporaryRoot = realpathSync.native(path.resolve(tmpdir()))
+  const relative = path.relative(temporaryRoot, actualOwned)
+  assert.ok(relative && relative !== '..' && !relative.startsWith('..' + path.sep) && !path.isAbsolute(relative), 'Owned root must stay within the actual runner temporary directory')
+  assert.equal(actualData, path.join(actualOwned, 'data'), 'Only the fresh runner-owned data child may be opened')
   const defaults = [path.join(homedir(), 'AppData/Roaming/Notepad'), path.join(homedir(), '.notepad'), path.join(homedir(), 'Library/Application Support/Notepad')]
   assert.ok(!defaults.some(item => path.resolve(item).toLowerCase() === data.toLowerCase()), 'Default user data is forbidden')
-  for (const entry of [owned, data]) { const info = lstatSync(entry); assert.ok(info.isDirectory() && !info.isSymbolicLink(), 'Owned directory must not be a link') }
   const db = path.join(data, 'data.db'), remote = path.join(data, 'sync-lab-remote')
   for (const entry of [db, db + '-wal', db + '-shm']) if (existsSync(entry)) {
     const info = lstatSync(entry); assert.ok(info.isFile() && !info.isSymbolicLink(), 'SQLite input must be an owned ordinary file')
