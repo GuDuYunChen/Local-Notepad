@@ -4858,10 +4858,10 @@ body {
   .workspace-sidebar.collapsed {
     position: relative !important;
     inset: auto !important;
-    width: 46px !important;
-    min-width: 46px !important;
-    max-width: 46px !important;
-    flex: 0 0 46px !important;
+    width: 52px !important;
+    min-width: 52px !important;
+    max-width: 52px !important;
+    flex: 0 0 52px !important;
     overflow: visible !important;
     border-right: 1px solid var(--line) !important;
     box-shadow: none !important;
@@ -4885,6 +4885,36 @@ body {
 .workspace-sidebar.collapsed .workspace-sidebar-icon-btn:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
 .workspace-sidebar.collapsed .workspace-sidebar-expand:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
     height: 36px !important;
+  }
+}
+
+/* Keep the complete collapsed rail reachable in the minimum-height window.
+   Only surrounding spacing changes; controls retain their official sizes. */
+@media (max-height: 560px) {
+  .workspace-sidebar.collapsed .workspace-sidebar-top {
+    padding-block: 4px;
+  }
+
+  .workspace-sidebar.collapsed .workspace-sidebar-search {
+    margin-top: 4px;
+  }
+
+  .workspace-sidebar.collapsed .workspace-sidebar-nav {
+    margin-top: 4px;
+    gap: 0;
+  }
+
+  .workspace-sidebar.collapsed .workspace-sidebar-icon-btn,
+  .workspace-sidebar.collapsed .workspace-sidebar-expand {
+    margin-top: 0;
+  }
+
+  .workspace-sidebar.collapsed .workspace-sidebar-bottom {
+    padding-block: 4px;
+  }
+
+  .workspace-sidebar.collapsed .workspace-sidebar-more {
+    margin-bottom: 0;
   }
 }
 
