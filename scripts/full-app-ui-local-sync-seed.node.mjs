@@ -1,7 +1,7 @@
 // Pure fixture/denial contracts only. This file never starts the application.
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, symlinkSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, symlinkSync, realpathSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -97,6 +97,15 @@ test('a missing or abnormal actual shutdown refuses seeding before SQLite writes
 
 test('owned path and absent remote checks refuse aliases and preexisting local stores', async () => {
   await databaseFixture(fixture => {
+    // Windows may expose the very same owned temp root as RUNNER~1; require
+    // canonical aliases to pass the unchanged read-only snapshot checks.
+    const baseline = snapshotLocalSyncLab(fixture)
+    const canonical = snapshotLocalSyncLab({ ...fixture,
+      ownedRoot: realpathSync.native(fixture.ownedRoot),
+      dataDir: realpathSync.native(fixture.dataDir) })
+    assert.deepEqual(canonical.logical, baseline.logical)
+    assert.deepEqual(canonical.uploads, baseline.uploads)
+    assert.deepEqual(canonical.remote.exists, baseline.remote.exists)
     assert.throws(() => snapshotLocalSyncLab({ ...fixture, dataDir: fixture.ownedRoot }), /fresh runner-owned/)
     mkdirSync(path.join(fixture.ownedRoot, 'elsewhere')); symlinkSync(fixture.dataDir, path.join(fixture.ownedRoot, 'elsewhere/data'), 'junction')
     assert.throws(() => snapshotLocalSyncLab({ dataDir: path.join(fixture.ownedRoot, 'elsewhere/data'), ownedRoot: path.join(fixture.ownedRoot, 'elsewhere') }), /link/)
