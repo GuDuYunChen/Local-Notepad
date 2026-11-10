@@ -125,12 +125,12 @@ export async function verifySettingsPages(ctx) {
     trash: await api('/api/files/trash'), versions: await api(filePath(fixture.historyNote.id) + '/versions'),
     sync: sameConfiguration(await api('/api/settings')),
   })
-  // The production toggle has a decorative arrow span in its textContent.
-  // Bind the unique real button and assert its visible label and ARIA state;
-  // an exact whole-button text match would reject the valid control.
+  // The production toggle has a decorative arrow span, and Ant Design may
+  // wrap both spans. Bind the unique actual button but check the exact leaf
+  // label (not the wrapper or decorative glyph) and pre/post ARIA state.
   const toggleDiagnostics = async (label, expectedExpanded) => {
     const selector = '.settings-panel .settings-advanced-toggle'
-    await until(() => evaluate(`(()=>{const b=document.querySelector(${json(selector)});return !!b&&!b.disabled&&b.querySelector('span:first-child')?.textContent.trim()===${json(label)}&&b.getAttribute('aria-expanded')===${json(String(!expectedExpanded))}})()`), 'Actual diagnostic toggle label or initial state mismatch: ' + label)
+    await until(() => evaluate(`(()=>{const b=document.querySelector(${json(selector)});return !!b&&!b.disabled&&[...b.querySelectorAll('span')].some(span=>span.childElementCount===0&&span.textContent.trim()===${json(label)})&&b.getAttribute('aria-expanded')===${json(String(!expectedExpanded))}})()`), 'Actual diagnostic toggle label or initial state mismatch: ' + label)
     await click(selector)
     await until(() => evaluate(`document.querySelector(${json(selector)})?.getAttribute('aria-expanded')===${json(String(expectedExpanded))}`), 'Actual diagnostic toggle did not change state: ' + label)
   }
