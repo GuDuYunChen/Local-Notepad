@@ -136,6 +136,16 @@ jobs:
         with:
           name: local-notepad-install-lifecycle-${{ github.sha }}
           path: .accepted-installation
+      # The pin reader imports original source validators; their ESM imports
+      # require both canonical desktop fixture bundles even for `outputs`.
+      # Build before resolving pins, without altering any acceptance assertions.
+      - name: Build canonical fixtures before the source-bound pin reader
+        shell: pwsh
+        run: |
+          node scripts/build-reading-mode-fixture.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/build-local-export-fixture.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Resolve the exact existing binary and source pin
         id: reading-pin
         run: node scripts/pin-reading-mode-installer.mjs outputs
