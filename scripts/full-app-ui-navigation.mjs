@@ -79,6 +79,38 @@ export async function prepareNavigation({ api, evaluate }) {
     ] }, noteIDs: notes.map(file => file.id) }
 }
 
+export async function ensureNavigationSidebar({ evaluate, click, until }, expanded) {
+  const selector = '.workspace-sidebar [aria-label=' + q(expanded ? '展开侧边栏' : '折叠侧边栏') + ']'
+  if (await evaluate(`Boolean(document.querySelector(${q(selector)}))`)) await click(selector)
+  await until(() => evaluate(`document.querySelector('.workspace-sidebar')?.classList.contains('collapsed')===${!expanded}`), 'Actual sidebar did not change expansion state')
+  if (!expanded) return
+
+  const observe = () => evaluate(`(() => {
+    const sidebar=document.querySelector('.workspace-sidebar'), library=sidebar?.querySelector('.file-list');
+    const expand=sidebar?.querySelector('button[aria-label="展开侧边栏"]'), bounds=expand?.getBoundingClientRect();
+    return {present:Boolean(sidebar),collapsed:Boolean(sidebar?.classList.contains('collapsed')),narrow:innerWidth<=720,
+      library:Boolean(library),tree:Boolean(library?.querySelector('.tree-list')),loading:Boolean(library?.querySelector(':scope > .placeholder')),
+      expandVisible:Boolean(bounds&&bounds.width>0&&bounds.height>0)};
+  })()`)
+  const ready = state => state.present && !state.collapsed && state.library && state.tree && !state.loading
+  let correctiveExpansionRequested = false
+  await until(async () => {
+    let state = await observe()
+    if (ready(state)) {
+      await evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(true))))')
+      state = await observe()
+      if (ready(state)) return true
+    }
+    // The first expansion was observed above. FileList's initial real selection
+    // can fold the narrow sidebar again; correct only that observed transition.
+    if (!correctiveExpansionRequested && state.narrow && state.collapsed && state.expandVisible) {
+      correctiveExpansionRequested = true
+      await click(selector)
+    }
+    return false
+  }, 'Actual navigation surface missing: .file-list')
+}
+
 export async function verifyNavigationPages(ctx) {
   const { evaluate, click, cdp, until, shared, api, setup, matrix } = ctx
   const fixture = setup.navigation
@@ -94,12 +126,7 @@ export async function verifyNavigationPages(ctx) {
   }
   const focus = (routeId, stateId, selector) => shared.focus(selector, { routeId, stateId })
   const row = file => '.file-list [data-file-id=' + q(safeId(file.id)) + ']'
-  const ensureSidebar = async expanded => {
-    const selector = '.workspace-sidebar [aria-label=' + q(expanded ? '展开侧边栏' : '折叠侧边栏') + ']'
-    if (await exists(selector)) await click(selector)
-    await until(() => evaluate(`document.querySelector('.workspace-sidebar')?.classList.contains('collapsed')===${!expanded}`), 'Actual sidebar did not change expansion state')
-    if (expanded) await present('.file-list')
-  }
+  const ensureSidebar = expanded => ensureNavigationSidebar(ctx, expanded)
   const notes = async () => {
     await shared.closeSearch(); await shared.closeSettings()
     await click('.workspace-sidebar [aria-label="笔记"]'); await ensureSidebar(true)

@@ -53,6 +53,80 @@ const projectActions = ({ click, evaluate, until, shared }) => ({
   },
 })
 
+// Setup only: use the actual focused combobox's native keyboard opening path.
+// The matrix below still tests pointer opening, Tab, repeated clicks and Escape.
+export async function chooseProjectSetupAlias({ shared, evaluate, until, report, save }, requested) {
+  const selector = '[aria-label="选择实体别名对象"]'
+  assert.equal(typeof requested, 'string')
+  const receipt = { selector, requested, scope: 'projects-setup-only', focusMethod: 'programmatic-focus',
+    stage: 'ensure-visible', complete: false, openingKey: null, events: [] }
+  ;(report.fullAppUi.setupInteractions ||= []).push(receipt); save()
+  const record = stage => { receipt.stage = stage; save() }
+  const check = state => {
+    assert.equal(state?.count, 1, 'Project setup Select is missing or ambiguous')
+    assert.equal(state.kind, 'shared'); assert.equal(state.disabled, false); assert.equal(state.multiple, false)
+    assert.ok(typeof state.inputId === 'string' && state.inputId, 'Project setup Select has no actual combobox identity')
+    if (receipt.before) assert.equal(state.inputId, receipt.before.inputId, 'Project setup combobox identity changed')
+    return state
+  }
+  const trace = async () => {
+    const observed = await evaluate(`({truncated:window.__fullAppUiTraceTruncated,events:window.__fullAppUiEvents.slice(${Number(receipt.firstEventIndex)})})`)
+    receipt.events = observed.events; receipt.traceTruncated = observed.truncated; save()
+    assert.equal(observed.truncated, false, 'Project setup interaction trace was truncated')
+    assert.ok(Array.isArray(observed.events))
+  }
+  try {
+    receipt.firstEventIndex = await evaluate('window.__fullAppUiEvents.length'); save()
+    assert.ok(Number.isInteger(receipt.firstEventIndex) && receipt.firstEventIndex >= 0)
+    await shared.ensureVisible(selector)
+    receipt.before = await shared.nativeSelect.inspect(selector); save(); check(receipt.before)
+    record('programmatic-focus')
+    receipt.focus = await evaluate(`(() => {
+      const matches=[...document.querySelectorAll(${q(selector)})];
+      if(matches.length!==1)throw Error('Project setup Select identity is missing or ambiguous');
+      const host=matches[0].closest('[data-ui-control="select"]'),fields=host?[...host.querySelectorAll('[role="combobox"]')]:[];
+      if(fields.length!==1||fields[0].id!==${q(receipt.before.inputId)}||document.querySelectorAll('[id='+JSON.stringify(fields[0].id)+']').length!==1)throw Error('Project setup combobox identity changed before focus');
+      const field=fields[0];if(field.matches(':disabled')||field.getAttribute('aria-disabled')==='true')throw Error('Project setup combobox became disabled');
+      field.focus({preventScroll:true});
+      return {method:'programmatic-focus',inputId:field.id,focused:document.activeElement===field,activeId:document.activeElement?.id||null};
+    })()`)
+    save(); assert.equal(receipt.focus.inputId, receipt.before.inputId); assert.equal(receipt.focus.focused, true)
+    receipt.focusState = await shared.nativeSelect.inspect(selector); save(); check(receipt.focusState)
+    assert.equal(receipt.focusState.focused, true, 'Actual project setup combobox did not retain focus')
+    if (!receipt.focusState.expanded) {
+      receipt.openingKey = 'ArrowDown'; record('native-keyboard-open')
+      await shared.key('ArrowDown'); await trace()
+    }
+    record('await-own-popup')
+    receipt.opened = await until(async () => {
+      receipt.latestOpening = await shared.nativeSelect.inspect(selector); save()
+      const state = check(receipt.latestOpening)
+      assert.equal(state.focused, true, 'Actual project setup combobox lost focus before opening')
+      return state.expanded && state.popupReady && state
+    }, 'Actual project setup combobox did not open its own popup')
+    save(); assert.ok(receipt.opened.popupId)
+    record('original-option-pointer')
+    receipt.committed = await shared.nativeSelect.choose(selector, requested); save(); check(receipt.committed)
+    assert.equal(receipt.committed.value, requested); assert.equal(receipt.committed.expanded, false)
+    await trace()
+    receipt.trustedOpeningKey = receipt.openingKey === null ? null : receipt.events.some(event =>
+      event.type === 'keydown' && event.key === 'ArrowDown' && event.trusted && event.id === receipt.before.inputId && event.role === 'combobox')
+    receipt.trustedOwnOptionClick = receipt.events.some(event => event.type === 'click' && event.trusted &&
+      event.option?.listboxId === receipt.opened.popupId && event.option.value === requested)
+    save()
+    if (receipt.openingKey !== null) assert.equal(receipt.trustedOpeningKey, true, 'Actual project setup opening key was not observed on its combobox')
+    assert.equal(receipt.trustedOwnOptionClick, true, 'Actual project setup option pointer was not observed in its own popup')
+    receipt.complete = true; record('complete'); return receipt.committed
+  } catch (error) {
+    receipt.error = { name: error.name, message: error.message, stack: error.stack }; record('failed')
+    // Preserve the original input failure; reading its trace never replays it.
+    if (Number.isInteger(receipt.firstEventIndex)) {
+      try { await trace() } catch (traceError) { receipt.traceError = { name: traceError.name, message: traceError.message }; save() }
+    }
+    throw error
+  }
+}
+
 export async function prepareProjects(ctx) {
   const { api, shared, evaluate, click, until, writeFixtureFile } = ctx
   const create = values => api('/api/files', { method: 'POST', body: JSON.stringify(values) })
@@ -83,7 +157,7 @@ export async function prepareProjects(ctx) {
   await ui.structure(project.id)
   await ui.shown('[aria-label="选择实体别名对象"]')
   for (const [index, alias] of aliasNames.entries()) {
-    await shared.nativeSelect.choose('[aria-label="选择实体别名对象"]', entityIDs[index])
+    await chooseProjectSetupAlias(ctx, entityIDs[index])
     await shared.text('[aria-label="新增实体别名"]', alias)
     await ui.button('.project-entity-alias-add', '添加别名')
     await ui.shown('[aria-label=' + q('删除实体别名 ' + alias) + ']')
@@ -107,6 +181,8 @@ export async function prepareProjects(ctx) {
   await shared.text('[aria-label="自定义关系标签"]', '本机合成人物与地点的长期关联')
   await shared.text('[aria-label="关系说明"]', '显式通过实际页面建立的关系，不把同章共现冒充已确认关系。')
   await ui.button('.project-relation-create-grid', '添加关系')
+  // Select the real relation; the previously created entity still owns the detail pane.
+  await click({ selector: '.project-relation-edges > g > text', text: '本机合成人物与地点的长期关联 · 关联' })
   await ui.shown('[aria-label="关系变化章节"]')
   await shared.nativeSelect.choose('[aria-label="关系变化章节"]', notes[3].id)
   await shared.text('[aria-label="关系变化说明"]', '第四章的实际合成关系演化记录。')
@@ -115,7 +191,7 @@ export async function prepareProjects(ctx) {
 
   // Create two real snapshots through the normal evidence review UI. The
   // storage access below is read-only and records exactly those saved bytes.
-  await shared.nativeSelect.choose('[aria-label="选择实体别名对象"]', entityIDs[0])
+  await chooseProjectSetupAlias(ctx, entityIDs[0])
   await until(() => evaluate("document.querySelectorAll('.project-entity-evidence-cards [data-evidence-chapter]').length===4"), 'Actual alias evidence did not cover all four owned chapters')
   const archiveBefore = await readArchives(evaluate); assert.deepEqual(archiveBefore, [], 'Project verifier requires its own empty archive shelf')
   await click('.project-entity-evidence-cards [data-evidence-chapter]:first-child header button')

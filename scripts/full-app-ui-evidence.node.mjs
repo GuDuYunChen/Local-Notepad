@@ -7,6 +7,8 @@ import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { deflateSync } from 'node:zlib'
+import { runInNewContext } from 'node:vm'
+import { ensureNavigationSidebar } from './full-app-ui-navigation.mjs'
 import { FULL_APP_GROUPS, FULL_APP_MATRIX, FULL_APP_PRODUCT_SOURCE_FILES, FULL_APP_RUNTIME_SOURCE_FILES, FULL_APP_VERIFIER_SOURCE_FILES, fullAppProductPageSources,
   validateFullAppUiLedger, validateFullAppLedgerSourceIdentity, validateFullAppUiEvidence, verifyFullAppUiFiles, validateNativeWindowResize,
   validateFullAppPrerequisites, validateFullAppInstalledReport, validateFullAppUiAggregate, validateFullAppFixtureFile, validateLocalSyncLabLifecycle, validateLocalSyncLabUi,
@@ -694,4 +696,99 @@ test('local-lab seeding and final close require the exact owned backend PID to e
     const invalid = clone(original); mutate(invalid)
     assert.throws(() => validateLocalSyncLabLifecycle(invalid))
   }
+})
+
+function navigationSidebarContract({ collapsed = true, width = 704, loading = false, missingTree = false,
+  onListWait, onListPoll, onClick, onPaint } = {}) {
+  const state = { collapsed, width, loading, missingTree, frames: 0 }
+  const clicks = [], waits = []
+  const expand = { getBoundingClientRect: () => ({ width: state.collapsed ? 40 : 0, height: 40 }) }
+  const library = { querySelector: selector => selector === '.tree-list' ? (state.missingTree ? null : {})
+    : selector === ':scope > .placeholder' ? (state.loading ? {} : null) : null }
+  const sidebar = { classList: { contains: name => name === 'collapsed' && state.collapsed },
+    querySelector: selector => selector === '.file-list' ? (state.collapsed ? null : library)
+      : selector === 'button[aria-label="展开侧边栏"]' ? (state.collapsed ? expand : null) : null }
+  const document = { querySelector: selector => {
+    if (selector === '.workspace-sidebar') return sidebar
+    if (selector === '.file-list') return state.collapsed ? null : library
+    if (selector === '.workspace-sidebar [aria-label="展开侧边栏"]') return state.collapsed ? expand : null
+    if (selector === '.workspace-sidebar [aria-label="折叠侧边栏"]') return state.collapsed ? null : {}
+    throw Error('Unexpected navigation contract selector: ' + selector)
+  } }
+  const context = {
+    evaluate: async expression => runInNewContext(expression, { document, innerWidth: state.width,
+      requestAnimationFrame: callback => { state.frames++; onPaint?.(state, state.frames); callback(); return state.frames } }),
+    click: async selector => {
+      clicks.push(selector); onClick?.(state, clicks.length)
+      state.collapsed = selector.includes('折叠侧边栏')
+    },
+    until: async (check, label, ...budgetArguments) => {
+      waits.push({ label, budgetArguments })
+      const listWait = label === 'Actual navigation surface missing: .file-list'
+      if (listWait) onListWait?.(state)
+      for (let poll = 0; poll < 8; poll++) {
+        if (listWait) onListPoll?.(state, poll, clicks.length)
+        const result = await check()
+        if (result) return result
+      }
+      throw Error(label)
+    },
+  }
+  return { state, clicks, waits, context }
+}
+
+test('navigation waits for the real tree and completed loading before its paint recheck', async () => {
+  const f = navigationSidebarContract({ collapsed: false, loading: true,
+    onListPoll: (state, poll) => { if (poll === 1) state.loading = false } })
+  await ensureNavigationSidebar(f.context, true)
+  assert.deepEqual(f.clicks, []); assert.equal(f.state.frames, 2)
+  assert.deepEqual(f.waits.map(wait => wait.budgetArguments), [[], []], 'Use the original until budgets without overrides')
+  const absent = navigationSidebarContract({ collapsed: false, missingTree: true })
+  await assert.rejects(ensureNavigationSidebar(absent.context, true), /Actual navigation surface missing: \.file-list/)
+  assert.deepEqual(absent.clicks, []); assert.equal(absent.state.frames, 0)
+})
+
+test('navigation reopens only the observed narrow sidebar collapse after its first expansion', async () => {
+  const f = navigationSidebarContract({ onListWait: state => { state.collapsed = true } })
+  await ensureNavigationSidebar(f.context, true)
+  assert.deepEqual(f.clicks, Array(2).fill('.workspace-sidebar [aria-label="展开侧边栏"]'))
+  assert.equal(f.state.collapsed, false); assert.equal(f.state.frames, 2)
+  assert.deepEqual(f.waits.map(wait => wait.budgetArguments), [[], []])
+})
+
+test('navigation rechecks actual sidebar state after paint before accepting a loaded tree', async () => {
+  const f = navigationSidebarContract({ onPaint: (state, frame) => { if (frame === 2) state.collapsed = true } })
+  await ensureNavigationSidebar(f.context, true)
+  assert.equal(f.clicks.length, 2); assert.equal(f.state.frames, 4); assert.equal(f.state.collapsed, false)
+})
+
+test('navigation refuses a second automatic collapse without a third pointer expansion', async () => {
+  const f = navigationSidebarContract({ onListWait: state => { state.collapsed = true },
+    onListPoll: (state, _poll, clicks) => { if (clicks === 2) state.collapsed = true } })
+  await assert.rejects(ensureNavigationSidebar(f.context, true), /Actual navigation surface missing: \.file-list/)
+  assert.equal(f.clicks.length, 2); assert.equal(f.state.frames, 0)
+})
+
+test('navigation does not mask an unexpected wide-window collapse with a corrective click', async () => {
+  const f = navigationSidebarContract({ width: 1008, onListWait: state => { state.collapsed = true } })
+  await assert.rejects(ensureNavigationSidebar(f.context, true), /Actual navigation surface missing: \.file-list/)
+  assert.equal(f.clicks.length, 1); assert.equal(f.state.frames, 0)
+})
+
+test('navigation propagates original and corrective native click failures without replay', async () => {
+  for (const failedClick of [1, 2]) {
+    const failure = Error('Uncertain native click acknowledgement')
+    const f = navigationSidebarContract({ onListWait: state => { state.collapsed = true },
+      onClick: (_state, number) => { if (number === failedClick) throw failure } })
+    await assert.rejects(ensureNavigationSidebar(f.context, true), error => error === failure)
+    assert.equal(f.clicks.length, failedClick); assert.equal(f.state.frames, 0)
+  }
+})
+
+test('navigation retains the original explicit collapse path without requiring a mounted file tree', async () => {
+  const f = navigationSidebarContract({ collapsed: false, missingTree: true })
+  await ensureNavigationSidebar(f.context, false)
+  assert.deepEqual(f.clicks, ['.workspace-sidebar [aria-label="折叠侧边栏"]'])
+  assert.equal(f.state.collapsed, true); assert.equal(f.state.frames, 0)
+  assert.deepEqual(f.waits, [{ label: 'Actual sidebar did not change expansion state', budgetArguments: [] }])
 })

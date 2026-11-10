@@ -456,3 +456,113 @@ test('serialized scroll coverage uses the actual viewport scroller once and reta
   assert.equal(nested.scrollAreas.find(item => item.selector === '[id="body"]').viewportScrollOwner, false)
   assert.equal(nested.scrollAreas.find(item => item.selector === '[id="page"]').visibleHeight, 70)
 })
+
+function nativeDetailsFixture() {
+  const f = overflowFixture(), { rectangle } = f
+  const move = (node, parent) => {
+    node.parentElement.children = node.parentElement.children.filter(item => item !== node)
+    parent.children.push(node); node.parentElement = parent
+  }
+  const details = f.make('details', 'native-details', rectangle(20, 30, 300, 40), f.page)
+  details.open = false
+  const summary = f.make('summary', 'details-summary', rectangle(20, 30, 300, 40), details)
+  const summaryControl = f.make('button', 'summary-control', rectangle(24, 36, 28, 28), summary)
+  summaryControl.dataset.uiControl = 'button'; summaryControl.dataset.uiLayout = 'icon'
+  const summaryLabel = f.make('span', 'summary-label', rectangle(64, 40, 120, 20), summary)
+  // The failed native reports retained nonzero, display:block boxes for closed
+  // contents. Deliberately retain these boxes instead of mocking them to zero.
+  const content = f.make('div', 'details-content', rectangle(20, 80, 300, 140), details)
+  move(f.control, content); f.control.box = rectangle(30, 90, 160, 40)
+  let paintedTargets = [summaryControl, summaryLabel, summary]
+  const setPaintedTargets = targets => { paintedTargets = targets }
+  f.document.elementFromPoint = (x, y) => paintedTargets.find(node => {
+    const box = node.getBoundingClientRect()
+    return x >= box.left && x <= box.right && y >= box.top && y <= box.bottom
+  }) || f.page
+  const open = () => {
+    details.open = true; details.box = rectangle(20, 30, 300, 190); details.clientHeight = 190; details.scrollHeight = 190
+    setPaintedTargets([summaryControl, summaryLabel, summary, f.control])
+  }
+  return { ...f, details, summary, summaryControl, summaryLabel, content, move, open, setPaintedTargets }
+}
+function serializedDetailsPage(f, anchors = ['#details-summary']) {
+  const code = `(${viewportObservers.observeFullAppPage.toString()})(${JSON.stringify({ root: '.actual-page', anchors })},${withinActualClientPort.toString()},${viewportObservers.observeFullAppOverflowViewport.toString()})`
+  return JSON.parse(JSON.stringify(runInNewContext(code, f.globals)))
+}
+
+test('serialized native details: closed body boxes do not become rendered controls or scroll surfaces', () => {
+  const f = nativeDetailsFixture()
+  f.content.css.overflowY = 'auto'; f.content.scrollHeight = 400
+  assert.equal(f.control.css.display, 'block'); assert.equal(f.control.getBoundingClientRect().height, 40)
+  const sample = serializedDetailsPage(f)
+  assert.deepEqual(sample.controls.map(item => item.selector), ['[id="summary-control"]'])
+  assert.equal(sample.scrollAreas.some(item => item.selector === '[id="details-content"]'), false)
+  assert.equal(sample.anchors[0].hit, true); validateFullAppPageSample(sample, matrix)
+})
+
+test('serialized native details: only the first direct summary and its subtree remain visible when closed', () => {
+  const f = nativeDetailsFixture()
+  // The first summary need not be the first element child, and a later direct
+  // summary is part of the closed content rather than another visible header.
+  f.details.children = [f.content, f.summary]
+  const later = f.make('summary', 'later-summary', f.rectangle(20, 150, 300, 40), f.details)
+  const laterButton = f.make('button', 'later-summary-control', f.rectangle(24, 154, 28, 28), later)
+  laterButton.dataset.uiControl = 'button'; laterButton.dataset.uiLayout = 'icon'
+  const sample = serializedDetailsPage(f, ['#details-summary', '#summary-label'])
+  assert.deepEqual(sample.controls.map(item => item.selector), ['[id="summary-control"]'])
+  assert.equal(sample.anchors.length, 2); assert.ok(sample.anchors.every(item => item.visible && item.inViewport && item.hit))
+  validateFullAppPageSample(sample, matrix)
+  assert.throws(() => serializedDetailsPage(f, ['#later-summary']), /Expected one rendered anchor/)
+})
+
+test('serialized native details: open content retains real control identity and strict capture geometry', () => {
+  const f = nativeDetailsFixture(); f.open()
+  const before = serializedDetailsPage(f, ['#control'])
+  assert.deepEqual(new Set(before.controls.map(item => item.selector)), new Set(['[id="control"]', '[id="summary-control"]']))
+  const input = before.controls.find(item => item.selector === '[id="control"]')
+  assert.equal(input.fieldSelector, '[id="control"]'); assert.equal(input.height, 40); assert.equal(input.expectedHeight, 40)
+  validateFullAppPageSample(before, matrix)
+  validateFullAppCaptureContinuity(before, serializedDetailsPage(f, ['#control']), matrix)
+  f.control.box.left += 2; f.control.box.right += 2
+  assert.throws(() => validateFullAppCaptureContinuity(before, serializedDetailsPage(f, ['#control']), matrix), /Actual target moved/)
+  f.control.box.height = 36; f.control.box.bottom -= 4
+  assert.throws(() => validateFullAppPageSample(serializedDetailsPage(f, ['#control']), matrix), /height differs/)
+})
+
+test('serialized native details: any closed ancestor hides nested content even when the inner details is open', () => {
+  const f = nativeDetailsFixture()
+  const inner = f.make('details', 'inner-details', f.rectangle(30, 80, 250, 100), f.content); inner.open = true
+  const innerSummary = f.make('summary', 'inner-summary', f.rectangle(30, 80, 250, 30), inner)
+  const innerContent = f.make('div', 'inner-content', f.rectangle(30, 110, 250, 70), inner)
+  f.move(f.control, innerContent); f.control.box = f.rectangle(40, 120, 160, 40)
+  assert.deepEqual(serializedDetailsPage(f).controls.map(item => item.selector), ['[id="summary-control"]'])
+  f.open(); inner.open = false
+  f.setPaintedTargets([f.summaryControl, f.summaryLabel, f.summary, innerSummary])
+  const collapsedInner = serializedDetailsPage(f, ['#inner-summary'])
+  assert.deepEqual(collapsedInner.controls.map(item => item.selector), ['[id="summary-control"]'])
+  validateFullAppPageSample(collapsedInner, matrix)
+  inner.open = true; f.setPaintedTargets([f.summaryControl, f.summaryLabel, f.summary, innerSummary, f.control])
+  const expanded = serializedDetailsPage(f, ['#control'])
+  assert.ok(expanded.controls.some(item => item.selector === '[id="control"]'))
+  validateFullAppPageSample(expanded, matrix)
+})
+
+test('serialized native details: an explicitly requested closed-content anchor is rejected rather than dropped', () => {
+  const f = nativeDetailsFixture()
+  assert.throws(() => serializedDetailsPage(f, ['#details-summary', '#control']), /Expected one rendered anchor: #control \(0\)/)
+  assert.equal(f.details.open, false); assert.equal(f.control.scrollCalls.length, 0)
+})
+
+test('serialized native details: genuinely clipped or obscured open controls remain mandatory failures', () => {
+  const f = nativeDetailsFixture(); f.open()
+  f.content.css.overflowX = 'auto'; f.content.clientWidth = 100
+  const clipped = serializedDetailsPage(f, ['#control'])
+  assert.equal(clipped.controls.find(item => item.selector === '[id="control"]').inViewport, false)
+  assert.equal(clipped.anchors.length, 1); assert.equal(clipped.anchors[0].inViewport, false)
+  assert.throws(() => validateFullAppPageSample(clipped, matrix), /hidden, clipped or obscured/)
+  f.content.css.overflowX = 'visible'; f.content.clientWidth = 300
+  f.setPaintedTargets([f.summaryControl, f.summaryLabel, f.summary])
+  const covered = serializedDetailsPage(f, ['#control'])
+  assert.equal(covered.controls.find(item => item.selector === '[id="control"]').hit, false)
+  assert.throws(() => validateFullAppPageSample(covered, matrix), /hidden, clipped or obscured/)
+})

@@ -100,7 +100,18 @@ export function observeFullAppPage({ root, anchors = [], editorExceptions = [], 
     const box = node.getBoundingClientRect()
     return { left: box.left, top: box.top, right: box.right, bottom: box.bottom, width: box.width, height: box.height }
   }
+  const hiddenByClosedDetails = node => {
+    // Closed native details may retain nonzero descendant boxes. Only its
+    // first direct summary subtree participates in this rendered state.
+    for (let owner = node.parentElement; owner; owner = owner.parentElement) {
+      if (owner.tagName !== 'DETAILS' || owner.open) continue
+      const summary = [...owner.children].find(child => child.tagName === 'SUMMARY')
+      if (!summary?.contains(node)) return true
+    }
+    return false
+  }
   const painted = node => {
+    if (hiddenByClosedDetails(node)) return false
     for (let owner = node; owner; owner = owner.parentElement) {
       const css = getComputedStyle(owner)
       if (css.display === 'none' || css.visibility !== 'visible' || Number(css.opacity) <= 0) return false
@@ -108,7 +119,7 @@ export function observeFullAppPage({ root, anchors = [], editorExceptions = [], 
     return true
   }
   const rendered = node => {
-    if (!node.isConnected) return false
+    if (!node.isConnected || hiddenByClosedDetails(node)) return false
     for (let owner = node; owner; owner = owner.parentElement) if (getComputedStyle(owner).display === 'none') return false
     const box = bounds(node)
     return box.width > 0 && box.height > 0
