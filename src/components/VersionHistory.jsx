@@ -147,7 +147,7 @@ export default function VersionHistory({ fileId, editor }) {
         <div className="version-list" role="list" aria-label="历史快照">
           {visible.length === 0 && <p className="version-empty">没有匹配的快照，清除查找条件可查看全部记录。</p>}
           {visible.map(row => <div key={row.id} role="listitem" className={'version-item' + (row.id === selectedId ? ' selected' : '')}>
-            <UiButton type="button" className="version-select-action" data-version-id={row.id} aria-pressed={row.id === selectedId} disabled={busy}
+            <UiButton type="button" layout="content" className="version-select-action" data-version-id={row.id} aria-pressed={row.id === selectedId} disabled={busy}
               onClick={() => { setSelectedId(row.id); setPreviewPage(0); setShowCurrent(false); setResult(null) }}>
               <strong>历史快照 #{row.id}</strong><small>{formatHistoryTime(row.created_at)}</small><span>{row.title || '未命名'}</span>
             </UiButton></div>)}

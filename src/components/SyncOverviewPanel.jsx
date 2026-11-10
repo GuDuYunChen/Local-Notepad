@@ -43,7 +43,7 @@ export default function SyncOverviewPanel({ onNavigate, ...input }) {
     </div>
     <SyncOverviewTimes view={view}/>
     <nav className="sync-overview-nav" aria-label="同步中心分区导航">
-      {view.destinations.map(item => <UiButton key={item.key} type="button" className="sync-overview-link"
+      {view.destinations.map(item => <UiButton key={item.key} type="button" layout="content" className="sync-overview-link"
         aria-label={'定位' + item.label} disabled={!item.available || typeof onNavigate !== 'function'}
         onClick={() => navigate(item.key)}>
         <strong>{item.label}<span aria-hidden="true"> →</span></strong>

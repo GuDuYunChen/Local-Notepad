@@ -7,7 +7,7 @@ import theme from 'antd/es/theme'
 import { createCache, StyleProvider } from '@ant-design/cssinjs'
 import { UiButton, UiInput, UiSelect } from './ControlKit'
 import UiThemeProvider from './UiThemeProvider'
-import { setUiValue, uiValue } from '~/test/uiControlDriver'
+import { changeUiValue, setUiValue, uiValue } from '~/test/uiControlDriver'
 
 const options = [{ value: 'a', label: 'Alpha' }, { value: 'b', label: 'Beta' }]
 let host, root, extraNodes, previousTheme
@@ -214,4 +214,55 @@ it('retains the canonical application theme as one separate real control scope',
   await click(named('themed-button')); await setUiValue(named('themed-choice'), 'b')
   expect(pressed).toHaveBeenCalledOnce(); expect(changed).toHaveBeenCalledOnce()
   expect(uiValue(named('themed-choice'))).toBe('b'); expect(named('themed-input').value).toBe('unchanged')
+})
+
+it('keeps native date semantics while applying live custom small, middle and large height tokens', async () => {
+  const sizes = ['small', 'middle', 'large'], refs = sizes.map(() => React.createRef()), changed = vi.fn()
+  const first = { token: { controlHeightSM: 31, controlHeight: 46, controlHeightLG: 59 } }
+  const next = { token: { controlHeightSM: 34, controlHeight: 48, controlHeightLG: 61 } }
+  const view = configuration => <ConfigProvider prefixCls="native-date" theme={configuration}>
+    <form>{sizes.map((size, index) => <UiInput key={size} ref={refs[index]} name={size} size={size}
+      aria-label={`date-${size}`} type="date" min="0001-01-01" max="9999-12-31"
+      defaultValue="2026-11-10" onChange={changed}/>)}</form>
+  </ConfigProvider>
+  await render(view(first))
+  const fields = sizes.map(size => named(`date-${size}`))
+  // These are token-to-style and native DOM contracts. This DOM test environment
+  // does not measure Chromium's date rendering; Windows captures cover geometry.
+  expect(fields.map(field => field.style.height)).toEqual(['31px', '46px', '59px'])
+  for (const [index, field] of fields.entries()) {
+    expect(field).toBeInstanceOf(HTMLInputElement)
+    expect(field.type).toBe('date')
+    expect(field.min).toBe('0001-01-01'); expect(field.max).toBe('9999-12-31')
+    expect(field.style.boxSizing).toBe('border-box')
+    expect(refs[index].current).toBe(field)
+  }
+  await changeUiValue(fields[1], '2026-11-11')
+  expect(changed).toHaveBeenCalledOnce()
+  expect(changed.mock.calls[0][0].target.value).toBe('2026-11-11')
+  expect(changed.mock.calls[0][0].target.type).toBe('date')
+  expect(Object.fromEntries(new FormData(host.querySelector('form')))).toEqual({
+    small: '2026-11-10', middle: '2026-11-11', large: '2026-11-10'
+  })
+  await render(view(next))
+  expect(fields.map(field => field.style.height)).toEqual(['34px', '48px', '61px'])
+  for (const [index, size] of sizes.entries()) {
+    expect(named(`date-${size}`)).toBe(fields[index])
+    expect(refs[index].current).toBe(fields[index])
+  }
+  expect(fields[1].value).toBe('2026-11-11')
+  expect(changed).toHaveBeenCalledOnce()
+})
+
+it('preserves caller date styles and leaves ordinary input height ownership unchanged', async () => {
+  await render(<ConfigProvider theme={{ token: { controlHeight: 46 } }}>
+    <UiInput aria-label="caller-date" type="date" style={{ height: 73, boxSizing: 'content-box', marginInlineStart: 7 }}/>
+    <UiInput aria-label="ordinary-text" style={{ width: '63%', marginInlineStart: 7 }}/>
+  </ConfigProvider>)
+  const date = named('caller-date'), text = named('ordinary-text')
+  expect(date.style.height).toBe('73px'); expect(date.style.boxSizing).toBe('content-box')
+  expect(date.style.marginInlineStart).toBe('7px')
+  expect(text.type).toBe('text')
+  expect(text.style.height).toBe(''); expect(text.style.boxSizing).toBe('')
+  expect(text.style.width).toBe('63%'); expect(text.style.marginInlineStart).toBe('7px')
 })

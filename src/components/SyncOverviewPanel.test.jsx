@@ -17,6 +17,21 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => root.unmount()); container.remove(); vi.restoreAllMocks(); globalThis.IS_REACT_ACT_ENVIRONMENT = actMode
 })
+it('multi-line navigation cards retain descriptions and refuse unavailable destinations', async () => {
+  await render();
+  const cards = [...container.querySelectorAll('.sync-overview-link')];expect(cards.length).toBeGreaterThan(1);
+  for (const card of cards) {
+    expect(card.querySelector('strong').textContent).toContain(card.getAttribute('aria-label').slice(2));
+    expect(card.querySelector('strong + span').textContent).not.toBe('');
+  }
+  expect(navigate).not.toHaveBeenCalled();await click(button('连接配置'));
+  expect(navigate).toHaveBeenCalledTimes(1);expect(navigate).toHaveBeenCalledWith('connection');
+  props.settings.sync_enabled = false;await render();
+  const unavailable = button('预演与执行');expect(unavailable.disabled).toBe(true);
+  expect(unavailable.querySelector('strong + span').textContent).toContain('启用同步后');
+  await click(unavailable);expect(navigate).toHaveBeenCalledTimes(1);
+  for (const card of container.querySelectorAll('.sync-overview-link')) expect(card.getAttribute('data-ui-layout')).toBe('content');
+});
 it('mount and StrictMode replay do not focus, navigate or execute', async () => {
   await render(true); expect(navigate).not.toHaveBeenCalled()
   expect(container.textContent).toContain('同步总览'); expect(button('预演与执行').disabled).toBe(false)

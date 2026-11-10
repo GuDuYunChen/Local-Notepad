@@ -20,13 +20,9 @@
 .local-shortcuts-settings kbd { font-family: inherit; }
 
 .local-shortcuts-filters { display: flex; flex: none; gap: 10px; padding: 0 24px 16px; }
-.local-shortcuts-search { display: flex; align-items: center; flex: 1; min-width: 0; gap: 8px; border: 1px solid var(--line-strong); border-radius: 9px; padding: 0 10px; background: var(--paper); }
-.local-shortcuts-search > span { color: var(--ink-soft); font-size: 24px; line-height: 1; }
-.local-shortcuts-search input { width: 100%; min-width: 0; }
-.local-shortcuts-search input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { height: 40px; padding: 0; border: 0; outline: none; background: transparent; color: var(--ink); font: inherit; font-size: 13px; }
-.local-shortcuts-search:focus-within { border-color: var(--clay); box-shadow: 0 0 0 2px var(--clay-light); }
-.local-shortcuts-search input:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { outline: none; }
-.local-shortcuts-search input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *))::placeholder { color: var(--ink-soft); }
+.local-shortcuts-search { display: flex; align-items: center; flex: 1; min-width: 0; gap: 8px; }
+.local-shortcuts-search-input { flex: 1; min-width: 0; }
+.local-shortcuts-search-icon { color: var(--ink-soft); }
 .local-shortcuts-search .icon-btn { flex: none; }
 .local-shortcuts-category select { width: 124px; }
 .local-shortcuts-category select:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { height: 42px; border: 1px solid var(--line-strong); border-radius: 9px; padding: 0 10px; background: var(--surface); color: var(--ink); font: inherit; font-size: 13px; }

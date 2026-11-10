@@ -30,6 +30,24 @@ beforeEach(async () => {
   host = document.createElement('div');document.body.append(host);root = createRoot(host);
 });
 afterEach(async () => {await act(async () => root.unmount());host.remove();vi.restoreAllMocks();vi.unstubAllGlobals();vi.clearAllMocks();});
+it('multi-line research cards preserve stored previews and reset consent when selection changes', async () => {
+  await service.save(buildStudyCompilation([{ collectionKey: 'c', collectionId: 'c', collectionName: '资料', id: 'another', title: '另一条目', folderPath: '旧卷', ordinal: 1, status: 'revisit', note: '另一份已存批注', updatedAt: '2026-09-24T12:00:00.000Z' }],
+    { title: '另一研究笔记', goal: '另一目标', parentId: '', group: 'collection' }, '2026-09-24T14:00:00.000Z', '2026-09-24T12:30:00.000Z'));
+  await render();
+  const cards = [...host.querySelectorAll('.research-task-list button')];expect(cards).toHaveLength(2);
+  const first = cards.find(card => card.querySelector('strong').textContent === '研究笔记.md');
+  const second = cards.find(card => card.querySelector('strong').textContent === '另一研究笔记.md');
+  expect(first.querySelector('strong + span').textContent).toContain('23 条批注');expect(second.querySelector('strong + span').textContent).toContain('1 条批注');
+  for (const card of cards) expect(card.querySelector('small').textContent).not.toBe('');
+  await act(async () => first.click());await act(async () => checkbox().click());expect(checkbox().checked).toBe(true);
+  await act(async () => second.click());expect(checkbox().checked).toBe(false);
+  expect(first.getAttribute('aria-pressed')).toBe('false');expect(second.getAttribute('aria-pressed')).toBe('true');
+  const preview = host.querySelector('[aria-label="历史研究草稿完整内容"]');
+  expect(preview.textContent).toContain('另一份已存批注');expect(preview.textContent).not.toContain('第22条批注');
+  expect(uiDisabled(button('以同一任务创建或重试'))).toBe(true);expect(request).not.toHaveBeenCalled();expect(onReceipt).not.toHaveBeenCalled();
+  expect(store.list()).toHaveLength(2);expect(store.list().find(item => item.key === entry.key).raw).toBe(entry.raw);
+  for (const card of cards) expect(card.getAttribute('data-ui-layout')).toBe('content');
+});
 it('lists persisted tasks without any network and shows the complete historical preview', async () => {
   await render();await select();expect(uiText(host)).toContain('第22条批注');expect(uiText(host)).toContain('不会自动混入最新批注');expect(request).not.toHaveBeenCalled();
 });

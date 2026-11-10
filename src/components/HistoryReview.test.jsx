@@ -24,6 +24,26 @@ beforeEach(async () => {
   host = document.createElement('div');document.body.append(host);root = createRoot(host);await act(async () => {root.render(<Harness />);await drain();});await wait(() => expect(uiQuery(document, '[data-history-file="a"]')).not.toBeNull());
 });
 afterEach(async () => {await act(async () => root.unmount());host.remove();vi.restoreAllMocks();vi.unstubAllGlobals();});
+it('multi-line history cards keep note and snapshot selection read-only and separate', async () => {
+  const note = id => document.querySelector(`[data-history-file="${id}"]`);
+  const version = id => document.querySelector(`[data-history-version="${id}"]`);
+  expect(note('a').querySelector('strong').textContent).toBe('比较笔记 a.md');expect(note('a').querySelector('small').textContent).not.toBe('');
+  expect(api.mock.calls.some(([path]) => path.startsWith('/api/history-review'))).toBe(false);
+  await selectNote();expect(note('a').getAttribute('aria-pressed')).toBe('true');
+  for (const id of [3, 2]) {
+    expect(version(id).querySelector('strong').textContent).toBe(`快照 #${id} · 历史标题 ${id}`);
+    expect(version(id).querySelector('small').textContent).toContain('字节');expect(version(id).getAttribute('aria-pressed')).toBe('false');
+  }
+  await tap('[data-history-version="3"]');await wait(() => expect(version(3).getAttribute('aria-pressed')).toBe('true'));
+  await tap('[data-history-version="2"]');await wait(() => expect(version(2).getAttribute('aria-pressed')).toBe('true'));
+  expect(version(3).getAttribute('aria-pressed')).toBe('false');expect(note('a').getAttribute('aria-pressed')).toBe('true');
+  await tap('[data-history-file="b"]');await wait(() => expect(version(3)).not.toBeNull());
+  expect(note('b').getAttribute('aria-pressed')).toBe('true');expect(note('a').getAttribute('aria-pressed')).toBe('false');
+  expect(version(3).getAttribute('aria-pressed')).toBe('false');expect(version(2).getAttribute('aria-pressed')).toBe('false');
+  expect(document.querySelector('[data-history-state]')).toBeNull();expect(opened).not.toHaveBeenCalled();expect(downloads).toHaveLength(0);
+  expect(api.mock.calls.every(([, init]) => !init?.method)).toBe(true);
+  for (const card of [note('a'), note('b'), version(3), version(2)]) expect(card.getAttribute('data-ui-layout')).toBe('content');
+});
 it('whole index pagination and explicit history selection precede comparison', async () => {expect(uiQueryAll(document, '[data-history-file]')).toHaveLength(20);await click('下一页笔记');await click('下一页笔记');expect(uiQueryAll(document, '[data-history-file]')).toHaveLength(3);await click('上一页笔记');await click('上一页笔记');await selectNote();expect(uiQuery(document, '[data-history-state]')).toBeNull();expect(uiDisabled(button('导出历史对照报告'))).toBe(true);await tap('[data-history-version="3"]');await wait(() => expect(uiQuery(document, '[data-history-state]').dataset.historyState).toBe('different'));expect(uiText(document.body)).toContain('historical');expect(api.mock.calls.every(([, init]) => !init?.method)).toBe(true);});
 it('complete metadata can be searched and paged without fetching unselected bodies', async () => {options.count = 43;await selectNote();expect(uiQueryAll(document, '[data-history-version]')).toHaveLength(20);await click('下一页快照');await click('下一页快照');expect(uiQueryAll(document, '[data-history-version]')).toHaveLength(3);await change('[aria-label="历史中心查找快照"]', '历史标题 42');expect(uiQueryAll(document, '[data-history-version]')).toHaveLength(1);expect(uiQuery(document, '[data-history-version="42"]')).not.toBeNull();expect(api.mock.calls.filter(([p]) => p.startsWith('/api/history-review')).every(([p]) => !p.includes('version='))).toBe(true);});
 it('no retained history does not create a fake snapshot or allow export', async () => {options.count = 0;await tap('[data-history-file="a"]');await wait(() => expect(uiText(document.body)).toContain('暂无保留历史'));expect(uiDisabled(button('导出历史对照报告'))).toBe(true);expect(uiDisabled(button('打开当前笔记'))).toBe(false);});

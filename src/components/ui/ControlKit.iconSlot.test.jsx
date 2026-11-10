@@ -39,6 +39,22 @@ it('keeps an explicit icon and its accompanying caption even on a legacy icon cl
   expect(button.classList.contains('ant-btn-icon-only')).toBe(false)
 })
 
+it('allows explicit multi-line content without changing ordinary actions or actual icon-only geometry', async () => {
+  const ref = createRef(), click = vi.fn()
+  await render(<>
+    <UiButton type="button" layout="content" ref={ref} onClick={click} aria-pressed="true"><strong>Snapshot</strong><small>2026-11-10</small><span>Long note title</span></UiButton>
+    <UiButton type="button">Ordinary action</UiButton>
+    <UiButton type="button" layout="content" icon={icon} aria-label="Icon action" />
+  </>)
+  const buttons = [...host.querySelectorAll('button')]
+  expect(buttons.map(button => button.dataset.uiLayout)).toEqual(['content', 'action', 'icon'])
+  expect(ref.current).toBe(buttons[0]); expect(buttons[0].getAttribute('layout')).toBeNull()
+  expect(buttons[0].getAttribute('aria-pressed')).toBe('true')
+  expect([...buttons[0].querySelectorAll('strong, small, span')].map(node => node.textContent)).toEqual(['Snapshot', '2026-11-10', 'Long note title'])
+  await act(async () => buttons[0].click())
+  expect(click).toHaveBeenCalledTimes(1)
+})
+
 it('does not infer icon-only from a substring, a single complex child, a numeric zero, or an explicitly empty icon', async () => {
   await render(<>
     <UiButton type="button" className="document-icon-btn-caption"><span><strong>Note</strong><small>Details</small></span></UiButton>

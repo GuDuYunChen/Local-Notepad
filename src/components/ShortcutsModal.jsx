@@ -351,14 +351,17 @@ function ShortcutSettingsSession({ onClose }) {
         )}
 
         <div className="local-shortcuts-filters">
-          <label className="local-shortcuts-search">
-            <span aria-hidden="true">⌕</span>
-            <UiInput size="middle" ref={searchRef} value={queryInput} placeholder="搜索操作或快捷键" aria-label="搜索快捷键" data-shortcut-search="true" maxLength={120}
+          <div className="local-shortcuts-search">
+            <UiInput size="middle" className="local-shortcuts-search-input" ref={searchRef} value={queryInput} placeholder="搜索操作或快捷键" aria-label="搜索快捷键" data-shortcut-search="true" maxLength={120}
+              prefix={<svg className="local-shortcuts-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+                <circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" />
+              </svg>}
               onCompositionStart={() => { composingSearch.current = true; setRecording(null) }}
               onCompositionEnd={event => { composingSearch.current = false; setQuery(event.currentTarget.value) }}
               onChange={event => { setQueryInput(event.target.value); setRecording(null); if (!composingSearch.current) setQuery(event.target.value) }} />
             {queryInput && <UiButton size="middle" type="button" className="icon-btn" aria-label="清除搜索" onClick={() => { setQueryInput(''); setQuery(''); searchRef.current?.focus() }}>×</UiButton>}
-          </label>
+          </div>
           <label className="local-shortcuts-category">
             <UiSelect size="middle" aria-label="操作分类" value={category} onChange={event => { setCategory(event.target.value); setRecording(null) }}>
               <option value="全部">全部操作</option>

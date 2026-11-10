@@ -34,3 +34,20 @@ test('malformed response cannot keep old actionable results', async () => {await
 test('latest parent opener is used when callback changes without changing note', async () => {await mount();const other = vi.fn(async () => false);await mount('target', other);await click('打开来源笔记');expect(opener).not.toHaveBeenCalled();expect(other).toHaveBeenCalledTimes(1);});
 test('HTML-like preview stays text and does not insert live HTML', async () => {api.mockResolvedValue(snap({ sources: [row({ file: file({ content: '<img src=x onerror=alert(1)>' }) })] }));await mount();expect(uiQuery(host, 'img')).toBeNull();expect(uiText(uiQuery(host, 'pre'))).toContain('<img');});
 test('a genuine ten-second read deadline is presented as failure, not empty', async () => {vi.useFakeTimers();try {api.mockReturnValue(new Promise(() => {}));await mount();await act(async () => vi.advanceTimersByTimeAsync(10001));expect(uiText(host)).toContain('超时');expect(uiText(host)).not.toContain('暂无已索引');} finally {vi.useRealTimers();}});
+
+test('multi-line source cards retain metadata and independent preview selection', async () => {
+  current = snap({ indexed_count: 2, sources: [row(), row({ link_id: 2, source_id: 'other-source', file: file({ id: 'other-source', title: '另一来源', content: body.replace('预览正文', '另一来源正文') }) })] });
+  api.mockResolvedValue(current);await mount();
+  const first = host.querySelector('[data-backlink-source="source"]');
+  const second = host.querySelector('[data-backlink-source="other-source"]');
+  expect(first.querySelector('strong').textContent).toBe('来源文档');
+  expect(second.querySelector('strong').textContent).toBe('另一来源');
+  for (const card of [first, second]) expect(card.querySelector('strong + span').textContent).toBe('1 处引用');
+  await act(async () => second.click());await tick();
+  expect(second.getAttribute('aria-pressed')).toBe('true');expect(first.getAttribute('aria-pressed')).toBe('false');
+  expect(uiText(uiQuery(host, 'pre'))).toContain('另一来源正文');
+  await act(async () => first.click());await tick();
+  expect(first.getAttribute('aria-pressed')).toBe('true');expect(second.getAttribute('aria-pressed')).toBe('false');
+  expect(uiText(uiQuery(host, 'pre'))).toContain('预览正文');expect(opener).not.toHaveBeenCalled();expect(api).toHaveBeenCalledTimes(1);
+  for (const card of [first, second]) expect(card.getAttribute('data-ui-layout')).toBe('content');
+});

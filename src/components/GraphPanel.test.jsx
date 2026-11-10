@@ -21,6 +21,18 @@ async function input(text) {await (async () => {
 async function choose(id = '甲') {await act(async () => uiQuery(host, `[data-graph-note-id="${id}"]`).click());await flush();}
 beforeEach(() => {globalThis.IS_REACT_ACT_ENVIRONMENT = true;vi.useFakeTimers();api.mockReset();current = data();close = vi.fn();adopted = vi.fn();api.mockImplementation(async (p) => p === '/api/local-graph' ? current : { id: decodeURIComponent(p.split('/').pop()), title: decodeURIComponent(p.split('/').pop()), content: 'latest-body', is_folder: false, is_deleted: false });select = vi.fn(async (id, options) => {const file = await options.readFile(id, { signal: options.signal });if (!options.shouldSelect()) return false;adopted(file);return false;});host = document.createElement('div');document.body.append(host);root = createRoot(host);});
 afterEach(async () => {await act(async () => root.unmount());host.remove();vi.restoreAllMocks();vi.useRealTimers();delete globalThis.IS_REACT_ACT_ENVIRONMENT;});
+test('multi-line graph cards keep relation metadata and explicit selection without opening', async () => {
+  await mount();
+  const first = host.querySelector('[data-graph-note-id="甲"]');
+  const second = host.querySelector('[data-graph-note-id="乙"]');
+  expect(first.querySelector('strong').textContent).toBe('甲');expect(first.querySelector('strong + span').textContent).toBe('引入 0 · 引出 1');
+  expect(second.querySelector('strong').textContent).toBe('乙');expect(second.querySelector('strong + span').textContent).toBe('引入 1 · 引出 0');
+  await choose('甲');expect(first.getAttribute('aria-pressed')).toBe('true');
+  await choose('乙');expect(first.getAttribute('aria-pressed')).toBe('false');expect(second.getAttribute('aria-pressed')).toBe('true');
+  expect(host.querySelector('[aria-label="选中笔记关系"] h3').textContent).toBe('乙');
+  expect(select).not.toHaveBeenCalled();expect(adopted).not.toHaveBeenCalled();expect(api).toHaveBeenCalledTimes(1);
+  for (const card of [first, second]) expect(card.getAttribute('data-ui-layout')).toBe('content');
+});
 test('complete entry preserves isolated notes and selection does not open', async () => {await mount();expect(uiText(host)).toContain('3 篇可用笔记');expect(uiQueryAll(host, '[data-graph-note-id]')).toHaveLength(3);await choose();expect(uiText(uiQuery(host, '[aria-label="选中笔记关系"]'))).toContain('引用了：乙');expect(select).not.toHaveBeenCalled();});
 test('genuine empty snapshot is different from a failed load', async () => {current = { scope: current.scope, complete: true, nodes: [], edges: [] };await mount();expect(uiText(host)).toContain('还没有可用笔记');expect(uiQuery(host, '[role=alert]')).toBeNull();});
 test('failed read gives retry, never an empty success and never backend private text', async () => {api.mockRejectedValue(Error('PRIVATE_SQL'));await mount();expect(uiQuery(host, '[role=alert]')).toBeTruthy();expect(uiText(host)).not.toContain('还没有可用笔记');expect(uiText(host)).not.toContain('PRIVATE_SQL');api.mockResolvedValue(current);await click('重新读取图谱');expect(uiText(host)).toContain('3 篇可用笔记');});
