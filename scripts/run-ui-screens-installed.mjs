@@ -14,7 +14,7 @@ import { createDesktopWindowSession } from './desktop-window-session.mjs'
 import { selectDesktopMainWindow, assertDesktopWindowImage } from './desktop-window-target.mjs'
 import { createExportDirectorySession } from './local-export-directory-session.mjs'
 import { verifyUiScreensDesktop } from './check-ui-screens-desktop.mjs'
-import { verifyUiScreensFiles } from './ui-screens-evidence.mjs'
+import { UI_INSTALLED_REGISTRATION_QUERY, validateUiInstalledRegistration, verifyUiScreensFiles } from './ui-screens-evidence.mjs'
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url))
 const VERSION = '4.249.0'
@@ -238,7 +238,7 @@ export async function runUiScreensInstalled({ pin, installerPath, originalInstal
   }
   const ps = async source => command('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand',
     Buffer.from("$ErrorActionPreference='Stop';[Console]::OutputEncoding=[Text.UTF8Encoding]::new();" + source, 'utf16le').toString('base64')], { timeout: 20000 })
-  const registrations = async () => JSON.parse(await ps("$all=@();foreach($scope in @('HKCU','HKLM')){foreach($tail in @('Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall','Software\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall')){Get-ItemProperty ($scope+':\\'+$tail+'\\*') -ErrorAction SilentlyContinue | Where-Object {($_.DisplayName -eq '记事本' -or $_.DisplayName -like '记事本 *')} | ForEach-Object {$all+=@{scope=$scope;key=$_.PSChildName;version=$_.DisplayVersion;location=$_.InstallLocation;uninstall=$_.UninstallString}}}};ConvertTo-Json -InputObject @($all) -Compress"))
+  const registrations = async () => JSON.parse(await ps(UI_INSTALLED_REGISTRATION_QUERY))
   const links = async () => JSON.parse(await ps("$links=@();foreach($folder in @([Environment]::GetFolderPath('DesktopDirectory'),[Environment]::GetFolderPath('Programs'))){$p=Join-Path $folder '记事本.lnk';if(Test-Path -LiteralPath $p){$links+=@{path=$p}}};ConvertTo-Json -InputObject @($links) -Compress"))
   const evaluate = async expression => {
     const result = await cdp.send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true })
@@ -323,8 +323,8 @@ export async function runUiScreensInstalled({ pin, installerPath, originalInstal
       asarSHA256: sha(readFileSync(path.join(installDirectory, 'resources/app.asar'))),
       backendSHA256: sha(readFileSync(path.join(installDirectory, 'resources/bin/notepad-server.exe'))) }
     for (const key of ['executableSHA256', 'asarSHA256', 'backendSHA256']) assert.equal(appIdentity[key], originalApplication[key], 'Additional installed application differs: ' + key)
-    const registered = await registrations(); assert.equal(registered.length, 1); assert.equal(registered[0].scope, 'HKCU'); assert.equal(registered[0].version, VERSION)
-    assert.ok(samePath(registered[0].location, installDirectory)); report.registration = registered[0]; report.app = appIdentity
+    const registered = await registrations(); report.registrationRead = registered; report.app = appIdentity; save()
+    report.registration = validateUiInstalledRegistration(registered, installDirectory, VERSION); save()
     assert.deepEqual(snapshot(defaultData), defaultBefore)
     windowSession = createDesktopWindowSession({ onEvent: event => { report.windowHelper.events.push(event); save() } })
     directorySession = createExportDirectorySession({ ownedRoot: scratch, onEvent: event => { report.directoryHelper.events.push(event); save() } })

@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
+import { inflateSync } from 'node:zlib'
 import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -148,6 +149,85 @@ function validateFocus(sample) {
   assert.equal(sample.outlines?.length, 1, 'Exactly one actual focus outline required')
   assert.equal(sample.outlines[0].owner, 'root'); assert.ok(sample.outlines[0].width >= 1.5)
   nonempty(sample.outlines[0].color); assert.deepEqual(sample.shadows, [], 'Duplicate visible focus shadow')
+}
+
+export const COLLAPSED_SIDEBAR_EXPAND = '.workspace-sidebar [aria-label="展开侧边栏"]'
+const exactRectangle = (rect, label) => {
+  for (const key of ['left', 'top', 'right', 'bottom', 'width', 'height']) assert.ok(Number.isFinite(rect?.[key]), label + ' has no real ' + key)
+  positive(rect.width); positive(rect.height)
+  assert.ok(Math.abs(rect.right - rect.left - rect.width) <= 0.00001 && Math.abs(rect.bottom - rect.top - rect.height) <= 0.00001, label + ' edges disagree')
+}
+const insideRectangle = (rect, port) => rect.left >= port.left && rect.top >= port.top && rect.right <= port.right && rect.bottom <= port.bottom
+const sameSidebarGeometry = (before, after) => {
+  for (const key of ['left', 'top', 'right', 'bottom', 'width', 'height']) {
+    assert.ok(Math.abs(before.sidebarIcon.controlBounds[key] - after.sidebarIcon.controlBounds[key]) <= 0.6, 'Sidebar moved while obtaining its focus proof')
+  }
+  assert.deepEqual(after.sidebarIcon.scrollPositions, before.sidebarIcon.scrollPositions, 'Scrolling cannot repair the collapsed rail before its focus proof')
+}
+
+// This additional gate applies only to the repaired real collapsed sidebar.
+// Other route focus contracts and every original scene remain unchanged.
+export function validateCollapsedSidebarObservation(sample, matrix, { focusRequired = true } = {}) {
+  assert.equal(sample.selector, COLLAPSED_SIDEBAR_EXPAND)
+  assert.deepEqual(sample.viewport, matrix.viewport); assert.equal(sample.theme, matrix.theme)
+  const rail = sample.sidebarIcon
+  assert.equal(rail?.collapsed, true); assert.equal(rail.tag, 'BUTTON'); assert.equal(rail.disabled, false)
+  assert.equal(rail.layout, 'icon'); assert.equal(rail.size, 'middle')
+  exactRectangle(rail.controlBounds, 'Sidebar button'); exactRectangle(rail.viewportBounds, 'Actual viewport')
+  assert.ok(insideRectangle(rail.controlBounds, rail.viewportBounds), 'Sidebar button leaves the actual viewport')
+  assert.ok(Math.abs(rail.controlBounds.width - 40) <= 0.6 && Math.abs(rail.controlBounds.height - 40) <= 0.6, 'Sidebar icon button must keep the actual middle 40px density')
+  assert.equal(rail.iconCount, 1); assert.equal(rail.glyphCount, 1)
+  for (const item of [rail.icon, rail.glyph]) {
+    exactRectangle(item?.bounds, 'Sidebar icon content'); assert.equal(item.painted, true)
+    assert.ok(insideRectangle(item.bounds, rail.controlBounds), 'Sidebar icon content leaves its button')
+  }
+  assert.ok(insideRectangle(rail.glyph.bounds, rail.icon.bounds), 'Sidebar glyph leaves its official icon wrapper')
+  for (const [start, extent] of [['left', 'width'], ['top', 'height']]) {
+    assert.ok(Math.abs(rail.icon.bounds[start] + rail.icon.bounds[extent] / 2 - rail.controlBounds[start] - rail.controlBounds[extent] / 2) <= 0.6, 'Sidebar icon wrapper is not centered in its middle-density button')
+  }
+  assert.equal(rail.glyph.text, '›')
+  for (const key of ['inViewport', 'hit']) assert.equal(sample[key], true, 'Sidebar button is clipped or obscured: ' + key)
+  assert.ok(Array.isArray(rail.scrollPositions) && rail.scrollPositions.length > 0)
+  for (const position of rail.scrollPositions) for (const key of ['left', 'top']) assert.ok(Number.isFinite(position[key]))
+  if (!focusRequired) return sample
+  assert.equal(sample.focused, true); assert.equal(sample.focusVisible, true)
+  assert.equal(sample.outlines?.length, 1); assert.equal(sample.outlines[0].owner, 'root')
+  assert.equal(rail.outline.width, 2); assert.equal(rail.outline.offset, 2)
+  assert.equal(sample.outlines[0].width, rail.outline.width); assert.equal(sample.outlines[0].color, rail.outline.color)
+  assert.deepEqual(sample.shadows, [])
+  exactRectangle(rail.outlineBounds, 'Sidebar outer focus ring')
+  const box = rail.controlBounds, outer = rail.outline.width + rail.outline.offset
+  assert.deepEqual(rail.outlineBounds, { left: box.left - outer, top: box.top - outer, right: box.right + outer, bottom: box.bottom + outer, width: box.width + 2 * outer, height: box.height + 2 * outer })
+  assert.ok(insideRectangle(rail.outlineBounds, rail.viewportBounds), 'Sidebar focus ring leaves the actual viewport')
+  assert.ok(Array.isArray(sample.clippingAncestors) && sample.clippingAncestors.length > 0)
+  for (const ancestor of sample.clippingAncestors) {
+    const p = ancestor.clientPort
+    assert.ok(p && ['left', 'top', 'width', 'height'].every(key => Number.isFinite(p[key])), 'Missing actual ancestor client port')
+    if (/hidden|auto|scroll|clip/.test(ancestor.appliedOverflowX)) assert.ok(rail.outlineBounds.left >= p.left && rail.outlineBounds.right <= p.left + p.width, 'Sidebar focus ring is clipped horizontally')
+    if (/hidden|auto|scroll|clip/.test(ancestor.appliedOverflowY)) assert.ok(rail.outlineBounds.top >= p.top && rail.outlineBounds.bottom <= p.top + p.height, 'Sidebar focus ring is clipped vertically')
+  }
+  assert.equal(rail.ringSamples?.length, 12)
+  const positions = ['left', 'right', 'top', 'bottom'].flatMap(side => [1 / 3, 1 / 2, 2 / 3].map(fraction => ({ side, fraction })))
+  for (const [index, point] of rail.ringSamples.entries()) {
+    const { side, fraction } = positions[index], vertical = side === 'left' || side === 'right', middle = rail.outline.offset + rail.outline.width / 2
+    assert.equal(point.side, side); assert.equal(point.fraction, fraction)
+    assert.equal(point.x, vertical ? box[side] + (side === 'left' ? -middle : middle) : box.left + box.width * fraction)
+    assert.equal(point.y, vertical ? box.top + box.height * fraction : box[side] + (side === 'top' ? -middle : middle))
+    assert.ok(Number.isFinite(point.x) && Number.isFinite(point.y))
+    assert.ok(point.topElement && typeof point.topElement.tag === 'string'); assert.ok(['ancestor', 'control', 'descendant', 'foreign'].includes(point.topElement.relation))
+    assert.equal(point.hitWithinOwner, point.topElement.relation !== 'foreign')
+  }
+  assert.ok(Array.isArray(rail.pointerTransparentOverlaps), 'Potential painted pointer-transparent overlaps must be observed')
+  return sample
+}
+
+export function validateCollapsedSidebarFocus(sample, matrix) {
+  assert.equal(sample.routeId, 'nav-sidebar'); assert.equal(sample.stateId, 'collapsed')
+  validateFocus(sample); validateCollapsedSidebarObservation(sample, matrix)
+  validateCollapsedSidebarObservation(sample.beforeTab, matrix, { focusRequired: false })
+  sameSidebarGeometry(sample.beforeTab, sample)
+  assert.ok(sample.events?.some(event => event.type === 'keydown' && event.key === 'Tab' && event.trusted), 'Sidebar focus needs its own actual Tab event')
+  return sample
 }
 
 export function validateFullAppPopupObservation(sample) {
@@ -372,6 +452,20 @@ export function validateFullAppUiEvidence(ui, ledger) {
     }
   }
   for (const route of routes) for (const matrix of ledger.matrix) assert.ok(routeCoverage.has(routeMatrixKey({ routeId: route.id, ...matrix })), 'Route only has a popup screenshot; expanded page controls remain unobserved')
+  if (routes.some(route => route.id === 'nav-sidebar')) for (const matrix of ledger.matrix) {
+    const key = sceneKey({ routeId: 'nav-sidebar', stateId: 'collapsed', ...matrix })
+    const focused = ui.focus.filter(sample => sceneKey(sample) === key && sample.selector === COLLAPSED_SIDEBAR_EXPAND)
+    assert.equal(focused.length, 1, 'Collapsed sidebar needs its own exact expand-button focus proof for every native size and theme')
+    validateCollapsedSidebarFocus(focused[0], matrix)
+    const scene = ui.scenes.find(item => sceneKey(item) === key)
+    assert.ok(scene, 'Missing the real collapsed sidebar scene')
+    for (const image of scene.images) for (const phase of ['before-capture', 'after-capture']) {
+      const samples = scene.rawSamples.filter(sample => sample.image === image.filename && sample.phase === phase)
+      assert.equal(samples.length, 1, 'Collapsed sidebar PNG needs independent focus reads on both boundaries')
+      validateCollapsedSidebarObservation(samples[0].sidebarFocus, matrix)
+      sameSidebarGeometry(focused[0], samples[0].sidebarFocus)
+    }
+  }
   return ui
 }
 
@@ -382,11 +476,68 @@ function verifyPng(image, out, viewport, dpr) {
   assert.equal(bytes.subarray(12, 16).toString(), 'IHDR')
   assert.equal(bytes.readUInt32BE(16), Math.round(viewport.width * dpr), 'Screenshot width does not match the native viewport')
   assert.equal(bytes.readUInt32BE(20), Math.round(viewport.height * dpr), 'Screenshot height does not match the native viewport')
+  return bytes
+}
+
+// The outside of a CSS outline can hit-test to a transparent sibling that is
+// painted behind it. Its real captured pixels, rather than DOM hit ownership,
+// decide whether the focus ring was actually visible over that background.
+export function verifyCollapsedSidebarRaster(bytes, observation, dpr) {
+  validateCollapsedSidebarObservation(observation, observation)
+  assert.ok(Number.isFinite(dpr) && dpr >= 0.5 && dpr <= 4)
+  assert.equal(bytes.subarray(0, 8).toString('hex'), '89504e470d0a1a0a')
+  const width = bytes.readUInt32BE(16), height = bytes.readUInt32BE(20), type = bytes[25]
+  assert.equal(width, Math.round(observation.viewport.width * dpr)); assert.equal(height, Math.round(observation.viewport.height * dpr))
+  assert.ok(width <= 8192 && height <= 8192); assert.equal(bytes[24], 8); assert.ok(type === 2 || type === 6)
+  for (const index of [26, 27, 28]) assert.equal(bytes[index], 0, 'Unsupported PNG compression/filter/interlace mode')
+  const chunks = []
+  for (let offset = 8; offset < bytes.length;) {
+    assert.ok(offset + 12 <= bytes.length)
+    const length = bytes.readUInt32BE(offset); assert.ok(length <= bytes.length - offset - 12)
+    if (bytes.toString('ascii', offset + 4, offset + 8) === 'IDAT') chunks.push(bytes.subarray(offset + 8, offset + 8 + length))
+    offset += length + 12
+  }
+  const color = observation.sidebarIcon.outline.color.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*1(?:\.0+)?)?\s*\)$/)
+  assert.ok(color, 'The actual sidebar outline must have an opaque computed RGB color')
+  const expected = color.slice(1, 4).map(Number); assert.ok(expected.every(value => value >= 0 && value <= 255))
+  const points = observation.sidebarIcon.ringSamples.map(point => ({ side: point.side, fraction: point.fraction, x: Math.floor(point.x * dpr), y: Math.floor(point.y * dpr) }))
+  for (const point of points) assert.ok(point.x >= 0 && point.x < width && point.y >= 0 && point.y < height)
+  const bpp = type === 6 ? 4 : 3, stride = width * bpp
+  const raw = inflateSync(Buffer.concat(chunks), { maxOutputLength: (stride + 1) * height })
+  assert.equal(raw.length, (stride + 1) * height)
+  const paeth = (a, b, c) => { const p = a + b - c, pa = Math.abs(p - a), pb = Math.abs(p - b), pc = Math.abs(p - c); return pa <= pb && pa <= pc ? a : pb <= pc ? b : c }
+  let previous = Buffer.alloc(stride)
+  const samples = []
+  for (let y = 0; y <= Math.max(...points.map(point => point.y)); y++) {
+    const filter = raw[y * (stride + 1)]; assert.ok(filter <= 4)
+    const row = Buffer.from(raw.subarray(y * (stride + 1) + 1, (y + 1) * (stride + 1)))
+    for (let x = 0; x < stride; x++) {
+      const a = x >= bpp ? row[x - bpp] : 0, b = previous[x], c = x >= bpp ? previous[x - bpp] : 0
+      row[x] = (row[x] + (filter === 0 ? 0 : filter === 1 ? a : filter === 2 ? b : filter === 3 ? Math.floor((a + b) / 2) : paeth(a, b, c))) & 255
+    }
+    for (const point of points.filter(point => point.y === y)) {
+      const rgb = [...row.subarray(point.x * bpp, point.x * bpp + 3)]
+      assert.deepEqual(rgb, expected, 'Actual collapsed sidebar focus stroke is absent or covered in PNG: ' + point.side + '/' + point.fraction)
+      if (bpp === 4) assert.equal(row[point.x * bpp + 3], 255)
+      samples.push({ ...point, rgb })
+    }
+    previous = row
+  }
+  assert.equal(samples.length, 12)
+  return { expectedRGB: expected, imageSHA256: sha(bytes), devicePixelRatio: dpr, samples }
 }
 
 export function verifyFullAppUiFiles(ui, out, ledger) {
   validateFullAppUiEvidence(ui, ledger)
-  for (const scene of ui.scenes) for (const image of scene.images) verifyPng(image, out, scene.viewport, scene.devicePixelRatio)
+  for (const scene of ui.scenes) for (const image of scene.images) {
+    const bytes = verifyPng(image, out, scene.viewport, scene.devicePixelRatio)
+    if (scene.routeId === 'nav-sidebar' && scene.stateId === 'collapsed') {
+      for (const phase of ['before-capture', 'after-capture']) {
+        const sample = scene.rawSamples.find(sample => sample.image === image.filename && sample.phase === phase)
+        verifyCollapsedSidebarRaster(bytes, sample.sidebarFocus, scene.devicePixelRatio)
+      }
+    }
+  }
   for (const popup of ui.popups) {
     const scene = ui.scenes.find(item => sceneKey(item) === sceneKey(popup))
     verifyPng(popup.image, out, popup.viewport, scene.devicePixelRatio)

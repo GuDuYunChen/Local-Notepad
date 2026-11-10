@@ -16,7 +16,7 @@ import { selectDesktopMainWindow, assertDesktopWindowImage } from './desktop-win
 import { verifyFullAppUiDesktop } from './check-full-app-ui-desktop.mjs'
 import { verifyLocalSyncLabDesktop } from './check-local-sync-lab-desktop.mjs'
 import { prepareLocalSyncLabNotes, seedLocalSyncLab, snapshotLocalSyncLab } from './full-app-ui-local-sync-seed.mjs'
-import { verifyUiScreensFiles } from './ui-screens-evidence.mjs'
+import { UI_INSTALLED_REGISTRATION_QUERY, validateUiInstalledRegistration, verifyUiScreensFiles } from './ui-screens-evidence.mjs'
 import { FULL_APP_GROUPS, FULL_APP_MATRIX, FULL_APP_PRODUCT_SOURCE_FILES, FULL_APP_RUNTIME_SOURCE_FILES, FULL_APP_VERIFIER_SOURCE_FILES, fullAppProductPageSources, validateFullAppUiLedger, validateFullAppLedgerSourceIdentity, verifyFullAppUiFiles, validateFullAppInstalledReport, validateFullAppPrerequisites, validateNativeWindowResize, validateFullAppFixtureFile, validateLocalSyncLabBackendProcess, validateLocalSyncLabBackendExit } from './full-app-ui-evidence.mjs'
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url))
@@ -316,7 +316,7 @@ export async function runFullAppUiInstalled({ group, pin, installerPath, origina
     assert.equal(processes.length, 1, 'The actual installed App must own exactly one backend process')
     return validateLocalSyncLabBackendProcess(processes[0], report.pid, path.join(installDirectory, 'resources/bin/notepad-server.exe'))
   }
-  const registrations = async () => JSON.parse(await ps("$all=@();foreach($scope in @('HKCU','HKLM')){foreach($tail in @('Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall','Software\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall')){Get-ItemProperty ($scope+':\\'+$tail+'\\*') -ErrorAction SilentlyContinue | Where-Object {($_.DisplayName -eq '记事本' -or $_.DisplayName -like '记事本 *')} | ForEach-Object {$all+=@{scope=$scope;key=$_.PSChildName;version=$_.DisplayVersion;location=$_.InstallLocation;uninstall=$_.UninstallString}}}};ConvertTo-Json -InputObject @($all) -Compress"))
+  const registrations = async () => JSON.parse(await ps(UI_INSTALLED_REGISTRATION_QUERY))
   const links = async () => JSON.parse(await ps("$links=@();foreach($folder in @([Environment]::GetFolderPath('DesktopDirectory'),[Environment]::GetFolderPath('Programs'))){$p=Join-Path $folder '记事本.lnk';if(Test-Path -LiteralPath $p){$links+=@{path=$p}}};ConvertTo-Json -InputObject @($links) -Compress"))
   const evaluate = async expression => {
     const result = await cdp.send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true })
@@ -452,8 +452,8 @@ export async function runFullAppUiInstalled({ group, pin, installerPath, origina
       asarSHA256: sha(readFileSync(path.join(installDirectory, 'resources/app.asar'))),
       backendSHA256: sha(readFileSync(path.join(installDirectory, 'resources/bin/notepad-server.exe'))) }
     for (const key of ['executableSHA256', 'asarSHA256', 'backendSHA256']) assert.equal(appIdentity[key], originalApplication[key], 'Additional installed application differs: ' + key)
-    const registered = await registrations(); assert.equal(registered.length, 1); assert.equal(registered[0].scope, 'HKCU'); assert.equal(registered[0].version, VERSION)
-    assert.ok(samePath(registered[0].location, installDirectory)); report.registration = registered[0]; report.app = appIdentity
+    const registered = await registrations(); report.registrationRead = registered; report.app = appIdentity; save()
+    report.registration = validateUiInstalledRegistration(registered, installDirectory, VERSION); save()
     assert.deepEqual(snapshot(defaultData), defaultBefore)
     windowSession = createDesktopWindowSession({ onEvent: event => { report.windowHelper.events.push(event); save() } })
     await windowSession.ready

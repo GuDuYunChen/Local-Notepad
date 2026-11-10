@@ -8,7 +8,9 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { build } from 'esbuild'
-import { captureActualFullAppPopup, validateFullAppCaptureContinuity, measureFullAppScrollCoverage, createFullAppUiShared, withinActualClientPort, finiteOwnerMotionActive, waitForFiniteOwnerMotion } from './full-app-ui-shared.mjs'
+import controlEvidence from './check-ui-control-render.cjs'
+import { COLLAPSED_SIDEBAR_EXPAND, validateCollapsedSidebarObservation } from './full-app-ui-evidence.mjs'
+import { captureActualFullAppPopup, validateFullAppCaptureContinuity, validateFullAppPageSample, measureFullAppScrollCoverage, createFullAppUiShared, withinActualClientPort, finiteOwnerMotionActive, waitForFiniteOwnerMotion } from './full-app-ui-shared.mjs'
 import { buildResearchImportFixtures, researchRoutes } from './full-app-ui-research.mjs'
 
 const clone = value => structuredClone(value)
@@ -262,6 +264,124 @@ async function serializedEnsureVisible(fixture) {
     cdp: { send() {} }, until: async check => check(), capture() {}, save() {}, report: { fullAppUi: {} }, routes: [], matrix })
   await shared.ensureVisible('#control')
 }
+
+function affixInputFixture({ small = false, password = false } = {}) {
+  const f = overflowFixture(), wrapper = f.make('span', 'official-affix', f.rectangle(20, 40, 200, small ? 28 : 40), f.page)
+  wrapper.className = 'ant-input-affix-wrapper app-ui-input' + (small ? ' ant-input-affix-wrapper-sm' : '')
+  // Locked rc-input keeps the data-ui-control attribute on this actual input.
+  // Only the existing official affix owns its dimensions and size class.
+  f.page.children = f.page.children.filter(node => node !== f.control)
+  wrapper.children.push(f.control); f.control.parentElement = wrapper
+  f.control.box = f.rectangle(42, small ? 43 : 49, 160, 22); f.control.clientHeight = 22
+  if (password) { f.control.dataset.uiControl = 'password'; f.control.type = 'password' }
+  for (const name of ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft']) f.control.css[name] = '0px'
+  return { ...f, wrapper }
+}
+test('serialized input and password measurements use their real affix but keep the actual inner field identity', () => {
+  for (const password of [false, true]) for (const small of [false, true]) {
+    const f = affixInputFixture({ password, small }), result = serializedOverflowObservation(f, 'page'), control = result.controls[0]
+    assert.equal(result.controls.length, 1); assert.equal(control.selector, '[id="official-affix"]'); assert.equal(control.fieldSelector, '[id="control"]')
+    assert.equal(control.kind, password ? 'password' : 'input'); assert.equal(control.classification, 'shared')
+    assert.equal(control.height, small ? 28 : 40); assert.equal(control.size, small ? 'small' : 'middle')
+    assert.equal(control.expectedHeight, small ? 28 : 40); assert.equal(f.control.getBoundingClientRect().height, 22)
+    validateFullAppPageSample(result, matrix)
+  }
+})
+test('ordinary shared input without an affix keeps its own geometry despite an unrelated affix sibling', () => {
+  const f = overflowFixture(), unrelated = f.make('span', 'unrelated-affix', f.rectangle(200, 80, 190, 28), f.page)
+  unrelated.className = 'ant-input-affix-wrapper ant-input-affix-wrapper-sm'
+  const result = serializedOverflowObservation(f, 'page'), control = result.controls[0]
+  assert.equal(result.controls.length, 1); assert.equal(control.selector, '[id="control"]'); assert.equal(control.fieldSelector, '[id="control"]')
+  assert.equal(control.height, 40); assert.equal(control.size, 'middle'); validateFullAppPageSample(result, matrix)
+})
+test('affix observation still rejects a malformed official height and swapped inner input identity at capture', () => {
+  const f = affixInputFixture(), before = serializedOverflowObservation(f, 'page')
+  f.wrapper.box.height = 36; f.wrapper.box.bottom -= 4
+  assert.throws(() => validateFullAppPageSample(serializedOverflowObservation(f, 'page'), matrix), /height differs/)
+  const swapped = clone(before); swapped.controls[0].fieldSelector = '[id="foreign-input"]'
+  assert.throws(() => validateFullAppCaptureContinuity(before, swapped, matrix), /fieldSelector/)
+})
+
+function collapsedSidebarFixture() {
+  const f = overflowFixture(), { rectangle } = f
+  f.html.box = rectangle(0, 0, 704, 455); f.html.scrollHeight = 455; f.html.scrollTop = 0
+  f.body.box = rectangle(0, 0, 704, 455); f.body.scrollHeight = 455; f.body.css.overflowX = 'visible'; f.body.css.overflowY = 'visible'
+  f.page.box = rectangle(0, 0, 52, 455); f.page.clientWidth = 52; f.page.clientHeight = 455
+  f.page.className = 'workspace-sidebar collapsed'; f.page.tagName = 'ASIDE'; f.page.localName = 'aside'
+  Object.assign(f.control, { box: rectangle(6, 400, 40, 40), tagName: 'BUTTON', localName: 'button', type: 'button', className: 'app-ui-button ant-btn', clientWidth: 40, clientHeight: 40 })
+  f.control.dataset.uiControl = 'button'; f.control.dataset.uiLayout = 'icon'
+  const icon = f.make('span', 'icon', rectangle(22, 410, 8, 20), f.control); icon.className = 'ant-btn-icon'
+  const glyph = f.make('span', 'glyph', rectangle(22, 410, 8, 20), icon); glyph.textContent = '›'; icon.textContent = '›'
+  const initialize = node => {
+    node.scrollLeft = 0; node.childNodes = node.children
+    node.classList = { contains: value => node.className.split(' ').includes(value) }
+    Object.assign(node.css, { outlineOffset: '0px', fontSize: '16px', color: 'rgb(112, 87, 217)', backgroundColor: 'rgba(0, 0, 0, 0)', backgroundImage: 'none', pointerEvents: 'auto',
+      borderTopWidth: '0px', borderRightWidth: '0px', borderBottomWidth: '0px', borderLeftWidth: '0px' })
+    return node
+  }
+  for (const node of f.document.querySelectorAll('*')) initialize(node)
+  Object.assign(f.control.css, { outlineStyle: 'solid', outlineWidth: '2px', outlineOffset: '2px', outlineColor: 'rgb(112, 87, 217)' })
+  const query = f.document.querySelectorAll.bind(f.document)
+  f.document.querySelectorAll = selector => selector === COLLAPSED_SIDEBAR_EXPAND ? [f.control] : query(selector)
+  f.document.elementFromPoint = (x, y) => x >= 6 && x <= 46 && y >= 400 && y <= 440 ? f.control : f.page
+  return { ...f, icon, glyph, initialize }
+}
+function serializedSidebarObservation(f) {
+  const code = `(${viewportObservers.observeCollapsedSidebarFocus.toString()})(${JSON.stringify(COLLAPSED_SIDEBAR_EXPAND)},${viewportObservers.observeFullAppFocus.toString()},${controlEvidence.hasVisibleBoxShadow.toString()},${withinActualClientPort.toString()},${viewportObservers.observeFullAppOverflowViewport.toString()})`
+  return JSON.parse(JSON.stringify(runInNewContext(code, f.globals)))
+}
+
+test('serialized sidebar focus measures the actual outer ring and accepts its own parent hit outside the button', () => {
+  const f = collapsedSidebarFixture(), result = serializedSidebarObservation(f)
+  assert.equal(validateCollapsedSidebarObservation(result, matrix), result)
+  assert.deepEqual(result.sidebarIcon.controlBounds, { left: 6, top: 400, right: 46, bottom: 440, width: 40, height: 40 })
+  assert.deepEqual(result.sidebarIcon.outlineBounds, { left: 2, top: 396, right: 50, bottom: 444, width: 48, height: 48 })
+  assert.equal(result.sidebarIcon.ringSamples.length, 12)
+  assert.ok(result.sidebarIcon.ringSamples.every(point => point.topElement.relation === 'ancestor' && point.hitWithinOwner))
+  assert.equal(f.control.scrollCalls.length, 0, 'The observer must not scroll the clipped target into place')
+})
+test('a failed at-rest collapsed focus observation is saved before any input or screenshot can hide it', async () => {
+  const f = collapsedSidebarFixture(), report = { fullAppUi: { group: 'editor', focus: [] } }, saved = [], actions = []
+  for (const node of f.document.querySelectorAll('*')) node.getAnimations = () => []
+  f.control.box = f.rectangle(-1, 400, 40, 40)
+  const shared = createFullAppUiShared({ evaluate: async source => JSON.parse(JSON.stringify(runInNewContext(source, f.globals))),
+    click: async () => actions.push('click'), cdp: { send: async () => actions.push('key') },
+    until: async check => check(), capture: async () => actions.push('PNG'), save: () => saved.push(clone(report)),
+    report, routes: [{ id: 'nav-sidebar' }], matrix })
+  await assert.rejects(shared.focus(COLLAPSED_SIDEBAR_EXPAND, { routeId: 'nav-sidebar', stateId: 'collapsed' }), /button leaves the actual viewport/)
+  assert.equal(report.fullAppUi.focus.length, 1)
+  assert.equal(saved.at(-1).fullAppUi.focus[0].beforeTab.sidebarIcon.controlBounds.left, -1)
+  assert.equal(saved.at(-1).fullAppUi.focus[0].motion.complete, true)
+  assert.deepEqual(actions, []); assert.equal(f.control.scrollCalls.length, 0)
+})
+test('serialized sidebar observation exposes outer clipping even when the button border box remains visible', () => {
+  const f = collapsedSidebarFixture()
+  f.page.css.overflowX = 'hidden'; f.page.clientLeft = 4; f.page.clientWidth = 44
+  const result = serializedSidebarObservation(f)
+  assert.equal(result.inViewport, true)
+  assert.throws(() => validateCollapsedSidebarObservation(result, matrix), /focus ring is clipped horizontally/)
+  assert.equal(f.control.scrollCalls.length, 0)
+})
+test('serialized sidebar observation records foreign outer-ring hits for the bound raster decision', () => {
+  const f = collapsedSidebarFixture(), cover = f.initialize(f.make('div', 'cover', f.rectangle(0, 396, 5, 48), f.body))
+  const hit = f.document.elementFromPoint
+  f.document.elementFromPoint = (x, y) => x < 5 ? cover : hit(x, y)
+  const result = serializedSidebarObservation(f)
+  assert.equal(result.hit, true)
+  assert.equal(result.sidebarIcon.ringSamples[0].topElement.relation, 'foreign')
+  assert.equal(result.sidebarIcon.ringSamples[0].hitWithinOwner, false)
+  assert.equal(validateCollapsedSidebarObservation(result, matrix), result)
+})
+test('serialized sidebar observation detects painted pointer-transparent overlays missed by center hit-testing', () => {
+  const f = collapsedSidebarFixture(), cover = f.initialize(f.make('div', 'toast', f.rectangle(0, 396, 5, 48), f.body))
+  cover.css.pointerEvents = 'none'; cover.css.backgroundColor = 'rgb(0, 0, 0)'
+  const result = serializedSidebarObservation(f)
+  assert.equal(result.hit, true)
+  assert.ok(result.sidebarIcon.ringSamples.every(point => point.hitWithinOwner))
+  assert.equal(result.sidebarIcon.pointerTransparentOverlaps.length, 1)
+  assert.equal(result.sidebarIcon.pointerTransparentOverlaps[0].element.id, 'toast')
+  assert.equal(validateCollapsedSidebarObservation(result, matrix), result)
+})
 
 test('serialized page, focus and actual ensureVisible do not clip against a body overflow propagated to the viewport', async () => {
   for (const overflow of ['auto', 'scroll', 'hidden', 'clip']) {

@@ -160,6 +160,7 @@ export async function verifyNavigationPages(ctx) {
   await focus('nav-sidebar', 'expanded', '.workspace-sidebar [aria-label="更多功能"]')
   await shot('nav-sidebar', 'expanded', ['.workspace-sidebar [aria-label="笔记"]', '.workspace-sidebar [aria-label="更多功能"]'])
   await ensureSidebar(false)
+  await focus('nav-sidebar', 'collapsed', '.workspace-sidebar [aria-label="展开侧边栏"]')
   await shot('nav-sidebar', 'collapsed', ['.workspace-sidebar [aria-label="展开侧边栏"]', '.workspace-sidebar [aria-label="每日笔记"]'])
   await ensureSidebar(true); await present(row(fixture.primary))
   await focus('nav-library', 'populated', '.file-list input[aria-label="搜索笔记"]')

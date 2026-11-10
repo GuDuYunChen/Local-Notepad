@@ -8,6 +8,31 @@ export const UI_SCREEN_PAGES = Object.freeze(['webdav', 'collections', 'pinned']
 export const UI_SCREEN_THEMES = Object.freeze(['light', 'dark'])
 export const UI_SCREEN_SIZES = Object.freeze(['wide', 'narrow'])
 export const UI_SCREEN_COLLECTION_PREFIX = 'localNotepad.searchCollection.v1:'
+// The locked NSIS template writes InstallLocation under Software\APP_GUID,
+// separately from its Windows Uninstall entry. Read the actual installation
+// key in the same registry scope; never substitute the expected owned path.
+export const UI_INSTALLED_REGISTRATION_QUERY = "$all=@();foreach($scope in @('HKCU','HKLM')){foreach($tail in @('Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall','Software\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall')){Get-ItemProperty ($scope+':\\'+$tail+'\\*') -ErrorAction SilentlyContinue | Where-Object {($_.DisplayName -eq '记事本' -or $_.DisplayName -like '记事本 *')} | ForEach-Object {$entry=$_;$key=[string]$entry.PSChildName;if($key -notmatch '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'){throw 'Unexpected application registration key'};$installKey=$scope+':\\Software\\'+$key;$install=Get-ItemProperty -LiteralPath $installKey -ErrorAction Stop;$all+=@{scope=$scope;key=$key;version=$entry.DisplayVersion;location=$install.InstallLocation;installRegistryKey=$installKey;uninstallLocation=$entry.InstallLocation;uninstall=$entry.UninstallString}}}};ConvertTo-Json -InputObject @($all) -Compress"
+
+export function validateUiInstalledRegistration(registrations, installDirectory, version) {
+  assert.ok(Array.isArray(registrations)); assert.equal(registrations.length, 1, 'Exactly one application registration is required')
+  assert.equal(typeof installDirectory, 'string'); assert.ok(path.win32.isAbsolute(installDirectory))
+  assert.equal(typeof version, 'string'); assert.match(version, /^\d+\.\d+\.\d+$/)
+  const registration = registrations[0]
+  assert.equal(registration.scope, 'HKCU'); assert.equal(registration.version, version)
+  assert.match(registration.key || '', /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
+  assert.equal(registration.installRegistryKey?.toLowerCase(), ('HKCU:\\Software\\' + registration.key).toLowerCase(), 'Install location must come from the same application key and scope')
+  assert.equal(typeof registration.location, 'string', 'Actual NSIS installation location is missing')
+  assert.ok(path.win32.isAbsolute(registration.location), 'Actual NSIS installation location must be absolute')
+  assert.equal(path.win32.resolve(registration.location).toLowerCase(), path.win32.resolve(installDirectory).toLowerCase(), 'Registered installation location differs from the owned directory')
+  assert.equal(typeof registration.uninstall, 'string')
+  assert.equal(registration.uninstall.toLowerCase(), ('"' + path.win32.join(installDirectory, 'Uninstall 记事本.exe') + '" /currentuser').toLowerCase(), 'Registered uninstaller must bind the exact owned directory and current-user scope')
+  if (registration.uninstallLocation !== null && registration.uninstallLocation !== undefined) {
+    assert.equal(typeof registration.uninstallLocation, 'string')
+    assert.ok(path.win32.isAbsolute(registration.uninstallLocation))
+    assert.equal(path.win32.resolve(registration.uninstallLocation).toLowerCase(), path.win32.resolve(installDirectory).toLowerCase(), 'Conflicting uninstall-entry location is refused')
+  }
+  return registration
+}
 const CONTROL_IDS = Object.freeze({ webdav: ['endpoint', 'username', 'password'], collections: ['saved-collection'], pinned: ['query', 'scope', 'order', 'clear'] })
 const tolerance = 0.6
 const hash = bytes => createHash('sha256').update(bytes).digest('hex')

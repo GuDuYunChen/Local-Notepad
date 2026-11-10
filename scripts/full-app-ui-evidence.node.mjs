@@ -9,7 +9,8 @@ import path from 'node:path'
 import { deflateSync } from 'node:zlib'
 import { FULL_APP_GROUPS, FULL_APP_MATRIX, FULL_APP_PRODUCT_SOURCE_FILES, FULL_APP_RUNTIME_SOURCE_FILES, FULL_APP_VERIFIER_SOURCE_FILES, fullAppProductPageSources,
   validateFullAppUiLedger, validateFullAppLedgerSourceIdentity, validateFullAppUiEvidence, verifyFullAppUiFiles, validateNativeWindowResize,
-  validateFullAppPrerequisites, validateFullAppInstalledReport, validateFullAppUiAggregate, validateFullAppFixtureFile, validateLocalSyncLabLifecycle, validateLocalSyncLabUi } from './full-app-ui-evidence.mjs'
+  validateFullAppPrerequisites, validateFullAppInstalledReport, validateFullAppUiAggregate, validateFullAppFixtureFile, validateLocalSyncLabLifecycle, validateLocalSyncLabUi,
+  COLLAPSED_SIDEBAR_EXPAND, validateCollapsedSidebarObservation, validateCollapsedSidebarFocus, verifyCollapsedSidebarRaster } from './full-app-ui-evidence.mjs'
 
 const clone = value => structuredClone(value)
 const hash = bytes => createHash('sha256').update(bytes).digest('hex')
@@ -63,6 +64,115 @@ function uiFixture(group = 'projects', ledger = ledgerFixture()) {
   }
   return ui
 }
+// Deliberately synthetic contracts for the repaired sidebar only.
+function sidebarObservation(matrix, left = 6, top = 400) {
+  const box = { left, top, right: left + 40, bottom: top + 40, width: 40, height: 40 }
+  const content = { bounds: { left: left + 16, top: top + 10, right: left + 24, bottom: top + 30, width: 8, height: 20 }, painted: true, text: '›', fontSize: '16px' }
+  const port = { left: 0, top: 0, width: matrix.viewport.width, height: matrix.viewport.height }
+  const ringSamples = ['left', 'right', 'top', 'bottom'].flatMap(side => [1 / 3, 1 / 2, 2 / 3].map(fraction => {
+    const vertical = side === 'left' || side === 'right'
+    return { side, fraction, x: vertical ? box[side] + (side === 'left' ? -3 : 3) : box.left + box.width * fraction,
+      y: vertical ? box.top + box.height * fraction : box[side] + (side === 'top' ? -3 : 3),
+      topElement: { tag: 'DIV', id: null, className: 'workspace-sidebar-bottom', relation: 'ancestor' }, hitWithinOwner: true }
+  }))
+  return { selector: COLLAPSED_SIDEBAR_EXPAND, theme: matrix.theme, viewport: clone(matrix.viewport), focused: true, focusVisible: true, inViewport: true, hit: true,
+    outlines: [{ owner: 'root', width: 2, color: 'rgb(112, 87, 217)' }], shadows: [],
+    clippingAncestors: [{ tag: 'HTML', id: null, clientPort: port, appliedOverflowX: 'hidden', appliedOverflowY: 'hidden' }],
+    sidebarIcon: { collapsed: true, tag: 'BUTTON', disabled: false, layout: 'icon', size: 'middle', controlBounds: box,
+      viewportBounds: { ...port, right: port.width, bottom: port.height }, iconCount: 1, glyphCount: 1, icon: clone(content), glyph: clone(content),
+      outline: { width: 2, offset: 2, color: 'rgb(112, 87, 217)' },
+      outlineBounds: { left: left - 4, top: top - 4, right: left + 44, bottom: top + 44, width: 48, height: 48 },
+      ringSamples, pointerTransparentOverlaps: [], scrollPositions: [{ tag: 'ASIDE', id: null, left: 0, top: 0 }, { tag: 'HTML', id: null, left: 0, top: 0 }] } }
+}
+function sidebarFocusFixture(matrix) {
+  const sample = sidebarObservation(matrix), beforeTab = clone(sample)
+  beforeTab.focused = false; beforeTab.focusVisible = false; beforeTab.outlines = []
+  return { ...sample, routeId: 'nav-sidebar', stateId: 'collapsed', trustedTab: true,
+    events: [{ type: 'keydown', key: 'Tab', trusted: true }], beforeTab }
+}
+function sidebarUiFixture() {
+  const ledger = ledgerFixture(), ui = uiFixture('editor', ledger), oldRoute = ledger.groups.editor.routes[0]
+  oldRoute.id = 'nav-sidebar'; oldRoute.source = 'src/components/WorkspaceSidebar.jsx'; oldRoute.root = '.workspace-sidebar'; oldRoute.requiredStates = ['expanded', 'collapsed']
+  const coverage = ledger.sourceCoverage.find(entry => entry.routeIds.includes('contract-editor'))
+  coverage.file = oldRoute.source; coverage.routeIds = ['nav-sidebar']
+  ui.routes = clone(ledger.groups.editor.routes)
+  for (const item of [...ui.scenes, ...ui.focus, ...ui.popups]) { item.routeId = 'nav-sidebar'; item.stateId = item.stateId === 'ready' ? 'expanded' : 'collapsed' }
+  for (const scene of ui.scenes) {
+    scene.root = oldRoute.root
+    for (const sample of scene.rawSamples) sample.root = oldRoute.root
+    if (scene.stateId !== 'collapsed') continue
+    const observation = sidebarObservation(scene)
+    scene.controls = [{ selector: COLLAPSED_SIDEBAR_EXPAND, fieldSelector: COLLAPSED_SIDEBAR_EXPAND, accessibleName: '展开侧边栏', kind: 'button', classification: 'shared', layout: 'icon', size: 'middle', expectedHeight: null, disabled: false, ...clone(observation.sidebarIcon.controlBounds), visible: true, inViewport: true, hit: true, image: scene.image.filename }]
+    scene.controlCoverage = { renderedCount: 1, observedCount: 1, unobserved: [] }
+    scene.anchors = [{ selector: COLLAPSED_SIDEBAR_EXPAND, ...clone(observation.sidebarIcon.controlBounds), visible: true, inViewport: true, hit: true, image: scene.image.filename }]
+    for (const sample of scene.rawSamples) { sample.controls = clone(scene.controls); sample.anchors = clone(scene.anchors); sample.sidebarFocus = clone(observation) }
+    ui.focus.push(sidebarFocusFixture(scene))
+  }
+  return { ledger, ui }
+}
+
+test('collapsed sidebar requires a separate real focus receipt and PNG boundary observations in all six matrices', () => {
+  const { ledger, ui } = sidebarUiFixture()
+  assert.equal(validateFullAppUiEvidence(ui, ledger), ui)
+  assert.equal(ui.scenes.length, 12)
+  for (const matrix of FULL_APP_MATRIX) assert.equal(validateCollapsedSidebarFocus(sidebarFocusFixture(matrix), matrix).stateId, 'collapsed')
+})
+test('expanded focus cannot stand in for a missing collapsed expand-button keyboard proof', () => {
+  const { ledger, ui } = sidebarUiFixture()
+  ui.focus = ui.focus.filter(item => item.stateId === 'expanded')
+  assert.throws(() => validateFullAppUiEvidence(ui, ledger), /Collapsed sidebar needs its own exact/)
+})
+test('collapsed sidebar refuses missing matrix entries, duplicate records, wrong targets and untrusted focus', () => {
+  for (const mutate of [
+    ui => { ui.focus.splice(ui.focus.findIndex(item => item.stateId === 'collapsed'), 1) },
+    ui => { ui.focus.push(clone(ui.focus.find(item => item.stateId === 'collapsed'))) },
+    ui => { ui.focus.find(item => item.stateId === 'collapsed').selector = '.different-control' },
+    ui => { ui.focus.find(item => item.stateId === 'collapsed').events[0].trusted = false },
+    ui => { ui.focus.find(item => item.stateId === 'collapsed').beforeTab = undefined },
+    ui => { ui.focus.find(item => item.stateId === 'collapsed').beforeTab.sidebarIcon.scrollPositions[0].top = 10 },
+  ]) { const { ledger, ui } = sidebarUiFixture(); mutate(ui); assert.throws(() => validateFullAppUiEvidence(ui, ledger)) }
+})
+test('a collapsed screenshot must retain actual focus and outer-ring proof on both sides of its capture', () => {
+  for (const phase of ['before-capture', 'after-capture']) for (const mutate of [
+    sample => { delete sample.sidebarFocus }, sample => { sample.sidebarFocus.focused = false },
+    sample => { sample.sidebarFocus.focusVisible = false }, sample => { sample.sidebarFocus.sidebarIcon.scrollPositions[0].top = 1 },
+    sample => { sample.sidebarFocus.sidebarIcon.ringSamples[0].hitWithinOwner = false },
+  ]) {
+    const { ledger, ui } = sidebarUiFixture(), scene = ui.scenes.find(item => item.stateId === 'collapsed')
+    mutate(scene.rawSamples.find(item => item.phase === phase)); assert.throws(() => validateFullAppUiEvidence(ui, ledger))
+  }
+})
+test('border-box visibility cannot hide outer focus clipping at viewport or ancestor edges', () => {
+  const matrix = FULL_APP_MATRIX[0]
+  for (const value of [sidebarObservation(matrix, 2), sidebarObservation(matrix, 6, 413)]) {
+    assert.equal(value.inViewport, true); assert.equal(value.hit, true)
+    assert.throws(() => validateCollapsedSidebarObservation(value, matrix), /focus ring leaves/)
+  }
+  for (const axis of ['X', 'Y']) {
+    const value = sidebarObservation(matrix)
+    value.clippingAncestors[0].clientPort = { left: 4, top: 398, width: 44, height: 44 }
+    value.clippingAncestors[0].appliedOverflowX = axis === 'X' ? 'hidden' : 'visible'
+    value.clippingAncestors[0].appliedOverflowY = axis === 'Y' ? 'hidden' : 'visible'
+    assert.throws(() => validateCollapsedSidebarObservation(value, matrix), /focus ring is clipped/)
+  }
+})
+test('sidebar focus refuses inconsistent hit records, displaced sample points and lost icon density', () => {
+  const matrix = FULL_APP_MATRIX[0]
+  for (const mutate of [
+    value => { value.sidebarIcon.ringSamples[0].topElement.relation = 'foreign' },
+    value => { value.sidebarIcon.ringSamples[0].x = value.sidebarIcon.controlBounds.left + 20 },
+    value => { value.sidebarIcon.ringSamples.pop() },
+    value => { delete value.sidebarIcon.pointerTransparentOverlaps },
+    value => { value.sidebarIcon.icon.bounds.width = 0 },
+    value => { value.sidebarIcon.icon.bounds.left += 2; value.sidebarIcon.icon.bounds.right += 2; value.sidebarIcon.glyph.bounds.left += 2; value.sidebarIcon.glyph.bounds.right += 2 },
+    value => { value.sidebarIcon.glyph.painted = false },
+    value => { value.sidebarIcon.glyph.text = '' },
+    value => { value.sidebarIcon.size = 'small' },
+    value => { value.sidebarIcon.controlBounds.width = 38; value.sidebarIcon.controlBounds.right -= 2 },
+    value => { value.sidebarIcon.outline.offset = 0 },
+  ]) { const value = sidebarObservation(matrix); mutate(value); assert.throws(() => validateCollapsedSidebarObservation(value, matrix)) }
+})
+
 function resizeFixture(viewport = { width: 704, height: 455 }) {
   const request = { protocol: 1, operation: 'resize-owned-client', pid: 100, handle: 200, executable: application.executable,
     width: viewport.width, height: viewport.height, devicePixelRatio: 1, beforeViewport: clone(viewport) }
@@ -441,14 +551,77 @@ test('aggregation refuses a different product, binary, prior acceptance or verif
 
 // A real encoded synthetic PNG is only a file-integrity contract. It is never
 // stored with an installed acceptance result or treated as an application image.
-function png(width, height) {
+function png(width, height, { pixel, channels = 3, filter = 0 } = {}) {
   const crc = bytes => { let c = 0xffffffff; for (const byte of bytes) { c ^= byte; for (let bit = 0; bit < 8; bit++) c = (c >>> 1) ^ ((c & 1) ? 0xedb88320 : 0) }; return (c ^ 0xffffffff) >>> 0 }
   const chunk = (type, bytes) => { const head = Buffer.from(type), length = Buffer.alloc(4), tail = Buffer.alloc(4); length.writeUInt32BE(bytes.length); tail.writeUInt32BE(crc(Buffer.concat([head, bytes]))); return Buffer.concat([length, head, bytes, tail]) }
-  const header = Buffer.alloc(13); header.writeUInt32BE(width); header.writeUInt32BE(height, 4); header[8] = 8; header[9] = 2
-  const raw = Buffer.alloc((width * 3 + 1) * height)
-  for (let row = 0; row < height; row++) for (let col = 0; col < width; col++) { const at = row * (width * 3 + 1) + 1 + col * 3; raw[at] = col % 256; raw[at + 1] = row % 256; raw[at + 2] = (row + col) % 256 }
+  const header = Buffer.alloc(13); header.writeUInt32BE(width); header.writeUInt32BE(height, 4); header[8] = 8; header[9] = channels === 4 ? 6 : 2
+  const stride = width * channels, raw = Buffer.alloc((stride + 1) * height)
+  let prior = Buffer.alloc(stride)
+  const paeth = (a, b, c) => { const distance = a + b - c, values = [a, b, c], scores = values.map(value => Math.abs(distance - value)); return values[scores.indexOf(Math.min(...scores))] }
+  for (let row = 0; row < height; row++) {
+    const current = Buffer.alloc(stride)
+    for (let col = 0; col < width; col++) {
+      const color = pixel ? pixel(col, row) : [col % 256, row % 256, (row + col) % 256, 255]
+      for (let component = 0; component < channels; component++) current[col * channels + component] = color[component] ?? 255
+    }
+    const at = row * (stride + 1); raw[at] = filter
+    for (let index = 0; index < stride; index++) {
+      const a = index < channels ? 0 : current[index - channels], b = prior[index], c = index < channels ? 0 : prior[index - channels]
+      const prediction = [0, a, b, Math.floor((a + b) / 2), paeth(a, b, c)][filter]
+      raw[at + 1 + index] = (current[index] - prediction + 256) % 256
+    }
+    prior = current
+  }
   return Buffer.concat([Buffer.from('89504e470d0a1a0a', 'hex'), chunk('IHDR', header), chunk('IDAT', deflateSync(raw)), chunk('IEND', Buffer.alloc(0))])
 }
+
+function sidebarPng(observation, { missingPoint = -1, alpha = 255, dpr = 1, ...options } = {}) {
+  const points = new Set(observation.sidebarIcon.ringSamples.filter((_, index) => index !== missingPoint).map(point => Math.floor(point.x * dpr) + ':' + Math.floor(point.y * dpr)))
+  return png(Math.round(observation.viewport.width * dpr), Math.round(observation.viewport.height * dpr), {
+    ...options, pixel: (x, y) => points.has(x + ':' + y) ? [112, 87, 217, alpha] : [243, 242, 240, 255] })
+}
+test('collapsed focus pixels are read from RGB and RGBA PNGs with all native lossless filter modes', () => {
+  const observation = sidebarObservation(FULL_APP_MATRIX[0])
+  // A transparent foreign hit may be behind the painted outline. Keep that
+  // fact without confusing hit-test ownership with the actual final pixels.
+  observation.sidebarIcon.ringSamples[0].topElement.relation = 'foreign'; observation.sidebarIcon.ringSamples[0].hitWithinOwner = false
+  observation.sidebarIcon.pointerTransparentOverlaps.push({ element: { tag: 'DIV' }, reason: 'Deliberately synthetic overlap behind the stroke' })
+  for (const channels of [3, 4]) for (const filter of [0, 1, 2, 3, 4]) {
+    const bytes = sidebarPng(observation, { channels, filter }), result = verifyCollapsedSidebarRaster(bytes, observation, 1)
+    assert.equal(result.samples.length, 12); assert.equal(result.imageSHA256, hash(bytes)); assert.deepEqual(result.expectedRGB, [112, 87, 217])
+  }
+  assert.equal(verifyCollapsedSidebarRaster(sidebarPng(observation, { dpr: 1.25 }), observation, 1.25).samples.length, 12)
+})
+test('matching DOM focus cannot replace an actually absent or covered stroke in the captured PNG', () => {
+  const observation = sidebarObservation(FULL_APP_MATRIX[0])
+  for (const missingPoint of [0, 3, 6, 9]) assert.throws(() => verifyCollapsedSidebarRaster(sidebarPng(observation, { missingPoint }), observation, 1), /absent or covered/)
+  assert.throws(() => verifyCollapsedSidebarRaster(png(704, 455), observation, 1), /absent or covered/)
+  assert.throws(() => verifyCollapsedSidebarRaster(sidebarPng(observation, { channels: 4, alpha: 0 }), observation, 1))
+  assert.throws(() => verifyCollapsedSidebarRaster(sidebarPng(observation), observation, 2))
+})
+test('the file verifier requires visible collapsed focus pixels in every native size and theme', () => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'sidebar-focus-file-contract-')), { ledger, ui } = sidebarUiFixture()
+  try {
+    const store = (image, bytes) => { Object.assign(image, { bytes: bytes.length, sha256: hash(bytes) }); writeFileSync(path.join(directory, image.filename), bytes) }
+    const cache = new Map()
+    const background = viewport => {
+      const key = viewport.width + ':' + viewport.height
+      if (!cache.has(key)) cache.set(key, png(viewport.width, viewport.height))
+      return cache.get(key)
+    }
+    for (const scene of ui.scenes) {
+      const bytes = scene.stateId === 'collapsed' ? sidebarPng(scene.rawSamples[0].sidebarFocus) : background(scene.viewport)
+      store(scene.image, bytes); scene.images = [clone(scene.image)]
+    }
+    for (const popup of ui.popups) { store(popup.image, background(popup.viewport)); popup.capture.image = clone(popup.image) }
+    verifyFullAppUiFiles(ui, directory, ledger)
+    const failed = ui.scenes.find(scene => scene.theme === 'dark' && scene.viewport.width === 1920 && scene.stateId === 'collapsed')
+    // The replacement has a matching real file digest and identical geometry;
+    // only its missing stroke makes this acceptance fail.
+    store(failed.image, sidebarPng(failed.rawSamples[0].sidebarFocus, { missingPoint: 9 })); failed.images = [clone(failed.image)]
+    assert.throws(() => verifyFullAppUiFiles(ui, directory, ledger), /absent or covered/)
+  } finally { rmSync(directory, { recursive: true, force: true }) }
+})
 test('actual PNG bytes, digest and native viewport dimensions are verified, including scrolled image segments', () => {
   const directory = mkdtempSync(path.join(tmpdir(), 'full-app-evidence-contract-')), ledger = ledgerFixture(), ui = uiFixture()
   try {

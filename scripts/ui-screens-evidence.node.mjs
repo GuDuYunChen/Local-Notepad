@@ -1,6 +1,47 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { UI_SCREEN_COLLECTION_PREFIX, createUiScreenPopupReader, captureUiScreenPopup, captureUiScreenPage, validateUiScreenPopupObservation, validateUiScreensEvidence } from './ui-screens-evidence.mjs'
+import { UI_SCREEN_COLLECTION_PREFIX, UI_INSTALLED_REGISTRATION_QUERY, validateUiInstalledRegistration, createUiScreenPopupReader, captureUiScreenPopup, captureUiScreenPage, validateUiScreenPopupObservation, validateUiScreensEvidence } from './ui-screens-evidence.mjs'
+
+const ownedInstallation = 'D:\\a\\_temp\\ui-owned-test\\中文 安装目录'
+const installedRegistration = () => ({ scope: 'HKCU', key: 'f98bf979-44e1-593d-831a-a4f3cba3a24b', version: '4.249.0',
+  location: ownedInstallation, installRegistryKey: 'HKCU:\\Software\\f98bf979-44e1-593d-831a-a4f3cba3a24b',
+  uninstallLocation: null, uninstall: '"' + ownedInstallation + '\\Uninstall 记事本.exe" /currentuser' })
+
+test('actual NSIS install-key location and exact uninstall command establish the same owned installation', () => {
+  const registration = installedRegistration()
+  assert.equal(validateUiInstalledRegistration([registration], ownedInstallation, '4.249.0'), registration)
+  assert.equal(registration.uninstallLocation, null, 'The absent location on the distinct Uninstall key is not invented')
+  assert.match(UI_INSTALLED_REGISTRATION_QUERY, /\$installKey=\$scope\+':\\Software\\'\+\$key/)
+  assert.match(UI_INSTALLED_REGISTRATION_QUERY, /Get-ItemProperty -LiteralPath \$installKey -ErrorAction Stop/)
+  assert.match(UI_INSTALLED_REGISTRATION_QUERY, /location=\$install\.InstallLocation/)
+  assert.match(UI_INSTALLED_REGISTRATION_QUERY, /uninstallLocation=\$entry\.InstallLocation;uninstall=\$entry\.UninstallString/)
+})
+
+for (const [name, alter] of [
+  ['missing install-key location', value => { value.location = null }],
+  ['empty install-key location', value => { value.location = '' }],
+  ['relative install-key location', value => { value.location = '中文 安装目录' }],
+  ['foreign install-key location', value => { value.location = 'D:\\other\\中文 安装目录' }],
+  ['missing install registry identity', value => { delete value.installRegistryKey }],
+  ['foreign install registry scope', value => { value.installRegistryKey = value.installRegistryKey.replace('HKCU', 'HKLM') }],
+  ['foreign install registry app', value => { value.installRegistryKey += '1' }],
+  ['malformed app key', value => { value.key = '..\\Uninstall' }],
+  ['machine registration', value => { value.scope = 'HKLM' }],
+  ['different version', value => { value.version = '4.248.1' }],
+  ['missing uninstall command', value => { value.uninstall = null }],
+  ['foreign uninstall command', value => { value.uninstall = '"D:\\other\\Uninstall 记事本.exe" /currentuser' }],
+  ['all-user uninstall command', value => { value.uninstall = value.uninstall.replace('/currentuser', '/allusers') }],
+  ['unquoted uninstall command', value => { value.uninstall = value.uninstall.replaceAll('"', '') }],
+  ['extra uninstall argument', value => { value.uninstall += ' /S' }],
+  ['conflicting uninstall-entry location', value => { value.uninstallLocation = 'D:\\other' }],
+]) test('installed UI refuses ' + name, () => {
+  const registration = installedRegistration(); alter(registration)
+  assert.throws(() => validateUiInstalledRegistration([registration], ownedInstallation, '4.249.0'))
+})
+test('installed UI refuses missing or duplicated registrations before page input', () => {
+  assert.throws(() => validateUiInstalledRegistration([], ownedInstallation, '4.249.0'))
+  assert.throws(() => validateUiInstalledRegistration([installedRegistration(), installedRegistration()], ownedInstallation, '4.249.0'))
+})
 
 const focus = () => ({ focused: true, focusVisible: true, inViewport: true, hit: true,
   outlines: [{ owner: 'root', width: 2 }], shadows: [] })

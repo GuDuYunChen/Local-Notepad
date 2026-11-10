@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { createNativeUiSelect } from './native-ui-select.mjs'
 import controlEvidence from './check-ui-control-render.cjs'
+import { COLLAPSED_SIDEBAR_EXPAND, validateCollapsedSidebarObservation, validateCollapsedSidebarFocus } from './full-app-ui-evidence.mjs'
 
 const { hasVisibleBoxShadow, paintedPopupReader } = controlEvidence
 const q = JSON.stringify
@@ -146,7 +147,7 @@ export function observeFullAppPage({ root, anchors = [], editorExceptions = [], 
     if (!shared && (node.type === 'hidden' || node.classList.contains('app-ui-validation-field'))) continue
     const kind = shared?.dataset.uiControl || node.tagName.toLowerCase()
     const field = kind === 'select' && shared ? node.querySelector('[role="combobox"]') : node.matches('input,textarea,button,select') ? node : node.querySelector('input,textarea,button,select')
-    const visual = kind === 'select' && shared ? node.querySelector('.app-ui-select') : kind === 'password' ? field?.closest('.ant-input-affix-wrapper') || node : node
+    const visual = kind === 'select' && shared ? node.querySelector('.app-ui-select') : ['input', 'password'].includes(kind) ? field?.closest('.ant-input-affix-wrapper') || node : node
     if (!visual || owners.has(visual) || !rendered(visual)) continue
     owners.add(visual)
     const nativeType = shared ? null : node.type || node.tagName.toLowerCase()
@@ -238,6 +239,74 @@ export function observeFullAppFocus(selector, visibleShadow, withinClientPort, r
   const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)
   return { selector, focused: document.activeElement === field, focusVisible: field.matches(':focus-visible'), inViewport,
     hit: Boolean(hit && (hit === root || root.contains(hit))), outlines, shadows, overflowViewport: overflowViewport.record, clippingAncestors }
+}
+
+// Read only the repaired real expand control. No scroll, style, focus or React
+// state is changed here; the surrounding driver supplies trusted Tab input.
+export function observeCollapsedSidebarFocus(selector, observeFocus, visibleShadow, withinClientPort, readOverflowViewport) {
+  const sample = observeFocus(selector, visibleShadow, withinClientPort, readOverflowViewport)
+  const field = document.querySelector(selector), sidebar = field.closest('.workspace-sidebar')
+  const overflow = readOverflowViewport(), css = getComputedStyle(field)
+  const bounds = node => { const b = node.getBoundingClientRect(); return { left: b.left, top: b.top, right: b.right, bottom: b.bottom, width: b.width, height: b.height } }
+  const painted = node => {
+    if (!node) return false
+    for (let owner = node; owner; owner = owner.parentElement) {
+      const style = getComputedStyle(owner)
+      if (style.display === 'none' || style.visibility !== 'visible' || Number(style.opacity) <= 0) return false
+    }
+    return true
+  }
+  const describe = node => node ? { tag: node.tagName, id: node.id || null, className: typeof node.className === 'string' ? node.className : null,
+    relation: node === field ? 'control' : field.contains(node) ? 'descendant' : node.contains(field) ? 'ancestor' : 'foreign' } : null
+  const iconNodes = [...field.querySelectorAll('.ant-btn-icon')], icon = iconNodes[0], glyphs = icon ? [...icon.children] : [], glyph = glyphs[0]
+  const content = node => node ? { bounds: bounds(node), painted: painted(node), text: node.textContent.trim(), fontSize: getComputedStyle(node).fontSize } : null
+  const box = bounds(field), width = Number.parseFloat(css.outlineWidth), offset = Number.parseFloat(css.outlineOffset)
+  const extent = Number.isFinite(width + offset) ? Math.max(0, width + offset) : 0
+  const outlineBounds = { left: box.left - extent, top: box.top - extent, right: box.right + extent, bottom: box.bottom + extent, width: box.width + 2 * extent, height: box.height + 2 * extent }
+  const ringSamples = []
+  if (width > 0 && Number.isFinite(offset)) {
+    const middle = offset + width / 2
+    for (const side of ['left', 'right', 'top', 'bottom']) for (const fraction of [1 / 3, 1 / 2, 2 / 3]) {
+      const vertical = side === 'left' || side === 'right'
+      const x = vertical ? box[side] + (side === 'left' ? -middle : middle) : box.left + box.width * fraction
+      const y = vertical ? box.top + box.height * fraction : box[side] + (side === 'top' ? -middle : middle)
+      const hit = document.elementFromPoint(x, y), topElement = describe(hit)
+      ringSamples.push({ side, fraction, x, y, topElement, hitWithinOwner: Boolean(topElement && topElement.relation !== 'foreign') })
+    }
+  }
+  // elementFromPoint ignores pointer-events:none. Preserve potential painted
+  // overlaps too; the bound PNG decides whether these are above the outline.
+  const pointerTransparentOverlaps = []
+  const colorVisible = color => visibleShadow('0 0 0 1px ' + color)
+  for (const node of document.querySelectorAll('*')) {
+    if (node === field || node.contains(field) || field.contains(node) || !painted(node)) continue
+    const style = getComputedStyle(node)
+    if (style.pointerEvents !== 'none') continue
+    const b = bounds(node)
+    if (b.width <= 0 || b.height <= 0) continue
+    const points = ringSamples.filter(point => point.x >= b.left && point.x <= b.right && point.y >= b.top && point.y <= b.bottom).filter(point => {
+      const rect = { left: point.x, right: point.x, top: point.y, bottom: point.y }
+      for (let parent = node.parentElement; parent; parent = parent.parentElement) {
+        const parentStyle = getComputedStyle(parent), clip = overflow.local(parent, parentStyle)
+        if (!withinClientPort(rect, parent.getBoundingClientRect(), parent, clip.x, clip.y, 0)) return false
+      }
+      return true
+    })
+    if (!points.length) continue
+    const text = [...node.childNodes].some(child => child.nodeType === 3 && child.textContent.trim()) && colorVisible(style.color)
+    const replaced = /^(IMG|SVG|CANVAS|VIDEO)$/.test(node.tagName)
+    const background = colorVisible(style.backgroundColor) || style.backgroundImage !== 'none'
+    const border = ['Top', 'Right', 'Bottom', 'Left'].some(side => Number.parseFloat(style['border' + side + 'Width']) > 0 && colorVisible(style['border' + side + 'Color']))
+    if (text || replaced || background || border || visibleShadow(style.boxShadow)) pointerTransparentOverlaps.push({ element: describe(node), bounds: b,
+      pointerEvents: style.pointerEvents, text, replaced, background, border, points: points.map(point => ({ side: point.side, fraction: point.fraction, x: point.x, y: point.y })) })
+  }
+  const scrollPositions = []
+  for (let owner = field.parentElement; owner; owner = owner.parentElement) scrollPositions.push({ tag: owner.tagName, id: owner.id || null, left: owner.scrollLeft, top: owner.scrollTop })
+  return { ...sample, viewport: { width: innerWidth, height: innerHeight }, theme: document.documentElement.dataset.theme,
+    sidebarIcon: { collapsed: Boolean(sidebar?.classList.contains('collapsed')), tag: field.tagName, disabled: field.matches(':disabled'),
+      layout: field.dataset.uiLayout, size: field.classList.contains('ant-btn-sm') ? 'small' : field.classList.contains('ant-btn-lg') ? 'large' : 'middle',
+      controlBounds: box, viewportBounds: { ...overflow.bounds }, iconCount: iconNodes.length, glyphCount: glyphs.length, icon: content(icon), glyph: content(glyph),
+      outline: { width, offset, color: css.outlineColor }, outlineBounds, ringSamples, pointerTransparentOverlaps, scrollPositions } }
 }
 
 export function ensureFullAppTargetVisible(selector, withinClientPort, readOverflowViewport) {
@@ -431,13 +500,15 @@ export function createFullAppUiShared(ctx) {
     ;(ui.fileInputs ||= []).push(receipt); save(); return receipt
   }
   const nameFor = (meta, suffix) => `${slug(meta.group)}-${slug(meta.theme)}-${meta.viewport.width}x${meta.viewport.height}-${slug(meta.routeId)}-${slug(meta.stateId)}-${suffix}.png`
-  const samplePage = (route, root, anchors, onlySelectors = []) => evaluate(`(${observeFullAppPage.toString()})(${q({ root, anchors, onlySelectors, editorExceptions: route.editorExceptions || [] })},${withinActualClientPort.toString()},${observeFullAppOverflowViewport.toString()})`)
+  const sidebarFocusExpression = `(${observeCollapsedSidebarFocus.toString()})(${q(COLLAPSED_SIDEBAR_EXPAND)},${observeFullAppFocus.toString()},${hasVisibleBoxShadow.toString()},${withinActualClientPort.toString()},${observeFullAppOverflowViewport.toString()})`
+  const samplePage = (route, root, anchors, onlySelectors = [], sidebarFocusRequired = false) => evaluate(`(()=>{const page=(${observeFullAppPage.toString()})(${q({ root, anchors, onlySelectors, editorExceptions: route.editorExceptions || [] })},${withinActualClientPort.toString()},${observeFullAppOverflowViewport.toString()});${sidebarFocusRequired ? `page.sidebarFocus=${sidebarFocusExpression};` : ''}return page;})()`)
   const captureState = async ({ routeId, stateId, root, anchors = [], requiredText = [], allowHorizontalScroll = [], coverageMode = 'route-controls', onlySelectors = [] }) => {
     const route = routeFor(routeId), registeredRoot = route.stateRoots?.[stateId] || route.root
     root ||= registeredRoot
     assert.ok(route.requiredStates.includes(stateId), 'Unregistered actual route state: ' + routeId + '/' + stateId)
     assert.equal(root, registeredRoot, 'An actual page state must use its independently registered root')
     const meta = binding({ routeId, stateId })
+    const sidebarFocusRequired = routeId === 'nav-sidebar' && stateId === 'collapsed'
     assert.equal(ui.scenes.some(scene => scene.routeId === routeId && scene.stateId === stateId && scene.theme === meta.theme && scene.viewport.width === meta.viewport.width && scene.viewport.height === meta.viewport.height), false, 'Duplicate actual page scene')
     assert.equal(ctx.windowReceipt?.nativeWindow, true, 'Actual owned native window receipt is required before a scene')
     assert.deepEqual(ctx.windowReceipt.viewport, ctx.matrix.viewport)
@@ -449,7 +520,9 @@ export function createFullAppUiShared(ctx) {
     const snap = async targetAnchors => {
       const motion = { complete: false }; scene.motionReadiness.push(motion)
       await waitForFiniteOwnerMotion(() => evaluate(`(${observeFullAppOwnerMotion.toString()})(${q(root)})`), until, motion)
-      const before = await samplePage(route, root, targetAnchors, onlySelectors)
+      const before = await samplePage(route, root, targetAnchors, onlySelectors, sidebarFocusRequired)
+      scene.rawSamples.push({ ...before, text: undefined }); save()
+      if (sidebarFocusRequired) validateCollapsedSidebarObservation(before.sidebarFocus, ctx.matrix)
       assert.deepEqual(before.viewport, meta.viewport); assert.equal(before.theme, meta.theme)
       for (const text of requiredText) assert.ok(before.text.includes(text), 'Actual visible page text missing: ' + text)
       const considered = coverageMode === 'owned-popup' ? before.controls.filter(control => control.selectedForProbe) : before.controls
@@ -457,13 +530,13 @@ export function createFullAppUiShared(ctx) {
       for (const item of considered) wanted.set(item.selector, item)
       const controls = considered.filter(item => item.visible && item.inViewport)
       const measured = { ...before, controls, overflow: { ...before.overflow, allowed: allowHorizontalScroll } }
-      scene.rawSamples.push({ ...before, text: undefined }); save()
       let afterCapture
       const filename = nameFor(meta, 'part-' + (++index))
       motion.image = filename
       const image = await capture(filename, async () => {
-        const fresh = await samplePage(route, root, targetAnchors, onlySelectors)
+        const fresh = await samplePage(route, root, targetAnchors, onlySelectors, sidebarFocusRequired)
         scene.rawSamples.push({ ...fresh, text: undefined, phase: 'before-capture', image: filename }); save()
+        if (sidebarFocusRequired) validateCollapsedSidebarObservation(fresh.sidebarFocus, ctx.matrix)
         validateFullAppCaptureContinuity(measured, fresh, ctx.matrix)
         return true
       })
@@ -472,8 +545,9 @@ export function createFullAppUiShared(ctx) {
       for (const item of before.anchors) capturedAnchors.set(item.selector, { ...item, image: image.filename })
       scene.controls = [...seen.values()]; scene.anchors = [...capturedAnchors.values()]; scene.overflow = measured.overflow; save()
       validateFullAppPageSample(measured, ctx.matrix)
-      afterCapture = await samplePage(route, root, targetAnchors, onlySelectors)
+      afterCapture = await samplePage(route, root, targetAnchors, onlySelectors, sidebarFocusRequired)
       scene.rawSamples.push({ ...afterCapture, text: undefined, phase: 'after-capture', image: image.filename }); save()
+      if (sidebarFocusRequired) validateCollapsedSidebarObservation(afterCapture.sidebarFocus, ctx.matrix)
       validateFullAppCaptureContinuity(measured, afterCapture, ctx.matrix)
       return image
     }
@@ -550,7 +624,19 @@ export function createFullAppUiShared(ctx) {
     }
   }
   const focus = async (selector, meta) => {
-    routeFor(meta.routeId); await ensureVisible(selector)
+    routeFor(meta.routeId)
+    const sidebarFocusRequired = meta.routeId === 'nav-sidebar' && meta.stateId === 'collapsed'
+    let beforeTab, motion, pendingSidebarFocus
+    if (sidebarFocusRequired) {
+      assert.equal(selector, COLLAPSED_SIDEBAR_EXPAND)
+      motion = { complete: false }
+      pendingSidebarFocus = { ...binding(meta), selector, motion }
+      ui.focus.push(pendingSidebarFocus); save()
+      await waitForFiniteOwnerMotion(() => evaluate(`(${observeFullAppOwnerMotion.toString()})('.workspace-sidebar')`), until, motion)
+      beforeTab = await evaluate(sidebarFocusExpression)
+      pendingSidebarFocus.beforeTab = beforeTab; save()
+      validateCollapsedSidebarObservation(beforeTab, ctx.matrix, { focusRequired: false })
+    } else await ensureVisible(selector)
     const first = await eventCount(), field = await evaluate(`(()=>{const n=document.querySelector(${q(selector)});return {tag:n?.tagName,type:n?.type}})()`)
     if (field.tag === 'TEXTAREA' || (field.tag === 'INPUT' && ['text', 'search', 'email', 'url', 'tel', 'password', 'number'].includes(field.type))) {
       const select = await nativeSelect.inspect(selector)
@@ -568,11 +654,15 @@ export function createFullAppUiShared(ctx) {
       if (await evaluate(`document.activeElement===document.querySelector(${q(selector)})`)) { reached = true; break }
     }
     assert.equal(reached, true, 'Actual Tab order never reached control: ' + selector)
-    const sample = { ...binding(meta), ...await evaluate(`(${observeFullAppFocus.toString()})(${q(selector)},${hasVisibleBoxShadow.toString()},${withinActualClientPort.toString()},${observeFullAppOverflowViewport.toString()})`) }
+    const sample = { ...binding(meta), ...await evaluate(sidebarFocusRequired ? sidebarFocusExpression : `(${observeFullAppFocus.toString()})(${q(selector)},${hasVisibleBoxShadow.toString()},${withinActualClientPort.toString()},${observeFullAppOverflowViewport.toString()})`),
+      ...(sidebarFocusRequired ? { beforeTab, motion } : {}) }
     sample.events = await events(first); sample.trustedTab = sample.events.some(event => event.type === 'keydown' && event.key === 'Tab' && event.trusted)
-    ui.focus.push(sample); save()
+    if (pendingSidebarFocus) Object.assign(pendingSidebarFocus, sample)
+    else ui.focus.push(sample)
+    save()
     assert.ok(sample.trustedTab && sample.focused && sample.focusVisible && sample.inViewport && sample.hit, 'Actual keyboard focus was not visible and reachable')
     assert.equal(sample.outlines.length, 1, 'Actual control has no single focus outline'); assert.deepEqual(sample.shadows, [], 'Actual control has duplicate focus glow')
+    if (sidebarFocusRequired) validateCollapsedSidebarFocus(sample, ctx.matrix)
     return sample
   }
   const select = async (selector, { routeId, stateId, value, restore = true, captureScene = true }) => {
