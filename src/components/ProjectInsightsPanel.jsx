@@ -12,6 +12,8 @@ import {
   formatProjectInsightReport,
 } from './projectInsightUtils'
 import './ProjectInsightsPanel.css'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 function stripExtension(value) {
   return String(value || '').replace(/\.[^.]+$/, '')
@@ -169,16 +171,16 @@ export default function ProjectInsightsPanel({
         </div>
 
         <div className="project-insights-head-actions">
-          <button
+          <UiButton size="middle"
             type="button"
             className="btn small"
             onClick={() => onNavigateView?.('planning')}
           >
             调整计划
-          </button>
+          </UiButton>
           <div className="project-insights-period">
           {[7, 30].map(days => (
-            <button
+            <UiButton size="middle"
               key={days}
               type="button"
               className={periodDays === days ? 'active' : ''}
@@ -188,7 +190,7 @@ export default function ProjectInsightsPanel({
               }}
             >
               {days} 天
-            </button>
+            </UiButton>
           ))}
           </div>
         </div>
@@ -253,7 +255,7 @@ export default function ProjectInsightsPanel({
 
           <div className="project-insight-alert-list">
             {snapshot.alerts.map(item => (
-              <button
+              <UiButton
                 key={item.id}
                 type="button"
                 className={'tone-' + item.tone}
@@ -265,7 +267,7 @@ export default function ProjectInsightsPanel({
                   <small>{item.detail}</small>
                 </span>
                 {item.noteId && <em>打开</em>}
-              </button>
+              </UiButton>
             ))}
           </div>
         </article>
@@ -281,7 +283,7 @@ export default function ProjectInsightsPanel({
           <div className="project-difficult-list">
             {snapshot.difficultChapters.length ? (
               snapshot.difficultChapters.slice(0, 6).map(item => (
-                <button
+                <UiButton
                   key={item.noteId}
                   type="button"
                   onClick={() => onOpenFile?.(item.noteId)}
@@ -295,7 +297,7 @@ export default function ProjectInsightsPanel({
                   <em className={'difficulty-' + item.difficulty}>
                     {item.difficulty === 'high' ? '高阻力' : '需关注'}
                   </em>
-                </button>
+                </UiButton>
               ))
             ) : (
               <div className="project-insight-empty">
@@ -315,7 +317,7 @@ export default function ProjectInsightsPanel({
 
           <div className="project-recommendation-list">
             {snapshot.recommendations.slice(0, 6).map((item, index) => (
-              <button
+              <UiButton
                 key={item.id}
                 type="button"
                 onClick={() => item.noteId && onOpenFile?.(item.noteId)}
@@ -326,7 +328,7 @@ export default function ProjectInsightsPanel({
                   <strong>{item.title}</strong>
                   <small>{item.detail}</small>
                 </div>
-              </button>
+              </UiButton>
             ))}
           </div>
         </article>
@@ -345,20 +347,20 @@ export default function ProjectInsightsPanel({
           </div>
 
           <div>
-            <button
+            <UiButton
               type="button"
               className="btn small"
               onClick={() => setReportOpen(value => !value)}
             >
               {reportOpen ? '收起报告' : '预览报告'}
-            </button>
-            <button
+            </UiButton>
+            <UiButton
               type="button"
               className="btn small primary"
               onClick={() => void copyReport()}
             >
               复制报告
-            </button>
+            </UiButton>
           </div>
         </header>
 

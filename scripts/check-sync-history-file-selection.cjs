@@ -17,7 +17,7 @@ if(!process.versions.electron){
   const watchdog=setTimeout(()=>app.exit(1),110000)
   const report={commit:process.env.GITHUB_SHA||'',platform:process.platform,complete:false,actualFileReader:true,syntheticRecords:true,compositionDriver:'CDP native composition',scenes:[]}
   const save=()=>fs.writeFileSync(path.join(out,'checks.json'),JSON.stringify(report,null,2))
-  function inspect(){
+  function inspect(readSelect){
     const p=document.querySelector('[data-history-file-viewer]'),key=n=>p.querySelector('[data-history-file-'+n+']'),text=n=>key(n)?.textContent||''
     const target=window.__phase==='stale'||window.__phase==='replaced'?p.querySelector('.sync-history-file-controls'):key('search')
     const r=target.getBoundingClientRect(),canvas=document.createElement('canvas');canvas.width=canvas.height=1
@@ -28,7 +28,7 @@ if(!process.versions.electron){
       ctx.clearRect(0,0,1,1);paint('#fff');for(const a of ancestors)paint(getComputedStyle(a).backgroundColor)
       const bg=rgb();paint(getComputedStyle(n).color);const a=lum(bg),b=lum(rgb());return(Math.max(a,b)+.05)/(Math.min(a,b)+.05)
     })
-    return{ids:[...p.querySelectorAll('[data-history-file-row]')].map(n=>n.querySelectorAll('code')[1].textContent),query:key('query').value,kind:key('kind').value,outcome:key('outcome').value,
+    return{ids:[...p.querySelectorAll('[data-history-file-row]')].map(n=>n.querySelectorAll('code')[1].textContent),query:key('query').value,kind:readSelect('[data-history-file-kind]').value,outcome:readSelect('[data-history-file-outcome]').value,
       filename:text('name'),scope:text('scope'),matches:text('matches'),page:text('page'),stale:!!key('stale'),composing:!!key('composing'),fileReads:window.__fileReads,
       requests:window.__requests.length,networkRequests:window.__networkRequests,mutations:window.__mutations,navigationCalls:window.__navigationCalls,
       liveHistoryUnchanged:document.querySelector('[data-sync-conflict-history]').textContent===window.__liveHistory,guidanceUnchanged:document.querySelector('[data-sync-guidance]').textContent===window.__guidance,
@@ -55,6 +55,8 @@ if(!process.versions.electron){
       focusInside:p.contains(document.activeElement),liveHistoryUnchanged:document.querySelector('[data-sync-conflict-history]').textContent===window.__liveHistory,guidanceUnchanged:document.querySelector('[data-sync-guidance]').textContent===window.__guidance,width:innerWidth,height:innerHeight}
   }
   app.whenReady().then(async()=>{
+    const {createNativeUiSelect,inspectNativeUiSelect}=await import('./native-ui-select.mjs')
+    const inspectSource='('+inspect.toString()+')('+inspectNativeUiSelect.toString()+')'
     fs.mkdirSync(out,{recursive:true});save()
     const {prepareHistoryExport}=await import(pathToFileURL(path.join(root,'src/services/syncHistoryExport.mjs')).href)
     const directory=fs.mkdtempSync(path.join(os.tmpdir(),'history-file-search-data-'))
@@ -72,10 +74,15 @@ if(!process.versions.electron){
         const entry={method,params,completed:false};cdpCommands.push(entry)
         await cdp(method,params);entry.completed=true
       }
-      const wait=async code=>{for(let i=0;i<80;i++){if(await exec(code))return;await delay(60)}throw Error('File selection wait failed: '+code)}
+      const wait=async(code,label)=>{for(let i=0;i<80;i++){const result=await(typeof code==='function'?code():exec(code));if(result)return result;await delay(60)}throw Error(label||'File selection wait failed: '+code)}
+      const nativeClick=async selector=>{
+        const point=await wait(()=>exec(`(()=>{const nodes=[...document.querySelectorAll(${JSON.stringify(selector)})];if(nodes.length!==1)return null;const n=nodes[0];n.scrollIntoView({block:'center',behavior:'instant'});const r=n.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2,hit=document.elementFromPoint(x,y);return r.width>0&&r.height>0&&hit&&n.contains(hit)?{x,y}:null})()`),'Select control missing, ambiguous or occluded: '+selector)
+        for(const type of ['mousePressed','mouseReleased'])await cdp('Input.dispatchMouseEvent',{type,...point,button:'left',clickCount:1})
+      }
+      const select=createNativeUiSelect({evaluate:exec,click:nativeClick,cdp:{send:cdp},until:wait})
       const click=key=>exec(`(()=>{const n=document.querySelector('[data-history-file-${key}]');n.focus({preventScroll:true});n.click();return true})()`)
       const type=value=>exec(`(()=>{const n=document.querySelector('[data-history-file-query]');n.focus({preventScroll:true});Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(n,${JSON.stringify(value)});n.dispatchEvent(new Event('input',{bubbles:true}));return true})()`)
-      const choose=(key,value)=>exec(`(()=>{const n=document.querySelector('[data-history-file-${key}]');n.focus({preventScroll:true});n.value=${JSON.stringify(value)};n.dispatchEvent(new Event('change',{bubbles:true}));return true})()`)
+      const choose=(key,value)=>select.choose('[data-history-file-'+key+']',value)
       const selectFile=async file=>{
         await exec("document.querySelector('[data-history-file-choose]').focus({preventScroll:true});true")
         const {root:doc}=await cdp('DOM.getDocument',{depth:0}),{nodeId}=await cdp('DOM.querySelector',{nodeId:doc.nodeId,selector:'[data-history-file-input]'})
@@ -101,14 +108,14 @@ if(!process.versions.electron){
         const top=phase==='stale'||phase==='replaced'
         await exec(`window.__phase=${JSON.stringify(phase)};document.querySelector(${JSON.stringify(top?'[data-history-file-viewer]':'[data-history-file-search]')}).scrollIntoView({block:'start',behavior:'instant'});true`)
         let frame,last='',stable=0
-        for(let i=0;i<50;i++){await delay(65);frame=await exec('('+inspect.toString()+')()');const s=JSON.stringify(frame);stable=s===last?stable+1:0;last=s;if(stable>=2)break}
+        for(let i=0;i<50;i++){await delay(65);frame=await exec(inspectSource);const s=JSON.stringify(frame);stable=s===last?stable+1:0;last=s;if(stable>=2)break}
         if(stable<2)throw Error('Unstable file-search frame')
         const code=names.indexOf(name)*phases.length+phases.indexOf(phase)+1
         await exec(`(()=>{let s=document.getElementById('file-search-raster');if(!s){s=document.createElement('div');s.id='file-search-raster';s.setAttribute('aria-hidden','true');document.body.append(s)}s.style.cssText='position:fixed;left:0;top:0;width:32px;height:4px;display:flex;z-index:2147483647;pointer-events:none;contain:strict';s.replaceChildren();for(let i=0;i<8;i++){const c=document.createElement('span');c.style.cssText='display:block;flex:none;width:4px;height:4px;background:'+(((${code}>>>i)&1)?'rgb(221,238,255)':'rgb(17,34,51)');s.append(c)}return true})()`)
         let bytes,prior='',rasterSamples=0
         for(let i=0;i<40;i++){await delay(65);const b=(await win.capturePage()).toPNG(),hash=createHash('sha256').update(b).digest('hex');let valid=false;try{valid=verifyRasterWitness(b,code)}catch{}
           rasterSamples=valid?(prior===hash?rasterSamples+1:1):0;prior=hash;if(rasterSamples>=2){bytes=b;break}}
-        if(!bytes||JSON.stringify(await exec('('+inspect.toString()+')()'))!==JSON.stringify(frame))throw Error('File-search capture does not match DOM')
+        if(!bytes||JSON.stringify(await exec(inspectSource))!==JSON.stringify(frame))throw Error('File-search capture does not match DOM')
         const png=name+'-'+phase+'.png';fs.writeFileSync(path.join(out,png),bytes);scene.frames.push({phase,...frame,cdpCommands:JSON.parse(JSON.stringify(cdpCommands)),downloads,stable,rasterSamples,rasterCode:code,png,bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')});save()
         await captureSummary(phase)
       }

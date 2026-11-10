@@ -9,6 +9,8 @@ import { toast } from '~/services/toast'
 import ConfirmDialog from './ConfirmDialog'
 import { SaveReviewArchiveButton } from './EvidenceReviewArchives'
 import './EvidenceReviewRecords.css'
+import { UiButton, UiInput, UiSelect, UiTextarea } from '~/components/ui/ControlKit'
+
 
 export default function EvidenceReviewRecords({ documentId, dirty = false, busy = false, onOpenFile }) {
   const session = useSyncExternalStore(evidenceReview.subscribe, evidenceReview.getSnapshot, () => null)
@@ -65,12 +67,12 @@ export default function EvidenceReviewRecords({ documentId, dirty = false, busy 
     <div className="evidence-review-records">
       <div className="evidence-review-records-tools">
         <span>本轮记录 · {session.entityLabel || '实体证据'} · {totals.changes} 章待修改</span>
-        <button type="button" onClick={exportReport}>导出本轮清单</button>
+        <UiButton size="middle" type="button" onClick={exportReport}>导出本轮清单</UiButton>
         <SaveReviewArchiveButton disabled={blocked} />
-        <button type="button" ref={endButton} disabled={blocked} onClick={() => {
+        <UiButton size="middle" type="button" ref={endButton} disabled={blocked} onClick={() => {
           if (hasReviewAnnotations(session)) setEndingId(session.id)
           else finish()
-        }}>结束核对</button>
+        }}>结束核对</UiButton>
       </div>
       <details className="evidence-review-records-details">
         <summary>核对备注与待修改清单</summary>
@@ -84,7 +86,7 @@ export default function EvidenceReviewRecords({ documentId, dirty = false, busy 
               {current ? <>
                 <label>
                   <span>问题、疑点或修订说明</span>
-                  <textarea aria-label="本章核对备注内容" value={annotation?.text || ''}
+                  <UiTextarea aria-label="本章核对备注内容" value={annotation?.text || ''}
                     maxLength={MAX_REVIEW_NOTE_LENGTH} disabled={blocked} rows={4}
                     placeholder="例如：本章称呼与人物设定不一致，需核对第二卷。"
                     onChange={event => {
@@ -94,10 +96,10 @@ export default function EvidenceReviewRecords({ documentId, dirty = false, busy 
                     }} />
                 </label>
                 <small>{(annotation?.text || '').length} / {MAX_REVIEW_NOTE_LENGTH} · 自动记入本轮，不修改正文</small>
-                <button type="button" disabled={blocked} aria-pressed={Boolean(annotation?.needsChanges)}
+                <UiButton type="button" disabled={blocked} aria-pressed={Boolean(annotation?.needsChanges)}
                   onClick={() => evidenceReview.setAnnotation(session.id, documentId, { needsChanges: !annotation?.needsChanges })}>
                   {annotation?.needsChanges ? '取消待修改标记' : '标记待修改'}
-                </button>
+                </UiButton>
                 <p className="evidence-review-records-notice">
                   {dirty ? '正文有未保存修改；备注仍保留，保存后再重新核对。' :
                     annotation?.needsChanges ? '处理后取消待修改，再明确标记已核对。' : '待修改会清除已核对标记，取消待修改不会自动标记完成。'}
@@ -106,32 +108,32 @@ export default function EvidenceReviewRecords({ documentId, dirty = false, busy 
             </section>
             <section className="evidence-review-records-list" aria-label="本轮核对章节清单">
               <div className="evidence-review-records-filters">
-                <label><span>查找章节或备注</span><input type="search" aria-label="核对清单搜索" value={filters.query}
+                <label><span>查找章节或备注</span><UiInput size="middle" type="search" aria-label="核对清单搜索" value={filters.query}
                   onChange={event => update({ query: event.target.value })} /></label>
-                <label><span>核对状态</span><select aria-label="核对清单状态" value={filters.state}
+                <label><span>核对状态</span><UiSelect size="middle" aria-label="核对清单状态" value={filters.state}
                   onChange={event => update({ state: event.target.value })}>
                   {REVIEW_STATES.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
-                </select></label>
+                </UiSelect></label>
               </div>
               <p aria-live="polite" aria-label="核对清单统计" className="evidence-review-records-notice">
                 本轮共 {totals.total} 章 · 已核对 {totals.reviewed} · 未核对 {totals.pending} · 待修改 {totals.changes}；筛选 {view.total} 章
               </p>
               <ul>
                 {view.rows.map(row => <li key={row.id}>
-                  <button type="button" disabled={blocked || !onOpenFile || row.id === documentId}
+                  <UiButton type="button" disabled={blocked || !onOpenFile || row.id === documentId}
                     aria-label={'打开核对清单章节 ' + row.title} aria-current={row.id === documentId ? 'true' : undefined}
                     onClick={() => void open(row.id)}>
                     <span>{row.ordinal} · {row.title}</span>
                     <small>{REVIEW_STATES.find(item => item.id === row.state).label}</small>
-                  </button>
+                  </UiButton>
                   {row.note && <p>{Array.from(row.note).slice(0, 100).join('')}{Array.from(row.note).length > 100 ? '…' : ''}</p>}
                 </li>)}
               </ul>
               {!view.total && <p className="evidence-review-records-notice">没有匹配的核对记录。</p>}
               {view.pageCount > 1 && <nav aria-label="核对清单分页">
-                <button type="button" disabled={view.page <= 1} onClick={() => setFilters(old => ({ ...old, page: view.page - 1 }))}>上一页清单</button>
+                <UiButton type="button" disabled={view.page <= 1} onClick={() => setFilters(old => ({ ...old, page: view.page - 1 }))}>上一页清单</UiButton>
                 <span>{view.page} / {view.pageCount}</span>
-                <button type="button" disabled={view.page >= view.pageCount} onClick={() => setFilters(old => ({ ...old, page: view.page + 1 }))}>下一页清单</button>
+                <UiButton type="button" disabled={view.page >= view.pageCount} onClick={() => setFilters(old => ({ ...old, page: view.page + 1 }))}>下一页清单</UiButton>
               </nav>}
             </section>
           </div>

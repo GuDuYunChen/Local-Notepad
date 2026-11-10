@@ -62,7 +62,11 @@ it('busy operation still allows read-only navigation, not a stop or retry button
   expect(query).toBeTruthy()
   const fileInput = container.querySelector('[data-history-file-viewer] input[type="file"][data-history-file-input]')
   expect(fileInput?.hidden).toBe(true)
-  expect([...container.querySelectorAll('input,textarea')]).toEqual([query, fileInput])
+  const filters = ['冲突记录类型', '筛选记录对象类型', '筛选记录处理结果', '处理日期筛选方式']
+    .map(label => container.querySelector(`input[role="combobox"][aria-label="${label}"]`))
+  expect(filters.every(Boolean)).toBe(true)
+  expect(filters.every(input => input.readOnly && input.closest('[data-ui-control="select"]'))).toBe(true)
+  expect(new Set(container.querySelectorAll('input,textarea'))).toEqual(new Set([query, fileInput, ...filters]))
   await act(async () => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(query, 'local-only')
     query.dispatchEvent(new Event('input', { bubbles: true }))

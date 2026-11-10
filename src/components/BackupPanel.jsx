@@ -7,6 +7,8 @@ import EvidenceReviewArchives from './EvidenceReviewArchives'
 import WorkspacePackagePanel from './WorkspacePackagePanel'
 import { formatBackupDate, formatBackupSize, readDatabaseBackupList, reviewBackupCoverage } from './backupCenterUtils'
 import './BackupPanel.css'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 function DatabaseBackups() {
   const [result, setResult] = useState({ status: 'loading', backups: [], directory: '', latestPath: '', error: '' })
@@ -94,15 +96,15 @@ function DatabaseBackups() {
     </div>
     <p>保存数据库内的笔记、项目等数据。<strong>不包含核对存档、未保存正文草稿、外部附件文件或窗口内的核对进度。</strong></p>
     <div className="backup-actions consumer-backup-actions">
-      <button type="button" className="btn primary" disabled={task.busy || typeof window.electronAPI?.backupCreate !== 'function'}
-        onClick={() => void runSafety('backupCreate')}>立即创建备份</button>
-      <button type="button" className="btn primary" onClick={() => void openFolder()}
+      <UiButton size="middle" type="button" className="btn primary" disabled={task.busy || typeof window.electronAPI?.backupCreate !== 'function'}
+        onClick={() => void runSafety('backupCreate')}>立即创建备份</UiButton>
+      <UiButton size="middle" type="button" className="btn primary" onClick={() => void openFolder()}
         disabled={folder.busy || typeof window.electronAPI?.backupOpenFolder !== 'function'}>
         {folder.busy ? '正在打开…' : '打开备份文件夹'}
-      </button>
-      <button type="button" className="btn" onClick={() => void load()} disabled={task.busy || result.status === 'loading'}>
+      </UiButton>
+      <UiButton size="middle" type="button" className="btn" onClick={() => void load()} disabled={task.busy || result.status === 'loading'}>
         {result.status === 'loading' ? '刷新中…' : '刷新列表'}
-      </button>
+      </UiButton>
     </div>
     <p className="backup-center-safety-hint">先保存正文再创建备份。手动快照不参与自动淘汰；另存可保留到其他目录或设备，不覆盖已有文件。</p>
     {task.message && <div className="backup-center-safety-result" role={task.error ? 'alert' : 'status'} aria-busy={task.busy}>
@@ -131,10 +133,10 @@ function DatabaseBackups() {
             <div className="backup-meta">{formatBackupSize(backup.size)} · {formatBackupDate(backup.date)} · {backup.name.startsWith('backup-manual-') ? '手动保留' : '自动备份'}</div>
             {verified[backup.name] && <p className="backup-verified">已通过完整性校验 · {verified[backup.name].files} 条记录（含目录及回收站）· 数据版本 {verified[backup.name].schemaVersion}</p>}
             <div className="backup-center-actions">
-              <button type="button" className="btn" disabled={task.busy || typeof window.electronAPI?.backupInspect !== 'function'}
-                aria-label={'校验备份 ' + backup.name} onClick={() => void runSafety('backupInspect', backup.name)}>校验完整性</button>
-              <button type="button" className="btn" disabled={task.busy || typeof window.electronAPI?.backupExport !== 'function'}
-                aria-label={'另存备份 ' + backup.name} onClick={() => void runSafety('backupExport', backup.name)}>另存备份</button>
+              <UiButton size="middle" type="button" className="btn" disabled={task.busy || typeof window.electronAPI?.backupInspect !== 'function'}
+                aria-label={'校验备份 ' + backup.name} onClick={() => void runSafety('backupInspect', backup.name)}>校验完整性</UiButton>
+              <UiButton size="middle" type="button" className="btn" disabled={task.busy || typeof window.electronAPI?.backupExport !== 'function'}
+                aria-label={'另存备份 ' + backup.name} onClick={() => void runSafety('backupExport', backup.name)}>另存备份</UiButton>
             </div>
           </li>)}
         </ul>}
@@ -179,14 +181,14 @@ function BackupCenter({ onClose }) {
       <header className="selector-modal-header">
         <div><h2 className="modal-title" id="backup-dialog-title" ref={heading} tabIndex={-1}>备份与恢复</h2>
           <div className="modal-message">工作区便携包负责已保存正文与附件；数据库快照和核对存档仍可独立管理与校验，不会自动合并未保存草稿或核对存档。</div></div>
-        <button type="button" className="icon-btn" onClick={onClose} aria-label="关闭备份中心" title="关闭">×</button>
+        <UiButton type="button" className="icon-btn" onClick={onClose} aria-label="关闭备份中心" title="关闭">×</UiButton>
       </header>
       <div className="backup-center-tabs" role="tablist" aria-label="备份数据类型">
         {[['database', '正文数据库', '笔记与项目 · .db'], ['reviews', '核对存档', '已存档进度与备注 · JSON']].map(([id, label, hint]) =>
-          <button key={id} type="button" role="tab" id={'backup-tab-' + id} aria-controls={'backup-panel-' + id}
+          <UiButton key={id} type="button" role="tab" id={'backup-tab-' + id} aria-controls={'backup-panel-' + id}
             aria-selected={tab === id} tabIndex={tab === id ? 0 : -1} onKeyDown={tabKey} onClick={() => selectTab(id)}>
             <strong>{label}</strong><span>{hint}</span>
-          </button>)}
+          </UiButton>)}
       </div>
       <div className="backup-center-body">
         {session && <section className="backup-center-active" aria-label="当前核对保存状态">
@@ -194,16 +196,16 @@ function BackupCenter({ onClose }) {
           <p>{session.entityLabel || '当前实体'} · {session.chapters.length} 章。{coverage.state === 'saved' ?
             '此状态仅核对本地快照，不代表 JSON 已下载或正文已保存。' : '先保存本地存档，再导出 JSON，才能将最新核对进度包含在备份中。'}</p>
           <div className="backup-center-actions">
-            <button type="button" className="btn primary" disabled={coverage.state === 'saved'} onClick={() => {
+            <UiButton size="middle" type="button" className="btn primary" disabled={coverage.state === 'saved'} onClick={() => {
               const current = evidenceReview.getSnapshot(); if (!current) return
               try { reviewArchives.save(current); setNotice({ text: '已保存当前核对快照；请到“核对存档”导出 JSON 留存。' }) }
               catch (error) { setNotice({ error: true, text: error.message || '存档失败，当前核对记录仍保留' }) }
-            }}>保存本地存档</button>
-            <button type="button" className="btn" onClick={() => {
+            }}>保存本地存档</UiButton>
+            <UiButton size="middle" type="button" className="btn" onClick={() => {
               const current = evidenceReview.getSnapshot(); if (!current) return
               try { downloadEvidenceReviewReport(current); setNotice({ text: '已发起本轮 Markdown 清单下载；清单不能用于恢复存档，请确认文件实际保存。' }) }
               catch (error) { setNotice({ error: true, text: error.message || '清单导出失败，记录仍保留' }) }
-            }}>导出本轮清单</button>
+            }}>导出本轮清单</UiButton>
           </div>
           <small>此处保存核对记录，不会保存编辑器中的正文草稿；关闭备份中心也不会结束当前核对。</small>
         </section>}

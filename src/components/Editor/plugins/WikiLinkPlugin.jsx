@@ -18,6 +18,8 @@ import {
   rememberReference,
 } from '../utils/referenceUtils'
 import './WikiLinkPlugin.css'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 const MAX_RESULTS = 8
 const MAX_SECTION_FILES = 5
@@ -356,7 +358,7 @@ export default function WikiLinkPlugin() {
           const sectionLabel = formatSectionPath(file.sectionPath)
 
           return (
-            <button
+            <UiButton density="compact"
               type="button"
               key={resultKey(file)}
               className={'wiki-link-menu-item' + (index === selectedIndex ? ' selected' : '')}
@@ -378,7 +380,7 @@ export default function WikiLinkPlugin() {
                   <small className="wiki-link-menu-section">{sectionLabel}</small>
                 )}
               </span>
-            </button>
+            </UiButton>
           )
         })
       )}

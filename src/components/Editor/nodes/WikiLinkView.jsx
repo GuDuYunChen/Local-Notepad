@@ -3,6 +3,8 @@ import { api } from '~/services/api'
 import { readBlockReference } from '../../../services/blockReferences.mjs'
 import { readWikiPreview } from '../../../services/wikiNavigation.mjs'
 import { normalizeSectionPath, formatSectionPath } from '../utils/referenceUtils.js'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 export default function WikiLinkView({ id, title, sectionPath = [], blockId = '' }) {
   const path = normalizeSectionPath(sectionPath)
@@ -68,7 +70,7 @@ function Preview({ id, title, path, blockId }) {
       {preview?.sectionMissing && <span className="wiki-link-preview-health">{preview.sectionState === 'ambiguous' ? '同名章节不唯一，打开前将拒绝猜测定位。' : '章节已改名或移除，可在“引用”面板核对。'}</span>}
       <span className={'wiki-link-preview-excerpt' + (error ? ' unavailable' : '')} role={error ? 'alert' : 'status'}>{loading ? '正在读取预览…' : error || preview?.excerpt}</span>
       {!loading && <span className="wiki-link-preview-footer"><span>{preview ? preview.backlinkCount === null ? '反向链接暂不可用' : `${preview.backlinkCount} 个已索引反向链接` : '重试不会修改正文'}</span>
-        <button type="button" data-wiki-control="true" className="btn small" onClick={event => { event.preventDefault(); event.stopPropagation(); void load() }}>{error ? '重试预览' : '刷新预览'}</button></span>}
+        <UiButton density="compact" type="button" data-wiki-control="true" className="btn small" onClick={event => { event.preventDefault(); event.stopPropagation(); void load() }}>{error ? '重试预览' : '刷新预览'}</UiButton></span>}
     </span>}
   </span>
 }

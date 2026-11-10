@@ -1,4 +1,32 @@
-# Current repair: local image insertion recovery / 4.248.1 candidate
+# Current module: complete UI control migration / 2F.116 / 4.249.0 candidate
+
+The accepted master baseline is `1c8ec5689847a580ce307b9157fbbc8c1ac43a8f` (4.248.1).
+Continue the existing PR29 branch `fix/local-ui-consistency-2f116`; do not resume
+the narrower PR30 candidate or the already accepted image/history repairs.
+Read `docs/LOCAL_UI_CONTROL_AUDIT_2F116.md`, `docs/LOCAL_UI_RECOVERY_2F116.md`
+and the actual current remote HEAD before any publication. The older headings
+below are retained history, not current release or acceptance identities.
+
+The hash-verified 38-file recovery from `08a32519697f462384349ac1c41a751b99b4f6e2`
+is now part of the working candidate. Do not reapply its archived manifest over
+newer sources. Preserve every original assertion and failed report. The six
+NoteComparison boundaries are independent test cases with the original 5-second
+budget. Source coverage, Linux tests, native control rendering, current installer
+acceptance and merge are distinct facts; none alone establishes module completion.
+
+Deliver the entire existing application control migration: official component
+geometry/theme, real popup and keyboard ownership, form/ref/disabled/IME behavior,
+and all original save/draft/quit/data policies. Keep schema14 and the dependency
+graph. The release metadata and active synthetic acceptance bindings are 4.249.0;
+real historical installer pins must never be relabeled as this candidate.
+Retain the original historical upgrade check and independently verify the current
+4.248.1-to-candidate upgrade from the actual packaging receipt. Keep all original
+installation lifecycle gates. Main stays untouched. Merge only after current
+source, complete regression, native Windows/install evidence and independent
+review are complete. Record final acceptance in the PR and evidence, not another
+status-only source commit.
+
+# Historical repair: local image insertion recovery / 4.248.1 candidate
 
 Accepted master is f989a5d74a81875311d9ab09dab4c062237889ca (PR25 merged). Continue existing fix/local-image-upload-recovery-4-248-1. Read docs/LOCAL_IMAGE_UPLOAD_RECOVERY_4_248_1.md and actual remote HEAD before writes. Repair toolbar/paste image recovery together; preserve existing save/draft/reading/quit policy, node serialization, upload API and schema14. No new business module/cloud work. Current session may lack GitHub write/PR/merge tools; record actual capabilities without disguising local changes as remote commits. A retained merged branch is maintenance, not a product blocker. The older Active headers below are historical context.
 

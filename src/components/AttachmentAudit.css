@@ -4,9 +4,12 @@
 .attachment-audit header { display:flex; justify-content:space-between; gap:16px; padding:18px 22px; border-bottom:1px solid var(--line); }
 .attachment-audit h2 { font-size:22px; margin:0; }
 .attachment-audit p { margin:6px 0; line-height:1.5; overflow-wrap:anywhere; }
-.attachment-audit button, .attachment-audit input, .attachment-audit select { font:inherit; color:var(--ink); background:var(--surface); border:1px solid var(--line); border-radius:7px; padding:7px 10px; min-width:0; }
+.attachment-audit button, .attachment-audit input, .attachment-audit select { min-width:0; }
+.attachment-audit button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.attachment-audit input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.attachment-audit select:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { font:inherit; color:var(--ink); background:var(--surface); border:1px solid var(--line); border-radius:7px; padding:7px 10px; }
 .attachment-audit button { cursor:pointer; overflow-wrap:anywhere; }
-.attachment-audit button:disabled { cursor:default; opacity:.5; }
+.attachment-audit button:disabled:where(:not([data-ui-control], .ant-btn)) { cursor:default; opacity:.5; }
 .attachment-audit :focus-visible { outline:2px solid var(--clay); outline-offset:2px; }
 .attachment-audit-scroll { min-height:0; flex:1 1 auto; overflow:auto; padding:16px 22px; overscroll-behavior:contain; }
 .attachment-audit-scope { color:var(--ink-soft); }
@@ -25,8 +28,9 @@
 .attachment-audit-filters input { flex:1; width:100%; box-sizing:border-box; }
 .attachment-audit-items { display:flex; flex-direction:column; gap:8px; }
 .attachment-audit-items article { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:5px 12px; padding:10px; border:1px solid var(--line); border-radius:8px; }
-.attachment-audit-items button { text-align:left; color:var(--clay); }
-.attachment-audit-items span { align-self:center; color:var(--ink-soft); }
+.attachment-audit-items button { text-align:left; }
+.attachment-audit-items button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { color:var(--clay); }
+.attachment-audit-items > article > span { align-self:center; color:var(--ink-soft); }
 .attachment-audit-items small { grid-column:1/-1; color:var(--ink-soft); overflow-wrap:anywhere; }
 .attachment-audit nav { display:flex; gap:10px; margin-top:12px; }
 .attachment-audit-feedback { flex:0 0 auto; padding:8px 22px; border-top:1px solid var(--line); overflow:auto; max-height:min(260px,45dvh); overscroll-behavior:contain; }
@@ -35,11 +39,12 @@
 .attachment-audit-feedback label { display:block; margin:8px 0; }
 .attachment-audit-feedback button+button { margin-left:8px; }
 .attachment-audit footer { display:flex; flex-wrap:wrap; flex:0 0 auto; align-items:center; gap:8px; padding:12px 22px; border-top:1px solid var(--line); }
-.attachment-audit footer span { margin-right:auto; color:var(--ink-soft); }
+.attachment-audit footer > span { margin-right:auto; color:var(--ink-soft); }
 @media(max-width:600px) { .attachment-audit-overlay { padding:8px; } .attachment-audit { height:calc(100dvh - 16px); border-radius:10px; } .attachment-audit header,.attachment-audit-scroll,.attachment-audit-feedback,.attachment-audit footer { padding:10px 12px; } .attachment-audit-cards { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; } .attachment-audit-cards dd { font-size:21px; } .attachment-audit-items article { grid-template-columns:minmax(0,1fr); } }
 
 .attachment-audit-sources { margin-top:18px; border-top:1px solid var(--line); }
 .attachment-audit-sources h3 { overflow-wrap:anywhere; }
 .attachment-audit-sources article { display:flex; align-items:center; gap:10px; margin:8px 0; }
-.attachment-audit-sources button { flex:1; text-align:left; color:var(--clay); }
-.attachment-audit-items button[aria-pressed=true] { outline:2px solid var(--clay); }
+.attachment-audit-sources button { flex:1; text-align:left; }
+.attachment-audit-sources button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { color:var(--clay); }
+.attachment-audit-items button[aria-pressed=true]:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { outline:2px solid var(--clay); }

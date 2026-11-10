@@ -4,6 +4,8 @@ import S3LocalOverviewReport from './S3LocalOverviewReport.jsx'
 import S3LocalOverviewFile from './S3LocalOverviewFile.jsx'
 import S3OfflineReportPair from './S3OfflineReportPair.jsx'
 import './S3LocalOverviewPanel.css'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 const labels = { file: '笔记与文件夹（含回收站）', tag: '标签', 'file-tag': '笔记与标签关联', attachment: '附件' }
 const bytes = n => n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(1)} KiB` : `${(n / 1048576).toFixed(1)} MiB`
@@ -32,10 +34,10 @@ export default function S3LocalOverviewPanel({ revision = 0, disabled = false })
     </header>
     <p id={`${id}-boundary`} className="local-inventory-note">{result.limitation}</p>
     <div className="local-inventory-actions">
-      <button type="button" className="btn" disabled={disabled || pending} onClick={start} aria-describedby={`${id}-boundary`}>
+      <UiButton size="middle" type="button" className="btn" disabled={disabled || pending} onClick={start} aria-describedby={`${id}-boundary`}>
         {pending ? '正在读取…' : summary ? '重新读取统计' : '读取本地统计'}
-      </button>
-      {pending && <button type="button" className="btn" onClick={stop}>停止采用本次结果</button>}
+      </UiButton>
+      {pending && <UiButton size="middle" type="button" className="btn" onClick={stop}>停止采用本次结果</UiButton>}
     </div>
     <div role="status" aria-live="polite" aria-atomic="true" className="local-inventory-status">
       <strong>{disabled ? '当前上下文不可读取' : summary ? '本次盘点已完成' : pending ? '正在进行本地只读盘点' : '本地统计尚未就绪'}</strong>

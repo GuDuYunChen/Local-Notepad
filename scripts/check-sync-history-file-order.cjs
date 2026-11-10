@@ -21,25 +21,28 @@ if(!process.versions.electron){
  const watchdog=setTimeout(()=>app.exit(1),100000)
  const report={commit:process.env.GITHUB_SHA||'',platform:process.platform,complete:false,actualFileReader:true,syntheticRecords:true,sourceFilesUnchanged:false,scenes:[]}
  const save=()=>fs.writeFileSync(path.join(out,'checks.json'),JSON.stringify(report,null,2))
- function inspect(){
+ function inspect(readSelect){
   const p=document.querySelector('[data-history-file-viewer]'),nav=p.querySelector('[data-history-file-order-panel]'),q=k=>p.querySelector('[data-history-file-'+k+']')
   const r=nav.getBoundingClientRect(),tools=p.querySelector('[data-history-file-record-tools]'),tr=tools.getBoundingClientRect(),canvas=document.createElement('canvas');canvas.width=canvas.height=1
   const ctx=canvas.getContext('2d',{willReadFrequently:true}),paint=c=>{ctx.fillStyle=c;ctx.fillRect(0,0,1,1)},rgb=()=>[...ctx.getImageData(0,0,1,1).data].slice(0,3)
   const lum=rgb=>rgb.map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4}).reduce((a,v,i)=>a+v*[.2126,.7152,.0722][i],0)
-  const colors=[...nav.querySelectorAll('label,select,p'),...tools.querySelectorAll('button,p'),...p.querySelectorAll('[data-history-file-identifiers][open] button,[data-history-file-filter-object],[data-history-file-object-filter-clear],[data-history-file-filter-record],[data-history-file-record-filter-clear]')].map(n=>{
+  const colors=[...nav.querySelectorAll('label,select,[data-ui-control="select"] .ant-select-content,p'),...tools.querySelectorAll('button,p'),...p.querySelectorAll('[data-history-file-identifiers][open] button,[data-history-file-filter-object],[data-history-file-object-filter-clear],[data-history-file-filter-record],[data-history-file-record-filter-clear]')].map(n=>{
    const ancestors=[];for(let a=n;a;a=a.parentElement)ancestors.unshift(a)
    ctx.clearRect(0,0,1,1);paint('#fff');for(const a of ancestors)paint(getComputedStyle(a).backgroundColor)
    const bg=rgb();paint(getComputedStyle(n).color);const a=lum(bg),b=lum(rgb());return(Math.max(a,b)+.05)/(Math.min(a,b)+.05)
   })
-  return {identifiersCount:p.querySelectorAll('[data-history-file-identifiers]').length,identifiersOpen:p.querySelectorAll('[data-history-file-identifiers][open]').length,detailsToolsVisible:tr.top>=0&&tr.bottom<=innerHeight&&tr.left>=0&&tr.right<=innerWidth,detailsDisabled:{expand:q('expand-identifiers').getAttribute('aria-disabled')==='true',collapse:q('collapse-identifiers').getAttribute('aria-disabled')==='true'},detailsScope:tools.querySelector('p').textContent,ids:[...p.querySelectorAll('[data-history-file-row]')].map(n=>n.querySelectorAll('code')[1].textContent),order:q('order').value,draft:q('jump-input').value,error:q('jump-error')?.textContent||'',invalid:!!q('jump-error'),objectFilter:q('object-filter-value')?.textContent||'',objectFilterVisible:!!q('object-filter'),query:q('query').value,
+  return {identifiersCount:p.querySelectorAll('[data-history-file-identifiers]').length,identifiersOpen:p.querySelectorAll('[data-history-file-identifiers][open]').length,detailsToolsVisible:tr.top>=0&&tr.bottom<=innerHeight&&tr.left>=0&&tr.right<=innerWidth,detailsDisabled:{expand:q('expand-identifiers').getAttribute('aria-disabled')==='true',collapse:q('collapse-identifiers').getAttribute('aria-disabled')==='true'},detailsScope:tools.querySelector('p').textContent,ids:[...p.querySelectorAll('[data-history-file-row]')].map(n=>n.querySelectorAll('code')[1].textContent),order:readSelect('[data-history-file-order]').value,draft:q('jump-input').value,error:q('jump-error')?.textContent||'',invalid:!!q('jump-error'),objectFilter:q('object-filter-value')?.textContent||'',objectFilterVisible:!!q('object-filter'),query:q('query').value,
    outcomes:[...p.querySelectorAll('[data-file-summary-outcome]')].map(n=>Number(n.textContent)),matches:q('matches').textContent,page:q('page').textContent,readOnly:q('jump-input').readOnly,
    disabled:Object.fromEntries(['first','prev','next','last','jump'].map(k=>[k,q(k).getAttribute('aria-disabled')==='true'])),
    reads:window.__fileReads,requests:window.__requests.length,mutations:window.__mutations,network:window.__networkRequests,navigation:window.__navigationCalls,
    liveUnchanged:document.querySelector('[data-sync-conflict-history]').textContent===window.__liveHistory,sourceUnchanged:q('scope').textContent===window.__fileScope,activeMarkup:p.querySelectorAll('img,script,a,iframe').length,
    targetRect:{top:r.top,bottom:r.bottom,left:r.left,right:r.right},visible:r.top>=0&&r.bottom<=innerHeight&&r.left>=0&&r.right<=innerWidth,
-   focusInside:p.contains(document.activeElement),focusOrder:document.activeElement===q('order'),focusJump:document.activeElement===q('jump-input'),focusQuery:document.activeElement===q('query'),overflow:document.documentElement.scrollWidth-innerWidth,colors,width:innerWidth,height:innerHeight}
+   focusInside:p.contains(document.activeElement),focusOrder:readSelect('[data-history-file-order]').focused,focusJump:document.activeElement===q('jump-input'),focusQuery:document.activeElement===q('query'),overflow:document.documentElement.scrollWidth-innerWidth,colors,width:innerWidth,height:innerHeight}
  }
  app.whenReady().then(async()=>{
+  const {createNativeUiSelect,inspectNativeUiSelect}=await import('./native-ui-select.mjs')
+  const inspectSource='('+inspect.toString()+')('+inspectNativeUiSelect.toString()+')'
+  const orderValue='('+inspectNativeUiSelect.toString()+')('+JSON.stringify('[data-history-file-order]')+').value'
   fs.mkdirSync(out,{recursive:true});save()
   const {prepareHistoryExport}=await import(pathToFileURL(path.join(root,'src/services/syncHistoryExport.mjs')).href)
   const rows=Array.from({length:61},(_,i)=>({id:'r'+i,itemID:i<3?'same':'object-'+i,title:i===60?'尾页':'笔记 '+i,kind:'file',status:'resolved',resolution:'local',createdAt:i===60?0:i+1,resolvedAt:i===60?0:1790812800+61-i}))
@@ -53,14 +56,20 @@ if(!process.versions.electron){
    const scene={name,frames:[],detailsActions:[],identifierSelections:[],objectFilterActions:[],recordFilterActions:[]};report.scenes.push(scene);let downloads=0
    const onDownload=()=>downloads++;win.webContents.session.on('will-download',onDownload)
    const exec=code=>win.webContents.executeJavaScript(code),cdp=(method,params)=>win.webContents.debugger.sendCommand(method,params)
-   const wait=async code=>{for(let i=0;i<80;i++){if(await exec(code))return;await delay(60)}throw Error('Order view not ready: '+code)}
+   const wait=async(code,label)=>{for(let i=0;i<80;i++){const result=await(typeof code==='function'?code():exec(code));if(result)return result;await delay(60)}throw Error(label||'Order view not ready: '+code)}
+   const nativeClick=async selector=>{
+    const point=await wait(()=>exec(`(()=>{const nodes=[...document.querySelectorAll(${JSON.stringify(selector)})];if(nodes.length!==1)return null;const n=nodes[0];n.scrollIntoView({block:'center',behavior:'instant'});const r=n.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2,hit=document.elementFromPoint(x,y);return r.width>0&&r.height>0&&hit&&n.contains(hit)?{x,y}:null})()`),'Select control missing, ambiguous or occluded: '+selector)
+    for(const type of ['mousePressed','mouseReleased'])await cdp('Input.dispatchMouseEvent',{type,...point,button:'left',clickCount:1})
+   }
+   const select=createNativeUiSelect({evaluate:exec,click:nativeClick,cdp:{send:cdp},until:wait})
    const fileControl=k=>'[data-history-file-'+k+']'
    const click=sel=>exec(`(()=>{const n=document.querySelector(${JSON.stringify(sel)});n.focus({preventScroll:true});n.click();return true})()`)
-   const change=(sel,value)=>exec(`(()=>{const n=document.querySelector(${JSON.stringify(sel)});n.focus({preventScroll:true});if(n.tagName==='INPUT')Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(n,${JSON.stringify(value)});else n.value=${JSON.stringify(value)};n.dispatchEvent(new Event('input',{bubbles:true}));n.dispatchEvent(new Event('change',{bubbles:true}));return true})()`)
+   const change=(sel,value)=>exec(`(()=>{const n=document.querySelector(${JSON.stringify(sel)});if(n?.tagName!=='INPUT'||n.getAttribute('role')==='combobox')throw Error('Expected an original text input');n.focus({preventScroll:true});Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(n,${JSON.stringify(value)});n.dispatchEvent(new Event('input',{bubbles:true}));n.dispatchEvent(new Event('change',{bubbles:true}));return true})()`)
+   const focusOrder=()=>exec(`(()=>{const node=document.querySelector('[data-history-file-order]'),field=node.matches('select,[role="combobox"]')?node:node.querySelector('[role="combobox"]');if(!field)throw Error('Original order field missing');field.focus({preventScroll:true});return document.activeElement===field})()`)
    const detailAction=async(action,selector)=>{
-    const before=await exec(`({page:document.querySelector('[data-history-file-page]').textContent,order:document.querySelector('[data-history-file-order]').value})`)
+    const before=await exec(`({page:document.querySelector('[data-history-file-page]').textContent,order:${orderValue}})`)
     await click(selector);await delay(70)
-    const result=await exec(`({open:document.querySelectorAll('[data-history-file-identifiers][open]').length,focusRetained:document.activeElement===document.querySelector(${JSON.stringify(selector)}),pageUnchanged:document.querySelector('[data-history-file-page]').textContent===${JSON.stringify(before.page)},orderUnchanged:document.querySelector('[data-history-file-order]').value===${JSON.stringify(before.order)},reads:window.__fileReads})`)
+    const result=await exec(`({open:document.querySelectorAll('[data-history-file-identifiers][open]').length,focusRetained:document.activeElement===document.querySelector(${JSON.stringify(selector)}),pageUnchanged:document.querySelector('[data-history-file-page]').textContent===${JSON.stringify(before.page)},orderUnchanged:${orderValue}===${JSON.stringify(before.order)},reads:window.__fileReads})`)
     scene.detailsActions.push({action,...result})
    }
    const selectIdentifier=async field=>{
@@ -71,7 +80,7 @@ if(!process.versions.electron){
    }
    const recordIdentifier=async(action,field,before)=>{
     const selector='[data-history-file-identifiers] [data-history-file-select-id="'+field+'"]'
-    const f=await exec('('+inspect.toString()+')()')
+    const f=await exec(inspectSource)
     const a=await exec(`(()=>{
      const p=document.querySelector('[data-history-file-viewer]'),button=p.querySelector(${JSON.stringify(selector)}),row=button.closest('[data-history-file-identifiers]'),code=row.querySelector('[data-history-file-selectable-id="'+${JSON.stringify(field)}+'"]'),selection=window.getSelection()
      const r=button.getBoundingClientRect(),lr=p.querySelector('.sync-history-file-list').getBoundingClientRect()
@@ -79,16 +88,16 @@ if(!process.versions.electron){
       exactNode:!!selection&&code.contains(selection.anchorNode)&&code.contains(selection.focusNode),focusRetained:document.activeElement===button,
       visible:r.width>0&&r.height>0&&r.top>=Math.max(0,lr.top)&&r.bottom<=Math.min(innerHeight,lr.bottom)&&r.left>=Math.max(0,lr.left)&&r.right<=Math.min(innerWidth,lr.right),
       notice:p.querySelector('[data-history-file-selection-notice]')?.textContent||'',reads:window.__fileReads,network:window.__networkRequests,mutations:window.__mutations,
-      page:p.querySelector('[data-history-file-page]').textContent,pageUnchanged:p.querySelector('[data-history-file-page]').textContent===${JSON.stringify(before.page)},orderUnchanged:p.querySelector('[data-history-file-order]').value===${JSON.stringify(before.order)}}
+      page:p.querySelector('[data-history-file-page]').textContent,pageUnchanged:p.querySelector('[data-history-file-page]').textContent===${JSON.stringify(before.page)},orderUnchanged:${orderValue}===${JSON.stringify(before.order)}}
     })()`)
     scene.identifierSelections.push({action,...a,contrast:Math.min(...f.colors)});save()
    }
    const recordObjectFilter=async action=>{
-    const f=await exec('('+inspect.toString()+')()')
+    const f=await exec(inspectSource)
     const a=await exec(`(()=>{
       const p=document.querySelector('[data-history-file-viewer]'),q=k=>p.querySelector('[data-history-file-'+k+']')
       return {ids:[...p.querySelectorAll('[data-history-file-row]')].map(n=>n.querySelectorAll('code')[1].textContent),
-        matches:q('matches').textContent,page:q('page').textContent,order:q('order').value,query:q('query').value,
+        matches:q('matches').textContent,page:q('page').textContent,order:${orderValue},query:q('query').value,
         itemID:q('object-filter-value')?.textContent||'',filterVisible:!!q('object-filter'),
         focusObject:document.activeElement?.matches?.('[data-history-file-filter-object]')===true,
         focusQuery:document.activeElement===q('query'),outcomes:[...p.querySelectorAll('[data-file-summary-outcome]')].map(n=>Number(n.textContent)),
@@ -97,11 +106,11 @@ if(!process.versions.electron){
     scene.objectFilterActions.push({action,...a,contrast:Math.min(...f.colors)});save()
    }
    const recordRecordFilter=async action=>{
-    const f=await exec('('+inspect.toString()+')()')
+    const f=await exec(inspectSource)
     const a=await exec(`(()=>{
       const p=document.querySelector('[data-history-file-viewer]'),q=k=>p.querySelector('[data-history-file-'+k+']')
       return {ids:[...p.querySelectorAll('[data-history-file-row]')].map(n=>n.querySelectorAll('code')[1].textContent),
-        matches:q('matches').textContent,page:q('page').textContent,order:q('order').value,query:q('query').value,
+        matches:q('matches').textContent,page:q('page').textContent,order:${orderValue},query:q('query').value,
         itemID:q('object-filter-value')?.textContent||'',recordID:q('record-filter-value')?.textContent||'',filterVisible:!!q('record-filter'),
         focusRecord:document.activeElement?.matches?.('[data-history-file-filter-record]')===true,
         focusQuery:document.activeElement===q('query'),outcomes:[...p.querySelectorAll('[data-file-summary-outcome]')].map(n=>Number(n.textContent)),
@@ -117,14 +126,14 @@ if(!process.versions.electron){
    const capture=async phase=>{
     await exec(`document.querySelector('[data-history-file-order-panel]').scrollIntoView({block:'center',behavior:'instant'});true`)
     let frame,last='',stable=0
-    for(let i=0;i<40;i++){await delay(70);frame=await exec('('+inspect.toString()+')()');const s=JSON.stringify(frame);stable=s===last?stable+1:0;last=s;if(stable>=2)break}
+    for(let i=0;i<40;i++){await delay(70);frame=await exec(inspectSource);const s=JSON.stringify(frame);stable=s===last?stable+1:0;last=s;if(stable>=2)break}
     if(stable<2)throw Error('Unstable file-order DOM')
     const code=names.indexOf(name)*phases.length+phases.indexOf(phase)+1
     await exec(`(()=>{let s=document.getElementById('order-raster');if(!s){s=document.createElement('div');s.id='order-raster';s.setAttribute('aria-hidden','true');document.body.append(s)}s.style.cssText='position:fixed;left:0;top:0;width:32px;height:4px;display:flex;z-index:2147483647;pointer-events:none;contain:strict';s.replaceChildren();for(let i=0;i<8;i++){const c=document.createElement('span');c.style.cssText='display:block;flex:none;width:4px;height:4px;background:'+(((${code}>>>i)&1)?'rgb(221,238,255)':'rgb(17,34,51)');s.append(c)}return true})()`)
     let bytes,prior='',samples=0
     for(let i=0;i<40;i++){await delay(70);const b=(await win.capturePage()).toPNG(),hash=createHash('sha256').update(b).digest('hex');let valid=false;try{valid=verifyRasterWitness(b,code)}catch{}
      samples=valid?(prior===hash?samples+1:1):0;prior=hash;if(samples>=2){bytes=b;break}}
-    if(!bytes||JSON.stringify(await exec('('+inspect.toString()+')()'))!==JSON.stringify(frame))throw Error('File-order raster/DOM mismatch')
+    if(!bytes||JSON.stringify(await exec(inspectSource))!==JSON.stringify(frame))throw Error('File-order raster/DOM mismatch')
     const png=name+'-'+phase+'.png';fs.writeFileSync(path.join(out,png),bytes);scene.frames.push({phase,...frame,downloads,stable,samples,code,png,bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')});save()
    }
    try{
@@ -141,13 +150,13 @@ if(!process.versions.electron){
     await detailAction('collapse',fileControl('collapse-identifiers'))
     await click(fileControl('last'));await change(fileControl('jump-input'),'99');await click(fileControl('jump'))
     await wait(`!!document.querySelector('[data-history-file-jump-error]')`)
-    await change(fileControl('order'),'completed-asc')
+    await select.choose(fileControl('order'),'completed-asc')
     await wait(`document.querySelector('[data-history-file-row] code:last-child') !== null && !document.querySelector('[data-history-file-jump-error]')`)
     await capture('oldest')
-    await change(fileControl('order'),'created-asc')
+    await select.choose(fileControl('order'),'created-asc')
     await detailAction('created-expand',fileControl('expand-identifiers'))
-    await exec(`document.querySelector('[data-history-file-order]').focus({preventScroll:true});true`);await capture('created')
-    const selectionBefore=await exec(`({page:document.querySelector('[data-history-file-page]').textContent,order:document.querySelector('[data-history-file-order]').value})`)
+    await focusOrder();await capture('created')
+    const selectionBefore=await exec(`({page:document.querySelector('[data-history-file-page]').textContent,order:${orderValue}})`)
     await selectIdentifier('object');await recordIdentifier('object','object',selectionBefore)
     await selectIdentifier('record');await recordIdentifier('record','record',selectionBefore)
     await click(fileControl('collapse-identifiers'))
@@ -167,10 +176,10 @@ if(!process.versions.electron){
     await change(fileControl('query'),'尾页');await detailAction('filtered-expand',fileControl('expand-identifiers'));await capture('filtered')
     await change(fileControl('query'),'missing');await detailAction('empty-expand',fileControl('expand-identifiers'));await detailAction('empty-collapse',fileControl('collapse-identifiers'));await capture('empty')
     await click(fileControl('filter-clear'))
-    if(!await exec(`document.querySelector('[data-history-file-order]').value==='created-asc'`))throw Error('Clearing filters discarded display order')
-    await change(fileControl('order'),'file')
+    if(await select.value(fileControl('order'))!=='created-asc')throw Error('Clearing filters discarded display order')
+    await select.choose(fileControl('order'),'file')
     await detailAction('restored-expand',fileControl('expand-identifiers'));await detailAction('restored-collapse',fileControl('collapse-identifiers'))
-    await exec(`document.querySelector('[data-history-file-order]').focus({preventScroll:true});true`);await capture('restored')
+    await focusOrder();await capture('restored')
     await click('[data-history-file-filter-object]');await delay(70);await recordObjectFilter('apply')
     await change(fileControl('query'),'笔记 1');await delay(70);await recordObjectFilter('combined')
     await click(fileControl('object-filter-clear'));await delay(70);await recordObjectFilter('clear-object')

@@ -1,5 +1,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { getTrashView, summarizeTrashReport, trashDaysRemaining, formatTrashDeletedAt, TRASH_BATCH_LIMIT, TRASH_HISTORY_LIMIT } from '../services/trashWorkspace.mjs'
+import { UiButton, UiInput, UiSelect } from '~/components/ui/ControlKit'
+
 
 const STATUS = { succeeded: '已成功', unconfirmed: '结果未确认', 'not-started': '未执行', sending: '等待回执' }
 function Confirmation({ plan, onCancel, onConfirm }) {
@@ -29,13 +31,13 @@ function Confirmation({ plan, onCancel, onConfirm }) {
       <ul className="trash-workspace-confirm-targets">{plan.targets.map(row => <li key={row.id}>{row.is_folder ? '文件夹 · ' : '笔记 · '}{row.title || '未命名'}</li>)}</ul>
       <p className="trash-workspace-muted">操作前重新读取并核对所选项目。批量操作逐项执行，不是一次全部成功或全部回滚的事务；遇到未确认结果会停止后续操作。</p>
       {destructive && <label className="trash-workspace-typed">输入“永久删除”确认
-        <input aria-label="输入永久删除确认" autoComplete="off" value={typed} onChange={e => setTyped(e.target.value)} />
+        <UiInput aria-label="输入永久删除确认" autoComplete="off" value={typed} onChange={e => setTyped(e.target.value)} />
       </label>}
       <div className="trash-workspace-dialog-actions">
-        <button ref={cancel} type="button" className="btn" onClick={onCancel}>取消</button>
-        <button type="button" className={`btn ${destructive ? 'danger' : 'primary'}`} disabled={destructive && typed !== '永久删除'} onClick={() => onConfirm(plan.key)}>
+        <UiButton size="middle" ref={cancel} type="button" className="btn" onClick={onCancel}>取消</UiButton>
+        <UiButton size="middle" type="button" className={`btn ${destructive ? 'danger' : 'primary'}`} disabled={destructive && typed !== '永久删除'} onClick={() => onConfirm(plan.key)}>
           {destructive ? '确认永久删除' : '确认恢复'}
-        </button>
+        </UiButton>
       </div>
     </section>
   </div>
@@ -65,10 +67,10 @@ function ReceiptHistory({ records, locked, onRemove }) {
     <ul className="trash-workspace-history-list">{records.map(record => {
       const counts = summarizeTrashReport(record), uncertain = counts.unconfirmed > 0, open = expanded === record.key
       return <li key={record.key} data-history-key={record.key}>
-        <button type="button" className="trash-workspace-history-toggle" aria-label={`查看${record.action === 'restore' ? '恢复' : '永久删除'}记录 #${record.key}`} aria-expanded={open} onClick={() => toggle(record.key)}>
+        <UiButton type="button" className="trash-workspace-history-toggle" aria-label={`查看${record.action === 'restore' ? '恢复' : '永久删除'}记录 #${record.key}`} aria-expanded={open} onClick={() => toggle(record.key)}>
           <strong>{record.action === 'restore' ? '恢复' : '永久删除'} #{record.key}</strong>
           <span>成功 {counts.succeeded} · 未确认 {counts.unconfirmed} · 未执行 {counts.notStarted}</span>
-        </button>
+        </UiButton>
         {open && <div className="trash-workspace-history-detail">
           <p>{record.message}</p>
           <ul className="trash-workspace-results">{record.rows.map(row => <li key={row.id} data-history-status={row.status}>
@@ -77,12 +79,12 @@ function ReceiptHistory({ records, locked, onRemove }) {
           {uncertain && <p className="trash-workspace-warning">这是当时未取得有效回执的记录，后来的操作或列表变化不能把它改写成成功；查看记录不会重发请求。</p>}
           {removing === record.key ? <div className="trash-workspace-history-remove" role="group" aria-label="移除操作记录确认">
             <p>移除后，本次运行中也不能再查看这份记录。这不会撤销或完成原来的操作。</p>
-            {uncertain && <label><input type="checkbox" aria-label="理解未确认记录移除后不能找回" checked={acknowledged} disabled={locked} onChange={event => setAcknowledged(event.target.checked)} />我理解：结果仍未确认，移除记录不会撤销请求。</label>}
+            {uncertain && <label><input data-ui-native="checkbox" type="checkbox" aria-label="理解未确认记录移除后不能找回" checked={acknowledged} disabled={locked} onChange={event => setAcknowledged(event.target.checked)} />我理解：结果仍未确认，移除记录不会撤销请求。</label>}
             <div className="trash-workspace-dialog-actions">
-              <button ref={cancel} type="button" className="btn small" onClick={() => { setRemoving(null); setAcknowledged(false) }}>取消移除</button>
-              <button type="button" className="btn small" disabled={locked || (uncertain && !acknowledged)} onClick={() => remove(record, uncertain)}>确认移除记录</button>
+              <UiButton size="middle" ref={cancel} type="button" className="btn small" onClick={() => { setRemoving(null); setAcknowledged(false) }}>取消移除</UiButton>
+              <UiButton size="middle" type="button" className="btn small" disabled={locked || (uncertain && !acknowledged)} onClick={() => remove(record, uncertain)}>确认移除记录</UiButton>
             </div>
-          </div> : <button type="button" className="btn small" disabled={locked} onClick={() => { setRemoving(record.key); setAcknowledged(false) }}>移除此记录</button>}
+          </div> : <UiButton type="button" className="btn small" disabled={locked} onClick={() => { setRemoving(record.key); setAcknowledged(false) }}>移除此记录</UiButton>}
         </div>}
       </li>
     })}</ul>
@@ -155,8 +157,8 @@ export default function TrashWorkspacePanel({ store, onClose, onRestored }) {
     <header className="trash-toolbar">
       <div><strong>回收站</strong><p>找回误删内容，确认后再永久清理。文件夹操作包含其子项。</p></div>
       <div className="trash-toolbar-actions">
-        <button type="button" className="btn small" disabled={locked} onClick={() => void store.refresh()}>刷新</button>
-        <button ref={closeRef} type="button" className="icon-btn" onClick={close} aria-label="返回笔记" title="返回笔记">×</button>
+        <UiButton size="middle" type="button" className="btn small" disabled={locked} onClick={() => void store.refresh()}>刷新</UiButton>
+        <UiButton size="middle" ref={closeRef} type="button" className="icon-btn" onClick={close} aria-label="返回笔记" title="返回笔记">×</UiButton>
       </div>
     </header>
     <div className="trash-workspace-body">
@@ -168,12 +170,12 @@ export default function TrashWorkspacePanel({ store, onClose, onRestored }) {
       </section>
       {(state.error || state.notificationError || state.historyError || localError) && <div role="alert" className="trash-workspace-error">
         {state.error && <p>{state.error}</p>}{state.historyError && <p>{state.historyError}</p>}{state.notificationError && <p>{state.notificationError}</p>}{localError && <p>{localError}</p>}
-        {state.loadState !== 'ready' && <button type="button" className="btn small" disabled={locked} onClick={() => void store.refresh()}>重新读取</button>}
+        {state.loadState !== 'ready' && <UiButton type="button" className="btn small" disabled={locked} onClick={() => void store.refresh()}>重新读取</UiButton>}
       </div>}
       {state.report && <section className="trash-workspace-report" aria-label="本次操作结果">
         <div className="trash-workspace-section-heading"><h3>{state.report.action === 'restore' ? '恢复' : '永久删除'}记录</h3>
-          {state.phase === 'checking' || state.phase === 'writing' ? <button type="button" className="btn small" disabled={state.stopRequested} onClick={store.stop}>{state.stopRequested ? '已请求停止后续操作' : '停止后续操作'}</button> :
-            <button type="button" className="btn small" disabled={locked} onClick={store.clearReport}>收起记录</button>}
+          {state.phase === 'checking' || state.phase === 'writing' ? <UiButton type="button" className="btn small" disabled={state.stopRequested} onClick={store.stop}>{state.stopRequested ? '已请求停止后续操作' : '停止后续操作'}</UiButton> :
+            <UiButton type="button" className="btn small" disabled={locked} onClick={store.clearReport}>收起记录</UiButton>}
         </div>
         <p role="status" aria-live="polite">{state.report.message}{!state.report.complete && ` 已成功 ${counts.succeeded} / ${state.report.rows.length} 项。`}</p>
         <p className="trash-workspace-muted">停止或离开页面只停止尚未发送的请求，已发送请求不能据此认定撤销。未确认结果不自动重试；刷新只读取现状，不会重发操作。</p>
@@ -184,43 +186,43 @@ export default function TrashWorkspacePanel({ store, onClose, onRestored }) {
       </section>}
       <ReceiptHistory records={state.history} locked={locked} onRemove={store.removeHistory} />
       <div className="trash-workspace-filters">
-        <label>查找已删除项目<input aria-label="查找已删除项目" type="search" value={searchInput} placeholder="按标题查找，不搜索正文" aria-invalid={!!searchError} aria-describedby={searchError ? 'trash-search-error' : undefined}
+        <label>查找已删除项目<UiInput size="middle" aria-label="查找已删除项目" type="search" value={searchInput} placeholder="按标题查找，不搜索正文" aria-invalid={!!searchError} aria-describedby={searchError ? 'trash-search-error' : undefined}
           onCompositionStart={() => { composing.current = true }} onCompositionEnd={e => { composing.current = false; changeFilters(() => setQuery(e.currentTarget.value)) }}
           onChange={e => { setSearchInput(e.target.value); if (!composing.current) changeFilters(() => setQuery(e.target.value)) }} /></label>
-        <label>类型<select aria-label="回收站类型" value={type} onChange={e => changeFilters(() => setType(e.target.value))}>
-          <option value="all">全部类型</option><option value="note">笔记</option><option value="folder">文件夹</option><option value="soon">3 天内到期</option></select></label>
-        <label>排序<select aria-label="回收站排序" value={sort} onChange={e => changeFilters(() => setSort(e.target.value))}>
-          <option value="newest">最近删除优先</option><option value="oldest">最早删除优先</option><option value="title">标题顺序</option></select></label>
-        {(query || type !== 'all' || sort !== 'newest') && <button type="button" className="btn small" onClick={() => changeFilters(() => { setQuery(''); setSearchInput(''); setType('all'); setSort('newest') })}>清除筛选</button>}
+        <label>类型<UiSelect size="middle" aria-label="回收站类型" value={type} onChange={e => changeFilters(() => setType(e.target.value))}>
+          <option value="all">全部类型</option><option value="note">笔记</option><option value="folder">文件夹</option><option value="soon">3 天内到期</option></UiSelect></label>
+        <label>排序<UiSelect size="middle" aria-label="回收站排序" value={sort} onChange={e => changeFilters(() => setSort(e.target.value))}>
+          <option value="newest">最近删除优先</option><option value="oldest">最早删除优先</option><option value="title">标题顺序</option></UiSelect></label>
+        {(query || type !== 'all' || sort !== 'newest') && <UiButton size="middle" type="button" className="btn small" onClick={() => changeFilters(() => { setQuery(''); setSearchInput(''); setType('all'); setSort('newest') })}>清除筛选</UiButton>}
       </div>
       {searchError && <p role="alert" id="trash-search-error" className="trash-workspace-error">{searchError} 请输入较短的搜索词；未截断中文候选。</p>}
       {state.items.length > 0 && !searchError && <div className="trash-bulkbar">
-        <label className="trash-select-all"><input ref={allBox} type="checkbox" aria-label="全选当前页" disabled={!canAct || pageIDs.length === 0}
+        <label className="trash-select-all"><input data-ui-native="checkbox" ref={allBox} type="checkbox" aria-label="全选当前页" disabled={!canAct || pageIDs.length === 0}
           checked={pageIDs.length > 0 && pageSelected === pageIDs.length} onChange={e => {
             store.cancelPlan(); const checked = e.target.checked
             setSelection(prev => { const next = new Set(prev); pageIDs.forEach(id => checked ? next.add(id) : next.delete(id)); return next })
           }} /><span>当前页 {view.rows.length} 项 · 已选 {selection.size} 项{hiddenSelected > 0 ? `（含其他页或筛选外 ${hiddenSelected} 项）` : ''}</span></label>
         <div className="trash-bulk-actions">
-          <button type="button" className="btn small" disabled={!selection.size || !canAct} onClick={() => makePlan('restore', [...selection])}>恢复所选</button>
-          <button type="button" className="btn small danger" disabled={!selection.size || !canAct} onClick={() => makePlan('delete', [...selection])}>永久删除所选</button>
-          {!!selection.size && <button type="button" className="btn small" disabled={locked} onClick={() => { store.cancelPlan(); setSelection(new Set()) }}>取消选择</button>}
-          <button type="button" className="btn small danger subtle" disabled={!canAct || state.items.length > TRASH_BATCH_LIMIT} onClick={() => makePlan('delete', state.items.map(row => row.id), 'snapshot')}>清空回收站</button>
+          <UiButton size="middle" type="button" className="btn small" disabled={!selection.size || !canAct} onClick={() => makePlan('restore', [...selection])}>恢复所选</UiButton>
+          <UiButton size="middle" type="button" className="btn small danger" disabled={!selection.size || !canAct} onClick={() => makePlan('delete', [...selection])}>永久删除所选</UiButton>
+          {!!selection.size && <UiButton size="middle" type="button" className="btn small" disabled={locked} onClick={() => { store.cancelPlan(); setSelection(new Set()) }}>取消选择</UiButton>}
+          <UiButton size="middle" type="button" className="btn small danger subtle" disabled={!canAct || state.items.length > TRASH_BATCH_LIMIT} onClick={() => makePlan('delete', state.items.map(row => row.id), 'snapshot')}>清空回收站</UiButton>
         </div>
       </div>}
       {state.items.length > TRASH_BATCH_LIMIT && <p className="trash-workspace-muted">一次最多处理 {TRASH_BATCH_LIMIT} 个顶层项目，请分批选择；不会自动循环清空后续项目。</p>}
       {state.loadState === 'loading' && <p role="status">正在读取回收站…</p>}
-      {state.loadState === 'ready' && state.items.length === 0 && <div className="empty-state trash-empty"><div className="trash-empty-mark" aria-hidden="true">✓</div><h3>回收站是空的</h3><p>已成功读取当前列表，没有可显示的已删除项目。</p><button type="button" className="btn" onClick={close}>返回笔记</button></div>}
+      {state.loadState === 'ready' && state.items.length === 0 && <div className="empty-state trash-empty"><div className="trash-empty-mark" aria-hidden="true">✓</div><h3>回收站是空的</h3><p>已成功读取当前列表，没有可显示的已删除项目。</p><UiButton type="button" className="btn" onClick={close}>返回笔记</UiButton></div>}
       {state.loadState !== 'loading' && state.items.length > 0 && !searchError && (view.total === 0 ? <div className="empty-state"><h3>没有匹配的项目</h3><p>只是当前筛选没有结果，不代表回收站为空。</p></div> : <>
         <div className="trash-list" role="list" aria-label="已删除项目">{view.rows.map(row => <article key={row.id} role="listitem" className={`trash-item${selection.has(row.id) ? ' selected' : ''}`} data-trash-id={row.id}>
-          <label className="trash-item-select"><input type="checkbox" aria-label={`选择 ${row.title || '未命名'}`} checked={selection.has(row.id)} disabled={!canAct} onChange={e => toggle(row.id, e.target.checked)} /></label>
+          <label className="trash-item-select"><input data-ui-native="checkbox" type="checkbox" aria-label={`选择 ${row.title || '未命名'}`} checked={selection.has(row.id)} disabled={!canAct} onChange={e => toggle(row.id, e.target.checked)} /></label>
           <div className={`trash-item-icon${row.is_folder ? ' folder' : ''}`} aria-hidden="true">{row.is_folder ? '▣' : '▤'}</div>
           <div className="trash-item-main"><div className="trash-item-title">{row.title || '未命名'}</div><div className="trash-item-meta"><span>{row.is_folder ? '文件夹（含子项）' : '笔记'}</span><span>{formatTrashDeletedAt(row.deleted_at)}</span></div></div>
           <div className={`trash-retention${row.deleted_at > 0 && trashDaysRemaining(row.deleted_at, now) <= 3 ? ' urgent' : ''}`}>
             {row.deleted_at <= 0 ? <span>清理日期未知</span> : trashDaysRemaining(row.deleted_at, now) === 0 ? <span>已到保留期限</span> : <><strong>{trashDaysRemaining(row.deleted_at, now)}</strong><span>天内到期</span></>}
           </div>
-          <div className="trash-item-actions"><button type="button" className="btn small" disabled={!canAct} onClick={() => makePlan('restore', [row.id])}>恢复</button><button type="button" className="btn small danger subtle" disabled={!canAct} onClick={() => makePlan('delete', [row.id])}>永久删除</button></div>
+          <div className="trash-item-actions"><UiButton size="middle" type="button" className="btn small" disabled={!canAct} onClick={() => makePlan('restore', [row.id])}>恢复</UiButton><UiButton size="middle" type="button" className="btn small danger subtle" disabled={!canAct} onClick={() => makePlan('delete', [row.id])}>永久删除</UiButton></div>
         </article>)}</div>
-        <nav className="trash-workspace-pages" aria-label="回收站分页"><span>匹配 {view.total} / {state.items.length} 项 · 第 {view.page} / {view.pages} 页</span><button type="button" className="btn small" disabled={view.page <= 1} onClick={() => { store.cancelPlan(); setPage(view.page - 1) }}>上一页</button><button type="button" className="btn small" disabled={view.page >= view.pages} onClick={() => { store.cancelPlan(); setPage(view.page + 1) }}>下一页</button></nav>
+        <nav className="trash-workspace-pages" aria-label="回收站分页"><span>匹配 {view.total} / {state.items.length} 项 · 第 {view.page} / {view.pages} 页</span><UiButton type="button" className="btn small" disabled={view.page <= 1} onClick={() => { store.cancelPlan(); setPage(view.page - 1) }}>上一页</UiButton><UiButton type="button" className="btn small" disabled={view.page >= view.pages} onClick={() => { store.cancelPlan(); setPage(view.page + 1) }}>下一页</UiButton></nav>
       </>)}
     </div>
     {state.plan && <Confirmation key={state.plan.key} plan={state.plan} onCancel={() => store.cancelPlan()} onConfirm={key => { void store.confirm(key) }} />}
