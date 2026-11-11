@@ -1,4 +1,30 @@
-# Current handoff: local image insertion recovery, 4.248.1 candidate
+# Current handoff: 2F.116 full UI migration, 4.249.0 candidate
+
+Accepted master: `1c8ec5689847a580ce307b9157fbbc8c1ac43a8f`, version 4.248.1.
+Active work remains PR29 / `fix/local-ui-consistency-2f116`. Recovery began at
+`08a32519697f462384349ac1c41a751b99b4f6e2`. Its repair run 42588374511 created
+an unpublished candidate with tree `42b6a46280fb35f5ce15754c4e5ce1be0365ec99`:
+5973/5975 full tests passed; a six-scenario comparison test exceeded its shared
+5-second budget and the following test also failed. Publication correctly stopped.
+
+That exact 38-file recovery was restored locally with every before/after SHA256
+checked. Current work also fixes independent comparison-case isolation, restores
+the original same-batch A-B-A refusal test, removes double password/compact input
+padding, binds focus styles to actual Ant Design 6 roots, and lets expanded
+Selects dismiss before their real modal capture owners. The recovered manifest
+is historical input and must not be applied again over this candidate.
+
+The current candidate is 4.249.0 with all active version and synthetic source
+bindings synchronized. Dependencies and all real historical installer pins are
+unchanged. New native control checks and current-package upgrade checks supplement
+the existing full gates. Final test/native/installation/publication status must
+be read from the current PR and exact-source evidence; this source document does
+not predeclare Windows acceptance or merge. Continue the same local UI module
+until all gates are complete. Do not start cloud or another product module.
+
+The earlier handoffs below are retained as history.
+
+# Historical handoff: local image insertion recovery, 4.248.1 candidate
 
 PR25 is merged in master f989a5d74a81875311d9ab09dab4c062237889ca. A new existing branch fix/local-image-upload-recovery-4-248-1 was created at that exact commit before interruption; at recovery it had no new commits or open PR. Continue the scoped repair in LOCAL_IMAGE_UPLOAD_RECOVERY_4_248_1.md, not the already accepted helper repair. Baseline image-insertion checks reproduce 8 failures in 12 cases; preserve their original logs. Current local source was restored from SHA256-verified archives and matched full accepted tree9fcb62bd before edits. It is not the user's Windows workspace or remote Git history.
 

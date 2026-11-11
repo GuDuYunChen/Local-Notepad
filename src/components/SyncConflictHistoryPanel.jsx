@@ -7,6 +7,8 @@ import SyncHistoryExport from './SyncHistoryExport'
 import SyncHistorySummary from './SyncHistorySummary'
 import SyncHistoryTimeFilter from './SyncHistoryTimeFilter'
 import { HISTORY_TIME_ALL, sameHistoryTimeFilter } from '~/services/syncHistoryTime.mjs'
+import { UiButton, UiInput, UiSelect } from '~/components/ui/ControlKit'
+
 
 const kinds = { file: '笔记或文件夹', tag: '标签', 'file-tag': '标签关联', attachment: '附件' }
 function Stamp({ value }) {
@@ -98,14 +100,14 @@ export default function SyncConflictHistoryPanel() {
     <section className="sync-conflict-history-body" aria-labelledby={titleID}>
       <p className="sync-conflict-history-note">仅包含本机工作区已有的已处理与已失效记录，可能跨越旧同步目标；不代表当前远端状态，也不是全部同步操作日志。查看不会恢复版本、重新解决冲突或执行同步。</p>
       <div className="sync-conflict-history-controls">
-        <label>记录类型<select aria-label="冲突记录类型" value={filter} onChange={event => {
+        <label>记录类型<UiSelect size="middle" aria-label="冲突记录类型" value={filter} onChange={event => {
           const next = event.target.value; setFilter(next); void read(next)
         }}>
           <option value="all">全部历史记录</option><option value="resolved">已选边处理</option><option value="superseded">已失效</option>
-        </select></label>
-        <button type="button" className="btn small" data-history-read ref={readButton} aria-controls={feedbackID} aria-disabled={phase === 'loading'}
-          onClick={() => { if (phase !== 'loading') void read() }}>{snapshot ? '重新读取记录' : '读取记录'}</button>
-        {phase === 'loading' && <button type="button" className="btn small" data-history-stop onClick={stop}>停止读取</button>}
+        </UiSelect></label>
+        <UiButton size="middle" type="button" className="btn small" data-history-read ref={readButton} aria-controls={feedbackID} aria-disabled={phase === 'loading'}
+          onClick={() => { if (phase !== 'loading') void read() }}>{snapshot ? '重新读取记录' : '读取记录'}</UiButton>
+        {phase === 'loading' && <UiButton size="middle" type="button" className="btn small" data-history-stop onClick={stop}>停止读取</UiButton>}
       </div>
       <p className="sync-conflict-history-feedback" id={feedbackID} role="status" aria-live="polite">{result}</p>
       <fieldset className="sync-history-search" aria-describedby={searchHintID}>
@@ -113,7 +115,7 @@ export default function SyncConflictHistoryPanel() {
         <p id={searchHintID}>按当前标题、对象或记录标识查找；不搜索正文，也不会自动读取更早记录。输入法确认后最多 128 个字符。</p>
         <div className="sync-history-search-fields">
           <label className="sync-history-search-query">查找文字
-            <input ref={searchInput} type="search" value={queryDraft} data-history-query aria-label="在已读取记录中查找"
+            <UiInput ref={searchInput} type="search" value={queryDraft} data-history-query aria-label="在已读取记录中查找"
               aria-controls={searchResultID} placeholder="输入标题或标识" autoComplete="off" spellCheck={false}
               onCompositionStart={() => { compositionActive.current = true; setIsComposing(true) }}
               onCompositionEnd={finishComposition} onBlur={finishComposition}
@@ -124,21 +126,21 @@ export default function SyncConflictHistoryPanel() {
                 } else applyQuery(event.target.value)
               }}/>
           </label>
-          <label>对象类型<select value={kind} data-history-kind aria-label="筛选记录对象类型" onChange={event => setKind(event.target.value)}>
+          <label>对象类型<UiSelect value={kind} data-history-kind aria-label="筛选记录对象类型" onChange={event => setKind(event.target.value)}>
             <option value="all">全部对象</option><option value="file">笔记或文件夹</option><option value="tag">标签</option>
             <option value="file-tag">标签关联</option><option value="attachment">附件</option>
-          </select></label>
-          <label>当时的处理结果<select value={outcome} data-history-outcome aria-label="筛选记录处理结果" onChange={event => setOutcome(event.target.value)}>
+          </UiSelect></label>
+          <label>当时的处理结果<UiSelect value={outcome} data-history-outcome aria-label="筛选记录处理结果" onChange={event => setOutcome(event.target.value)}>
             <option value="all">全部结果</option><option value="local">保留本机</option><option value="remote">采用远端</option>
             <option value="superseded">已失效</option><option value="unknown">处理方式未核实</option>
-          </select></label>
-          {(queryDraft || query || kind !== 'all' || outcome !== 'all' || timeFilter.mode !== 'all' || hasTimeDraft) && <button type="button" className="btn small" data-history-clear onClick={event => {
+          </UiSelect></label>
+          {(queryDraft || query || kind !== 'all' || outcome !== 'all' || timeFilter.mode !== 'all' || hasTimeDraft) && <UiButton type="button" className="btn small" data-history-clear onClick={event => {
             const ownsFocus = event.currentTarget === event.currentTarget.ownerDocument.activeElement
             compositionActive.current = false; setIsComposing(false)
             applyQuery(''); setKind('all'); setOutcome('all')
             setTimeFilter(HISTORY_TIME_ALL); setTimeReset(n => n + 1); setHasTimeDraft(false)
             if (ownsFocus) searchInput.current?.focus({ preventScroll: true })
-          }}>清除本地筛选</button>}
+          }}>清除本地筛选</UiButton>}
         </div>
         <SyncHistoryTimeFilter value={timeFilter} resetVersion={timeReset} onDraftChange={setHasTimeDraft}
           onApply={next => setTimeFilter(previous => sameHistoryTimeFilter(previous, next) ? previous : next)}/>
@@ -159,8 +161,8 @@ export default function SyncConflictHistoryPanel() {
           </li>)}
         </ol>
       </div>}
-      {snapshot?.hasMore && <button type="button" className="btn small" data-history-more ref={moreButton} aria-disabled={phase === 'loading'}
-        onClick={() => { if (phase !== 'loading') void read(filter, true) }}>读取更早记录</button>}
+      {snapshot?.hasMore && <UiButton type="button" className="btn small" data-history-more ref={moreButton} aria-disabled={phase === 'loading'}
+        onClick={() => { if (phase !== 'loading') void read(filter, true) }}>读取更早记录</UiButton>}
       {snapshot && <p className="sync-conflict-history-note">按处理或失效时间从新到旧排列；新产生的记录需重新读取。已失效不等于已解决，历史选边不保证现在仍是该版本。</p>}
       <SyncHistoryExport snapshot={snapshot} query={query} kind={kind} outcome={outcome}
         phase={phase} composing={isComposing} matched={selection.matched} timeFilter={timeFilter}/>

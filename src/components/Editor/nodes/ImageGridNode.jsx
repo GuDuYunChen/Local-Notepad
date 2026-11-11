@@ -3,6 +3,8 @@ import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext
 import { useLexicalEditable } from '@lexical/react/useLexicalEditable'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { uploadFile } from '../utils/fileUpload'
+import { UiButton, UiInput } from '~/components/ui/ControlKit'
+
 
 export class ImageGridNode extends DecoratorNode {
   __items
@@ -484,7 +486,7 @@ function ImageGridComponent({ nodeKey, items, columns, gap }) {
         <div className="editor-image-grid-toolbar" role="toolbar" aria-label="图片组工具">
           <span>列数</span>
           {[2, 3, 4].map(value => (
-            <button
+            <UiButton density="compact"
               type="button"
               key={value}
               className={currentColumns === value ? 'active' : ''}
@@ -494,7 +496,7 @@ function ImageGridComponent({ nodeKey, items, columns, gap }) {
               }}
             >
               {value}
-            </button>
+            </UiButton>
           ))}
 
           <span className="editor-image-toolbar-divider" />
@@ -505,7 +507,7 @@ function ImageGridComponent({ nodeKey, items, columns, gap }) {
             [8, '中'],
             [16, '松'],
           ].map(([value, label]) => (
-            <button
+            <UiButton density="compact"
               type="button"
               key={value}
               className={currentGap === value ? 'active' : ''}
@@ -515,12 +517,12 @@ function ImageGridComponent({ nodeKey, items, columns, gap }) {
               }}
             >
               {label}
-            </button>
+            </UiButton>
           ))}
 
           <span className="editor-image-toolbar-divider" />
 
-          <button
+          <UiButton density="compact"
             type="button"
             onClick={event => {
               event.stopPropagation()
@@ -530,8 +532,8 @@ function ImageGridComponent({ nodeKey, items, columns, gap }) {
             disabled={uploading}
           >
             {uploading ? '处理中…' : '添加图片'}
-          </button>
-          <input
+          </UiButton>
+          <input data-ui-native="file"
             ref={addInputRef}
             type="file"
             accept="image/*"
@@ -541,15 +543,15 @@ function ImageGridComponent({ nodeKey, items, columns, gap }) {
             onChange={handleAddImages}
           />
           {uploading && (
-            <button type="button" onClick={event => {
+            <UiButton density="compact" type="button" onClick={event => {
               event.stopPropagation()
               cancelUpload('已取消本次上传，可重新选择图片。')
             }}>
               取消本次上传
-            </button>
+            </UiButton>
           )}
 
-          <button
+          <UiButton density="compact"
             type="button"
             className="danger"
             onClick={event => {
@@ -558,7 +560,7 @@ function ImageGridComponent({ nodeKey, items, columns, gap }) {
             }}
           >
             删除图片组
-          </button>
+          </UiButton>
         </div>
       )}
 
@@ -580,7 +582,7 @@ function ImageGridComponent({ nodeKey, items, columns, gap }) {
           >
             <div className="editor-image-grid-media">
               {selected && isEditable && (
-                <button
+                <button data-ui-native="editor-pointer-handle"
                   type="button"
                   className="editor-image-grid-drag"
                   draggable
@@ -602,7 +604,7 @@ function ImageGridComponent({ nodeKey, items, columns, gap }) {
 
               {selected && isEditable && (
                 <div className="editor-image-grid-card-actions">
-                  <button
+                  <UiButton density="compact"
                     type="button"
                     className="editor-image-grid-replace"
                     onClick={event => {
@@ -615,8 +617,8 @@ function ImageGridComponent({ nodeKey, items, columns, gap }) {
                     title="替换图片"
                   >
                     ↻
-                  </button>
-                  <button
+                  </UiButton>
+                  <UiButton density="compact"
                     type="button"
                     className="editor-image-grid-remove"
                   onClick={event => {
@@ -627,13 +629,13 @@ function ImageGridComponent({ nodeKey, items, columns, gap }) {
                   title="从图片组移除"
                 >
                   ×
-                </button>
+                </UiButton>
                 </div>
               )}
             </div>
 
             {(selected || (item.caption ?? item.alt)) && (
-              <input
+              <UiInput density="compact"
                 className="editor-image-grid-caption"
                 value={item.caption ?? item.alt ?? ''}
                 readOnly={!isEditable}
@@ -646,7 +648,7 @@ function ImageGridComponent({ nodeKey, items, columns, gap }) {
           </div>
         ))}
       </div>
-      <input
+      <input data-ui-native="file"
         ref={replaceInputRef}
         type="file"
         accept="image/*"

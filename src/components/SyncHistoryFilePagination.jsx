@@ -1,5 +1,7 @@
 import React, { useEffect, useId, useRef, useState } from 'react'
 import { parseHistoryFilePageJump } from '~/services/syncHistoryFilePageJump.mjs'
+import { UiButton, UiInput } from '~/components/ui/ControlKit'
+
 
 export default function SyncHistoryFilePagination({ selection, report, filters, order, onNavigate }) {
   const { page, pages, matched, from, to } = selection
@@ -28,20 +30,20 @@ export default function SyncHistoryFilePagination({ selection, report, filters, 
     event.preventDefault(); jump()
   }
   return <div className="sync-history-file-pages" role="group" aria-label="离线文件分页">
-    <button type="button" className="btn small" data-history-file-first aria-disabled={!matched || page === 0} onClick={() => { if (page > 0) go(0) }}>首页</button>
-    <button type="button" className="btn small" data-history-file-prev aria-disabled={!matched || page === 0} onClick={() => go(page - 1)}>上一页</button>
+    <UiButton type="button" className="btn small" data-history-file-first aria-disabled={!matched || page === 0} onClick={() => { if (page > 0) go(0) }}>首页</UiButton>
+    <UiButton type="button" className="btn small" data-history-file-prev aria-disabled={!matched || page === 0} onClick={() => go(page - 1)}>上一页</UiButton>
     <span data-history-file-page role="status">{matched ? <>第 {page + 1} / {pages} 页，本页第 {from}–{to} 条</> : '没有匹配记录，暂无可翻页内容'}</span>
-    <button type="button" className="btn small" data-history-file-next aria-disabled={!matched || page + 1 >= pages} onClick={() => go(page + 1)}>下一页</button>
-    <button type="button" className="btn small" data-history-file-last aria-disabled={!matched || page + 1 >= pages} onClick={() => { if (page + 1 < pages) go(pages - 1) }}>末页</button>
+    <UiButton type="button" className="btn small" data-history-file-next aria-disabled={!matched || page + 1 >= pages} onClick={() => go(page + 1)}>下一页</UiButton>
+    <UiButton type="button" className="btn small" data-history-file-last aria-disabled={!matched || page + 1 >= pages} onClick={() => { if (page + 1 < pages) go(pages - 1) }}>末页</UiButton>
     <div className="sync-history-file-page-jump">
-      <label>跳至第 <input type="text" inputMode="numeric" autoComplete="off" spellCheck={false}
+      <label>跳至第 <UiInput type="text" inputMode="numeric" autoComplete="off" spellCheck={false}
         data-history-file-jump-input aria-label="离线文件跳转页码" aria-describedby={hintID + (error ? ' ' + errorID : '')}
         aria-invalid={!!error} readOnly={!matched} value={draft}
         onChange={event => { setDraft(event.target.value); setError('') }} onKeyDown={enter}
         onCompositionStart={() => { composing.current = true }}
         onCompositionEnd={event => { if (composing.current) { composing.current = false; setDraft(event.currentTarget.value) } }}
         onBlur={() => { composing.current = false }}/><span>页</span></label>
-      <button type="button" className="btn small" data-history-file-jump aria-disabled={!matched} onClick={jump}>跳转</button>
+      <UiButton type="button" className="btn small" data-history-file-jump aria-disabled={!matched} onClick={jump}>跳转</UiButton>
       <span id={hintID}>{matched ? `共 ${pages} 页，仅在当前文件匹配结果中定位，不重新读取文件。` : '没有匹配记录，不能跳页。'}</span>
     </div>
     {error && <p className="sync-history-file-page-error" id={errorID} data-history-file-jump-error role="alert">{error}</p>}

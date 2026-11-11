@@ -10,12 +10,14 @@ import ConfirmDialog from './ConfirmDialog'
 import EvidenceReviewArchiveComparison from './EvidenceReviewArchiveComparison'
 import EvidenceReviewBackup from './EvidenceReviewBackup'
 import './EvidenceReviewArchives.css'
+import { UiButton, UiSelect } from '~/components/ui/ControlKit'
+
 
 export function SaveReviewArchiveButton({ disabled = false }) {
   const session = useSyncExternalStore(evidenceReview.subscribe, evidenceReview.getSnapshot, () => null)
   const [saved, setSaved] = useState(null)
   return <span className="evidence-archive-save">
-    <button type="button" disabled={disabled || !session || saved === session} onClick={() => {
+    <UiButton type="button" disabled={disabled || !session || saved === session} onClick={() => {
       const current = evidenceReview.getSnapshot()
       if (!current) return
       try {
@@ -23,7 +25,7 @@ export function SaveReviewArchiveButton({ disabled = false }) {
         setSaved(current)
         toast.success('已保存本地核对存档；后续修改需再次存档。存档不包含正文，建议另导出 JSON 备份')
       } catch (error) { toast.error(error.message || '存档失败，当前核对记录仍保留') }
-    }}>保存本地存档</button>
+    }}>保存本地存档</UiButton>
     {saved && <small aria-live="polite">{saved === session ? '此份记录已存档' : '本轮有更新，尚未再次存档'}</small>}
   </span>
 }
@@ -114,12 +116,12 @@ function ArchiveManager({ projectId, entityId, intelligence, onRestored, embedde
     <div className="evidence-review-archives-body">
       <p>{embedded ? '存档仅保存在本机用户数据中，不是云备份，也不随正文数据库备份迁移。请导出 JSON 到其他设备留存。' : '手动保存的独立快照，刷新或重启后仍可读取；后续备注不会自动写入旧存档。仅保存在当前浏览器／应用用户数据中，不是云备份，也不随正文数据库备份迁移，请导出 JSON 留存。'}</p>
       <div className="evidence-review-archives-tools">
-        {!embedded && <label>查看范围<select aria-label="存档查看范围" value={scope} onChange={event => { setScope(event.target.value); setPage(1) }}>
+        {!embedded && <label>查看范围<UiSelect size="middle" aria-label="存档查看范围" value={scope} onChange={event => { setScope(event.target.value); setPage(1) }}>
           {projectId && entityId && <option value="current">当前项目与实体</option>}<option value="all">全部本地存档</option>
-        </select></label>}
-        {!embedded && <button type="button" disabled={importing} onClick={() => input.current?.click()}>{importing ? '正在读取存档…' : '导入存档 JSON'}</button>}
-        {!embedded && <input ref={input} type="file" accept=".json,application/json" aria-label="导入核对存档文件" hidden onChange={event => void importFile(event)} />}
-        <button type="button" onClick={() => setResult(reviewArchives.list())}>刷新存档列表</button>
+        </UiSelect></label>}
+        {!embedded && <UiButton size="middle" type="button" disabled={importing} onClick={() => input.current?.click()}>{importing ? '正在读取存档…' : '导入存档 JSON'}</UiButton>}
+        {!embedded && <input data-ui-native="file" ref={input} type="file" accept=".json,application/json" aria-label="导入核对存档文件" hidden onChange={event => void importFile(event)} />}
+        <UiButton size="middle" type="button" onClick={() => setResult(reviewArchives.list())}>刷新存档列表</UiButton>
       </div>
       {result.error && <p role="alert">{result.error}</p>}
       <EvidenceReviewBackup key={scope} entries={entries} storageError={result.error}
@@ -139,21 +141,21 @@ function ArchiveManager({ projectId, entityId, intelligence, onRestored, embedde
               {!matches && <p>恢复前请切换到对应项目与实体（{data.entityId}）。</p>}
             </> : <p role="status">{entry.error}</p>}
             <div className="evidence-review-archives-actions">
-              {data && !embedded && <button type="button" disabled={!matches || !onRestored} onClick={event => beginRestore(entry, event)}>恢复此存档</button>}
-              {data && <button type="button" onClick={() => {
+              {data && !embedded && <UiButton size="middle" type="button" disabled={!matches || !onRestored} onClick={event => beginRestore(entry, event)}>恢复此存档</UiButton>}
+              {data && <UiButton size="middle" type="button" onClick={() => {
                 try { const fresh = readReviewArchive(reviewArchives.readUnchanged(entry)); downloadEvidenceReviewReport(fresh.data) }
                 catch (error) { toast.error(error.message || '历史清单导出失败') }
-              }}>导出历史清单</button>}
-              <button type="button" onClick={() => { try { downloadReviewArchive(entry) } catch (error) { toast.error(error.message) } }}>导出存档 JSON</button>
-              <button type="button" onClick={event => { trigger.current = event.currentTarget; setAction({ type: 'delete', entry }) }}>删除此存档</button>
+              }}>导出历史清单</UiButton>}
+              <UiButton size="middle" type="button" onClick={() => { try { downloadReviewArchive(entry) } catch (error) { toast.error(error.message) } }}>导出存档 JSON</UiButton>
+              <UiButton size="middle" type="button" onClick={event => { trigger.current = event.currentTarget; setAction({ type: 'delete', entry }) }}>删除此存档</UiButton>
             </div>
           </li>
         })}
       </ul>
       {pages > 1 && <nav aria-label="核对存档分页">
-        <button type="button" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>上一页存档</button>
+        <UiButton type="button" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>上一页存档</UiButton>
         <span>{currentPage} / {pages}</span>
-        <button type="button" disabled={currentPage >= pages} onClick={() => setPage(currentPage + 1)}>下一页存档</button>
+        <UiButton type="button" disabled={currentPage >= pages} onClick={() => setPage(currentPage + 1)}>下一页存档</UiButton>
       </nav>}
       {action && <ConfirmDialog title={action.type === 'delete' ? '删除这份本地存档？' : '恢复核对存档？'}
         message={action.type === 'delete' ? '只删除此份本地快照，不改动当前核对、正文或已经导出的文件。删除后无法撤销，建议先导出 JSON。' :

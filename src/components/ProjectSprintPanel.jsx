@@ -16,6 +16,8 @@ import {
   writeDailyReview,
 } from './projectSprintUtils'
 import './ProjectSprintPanel.css'
+import { UiButton, UiInput, UiTextarea } from '~/components/ui/ControlKit'
+
 
 function stripExtension(value) {
   return String(value || '').replace(/\.[^.]+$/, '')
@@ -208,27 +210,27 @@ export default function ProjectSprintPanel({
               </span>
             </div>
             <div className="project-calendar-nav">
-              <button
+              <UiButton
                 type="button"
                 onClick={() => moveCalendar('previous')}
                 aria-label="上个月"
               >
                 ‹
-              </button>
-              <button
+              </UiButton>
+              <UiButton
                 type="button"
                 onClick={resetCalendar}
                 title="回到本月"
               >
                 {monthTitle(calendar.year, calendar.month)}
-              </button>
-              <button
+              </UiButton>
+              <UiButton
                 type="button"
                 onClick={() => moveCalendar('next')}
                 aria-label="下个月"
               >
                 ›
-              </button>
+              </UiButton>
             </div>
           </header>
 
@@ -244,7 +246,7 @@ export default function ProjectSprintPanel({
             ))}
 
             {calendar.days.map(day => (
-              <button
+              <UiButton
                 key={day.date}
                 type="button"
                 className={
@@ -265,7 +267,7 @@ export default function ProjectSprintPanel({
                 {day.hasSnapshot && !day.baseline && (
                   <small>{day.delta > 0 ? '+' + day.delta : day.delta}</small>
                 )}
-              </button>
+              </UiButton>
             ))}
           </div>
 
@@ -344,7 +346,7 @@ export default function ProjectSprintPanel({
           <div className="project-today-queue">
             <strong>今日待写</strong>
             {todayQueue.length ? todayQueue.map((note, index) => (
-              <button
+              <UiButton
                 key={note.id}
                 type="button"
                 onClick={() => onOpenFile?.(note.id)}
@@ -357,7 +359,7 @@ export default function ProjectSprintPanel({
                     {note.status === 'review' ? ' 修订' : ' 草稿'}
                   </small>
                 </div>
-              </button>
+              </UiButton>
             )) : (
               <small>当前没有未完成章节。</small>
             )}
@@ -376,7 +378,7 @@ export default function ProjectSprintPanel({
             <>
               <div className="project-sprint-starts">
                 {[7, 14, 30].map(duration => (
-                  <button
+                  <UiButton
                     key={duration}
                     type="button"
                     onClick={() => startSprint(duration)}
@@ -392,7 +394,7 @@ export default function ProjectSprintPanel({
                         )
                       } 字
                     </span>
-                  </button>
+                  </UiButton>
                 ))}
               </div>
               <p>
@@ -436,7 +438,7 @@ export default function ProjectSprintPanel({
 
               <label className="project-sprint-goal">
                 <span>冲刺目标字数</span>
-                <input
+                <UiInput
                   type="number"
                   min="0"
                   step="500"
@@ -455,13 +457,13 @@ export default function ProjectSprintPanel({
                 </span>
               </div>
 
-              <button
+              <UiButton
                 type="button"
                 className="btn small"
                 onClick={stopSprint}
               >
                 结束当前冲刺
-              </button>
+              </UiButton>
             </>
           )}
         </article>
@@ -474,7 +476,7 @@ export default function ProjectSprintPanel({
             </div>
           </header>
 
-          <textarea
+          <UiTextarea
             value={reviewDraft}
             onChange={event => setReviewDraft(event.target.value)}
             placeholder="今天推进了什么？卡在哪里？明天第一步做什么？"
@@ -484,13 +486,13 @@ export default function ProjectSprintPanel({
 
           <div className="project-review-actions">
             <span>{reviewDraft.length}/1200</span>
-            <button
+            <UiButton size="middle"
               type="button"
               className="btn small primary"
               onClick={saveReview}
             >
               保存今日复盘
-            </button>
+            </UiButton>
           </div>
         </article>
       </div>

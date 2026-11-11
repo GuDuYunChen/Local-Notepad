@@ -3,6 +3,8 @@ import { deviceSyncTimeZone, syncClockDisplay } from '~/services/syncClock.mjs'
 import './SyncOverviewTimes.css'
 import { syncClockPreferenceView } from '~/services/syncClockPreferenceView.mjs'
 import { readSyncClockPreference, saveSyncClockPreference, clearSyncClockPreference } from '~/services/syncClockPreference.mjs'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 function TimeValue({ value }) {
   return value.iso ? <time dateTime={value.iso} title={'UTC：' + value.iso}>{value.text}</time> : value.text
@@ -73,10 +75,10 @@ export default function SyncOverviewTimes({ view }) {
   return <>
     <div className="sync-clock-controls" role="group" aria-label="同步时间显示方式">
       <span>时间显示</span>
-      <button type="button" className="btn small sync-clock-button" aria-pressed={zone === null}
-        onClick={() => selectZone(null)}>UTC</button>
-      <button type="button" className="btn small sync-clock-button" aria-pressed={zone !== null}
-        onClick={() => selectZone(deviceSyncTimeZone())}>本机时区</button>
+      <UiButton size="middle" type="button" className="btn small sync-clock-button" aria-pressed={zone === null}
+        onClick={() => selectZone(null)}>UTC</UiButton>
+      <UiButton size="middle" type="button" className="btn small sync-clock-button" aria-pressed={zone !== null}
+        onClick={() => selectZone(deviceSyncTimeZone())}>本机时区</UiButton>
       <span className="sync-clock-zone">{clock.mode === 'local' ? clock.timeZone : 'UTC'}</span>
     </div>
     {clock.fallback && <p className="sync-clock-fallback" role="status">本机时区显示不可用，已保留 UTC 时间；没有刷新或执行同步。</p>}
@@ -84,12 +86,12 @@ export default function SyncOverviewTimes({ view }) {
       <summary>时间显示偏好<span>{preferenceView.summary}</span></summary>
       <div className="sync-clock-preference-actions" role="group" aria-label="记住时间显示方式">
       <p className="sync-clock-preference-summary" data-sync-clock-comparison>{preferenceView.detail}</p>
-      <button type="button" className="btn small sync-clock-preference-button" data-sync-clock-restore aria-controls={feedbackID}
-        onClick={restore}>读取并使用已保存方式</button>
-      <button type="button" className="btn small sync-clock-preference-button" data-sync-clock-save aria-controls={feedbackID}
-        disabled={clock.fallback} onClick={remember}>记住当前选择</button>
-      <button type="button" className="btn small sync-clock-preference-button" data-sync-clock-clear aria-controls={feedbackID}
-        onClick={forget}>清除时间偏好</button>
+      <UiButton size="middle" type="button" className="btn small sync-clock-preference-button" data-sync-clock-restore aria-controls={feedbackID}
+        onClick={restore}>读取并使用已保存方式</UiButton>
+      <UiButton size="middle" type="button" className="btn small sync-clock-preference-button" data-sync-clock-save aria-controls={feedbackID}
+        disabled={clock.fallback} onClick={remember}>记住当前选择</UiButton>
+      <UiButton size="middle" type="button" className="btn small sync-clock-preference-button" data-sync-clock-clear aria-controls={feedbackID}
+        onClick={forget}>清除时间偏好</UiButton>
       <span className="sync-clock-preference-summary">保存状态是上次核对结果，不保证其他页面未修改。读取只使用此设备当前保存的方式，不写入偏好、不刷新或执行同步。</span>
       </div>
     </details>

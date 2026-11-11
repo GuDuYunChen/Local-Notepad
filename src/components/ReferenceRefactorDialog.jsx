@@ -1,6 +1,8 @@
 import React from 'react'
 import { formatSectionPath } from './Editor/utils/referenceUtils'
 import './ReferenceRefactorDialog.css'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 function modeCopy(mode) {
   if (mode === 'rename') {
@@ -80,7 +82,7 @@ export default function ReferenceRefactorDialog({
             <h2 id="reference-refactor-title">{copy.title}</h2>
             <p>{copy.intro}</p>
           </div>
-          <button
+          <UiButton
             type="button"
             className="icon-btn"
             onClick={onCancel}
@@ -89,7 +91,7 @@ export default function ReferenceRefactorDialog({
             title="关闭"
           >
             ×
-          </button>
+          </UiButton>
         </header>
 
         {(mode === 'rename' || mode === 'extract') && (
@@ -128,13 +130,13 @@ export default function ReferenceRefactorDialog({
             {sources.map(source => (
               <article key={source.id} className="reference-refactor-source">
                 <header>
-                  <button
+                  <UiButton
                     type="button"
                     onClick={() => onOpenSource?.(source.id)}
                     disabled={busy}
                   >
                     {source.title}
-                  </button>
+                  </UiButton>
                   <span>
                     {mode === 'delete'
                       ? source.references?.length || 0
@@ -214,17 +216,17 @@ export default function ReferenceRefactorDialog({
         </div>
 
         <div className="modal-actions consumer-modal-actions reference-refactor-actions">
-          <button type="button" className="btn" onClick={onCancel} disabled={busy}>
+          <UiButton size="middle" type="button" className="btn" onClick={onCancel} disabled={busy}>
             取消
-          </button>
-          <button
+          </UiButton>
+          <UiButton size="middle"
             type="button"
             className={'btn ' + (mode === 'delete' ? 'danger' : 'primary')}
             onClick={onConfirm}
             disabled={busy}
           >
             {busy ? '处理中…' : copy.action}
-          </button>
+          </UiButton>
         </div>
       </section>
     </div>

@@ -69,7 +69,7 @@
   gap: 5px;
 }
 
-.reference-health-actions .btn {
+.reference-health-actions .btn:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   min-height: 31px;
   padding-inline: 10px;
   font-size: 9px;
@@ -191,6 +191,10 @@
 }
 
 .reference-health-item-actions button {
+  cursor: pointer;
+}
+
+.reference-health-item-actions button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   min-height: 27px;
   padding: 0 7px;
   border: 1px solid var(--line);
@@ -199,10 +203,9 @@
   color: var(--ink-soft);
   font: inherit;
   font-size: 8px;
-  cursor: pointer;
 }
 
-.reference-health-item-actions button:hover {
+.reference-health-item-actions button:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-color: var(--line-strong);
   background: var(--surface-hover);
   color: var(--ink);

@@ -12,6 +12,9 @@ import {
   validateShortcutBindings,
 } from '../services/localShortcuts'
 import './ShortcutsModal.css'
+import { UiButton, UiInput, UiSelect } from '~/components/ui/ControlKit'
+import { selectOwnsEscape } from '~/components/ui/keyboard'
+
 
 const gestures = [
   ['Ctrl / ⌘ + A、X', '全选或剪切'],
@@ -287,6 +290,7 @@ function ShortcutSettingsSession({ onClose }) {
 
   function handleDialogKey(event) {
     if (eventIsComposing(event) || event.repeat) return
+    if (selectOwnsEscape(event, dialogRef.current)) return
     if (event.key === 'Escape') {
       event.preventDefault()
       event.stopPropagation()
@@ -328,38 +332,41 @@ function ShortcutSettingsSession({ onClose }) {
             <h2 className="modal-title" id="shortcuts-dialog-title">快捷键</h2>
             <div className="modal-message">把常用操作设成顺手的按键。</div>
           </div>
-          <button type="button" className="icon-btn" onClick={requestClose} aria-label="关闭快捷键设置" title="关闭">×</button>
+          <UiButton type="button" className="icon-btn" onClick={requestClose} aria-label="关闭快捷键设置" title="关闭">×</UiButton>
         </header>
 
         {snapshot.status !== 'ready' && (
           <div className="local-shortcuts-notice" role="status">
             <span>{snapshot.message || (snapshot.status === 'invalid' ? '本地配置无法使用，当前采用默认快捷键。' : '本地设置暂时无法确认，请保留修改并重试。')}</span>
             {snapshot.status === 'invalid'
-              ? <button type="button" className="btn" onClick={restoreAll}>恢复默认配置</button>
-              : <button type="button" className="btn" onClick={requestReload}>重新读取</button>}
+              ? <UiButton type="button" className="btn" onClick={restoreAll}>恢复默认配置</UiButton>
+              : <UiButton type="button" className="btn" onClick={requestReload}>重新读取</UiButton>}
           </div>
         )}
         {externalChanged && (
           <div className="local-shortcuts-notice" role="status">
             <span>其他窗口已更改快捷键。你的修改仍保留在本页，请重新读取后再编辑。</span>
-            <button type="button" className="btn" onClick={requestReload}>重新读取最新设置</button>
+            <UiButton type="button" className="btn" onClick={requestReload}>重新读取最新设置</UiButton>
           </div>
         )}
 
         <div className="local-shortcuts-filters">
-          <label className="local-shortcuts-search">
-            <span aria-hidden="true">⌕</span>
-            <input ref={searchRef} value={queryInput} placeholder="搜索操作或快捷键" aria-label="搜索快捷键" data-shortcut-search="true" maxLength={120}
+          <div className="local-shortcuts-search">
+            <UiInput size="middle" className="local-shortcuts-search-input" ref={searchRef} value={queryInput} placeholder="搜索操作或快捷键" aria-label="搜索快捷键" data-shortcut-search="true" maxLength={120}
+              prefix={<svg className="local-shortcuts-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+                <circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" />
+              </svg>}
               onCompositionStart={() => { composingSearch.current = true; setRecording(null) }}
               onCompositionEnd={event => { composingSearch.current = false; setQuery(event.currentTarget.value) }}
               onChange={event => { setQueryInput(event.target.value); setRecording(null); if (!composingSearch.current) setQuery(event.target.value) }} />
-            {queryInput && <button type="button" className="icon-btn" aria-label="清除搜索" onClick={() => { setQueryInput(''); setQuery(''); searchRef.current?.focus() }}>×</button>}
-          </label>
+            {queryInput && <UiButton size="middle" type="button" className="icon-btn" aria-label="清除搜索" onClick={() => { setQueryInput(''); setQuery(''); searchRef.current?.focus() }}>×</UiButton>}
+          </div>
           <label className="local-shortcuts-category">
-            <select aria-label="操作分类" value={category} onChange={event => { setCategory(event.target.value); setRecording(null) }}>
+            <UiSelect size="middle" aria-label="操作分类" value={category} onChange={event => { setCategory(event.target.value); setRecording(null) }}>
               <option value="全部">全部操作</option>
               {categories.map(value => <option value={value} key={value}>{value}</option>)}
-            </select>
+            </UiSelect>
           </label>
         </div>
 
@@ -380,20 +387,20 @@ function ShortcutSettingsSession({ onClose }) {
                       <small>{command.description}</small>
                       {changed && <small>当前生效：{formatShortcut(snapshot.bindings[command.id])}</small>}
                     </div>
-                    <button type="button" className="local-shortcuts-binding" data-shortcut-edit={command.id}
+                    <UiButton type="button" className="local-shortcuts-binding" data-shortcut-edit={command.id}
                       aria-label={`修改${command.label}快捷键`} aria-expanded={isRecording} onClick={() => startRecording(command)}>
                       <kbd>{formatShortcut(draft[command.id])}</kbd><span aria-hidden="true">修改</span>
-                    </button>
+                    </UiButton>
                     <div className="local-shortcuts-row-actions">
-                      <button type="button" className="local-shortcuts-text-button" disabled={draft[command.id] == null}
-                        aria-label={`清除${command.label}快捷键`} onClick={() => { replaceDraft({ ...draft, [command.id]: null }); setRecording(null) }}>清除</button>
-                      <button type="button" className="local-shortcuts-text-button" data-shortcut-reset={command.id} disabled={draft[command.id] === command.defaultBinding}
-                        aria-label={`恢复${command.label}默认快捷键`} onClick={() => restoreCommand(command)}>默认</button>
+                      <UiButton size="middle" type="button" className="local-shortcuts-text-button" disabled={draft[command.id] == null}
+                        aria-label={`清除${command.label}快捷键`} onClick={() => { replaceDraft({ ...draft, [command.id]: null }); setRecording(null) }}>清除</UiButton>
+                      <UiButton size="middle" type="button" className="local-shortcuts-text-button" data-shortcut-reset={command.id} disabled={draft[command.id] === command.defaultBinding}
+                        aria-label={`恢复${command.label}默认快捷键`} onClick={() => restoreCommand(command)}>默认</UiButton>
                     </div>
                     {isRecording && (
                       <div ref={recorderPanelRef} className="local-shortcuts-recorder-panel">
                         <label htmlFor="shortcut-recorder">为“{activeRecording.label}”设置快捷键</label>
-                        <input id="shortcut-recorder" ref={recorderRef} data-shortcut-recorder="true" readOnly
+                        <UiInput id="shortcut-recorder" ref={recorderRef} data-shortcut-recorder="true" readOnly
                           aria-label={`录入${activeRecording.label}快捷键`} aria-describedby={`shortcut-recording-hint${recording.error || recordingConflict ? ' shortcut-recording-feedback' : ''}`}
                           value={recording.candidate ? formatShortcut(recording.candidate) : '请按下组合键'} onKeyDownCapture={recordKey} />
                         <p id="shortcut-recording-hint">按下 Ctrl / ⌘ 与字母等组合键，或可用的功能键。按 Esc 取消录入。</p>
@@ -402,11 +409,11 @@ function ShortcutSettingsSession({ onClose }) {
                           已用于“{recordingConflict.label}”。替换后，该操作将不再绑定快捷键。
                         </p>}
                         <div className="local-shortcuts-recorder-actions">
-                          <button type="button" className="btn" onClick={closeRecording}>取消录入</button>
-                          <button type="button" className="btn primary" disabled={!recording.candidate || Boolean(recording.error)}
+                          <UiButton size="middle" type="button" className="btn" onClick={closeRecording}>取消录入</UiButton>
+                          <UiButton size="middle" type="button" className="btn primary" disabled={!recording.candidate || Boolean(recording.error)}
                             onClick={() => acceptRecording(Boolean(recordingConflict))}>
                             {recordingConflict ? '替换冲突快捷键' : '使用此快捷键'}
-                          </button>
+                          </UiButton>
                         </div>
                       </div>
                     )}
@@ -433,22 +440,22 @@ function ShortcutSettingsSession({ onClose }) {
             <strong>{confirmation === 'reload' ? '放弃本页修改并重新读取？' : '还有未应用的修改，要放弃吗？'}</strong>
             <span>当前生效的快捷键不会因关闭本页而改变。</span>
             <div>
-              <button type="button" className="btn" onClick={() => setConfirmation(null)}>继续编辑</button>
-              <button type="button" className="btn" onClick={() => confirmation === 'reload' ? loadLatest() : onClose?.()}>
+              <UiButton type="button" className="btn" onClick={() => setConfirmation(null)}>继续编辑</UiButton>
+              <UiButton type="button" className="btn" onClick={() => confirmation === 'reload' ? loadLatest() : onClose?.()}>
                 {confirmation === 'reload' ? '放弃修改并重新读取' : '放弃修改并关闭'}
-              </button>
+              </UiButton>
             </div>
           </div> : <>
             <div className="local-shortcuts-status" role="status" aria-live="polite">
               {message || ((repairInvalid || resetPending) && changedCount === 0 ? '默认配置待恢复，点击“应用”确认。' : dirty ? `${changedCount} 项修改待应用${repairInvalid ? '，将同时恢复本地配置' : ''}。` : '当前快捷键已生效。')}
             </div>
             <div className="local-shortcuts-footer-actions">
-              <button type="button" className="local-shortcuts-text-button" onClick={restoreAll}>全部恢复默认</button>
+              <UiButton size="middle" type="button" className="local-shortcuts-text-button" onClick={restoreAll}>全部恢复默认</UiButton>
               <div>
-                <button type="button" className="btn" onClick={requestClose}>{dirty ? '取消' : '完成'}</button>
-                <button type="button" className="btn primary" data-shortcut-apply="true" disabled={!dirty || Boolean(recording) || externalChanged || requiresRepair} onClick={apply}>
+                <UiButton size="middle" type="button" className="btn" onClick={requestClose}>{dirty ? '取消' : '完成'}</UiButton>
+                <UiButton size="middle" type="button" className="btn primary" data-shortcut-apply="true" disabled={!dirty || Boolean(recording) || externalChanged || requiresRepair} onClick={apply}>
                   {error || snapshot.status === 'unconfirmed' ? '重试应用' : '应用'}
-                </button>
+                </UiButton>
               </div>
             </div>
           </>}

@@ -1,4 +1,5 @@
 import React, { useId, useLayoutEffect, useMemo, useRef } from 'react'
+import { UiButton } from './ui/ControlKit'
 import useS3Preview from '../hooks/useS3Preview.js'
 import './S3PreviewPanel.css'
 
@@ -45,9 +46,9 @@ export default function S3PreviewPanel({ request = null, revision = 0, disabled 
       h('span', { className: 's3-preview-panel-badge' }, '只读 · 不写入')),
     h('p', { id: `${id}-boundary`, className: 's3-preview-panel-boundary' }, result.limitation),
     h('div', { className: 's3-preview-panel-actions' },
-      h('button', { type: 'button', className: 'btn', disabled: disabled || !hasRequest || pending,
+      h(UiButton, { type: 'button', className: 'btn', disabled: disabled || !hasRequest || pending,
         onClick: start, 'aria-describedby': `${id}-boundary` }, pending ? '正在预览…' : ready ? '重新预览差异' : '预览差异'),
-      pending && h('button', { type: 'button', className: 'btn', onClick: stop }, '停止采用本次结果')),
+      pending && h(UiButton, { type: 'button', className: 'btn', onClick: stop }, '停止采用本次结果')),
     !hasRequest && h('p', { className: 's3-preview-panel-note' }, '尚未提供完整的只读比较输入；不会扫描本地数据或自动请求远端。'),
     disabled && h('p', { className: 's3-preview-panel-note' }, '当前上下文暂不允许预览；不会自动恢复请求。'),
     h('div', { className: `s3-preview-panel-status${conflicts ? ' has-conflicts' : ''}`,

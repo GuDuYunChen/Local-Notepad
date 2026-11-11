@@ -1,31 +1,36 @@
 .global-search-overlay { position: fixed; inset: 0; z-index: 2200; background: rgba(0,0,0,.34); display: flex; align-items: center; justify-content: center; padding: 24px; }
 .global-search-panel { width: min(1120px,100%); height: min(840px,calc(100dvh - 48px)); display: flex; flex-direction: column; overflow: hidden; background: var(--paper); color: var(--ink); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 18px 70px rgba(0,0,0,.22); text-align: left; }
-.global-search-panel button, .global-search-panel input, .global-search-panel select { font: inherit; font-size: 13px; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 8px; min-height: 36px; padding: 7px 11px; }
+.global-search-panel button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.global-search-panel input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.global-search-panel select:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { font: inherit; font-size: 13px; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 8px; min-height: 36px; padding: 7px 11px; }
 .global-search-panel button { cursor: pointer; }
-.global-search-panel button:disabled { cursor: default; opacity: .45; }
-.global-search-panel button.primary { background: var(--clay); color: var(--paper); border-color: var(--clay); }
-.global-search-panel :is(button, input, select):focus-visible { outline: 2px solid var(--clay); outline-offset: 2px; }
+.global-search-panel button:disabled:where(:not([data-ui-control], .ant-btn)) { cursor: default; opacity: .45; }
+.global-search-panel :is(button, input, select):focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { outline: 2px solid var(--clay); outline-offset: 2px; }
 .global-search-panel mark { color: var(--ink); background: var(--clay-light); border-radius: 2px; padding: 0 1px; }
 .global-search-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 22px 24px 12px; }
 .global-search-header h2 { font-size: 22px; margin: 0; line-height: 1.4; }
 .global-search-header p { margin: 6px 0 0; color: var(--ink-muted); font-size: 13px; }
-.global-search-header button { flex-shrink: 0; font-size: 20px; width: 36px; padding: 0; }
+.global-search-header button { flex-shrink: 0; width: 36px; }
+.global-search-header button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { font-size: 20px; padding: 0; }
 .global-search-query { display: flex; gap: 10px; padding: 0 24px 14px; }
-.global-search-query input { flex: 1; min-width: 0; height: 44px; font-size: 15px; background: var(--surface); }
+.global-search-query input { flex: 1; min-width: 0; }
+.global-search-query input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { height: 44px; font-size: 15px; background: var(--surface); }
 .global-search-query button { flex-shrink: 0; }
 .global-search-filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; padding: 0 24px 14px; border-bottom: 1px solid var(--line); }
 .global-search-filters label { min-width: 0; display: flex; flex-direction: column; gap: 4px; color: var(--ink-soft); font-size: 12px; }
 .global-search-filters label:first-child { flex: 1 1 200px; }
 .global-search-filters select { width: 100%; max-width: 280px; }
 .global-search-filters label.check { flex-direction: row; align-items: center; align-self: flex-end; min-height: 36px; white-space: nowrap; }
-.global-search-filters input[type=checkbox] { margin: 0 3px 0 0; min-height: auto; width: 15px; height: 15px; accent-color: var(--clay); }
+.global-search-filters input[type=checkbox] { margin: 0 3px 0 0; width: 15px; accent-color: var(--clay); }
+.global-search-filters input[type=checkbox]:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { min-height: auto; height: 15px; }
 .global-search-summary { padding: 10px 24px; font-size: 12px; color: var(--ink-muted); }
 .global-search-content { min-height: 0; flex: 1; display: grid; grid-template-columns: minmax(270px,.9fr) minmax(0,1.1fr); border-top: 1px solid var(--line); }
 .global-search-result-column { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--line); }
 .global-search-results { flex: 1; overflow: auto; padding: 8px; min-height: 80px; overscroll-behavior: contain; }
-.global-search-results button { display: flex; flex-direction: column; align-items: stretch; text-align: left; width: 100%; padding: 12px; margin-bottom: 4px; gap: 5px; border-color: transparent; min-width: 0; overflow-wrap: anywhere; }
-.global-search-results button:hover { background: var(--surface); }
-.global-search-results button[aria-selected=true] { border-color: var(--clay); background: var(--clay-light); }
+.global-search-results button { display: flex; flex-direction: column; align-items: stretch; text-align: left; width: 100%; margin-bottom: 4px; gap: 5px; min-width: 0; overflow-wrap: anywhere; }
+.global-search-results button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { padding: 12px; border-color: transparent; }
+.global-search-results button:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { background: var(--surface); }
+.global-search-results button[aria-selected=true]:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { border-color: var(--clay); background: var(--clay-light); }
 .global-search-result-title { font-size: 14px; font-weight: 600; line-height: 1.5; }
 .global-search-result-path, .global-search-result-meta { font-size: 12px; color: var(--ink-muted); line-height: 1.5; }
 .global-search-preview { padding: 20px 24px; overflow: auto; min-width: 0; overscroll-behavior: contain; }
@@ -64,7 +69,8 @@
 .search-presets-tools, .search-presets-confirm, .global-search-result-navigation { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
 .search-presets-tools label { display: flex; flex: 1 1 170px; min-width: 0; flex-direction: column; gap: 4px; font-size: 12px; color: var(--ink-soft); }
 .search-presets-tools input, .search-presets-tools select { width: 100%; min-width: 0; }
-.search-presets-tools button, .search-presets-confirm button { min-height: 36px; }
+.search-presets-tools button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.search-presets-confirm button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { min-height: 36px; }
 .search-presets-confirm { padding: 10px 0; align-items: center; }
 .search-presets-confirm span { flex: 1 1 220px; overflow-wrap: anywhere; }
 .global-search-result-navigation { justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 12px; color: var(--ink-soft); }
@@ -77,7 +83,7 @@
 .search-preset-import-preview ul { max-height: 170px; overflow: auto; padding: 0; list-style: none; }
 .search-preset-import-preview li { padding: 6px 0; border-bottom: 1px solid var(--line); }
 .search-preset-import-preview li span { display: block; overflow-wrap: anywhere; font-size: 12px; }
-.search-preset-import-preview button { min-height: 36px; }
+.search-preset-import-preview button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { min-height: 36px; }
 
 .search-result-export { flex-shrink: 0; max-height: 230px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; margin: 0 18px 8px; min-width: 0; }
 .search-result-export summary { cursor: pointer; font-size: 12px; color: var(--ink-soft); }
@@ -85,8 +91,8 @@
 .search-result-export-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; margin-top: 8px; }
 .search-result-export-tools label { display: flex; flex-direction: column; min-width: 0; gap: 4px; font-size: 12px; }
 .search-result-export-tools label.check { flex-direction: row; align-items: center; min-height: 36px; }
-.search-result-export-tools input[type=checkbox] { width: 16px; height: 16px; min-height: auto; accent-color: var(--clay); }
+.search-result-export-tools input[type=checkbox] { width: 16px; accent-color: var(--clay); }
+.search-result-export-tools input[type=checkbox]:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { height: 16px; min-height: auto; }
 .search-result-export progress { max-width: 100%; accent-color: var(--clay); }
 .global-search-panel .search-result-collect { margin: 6px 0 0 8px; }
-.global-search-panel .search-result-collect[aria-pressed=true] { background: var(--clay-light); border-color: var(--clay); }
 @media (max-width: 640px) { .search-result-export { margin: 0 10px 8px; max-height: 190px; } .search-result-export-tools label { flex-basis: 100%; } }
