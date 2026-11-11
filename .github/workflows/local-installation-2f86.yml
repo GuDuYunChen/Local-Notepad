@@ -117,140 +117,25 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      # The exact PR merge commit is not reachable from verifier-branch checkout,
-      # even with fetch-depth: 0. Read only the existing PR merge ref and reject
-      # any product SHA/tree drift; do not change the verifier working tree.
-      - name: Fetch exact pinned product merge source for full application identity checks
+      # Fetch approved immutable PR merge object for source identity checks.
+      # Verifier checkout history cannot resolve the synthetic merge SHA.
+      - name: Fetch and verify accepted product merge object for app matrices
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           $pin = Get-Content -Raw -LiteralPath scripts/reading-mode-installer-pin.json | ConvertFrom-Json
           $ledger = Get-Content -Raw -LiteralPath scripts/full-app-ui-routes.json | ConvertFrom-Json
           $expected = [string]$pin.product
-          if ($expected -cnotmatch '^[a-f0-9]{40}
-        with:
-          node-version: '24'
-      - name: Use the product Go version for exact record-byte contracts
-        uses: actions/setup-go@v7
-        with:
-          go-version: '1.24.11'
-          cache: false
-      - name: Verify the unchanged dependency lock
-        run: node scripts/verify-dependency-lock.mjs
-      - name: Install exact verifier dependencies
-        run: npm ci --no-audit --no-fund
-      - name: Ensure package inputs were not modified
-        run: git diff --exit-code -- package.json package-lock.json
-      - name: Download the preceding original installed acceptance evidence
-        uses: actions/download-artifact@v4
-        with:
-          name: local-notepad-install-lifecycle-${{ github.sha }}
-          path: .accepted-installation
-      # The pin reader imports original source validators; their ESM imports
-      # require both canonical desktop fixture bundles even for `outputs`.
-      # Build before resolving pins, without altering any acceptance assertions.
-      - name: Build canonical fixtures before the source-bound pin reader
-        shell: pwsh
-        run: |
-          node scripts/build-reading-mode-fixture.mjs
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          node scripts/build-local-export-fixture.mjs
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Resolve the exact existing binary and source pin
-        id: reading-pin
-        run: node scripts/pin-reading-mode-installer.mjs outputs
-      - name: Verify current and retained historical artifact identities
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node scripts/pin-reading-mode-installer.mjs verify-artifacts
-      - name: Download the exact accepted old installer for original source preparation
-        uses: actions/download-artifact@v4
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: ${{ steps.reading-pin.outputs.previous-run }}
-          name: ${{ steps.reading-pin.outputs.previous-name }}
-          path: .installer-input/previous
-      - name: Download the same accepted current installer
-        uses: actions/download-artifact@v4
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: ${{ steps.reading-pin.outputs.current-run }}
-          name: ${{ steps.reading-pin.outputs.current-name }}
-          path: .installer-input/current
-      - name: Reproduce the original verified serializer and lifecycle source preparation
-        shell: pwsh
-        run: |
-          node scripts/build-reading-mode-fixture.mjs
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          node scripts/build-local-export-fixture.mjs
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          node scripts/pin-reading-mode-installer.mjs prepare
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          node scripts/run-reading-mode-installer.mjs prepare
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Refuse incomplete routes, screenshots, native bounds and cross-runner identity claims
-        run: node --test scripts/full-app-ui-evidence.node.mjs scripts/full-app-ui-shared.node.mjs scripts/full-app-ui-local-sync-seed.node.mjs
-      - name: Fresh install and actual application page matrix
-        run: node scripts/run-full-app-ui-installed.mjs ${{ matrix.group }}
-      - name: Retain successful or failed page-matrix evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: local-notepad-full-app-ui-${{ matrix.group }}-${{ github.sha }}
-          path: |
-            test-results/full-app-ui/${{ matrix.group }}/
-          if-no-files-found: error
-          retention-days: 14
-
-  full-application-ui-acceptance:
-    name: Validate the complete actual application matrix
-    needs: [install-upgrade-uninstall, full-application-ui]
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: '24'
-      - uses: actions/download-artifact@v4
-        with:
-          name: local-notepad-full-app-ui-settings-${{ github.sha }}
-          path: test-results/full-app-ui/settings
-      - uses: actions/download-artifact@v4
-        with:
-          name: local-notepad-full-app-ui-projects-${{ github.sha }}
-          path: test-results/full-app-ui/projects
-      - uses: actions/download-artifact@v4
-        with:
-          name: local-notepad-full-app-ui-research-${{ github.sha }}
-          path: test-results/full-app-ui/research
-      - uses: actions/download-artifact@v4
-        with:
-          name: local-notepad-full-app-ui-editor-${{ github.sha }}
-          path: test-results/full-app-ui/editor
-      - uses: actions/download-artifact@v4
-        with:
-          name: local-notepad-full-app-ui-local-sync-lab-${{ github.sha }}
-          path: test-results/full-app-ui/local-sync-lab
-      - name: Require all original prerequisites, all groups, and zero unmapped pages
-        run: node scripts/full-app-ui-evidence.mjs aggregate
-      - name: Retain the aggregate receipt without replacing original artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: local-notepad-full-app-ui-accepted-${{ github.sha }}
-          path: test-results/full-app-ui/full-app-ui-accepted.json
-          if-no-files-found: error
-          retention-days: 14
-) { throw 'Invalid pinned product commit' }
+          if ($expected -cnotmatch '^[a-f0-9]{40}$') { throw 'Invalid product commit pin' }
           git fetch --no-tags origin refs/pull/29/merge
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $actual = (git rev-parse --verify FETCH_HEAD).Trim()
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          if ($actual -cne $expected) { throw "PR merge source changed: expected $expected; fetched $actual" }
+          if ($actual -cne $expected) { throw 'Current PR merge has changed from accepted product commit' }
           $productTree = (git rev-parse --verify "$expected^{tree}").Trim()
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          if ($productTree -cne [string]$ledger.productSource.tree) { throw 'Pinned product tree differs from verified matrix ledger' }
-          if ((git rev-parse --verify HEAD).Trim() -cne $env:GITHUB_SHA) { throw 'Verifier checkout changed during source fetch' }
+          if ($productTree -cne [string]$ledger.productSource.tree) { throw 'Accepted product tree changed' }
+          if ((git rev-parse --verify HEAD).Trim() -cne $env:GITHUB_SHA) { throw 'Verifier HEAD changed' }
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
