@@ -145,8 +145,17 @@ export async function prepareNavigationNoteSelection(ctx, file) {
   const selector = '.file-list [data-file-id=' + q(safeId(file.id)) + '] .title'
   const observe = () => evaluate(`(${observeNavigationLibrary.toString()})(${q(owned)})`)
   const receipt = navigationReadiness(ctx, 'owned-note-selection', { fileId: file.id, title: file.title, selector, before: await observe() })
-  assert.equal(await evaluate(`document.querySelector(${q(selector)})?.textContent.trim()===${q(file.title)}`), true,
-    'Navigation readiness requires the exact owned row title')
+  // FileList deliberately hides the filename extension in its painted row,
+  // while retaining the exact full filename in the row's native title.
+  // Validate both identities, including a possible decorative pin icon.
+  assert.equal(await evaluate(`(() => {
+    const row = document.querySelector(${q(selector)}), name = ${q(file.title)};
+    if (!row || row.getAttribute('title') !== name) return false;
+    const painted = row.cloneNode(true);
+    painted.querySelectorAll('.pin-icon').forEach(icon => icon.remove());
+    const dot = name.lastIndexOf('.'), expectedLabel = dot > 0 ? name.slice(0, dot) : name;
+    return painted.textContent.trim() === expectedLabel;
+  })()`), true, 'Navigation readiness requires the exact owned row title')
   receipt.firstEventIndex = await evaluate('window.__fullAppUiEvents.length'); save()
   await click(selector)
   await until(async () => {

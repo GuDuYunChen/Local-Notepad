@@ -127,7 +127,9 @@ export async function verifyLocalSyncLabPages(ctx) {
   await shot('lab-sync-history', 'loaded', [historyRoot + ' input[data-history-query]'], ['已读取 25 条记录'])
   await hit('[data-history-more]')
   await until(() => evaluate('document.querySelectorAll("[data-history-row]").length===26&&!document.querySelector("[data-history-more]")'), 'Actual earlier history was not appended')
-  await shot('lab-sync-history', 'earlier-records', ['.sync-conflict-history-feedback'], ['已读取 26 条记录'])
+  // Two status paragraphs intentionally share this class. Select the real
+  // primary loaded-count status, not the independent search-status paragraph.
+  await shot('lab-sync-history', 'earlier-records', [historyRoot + ' > .sync-conflict-history-feedback:not([data-history-search-feedback])'], ['已读取 26 条记录'])
   await hit('[data-sync-conflict-history] > summary')
 
   const after = await ctx.api('/api/sync/conflicts')
