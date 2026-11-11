@@ -5134,6 +5134,13 @@ body {
   border-radius: 12px;
 }
 
+/* Template cards wrap real content. They retain their original minimum
+   height over the shared content-button 28px minimum; action buttons still
+   use the unmodified 40px shared-control token. */
+.template-card.app-ui-button[data-ui-layout="content"] {
+  min-height: 150px;
+}
+
 .template-card.primary-template {
   background: color-mix(in srgb, var(--paper-deep) 74%, var(--surface));
 }

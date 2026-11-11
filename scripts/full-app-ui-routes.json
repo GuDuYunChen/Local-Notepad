@@ -3,8 +3,8 @@
   "scope": "installed-actual-app-page-matrix",
   "sourceScope": "control-source entry coverage with declared states; not every possible failure combination",
   "productSource": {
-    "commit": "d6fe7db2a00a7f2623815f7426a65ed202104242",
-    "tree": "02b9e80943aadf1bd1f82996006b8e48c55283e9",
+    "commit": "f8169da4f7a4f084870996c124283e6b50c79160",
+    "tree": "d4e5d57758e81839b9c967d64be2ef826128214e",
     "dirty": false
   },
   "inventory": {
@@ -4147,9 +4147,9 @@
     },
     {
       "file": "src/components/TemplateSelector.jsx",
-      "bytes": 5800,
-      "sha256": "7606b4bc9a7cd763f46f42cb33762826c8a9eff9662c29a9b6c5a4a6624765de",
-      "blob": "505a691f58d4389689ab3c6b3f7e1579ebf2ac1a",
+      "bytes": 5831,
+      "sha256": "4ea49a06f7a3f02bcef86c723c5cfb325ceeab9498fdde9df0c6d9dc711380c7",
+      "blob": "333ffbd0b73db7c3dda8fd6b85c478d94086a6e2",
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [

@@ -168,6 +168,7 @@ export default function TemplateSelector({ open, onClose, onSelect, onCreated, b
             <UiButton
               key={template.id}
               type="button"
+              layout="content"
               className={`template-card${index === 0 ? ' primary-template' : ''}`}
               onClick={() => choose(template)}
             >
