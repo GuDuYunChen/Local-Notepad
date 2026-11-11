@@ -17,6 +17,35 @@ export function withinActualClientPort(rect, bounds, metrics, overflowX, overflo
     (!/hidden|auto|scroll|clip/.test(overflowY) || (rect.top >= top - tolerance && rect.bottom <= top + metrics.clientHeight + tolerance))
 }
 
+
+/* CSS fixed elements escape ordinary ancestors' overflow, but not a
+   transform/filter/contain-created fixed containing block. This boundary
+   never replaces the actual viewport, modal scroll-port or painted hit gates. */
+export function viewportFixedClipBoundary(node) {
+  for (let fixed = node; fixed; fixed = fixed.parentElement) {
+    if (getComputedStyle(fixed).position !== 'fixed') continue
+    let contained = false
+    for (let ancestor = fixed.parentElement; ancestor; ancestor = ancestor.parentElement) {
+      const css = getComputedStyle(ancestor)
+      if ((css.transform && css.transform !== 'none') ||
+          (css.perspective && css.perspective !== 'none') ||
+          (css.filter && css.filter !== 'none') ||
+          (css.backdropFilter && css.backdropFilter !== 'none') ||
+          (css.translate && css.translate !== 'none') ||
+          (css.rotate && css.rotate !== 'none') ||
+          (css.scale && css.scale !== 'none') ||
+          ['layout', 'paint', 'content', 'strict'].some(word => String(css.contain || '').split(' ').includes(word)) ||
+          ['transform', 'perspective', 'filter', 'backdrop-filter'].some(word => String(css.willChange || '').includes(word)) ||
+          css.contentVisibility === 'auto' || css.contentVisibility === 'hidden') {
+        contained = true
+        break
+      }
+    }
+    if (!contained) return fixed
+  }
+  return null
+}
+
 // CSS Overflow viewport propagation changes the used clipping owner, while
 // getComputedStyle still reports the root/body declarations. Read that owner
 // once per native observation; real nested client ports remain independent.
@@ -94,7 +123,7 @@ export async function waitForFiniteOwnerMotion(read, until, receipt = {}) {
 
 // This runs in the real App renderer. It observes existing nodes and CSS; it
 // does not mount a fixture, assign field values or alter application styling.
-export function observeFullAppPage({ root, anchors = [], editorExceptions = [], onlySelectors = [] }, withinClientPort, readOverflowViewport) {
+export function observeFullAppPage({ root, anchors = [], editorExceptions = [], onlySelectors = [] }, withinClientPort, readOverflowViewport, fixedBoundaryFor = () => null) {
   const overflowViewport = readOverflowViewport(), viewport = overflowViewport.bounds
   const bounds = node => {
     const box = node.getBoundingClientRect()
@@ -139,10 +168,13 @@ export function observeFullAppPage({ root, anchors = [], editorExceptions = [], 
   }
   const observe = (node, checkPaintedFragments = false) => {
     const box = bounds(node), visible = painted(node), clippingAncestors = []
+    const fixedBoundary = fixedBoundaryFor(node)
+    let beyondFixed = fixedBoundary === node
     let inViewport = box.left >= -1 && box.top >= -1 && box.right <= viewport.right + 1 && box.bottom <= viewport.bottom + 1
     for (let parent = node.parentElement; parent; parent = parent.parentElement) {
       const css = getComputedStyle(parent), clip = bounds(parent), applied = overflowViewport.local(parent, css)
-      inViewport &&= withinClientPort(box, clip, parent, applied.x, applied.y)
+      if (!beyondFixed) inViewport &&= withinClientPort(box, clip, parent, applied.x, applied.y)
+      if (parent === fixedBoundary) beyondFixed = true
       clippingAncestors.push({ tag: parent.tagName, id: parent.id, bounds: clip,
         clientPort: { left: clip.left + parent.clientLeft, top: clip.top + parent.clientTop, width: parent.clientWidth, height: parent.clientHeight },
         overflowX: css.overflowX, overflowY: css.overflowY, appliedOverflowX: applied.x, appliedOverflowY: applied.y, viewportApplied: applied.viewportApplied })
@@ -263,7 +295,7 @@ export function observeFullAppPage({ root, anchors = [], editorExceptions = [], 
     overflow: { document: Math.max(0, document.documentElement.scrollWidth - innerWidth), root: Math.max(0, area.scrollWidth - area.clientWidth), allowed: [] } }
 }
 
-export function observeFullAppFocus(selector, visibleShadow, withinClientPort, readOverflowViewport) {
+export function observeFullAppFocus(selector, visibleShadow, withinClientPort, readOverflowViewport, fixedBoundaryFor = () => null) {
   const overflowViewport = readOverflowViewport(), viewport = overflowViewport.bounds
   const nodes = [...document.querySelectorAll(selector)].filter(node => node.getBoundingClientRect().width > 0)
   if (nodes.length !== 1) throw Error('Expected one native focus target: ' + selector)
@@ -275,11 +307,13 @@ export function observeFullAppFocus(selector, visibleShadow, withinClientPort, r
     if (css.outlineStyle !== 'none' && Number.parseFloat(css.outlineWidth) > 0 && visibleShadow('0 0 0 ' + css.outlineWidth + ' ' + css.outlineColor)) outlines.push({ owner: index ? node.tagName.toLowerCase() + ':' + index : 'root', width: Number.parseFloat(css.outlineWidth), color: css.outlineColor })
     if (visibleShadow(css.boxShadow)) shadows.push({ owner: index ? node.tagName.toLowerCase() + ':' + index : 'root', value: css.boxShadow })
   }
-  const clippingAncestors = []
+  const clippingAncestors = [], fixedBoundary = fixedBoundaryFor(root)
+  let beyondFixed = fixedBoundary === root
   let inViewport = box.left >= -1 && box.top >= -1 && box.right <= viewport.right + 1 && box.bottom <= viewport.bottom + 1
   for (let parent = root.parentElement; parent; parent = parent.parentElement) {
     const css = getComputedStyle(parent), clip = parent.getBoundingClientRect(), applied = overflowViewport.local(parent, css)
-    inViewport &&= withinClientPort(box, clip, parent, applied.x, applied.y)
+    if (!beyondFixed) inViewport &&= withinClientPort(box, clip, parent, applied.x, applied.y)
+    if (parent === fixedBoundary) beyondFixed = true
     clippingAncestors.push({ tag: parent.tagName, id: parent.id,
       bounds: { left: clip.left, top: clip.top, right: clip.right, bottom: clip.bottom, width: clip.width, height: clip.height },
       clientPort: { left: clip.left + parent.clientLeft, top: clip.top + parent.clientTop, width: parent.clientWidth, height: parent.clientHeight },
@@ -292,8 +326,8 @@ export function observeFullAppFocus(selector, visibleShadow, withinClientPort, r
 
 // Read only the repaired real expand control. No scroll, style, focus or React
 // state is changed here; the surrounding driver supplies trusted Tab input.
-export function observeCollapsedSidebarFocus(selector, observeFocus, visibleShadow, withinClientPort, readOverflowViewport) {
-  const sample = observeFocus(selector, visibleShadow, withinClientPort, readOverflowViewport)
+export function observeCollapsedSidebarFocus(selector, observeFocus, visibleShadow, withinClientPort, readOverflowViewport, fixedBoundaryFor = () => null) {
+  const sample = observeFocus(selector, visibleShadow, withinClientPort, readOverflowViewport, fixedBoundaryFor)
   const field = document.querySelector(selector), sidebar = field.closest('.workspace-sidebar')
   const overflow = readOverflowViewport(), css = getComputedStyle(field)
   const bounds = node => { const b = node.getBoundingClientRect(); return { left: b.left, top: b.top, right: b.right, bottom: b.bottom, width: b.width, height: b.height } }
@@ -358,15 +392,18 @@ export function observeCollapsedSidebarFocus(selector, observeFocus, visibleShad
       outline: { width, offset, color: css.outlineColor }, outlineBounds, ringSamples, pointerTransparentOverlaps, scrollPositions } }
 }
 
-export function ensureFullAppTargetVisible(selector, withinClientPort, readOverflowViewport) {
+export function ensureFullAppTargetVisible(selector, withinClientPort, readOverflowViewport, fixedBoundaryFor = () => null) {
   const overflowViewport = readOverflowViewport(), viewport = overflowViewport.bounds
   const nodes = [...document.querySelectorAll(selector)].filter(node => node.getBoundingClientRect().width > 0 && node.getBoundingClientRect().height > 0)
   if (nodes.length !== 1) throw Error('Missing or ambiguous actual scroll target')
   const node = nodes[0], box = node.getBoundingClientRect()
+  const fixedBoundary = fixedBoundaryFor(node)
+  let beyondFixed = fixedBoundary === node
   let fits = box.left >= 0 && box.top >= 0 && box.right <= viewport.right && box.bottom <= viewport.bottom
   for (let parent = node.parentElement; parent; parent = parent.parentElement) {
     const css = getComputedStyle(parent), clip = parent.getBoundingClientRect(), applied = overflowViewport.local(parent, css)
-    fits &&= withinClientPort(box, clip, parent, applied.x, applied.y, 0)
+    if (!beyondFixed) fits &&= withinClientPort(box, clip, parent, applied.x, applied.y, 0)
+    if (parent === fixedBoundary) beyondFixed = true
   }
   if (!fits) node.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'instant' })
   return true
@@ -515,7 +552,7 @@ export function createFullAppUiShared(ctx) {
     for (const type of ['rawKeyDown', 'keyUp']) await cdp.send('Input.dispatchKeyEvent', { type, key: name, windowsVirtualKeyCode: code, nativeVirtualKeyCode: code, modifiers })
   }
   const ensureVisible = async selector => {
-    await evaluate(`(${ensureFullAppTargetVisible.toString()})(${q(selector)},${withinActualClientPort.toString()},${observeFullAppOverflowViewport.toString()})`)
+    await evaluate(`(${ensureFullAppTargetVisible.toString()})(${q(selector)},${withinActualClientPort.toString()},${observeFullAppOverflowViewport.toString()},${viewportFixedClipBoundary.toString()})`)
     await frame()
   }
   const text = async (selector, value) => {
@@ -549,8 +586,8 @@ export function createFullAppUiShared(ctx) {
     ;(ui.fileInputs ||= []).push(receipt); save(); return receipt
   }
   const nameFor = (meta, suffix) => `${slug(meta.group)}-${slug(meta.theme)}-${meta.viewport.width}x${meta.viewport.height}-${slug(meta.routeId)}-${slug(meta.stateId)}-${suffix}.png`
-  const sidebarFocusExpression = `(${observeCollapsedSidebarFocus.toString()})(${q(COLLAPSED_SIDEBAR_EXPAND)},${observeFullAppFocus.toString()},${hasVisibleBoxShadow.toString()},${withinActualClientPort.toString()},${observeFullAppOverflowViewport.toString()})`
-  const samplePage = (route, root, anchors, onlySelectors = [], sidebarFocusRequired = false) => evaluate(`(()=>{const page=(${observeFullAppPage.toString()})(${q({ root, anchors, onlySelectors, editorExceptions: route.editorExceptions || [] })},${withinActualClientPort.toString()},${observeFullAppOverflowViewport.toString()});${sidebarFocusRequired ? `page.sidebarFocus=${sidebarFocusExpression};` : ''}return page;})()`)
+  const sidebarFocusExpression = `(${observeCollapsedSidebarFocus.toString()})(${q(COLLAPSED_SIDEBAR_EXPAND)},${observeFullAppFocus.toString()},${hasVisibleBoxShadow.toString()},${withinActualClientPort.toString()},${observeFullAppOverflowViewport.toString()},${viewportFixedClipBoundary.toString()})`
+  const samplePage = (route, root, anchors, onlySelectors = [], sidebarFocusRequired = false) => evaluate(`(()=>{const page=(${observeFullAppPage.toString()})(${q({ root, anchors, onlySelectors, editorExceptions: route.editorExceptions || [] })},${withinActualClientPort.toString()},${observeFullAppOverflowViewport.toString()},${viewportFixedClipBoundary.toString()});${sidebarFocusRequired ? `page.sidebarFocus=${sidebarFocusExpression};` : ''}return page;})()`)
   const captureState = async ({ routeId, stateId, root, anchors = [], requiredText = [], allowHorizontalScroll = [], coverageMode = 'route-controls', onlySelectors = [] }) => {
     const route = routeFor(routeId), registeredRoot = route.stateRoots?.[stateId] || route.root
     root ||= registeredRoot
@@ -706,7 +743,7 @@ export function createFullAppUiShared(ctx) {
       if (await evaluate(`document.activeElement===document.querySelector(${q(selector)})`)) { reached = true; break }
     }
     assert.equal(reached, true, 'Actual Tab order never reached control: ' + selector)
-    const sample = { ...binding(meta), ...await evaluate(sidebarFocusRequired ? sidebarFocusExpression : `(${observeFullAppFocus.toString()})(${q(selector)},${hasVisibleBoxShadow.toString()},${withinActualClientPort.toString()},${observeFullAppOverflowViewport.toString()})`),
+    const sample = { ...binding(meta), ...await evaluate(sidebarFocusRequired ? sidebarFocusExpression : `(${observeFullAppFocus.toString()})(${q(selector)},${hasVisibleBoxShadow.toString()},${withinActualClientPort.toString()},${observeFullAppOverflowViewport.toString()},${viewportFixedClipBoundary.toString()})`),
       ...(sidebarFocusRequired ? { beforeTab, motion } : {}) }
     sample.events = await events(first); sample.trustedTab = sample.events.some(event => event.type === 'keydown' && event.key === 'Tab' && event.trusted)
     if (pendingSidebarFocus) Object.assign(pendingSidebarFocus, sample)
