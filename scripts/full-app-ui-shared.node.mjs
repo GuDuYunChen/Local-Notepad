@@ -287,6 +287,52 @@ test('serialized input and password measurements use their real affix but keep t
     validateFullAppPageSample(result, matrix)
   }
 })
+test('transparent project checkbox keeps its native field and measures only the owned painted label', () => {
+  const f = overflowFixture(), { rectangle } = f
+  delete f.control.dataset.uiControl
+  f.control.dataset.uiNative = 'checkbox'
+  f.control.type = 'checkbox'
+  f.control.checked = false
+  f.control.css.opacity = '0'
+  f.control.css.pointerEvents = 'none'
+  f.control.box = rectangle(25, 45, 15, 15)
+  const label = f.make('label', 'chapter-label', rectangle(18, 40, 30, 28), f.page)
+  label.className = 'project-chapter-select'
+  label.classList = { contains: name => name === 'project-chapter-select' }
+  f.page.children = f.page.children.filter(node => node !== f.control)
+  label.children.unshift(f.control)
+  f.control.parentElement = label
+  const mark = f.make('span', 'chapter-paint', rectangle(25, 45, 15, 15), label)
+  mark.getAttribute = name => name === 'aria-hidden' ? 'true' : name === 'id' ? mark.id : null
+  f.control.nextElementSibling = mark
+  f.document.elementFromPoint = () => mark
+  const observe = () => JSON.parse(JSON.stringify(runInNewContext(
+    '(' + viewportObservers.observeFullAppPage.toString() + ')({root:".actual-page",anchors:[]},' +
+      withinActualClientPort.toString() + ',' + viewportObservers.observeFullAppOverflowViewport.toString() + ')', f.globals)))
+  const first = observe(), control = first.controls[0]
+  assert.equal(first.controls.length, 1)
+  assert.equal(control.kind, 'input')
+  assert.equal(control.classification, 'native')
+  assert.equal(control.nativeType, 'checkbox')
+  assert.equal(control.selector, '[id="chapter-paint"]')
+  assert.equal(control.fieldSelector, '[id="control"]')
+  assert.equal(control.nativePresentation?.owner, 'project-chapter-select-label')
+  assert.equal(control.nativePresentation.inputChecked, false)
+  assert.equal(control.visible, true); assert.equal(control.hit, true)
+  validateFullAppPageSample(first, matrix)
+  f.control.checked = true
+  const checked = observe()
+  assert.equal(checked.controls[0].nativePresentation.inputChecked, true)
+  validateFullAppCaptureContinuity(first, checked, matrix)
+  mark.css.opacity = '0'
+  assert.throws(() => validateFullAppPageSample(observe(), matrix), /hidden, clipped or obscured/)
+  mark.css.opacity = '1'
+  mark.getAttribute = name => name === 'id' ? mark.id : null
+  const unowned = observe()
+  assert.equal(unowned.controls[0].selector, '[id="control"]')
+  assert.throws(() => validateFullAppPageSample(unowned, matrix), /hidden, clipped or obscured/)
+})
+
 test('ordinary shared input without an affix keeps its own geometry despite an unrelated affix sibling', () => {
   const f = overflowFixture(), unrelated = f.make('span', 'unrelated-affix', f.rectangle(200, 80, 190, 28), f.page)
   unrelated.className = 'ant-input-affix-wrapper ant-input-affix-wrapper-sm'

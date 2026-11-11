@@ -3,8 +3,8 @@
   "scope": "installed-actual-app-page-matrix",
   "sourceScope": "control-source entry coverage with declared states; not every possible failure combination",
   "productSource": {
-    "commit": "407cf6f99e2833d28b12f3d8c6e94397b91940de",
-    "tree": "e8def944fe35d8f3c4d74367565072dc0ed62b0b",
+    "commit": "59eaf6298d653dd6b23ca023694ba5f14f9911f4",
+    "tree": "ccd682653775f7bc5ad2c6851abe6218f80ace02",
     "dirty": false
   },
   "inventory": {
@@ -4314,9 +4314,9 @@
     },
     {
       "file": "src/components/WorkspaceSidebar.jsx",
-      "bytes": 8155,
-      "sha256": "a0697c37d7e7f834be0e2f9795eb09efffc98fab494e4be8012ce27fb19e949b",
-      "blob": "8ced7cca61fd37167354e848372c81166cd4478a",
+      "bytes": 8373,
+      "sha256": "4b538da222ec940d62d1c16361782eba719b3f2b0198be6786ab83f0bf4f594e",
+      "blob": "6ecfe1c6dd3f671771200964bebeba87b070fa11",
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [

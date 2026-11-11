@@ -860,6 +860,7 @@ body {
 }
 
 .file-library-title-row {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -898,9 +899,11 @@ body {
   gap: 5px !important;
 }
 
+/* Use the full title row as the popup anchor, including the new button
+   wrapper whose original inline position would otherwise narrow the anchor. */
 .file-more-wrap,
 .file-new-wrap {
-  position: relative;
+  position: static !important;
 }
 
 .file-more-btn {
@@ -911,9 +914,12 @@ body {
 .file-action-menu {
   position: absolute !important;
   top: calc(100% + 6px) !important;
-  left: 0 !important;
+  left: auto !important;
+  right: 0;
   z-index: 120 !important;
-  min-width: 190px;
+  width: 218px;
+  max-width: calc(100% + 12px);
+  min-width: min(218px, calc(100% + 12px)) !important;
   padding: 5px !important;
   border: 1px solid var(--line) !important;
   border-radius: 10px !important;
@@ -4554,6 +4560,17 @@ body {
   background: color-mix(in srgb, var(--paper) 88%, var(--surface)) !important;
 }
 
+/* Scroll navigation and the library together when the window is short.
+   Keep the persistent footer and its popover outside this clipping boundary. */
+.workspace-sidebar-scroll {
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
 .workspace-sidebar-top {
   flex: 0 0 auto;
   padding: 10px 10px 8px;
@@ -4676,6 +4693,12 @@ body {
   font-weight: 620;
 }
 
+/* Header (117px), tree padding (26px), and one full action row (63px)
+   need more than 206px; keep that space instead of shrinking the tree to padding. */
+.workspace-sidebar:not(.collapsed) .workspace-sidebar-scroll > .workspace-sidebar-library {
+  min-height: 216px;
+}
+
 .workspace-sidebar-library {
   min-height: 0;
   flex: 1;
@@ -4686,6 +4709,23 @@ body {
 
 .workspace-sidebar-library .file-list {
   height: 100%;
+}
+
+/* Keep the note tree usable at the real 704x455 Windows client size.
+   The fixed-height navigation and footer previously squeezed its 40px actions
+   into a 26px tree scrollport. Scroll navigation, not official row controls. */
+@media (max-height: 560px) {
+  .workspace-sidebar:not(.collapsed) .workspace-sidebar-top {
+    flex: 0 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .workspace-sidebar:not(.collapsed) .workspace-sidebar-library {
+    flex: 1 0 136px;
+    min-height: 136px;
+  }
 }
 
 .workspace-sidebar-library .file-library-header {
@@ -4912,14 +4952,14 @@ body {
 /* -------------------------------------------------------------------------- */
 .file-action-menu,
 .file-context-menu {
-  min-width: 218px !important;
   padding: 6px !important;
   border-radius: 12px !important;
   box-shadow: 0 18px 44px rgba(25, 20, 46, .16) !important;
 }
 
 .file-more-menu {
-  min-width: 244px !important;
+  width: 244px;
+  min-width: min(244px, calc(100% + 12px)) !important;
 }
 
 .file-action-menu .menu-item,
@@ -4993,6 +5033,7 @@ body {
 }
 
 .file-context-menu {
+  min-width: 218px !important;
   max-width: min(248px, calc(100vw - 20px));
 }
 

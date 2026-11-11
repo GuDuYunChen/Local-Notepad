@@ -374,6 +374,9 @@ export async function verifyResearchPages(ctx) {
   await ui.press('.global-search-preview', '打开笔记'); await ui.absent('.global-search-panel')
   await ui.present(route('research-return').root)
   await shot('research-return', 'opened', [route('research-return').root + ' button:first-of-type'])
+  // Establish native keyboard traversal from the actual inert return-bar heading.
+  // The original trusted Tab sweep and all visible-focus assertions are unchanged.
+  await ui.hit(route('research-return').root + ' > div > strong')
   await focus('research-return', 'opened', route('research-return').root + ' button:first-of-type')
   await ui.press(route('research-return').root, '返回检索结果'); await ui.present('.global-search-panel')
   await ui.selectCollection(fixture.primary.key)

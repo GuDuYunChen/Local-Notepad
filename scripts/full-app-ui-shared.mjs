@@ -158,7 +158,16 @@ export function observeFullAppPage({ root, anchors = [], editorExceptions = [], 
     if (!shared && (node.type === 'hidden' || node.classList.contains('app-ui-validation-field'))) continue
     const kind = shared?.dataset.uiControl || node.tagName.toLowerCase()
     const field = kind === 'select' && shared ? node.querySelector('[role="combobox"]') : node.matches('input,textarea,button,select') ? node : node.querySelector('input,textarea,button,select')
-    const visual = kind === 'select' && shared ? node.querySelector('.app-ui-select') : ['input', 'password'].includes(kind) ? field?.closest('.ant-input-affix-wrapper') || node : node
+    // A native project checkbox paints its adjacent mark, while the real input
+    // stays transparent. Measure the mark only within this exact owned label.
+    // All native classification, hit, visibility and keyboard gates remain.
+    const nativeCheckboxMark = !shared && node.tagName === 'INPUT' && node.type === 'checkbox' &&
+      node.dataset.uiNative === 'checkbox' && node.parentElement?.tagName === 'LABEL' &&
+      node.parentElement.classList.contains('project-chapter-select') &&
+      node.nextElementSibling?.tagName === 'SPAN' &&
+      node.nextElementSibling.getAttribute('aria-hidden') === 'true' ? node.nextElementSibling : null
+    const visual = kind === 'select' && shared ? node.querySelector('.app-ui-select') : nativeCheckboxMark ||
+      (['input', 'password'].includes(kind) ? field?.closest('.ant-input-affix-wrapper') || node : node)
     if (!visual || owners.has(visual) || !rendered(visual)) continue
     owners.add(visual)
     const nativeType = shared ? null : node.type || node.tagName.toLowerCase()
@@ -177,6 +186,8 @@ export function observeFullAppPage({ root, anchors = [], editorExceptions = [], 
     const css = getComputedStyle(visual)
     item.computed = { color: css.color, background: css.backgroundColor, border: css.borderTopColor, whiteSpace: css.whiteSpace,
       lineHeight: css.lineHeight, fontSize: css.fontSize, overflowX: css.overflowX, opacity: css.opacity }
+    if (nativeCheckboxMark) item.nativePresentation = { owner: 'project-chapter-select-label',
+      inputChecked: Boolean(node.checked), inputNativeType: node.type, visibleMarkSelector: selector(nativeCheckboxMark) }
     if (exception) item.semanticException = { selector: exception.selector, source: exception.source, reason: exception.reason }
     if (kind === 'password' && field) {
       const css = getComputedStyle(field)

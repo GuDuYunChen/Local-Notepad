@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import UiThemeProvider from './ui/UiThemeProvider';
 import { setUiValue, uiDisabled, uiOptions, uiQuery, uiQueryAll, uiText, uiValue } from "~/test/uiControlDriver";import React from 'react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -185,6 +186,65 @@ describe('UI redesign smoke tests', () => {
     expect(uiQuery(container, '.workspace-sidebar').classList.contains('collapsed')).toBe(true);
     expect(uiQuery(container, '[data-library="true"]')).toBeNull();
     expect(uiQuery(container, 'button[aria-label="展开侧边栏"]')).toBeTruthy();
+  });
+
+  it('keeps navigation and the library scrollable without enclosing the persistent menu', async () => {
+    // This checks the real DOM/CSS ownership contract, not browser layout.
+    // The native 704x455 failure retained only 26px of tree padding for a 40px action.
+    const stylesheet = document.createElement('style');
+    stylesheet.textContent = readFileSync(process.cwd() + '/src/styles/redesign.css', 'utf8');
+    document.head.appendChild(stylesheet);
+    const onOpenSearch = vi.fn();
+    const onChangeWorkspace = vi.fn();
+    const onToggleCollapsed = vi.fn();
+    const onLibraryAction = vi.fn();
+    const renderSidebar = (collapsed) => act(async () => {
+      root.render(<UiThemeProvider><WorkspaceSidebar activeWorkspace="notes" collapsed={collapsed}
+        onOpenSearch={onOpenSearch} onChangeWorkspace={onChangeWorkspace}
+        onToggleCollapsed={onToggleCollapsed} onOpenLocalActions={() => {}}>
+        <button type="button" onClick={onLibraryAction}>资料库操作</button>
+      </WorkspaceSidebar></UiThemeProvider>);
+    });
+    try {
+      await renderSidebar(false);
+      const sidebar = container.querySelector('.workspace-sidebar');
+      const navigation = container.querySelector('nav[aria-label="主要功能"]');
+      const library = container.querySelector('.workspace-sidebar-library');
+      const footer = container.querySelector('.workspace-sidebar-bottom');
+      let scrollOwner = library.parentElement;
+      while (scrollOwner && scrollOwner !== sidebar && !['auto', 'scroll'].includes(getComputedStyle(scrollOwner).overflowY)) {
+        scrollOwner = scrollOwner.parentElement;
+      }
+      expect(scrollOwner).not.toBe(sidebar);
+      expect(scrollOwner).not.toBeNull();
+      expect(scrollOwner.contains(navigation)).toBe(true);
+      expect(scrollOwner.contains(library)).toBe(true);
+      expect(scrollOwner.contains(footer)).toBe(false);
+      // Production header + tree padding + one complete row + library border.
+      expect(parseFloat(getComputedStyle(library).minHeight)).toBeGreaterThanOrEqual(207);
+      const libraryAction = library.querySelector('button');
+      libraryAction.focus();
+      expect(document.activeElement).toBe(libraryAction);
+      await click(libraryAction);
+      expect(onLibraryAction).toHaveBeenCalledTimes(1);
+      await click(sidebar.querySelector('button[aria-label="搜索笔记"]'));
+      expect(onOpenSearch).toHaveBeenCalledTimes(1);
+      await click(sidebar.querySelector('button[aria-label="更多功能"]'));
+      const menu = sidebar.querySelector('[role="menu"]');
+      expect(footer.contains(menu)).toBe(true);
+      expect(scrollOwner.contains(menu)).toBe(false);
+      await act(async () => menu.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+      expect(sidebar.querySelector('[role="menu"]')).toBeNull();
+      expect(onChangeWorkspace).not.toHaveBeenCalled();
+      await renderSidebar(true);
+      expect(container.querySelector('.workspace-sidebar-library')).toBeNull();
+      const expand = container.querySelector('button[aria-label="展开侧边栏"]');
+      expect(expand).not.toBeNull();
+      await click(expand);
+      expect(onToggleCollapsed).toHaveBeenCalledTimes(1);
+    } finally {
+      stylesheet.remove();
+    }
   });
 
   it('sorts pinned and newly created library items predictably', () => {
