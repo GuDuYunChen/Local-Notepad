@@ -1,5 +1,6 @@
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
+import { readFileSync } from 'node:fs'
 import { test, expect, vi } from 'vitest'
 import TemplateSelector from './TemplateSelector'
 import UiThemeProvider from './ui/UiThemeProvider'
@@ -36,4 +37,9 @@ test('template tiles declare content layout without reclassifying ordinary actio
     host.remove()
     delete globalThis.IS_REACT_ACT_ENVIRONMENT
   }
+})
+
+test('template card minimum remains 150px after shared content-layout sizing', () => {
+  const css = readFileSync(new URL('../styles/redesign.css', import.meta.url), 'utf8')
+  expect(css).toMatch(/\\.template-card\\.app-ui-button\\[data-ui-layout="content"\\]\\s*\\{[^}]*min-height:\\s*150px\\s*;/)
 })
