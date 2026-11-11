@@ -887,8 +887,10 @@
 
 .project-chapter-card {
   min-height: 58px;
+  flex: 0 0 auto;
   position: relative;
   display: flex;
+  flex-wrap: wrap;
   align-items: stretch;
   gap: 5px;
   padding: 5px;
@@ -979,24 +981,25 @@
 
 .project-chapter-open {
   min-width: 0;
-  flex: 1;
+  flex: 0 0 auto;
   text-align: left;
   cursor: pointer;
 }
 
-/* The chapter action uses the shared middle-size 40px button token.
-   Do not shrink it when the chapter card has a constrained flex height. */
-.project-chapter-main > .project-chapter-open.app-ui-button {
-  flex: 0 0 40px;
-  min-height: 40px;
+.project-chapter-open > span,
+.project-chapter-caption {
+  min-width: 0;
+  max-width: 100%;
 }
 
-.project-chapter-open strong,
-.project-chapter-open span {
+.project-chapter-caption,
+.project-chapter-caption strong,
+.project-chapter-meta {
   display: block;
+  line-height: 1.2;
 }
 
-.project-chapter-open strong {
+.project-chapter-caption strong {
   overflow: hidden;
   font-size: 9px;
   font-weight: 610;
@@ -1004,8 +1007,11 @@
   white-space: nowrap;
 }
 
-.project-chapter-open span {
+.project-chapter-meta {
   margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--ink-muted);
   font-size: 7px;
 }
@@ -1054,6 +1060,7 @@
 
 .project-chapter-status {
   min-width: 38px;
+  margin-left: auto;
   align-self: center;
   padding: 4px 5px;
   border: 0;
@@ -1425,19 +1432,31 @@
 
 .project-chapter-main {
   min-width: 0;
-  flex: 1;
+  /* Give the title and summary their own row above the standard-size actions. */
+  flex: 1 1 100%;
   display: flex;
   flex-direction: column;
 }
 
+.project-chapter-card.selection-mode .project-chapter-main {
+  flex: 1;
+}
+
 .project-chapter-summary {
   min-width: 0;
+  flex: 0 0 auto;
   margin: 1px 4px 3px;
   overflow: hidden;
   text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
   cursor: text;
+}
+
+.project-chapter-summary > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .project-chapter-summary-editor {

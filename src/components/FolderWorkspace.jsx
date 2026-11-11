@@ -6,7 +6,7 @@ import { api } from '~/services/api'
 import { FOLDER_JOURNAL, FOLDER_CHANGED, createFolderJournal, folderChildren, folderCurrentMatches, folderIntent, folderPath, readFolderWorkspace, sendFolderChange } from '~/services/folderWorkspace.mjs'
 import './FolderWorkspace.css'
 
-const controls = node => [...(node?.querySelectorAll('button:not(:disabled),input:not(:disabled),select:not(:disabled),[tabindex="0"]') || [])].filter(n => !n.closest('fieldset:disabled,[hidden]'))
+const controls = node => [...(node?.querySelectorAll('button:not(:disabled),input:not(:disabled),select:not(:disabled),[tabindex="0"],summary') || [])].filter(n => !n.closest('fieldset:disabled,[hidden]'))
 const blank = () => ({ kind:'create', name:'' })
 export default function FolderWorkspace({ onClose, onOpenFile }) {
   const [snapshot,setSnapshot] = useState(null), [loading,setLoading] = useState(false), [busy,setBusy] = useState(false), [opening,setOpening] = useState(false), [stale,setStale] = useState(false)
