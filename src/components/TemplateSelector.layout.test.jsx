@@ -40,6 +40,6 @@ test('template tiles declare content layout without reclassifying ordinary actio
 })
 
 test('template card minimum remains 150px after shared content-layout sizing', () => {
-  const css = readFileSync(new URL('../styles/redesign.css', import.meta.url), 'utf8')
+  const css = readFileSync(process.cwd() + '/src/styles/redesign.css', 'utf8')
   expect(css).toMatch(/\.template-card\.app-ui-button\[data-ui-layout="content"\]\s*\{[^}]*min-height:\s*150px\s*;/)
 })
