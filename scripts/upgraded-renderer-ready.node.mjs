@@ -129,6 +129,25 @@ test('the concurrent transport repair and the original 20-second process gates r
 })
 
 
+
+test('historical and current upgrades wait for the real mounted editor before the original close gate', () => {
+  const source = readFileSync(new URL('../.github/scripts/windows-in-place-upgrade.ps1', import.meta.url), 'utf8').replace(/\r\n/g, '\n')
+  const launch = source.indexOf(" $gui=Start-Process -FilePath $app.FullName")
+  const prepare = source.indexOf(" & node (Join-Path $root 'scripts\\upgraded-renderer-ready.mjs') prepare", launch)
+  const close = source.indexOf(" $versionInfo=Invoke-RestMethod 'http://127.0.0.1:27164/json/version'", launch)
+  assert.ok(launch >= 0 && prepare > launch && close > prepare, 'Readiness precedes both upgrade close checks')
+  const guarded = source.slice(launch, close)
+  assert.doesNotMatch(guarded, /if\(\$CurrentCandidate\)/, 'No legacy bypass of renderer readiness')
+  assert.match(guarded, /--note \$id --marker \(\$marker\+"-SAVED-BY-\$\{newVersion\}"\) --deadline \(\$deadline\.ToString\('o'\)\)/)
+  assert.match(guarded, /if\(\$LASTEXITCODE -ne 0\)\{throw 'The actual upgraded renderer was not ready/)
+  assert.match(guarded, /\$r\.rendererReadiness=@\{file='renderer-prepare\.json'/)
+  const failure = source.slice(source.indexOf('}catch{\n $failedUpgrade=$_'), source.indexOf('\nfinally{\n if($gui'))
+  assert.ok(failure.includes('if($gui -and -not $gui.HasExited -and $page){'))
+  assert.ok(failure.includes("upgraded-renderer-ready.mjs') failure"), 'Preserve native and renderer failed-quit evidence for either version')
+  assert.ok(source.includes('$deadline=[DateTime]::UtcNow.AddSeconds(30)'))
+  assert.ok(source.includes('$gui.WaitForExit(20000)'))
+})
+
 test('the current installer upgrade runs before historical upgrade, retaining both strict gates', () => {
   const workflow = readFileSync(new URL('../.github/workflows/ui-redesign-ci.yml', import.meta.url), 'utf8').replace(/\r\n/g, '\n')
   const steps = [

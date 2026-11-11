@@ -117,12 +117,12 @@ try{
  if(!$page){throw 'Upgraded Electron window did not load the packaged renderer and local backend.'}
  $guiNote=Invoke-RestMethod "$guiBase/api/files/$id" -TimeoutSec 5
  if($guiNote.code -ne 0 -or $guiNote.data.content -ne $updated){throw 'The launched upgraded desktop did not read the retained upgraded note.'}
- if($CurrentCandidate){
-  & node (Join-Path $root 'scripts\upgraded-renderer-ready.mjs') prepare --socket $page.webSocketDebuggerUrl --url $page.url --note $id --marker ($marker+"-SAVED-BY-${newVersion}") --deadline ($deadline.ToString('o')) --out $out --pid $gui.Id --exe $app.FullName
-  if($LASTEXITCODE -ne 0){throw 'The actual upgraded renderer was not ready before the original desktop startup deadline.'}
-  $readyFile=Join-Path $out 'renderer-prepare.json'
-  $r.rendererReadiness=@{file='renderer-prepare.json';bytes=(Get-Item $readyFile).Length;sha256=(Get-FileHash $readyFile -Algorithm SHA256).Hash.ToLowerInvariant()}
- }
+ # Do not send Browser.close to a half-mounted editor in either upgrade route.
+ # Both versions retain the original 30-second startup deadline and all quit checks.
+ & node (Join-Path $root 'scripts\upgraded-renderer-ready.mjs') prepare --socket $page.webSocketDebuggerUrl --url $page.url --note $id --marker ($marker+"-SAVED-BY-${newVersion}") --deadline ($deadline.ToString('o')) --out $out --pid $gui.Id --exe $app.FullName
+ if($LASTEXITCODE -ne 0){throw 'The actual upgraded renderer was not ready before the original desktop startup deadline.'}
+ $readyFile=Join-Path $out 'renderer-prepare.json'
+ $r.rendererReadiness=@{file='renderer-prepare.json';bytes=(Get-Item $readyFile).Length;sha256=(Get-FileHash $readyFile -Algorithm SHA256).Hash.ToLowerInvariant()}
  $r.checks.Add("${newVersion}-installed-electron-window-loads-retained-note")
  # Electron may not expose a Win32 MainWindowHandle on a hosted runner. Request the
  # supported Chromium Browser.close command over its loopback DevTools endpoint.
@@ -210,7 +210,7 @@ try{
 }catch{
  $failedUpgrade=$_
  $r.status='failed';$r.error=$_.Exception.Message;$r.finishedAt=[DateTime]::UtcNow.ToString('o')
- if($CurrentCandidate -and $gui -and -not $gui.HasExited -and $page){
+ if($gui -and -not $gui.HasExited -and $page){
   try{
    & node (Join-Path $root 'scripts\upgraded-renderer-ready.mjs') failure --socket $page.webSocketDebuggerUrl --url $page.url --note $id --marker ($marker+"-SAVED-BY-${newVersion}") --out $out --pid $gui.Id --exe $app.FullName
    $r.rendererDiagnosticExitCode=$LASTEXITCODE
