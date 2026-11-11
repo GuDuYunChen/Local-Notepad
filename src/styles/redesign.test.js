@@ -52,6 +52,16 @@ describe('redesign stylesheet architecture', () => {
     expect(rules[2]).not.toMatch(/\bheight:\s*\d+px\s*!important/)
   })
 
+  it('keeps the collapsed More action at the official 40px in narrow windows', () => {
+    const css = readRedesignCss()
+    const narrowRail = css.lastIndexOf('@media (max-width: 820px)')
+    const guard = css.match(/\/\* The persistent collapsed More action[\s\S]*?\*\/\s*\.workspace-sidebar\.collapsed \.workspace-sidebar-more \{([^}]+)\}/)
+    expect(guard).not.toBeNull()
+    expect(css.indexOf(guard[0])).toBeGreaterThan(narrowRail)
+    expect(guard[1]).toMatch(/\bheight:\s*40px\s*!important;/)
+    expect(guard[1]).toMatch(/\bmin-height:\s*40px\s*!important;/)
+  })
+
   it('keeps the redesign stylesheet below the post-cleanup growth budget', () => {
     const css = readRedesignCss()
     expect(Buffer.byteLength(css, 'utf8')).toBeLessThan(106_000)
