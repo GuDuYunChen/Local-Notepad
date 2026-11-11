@@ -750,3 +750,60 @@ test('fractional ranges account for top clipping and remain clamped to native sc
   assert.equal(edge.rangeStart, 0); assert.equal(edge.rangeEnd, 612)
   assert.equal(edge.rangeEnd, edge.scrollHeight - edge.clientHeight)
 })
+
+function fixedModalOverflowFixture() {
+  const f = overflowFixture(), { rectangle } = f
+  f.html.box = rectangle(0, 0, 704, 455); f.html.clientHeight = 455; f.html.scrollHeight = 455; f.html.scrollTop = 0
+  f.body.box = rectangle(0, 0, 704, 455); f.body.scrollHeight = 455
+  f.page.className = 'workspace-sidebar'; f.page.box = rectangle(0, 0, 220, 455)
+  f.page.clientWidth = 220; f.page.clientHeight = 455; f.page.css.overflowX = 'hidden'
+  const overlay = f.make('div', 'modal-overlay', rectangle(0, 0, 704, 455), f.page)
+  overlay.css.position = 'fixed'
+  const dialog = f.make('section', 'modal-surface', rectangle(16, 20, 672, 415), overlay)
+  dialog.className = 'actual-page'; dialog.css.overflowX = 'auto'; dialog.css.overflowY = 'auto'
+  f.page.children = f.page.children.filter(node => node !== f.control)
+  dialog.children.push(f.control); f.control.parentElement = dialog
+  f.control.box = rectangle(610, 40, 48, 40); f.control.clientWidth = 48; f.control.clientHeight = 40
+  f.control.css.outlineStyle = 'solid'; f.control.css.outlineWidth = '2px'
+  f.control.css.outlineColor = 'rgb(112, 87, 217)'
+  f.document.elementFromPoint = () => f.control
+  return { ...f, overlay, dialog }
+}
+function observeFixedModal(f, kind) {
+  const port = withinActualClientPort.toString(), overflow = viewportObservers.observeFullAppOverflowViewport.toString()
+  const fixed = viewportObservers.viewportFixedClipBoundary.toString()
+  const code = kind === 'page'
+    ? `(${viewportObservers.observeFullAppPage.toString()})({root:'.actual-page',anchors:['#control']},${port},${overflow},${fixed})`
+    : `(${viewportObservers.observeFullAppFocus.toString()})('#control',()=>true,${port},${overflow},${fixed})`
+  return JSON.parse(JSON.stringify(runInNewContext(code, f.globals)))
+}
+test('fixed native template modal escapes sidebar overflow but retains focus, viewport, scroll and hit proof', async () => {
+  const f = fixedModalOverflowFixture()
+  const page = observeFixedModal(f, 'page'), focus = observeFixedModal(f, 'focus')
+  assert.equal(page.controls[0].inViewport, true)
+  assert.equal(page.anchors[0].hit, true)
+  assert.equal(focus.inViewport, true); assert.equal(focus.hit, true)
+  assert.equal(focus.focused, true); assert.equal(focus.focusVisible, true)
+  assert.equal(focus.outlines.length, 1)
+  validateFullAppPageSample(page, matrix)
+  await serializedEnsureVisible(f)
+  assert.equal(f.control.scrollCalls.length, 0)
+})
+test('fixed modal still rejects containing-block overflow, inner clipping, offscreen and obscured controls', () => {
+  for (const change of [
+    f => { f.page.css.transform = 'translateZ(0)' },
+    f => { f.page.css.filter = 'blur(0px)' },
+    f => { f.page.css.contain = 'paint' },
+    f => { f.overlay.css.position = 'absolute' },
+    f => { f.dialog.clientWidth = 200; f.dialog.css.overflowX = 'hidden' },
+    f => { f.control.box = f.rectangle(692, 40, 48, 40) },
+  ]) {
+    const f = fixedModalOverflowFixture(); change(f)
+    assert.equal(observeFixedModal(f, 'page').controls[0].inViewport, false)
+    assert.equal(observeFixedModal(f, 'focus').inViewport, false)
+  }
+  const covered = fixedModalOverflowFixture()
+  covered.document.elementFromPoint = () => covered.page
+  assert.equal(observeFixedModal(covered, 'page').controls[0].hit, false)
+  assert.equal(observeFixedModal(covered, 'focus').hit, false)
+})
