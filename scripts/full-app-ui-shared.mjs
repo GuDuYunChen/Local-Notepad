@@ -137,7 +137,7 @@ export function observeFullAppPage({ root, anchors = [], editorExceptions = [], 
     }
     return 'html > ' + parts.join(' > ')
   }
-  const observe = node => {
+  const observe = (node, checkPaintedFragments = false) => {
     const box = bounds(node), visible = painted(node), clippingAncestors = []
     let inViewport = box.left >= -1 && box.top >= -1 && box.right <= viewport.right + 1 && box.bottom <= viewport.bottom + 1
     for (let parent = node.parentElement; parent; parent = parent.parentElement) {
@@ -147,8 +147,15 @@ export function observeFullAppPage({ root, anchors = [], editorExceptions = [], 
         clientPort: { left: clip.left + parent.clientLeft, top: clip.top + parent.clientTop, width: parent.clientWidth, height: parent.clientHeight },
         overflowX: css.overflowX, overflowY: css.overflowY, appliedOverflowX: applied.x, appliedOverflowY: applied.y, viewportApplied: applied.viewportApplied })
     }
-    const hit = visible && inViewport ? document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2) : null
-    return { ...box, visible, inViewport, hit: Boolean(hit && (hit === node || node.contains(hit))), clippingAncestors: inViewport ? [] : clippingAncestors }
+    // An inline label can wrap into separate painted boxes. The centre of
+    // its union can be an unpainted inter-line gap. Check each real painted
+    // fragment for anchors; interactive controls retain the original gate.
+    const hitRects = checkPaintedFragments ? [...node.getClientRects()].filter(rect => rect.width > 0 && rect.height > 0) : [box]
+    const hit = visible && inViewport && hitRects.length > 0 && hitRects.every(rect => {
+      const front = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)
+      return Boolean(front && (front === node || node.contains(front)))
+    })
+    return { ...box, visible, inViewport, hit, clippingAncestors: inViewport ? [] : clippingAncestors }
   }
   const controls = [], owners = new Set(), controlSelector = '[data-ui-control], button, input, select, textarea'
   const candidates = [...(area.matches(controlSelector) ? [area] : []), ...area.querySelectorAll(controlSelector)]
@@ -198,7 +205,7 @@ export function observeFullAppPage({ root, anchors = [], editorExceptions = [], 
   const measuredAnchors = anchors.map(target => {
     const matches = [...document.querySelectorAll(target)].filter(rendered)
     if (matches.length !== 1) throw Error('Expected one rendered anchor: ' + target + ' (' + matches.length + ')')
-    return { selector: target, ...observe(matches[0]) }
+    return { selector: target, ...observe(matches[0], true) }
   })
   const scrollOwners = new Set([area, ...area.querySelectorAll('*')])
   for (let owner = area.parentElement; owner; owner = owner.parentElement) scrollOwners.add(owner)

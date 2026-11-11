@@ -831,7 +831,62 @@ test('a fitting popup frame still permits a longer internally scrolling option l
 })
 
 import { filterNavigationLibrary, prepareNavigationNoteSelection, verifyNavigationPages } from './full-app-ui-navigation.mjs'
-import { createFullAppUiShared } from './full-app-ui-shared.mjs'
+import { createFullAppUiShared, observeFullAppPage } from './full-app-ui-shared.mjs'
+
+
+// Native wrapped labels can occupy two separate painted lines. Their union's
+// centre is blank. All fragments must actually hit the owned label, and a
+// genuinely obscured second line must still be rejected.
+test('native anchor observation accepts wrapped painted fragments but refuses an obscured line', () => {
+  const rect = (left, top, width, height) => ({ left, top, width, height, right: left + width, bottom: top + height })
+  const make = (tag, id, box, parent = null) => {
+    const node = { tagName: tag.toUpperCase(), id, parentElement: parent, children: [], isConnected: true,
+      className: id === 'contract-reading' ? 'contract-reading' : '', dataset: {}, box,
+      clientLeft: 0, clientTop: 0, clientWidth: box.width, clientHeight: box.height,
+      scrollHeight: box.height, scrollWidth: box.width, innerText: 'Full wrapped title',
+      getBoundingClientRect() { return this.box }, getClientRects() { return [this.box] },
+      matches(selector) { return selector === '.contract-reading' && this.id === 'contract-reading' },
+      querySelectorAll() { return [] },
+      contains(other) { return other === this || this.children.some(child => child.contains(other)) },
+    }
+    if (parent) parent.children.push(node)
+    return node
+  }
+  const html = make('html', 'contract-html', rect(0, 0, 704, 455))
+  html.dataset.theme = 'light'
+  const body = make('body', 'contract-body', rect(0, 0, 704, 455), html)
+  const route = make('section', 'contract-reading', rect(0, 0, 704, 455), body)
+  const label = make('strong', 'contract-title', rect(70, 56, 298, 40), route)
+  label.getClientRects = () => [rect(70, 56, 298, 18), rect(70, 78, 94, 18)]
+  let obscureSecondLine = false
+  const document = { documentElement: html, body,
+    querySelectorAll(selector) {
+      if (selector === '.contract-reading') return [route]
+      if (selector === '#contract-title') return [label]
+      return []
+    },
+    elementFromPoint(x, y) {
+      if (x >= 70 && x <= 368 && y >= 56 && y <= 74) return label
+      if (x >= 70 && x <= 164 && y >= 78 && y <= 96) return obscureSecondLine ? route : label
+      return route
+    },
+  }
+  const globals = { document, innerWidth: 704, innerHeight: 455, devicePixelRatio: 1,
+    getComputedStyle: () => ({ display: 'block', visibility: 'visible', opacity: '1', overflowX: 'visible', overflowY: 'visible' }) }
+  const expression = '(' + observeFullAppPage.toString() + ')({root: ".contract-reading", anchors: ["#contract-title"]},' +
+    '()=>true,()=>({bounds:{left:0,top:0,right:704,bottom:455,width:704,height:455},' +
+    'local:()=>({x:"visible",y:"visible"}),propagated:()=>false,isViewportScroller:()=>false,record:{}}))'
+  const originalCentre = rect(70, 56, 298, 40)
+  assert.notEqual(document.elementFromPoint(originalCentre.left + originalCentre.width / 2, originalCentre.top + originalCentre.height / 2), label)
+  const visible = runInNewContext(expression, globals)
+  assert.equal(visible.anchors.length, 1)
+  assert.equal(visible.anchors[0].hit, true)
+  assert.equal(visible.anchors[0].visible, true)
+  assert.equal(visible.anchors[0].inViewport, true)
+  obscureSecondLine = true
+  const obscured = runInNewContext(expression, globals)
+  assert.equal(obscured.anchors[0].hit, false)
+})
 
 function ownedNavigationContract({ width = 704, query = '', selected = 'primary', onText, onClick, onPoll, onRow } = {}) {
   const primary = { id: 'primary', title: 'NAV-CONTRACT 完整主笔记.md' }, alternate = { id: 'alternate', title: 'NAV-CONTRACT 第二篇可打开笔记.md' }
