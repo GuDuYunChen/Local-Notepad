@@ -8,6 +8,20 @@ describe('complete read-only statistics snapshot',()=>{
  it('filters and sorts one immutable snapshot with no network requests',()=>{const s=validateLibraryStatistics(fixture(60));expect(statisticsNotes(s,{filter:'untagged'})).toHaveLength(59);expect(statisticsNotes(s,{filter:'pinned'})).toHaveLength(1);expect(statisticsNotes(s,{filter:'no-text'})[0].id).toBe('note-1');expect(statisticsNotes(s,{query:'  笔记 59  '})[0].id).toBe('note-59');expect(()=>statisticsNotes(s,{filter:'trash'})).toThrow();expect(statisticsNotes(s,{sort:'characters'}).at(-1).id).toBe('note-1')})
  it('exports explicit UTC metrics and only includes titles after consent',()=>{const s=fixture();const aggregate=JSON.parse(statisticsReport(s,{query:'',filter:'all'}));expect(aggregate.notes).toBeUndefined();expect(aggregate.contains_titles).toBe(false);expect(aggregate.scope).toBe('saved-active-notes-only');const rows=JSON.parse(statisticsReport(s,{filter:'pinned'},true));expect(rows.notes).toHaveLength(1);expect(rows.notes[0].content).toBeUndefined();expect(rows.selection.count).toBe(1)})
  it('does not mutate data and uses one GET with cancellation',async()=>{const load=vi.fn(async()=>fixture());await readLibraryStatistics(load);expect(load.mock.calls[0][0]).toBe('/api/library-statistics');expect(load.mock.calls[0][1].method).toBeUndefined();const ctl=new AbortController();ctl.abort();await expect(readLibraryStatistics(load,ctl.signal)).rejects.toThrow();expect(load).toHaveBeenCalledTimes(1)})
- it('bounds a hanging request and rejects its late result',async()=>{vi.useFakeTimers();let done;const pending=readLibraryStatistics(()=>new Promise(r=>{done=r}),undefined,20);const assertion=expect(pending).rejects.toThrow('超时');await vi.advanceTimersByTimeAsync(21);await assertion;done(fixture());await Promise.resolve()})
+ it('bounds a hanging request and rejects its late result',async()=>{
+  vi.useFakeTimers({toFake:['setTimeout','clearTimeout','setInterval','clearInterval','setImmediate','clearImmediate','Date','performance']});
+  let done,entered;
+  const sent=new Promise(resolve=>{entered=resolve});
+  const load=vi.fn(()=>new Promise(r=>{done=r;entered()}));
+  const pending=readLibraryStatistics(load,undefined,20);
+  const assertion=expect(pending).rejects.toThrow('超时');
+  await Promise.race([sent,pending]);
+  expect(load).toHaveBeenCalledTimes(1);expect(typeof done).toBe('function');
+  await vi.advanceTimersByTimeAsync(21);await assertion;
+  expect(load.mock.calls[0][1].signal.aborted).toBe(true);
+  done(fixture());await Promise.resolve();
+  await expect(pending).rejects.toMatchObject({code:'timeout'});
+  expect(load).toHaveBeenCalledTimes(1);
+ })
  it('cleans up a failed download without claiming a saved file',()=>{vi.useFakeTimers();const revoke=vi.fn();vi.stubGlobal('URL',{createObjectURL:()=> 'blob:test',revokeObjectURL:revoke});vi.spyOn(HTMLAnchorElement.prototype,'click').mockImplementation(()=>{throw Error('blocked')});expect(()=>downloadStatisticsReport(fixture(),{})).toThrow('blocked');expect(document.querySelector('a[download]')).toBeNull();vi.runAllTimers();expect(revoke).toHaveBeenCalledWith('blob:test')})
 })

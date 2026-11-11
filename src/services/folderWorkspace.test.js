@@ -32,7 +32,19 @@ describe('durable intent before send and no automatic replay',()=>{
  it('accepts only exact acknowledgement and excludes local-only fields from POST',async()=>{const before=folderFixture(),c=make(),result={request_id:c.request_id,kind:c.kind,before_revision:c.expected_revision,applied_ids:c.ids,snapshot:applyFolderFixture(before,c)},load=vi.fn(async()=>result);await sendFolderChange(load,before,c);const sent=JSON.parse(load.mock.calls[0][1].body);expect(Object.keys(sent).sort()).toEqual(['expected_revision','ids','kind','name','parent_id','request_id']);for(const field of ['request_id','kind','before_revision','applied_ids'])await expect(sendFolderChange(async()=>({...result,[field]:'wrong'}),before,c)).rejects.toThrow()})
  it('reads metadata with no mutation',async()=>{const load=vi.fn(async()=>folderFixture());expect((await readFolderWorkspace(load)).items).toHaveLength(5);expect(load.mock.calls[0][0]).toBe('/api/folder-workspace');expect(load.mock.calls[0][1].method).toBeUndefined()})
  it('does not send an already aborted operation',async()=>{const ctl=new AbortController();ctl.abort();const load=vi.fn();await expect(sendFolderChange(load,folderFixture(),make(),ctl.signal)).rejects.toThrow();expect(load).not.toHaveBeenCalled()})
- it('times out once and rejects a late response without another POST',async()=>{vi.useFakeTimers();let release;const load=vi.fn(()=>new Promise(r=>{release=r})),p=sendFolderChange(load,folderFixture(),make(),undefined,20);const reject=expect(p).rejects.toThrow('超时');await vi.advanceTimersByTimeAsync(21);await reject;release({});await Promise.resolve();expect(load).toHaveBeenCalledTimes(1)})
+ it('times out once and rejects a late response without another POST',async()=>{
+  vi.useFakeTimers({toFake:['setTimeout','clearTimeout','setInterval','clearInterval','setImmediate','clearImmediate','Date','performance']});
+  let release,entered;
+  const sent=new Promise(resolve=>{entered=resolve});
+  const load=vi.fn(()=>new Promise(r=>{release=r;entered()})),p=sendFolderChange(load,folderFixture(),make(),undefined,20);
+  const reject=expect(p).rejects.toThrow('超时');
+  await Promise.race([sent,p]);
+  expect(load).toHaveBeenCalledTimes(1);expect(typeof release).toBe('function');
+  await vi.advanceTimersByTimeAsync(21);await reject;
+  expect(load.mock.calls[0][1].signal.aborted).toBe(true);
+  release({});await Promise.resolve();expect(load).toHaveBeenCalledTimes(1);
+  await expect(p).rejects.toMatchObject({code:'timeout'});
+ })
 })
 
 describe('compatibility with original drag ordering and bounded receipts',()=>{

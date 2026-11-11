@@ -29,7 +29,20 @@ describe('complete saved task snapshot', () => {
     expect(load.mock.calls[0][0]).toBe('/api/task-center'); expect(load.mock.calls[0][1].method).toBeUndefined()
     const p = readTaskCenter(async () => { ctl.abort(); return fixture(1) }, ctl.signal); await expect(p).rejects.toThrow()
   })
-  it('times out a hung read without retrying', async () => { vi.useFakeTimers(); const load = vi.fn(() => new Promise(() => {})); const p = readTaskCenter(load, undefined, 20); const rejected = expect(p).rejects.toThrow(); await vi.advanceTimersByTimeAsync(21); await rejected; expect(load).toHaveBeenCalledTimes(1) })
+  it('times out a hung read without retrying', async () => {
+    vi.useFakeTimers({toFake:['setTimeout','clearTimeout','setInterval','clearInterval','setImmediate','clearImmediate','Date','performance']});
+    let entered;
+    const sent = new Promise(resolve => { entered = resolve });
+    const load = vi.fn(() => new Promise(() => { entered() }));
+    const p = readTaskCenter(load, undefined, 20);
+    const rejected = expect(p).rejects.toThrow();
+    await Promise.race([sent, p]);
+    expect(load).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(21); await rejected;
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(load.mock.calls[0][1].signal.aborted).toBe(true);
+    await expect(p).rejects.toMatchObject({code:'timeout'});
+  })
 })
 describe('source navigation uses fresh saved content and the original guard', () => {
   it('reads the exact source and verifies its bytes without saving anything', async () => {

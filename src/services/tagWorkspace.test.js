@@ -34,5 +34,18 @@ describe('bounded requests, cancellation and exact acknowledgement',()=>{
  it('accepts only the exact operation result and postcondition',async()=>{const c=command(),result={request_id:c.request_id,kind:c.kind,before_revision:rev,snapshot:snapshot([{...tag(c.id,c.name),color:c.color}])};const load=vi.fn(async()=>result);expect((await sendTagWorkspaceIntent(load,c)).tags[0].name).toBe(c.name);expect(JSON.parse(load.mock.calls[0][1].body).started_at).toBeUndefined();for(const key of ['request_id','kind','before_revision']){await expect(sendTagWorkspaceIntent(async()=>({...result,[key]:'wrong'}),c)).rejects.toThrow()}})
  it('does not accept a server response whose target state is missing',async()=>{const c=command();await expect(sendTagWorkspaceIntent(async()=>({request_id:c.request_id,kind:c.kind,before_revision:rev,snapshot:snapshot()}),c)).rejects.toThrow('未确认')})
  it('does not send an already cancelled operation',async()=>{const ctl=new AbortController();ctl.abort();const load=vi.fn();await expect(sendTagWorkspaceIntent(load,command(),ctl.signal)).rejects.toThrow();expect(load).not.toHaveBeenCalled()})
- it('times out once without retrying and ignores late completion',async()=>{vi.useFakeTimers();let done;const load=vi.fn(()=>new Promise(resolve=>{done=resolve}));const task=sendTagWorkspaceIntent(load,command(),undefined,25);const rejected=expect(task).rejects.toThrow('超时');await vi.advanceTimersByTimeAsync(26);await rejected;done({});await Promise.resolve();expect(load).toHaveBeenCalledTimes(1)})
+ it('times out once without retrying and ignores late completion',async()=>{
+  vi.useFakeTimers({toFake:['setTimeout','clearTimeout','setInterval','clearInterval','setImmediate','clearImmediate','Date','performance']});
+  let done,entered;
+  const sent=new Promise(resolve=>{entered=resolve});
+  const load=vi.fn(()=>new Promise(resolve=>{done=resolve;entered()}));
+  const task=sendTagWorkspaceIntent(load,command(),undefined,25);
+  const rejected=expect(task).rejects.toThrow('超时');
+  await Promise.race([sent,task]);
+  expect(load).toHaveBeenCalledTimes(1);expect(typeof done).toBe('function');
+  await vi.advanceTimersByTimeAsync(26);await rejected;
+  expect(load.mock.calls[0][1].signal.aborted).toBe(true);
+  done({});await Promise.resolve();expect(load).toHaveBeenCalledTimes(1);
+  await expect(task).rejects.toMatchObject({code:'timeout'});
+ })
 })
