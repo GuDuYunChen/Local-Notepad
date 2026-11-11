@@ -4688,6 +4688,23 @@ body {
   height: 100%;
 }
 
+/* Keep the note tree usable at the real 704x455 Windows client size.
+   The fixed-height navigation and footer previously squeezed its 40px actions
+   into a 26px tree scrollport. Scroll navigation, not official row controls. */
+@media (max-height: 560px) {
+  .workspace-sidebar:not(.collapsed) .workspace-sidebar-top {
+    flex: 0 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .workspace-sidebar:not(.collapsed) .workspace-sidebar-library {
+    flex: 1 0 136px;
+    min-height: 136px;
+  }
+}
+
 .workspace-sidebar-library .file-library-header {
   padding-top: 12px;
 }
