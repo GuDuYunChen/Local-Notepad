@@ -95,88 +95,90 @@ export default function WorkspaceSidebar({
 
   return (
     <aside className={`workspace-sidebar file-sidebar${collapsed ? ' collapsed' : ''}`}>
-      <div className="workspace-sidebar-top">
-        <div className="workspace-sidebar-brand">
-          <UiButton
-            type="button"
-            variant="text"
-            className="workspace-brand-mark"
-            icon={<img src={APP_ICON_DATA_URL} alt="" aria-hidden="true" />}
-            onClick={() => navigate('notes')}
-            aria-label="返回笔记"
-            title="记事本"
-          />
-
-          {!collapsed && (
-            <>
-              <div className="workspace-brand-copy">
-                <strong>记事本</strong>
-                <span>我的本地空间</span>
-              </div>
-              <UiButton
-                type="button"
-                density="compact"
-                variant="text"
-                className="workspace-sidebar-collapse"
-                icon={<span aria-hidden="true">‹</span>}
-                onClick={onToggleCollapsed}
-                aria-label="折叠侧边栏"
-                title="折叠侧边栏"
-              />
-            </>
-          )}
-        </div>
-
-        {collapsed ? (
-          <UiButton
-            type="button"
-            className="workspace-sidebar-icon-btn"
-            onClick={onOpenSearch}
-            aria-label="搜索笔记"
-            title={`全局检索 (${shortcutLabel('globalSearch', shortcutBindings)})`}
-          >
-            <Icon><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></Icon>
-          </UiButton>
-        ) : (
-          <UiButton
-            type="button"
-            className="workspace-sidebar-search"
-            onClick={onOpenSearch}
-            aria-label="搜索笔记"
-          >
-            <Icon size={16}><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></Icon>
-            <span>搜索笔记</span>
-            <kbd>{shortcutLabel('globalSearch', shortcutBindings)}</kbd>
-          </UiButton>
-        )}
-
-        {onOpenLocalActions && <UiButton type="button" className="workspace-sidebar-search" onClick={onOpenLocalActions} aria-label="打开快捷操作" title="查找本地功能"
-          icon={collapsed ? <Icon size={16}><path d="m9 4-5 8 5 8M15 4l5 8-5 8" /></Icon> : undefined}>
-          {collapsed ? null : [<Icon key="icon" size={16}><path d="m9 4-5 8 5 8M15 4l5 8-5 8" /></Icon>, <span key="label">快捷操作</span>]}
-        </UiButton>}
-        <nav className="workspace-sidebar-nav" aria-label="主要功能">
-          {navItems.map(item => (
+      <div className="workspace-sidebar-scroll">
+        <div className="workspace-sidebar-top">
+          <div className="workspace-sidebar-brand">
             <UiButton
-              key={item.id}
               type="button"
-              className={`workspace-sidebar-nav-item${activeWorkspace === item.id ? ' active' : ''}`}
-              onClick={() => navigate(item.id)}
-              aria-pressed={activeWorkspace === item.id}
-              aria-label={item.label}
-              title={collapsed ? item.label : undefined}
-            >
-              {item.icon}
-              {!collapsed && <span>{item.label}</span>}
-            </UiButton>
-          ))}
-        </nav>
-      </div>
+              variant="text"
+              className="workspace-brand-mark"
+              icon={<img src={APP_ICON_DATA_URL} alt="" aria-hidden="true" />}
+              onClick={() => navigate('notes')}
+              aria-label="返回笔记"
+              title="记事本"
+            />
 
-      {!collapsed && (
-        <div className="workspace-sidebar-library">
-          {children}
+            {!collapsed && (
+              <>
+                <div className="workspace-brand-copy">
+                  <strong>记事本</strong>
+                  <span>我的本地空间</span>
+                </div>
+                <UiButton
+                  type="button"
+                  density="compact"
+                  variant="text"
+                  className="workspace-sidebar-collapse"
+                  icon={<span aria-hidden="true">‹</span>}
+                  onClick={onToggleCollapsed}
+                  aria-label="折叠侧边栏"
+                  title="折叠侧边栏"
+                />
+              </>
+            )}
+          </div>
+
+          {collapsed ? (
+            <UiButton
+              type="button"
+              className="workspace-sidebar-icon-btn"
+              onClick={onOpenSearch}
+              aria-label="搜索笔记"
+              title={`全局检索 (${shortcutLabel('globalSearch', shortcutBindings)})`}
+            >
+              <Icon><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></Icon>
+            </UiButton>
+          ) : (
+            <UiButton
+              type="button"
+              className="workspace-sidebar-search"
+              onClick={onOpenSearch}
+              aria-label="搜索笔记"
+            >
+              <Icon size={16}><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></Icon>
+              <span>搜索笔记</span>
+              <kbd>{shortcutLabel('globalSearch', shortcutBindings)}</kbd>
+            </UiButton>
+          )}
+
+          {onOpenLocalActions && <UiButton type="button" className="workspace-sidebar-search" onClick={onOpenLocalActions} aria-label="打开快捷操作" title="查找本地功能"
+            icon={collapsed ? <Icon size={16}><path d="m9 4-5 8 5 8M15 4l5 8-5 8" /></Icon> : undefined}>
+            {collapsed ? null : [<Icon key="icon" size={16}><path d="m9 4-5 8 5 8M15 4l5 8-5 8" /></Icon>, <span key="label">快捷操作</span>]}
+          </UiButton>}
+          <nav className="workspace-sidebar-nav" aria-label="主要功能">
+            {navItems.map(item => (
+              <UiButton
+                key={item.id}
+                type="button"
+                className={`workspace-sidebar-nav-item${activeWorkspace === item.id ? ' active' : ''}`}
+                onClick={() => navigate(item.id)}
+                aria-pressed={activeWorkspace === item.id}
+                aria-label={item.label}
+                title={collapsed ? item.label : undefined}
+              >
+                {item.icon}
+                {!collapsed && <span>{item.label}</span>}
+              </UiButton>
+            ))}
+          </nav>
         </div>
-      )}
+
+        {!collapsed && (
+          <div className="workspace-sidebar-library">
+            {children}
+          </div>
+        )}
+      </div>
 
       <div className="workspace-sidebar-bottom" ref={moreRef}>
         <UiButton
