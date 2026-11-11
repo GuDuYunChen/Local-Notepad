@@ -4946,6 +4946,13 @@ body {
   }
 }
 
+/* The persistent collapsed More action is a regular shared action button.
+   Keep its 40px production height after the narrow-width 36px legacy rail rule;
+   spacing reductions above preserve both footer buttons at 704x455. */
+.workspace-sidebar.collapsed .workspace-sidebar-more {
+  height: 40px !important;
+  min-height: 40px !important;
+}
 
 /* -------------------------------------------------------------------------- */
 /* Refined sidebar menus                                                       */

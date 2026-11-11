@@ -117,12 +117,12 @@ try{
  if(!$page){throw 'Upgraded Electron window did not load the packaged renderer and local backend.'}
  $guiNote=Invoke-RestMethod "$guiBase/api/files/$id" -TimeoutSec 5
  if($guiNote.code -ne 0 -or $guiNote.data.content -ne $updated){throw 'The launched upgraded desktop did not read the retained upgraded note.'}
- if($CurrentCandidate){
-  & node (Join-Path $root 'scripts\upgraded-renderer-ready.mjs') prepare --socket $page.webSocketDebuggerUrl --url $page.url --note $id --marker ($marker+"-SAVED-BY-${newVersion}") --deadline ($deadline.ToString('o')) --out $out --pid $gui.Id --exe $app.FullName
-  if($LASTEXITCODE -ne 0){throw 'The actual upgraded renderer was not ready before the original desktop startup deadline.'}
-  $readyFile=Join-Path $out 'renderer-prepare.json'
-  $r.rendererReadiness=@{file='renderer-prepare.json';bytes=(Get-Item $readyFile).Length;sha256=(Get-FileHash $readyFile -Algorithm SHA256).Hash.ToLowerInvariant()}
- }
+ # Do not send Browser.close to a half-mounted editor in either upgrade route.
+ # Both versions retain the original 30-second startup deadline and all quit checks.
+ & node (Join-Path $root 'scripts\upgraded-renderer-ready.mjs') prepare --socket $page.webSocketDebuggerUrl --url $page.url --note $id --marker ($marker+"-SAVED-BY-${newVersion}") --deadline ($deadline.ToString('o')) --out $out --pid $gui.Id --exe $app.FullName
+ if($LASTEXITCODE -ne 0){throw 'The actual upgraded renderer was not ready before the original desktop startup deadline.'}
+ $readyFile=Join-Path $out 'renderer-prepare.json'
+ $r.rendererReadiness=@{file='renderer-prepare.json';bytes=(Get-Item $readyFile).Length;sha256=(Get-FileHash $readyFile -Algorithm SHA256).Hash.ToLowerInvariant()}
  $r.checks.Add("${newVersion}-installed-electron-window-loads-retained-note")
  # Electron may not expose a Win32 MainWindowHandle on a hosted runner. Request the
  # supported Chromium Browser.close command over its loopback DevTools endpoint.
@@ -164,28 +164,41 @@ try{
    $r.desktopClose.finishedAt=[DateTime]::UtcNow.ToString('o');$ws.Dispose()
  }
  }else{
- $ws=[System.Net.WebSockets.ClientWebSocket]::new()
+ # Historical upgrade uses the same live CDP receive/response observation as
+ # the current-candidate upgrade. The original Browser.close action and strict
+ # 20-second process-exit gate remain unchanged.
+ $r.desktopClose=[ordered]@{method='Browser.close';processBudgetMs=20000;commandId=1;sent=$false;ack=$null;startedAt=[DateTime]::UtcNow.ToString('o')}
+ $ws=[System.Net.WebSockets.ClientWebSocket]::new();$receive=$null;$buffer=[byte[]]::new(8192)
  try{
    $ws.ConnectAsync([Uri]$browserSocket,[Threading.CancellationToken]::None).GetAwaiter().GetResult()
+   $receive=$ws.ReceiveAsync([ArraySegment[byte]]::new($buffer),[Threading.CancellationToken]::None)
    $command=[Text.Encoding]::UTF8.GetBytes('{"id":1,"method":"Browser.close"}')
    $segment=[ArraySegment[byte]]::new($command)
    $ws.SendAsync($segment,[System.Net.WebSockets.WebSocketMessageType]::Text,$true,[Threading.CancellationToken]::None).GetAwaiter().GetResult()
- # Keep the CDP connection alive while Chromium dispatches Browser.close. Closing
- # the client socket immediately after SendAsync can race delivery on Windows.
- # This still requires the original real process exit within 20 seconds.
- if(-not $gui.WaitForExit(20000)){
-   $r.quitDiagnostics=[ordered]@{cdpCommand='Browser.close';sent=$true;nativeProcessId=$gui.Id;webSocketState=[string]$ws.State}
-   try{
-     $targetsAfter=Invoke-RestMethod $cdp -TimeoutSec 3
-     $r.quitDiagnostics.cdpTargetsAfter=@($targetsAfter|ForEach-Object{@{type=$_.type;url=$_.url}})
-   }catch{$r.quitDiagnostics.cdpAfterError=$_.Exception.Message}
-   try{
-     $healthAfter=Invoke-RestMethod "$guiBase/api/health" -TimeoutSec 2
-     $r.quitDiagnostics.backendHealthCode=$healthAfter.code
-   }catch{$r.quitDiagnostics.backendHealthError=$_.Exception.Message}
-   throw 'Upgraded Electron app did not exit after CDP Browser.close.'
+   $r.desktopClose.sent=$true
+   if(-not $gui.WaitForExit(20000)){
+     $r.quitDiagnostics=[ordered]@{cdpCommand='Browser.close';sent=$true;nativeProcessId=$gui.Id;webSocketState=[string]$ws.State}
+     try{
+       $targetsAfter=Invoke-RestMethod $cdp -TimeoutSec 3
+       $r.quitDiagnostics.cdpTargetsAfter=@($targetsAfter|ForEach-Object{@{type=$_.type;url=$_.url}})
+     }catch{$r.quitDiagnostics.cdpAfterError=$_.Exception.Message}
+     try{
+       $healthAfter=Invoke-RestMethod "$guiBase/api/health" -TimeoutSec 2
+       $r.quitDiagnostics.backendHealthCode=$healthAfter.code
+     }catch{$r.quitDiagnostics.backendHealthError=$_.Exception.Message}
+     throw 'Upgraded Electron app did not exit after CDP Browser.close.'
+   }
+   $r.desktopClose.exitCode=[int]$gui.ExitCode
+   if($gui.ExitCode -ne 0){throw "Upgraded desktop did not exit cleanly: $($gui.ExitCode)"}
+ }finally{
+   if($receive -and $receive.IsCompletedSuccessfully){
+     $frame=$receive.GetAwaiter().GetResult();$payload=[Text.Encoding]::UTF8.GetString($buffer,0,$frame.Count)
+     $r.desktopClose.ack=@{complete=$frame.EndOfMessage;messageType=[string]$frame.MessageType;text=$payload}
+   }elseif($receive -and $receive.IsFaulted){$r.desktopClose.ack=@{error=$receive.Exception.GetBaseException().Message}}
+   else{$r.desktopClose.ack=@{pending=$true}}
+   $r.desktopClose.finishedAt=[DateTime]::UtcNow.ToString('o');$ws.Dispose()
  }
- }finally{$ws.Dispose()}
+
  }
  $stopped=$false;$stopDeadline=[DateTime]::UtcNow.AddSeconds(10)
  while([DateTime]::UtcNow -lt $stopDeadline){
@@ -197,7 +210,7 @@ try{
 }catch{
  $failedUpgrade=$_
  $r.status='failed';$r.error=$_.Exception.Message;$r.finishedAt=[DateTime]::UtcNow.ToString('o')
- if($CurrentCandidate -and $gui -and -not $gui.HasExited -and $page){
+ if($gui -and -not $gui.HasExited -and $page){
   try{
    & node (Join-Path $root 'scripts\upgraded-renderer-ready.mjs') failure --socket $page.webSocketDebuggerUrl --url $page.url --note $id --marker ($marker+"-SAVED-BY-${newVersion}") --out $out --pid $gui.Id --exe $app.FullName
    $r.rendererDiagnosticExitCode=$LASTEXITCODE

@@ -104,18 +104,70 @@ test('quit observation never reports a result, freezes the UI or changes the rea
 test('the concurrent transport repair and the original 20-second process gates remain intact', () => {
   // Compare source structure using Git's line endings, including Windows CRLF checkouts.
   const source = readFileSync(new URL('../.github/scripts/windows-in-place-upgrade.ps1', import.meta.url), 'utf8').replace(/\r\n/g, '\n')
-  const historical = source.slice(source.indexOf(' }else{\n $ws=[System.Net.WebSockets.ClientWebSocket]::new()'))
-  assert.ok(historical.includes('$ws.SendAsync($segment,[System.Net.WebSockets.WebSocketMessageType]::Text,$true,[Threading.CancellationToken]::None).GetAwaiter().GetResult()'))
-  assert.ok(historical.indexOf('$gui.WaitForExit(20000)') < historical.indexOf('}finally{$ws.Dispose()}'))
+  const historicalStart = source.indexOf(' }else{\n # Historical upgrade uses the same live CDP receive/response observation as')
+  const historicalEnd = source.indexOf('\n $stopped=$false;', historicalStart)
+  assert.ok(historicalStart >= 0 && historicalEnd > historicalStart, 'Historical close block must be present')
+  const historical = source.slice(historicalStart, historicalEnd)
+  const candidate = source.slice(source.indexOf(' $r.desktopClose='), historicalStart)
+  const send = '$ws.SendAsync($segment,[System.Net.WebSockets.WebSocketMessageType]::Text,$true,[Threading.CancellationToken]::None).GetAwaiter().GetResult()'
+  // Both routes retain the original CDP Browser.close and real 20s process gate.
+  for (const route of [candidate, historical]) {
+    assert.ok(route.includes(send))
+    assert.ok(route.includes(`$command=[Text.Encoding]::UTF8.GetBytes('{"id":1,"method":"Browser.close"}')`))
+    assert.ok(route.indexOf('$receive=$ws.ReceiveAsync') < route.indexOf(send))
+    assert.ok(route.indexOf('$receive=$ws.ReceiveAsync') < route.indexOf('$gui.WaitForExit(20000)'))
+    assert.ok(route.indexOf('$gui.WaitForExit(20000)') < route.lastIndexOf('$ws.Dispose()'))
+    assert.ok(route.includes('if($gui.ExitCode -ne 0){throw'))
+    assert.ok(route.includes('$r.desktopClose.ack='))
+    assert.equal(/Stop-Process|\.Kill\(|reportQuitResult\(/.test(route), false)
+  }
   assert.equal((source.match(/\$r\.quitDiagnostics=\[ordered\]/g) || []).length, 2)
   assert.equal((source.match(/\$gui\.WaitForExit\(20000\)/g) || []).length, 3)
   assert.ok(source.includes('$deadline=[DateTime]::UtcNow.AddSeconds(30)'))
   assert.ok(source.includes('$stopDeadline=[DateTime]::UtcNow.AddSeconds(10)'))
   assert.ok(source.includes('if(-not $stopped){throw'))
-  const candidate = source.slice(source.indexOf(' $r.desktopClose='), source.indexOf(' }else{\n $ws='))
-  assert.ok(candidate.indexOf('$receive=$ws.ReceiveAsync') < candidate.indexOf('$ws.SendAsync'))
-  assert.ok(candidate.indexOf('$receive=$ws.ReceiveAsync') < candidate.indexOf('$gui.WaitForExit(20000)'))
-  assert.ok(candidate.indexOf('$gui.WaitForExit(20000)') < candidate.lastIndexOf('$ws.Dispose()'))
-  assert.equal(/Stop-Process|\.Kill\(|reportQuitResult\(/.test(candidate), false)
-  assert.ok(candidate.includes('if($gui.ExitCode -ne 0){throw'))
+})
+
+
+
+test('historical and current upgrades wait for the real mounted editor before the original close gate', () => {
+  const source = readFileSync(new URL('../.github/scripts/windows-in-place-upgrade.ps1', import.meta.url), 'utf8').replace(/\r\n/g, '\n')
+  const launch = source.indexOf(" $gui=Start-Process -FilePath $app.FullName")
+  const prepare = source.indexOf(" & node (Join-Path $root 'scripts\\upgraded-renderer-ready.mjs') prepare", launch)
+  const close = source.indexOf(" $versionInfo=Invoke-RestMethod 'http://127.0.0.1:27164/json/version'", launch)
+  assert.ok(launch >= 0 && prepare > launch && close > prepare, 'Readiness precedes both upgrade close checks')
+  const guarded = source.slice(launch, close)
+  assert.doesNotMatch(guarded, /if\(\$CurrentCandidate\)/, 'No legacy bypass of renderer readiness')
+  assert.match(guarded, /--note \$id --marker \(\$marker\+"-SAVED-BY-\$\{newVersion\}"\) --deadline \(\$deadline\.ToString\('o'\)\)/)
+  assert.match(guarded, /if\(\$LASTEXITCODE -ne 0\)\{throw 'The actual upgraded renderer was not ready/)
+  assert.match(guarded, /\$r\.rendererReadiness=@\{file='renderer-prepare\.json'/)
+  const failure = source.slice(source.indexOf('}catch{\n $failedUpgrade=$_'), source.indexOf('\nfinally{\n if($gui'))
+  assert.ok(failure.includes('if($gui -and -not $gui.HasExited -and $page){'))
+  assert.ok(failure.includes("upgraded-renderer-ready.mjs') failure"), 'Preserve native and renderer failed-quit evidence for either version')
+  assert.ok(source.includes('$deadline=[DateTime]::UtcNow.AddSeconds(30)'))
+  assert.ok(source.includes('$gui.WaitForExit(20000)'))
+})
+
+test('the current installer upgrade runs before historical upgrade, retaining both strict gates', () => {
+  const workflow = readFileSync(new URL('../.github/workflows/ui-redesign-ci.yml', import.meta.url), 'utf8').replace(/\r\n/g, '\n')
+  const steps = [
+    'Verify accepted 4.248.1 to actual current package in-place upgrade',
+    'Upload current-package upgrade evidence',
+    'Verify actual 4.248.0 to 4.248.1 in-place upgrade and data retention',
+    'Upload in-place upgrade evidence',
+    'Upload NSIS installer',
+  ]
+  const positions = steps.map(name => workflow.indexOf('      - name: ' + name))
+  assert.ok(positions.every((position, index) => position >= 0 && (!index || position > positions[index - 1])))
+  const section = workflow.slice(positions[0], positions[4])
+  const current = section.slice(0, section.indexOf('      - name: ' + steps[2]))
+  const historical = section.slice(section.indexOf('      - name: ' + steps[2]))
+  assert.ok(current.includes('windows-in-place-upgrade.ps1 -CurrentCandidate'))
+  assert.ok(historical.includes('windows-in-place-upgrade.ps1\n'))
+  assert.ok(current.includes('test-results/current-in-place-upgrade/*'))
+  assert.ok(historical.includes('test-results/in-place-upgrade/*'))
+  assert.doesNotMatch(section, /continue-on-error:\s*true/)
+  const installer = workflow.slice(positions[4], workflow.indexOf('\n  native-controls:', positions[4]))
+  assert.ok(installer.includes('uses: actions/upload-artifact@v4'))
+  assert.doesNotMatch(installer, /if:\s*always\(\)|if:\s*success\(\)\s*\|\|/)
 })
