@@ -144,7 +144,7 @@ test('the current installer upgrade runs before historical upgrade, retaining bo
   const current = section.slice(0, section.indexOf('      - name: ' + steps[2]))
   const historical = section.slice(section.indexOf('      - name: ' + steps[2]))
   assert.ok(current.includes('windows-in-place-upgrade.ps1 -CurrentCandidate'))
-  assert.ok(historical.includes('windows-in-place-upgrade.ps1\\n'))
+  assert.ok(historical.includes('windows-in-place-upgrade.ps1\n'))
   assert.ok(current.includes('test-results/current-in-place-upgrade/*'))
   assert.ok(historical.includes('test-results/in-place-upgrade/*'))
   assert.doesNotMatch(section, /continue-on-error:\s*true/)
