@@ -164,7 +164,7 @@ export default function AppearanceCenter({ onClose }) {
           <fieldset disabled={Boolean(confirmation)} className="appearance-fields">
             <legend>选择方案</legend>
             <div className="appearance-schemes" role="group" aria-label="主题方案列表">
-              {[...BUILTIN_SCHEMES, ...draft.schemes].map(scheme => <UiButton type="button" key={scheme.id} aria-pressed={draft.activeId === scheme.id} onClick={() => select(scheme.id)}>
+              {[...BUILTIN_SCHEMES, ...draft.schemes].map(scheme => <UiButton type="button" key={scheme.id} title={scheme.name || '未命名方案'} aria-pressed={draft.activeId === scheme.id} onClick={() => select(scheme.id)}>
                 <span className="appearance-swatch" style={{ background: /^#[0-9a-f]{6}$/i.test(scheme.lightAccent) ? scheme.lightAccent : '#7057d9' }} aria-hidden="true" />
                 <span>{scheme.name || '未命名方案'}</span><small>{scheme.id.startsWith('custom-') ? '自定义' : '内置'}</small>
               </UiButton>)}

@@ -792,3 +792,311 @@ test('navigation retains the original explicit collapse path without requiring a
   assert.equal(f.state.collapsed, true); assert.equal(f.state.frames, 0)
   assert.deepEqual(f.waits, [{ label: 'Actual sidebar did not change expansion state', budgetArguments: [] }])
 })
+
+test('every popup matrix rejects each clipped outer-frame edge independently before and after its PNG', () => {
+  for (let index = 0; index < FULL_APP_MATRIX.length; index++) for (const side of ['before', 'after']) {
+    for (const edge of ['left', 'top', 'right', 'bottom']) {
+      const ledger = ledgerFixture(), ui = uiFixture('projects', ledger), receipt = ui.popups[index]
+      const root = receipt.capture[side].popup.root
+      root[edge] = edge === 'left' || edge === 'top' ? -0.25 : receipt.viewport[edge === 'right' ? 'width' : 'height'] + 0.25
+      root.width = root.right - root.left; root.height = root.bottom - root.top
+      if (side === 'before') receipt.popup = clone(receipt.capture.before.popup)
+      assert.throws(() => validateFullAppUiEvidence(ui, ledger), /Actual popup outer frame leaves its native viewport/)
+    }
+  }
+})
+
+test('a visible owned option cannot excuse the observed four-pixel popup-frame clipping', () => {
+  const ledger = ledgerFixture(), ui = uiFixture('projects', ledger), receipt = ui.popups[0]
+  for (const side of ['before', 'after']) {
+    const popup = receipt.capture[side].popup
+    popup.root = { left: 102, top: -4, right: 368, bottom: 244, width: 266, height: 248 }
+    popup.content = { left: 106, top: 0, right: 364, bottom: 240, width: 258, height: 240 }
+    popup.item = { left: 106, top: 0, right: 364, bottom: 40, width: 258, height: 40 }
+    assert.equal(popup.ownedHit, true); assert.equal(popup.inViewport, true)
+  }
+  receipt.popup = clone(receipt.capture.before.popup)
+  assert.throws(() => validateFullAppUiEvidence(ui, ledger), /Actual popup outer frame leaves its native viewport/)
+})
+
+test('a fitting popup frame still permits a longer internally scrolling option list', () => {
+  const ledger = ledgerFixture(), ui = uiFixture('projects', ledger)
+  for (const receipt of ui.popups) {
+    for (const side of ['before', 'after']) {
+      receipt.capture[side].popup.content.bottom = 1040; receipt.capture[side].popup.content.height = 1000
+    }
+    receipt.popup = clone(receipt.capture.before.popup)
+  }
+  assert.equal(validateFullAppUiEvidence(ui, ledger), ui)
+})
+
+import { filterNavigationLibrary, prepareNavigationNoteSelection, verifyNavigationPages } from './full-app-ui-navigation.mjs'
+import { createFullAppUiShared } from './full-app-ui-shared.mjs'
+
+function ownedNavigationContract({ width = 704, query = '', selected = 'primary', onText, onClick, onPoll } = {}) {
+  const primary = { id: 'primary', title: 'NAV-CONTRACT 完整主笔记.md' }, alternate = { id: 'alternate', title: 'NAV-CONTRACT 第二篇可打开笔记.md' }
+  const fixture = { marker: 'NAV-CONTRACT', expectedBodyMarker: 'NAV-CONTRACT-BODY-PRIMARY', primary, alternate,
+    notes: [primary, alternate], daily: { id: 'daily' }, trashed: { id: 'trashed' }, folder: { id: 'folder' } }
+  const state = { width, collapsed: false, loading: false, query, rows: query ? [] : [primary, alternate], selected,
+    editable: true, quitVeil: false, titleOverride: null, bodyOverride: null, trusted: true, frames: 0 }
+  const events = [], clicks = [], queries = [], waits = [], records = [], all = [primary, alternate]
+  const actualFile = () => all.find(file => file.id === state.selected)
+  const titleNode = () => actualFile() ? { textContent: state.titleOverride ?? actualFile().title } : null
+  const editorNode = () => actualFile() ? { isContentEditable: state.editable,
+    innerText: state.bodyOverride ?? fixture.marker + (state.selected === primary.id ? '-BODY-PRIMARY' : '-BODY-ALTERNATE') } : null
+  const expand = { getBoundingClientRect: () => ({ left: 6, top: 400, right: 46, bottom: 440, width: 40, height: 40 }) }
+  const rowFile = selector => {
+    const match = selector.match(/\[data-file-id=("[^"]+")\]/)
+    return match && state.rows.find(file => file.id === JSON.parse(match[1]))
+  }
+  const library = {
+    querySelector: selector => selector === '.tree-list' ? {} : selector === ':scope > .placeholder' ? (state.loading ? {} : null)
+      : selector === 'input[aria-label="搜索笔记"]' ? { value: state.query }
+        : rowFile(selector) ? { textContent: rowFile(selector).title } : null,
+    querySelectorAll: selector => selector === '[data-file-id]' ? state.rows.map(file => ({ getAttribute: name => name === 'data-file-id' ? file.id : null })) : [],
+  }
+  const sidebar = { classList: { contains: name => name === 'collapsed' && state.collapsed },
+    querySelector: selector => selector === '.file-list' ? (state.collapsed ? null : library)
+      : selector === 'button[aria-label="展开侧边栏"]' ? (state.collapsed ? expand : null) : null }
+  const document = { querySelector: selector => {
+    if (selector === '.workspace-sidebar') return sidebar
+    if (selector === '.file-list') return state.collapsed ? null : library
+    if (selector === '.file-list > .placeholder') return !state.collapsed && state.loading ? {} : null
+    if (selector === '.workspace-sidebar [aria-label="展开侧边栏"]') return state.collapsed ? expand : null
+    if (selector === '.workspace-sidebar [aria-label="折叠侧边栏"]') return state.collapsed ? null : {}
+    if (selector === '.workspace-title-button') return titleNode()
+    if (selector === '.editor-input') return editorNode()
+    if (selector === '.editor-quit-veil') return state.quitVeil ? {} : null
+    if (selector.startsWith('.file-list [data-file-id=')) return state.collapsed ? null : library.querySelector(selector)
+    throw Error('Unexpected owned navigation selector: ' + selector)
+  } }
+  const globals = { document, window: { __fullAppUiEvents: events }, innerWidth: width,
+    localStorage: { getItem: () => null }, requestAnimationFrame: callback => { state.frames++; callback(); return state.frames } }
+  const report = { fullAppUi: {} }
+  const context = { setup: { navigation: fixture }, matrix: clone(FULL_APP_MATRIX[0]), report,
+    save: () => records.push(clone(report.fullAppUi)),
+    evaluate: async expression => {
+      const value = await runInNewContext(expression, globals)
+      return value && typeof value === 'object' ? JSON.parse(JSON.stringify(value)) : value
+    },
+    click: async selector => {
+      clicks.push(selector)
+      if (selector === '.workspace-sidebar [aria-label="展开侧边栏"]') state.collapsed = false
+      else if (selector === '.workspace-sidebar [aria-label="折叠侧边栏"]') state.collapsed = true
+      else if (selector.startsWith('.file-list [data-file-id=')) {
+        assert.equal(state.collapsed, false); const file = rowFile(selector); assert.ok(file)
+        state.selected = file.id; if (width <= 720) state.collapsed = true
+      } else assert.equal(selector, '.workspace-sidebar [aria-label="笔记"]')
+      onClick?.(state, selector, clicks.length)
+      events.push({ type: 'click', trusted: state.trusted })
+    },
+    until: async (check, label, ...budgets) => {
+      waits.push({ label, budgets })
+      for (let poll = 0; poll < 8; poll++) { onPoll?.(state, label, poll); const value = await check(); if (value) return value }
+      throw Error(label)
+    },
+    shared: { closeSearch: async () => {}, closeSettings: async () => {}, text: async (selector, value) => {
+      assert.equal(selector, '.file-list input[aria-label="搜索笔记"]'); assert.equal(state.collapsed, false)
+      queries.push(value); state.query = value; state.rows = value ? all.filter(file => file.title === value) : [...all]
+      if (!state.rows.some(file => file.id === state.selected)) {
+        state.selected = state.rows[0]?.id ?? null
+        if (state.selected && width <= 720) state.collapsed = true
+      }
+      onText?.(state, value)
+    } }, api: async () => [], cdp: { send: async () => { throw Error('Unexpected navigation contract CDP write') } } }
+  return { fixture, state, context, clicks, queries, waits, events, records, report }
+}
+
+test('navigation prepares alternate then primary by native row selection while retaining each original title query and final click', async () => {
+  const f = ownedNavigationContract(), reachedOriginalFocus = Error('Reached untouched navigation scene sequence')
+  f.context.shared.focus = async () => { throw reachedOriginalFocus }
+  await assert.rejects(verifyNavigationPages(f.context), error => error === reachedOriginalFocus)
+  const rowClicks = f.clicks.filter(selector => selector.startsWith('.file-list [data-file-id='))
+  assert.deepEqual(rowClicks, ['alternate', 'alternate', 'primary', 'primary'].map(id => '.file-list [data-file-id="' + id + '"] .title'))
+  assert.deepEqual(f.queries, ['', '', f.fixture.alternate.title, '', '', f.fixture.primary.title, ''])
+  assert.deepEqual(f.report.fullAppUi.navigationReadiness.filter(receipt => receipt.kind === 'owned-note-selection').map(receipt => receipt.fileId), ['alternate', 'primary'])
+  assert.ok(f.report.fullAppUi.navigationReadiness.every(receipt => receipt.complete))
+  assert.ok(f.waits.every(wait => wait.budgets.length === 0))
+})
+
+test('owned navigation selection refuses an incomplete title, foreign body, read-only editor, quit veil or untrusted click', async () => {
+  for (const mutate of [state => { state.titleOverride = 'NAV-CONTRACT 第二篇' }, state => { state.bodyOverride = 'unrelated body' },
+    state => { state.editable = false }, state => { state.quitVeil = true }, state => { state.trusted = false }]) {
+    const f = ownedNavigationContract({ onClick: state => mutate(state) })
+    await assert.rejects(prepareNavigationNoteSelection(f.context, f.fixture.alternate))
+    assert.equal(f.clicks.length, 1); assert.equal(f.report.fullAppUi.navigationReadiness[0].complete, false)
+    assert.ok(f.waits.every(wait => wait.budgets.length === 0))
+  }
+})
+
+test('owned navigation preparation propagates a native pointer failure without replaying it', async () => {
+  const failure = Error('Uncertain owned navigation pointer acknowledgement')
+  const f = ownedNavigationContract({ onClick: () => { throw failure } })
+  await assert.rejects(prepareNavigationNoteSelection(f.context, f.fixture.alternate), error => error === failure)
+  assert.equal(f.clicks.length, 1); assert.equal(f.report.fullAppUi.navigationReadiness[0].complete, false)
+  assert.equal(f.waits.length, 0)
+})
+
+test('the original navigation query still rejects stale text, missing included rows, retained excluded rows and loading', async () => {
+  for (const mutate of [state => { state.query = 'stale query' }, state => { state.rows = [] },
+    (state, f) => { state.rows = [f.primary, f.alternate] }, state => { state.loading = true }]) {
+    let fixture
+    const f = ownedNavigationContract({ onText: state => mutate(state, fixture) }); fixture = f.fixture
+    await assert.rejects(filterNavigationLibrary(f.context, fixture.primary.title, [fixture.primary], [fixture.alternate]), /Actual debounced file results/)
+    assert.equal(f.clicks.length, 0); assert.equal(f.report.fullAppUi.navigationReadiness[0].complete, false)
+    assert.deepEqual(f.waits.map(wait => wait.budgets), [[]])
+  }
+})
+
+const navigationEmptyQuery = '无对应结果-ONLY-OWNED-NAVIGATION-000000'
+test('clearing the exact observed empty query permits one owned narrow-sidebar expansion then requires the full original predicate', async () => {
+  const f = ownedNavigationContract({ query: navigationEmptyQuery, selected: null })
+  const receipt = await filterNavigationLibrary(f.context, '', [f.fixture.primary, f.fixture.alternate])
+  assert.equal(receipt.complete, true); assert.equal(receipt.polls, 2)
+  assert.deepEqual(f.clicks, ['.workspace-sidebar [aria-label="展开侧边栏"]'])
+  assert.equal(receipt.correctiveExpansion.before.ownedEditor, f.fixture.primary.id)
+  assert.equal(receipt.correctiveExpansion.complete, true)
+  assert.ok(receipt.correctiveExpansion.events.some(event => event.type === 'click' && event.trusted))
+  assert.deepEqual(f.waits.map(wait => wait.budgets), [[]])
+})
+
+test('navigation never expands for a nonempty query, unrelated previous filter, wide collapse or foreign selected editor', async () => {
+  for (const scenario of ['nonempty', 'unrelated', 'wide', 'foreign']) {
+    const f = ownedNavigationContract({ width: scenario === 'wide' ? 1008 : 704,
+      query: scenario === 'unrelated' ? 'unrelated empty filter' : navigationEmptyQuery, selected: null,
+      onText: state => { state.collapsed = true; if (scenario === 'foreign') state.bodyOverride = 'foreign body' } })
+    const value = scenario === 'nonempty' ? f.fixture.primary.title : ''
+    await assert.rejects(filterNavigationLibrary(f.context, value, [f.fixture.primary]), /Actual debounced file results/)
+    assert.equal(f.clicks.length, 0); assert.equal(f.report.fullAppUi.navigationReadiness[0].correctiveExpansion, null)
+  }
+})
+
+test('navigation permits no second expansion and never waives an excluded row after the first', async () => {
+  for (const recollapse of [false, true]) {
+    const f = ownedNavigationContract({ query: navigationEmptyQuery, selected: null,
+      onClick: state => { if (recollapse) state.collapsed = true } })
+    await assert.rejects(filterNavigationLibrary(f.context, '', [f.fixture.primary], [f.fixture.alternate]), /Actual debounced file results/)
+    assert.equal(f.clicks.length, 1); assert.equal(f.report.fullAppUi.navigationReadiness[0].complete, false)
+  }
+})
+
+test('a failed or untrusted corrective expansion is preserved and cannot become completed navigation', async () => {
+  for (const rejected of [false, true]) {
+    const failure = Error('Uncertain corrective native expansion')
+    const f = ownedNavigationContract({ query: navigationEmptyQuery, selected: null,
+      onClick: state => { if (rejected) throw failure; state.trusted = false } })
+    await assert.rejects(filterNavigationLibrary(f.context, '', [f.fixture.primary, f.fixture.alternate]),
+      error => rejected ? error === failure : /actual trusted click/.test(error.message))
+    assert.equal(f.clicks.length, 1); assert.equal(f.report.fullAppUi.navigationReadiness[0].complete, false)
+    assert.equal(f.report.fullAppUi.navigationReadiness[0].correctiveExpansion.complete, false)
+  }
+})
+
+function serializedSweepContract(root, matrix) {
+  const all = [], rect = (left, top, width, height) => ({ left, top, right: left + width, bottom: top + height, width, height })
+  const make = (tag, id, box, parent = null) => {
+    const node = { tagName: tag.toUpperCase(), localName: tag, namespaceURI: 'http://www.w3.org/1999/xhtml', id,
+      parentElement: parent, children: [], isConnected: true, className: '', dataset: {}, box,
+      textContent: id, innerText: id, type: tag === 'input' ? 'text' : '', disabled: false,
+      clientLeft: 0, clientTop: 0, clientWidth: box.width, clientHeight: box.height,
+      scrollWidth: box.width, scrollHeight: box.height, scrollTop: 0,
+      css: { display: 'block', visibility: 'visible', opacity: '1', overflowX: 'visible', overflowY: 'visible', contain: 'none', contentVisibility: 'visible' },
+      getBoundingClientRect() { return { ...this.box } }, getClientRects() { return [this.box] },
+      getAttribute(name) { return name === 'aria-label' ? this.id : null },
+      getAnimations() { return [] }, contains(other) { return other === this || this.children.some(child => child.contains(other)) },
+      matches(selector) { return selector.split(',').some(value => {
+        const part = value.trim()
+        if (part === '*') return true
+        if (part === ':disabled') return this.disabled
+        if (part === '[data-ui-control]') return Boolean(this.dataset.uiControl)
+        if (part.startsWith('#')) return this.id === part.slice(1)
+        if (part.startsWith('[id=')) return this.id === JSON.parse(part.slice(4, -1))
+        if (part.startsWith('.')) return this.className.split(' ').includes(part.slice(1))
+        return this.localName === part
+      }) },
+      closest(selector) { for (let owner = this; owner; owner = owner.parentElement) if (owner.matches(selector)) return owner; return null },
+      querySelectorAll(selector) { return all.filter(node => node !== this && this.contains(node) && node.matches(selector)) },
+      querySelector(selector) { return this.querySelectorAll(selector)[0] ?? null },
+      scrollIntoView() { throw Error('The initial contract anchor is already fully visible') },
+      classList: { contains() { return false } },
+    }
+    parent?.children.push(node); all.push(node); return node
+  }
+  const html = make('html', '', rect(0, 0, matrix.viewport.width, matrix.viewport.height)); html.dataset.theme = matrix.theme
+  const body = make('body', 'contract-body', rect(0, 0, matrix.viewport.width, matrix.viewport.height), html)
+  const clip = make('div', 'contract-clip', rect(0, -327.921875, matrix.viewport.width, 455), body); clip.css.overflowY = 'hidden'
+  const owner = make('div', 'contract-scroll', rect(10, -45.765625, 600, 218), clip)
+  owner.css.overflowY = 'auto'; owner.scrollHeight = 800; owner.scrollTop = 180
+  const page = make('section', 'contract-route', rect(20, -45, 500, 380.078125), owner); page.className = root.slice(1)
+  const input = make('input', 'owned-select', rect(30, 35, 160, 40), page)
+  input.dataset.uiControl = 'input'; input.className = 'app-ui-input ant-input'
+  let fresh = false, pageReads = 0
+  const update = () => {
+    clip.box = rect(0, fresh ? 0 : -327.921875, matrix.viewport.width, 455)
+    owner.box = rect(10, fresh ? 50 : -45.765625, 600, 218)
+    page.box = rect(20, owner.box.top + 180.765625 - owner.scrollTop, 500, 380.078125)
+    input.box = rect(30, page.box.top + 80, 160, 40)
+  }
+  owner.scrollTo = ({ top }) => { owner.scrollTop = Math.max(0, Math.min(owner.scrollHeight - owner.clientHeight, Math.round(top))); update() }
+  const document = { documentElement: html, body, scrollingElement: html, compatMode: 'CSS1Compat', activeElement: input,
+    querySelectorAll: selector => all.filter(node => node.matches(selector)),
+    querySelector: selector => all.find(node => node.matches(selector)) ?? null,
+    elementFromPoint: () => input }
+  const globals = { document, innerWidth: matrix.viewport.width, innerHeight: matrix.viewport.height, devicePixelRatio: 1,
+    getComputedStyle: node => node.css, requestAnimationFrame: callback => callback() }
+  return { evaluate: async expression => {
+    if (expression.startsWith('(()=>{const page=')) {
+      pageReads++
+      // Model a changed clipped position between the initial surface list and
+      // the producer's fresh read. Every sample is still the actual serialized
+      // observer, with a genuine ancestor owner and its complete route extent.
+      // This is a controlled DOM contract, not a claim of a native transition.
+      if (pageReads === 5) { fresh = true; update() }
+    }
+    const result = await runInNewContext(expression, globals)
+    return result && typeof result === 'object' ? JSON.parse(JSON.stringify(result)) : result
+  } }
+}
+
+test('the real capture producer and full validator agree on the refreshed ancestor sweep while stale declared endpoints still fail', async () => {
+  const ledger = ledgerFixture(), ui = uiFixture('projects', ledger), route = ledger.groups.projects.routes[0]
+  const matrix = clone(FULL_APP_MATRIX[0]), previous = ui.scenes.find(scene => scene.stateId === 'ready' && scene.theme === matrix.theme && scene.viewport.width === matrix.viewport.width)
+  ui.scenes.splice(ui.scenes.indexOf(previous), 1)
+  const f = serializedSweepContract(route.root, matrix), directory = mkdtempSync(path.join(tmpdir(), 'notepad-sweep-contract-'))
+  const captures = [], budgets = [], report = { fullAppUi: ui }
+  const shared = createFullAppUiShared({ evaluate: f.evaluate, report, routes: [route], matrix,
+    windowReceipt: { nativeWindow: true, viewport: clone(matrix.viewport), requested: clone(matrix.viewport) },
+    click: async () => { throw Error('Unexpected pointer input in sweep contract') }, cdp: { send: async () => { throw Error('Unexpected keyboard input in sweep contract') } },
+    until: async (check, label, ...extra) => { budgets.push(extra); const value = await check(); assert.ok(value, label); return value },
+    save() {}, capture: async (filename, guard) => {
+      if (guard) await guard()
+      const bytes = png(matrix.viewport.width, matrix.viewport.height), image = { filename, bytes: bytes.length, sha256: hash(bytes) }
+      writeFileSync(path.join(directory, filename), bytes); captures.push(image); return image
+    } })
+  try {
+    const scene = await shared.captureState({ routeId: route.id, stateId: 'ready', anchors: ['#owned-select'] })
+    assert.equal(scene.complete, true); assert.equal(scene.images.length, 3); assert.equal(captures.length, 3)
+    assert.equal(scene.scrollCoverage.length, 1)
+    const covered = scene.scrollCoverage[0]
+    assert.equal(covered.ancestor, true)
+    assert.deepEqual([covered.requiredContentStart, covered.requiredContentEnd], [180.765625, 560.84375])
+    assert.deepEqual(covered.initialRange, { start: 135, end: 388 })
+    assert.deepEqual(covered.sweepRange, { start: 180, end: 343 })
+    assert.deepEqual([covered.rangeStart, covered.rangeEnd], [180, 343])
+    assert.deepEqual(covered.positions.map(position => position.requested), [180, 343])
+    assert.equal(covered.step, 163); assert.equal(covered.complete, true); assert.deepEqual(covered.gaps, [])
+    assert.ok(scene.rawSamples.every(sample => sample.scrollAreas[0].ancestor))
+    assert.ok(budgets.every(value => value.length === 0))
+    for (const image of captures) {
+      const bytes = readFileSync(path.join(directory, image.filename))
+      assert.equal(bytes.length, image.bytes); assert.equal(hash(bytes), image.sha256)
+      assert.equal(bytes.subarray(0, 8).toString('hex'), '89504e470d0a1a0a')
+    }
+    assert.equal(validateFullAppUiEvidence(ui, ledger), ui)
+    for (const [field, stale] of [['rangeStart', 135], ['rangeEnd', 388]]) {
+      const invalid = clone(ui), target = invalid.scenes.find(item => item.images[0].filename === scene.images[0].filename)
+      target.scrollCoverage[0][field] = stale
+      assert.throws(() => validateFullAppUiEvidence(invalid, ledger))
+    }
+  } finally { rmSync(directory, { recursive: true, force: true }) }
+})

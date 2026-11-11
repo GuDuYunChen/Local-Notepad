@@ -245,12 +245,84 @@ export function selectOptions(children) {
 const normalOptions = options => options.map(option => option.options ? { ...option, options: normalOptions(option.options) } : { ...option, value: String(option.value ?? textOf(option.label)), title: option.title ?? textOf(option.label) })
 const flatOptions = options => options.flatMap(option => option.options ? flatOptions(option.options) : [option])
 const normalValue = value => Array.isArray(value) ? value.map(String) : value == null ? '' : String(value)
+const defaultSelectPopupContainer = trigger => trigger.closest('[role="dialog"], [role="alertdialog"]') || trigger.ownerDocument.body
+
+// Keep the normal placement gap and themed popup frame. Only the official
+// option-list height shrinks, so long menus scroll inside the available side.
+function useSelectListHeight(node, api, open, requestedHeight, padding, prefixCls) {
+  const [availableHeight, setAvailableHeight] = useState(null)
+  const measuredHeight = useRef(null)
+  useLayoutEffect(() => {
+    if (!open || !node || !Number.isFinite(requestedHeight) || requestedHeight <= 0) return
+    const document = node.ownerDocument, window = document.defaultView
+    let disposed = false
+    const watched = new Set()
+    const resize = window.ResizeObserver ? new window.ResizeObserver(() => update()) : null
+    const watch = element => {
+      if (element && !watched.has(element)) { watched.add(element); resize?.observe(element) }
+    }
+    const update = () => {
+      if (disposed) return
+      const trigger = api.current?.nativeElement, viewportHeight = document.documentElement.clientHeight
+      if (!trigger || viewportHeight <= 0) return
+      const triggerRect = trigger.getBoundingClientRect()
+      if (triggerRect.height <= 0) return
+      const field = node.querySelector('[role="combobox"]')
+      let popup = document.getElementById(field?.getAttribute('aria-controls'))
+      while (popup && !popup.classList.contains(`${prefixCls}-dropdown`)) popup = popup.parentElement
+      let top = 0, bottom = viewportHeight, scale = 1, frame = padding * 2
+      if (popup) {
+        const popupRect = popup.getBoundingClientRect(), css = window.getComputedStyle(popup)
+        if (popup.offsetHeight > 0 && popupRect.height > 0) scale = popupRect.height / popup.offsetHeight
+        const pixels = value => Number.parseFloat(value)
+        const dimensions = [css.paddingTop, css.paddingBottom].map(pixels)
+        if (dimensions.every(Number.isFinite)) frame = dimensions.reduce((sum, value) => sum + value, 0) +
+          (pixels(css.borderTopWidth) || 0) + (pixels(css.borderBottomWidth) || 0)
+        watch(popup)
+        // Match the popup's actual portal clipping ancestors, not the trigger's
+        // scroll parents: a body portal may deliberately escape those parents.
+        for (let parent = popup.parentElement; parent && parent !== document.body && parent !== document.documentElement; parent = parent.parentElement) {
+          const style = window.getComputedStyle(parent)
+          if (!/^(auto|scroll|hidden|clip)$/.test(style.overflowY || style.overflow)) continue
+          const rect = parent.getBoundingClientRect()
+          if (rect.height <= 0 || parent.offsetHeight <= 0) continue
+          const parentScale = rect.height / parent.offsetHeight
+          const innerTop = rect.top + parent.clientTop * parentScale
+          top = Math.max(top, innerTop)
+          bottom = Math.min(bottom, innerTop + parent.clientHeight * parentScale)
+          watch(parent)
+        }
+      }
+      const above = Math.max(0, Math.min(triggerRect.top, bottom) - top)
+      const below = Math.max(0, bottom - Math.max(triggerRect.bottom, top))
+      // A zero listHeight disables the library's max-height. Keep a positive
+      // scroll viewport even when the surrounding window has almost no room.
+      const height = Math.max(1, Math.floor((Math.max(above, below) - 4) / scale - frame))
+      if (measuredHeight.current !== height) { measuredHeight.current = height; setAvailableHeight(height) }
+      watch(trigger)
+    }
+    const mutations = new window.MutationObserver(update)
+    mutations.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style'] })
+    mutations.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'style'] })
+    window.addEventListener('resize', update)
+    document.addEventListener('scroll', update, true)
+    update()
+    return () => {
+      disposed = true; mutations.disconnect(); resize?.disconnect()
+      window.removeEventListener('resize', update)
+      document.removeEventListener('scroll', update, true)
+    }
+  }, [node, api, open, requestedHeight, padding, prefixCls])
+  return open && availableHeight !== null && Number.isFinite(requestedHeight) && requestedHeight > 0 ? Math.min(requestedHeight, availableHeight) : requestedHeight
+}
 
 export const UiSelect = forwardRef(function UiSelect({ className = '', style, size, density, onChange, onInput, options, children, multiple = false,
   value, defaultValue, disabled = false, name, form, required = false, id, onKeyDown, onInputKeyDown, onOpenChange, onDropdownVisibleChange,
-  open: requestedOpen, showSearch, getPopupContainer, ...props }, forwardedRef) {
+  open: requestedOpen, showSearch, getPopupContainer, listHeight = 256, ...props }, forwardedRef) {
   const inheritedDefaults = useContext(UiControlDefaultsContext)
   const fallbackTheme = useFallbackControlTheme()
+  const { token } = theme.useToken()
+  const { getPrefixCls } = useContext(ConfigProvider.ConfigContext)
   // Own the ARIA identity instead of inheriting rc-util's shared test-id.
   // This is the same real React identity in every environment, not a test path.
   // Explicit caller IDs remain authoritative; IDs survive ordinary rerenders.
@@ -293,6 +365,7 @@ export const UiSelect = forwardRef(function UiSelect({ className = '', style, si
     onInput?.({ ...event, type: 'input' }); onChange?.(event)
   }
   const open = requestedOpen ?? expanded
+  const fittedListHeight = useSelectListHeight(node, api, open && !blocked, listHeight, token.Select?.paddingXXS ?? token.paddingXXS, getPrefixCls('select', props.prefixCls))
   const openRef = useRef(open); openRef.current = open
   const changeOpen = next => {
     const allowed = next && !disabled && !fieldsetDisabled(node)
@@ -314,7 +387,7 @@ export const UiSelect = forwardRef(function UiSelect({ className = '', style, si
     <Select {...props} virtual={false} optionRender={option => <span data-ui-option-value={String(option.value)}>{option.label}</span>} ref={api} id={selectId} aria-required={required || undefined} value={selected} options={resolved} disabled={blocked}
       mode={multiple ? 'multiple' : undefined} size={controlSize(size, density, className)} status={errorStatus(props)} className="app-ui-select"
       showSearch={showSearch ?? flat.length > 12} optionFilterProp="label" open={blocked ? false : open} onOpenChange={changeOpen} onChange={change} onInputKeyDown={key}
-      getPopupContainer={getPopupContainer || (trigger => trigger.closest('[role="dialog"], [role="alertdialog"]') || trigger.ownerDocument.body)} />
+      listHeight={fittedListHeight} getPopupContainer={getPopupContainer || defaultSelectPopupContainer} />
     {name && values.map((item, index) => <input key={index} type="hidden" data-ui-native="form-value" name={name} form={form} value={item} disabled={blocked} />)}
     {required && <input className="app-ui-validation-field" data-ui-native="form-validation" type="text" aria-hidden="true" tabIndex={-1} form={form}
       value={values.some(item => item !== '') ? 'selected' : ''} readOnly={false} required disabled={blocked} onChange={() => {}}

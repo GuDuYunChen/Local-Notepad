@@ -111,6 +111,82 @@ export async function ensureNavigationSidebar({ evaluate, click, until }, expand
   }, 'Actual navigation surface missing: .file-list')
 }
 
+// Read existing App state only. The title and body jointly identify an owned
+// editor; a mounted input or a truncated title alone cannot prove selection.
+export function observeNavigationLibrary(owned) {
+  const sidebar = document.querySelector('.workspace-sidebar'), library = sidebar?.querySelector('.file-list')
+  const expand = sidebar?.querySelector('button[aria-label="展开侧边栏"]'), bounds = expand?.getBoundingClientRect()
+  const editor = document.querySelector('.editor-input'), title = document.querySelector('.workspace-title-button')?.textContent.trim() ?? null
+  const editable = Boolean(editor?.isContentEditable), quitVeil = Boolean(document.querySelector('.editor-quit-veil'))
+  const selected = editable && !quitVeil ? owned.find(file => title === file.title && editor.innerText.includes(file.marker)) : null
+  return { present: Boolean(sidebar), collapsed: Boolean(sidebar?.classList.contains('collapsed')), narrow: innerWidth <= 720,
+    library: Boolean(library), tree: Boolean(library?.querySelector('.tree-list')), loading: Boolean(library?.querySelector(':scope > .placeholder')),
+    query: library?.querySelector('input[aria-label="搜索笔记"]')?.value ?? null,
+    rows: library ? [...library.querySelectorAll('[data-file-id]')].map(node => node.getAttribute('data-file-id')) : [],
+    expandVisible: Boolean(bounds && bounds.width > 0 && bounds.height > 0),
+    editor: { title, editable, quitVeil }, ownedEditor: selected?.id ?? null }
+}
+
+function ownedNavigationEditors(fixture) {
+  return [{ id: safeId(fixture.primary.id), title: fixture.primary.title, marker: fixture.expectedBodyMarker },
+    { id: safeId(fixture.alternate.id), title: fixture.alternate.title, marker: fixture.marker + '-BODY-ALTERNATE' }]
+}
+
+function navigationReadiness(ctx, kind, detail) {
+  const receipt = { kind, matrix: ctx.matrix, complete: false, ...detail }
+  ;(ctx.report.fullAppUi.navigationReadiness ||= []).push(receipt); ctx.save()
+  return receipt
+}
+
+export async function prepareNavigationNoteSelection(ctx, file) {
+  const { evaluate, click, until, save } = ctx, owned = ownedNavigationEditors(ctx.setup.navigation)
+  const target = owned.find(item => item.id === file.id && item.title === file.title)
+  assert.ok(target, 'Navigation readiness may select only an exact owned note')
+  const selector = '.file-list [data-file-id=' + q(safeId(file.id)) + '] .title'
+  const observe = () => evaluate(`(${observeNavigationLibrary.toString()})(${q(owned)})`)
+  const receipt = navigationReadiness(ctx, 'owned-note-selection', { fileId: file.id, title: file.title, selector, before: await observe() })
+  assert.equal(await evaluate(`document.querySelector(${q(selector)})?.textContent.trim()===${q(file.title)}`), true,
+    'Navigation readiness requires the exact owned row title')
+  receipt.firstEventIndex = await evaluate('window.__fullAppUiEvents.length'); save()
+  await click(selector)
+  await until(async () => {
+    receipt.latest = await observe(); save()
+    return receipt.latest.ownedEditor === file.id
+  }, 'Actual editor did not finish preparing the owned navigation note')
+  receipt.events = await evaluate(`window.__fullAppUiEvents.slice(${Number(receipt.firstEventIndex)})`); save()
+  assert.ok(receipt.events.some(event => event.type === 'click' && event.trusted), 'Owned navigation preparation needs its actual trusted click')
+  receipt.complete = true; save(); return receipt
+}
+
+export async function filterNavigationLibrary(ctx, value, included, excluded = []) {
+  const { evaluate, click, until, shared, save } = ctx, owned = ownedNavigationEditors(ctx.setup.navigation)
+  const observe = () => evaluate(`(${observeNavigationLibrary.toString()})(${q(owned)})`)
+  const before = await observe(), receipt = navigationReadiness(ctx, 'owned-library-query', { value,
+    included: included.map(file => file.id), excluded: excluded.map(file => file.id), before, polls: 0, correctiveExpansion: null })
+  // Clearing this exact observed empty result can let the original FileList
+  // select an owned note and fold its narrow sidebar. Correct that transition
+  // at most once; the original complete query predicate still decides success.
+  const mayRestore = value === '' && before.present && !before.collapsed && before.library && before.tree && !before.loading &&
+    before.query === noMatch && before.rows.length === 0 && before.ownedEditor === null
+  await shared.text('.file-list input[aria-label="搜索笔记"]', value)
+  await until(async () => {
+    receipt.latest = await observe(); receipt.polls++; save()
+    const matched = await evaluate(`(()=>{const root=document.querySelector('.file-list');return !!root?.querySelector('.tree-list')&&!root.querySelector(':scope > .placeholder')&&root.querySelector('input[aria-label="搜索笔记"]')?.value===${q(value)}&&${q(included.map(file => file.id))}.every(id=>root.querySelector('[data-file-id='+JSON.stringify(id)+']'))&&${q(excluded.map(file => file.id))}.every(id=>!root.querySelector('[data-file-id='+JSON.stringify(id)+']'))})()`)
+    if (matched) return true
+    const actual = receipt.latest
+    if (mayRestore && !receipt.correctiveExpansion && actual.narrow && actual.collapsed && actual.expandVisible && actual.ownedEditor) {
+      const expansion = { before: actual, firstEventIndex: await evaluate('window.__fullAppUiEvents.length'), complete: false }
+      receipt.correctiveExpansion = expansion; save()
+      await click('.workspace-sidebar [aria-label="展开侧边栏"]')
+      expansion.events = await evaluate(`window.__fullAppUiEvents.slice(${Number(expansion.firstEventIndex)})`); save()
+      assert.ok(expansion.events.some(event => event.type === 'click' && event.trusted), 'Navigation query expansion needs its actual trusted click')
+      expansion.complete = true; save()
+    }
+    return false
+  }, 'Actual debounced file results did not match the current owned query')
+  receipt.complete = true; save(); return receipt
+}
+
 export async function verifyNavigationPages(ctx) {
   const { evaluate, click, cdp, until, shared, api, setup, matrix } = ctx
   const fixture = setup.navigation
@@ -135,11 +211,10 @@ export async function verifyNavigationPages(ctx) {
   // FileList debounces its actual backend read. An old matching row alone is
   // not completion evidence: require the expected included AND excluded owned
   // records after loading finishes, without adding an artificial sleep.
-  const filterLibrary = async (value, included, excluded = []) => {
-    await shared.text('.file-list input[aria-label="搜索笔记"]', value)
-    await until(() => evaluate(`(()=>{const root=document.querySelector('.file-list');return !!root?.querySelector('.tree-list')&&!root.querySelector(':scope > .placeholder')&&root.querySelector('input[aria-label="搜索笔记"]')?.value===${q(value)}&&${q(included.map(file => file.id))}.every(id=>root.querySelector('[data-file-id='+JSON.stringify(id)+']'))&&${q(excluded.map(file => file.id))}.every(id=>!root.querySelector('[data-file-id='+JSON.stringify(id)+']'))})()`), 'Actual debounced file results did not match the current owned query')
-  }
+  const filterLibrary = (value, included, excluded = []) => filterNavigationLibrary(ctx, value, included, excluded)
   const openNote = async file => {
+    await notes(); await filterLibrary('', [fixture.primary, fixture.alternate])
+    await prepareNavigationNoteSelection(ctx, file)
     await notes(); await filterLibrary('', [fixture.primary, fixture.alternate])
     await filterLibrary(file.title, [file], [file.id === fixture.primary.id ? fixture.alternate : fixture.primary])
     await click(row(file) + ' .title')

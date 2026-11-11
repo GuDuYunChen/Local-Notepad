@@ -15,10 +15,14 @@
 .appearance-fields { border: 0; min-width: 0; padding: 0; margin: 0; }
 .appearance-fields legend { padding: 0; margin-bottom: 12px; font-weight: 600; }
 .appearance-schemes { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 10px; }
-.appearance-schemes button { display: flex; align-items: center; gap: 8px; text-align: left; min-width: 0; }
-.appearance-schemes button > span:not(.appearance-swatch) { overflow-wrap: anywhere; }
+.appearance-schemes button { display: flex; align-items: center; gap: 8px; text-align: left; min-width: 0; overflow: hidden; }
+/* Ant Design may wrap all children in .ant-btn-content. Both its wrapped and
+   unwrapped forms must keep a long custom scheme name inside the button. */
+.appearance-schemes button .ant-btn-content { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; max-width: 100%; overflow: hidden; }
+.appearance-schemes button > span:not(.appearance-swatch):not(.ant-btn-content),
+.appearance-schemes button .ant-btn-content > span:not(.appearance-swatch) { flex: 1 1 0; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .appearance-schemes button[aria-pressed="true"]:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { border-color: var(--clay); background: var(--clay-light); box-shadow: 0 0 0 1px var(--clay); }
-.appearance-schemes small { font-size: 12px; color: var(--ink-soft); margin-left: auto; white-space: nowrap; }
+.appearance-schemes small { font-size: 12px; color: var(--ink-soft); flex: 0 0 auto; margin-left: auto; white-space: nowrap; }
 .appearance-swatch { width: 16px; height: 16px; border-radius: 50%; flex-shrink: 0; }
 .appearance-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 16px 0; }
 .appearance-tools > span { margin-left: auto; color: var(--ink-soft); }

@@ -316,7 +316,8 @@
 .project-workspace-view-content.view-project {
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .project-workspace-view-content.view-project .project-creative-console {
@@ -650,7 +651,8 @@
 
 .project-workspace-board {
   min-height: 0;
-  flex: 1;
+  /* Keep the real column controls reachable below a tall creative console. */
+  flex: 1 0 auto;
   padding: 14px 16px 18px;
   display: flex;
   align-items: flex-start;

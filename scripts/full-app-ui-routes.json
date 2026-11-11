@@ -3,13 +3,13 @@
   "scope": "installed-actual-app-page-matrix",
   "sourceScope": "control-source entry coverage with declared states; not every possible failure combination",
   "productSource": {
-    "commit": "cc8a1af87fbc7987cad29bdc0483c860de08e493",
-    "tree": "e505f7e2978b5d240b2a156283ffdf9d7d40ec46",
+    "commit": "b58a812088257d53f3b3e5b6f73b8cd50612837b",
+    "tree": "36d7b26d00a65d12135d2984e3d886e58f656b53",
     "dirty": false
   },
   "inventory": {
     "file": "inventory.json",
-    "sha256": "63decc52a63e95a2762b5fc6da5c1a13e840371a1e6f2036c086315a0d7593d0",
+    "sha256": "5e4a2ca6e36842db44ad89efb1e7e48faf72110ff32a5593726144189c350dae",
     "originalDirty": false,
     "currentCodeFilesHashRevalidated": 347,
     "currentControlsFiles": 137
@@ -1555,9 +1555,9 @@
     },
     {
       "file": "src/components/AppearanceCenter.jsx",
-      "bytes": 15287,
-      "sha256": "6fdc37842e3bda938a0634ad2da915679bbae8338973dd932fcbf59e60ced08f",
-      "blob": "42ec3e06f85d1a83da01be19e1c7b9be7db5b670",
+      "bytes": 15328,
+      "sha256": "20831c4c5c04934d56f6b96dd53a21ce616c17d3a6c970279f79ba2bddc42f40",
+      "blob": "4515c8a746f509214d17379d185bb362cd289be8",
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [
@@ -4334,9 +4334,9 @@
     },
     {
       "file": "src/components/ui/ControlKit.jsx",
-      "bytes": 21882,
-      "sha256": "713f656be110f6d06c6e3e5f3b807816a65e8cef6f670296c17e35489fb0beb9",
-      "blob": "2c5ca48eefa5b3b3a650b4ed80bd23f26863d484",
+      "bytes": 26524,
+      "sha256": "f263ff1a46ff57afc4d6c9ddc4aef45df0e02449ad32abd4491cd74a3b2e4a8f",
+      "blob": "65f17486b342cceb29edf37205d284b675103bcc",
       "classification": "shared-or-browser-semantic-helper",
       "reason": "Shared adapter implementation and form/validation semantics; source-bound native control fixture verifies six scenes separately. It is not an application page.",
       "routeIds": [],

@@ -198,13 +198,27 @@ export function observeFullAppPage({ root, anchors = [], editorExceptions = [], 
     const overflowY = viewportScrollOwner ? overflowViewport.viewportOverflowY : css.overflowY
     const clientHeight = viewportScrollOwner ? viewport.height : owner.clientHeight
     if ((!viewportScrollOwner && !rendered(owner)) || !/auto|scroll/.test(overflowY) || owner.scrollHeight <= clientHeight + 1) continue
-    const ownerBounds = bounds(owner), box = viewportScrollOwner ? viewport : ownerBounds, page = bounds(area), maximum = owner.scrollHeight - clientHeight
+    const ownerBounds = bounds(owner), box = viewportScrollOwner ? viewport : ownerBounds, maximum = owner.scrollHeight - clientHeight
     const ancestor = owner !== area && owner.contains(area)
+    // An independently swept nested scroll surface owns its content. Its
+    // outermost client port, rather than the moving route inside it, is the
+    // stable content extent that this ancestor must photograph.
+    let contentOwner = area, nestedContent = false
+    if (ancestor) for (let nested = area; nested && nested !== owner; nested = nested.parentElement) {
+      const nestedStyle = getComputedStyle(nested), nestedViewportOwner = overflowViewport.isViewportScroller(nested)
+      if (overflowViewport.propagated(nested) && !nestedViewportOwner) continue
+      const nestedOverflow = nestedViewportOwner ? overflowViewport.viewportOverflowY : nestedStyle.overflowY
+      const nestedHeight = nestedViewportOwner ? viewport.height : nested.clientHeight
+      if ((nestedViewportOwner || rendered(nested)) && /auto|scroll/.test(nestedOverflow) && nested.scrollHeight > nestedHeight + 1) {
+        contentOwner = nested; nestedContent = true
+      }
+    }
+    const contentBounds = bounds(contentOwner)
+    const page = nestedContent ? { top: contentBounds.top + contentOwner.clientTop,
+      bottom: contentBounds.top + contentOwner.clientTop + contentOwner.clientHeight } : bounds(area)
     const contentTop = viewportScrollOwner ? 0 : box.top + owner.clientTop
     const requiredContentStart = ancestor ? Math.max(0, Math.min(owner.scrollHeight, owner.scrollTop + page.top - contentTop)) : 0
     const requiredContentEnd = ancestor ? Math.max(requiredContentStart, Math.min(owner.scrollHeight, owner.scrollTop + page.bottom - contentTop)) : owner.scrollHeight
-    const start = Math.max(0, Math.min(maximum, requiredContentStart))
-    const end = Math.max(start, Math.min(maximum, requiredContentEnd - clientHeight))
     let visibleTop = Math.max(0, contentTop), visibleBottom = Math.min(viewport.bottom, contentTop + clientHeight)
     for (let parent = owner.parentElement; parent; parent = parent.parentElement) {
       const clipCss = getComputedStyle(parent), applied = overflowViewport.local(parent, clipCss)
@@ -213,11 +227,17 @@ export function observeFullAppPage({ root, anchors = [], editorExceptions = [], 
         visibleTop = Math.max(visibleTop, top); visibleBottom = Math.min(visibleBottom, top + parent.clientHeight)
       }
     }
+    // Native scroll offsets can be quantized while CSS boxes are fractional.
+    // Request outward integer endpoints using the actual clipped client port;
+    // the original one-pixel coverage and native-position gates remain exact.
+    const start = Math.max(0, Math.min(maximum, Math.floor(requiredContentStart - (visibleTop - contentTop))))
+    const end = Math.max(start, Math.min(maximum, Math.ceil(requiredContentEnd - (visibleBottom - contentTop))))
     const visibleHeight = painted(owner) ? Math.max(0, visibleBottom - visibleTop) : 0
     const visibleContentStart = Math.max(0, Math.min(owner.scrollHeight, owner.scrollTop + visibleTop - contentTop))
     const visibleContentEnd = Math.max(visibleContentStart, Math.min(owner.scrollHeight, visibleContentStart + visibleHeight))
     scrollAreas.push({ selector: selector(owner), clientHeight, scrollHeight: owner.scrollHeight, scrollTop: owner.scrollTop,
       rangeStart: start, rangeEnd: end, ancestor, bounds: box, requiredContentStart, requiredContentEnd,
+      contentTarget: { selector: selector(contentOwner), kind: nestedContent ? 'nested-scroll-client-port' : 'route-content' },
       visibleHeight, visibleContentStart, visibleContentEnd, viewportScrollOwner, ownerBounds })
   }
   return { root, viewport: { width: innerWidth, height: innerHeight }, devicePixelRatio, theme: document.documentElement.dataset.theme,
@@ -602,9 +622,12 @@ export function createFullAppUiShared(ctx) {
           assert.ok(visible?.visibleHeight > 0, 'Actual long-text scroll surface has no painted viewport')
           const step = Math.max(1, Math.floor(visible.visibleHeight * 0.75))
           covered.step = step
+          covered.initialRange = { start: covered.rangeStart, end: covered.rangeEnd }
+          covered.rangeStart = visible.rangeStart; covered.rangeEnd = visible.rangeEnd
+          covered.sweepRange = { start: visible.rangeStart, end: visible.rangeEnd }
           const positions = []
-          for (let value = surface.rangeStart; value < surface.rangeEnd; value += step) positions.push(value)
-          positions.push(surface.rangeEnd)
+          for (let value = visible.rangeStart; value < visible.rangeEnd; value += step) positions.push(value)
+          positions.push(visible.rangeEnd)
           for (const position of positions) {
             assert.ok(index < 64, 'Long page exceeds the bounded native image sweep')
             const actual = await evaluate(`(() => {const node=document.querySelector(${q(surface.selector)});if(!node)throw Error('Actual scroll surface disappeared');node.scrollTo({top:${Number(position)},behavior:'instant'});return node.scrollTop})()`)

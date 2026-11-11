@@ -566,3 +566,141 @@ test('serialized native details: genuinely clipped or obscured open controls rem
   assert.equal(covered.controls.find(item => item.selector === '[id="control"]').hit, false)
   assert.throws(() => validateFullAppPageSample(covered, matrix), /hidden, clipped or obscured/)
 })
+
+// Reconstructed regression contracts: these execute the serialized production
+// observer. They are synthetic geometry inputs, never installed-page evidence.
+function nestedScrollFixture() {
+  const f = overflowFixture(), { rectangle } = f
+  f.html.box = rectangle(0, 0, 704, 455); f.html.scrollHeight = 455; f.html.scrollTop = 0
+  f.body.box = rectangle(0, 0, 704, 455); f.body.scrollHeight = 455
+  f.body.css.overflowX = 'visible'; f.body.css.overflowY = 'visible'
+  const outer = f.make('div', 'outer-scroll', rectangle(40, 10, 550, 437), f.body)
+  outer.css.overflowY = 'auto'; outer.scrollHeight = 978
+  const inner = f.make('div', 'inner-scroll', rectangle(50, 188.59375, 500, 218), outer)
+  inner.css.overflowY = 'auto'; inner.scrollHeight = 569
+  f.page.parentElement.children = f.page.parentElement.children.filter(node => node !== f.page)
+  inner.children.push(f.page); f.page.parentElement = inner
+  f.page.clientHeight = 380; f.page.scrollHeight = 380
+  const setOffsets = (innerOffset, outerOffset = 160) => {
+    outer.scrollTop = outerOffset; inner.scrollTop = innerOffset
+    inner.box = rectangle(50, 10 + 338.59375 - outerOffset, 500, 218)
+    f.page.box = rectangle(60, inner.box.top + 180.765625 - innerOffset, 450, 380.078125)
+    f.control.box = rectangle(70, f.page.box.top + 4, 160, 40)
+  }
+  setOffsets(155)
+  return { ...f, outer, inner, setOffsets }
+}
+
+function measuredImages(samples) {
+  const images = samples.map((_, index) => ({ filename: 'serialized-scroll-' + index + '.png' }))
+  return { images, samples: samples.flatMap((sample, index) => ['before-capture', 'after-capture'].map(phase =>
+    ({ ...clone(sample), phase, image: images[index].filename }))) }
+}
+
+test('serialized nested scroll coverage binds ancestor extent to its independently swept client port', () => {
+  const f = nestedScrollFixture(), observations = [155, 351, 180, 342].map(offset => {
+    f.setOffsets(offset); return serializedOverflowObservation(f, 'page')
+  })
+  for (const sample of observations) {
+    const outer = sample.scrollAreas.find(surface => surface.selector === '[id="outer-scroll"]')
+    const inner = sample.scrollAreas.find(surface => surface.selector === '[id="inner-scroll"]')
+    assert.deepEqual([outer.requiredContentStart, outer.requiredContentEnd], [338.59375, 556.59375])
+    assert.deepEqual(outer.contentTarget, { selector: '[id="inner-scroll"]', kind: 'nested-scroll-client-port' })
+    assert.deepEqual([inner.requiredContentStart, inner.requiredContentEnd], [180.765625, 560.84375])
+    assert.deepEqual(inner.contentTarget, { selector: '[id="page"]', kind: 'route-content' })
+  }
+  assert.notEqual(observations[0].rootBounds.top, observations[1].rootBounds.top, 'The real route still moves inside its inner scroller')
+})
+
+test('serialized nested image intervals cover both surfaces and still reject a two-pixel content drift', () => {
+  const f = nestedScrollFixture(), observations = [155, 351, 180, 342].map(offset => {
+    f.setOffsets(offset); return serializedOverflowObservation(f, 'page')
+  })
+  const receipts = measuredImages(observations)
+  for (const surface of observations[0].scrollAreas) {
+    assert.equal(measureFullAppScrollCoverage(surface, receipts.samples, receipts.images).complete, true)
+  }
+  const altered = clone(receipts.samples)
+  altered.at(-1).scrollAreas.find(surface => surface.selector === '[id="outer-scroll"]').requiredContentEnd += 2
+  const outer = observations[0].scrollAreas.find(surface => surface.selector === '[id="outer-scroll"]')
+  assert.throws(() => measureFullAppScrollCoverage(outer, altered, receipts.images), /content range changed/)
+})
+
+test('hidden, clipped or non-scrolling nested owners cannot replace the full route interval', () => {
+  for (const overflowY of ['hidden', 'clip', 'visible']) {
+    const f = nestedScrollFixture(); f.inner.css.overflowY = overflowY
+    const first = serializedOverflowObservation(f, 'page'), outer = first.scrollAreas.find(surface => surface.selector === '[id="outer-scroll"]')
+    assert.deepEqual(outer.contentTarget, { selector: '[id="page"]', kind: 'route-content' })
+    assert.equal(first.scrollAreas.some(surface => surface.selector === '[id="inner-scroll"]'), false)
+    f.setOffsets(351)
+    const after = serializedOverflowObservation(f, 'page')
+    const receipts = measuredImages([first, after])
+    assert.throws(() => measureFullAppScrollCoverage(outer, receipts.samples, receipts.images), /content range changed/)
+  }
+  const f = nestedScrollFixture(); f.inner.scrollHeight = f.inner.clientHeight + 1
+  const sample = serializedOverflowObservation(f, 'page')
+  assert.deepEqual(sample.scrollAreas.find(surface => surface.selector === '[id="outer-scroll"]').contentTarget,
+    { selector: '[id="page"]', kind: 'route-content' })
+})
+
+test('a scrollable route retains its full content while each outer ancestor measures the outermost tracked port', () => {
+  const f = nestedScrollFixture()
+  f.page.css.overflowY = 'auto'; f.page.clientHeight = 200; f.page.scrollHeight = 800
+  f.page.box.height = 204; f.page.box.bottom = f.page.box.top + 204; f.page.clientTop = 2
+  const sample = serializedOverflowObservation(f, 'page')
+  const route = sample.scrollAreas.find(surface => surface.selector === '[id="page"]')
+  const inner = sample.scrollAreas.find(surface => surface.selector === '[id="inner-scroll"]')
+  const outer = sample.scrollAreas.find(surface => surface.selector === '[id="outer-scroll"]')
+  assert.equal(route.ancestor, false); assert.deepEqual([route.requiredContentStart, route.requiredContentEnd], [0, 800])
+  assert.deepEqual([inner.requiredContentStart, inner.requiredContentEnd], [182.765625, 382.765625])
+  assert.deepEqual(inner.contentTarget, { selector: '[id="page"]', kind: 'nested-scroll-client-port' })
+  assert.deepEqual([outer.requiredContentStart, outer.requiredContentEnd], [338.59375, 556.59375])
+  assert.deepEqual(outer.contentTarget, { selector: '[id="inner-scroll"]', kind: 'nested-scroll-client-port' })
+})
+
+function fractionalScrollFixture({ top = 67.1875, clientHeight = 388, scrollHeight = 9000,
+  requiredStart = 7450.671875, requiredEnd = 8113.96875 } = {}) {
+  const f = overflowFixture(), { rectangle } = f
+  f.html.box = rectangle(0, 0, 704, 455); f.html.scrollHeight = 455; f.html.scrollTop = 0
+  f.body.box = rectangle(0, 0, 704, 455); f.body.scrollHeight = 455
+  f.body.css.overflowX = 'visible'; f.body.css.overflowY = 'visible'
+  const owner = f.make('div', 'fractional-scroll', rectangle(10, top, 600, clientHeight), f.body)
+  owner.css.overflowY = 'auto'; owner.scrollHeight = scrollHeight
+  f.page.parentElement.children = f.page.parentElement.children.filter(node => node !== f.page)
+  owner.children.push(f.page); f.page.parentElement = owner
+  f.page.clientHeight = Math.round(requiredEnd - requiredStart); f.page.scrollHeight = f.page.clientHeight
+  const setOffset = value => {
+    owner.scrollTop = value
+    f.page.box = rectangle(20, top + requiredStart - value, 500, requiredEnd - requiredStart)
+    f.control.box = rectangle(30, f.page.box.top + 4, 160, 40)
+  }
+  setOffset(Math.floor(requiredStart))
+  return { ...f, owner, setOffset }
+}
+
+test('fractional viewport endpoints retain the original one-pixel gap rejection and request outward integer positions', () => {
+  const f = fractionalScrollFixture(), first = serializedOverflowObservation(f, 'page')
+  const surface = first.scrollAreas.find(item => item.selector === '[id="fractional-scroll"]')
+  assert.equal(surface.clientHeight, 388); assert.equal(surface.visibleHeight, 387.8125)
+  assert.deepEqual([surface.rangeStart, surface.rangeEnd], [7450, 7727])
+  f.setOffset(7725)
+  const old = measuredImages([first, serializedOverflowObservation(f, 'page')])
+  const refused = measureFullAppScrollCoverage(surface, old.samples, old.images)
+  assert.equal(refused.complete, false)
+  assert.deepEqual(refused.gaps, [{ from: 8112.8125, to: 8113.96875 }])
+  assert.equal(refused.gaps[0].to - refused.gaps[0].from, 1.15625)
+  f.setOffset(surface.rangeEnd)
+  const fixed = measuredImages([first, serializedOverflowObservation(f, 'page')])
+  assert.equal(measureFullAppScrollCoverage(surface, fixed.samples, fixed.images).complete, true)
+})
+
+test('fractional ranges account for top clipping and remain clamped to native scroll bounds', () => {
+  const partial = fractionalScrollFixture({ top: -50.5, clientHeight: 388, scrollHeight: 2000, requiredStart: 300.25, requiredEnd: 900.75 })
+  const surface = serializedOverflowObservation(partial, 'page').scrollAreas.find(item => item.selector === '[id="fractional-scroll"]')
+  assert.equal(surface.visibleHeight, 337.5)
+  assert.deepEqual([surface.rangeStart, surface.rangeEnd], [249, 513])
+  const clamped = fractionalScrollFixture({ top: -50.5, clientHeight: 388, scrollHeight: 1000, requiredStart: 20.25, requiredEnd: 999.75 })
+  const edge = serializedOverflowObservation(clamped, 'page').scrollAreas.find(item => item.selector === '[id="fractional-scroll"]')
+  assert.equal(edge.rangeStart, 0); assert.equal(edge.rangeEnd, 612)
+  assert.equal(edge.rangeEnd, edge.scrollHeight - edge.clientHeight)
+})

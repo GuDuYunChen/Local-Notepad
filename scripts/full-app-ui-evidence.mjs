@@ -230,7 +230,8 @@ export function validateCollapsedSidebarFocus(sample, matrix) {
   return sample
 }
 
-export function validateFullAppPopupObservation(sample) {
+export function validateFullAppPopupObservation(sample, viewport) {
+  extent(viewport)
   assert.equal(sample?.expanded, true); assert.equal(sample.optionsAvailable, true)
   nonempty(sample.inputId); assert.equal(typeof sample.value, 'string')
   const popup = sample.popup
@@ -242,6 +243,9 @@ export function validateFullAppPopupObservation(sample) {
     for (const field of ['left', 'top', 'right', 'bottom', 'width', 'height']) assert.ok(Number.isFinite(rect?.[field]))
     positive(rect.width); positive(rect.height); assert.ok(rect.right > rect.left && rect.bottom > rect.top)
   }
+  const root = popup.root
+  assert.ok(root.left >= 0 && root.top >= 0 && root.right <= viewport.width && root.bottom <= viewport.height,
+    'Actual popup outer frame leaves its native viewport')
   assert.ok(Array.isArray(popup.ancestors) && popup.ancestors.length > 0)
   for (const node of popup.ancestors) {
     assert.notEqual(node.display, 'none'); assert.equal(node.visibility, 'visible'); assert.ok(Number(node.opacity) > 0)
@@ -266,7 +270,7 @@ function validatePopup(receipt) {
   assert.equal(receipt.trustedPointer, true); assert.equal(receipt.trustedKeyboard, true)
   assert.equal(typeof receipt.beforeValue, 'string'); assert.equal(typeof receipt.afterValue, 'string')
   const capture = receipt.capture; assert.equal(capture?.complete, true)
-  for (const side of ['before', 'after']) validateFullAppPopupObservation(capture[side])
+  for (const side of ['before', 'after']) validateFullAppPopupObservation(capture[side], receipt.viewport)
   if (receipt.interactionMode === 'preview') assert.equal(capture.before.value, receipt.beforeValue, 'Preview screenshot must show the unchanged selected value')
   const key = sample => JSON.stringify([sample.inputId, sample.popup.listId, sample.popup.optionId, sample.value,
     sample.options.map(option => [option.value, option.disabled])])
