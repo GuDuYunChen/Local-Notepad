@@ -501,19 +501,8 @@ jobs:
           name: local-notepad-windows-7bee8ed1effde41e3657a36a66b9a6ecec1c940b
           path: .installer-input/4.248.1
 
-      - name: Verify actual 4.248.0 to 4.248.1 in-place upgrade and data retention
-        shell: pwsh
-        run: .\.github\scripts\windows-in-place-upgrade.ps1
-
-      - name: Upload in-place upgrade evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: local-notepad-in-place-upgrade-${{ github.sha }}
-          path: test-results/in-place-upgrade/*
-          if-no-files-found: warn
-          retention-days: 90
-
+      # Check the actual PR installer before the flaky historical-version quit path.
+      # Both independent upgrades remain required; neither failure permits installer upload.
       - name: Verify accepted 4.248.1 to actual current package in-place upgrade
         shell: pwsh
         run: .\.github\scripts\windows-in-place-upgrade.ps1 -CurrentCandidate
@@ -524,6 +513,19 @@ jobs:
         with:
           name: local-notepad-current-in-place-upgrade-${{ github.sha }}
           path: test-results/current-in-place-upgrade/*
+          if-no-files-found: warn
+          retention-days: 90
+
+      - name: Verify actual 4.248.0 to 4.248.1 in-place upgrade and data retention
+        shell: pwsh
+        run: .\.github\scripts\windows-in-place-upgrade.ps1
+
+      - name: Upload in-place upgrade evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-notepad-in-place-upgrade-${{ github.sha }}
+          path: test-results/in-place-upgrade/*
           if-no-files-found: warn
           retention-days: 90
 

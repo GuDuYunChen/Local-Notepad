@@ -127,3 +127,28 @@ test('the concurrent transport repair and the original 20-second process gates r
   assert.ok(source.includes('$stopDeadline=[DateTime]::UtcNow.AddSeconds(10)'))
   assert.ok(source.includes('if(-not $stopped){throw'))
 })
+
+
+test('the current installer upgrade runs before historical upgrade, retaining both strict gates', () => {
+  const workflow = readFileSync(new URL('../.github/workflows/ui-redesign-ci.yml', import.meta.url), 'utf8').replace(/\r\n/g, '\n')
+  const steps = [
+    'Verify accepted 4.248.1 to actual current package in-place upgrade',
+    'Upload current-package upgrade evidence',
+    'Verify actual 4.248.0 to 4.248.1 in-place upgrade and data retention',
+    'Upload in-place upgrade evidence',
+    'Upload NSIS installer',
+  ]
+  const positions = steps.map(name => workflow.indexOf('      - name: ' + name))
+  assert.ok(positions.every((position, index) => position >= 0 && (!index || position > positions[index - 1])))
+  const section = workflow.slice(positions[0], positions[4])
+  const current = section.slice(0, section.indexOf('      - name: ' + steps[2]))
+  const historical = section.slice(section.indexOf('      - name: ' + steps[2]))
+  assert.ok(current.includes('windows-in-place-upgrade.ps1 -CurrentCandidate'))
+  assert.ok(historical.includes('windows-in-place-upgrade.ps1\\n'))
+  assert.ok(current.includes('test-results/current-in-place-upgrade/*'))
+  assert.ok(historical.includes('test-results/in-place-upgrade/*'))
+  assert.doesNotMatch(section, /continue-on-error:\s*true/)
+  const installer = workflow.slice(positions[4], workflow.indexOf('\n  native-controls:', positions[4]))
+  assert.ok(installer.includes('uses: actions/upload-artifact@v4'))
+  assert.doesNotMatch(installer, /if:\s*always\(\)|if:\s*success\(\)\s*\|\|/)
+})
