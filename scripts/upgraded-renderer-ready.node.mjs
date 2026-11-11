@@ -113,7 +113,7 @@ test('the concurrent transport repair and the original 20-second process gates r
   // Both routes retain the original CDP Browser.close and real 20s process gate.
   for (const route of [candidate, historical]) {
     assert.ok(route.includes(send))
-    assert.ok(route.includes("$command=[Text.Encoding]::UTF8.GetBytes('{\\"id\\":1,\\"method\\":\\"Browser.close\\"}')"))
+    assert.ok(route.includes(`$command=[Text.Encoding]::UTF8.GetBytes('{"id":1,"method":"Browser.close"}')`))
     assert.ok(route.indexOf('$receive=$ws.ReceiveAsync') < route.indexOf(send))
     assert.ok(route.indexOf('$receive=$ws.ReceiveAsync') < route.indexOf('$gui.WaitForExit(20000)'))
     assert.ok(route.indexOf('$gui.WaitForExit(20000)') < route.lastIndexOf('$ws.Dispose()'))
