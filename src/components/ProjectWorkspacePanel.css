@@ -984,6 +984,13 @@
   cursor: pointer;
 }
 
+/* The chapter action uses the shared middle-size 40px button token.
+   Do not shrink it when the chapter card has a constrained flex height. */
+.project-chapter-main > .project-chapter-open.app-ui-button {
+  flex: 0 0 40px;
+  min-height: 40px;
+}
+
 .project-chapter-open strong,
 .project-chapter-open span {
   display: block;
