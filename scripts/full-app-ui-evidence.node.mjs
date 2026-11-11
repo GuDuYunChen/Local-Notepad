@@ -833,7 +833,7 @@ test('a fitting popup frame still permits a longer internally scrolling option l
 import { filterNavigationLibrary, prepareNavigationNoteSelection, verifyNavigationPages } from './full-app-ui-navigation.mjs'
 import { createFullAppUiShared } from './full-app-ui-shared.mjs'
 
-function ownedNavigationContract({ width = 704, query = '', selected = 'primary', onText, onClick, onPoll } = {}) {
+function ownedNavigationContract({ width = 704, query = '', selected = 'primary', onText, onClick, onPoll, onRow } = {}) {
   const primary = { id: 'primary', title: 'NAV-CONTRACT 完整主笔记.md' }, alternate = { id: 'alternate', title: 'NAV-CONTRACT 第二篇可打开笔记.md' }
   const fixture = { marker: 'NAV-CONTRACT', expectedBodyMarker: 'NAV-CONTRACT-BODY-PRIMARY', primary, alternate,
     notes: [primary, alternate], daily: { id: 'daily' }, trashed: { id: 'trashed' }, folder: { id: 'folder' } }
@@ -849,10 +849,20 @@ function ownedNavigationContract({ width = 704, query = '', selected = 'primary'
     const match = selector.match(/\[data-file-id=("[^"]+")\]/)
     return match && state.rows.find(file => file.id === JSON.parse(match[1]))
   }
+  const rowDocuments = new Map()
+  const rowNodes = selector => {
+    const file = rowFile(selector)
+    if (!file) return []
+    if (!rowDocuments.has(file.id)) {
+      const row = productionNavigationRow(file)
+      onRow?.(row, file); rowDocuments.set(file.id, row.ownerDocument)
+    }
+    return [...rowDocuments.get(file.id).querySelectorAll(selector)]
+  }
   const library = {
     querySelector: selector => selector === '.tree-list' ? {} : selector === ':scope > .placeholder' ? (state.loading ? {} : null)
       : selector === 'input[aria-label="搜索笔记"]' ? { value: state.query }
-        : rowFile(selector) ? { textContent: rowFile(selector).title } : null,
+        : rowNodes(selector)[0] ?? null,
     querySelectorAll: selector => selector === '[data-file-id]' ? state.rows.map(file => ({ getAttribute: name => name === 'data-file-id' ? file.id : null })) : [],
   }
   const sidebar = { classList: { contains: name => name === 'collapsed' && state.collapsed },
@@ -869,7 +879,7 @@ function ownedNavigationContract({ width = 704, query = '', selected = 'primary'
     if (selector === '.editor-quit-veil') return state.quitVeil ? {} : null
     if (selector.startsWith('.file-list [data-file-id=')) return state.collapsed ? null : library.querySelector(selector)
     throw Error('Unexpected owned navigation selector: ' + selector)
-  } }
+  }, querySelectorAll: selector => state.collapsed ? [] : rowNodes(selector) }
   const globals = { document, window: { __fullAppUiEvents: events }, innerWidth: width,
     localStorage: { getItem: () => null }, requestAnimationFrame: callback => { state.frames++; callback(); return state.frames } }
   const report = { fullAppUi: {} }
@@ -1099,4 +1109,172 @@ test('the real capture producer and full validator agree on the refreshed ancest
       assert.throws(() => validateFullAppUiEvidence(invalid, ledger))
     }
   } finally { rmSync(directory, { recursive: true, force: true }) }
+})
+
+import { parse as parseNavigationRowSource } from '@babel/parser'
+import { transformSync as transformNavigationRowJsx } from 'esbuild'
+import { createElement as createNavigationRowElement } from 'react'
+import { renderToStaticMarkup as renderNavigationRowMarkup } from 'react-dom/server'
+import { JSDOM as NavigationRowDom } from 'jsdom'
+
+let navigationRowTemplate
+function productionNavigationRow(file) {
+  if (!navigationRowTemplate) {
+    const source = readFileSync(new URL('../src/components/FileList.jsx', import.meta.url), 'utf8')
+    const syntax = parseNavigationRowSource(source, { sourceType: 'module', plugins: ['jsx'] })
+    const declaration = syntax.program.body.flatMap(node => node.type === 'VariableDeclaration' ? node.declarations : [])
+      .find(node => node.id.name === 'FileNode')
+    const returned = declaration?.init.body.body.find(node => node.type === 'ReturnStatement')?.argument
+    const component = syntax.program.body.find(node => node.type === 'ExportDefaultDeclaration' && node.declaration.id?.name === 'FileList')?.declaration
+    const removeExtension = component?.body.body.find(node => node.type === 'FunctionDeclaration' && node.id.name === 'removeExtension')
+    assert.equal(returned?.type, 'JSXElement'); assert.ok(removeExtension)
+    navigationRowTemplate = {
+      jsx: transformNavigationRowJsx('(' + source.slice(returned.start, returned.end) + ')',
+        { loader: 'jsx', jsxFactory: 'React.createElement', target: 'es2022' }).code,
+      removeExtension: runInNewContext('(' + source.slice(removeExtension.start, removeExtension.end) + ')'),
+    }
+  }
+  // Evaluate the actual FileNode return and its actual filename transformation.
+  // Only unrelated action buttons become inert HTML buttons. No application,
+  // native pointer, React state transition or installed acceptance is simulated.
+  const element = runInNewContext(navigationRowTemplate.jsx, {
+    React: { createElement: createNavigationRowElement }, UiButton: 'button', node: file,
+    ref: null, level: 0, isSelected: false, isKeyboardFocused: false, isExpanded: false,
+    isDragging: false, dragClass: '', folderState: 0, removeExtension: navigationRowTemplate.removeExtension,
+    onSelect() {}, onContextMenu() {}, onRename() {}, onDelete() {},
+  })
+  const dom = new NavigationRowDom('<div class="file-list">' + renderNavigationRowMarkup(element) + '</div>')
+  return dom.window.document.querySelector('[data-file-id]')
+}
+
+for (const pinned of [false, true]) test('owned navigation accepts the production FileNode title attribute with extension-hidden display' + (pinned ? ' and a pin child' : ''), async () => {
+  const f = ownedNavigationContract(); f.fixture.alternate.is_pinned = pinned
+  const row = productionNavigationRow(f.fixture.alternate), title = row.querySelector('.title')
+  assert.equal(row.getAttribute('data-file-id'), f.fixture.alternate.id)
+  assert.equal(title.getAttribute('title'), f.fixture.alternate.title)
+  assert.equal(title.textContent, (pinned ? '⭐' : '') + f.fixture.alternate.title.slice(0, -3))
+  assert.equal(Boolean(title.querySelector('.pin-icon')), pinned)
+  const receipt = await prepareNavigationNoteSelection(f.context, f.fixture.alternate)
+  assert.equal(receipt.complete, true); assert.equal(receipt.latest.ownedEditor, f.fixture.alternate.id)
+  assert.equal(f.clicks.length, 1); assert.ok(receipt.events.some(event => event.type === 'click' && event.trusted))
+  assert.deepEqual(f.waits.map(wait => wait.budgets), [[]])
+})
+
+const invalidProductionNavigationRows = [
+  ['forged full-title metadata despite matching display text', (row, file) => {
+    const title = row.querySelector('.title'); title.setAttribute('title', 'foreign.md'); title.textContent = file.title
+  }],
+  ['a different painted title despite exact full-title metadata', row => { row.querySelector('.title').textContent = 'foreign visible note' }],
+  ['missing full-title metadata', row => row.querySelector('.title').removeAttribute('title')],
+  ['a different file id', row => row.setAttribute('data-file-id', 'foreign')],
+  ['a missing row', row => row.remove()],
+  ['a missing title node', row => row.querySelector('.title').remove()],
+  ['an ambiguous duplicate row', row => row.after(row.cloneNode(true))],
+  ['a foreign nearest row owner', row => {
+    const title = row.querySelector('.title'), owner = row.ownerDocument.createElement('div')
+    owner.setAttribute('data-file-id', 'foreign'); title.before(owner); owner.append(title)
+  }],
+]
+for (const [name, mutate] of invalidProductionNavigationRows) test('owned navigation refuses ' + name + ' before any native click', async () => {
+  const f = ownedNavigationContract({ onRow: (row, file) => { if (file.id === 'alternate') mutate(row, file) } })
+  await assert.rejects(prepareNavigationNoteSelection(f.context, f.fixture.alternate), /Navigation readiness requires the exact owned row title/)
+  assert.equal(f.clicks.length, 0); assert.equal(f.waits.length, 0)
+  assert.equal(f.report.fullAppUi.navigationReadiness[0].complete, false)
+})
+
+test('a real production row title cannot waive the original owned editor body after its click', async () => {
+  const f = ownedNavigationContract({ onClick: state => { state.bodyOverride = 'foreign body without the owned marker' } })
+  await assert.rejects(prepareNavigationNoteSelection(f.context, f.fixture.alternate), /Actual editor did not finish preparing the owned navigation note/)
+  assert.equal(f.clicks.length, 1); assert.equal(f.report.fullAppUi.navigationReadiness[0].complete, false)
+  assert.equal(f.report.fullAppUi.navigationReadiness[0].latest.ownedEditor, null)
+  assert.deepEqual(f.waits.map(wait => wait.budgets), [[]])
+})
+
+import { ensureFullAppTargetVisible, withinActualClientPort } from './full-app-ui-shared.mjs'
+
+function productionHistoryFeedbackContract() {
+  const source = readFileSync(new URL('../src/components/SyncConflictHistoryPanel.jsx', import.meta.url), 'utf8')
+  const driver = readFileSync(new URL('./full-app-ui-local-sync-lab.mjs', import.meta.url), 'utf8')
+  const find = (syntax, predicate) => {
+    const found = []
+    const walk = node => {
+      if (!node || typeof node !== 'object') return
+      if (predicate(node)) found.push(node)
+      for (const [key, value] of Object.entries(node)) if (!['loc', 'start', 'end', 'comments'].includes(key)) {
+        if (Array.isArray(value)) value.forEach(walk)
+        else if (value && typeof value === 'object') walk(value)
+      }
+    }
+    walk(syntax); return found
+  }
+  const syntax = parseNavigationRowSource(source, { sourceType: 'module', plugins: ['jsx'] })
+  const classIs = (node, value) => node.type === 'JSXElement' && node.openingElement.attributes.some(attribute =>
+    attribute.type === 'JSXAttribute' && attribute.name.name === 'className' && attribute.value?.value === value)
+  const feedback = find(syntax, node => classIs(node, 'sync-conflict-history-feedback'))
+  const sections = find(syntax, node => classIs(node, 'sync-conflict-history-body'))
+  assert.equal(feedback.length, 2); assert.equal(sections.length, 1)
+  const state = { phase: 'ready', loadedRows: Array(26).fill({}), rows: Array(26).fill({}),
+    snapshot: { hasMore: false }, isComposing: false, selection: { matched: 26, loaded: 26, narrowed: false } }
+  for (const name of ['result', 'searchMessage']) {
+    const expressions = find(syntax, node => node.type === 'VariableDeclarator' && node.id.name === name)
+    assert.equal(expressions.length, 1)
+    state[name] = runInNewContext('(' + source.slice(expressions[0].init.start, expressions[0].init.end) + ')', state)
+  }
+  const section = sections[0], jsx = source.slice(section.openingElement.start, section.openingElement.end) +
+    feedback.map(node => source.slice(node.start, node.end)).join('') + source.slice(section.closingElement.start, section.closingElement.end)
+  const compiled = transformNavigationRowJsx('(' + jsx + ')', { loader: 'jsx', jsxFactory: 'React.createElement', target: 'es2022' }).code
+  const element = runInNewContext(compiled, { ...state, React: { createElement: createNavigationRowElement },
+    titleID: 'history-title', feedbackID: 'history-result', searchResultID: 'history-search' })
+  const dom = new NavigationRowDom('<!doctype html>' + renderNavigationRowMarkup(element)), document = dom.window.document
+  const routeSyntax = parseNavigationRowSource(driver, { sourceType: 'module' })
+  const shots = find(routeSyntax, node => node.type === 'CallExpression' && node.callee.name === 'shot' &&
+    node.arguments[0]?.value === 'lab-sync-history' && node.arguments[1]?.value === 'earlier-records')
+  const roots = find(routeSyntax, node => node.type === 'VariableDeclarator' && node.id.name === 'historyRoot')
+  assert.equal(shots.length, 1); assert.equal(roots.length, 1)
+  const anchors = runInNewContext(driver.slice(shots[0].arguments[2].start, shots[0].arguments[2].end), { historyRoot: roots[0].init.value })
+  const requiredText = runInNewContext(driver.slice(shots[0].arguments[3].start, shots[0].arguments[3].end))
+  assert.equal(anchors.length, 1)
+  const scrolls = []
+  // Positive deterministic boxes exercise the actual uniqueness/scroll guard;
+  // they are controlled DOM inputs, not a claim of native measured geometry.
+  for (const node of document.querySelectorAll('.sync-conflict-history-feedback')) {
+    const top = node.id === 'history-result' ? 600 : 30
+    node.getBoundingClientRect = () => ({ left: 20, top, right: 320, bottom: top + 24, width: 300, height: 24 })
+    node.scrollIntoView = options => scrolls.push({ id: node.id, options })
+  }
+  const ensure = selector => runInNewContext(`(${ensureFullAppTargetVisible.toString()})(${JSON.stringify(selector)},${withinActualClientPort.toString()},()=>({bounds:{left:0,top:0,right:704,bottom:455,width:704,height:455},local:()=>({x:'visible',y:'visible'})}))`,
+    { document, getComputedStyle: node => dom.window.getComputedStyle(node) })
+  return { document, selector: anchors[0], requiredText: [...requiredText], scrolls, ensure }
+}
+
+test('local-sync production feedback keeps the original ambiguous class selector rejected', () => {
+  const f = productionHistoryFeedbackContract(), nodes = f.document.querySelectorAll('.sync-conflict-history-feedback')
+  assert.equal(nodes.length, 2); assert.equal(nodes[0].getAttribute('role'), 'status'); assert.equal(nodes[1].getAttribute('role'), 'status')
+  assert.equal(nodes[0].hasAttribute('data-history-search-feedback'), false)
+  assert.equal(nodes[1].hasAttribute('data-history-search-feedback'), true)
+  assert.throws(() => f.ensure('.sync-conflict-history-feedback'), /Missing or ambiguous actual scroll target/)
+  assert.deepEqual(f.scrolls, [])
+})
+
+test('local-sync production feedback uses the actual earlier-records anchor for the unique complete read status', () => {
+  const f = productionHistoryFeedbackContract(), nodes = f.document.querySelectorAll(f.selector)
+  assert.equal(nodes.length, 1); assert.equal(nodes[0].id, 'history-result')
+  assert.equal(nodes[0].hasAttribute('data-history-search-feedback'), false)
+  assert.deepEqual(f.requiredText, ['已读取 26 条记录'])
+  assert.ok(nodes[0].textContent.includes(f.requiredText[0]))
+  assert.equal(f.ensure(f.selector), true)
+  assert.equal(f.scrolls.length, 1); assert.equal(f.scrolls[0].id, 'history-result')
+  assert.deepEqual(JSON.parse(JSON.stringify(f.scrolls[0].options)), { block: 'center', inline: 'nearest', behavior: 'instant' })
+})
+
+test('local-sync production feedback refuses a missing or duplicate read status instead of selecting the search status', () => {
+  for (const duplicate of [false, true]) {
+    const f = productionHistoryFeedbackContract(), result = f.document.getElementById('history-result')
+    if (duplicate) {
+      const copy = result.cloneNode(true); copy.getBoundingClientRect = result.getBoundingClientRect
+      copy.scrollIntoView = result.scrollIntoView; result.after(copy)
+    } else result.remove()
+    assert.throws(() => f.ensure(f.selector), /Missing or ambiguous actual scroll target/)
+    assert.deepEqual(f.scrolls, [])
+  }
 })

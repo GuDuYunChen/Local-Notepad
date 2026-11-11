@@ -168,3 +168,13 @@ it('unsaved draft warns on normal unload until explicitly saved or discarded', a
   await click('保存批注与进度');
   const later = new Event('beforeunload', { cancelable: true });window.dispatchEvent(later);expect(later.defaultPrevented).toBe(false);
 });
+
+it('retains full study edit-button names for clipped narrow layouts', async () => {
+  await panel();
+  const controls = [...uiQueryAll(host, '.collection-study-list button')];
+  expect(controls.length).toBeGreaterThan(0);
+  for (const node of controls) {
+    expect(node.getAttribute('title')).toBe(uiText(node));
+    expect(node.getAttribute('title')).toMatch(/^编辑批注：/);
+  }
+});

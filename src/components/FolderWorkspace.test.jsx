@@ -69,3 +69,58 @@ describe('read lifecycle, ownership, feedback and keyboard',()=>{
  it('confirms discarded input before location change, reload or close',async()=>{await input('整理文件夹名称','未提交');await browse('a');await click('取消操作');expect(panel().querySelector('.folder-workspace-path strong').textContent).toBe('/');await click('重新读取目录');await click('取消操作');expect(panel().querySelector('[aria-label="整理文件夹名称"]').value).toBe('未提交');await click('关闭文件夹整理');await click('确认继续');expect(close).toHaveBeenCalledTimes(1);expect(writes()).toHaveLength(0)})
  it('isolates Ctrl+S, IME Escape and wraps confirmation focus',async()=>{const event=new KeyboardEvent('keydown',{key:'s',ctrlKey:true,bubbles:true,cancelable:true});await act(async()=>panel().dispatchEvent(event));expect(event.defaultPrevented).toBe(true);await input('整理文件夹名称','新');await tap(button('预览名称操作'));expect(document.activeElement).toBe(button('取消操作'));const ime=new KeyboardEvent('keydown',{key:'Escape',isComposing:true,bubbles:true,cancelable:true});await act(async()=>panel().dispatchEvent(ime));expect(panel().querySelector('[role=alertdialog]')).not.toBeNull();await act(async()=>{button('确认继续').focus();button('确认继续').dispatchEvent(new KeyboardEvent('keydown',{key:'Tab',bubbles:true,cancelable:true}))});expect(document.activeElement).toBe(button('取消操作'));expect(writes()).toHaveLength(0)})
 })
+
+// Real mounted selected-summary contracts. happy-dom does not perform native
+// Tab traversal; the component must leave the browser default unprevented.
+describe('folder selection disclosure retains native Tab ownership', () => {
+  it.each([false, true])('keeps selected summary default Tab available (shift=%s)', async shiftKey => {
+    await choose('a');
+    const summary = panel().querySelector('.folder-workspace-scroll > details > summary');
+    expect(summary.textContent).toBe('已选择 1 项（跨目录保留选择）');
+    expect(summary.parentElement.open).toBe(false);
+    expect(row('a', 'input').checked).toBe(true);
+    const name = panel().querySelector('[aria-label="整理文件夹名称"]');
+    expect(disabled(name)).toBe(false);
+    expect(summary.compareDocumentPosition(name) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    const calls = api.mock.calls.length;
+    summary.focus(); expect(document.activeElement).toBe(summary);
+    const tab = new KeyboardEvent('keydown', { key: 'Tab', shiftKey, bubbles: true, cancelable: true });
+    await act(async () => summary.dispatchEvent(tab));
+    expect(tab.defaultPrevented).toBe(false);
+    expect(document.activeElement).toBe(summary);
+    expect(api).toHaveBeenCalledTimes(calls); expect(writes()).toHaveLength(0);
+    expect(localStorage.getItem(FOLDER_JOURNAL)).toBeNull();
+    expect(close).not.toHaveBeenCalled(); expect(open).not.toHaveBeenCalled();
+    expect(row('a', 'input').checked).toBe(true);
+  });
+
+  it('retains outer endpoints and the narrower confirmation scope with a selected disclosure', async () => {
+    await choose('a');
+    const summary = panel().querySelector('.folder-workspace-scroll > details > summary');
+    summary.parentElement.open = true;
+    const first = button('关闭文件夹整理'), last = button('重新读取目录');
+    first.focus();
+    const backward = new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true });
+    await act(async () => first.dispatchEvent(backward));
+    expect(backward.defaultPrevented).toBe(true); expect(document.activeElement).toBe(last);
+    const forward = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+    await act(async () => last.dispatchEvent(forward));
+    expect(forward.defaultPrevented).toBe(true); expect(document.activeElement).toBe(first);
+    await input('整理文件夹名称', '未提交的焦点契约');
+    await tap(button('预览名称操作'));
+    const dialog = panel().querySelector('[role=alertdialog]');
+    expect(dialog.contains(summary)).toBe(false);
+    expect(document.activeElement).toBe(button('取消操作'));
+    const backInDialog = new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true });
+    await act(async () => button('取消操作').dispatchEvent(backInDialog));
+    expect(backInDialog.defaultPrevented).toBe(true); expect(document.activeElement).toBe(button('确认继续'));
+    const forwardInDialog = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+    await act(async () => button('确认继续').dispatchEvent(forwardInDialog));
+    expect(forwardInDialog.defaultPrevented).toBe(true); expect(document.activeElement).toBe(button('取消操作'));
+    await click('取消操作');
+    expect(row('a', 'input').checked).toBe(true);
+    expect(panel().querySelector('[aria-label="整理文件夹名称"]').value).toBe('未提交的焦点契约');
+    expect(writes()).toHaveLength(0); expect(localStorage.getItem(FOLDER_JOURNAL)).toBeNull();
+    expect(close).not.toHaveBeenCalled(); expect(open).not.toHaveBeenCalled();
+  });
+});

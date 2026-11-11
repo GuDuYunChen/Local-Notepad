@@ -2692,9 +2692,11 @@ export default function ProjectWorkspacePanel({
                               : onOpenFile?.(note.id)
                           )}
                         >
-                          <strong>{displayTitle(note.title)}</strong>
-                          <span>
-                            {formatCount(note.wordCount)} 字 · {formatUpdated(note.updated_at)}
+                          <span className="project-chapter-caption">
+                            <strong>{displayTitle(note.title)}</strong>
+                            <span className="project-chapter-meta">
+                              {formatCount(note.wordCount)} 字 · {formatUpdated(note.updated_at)}
+                            </span>
                           </span>
                         </UiButton>
 

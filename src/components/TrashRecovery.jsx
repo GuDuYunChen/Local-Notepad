@@ -7,7 +7,7 @@ import { api } from '~/services/api'
 import { RECOVERY_JOURNAL, RECOVERY_CHANGED, createRecoveryJournal, ordinaryRecoveryItem, recoveryView, recoveryIntent, recoveryCurrentMatches, readTrashRecovery, sendTrashRecovery } from '~/services/trashRecovery.mjs'
 import './TrashRecovery.css'
 
-const controls = node => [...(node?.querySelectorAll('button:not(:disabled),input:not(:disabled),select:not(:disabled),[tabindex="0"]') || [])].filter(n => !n.closest('fieldset:disabled,[hidden]'))
+const controls = node => [...(node?.querySelectorAll('button:not(:disabled),input:not(:disabled),select:not(:disabled),[tabindex="0"],summary') || [])].filter(n => !n.closest('fieldset:disabled,[hidden]'))
 // Resolve usable target paths once, not one full-tree walk for every option.
 export function recoveryTargets(items) {
   const byID = new Map(items.map(r => [r.id,r])), known = new Map([['',true]])

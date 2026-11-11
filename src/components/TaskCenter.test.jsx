@@ -31,7 +31,47 @@ describe('complete task center workflow', () => {
   it('never shows a late read after a library change', async () => {let resolve;api.mockReturnValue(new Promise((r) => {resolve = r;}));await mount();await act(async () => window.dispatchEvent(new Event('library:refresh')));await act(async () => {resolve(snapshot);await drain();});expect(uiQuery(panel(), '.task-center-cards')).toBeNull();expect(uiText(panel())).toContain('资料库已变化');});
   it('requires export confirmation and cancellation creates no file', async () => {const create = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:tasks');await mount();await click('导出待办报告');expect(uiQuery(panel(), '[role=alertdialog] input').checked).toBe(false);await click('取消导出');expect(create).not.toHaveBeenCalled();expect(document.activeElement).toBe(button('导出待办报告'));});
   it('reports download failure without claiming the file is saved, then permits retry', async () => {vi.spyOn(URL, 'createObjectURL').mockImplementationOnce(() => {throw Error('denied');}).mockReturnValue('blob:tasks');vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});await mount();await click('导出待办报告');await click('确认导出');expect(uiText(panel())).toContain('报告未能导出');expect(uiQuery(panel(), '[role=alertdialog]')).not.toBeNull();await click('确认导出');expect(uiQuery(panel(), '[role=alert]')).toBeNull();expect(uiText(panel())).toContain('已发起待办报告下载');});
+  it('keeps native disclosure in Tab sequence so task filters remain keyboard reachable', async () => {
+    await mount();
+    const summary = uiQuery(panel(), '.task-center-scroll details > summary');
+    const finder = uiQuery(panel(), '[aria-label="待办查找"]');
+    expect(summary).toBeTruthy();expect(finder).toBeTruthy();
+    summary.focus();
+    const tab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+    await act(async () => summary.dispatchEvent(tab));
+    expect(tab.defaultPrevented).toBe(false);
+    expect(document.activeElement).toBe(summary);
+  });
   it('traps export focus, preserves IME Escape and blocks Ctrl+S', async () => {await mount();await click('导出待办报告');const confirm = button('确认导出');confirm.focus();await act(async () => confirm.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })));expect(document.activeElement).toBe(uiQuery(panel(), '[role=alertdialog] input'));await act(async () => panel().dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', isComposing: true, bubbles: true })));expect(uiQuery(panel(), '[role=alertdialog]')).not.toBeNull();const save = new KeyboardEvent('keydown', { key: 's', ctrlKey: true, bubbles: true, cancelable: true });await act(async () => panel().dispatchEvent(save));expect(save.defaultPrevented).toBe(true);});
   it('restores entry focus and aborts the owned request on unmount', async () => {api.mockReturnValue(new Promise(() => {}));await mount();const signal = api.mock.calls[0][1].signal;await act(async () => root.render(null));expect(signal.aborted).toBe(true);expect(document.activeElement).toBe(entry);});
+  it.each([false, true])('lets the native explanation summary continue its Tab order (shift=%s)', async shiftKey => {
+    await mount();
+    const summary = panel().querySelector('.task-center-scroll details > summary');
+    expect(summary.textContent).toBe('识别范围与完成流程');
+    expect(summary.parentElement.open).toBe(false);
+    summary.focus(); expect(document.activeElement).toBe(summary);
+    const tab = new KeyboardEvent('keydown', { key: 'Tab', shiftKey, bubbles: true, cancelable: true });
+    await act(async () => summary.dispatchEvent(tab));
+    // The DOM runner does not perform native Tab traversal. The dialog must
+    // leave that default action alone instead of jumping to an endpoint.
+    expect(tab.defaultPrevented).toBe(false);
+    expect(document.activeElement).toBe(summary);
+    expect(onClose).not.toHaveBeenCalled(); expect(onOpen).not.toHaveBeenCalled();
+    expect(api).toHaveBeenCalledTimes(1); expect(localStorage.length).toBe(0);
+  });
+  it('keeps the original dialog endpoints trapped when its explanation is open', async () => {
+    await mount();
+    const summary = panel().querySelector('.task-center-scroll details > summary');
+    summary.parentElement.open = true;
+    const first = button('关闭待办任务中心'), last = button('导出待办报告');
+    first.focus();
+    const backward = new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true });
+    await act(async () => first.dispatchEvent(backward));
+    expect(backward.defaultPrevented).toBe(true); expect(document.activeElement).toBe(last);
+    const forward = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+    await act(async () => last.dispatchEvent(forward));
+    expect(forward.defaultPrevented).toBe(true); expect(document.activeElement).toBe(first);
+    expect(onClose).not.toHaveBeenCalled(); expect(onOpen).not.toHaveBeenCalled();
+  });
   it('reloading after a source save reflects the new checkbox instead of changing it locally', async () => {snapshot = fixture(1);api.mockResolvedValue(snapshot);await mount();expect(uiText(panel())).toContain('任务 1');const done = structuredClone(snapshot);done.items[0].done = true;done.totals.pending = 0;done.totals.done = 1;api.mockResolvedValue(done);await click('重新读取');expect(uiQueryAll(panel(), '.task-center-items article')).toHaveLength(0);await input('待办状态', 'done', 'select');expect(uiQueryAll(panel(), '.task-center-items article')).toHaveLength(1);expect(api.mock.calls.every(([, init]) => !init.method)).toBe(true);});
 });

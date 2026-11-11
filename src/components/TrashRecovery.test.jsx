@@ -86,3 +86,62 @@ describe('restore destination controls retain compact native radio geometry', ()
   it('does not apply the search control growth rule to row checkboxes', () => {const css = getComputedStyle(uiQuery(document, '[data-recovery-item] input')),searchCss = getComputedStyle(uiQuery(document, 'input[aria-label="恢复项目查找"]'));expect(css.flexGrow).not.toBe('1');expect(css.padding).not.toBe('8px 10px');expect(css.padding).not.toBe(searchCss.padding);});
   it('keeps each radio next to its own label with the existing inline gap', () => {for (const radio of uiQueryAll(document, 'input[name="recovery-mode"]')) {const label = radio.closest('label'),css = getComputedStyle(label);expect(css.display).toBe('flex');expect(css.alignItems).toBe('center');expect(css.gap).toBe('8px');expect(uiQueryAll(label, 'input')).toHaveLength(1);expect(uiText(label).trim()).toMatch(/^(各自原位置|指定现存目录)$/);}});
 });
+
+// Real mounted selected-summary contracts. happy-dom does not perform native
+// Tab traversal; the component must leave the browser default unprevented.
+describe('restore selection disclosure retains native Tab ownership', () => {
+  it.each([false, true])('keeps selected recovery summary default Tab available (shift=%s)', async shiftKey => {
+    await choose('gone');
+    const panel = document.querySelector('.trash-recovery');
+    const summary = panel.querySelector('.trash-recovery-scroll > details > summary');
+    expect(summary.textContent).toBe('已选择 1 个来源（跨页保留）');
+    expect(summary.parentElement.open).toBe(false);
+    expect(panel.querySelector('[data-recovery-item="gone"] input').checked).toBe(true);
+    const destination = panel.querySelector('.trash-recovery-destination input[name="recovery-mode"]');
+    expect(destination.disabled || !!destination.closest('fieldset:disabled')).toBe(false);
+    expect(summary.compareDocumentPosition(destination) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    const calls = api.mock.calls.length;
+    summary.focus(); expect(document.activeElement).toBe(summary);
+    const tab = new KeyboardEvent('keydown', { key: 'Tab', shiftKey, bubbles: true, cancelable: true });
+    await act(async () => summary.dispatchEvent(tab));
+    expect(tab.defaultPrevented).toBe(false);
+    expect(document.activeElement).toBe(summary);
+    expect(api).toHaveBeenCalledTimes(calls); expect(posts()).toHaveLength(0);
+    expect(localStorage.getItem(RECOVERY_JOURNAL)).toBeNull();
+    expect(close).not.toHaveBeenCalled(); expect(open).not.toHaveBeenCalled();
+    expect(panel.querySelector('[data-recovery-item="gone"] input').checked).toBe(true);
+  });
+
+  it('retains outer endpoints and excludes background disclosures from restore confirmation scope', async () => {
+    await choose('gone');
+    const panel = document.querySelector('.trash-recovery');
+    const summary = panel.querySelector('.trash-recovery-scroll > details > summary');
+    summary.parentElement.open = true;
+    const first = button('关闭恢复工作台'), last = button('预览整批恢复');
+    first.focus();
+    const backward = new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true });
+    await act(async () => first.dispatchEvent(backward));
+    expect(backward.defaultPrevented).toBe(true); expect(document.activeElement).toBe(last);
+    const forward = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+    await act(async () => last.dispatchEvent(forward));
+    expect(forward.defaultPrevented).toBe(true); expect(document.activeElement).toBe(first);
+    await click('预览整批恢复');
+    const dialog = panel.querySelector('[role=alertdialog]');
+    expect(dialog.querySelector('summary')).toBeNull();
+    const disclosures = [...panel.querySelectorAll('.trash-recovery-scroll > details > summary')];
+    expect(disclosures).toHaveLength(2);
+    expect(disclosures[1].textContent).toBe('本次恢复明细（2 项）');
+    expect(disclosures.every(node => !dialog.contains(node))).toBe(true);
+    expect(document.activeElement).toBe(button('取消操作'));
+    const backInDialog = new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true });
+    await act(async () => button('取消操作').dispatchEvent(backInDialog));
+    expect(backInDialog.defaultPrevented).toBe(true); expect(document.activeElement).toBe(button('确认继续'));
+    const forwardInDialog = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+    await act(async () => button('确认继续').dispatchEvent(forwardInDialog));
+    expect(forwardInDialog.defaultPrevented).toBe(true); expect(document.activeElement).toBe(button('取消操作'));
+    await click('取消操作');
+    expect(panel.querySelector('[data-recovery-item="gone"] input').checked).toBe(true);
+    expect(posts()).toHaveLength(0); expect(localStorage.getItem(RECOVERY_JOURNAL)).toBeNull();
+    expect(close).not.toHaveBeenCalled(); expect(open).not.toHaveBeenCalled();
+  });
+});

@@ -3,13 +3,13 @@
   "scope": "installed-actual-app-page-matrix",
   "sourceScope": "control-source entry coverage with declared states; not every possible failure combination",
   "productSource": {
-    "commit": "b58a812088257d53f3b3e5b6f73b8cd50612837b",
-    "tree": "36d7b26d00a65d12135d2984e3d886e58f656b53",
+    "commit": "407cf6f99e2833d28b12f3d8c6e94397b91940de",
+    "tree": "e8def944fe35d8f3c4d74367565072dc0ed62b0b",
     "dirty": false
   },
   "inventory": {
     "file": "inventory.json",
-    "sha256": "5e4a2ca6e36842db44ad89efb1e7e48faf72110ff32a5593726144189c350dae",
+    "sha256": "bd1d74fb0a1218c1e061bdc70b49848a330ab2ecc972de8f2fb8509326c06e7a",
     "originalDirty": false,
     "currentCodeFilesHashRevalidated": 347,
     "currentControlsFiles": 137
@@ -1735,9 +1735,9 @@
     },
     {
       "file": "src/components/CollectionStudyPanel.jsx",
-      "bytes": 9531,
-      "sha256": "80e63f193021f4e571ac09d4d3973c708d0e63d31eb5da67b7551f619cc6b72b",
-      "blob": "12e99627e5f7239d752b89fca2bc907816d60bd7",
+      "bytes": 9581,
+      "sha256": "2189727b8360577db894de6d0202b8cd1bc84f80db60d3e594ec8ea66bbe8f8f",
+      "blob": "3660e681051b27c27f78e19a147fb3e9c68efb0d",
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [
@@ -2784,9 +2784,9 @@
     },
     {
       "file": "src/components/FolderWorkspace.jsx",
-      "bytes": 19601,
-      "sha256": "cb9ad847f014b70ed75a8dd68aaf44d6886aa71cfeb8522b6de9d16559c1af39",
-      "blob": "687e9211377e01edb1569980139c8b34b678c9d4",
+      "bytes": 19609,
+      "sha256": "7b076961c6eab1d91fdf477791f223e1aab4237832f76ff78f1c6d3e891b5637",
+      "blob": "6a3be3b4e1f821480de28076062841b24b876e7e",
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [
@@ -3257,9 +3257,9 @@
     },
     {
       "file": "src/components/ProjectWorkspacePanel.jsx",
-      "bytes": 96828,
-      "sha256": "b8d8a04f4585bdef14a503b32d7cf85714dd54bb8eb9cb04213080f0ad326643",
-      "blob": "76aafed2084cb51d1d387928128e227348340db0",
+      "bytes": 96972,
+      "sha256": "5734bd579f540f8d2cc50f9b3f57b6e647671a15fd61e7c36ef3ea730fcabc25",
+      "blob": "a330100815ad4cca7bec3a36b13bcb8ed88cdfbc",
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [
@@ -4099,9 +4099,9 @@
     },
     {
       "file": "src/components/TaskCenter.jsx",
-      "bytes": 13083,
-      "sha256": "97bc189562199d3c194ad0f8e0d727830a7f931654597f891350456d68ca1c00",
-      "blob": "8957bbe6f19c630d1d4e420eeed120dbb85d2f1d",
+      "bytes": 13307,
+      "sha256": "4862c02e8a7b2557dca847d3f7fc2cc80f2b43c6790831380e31626d0ea734ad",
+      "blob": "8a9e01145c0fc0fe10dab4b6264c66fd0c9c6415",
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [
@@ -4207,9 +4207,9 @@
     },
     {
       "file": "src/components/TrashRecovery.jsx",
-      "bytes": 18516,
-      "sha256": "24c3035a4e1bea78b09aa9d8e0eeaad65918d0cb85a00b9ffa5af1024a3daa57",
-      "blob": "7a3a6c7272972549dcf845ba99eebe260eb2abe5",
+      "bytes": 18524,
+      "sha256": "3a8d84cd1332dc80d865211b040add63e4316fa921a3ea017519cc4d14316206",
+      "blob": "1dc38607fb225351de9806274cb90bbc701668c5",
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [

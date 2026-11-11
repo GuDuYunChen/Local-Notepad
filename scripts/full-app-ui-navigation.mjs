@@ -149,8 +149,10 @@ export async function prepareNavigationNoteSelection(ctx, file) {
   // while retaining the exact full filename in the row's native title.
   // Validate both identities, including a possible decorative pin icon.
   assert.equal(await evaluate(`(() => {
-    const row = document.querySelector(${q(selector)}), name = ${q(file.title)};
-    if (!row || row.getAttribute('title') !== name) return false;
+    const rows = [...document.querySelectorAll(${q(selector)})], name = ${q(file.title)};
+    if (rows.length !== 1) return false;
+    const row = rows[0];
+    if (row.getAttribute('title') !== name || row.closest('[data-file-id]')?.getAttribute('data-file-id') !== ${q(file.id)}) return false;
     const painted = row.cloneNode(true);
     painted.querySelectorAll('.pin-icon').forEach(icon => icon.remove());
     const dot = name.lastIndexOf('.'), expectedLabel = dot > 0 ? name.slice(0, dot) : name;

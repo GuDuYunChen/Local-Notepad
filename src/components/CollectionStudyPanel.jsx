@@ -90,7 +90,7 @@ function StudyPanel({ entry, onResume, focusRequest, disabled, sourceStore, stud
       <div className="collection-study-list">{rows.slice((currentPage - 1) * 8, currentPage * 8).map(item => <article key={item.id}>
         <strong>{item.title || '未命名'}</strong><span>{STUDY_STATUS_LABELS[byId.get(item.id)?.status || 'unread']}</span>
         {byId.get(item.id)?.note && <p className="collection-study-note">{byId.get(item.id).note}</p>}
-        <UiButton type="button" disabled={locked} onClick={() => setEditing(item.id)}>编辑批注：{item.title || item.id}</UiButton>
+        <UiButton type="button" disabled={locked} title={`编辑批注：${item.title || item.id}`} onClick={() => setEditing(item.id)}>编辑批注：{item.title || item.id}</UiButton>
       </article>)}</div>
       {!rows.length && <p>没有符合条件的已存阅读记录；未删除任何条目。</p>}
       <nav className="collection-study-actions" aria-label="阅读记录分页"><UiButton size="middle" type="button" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>阅读记录上一页</UiButton><span>第 {currentPage} / {pages} 页 · {rows.length} 篇</span><UiButton size="middle" type="button" disabled={currentPage >= pages} onClick={() => setPage(currentPage + 1)}>阅读记录下一页</UiButton></nav>

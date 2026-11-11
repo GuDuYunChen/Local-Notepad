@@ -5,7 +5,10 @@ import { api } from '~/services/api'
 import { TASK_PAGE_SIZE, readTaskCenter, filterTasks, readTaskSource, downloadTaskCenter } from '~/services/taskCenter.mjs'
 import './TaskCenter.css'
 
-const controls = node => [...(node?.querySelectorAll('button:not(:disabled),input:not(:disabled),select:not(:disabled)') || [])].filter(n => !n.closest('[hidden],fieldset:disabled'))
+// Native <summary> participates in Tab order. Excluding it from the modal
+// focus-loop list trapped focus between the close button and disclosure,
+// preventing keyboard access to the real task search and filters.
+const controls = node => [...(node?.querySelectorAll('button:not(:disabled),input:not(:disabled),select:not(:disabled),summary') || [])].filter(n => !n.closest('[hidden],fieldset:disabled'))
 export default function TaskCenter({ onClose, onOpenFile }) {
   const [snapshot, setSnapshot] = useState(null), [loading, setLoading] = useState(false), [opening, setOpening] = useState(false), [stale, setStale] = useState(false)
   const [query, setQuery] = useState(''), [filter, setFilter] = useState('pending'), [sort, setSort] = useState('updated'), [page, setPage] = useState(0), [gaps, setGaps] = useState(false)

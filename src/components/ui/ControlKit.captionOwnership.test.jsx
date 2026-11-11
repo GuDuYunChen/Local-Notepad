@@ -13,6 +13,7 @@ import UiThemeProvider from './UiThemeProvider'
 // not encode the repaired selectors or replace the library's generated spans.
 // Columns: stylesheet, JSX location, ancestor DOM path, original button class.
 const actionCases = [
+  ["src/components/ProjectWorkspacePanel.css","src/components/ProjectWorkspacePanel.jsx:2688",[["div","project-chapter-main"]],"project-chapter-open"],
   ["src/components/AttachmentAudit.css","src/components/AttachmentAudit.jsx:63",[["div","attachment-audit-overlay"],["section","attachment-audit"],["div","attachment-audit-scroll"],["div","attachment-audit-items"],["article",""]],""],
   ["src/components/AttachmentAudit.css","src/components/AttachmentAudit.jsx:73",[["div","attachment-audit-overlay"],["section","attachment-audit"],["footer",""]],""],
   ["src/components/SearchReturnBar.css","src/components/CollectionReadingBar.jsx:62",[["section","search-return-bar collection-reading-bar"]],""],
@@ -89,6 +90,7 @@ const actionCases = [
 // Caption paths include the authored leaf. Keep its existing text declarations,
 // including deliberately authored text inside mixed-content buttons.
 const captionCases = [
+  ["src/components/ProjectWorkspacePanel.css","src/components/ProjectWorkspacePanel.jsx:2697",[["button","project-chapter-open"],["span","project-chapter-caption"],["span","project-chapter-meta"]],{"color":"var(--ink-muted)","font-size":"7px"},false],
   ["src/components/AttachmentAudit.css","src/components/AttachmentAudit.jsx:63",[["div","attachment-audit-overlay"],["section","attachment-audit"],["div","attachment-audit-scroll"],["div","attachment-audit-items"],["article",""],["span",""]],{"color":"var(--ink-soft)"},false],
   ["src/components/AttachmentAudit.css","src/components/AttachmentAudit.jsx:73",[["div","attachment-audit-overlay"],["section","attachment-audit"],["footer",""],["span",""]],{"color":"var(--ink-soft)"},false],
   ["src/components/SearchReturnBar.css","src/components/CollectionReadingBar.jsx:55",[["section","search-return-bar collection-reading-bar"],["div",""],["span",""]],{"font-size":"12px"},false],
