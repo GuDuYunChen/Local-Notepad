@@ -104,18 +104,26 @@ test('quit observation never reports a result, freezes the UI or changes the rea
 test('the concurrent transport repair and the original 20-second process gates remain intact', () => {
   // Compare source structure using Git's line endings, including Windows CRLF checkouts.
   const source = readFileSync(new URL('../.github/scripts/windows-in-place-upgrade.ps1', import.meta.url), 'utf8').replace(/\r\n/g, '\n')
-  const historical = source.slice(source.indexOf(' }else{\n $ws=[System.Net.WebSockets.ClientWebSocket]::new()'))
-  assert.ok(historical.includes('$ws.SendAsync($segment,[System.Net.WebSockets.WebSocketMessageType]::Text,$true,[Threading.CancellationToken]::None).GetAwaiter().GetResult()'))
-  assert.ok(historical.indexOf('$gui.WaitForExit(20000)') < historical.indexOf('}finally{$ws.Dispose()}'))
+  const historicalStart = source.indexOf(' }else{\n # Historical upgrade uses the same live CDP receive/response observation as')
+  const historicalEnd = source.indexOf('\n $stopped=$false;', historicalStart)
+  assert.ok(historicalStart >= 0 && historicalEnd > historicalStart, 'Historical close block must be present')
+  const historical = source.slice(historicalStart, historicalEnd)
+  const candidate = source.slice(source.indexOf(' $r.desktopClose='), historicalStart)
+  const send = '$ws.SendAsync($segment,[System.Net.WebSockets.WebSocketMessageType]::Text,$true,[Threading.CancellationToken]::None).GetAwaiter().GetResult()'
+  // Both routes retain the original CDP Browser.close and real 20s process gate.
+  for (const route of [candidate, historical]) {
+    assert.ok(route.includes(send))
+    assert.ok(route.includes("$command=[Text.Encoding]::UTF8.GetBytes('{\\"id\\":1,\\"method\\":\\"Browser.close\\"}')"))
+    assert.ok(route.indexOf('$receive=$ws.ReceiveAsync') < route.indexOf(send))
+    assert.ok(route.indexOf('$receive=$ws.ReceiveAsync') < route.indexOf('$gui.WaitForExit(20000)'))
+    assert.ok(route.indexOf('$gui.WaitForExit(20000)') < route.lastIndexOf('$ws.Dispose()'))
+    assert.ok(route.includes('if($gui.ExitCode -ne 0){throw'))
+    assert.ok(route.includes('$r.desktopClose.ack='))
+    assert.equal(/Stop-Process|\.Kill\(|reportQuitResult\(/.test(route), false)
+  }
   assert.equal((source.match(/\$r\.quitDiagnostics=\[ordered\]/g) || []).length, 2)
   assert.equal((source.match(/\$gui\.WaitForExit\(20000\)/g) || []).length, 3)
   assert.ok(source.includes('$deadline=[DateTime]::UtcNow.AddSeconds(30)'))
   assert.ok(source.includes('$stopDeadline=[DateTime]::UtcNow.AddSeconds(10)'))
   assert.ok(source.includes('if(-not $stopped){throw'))
-  const candidate = source.slice(source.indexOf(' $r.desktopClose='), source.indexOf(' }else{\n $ws='))
-  assert.ok(candidate.indexOf('$receive=$ws.ReceiveAsync') < candidate.indexOf('$ws.SendAsync'))
-  assert.ok(candidate.indexOf('$receive=$ws.ReceiveAsync') < candidate.indexOf('$gui.WaitForExit(20000)'))
-  assert.ok(candidate.indexOf('$gui.WaitForExit(20000)') < candidate.lastIndexOf('$ws.Dispose()'))
-  assert.equal(/Stop-Process|\.Kill\(|reportQuitResult\(/.test(candidate), false)
-  assert.ok(candidate.includes('if($gui.ExitCode -ne 0){throw'))
 })
