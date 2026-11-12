@@ -142,7 +142,51 @@ export async function verifyMainEditorPages(ctx) {
     await clean(); await closeInspector(); await shared.openSearch(); await hit('#search-tab-search')
     await press('.global-search-filters', '重置')
     await shared.text('[aria-label="全局检索关键词"]', note.title)
+    try {
     await until(() => evaluate(`document.querySelectorAll('[data-search-result]').length===1&&document.querySelector('.global-search-result-title')?.textContent.trim()===${q(note.title)}`), 'Unique owned editor fixture did not appear in actual Search')
+    } catch (error) {
+      // Failure-only, read-only diagnostics. Preserve the original exact
+      // search-result predicate, deadline, trusted input and thrown error.
+      const receipt = { expectedId: note.id, expectedTitle: note.title, complete: false }
+      ;(ctx.report.fullAppUi.editorSearchFailures ||= []).push(receipt); ctx.save()
+      try {
+        receipt.renderer = await evaluate(`(() => {
+          const query = document.querySelector('[aria-label="全局检索关键词"]')
+          const selectors = ['检索目录范围', '检索命中位置', '检索修改时间', '检索结果排序']
+          return {
+            query: query?.value ?? null,
+            summary: document.querySelector('.global-search-summary')?.textContent.trim() ?? null,
+            busy: document.querySelector('.global-search-content')?.getAttribute('aria-busy') ?? null,
+            notices: [...document.querySelectorAll('.global-search-notice')].map(node => node.textContent.trim()),
+            results: [...document.querySelectorAll('[data-search-result]')].map(node => ({
+              title: node.querySelector('.global-search-result-title')?.textContent.trim() ?? null,
+              text: node.textContent.trim().slice(0, 160)
+            })),
+            filters: selectors.map(name => {
+              const field = document.querySelector('[aria-label="' + name + '"]')
+              return { name, value: field?.closest('[data-ui-control="select"]')?.getAttribute('data-ui-value') ?? null }
+            })
+          }
+        })()`)
+        const saved = await api('/api/files/' + encodeURIComponent(note.id))
+        receipt.savedNote = { id: saved?.id, title: saved?.title, is_folder: saved?.is_folder, is_deleted: saved?.is_deleted }
+        const params = new URLSearchParams({ q: note.title, source: 'all', folder_id: '', pinned: '0',
+          match_case: '0', since: '0', sort: 'relevance', page: '1', size: '20' })
+        try {
+          const found = await api('/api/search?' + params.toString())
+          receipt.directSearch = { query: found?.query, total: found?.total, scanned: found?.scanned,
+            results: found?.items?.map(item => ({ id: item.id, title: item.title })).slice(0, 20) }
+        } catch (diagnostic) {
+          receipt.directSearchError = String(diagnostic?.message || diagnostic)
+        }
+        receipt.complete = true
+      } catch (diagnostic) {
+        receipt.diagnosticError = String(diagnostic?.message || diagnostic)
+      } finally {
+        ctx.save()
+      }
+      throw error
+    }
     await hit('[data-search-result]'); await press('.global-search-preview', '打开笔记')
     await absent('.global-search-panel')
     await until(() => evaluate(`document.querySelector('.workspace-title-button')?.textContent.trim()===${q(note.title)}&&Boolean(document.querySelector('.editor-input'))&&!document.querySelector('.content.switching')`), 'Selected owned note did not finish loading')

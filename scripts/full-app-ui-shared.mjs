@@ -831,7 +831,28 @@ export function createFullAppUiShared(ctx) {
     const requested = value === undefined ? choices.find(option => option.value !== before.value)?.value ?? before.value : value
     assert.equal(typeof requested, 'string'); assert.ok(choices.some(option => option.value === requested))
     await nativeSelect.choose(selector, requested); receipt.pointerCommitted = (await nativeSelect.inspect(selector)).value === requested
-    await key('ArrowDown'); await opened(); await key('ArrowDown')
+    await key('ArrowDown')
+    try {
+      await opened()
+    } catch (error) {
+      // Diagnose the original failed post-pointer keyboard reopening in the
+      // installed renderer. No added input or relaxed popup/ownership gate.
+      try {
+        receipt.keyboardReopenFailure = {
+          select: await nativeSelect.inspect(selector),
+          painted: await evaluate(`(${observeFullAppPopup.toString()})(${q(selector)})`),
+          focus: await evaluate(`(() => {const node=document.activeElement;return node ? {
+            tag:node.tagName,id:node.id||null,role:node.getAttribute('role'),ariaLabel:node.getAttribute('aria-label')
+          } : null})()`)
+        }
+      } catch (diagnostic) {
+        receipt.keyboardReopenFailureError = String(diagnostic?.message || diagnostic)
+      } finally {
+        save()
+      }
+      throw error
+    }
+    await key('ArrowDown')
     const keyboardTarget = await until(async () => {
       const state = await evaluate(`(${observeFullAppPopup.toString()})(${q(selector)})`)
       return state.options.find(option => option.id === state.activeOptionId && !option.disabled)
