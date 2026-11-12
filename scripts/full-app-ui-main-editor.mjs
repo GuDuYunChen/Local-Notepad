@@ -122,6 +122,24 @@ export async function prepareEditor(ctx) {
   return { mainEditor: { marker, notes, assetReceipts, versionId: String(version.id), tag, blockId, missingId, sourceAddress: 'notepad://block/' + basic.id + '/' + blockId }, noteIDs: Object.values(notes).map(note => note.id) }
 }
 
+// A real pointer outside the overlaid table picker is the user-reachable
+// dismissal path. Its panel covers the original toolbar trigger in narrow
+// windows, so clicking that trigger again is not a valid native hit test.
+// Refuse a background click if no safe, non-interactive target is painted.
+export function editorInsertMenuOutsidePoint() {
+  const menu = document.querySelector('.toolbar-insert-menu')
+  const picker = document.querySelector('.product-table-insert-menu')
+  if (!menu || !picker || !menu.contains(picker)) throw Error('Actual editor table picker ownership is missing')
+  const width = innerWidth, height = innerHeight
+  if (![width, height].every(value => Number.isFinite(value) && value > 32)) throw Error('Actual editor viewport is unavailable')
+  for (const [x, y] of [[width / 2, 8], [width / 3, 8], [width * 2 / 3, 8], [width / 2, height - 8], [width / 3, height - 8]]) {
+    const target = document.elementFromPoint(x, y)
+    if (!target || menu.contains(target) || target.closest('.toolbar-more-wrap,button,a,input,textarea,select,[role="button"],[role="link"],[contenteditable="true"]')) continue
+    return { x, y }
+  }
+  throw Error('No safe actual background surface to dismiss editor table picker')
+}
+
 export async function verifyMainEditorPages(ctx) {
   await verifyNavigationPages(ctx)
   const { api, evaluate, click, until, cdp, shared, setup } = ctx
@@ -245,7 +263,14 @@ export async function verifyMainEditorPages(ctx) {
   await hit('.table-insert-trigger'); await present('.product-table-insert-menu')
   await shot('editor-table-insert', 'picker', ['.tm-grid-cell[aria-label="1 行 1 列"]'])
   await focus('editor-table-insert', 'picker', '.tm-grid-cell[aria-label="1 行 1 列"]')
-  await hit('.editor-toolbar [aria-label="插入内容"]'); await absent('.toolbar-insert-menu')
+  // Preserve the original observed menu-close requirement: the open picker
+  // occludes its toolbar trigger, so use a trusted outside pointer instead.
+  const outsidePicker = await evaluate(`(${editorInsertMenuOutsidePoint.toString()})()`)
+  for (const type of ['mousePressed', 'mouseReleased']) {
+    await cdp.send('Input.dispatchMouseEvent', { type, ...outsidePicker, button: 'left', clickCount: 1 })
+  }
+  await absent('.toolbar-insert-menu')
+  await absent('.product-table-insert-menu')
   await hit('.editor-toolbar [aria-label="更多格式"]'); await present('.toolbar-format-menu')
   await shot('editor-toolbar', 'format-menu', ['.toolbar-format-menu [aria-label="字体"]'], { root: '.toolbar-format-menu' })
   await popup('editor-toolbar', 'font-popup', '.toolbar-format-menu [aria-label="字体"]')
