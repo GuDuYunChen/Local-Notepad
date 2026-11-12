@@ -1330,7 +1330,7 @@ test('a real production row title cannot waive the original owned editor body af
   assert.deepEqual(f.waits.map(wait => wait.budgets), [[]])
 })
 
-import { ensureFullAppTargetVisible, withinActualClientPort } from './full-app-ui-shared.mjs'
+import { ensureFullAppTargetVisible } from './full-app-ui-shared.mjs'
 
 function productionHistoryFeedbackContract() {
   const source = readFileSync(new URL('../src/components/SyncConflictHistoryPanel.jsx', import.meta.url), 'utf8')
