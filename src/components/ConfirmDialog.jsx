@@ -36,7 +36,7 @@ export default function ConfirmDialog({ title, message, actions, onClose }) {
         aria-labelledby="consumer-confirm-title"
         aria-describedby={descriptionId}
         onKeyDown={(event) => {
-          if (event.key !== 'Tab' || isAnyLoading) return
+          if (event.key !== 'Tab' || isAnyLoading || event.nativeEvent?.isComposing || event.keyCode === 229) return
           const buttons = [...event.currentTarget.querySelectorAll('button:not(:disabled)')]
           if (buttons.length === 0) return
           const activeIndex = buttons.indexOf(document.activeElement)

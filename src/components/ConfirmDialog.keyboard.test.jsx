@@ -79,3 +79,25 @@ it('does not Tab-focus disabled loading confirmation actions', async () => {
   buttons[0].dispatchEvent(event)
   expect(event.defaultPrevented).toBe(false)
 })
+
+it.each([
+  ['native composition', { isComposing: true }],
+  ['legacy composition', { keyCode: 229 }],
+])('leaves %s Tab with the input method without moving focus or invoking an action', async (_label, options) => {
+  const cancel = vi.fn(), confirm = vi.fn(), onClose = vi.fn()
+  await act(async () => root.render(<ConfirmDialog
+    title="保留输入状态" message="确认后继续" onClose={onClose} actions={[
+      { label: '取消', onClick: cancel },
+      { label: '确认', kind: 'primary', onClick: confirm },
+    ]}
+  />))
+  const primary = host.querySelector('.consumer-confirm-modal button:last-of-type')
+  primary.focus()
+  const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true, ...options })
+  primary.dispatchEvent(event)
+  expect(event.defaultPrevented).toBe(false)
+  expect(document.activeElement).toBe(primary)
+  expect(cancel).not.toHaveBeenCalled()
+  expect(confirm).not.toHaveBeenCalled()
+  expect(onClose).not.toHaveBeenCalled()
+})
