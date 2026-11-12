@@ -228,6 +228,16 @@ export async function verifyMainEditorPages(ctx) {
 
   await openNote('基本编辑正文')
   await shot('editor-toolbar', 'default', ['.editor-toolbar [aria-label="段落类型"]'])
+  // Lexical consumes Tab as an intentional indentation command while its
+  // contenteditable owns focus. Enter the genuine adjacent toolbar Select
+  // using a trusted pointer action before testing keyboard traversal; do not
+  // call element.focus(), skip the original Shift+Tab/Tab walk, or weaken its
+  // native focus, geometry, and input assertions.
+  const toolbarOrigin = '.editor-toolbar [aria-label="段落类型"]'
+  await hit(toolbarOrigin)
+  await shared.key('Escape')
+  await until(() => evaluate(`document.activeElement===document.querySelector(${q(toolbarOrigin)})`),
+    'Actual paragraph control did not retain keyboard focus for the original Tab proof')
   await focus('editor-toolbar', 'default', '.editor-toolbar [aria-label="加粗"]')
   await popup('editor-toolbar', 'paragraph-popup', '.editor-toolbar [aria-label="段落类型"]')
   await hit('.editor-toolbar [aria-label="插入内容"]'); await present('.toolbar-insert-menu')
