@@ -3,13 +3,13 @@
   "scope": "installed-actual-app-page-matrix",
   "sourceScope": "control-source entry coverage with declared states; not every possible failure combination",
   "productSource": {
-    "commit": "564489b15711ba17c228509a753ca8daa5c78505",
-    "tree": "e9b45a304a2187e4fac57331ee11982d2433d3db",
+    "commit": "3bb50791d093ac5f698d201abc01881e1f0cb5cd",
+    "tree": "eec8f090f3e2720a6742db08db25b93901629c4f",
     "dirty": false
   },
   "inventory": {
     "file": "inventory.json",
-    "sha256": "fd5d75d2b17e089cc2e4ce5c25154b8b7a0f3bbcf5cdfe45416d7c54d0cd1d79",
+    "sha256": "3a3160983e1fe6cfcc834ad5ef6c436020c83329b1d38c75816f197d060e896d",
     "originalDirty": false,
     "currentCodeFilesHashRevalidated": 347,
     "currentControlsFiles": 137
@@ -1539,9 +1539,9 @@
   "sourceCoverage": [
     {
       "file": "src/App.jsx",
-      "bytes": 57456,
-      "sha256": "bab57f87cae4816fb4f721e9e64093a71dde5863a901abe81e9b2c7b54749b61",
-      "blob": "61dc2f9b53b3bebec18973015d367da4d0b9ce61",
+      "bytes": 57565,
+      "sha256": "f79388afb132242274d4ec574fb3f0234531f6b7c2a940fbf7ed3b5fbbbc2ab0",
+      "blob": "e21c0e3fa79faa2794ff5e63595d24b972e9702f",
       "classification": "planned-nested-controls",
       "reason": "Production controls are rendered within the declared actual route. Scope is the listed route states; unvisited conditional child panels remain explicit gaps below.",
       "routeIds": [
@@ -2647,9 +2647,9 @@
     },
     {
       "file": "src/components/FileList.jsx",
-      "bytes": 70800,
-      "sha256": "9ede6f53453c70fd66cdd2139152b38800b0e5310cef1ba863431e57f09c5311",
-      "blob": "154410b666a7f6d0b1752acecdac0db24e1d08ca",
+      "bytes": 70906,
+      "sha256": "1683351f030ccedd4419e1a9f5276cddef98815dd55d54e3ad1f0ed32c84ab2a",
+      "blob": "bc8a801ef94035eca6985ac345dbdaa6378130b9",
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [
@@ -3092,9 +3092,9 @@
     },
     {
       "file": "src/components/ProjectEntityIntelligencePanel.jsx",
-      "bytes": 13628,
-      "sha256": "21cf96e408d5143804e2fc74276e3136843ee5545c1001c5ca80efafa9cfdbdf",
-      "blob": "f44c67347914210a7c3a5359ee9d37917d0ff397",
+      "bytes": 14143,
+      "sha256": "19c1265c098ec4cc654ed5f5c7e0e8b428badaf9134fe4535cfa9db8e6e28262",
+      "blob": "2d2bb6ce269e4d79ddb55b41e528870df2072349",
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [

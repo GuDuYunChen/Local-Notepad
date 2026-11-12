@@ -1518,7 +1518,8 @@ export default function FileList({
     // unless Ctrl/Shift is pressed? Context menu usually selects the item if not selected.
     // If item IS in selection, keep selection (to allow operation on batch).
     if (!selectedIds.has(item.id)) {
-        onSelect(item) // This triggers single selection logic
+        // The original guarded selection must keep this menu's owner mounted.
+        onSelect(item, { preserveSidebar: true }) // This triggers single selection logic
         // But wait, onSelect might be async or dependent on prop update.
         // For context menu, we might want to force update selectedIds locally?
         // Actually, let's just use the item passed to context menu if it's not selected.

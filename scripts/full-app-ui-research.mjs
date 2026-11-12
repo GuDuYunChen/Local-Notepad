@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
 import { desktopNote } from './desktop-save-fixture.mjs'
+import { observeFullAppPage, observeFullAppOverflowViewport, withinActualClientPort, viewportFixedClipBoundary, validateFullAppPageSample } from './full-app-ui-shared.mjs'
 
 // Real installed Search, collections and research UI. Only prepareResearch
 // creates owned fixtures; all local records are created by their actual UI.
@@ -34,6 +35,68 @@ const draftTitle = '合成研究草稿：已存批注与来源完整预览'
 const createdTitle = '合成研究创建结果：独立笔记与原来源保持不变'
 const annotation = index => `第 ${index + 1} 条合成阅读批注。` + '中文说明与 English evidence 必须换行且保持全部来源信息，不把界面预览当作正文改写。\n'.repeat(8)
 const goal = '核对合成材料的已存批注、来源与阅读状态。\n' + '较长研究目标只用于实际控件换行和滚动，不生成结论，也不覆盖原笔记。\n'.repeat(9)
+
+// Scroll observation/restoration only. Keep the actual focus and native input
+// sequence intact; never change layout to make the dialog shell reachable.
+export function researchShellScrollState(restore) {
+  const headers = [...document.querySelectorAll('.global-search-header')]
+  if (headers.length !== 1 || !headers[0].closest('.global-search-panel')) throw Error('Actual research shell missing or ambiguous')
+  const header = headers[0], nodes = []
+  if (header.querySelectorAll('#global-search-title').length !== 1 ||
+      header.querySelectorAll('[aria-label="关闭全局检索"]').length !== 1) throw Error('Actual research shell title or close owner missing')
+  for (let node = header; node; node = node.parentElement) nodes.push(node)
+  const identity = node => ({ tag: node.tagName, id: node.id, className: String(node.className),
+    clientWidth: node.clientWidth, clientHeight: node.clientHeight, scrollWidth: node.scrollWidth, scrollHeight: node.scrollHeight })
+  if (restore) {
+    if (!Array.isArray(restore) || restore.length !== nodes.length ||
+        nodes.some((node, index) => JSON.stringify(identity(node)) !== JSON.stringify(restore[index].owner))) throw Error('Actual research shell scroll owner changed before restoration')
+    nodes.forEach((node, index) => {
+      if (node.scrollLeft !== restore[index].left || node.scrollTop !== restore[index].top)
+        node.scrollTo({ left: restore[index].left, top: restore[index].top, behavior: 'instant' })
+    })
+  }
+  const active = document.activeElement
+  return { positions: nodes.map(node => ({ owner: identity(node), left: node.scrollLeft, top: node.scrollTop })),
+    focus: active ? { tag: active.tagName, id: active.id, label: active.getAttribute('aria-label') } : null,
+    nativeInputs: window.__fullAppUiEvents.filter(event => ['click', 'keydown', 'change'].includes(event.type)).length }
+}
+
+export async function verifyResearchShellReachability(ctx, receipt) {
+  const { evaluate, shared, matrix, save } = ctx
+  Object.assign(receipt, { matrix, observationOnly: true, complete: false, restored: false })
+  receipt.before = await evaluate(`(${researchShellScrollState.toString()})()`); save()
+  const read = () => evaluate(`(${observeFullAppPage.toString()})(${q({ root: '.global-search-header',
+    anchors: ['#global-search-title', '[aria-label="关闭全局检索"]'] })},${withinActualClientPort.toString()},${observeFullAppOverflowViewport.toString()},${viewportFixedClipBoundary.toString()})`)
+  let failed = false
+  try {
+    await shared.ensureVisible('.global-search-header')
+    receipt.visible = await read(); save(); validateFullAppPageSample(receipt.visible, matrix)
+    await shared.frame()
+    receipt.afterPaint = await read(); save(); validateFullAppPageSample(receipt.afterPaint, matrix)
+  } catch (error) {
+    failed = true; receipt.error = String(error.stack || error); save(); throw error
+  } finally {
+    try {
+      await evaluate(`(${researchShellScrollState.toString()})(${q(receipt.before.positions)})`)
+      await shared.frame()
+      receipt.afterRestore = await evaluate(`(${researchShellScrollState.toString()})()`); save()
+      assert.deepEqual(receipt.afterRestore.focus, receipt.before.focus, 'Research shell observation changed the original focus')
+      assert.equal(receipt.afterRestore.nativeInputs, receipt.before.nativeInputs, 'Research shell observation added native input')
+      assert.equal(receipt.afterRestore.positions.length, receipt.before.positions.length)
+      receipt.afterRestore.positions.forEach((position, index) => {
+        const before = receipt.before.positions[index]
+        assert.deepEqual(position.owner, before.owner, 'Research shell scroll owner changed')
+        assert.ok(Math.abs(position.left - before.left) <= 1 && Math.abs(position.top - before.top) <= 1,
+          'Research shell did not restore the original scroll position')
+      })
+      receipt.restored = true
+    } catch (error) {
+      receipt.restorationError = String(error.stack || error)
+      if (!failed) throw error
+    } finally { save() }
+  }
+  receipt.complete = true; save(); return receipt
+}
 
 function actions(ctx) {
   const { evaluate, click, until, shared } = ctx
@@ -220,6 +283,8 @@ export async function verifyResearchPages(ctx) {
   await shared.text(field(labels.collection), ''); await ui.press('.search-result-export', '清空选择'); await ui.details('.search-result-export', false)
 
   await ui.selectCollection(fixture.primary.key)
+  records.shellReachability = {}; save()
+  await verifyResearchShellReachability(ctx, records.shellReachability)
   for (const root of ['.collection-package-transfer', '.collection-study-panel', '.search-collections-review-report', '.search-collections-import']) await ui.details(root, false)
   await shot('research-collections', 'populated', [field(labels.collectionSelect)])
   await focus('research-collections', 'populated', field(labels.collectionSelect))

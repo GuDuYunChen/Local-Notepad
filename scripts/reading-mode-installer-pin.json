@@ -1,5 +1,5 @@
 {
-  "product": "564489b15711ba17c228509a753ca8daa5c78505",
+  "product": "3bb50791d093ac5f698d201abc01881e1f0cb5cd",
   "quickBlob": "c1e8f40862b770f82af47c26a455b57efc853700",
   "tagsBlob": "54bb56864e58e2aa3f5ed08aedb52a00de5f0769",
   "templateBlob": "42378f13f71a03c3e91cdfdcb6dec44dbbb05f33",
@@ -16,8 +16,8 @@
   "importEvidenceTestsBlob": "5a46ce6dad5fe757b1d2714e485242aa79959559",
   "current": {
     "version": "4.249.0",
-    "bytes": 115599887,
-    "sha256": "49064466eb48f660d45964f91ab11bacea49a2b28198f66ca78548d9219114e7"
+    "bytes": 115602090,
+    "sha256": "07275a4e3cf88d2a829d8f2455409941c1cf4ce3ae94ef93a1a086ef422fbb1c"
   },
   "previous": {
     "version": "4.232.0",
@@ -31,14 +31,14 @@
     "productSourceCommit": "1a8e17ba775312c359f4ac23851c8c365b57a9cb"
   },
   "currentSource": {
-    "run": 43162081352,
-    "artifact": 13919585733,
-    "name": "local-notepad-windows-564489b15711ba17c228509a753ca8daa5c78505",
-    "headSha": "8f15b9a7f70daffc3f03fb2567f14fea642a08ed",
+    "run": 43182912253,
+    "artifact": 13928640845,
+    "name": "local-notepad-windows-3bb50791d093ac5f698d201abc01881e1f0cb5cd",
+    "headSha": "4779a9ff9dabe4b38304ed18467e8593dae2b2d3",
     "branch": "fix/local-ui-consistency-2f116",
     "repositoryId": 1105107817,
-    "archiveBytes": 115606830,
-    "archiveSha256": "46ca2d7694236a8621830098ca508f92d7a3ca88c5566202d01068a713d33790"
+    "archiveBytes": 115609160,
+    "archiveSha256": "36c58163363ef6e6df5fe720dde21eaac2dc45d5a09a2ff2da929c331f861b6a"
   },
   "readingDriverBlob": "6924b128c1125424c91f71dbd1ecc415762e2f77",
   "readingFixtureBlob": "0c7ffadbb187dd33a7bc6b5aa8c69427eec5cc34",
@@ -89,7 +89,7 @@
     "src/components/Editor/Editor.jsx": "08c6f8bb08d5f885b26ac97ad5f01bcb45265886",
     "src/services/wikiNavigation.mjs": "4ecc8c52880deb514cdb950c9432dcabd13da110",
     "src/hooks/useGuardedNoteOpener.js": "13c0ae3b56a7df0c8954ce9113c0b46352162d98",
-    "src/App.jsx": "61dc2f9b53b3bebec18973015d367da4d0b9ce61",
+    "src/App.jsx": "e21c0e3fa79faa2794ff5e63595d24b972e9702f",
     "src/services/markdownSource.js": "37d1097e06e01242562be1c6b6c0442175d9e61e",
     "electron/local-export-document.js": "e9ed11cfced23369f51333b1bf1208ff247f2c25",
     "src/utils/lexicalText.js": "a65c6fb38a5406494683686a6083a9079560f71c",

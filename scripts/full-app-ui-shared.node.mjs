@@ -814,11 +814,12 @@ test('owned native popup sees a Select wrapper and its actual input but rejects 
   const field = { id: 'owned-input', matches: selector => selector === '[role="combobox"]', getBoundingClientRect: () => box,
     getAttribute: name => ({ 'aria-controls': 'owned-list', 'aria-expanded': 'true', 'aria-activedescendant': 'owned-option' })[name] ?? null,
     closest: selector => selector === '[data-ui-control="select"]' ? host : null }
-  const option = { id: 'owned-option', innerText: '全部对象', getBoundingClientRect: () => rectangle(30, 76, 180, 30),
+  const option = { tagName: 'DIV', id: 'owned-option', isConnected: true, innerText: '全部对象', getBoundingClientRect: () => rectangle(30, 76, 180, 30),
     getAttribute: name => ({ 'aria-disabled': 'false', 'aria-selected': 'true' })[name] ?? null,
     querySelector: selector => selector === '[data-ui-option-value]' ? { getAttribute: () => 'all' } : null }
-  const dropdown = { getBoundingClientRect: () => rectangle(28, 73, 186, 90), parentElement: null }
-  const list = { parentElement: dropdown, getBoundingClientRect: () => rectangle(28, 73, 186, 90),
+  const dropdown = { tagName: 'DIV', id: 'owned-dropdown', getAttribute: name => name === 'class' ? 'ant-select-dropdown' : null,
+    getBoundingClientRect: () => rectangle(28, 73, 186, 90), parentElement: null }
+  const list = { tagName: 'DIV', id: 'owned-list', parentElement: dropdown, getBoundingClientRect: () => rectangle(28, 73, 186, 90),
     getAttribute: name => name === 'role' ? 'listbox' : null,
     closest: selector => selector === '.ant-select-dropdown' ? dropdown : null,
     querySelectorAll: selector => selector === '[role="option"]' ? [option] : [] }
@@ -834,6 +835,9 @@ test('owned native popup sees a Select wrapper and its actual input but rejects 
   assert.equal(run('.shared-wrapper').popup.ready, true)
   assert.equal(run('.shared-input').popup.ready, true)
   assert.equal(run('.shared-wrapper').popup.optionValue, 'all')
+  option.isConnected = false
+  assert.equal(run('.shared-wrapper').popup.ready, false, 'A detached option must never count as a painted popup')
+  option.isConnected = true
   document.elementFromPoint = () => null
   assert.equal(run('.shared-wrapper').popup.ready, false, 'A real popup blocked by another element must fail')
   document.elementFromPoint = () => option
@@ -841,4 +845,114 @@ test('owned native popup sees a Select wrapper and its actual input but rejects 
   assert.throws(() => run('.shared-wrapper'), /one actual shared Select combobox/)
   wrapper.querySelectorAll = () => [field, field]
   assert.throws(() => run('.shared-wrapper'), /one actual shared Select combobox/)
+})
+
+const { verifyResearchShellReachability } = await import('./full-app-ui-research.mjs')
+function researchShellFixture() {
+  const f = overflowFixture(), { rectangle } = f
+  f.html.box = rectangle(0, 0, 704, 455); f.html.clientHeight = 455; f.html.scrollHeight = 455; f.html.scrollTop = 0
+  f.body.box = rectangle(0, 0, 704, 455); f.body.scrollHeight = 455
+  f.body.css.overflowX = 'visible'; f.body.css.overflowY = 'visible'
+  f.page.className = 'global-search-panel'; f.page.box = rectangle(8, 8, 688, 439)
+  f.page.clientWidth = 688; f.page.clientHeight = 439; f.page.scrollWidth = 688; f.page.scrollHeight = 560; f.page.scrollTop = 54
+  f.page.css.overflowX = 'hidden'; f.page.css.overflowY = 'auto'
+  const header = f.make('header', 'shell-header', rectangle(24, -30, 658, 80), f.page)
+  header.className = 'global-search-header'
+  const title = f.make('h2', 'global-search-title', rectangle(24, -30, 160, 31), header)
+  title.textContent = '全局检索'; title.innerText = '全局检索'
+  f.page.children = f.page.children.filter(node => node !== f.control)
+  header.children.push(f.control); f.control.parentElement = header
+  f.control.tagName = 'BUTTON'; f.control.localName = 'button'; f.control.type = 'button'
+  f.control.className = 'ant-btn app-ui-button'; f.control.dataset = { uiControl: 'button', uiLayout: 'action' }
+  f.control.clientWidth = 36; f.control.clientHeight = 40; f.control.scrollWidth = 36
+  f.control.getAttribute = name => name === 'aria-label' ? '关闭全局检索' : name === 'id' ? f.control.id : null
+  const matches = f.control.matches.bind(f.control)
+  f.control.matches = selector => selector === '[aria-label="关闭全局检索"]' || matches(selector)
+  const input = f.make('input', 'original-research-input', rectangle(30, 200, 180, 40), f.page)
+  f.document.activeElement = input; f.globals.window = { __fullAppUiEvents: [] }
+  const draw = () => {
+    const top = 24 - f.page.scrollTop
+    header.box = rectangle(24, top, 658, 80)
+    title.box = rectangle(24, top, 160, f.zeroTitle ? 0 : 31)
+    f.control.box = rectangle(646, top, 36, 40)
+  }
+  for (let node = header; node; node = node.parentElement) {
+    node.scrollLeft = 0
+    node.scrollTo = function ({ top, left }) {
+      if (this === f.page && (f.lockScroll || (f.failRestore && top === 54))) return
+      this.scrollTop = top; this.scrollLeft = left; draw()
+    }
+  }
+  header.scrollIntoView = () => f.page.scrollTo({ top: 0, left: 0 })
+  f.document.elementFromPoint = (x, y) => {
+    if (f.obscured) return f.page
+    for (const node of [f.control, title]) {
+      const r = node.box
+      if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return node
+    }
+    return header
+  }
+  draw()
+  let nativeCalls = 0
+  const native = () => { nativeCalls++; throw Error('Shell evidence must not add native input or a scene capture') }
+  const context = { evaluate: async source => JSON.parse(JSON.stringify(await runInNewContext(source, f.globals))),
+    click: native, cdp: { send: native }, until: async check => check(), capture: native, save() {},
+    report: { fullAppUi: {} }, routes: [], matrix }
+  context.shared = createFullAppUiShared(context)
+  return { f, header, title, input, context, nativeCalls: () => nativeCalls }
+}
+
+test('research shell scroll evidence restores the original clipped view without native input or replacing a scene', async () => {
+  const f = researchShellFixture(), receipt = {}
+  assert.ok(f.title.box.top < 0, 'The fixture begins at the real reported type of scrolled position')
+  await verifyResearchShellReachability(f.context, receipt)
+  assert.equal(receipt.complete, true); assert.equal(receipt.restored, true); assert.equal(receipt.observationOnly, true)
+  assert.equal(receipt.visible.anchors.length, 2)
+  assert.ok(receipt.visible.anchors.every(item => item.inViewport && item.hit))
+  assert.ok(receipt.afterPaint.anchors.every(item => item.inViewport && item.hit))
+  assert.equal(f.f.page.scrollTop, 54); assert.ok(f.title.box.top < 0)
+  assert.equal(f.f.document.activeElement, f.input); assert.equal(f.nativeCalls(), 0)
+  assert.deepEqual(receipt.afterRestore, receipt.before)
+})
+
+test('research shell evidence rejects an unscrollable clipped header, inner clip, foreign hit and collapsed title', async () => {
+  for (const mutate of [
+    f => { f.f.lockScroll = true },
+    f => { f.f.page.clientHeight = 40 },
+    f => { f.f.obscured = true },
+    f => { f.f.zeroTitle = true },
+  ]) {
+    const f = researchShellFixture(), receipt = {}; mutate(f)
+    await assert.rejects(verifyResearchShellReachability(f.context, receipt), /clipped|obscured|rendered anchor/)
+    assert.equal(receipt.complete, false); assert.equal(receipt.restored, true); assert.ok(receipt.error)
+    assert.equal(f.f.page.scrollTop, 54); assert.equal(f.nativeCalls(), 0)
+  }
+})
+
+test('research shell evidence refuses success when the original scroll position cannot be restored', async () => {
+  const f = researchShellFixture(), receipt = {}; f.f.failRestore = true
+  await assert.rejects(verifyResearchShellReachability(f.context, receipt), /restore the original scroll/)
+  assert.equal(receipt.complete, false); assert.equal(receipt.restored, false); assert.ok(receipt.restorationError)
+  assert.equal(f.nativeCalls(), 0)
+})
+
+test('research shell evidence refuses a changed focus or added input even if all geometry is visible', async () => {
+  for (const change of [
+    f => { f.f.document.activeElement = f.f.control },
+    f => { f.f.globals.window.__fullAppUiEvents.push({ type: 'keydown', key: 'Tab', trusted: true }) },
+  ]) {
+    const f = researchShellFixture(), receipt = {}, frame = f.context.shared.frame
+    f.context.shared.frame = async () => { await frame(); change(f) }
+    await assert.rejects(verifyResearchShellReachability(f.context, receipt), /original focus|added native input/)
+    assert.equal(receipt.complete, false); assert.equal(receipt.restored, false); assert.ok(receipt.restorationError)
+    assert.equal(f.nativeCalls(), 0)
+  }
+})
+
+test('research shell failure preserves the original geometry error when restoration also fails', async () => {
+  const f = researchShellFixture(), receipt = {}; f.f.obscured = true; f.f.failRestore = true
+  await assert.rejects(verifyResearchShellReachability(f.context, receipt), /clipped or obscured/)
+  assert.ok(receipt.error.includes('clipped or obscured'))
+  assert.ok(receipt.restorationError.includes('restore the original scroll'))
+  assert.equal(receipt.complete, false); assert.equal(receipt.restored, false)
 })
