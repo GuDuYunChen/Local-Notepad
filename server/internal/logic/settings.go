@@ -28,6 +28,7 @@ func (l *SettingsLogic) Update(ctx context.Context, patch *model.SettingsPatch) 
 	if err != nil {
 		return nil, err
 	}
+	previousAutoEnabled := current.SyncAutoEnabled
 
 	if patch.Theme != nil {
 		if *patch.Theme != "light" && *patch.Theme != "dark" {
@@ -98,7 +99,11 @@ func (l *SettingsLogic) Update(ctx context.Context, patch *model.SettingsPatch) 
 		current.EditorOpts = map[string]interface{}{}
 	}
 
-	if err := l.SettingsDAO.Update(ctx, current); err != nil {
+	effectivePatch := *patch
+	if current.SyncAutoEnabled != previousAutoEnabled {
+		effectivePatch.SyncAutoEnabled = &current.SyncAutoEnabled
+	}
+	if err := l.SettingsDAO.Update(ctx, current, &effectivePatch); err != nil {
 		return nil, err
 	}
 	return current, nil

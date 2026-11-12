@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useLayoutEffect, useRef } from 'react'
 import { formatSectionPath } from './Editor/utils/referenceUtils'
 import './ReferenceRefactorDialog.css'
 import { UiButton } from '~/components/ui/ControlKit'
@@ -51,6 +51,38 @@ export default function ReferenceRefactorDialog({
   onCancel,
   onOpenSource,
 }) {
+  const panel = useRef(null)
+  const open = Boolean(plan)
+  useLayoutEffect(() => {
+    const dialog = panel.current
+    if (!open || !dialog) return undefined
+    const document = dialog.ownerDocument
+    const previous = document.activeElement
+    const controls = () => [...dialog.querySelectorAll('button:not(:disabled)')]
+      .filter(node => node.tabIndex >= 0 && !node.closest('[hidden], [inert]'))
+    const enter = () => (controls()[0] || dialog).focus({ preventScroll: true })
+    // The pending rename form can still be mounted behind this review. Move
+    // keyboard ownership here before Tab can enter the underlying editor.
+    enter()
+    const keydown = event => {
+      if (event.key !== 'Tab' || event.isComposing || event.keyCode === 229) return
+      const items = controls()
+      const index = items.indexOf(document.activeElement)
+      if (!items.length || index < 0 || (event.shiftKey ? index === 0 : index === items.length - 1)) {
+        event.preventDefault()
+        event.stopPropagation()
+        const target = (event.shiftKey ? items.at(-1) : items[0]) || dialog
+        target.focus()
+      }
+    }
+    document.addEventListener('keydown', keydown, true)
+    return () => {
+      document.removeEventListener('keydown', keydown, true)
+      if (previous?.isConnected && !previous.disabled && !previous.closest('[hidden], [inert]')) {
+        previous.focus({ preventScroll: true })
+      }
+    }
+  }, [open])
   if (!plan) return null
 
   const copy = modeCopy(mode)
@@ -71,6 +103,8 @@ export default function ReferenceRefactorDialog({
       }}
     >
       <section
+        ref={panel}
+        tabIndex={-1}
         className="modal consumer-modal reference-refactor-dialog"
         role="dialog"
         aria-modal="true"
