@@ -956,3 +956,310 @@ test('research shell failure preserves the original geometry error when restorat
   assert.ok(receipt.restorationError.includes('restore the original scroll'))
   assert.equal(receipt.complete, false); assert.equal(receipt.restored, false)
 })
+
+// These are setup-driver contracts, not installed-app or trusted-input evidence.
+// Run the real DOM inspector/choice driver and the runner's unchanged until body
+// with a monotonic fixture clock, preserving its full 15000 ms / 100 ms budget.
+const { chooseProjectSetupAlias } = await import('./full-app-ui-projects.mjs')
+const { createNativeUiSelect } = await import('./native-ui-select.mjs')
+const { JSDOM: ProjectSetupDOM } = await import('jsdom')
+const { readFileSync: readProjectSetupSource } = await import('node:fs')
+const { parse: parseProjectSetupSource } = await import('acorn')
+const projectSetupRunnerSource = readProjectSetupSource(new URL('./run-full-app-ui-installed.mjs', import.meta.url), 'utf8')
+const projectSetupUntilNode = parseProjectSetupSource(projectSetupRunnerSource, { ecmaVersion: 'latest', sourceType: 'module' }).body
+  .find(node => node.type === 'FunctionDeclaration' && node.id?.name === 'until')
+assert.ok(projectSetupUntilNode)
+const projectSetupUntilSource = projectSetupRunnerSource.slice(projectSetupUntilNode.start, projectSetupUntilNode.end)
+const projectSetupRequested = 'index:project-setup-fixture-note'
+const projectSetupTarget = { id: 'project-alias-target', value: projectSetupRequested, disabled: false }
+
+function projectSetupAliasFixture(t, { appearAt = 0, choices = [projectSetupTarget], removeBeforeChoose = false,
+  clickFailure = null, truncateOnFailure = false } = {}) {
+  const dom = new ProjectSetupDOM('<div data-ui-control="select" data-ui-value=\'""\'><input id="project-alias-input" role="combobox" aria-label="选择实体别名对象" aria-expanded="false"></div>', { runScripts: 'outside-only' })
+  t.after(() => dom.window.close())
+  const { document } = dom.window, field = document.querySelector('input'), host = field.parentElement
+  const selector = '[aria-label="选择实体别名对象"]', popupId = field.id + '_list'
+  const report = { fullAppUi: {} }, saved = [], keys = [], clicks = [], chooseCalls = [], waits = [], sleeps = []
+  let clock = 0, available = choices, popup
+  dom.window.__fullAppUiEvents = []; dom.window.__fullAppUiTraceTruncated = false
+  const renderOptions = () => {
+    if (!popup) return
+    popup.replaceChildren()
+    for (const option of [{ id: popupId + '_empty', value: '', disabled: false }, ...(clock >= appearAt ? available : [])]) {
+      const node = document.createElement('div'), label = document.createElement('span')
+      node.id = option.id; node.setAttribute('role', 'option')
+      node.setAttribute('aria-disabled', String(option.disabled)); node.setAttribute('aria-selected', String(option.value === ''))
+      label.setAttribute('data-ui-option-value', option.value); node.append(label); popup.append(node)
+    }
+  }
+  const actualUntil = runInNewContext(projectSetupUntilSource + '; until', {
+    performance: { now: () => clock },
+    sleep: async milliseconds => { assert.equal(milliseconds, 100); sleeps.push(milliseconds); clock += milliseconds; renderOptions() },
+  })
+  const until = async (...args) => {
+    const wait = { label: args[1], argumentCount: args.length, startedAt: clock, checks: 0 }; waits.push(wait)
+    try { return await actualUntil(async () => { wait.checks++; return args[0]() }, ...args.slice(1)) }
+    catch (error) { wait.failure = error; throw error }
+    finally { wait.finishedAt = clock }
+  }
+  const evaluate = async expression => JSON.parse(JSON.stringify(dom.window.eval(expression)))
+  const nativeSelect = createNativeUiSelect({ evaluate, until,
+    cdp: { send: () => assert.fail('The shared setup Select must not add compatibility key input') },
+    click: async target => {
+      clicks.push(target)
+      const matches = [...document.querySelectorAll(target)]; assert.equal(matches.length, 1)
+      const option = matches[0]; assert.equal(option.getAttribute('role'), 'option')
+      assert.equal(option.closest('[role="listbox"]')?.id, popupId)
+      const value = option.querySelector('[data-ui-option-value]').getAttribute('data-ui-option-value')
+      dom.window.__fullAppUiEvents.push({ type: 'click', trusted: true, option: { listboxId: popupId, value } })
+      if (clickFailure) { dom.window.__fullAppUiTraceTruncated = truncateOnFailure; throw clickFailure }
+      host.setAttribute('data-ui-value', JSON.stringify(value)); field.setAttribute('aria-expanded', 'false')
+      field.removeAttribute('aria-controls'); popup.remove(); popup = null
+    },
+  })
+  const context = { evaluate, until, report,
+    save: () => saved.push(clone(report.fullAppUi.setupInteractions?.[0] ?? null)),
+    shared: {
+      ensureVisible: async target => assert.equal(target, selector),
+      key: async key => {
+        keys.push(key); assert.equal(key, 'ArrowDown'); assert.equal(document.activeElement, field)
+        field.setAttribute('aria-expanded', 'true'); field.setAttribute('aria-controls', popupId)
+        popup = document.createElement('div'); popup.id = popupId; popup.setAttribute('role', 'listbox'); document.body.append(popup)
+        renderOptions()
+        dom.window.__fullAppUiEvents.push({ type: 'keydown', key, trusted: true, id: field.id, role: 'combobox' })
+      },
+      nativeSelect: { ...nativeSelect, choose: async (...args) => {
+        chooseCalls.push({ args, at: clock })
+        if (removeBeforeChoose) { available = []; renderOptions() }
+        return nativeSelect.choose(...args)
+      } },
+    },
+  }
+  return { context, saved, keys, clicks, chooseCalls, waits, sleeps, dom, selector, popupId,
+    elapsed: () => clock, receipt: () => report.fullAppUi.setupInteractions[0] }
+}
+
+function assertProjectSetupFailureTrace(f, failure, truncated = false) {
+  const receipt = f.receipt()
+  assert.equal(receipt.complete, false); assert.equal(receipt.stage, 'failed')
+  assert.deepEqual(receipt.error, { name: failure.name, message: failure.message, stack: failure.stack })
+  assert.deepEqual(receipt.events, clone(f.dom.window.__fullAppUiEvents)); assert.equal(receipt.traceTruncated, truncated)
+  assert.equal(receipt.committed, undefined); assert.deepEqual(f.keys, ['ArrowDown'])
+  assert.ok(f.saved.some(item => item?.stage === 'failed' && item.error?.message === failure.message))
+  assert.ok(f.waits.every(wait => wait.argumentCount === 2), 'The setup driver must leave every original wait budget unchanged')
+}
+
+test('project setup waits for a delayed own target before one original option choice', async t => {
+  const f = projectSetupAliasFixture(t, { appearAt: 200 })
+  const committed = await chooseProjectSetupAlias(f.context, projectSetupRequested), receipt = f.receipt()
+  assert.equal(committed.value, projectSetupRequested); assert.equal(committed.expanded, false)
+  assert.equal(receipt.complete, true); assert.equal(receipt.stage, 'complete')
+  assert.equal(receipt.opened.popupId, f.popupId); assert.equal(receipt.trustedOpeningKey, true); assert.equal(receipt.trustedOwnOptionClick, true)
+  assert.ok(f.saved.some(item => item?.latestOpening?.popupReady && item.latestOpening.options.length === 1 && item.latestOpening.options[0].value === ''))
+  assert.ok(receipt.opened.options.some(option => option.value === projectSetupRequested))
+  assert.deepEqual(f.keys, ['ArrowDown']); assert.equal(f.clicks.length, 1)
+  assert.deepEqual(f.chooseCalls, [{ args: [f.selector, projectSetupRequested], at: 200 }])
+  assert.deepEqual(f.sleeps, [100, 100]); assert.equal(f.waits[0].checks, 3); assert.equal(f.elapsed(), 200)
+  assert.ok(f.waits.every(wait => wait.argumentCount === 2))
+  assert.equal(receipt.events.length, 2); assert.equal(receipt.traceTruncated, false)
+})
+
+test('project setup permanently missing target expires the original default budget without another input', async t => {
+  const f = projectSetupAliasFixture(t, { appearAt: Infinity }); let failure
+  await assert.rejects(chooseProjectSetupAlias(f.context, projectSetupRequested), error => { failure = error; return true })
+  assert.equal(failure.message, 'Actual project setup combobox did not open its own popup')
+  assert.equal(f.waits.length, 1); assert.equal(failure, f.waits[0].failure)
+  assert.equal(f.elapsed(), 15000); assert.equal(f.waits[0].checks, 150)
+  assert.equal(f.sleeps.length, 150); assert.ok(f.sleeps.every(milliseconds => milliseconds === 100))
+  assert.equal(f.chooseCalls.length, 0); assert.equal(f.clicks.length, 0)
+  assert.equal(f.receipt().latestOpening.popupReady, true)
+  assert.deepEqual(f.receipt().latestOpening.options.map(option => option.value), [''])
+  assertProjectSetupFailureTrace(f, failure)
+})
+
+test('project setup hands duplicate target options directly to the original ambiguous-choice refusal', async t => {
+  const f = projectSetupAliasFixture(t, { choices: [projectSetupTarget, { ...projectSetupTarget, id: 'project-alias-duplicate' }] }); let failure
+  await assert.rejects(chooseProjectSetupAlias(f.context, projectSetupRequested), error => {
+    failure = error; return /Requested popup choice missing or ambiguous/.test(error.message)
+  })
+  assert.equal(failure.actual, 2); assert.equal(failure.expected, 1); assert.match(failure.stack, /native-ui-select\.mjs/)
+  assert.equal(f.chooseCalls.length, 1); assert.equal(f.clicks.length, 0); assert.deepEqual(f.sleeps, [])
+  assert.equal(f.waits[0].checks, 1); assert.equal(f.elapsed(), 0)
+  assertProjectSetupFailureTrace(f, failure)
+})
+
+test('project setup hands a disabled target directly to the original disabled-choice refusal', async t => {
+  const f = projectSetupAliasFixture(t, { choices: [{ ...projectSetupTarget, disabled: true }] }); let failure
+  await assert.rejects(chooseProjectSetupAlias(f.context, projectSetupRequested), error => {
+    failure = error; return /Requested popup choice is disabled/.test(error.message)
+  })
+  assert.equal(failure.actual, true); assert.equal(failure.expected, false); assert.match(failure.stack, /native-ui-select\.mjs/)
+  assert.equal(f.chooseCalls.length, 1); assert.equal(f.clicks.length, 0); assert.deepEqual(f.sleeps, [])
+  assert.equal(f.waits[0].checks, 1); assert.equal(f.elapsed(), 0)
+  assertProjectSetupFailureTrace(f, failure)
+})
+
+test('project setup preserves the original missing-choice refusal if a ready target disappears', async t => {
+  const f = projectSetupAliasFixture(t, { removeBeforeChoose: true }); let failure
+  await assert.rejects(chooseProjectSetupAlias(f.context, projectSetupRequested), error => {
+    failure = error; return /Requested popup choice missing or ambiguous/.test(error.message)
+  })
+  assert.equal(failure.actual, 0); assert.equal(failure.expected, 1); assert.match(failure.stack, /native-ui-select\.mjs/)
+  assert.ok(f.receipt().opened.options.some(option => option.value === projectSetupRequested))
+  assert.equal(f.chooseCalls.length, 1); assert.equal(f.clicks.length, 0); assert.deepEqual(f.sleeps, [])
+  assertProjectSetupFailureTrace(f, failure)
+})
+
+test('project setup retains an uncertain original click failure and its trace without replay even when trace validation fails', async t => {
+  for (const truncated of [false, true]) {
+    const failure = new Error('Original option click outcome is uncertain')
+    const f = projectSetupAliasFixture(t, { clickFailure: failure, truncateOnFailure: truncated })
+    await assert.rejects(chooseProjectSetupAlias(f.context, projectSetupRequested), error => error === failure)
+    assert.equal(f.chooseCalls.length, 1); assert.equal(f.clicks.length, 1); assert.deepEqual(f.sleeps, [])
+    assertProjectSetupFailureTrace(f, failure, truncated)
+    assert.equal(f.receipt().events.length, 2)
+    if (truncated) assert.match(f.receipt().traceError.message, /trace was truncated/)
+    else assert.equal(f.receipt().traceError, undefined)
+  }
+})
+
+// Synthetic DOM/CDP protocol contracts for failed-focus serialization. These
+// records are not trusted native input or evidence from the earlier failed run.
+function focusFailureFixture({ reachAt = Infinity, traceLimit = Infinity, diagnosticFailure = null,
+  traceAvailable = true, saveFailure = null } = {}) {
+  const f = overflowFixture(), selector = '#control', meta = { routeId: 'nav-trash', stateId: 'cancel-confirm' }
+  Object.assign(f.control, { tagName: 'BUTTON', localName: 'button', type: 'button' })
+  Object.assign(f.control.css, { outlineStyle: 'solid', outlineWidth: '2px', outlineColor: 'rgb(112, 87, 217)' })
+  const outside = f.make('div', 'background-editor', f.rectangle(440, 40, 200, 200), f.body)
+  outside.getAttribute = name => ({ id: outside.id, role: 'textbox', contenteditable: 'true' })[name] ?? null
+  for (const name of ['value', 'textContent', 'innerText']) Object.defineProperty(outside, name, {
+    get() { throw Error('Failure observation must not read note or field content') },
+  })
+  f.document.activeElement = outside
+  f.globals.window = { __fullAppUiEvents: [{ type: 'click', id: 'previous-control', trusted: true }], __fullAppUiTraceTruncated: false }
+  const priorFocus = { selector: '#previous-control', fixtureOnly: true }
+  const report = { fullAppUi: { group: 'editor', focus: [priorFocus] } }, commands = [], saved = []
+  let forwardTabs = 0, boundaryChecks = 0, diagnosticReads = 0, frames = 0
+  f.globals.requestAnimationFrame = callback => { frames++; callback() }
+  const context = { report, matrix, routes: [{ id: meta.routeId }],
+    evaluate: async source => {
+      if (source.startsWith('document.activeElement===document.querySelector(')) boundaryChecks++
+      else if (boundaryChecks === 256) {
+        diagnosticReads++
+        if (diagnosticFailure) throw diagnosticFailure
+        if (!traceAvailable) delete f.globals.window.__fullAppUiTraceTruncated
+      }
+      return JSON.parse(JSON.stringify(await runInNewContext(source, f.globals)))
+    },
+    cdp: { send: async (method, params) => {
+      assert.equal(method, 'Input.dispatchKeyEvent'); assert.equal(params.key, 'Tab')
+      commands.push({ method, ...params })
+      if (params.type !== 'rawKeyDown') return
+      if (params.modifiers === 0) forwardTabs++
+      f.document.activeElement = forwardTabs === reachAt ? f.control : outside
+      const trace = f.globals.window.__fullAppUiEvents
+      if (trace.length >= traceLimit) f.globals.window.__fullAppUiTraceTruncated = true
+      else trace.push({ type: 'keydown', key: 'Tab', trusted: true, tag: f.document.activeElement.tagName, id: f.document.activeElement.id })
+    } },
+    click: () => assert.fail('Button focus failure observation must not click'),
+    capture: () => assert.fail('Focus failure observation must not capture a replacement scene'),
+    until: () => assert.fail('Focus failure observation must not add a wait or retry'),
+    save: () => { saved.push(clone(report)); if (saveFailure) throw saveFailure },
+  }
+  return { f, shared: createFullAppUiShared(context), selector, meta, priorFocus, report, commands, saved,
+    stats: () => ({ forwardTabs, boundaryChecks, diagnosticReads, frames }) }
+}
+
+async function assertOriginalFocusTraversalFailure(f) {
+  let failure
+  await assert.rejects(f.shared.focus(f.selector, f.meta), error => {
+    failure = error
+    assert.equal(error.code, 'ERR_ASSERTION'); assert.equal(error.name, 'AssertionError')
+    assert.match(error.message, /^Actual Tab order never reached control: #control/)
+    assert.equal(error.actual, false); assert.equal(error.expected, true); assert.equal(error.operator, 'strictEqual')
+    return true
+  })
+  assert.equal(f.commands.length, 514, 'Keep the original reverse Tab and all 256 forward Tabs, each down/up')
+  for (const [index, command] of f.commands.entries()) {
+    assert.equal(command.type, index % 2 ? 'keyUp' : 'rawKeyDown')
+    assert.equal(command.modifiers, index < 2 ? 8 : 0)
+  }
+  assert.equal(f.stats().forwardTabs, 256); assert.equal(f.stats().boundaryChecks, 256)
+  assert.equal(f.stats().frames, 2, 'Only the original ensureVisible paint boundary may run')
+  assert.deepEqual(f.report.fullAppUi.focus, [f.priorFocus], 'A failed target must not earn or replace a successful focus receipt')
+  return failure
+}
+
+test('exhausted Tab traversal saves its bound failure, actual input counts and safe last element before the original assertion', async () => {
+  const f = focusFailureFixture()
+  await assertOriginalFocusTraversalFailure(f)
+  assert.equal(f.report.fullAppUi.focusFailures?.length, 1, 'The exhausted traversal needs its own failed receipt')
+  const receipt = f.report.fullAppUi.focusFailures[0]
+  assert.deepEqual({ group: receipt.group, routeId: receipt.routeId, stateId: receipt.stateId, theme: receipt.theme, viewport: receipt.viewport, selector: receipt.selector },
+    { group: 'editor', ...f.meta, ...matrix, selector: f.selector })
+  assert.equal(receipt.complete, false); assert.equal(receipt.reached, false); assert.equal(receipt.reason, 'tab-order-exhausted')
+  assert.equal(receipt.diagnosticComplete, true)
+  assert.deepEqual(receipt.attempts, { reverseTabs: 1, forwardTabs: 256, totalTabs: 257 })
+  assert.deepEqual(receipt.activeElement, { tag: 'DIV', id: 'background-editor', role: 'textbox', type: null, contentEditable: 'true' })
+  assert.equal(receipt.eventStart, 1); assert.equal(receipt.eventEnd, 258)
+  assert.deepEqual(receipt.events, clone(f.f.globals.window.__fullAppUiEvents.slice(1)))
+  assert.equal(receipt.traceTruncated, false); assert.equal(receipt.events.length, 257)
+  assert.equal(f.stats().diagnosticReads, 1); assert.equal(f.saved.length, 1)
+  assert.deepEqual(f.saved[0].fullAppUi.focusFailures[0], receipt)
+})
+
+test('a truncated focus event segment stays explicitly truncated without fabricating the missing key events', async () => {
+  const f = focusFailureFixture({ traceLimit: 4 })
+  await assertOriginalFocusTraversalFailure(f)
+  assert.equal(f.report.fullAppUi.focusFailures?.length, 1)
+  const receipt = f.report.fullAppUi.focusFailures[0]
+  assert.equal(receipt.traceTruncated, true); assert.equal(receipt.eventStart, 1); assert.equal(receipt.eventEnd, 4)
+  assert.equal(receipt.events.length, 3); assert.equal(receipt.attempts.totalTabs, 257)
+  assert.deepEqual(receipt.events, clone(f.f.globals.window.__fullAppUiEvents.slice(1)))
+  assert.equal(receipt.complete, false); assert.equal(receipt.diagnosticComplete, true)
+  assert.deepEqual(f.saved[0].fullAppUi.focusFailures[0], receipt)
+})
+
+test('failed diagnostic reading is saved as unavailable and cannot replace the original Tab assertion', async () => {
+  const diagnosticFailure = new Error('Diagnostic renderer read was disconnected'), f = focusFailureFixture({ diagnosticFailure })
+  const original = await assertOriginalFocusTraversalFailure(f)
+  assert.notEqual(original, diagnosticFailure); assert.equal(f.report.fullAppUi.focusFailures?.length, 1)
+  const receipt = f.report.fullAppUi.focusFailures[0]
+  assert.equal(receipt.diagnosticComplete, false); assert.equal(receipt.activeElement, null)
+  assert.equal(receipt.events, null); assert.equal(receipt.traceTruncated, null)
+  assert.deepEqual(receipt.diagnosticError, { name: diagnosticFailure.name, message: diagnosticFailure.message, stack: diagnosticFailure.stack })
+  assert.deepEqual(receipt.attempts, { reverseTabs: 1, forwardTabs: 256, totalTabs: 257 })
+  assert.deepEqual(f.saved[0].fullAppUi.focusFailures[0], receipt)
+})
+
+test('missing trace metadata cannot be recorded as an untruncated successful diagnostic', async () => {
+  const f = focusFailureFixture({ traceAvailable: false })
+  await assertOriginalFocusTraversalFailure(f)
+  assert.equal(f.report.fullAppUi.focusFailures?.length, 1)
+  const receipt = f.report.fullAppUi.focusFailures[0]
+  assert.equal(receipt.diagnosticComplete, false); assert.equal(receipt.traceTruncated, null); assert.equal(receipt.events, null)
+  assert.match(receipt.diagnosticError.message, /Actual focus failure trace is unavailable/)
+  assert.deepEqual(f.saved[0].fullAppUi.focusFailures[0], receipt)
+})
+
+test('failure-receipt persistence errors remain secondary to the original Tab assertion', async () => {
+  const saveFailure = new Error('Diagnostic checkpoint write was refused'), f = focusFailureFixture({ saveFailure })
+  const original = await assertOriginalFocusTraversalFailure(f)
+  assert.notEqual(original, saveFailure); assert.equal(f.report.fullAppUi.focusFailures?.length, 1)
+  const receipt = f.report.fullAppUi.focusFailures[0]
+  assert.equal(receipt.complete, false); assert.equal(receipt.diagnosticComplete, true)
+  assert.deepEqual(receipt.diagnosticSaveError, { name: saveFailure.name, message: saveFailure.message, stack: saveFailure.stack })
+  assert.equal(f.saved.length, 1, 'Do not replay a failed diagnostic save or any native input')
+})
+
+test('successful Tab focus keeps its original receipt and adds no failure observation or input', async () => {
+  const f = focusFailureFixture({ reachAt: 2 }), receipt = await f.shared.focus(f.selector, f.meta)
+  assert.equal(f.report.fullAppUi.focusFailures, undefined); assert.equal(f.report.fullAppUi.focus.length, 2)
+  assert.equal(f.report.fullAppUi.focus[0], f.priorFocus); assert.equal(f.report.fullAppUi.focus[1], receipt)
+  assert.ok(receipt.focused && receipt.focusVisible && receipt.inViewport && receipt.hit && receipt.trustedTab)
+  assert.equal(receipt.outlines.length, 1); assert.deepEqual(receipt.shadows, [])
+  assert.equal(receipt.events.length, 3); assert.deepEqual(receipt.events, clone(f.f.globals.window.__fullAppUiEvents.slice(1)))
+  assert.equal(f.commands.length, 6); assert.deepEqual(f.commands.map(command => command.modifiers), [8, 8, 0, 0, 0, 0])
+  assert.deepEqual(f.stats(), { forwardTabs: 2, boundaryChecks: 2, diagnosticReads: 0, frames: 2 })
+  assert.equal(f.saved.length, 1); assert.deepEqual(f.saved[0].fullAppUi.focus, clone(f.report.fullAppUi.focus))
+})

@@ -2,6 +2,8 @@
 [data-local-report-file] label { display: block; min-width: 0; max-width: 100%; }
 [data-local-report-file] input[type="file"] { display: block; box-sizing: border-box; max-width: 100%; margin-top: 6px; }
 [data-local-report-file] input[type="file"]:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { color: inherit; font: inherit; }
+/* The native file picker needs its own visible keyboard outline; the drop-zone ring is not its focus ring. */
+[data-local-report-file] input[data-ui-native="file"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 [data-local-file-result] { color: var(--ink, var(--fg)); }
 
 .local-report-drop-zone { border: 1px dashed var(--line-strong, var(--line)); border-radius: 8px; padding: 12px; min-width: 0; }

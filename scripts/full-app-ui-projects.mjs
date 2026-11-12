@@ -102,7 +102,7 @@ export async function chooseProjectSetupAlias({ shared, evaluate, until, report,
       receipt.latestOpening = await shared.nativeSelect.inspect(selector); save()
       const state = check(receipt.latestOpening)
       assert.equal(state.focused, true, 'Actual project setup combobox lost focus before opening')
-      return state.expanded && state.popupReady && state
+      return state.expanded && state.popupReady && state.options.some(option => option.value === requested) && state
     }, 'Actual project setup combobox did not open its own popup')
     save(); assert.ok(receipt.opened.popupId)
     record('original-option-pointer')

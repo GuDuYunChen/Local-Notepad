@@ -3,13 +3,13 @@
   "scope": "installed-actual-app-page-matrix",
   "sourceScope": "control-source entry coverage with declared states; not every possible failure combination",
   "productSource": {
-    "commit": "3bb50791d093ac5f698d201abc01881e1f0cb5cd",
-    "tree": "eec8f090f3e2720a6742db08db25b93901629c4f",
+    "commit": "800ce4e1982bee89531e751092b3a2baeab5afbc",
+    "tree": "a82fb041a28abdc8caff247fbc79ac7999784915",
     "dirty": false
   },
   "inventory": {
     "file": "inventory.json",
-    "sha256": "3a3160983e1fe6cfcc834ad5ef6c436020c83329b1d38c75816f197d060e896d",
+    "sha256": "3ea87532614869e4233d688e913913ff954f5192eedbf17bb5cf2bb9a11bc8d9",
     "originalDirty": false,
     "currentCodeFilesHashRevalidated": 347,
     "currentControlsFiles": 137
@@ -1759,9 +1759,9 @@
     },
     {
       "file": "src/components/ConfirmDialog.jsx",
-      "bytes": 2657,
-      "sha256": "75ad09853b50604a7769ddcc8483f8d72f00f491f1089e8fee4a0a4594dfc698",
-      "blob": "78a931f73bdb6133d51a1520a3637e807e91455b",
+      "bytes": 3410,
+      "sha256": "08dd4a5e7f3a4f5d336fdf1e4fcdf0af4298f73143946f14f5541e269f329690",
+      "blob": "f8fbf027891b71718b28eef64fc5f922134d3c94",
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [

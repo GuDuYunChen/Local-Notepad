@@ -752,10 +752,33 @@ export function createFullAppUiShared(ctx) {
       } else await click(selector)
     }
     await key('Tab', 8)
-    let reached = false
+    let reached = false, tabAttempts = 0
     for (let index = 0; index < 256; index++) {
       await key('Tab')
+      tabAttempts++
       if (await evaluate(`document.activeElement===document.querySelector(${q(selector)})`)) { reached = true; break }
+    }
+    if (!reached) {
+      // Observe only an exhausted traversal. Keep the original input sequence,
+      // budget and assertion, even if this diagnostic read or checkpoint fails.
+      const failure = { ...binding(meta), selector, complete: false, reached: false, reason: 'tab-order-exhausted',
+        attempts: { reverseTabs: 1, forwardTabs: tabAttempts, totalTabs: tabAttempts + 1 }, eventStart: first,
+        diagnosticComplete: false, activeElement: null, events: null, traceTruncated: null }
+      ;(ui.focusFailures ||= []).push(failure)
+      try {
+        Object.assign(failure, await evaluate(`(() => {
+          const node=document.activeElement, trace=window.__fullAppUiEvents;
+          if(!Array.isArray(trace)||typeof window.__fullAppUiTraceTruncated!=='boolean')throw Error('Actual focus failure trace is unavailable');
+          return {activeElement:node?{tag:node.tagName,id:node.id||null,role:node.getAttribute('role'),type:node.getAttribute('type'),contentEditable:node.getAttribute('contenteditable')}:null,
+            events:trace.slice(${Number(first)}),eventEnd:trace.length,traceTruncated:window.__fullAppUiTraceTruncated};
+        })()`))
+        failure.diagnosticComplete = true
+      } catch (error) {
+        failure.diagnosticError = { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack }
+      }
+      try { save() } catch (error) {
+        failure.diagnosticSaveError = { name: error?.name || 'Error', message: error?.message || String(error), stack: error?.stack }
+      }
     }
     assert.equal(reached, true, 'Actual Tab order never reached control: ' + selector)
     const sample = { ...binding(meta), ...await evaluate(sidebarFocusRequired ? sidebarFocusExpression : `(${observeFullAppFocus.toString()})(${q(selector)},${hasVisibleBoxShadow.toString()},${withinActualClientPort.toString()},${observeFullAppOverflowViewport.toString()},${viewportFixedClipBoundary.toString()})`),
