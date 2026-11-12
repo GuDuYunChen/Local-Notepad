@@ -375,6 +375,34 @@ export async function verifyProjectsPages(ctx) {
   await until(() => evaluate("!document.querySelector('.project-workspace-panel')"), 'Actual project workspace did not close')
 }
 
+// Lexical legitimately consumes Tab as an indent command while its editor
+// owns focus. Move through an actual trusted pointer on the inert Session
+// banner before the unchanged reverse/forward keyboard focus proof.
+export async function prepareProjectFocusSessionTabOrigin({ evaluate, click }) {
+  const original = await evaluate(`(() => {
+    const banners = [...document.querySelectorAll('.focus-session-copy')]
+    const actions = [...document.querySelectorAll('.focus-session-actions > button:first-child')]
+    if (banners.length !== 1 || actions.length !== 1 ||
+        banners[0].getBoundingClientRect().width <= 0 ||
+        banners[0].getBoundingClientRect().height <= 0 ||
+        actions[0].disabled || actions[0].getBoundingClientRect().width <= 0 ||
+        actions[0].getBoundingClientRect().height <= 0 ||
+        !banners[0].closest('.focus-session-bar')?.contains(actions[0])) {
+      throw Error('Actual Session focus origin or return action is unavailable')
+    }
+    return { wasEditorOwned: Boolean(document.activeElement?.isContentEditable), targetAvailable: true }
+  })()`)
+  await click('.focus-session-copy')
+  const after = await evaluate(`(() => ({
+    editorOwnsFocus: Boolean(document.activeElement?.isContentEditable),
+    targetAvailable: [...document.querySelectorAll('.focus-session-actions > button:first-child')]
+      .filter(button => !button.disabled && button.getBoundingClientRect().width > 0 && button.getBoundingClientRect().height > 0).length === 1
+  }))()`)
+  assert.equal(after.editorOwnsFocus, false, 'Real Session banner pointer did not release editor Tab indentation ownership')
+  assert.equal(after.targetAvailable, true, 'Actual Session return button disappeared after pointer origin')
+  return { method: 'trusted-session-banner-pointer', ...original, ...after }
+}
+
 async function verifyProjectFocusSession(ctx, capture) {
   const { shared, setup, click, evaluate, until, report, save, matrix } = ctx, ui = projectActions(ctx)
   const history = () => evaluate(`JSON.parse(localStorage.getItem('localNotepad.focusSessions.v1')||'{}')[${q(setup.projectID)}]||[]`)
@@ -384,6 +412,7 @@ async function verifyProjectFocusSession(ctx, capture) {
   await click('.project-today-task-list > div:first-child [title="25 分钟专注"]')
   await ui.shown('.focus-session-bar')
   await ui.text('.focus-session-actions', '显示界面')
+  await prepareProjectFocusSessionTabOrigin(ctx)
   await shared.focus('.focus-session-actions > button:first-child', { routeId: 'projects-focus-session', stateId: 'focused' })
   await capture('projects-focus-session', 'focused', ['.focus-session-actions > button:first-child'], ['专注 Session'])
   await ui.button('.focus-session-actions', '显示界面')
