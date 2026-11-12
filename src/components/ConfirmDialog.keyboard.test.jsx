@@ -46,6 +46,26 @@ it('keeps native forward and reverse Tab focus on both visible confirmation acti
   expect(confirm).not.toHaveBeenCalled()
 })
 
+
+it('keeps the nested confirmation Tab key out of a parent workspace focus trap', async () => {
+  const parentKeyDown = vi.fn()
+  await act(async () => root.render(
+    <div onKeyDown={parentKeyDown}>
+      <ConfirmDialog title="移到回收站?" message="确认" actions={[
+        { label: '取消', onClick: vi.fn() },
+        { label: '移到回收站', kind: 'danger', onClick: vi.fn() },
+      ]} />
+    </div>
+  ))
+  const buttons = [...host.querySelectorAll('.consumer-confirm-modal button')]
+  buttons[1].focus()
+  const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
+  buttons[1].dispatchEvent(event)
+  expect(event.defaultPrevented).toBe(true)
+  expect(parentKeyDown).not.toHaveBeenCalled()
+  expect(document.activeElement).toBe(buttons[0])
+})
+
 it('does not Tab-focus disabled loading confirmation actions', async () => {
   await act(async () => root.render(<ConfirmDialog
     title="处理中"

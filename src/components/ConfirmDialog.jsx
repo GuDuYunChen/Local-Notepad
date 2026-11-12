@@ -44,6 +44,8 @@ export default function ConfirmDialog({ title, message, actions, onClose }) {
             ? (event.shiftKey ? buttons.length - 1 : 0)
             : (activeIndex + (event.shiftKey ? -1 : 1) + buttons.length) % buttons.length
           event.preventDefault()
+          // A parent workspace may have its own Tab trap; only this dialog owns these keys.
+          event.stopPropagation()
           buttons[nextIndex].focus()
         }}
       >
