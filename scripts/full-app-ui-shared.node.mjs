@@ -10,7 +10,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { build } from 'esbuild'
 import controlEvidence from './check-ui-control-render.cjs'
 import { COLLAPSED_SIDEBAR_EXPAND, validateCollapsedSidebarObservation } from './full-app-ui-evidence.mjs'
-import { captureActualFullAppPopup, validateFullAppCaptureContinuity, validateFullAppPageSample, measureFullAppScrollCoverage, createFullAppUiShared, withinActualClientPort, finiteOwnerMotionActive, waitForFiniteOwnerMotion } from './full-app-ui-shared.mjs'
+import { observeFullAppPopup, captureActualFullAppPopup, validateFullAppCaptureContinuity, validateFullAppPageSample, measureFullAppScrollCoverage, createFullAppUiShared, withinActualClientPort, finiteOwnerMotionActive, waitForFiniteOwnerMotion } from './full-app-ui-shared.mjs'
 import { buildResearchImportFixtures, researchRoutes } from './full-app-ui-research.mjs'
 
 const clone = value => structuredClone(value)
@@ -806,4 +806,39 @@ test('fixed modal still rejects containing-block overflow, inner clipping, offsc
   covered.document.elementFromPoint = () => covered.page
   assert.equal(observeFixedModal(covered, 'page').controls[0].hit, false)
   assert.equal(observeFixedModal(covered, 'focus').hit, false)
+})
+
+test('owned native popup sees a Select wrapper and its actual input but rejects obscured or ambiguous owners', () => {
+  const rectangle = (left, top, width, height) => ({ left, top, width, height, right: left + width, bottom: top + height })
+  const host = { dataset: { uiValue: '"all"' } }, box = rectangle(30, 20, 180, 40)
+  const field = { id: 'owned-input', matches: selector => selector === '[role="combobox"]', getBoundingClientRect: () => box,
+    getAttribute: name => ({ 'aria-controls': 'owned-list', 'aria-expanded': 'true', 'aria-activedescendant': 'owned-option' })[name] ?? null,
+    closest: selector => selector === '[data-ui-control="select"]' ? host : null }
+  const option = { id: 'owned-option', innerText: '全部对象', getBoundingClientRect: () => rectangle(30, 76, 180, 30),
+    getAttribute: name => ({ 'aria-disabled': 'false', 'aria-selected': 'true' })[name] ?? null,
+    querySelector: selector => selector === '[data-ui-option-value]' ? { getAttribute: () => 'all' } : null }
+  const dropdown = { getBoundingClientRect: () => rectangle(28, 73, 186, 90), parentElement: null }
+  const list = { parentElement: dropdown, getBoundingClientRect: () => rectangle(28, 73, 186, 90),
+    getAttribute: name => name === 'role' ? 'listbox' : null,
+    closest: selector => selector === '.ant-select-dropdown' ? dropdown : null,
+    querySelectorAll: selector => selector === '[role="option"]' ? [option] : [] }
+  option.parentElement = list
+  const wrapper = { matches: () => false, getBoundingClientRect: () => box,
+    querySelectorAll: selector => selector === '[role="combobox"]' ? [field] : [] }
+  const document = { activeElement: field,
+    querySelectorAll: selector => selector === '.shared-wrapper' ? [wrapper] : selector === '.shared-input' ? [field] : [],
+    getElementById: id => id === 'owned-list' ? list : null, elementFromPoint: () => option }
+  const globals = { document, getComputedStyle: () => ({ display: 'block', visibility: 'visible', opacity: '1', pointerEvents: 'auto' }),
+    innerWidth: 704, innerHeight: 455 }
+  const run = selector => runInNewContext('(' + observeFullAppPopup.toString() + ')(' + JSON.stringify(selector) + ')', globals)
+  assert.equal(run('.shared-wrapper').popup.ready, true)
+  assert.equal(run('.shared-input').popup.ready, true)
+  assert.equal(run('.shared-wrapper').popup.optionValue, 'all')
+  document.elementFromPoint = () => null
+  assert.equal(run('.shared-wrapper').popup.ready, false, 'A real popup blocked by another element must fail')
+  document.elementFromPoint = () => option
+  wrapper.querySelectorAll = () => []
+  assert.throws(() => run('.shared-wrapper'), /one actual shared Select combobox/)
+  wrapper.querySelectorAll = () => [field, field]
+  assert.throws(() => run('.shared-wrapper'), /one actual shared Select combobox/)
 })

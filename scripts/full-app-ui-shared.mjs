@@ -419,7 +419,12 @@ export function ensureFullAppTargetVisible(selector, withinClientPort, readOverf
 export function observeFullAppPopup(selector) {
   const nodes = [...document.querySelectorAll(selector)].filter(node => node.getBoundingClientRect().width > 0)
   if (nodes.length !== 1) throw Error('Expected one actual shared Select')
-  const field = nodes[0], host = field.closest('[data-ui-control="select"]')
+  // A data-* selector may identify the real shared Select wrapper; ARIA
+  // popup ownership is on its one combobox input. Preserve every paint/hit gate.
+  const owner = nodes[0]
+  const fields = owner.matches('[role="combobox"]') ? [owner] : [...owner.querySelectorAll('[role="combobox"]')]
+  if (fields.length !== 1) throw Error('Expected one actual shared Select combobox')
+  const field = fields[0], host = field.closest('[data-ui-control="select"]')
   const listId = field.getAttribute('aria-controls') || field.getAttribute('aria-owns'), list = listId && document.getElementById(listId)
   const outer = list?.getAttribute('role') === 'listbox' && list.closest('.ant-select-dropdown')
   const bounds = node => { const b = node.getBoundingClientRect(); return { left: b.left, top: b.top, right: b.right, bottom: b.bottom, width: b.width, height: b.height } }
