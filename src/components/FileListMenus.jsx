@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import { UiButton } from '~/components/ui/ControlKit'
 
 
@@ -81,6 +81,14 @@ export function FileLibraryMenu({
   )
 }
 
+// Keep the entire real menu (including its destructive action) within the
+// current Electron client viewport. This is placement, not an acceptance waiver.
+export function fitFileContextMenuToViewport({ x, y, width, height, viewportWidth, viewportHeight, inset = 8 }) {
+  const left = Math.min(Math.max(inset, x), Math.max(inset, viewportWidth - width - inset))
+  const top = Math.min(Math.max(inset, y), Math.max(inset, viewportHeight - height - inset))
+  return { left, top }
+}
+
 export function FileContextMenu({
   contextMenu,
   menuRef,
@@ -91,21 +99,54 @@ export function FileContextMenu({
   onSaveAs,
   onDelete,
 }) {
-  if (!contextMenu) return null
+  const elementRef = useRef(null)
+  const [position, setPosition] = useState(null)
+  const bindRef = useCallback((node) => {
+    elementRef.current = node
+    if (typeof menuRef === 'function') menuRef(node)
+    else if (menuRef) menuRef.current = node
+  }, [menuRef])
 
+  useLayoutEffect(() => {
+    if (!contextMenu) return undefined
+    const update = () => {
+      const element = elementRef.current
+      if (!element) return
+      const bounds = element.getBoundingClientRect()
+      const fitted = fitFileContextMenuToViewport({
+        x: contextMenu.x,
+        y: contextMenu.y,
+        width: element.offsetWidth || bounds.width,
+        height: element.offsetHeight || bounds.height,
+        viewportWidth: window.innerWidth,
+        viewportHeight: window.innerHeight,
+      })
+      setPosition(previous => previous?.menu === contextMenu
+        && previous.left === fitted.left && previous.top === fitted.top
+        ? previous : { menu: contextMenu, ...fitted })
+    }
+    update()
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [contextMenu])
+
+  if (!contextMenu) return null
   const item = contextMenu.item
+  const fitted = position?.menu === contextMenu ? position : contextMenu
 
   return (
     <div
       className="context-menu file-context-menu"
-      ref={menuRef}
+      ref={bindRef}
       role="menu"
       aria-label={item.title + ' 操作'}
       style={{
-        top: contextMenu.y,
-        left: contextMenu.x,
+        top: fitted.top ?? contextMenu.y,
+        left: fitted.left ?? contextMenu.x,
         position: 'fixed',
         zIndex: 200,
+        maxHeight: 'calc(100vh - 16px)',
+        overflowY: 'auto',
       }}
     >
       {item.is_folder && (
