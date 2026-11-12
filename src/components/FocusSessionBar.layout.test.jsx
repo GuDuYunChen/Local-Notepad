@@ -47,7 +47,8 @@ test('focus mode offers a separate exit action without ending the current sessio
   buttons = [...host.querySelectorAll('.focus-session-actions button')]
   expect(buttons.map(button => button.textContent.trim())).toEqual(['继续专注', '结束 Session'])
   await act(async () => buttons[1].click())
-  expect(onEnd).toHaveBeenCalledExactlyOnceWith('manual')
+  expect(onEnd).toHaveBeenCalledTimes(1)
+  expect(onEnd).toHaveBeenCalledWith('manual')
 })
 
 test('compact session CSS does not hide its only return-to-interface action', () => {
