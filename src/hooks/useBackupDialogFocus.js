@@ -61,6 +61,12 @@ export default function useBackupDialogFocus(overlayRef, dialogRef, headingRef, 
         event.preventDefault(); event.stopImmediatePropagation(); close.current?.(); return
       }
       if (event.key !== 'Tab') return
+      // ConfirmDialog owns Tab cycling for its enabled buttons in the bubble phase.
+      // The outer capture trap must not move focus first: otherwise Shift+Tab at
+      // the first button wraps twice and lands back on the same button.
+      // Keep the outer trap active while the nested confirmation is busy.
+      if (scope !== dialog && scope.classList.contains('consumer-confirm-modal') &&
+        scope.contains(event.target) && focusable(scope).length > 0) return
       const items = focusable(scope)
       const index = items.indexOf(document.activeElement)
       if (!items.length) { event.preventDefault(); return }
