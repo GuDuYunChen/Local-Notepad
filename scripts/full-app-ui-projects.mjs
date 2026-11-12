@@ -18,7 +18,7 @@ export const projectsRoutes = Object.freeze([
   { id: 'projects-analysis', title: '创作与 Session 分析', source: source('ProjectAnalyticsPanel'), root: '.view-analysis', requiredStates: ['analytics', 'session-empty'] },
   { id: 'projects-insights', title: '创作洞察与复盘', source: source('ProjectInsightsPanel'), root: '.project-insights-panel', requiredStates: ['overview', 'report'] },
   { id: 'projects-structure', title: '故事地图与索引', source: source('ProjectStructurePanel'), root: '.project-structure-panel', requiredStates: ['map', 'empty-filter', 'storyline-indexes'] },
-  { id: 'projects-storylines', title: '轨迹编辑与生命周期诊断', source: source('ProjectStructurePanel'), root: '.project-storyline-system', requiredStates: ['selected-track', 'lifecycle', 'diagnostics'] },
+  { id: 'projects-storylines', title: '轨迹编辑与生命周期诊断', source: source('ProjectStructurePanel'), root: '.project-storyline-system', requiredStates: ['selected-track', 'lifecycle', 'diagnostics'], stateRoots: { diagnostics: '.project-storyline-diagnostics' } },
   { id: 'projects-relation-create', title: '实体与关系表单', source: source('ProjectRelationGraphPanel'), root: '.project-relation-create-grid', requiredStates: ['entity-form', 'relation-form'] },
   { id: 'projects-relations', title: '实体关系详情与演化', source: source('ProjectRelationGraphPanel'), root: '.project-relation-workspace', requiredStates: ['entity-detail', 'relation-detail', 'evolution'], stateRoots: { evolution: '.project-relation-timeline' } },
   { id: 'projects-entities', title: '实际实体别名', source: source('ProjectEntityIntelligencePanel'), root: '.project-entity-alias-editor', requiredStates: ['aliases', 'empty-selection'] },
