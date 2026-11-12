@@ -543,6 +543,7 @@ export function measureFullAppScrollCoverage(surface, samples, images) {
 export function createFullAppUiShared(ctx) {
   const { evaluate, click, cdp, until, capture, report, save } = ctx
   const ui = report.fullAppUi
+  const appendRaw = (scene, sample) => ctx.evidenceStore ? ctx.evidenceStore.appendRaw(scene, sample) : scene.rawSamples.push(sample)
   const frame = () => evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(true))))')
   const originalSelect = createNativeUiSelect({ evaluate, click, cdp, until })
   const nativeSelect = { inspect: originalSelect.inspect, value: originalSelect.value, choose: async (selector, value) => {
@@ -614,7 +615,7 @@ export function createFullAppUiShared(ctx) {
       const motion = { complete: false }; scene.motionReadiness.push(motion)
       await waitForFiniteOwnerMotion(() => evaluate(`(${observeFullAppOwnerMotion.toString()})(${q(root)})`), until, motion)
       const before = await samplePage(route, root, targetAnchors, onlySelectors, sidebarFocusRequired)
-      scene.rawSamples.push({ ...before, text: undefined }); save()
+      appendRaw(scene, { ...before, text: undefined }); save()
       if (sidebarFocusRequired) validateCollapsedSidebarObservation(before.sidebarFocus, ctx.matrix)
       assert.deepEqual(before.viewport, meta.viewport); assert.equal(before.theme, meta.theme)
       for (const text of requiredText) assert.ok(before.text.includes(text), 'Actual visible page text missing: ' + text)
@@ -628,7 +629,7 @@ export function createFullAppUiShared(ctx) {
       motion.image = filename
       const image = await capture(filename, async () => {
         const fresh = await samplePage(route, root, targetAnchors, onlySelectors, sidebarFocusRequired)
-        scene.rawSamples.push({ ...fresh, text: undefined, phase: 'before-capture', image: filename }); save()
+        appendRaw(scene, { ...fresh, text: undefined, phase: 'before-capture', image: filename }); save()
         if (sidebarFocusRequired) validateCollapsedSidebarObservation(fresh.sidebarFocus, ctx.matrix)
         validateFullAppCaptureContinuity(measured, fresh, ctx.matrix)
         return true
@@ -639,7 +640,7 @@ export function createFullAppUiShared(ctx) {
       scene.controls = [...seen.values()]; scene.anchors = [...capturedAnchors.values()]; scene.overflow = measured.overflow; save()
       validateFullAppPageSample(measured, ctx.matrix)
       afterCapture = await samplePage(route, root, targetAnchors, onlySelectors, sidebarFocusRequired)
-      scene.rawSamples.push({ ...afterCapture, text: undefined, phase: 'after-capture', image: image.filename }); save()
+      appendRaw(scene, { ...afterCapture, text: undefined, phase: 'after-capture', image: image.filename }); save()
       if (sidebarFocusRequired) validateCollapsedSidebarObservation(afterCapture.sidebarFocus, ctx.matrix)
       validateFullAppCaptureContinuity(measured, afterCapture, ctx.matrix)
       return image
@@ -711,7 +712,9 @@ export function createFullAppUiShared(ctx) {
       }
       scene.controlCoverage = { renderedCount: wanted.size, observedCount: seen.size, unobserved: [...wanted.keys()].filter(selector => !seen.has(selector)) }
       assert.deepEqual(scene.controlCoverage.unobserved, [])
-      scene.geometry = { valid: true, failures: [] }; scene.complete = true; save(); return scene
+      scene.geometry = { valid: true, failures: [] }; scene.complete = true; save()
+      ctx.evidenceStore?.sealScene(scene)
+      return scene
     } catch (error) {
       scene.geometry.failures.push({ message: String(error.message), actual: error.actual, expected: error.expected, operator: error.operator }); save()
       try { scene.failureImage = await capture(nameFor(meta, 'failure')); save() }

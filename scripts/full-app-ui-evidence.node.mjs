@@ -831,7 +831,7 @@ test('a fitting popup frame still permits a longer internally scrolling option l
 })
 
 import { filterNavigationLibrary, prepareNavigationNoteSelection, verifyNavigationPages } from './full-app-ui-navigation.mjs'
-import { createFullAppUiShared, observeFullAppPage, withinActualClientPort, viewportFixedClipBoundary, measureFullAppScrollCoverage } from './full-app-ui-shared.mjs'
+import { createFullAppUiShared, observeFullAppPage, viewportFixedClipBoundary, measureFullAppScrollCoverage } from './full-app-ui-shared.mjs'
 
 
 // Native wrapped labels can occupy two separate painted lines. Their union's
@@ -1330,7 +1330,7 @@ test('a real production row title cannot waive the original owned editor body af
   assert.deepEqual(f.waits.map(wait => wait.budgets), [[]])
 })
 
-import { ensureFullAppTargetVisible } from './full-app-ui-shared.mjs'
+import { ensureFullAppTargetVisible, withinActualClientPort } from './full-app-ui-shared.mjs'
 
 function productionHistoryFeedbackContract() {
   const source = readFileSync(new URL('../src/components/SyncConflictHistoryPanel.jsx', import.meta.url), 'utf8')
@@ -1417,4 +1417,421 @@ test('local-sync production feedback refuses a missing or duplicate read status 
     assert.throws(() => f.ensure(f.selector), /Missing or ambiguous actual scroll target/)
     assert.deepEqual(f.scrolls, [])
   }
+})
+
+// Filesystem/JSON contracts for the storage adapter. These are deliberately
+// synthetic observations, not native images, page execution or acceptance.
+import { mkdirSync as storageMkdir, renameSync as storageRename, unlinkSync as storageUnlink,
+  symlinkSync as storageSymlink, linkSync as storageLink, lstatSync as storageStat } from 'node:fs'
+import { FULL_APP_STORAGE_FORMAT, createFullAppEvidenceWriter, createFullAppEvidenceCache,
+  readFullAppEvidence, fullAppEvidenceFingerprint } from './full-app-ui-storage.mjs'
+
+const storageJSON = value => JSON.parse(JSON.stringify(value))
+function storageReport(group = 'projects') {
+  return { schemaVersion: 1, complete: false, group, productCommit: 'a'.repeat(40), productTree: 'b'.repeat(40),
+    verifierCommit: 'c'.repeat(40), startedAt: '2026-11-12T00:00:00.000Z',
+    runner: { runID: 'storage-contract', runAttempt: '1', job: 'full-application-ui', group },
+    sourceFiles: { verifier: { 'scripts/full-app-ui-storage.mjs': 'd'.repeat(40) } },
+    fullAppUi: { complete: false, scenes: [], events: [], unknownUI: { keep: [null, false, 0, '', '中文'] } },
+    unknownRoot: { filename: '../../ordinary-data.json', kind: 'raw', sha256: 'e'.repeat(64), nested: [undefined, -0, NaN] } }
+}
+function storageScene(index = 0, group = 'projects') {
+  return { group, routeId: 'contract-' + index, stateId: 'ready', theme: 'light', viewport: { width: 704, height: 455 },
+    root: '.storage-contract-' + index, complete: false, geometry: { valid: false, failures: [] }, rawSamples: [],
+    unknownScene: { text: 'all metadata kept', omittedByJSON: undefined, values: [1, null, true] } }
+}
+function storageSample(phase, marker = 'owned') {
+  return { phase, image: 'contract.png', root: '.storage-contract-0',
+    controls: [{ selector: '#owned', marker, width: 40, height: 40, disabled: false }],
+    scrollAreas: [{ visibleContentStart: 0, visibleContentEnd: 455 }],
+    extraRaw: { marker, empty: [], nested: { keep: '完整' }, omittedByJSON: undefined }, text: undefined }
+}
+function storageCase(group = 'projects') {
+  const directory = mkdtempSync(path.join(tmpdir(), 'notepad-segmented-contract-'))
+  const filename = path.join(directory, 'full-app-ui-installed.json'), report = storageReport(group)
+  const writer = createFullAppEvidenceWriter(filename, report)
+  const scene = storageScene(0, group); report.fullAppUi.scenes.push(scene); writer.save()
+  const cleanup = () => rmSync(directory, { recursive: true, force: true })
+  return { directory, filename, report, writer, scene, cleanup }
+}
+function storagePair(f, scene = f.scene) {
+  for (const phase of ['before-capture', 'after-capture']) { f.writer.appendRaw(scene, storageSample(phase)); f.writer.save() }
+}
+function storageFinish(f) {
+  for (const scene of f.report.fullAppUi.scenes) if (!Object.isFrozen(scene)) {
+    scene.geometry = { valid: true, failures: [] }; scene.complete = true; f.writer.save(); f.writer.sealScene(scene)
+  }
+  f.report.fullAppUi.complete = true; f.report.complete = true; f.writer.save()
+  return { complete: true, report: fullAppEvidenceFingerprint(f.filename), storage: f.writer.receipt() }
+}
+function storageManifest(f) { return JSON.parse(readFileSync(f.filename, 'utf8')) }
+function storageWriteManifest(f, manifest) { writeFileSync(f.filename, JSON.stringify(manifest) + '\n') }
+function storagePartPath(f, ref) { return path.join(f.directory, ...ref.file.split('/')) }
+function storageRehashPart(f, ref, mutate) {
+  const part = JSON.parse(readFileSync(storagePartPath(f, ref), 'utf8')); mutate(part)
+  const bytes = Buffer.from(JSON.stringify(part) + '\n'), digest = hash(bytes)
+  ref.sha256 = digest; ref.bytes = bytes.length
+  ref.file = 'full-app-ui-installed.json.parts/' + ref.kind + '-' + digest + '.json'
+  writeFileSync(storagePartPath(f, ref), bytes)
+}
+
+test('segmented checkpoints preserve every JSON-domain field, raw order and incomplete failure observation', () => {
+  const f = storageCase()
+  try {
+    storagePair(f)
+    f.scene.geometry.failures.push({ message: 'original rejection', actual: 16, expected: 40, detail: { retained: true } })
+    f.scene.failureImage = { filename: 'failure.png', bytes: 1234, sha256: 'f'.repeat(64) }
+    f.report.fullAppUi.events.push({ type: 'keydown', key: 'Tab', trusted: true, extra: { untouched: 'event' } })
+    f.report.unknownRoot.more = { missing: undefined, numeric: Infinity, list: ['one', undefined, 'three'] }
+    f.writer.save()
+    const loaded = readFullAppEvidence(f.filename)
+    assert.deepEqual(storageJSON(loaded.report), storageJSON(f.report))
+    assert.ok(Array.isArray(loaded.report.fullAppUi.scenes))
+    assert.ok(Array.isArray(loaded.report.fullAppUi.scenes[0].rawSamples))
+    assert.ok(Array.isArray(loaded.report.fullAppUi.events))
+    assert.deepEqual(loaded.report.fullAppUi.scenes[0].rawSamples.map(sample => sample.phase), ['before-capture', 'after-capture'])
+    assert.equal(loaded.report.complete, false)
+    assert.throws(() => f.writer.receipt(), /incomplete/)
+    assert.equal(storageManifest(f).format, FULL_APP_STORAGE_FORMAT)
+  } finally { f.cleanup() }
+})
+
+test('each checkpoint retains mutable globals, changed old events and whole event-array replacement', () => {
+  const f = storageCase(), cache = createFullAppEvidenceCache()
+  try {
+    storagePair(f)
+    f.report.fullAppUi.events = Array.from({ length: 2051 }, (_, index) => ({ type: 'click', index, trusted: true }))
+    f.writer.save()
+    const first = readFullAppEvidence(f.filename, { cache })
+    assert.equal(first.report.fullAppUi.events.length, 2051)
+    f.report.fullAppUi.events[0].trusted = false
+    f.report.fullAppUi.events[1024].extra = { retained: 'changed old event' }
+    f.report.fullAppUi.extraStatus = { pending: true }; f.writer.save()
+    const changed = readFullAppEvidence(f.filename, { cache })
+    assert.deepEqual(storageJSON(changed.report), storageJSON(f.report))
+    assert.equal(first.report.fullAppUi.events[0].trusted, true, 'An earlier committed snapshot stays unchanged')
+    f.report.fullAppUi.events = [{ type: 'change', trusted: true, files: ['fixture.json'] }]
+    f.report.fullAppUi.extraStatus.pending = false; f.writer.save()
+    assert.deepEqual(storageJSON(readFullAppEvidence(f.filename, { cache }).report), storageJSON(f.report))
+  } finally { f.cleanup() }
+})
+
+test('completed scene metadata and raw payloads are neither rewritten nor reread by later checkpoints or identity scans', () => {
+  const f = storageCase()
+  try {
+    storagePair(f)
+    for (let index = 1; index < 3; index++) {
+      const scene = storageScene(index); f.report.fullAppUi.scenes.push(scene); f.writer.save(); storagePair(f, scene)
+    }
+    for (const scene of f.report.fullAppUi.scenes) {
+      scene.complete = true; scene.geometry = { valid: true, failures: [] }; f.writer.save(); f.writer.sealScene(scene)
+    }
+    const sealed = f.writer.statistics()
+    assert.equal(sealed.sceneParts, 3); assert.equal(sealed.rawParts, 6)
+    assert.equal(sealed.activeScenes, 0)
+    for (let index = 0; index < 24; index++) {
+      f.report.currentDiagnostic = { index, message: 'new mutable checkpoint' }
+      assert.equal(f.report.fullAppUi.scenes.some(scene => scene.routeId === 'contract-2' && scene.stateId === 'ready' && scene.theme === 'light' && scene.viewport.width === 704), true)
+      f.writer.save()
+    }
+    const later = f.writer.statistics()
+    for (const key of ['rawParts', 'rawBytes', 'sceneParts', 'sceneBytes', 'partBytes']) assert.equal(later[key], sealed[key])
+    assert.deepEqual(later.reads, sealed.reads, 'Identity scans and checkpoints must not read completed scene parts')
+    assert.ok(later.checkpointBytes > sealed.checkpointBytes, 'Small manifests still commit every call; they are not silently throttled')
+    assert.deepEqual(storageJSON(readFullAppEvidence(f.filename).report), storageJSON(f.report))
+  } finally { f.cleanup() }
+})
+
+test('shared readers retain one complete scene and one event group without stale checkpoint values', () => {
+  const a = storageCase('projects'), b = storageCase('research'), cache = createFullAppEvidenceCache()
+  try {
+    storagePair(a); storagePair(b)
+    a.report.fullAppUi.events = [{ group: 'projects' }]; b.report.fullAppUi.events = [{ group: 'research' }]
+    a.writer.save(); b.writer.save()
+    const left = readFullAppEvidence(a.filename, { cache }), right = readFullAppEvidence(b.filename, { cache })
+    const first = left.report.fullAppUi.scenes[0].rawSamples
+    assert.equal(first.length, 2); assert.equal(left.report.fullAppUi.events[0].group, 'projects')
+    assert.equal(left.report.fullAppUi.scenes[0].rawSamples, first)
+    assert.equal(right.report.fullAppUi.scenes[0].rawSamples.length, 2)
+    assert.equal(right.report.fullAppUi.events[0].group, 'research')
+    assert.deepEqual([cache.state().retainedScenes, cache.state().retainedEventGroups], [1, 1])
+    assert.deepEqual(left.report.fullAppUi.scenes[0].rawSamples, first)
+    a.scene.unknownScene.text = 'changed active metadata'; a.writer.save()
+    const later = readFullAppEvidence(a.filename, { cache })
+    assert.equal(later.report.fullAppUi.scenes[0].unknownScene.text, 'changed active metadata')
+    assert.equal(left.report.fullAppUi.scenes[0].unknownScene.text, 'all metadata kept')
+  } finally { a.cleanup(); b.cleanup() }
+})
+
+test('accepted storage binds the manifest and every part and refuses unsaved live evidence', () => {
+  const f = storageCase()
+  try {
+    storagePair(f); const accepted = storageFinish(f)
+    const loaded = readFullAppEvidence(f.filename, { accepted })
+    assert.deepEqual(storageJSON(loaded.report), storageJSON(f.report))
+    assert.equal(accepted.storage.parts.count, 3)
+    assert.equal(accepted.storage.rawSamples, 2)
+    f.report.newDiagnostic = 'not yet checkpointed'
+    assert.throws(() => f.writer.receipt(), /last complete checkpoint/)
+    f.writer.save()
+    assert.throws(() => readFullAppEvidence(f.filename, { accepted }), /Accepted manifest bytes differ/)
+    const newer = { complete: true, report: fullAppEvidenceFingerprint(f.filename), storage: f.writer.receipt() }
+    assert.equal(readFullAppEvidence(f.filename, { accepted: newer }).report.newDiagnostic, 'not yet checkpointed')
+    const wrongClosure = storageJSON(newer); wrongClosure.storage.parts.sha256 = '0'.repeat(64)
+    assert.throws(() => readFullAppEvidence(f.filename, { accepted: wrongClosure }), /closure differs/)
+  } finally { f.cleanup() }
+})
+
+test('a failed scene seal leaves the original scene writable and later failure evidence fully checkpointed', () => {
+  const f = storageCase()
+  try {
+    storagePair(f)
+    f.scene.complete = true; f.scene.geometry = { valid: true, failures: [] }; f.writer.save()
+    const preceding = readFileSync(f.filename), original = f.scene
+    storageMkdir(f.filename + '.next')
+    assert.throws(() => f.writer.sealScene(original))
+    assert.equal(f.report.fullAppUi.scenes[0], original); assert.equal(Object.isFrozen(original), false)
+    assert.deepEqual(readFileSync(f.filename), preceding, 'Failed publication must leave the preceding complete checkpoint')
+    assert.ok(storageStat(f.filename + '.next').isDirectory(), 'Unexpected staging evidence is not erased')
+    rmSync(f.filename + '.next', { recursive: true })
+    // These are the existing captureState catch fields, on the SAME object.
+    original.geometry.failures.push({ message: 'original seal write refusal', actual: 'EEXIST' })
+    original.failureImage = { filename: 'failure.png', bytes: 1500, sha256: '4'.repeat(64) }
+    f.report.fullAppUi.error = { message: 'original seal write refusal' }; f.writer.save()
+    const loaded = readFullAppEvidence(f.filename)
+    assert.deepEqual(storageJSON(loaded.report), storageJSON(f.report))
+    assert.equal(loaded.report.fullAppUi.scenes[0].geometry.failures[0].message, 'original seal write refusal')
+    assert.equal(f.writer.statistics().activeScenes, 1)
+    assert.throws(() => f.writer.receipt(), /incomplete/)
+  } finally { f.cleanup() }
+})
+
+test('an interrupted active checkpoint cannot accept an orphan raw part or erase the prior observation', () => {
+  const f = storageCase()
+  try {
+    f.writer.appendRaw(f.scene, storageSample('before-capture')); f.writer.save()
+    const before = storageJSON(readFullAppEvidence(f.filename).report)
+    f.writer.appendRaw(f.scene, storageSample('after-capture'))
+    storageMkdir(f.filename + '.next')
+    assert.throws(() => f.writer.save())
+    assert.deepEqual(storageJSON(readFullAppEvidence(f.filename).report), before)
+    assert.throws(() => f.writer.receipt(), /incomplete/)
+    rmSync(f.filename + '.next', { recursive: true }); f.writer.save()
+    assert.equal(readFullAppEvidence(f.filename).report.fullAppUi.scenes[0].rawSamples.length, 2)
+  } finally { f.cleanup() }
+})
+
+test('missing, truncated and changed raw-part bytes are refused before reconstructed observations are returned', () => {
+  for (const change of ['missing', 'truncated', 'changed']) {
+    const f = storageCase()
+    try {
+      storagePair(f)
+      const ref = storageManifest(f).scenes[0].value.rawSamples[0], target = storagePartPath(f, ref), bytes = readFileSync(target)
+      if (change === 'missing') storageUnlink(target)
+      else if (change === 'truncated') writeFileSync(target, bytes.subarray(0, bytes.length - 1))
+      else { bytes[bytes.indexOf('owned')] ^= 1; writeFileSync(target, bytes) }
+      assert.throws(() => readFullAppEvidence(f.filename), /ENOENT|truncated|digest differs/)
+    } finally { f.cleanup() }
+  }
+})
+
+test('duplicate, reordered, missing-tail and wrong-scene references cannot become raw evidence arrays', () => {
+  for (const mutate of [
+    manifest => { const refs = manifest.scenes[0].value.rawSamples; refs[1] = storageJSON(refs[0]) },
+    manifest => manifest.scenes[0].value.rawSamples.reverse(),
+    manifest => manifest.scenes[0].value.rawSamples.pop(),
+    manifest => { manifest.scenes[0].index = 1 },
+    manifest => manifest.scenes.pop(),
+  ]) {
+    const f = storageCase()
+    try { storagePair(f); const manifest = storageManifest(f); mutate(manifest); storageWriteManifest(f, manifest); assert.throws(() => readFullAppEvidence(f.filename)) }
+    finally { f.cleanup() }
+  }
+})
+
+test('rehashing cannot disguise a foreign part owner, scene ordinal or changed capture phase', () => {
+  for (const mutate of [
+    part => { part.owner = '0'.repeat(64) },
+    part => { part.context.scene.index++ },
+    part => { part.value.phase = 'after-capture' },
+    part => { part.value.image = 'foreign.png' },
+  ]) {
+    const f = storageCase()
+    try {
+      storagePair(f); const manifest = storageManifest(f), ref = manifest.scenes[0].value.rawSamples[0]
+      storageRehashPart(f, ref, mutate); storageWriteManifest(f, manifest)
+      assert.throws(() => readFullAppEvidence(f.filename), /another run\/source|context differs|phase\/image differs/)
+    } finally { f.cleanup() }
+  }
+})
+
+test('raw parts from another real storage instance are refused even with the same scene and report identities', () => {
+  const a = storageCase(), b = storageCase()
+  try {
+    storagePair(a); storagePair(b)
+    const manifest = storageManifest(a), foreign = storageManifest(b).scenes[0].value.rawSamples[0]
+    writeFileSync(storagePartPath(a, foreign), readFileSync(storagePartPath(b, foreign)))
+    manifest.scenes[0].value.rawSamples[0] = foreign; storageWriteManifest(a, manifest)
+    assert.throws(() => readFullAppEvidence(a.filename), /another run\/source/)
+  } finally { a.cleanup(); b.cleanup() }
+})
+
+test('part path traversal, absolute paths, directory links and hard-link aliases are refused', () => {
+  for (const file of ['../outside.json', '/absolute.json', 'C:\\outside.json', 'full-app-ui-installed.json.parts/../alias.json']) {
+    const f = storageCase()
+    try {
+      storagePair(f); const manifest = storageManifest(f)
+      manifest.scenes[0].value.rawSamples[0].file = file; storageWriteManifest(f, manifest)
+      assert.throws(() => readFullAppEvidence(f.filename), /escapes or aliases/)
+    } finally { f.cleanup() }
+  }
+  const linked = storageCase(), aliased = storageCase()
+  try {
+    storagePair(linked)
+    const parts = linked.filename + '.parts', moved = path.join(linked.directory, 'original-parts')
+    storageRename(parts, moved); storageSymlink(moved, parts, 'junction')
+    assert.throws(() => readFullAppEvidence(linked.filename), /directory must not be a link/)
+    storagePair(aliased)
+    const ref = storageManifest(aliased).scenes[0].value.rawSamples[0]
+    storageLink(storagePartPath(aliased, ref), path.join(aliased.directory, 'same-inode.json'))
+    assert.throws(() => readFullAppEvidence(aliased.filename), /not an alias/)
+  } finally { linked.cleanup(); aliased.cleanup() }
+})
+
+test('event chunks retain their full declared tail and reject reordered, missing or altered bytes', () => {
+  for (const change of ['reorder', 'missing-tail', 'bytes']) {
+    const f = storageCase()
+    try {
+      f.report.fullAppUi.events = Array.from({ length: 1030 }, (_, index) => ({ index, type: 'keydown', key: 'Tab', trusted: true }))
+      f.writer.save(); const manifest = storageManifest(f)
+      if (change === 'reorder') manifest.events.parts.reverse()
+      else if (change === 'missing-tail') manifest.events.parts.pop()
+      else {
+        const ref = manifest.events.parts[0], target = storagePartPath(f, ref), bytes = readFileSync(target)
+        bytes[bytes.indexOf('keydown')] ^= 1; writeFileSync(target, bytes)
+      }
+      storageWriteManifest(f, manifest)
+      assert.throws(() => readFullAppEvidence(f.filename), /context differs|tail was omitted|digest differs/)
+    } finally { f.cleanup() }
+  }
+})
+
+test('unsupported storage versions, changed source bindings and premature complete manifests are refused', () => {
+  for (const mutate of [
+    manifest => { manifest.storageVersion = 2 },
+    manifest => { manifest.body.verifierCommit = '9'.repeat(40) },
+    manifest => { manifest.body.complete = true },
+  ]) {
+    const f = storageCase()
+    try { storagePair(f); const manifest = storageManifest(f); mutate(manifest); storageWriteManifest(f, manifest); assert.throws(() => readFullAppEvidence(f.filename)) }
+    finally { f.cleanup() }
+  }
+})
+
+test('acknowledged raw snapshots cannot be silently mutated, replaced or reordered before a later save', () => {
+  const f = storageCase()
+  try {
+    const input = storageSample('before-capture'); f.writer.appendRaw(f.scene, input); f.writer.save()
+    input.extraRaw.nested.keep = 'later source mutation'
+    assert.equal(f.scene.rawSamples[0].extraRaw.nested.keep, '完整')
+    assert.throws(() => { f.scene.rawSamples[0].extraRaw.nested.keep = 'forged' }, TypeError)
+    f.writer.appendRaw(f.scene, storageSample('after-capture')); f.writer.save()
+    const before = readFileSync(f.filename); f.scene.rawSamples.reverse()
+    assert.throws(() => f.writer.save(), /replaced or reordered/)
+    assert.deepEqual(readFileSync(f.filename), before)
+  } finally { f.cleanup() }
+})
+
+test('the original capture producer and full validator retain all observations through sealed storage', async () => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'notepad-storage-producer-'))
+  const filename = path.join(directory, 'full-app-ui-installed.json')
+  const ledger = ledgerFixture(), ui = uiFixture('projects', ledger), route = ledger.groups.projects.routes[0]
+  const matrix = clone(FULL_APP_MATRIX[0]), previous = ui.scenes.find(scene => scene.stateId === 'ready' && scene.theme === matrix.theme && scene.viewport.width === matrix.viewport.width)
+  ui.scenes.splice(ui.scenes.indexOf(previous), 1)
+  const report = storageReport(); report.fullAppUi = ui
+  const writer = createFullAppEvidenceWriter(filename, report)
+  try {
+    writer.save(); for (const scene of ui.scenes) writer.sealScene(scene)
+    const nativeContract = serializedSweepContract(route.root, matrix), captures = [], budgets = []
+    const shared = createFullAppUiShared({ evaluate: nativeContract.evaluate, report, routes: [route], matrix, evidenceStore: writer,
+      windowReceipt: { nativeWindow: true, viewport: clone(matrix.viewport), requested: clone(matrix.viewport) },
+      click: async () => { throw Error('Unexpected pointer input in storage contract') },
+      cdp: { send: async () => { throw Error('Unexpected keyboard input in storage contract') } },
+      until: async (check, label, ...extra) => { budgets.push(extra); const value = await check(); assert.ok(value, label); return value },
+      save: () => writer.save(), capture: async (name, guard) => {
+        if (guard) await guard()
+        const bytes = png(matrix.viewport.width, matrix.viewport.height), image = { filename: name, bytes: bytes.length, sha256: hash(bytes) }
+        writeFileSync(path.join(directory, name), bytes); captures.push(image); return image
+      } })
+    const scene = await shared.captureState({ routeId: route.id, stateId: 'ready', anchors: ['#owned-select'] })
+    assert.equal(scene, ui.scenes.at(-1)); assert.equal(Object.isFrozen(scene), true)
+    assert.equal(scene.images.length, 3); assert.equal(captures.length, 3)
+    assert.ok(budgets.every(value => value.length === 0))
+    assert.equal(validateFullAppUiEvidence(ui, ledger), ui)
+    const loaded = readFullAppEvidence(filename).report
+    assert.deepEqual(storageJSON(loaded), storageJSON(report))
+    assert.equal(validateFullAppUiEvidence(loaded.fullAppUi, ledger), loaded.fullAppUi)
+    const missing = storageJSON(loaded.fullAppUi)
+    missing.scenes.at(-1).rawSamples = missing.scenes.at(-1).rawSamples.filter(sample => sample.phase !== 'after-capture')
+    assert.throws(() => validateFullAppUiEvidence(missing, ledger))
+  } finally { rmSync(directory, { recursive: true, force: true }) }
+})
+
+test('legacy JSON remains explicit JSON-domain data and file fingerprints keep exact binary byte identity', () => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'notepad-storage-legacy-'))
+  try {
+    const filename = path.join(directory, 'legacy.json'), legacy = { complete: true,
+      rawSamples: [{ file: '../ordinary.json', kind: 'raw', value: ['keep', null] }],
+      ui: { events: [{ type: 'click', trusted: true }] }, unknown: '旧格式原值' }
+    writeFileSync(filename, JSON.stringify(legacy, null, 2) + '\n')
+    const accepted = { complete: true, report: fullAppEvidenceFingerprint(filename) }
+    assert.deepEqual(readFullAppEvidence(filename, { accepted }).report, legacy)
+    assert.equal(readFullAppEvidence(filename).storage, null)
+    assert.throws(() => readFullAppEvidence(filename, { accepted: { ...accepted, storage: {} } }), /Legacy JSON/)
+    const binary = path.join(directory, 'binary.bin'), bytes = Buffer.alloc(600001)
+    for (let index = 0; index < bytes.length; index++) bytes[index] = index % 251
+    writeFileSync(binary, bytes)
+    assert.deepEqual(fullAppEvidenceFingerprint(binary), { filename: 'binary.bin', bytes: bytes.length, sha256: hash(bytes) })
+  } finally { rmSync(directory, { recursive: true, force: true }) }
+})
+
+test('the original capture catch preserves a seal IO error and its failure PNG on the same active scene', async () => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'notepad-storage-seal-failure-'))
+  const filename = path.join(directory, 'full-app-ui-installed.json'), ledger = ledgerFixture()
+  const ui = uiFixture('projects', ledger), route = ledger.groups.projects.routes[0], matrix = clone(FULL_APP_MATRIX[0])
+  const previous = ui.scenes.find(scene => scene.stateId === 'ready' && scene.theme === matrix.theme && scene.viewport.width === matrix.viewport.width)
+  ui.scenes.splice(ui.scenes.indexOf(previous), 1)
+  const report = storageReport(); report.fullAppUi = ui
+  const writer = createFullAppEvidenceWriter(filename, report)
+  let originalFailure, originalScene
+  try {
+    writer.save(); for (const scene of ui.scenes) writer.sealScene(scene)
+    const evidenceStore = { appendRaw: writer.appendRaw, sealScene(scene) {
+      originalScene = scene; storageMkdir(filename + '.next')
+      try { return writer.sealScene(scene) }
+      catch (error) { originalFailure = error; throw error }
+      finally { rmSync(filename + '.next', { recursive: true }) }
+    } }
+    const contract = serializedSweepContract(route.root, matrix)
+    const shared = createFullAppUiShared({ evaluate: contract.evaluate, report, routes: [route], matrix, evidenceStore,
+      windowReceipt: { nativeWindow: true, viewport: clone(matrix.viewport), requested: clone(matrix.viewport) },
+      click() { throw Error('Unexpected pointer input') }, cdp: { send() { throw Error('Unexpected keyboard input') } },
+      until: async (check, label) => { const value = await check(); assert.ok(value, label); return value },
+      save: () => writer.save(), capture: async (name, guard) => {
+        if (guard) await guard()
+        const bytes = png(matrix.viewport.width, matrix.viewport.height)
+        writeFileSync(path.join(directory, name), bytes)
+        return { filename: name, bytes: bytes.length, sha256: hash(bytes) }
+      } })
+    await assert.rejects(shared.captureState({ routeId: route.id, stateId: 'ready', anchors: ['#owned-select'] }), error => error === originalFailure)
+    assert.ok(originalFailure); assert.equal(ui.scenes.at(-1), originalScene)
+    assert.equal(Object.isFrozen(originalScene), false)
+    assert.equal(originalScene.geometry.failures.length, 1)
+    assert.equal(originalScene.geometry.failures[0].message, originalFailure.message)
+    assert.ok(originalScene.failureImage.filename.endsWith('-failure.png'))
+    const loaded = readFullAppEvidence(filename).report
+    assert.deepEqual(storageJSON(loaded), storageJSON(report))
+    assert.throws(() => validateFullAppUiEvidence(loaded.fullAppUi, ledger))
+    assert.equal(writer.statistics().activeScenes, 1)
+  } finally { rmSync(directory, { recursive: true, force: true }) }
 })

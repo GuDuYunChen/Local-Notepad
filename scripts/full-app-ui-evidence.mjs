@@ -7,6 +7,7 @@ import { inflateSync } from 'node:zlib'
 import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { createFullAppEvidenceCache, readFullAppEvidence } from './full-app-ui-storage.mjs'
 
 export const FULL_APP_GROUPS = Object.freeze(['settings', 'projects', 'research', 'editor', 'local-sync-lab'])
 export const FULL_APP_PRODUCT_SOURCE_FILES = Object.freeze([
@@ -34,6 +35,7 @@ export const FULL_APP_VERIFIER_SOURCE_FILES = Object.freeze([
   'scripts/full-app-ui-projects.mjs', 'scripts/full-app-ui-settings.mjs', 'scripts/full-app-ui-offline-settings.mjs', 'scripts/full-app-ui-research.mjs', 'scripts/full-app-ui-main-editor.mjs', 'scripts/full-app-ui-navigation.mjs',
   'scripts/full-app-ui-local-sync-lab.mjs', 'scripts/check-local-sync-lab-desktop.mjs', 'scripts/full-app-ui-local-sync-seed.mjs', 'scripts/full-app-ui-local-sync-seed.node.mjs',
   'scripts/full-app-ui-evidence.mjs', 'scripts/full-app-ui-evidence.node.mjs', 'scripts/full-app-ui-window-worker.ps1',
+  'scripts/full-app-ui-storage.mjs',
   'scripts/full-app-ui-routes.json', 'scripts/ui-screens-product-sources.json',
   'scripts/run-ui-screens-installed.mjs', 'scripts/check-ui-screens-desktop.mjs',
   'scripts/ui-screens-evidence.mjs', 'scripts/ui-screens-evidence.node.mjs', '.github/workflows/local-installation-2f86.yml',
@@ -884,12 +886,15 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const git = (...args) => execFileSync('git', ['-C', root, ...args], { encoding: 'utf8', timeout: 10000 }).trim()
   assert.equal(git('rev-parse', 'HEAD'), process.env.GITHUB_SHA)
   const ledgerBytes = Buffer.from(readFileSync(path.join(root, 'scripts/full-app-ui-routes.json'), 'utf8').replace(/\r\n/g, '\n'))
+  const storageCache = createFullAppEvidenceCache()
   const out = path.join(root, 'test-results/full-app-ui'), reports = FULL_APP_GROUPS.map(group => {
     const directory = path.join(out, group), reportFile = path.join(directory, 'full-app-ui-installed.json')
-    const report = JSON.parse(readFileSync(reportFile)), accepted = JSON.parse(readFileSync(path.join(directory, 'full-app-ui-installed-accepted.json')))
+    const accepted = JSON.parse(readFileSync(path.join(directory, 'full-app-ui-installed-accepted.json')))
+    const loaded = readFullAppEvidence(reportFile, { cache: storageCache, accepted }), report = loaded.report
     assert.equal(accepted.complete, true); assert.equal(accepted.group, group)
-    const bytes = readFileSync(reportFile)
-    assert.deepEqual(accepted.report, { filename: path.basename(reportFile), bytes: bytes.length, sha256: sha(bytes) })
+    assert.deepEqual(accepted.report, loaded.fingerprint)
+    if (loaded.storage) assert.deepEqual(accepted.storage, loaded.storage, 'Accepted manifest and complete evidence-part closure differ')
+    else assert.equal(accepted.storage, undefined, 'Legacy JSON cannot claim a segmented storage receipt')
     assert.equal(report.verifierCommit, process.env.GITHUB_SHA); assert.equal(report.runner.runID, process.env.GITHUB_RUN_ID)
     assert.equal(report.runner.runAttempt, process.env.GITHUB_RUN_ATTEMPT)
     assert.deepEqual(report.ledger, { filename: 'full-app-ui-routes.json', bytes: ledgerBytes.length, sha256: sha(ledgerBytes), canonicalization: 'git-LF' })

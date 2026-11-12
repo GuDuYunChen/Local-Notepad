@@ -18,6 +18,7 @@ import { verifyLocalSyncLabDesktop } from './check-local-sync-lab-desktop.mjs'
 import { prepareLocalSyncLabNotes, seedLocalSyncLab, snapshotLocalSyncLab } from './full-app-ui-local-sync-seed.mjs'
 import { UI_INSTALLED_REGISTRATION_QUERY, validateUiInstalledRegistration, verifyUiScreensFiles } from './ui-screens-evidence.mjs'
 import { FULL_APP_GROUPS, FULL_APP_MATRIX, FULL_APP_PRODUCT_SOURCE_FILES, FULL_APP_RUNTIME_SOURCE_FILES, FULL_APP_VERIFIER_SOURCE_FILES, fullAppProductPageSources, validateFullAppUiLedger, validateFullAppLedgerSourceIdentity, verifyFullAppUiFiles, validateFullAppInstalledReport, validateFullAppPrerequisites, validateNativeWindowResize, validateFullAppFixtureFile, validateLocalSyncLabBackendProcess, validateLocalSyncLabBackendExit } from './full-app-ui-evidence.mjs'
+import { createFullAppEvidenceWriter, fullAppEvidenceFingerprint } from './full-app-ui-storage.mjs'
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url))
 const VERSION = '4.249.0'
@@ -32,7 +33,7 @@ const blob = bytes => createHash('sha1').update('blob ' + Buffer.byteLength(byte
 const readJSON = filename => JSON.parse(readFileSync(filename, 'utf8'))
 const canonical = filename => readFileSync(filename, 'utf8').replace(/\r\n/g, '\n')
 const samePath = (a, b) => path.win32.resolve(a).toLowerCase() === path.win32.resolve(b).toLowerCase()
-const fingerprint = filename => ({ filename: path.basename(filename), bytes: lstatSync(filename).size, sha256: sha(readFileSync(filename)) })
+const fingerprint = fullAppEvidenceFingerprint
 const sourceFingerprint = filename => {
   const bytes = Buffer.from(canonical(filename), 'utf8')
   return { filename: path.basename(filename), bytes: bytes.length, sha256: sha(bytes), canonicalization: 'git-LF' }
@@ -251,13 +252,14 @@ export async function runFullAppUiInstalled({ group, pin, installerPath, origina
     checks: [], screenshots: [], windowSizes: [], commands: [], runtimeErrors: [], fixtureInputs: [], fixtureInputsVerified: false,
     windowHelper: { events: [] }, resizeCommands: [] }
   const reportPath = path.join(out, REPORT)
+  const evidenceStore = createFullAppEvidenceWriter(reportPath, report)
   let app, exited, cdp, windowSession, trace = '', closeRequested = false, uninstalled = false, activeLabBackend
   const liveCommands = new Set()
   const save = () => {
     if (windowSession) report.windowHelper.lifecycle = windowSession.diagnostics()
-    writeFileSync(reportPath, JSON.stringify(report, null, 2) + '\n')
+    evidenceStore.save()
   }
-  writeFileSync(reportPath, JSON.stringify(report, null, 2) + '\n', { flag: 'wx' })
+  evidenceStore.save()
   const cleanEnvironment = { ...process.env }
   for (const key of Object.keys(cleanEnvironment)) if (/TOKEN|SECRET|PASSWORD|CREDENTIAL/i.test(key)) delete cleanEnvironment[key]
   for (const key of ['ELECTRON_RUN_AS_NODE', 'NOTEPAD_DATA', 'PORT']) delete cleanEnvironment[key]
@@ -534,7 +536,7 @@ export async function runFullAppUiInstalled({ group, pin, installerPath, origina
       save()
     }
     const verifyDesktop = group === 'local-sync-lab' ? verifyLocalSyncLabDesktop : verifyFullAppUiDesktop
-    await verifyDesktop({ evaluate, click, cdp, until, api, readAsset, writeFixtureFile, capture, resize, report, save, group,
+    await verifyDesktop({ evaluate, click, cdp, until, api, readAsset, writeFixtureFile, capture, resize, report, save, evidenceStore, group,
       processID: report.pid, applicationIdentity: report.app })
     await verifyFullAppUiFiles(report.fullAppUi, out, ledger)
     assert.deepEqual(report.runtimeErrors, [])
@@ -597,6 +599,7 @@ export async function runFullAppUiInstalled({ group, pin, installerPath, origina
     productCommit: pin.product, productTree: sources.productTree, verifierCommit: process.env.GITHUB_SHA, currentInstaller: pin.current,
     sameOriginallyAcceptedInstalledBytes: true, originalLifecyclePreserved: true,
     scope: report.scope, group, scenes: report.fullAppUi.scenes.map(scene => [scene.routeId, scene.stateId, scene.theme, scene.viewport]), report: fingerprint(reportPath),
+    storage: evidenceStore.receipt(),
     originalThreePages: report.originalThreePages, ledger: report.ledger, runner: report.runner,
     originalInstallation: report.originalInstallation, sourceFiles: report.sourceFiles,
     normalNativeExit: true, cleanupComplete: true, defaultDataUnchanged: true }, null, 2) + '\n', { flag: 'wx' })
