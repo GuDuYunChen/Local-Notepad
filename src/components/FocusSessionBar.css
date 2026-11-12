@@ -139,11 +139,39 @@
     display: none;
   }
 
-  .focus-session-actions button:first-child {
-    display: none;
+  /* Keep both session actions reachable in compact windows. Hiding the
+     first button trapped a focused writer in distraction-free mode until
+     they ended the session, and made its keyboard action unreachable. */
+  .focus-session-actions button {
+    min-width: 0;
+    padding-inline: 5px;
   }
 
   .focus-session-active .editor-shell {
     padding-top: 58px;
+  }
+}
+
+@media (max-width: 480px) {
+  .focus-session-bar {
+    gap: 4px;
+    padding-right: 6px;
+    padding-left: 6px;
+  }
+
+  .focus-session-clock {
+    min-width: 48px;
+  }
+
+  .focus-session-stat {
+    display: none;
+  }
+
+  .focus-session-actions {
+    gap: 2px;
+  }
+
+  .focus-session-actions button {
+    padding-inline: 4px;
   }
 }
