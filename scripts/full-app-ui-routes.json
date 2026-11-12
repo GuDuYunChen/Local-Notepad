@@ -3,8 +3,8 @@
   "scope": "installed-actual-app-page-matrix",
   "sourceScope": "control-source entry coverage with declared states; not every possible failure combination",
   "productSource": {
-    "commit": "89f444e99ad91309b7727e55f76bbb96cdc32e41",
-    "tree": "8258eb5b6a8ea65495d058a896e77186aa88ab4c",
+    "commit": "bd1ff71e79993c6576cddeb004ab656cc8750487",
+    "tree": "d84fbc923790ebeb7c359faa6363bfeea5f0432a",
     "dirty": false
   },
   "inventory": {
@@ -3216,9 +3216,9 @@
     },
     {
       "file": "src/components/ProjectStructurePanel.jsx",
-      "bytes": 37241,
-      "sha256": "5633d4fec4196d38d49a73317520731e35801978268d01a70d48c135c9418753",
-      "blob": "73201073b79ed95944c05a749b4a845bb9cec96b",
+      "bytes": 37278,
+      "sha256": "59490f4117cc2f0cd959d98fc631d10e5b57fcc035ccbd06b9dbe2d52058a97f",
+      "blob": "b500b12bf8f09a12162044253cb2c9f35e69f46a",
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [

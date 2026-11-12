@@ -951,6 +951,7 @@ export default function ProjectStructurePanel({
                   <UiButton
                     key={chapter.id}
                     type="button"
+                    layout="content"
                     className={
                       'project-story-node status-' + chapter.status +
                       ' word-' + chapter.wordBand +
