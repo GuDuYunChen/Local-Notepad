@@ -831,7 +831,7 @@ test('a fitting popup frame still permits a longer internally scrolling option l
 })
 
 import { filterNavigationLibrary, prepareNavigationNoteSelection, verifyNavigationPages } from './full-app-ui-navigation.mjs'
-import { createFullAppUiShared, observeFullAppPage } from './full-app-ui-shared.mjs'
+import { createFullAppUiShared, observeFullAppPage, withinActualClientPort, viewportFixedClipBoundary, measureFullAppScrollCoverage } from './full-app-ui-shared.mjs'
 
 
 // Native wrapped labels can occupy two separate painted lines. Their union's
@@ -1055,6 +1055,91 @@ test('a failed or untrusted corrective expansion is preserved and cannot become 
     assert.equal(f.clicks.length, 1); assert.equal(f.report.fullAppUi.navigationReadiness[0].complete, false)
     assert.equal(f.report.fullAppUi.navigationReadiness[0].correctiveExpansion.complete, false)
   }
+})
+
+
+test('fixed modal scroll photographs its complete visible content without inheriting unrelated ancestor clipping', () => {
+  // Synthetic DOM geometry matching the 704x455 Windows template-picker
+  // failure. The real PNGs show its header and last tile, but the previous
+  // observer counted hidden overflow on an ancestor behind the fixed overlay.
+  const rect = (left, top, width, height) => ({ left, top, right: left + width, bottom: top + height, width, height })
+  const nodes = []
+  const make = (tag, box, parent = null) => {
+    const node = { tagName: tag.toUpperCase(), localName: tag, namespaceURI: 'http://www.w3.org/1999/xhtml',
+      id: '', className: '', isConnected: true, parentElement: parent, children: [], dataset: {},
+      box, clientLeft: 0, clientTop: 0, clientWidth: box.width, clientHeight: box.height,
+      scrollWidth: box.width, scrollHeight: box.height, scrollTop: 0, innerText: '',
+      css: { display: 'block', visibility: 'visible', opacity: '1', position: 'static',
+        overflowX: 'visible', overflowY: 'visible', contain: 'none', contentVisibility: 'visible' },
+      getBoundingClientRect() { return { ...this.box } },
+      getClientRects() { return [this.box] },
+      contains(other) { return other === this || this.children.some(child => child.contains(other)) },
+      matches(selector) { return selector.split(',').some(part => {
+        const key = part.trim()
+        return key === '*' || (key.startsWith('.') ? this.className.split(' ').includes(key.slice(1)) : key === this.localName)
+      }) },
+      querySelectorAll(selector) { return nodes.filter(other => other !== this && this.contains(other) && other.matches(selector)) },
+    }
+    parent?.children.push(node); nodes.push(node); return node
+  }
+  const viewport = rect(0, 0, 704, 455)
+  const html = make('html', viewport)
+  const body = make('body', viewport, html)
+  const behind = make('main', rect(0, 181, 704, 200), body)
+  behind.css.overflowY = 'hidden'
+  const overlay = make('div', viewport, behind)
+  const surface = make('section', rect(16, 20, 672, 415), overlay)
+  surface.className = 'template-selector'
+  surface.css.overflowY = 'auto'
+  surface.clientHeight = 413
+  surface.scrollHeight = 735
+  const document = {
+    documentElement: html, body,
+    querySelectorAll(selector) { return nodes.filter(node => node.matches(selector)) },
+  }
+  const readViewport = {
+    bounds: viewport, record: {}, isViewportScroller: () => false, propagated: () => false,
+    local: (_node, css) => ({ x: css.overflowX, y: css.overflowY }),
+  }
+  const globals = { document, readViewport, innerWidth: 704, innerHeight: 455, devicePixelRatio: 1,
+    getComputedStyle: node => node.css }
+  const expression = '(' + observeFullAppPage.toString() + ')({root:".template-selector"},' +
+    withinActualClientPort.toString() + ',()=>readViewport,' + viewportFixedClipBoundary.toString() + ')'
+  const read = () => {
+    const sample = runInNewContext(expression, globals)
+    const actual = sample.scrollAreas.find(item => item.selector === '.template-selector')
+    assert.ok(actual)
+    return JSON.parse(JSON.stringify(actual))
+  }
+  overlay.css.position = 'fixed'
+  const first = read()
+  assert.deepEqual([first.requiredContentStart, first.requiredContentEnd], [0, 735])
+  assert.deepEqual([first.visibleContentStart, first.visibleContentEnd], [0, 413])
+  assert.deepEqual([first.rangeStart, first.rangeEnd], [0, 322])
+  surface.scrollTop = 322
+  const last = read()
+  assert.deepEqual([last.visibleContentStart, last.visibleContentEnd], [322, 735])
+  const images = [{ filename: 'fixed-first.png' }, { filename: 'fixed-last.png' }]
+  const samples = images.flatMap((image, index) => ['before-capture', 'after-capture'].map(phase => ({
+    phase, image: image.filename, scrollAreas: [index === 0 ? first : last],
+  })))
+  const covered = measureFullAppScrollCoverage(first, samples, images)
+  assert.equal(covered.complete, true)
+  assert.deepEqual(covered.gaps, [])
+
+  // An ordinary modal and a fixed modal trapped by a transformed ancestor
+  // still inherit the real clipping port. Neither can claim full coverage.
+  surface.scrollTop = 0
+  overlay.css.position = 'absolute'
+  const ordinary = read()
+  assert.deepEqual([ordinary.visibleContentStart, ordinary.visibleContentEnd], [161, 361])
+  overlay.css.position = 'fixed'
+  behind.css.transform = 'translateZ(0)'
+  const contained = read()
+  assert.deepEqual([contained.visibleContentStart, contained.visibleContentEnd], [161, 361])
+  assert.equal(measureFullAppScrollCoverage(ordinary,
+    ['before-capture', 'after-capture'].map(phase => ({ phase, image: 'clipped.png', scrollAreas: [ordinary] })),
+    [{ filename: 'clipped.png' }]).complete, false)
 })
 
 function serializedSweepContract(root, matrix) {

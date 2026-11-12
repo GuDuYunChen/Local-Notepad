@@ -270,12 +270,19 @@ export function observeFullAppPage({ root, anchors = [], editorExceptions = [], 
     const requiredContentStart = ancestor ? Math.max(0, Math.min(owner.scrollHeight, owner.scrollTop + page.top - contentTop)) : 0
     const requiredContentEnd = ancestor ? Math.max(requiredContentStart, Math.min(owner.scrollHeight, owner.scrollTop + page.bottom - contentTop)) : owner.scrollHeight
     let visibleTop = Math.max(0, contentTop), visibleBottom = Math.min(viewport.bottom, contentTop + clientHeight)
+    // Fixed-position overlays escape ordinary ancestor overflow unless a
+    // transform/contain-created fixed containing block makes that clip real.
+    // Apply the same boundary already used for native control observations;
+    // keep every actual viewport and in-boundary client-port gate intact.
+    const fixedBoundary = fixedBoundaryFor(owner)
+    let beyondFixed = fixedBoundary === owner
     for (let parent = owner.parentElement; parent; parent = parent.parentElement) {
       const clipCss = getComputedStyle(parent), applied = overflowViewport.local(parent, clipCss)
-      if (/hidden|auto|scroll|clip/.test(applied.y)) {
+      if (!beyondFixed && /hidden|auto|scroll|clip/.test(applied.y)) {
         const clip = bounds(parent), top = clip.top + parent.clientTop
         visibleTop = Math.max(visibleTop, top); visibleBottom = Math.min(visibleBottom, top + parent.clientHeight)
       }
+      if (parent === fixedBoundary) beyondFixed = true
     }
     // Native scroll offsets can be quantized while CSS boxes are fractional.
     // Request outward integer endpoints using the actual clipped client port;
