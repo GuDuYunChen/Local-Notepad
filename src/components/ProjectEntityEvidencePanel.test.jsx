@@ -170,3 +170,23 @@ describe('entity body evidence browser', () => {
     expect(uiDisabled(byLabel('打开证据章节 第1章'))).toBe(true);
   });
 });
+
+
+describe('actual entity chooser empty-selection ownership', () => {
+  it('keeps a manually cleared choice empty while retaining initial default and next-project recovery', async () => {
+    const data = fixture(2)
+    const renderPanel = workspace => <ProjectEntityIntelligencePanel
+      workspace={workspace} projectIndexes={data.indexes} projectMeta={data.meta} />
+    await act(async () => root.render(renderPanel(data.workspace)))
+    expect(uiValue(byLabel('选择实体别名对象'))).toBe('index:char-a')
+    await change(byLabel('选择实体别名对象'), '')
+    expect(uiValue(byLabel('选择实体别名对象'))).toBe('')
+    expect(uiQuery(container, '.project-entity-alias-empty')).toBeTruthy()
+    await change(byLabel('选择实体别名对象'), 'index:char-b')
+    expect(uiValue(byLabel('选择实体别名对象'))).toBe('index:char-b')
+    await change(byLabel('选择实体别名对象'), '')
+    expect(uiValue(byLabel('选择实体别名对象'))).toBe('')
+    await act(async () => root.render(renderPanel({ ...data.workspace, project: { id: 'p2' } })))
+    expect(uiValue(byLabel('选择实体别名对象'))).toBe('index:char-a')
+  })
+})

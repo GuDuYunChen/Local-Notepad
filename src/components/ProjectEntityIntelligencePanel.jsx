@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from '~/services/toast'
 import { buildProjectEntityIntelligence } from './projectEntityIntelligenceUtils'
 import { getProjectRelationEntityTypes } from './projectRelationsUtils'
@@ -29,6 +29,8 @@ export default function ProjectEntityIntelligencePanel({
     () => evidenceReview.getReturn(workspace?.project?.id)?.entityId || '',
   )
   const [aliasDraft, setAliasDraft] = useState('')
+  // An explicit '选择实体' action differs from an uninitialized or removed entity.
+  const manuallyClearedEntity = useRef({ active: false, projectId: null })
   const [heatmapLimit, setHeatmapLimit] = useState(12)
 
   const entityTypes = useMemo(() => getProjectRelationEntityTypes(), [])
@@ -50,6 +52,7 @@ export default function ProjectEntityIntelligencePanel({
     const returning = evidenceReview.getReturn(workspace?.project?.id)
     if (returning) {
       if (intelligence.entityById.has(returning.entityId)) {
+        manuallyClearedEntity.current = { active: false, projectId: null }
         setSelectedEntityId(returning.entityId)
         return
       }
@@ -62,6 +65,8 @@ export default function ProjectEntityIntelligencePanel({
     ) {
       return
     }
+    if (!selectedEntityId && manuallyClearedEntity.current.active &&
+      manuallyClearedEntity.current.projectId === workspace?.project?.id) return
     setSelectedEntityId(
       intelligence.entities.find(entity => entity.chapterCount > 0)?.id ||
       intelligence.entities[0]?.id ||
@@ -188,6 +193,7 @@ export default function ProjectEntityIntelligencePanel({
           <UiSelect
             value={selectedEntityId}
             onChange={event => {
+              manuallyClearedEntity.current = { active: event.target.value === '', projectId: workspace?.project?.id }
               setSelectedEntityId(event.target.value)
               setAliasDraft('')
             }}
