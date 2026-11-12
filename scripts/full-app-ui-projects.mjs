@@ -237,7 +237,7 @@ export async function prepareEvidenceReviewFocusOrigin(evaluate) {
     const bar = document.querySelector('.evidence-review-bar')
     const anchor = bar?.querySelector('.evidence-review-actions button[aria-pressed]')
     const target = bar?.querySelector('.evidence-review-return')
-    const editor = document.querySelector('.editor-input [contenteditable="true"]')
+    const editor = document.querySelector('.editor-input[contenteditable="true"]')
     if (!bar || !anchor || !target || !editor || !editor.isConnected ||
         anchor.disabled || target.disabled || !anchor.isConnected ||
         !(anchor.compareDocumentPosition(target) & Node.DOCUMENT_POSITION_FOLLOWING)) {

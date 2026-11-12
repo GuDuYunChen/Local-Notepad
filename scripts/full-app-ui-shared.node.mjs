@@ -1265,18 +1265,18 @@ test('successful Tab focus keeps its original receipt and adds no failure observ
 })
 
 test('review toolbar origin keeps the editor mounted and requires an enabled preceding control', async t => {
-  const dom = new ProjectSetupDOM('<div class="editor-input"><div role="textbox" contenteditable="true" tabindex="0">source</div></div><section class="evidence-review-bar"><div class="evidence-review-actions"><button>previous</button><button aria-pressed="false">mark</button><button class="evidence-review-return">return</button></div></section>', { runScripts: 'outside-only' })
+  const dom = new ProjectSetupDOM('<div class="editor-input" role="textbox" contenteditable="true" tabindex="0">source</div><section class="evidence-review-bar"><div class="evidence-review-actions"><button>previous</button><button aria-pressed="false">mark</button><button class="evidence-review-return">return</button></div></section>', { runScripts: 'outside-only' })
   t.after(() => dom.window.close())
   const editor = dom.window.document.querySelector('[role="textbox"]')
   editor.focus(); assert.equal(dom.window.document.activeElement, editor)
-  const result = await prepareEvidenceReviewFocusOrigin(source => dom.window.eval(source))
+  const result = await prepareEvidenceReviewFocusOrigin(source => JSON.parse(JSON.stringify(dom.window.eval(source))))
   assert.deepEqual(result, { method: 'bounded-review-toolbar-origin', focused: true, editorRetained: true, targetAvailable: true })
   assert.equal(dom.window.document.activeElement, dom.window.document.querySelector('[aria-pressed]'))
   assert.equal(editor.isConnected, true)
 })
 
 test('review toolbar origin refuses missing, disabled, and reordered targets without changing the assertion', async t => {
-  const html = '<div class="editor-input"><div role="textbox" contenteditable="true"></div></div><section class="evidence-review-bar"><div class="evidence-review-actions"><button aria-pressed="false">mark</button><button class="evidence-review-return">return</button></div></section>'
+  const html = '<div class="editor-input" role="textbox" contenteditable="true"></div><section class="evidence-review-bar"><div class="evidence-review-actions"><button aria-pressed="false">mark</button><button class="evidence-review-return">return</button></div></section>'
   for (const mutate of [
     doc => doc.querySelector('[aria-pressed]').disabled = true,
     doc => doc.querySelector('.evidence-review-return').disabled = true,
