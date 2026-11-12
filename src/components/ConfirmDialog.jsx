@@ -35,6 +35,17 @@ export default function ConfirmDialog({ title, message, actions, onClose }) {
         aria-modal="true"
         aria-labelledby="consumer-confirm-title"
         aria-describedby={descriptionId}
+        onKeyDown={(event) => {
+          if (event.key !== 'Tab' || isAnyLoading) return
+          const buttons = [...event.currentTarget.querySelectorAll('button:not(:disabled)')]
+          if (buttons.length === 0) return
+          const activeIndex = buttons.indexOf(document.activeElement)
+          const nextIndex = activeIndex < 0
+            ? (event.shiftKey ? buttons.length - 1 : 0)
+            : (activeIndex + (event.shiftKey ? -1 : 1) + buttons.length) % buttons.length
+          event.preventDefault()
+          buttons[nextIndex].focus()
+        }}
       >
         <div className="consumer-modal-heading">
           <div className="modal-title" id="consumer-confirm-title">{title}</div>
