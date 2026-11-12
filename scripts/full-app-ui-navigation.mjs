@@ -383,7 +383,7 @@ export async function verifyNavigationPages(ctx) {
   await shot('nav-graph', 'populated', ['.local-graph [aria-label="搜索知识图谱中的笔记"]', '.local-graph-stats'], [fixture.marker])
   await shared.select('.local-graph [aria-label="图谱关系范围"]', { routeId: 'nav-graph', stateId: 'scope-popup', value: 'connected', restore: true })
   await click(graphRow); await textVisible('.local-graph-detail', fixture.primary.title)
-  await shot('nav-graph', 'selected', ['.local-graph-detail h3', '.local-graph-detail button:first-of-type'], [fixture.reference.title, fixture.primary.title])
+  await shot('nav-graph', 'selected', ['.local-graph-detail h3', '.local-graph-detail > button:first-of-type'], [fixture.reference.title, fixture.primary.title])
   await button('.local-graph-detail', '查看一跳关联'); await textVisible('.local-graph-stats', '聚焦一跳关系')
   await shot('nav-graph', 'one-hop', ['.local-graph-stats', '.local-graph-detail h3'], ['聚焦一跳关系'])
   await button('.local-graph', '清除筛选'); await present('.local-graph svg [data-graph-node-id]')

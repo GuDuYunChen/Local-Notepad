@@ -1303,3 +1303,21 @@ test('review toolbar origin refuses missing, disabled, and reordered targets wit
     await assert.rejects(() => prepareEvidenceReviewFocusOrigin(source => dom.window.eval(source)), /Review focus origin/)
   }
 })
+
+
+test('graph selected screenshot uses only the direct detail button', t => {
+  const source = readProjectSetupSource(new URL('./full-app-ui-navigation.mjs', import.meta.url), 'utf8')
+  const direct = '.local-graph-detail > button:first-of-type'
+  assert.ok(source.includes("await shot('nav-graph', 'selected', ['.local-graph-detail h3', '" + direct + "']"),
+    'The real selected route must retain the unique direct control anchor')
+  const dom = new ProjectSetupDOM('<section class="local-graph-detail"><h3>选中笔记</h3><button>打开选中笔记</button><button>查看一跳关联</button><ul><li><button>引用了：相邻笔记一</button></li><li><button>引用了：相邻笔记二</button></li></ul></section>', { runScripts: 'outside-only' })
+  t.after(() => dom.window.close())
+  const document = dom.window.document
+  assert.equal(document.querySelectorAll('.local-graph-detail button:first-of-type').length, 3,
+    'The original descendant selector must be demonstrably ambiguous when neighbors exist')
+  const matched = [...document.querySelectorAll(direct)]
+  assert.equal(matched.length, 1, 'The required image anchor cannot accept a neighbor action')
+  assert.equal(matched[0].textContent, '打开选中笔记')
+  assert.equal(document.querySelectorAll('.local-graph-detail > button').length, 2,
+    'Retain both direct user actions in their original order')
+})
