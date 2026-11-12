@@ -4,6 +4,27 @@
 .review-compare-selectors, .review-compare-sides, .review-compare-provenance { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .review-archive-comparison .review-compare-selectors label, .review-archive-comparison .review-compare-filters label { display: flex; flex-direction: column; align-items: stretch; min-width: 0; gap: 6px; }
 .review-compare-selectors select { width: 100%; min-width: 0; text-overflow: ellipsis; }
+/* Actual archive selectors use ControlKit's inline-flex AntD host, not native
+   <select>. A long selected archive label must not grow the host/dropdown past
+   the narrow application viewport after a real pointer selection. */
+.review-compare-selectors .app-ui-select-host {
+  display: flex;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+.review-compare-selectors .app-ui-select-host > .app-ui-select {
+  flex: 1 1 auto;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+.review-compare-selectors .app-ui-select-host .ant-select-selection-item {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .review-compare-actions, .review-compare-filters { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0; }
 .review-compare-filters label { flex: 1 1 170px; }
 .review-compare-filters input { min-width: 0; width: 100%; box-sizing: border-box; }
