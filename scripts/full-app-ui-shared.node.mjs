@@ -268,7 +268,7 @@ function overflowFixture() {
 function serializedOverflowObservation(fixture, kind) {
   const helper = viewportObservers.observeFullAppOverflowViewport.toString(), port = withinActualClientPort.toString()
   const source = kind === 'page'
-    ? `(${viewportObservers.observeFullAppPage.toString()})({root:'.actual-page',anchors:['#control']},${port},${helper})`
+    ? `(()=>{const collectFullAppScrollOwners=${collectFullAppScrollOwners.toString()};return (${viewportObservers.observeFullAppPage.toString()})({root:'.actual-page',anchors:['#control']},${port},${helper});})()`
     : `(${viewportObservers.observeFullAppFocus.toString()})('#control',()=>false,${port},${helper})`
   return JSON.parse(JSON.stringify(runInNewContext(source, fixture.globals)))
 }
@@ -320,8 +320,8 @@ test('transparent project checkbox keeps its native field and measures only the 
   f.control.nextElementSibling = mark
   f.document.elementFromPoint = () => mark
   const observe = () => JSON.parse(JSON.stringify(runInNewContext(
-    '(' + viewportObservers.observeFullAppPage.toString() + ')({root:".actual-page",anchors:[]},' +
-      withinActualClientPort.toString() + ',' + viewportObservers.observeFullAppOverflowViewport.toString() + ')', f.globals)))
+    '(()=>{const collectFullAppScrollOwners=' + collectFullAppScrollOwners.toString() + ';return (' + viewportObservers.observeFullAppPage.toString() + ')({root:".actual-page",anchors:[]},' +
+      withinActualClientPort.toString() + ',' + viewportObservers.observeFullAppOverflowViewport.toString() + ');})()', f.globals)))
   const first = observe(), control = first.controls[0]
   assert.equal(first.controls.length, 1)
   assert.equal(control.kind, 'input')
@@ -545,7 +545,7 @@ function nativeDetailsFixture() {
   return { ...f, details, summary, summaryControl, summaryLabel, content, move, open, setPaintedTargets }
 }
 function serializedDetailsPage(f, anchors = ['#details-summary']) {
-  const code = `(${viewportObservers.observeFullAppPage.toString()})(${JSON.stringify({ root: '.actual-page', anchors })},${withinActualClientPort.toString()},${viewportObservers.observeFullAppOverflowViewport.toString()})`
+  const code = `(()=>{const collectFullAppScrollOwners=${collectFullAppScrollOwners.toString()};return (${viewportObservers.observeFullAppPage.toString()})(${JSON.stringify({ root: '.actual-page', anchors })},${withinActualClientPort.toString()},${viewportObservers.observeFullAppOverflowViewport.toString()});})()`
   return JSON.parse(JSON.stringify(runInNewContext(code, f.globals)))
 }
 
@@ -786,7 +786,7 @@ function observeFixedModal(f, kind) {
   const port = withinActualClientPort.toString(), overflow = viewportObservers.observeFullAppOverflowViewport.toString()
   const fixed = viewportObservers.viewportFixedClipBoundary.toString()
   const code = kind === 'page'
-    ? `(${viewportObservers.observeFullAppPage.toString()})({root:'.actual-page',anchors:['#control']},${port},${overflow},${fixed})`
+    ? `(()=>{const collectFullAppScrollOwners=${collectFullAppScrollOwners.toString()};return (${viewportObservers.observeFullAppPage.toString()})({root:'.actual-page',anchors:['#control']},${port},${overflow},${fixed});})()`
     : `(${viewportObservers.observeFullAppFocus.toString()})('#control',()=>true,${port},${overflow},${fixed})`
   return JSON.parse(JSON.stringify(runInNewContext(code, f.globals)))
 }

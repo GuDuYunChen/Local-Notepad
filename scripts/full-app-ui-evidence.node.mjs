@@ -848,7 +848,7 @@ test('a fitting popup frame still permits a longer internally scrolling option l
 })
 
 import { filterNavigationLibrary, prepareNavigationNoteSelection, verifyNavigationPages } from './full-app-ui-navigation.mjs'
-import { createFullAppUiShared, observeFullAppPage, viewportFixedClipBoundary, measureFullAppScrollCoverage } from './full-app-ui-shared.mjs'
+import { createFullAppUiShared, observeFullAppPage, collectFullAppScrollOwners, viewportFixedClipBoundary, measureFullAppScrollCoverage } from './full-app-ui-shared.mjs'
 
 
 // Native wrapped labels can occupy two separate painted lines. Their union's
@@ -890,9 +890,9 @@ test('native anchor observation accepts wrapped painted fragments but refuses an
   }
   const globals = { document, innerWidth: 704, innerHeight: 455, devicePixelRatio: 1,
     getComputedStyle: () => ({ display: 'block', visibility: 'visible', opacity: '1', overflowX: 'visible', overflowY: 'visible' }) }
-  const expression = '(' + observeFullAppPage.toString() + ')({root: ".contract-reading", anchors: ["#contract-title"]},' +
+  const expression = '(()=>{const collectFullAppScrollOwners=' + collectFullAppScrollOwners.toString() + ';return (' + observeFullAppPage.toString() + ')({root: ".contract-reading", anchors: ["#contract-title"]},' +
     '()=>true,()=>({bounds:{left:0,top:0,right:704,bottom:455,width:704,height:455},' +
-    'local:()=>({x:"visible",y:"visible"}),propagated:()=>false,isViewportScroller:()=>false,record:{}}))'
+    'local:()=>({x:"visible",y:"visible"}),propagated:()=>false,isViewportScroller:()=>false,record:{}}));})()'
   const originalCentre = rect(70, 56, 298, 40)
   assert.notEqual(document.elementFromPoint(originalCentre.left + originalCentre.width / 2, originalCentre.top + originalCentre.height / 2), label)
   const visible = runInNewContext(expression, globals)
@@ -1120,8 +1120,8 @@ test('fixed modal scroll photographs its complete visible content without inheri
   }
   const globals = { document, readViewport, innerWidth: 704, innerHeight: 455, devicePixelRatio: 1,
     getComputedStyle: node => node.css }
-  const expression = '(' + observeFullAppPage.toString() + ')({root:".template-selector"},' +
-    withinActualClientPort.toString() + ',()=>readViewport,' + viewportFixedClipBoundary.toString() + ')'
+  const expression = '(()=>{const collectFullAppScrollOwners=' + collectFullAppScrollOwners.toString() + ';return (' + observeFullAppPage.toString() + ')({root:".template-selector"},' +
+    withinActualClientPort.toString() + ',()=>readViewport,' + viewportFixedClipBoundary.toString() + ');})()'
   const read = () => {
     const sample = runInNewContext(expression, globals)
     const actual = sample.scrollAreas.find(item => item.selector === '.template-selector')
@@ -1212,7 +1212,7 @@ function serializedSweepContract(root, matrix) {
   const globals = { document, innerWidth: matrix.viewport.width, innerHeight: matrix.viewport.height, devicePixelRatio: 1,
     getComputedStyle: node => node.css, requestAnimationFrame: callback => callback() }
   return { evaluate: async expression => {
-    if (expression.startsWith('(()=>{const page=')) {
+    if (expression.startsWith('(()=>{const collectFullAppScrollOwners=' + collectFullAppScrollOwners.toString() + ';const page=')) {
       pageReads++
       // Model a changed clipped position between the initial surface list and
       // the producer's fresh read. Every sample is still the actual serialized

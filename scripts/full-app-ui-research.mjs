@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
 import { desktopNote } from './desktop-save-fixture.mjs'
-import { observeFullAppPage, observeFullAppOverflowViewport, withinActualClientPort, viewportFixedClipBoundary, validateFullAppPageSample } from './full-app-ui-shared.mjs'
+import { observeFullAppPage, collectFullAppScrollOwners, observeFullAppOverflowViewport, withinActualClientPort, viewportFixedClipBoundary, validateFullAppPageSample } from './full-app-ui-shared.mjs'
 
 // Real installed Search, collections and research UI. Only prepareResearch
 // creates owned fixtures; all local records are created by their actual UI.
@@ -65,8 +65,8 @@ export async function verifyResearchShellReachability(ctx, receipt) {
   const { evaluate, shared, matrix, save } = ctx
   Object.assign(receipt, { matrix, observationOnly: true, complete: false, restored: false })
   receipt.before = await evaluate(`(${researchShellScrollState.toString()})()`); save()
-  const read = () => evaluate(`(${observeFullAppPage.toString()})(${q({ root: '.global-search-header',
-    anchors: ['#global-search-title', '[aria-label="关闭全局检索"]'] })},${withinActualClientPort.toString()},${observeFullAppOverflowViewport.toString()},${viewportFixedClipBoundary.toString()})`)
+  const read = () => evaluate(`(()=>{const collectFullAppScrollOwners=${collectFullAppScrollOwners.toString()};return (${observeFullAppPage.toString()})(${q({ root: '.global-search-header',
+    anchors: ['#global-search-title', '[aria-label="关闭全局检索"]'] })},${withinActualClientPort.toString()},${observeFullAppOverflowViewport.toString()},${viewportFixedClipBoundary.toString()});})()`)
   let failed = false
   try {
     await shared.ensureVisible('.global-search-header')
