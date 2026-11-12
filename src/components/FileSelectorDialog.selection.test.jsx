@@ -114,3 +114,22 @@ it('can close and reopen with initial folder selection without changing hook ord
   await render({ initialSelectedIds: ['root'] });await expandAll();
   expect(checkbox('取消的笔记').checked).toBe(true);expect(checkbox('主目录').checked).toBe(true);
 });
+
+it('keeps leaf toggle space noninteractive while retaining real folder expansion and note selection', async () => {
+  await render();
+  expect(row('主目录').querySelectorAll('button.selector-tree-toggle')).toHaveLength(1);
+  await expand('主目录');await expand('子目录');
+  const leaf = row('取消的笔记');
+  expect(leaf).toBeTruthy();
+  expect(leaf.querySelector('button.selector-tree-toggle')).toBeNull();
+  const spacer = leaf.querySelector('span.selector-tree-spacer[aria-hidden="true"]');
+  expect(spacer).toBeTruthy();
+  expect(spacer.style.width).toBe('32px');
+  expect(spacer.style.height).toBe('28px');
+  expect(spacer.tabIndex).toBe(-1);
+  expect(checkbox('取消的笔记').checked).toBe(false);
+  await click(checkbox('取消的笔记'));
+  expect(checkbox('取消的笔记').checked).toBe(true);
+  await click(button('确定'));
+  expect(confirm).toHaveBeenLastCalledWith(['a'], ['a']);
+});
