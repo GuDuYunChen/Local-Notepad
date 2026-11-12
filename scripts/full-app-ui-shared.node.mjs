@@ -973,7 +973,8 @@ test('research shell failure preserves the original geometry error when restorat
 // These are setup-driver contracts, not installed-app or trusted-input evidence.
 // Run the real DOM inspector/choice driver and the runner's unchanged until body
 // with a monotonic fixture clock, preserving its full 15000 ms / 100 ms budget.
-const { chooseProjectSetupAlias, prepareEvidenceReviewFocusOrigin } = await import('./full-app-ui-projects.mjs')
+const { chooseProjectSetupAlias, prepareEvidenceReviewFocusOrigin, prepareProjectFocusSessionTabOrigin } = await import('./full-app-ui-projects.mjs')
+const { editorInsertMenuOutsidePoint } = await import('./full-app-ui-main-editor.mjs')
 const { createNativeUiSelect } = await import('./native-ui-select.mjs')
 const { JSDOM: ProjectSetupDOM } = await import('jsdom')
 const { readFileSync: readProjectSetupSource } = await import('node:fs')
@@ -1304,6 +1305,63 @@ test('review toolbar origin refuses missing, disabled, and reordered targets wit
   }
 })
 
+
+
+// The same actual unoccluded background action must be available even while
+// the table picker covers the toolbar. Rejection fixtures cannot be counted
+// as native Windows acceptance.
+test('editor picker outside target is painted and cannot be an overlay or interactive control', t => {
+  const dom = new ProjectSetupDOM('<div id="background">safe surface</div><section class="toolbar-more-wrap"><div class="toolbar-insert-menu"><div class="product-table-insert-menu"><button>1 x 1</button></div></div></section><button id="foreign">action</button>', { runScripts: 'outside-only' })
+  t.after(() => dom.window.close())
+  const document = dom.window.document
+  const read = () => dom.window.eval('(' + editorInsertMenuOutsidePoint.toString() + ')()')
+  document.elementFromPoint = () => document.querySelector('#background')
+  assert.deepEqual({ ...read() }, { x: dom.window.innerWidth / 2, y: 8 })
+  for (const selector of ['.product-table-insert-menu button', '#foreign']) {
+    document.elementFromPoint = () => document.querySelector(selector)
+    assert.throws(read, /No safe actual background surface/)
+  }
+  document.querySelector('.product-table-insert-menu').remove()
+  assert.throws(read, /picker ownership is missing/)
+})
+
+function focusSessionOriginDOM(t) {
+  const dom = new ProjectSetupDOM('<div class="editor-input" role="textbox" contenteditable="true" tabindex="0">draft</div><div class="focus-session-bar"><div class="focus-session-copy">真实 Session</div><div class="focus-session-actions"><button>显示界面</button><button>结束 Session</button></div></div>', { runScripts: 'outside-only' })
+  t.after(() => dom.window.close())
+  for (const selector of ['.focus-session-copy', '.focus-session-actions > button:first-child']) {
+    dom.window.document.querySelector(selector).getBoundingClientRect = () => ({ width: 90, height: 30 })
+  }
+  return dom
+}
+
+test('project Session focus origin uses one trusted banner pointer before the original full Tab proof', async t => {
+  const dom = focusSessionOriginDOM(t), document = dom.window.document
+  const editor = document.querySelector('.editor-input')
+  editor.focus(); assert.equal(document.activeElement, editor)
+  const clicks = []
+  const result = await prepareProjectFocusSessionTabOrigin({
+    evaluate: source => dom.window.eval(source),
+    click: async selector => { clicks.push(selector); editor.blur() },
+  })
+  assert.deepEqual(clicks, ['.focus-session-copy'])
+  assert.equal(result.method, 'trusted-session-banner-pointer')
+  assert.equal(result.wasEditorOwned, true)
+  assert.equal(result.editorOwnsFocus, false)
+  assert.equal(result.targetAvailable, true)
+  const verifier = readProjectSetupSource(new URL('./full-app-ui-projects.mjs', import.meta.url), 'utf8')
+  assert.ok(verifier.includes("await shared.focus('.focus-session-actions > button:first-child', { routeId: 'projects-focus-session', stateId: 'focused' })"),
+    'The original full reverse/forward keyboard focus assertion must remain')
+})
+
+test('project Session focus origin refuses missing action and still-editor-owned Tab state', async t => {
+  const dom = focusSessionOriginDOM(t), document = dom.window.document
+  const editor = document.querySelector('.editor-input')
+  const context = { evaluate: source => dom.window.eval(source), click: async () => {} }
+  editor.focus()
+  await assert.rejects(prepareProjectFocusSessionTabOrigin(context), /did not release editor Tab indentation/)
+  document.querySelector('.focus-session-actions > button:first-child').disabled = true
+  await assert.rejects(prepareProjectFocusSessionTabOrigin(context), /return action is unavailable/)
+})
 
 test('graph selected screenshot uses only the direct detail button', t => {
   const source = readProjectSetupSource(new URL('./full-app-ui-navigation.mjs', import.meta.url), 'utf8')
