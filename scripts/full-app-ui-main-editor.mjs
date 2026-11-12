@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { exactTitleSearchResultIndex } from './full-app-ui-owned-search.mjs'
 import { createHash, randomUUID } from 'node:crypto'
 import { navigationRoutes, prepareNavigation, verifyNavigationPages } from './full-app-ui-navigation.mjs'
 import { desktopNote } from './desktop-save-fixture.mjs'
@@ -142,11 +143,19 @@ export async function verifyMainEditorPages(ctx) {
     await clean(); await closeInspector(); await shared.openSearch(); await hit('#search-tab-search')
     await press('.global-search-filters', '重置')
     await shared.text('[aria-label="全局检索关键词"]', note.title)
+    // The global search legitimately includes related notes whose *body*
+    // contains this fixture title. Require exactly one result with the exact
+    // visible title, after the real search has settled, not a singleton list.
+    const ownedSearchIndex = () => evaluate(`(() => {
+      if (document.querySelector('.global-search-content')?.getAttribute('aria-busy') !== 'false') return -1
+      const titles = [...document.querySelectorAll('.global-search-results > [data-search-result]')].map(row => row.querySelector('.global-search-result-title')?.textContent.trim())
+      return (${exactTitleSearchResultIndex.toString()})(titles, ${q(note.title)})
+    })()`)
     try {
-    await until(() => evaluate(`document.querySelectorAll('[data-search-result]').length===1&&document.querySelector('.global-search-result-title')?.textContent.trim()===${q(note.title)}`), 'Unique owned editor fixture did not appear in actual Search')
+      await until(async () => (await ownedSearchIndex()) >= 0, 'Unique owned editor fixture did not appear in actual Search')
     } catch (error) {
       // Failure-only, read-only diagnostics. Preserve the original exact
-      // search-result predicate, deadline, trusted input and thrown error.
+      // exact-title uniqueness, deadline, trusted input and thrown error.
       const receipt = { expectedId: note.id, expectedTitle: note.title, complete: false }
       ;(ctx.report.fullAppUi.editorSearchFailures ||= []).push(receipt); ctx.save()
       try {
@@ -187,7 +196,15 @@ export async function verifyMainEditorPages(ctx) {
       }
       throw error
     }
-    await hit('[data-search-result]'); await press('.global-search-preview', '打开笔记')
+    const chosenIndex = await ownedSearchIndex()
+    assert.ok(Number.isInteger(chosenIndex) && chosenIndex >= 0, 'Exact owned title became ambiguous before click')
+    const row = `.global-search-results > [data-search-result]:nth-of-type(${chosenIndex + 1})`
+    assert.equal(await evaluate(`document.querySelector(${q(row)})?.querySelector('.global-search-result-title')?.textContent.trim()`),
+      note.title, 'Chosen search row does not belong to the exact owned note')
+    await hit(row)
+    await until(() => evaluate(`document.querySelector('.global-search-preview h3')?.textContent.trim()===${q(note.title)}`),
+      'Exact owned search result did not become the real preview')
+    await press('.global-search-preview', '打开笔记')
     await absent('.global-search-panel')
     await until(() => evaluate(`document.querySelector('.workspace-title-button')?.textContent.trim()===${q(note.title)}&&Boolean(document.querySelector('.editor-input'))&&!document.querySelector('.content.switching')`), 'Selected owned note did not finish loading')
     if (await exists('[aria-label="切换到编辑模式"]')) await hit('[aria-label="切换到编辑模式"]')
