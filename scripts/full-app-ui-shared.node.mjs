@@ -10,7 +10,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { build } from 'esbuild'
 import controlEvidence from './check-ui-control-render.cjs'
 import { COLLAPSED_SIDEBAR_EXPAND, validateCollapsedSidebarObservation } from './full-app-ui-evidence.mjs'
-import { observeFullAppPopup, captureActualFullAppPopup, validateFullAppCaptureContinuity, validateFullAppPageSample, measureFullAppScrollCoverage, createFullAppUiShared, withinActualClientPort, finiteOwnerMotionActive, waitForFiniteOwnerMotion } from './full-app-ui-shared.mjs'
+import { observeFullAppPopup, captureActualFullAppPopup, validateFullAppCaptureContinuity, validateFullAppPageSample, measureFullAppScrollCoverage, collectFullAppScrollOwners, createFullAppUiShared, withinActualClientPort, finiteOwnerMotionActive, waitForFiniteOwnerMotion } from './full-app-ui-shared.mjs'
 import { buildResearchImportFixtures, researchRoutes } from './full-app-ui-research.mjs'
 
 const clone = value => structuredClone(value)
@@ -91,6 +91,19 @@ test('current App selection refuses the historical native-select compatibility p
   await assert.rejects(shared.nativeSelect.choose('select', 'one'), /actual migrated shared Select/)
   assert.deepEqual(calls, ['read'])
 })
+test('viewport-fixed modal sweep excludes background scrollers but keeps genuine nested and contained scrolling', () => {
+  const node = parentElement => ({ parentElement, querySelectorAll: () => [] })
+  const viewport = node(null), background = node(viewport), overlay = node(background)
+  const dialog = node(overlay), nestedScrollport = node(dialog), child = node(nestedScrollport)
+  dialog.querySelectorAll = () => [nestedScrollport, child]
+  const fixed = [...collectFullAppScrollOwners(dialog, () => overlay)]
+  assert.deepEqual(fixed, [dialog, nestedScrollport, child, overlay])
+  assert.ok(!fixed.includes(background) && !fixed.includes(viewport), 'Underlying app scroll panes cannot be claimed by a fixed dialog')
+  assert.deepEqual([...collectFullAppScrollOwners(overlay, () => overlay)], [overlay], 'Fixed root must not sweep background')
+  assert.deepEqual([...collectFullAppScrollOwners(dialog, () => null)],
+    [dialog, nestedScrollport, child, overlay, background, viewport], 'Normal or transformed containing blocks retain real ancestor scrollers')
+})
+
 test('long-page coverage uses actual clipped image intervals, not nominal scroll step or screenshot counts', () => {
   const surface = { selector: '.scroll', clientHeight: 455, scrollHeight: 1100, requiredContentStart: 0, requiredContentEnd: 1100 }
   const fixture = ranges => {

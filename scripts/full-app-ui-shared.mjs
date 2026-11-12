@@ -123,6 +123,21 @@ export async function waitForFiniteOwnerMotion(read, until, receipt = {}) {
 
 // This runs in the real App renderer. It observes existing nodes and CSS; it
 // does not mount a fixture, assign field values or alter application styling.
+// An uncontained viewport-fixed dialog is independent of any scrollable app
+// surface behind its overlay. Keep its own nested scrollports and the fixed
+// boundary, but never sweep ancestors above that boundary as page content.
+export function collectFullAppScrollOwners(area, fixedBoundaryFor = () => null) {
+  const owners = new Set([area, ...area.querySelectorAll('*')])
+  const fixedBoundary = fixedBoundaryFor(area)
+  if (fixedBoundary !== area) {
+    for (let owner = area.parentElement; owner; owner = owner.parentElement) {
+      owners.add(owner)
+      if (owner === fixedBoundary) break
+    }
+  }
+  return owners
+}
+
 export function observeFullAppPage({ root, anchors = [], editorExceptions = [], onlySelectors = [] }, withinClientPort, readOverflowViewport, fixedBoundaryFor = () => null) {
   const overflowViewport = readOverflowViewport(), viewport = overflowViewport.bounds
   const bounds = node => {
@@ -239,8 +254,7 @@ export function observeFullAppPage({ root, anchors = [], editorExceptions = [], 
     if (matches.length !== 1) throw Error('Expected one rendered anchor: ' + target + ' (' + matches.length + ')')
     return { selector: target, ...observe(matches[0], true) }
   })
-  const scrollOwners = new Set([area, ...area.querySelectorAll('*')])
-  for (let owner = area.parentElement; owner; owner = owner.parentElement) scrollOwners.add(owner)
+  const scrollOwners = collectFullAppScrollOwners(area, fixedBoundaryFor)
   const scrollAreas = []
   for (const owner of scrollOwners) {
     const css = getComputedStyle(owner), viewportScrollOwner = overflowViewport.isViewportScroller(owner)
@@ -600,7 +614,7 @@ export function createFullAppUiShared(ctx) {
   }
   const nameFor = (meta, suffix) => `${slug(meta.group)}-${slug(meta.theme)}-${meta.viewport.width}x${meta.viewport.height}-${slug(meta.routeId)}-${slug(meta.stateId)}-${suffix}.png`
   const sidebarFocusExpression = `(${observeCollapsedSidebarFocus.toString()})(${q(COLLAPSED_SIDEBAR_EXPAND)},${observeFullAppFocus.toString()},${hasVisibleBoxShadow.toString()},${withinActualClientPort.toString()},${observeFullAppOverflowViewport.toString()},${viewportFixedClipBoundary.toString()})`
-  const samplePage = (route, root, anchors, onlySelectors = [], sidebarFocusRequired = false) => evaluate(`(()=>{const page=(${observeFullAppPage.toString()})(${q({ root, anchors, onlySelectors, editorExceptions: route.editorExceptions || [] })},${withinActualClientPort.toString()},${observeFullAppOverflowViewport.toString()},${viewportFixedClipBoundary.toString()});${sidebarFocusRequired ? `page.sidebarFocus=${sidebarFocusExpression};` : ''}return page;})()`)
+  const samplePage = (route, root, anchors, onlySelectors = [], sidebarFocusRequired = false) => evaluate(`(()=>{const collectFullAppScrollOwners=${collectFullAppScrollOwners.toString()};const page=(${observeFullAppPage.toString()})(${q({ root, anchors, onlySelectors, editorExceptions: route.editorExceptions || [] })},${withinActualClientPort.toString()},${observeFullAppOverflowViewport.toString()},${viewportFixedClipBoundary.toString()});${sidebarFocusRequired ? `page.sidebarFocus=${sidebarFocusExpression};` : ''}return page;})()`)
   const captureState = async ({ routeId, stateId, root, anchors = [], requiredText = [], allowHorizontalScroll = [], coverageMode = 'route-controls', onlySelectors = [] }) => {
     const route = routeFor(routeId), registeredRoot = route.stateRoots?.[stateId] || route.root
     root ||= registeredRoot
