@@ -9,6 +9,7 @@ import path from 'node:path'
 import { deflateSync } from 'node:zlib'
 import { runInNewContext } from 'node:vm'
 import { ensureNavigationSidebar } from './full-app-ui-navigation.mjs'
+import { projectsRoutes } from './full-app-ui-projects.mjs'
 import { FULL_APP_GROUPS, FULL_APP_MATRIX, FULL_APP_PRODUCT_SOURCE_FILES, FULL_APP_RUNTIME_SOURCE_FILES, FULL_APP_VERIFIER_SOURCE_FILES, fullAppProductPageSources,
   validateFullAppUiLedger, validateFullAppLedgerSourceIdentity, validateFullAppUiEvidence, verifyFullAppUiFiles, validateNativeWindowResize,
   validateFullAppPrerequisites, validateFullAppInstalledReport, validateFullAppUiAggregate, validateFullAppFixtureFile, validateLocalSyncLabLifecycle, validateLocalSyncLabUi,
@@ -317,6 +318,22 @@ test('a portal state uses its exact reviewed root and cannot redefine the route 
     assert.throws(() => validateFullAppUiLedger(altered))
   }
 })
+test('the real storyline diagnostics state keeps its separate visible owner without weakening other roots', () => {
+  const route = projectsRoutes.find(item => item.id === 'projects-storylines')
+  assert.ok(route, 'The original storyline route must remain registered')
+  assert.deepEqual(route.requiredStates, ['selected-track', 'lifecycle', 'diagnostics'])
+  assert.equal(route.root, '.project-storyline-system')
+  assert.deepEqual(route.stateRoots, { diagnostics: '.project-storyline-diagnostics' })
+  const productSource = readFileSync(path.join('src', 'components', 'ProjectStructurePanel.jsx'), 'utf8')
+  assert.match(productSource, /<section className="project-storyline-system"/)
+  assert.match(productSource, /<section className="project-storyline-diagnostics"/)
+  assert.match(productSource, /aria-label="剧情线交叉与节奏诊断"/)
+  const rootFor = state => route.stateRoots?.[state] || route.root
+  assert.equal(rootFor('selected-track'), '.project-storyline-system')
+  assert.equal(rootFor('lifecycle'), '.project-storyline-system')
+  assert.equal(rootFor('diagnostics'), '.project-storyline-diagnostics')
+})
+
 test('ordinary fields cannot impersonate an undeclared editor semantic exception', () => {
   const ledger = ledgerFixture(), route = ledger.groups.projects.routes[0]
   const exception = { selector: '.actual-editor-body', source: route.source, reason: 'The real editor owns this multiline serialized body surface' }
