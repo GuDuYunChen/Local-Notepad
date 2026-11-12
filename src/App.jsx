@@ -180,7 +180,7 @@ export default function App() {
     return () => { window.removeEventListener('editor:heading-navigation-ready', onHeadingNavigationReady); window.removeEventListener('editor:block-navigation-ready', onHeadingNavigationReady) }
   }, [])
 
-  const select = React.useCallback((f) => {
+  const select = React.useCallback((f, { preserveSidebar = false } = {}) => {
     navigationEpoch.current += 1
     pendingEditorNavigationRef.current = null
     if (
@@ -223,7 +223,7 @@ export default function App() {
       wordCount: 0,
     })
     setWorkspace('notes')
-    if (typeof window !== 'undefined' && window.innerWidth <= 720) {
+    if (!preserveSidebar && typeof window !== 'undefined' && window.innerWidth <= 720) {
       setSidebarCollapsed(true)
       localStorage.setItem('sidebarCollapsedV4', 'true')
     }
@@ -901,7 +901,7 @@ export default function App() {
     if (options.shouldSelect?.() === false) { options.onCancel?.(); return }
     const performSelect = () => {
       if (options.shouldSelect?.() === false) { options.onCancel?.(); return }
-      select(f)
+      select(f, { preserveSidebar: options.preserveSidebar === true })
       options.afterSelect?.(f)
     }
 
