@@ -390,11 +390,11 @@ export async function prepareProjectFocusSessionTabOrigin({ evaluate, click }) {
         !banners[0].closest('.focus-session-bar')?.contains(actions[0])) {
       throw Error('Actual Session focus origin or return action is unavailable')
     }
-    return { wasEditorOwned: Boolean(document.activeElement?.isContentEditable), targetAvailable: true }
+    return { wasEditorOwned: Boolean(document.activeElement?.isContentEditable || document.activeElement?.closest?.('[contenteditable="true"]')), targetAvailable: true }
   })()`)
   await click('.focus-session-copy')
   const after = await evaluate(`(() => ({
-    editorOwnsFocus: Boolean(document.activeElement?.isContentEditable),
+    editorOwnsFocus: Boolean(document.activeElement?.isContentEditable || document.activeElement?.closest?.('[contenteditable="true"]')),
     targetAvailable: [...document.querySelectorAll('.focus-session-actions > button:first-child')]
       .filter(button => !button.disabled && button.getBoundingClientRect().width > 0 && button.getBoundingClientRect().height > 0).length === 1
   }))()`)
