@@ -3,13 +3,13 @@
   "scope": "installed-actual-app-page-matrix",
   "sourceScope": "control-source entry coverage with declared states; not every possible failure combination",
   "productSource": {
-    "commit": "bd1ff71e79993c6576cddeb004ab656cc8750487",
-    "tree": "d84fbc923790ebeb7c359faa6363bfeea5f0432a",
+    "commit": "564489b15711ba17c228509a753ca8daa5c78505",
+    "tree": "e9b45a304a2187e4fac57331ee11982d2433d3db",
     "dirty": false
   },
   "inventory": {
     "file": "inventory.json",
-    "sha256": "9f3983e1735b07ed86799bb18b43f52c60c7c4ea89f054f851601278a307fbd4",
+    "sha256": "fd5d75d2b17e089cc2e4ce5c25154b8b7a0f3bbcf5cdfe45416d7c54d0cd1d79",
     "originalDirty": false,
     "currentCodeFilesHashRevalidated": 347,
     "currentControlsFiles": 137
@@ -543,7 +543,10 @@
             "selected-track",
             "lifecycle",
             "diagnostics"
-          ]
+          ],
+          "stateRoots": {
+            "diagnostics": ".project-storyline-diagnostics"
+          }
         },
         {
           "id": "projects-relation-create",
@@ -3352,9 +3355,9 @@
     },
     {
       "file": "src/components/ReferenceRefactorDialog.jsx",
-      "bytes": 8422,
-      "sha256": "646f87738aa3d2154f17afd6c72c91aeaa24602cc29419dee05288d86024ecd8",
-      "blob": "fa568d7d290b018d2d50a3c2b9d799b8c9dffcff",
+      "bytes": 9938,
+      "sha256": "0ae020defa3d96eef4d684da97c90b99c423507a604cb1e1add0ce6f069dd962",
+      "blob": "abeef848c1da2c5672dd15b3990bfddd07792b10",
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [
@@ -3735,9 +3738,9 @@
     },
     {
       "file": "src/components/SyncCenterPanel.jsx",
-      "bytes": 25620,
-      "sha256": "6800f61d8f1d5a0a30fcd0c8c0a6633d9a28e1ccd48b81cad5944846eaf94bec",
-      "blob": "5d064a7e0a5bdce8dafad02927a549c261a7cb32",
+      "bytes": 25661,
+      "sha256": "d045c79d7427c2bb19a91fcbc0f716256a01d67b922ed0b5312946b973ab07f4",
+      "blob": "3797a7a8f0646129dd26220ebc1369c4227aa456",
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [

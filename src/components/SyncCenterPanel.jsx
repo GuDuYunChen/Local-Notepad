@@ -284,7 +284,7 @@ export default function SyncCenterPanel() {
   })
   const editDraft = (field, value) => {
     invalidatePlan()
-    if (field !== 'password') dirty.current[field] = true
+    if (field !== 'password') dirty.current[field] = value !== (settings?.[`sync_${field}`] || '')
     setWebdav(current => ({ ...current, [field]: value }))
     setConnectionCheck(null)
   }
