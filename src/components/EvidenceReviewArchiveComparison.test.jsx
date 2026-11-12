@@ -74,6 +74,23 @@ describe('read-only review archive comparison', () => {
     await compare([pairs[0][0], pairs[2][1]]);
     expect(uiText(panel())).toContain('共同 3 章');
   });
+  it('retains both controlled archive choices for long native option labels', async () => {
+    const longEntityLabel = '第一章 人物与项目开端的长标题'.repeat(8);
+    const pair = savePair(3, { entityLabel: longEntityLabel }, { entityLabel: longEntityLabel });
+    await render();
+    const base = byLabel('对比基准存档');
+    const target = byLabel('对比目标存档');
+    // Both fields must still use the width-constrained real ControlKit host.
+    expect(base.closest('.review-compare-selectors .app-ui-select-host')).toBeTruthy();
+    expect(target.closest('.review-compare-selectors .app-ui-select-host')).toBeTruthy();
+    await change(base, REVIEW_ARCHIVE_PREFIX + pair[0].id);
+    await change(target, REVIEW_ARCHIVE_PREFIX + pair[1].id);
+    expect(uiValue(base)).toBe(REVIEW_ARCHIVE_PREFIX + pair[0].id);
+    expect(uiValue(target)).toBe(REVIEW_ARCHIVE_PREFIX + pair[1].id);
+    expect(uiDisabled(button('开始对比'))).toBe(false);
+    await click(button('开始对比'));
+    expect(uiText(panel())).toContain('共同 3 章');
+  });
   it('excludes a different project or entity and unreadable records from the target selector', async () => {
     const pair = savePair();
     reviewArchives.save(data(3, { entityId: 'else', entityLabel: '同名' }));
