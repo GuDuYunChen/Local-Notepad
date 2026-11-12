@@ -3,13 +3,13 @@
   "scope": "installed-actual-app-page-matrix",
   "sourceScope": "control-source entry coverage with declared states; not every possible failure combination",
   "productSource": {
-    "commit": "f8169da4f7a4f084870996c124283e6b50c79160",
-    "tree": "d4e5d57758e81839b9c967d64be2ef826128214e",
+    "commit": "89f444e99ad91309b7727e55f76bbb96cdc32e41",
+    "tree": "8258eb5b6a8ea65495d058a896e77186aa88ab4c",
     "dirty": false
   },
   "inventory": {
     "file": "inventory.json",
-    "sha256": "bd1d74fb0a1218c1e061bdc70b49848a330ab2ecc972de8f2fb8509326c06e7a",
+    "sha256": "9f3983e1735b07ed86799bb18b43f52c60c7c4ea89f054f851601278a307fbd4",
     "originalDirty": false,
     "currentCodeFilesHashRevalidated": 347,
     "currentControlsFiles": 137
@@ -2116,8 +2116,8 @@
     {
       "file": "src/components/Editor/plugins/DocumentOutlinePlugin.jsx",
       "bytes": 20950,
-      "sha256": "26c55762f9f2bfa217ee55d23ab7e622ec06d9cba23785c89fbf03b44fa58f54",
-      "blob": "8977fff7adea4b770dcec76a5fc596bf6179ef4d",
+      "sha256": "140ccaf27883f93f36cd6da6656b2941a0cb2a7373119a78e623fcac95a0fe09",
+      "blob": "0eebd7649c83f8e19abe453655e649687eded8ef",
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [
@@ -2663,9 +2663,9 @@
     },
     {
       "file": "src/components/FileListMenus.jsx",
-      "bytes": 5940,
-      "sha256": "567f3ef1832b3562a237b26a8bca40f324fbb7f5a63a6638038f789ca5a357bd",
-      "blob": "28d7da0a5049556835f23def8d0c99064e4bfd09",
+      "bytes": 7768,
+      "sha256": "97384125f336b46b735abf5c81aa51f4b0ba451be9057aa4cdd183d5598531a2",
+      "blob": "0828e13c7a386c7706cceecb2e5fee7c6101652e",
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [

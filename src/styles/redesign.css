@@ -1073,7 +1073,6 @@ body {
 
 .calendar-card .calendar-day {
   position: relative;
-  min-height: 46px !important;
   display: grid !important;
   place-items: center;
   border-radius: 10px !important;

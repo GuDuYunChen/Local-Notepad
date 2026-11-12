@@ -298,7 +298,7 @@
 .project-entity-heatmap-row {
   min-width: max-content;
   display: grid;
-  grid-template-columns: 120px repeat(var(--chapter-count, 12), 26px);
+  grid-template-columns: 120px repeat(var(--chapter-count, 12), 40px);
   gap: 2px;
   align-items: center;
   margin-top: 2px;
@@ -320,7 +320,7 @@
 }
 
 .project-entity-heatmap-row.head b {
-  width: 26px;
+  width: 40px;
   color: var(--ink-muted);
   font-size: 6px;
   font-weight: 650;
@@ -367,15 +367,9 @@
 }
 
 .project-entity-heatmap-cell {
-  width: 26px;
-  height: 24px;
-  padding: 0;
-  border: 1px solid transparent;
-  border-radius: 5px;
+  width: 40px;
+  padding-inline: 0;
   background: color-mix(in srgb, var(--ink) 3%, transparent);
-  color: var(--ink-muted);
-  font: inherit;
-  font-size: 6px;
 }
 
 .project-entity-heatmap-cell.active {

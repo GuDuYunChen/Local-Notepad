@@ -180,7 +180,7 @@ function CurrentOutline({documentId='',documentTitle='',initialContent,requireLo
       const h=el&&root.contains(el)&&snapshot.headings.find(n=>editor.getElementByKey(n.key)===el)
       const index=h?snapshot.nodes.findIndex(n=>n.key===h.key):-1,after=snapshot.nodes[index+1]
       if(!h||!after||after.isHeading&&after.level<=h.level){hide();return}
-      const r=el.getBoundingClientRect();setBodyToggle({key:h.key,left:Math.max(6,r.left-32),top:r.top+Math.max(0,(r.height-24)/2)})
+      const r=el.getBoundingClientRect();setBodyToggle({key:h.key,left:Math.max(6,r.left-32),top:r.top+Math.max(0,(r.height-28)/2)})
     }
     root.addEventListener('mousemove',move);box.addEventListener('scroll',hide,{passive:true});window.addEventListener('resize',hide)
     return()=>{root.removeEventListener('mousemove',move);box.removeEventListener('scroll',hide);window.removeEventListener('resize',hide)}
