@@ -960,7 +960,7 @@ test('research shell failure preserves the original geometry error when restorat
 // These are setup-driver contracts, not installed-app or trusted-input evidence.
 // Run the real DOM inspector/choice driver and the runner's unchanged until body
 // with a monotonic fixture clock, preserving its full 15000 ms / 100 ms budget.
-const { chooseProjectSetupAlias } = await import('./full-app-ui-projects.mjs')
+const { chooseProjectSetupAlias, prepareEvidenceReviewFocusOrigin } = await import('./full-app-ui-projects.mjs')
 const { createNativeUiSelect } = await import('./native-ui-select.mjs')
 const { JSDOM: ProjectSetupDOM } = await import('jsdom')
 const { readFileSync: readProjectSetupSource } = await import('node:fs')
@@ -1262,4 +1262,31 @@ test('successful Tab focus keeps its original receipt and adds no failure observ
   assert.equal(f.commands.length, 6); assert.deepEqual(f.commands.map(command => command.modifiers), [8, 8, 0, 0, 0, 0])
   assert.deepEqual(f.stats(), { forwardTabs: 2, boundaryChecks: 2, diagnosticReads: 0, frames: 2 })
   assert.equal(f.saved.length, 1); assert.deepEqual(f.saved[0].fullAppUi.focus, clone(f.report.fullAppUi.focus))
+})
+
+test('review toolbar origin keeps the editor mounted and requires an enabled preceding control', async t => {
+  const dom = new ProjectSetupDOM('<div class="editor-input"><div role="textbox" contenteditable="true" tabindex="0">source</div></div><section class="evidence-review-bar"><div class="evidence-review-actions"><button>previous</button><button aria-pressed="false">mark</button><button class="evidence-review-return">return</button></div></section>', { runScripts: 'outside-only' })
+  t.after(() => dom.window.close())
+  const editor = dom.window.document.querySelector('[role="textbox"]')
+  editor.focus(); assert.equal(dom.window.document.activeElement, editor)
+  const result = await prepareEvidenceReviewFocusOrigin(source => dom.window.eval(source))
+  assert.deepEqual(result, { method: 'bounded-review-toolbar-origin', focused: true, editorRetained: true, targetAvailable: true })
+  assert.equal(dom.window.document.activeElement, dom.window.document.querySelector('[aria-pressed]'))
+  assert.equal(editor.isConnected, true)
+})
+
+test('review toolbar origin refuses missing, disabled, and reordered targets without changing the assertion', async t => {
+  const html = '<div class="editor-input"><div role="textbox" contenteditable="true"></div></div><section class="evidence-review-bar"><div class="evidence-review-actions"><button aria-pressed="false">mark</button><button class="evidence-review-return">return</button></div></section>'
+  for (const mutate of [
+    doc => doc.querySelector('[aria-pressed]').disabled = true,
+    doc => doc.querySelector('.evidence-review-return').disabled = true,
+    doc => doc.querySelector('.evidence-review-return').remove(),
+    doc => doc.querySelector('.editor-input').remove(),
+    doc => doc.querySelector('.evidence-review-actions').prepend(doc.querySelector('.evidence-review-return')),
+  ]) {
+    const dom = new ProjectSetupDOM(html, { runScripts: 'outside-only' })
+    t.after(() => dom.window.close())
+    mutate(dom.window.document)
+    await assert.rejects(() => prepareEvidenceReviewFocusOrigin(source => dom.window.eval(source)), /Review focus origin/)
+  }
 })

@@ -3,8 +3,8 @@
   "scope": "installed-actual-app-page-matrix",
   "sourceScope": "control-source entry coverage with declared states; not every possible failure combination",
   "productSource": {
-    "commit": "800ce4e1982bee89531e751092b3a2baeab5afbc",
-    "tree": "a82fb041a28abdc8caff247fbc79ac7999784915",
+    "commit": "97ada35a7f569f19562a93de6bfd5b77ee1639c1",
+    "tree": "713831f381e108af1b3d3c7bea5186919cc534a2",
     "dirty": false
   },
   "inventory": {
@@ -2686,9 +2686,9 @@
     },
     {
       "file": "src/components/FileSelectorDialog.jsx",
-      "bytes": 24604,
-      "sha256": "42e2ff5eff190c2f56289de5b0b81bb4a43e5edf0b1d8b6a6d0fbab97da20d66",
-      "blob": "ac041d50fb40289e416253e25bad99b663c67c35",
+      "bytes": 24965,
+      "sha256": "c7a0482ca8d525b2c25092acfd067ca31a9df9214e5616d1711d0a7642de13f3",
+      "blob": "cf76c078c5526d660fc403a7c25ab3ad01210758",
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [

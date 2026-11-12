@@ -480,15 +480,21 @@ export default function FileSelectorDialog({
                     style={{ paddingLeft: level * 20 + 10 }}
                     title={tooltip}
                 >
-                    <UiButton
-                        type="button"
-                        className="toggle selector-tree-toggle"
-                        onClick={(e) => { e.stopPropagation(); node.is_folder && handleExpand(node.id, e); }}
-                        style={{ visibility: node.is_folder ? 'visible' : 'hidden' }}
-                        aria-label={isExpanded ? '收起文件夹' : '展开文件夹'}
-                    >
-                        <ChevronIcon expanded={isExpanded} />
-                    </UiButton>
+                    {node.is_folder ? (
+                        <UiButton
+                            type="button"
+                            className="toggle selector-tree-toggle"
+                            onClick={(e) => handleExpand(node.id, e)}
+                            aria-label={isExpanded ? '收起文件夹' : '展开文件夹'}
+                        >
+                            <ChevronIcon expanded={isExpanded} />
+                        </UiButton>
+                    ) : (
+                        // Reserve the row's original 32x28 toggle footprint without
+                        // advertising a permanently hidden, unreachable button.
+                        <span className="toggle selector-tree-spacer" aria-hidden="true"
+                            style={{ display: 'block', width: 32, minWidth: 32, height: 28, flex: '0 0 32px' }} />
+                    )}
                     <input data-ui-native="checkbox"
                         type="checkbox"
                         checked={allChildrenSelected}

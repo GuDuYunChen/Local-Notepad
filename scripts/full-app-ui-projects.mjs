@@ -227,6 +227,32 @@ export async function prepareProjects(ctx) {
     permittedNoteBodyWrites: [], forbiddenOperations: ['create chapter from page', 'delete', 'move', 'merge export', 'wait for a planned timer or accelerate any clock'] }
 }
 
+// The evidence locator intentionally focuses Lexical's rich-text editor, where
+// Tab is reserved for indentation. For this toolbar-only focus assertion,
+// establish a stable adjacent enabled button as the start of the existing
+// trusted Shift+Tab / Tab traversal. This does not invoke the return action,
+// change application keyboard behaviour, or waive the original focus gate.
+export async function prepareEvidenceReviewFocusOrigin(evaluate) {
+  const origin = await evaluate(`(() => {
+    const bar = document.querySelector('.evidence-review-bar')
+    const anchor = bar?.querySelector('.evidence-review-actions button[aria-pressed]')
+    const target = bar?.querySelector('.evidence-review-return')
+    const editor = document.querySelector('.editor-input [contenteditable="true"]')
+    if (!bar || !anchor || !target || !editor || !editor.isConnected ||
+        anchor.disabled || target.disabled || !anchor.isConnected ||
+        !(anchor.compareDocumentPosition(target) & Node.DOCUMENT_POSITION_FOLLOWING)) {
+      throw Error('Review focus origin is not a live enabled toolbar control next to its required target')
+    }
+    anchor.focus({ preventScroll: true })
+    return { method: 'bounded-review-toolbar-origin', focused: document.activeElement === anchor,
+      editorRetained: editor.isConnected, targetAvailable: !target.disabled }
+  })()`)
+  assert.equal(origin.focused, true, 'Actual review toolbar anchor could not receive focus')
+  assert.equal(origin.editorRetained, true, 'Actual review editor disappeared during focus preparation')
+  assert.equal(origin.targetAvailable, true, 'Actual review return action is unavailable')
+  return origin
+}
+
 export async function verifyProjectsPages(ctx) {
   const { shared, click, evaluate, until, setup, api } = ctx
   assert.equal(setup.kind, 'actual-backend-projects')
@@ -456,6 +482,7 @@ async function verifyProjectDetails(ctx, capture) {
   await click('[aria-label=' + q(locateLabel) + ']')
   await ui.shown('.evidence-review-bar')
   await until(() => evaluate("(()=>{const node=document.querySelector('.editor-input .editor-evidence-target');if(!node)return false;const box=node.getBoundingClientRect();return box.width>0&&box.height>0&&box.bottom>0&&box.top<innerHeight})()"), 'The actual Locate action did not reveal its owned saved-text evidence')
+  await prepareEvidenceReviewFocusOrigin(evaluate)
   await focus('projects-review', 'current', '.evidence-review-return')
   await capture('projects-review', 'current', ['.evidence-review-return'], ['证据章节'])
   await ui.details('.evidence-review-bar .evidence-review-records-details')
