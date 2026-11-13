@@ -10,7 +10,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { build } from 'esbuild'
 import controlEvidence from './check-ui-control-render.cjs'
 import { COLLAPSED_SIDEBAR_EXPAND, validateCollapsedSidebarObservation } from './full-app-ui-evidence.mjs'
-import { observeFullAppPopup, captureActualFullAppPopup, validateFullAppCaptureContinuity, validateFullAppPageSample, measureFullAppScrollCoverage, collectFullAppScrollOwners, createFullAppUiShared, withinActualClientPort, finiteOwnerMotionActive, waitForFiniteOwnerMotion } from './full-app-ui-shared.mjs'
+import { observeFullAppPopup, captureActualFullAppPopup, validateFullAppCaptureContinuity, validateFullAppPageSample, measureFullAppScrollCoverage, collectFullAppScrollOwners, createFullAppUiShared, traverseMarkdownSourceCloseWithNativeTabs, withinActualClientPort, finiteOwnerMotionActive, waitForFiniteOwnerMotion } from './full-app-ui-shared.mjs'
 import { buildResearchImportFixtures, researchRoutes } from './full-app-ui-research.mjs'
 
 const clone = value => structuredClone(value)
@@ -1303,6 +1303,40 @@ test('failure-receipt persistence errors remain secondary to the original Tab as
   assert.equal(f.saved.length, 1, 'Do not replay a failed diagnostic save or any native input')
 })
 
+
+test('Markdown source Close is reached from its real focused textarea by reverse, forward, reverse native Tabs', async () => {
+  const textarea = { panelReady: true, textareaFocused: true, closeFocused: false }
+  const close = { panelReady: true, textareaFocused: false, closeFocused: true }
+  const samples = [textarea, close, textarea, close], native = []
+  const result = await traverseMarkdownSourceCloseWithNativeTabs({
+    key: async (...args) => native.push(args),
+    evaluate: async script => { assert.match(script, /markdown-source-panel/); return samples.shift() },
+  })
+  assert.equal(result.reached, true)
+  assert.deepEqual(native, [['Tab', 8], ['Tab'], ['Tab', 8]])
+  assert.deepEqual({ reverseTabs: result.reverseTabs, forwardTabs: result.forwardTabs }, { reverseTabs: 2, forwardTabs: 1 })
+  assert.equal(samples.length, 0)
+})
+test('Markdown source native focus proof refuses a missing Close, wrong origin, and either broken direction', async () => {
+  const textarea = { panelReady: true, textareaFocused: true, closeFocused: false }
+  const close = { panelReady: true, textareaFocused: false, closeFocused: true }
+  for (const states of [
+    [{ ...textarea, panelReady: false }],
+    [{ ...close }],
+    [textarea, textarea, textarea, close],
+    [textarea, close, close, close],
+    [textarea, close, textarea, textarea],
+  ]) {
+    const samples = structuredClone(states), native = []
+    const result = await traverseMarkdownSourceCloseWithNativeTabs({
+      key: async (...args) => native.push(args),
+      evaluate: async () => samples.shift(),
+    })
+    assert.equal(result.reached, false, 'An incorrect native focus transition cannot pass')
+    assert.equal(native.length, states.length === 1 ? 0 : 3)
+  }
+})
+
 test('successful Tab focus keeps its original receipt and adds no failure observation or input', async () => {
   const f = focusFailureFixture({ reachAt: 2 }), receipt = await f.shared.focus(f.selector, f.meta)
   assert.equal(f.report.fullAppUi.focusFailures, undefined); assert.equal(f.report.fullAppUi.focus.length, 2)
@@ -2136,6 +2170,24 @@ test('Sync one fresh cycle can cover consecutive PNGs without another forced fiv
   assert.deepEqual(argumentsUsed, [2, 2]); assert.equal(receipt.attempts.length, 2); assert.equal(receipt.complete, true)
   assert.equal(receipt.disposal.cycles.length, 1); assert.equal(receipt.disposal.resources.length, 1)
   assert.equal(receipt.attempts[0].ticket.cycleVersion, receipt.attempts[1].ticket.cycleVersion)
+})
+
+
+test('Settings main captures bind the same real Sync activity loading and resource cycle at the PNG boundary', async t => {
+  const f = syncCycleFixture(t), receipt = {}
+  const controller = syncCycleExports.createSyncActivityCaptureReadiness({
+    routeId: 'settings-main', ownerToken: f.ownerToken, evaluate: f.evaluate,
+    until: async check => check(), receipt, save() {},
+  })
+  assert.ok(controller, 'Settings main must monitor the actual background Sync poll')
+  await controller.install(); await f.cycle()
+  const ticket = await controller.wait()
+  await controller.boundary(ticket, 'before-capture', 'settings-diagnostics.png')
+  f.advance(35); await controller.boundary(ticket, 'after-capture', 'settings-diagnostics.png')
+  await controller.close()
+  assert.equal(receipt.complete, true)
+  assert.equal(receipt.disposal.cycles.length, 1)
+  assert.equal(receipt.disposal.resources.length, 1)
 })
 
 test('Sync a complete intervening loading cycle is refused even if disabled is false again after PNG', async t => {

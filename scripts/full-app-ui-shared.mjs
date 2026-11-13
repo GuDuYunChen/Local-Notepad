@@ -508,6 +508,29 @@ export async function captureActualFullAppPopup({ receipt, read, capture, filena
   return receipt
 }
 
+
+/**
+ * Markdown source opens with native textarea focus. The immediately preceding
+ * button is Close, so the genuine keyboard path to it is Shift+Tab, not a
+ * forward sweep out of the source panel into Lexical (which owns Tab indent).
+ * Prove both directions and the return without calling focus() or clicking.
+ * This does not replace the shared focus ring, hit, visibility or trusted-key
+ * assertions performed by the caller.
+ */
+export async function traverseMarkdownSourceCloseWithNativeTabs({ key, evaluate }) {
+  const observe = () => evaluate('(() => { const panel = document.querySelector(".markdown-source-panel"); const textarea = panel?.querySelector(".markdown-source-textarea"); const close = panel?.querySelector(".markdown-source-actions button:last-child"); return { panelReady: !!panel && !!textarea && !!close && close.textContent.trim() === "关闭" && !close.disabled, textareaFocused: !!textarea && document.activeElement === textarea, closeFocused: !!close && document.activeElement === close }; })()')
+  const initial = await observe()
+  const result = { initial, backward: null, forward: null, returned: null, reverseTabs: 0, forwardTabs: 0, reached: false }
+  if (!initial.panelReady || !initial.textareaFocused) return result
+  await key('Tab', 8); result.reverseTabs++; result.backward = await observe()
+  await key('Tab'); result.forwardTabs++; result.forward = await observe()
+  await key('Tab', 8); result.reverseTabs++; result.returned = await observe()
+  result.reached = result.backward.panelReady && result.backward.closeFocused &&
+    result.forward.panelReady && result.forward.textareaFocused &&
+    result.returned.panelReady && result.returned.closeFocused
+  return result
+}
+
 export function validateFullAppCaptureContinuity(before, actual, matrix) {
   assert.equal(actual.root, before.root, 'Actual page root changed across the native PNG')
   assert.deepEqual(actual.viewport, before.viewport); assert.equal(actual.theme, before.theme)
@@ -655,7 +678,7 @@ export function createFullAppUiShared(ctx) {
       controls: [], anchors: [], images: [], geometry: { valid: false, failures: [] }, rawSamples: [], scrollCoverage: [], disclosures: [], motionReadiness: [] }
     ui.scenes.push(scene); save()
     const seen = new Map(), wanted = new Map(), capturedAnchors = new Map()
-    const syncReadiness = meta.routeId === 'sync-presentation' ? createSyncActivityCaptureReadiness({ routeId: meta.routeId,
+    const syncReadiness = ['sync-presentation', 'settings-main'].includes(meta.routeId) ? createSyncActivityCaptureReadiness({ routeId: meta.routeId,
       ownerToken: JSON.stringify(meta), evaluate, until, receipt: (scene.syncActivityReadiness = {}), save }) : null
     let captureFailure = null
     let index = 0
@@ -812,8 +835,14 @@ export function createFullAppUiShared(ctx) {
         await until(async () => !(await nativeSelect.inspect(selector)).expanded, 'Actual focus Select did not close')
       } else await click(selector)
     }
-    let reached = false, tabAttempts = 0
-    if (meta.routeId === 'projects-focus-session' && meta.stateId === 'focused' &&
+    let reached = false, tabAttempts = 0, reverseTabs = 0, nativeSourceOrder = null
+    if (meta.routeId === 'editor-source' && meta.stateId === 'default' &&
+        selector === '.markdown-source-actions button:last-child') {
+      nativeSourceOrder = await traverseMarkdownSourceCloseWithNativeTabs({ key, evaluate })
+      reached = nativeSourceOrder.reached
+      reverseTabs = nativeSourceOrder.reverseTabs
+      tabAttempts = nativeSourceOrder.forwardTabs
+    } else if (meta.routeId === 'projects-focus-session' && meta.stateId === 'focused' &&
         selector === '.focus-session-actions > button:first-child') {
       // Lexical consumes Tab as indent. The preceding trusted action toggle
       // restored the real first button's focus; prove its *adjacent* keyboard
@@ -828,9 +857,11 @@ export function createFullAppUiShared(ctx) {
         return next?.tagName === 'BUTTON' && !next.disabled && document.activeElement === next
       })()`), true, 'Actual Session actions are not adjacent in real forward Tab order')
       await key('Tab', 8)
+      reverseTabs++
       reached = await evaluate(`document.activeElement===document.querySelector(${q(selector)})`)
     } else {
       await key('Tab', 8)
+      reverseTabs++
       for (let index = 0; index < 256; index++) {
         await key('Tab')
         tabAttempts++
@@ -841,7 +872,8 @@ export function createFullAppUiShared(ctx) {
       // Observe only an exhausted traversal. Keep the original input sequence,
       // budget and assertion, even if this diagnostic read or checkpoint fails.
       const failure = { ...binding(meta), selector, complete: false, reached: false, reason: 'tab-order-exhausted',
-        attempts: { reverseTabs: 1, forwardTabs: tabAttempts, totalTabs: tabAttempts + 1 }, eventStart: first,
+        attempts: { reverseTabs, forwardTabs: tabAttempts, totalTabs: tabAttempts + reverseTabs },
+        ...(nativeSourceOrder ? { nativeSourceOrder } : {}), eventStart: first,
         diagnosticComplete: false, activeElement: null, events: null, traceTruncated: null }
       ;(ui.focusFailures ||= []).push(failure)
       try {
@@ -861,7 +893,7 @@ export function createFullAppUiShared(ctx) {
     }
     assert.equal(reached, true, 'Actual Tab order never reached control: ' + selector)
     const sample = { ...binding(meta), ...await evaluate(sidebarFocusRequired ? sidebarFocusExpression : `(${observeFullAppFocus.toString()})(${q(selector)},${hasVisibleBoxShadow.toString()},${withinActualClientPort.toString()},${observeFullAppOverflowViewport.toString()},${viewportFixedClipBoundary.toString()})`),
-      ...(sidebarFocusRequired ? { beforeTab, motion } : {}) }
+      ...(sidebarFocusRequired ? { beforeTab, motion } : {}), ...(nativeSourceOrder ? { nativeSourceOrder } : {}) }
     sample.events = await events(first); sample.trustedTab = sample.events.some(event => event.type === 'keydown' && event.key === 'Tab' && event.trusted)
     if (pendingSidebarFocus) Object.assign(pendingSidebarFocus, sample)
     else ui.focus.push(sample)
@@ -1227,7 +1259,7 @@ export function observeSyncActivityCaptureCycle(action, ownerToken) {
 }
 
 export function createSyncActivityCaptureReadiness({ routeId, ownerToken, evaluate, until, receipt, save }) {
-  if (routeId !== 'sync-presentation') return null
+  if (!['sync-presentation', 'settings-main'].includes(routeId)) return null
   receipt.kind = 'passive-renderer-resource-and-owned-loading-cycle'; receipt.attempts = []; receipt.complete = false
   const call = action => evaluate(`(${observeSyncActivityCaptureCycle.toString()})(${JSON.stringify(action)},${JSON.stringify(ownerToken)})`)
   const valid = sample => {
