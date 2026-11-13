@@ -179,6 +179,22 @@ describe('native F6 keyboard access to a saved embedded block', () => {
     expect(document.activeElement).toBe(first);
     expect(json(liveEditor)).toBe(original);
 
+    // A real browser provides the focus move after a non-cancelled Tab.
+    // The read-only decorator must keep that native event away from Lexical's
+    // ancestor indentation handler, in both directions from both buttons.
+    const rootTabs = [];
+    const observeRootTab = event => { if (event.key === 'Tab') rootTabs.push(event.shiftKey); };
+    editable.addEventListener('keydown', observeRootTab);
+    for (const action of [first, second]) {
+      for (const shiftKey of [false, true]) {
+        const actionTab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true, shiftKey });
+        await act(async () => action.dispatchEvent(actionTab));
+        expect(actionTab.defaultPrevented).toBe(false);
+      }
+    }
+    expect(rootTabs).toEqual([]);
+    expect(json(liveEditor)).toBe(original);
+
     await act(async () => editable.focus());
     for (const options of [
       { shiftKey: true }, { altKey: true }, { ctrlKey: true },
@@ -193,6 +209,8 @@ describe('native F6 keyboard access to a saved embedded block', () => {
     await act(async () => editable.dispatchEvent(tab));
     expect(tab.defaultPrevented).toBe(false);
     expect(document.activeElement).toBe(editable);
+    expect(rootTabs).toEqual([false]);
+    editable.removeEventListener('keydown', observeRootTab);
     expect(json(liveEditor)).toBe(original);
   });
 
