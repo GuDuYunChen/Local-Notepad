@@ -974,7 +974,7 @@ test('research shell failure preserves the original geometry error when restorat
 // Run the real DOM inspector/choice driver and the runner's unchanged until body
 // with a monotonic fixture clock, preserving its full 15000 ms / 100 ms budget.
 const { chooseProjectSetupAlias, prepareEvidenceReviewFocusOrigin, prepareProjectFocusSessionTabOrigin } = await import('./full-app-ui-projects.mjs')
-const { editorInsertMenuOutsidePoint } = await import('./full-app-ui-main-editor.mjs')
+const { editorInsertMenuOutsidePoint, editorFormatMenuOutsidePoint } = await import('./full-app-ui-main-editor.mjs')
 const { createNativeUiSelect } = await import('./native-ui-select.mjs')
 const { JSDOM: ProjectSetupDOM } = await import('jsdom')
 const { readFileSync: readProjectSetupSource } = await import('node:fs')
@@ -1325,6 +1325,21 @@ test('editor picker outside target is painted and cannot be an overlay or intera
   assert.throws(read, /picker ownership is missing/)
 })
 
+test('editor highlight picker closes only through a painted safe outside pointer', t => {
+  const dom = new ProjectSetupDOM('<div id="background">background</div><section class="toolbar-more-wrap"><div class="toolbar-format-menu"><div aria-label="高亮颜色选择"><button>颜色</button></div></div></section><button id="foreign">action</button>', { runScripts: 'outside-only' })
+  t.after(() => dom.window.close())
+  const document = dom.window.document
+  const read = () => dom.window.eval('(' + editorFormatMenuOutsidePoint.toString() + ')()')
+  document.elementFromPoint = () => document.querySelector('#background')
+  assert.deepEqual({ ...read() }, { x: dom.window.innerWidth / 2, y: 8 })
+  for (const selector of ['[aria-label="高亮颜色选择"] button', '#foreign']) {
+    document.elementFromPoint = () => document.querySelector(selector)
+    assert.throws(read, /No safe actual background surface/)
+  }
+  document.querySelector('[aria-label="高亮颜色选择"]').remove()
+  assert.throws(read, /highlight picker ownership is missing/)
+})
+
 function focusSessionOriginDOM(t) {
   const dom = new ProjectSetupDOM('<div class="editor-input" role="textbox" contenteditable="true" tabindex="0">draft</div><div class="focus-session-bar"><div class="focus-session-copy">真实 Session</div><div class="focus-session-actions"><button>显示界面</button><button>结束 Session</button></div></div>', { runScripts: 'outside-only' })
   t.after(() => dom.window.close())
@@ -1341,16 +1356,35 @@ test('project Session focus origin uses one trusted banner pointer before the or
   const clicks = []
   const result = await prepareProjectFocusSessionTabOrigin({
     evaluate: source => dom.window.eval(source),
-    click: async selector => { clicks.push(selector); editor.blur() },
+    click: async selector => {
+      clicks.push(selector)
+      if (selector === '.focus-session-copy') editor.blur()
+      else {
+        assert.equal(selector, '.focus-session-actions > button:first-child')
+        const action = document.querySelector(selector)
+        action.textContent = action.textContent === '显示界面' ? '继续专注' : '显示界面'
+        action.focus()
+      }
+    },
+    until: async (check, message) => { assert.equal(await check(), true, message); return true },
   })
-  assert.deepEqual(clicks, ['.focus-session-copy'])
-  assert.equal(result.method, 'trusted-session-banner-pointer')
+  assert.deepEqual(clicks, ['.focus-session-copy', '.focus-session-actions > button:first-child', '.focus-session-actions > button:first-child'])
+  assert.equal(result.method, 'trusted-session-action-toggle-restore')
+  assert.equal(document.querySelector('.focus-session-actions > button:first-child').textContent, '显示界面')
+  assert.equal(document.activeElement, document.querySelector('.focus-session-actions > button:first-child'))
   assert.equal(result.wasEditorOwned, true)
   assert.equal(result.editorOwnsFocus, false)
   assert.equal(result.targetAvailable, true)
   const verifier = readProjectSetupSource(new URL('./full-app-ui-projects.mjs', import.meta.url), 'utf8')
   assert.ok(verifier.includes("await shared.focus('.focus-session-actions > button:first-child', { routeId: 'projects-focus-session', stateId: 'focused' })"),
-    'The original full reverse/forward keyboard focus assertion must remain')
+    'The original native keyboard focus assertion must remain')
+  const sharedSource = readProjectSetupSource(new URL('./full-app-ui-shared.mjs', import.meta.url), 'utf8')
+  assert.ok(sharedSource.includes("meta.routeId === 'projects-focus-session' && meta.stateId === 'focused'"))
+  assert.ok(sharedSource.includes("Actual Session actions are not adjacent in real forward Tab order"))
+  assert.ok(sharedSource.includes("await key('Tab', 8)"))
+  assert.ok(sharedSource.includes("assert.equal(reached, true, 'Actual Tab order never reached control: ' + selector)"))
+  assert.ok(sharedSource.includes("for (const key of ['fieldSelector', 'kind', 'classification', 'size', 'layout', 'expectedHeight', 'disabled'])"))
+  assert.ok(sharedSource.includes("Actual Sync activity refresh was not settled before native capture"))
 })
 
 test('project Session focus origin refuses missing action and still-editor-owned Tab state', async t => {
