@@ -40,8 +40,22 @@ function Embed({ id, blockId, title }) {
       event.preventDefault()
       event.stopPropagation()
     }
+    // Lexical's TabIndentationPlugin owns Tab on the editable ancestor.
+    // When an embedded action itself is focused, let the browser perform its
+    // native Tab / Shift+Tab traversal rather than indenting the editor body.
+    // Do not preventDefault or synthesize focus: both real buttons must remain
+    // reachable through ordinary trusted keyboard navigation.
+    const preserveActionTab = event => {
+      if (event.key !== 'Tab' || event.defaultPrevented || event.isComposing) return
+      const buttons = embed.querySelectorAll('footer button')
+      if ([...buttons].includes(event.target)) event.stopPropagation()
+    }
     root.addEventListener('keydown', enter, true)
-    return () => root.removeEventListener('keydown', enter, true)
+    embed.addEventListener('keydown', preserveActionTab)
+    return () => {
+      root.removeEventListener('keydown', enter, true)
+      embed.removeEventListener('keydown', preserveActionTab)
+    }
   }, [])
   const stop = () => { owner.current?.abort(); setPhase('stopped'); setResult(null) }
   return <section ref={embedElement} className="block-reference-embed" contentEditable={false} title="按 F6 从编辑正文进入块嵌入操作" aria-label={'块嵌入：' + (result?.title || title || '笔记')}>
