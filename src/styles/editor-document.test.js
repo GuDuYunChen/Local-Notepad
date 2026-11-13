@@ -8,6 +8,20 @@ function read(path) {
 }
 
 describe('editor document presentation', () => {
+  it('paints the portalled Markdown source discard dialog above its source overlay', () => {
+    const css = read(['src', 'components', 'Editor', 'Editor.css'])
+    const sourceOverlay = css.match(/\\.markdown-source-overlay\\s*\\{[^}]*z-index:\\s*(\\d+)/s)
+    const confirmation = css.match(/body:has\\(\\.markdown-source-overlay\\)\\s*>\\s*\\.consumer-modal-overlay\\s*\\{[^}]*z-index:\\s*(\\d+)/s)
+    expect(sourceOverlay).not.toBeNull()
+    expect(confirmation).not.toBeNull()
+    expect(Number(confirmation[1])).toBeGreaterThan(Number(sourceOverlay[1]))
+    const source = read(['src', 'components', 'Editor', 'plugins', 'MarkdownSourcePlugin.jsx'])
+    expect(source).toContain('closeReview && createPortal(<ConfirmDialog')
+    expect(source).toContain('document.body)')
+    expect(read(['src', 'components', 'ConfirmDialog.jsx'])).toContain('modal-overlay consumer-modal-overlay')
+  })
+
+
   it('loads the document visual layer after the global redesign', () => {
     const main = read(['src', 'main.jsx'])
     const redesign = main.indexOf("import './styles/redesign.css'")
