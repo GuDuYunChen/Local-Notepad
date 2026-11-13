@@ -2063,5 +2063,28 @@ test('Sync observer token collisions cannot replace or dispose another scene obs
   await f.invoke('dispose'); assert.equal(f.window.__fullAppSyncActivityCaptureCycle, undefined)
 })
 
+
+test('Sync near-expired refresh waits for a new real cycle before PNG instead of weakening the boundary', async t => {
+  const f = syncCycleFixture(t)
+  const { controller, receipt } = syncReadinessController(f, { until: async check => {
+    assert.equal(await check(), false, 'Near-expired cycle must not be admitted as a fresh capture ticket')
+    await f.cycle()
+    return check()
+  } })
+  await controller.install(); await f.cycle(); f.advance(900)
+  const old = await f.invoke('read')
+  assert.equal(old.ready, true, 'Underlying one-second observation remains valid')
+  assert.ok(old.ageMs > 650 && old.ageMs < 1000)
+  const ticket = await controller.wait()
+  assert.equal(receipt.attempts[0].polls, 2)
+  assert.ok(ticket.responseEnd > old.completedCycle.resource.responseEnd, 'New ticket must come from a different completed fetch')
+  await controller.boundary(ticket, 'before-capture', 'fresh-cycle.png')
+  f.advance(50)
+  await controller.boundary(ticket, 'after-capture', 'fresh-cycle.png')
+  await controller.close()
+  assert.equal(receipt.complete, true)
+  assert.equal(receipt.disposal.cycles.length, 2)
+})
+
 // Execute the existing exact-title search contracts through the original full-app argv.
 await import('./full-app-ui-owned-search.test.mjs')

@@ -1206,7 +1206,11 @@ export function createSyncActivityCaptureReadiness({ routeId, ownerToken, evalua
       try {
         const ready = await until(async () => {
           const sample = await call('read'); attempt.polls++; attempt.first ||= sample; attempt.latest = sample
-          save(); valid(sample); return sample.ready && sample
+          save(); valid(sample)
+          // A healthy cycle near its one-second expiry cannot survive the native
+          // screenshot boundary. Wait for the next real 5-second refresh instead
+          // of accepting a ticket that is already too old to photograph.
+          return sample.ready && sample.ageMs <= 650 && sample
         }, 'Actual Sync activity refresh was not settled before native capture: did not complete a fresh owned renderer read')
         const ticket = { transitionVersion: ready.transitionVersion, cycleVersion: ready.completedCycle.version,
           startTime: ready.completedCycle.resource.startTime, responseEnd: ready.completedCycle.resource.responseEnd }
