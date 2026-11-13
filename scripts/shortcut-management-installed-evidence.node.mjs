@@ -325,6 +325,7 @@ test('workflow refuses missing changed or duplicated UI budgets and prerequisite
   ]
   for (const [original, changed] of fields) for (const replacement of ['', changed, original + original]) {
     const altered = normalized.replace(original, replacement)
+    assert.notEqual(altered, normalized, 'A refusal mutation must change the actual current workflow text')
     for (const workflow of [altered, altered.replace(/\n/g, '\r\n')]) assert.throws(() => assertWorkflowContract(workflow))
   }
   for (const altered of [normalized.replace('jobs:\n', ''), normalized + '\njobs:\n', normalized + '\n  install-upgrade-uninstall:\n', normalized.replace('  full-application-ui:\n', '  unexpected-ui-job:\n')]) {
