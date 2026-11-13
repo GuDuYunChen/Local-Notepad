@@ -7,7 +7,7 @@ const { hasVisibleBoxShadow, paintedPopupReader } = controlEvidence
 const q = JSON.stringify
 const heights = { small: 28, middle: 40, large: 44 }
 const keyCodes = { Tab: 9, Enter: 13, Escape: 27, Backspace: 8, Delete: 46, Home: 36, End: 35,
-  ArrowLeft: 37, ArrowUp: 38, ArrowRight: 39, ArrowDown: 40, F10: 121, ' ': 32, a: 65 }
+  ArrowLeft: 37, ArrowUp: 38, ArrowRight: 39, ArrowDown: 40, F6: 117, F10: 121, ' ': 32, a: 65 }
 const slug = value => String(value).replace(/[^a-zA-Z0-9_-]+/g, '-').slice(0, 90)
 
 export function withinActualClientPort(rect, bounds, metrics, overflowX, overflowY, tolerance = 1) {
@@ -531,6 +531,24 @@ export async function traverseMarkdownSourceCloseWithNativeTabs({ key, evaluate 
   return result
 }
 
+/**
+ * Prove a native F6 entry reaches the embed's first action, then a real Tab
+ * moves to its sibling and Shift+Tab returns. Lexical continues to own ordinary
+ * Tab while the editable body itself has focus. Never programmatically focus
+ * a required button, replace the original focus assertion, or skip a key.
+ */
+export async function traverseBlockEmbedWithNativeTabs({ key, evaluate }) {
+  const observe = () => evaluate('(() => { const root = document.querySelector(".editor-input[contenteditable=true]"); const embeds = root ? [...root.querySelectorAll(".block-reference-embed")] : []; const first = embeds[0]?.querySelector("footer button:first-child"); const second = first?.nextElementSibling; return { ownerReady: embeds.length > 0 && first?.tagName === "BUTTON" && second?.tagName === "BUTTON" && !first.disabled && !second.disabled && first.parentElement === second.parentElement && first.closest(".block-reference-embed") === embeds[0] && document.querySelectorAll(".block-reference-embed footer button:first-child").length === 1, firstFocused: !!first && document.activeElement === first, secondFocused: !!second && document.activeElement === second }; })()')
+  const initial = await observe()
+  const receipt = { initial, forward: null, returned: null, reverseTabs: 0, forwardTabs: 0, reached: false }
+  if (!initial.ownerReady || !initial.firstFocused) return receipt
+  await key('Tab'); receipt.forwardTabs++; receipt.forward = await observe()
+  await key('Tab', 8); receipt.reverseTabs++; receipt.returned = await observe()
+  receipt.reached = receipt.forward.ownerReady && receipt.forward.secondFocused &&
+    receipt.returned.ownerReady && receipt.returned.firstFocused
+  return receipt
+}
+
 export function validateFullAppCaptureContinuity(before, actual, matrix) {
   assert.equal(actual.root, before.root, 'Actual page root changed across the native PNG')
   assert.deepEqual(actual.viewport, before.viewport); assert.equal(actual.theme, before.theme)
@@ -848,6 +866,12 @@ export function createFullAppUiShared(ctx) {
     if (meta.routeId === 'editor-source' && meta.stateId === 'default' &&
         selector === '.markdown-source-actions button:last-child') {
       nativeSourceOrder = await traverseMarkdownSourceCloseWithNativeTabs({ key, evaluate })
+      reached = nativeSourceOrder.reached
+      reverseTabs = nativeSourceOrder.reverseTabs
+      tabAttempts = nativeSourceOrder.forwardTabs
+    } else if (meta.routeId === 'editor-block-embed' && meta.stateId === 'loaded' &&
+        selector === '.block-reference-embed footer button:first-child') {
+      nativeSourceOrder = await traverseBlockEmbedWithNativeTabs({ key, evaluate })
       reached = nativeSourceOrder.reached
       reverseTabs = nativeSourceOrder.reverseTabs
       tabAttempts = nativeSourceOrder.forwardTabs
