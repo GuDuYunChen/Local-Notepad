@@ -110,7 +110,7 @@ jobs:
     # Settings has 720 native scenes and a five-second real sync polling cycle.
     # Only the hosted-job wall-clock limit increases; all native scene, keyboard,
     # screenshot, per-assertion waiting and rejection budgets remain unchanged.
-    timeout-minutes: ${{ matrix.group == 'settings' && 50 || 25 }}
+    timeout-minutes: ${{ matrix.group == 'settings' && 40 || 25 }}
     strategy:
       fail-fast: false
       max-parallel: 4
