@@ -1094,6 +1094,18 @@ export function observeSyncActivityCaptureCycle(action, ownerToken) {
   const endpoint = root && one(root, 'input[aria-label="WebDAV 端点"]')
   if (!root || !owner || owner.parentElement !== root || !button || !status || !endpoint ||
       button.textContent.trim() !== '刷新任务状态') throw Error('Missing or ambiguous actual Sync activity owner')
+  // Long-running installed-page matrices can exceed Chromium's default 250
+  // resource entries. Reserve headroom before observing; do not clear history,
+  // suppress PerformanceObserver.droppedEntriesCount, or invent an API response.
+  if (typeof performance.getEntriesByType !== 'function' ||
+      typeof performance.setResourceTimingBufferSize !== 'function') {
+    throw Error('Actual Sync resource timing capacity cannot be configured')
+  }
+  const existingResourceEntries = performance.getEntriesByType('resource').length
+  if (!Number.isSafeInteger(existingResourceEntries) || existingResourceEntries < 0) {
+    throw Error('Actual Sync resource timing baseline is invalid')
+  }
+  performance.setResourceTimingBufferSize(existingResourceEntries + 8192)
   const installedAt = performance.now(), resources = [], cycles = [], events = []
   let mutationObserver, resourceObserver, fatal = null, transitionVersion = 0, lowerBound = installedAt
   let lastDisabled = button.disabled, pending = null, ignoredResources = 0

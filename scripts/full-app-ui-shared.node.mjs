@@ -1879,7 +1879,15 @@ function syncCycleFixture(t, { initiallyDisabled = false } = {}) {
     takeRecords() { return this.entries.splice(0) }
     disconnect() { disconnected++ }
   }
-  const globals = { window, document, performance: { now: () => clock }, MutationObserver: window.MutationObserver, PerformanceObserver: ResourceObserver }
+  const timingBufferCalls = []
+  const globals = { window, document, performance: {
+    now: () => clock,
+    getEntriesByType: type => {
+      assert.equal(type, 'resource')
+      return Array.from({ length: 256 }, () => ({}))
+    },
+    setResourceTimingBufferSize: size => { timingBufferCalls.push(size) },
+  }, MutationObserver: window.MutationObserver, PerformanceObserver: ResourceObserver }
   const evaluate = async source => JSON.parse(JSON.stringify(await runInNewContext(source, globals)))
   const ownerToken = 'sync-presentation/long-draft/light/704x455'
   const invoke = action => evaluate(`(${syncCycleExports.observeSyncActivityCaptureCycle.toString()})(${JSON.stringify(action)},${JSON.stringify(ownerToken)})`)
@@ -1897,8 +1905,23 @@ function syncCycleFixture(t, { initiallyDisabled = false } = {}) {
     return invoke('read')
   }
   return { window, document, root, owner, button, status, globals, ownerToken, evaluate, invoke, cycle, resource, flush,
+    timingBufferCalls, notifyDropped: count => observer.callback({ getEntries: () => [] }, observer, { droppedEntriesCount: count }),
     now: () => clock, advance: value => { clock += value }, disconnected: () => disconnected }
 }
+
+test('Sync reserves resource timeline capacity without suppressing a lost actual entry', async t => {
+  const f = syncCycleFixture(t)
+  const initial = await f.invoke('install')
+  assert.equal(initial.fatal, null)
+  assert.deepEqual(f.timingBufferCalls, [256 + 8192])
+  f.notifyDropped(1)
+  const lost = await f.invoke('read')
+  assert.equal(lost.fatal, 'Actual Sync resource observation dropped entries')
+  assert.equal(lost.ready, false)
+  const disposed = await f.invoke('dispose')
+  assert.equal(disposed.disposed, true)
+  assert.equal(disposed.fatal, 'Actual Sync resource observation dropped entries')
+})
 
 test('Sync passive readiness serializes a complete new owned loading and renderer resource cycle', async t => {
   const f = syncCycleFixture(t), initial = await f.invoke('install')
