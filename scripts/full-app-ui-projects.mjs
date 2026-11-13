@@ -378,7 +378,7 @@ export async function verifyProjectsPages(ctx) {
 // Lexical legitimately consumes Tab as an indent command while its editor
 // owns focus. Move through an actual trusted pointer on the inert Session
 // banner before the unchanged reverse/forward keyboard focus proof.
-export async function prepareProjectFocusSessionTabOrigin({ evaluate, click }) {
+export async function prepareProjectFocusSessionTabOrigin({ evaluate, click, until }) {
   const original = await evaluate(`(() => {
     const banners = [...document.querySelectorAll('.focus-session-copy')]
     const actions = [...document.querySelectorAll('.focus-session-actions > button:first-child')]
@@ -400,7 +400,18 @@ export async function prepareProjectFocusSessionTabOrigin({ evaluate, click }) {
   }))()`)
   assert.equal(after.editorOwnsFocus, false, 'Real Session banner pointer did not release editor Tab indentation ownership')
   assert.equal(after.targetAvailable, true, 'Actual Session return button disappeared after pointer origin')
-  return { method: 'trusted-session-banner-pointer', ...original, ...after }
+  // A banner click leaves focus on BODY: reverse Tab jumps into Lexical and
+  // every forward Tab is consumed as indentation. Establish a *real* button
+  // focus origin with two trusted user toggles, and require the original
+  // focused view to be restored before testing keyboard traversal.
+  const action = '.focus-session-actions > button:first-child'
+  await click(action)
+  await until(() => evaluate(`document.querySelector('.focus-session-actions > button:first-child')?.textContent.trim()==='继续专注'`),
+    'Actual Session did not enter ordinary view after the first trusted toggle')
+  await click(action)
+  await until(() => evaluate(`document.querySelector('.focus-session-actions > button:first-child')?.textContent.trim()==='显示界面'&&document.activeElement===document.querySelector('.focus-session-actions > button:first-child')`),
+    'Actual Session did not restore focused view and keyboard owner')
+  return { method: 'trusted-session-action-toggle-restore', ...original, ...after, restoredFocusOwner: true }
 }
 
 async function verifyProjectFocusSession(ctx, capture) {
