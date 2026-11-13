@@ -91,6 +91,66 @@ test('current App selection refuses the historical native-select compatibility p
   await assert.rejects(shared.nativeSelect.choose('select', 'one'), /actual migrated shared Select/)
   assert.deepEqual(calls, ['read'])
 })
+test('current shared Select waits for its real remount before making the original owned choice', async () => {
+  const pointer = []
+  let reads = 0, stage = 'closed'
+  const shared = createFullAppUiShared({
+    evaluate: async () => {
+      reads++
+      if (reads === 1) return { count: 0 }
+      return { count: 1, kind: 'shared', value: stage === 'committed' ? 'one' : 'initial',
+        multiple: false, disabled: false, expanded: stage === 'opened', popupReady: true,
+        inputId: 'actual-combobox', popupId: 'owned-listbox',
+        options: [{ id: 'owned-option', value: 'one', disabled: false, selected: stage === 'committed' }] }
+    },
+    click: async selector => {
+      pointer.push(selector)
+      if (stage === 'closed') stage = 'opened'
+      else if (stage === 'opened') stage = 'committed'
+      else throw Error('An extra click was sent')
+    },
+    until: async (check, message) => {
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const result = await check()
+        if (result) return result
+      }
+      throw Error(message)
+    },
+    cdp: { send: async () => { throw Error('No native fallback input is allowed') } },
+    capture() {}, save() {}, report: { fullAppUi: {} }, routes: [], matrix,
+  })
+  const choice = await shared.nativeSelect.choose('.owned-project-selector', 'one')
+  assert.equal(reads > 4, true, 'One originally missing observation must be retained')
+  assert.equal(choice.value, 'one')
+  assert.equal(choice.kind, 'shared')
+  assert.equal(pointer.length, 2, 'One original open and one owned-option click, without replay')
+  assert.match(pointer[0], /actual-combobox/)
+  assert.match(pointer[1], /owned-listbox/)
+})
+
+test('current shared Select still refuses duplicate controls and permanently absent owners before native input', async () => {
+  for (const observed of [{ count: 2 }, { count: 1, kind: 'unsupported' }, { count: 0 }]) {
+    const inputs = [], reads = []
+    const shared = createFullAppUiShared({
+      evaluate: async () => { reads.push(observed.count); return observed },
+      click: async () => inputs.push('click'),
+      cdp: { send: async () => inputs.push('native') },
+      until: async (check, message) => {
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const result = await check()
+          if (result) return result
+        }
+        throw Error(message)
+      },
+      capture() {}, save() {}, report: { fullAppUi: {} }, routes: [], matrix,
+    })
+    await assert.rejects(shared.nativeSelect.choose('.owned-project-selector', 'one'),
+      /actual migrated shared Select|migrated shared Select did not mount/)
+    assert.deepEqual(inputs, [], 'No click or native event may repair a missing or invalid Select')
+    assert.equal(reads.length, observed.count === 0 ? 3 : 1)
+  }
+})
+
 test('viewport-fixed modal sweep excludes background scrollers but keeps genuine nested and contained scrolling', () => {
   const node = parentElement => ({ parentElement, querySelectorAll: () => [] })
   const viewport = node(null), background = node(viewport), overlay = node(background)

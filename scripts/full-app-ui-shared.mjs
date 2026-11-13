@@ -615,7 +615,16 @@ export function createFullAppUiShared(ctx) {
   const frame = () => evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(true))))')
   const originalSelect = createNativeUiSelect({ evaluate, click, cdp, until })
   const nativeSelect = { inspect: originalSelect.inspect, value: originalSelect.value, choose: async (selector, value) => {
-    assert.equal((await originalSelect.inspect(selector)).kind, 'shared', 'Current App acceptance requires the actual migrated shared Select')
+    // A real workspace remount can briefly leave no Select in the DOM. Wait
+    // only for that absent state, within the original readiness deadline; a
+    // duplicate, unsupported or native control remains a strict refusal.
+    await until(async () => {
+      const observed = await originalSelect.inspect(selector)
+      if (observed.count === 0) return false
+      assert.equal(observed.count, 1, 'Current App acceptance requires one actual migrated shared Select')
+      assert.equal(observed.kind, 'shared', 'Current App acceptance requires the actual migrated shared Select')
+      return observed
+    }, 'Current App migrated shared Select did not mount: ' + selector)
     return originalSelect.choose(selector, value)
   } }
   const events = from => evaluate(`window.__fullAppUiEvents.slice(${Number(from)})`)
