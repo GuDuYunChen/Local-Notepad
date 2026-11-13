@@ -2856,6 +2856,12 @@
   white-space: nowrap;
 }
 
+/* The dirty Markdown source confirmation is portalled to document.body.
+   Keep its original action buttons above the source panel, not behind it. */
+body:has(.markdown-source-overlay) > .consumer-modal-overlay {
+  z-index: 1551;
+}
+
 .markdown-source-overlay {
   position: absolute;
   inset: 0;
