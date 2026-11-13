@@ -12,7 +12,6 @@ import controlEvidence from './check-ui-control-render.cjs'
 import { COLLAPSED_SIDEBAR_EXPAND, validateCollapsedSidebarObservation } from './full-app-ui-evidence.mjs'
 import { observeFullAppPopup, captureActualFullAppPopup, validateFullAppCaptureContinuity, validateFullAppPageSample, measureFullAppScrollCoverage, collectFullAppScrollOwners, createFullAppUiShared, withinActualClientPort, finiteOwnerMotionActive, waitForFiniteOwnerMotion } from './full-app-ui-shared.mjs'
 import { buildResearchImportFixtures, researchRoutes } from './full-app-ui-research.mjs'
-import { inspectProjectSetupOptionPointer } from './full-app-ui-projects.mjs'
 
 const clone = value => structuredClone(value)
 const hash = value => createHash('sha256').update(value).digest('hex')
@@ -989,7 +988,7 @@ const projectSetupRequested = 'index:project-setup-fixture-note'
 const projectSetupTarget = { id: 'project-alias-target', value: projectSetupRequested, disabled: false }
 
 function projectSetupAliasFixture(t, { appearAt = 0, choices = [projectSetupTarget], removeBeforeChoose = false,
-  clickFailure = null, truncateOnFailure = false, occludedOption = false } = {}) {
+  clickFailure = null, truncateOnFailure = false } = {}) {
   const dom = new ProjectSetupDOM('<div data-ui-control="select" data-ui-value=\'""\'><input id="project-alias-input" role="combobox" aria-label="选择实体别名对象" aria-expanded="false"></div>', { runScripts: 'outside-only' })
   t.after(() => dom.window.close())
   const { document } = dom.window, field = document.querySelector('input'), host = field.parentElement
@@ -997,28 +996,6 @@ function projectSetupAliasFixture(t, { appearAt = 0, choices = [projectSetupTarg
   const report = { fullAppUi: {} }, saved = [], keys = [], clicks = [], chooseCalls = [], waits = [], sleeps = []
   let clock = 0, available = choices, popup
   dom.window.__fullAppUiEvents = []; dom.window.__fullAppUiTraceTruncated = false
-  // JSDOM implements DOM ownership, not scrolling, box layout or hit-testing.
-  // Supply only deterministic fixture geometry; the installed-app runner still
-  // uses real renderer scrollIntoView, animation frames and elementFromPoint.
-  const scrolls = [], frames = []
-  dom.window.HTMLElement.prototype.getBoundingClientRect = function () {
-    if (this.getAttribute('role') !== 'option') return { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 }
-    const index = [...this.parentElement.children].indexOf(this)
-    const left = 40, top = 60 + index * 32, width = 180, height = 28
-    return { left, top, right: left + width, bottom: top + height, width, height }
-  }
-  dom.window.HTMLElement.prototype.scrollIntoView = function (options) {
-    assert.equal(this.getAttribute('role'), 'option')
-    assert.deepEqual({ ...options }, { block: 'center', inline: 'nearest', behavior: 'instant' })
-    scrolls.push(this.id)
-  }
-  document.elementFromPoint = (x, y) => {
-    const option = [...document.querySelectorAll('[role="option"]')].find(node => {
-      const box = node.getBoundingClientRect()
-      return x >= box.left && x <= box.right && y >= box.top && y <= box.bottom
-    })
-    return occludedOption && option ? field : option || null
-  }
   const renderOptions = () => {
     if (!popup) return
     popup.replaceChildren()
@@ -1058,7 +1035,6 @@ function projectSetupAliasFixture(t, { appearAt = 0, choices = [projectSetupTarg
     save: () => saved.push(clone(report.fullAppUi.setupInteractions?.[0] ?? null)),
     shared: {
       ensureVisible: async target => assert.equal(target, selector),
-      frame: async () => { frames.push(clock) },
       key: async key => {
         keys.push(key); assert.equal(key, 'ArrowDown'); assert.equal(document.activeElement, field)
         field.setAttribute('aria-expanded', 'true'); field.setAttribute('aria-controls', popupId)
@@ -1073,7 +1049,7 @@ function projectSetupAliasFixture(t, { appearAt = 0, choices = [projectSetupTarg
       } },
     },
   }
-  return { context, saved, keys, clicks, chooseCalls, waits, sleeps, scrolls, frames, dom, selector, popupId,
+  return { context, saved, keys, clicks, chooseCalls, waits, sleeps, dom, selector, popupId,
     elapsed: () => clock, receipt: () => report.fullAppUi.setupInteractions[0] }
 }
 
@@ -1096,24 +1072,10 @@ test('project setup waits for a delayed own target before one original option ch
   assert.ok(f.saved.some(item => item?.latestOpening?.popupReady && item.latestOpening.options.length === 1 && item.latestOpening.options[0].value === ''))
   assert.ok(receipt.opened.options.some(option => option.value === projectSetupRequested))
   assert.deepEqual(f.keys, ['ArrowDown']); assert.equal(f.clicks.length, 1)
-  assert.deepEqual(f.scrolls, ['project-alias-target']); assert.deepEqual(f.frames, [200, 200])
-  assert.equal(receipt.optionPreScroll.hit, true); assert.equal(receipt.optionBeforeClick.hit, true)
   assert.deepEqual(f.chooseCalls, [{ args: [f.selector, projectSetupRequested], at: 200 }])
   assert.deepEqual(f.sleeps, [100, 100]); assert.equal(f.waits[0].checks, 3); assert.equal(f.elapsed(), 200)
   assert.ok(f.waits.every(wait => wait.argumentCount === 2))
   assert.equal(receipt.events.length, 2); assert.equal(receipt.traceTruncated, false)
-})
-
-test('project setup refuses an occluded option after scroll and two frames without a trusted click', async t => {
-  const f = projectSetupAliasFixture(t, { occludedOption: true }); let failure
-  await assert.rejects(chooseProjectSetupAlias(f.context, projectSetupRequested), error => {
-    failure = error; return /not hit-testable after native scroll and paint/.test(error.message)
-  })
-  assert.deepEqual(f.scrolls, ['project-alias-target']); assert.deepEqual(f.frames, [0, 0])
-  assert.equal(f.receipt().optionPreScroll.hit, false)
-  assert.equal(f.receipt().optionBeforeClick.hit, false)
-  assert.equal(f.clicks.length, 0); assert.equal(f.chooseCalls.length, 0)
-  assertProjectSetupFailureTrace(f, failure)
 })
 
 test('project setup permanently missing target expires the original default budget without another input', async t => {
@@ -1452,37 +1414,654 @@ test('graph selected screenshot uses only the direct detail button', t => {
     'Retain both direct user actions in their original order')
 })
 
+// These fixtures execute the runner's actual click closure and its original
+// until body. Their DOM/clock/input boundaries are controlled, not Windows
+// evidence. Scroll alignment, fresh drift/hit and owner failures replay the
+// old runner's actual input boundary on an isolated 3c baseline. Identity drift
+// and perpetual movement below are new-helper rejection contracts: their
+// observer/frame faults do not occur on the old one-read path. An absent new
+// helper in that baseline is a capability failure, not a replay of those faults.
+const { fullAppOwnedOptionRequest, observeFullAppOwnedOptionPointer,
+  prepareFullAppOwnedOptionPointer } = await import('./full-app-ui-shared.mjs')
 
-test('Project setup owns and settles its native popup option without dispatching a selection', () => {
-  const scrolls = [], marker = { getAttribute: () => 'target' }
-  const option = { getAttribute: k => k === 'role' ? 'option' : 'false',
-    querySelectorAll: () => [marker],
-    scrollIntoView: opts => scrolls.push(opts),
-    getBoundingClientRect: () => ({ left: 25, top: 40, width: 100, height: 32 }),
-    contains: node => node === marker }
-  const popup = { getAttribute: () => 'listbox', contains: node => node === option }
-  const page = { getElementById: id => id === 'own-list' ? popup : id === 'own-option' ? option : null,
-    elementFromPoint: () => marker }
-  const first = inspectProjectSetupOptionPointer('own-list', 'own-option', 'target', true, page)
-  const later = inspectProjectSetupOptionPointer('own-list', 'own-option', 'target', false, page)
-  assert.equal(first.hit, true); assert.equal(later.hit, true)
-  assert.deepEqual(later.center, { x: 75, y: 56 })
-  assert.deepEqual(scrolls, [{ block: 'center', inline: 'nearest', behavior: 'instant' }])
+function actualRunnerOptionClick(context) {
+  const ast = parseProjectSetupSource(projectSetupRunnerSource, { ecmaVersion: 'latest', sourceType: 'module' })
+  const matches = []
+  const walk = value => {
+    if (!value || typeof value !== 'object') return
+    if (value.type === 'VariableDeclarator' && value.id?.name === 'click') matches.push(value.init)
+    for (const child of Object.values(value)) if (Array.isArray(child)) child.forEach(walk); else if (child && typeof child === 'object') walk(child)
+  }
+  walk(ast)
+  assert.equal(matches.length, 1, 'The regression must execute the one actual installed-runner click')
+  const node = matches[0]
+  return runInNewContext('(' + projectSetupRunnerSource.slice(node.start, node.end) + ')', {
+    ...context, fullAppOwnedOptionRequest, prepareFullAppOwnedOptionPointer,
+  })
+}
+
+function ownedOptionPointerFixture(t, mode = 'stable') {
+  const dom = new ProjectSetupDOM('<div data-ui-control="select" data-ui-value=\'"before"\'><input id="owned-field" role="combobox" aria-controls="owned-list" aria-expanded="true"></div><div class="ant-select-dropdown"><div id="owned-list" role="listbox"><div id="owned-option" role="option" aria-disabled="false"><span data-ui-option-value="requested">Requested option</span></div></div></div><h4 id="background">Background heading</h4><button aria-label="ordinary-action">Action</button>', { runScripts: 'outside-only' })
+  t.after(() => dom.window.close())
+  const { document } = dom.window
+  Object.defineProperties(dom.window, { innerWidth: { value: 1280 }, innerHeight: { value: 800 } })
+  const field = document.querySelector('input'), option = document.querySelector('[role="option"]'), list = option.parentElement
+  const marker = option.firstElementChild, background = document.querySelector('h4'), ordinary = document.querySelector('button')
+  const selector = '[role="listbox"][id="owned-list"] [role="option"][id="owned-option"]'
+  const timeline = []
+  let left = 100, pendingAlignment = false, lostHit = false, scrollCalls = 0, frameCount = 0, observerReads = 0, clock = 0
+  const rect = (x, y, width, height) => ({ x, y, left: x, top: y, right: x + width, bottom: y + height, width, height })
+  for (const element of document.querySelectorAll('*')) {
+    element.style.opacity = '1'; element.style.visibility = 'visible'
+    element.getBoundingClientRect = () => rect(0, 0, 1280, 800)
+  }
+  option.getBoundingClientRect = () => rect(left, 100, 160, 32)
+  list.getBoundingClientRect = () => rect(80, 80, 500, 200)
+  list.parentElement.getBoundingClientRect = () => rect(76, 76, 508, 208)
+  field.getBoundingClientRect = () => rect(80, 40, 160, 32)
+  ordinary.getBoundingClientRect = () => rect(800, 80, 120, 32)
+  option.scrollIntoView = () => { scrollCalls++; if (mode === 'align-after-scroll') pendingAlignment = true }
+  ordinary.scrollIntoView = () => { scrollCalls++ }
+  document.elementFromPoint = (x, y) => {
+    if (x >= 800 && x <= 920 && y >= 80 && y <= 112) return ordinary
+    return !lostHit && x >= left && x <= left + 160 && y >= 100 && y <= 132 ? marker : background
+  }
+  dom.window.requestAnimationFrame = callback => {
+    frameCount++
+    if (pendingAlignment) { left = 300; pendingAlignment = false }
+    if (mode === 'never-stable') left += 1
+    callback(frameCount * 16); return frameCount
+  }
+  if (mode === 'duplicate-owner') {
+    const duplicate = field.cloneNode(); duplicate.id = 'other-field'; document.body.append(duplicate)
+  }
+  if (mode === 'closed-owner') field.setAttribute('aria-expanded', 'false')
+  const observerPrefix = typeof observeFullAppOwnedOptionPointer === 'function' ? '(' + observeFullAppOwnedOptionPointer.toString() + ')' : null
+  const evaluate = async expression => {
+    if (observerPrefix && expression.startsWith(observerPrefix)) {
+      observerReads++
+      if (observerReads === 2 && mode === 'identity-drift') marker.setAttribute('data-ui-option-value', 'foreign')
+      if (observerReads === 4 && mode === 'fresh-drift') left += 20
+      if (observerReads === 4 && mode === 'fresh-hit-loss') lostHit = true
+      timeline.push({ kind: 'observation', index: observerReads })
+    }
+    return JSON.parse(JSON.stringify(await dom.window.eval(expression)))
+  }
+  const sleeps = [], waits = [], commands = [], saved = [], report = { fullAppUi: {} }
+  const actualUntil = runInNewContext(projectSetupUntilSource + '; until', {
+    performance: { now: () => clock },
+    sleep: async milliseconds => { sleeps.push(milliseconds); clock += milliseconds },
+  })
+  const until = async (...args) => {
+    waits.push({ argumentCount: args.length, label: args[1] })
+    return actualUntil(...args)
+  }
+  const cdp = { send: async (method, parameters) => {
+    assert.equal(method, 'Input.dispatchMouseEvent')
+    timeline.push({ kind: 'input', type: parameters.type })
+    // An outstanding layout update can land between an old one-shot point
+    // read and the protocol press. A fresh prepared path has already settled
+    // or refused that transition before this input boundary is reached.
+    if (parameters.type === 'mousePressed') {
+      if (pendingAlignment) { left = 300; pendingAlignment = false }
+      if (!observerReads && mode === 'fresh-drift') left += 20
+      if (!observerReads && mode === 'fresh-hit-loss') lostHit = true
+    }
+    const actualTarget = document.elementFromPoint(parameters.x, parameters.y)
+    commands.push({ ...parameters, targetTag: actualTarget.tagName, ownedOptionHit: option.contains(actualTarget) })
+  } }
+  const click = actualRunnerOptionClick({ evaluate, until, cdp, report, save: () => {
+    timeline.push({ kind: 'save', inputDispatchComplete: report.fullAppUi.optionPointerPreparations?.[0]?.inputDispatchComplete })
+    saved.push(structuredClone(report))
+  } })
+  return { click, selector, commands, waits, sleeps, saved, report, dom, timeline,
+    frames: () => frameCount, scrolls: () => scrollCalls, elapsed: () => clock,
+    receipt: () => report.fullAppUi.optionPointerPreparations?.[0] }
+}
+
+test('owned option pointer waits for actual scroll alignment before its one original press and release', async t => {
+  const f = ownedOptionPointerFixture(t, 'align-after-scroll')
+  await f.click(f.selector)
+  assert.deepEqual(f.commands.map(x => x.type), ['mousePressed', 'mouseReleased'])
+  assert.ok(f.commands.every(x => x.x === 380 && x.y === 116 && x.ownedOptionHit), 'A formerly hit-tested stale point must never be sent')
+  assert.equal(f.scrolls(), 1)
+  assert.ok(f.frames() >= 2)
+  assert.equal(f.waits.length, 1); assert.equal(f.waits[0].argumentCount, 2)
+  assert.equal(f.receipt().complete, true)
+  assert.equal(f.receipt().stableSamples.length, 3)
+  assert.equal(f.receipt().samples.at(-1).phase, 'fresh-before-input')
+  assert.equal(f.receipt().fresh.point.x, 380)
+  assert.equal(f.receipt().nativeInputSentByPreparation, 0)
+  const press = f.timeline.findIndex(item => item.kind === 'input' && item.type === 'mousePressed')
+  const fresh = f.timeline.slice(0, press).findLastIndex(item => item.kind === 'observation')
+  assert.ok(fresh >= 0 && press > fresh)
+  assert.equal(f.timeline.slice(fresh + 1, press).some(item => item.kind === 'save'), false,
+    'No synchronous checkpoint may separate the final actual observation from the one native press')
+  const release = f.timeline.findIndex(item => item.kind === 'input' && item.type === 'mouseReleased')
+  assert.deepEqual(f.timeline.slice(release + 1), [{ kind: 'save', inputDispatchComplete: true }])
+  assert.equal(f.receipt().inputDispatchComplete, true)
 })
-test('Project setup fails closed on foreign, wrong-value, disabled and occluded options', () => {
-  const marker = { getAttribute: () => 'target' }
-  const option = { getAttribute: k => k === 'role' ? 'option' : 'false',
-    querySelectorAll: () => [marker],
-    getBoundingClientRect: () => ({ left: 25, top: 40, width: 100, height: 32 }),
-    contains: node => node === marker }
-  const popup = { getAttribute: () => 'listbox', contains: node => node === option }
-  const page = { getElementById: id => id === 'own-list' ? popup : id === 'own-option' ? option : null,
-    elementFromPoint: () => marker }
-  assert.throws(() => inspectProjectSetupOptionPointer('foreign-list', 'own-option', 'target', false, page), /ownership/)
-  assert.throws(() => inspectProjectSetupOptionPointer('own-list', 'own-option', 'wrong', false, page), /identity/)
-  option.getAttribute = k => k === 'role' ? 'option' : k === 'aria-disabled' ? 'true' : null
-  assert.throws(() => inspectProjectSetupOptionPointer('own-list', 'own-option', 'target', false, page), /enabled state/)
-  option.getAttribute = k => k === 'role' ? 'option' : 'false'
-  page.elementFromPoint = () => ({ tagName: 'H4' })
-  assert.equal(inspectProjectSetupOptionPointer('own-list', 'own-option', 'target', false, page).hit, false)
+
+test('owned option pointer refuses fresh geometry drift without sending or replaying native input', async t => {
+  const f = ownedOptionPointerFixture(t, 'fresh-drift')
+  await assert.rejects(f.click(f.selector), /Actual owned Select option moved before native pointer/)
+  assert.deepEqual(f.commands, [])
+  assert.equal(f.receipt().complete, false)
+  assert.equal(f.receipt().samples.at(-1).phase, 'fresh-before-input')
+  assert.equal(f.receipt().stableSamples.at(-1).rect.left, 100)
+  assert.equal(f.receipt().samples.at(-1).sample.rect.left, 120)
+  assert.ok(f.saved.at(-1).fullAppUi.optionPointerPreparations[0].error)
 })
+
+test('owned option pointer refuses a fresh heading hit even if the earlier option coordinates were stable', async t => {
+  const f = ownedOptionPointerFixture(t, 'fresh-hit-loss')
+  await assert.rejects(f.click(f.selector), /lost its fresh native hit target/)
+  assert.deepEqual(f.commands, [])
+  assert.equal(f.receipt().samples.at(-1).sample.hit.tag, 'H4')
+  assert.equal(f.receipt().samples.at(-1).sample.ownedHit, false)
+  assert.equal(f.receipt().complete, false)
+})
+
+test('new owned-option preparation rejects changed option identity at its observation boundary', async t => {
+  assert.equal(typeof prepareFullAppOwnedOptionPointer, 'function',
+    'New-helper identity refusal contract requires pointer preparation; the old baseline does not replay its observer fault')
+  const f = ownedOptionPointerFixture(t, 'identity-drift')
+  await assert.rejects(f.click(f.selector), /option identity changed during pointer preparation/)
+  assert.deepEqual(f.commands, [])
+  assert.equal(f.receipt().identity.optionValue, 'requested')
+  assert.equal(f.receipt().samples.at(-1).sample.identity.optionValue, 'foreign')
+  assert.equal(f.receipt().complete, false)
+})
+
+test('owned option pointer rejects closed or ambiguous combobox ownership within the original wait budget', async t => {
+  for (const mode of ['closed-owner', 'duplicate-owner']) {
+    const f = ownedOptionPointerFixture(t, mode)
+    await assert.rejects(f.click(f.selector), /Actual owned Select option did not settle before native pointer/)
+    assert.deepEqual(f.commands, [])
+    assert.equal(f.elapsed(), 15000)
+    assert.equal(f.sleeps.length, 150); assert.ok(f.sleeps.every(x => x === 100))
+    assert.equal(f.waits.length, 1); assert.equal(f.waits[0].argumentCount, 2)
+    assert.equal(f.receipt().complete, false)
+    assert.ok(f.receipt().omittedSamples > 0)
+  }
+})
+
+test('new owned-option preparation rejects continuous motion at its frame boundaries', async t => {
+  assert.equal(typeof prepareFullAppOwnedOptionPointer, 'function',
+    'New-helper motion refusal contract requires pointer preparation; the old baseline does not replay its frame fault')
+  const f = ownedOptionPointerFixture(t, 'never-stable')
+  await assert.rejects(f.click(f.selector), /Actual owned Select option did not settle before native pointer/)
+  assert.deepEqual(f.commands, [])
+  assert.equal(f.elapsed(), 15000)
+  assert.equal(f.sleeps.length, 150); assert.ok(f.sleeps.every(x => x === 100))
+  assert.equal(f.scrolls(), 1)
+  assert.equal(f.waits.length, 1); assert.equal(f.waits[0].argumentCount, 2)
+  assert.equal(f.receipt().samples.length, 8)
+  assert.ok(f.receipt().omittedSamples > 0)
+  assert.equal(f.receipt().complete, false)
+})
+
+test('ordinary runner clicks retain their original path without owned-option preparation', async t => {
+  const f = ownedOptionPointerFixture(t)
+  await f.click('[aria-label="ordinary-action"]')
+  assert.deepEqual(f.commands.map(x => x.type), ['mousePressed', 'mouseReleased'])
+  assert.ok(f.commands.every(x => x.x === 860 && x.y === 96 && x.targetTag === 'BUTTON'))
+  assert.equal(f.receipt(), undefined)
+  assert.equal(f.frames(), 0); assert.equal(f.scrolls(), 1)
+  assert.equal(f.waits.length, 1); assert.equal(f.waits[0].argumentCount, 2)
+})
+
+// Floating-toolbar entry contracts. DOM routing below is an explicit protocol
+// fixture, not native Windows evidence. It never focuses the required Bold
+// target; the installed run must still pass the unchanged shared.focus proof.
+const { observeFloatingToolbarKeyboardEntry, prepareFloatingToolbarKeyboardEntry, finishFloatingToolbarKeyboardEntry,
+  disposeFloatingToolbarKeyboardEntry } = await import('./full-app-ui-main-editor.mjs')
+
+function floatingKeyboardEntryFixture(t, { expanded = false, noShortcut = false, loseSelection = false,
+  changeContent = false, ignoreEscape = false, closeReturnsEditor = false, uncertainKey = null,
+  truncated = false, replaceOwner = null } = {}) {
+  const dom = new ProjectSetupDOM('<button class="workspace-title-button">Owned note</button><div class="editor-shell"><div class="editor-toolbar"><button id="preceding">Existing toolbar control</button><div class="toolbar-more-wrap"><button aria-label="更多格式">More</button></div></div><div class="block-reference-entry"><button>Reference</button></div><button class="editor-resource-toggle">Resources</button><div class="floating-text-toolbar" role="toolbar"><button aria-label="加粗">Bold</button><button>Italic</button></div><div class="editor-input" role="textbox" contenteditable="true" tabindex="0"><p>Selected original text</p></div></div>', { runScripts: 'outside-only' })
+  t.after(() => dom.window.close())
+  const document = dom.window.document, editor = document.querySelector('.editor-input')
+  const more = document.querySelector('[aria-label="更多格式"]'), target = document.querySelector('[aria-label="加粗"]')
+  const prior = document.querySelector('#preceding'), selection = dom.window.getSelection()
+  // JSDOM focus() collapses document Selection for every element, including
+  // buttons and inputs. This protocol fixture models focus ownership separately;
+  // it does not claim Chromium selection retention and never restores a Range.
+  let protocolActiveElement = editor
+  Object.defineProperty(document, 'activeElement', { configurable: true,
+    get: () => protocolActiveElement?.isConnected ? protocolActiveElement : document.body })
+  const setProtocolFocus = node => {
+    assert.ok(node?.isConnected, 'Protocol focus requires a connected owner')
+    assert.notEqual(node, target, 'The entry fixture must never focus its required Bold target')
+    protocolActiveElement = node
+  }
+  const range = document.createRange(); range.selectNodeContents(editor.firstChild)
+  selection.removeAllRanges(); selection.addRange(range)
+  const report = { fullAppUi: { group: 'editor' } }, saved = [], keys = [], waits = [], sleeps = []
+  let clock = 0, targetFocusCalls = 0
+  target.focus = () => { targetFocusCalls++; throw Error('The entry fixture must never focus its required Bold target') }
+  dom.window.__fullAppUiEvents = []; dom.window.__fullAppUiTraceTruncated = truncated
+  const event = (type, key = null) => {
+    const node = document.activeElement
+    dom.window.__fullAppUiEvents.push({ type, key, trusted: true, tag: node.tagName, role: node.getAttribute('role') })
+  }
+  const evaluate = async source => JSON.parse(JSON.stringify(dom.window.eval(source)))
+  const actualUntil = new Function('performance', 'sleep', 'return (' + projectSetupUntilSource + ')')(
+    { now: () => clock }, async ms => { sleeps.push(ms); clock += ms })
+  const key = async (value, modifiers = 0) => {
+    keys.push({ key: value, modifiers }); event('keydown', value)
+    if (uncertainKey === value) throw Error('Uncertain native entry key outcome')
+    if (value === 'F' && modifiers === 10) {
+      assert.equal(document.activeElement, editor)
+      if (noShortcut) return
+      const menu = document.createElement('div'); menu.className = 'toolbar-format-menu'
+      const font = document.createElement('input'); font.setAttribute('aria-label', '字体'); font.setAttribute('role', 'combobox')
+      font.setAttribute('aria-expanded', String(expanded)); menu.append(font); more.parentElement.append(menu); setProtocolFocus(font)
+      if (loseSelection) selection.removeAllRanges()
+      if (changeContent) editor.firstChild.setAttribute('style', 'padding-left:40px')
+      if (replaceOwner) {
+        const selectors = { editor: '.editor-input', shell: '.editor-shell', toolbar: '.floating-text-toolbar',
+          more: '[aria-label="更多格式"]', target: '.floating-text-toolbar [aria-label="加粗"]' }
+        const old = document.querySelector(selectors[replaceOwner]); old.replaceWith(old.cloneNode(true))
+        // Deliberately preserve all serialized content/range coordinates: the
+        // new observer must detect DOM identity, not a convenient text change.
+        if (replaceOwner === 'editor' || replaceOwner === 'shell') {
+          const replacementRange = document.createRange()
+          replacementRange.selectNodeContents(document.querySelector('.editor-input').firstChild)
+          selection.removeAllRanges(); selection.addRange(replacementRange)
+        }
+      }
+    } else if (value === 'Escape') {
+      const font = document.querySelector('[aria-label="字体"]'); assert.equal(document.activeElement, font)
+      if (!ignoreEscape) font.setAttribute('aria-expanded', 'false')
+    } else if (value === 'Tab' && modifiers === 8) {
+      if (document.activeElement === document.querySelector('[aria-label="字体"]')) setProtocolFocus(more)
+      else if (document.activeElement === more) setProtocolFocus(prior)
+      else throw Error('Unexpected reverse Tab owner in entry fixture')
+    } else if (value === 'Tab' && modifiers === 0) {
+      assert.equal(document.activeElement, prior); setProtocolFocus(more)
+    } else if (value === ' ') {
+      assert.equal(document.activeElement, more)
+      document.querySelector('.toolbar-format-menu').remove(); event('click')
+      if (closeReturnsEditor) setProtocolFocus(editor)
+    } else throw Error('Unexpected entry input: ' + value)
+  }
+  const context = { evaluate, report, matrix: clone(matrix), save: () => saved.push(clone(report.fullAppUi)),
+    until: async function (check, label, ...rest) {
+      waits.push({ argumentCount: arguments.length, label })
+      return actualUntil(check, label, ...rest)
+    }, shared: { key } }
+  return { context, document, dom, editor, more, target, prior, selection, keys, saved, waits, sleeps, key,
+    observe: () => evaluate('(' + observeFloatingToolbarKeyboardEntry.toString() + ')()'),
+    receipt: () => report.fullAppUi.floatingToolbarKeyboardEntries?.[0],
+    stats: () => ({ clock, targetFocusCalls }) }
+}
+
+test('the locked Lexical Tab handler consumes the original editor traversal as indentation', async () => {
+  const bundle = await build({ stdin: { contents: [
+    "export { createEditor, $getRoot, $createParagraphNode, $createTextNode, KEY_TAB_COMMAND } from 'lexical'",
+    "export { registerTabIndentation } from '@lexical/extension'",
+  ].join('\n'), resolveDir: productRoot, loader: 'js' }, bundle: true, platform: 'node', format: 'esm', write: false, logLevel: 'silent' })
+  const filename = path.join(temporary, 'floating-entry-lexical-contract.mjs'); writeFileSync(filename, bundle.outputFiles[0].contents)
+  const lexical = await import(pathToFileURL(filename).href)
+  const editor = lexical.createEditor({ namespace: 'floating-entry-original-tab', onError: error => { throw error } })
+  const unregister = lexical.registerTabIndentation(editor, 8), prevented = []
+  try {
+    // The installed Home/Shift+End setup selects text in an already committed
+    // editor. Each later key is a separate event, not part of node creation.
+    editor.update(() => {
+      const text = lexical.$createTextNode('Original selected text')
+      const paragraph = lexical.$createParagraphNode().append(text)
+      lexical.$getRoot().clear().append(paragraph); text.select(0, text.getTextContentSize())
+    }, { discrete: true })
+    for (const shiftKey of [true, ...Array(256).fill(false)]) {
+      editor.update(() => {
+        let cancelled = false
+        editor.dispatchCommand(lexical.KEY_TAB_COMMAND, { shiftKey, preventDefault: () => { cancelled = true } })
+        prevented.push(cancelled)
+      }, { discrete: true })
+    }
+    editor.getEditorState().read(() => {
+      const paragraph = lexical.$getRoot().getFirstChild()
+      assert.equal(paragraph.getIndent(), 7, 'Keep the locked maxIndent=8 strict upper bound')
+      assert.equal(paragraph.getTextContent(), 'Original selected text')
+    })
+    assert.equal(prevented.length, 257); assert.ok(prevented.every(Boolean))
+  } finally { unregister() }
+})
+
+test('floating toolbar entry uses one existing font shortcut and leaves the original Tab proof at its real preceding control', async t => {
+  const f = floatingKeyboardEntryFixture(t), before = await f.observe()
+  const receipt = await prepareFloatingToolbarKeyboardEntry(f.context)
+  assert.deepEqual(f.keys, [{ key: 'F', modifiers: 10 }, { key: 'Tab', modifiers: 8 }, { key: ' ', modifiers: 0 }])
+  assert.equal(f.document.activeElement, f.more)
+  assert.equal(receipt.entryComplete, true); assert.equal(receipt.complete, false)
+  assert.equal(receipt.method, 'existing-native-font-shortcut')
+  assert.equal(receipt.observations.at(-1).value.menuOpen, false)
+  assert.deepEqual(receipt.before.selection, before.selection); assert.equal(receipt.before.content, before.content)
+  assert.equal(f.stats().targetFocusCalls, 0)
+  // The original reverse/forward prefix starts outside the contenteditable;
+  // this explicit fixture checks its starting owner, never target arrival.
+  await f.key('Tab', 8); assert.equal(f.document.activeElement, f.prior)
+  await f.key('Tab'); assert.equal(f.document.activeElement, f.more)
+  assert.equal(f.stats().targetFocusCalls, 0)
+  assert.ok(f.waits.every(item => item.argumentCount === 2)); assert.deepEqual(f.sleeps, [])
+  const owned = f.dom.window.__fullAppFloatingToolbarKeyboardOwner
+  await assert.rejects(f.context.evaluate('(' + observeFloatingToolbarKeyboardEntry.toString() + ')("foreign-token","dispose")'), /observer token changed/)
+  await assert.rejects(f.context.evaluate('(' + observeFloatingToolbarKeyboardEntry.toString() + ')("foreign-token","install")'), /earlier floating toolbar keyboard observer/)
+  assert.equal(f.dom.window.__fullAppFloatingToolbarKeyboardOwner, owned)
+  await disposeFloatingToolbarKeyboardEntry(f.context, receipt)
+  assert.equal(receipt.ownerDisposal.identityRetained, true)
+  assert.equal(f.dom.window.__fullAppFloatingToolbarKeyboardOwner, undefined)
+})
+
+test('floating toolbar entry closes a genuinely expanded font popup once before leaving its input', async t => {
+  const f = floatingKeyboardEntryFixture(t, { expanded: true }), receipt = await prepareFloatingToolbarKeyboardEntry(f.context)
+  assert.deepEqual(f.keys, [{ key: 'F', modifiers: 10 }, { key: 'Escape', modifiers: 0 }, { key: 'Tab', modifiers: 8 }, { key: ' ', modifiers: 0 }])
+  const closed = receipt.observations.find(item => item.stage === 'font-popup-closed').value
+  assert.equal(closed.active, 'font'); assert.equal(closed.fontExpanded, false)
+  assert.equal(f.document.activeElement, f.more); assert.equal(f.stats().targetFocusCalls, 0)
+  await disposeFloatingToolbarKeyboardEntry(f.context, receipt)
+  assert.equal(f.dom.window.__fullAppFloatingToolbarKeyboardOwner, undefined)
+})
+
+test('floating toolbar entry refuses changed selection, body or same-content owner replacement without repair', async t => {
+  for (const option of ['loseSelection', 'changeContent']) {
+    const f = floatingKeyboardEntryFixture(t, { [option]: true })
+    await assert.rejects(prepareFloatingToolbarKeyboardEntry(f.context), /original editor selection|changed its original content/)
+    assert.deepEqual(f.keys, [{ key: 'F', modifiers: 10 }]); assert.equal(f.receipt().complete, false)
+    assert.equal(f.receipt().stage, 'failed'); assert.equal(f.stats().targetFocusCalls, 0)
+    if (option === 'loseSelection') assert.equal(f.selection.rangeCount, 0)
+    else assert.equal(f.editor.firstChild.style.paddingLeft, '40px')
+    assert.ok(f.saved.some(item => item.floatingToolbarKeyboardEntries?.[0]?.stage === 'failed'))
+    assert.equal(f.receipt().ownerDisposal.disposed, true)
+    assert.equal(f.dom.window.__fullAppFloatingToolbarKeyboardOwner, undefined)
+  }
+  for (const replaceOwner of ['editor', 'shell', 'toolbar', 'more', 'target']) {
+    const f = floatingKeyboardEntryFixture(t, { replaceOwner }), before = await f.observe()
+    await assert.rejects(prepareFloatingToolbarKeyboardEntry(f.context), /owner identity was replaced/)
+    const after = await f.observe()
+    for (const key of ['content', 'selection', 'documentTitle']) assert.deepEqual(after[key], before[key])
+    assert.deepEqual(f.keys, [{ key: 'F', modifiers: 10 }]); assert.equal(f.stats().targetFocusCalls, 0)
+    assert.equal(f.receipt().ownerDisposal.disposed, true); assert.equal(f.receipt().ownerDisposal.identityRetained, false)
+    assert.equal(f.dom.window.__fullAppFloatingToolbarKeyboardOwner, undefined)
+  }
+})
+
+test('floating toolbar entry rejects unavailable or foreign owners before any native request', async t => {
+  for (const mutate of [
+    f => { f.target.disabled = true },
+    f => { f.more.disabled = true },
+    f => f.target.remove(),
+    f => f.document.body.append(f.target.parentElement),
+    f => f.target.parentElement.append(f.target.cloneNode(true)),
+  ]) {
+    const f = floatingKeyboardEntryFixture(t); mutate(f)
+    await assert.rejects(prepareFloatingToolbarKeyboardEntry(f.context), /ownership|live enabled/)
+    assert.deepEqual(f.keys, []); assert.equal(f.receipt().complete, false)
+  }
+})
+
+test('missing fixed shortcut expires the original default readiness budget without another key', async t => {
+  const f = floatingKeyboardEntryFixture(t, { noShortcut: true })
+  await assert.rejects(prepareFloatingToolbarKeyboardEntry(f.context), /Ctrl\+Shift\+F did not focus/)
+  assert.deepEqual(f.keys, [{ key: 'F', modifiers: 10 }]); assert.equal(f.document.activeElement, f.editor)
+  assert.equal(f.stats().clock, 15000); assert.equal(f.sleeps.length, 150)
+  assert.ok(f.sleeps.every(ms => ms === 100)); assert.ok(f.waits.every(item => item.argumentCount === 2))
+})
+
+test('font popup refusal and unexpected editor refocus preserve failure without a fallback route', async t => {
+  const popup = floatingKeyboardEntryFixture(t, { expanded: true, ignoreEscape: true })
+  await assert.rejects(prepareFloatingToolbarKeyboardEntry(popup.context), /font popup did not close/)
+  assert.deepEqual(popup.keys, [{ key: 'F', modifiers: 10 }, { key: 'Escape', modifiers: 0 }])
+  assert.equal(popup.stats().clock, 15000); assert.equal(popup.receipt().complete, false)
+  const returned = floatingKeyboardEntryFixture(t, { closeReturnsEditor: true })
+  await assert.rejects(prepareFloatingToolbarKeyboardEntry(returned.context), /returned focus to the editor/)
+  assert.equal(returned.keys.length, 3); assert.equal(returned.receipt().entryComplete, false)
+})
+
+test('uncertain entry input and truncated traces never become completed floating-toolbar proof', async t => {
+  const uncertain = floatingKeyboardEntryFixture(t, { uncertainKey: 'F' })
+  await assert.rejects(prepareFloatingToolbarKeyboardEntry(uncertain.context), /Uncertain native entry key outcome/)
+  assert.equal(uncertain.keys.length, 1); assert.equal(uncertain.receipt().inputs[0].completed, false)
+  const truncated = floatingKeyboardEntryFixture(t, { truncated: true })
+  await assert.rejects(prepareFloatingToolbarKeyboardEntry(truncated.context), /trace was truncated/)
+  assert.equal(truncated.receipt().traceTruncated, true); assert.equal(truncated.receipt().entryComplete, false)
+})
+
+test('a prepared floating-toolbar entry cannot replace the original native focus result', async t => {
+  const f = floatingKeyboardEntryFixture(t), receipt = await prepareFloatingToolbarKeyboardEntry(f.context)
+  await assert.rejects(finishFloatingToolbarKeyboardEntry(f.context, receipt), /Original native Tab proof did not leave/)
+  assert.equal(receipt.complete, false); assert.equal(receipt.stage, 'failed')
+  assert.equal(f.stats().targetFocusCalls, 0); assert.equal(f.document.activeElement, f.more)
+  assert.equal(receipt.ownerDisposal.disposed, true); assert.equal(f.dom.window.__fullAppFloatingToolbarKeyboardOwner, undefined)
+
+  // Exercise the route's actual finally block with a failed original focus,
+  // rather than calling finish or duplicating the cleanup in the test.
+  const original = new Error('Original shared.focus assertion'), pending = floatingKeyboardEntryFixture(t)
+  const pendingReceipt = await prepareFloatingToolbarKeyboardEntry(pending.context)
+  const source = readProjectSetupSource(new URL('./full-app-ui-main-editor.mjs', import.meta.url), 'utf8')
+  const ast = parseProjectSetupSource(source, { ecmaVersion: 'latest', sourceType: 'module' })
+  const verify = ast.body.find(node => node.type === 'ExportNamedDeclaration' && node.declaration?.id?.name === 'verifyMainEditorPages').declaration
+  const routeFinally = verify.body.body.find(node => node.type === 'TryStatement' &&
+    source.slice(node.start, node.end).includes('floatingFocusFailure'))
+  assert.ok(routeFinally?.finalizer, 'The real floating route must dispose even when original shared.focus fails')
+  const run = runInNewContext('(async()=>{' + source.slice(routeFinally.start, routeFinally.end) + '})', {
+    ctx: pending.context, floatingEntry: pendingReceipt, floatingFocusFailure: null,
+    focus: async (...args) => {
+      assert.deepEqual(args, ['editor-floating', 'selection', '.floating-text-toolbar [aria-label="加粗"]'])
+      throw original
+    },
+    finishFloatingToolbarKeyboardEntry: async () => { throw Error('finish must not run after original focus failure') },
+    disposeFloatingToolbarKeyboardEntry,
+  })
+  await assert.rejects(run(), error => error === original)
+  assert.equal(pendingReceipt.focusError.message, original.message)
+  assert.equal(pendingReceipt.ownerDisposal.disposed, true)
+  assert.equal(pending.dom.window.__fullAppFloatingToolbarKeyboardOwner, undefined)
+})
+
+// Synthetic protocol contracts only: these do not claim a real renderer request,
+// native screenshot, or Windows settings acceptance.
+const syncCycleExports = await import('./full-app-ui-shared.mjs')
+function syncCycleFixture(t, { initiallyDisabled = false } = {}) {
+  const dom = new ProjectSetupDOM('<section class="sync-center-card"><div class="sync-activity" aria-label="当前同步任务"><div class="sync-activity-heading"><strong role="status">当前没有正在执行的同步任务</strong><button>刷新任务状态</button></div></div><input aria-label="WebDAV 端点"></section>')
+  t.after(() => dom.window.close())
+  const window = dom.window, document = window.document, root = document.querySelector('.sync-center-card')
+  const owner = document.querySelector('.sync-activity'), button = owner.querySelector('button'), status = owner.querySelector('strong')
+  button.disabled = initiallyDisabled; window.__API_BASE__ = 'http://127.0.0.1:27121'
+  let clock = 100, observer = null, disconnected = 0
+  class ResourceObserver {
+    static supportedEntryTypes = ['resource']
+    constructor(callback) { this.callback = callback; this.entries = []; observer = this }
+    observe(options) { assert.deepEqual(JSON.parse(JSON.stringify(options)), { type: 'resource', buffered: false }) }
+    takeRecords() { return this.entries.splice(0) }
+    disconnect() { disconnected++ }
+  }
+  const globals = { window, document, performance: { now: () => clock }, MutationObserver: window.MutationObserver, PerformanceObserver: ResourceObserver }
+  const evaluate = async source => JSON.parse(JSON.stringify(await runInNewContext(source, globals)))
+  const ownerToken = 'sync-presentation/long-draft/light/704x455'
+  const invoke = action => evaluate(`(${syncCycleExports.observeSyncActivityCaptureCycle.toString()})(${JSON.stringify(action)},${JSON.stringify(ownerToken)})`)
+  const resource = (overrides = {}) => observer.entries.push({ name: 'http://127.0.0.1:27121/api/sync/activity', entryType: 'resource',
+    initiatorType: 'fetch', startTime: clock - 10, responseEnd: clock, ...overrides })
+  const flush = () => new Promise(resolve => queueMicrotask(resolve))
+  const cycle = async ({ label, extraStatus = false, resourceOverrides = {}, withResource = true } = {}) => {
+    clock += 100; const startTime = clock
+    button.disabled = true; await flush()
+    clock += 20
+    if (withResource) resource({ startTime, ...resourceOverrides })
+    if (label !== undefined) status.textContent = label
+    if (extraStatus) { const warning = document.createElement('p'); warning.setAttribute('role', 'status'); warning.textContent = '读取失败'; owner.append(warning) }
+    button.disabled = false; await flush()
+    return invoke('read')
+  }
+  return { window, document, root, owner, button, status, globals, ownerToken, evaluate, invoke, cycle, resource, flush,
+    now: () => clock, advance: value => { clock += value }, disconnected: () => disconnected }
+}
+
+test('Sync passive readiness serializes a complete new owned loading and renderer resource cycle', async t => {
+  const f = syncCycleFixture(t), initial = await f.invoke('install')
+  assert.equal(initial.ready, false); assert.equal(initial.settledCycle, false)
+  const ready = await f.cycle()
+  assert.equal(ready.ready, true); assert.equal(ready.sameOwner, true); assert.equal(ready.disabled, false)
+  assert.equal(ready.transitionVersion, 2); assert.equal(ready.completedCycle.version, 1)
+  assert.ok(ready.completedCycle.resource.startTime >= ready.installedAt)
+  assert.ok(ready.completedCycle.resource.responseEnd <= ready.completedCycle.idleObservedAt)
+  const closed = await f.invoke('dispose')
+  assert.equal(closed.disposed, true); assert.equal(closed.cycles.length, 1); assert.equal(closed.resources.length, 1)
+  assert.deepEqual(closed.events.map(item => item.kind), ['installed', 'disabled-transition', 'disabled-transition', 'resource-completed'])
+  assert.equal(f.disconnected(), 1); assert.equal(f.window.__fullAppSyncActivityCaptureCycle, undefined)
+})
+
+test('Sync instantaneous idle and a resource without an owned busy-to-idle cycle are insufficient', async t => {
+  const f = syncCycleFixture(t)
+  assert.equal((await f.invoke('install')).ready, false)
+  f.advance(100); f.resource()
+  const sample = await f.invoke('read')
+  assert.equal(sample.ready, false); assert.equal(sample.completedCycle, null)
+  const closed = await f.invoke('dispose'); assert.equal(closed.resources.length, 1); assert.equal(closed.cycles.length, 0)
+})
+
+test('Sync a request already busy at observer installation cannot become the first qualifying cycle', async t => {
+  const f = syncCycleFixture(t, { initiallyDisabled: true })
+  await f.invoke('install'); f.advance(20); f.resource({ startTime: 50 }); f.button.disabled = false; await f.flush()
+  assert.equal((await f.invoke('read')).ready, false)
+  const ready = await f.cycle(); assert.equal(ready.ready, true); assert.equal(ready.completedCycle.version, 1)
+  const closed = await f.invoke('dispose'); assert.ok(closed.events.some(item => item.kind === 'ineligible-resource'))
+})
+
+test('Sync old resources, another endpoint, and a non-fetch initiator cannot qualify an idle button', async t => {
+  for (const resourceOverrides of [{ startTime: 50 }, { name: 'http://127.0.0.1:27121/api/sync/status' }, { initiatorType: 'img' }]) {
+    const f = syncCycleFixture(t); await f.invoke('install')
+    const sample = await f.cycle({ resourceOverrides })
+    assert.equal(sample.ready, false); assert.equal(sample.completedCycle.resource, null)
+    await f.invoke('dispose')
+  }
+})
+
+test('Sync error, active task and parent busy observations cannot qualify a completed fetch', async t => {
+  for (const mode of ['error', 'active', 'parent-busy']) {
+    const f = syncCycleFixture(t); await f.invoke('install')
+    if (mode === 'parent-busy') f.document.querySelector('input').disabled = true
+    const sample = await f.cycle(mode === 'error' ? { label: '任务状态暂时不可用，以下为上次读取结果', extraStatus: true }
+      : mode === 'active' ? { label: '手动同步 · 只读预检阶段' } : {})
+    assert.equal(sample.ready, false); assert.equal(sample.healthyIdle, false)
+    assert.equal(sample.completedCycle.idleObservation.healthyIdle, false)
+    await f.invoke('dispose')
+  }
+})
+
+test('Sync a failed cycle is not relabelled successful by a later idle DOM change without a new cycle', async t => {
+  const f = syncCycleFixture(t); await f.invoke('install')
+  await f.cycle({ label: '任务状态暂时不可用，以下为上次读取结果' })
+  f.status.textContent = '当前没有正在执行的同步任务'; await f.flush()
+  const sample = await f.invoke('read')
+  assert.equal(sample.healthyIdle, true); assert.equal(sample.ready, false)
+  f.advance(5000); assert.equal((await f.cycle()).ready, true)
+  await f.invoke('dispose')
+})
+
+test('Sync detached, replacement or other-owner buttons retain refusal and dispose both observers', async t => {
+  for (const mutate of [f => f.owner.remove(), f => f.owner.replaceWith(f.owner.cloneNode(true)),
+    f => f.root.append(f.button)]) {
+    const f = syncCycleFixture(t); await f.invoke('install'); await f.cycle(); mutate(f)
+    const sample = await f.invoke('read')
+    assert.equal(sample.ready, false); assert.equal(sample.sameOwner, false); assert.match(sample.fatal, /owner/)
+    const closed = await f.invoke('dispose'); assert.equal(closed.disposed, true); assert.match(closed.fatal, /owner/)
+    assert.equal(f.window.__fullAppSyncActivityCaptureCycle, undefined)
+  }
+})
+
+test('Sync stale completion is refused using responseEnd rather than observer delivery time', async t => {
+  const f = syncCycleFixture(t); await f.invoke('install'); const first = await f.cycle()
+  assert.equal(first.ready, true); f.advance(1001)
+  const stale = await f.invoke('read'); assert.equal(stale.ready, false); assert.equal(stale.ageMs, 1001)
+  assert.equal(stale.completedCycle.resource.responseEnd, first.completedCycle.resource.responseEnd)
+  await f.invoke('dispose')
+})
+
+test('Sync ambiguous same-endpoint resources in one observed loading cycle are refused', async t => {
+  const f = syncCycleFixture(t); await f.invoke('install')
+  f.advance(100); f.button.disabled = true; await f.flush(); f.advance(20)
+  f.resource({ startTime: 201, responseEnd: 219 }); f.resource({ startTime: 202, responseEnd: 220 })
+  f.button.disabled = false; await f.flush()
+  const sample = await f.invoke('read'); assert.equal(sample.ready, false); assert.match(sample.fatal, /ambiguous renderer requests/)
+  await f.invoke('dispose')
+})
+
+test('Sync readiness is inert for every other route without reads, waits, input or receipt changes', () => {
+  const receipt = {}, unexpected = () => { throw Error('An unrelated scene must not wait for Sync') }
+  assert.equal(syncCycleExports.createSyncActivityCaptureReadiness({ routeId: 'nav-graph', receipt,
+    evaluate: unexpected, until: unexpected, save: unexpected }), null)
+  assert.deepEqual(receipt, {})
+})
+
+function syncReadinessController(f, { until, save = () => {} } = {}) {
+  const receipt = {}, argumentsUsed = []
+  const controller = syncCycleExports.createSyncActivityCaptureReadiness({ routeId: 'sync-presentation', ownerToken: f.ownerToken,
+    evaluate: f.evaluate, until: async (...args) => { argumentsUsed.push(args.length); return until(...args) }, receipt, save })
+  return { controller, receipt, argumentsUsed }
+}
+
+test('Sync missing completion exhausts the original 15000ms and 100ms poll without an override or replay', async t => {
+  const f = syncCycleFixture(t), sleeps = []
+  const actualUntil = runInNewContext(projectSetupUntilSource + '; until', {
+    performance: { now: f.now }, sleep: async milliseconds => { sleeps.push(milliseconds); f.advance(milliseconds) },
+  })
+  const { controller, receipt, argumentsUsed } = syncReadinessController(f, { until: actualUntil })
+  await controller.install(); let firstFailure
+  await assert.rejects(controller.wait(), error => { firstFailure = error; return /did not complete a fresh owned renderer read/.test(error.message) })
+  assert.equal(f.now(), 15100); assert.equal(receipt.attempts[0].polls, 150)
+  assert.equal(sleeps.length, 150); assert.ok(sleeps.every(value => value === 100)); assert.deepEqual(argumentsUsed, [2])
+  assert.equal(receipt.attempts[0].error.message, firstFailure.message)
+  await controller.close(); assert.equal(receipt.complete, false); assert.equal(receipt.disposal.disposed, true)
+  assert.equal(f.window.__fullAppSyncActivityCaptureCycle, undefined)
+})
+
+test('Sync one fresh cycle can cover consecutive PNGs without another forced five-second wait', async t => {
+  const f = syncCycleFixture(t), { controller, receipt, argumentsUsed } = syncReadinessController(f, { until: async check => check() })
+  await controller.install(); await f.cycle()
+  for (const image of ['first.png', 'second.png']) {
+    const ticket = await controller.wait()
+    await controller.boundary(ticket, 'before-capture', image); f.advance(25)
+    await controller.boundary(ticket, 'after-capture', image)
+  }
+  await controller.close()
+  assert.deepEqual(argumentsUsed, [2, 2]); assert.equal(receipt.attempts.length, 2); assert.equal(receipt.complete, true)
+  assert.equal(receipt.disposal.cycles.length, 1); assert.equal(receipt.disposal.resources.length, 1)
+  assert.equal(receipt.attempts[0].ticket.cycleVersion, receipt.attempts[1].ticket.cycleVersion)
+})
+
+test('Sync a complete intervening loading cycle is refused even if disabled is false again after PNG', async t => {
+  const f = syncCycleFixture(t), { controller, receipt } = syncReadinessController(f, { until: async check => check() })
+  await controller.install(); await f.cycle(); const ticket = await controller.wait()
+  await controller.boundary(ticket, 'before-capture', 'single.png'); f.advance(5000); await f.cycle()
+  assert.equal(f.button.disabled, false)
+  await assert.rejects(controller.boundary(ticket, 'after-capture', 'single.png'), /refresh cycle changed at PNG boundary/)
+  await controller.close(); assert.equal(receipt.complete, false); assert.equal(receipt.attempts.length, 1)
+  assert.equal(receipt.attempts[0].boundaries.length, 2)
+})
+
+test('Sync stale entry and an over-cadence PNG are strict refusals without replacing original continuity', async t => {
+  for (const [phase, delay, pattern] of [['before-capture', 1001, /became stale before PNG/],
+    ['after-capture', 5000, /exceeded the observed normal Sync idle interval/]]) {
+    const f = syncCycleFixture(t), { controller, receipt } = syncReadinessController(f, { until: async check => check() })
+    await controller.install(); await f.cycle(); const ticket = await controller.wait(); f.advance(delay)
+    await assert.rejects(controller.boundary(ticket, phase, 'single.png'), pattern)
+    await controller.close(); assert.equal(receipt.complete, false); assert.equal(receipt.attempts.length, 1)
+  }
+  const before = pageSample(), after = clone(before); after.controls[0].disabled = true
+  assert.throws(() => validateFullAppCaptureContinuity(before, after, matrix), /state changed at PNG boundary: disabled/)
+})
+
+test('Sync observer token collisions cannot replace or dispose another scene observer', async t => {
+  const f = syncCycleFixture(t); await f.invoke('install')
+  await assert.rejects(f.invoke('install'), /earlier Sync capture observer was not disposed/)
+  await assert.rejects(f.evaluate(`(${syncCycleExports.observeSyncActivityCaptureCycle.toString()})('dispose','other-scene')`), /ownership changed/)
+  assert.ok(f.window.__fullAppSyncActivityCaptureCycle)
+  await f.invoke('dispose'); assert.equal(f.window.__fullAppSyncActivityCaptureCycle, undefined)
+})
+
+// Execute the existing exact-title search contracts through the original full-app argv.
+await import('./full-app-ui-owned-search.test.mjs')

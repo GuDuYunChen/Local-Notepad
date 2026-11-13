@@ -53,27 +53,6 @@ const projectActions = ({ click, evaluate, until, shared }) => ({
   },
 })
 
-
-/** Setup-only real popup hit test; scrolls but never selects or dispatches input. */
-export function inspectProjectSetupOptionPointer(popupId, optionId, requested, scroll = false, page = document) {
-  const popup = page.getElementById(popupId), option = page.getElementById(optionId)
-  if (!popup || popup.getAttribute('role') !== 'listbox' || !option ||
-      option.getAttribute('role') !== 'option' || !popup.contains(option)) {
-    throw Error('Project setup option lost its original listbox ownership')
-  }
-  const markers = [...option.querySelectorAll('[data-ui-option-value]')]
-  if (markers.length !== 1 || markers[0].getAttribute('data-ui-option-value') !== requested ||
-      option.getAttribute('aria-disabled') === 'true') {
-    throw Error('Project setup option identity, value or enabled state changed')
-  }
-  if (scroll) option.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'instant' })
-  const bounds = option.getBoundingClientRect()
-  const x = bounds.left + bounds.width / 2, y = bounds.top + bounds.height / 2
-  const target = page.elementFromPoint(x, y)
-  return { popupId, optionId, requested, scrolled: scroll, center: { x, y },
-    hit: bounds.width > 0 && bounds.height > 0 && Boolean(target && (target === option || option.contains(target))) }
-}
-
 // Setup only: use the actual focused combobox's native keyboard opening path.
 // The matrix below still tests pointer opening, Tab, repeated clicks and Escape.
 export async function chooseProjectSetupAlias({ shared, evaluate, until, report, save }, requested) {
@@ -126,20 +105,6 @@ export async function chooseProjectSetupAlias({ shared, evaluate, until, report,
       return state.expanded && state.popupReady && state.options.some(option => option.value === requested) && state
     }, 'Actual project setup combobox did not open its own popup')
     save(); assert.ok(receipt.opened.popupId)
-    // The popup option may move when scrollIntoView changes its layout.
-    // Settle its native position before the unchanged single trusted click.
-    record('settle-own-option')
-    const ownOptions = receipt.opened.options.filter(option => option.value === requested)
-    // Preserve the original Select's missing/ambiguous, disabled and identity
-    // refusal paths. Only the single enabled, identified target can be scrolled
-    // and hit-tested; no extra click or compatibility selection is introduced.
-    if (ownOptions.length === 1 && !ownOptions[0].disabled && ownOptions[0].id && receipt.opened.popupId) {
-      const inspectOption = scroll => evaluate(`(${inspectProjectSetupOptionPointer.toString()})(${q(receipt.opened.popupId)},${q(ownOptions[0].id)},${q(requested)},${scroll})`)
-      receipt.optionPreScroll = await inspectOption(true); save()
-      await shared.frame(); await shared.frame()
-      receipt.optionBeforeClick = await inspectOption(false); save()
-      assert.equal(receipt.optionBeforeClick.hit, true, 'Project setup option not hit-testable after native scroll and paint')
-    }
     record('original-option-pointer')
     receipt.committed = await shared.nativeSelect.choose(selector, requested); save(); check(receipt.committed)
     assert.equal(receipt.committed.value, requested); assert.equal(receipt.committed.expanded, false)

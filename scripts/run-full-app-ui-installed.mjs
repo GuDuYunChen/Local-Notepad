@@ -19,6 +19,7 @@ import { prepareLocalSyncLabNotes, seedLocalSyncLab, snapshotLocalSyncLab } from
 import { UI_INSTALLED_REGISTRATION_QUERY, validateUiInstalledRegistration, verifyUiScreensFiles } from './ui-screens-evidence.mjs'
 import { FULL_APP_GROUPS, FULL_APP_MATRIX, FULL_APP_PRODUCT_SOURCE_FILES, FULL_APP_RUNTIME_SOURCE_FILES, FULL_APP_VERIFIER_SOURCE_FILES, fullAppProductPageSources, validateFullAppUiLedger, validateFullAppLedgerSourceIdentity, verifyFullAppUiFiles, validateFullAppInstalledReport, validateFullAppPrerequisites, validateNativeWindowResize, validateFullAppFixtureFile, validateLocalSyncLabBackendProcess, validateLocalSyncLabBackendExit } from './full-app-ui-evidence.mjs'
 import { createFullAppEvidenceWriter, fullAppEvidenceFingerprint } from './full-app-ui-storage.mjs'
+import { fullAppOwnedOptionRequest, prepareFullAppOwnedOptionPointer } from './full-app-ui-shared.mjs'
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url))
 const VERSION = '4.249.0'
@@ -354,8 +355,18 @@ export async function runFullAppUiInstalled({ group, pin, installerPath, origina
   }
   const click = async request => {
     if (typeof request === 'string') request = { selector: request }
-    const point = await until(() => evaluate(`(()=>{const request=${JSON.stringify(request)};const nodes=[...document.querySelectorAll(request.selector)].filter(n=>!n.disabled&&(request.text===undefined||n.textContent.trim()===request.text||n.getAttribute('aria-label')===request.text)&&n.getBoundingClientRect().width>0&&n.getBoundingClientRect().height>0);if(nodes.length!==1)return null;const n=nodes[0];n.scrollIntoView({block:'center',behavior:'instant'});const r=n.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2,hit=document.elementFromPoint(x,y);return hit&&(hit===n||n.contains(hit))?{x,y}:null})()`), 'Full application UI control unavailable: ' + request.selector)
+    let point, optionReceipt
+    if (fullAppOwnedOptionRequest(request)) {
+      const receipt = optionReceipt = { complete: false, inputDispatchComplete: false }
+      ;(report.fullAppUi.optionPointerPreparations ||= []).push(receipt); save()
+      point = await prepareFullAppOwnedOptionPointer({ request, evaluate, until, receipt, save })
+    } else {
+      point = await until(() => evaluate(`(()=>{const request=${JSON.stringify(request)};const nodes=[...document.querySelectorAll(request.selector)].filter(n=>!n.disabled&&(request.text===undefined||n.textContent.trim()===request.text||n.getAttribute('aria-label')===request.text)&&n.getBoundingClientRect().width>0&&n.getBoundingClientRect().height>0);if(nodes.length!==1)return null;const n=nodes[0];n.scrollIntoView({block:'center',behavior:'instant'});const r=n.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2,hit=document.elementFromPoint(x,y);return hit&&(hit===n||n.contains(hit))?{x,y}:null})()`), 'Full application UI control unavailable: ' + request.selector)
+    }
     for (const type of ['mousePressed', 'mouseReleased']) await cdp.send('Input.dispatchMouseEvent', { type, ...point, button: 'left', clickCount: 1 })
+    // This records completed protocol dispatch only. The original Select
+    // value/closed-popup gates still decide whether the choice was accepted.
+    if (optionReceipt) { optionReceipt.inputDispatchComplete = true; save() }
   }
   const capture = async (filename, observeBeforeCapture) => {
     assert.match(filename, /^[a-z0-9][a-z0-9_-]*\.png$/)

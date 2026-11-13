@@ -629,19 +629,14 @@ export function createFullAppUiShared(ctx) {
       controls: [], anchors: [], images: [], geometry: { valid: false, failures: [] }, rawSamples: [], scrollCoverage: [], disclosures: [], motionReadiness: [] }
     ui.scenes.push(scene); save()
     const seen = new Map(), wanted = new Map(), capturedAnchors = new Map()
+    const syncReadiness = meta.routeId === 'sync-presentation' ? createSyncActivityCaptureReadiness({ routeId: meta.routeId,
+      ownerToken: JSON.stringify(meta), evaluate, until, receipt: (scene.syncActivityReadiness = {}), save }) : null
+    let captureFailure = null
     let index = 0
     const snap = async targetAnchors => {
-      // The Sync activity reader legitimately polls every five seconds and
-      // temporarily disables its refresh action during requests. Require the
-      // real read to settle before the original strict PNG continuity proof.
-      // Never mask a changed disabled value or remove the original assertion.
-      if (meta.routeId === 'sync-presentation') {
-        await until(() => evaluate(`(() => {
-          const matches = [...document.querySelectorAll('.sync-activity-heading button')]
-            .filter(node => node.textContent.trim() === '刷新任务状态')
-          return matches.length === 1 && !matches[0].disabled
-        })()`), 'Actual Sync activity refresh was not settled before native capture')
-      }
+      // A momentary enabled button can be just before the next normal poll.
+      // Observe a newly completed owned renderer read, without initiating one.
+      const syncTicket = syncReadiness ? await syncReadiness.wait() : null
       const motion = { complete: false }; scene.motionReadiness.push(motion)
       await waitForFiniteOwnerMotion(() => evaluate(`(${observeFullAppOwnerMotion.toString()})(${q(root)})`), until, motion)
       const before = await samplePage(route, root, targetAnchors, onlySelectors, sidebarFocusRequired)
@@ -662,6 +657,7 @@ export function createFullAppUiShared(ctx) {
         appendRaw(scene, { ...fresh, text: undefined, phase: 'before-capture', image: filename }); save()
         if (sidebarFocusRequired) validateCollapsedSidebarObservation(fresh.sidebarFocus, ctx.matrix)
         validateFullAppCaptureContinuity(measured, fresh, ctx.matrix)
+        if (syncReadiness) await syncReadiness.boundary(syncTicket, 'before-capture', filename)
         return true
       })
       scene.images.push(image); scene.image ||= image; scene.devicePixelRatio = before.devicePixelRatio
@@ -673,9 +669,11 @@ export function createFullAppUiShared(ctx) {
       appendRaw(scene, { ...afterCapture, text: undefined, phase: 'after-capture', image: image.filename }); save()
       if (sidebarFocusRequired) validateCollapsedSidebarObservation(afterCapture.sidebarFocus, ctx.matrix)
       validateFullAppCaptureContinuity(measured, afterCapture, ctx.matrix)
+      if (syncReadiness) await syncReadiness.boundary(syncTicket, 'after-capture', image.filename)
       return image
     }
     try {
+      if (syncReadiness) await syncReadiness.install()
       if (anchors.length) { await ensureVisible(anchors[0]); await snap([anchors[0]]) }
       else {
         const initial = await samplePage(route, root, [])
@@ -740,16 +738,28 @@ export function createFullAppUiShared(ctx) {
           assert.equal(surface.complete, true, 'Actual long-page content contains an unphotographed interval: ' + surface.selector)
         }
       }
+      // Dispose before sealing the immutable successful scene. The failure
+      // path below still disposes in finally and retains its complete trace.
+      if (syncReadiness) await syncReadiness.close()
       scene.controlCoverage = { renderedCount: wanted.size, observedCount: seen.size, unobserved: [...wanted.keys()].filter(selector => !seen.has(selector)) }
       assert.deepEqual(scene.controlCoverage.unobserved, [])
       scene.geometry = { valid: true, failures: [] }; scene.complete = true; save()
       ctx.evidenceStore?.sealScene(scene)
       return scene
     } catch (error) {
+      captureFailure = error
       scene.geometry.failures.push({ message: String(error.message), actual: error.actual, expected: error.expected, operator: error.operator }); save()
       try { scene.failureImage = await capture(nameFor(meta, 'failure')); save() }
       catch (diagnostic) { scene.failureImageError = String(diagnostic.message); save() }
       throw error
+    } finally {
+      if (syncReadiness && !syncReadiness.closed) {
+        try { await syncReadiness.close() }
+        catch (error) {
+          scene.syncActivityReadiness.cleanupError = { name: error.name, message: error.message }; save()
+          if (!captureFailure) throw error
+        }
+      }
     }
   }
   const focus = async (selector, meta) => {
@@ -941,4 +951,288 @@ export function createFullAppUiShared(ctx) {
   const closeSearch = async () => { if (await evaluate('Boolean(document.querySelector(".global-search-panel"))')) { await click('[aria-label="关闭全局检索"]'); await until(() => evaluate('!document.querySelector(".global-search-panel")'), 'Actual Search entry did not close') } }
   const enterWorkspace = async (ariaLabel, root) => { await closeSearch(); await closeSettings(); await collapseSidebar(); await click('[aria-label=' + q(ariaLabel) + ']'); await until(() => evaluate('Boolean(document.querySelector(' + q(root) + '))'), 'Actual workspace did not mount: ' + root) }
   return { frame, key, text, ensureVisible, hover, chooseFile, nativeSelect, focus, select, selectPreview, captureState, openSettings, closeSettings, openSearch, closeSearch, enterWorkspace, collapseSidebar }
+}
+
+// Only the canonical owned-option request emitted by native-ui-select enters
+// this preparation. Ordinary buttons and all existing shared interactions keep
+// their original input path. No business state or focus is assigned here.
+export function fullAppOwnedOptionRequest(request) {
+  if (typeof request === 'string') request = { selector: request }
+  if (!request || typeof request.selector !== 'string' || request.text !== undefined) return null
+  const quoted = '"(?:[^"\\\\]|\\\\.)*"'
+  const pattern = new RegExp('^\\[role="listbox"\\]\\[id=(' + quoted + ')\\] \\[role="option"\\]\\[id=(' + quoted + ')\\]$')
+  const match = pattern.exec(request.selector)
+  if (!match) return null
+  const listboxId = JSON.parse(match[1]), optionId = JSON.parse(match[2])
+  if (!listboxId || !optionId) return null
+  const selector = '[role="listbox"][id=' + JSON.stringify(listboxId) + '] [role="option"][id=' + JSON.stringify(optionId) + ']'
+  return selector === request.selector ? { selector, listboxId, optionId } : null
+}
+
+// Self-contained because it is serialized into the actual installed renderer.
+// A semantic listbox alone is not evidence that its option is painted at the
+// point which will receive the one original mouse press/release.
+export function observeFullAppOwnedOptionPointer(request, scroll = false) {
+  const unavailable = (reason, details = {}) => ({ ready: false, reason, scrolled: false, ...details })
+  const nodes = [...document.querySelectorAll(request.selector)]
+  if (nodes.length !== 1) return unavailable('option-count', { count: nodes.length })
+  const option = nodes[0], list = option.closest('[role="listbox"]')
+  const uniqueId = node => node?.id && document.querySelectorAll('[id=' + JSON.stringify(node.id) + ']').length === 1
+  if (!option.isConnected || option.id !== request.optionId || !uniqueId(option) ||
+      list?.id !== request.listboxId || !uniqueId(list)) return unavailable('option-listbox-identity')
+  const fields = [...document.querySelectorAll('[role="combobox"]')].filter(field =>
+    field.getAttribute('aria-controls') === list.id || (field.getAttribute('aria-owns') || '').split(/\s+/).includes(list.id))
+  if (fields.length !== 1) return unavailable('combobox-owner-count', { count: fields.length })
+  const field = fields[0], host = field.closest('[data-ui-control="select"]'), outer = list.closest('.ant-select-dropdown')
+  const markers = [...option.querySelectorAll('[data-ui-option-value]')]
+  if (!field.isConnected || !uniqueId(field) || !host || host.querySelectorAll('[role="combobox"]').length !== 1 ||
+      !host.hasAttribute('data-ui-value') || !outer || markers.length !== 1) return unavailable('shared-option-ownership')
+  const identity = { inputId: field.id, listboxId: list.id, optionId: option.id,
+    optionValue: markers[0].getAttribute('data-ui-option-value'), selectedValue: host.getAttribute('data-ui-value') }
+  if (field.matches(':disabled') || field.getAttribute('aria-disabled') === 'true' ||
+      option.getAttribute('aria-disabled') === 'true' || field.getAttribute('aria-expanded') !== 'true') {
+    return unavailable('closed-or-disabled-owner-option', { identity })
+  }
+  if (scroll) option.scrollIntoView({ block: 'center', behavior: 'instant' })
+  const bounds = node => { const b = node.getBoundingClientRect(); return { left: b.left, top: b.top, right: b.right, bottom: b.bottom, width: b.width, height: b.height } }
+  const rect = bounds(option), popup = bounds(outer), listbox = bounds(list), trigger = bounds(field)
+  const positive = box => Object.values(box).every(Number.isFinite) && box.width > 0 && box.height > 0
+  let visible = [rect, popup, listbox, trigger].every(positive)
+  for (let node = option; node && visible; node = node.parentElement) {
+    const css = getComputedStyle(node)
+    visible = css.display !== 'none' && css.visibility === 'visible' && Number(css.opacity) > 0
+  }
+  const viewport = { width: innerWidth, height: innerHeight }
+  const point = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+  const inViewport = point.x >= 0 && point.y >= 0 && point.x < innerWidth && point.y < innerHeight
+  const hit = visible && inViewport ? document.elementFromPoint(point.x, point.y) : null
+  const ownedHit = Boolean(hit && (hit === option || option.contains(hit)))
+  return { identity, rect, popup, listbox, trigger, viewport, point, visible, inViewport, ownedHit,
+    hit: hit ? { tag: hit.tagName, id: hit.id || null, role: hit.getAttribute('role') } : null,
+    scrolled: scroll, ready: visible && inViewport && ownedHit,
+    reason: !visible ? 'not-painted' : !inViewport ? 'outside-viewport' : !ownedHit ? 'foreign-hit' : null }
+}
+
+export async function prepareFullAppOwnedOptionPointer({ request, evaluate, until, receipt, save }) {
+  const owned = fullAppOwnedOptionRequest(request)
+  assert.ok(owned, 'Only the original owned Select option request may use pointer preparation')
+  Object.assign(receipt, { scope: 'owned-select-option-pointer-preparation', request: owned, complete: false,
+    nativeInputSentByPreparation: 0, sampleRetention: 'first and latest seven observations', omittedSamples: 0, samples: [], checks: 0 })
+  save()
+  let scrolled = false, identity = null
+  const read = async (phase, shouldScroll = false, checkpoint = true) => {
+    const sample = await evaluate(`(${observeFullAppOwnedOptionPointer.toString()})(${JSON.stringify(owned)},${shouldScroll})`)
+    receipt.samples.push({ phase, sample })
+    if (receipt.samples.length > 8) { receipt.samples.splice(1, 1); receipt.omittedSamples++ }
+    receipt.lastPhase = phase
+    if (sample.scrolled) scrolled = true
+    if (checkpoint) save()
+    if (identity) assert.deepEqual(sample.identity, identity, 'Actual owned Select option identity changed during pointer preparation')
+    else if (sample.identity) { identity = sample.identity; receipt.identity = identity; if (checkpoint) save() }
+    return sample
+  }
+  const geometry = sample => JSON.stringify([sample.rect, sample.popup, sample.listbox, sample.trigger, sample.viewport, sample.point])
+  const frame = () => evaluate('new Promise(resolve=>requestAnimationFrame(()=>resolve(true)))')
+  try {
+    // One call uses the runner's unchanged 15000 ms / 100 ms until body. A
+    // pending alignment never adds a click, a focus call or another budget.
+    const stable = await until(async () => {
+      receipt.checks++
+      const first = await read('before-frame', !scrolled)
+      if (!first.ready) return false
+      await frame()
+      const second = await read('first-frame')
+      if (!second.ready || geometry(first) !== geometry(second)) return false
+      await frame()
+      const third = await read('second-frame')
+      if (!third.ready || geometry(second) !== geometry(third)) return false
+      receipt.stableSamples = [first, second, third]; save()
+      return third
+    }, 'Actual owned Select option did not settle before native pointer')
+    // This is a new actual renderer read after the wait returned, not the
+    // previously cached point. Any final drift refuses input instead of replay.
+    // Keep the fresh journal in memory: synchronous checkpoint I/O here would
+    // reopen the observed point-to-press gap. The caller saves after its one
+    // original press/release; failures still reach the existing saved catch.
+    const fresh = await read('fresh-before-input', false, false)
+    assert.equal(fresh.ready, true, 'Actual owned Select option lost its fresh native hit target')
+    assert.equal(geometry(fresh), geometry(stable), 'Actual owned Select option moved before native pointer')
+    receipt.fresh = fresh; receipt.complete = true
+    return fresh.point
+  } catch (error) {
+    receipt.complete = false; receipt.error = { name: error.name, message: error.message, stack: error.stack }
+    save()
+    throw error
+  }
+}
+
+// Observe the real renderer fetch and its existing DOM loading cycle. This
+// verifier never starts a request, changes a timer, or changes application DOM.
+// The function is deliberately self-contained for Runtime.evaluate serialization.
+export function observeSyncActivityCaptureCycle(action, ownerToken) {
+  const key = '__fullAppSyncActivityCaptureCycle'
+  if (action !== 'install') {
+    const owned = window[key]
+    if (!owned && action === 'dispose') return { disposed: true, absent: true, ownerToken }
+    if (!owned || owned.ownerToken !== ownerToken) throw Error('Sync capture observer ownership changed')
+    if (action === 'read') return owned.read()
+    if (action === 'dispose') {
+      try { return { ...owned.read(), events: owned.events, cycles: owned.cycles, resources: owned.resources, disposed: true } }
+      finally { owned.disconnect(); delete window[key] }
+    }
+    throw Error('Unknown Sync capture observer operation')
+  }
+  if (window[key]) throw Error('An earlier Sync capture observer was not disposed')
+  if (window.__API_BASE__ !== 'http://127.0.0.1:27121') throw Error('Sync activity renderer API origin changed')
+  if (typeof PerformanceObserver !== 'function' || !PerformanceObserver.supportedEntryTypes.includes('resource') ||
+      typeof MutationObserver !== 'function') throw Error('Actual Sync resource or DOM observation is unavailable')
+  const rootSelector = '.sync-center-card', ownerSelector = '.sync-activity[aria-label="当前同步任务"]'
+  const one = (base, selector) => { const values = [...base.querySelectorAll(selector)]; return values.length === 1 ? values[0] : null }
+  const root = one(document, rootSelector), owner = one(document, ownerSelector)
+  const button = owner && one(owner, '.sync-activity-heading > button')
+  const status = owner && one(owner, '.sync-activity-heading > strong[role="status"]')
+  const endpoint = root && one(root, 'input[aria-label="WebDAV 端点"]')
+  if (!root || !owner || owner.parentElement !== root || !button || !status || !endpoint ||
+      button.textContent.trim() !== '刷新任务状态') throw Error('Missing or ambiguous actual Sync activity owner')
+  const installedAt = performance.now(), resources = [], cycles = [], events = []
+  let mutationObserver, resourceObserver, fatal = null, transitionVersion = 0, lowerBound = installedAt
+  let lastDisabled = button.disabled, pending = null, ignoredResources = 0
+  const log = value => {
+    if (events.length >= 2048) { fatal ||= 'Sync passive observation exceeded its complete bounded trace'; return }
+    events.push({ observedAt: performance.now(), ...value })
+  }
+  const dom = () => {
+    const sameOwner = root.isConnected && owner.isConnected && button.isConnected && status.isConnected && endpoint.isConnected &&
+      one(document, rootSelector) === root && one(document, ownerSelector) === owner && owner.parentElement === root &&
+      one(owner, '.sync-activity-heading > button') === button && one(owner, '.sync-activity-heading > strong[role="status"]') === status &&
+      one(root, 'input[aria-label="WebDAV 端点"]') === endpoint && button.closest(ownerSelector) === owner &&
+      button.textContent.trim() === '刷新任务状态' && window.__API_BASE__ === 'http://127.0.0.1:27121'
+    if (!sameOwner) fatal ||= 'Actual Sync activity owner was detached, replaced, or moved'
+    const label = status.textContent.trim(), statusCount = owner.querySelectorAll('[role="status"]').length
+    const healthyIdle = sameOwner && label === '当前没有正在执行的同步任务' && statusCount === 1 &&
+      owner.querySelectorAll('button').length === 1 && !endpoint.disabled
+    return { sameOwner, disabled: button.disabled, endpointDisabled: endpoint.disabled, label, statusCount, healthyIdle }
+  }
+  const mutations = records => {
+    const changes = records.filter(record => record.type === 'attributes' && record.target === button && record.attributeName === 'disabled')
+    for (let index = 0; index < changes.length; index++) {
+      const before = changes[index].oldValue !== null
+      const after = index + 1 < changes.length ? changes[index + 1].oldValue !== null : button.hasAttribute('disabled')
+      if (before === after) continue
+      if (before !== lastDisabled) fatal ||= 'Actual Sync loading transition history is incomplete'
+      lastDisabled = after; transitionVersion++
+      const observedAt = performance.now()
+      log({ kind: 'disabled-transition', before, after, transitionVersion })
+      if (after) {
+        if (pending) fatal ||= 'Actual Sync loading cycles overlapped'
+        pending = { version: cycles.length + 1, lowerBound, busyObservedAt: observedAt, idleObservedAt: null, resource: null }
+        cycles.push(pending)
+      } else {
+        if (pending) {
+          pending.idleObservedAt = observedAt; pending.endTransitionVersion = transitionVersion
+          pending.idleObservation = dom(); pending = null
+        }
+        // A request already busy at installation is deliberately ineligible.
+        lowerBound = observedAt
+      }
+    }
+    dom()
+  }
+  const entries = values => {
+    for (const entry of values) {
+      if (entry.entryType !== 'resource' || entry.initiatorType !== 'fetch' || entry.name !== 'http://127.0.0.1:27121/api/sync/activity') {
+        ignoredResources++; continue
+      }
+      const item = { serial: resources.length + 1, name: entry.name, initiatorType: entry.initiatorType,
+        startTime: entry.startTime, responseEnd: entry.responseEnd }
+      if (!Number.isFinite(item.startTime) || !Number.isFinite(item.responseEnd) || item.startTime < installedAt ||
+          item.responseEnd < item.startTime || item.responseEnd > performance.now()) {
+        log({ kind: 'ineligible-resource', ...item }); continue
+      }
+      if (resources.some(value => value.startTime === item.startTime && value.responseEnd === item.responseEnd)) {
+        fatal ||= 'Actual Sync resource timing identity is duplicated'; continue
+      }
+      resources.push(item); log({ kind: 'resource-completed', ...item })
+    }
+  }
+  const read = () => {
+    if (mutationObserver) mutations(mutationObserver.takeRecords())
+    if (resourceObserver) entries(resourceObserver.takeRecords())
+    const state = dom(), now = performance.now()
+    for (const cycle of cycles.filter(value => value.idleObservedAt !== null && !value.resource)) {
+      const matching = resources.filter(value => value.startTime >= cycle.lowerBound && value.responseEnd <= cycle.idleObservedAt)
+      if (matching.length > 1) fatal ||= 'Actual Sync loading cycle has ambiguous renderer requests'
+      if (matching.length === 1) cycle.resource = matching[0]
+    }
+    const cycle = cycles.at(-1), resource = cycle?.resource || null
+    const ageMs = resource ? now - resource.responseEnd : null
+    const settledCycle = Boolean(cycle && cycle.idleObservedAt !== null && cycle.idleObservation.healthyIdle &&
+      cycle.endTransitionVersion === transitionVersion && !state.disabled && state.healthyIdle && resource)
+    const ready = !fatal && settledCycle && ageMs >= 0 && ageMs <= 1000
+    return { ownerToken, installedAt, observedAt: now, ...state, fatal, transitionVersion, ignoredResources,
+      completedCycle: cycle ? { ...cycle, resource } : null, ageMs, settledCycle, ready }
+  }
+  const owned = { ownerToken, resources, cycles, events, read, disconnect() { mutationObserver?.disconnect(); resourceObserver?.disconnect() } }
+  window[key] = owned
+  try {
+    mutationObserver = new MutationObserver(mutations)
+    mutationObserver.observe(owner, { subtree: true, childList: true, characterData: true,
+      attributes: true, attributeFilter: ['disabled'], attributeOldValue: true })
+    resourceObserver = new PerformanceObserver((list, observer, options) => {
+      if (options?.droppedEntriesCount) fatal ||= 'Actual Sync resource observation dropped entries'
+      entries(list.getEntries())
+    })
+    resourceObserver.observe({ type: 'resource', buffered: false })
+    log({ kind: 'installed', initialObservation: dom() })
+  } catch (error) { fatal = 'Sync passive observer installation failed: ' + String(error.message); owned.disconnect() }
+  return read()
+}
+
+export function createSyncActivityCaptureReadiness({ routeId, ownerToken, evaluate, until, receipt, save }) {
+  if (routeId !== 'sync-presentation') return null
+  receipt.kind = 'passive-renderer-resource-and-owned-loading-cycle'; receipt.attempts = []; receipt.complete = false
+  const call = action => evaluate(`(${observeSyncActivityCaptureCycle.toString()})(${JSON.stringify(action)},${JSON.stringify(ownerToken)})`)
+  const valid = sample => {
+    assert.equal(sample.ownerToken, ownerToken, 'Actual Sync capture observer token changed')
+    assert.equal(sample.fatal, null, sample.fatal || 'Actual Sync observer rejected its evidence')
+    assert.equal(sample.sameOwner, true, 'Actual Sync capture owner changed')
+  }
+  let closed = false
+  return {
+    get closed() { return closed },
+    async install() { receipt.install = await call('install'); save(); valid(receipt.install) },
+    async wait() {
+      const attempt = { polls: 0, complete: false, boundaries: [] }; receipt.attempts.push(attempt)
+      try {
+        const ready = await until(async () => {
+          const sample = await call('read'); attempt.polls++; attempt.first ||= sample; attempt.latest = sample
+          save(); valid(sample); return sample.ready && sample
+        }, 'Actual Sync activity refresh was not settled before native capture: did not complete a fresh owned renderer read')
+        const ticket = { transitionVersion: ready.transitionVersion, cycleVersion: ready.completedCycle.version,
+          startTime: ready.completedCycle.resource.startTime, responseEnd: ready.completedCycle.resource.responseEnd }
+        attempt.ready = ready; attempt.ticket = ticket; save(); return ticket
+      } catch (error) { attempt.error = { name: error.name, message: error.message }; save(); throw error }
+    },
+    async boundary(ticket, phase, image) {
+      const sample = await call('read'), attempt = receipt.attempts.at(-1)
+      attempt.boundaries.push({ phase, image, sample }); save(); valid(sample)
+      assert.equal(sample.settledCycle, true, 'Actual Sync refresh ceased to be healthy and idle at PNG boundary')
+      assert.deepEqual({ transitionVersion: sample.transitionVersion, cycleVersion: sample.completedCycle.version,
+        startTime: sample.completedCycle.resource.startTime, responseEnd: sample.completedCycle.resource.responseEnd }, ticket,
+      'Actual Sync refresh cycle changed at PNG boundary')
+      assert.ok(sample.ageMs >= 0 && sample.ageMs < 5000, 'Actual PNG exceeded the observed normal Sync idle interval')
+      if (phase === 'before-capture') assert.equal(sample.ready, true, 'Actual Sync refresh cycle became stale before PNG capture')
+      if (phase === 'after-capture') attempt.complete = true
+      save()
+    },
+    async close() {
+      if (closed) return
+      receipt.disposal = await call('dispose'); closed = receipt.disposal.disposed === true; save()
+      assert.equal(closed, true, 'Actual Sync passive observers were not disposed')
+      assert.equal(receipt.disposal.absent, undefined, 'Actual Sync passive observer disappeared before disposal')
+      valid(receipt.disposal)
+      receipt.complete = receipt.attempts.length > 0 && receipt.attempts.every(attempt => attempt.complete)
+      save()
+    },
+  }
 }

@@ -156,6 +156,179 @@ export function editorFormatMenuOutsidePoint() {
   throw Error('No safe actual background surface to dismiss editor highlight picker')
 }
 
+// Read only. In particular, an entry failure must not restore a selection or
+// alter editor content to make the following native focus assertion succeed.
+export function observeFloatingToolbarKeyboardEntry(ownerToken = null, action = 'read') {
+  const key = '__fullAppFloatingToolbarKeyboardOwner'
+  if (action === 'dispose') {
+    const owned = window[key]
+    if (!owned) return { ownerToken, disposed: true, absent: true }
+    if (owned.ownerToken !== ownerToken) throw Error('Floating toolbar keyboard observer token changed')
+    try {
+      const same = (selector, node) => { const nodes = document.querySelectorAll(selector); return nodes.length === 1 && nodes[0] === node }
+      return { ownerToken, disposed: true, identityRetained:
+        same('.editor-input[contenteditable="true"]', owned.editor) && owned.editor.closest('.editor-shell') === owned.shell &&
+        same('.floating-text-toolbar', owned.toolbar) && same('.floating-text-toolbar [aria-label="加粗"]', owned.target) &&
+        same('.editor-toolbar [aria-label="更多格式"]', owned.more),
+        connected: Object.fromEntries(['editor', 'shell', 'toolbar', 'more', 'target'].map(name => [name, owned[name].isConnected])) }
+    } finally { delete window[key] }
+  }
+  if (!['read', 'install'].includes(action) || (action === 'install' && !ownerToken)) throw Error('Invalid floating toolbar keyboard observer operation')
+  const one = (selector, required = true) => {
+    const nodes = document.querySelectorAll(selector)
+    if (nodes.length > 1 || (required && nodes.length !== 1)) throw Error('Floating toolbar keyboard entry has missing or ambiguous ownership: ' + selector)
+    return nodes[0] || null
+  }
+  const editor = one('.editor-input[contenteditable="true"]')
+  const toolbar = one('.floating-text-toolbar'), target = one('.floating-text-toolbar [aria-label="加粗"]')
+  const more = one('.editor-toolbar [aria-label="更多格式"]'), owner = editor.closest('.editor-shell')
+  if (!owner || !editor.isConnected || !toolbar.isConnected || !target.isConnected || !more.isConnected ||
+      [toolbar, target, more].some(node => node.closest('.editor-shell') !== owner) ||
+      toolbar.getAttribute('role') !== 'toolbar' || !toolbar.contains(target) ||
+      target.tagName !== 'BUTTON' || more.tagName !== 'BUTTON' || target.disabled || more.disabled ||
+      target.tabIndex < 0 || more.tabIndex < 0 || !(more.compareDocumentPosition(target) & Node.DOCUMENT_POSITION_FOLLOWING)) {
+    throw Error('Floating toolbar keyboard entry does not own live enabled controls')
+  }
+  const selection = window.getSelection()
+  if (!selection || selection.rangeCount !== 1 || selection.isCollapsed ||
+      !editor.contains(selection.anchorNode) || !editor.contains(selection.focusNode) || !selection.toString()) {
+    throw Error('Floating toolbar keyboard entry lost its original editor selection')
+  }
+  const point = (node, offset) => {
+    const path = [], type = node.nodeType
+    while (node !== editor) {
+      const parent = node.parentNode
+      if (!parent) throw Error('Floating toolbar selection endpoint left its editor')
+      path.unshift(Array.prototype.indexOf.call(parent.childNodes, node)); node = parent
+    }
+    return { path, type, offset }
+  }
+  const menu = one('.toolbar-format-menu', false), font = one('.toolbar-format-menu [aria-label="字体"]', false)
+  if ((menu && menu.closest('.editor-shell') !== owner) ||
+      (font && (!menu?.contains(font) || font.closest('.editor-shell') !== owner || font.disabled || font.getAttribute('role') !== 'combobox'))) {
+    throw Error('Floating toolbar font entry belongs to a different owner or disabled control')
+  }
+  if (font && !['true', 'false'].includes(font.getAttribute('aria-expanded'))) throw Error('Actual font popup state is unavailable')
+  if (ownerToken) {
+    if (action === 'install') {
+      if (window[key]) throw Error('An earlier floating toolbar keyboard observer was not disposed')
+      window[key] = { ownerToken, editor, shell: owner, toolbar, more, target }
+    } else {
+      const owned = window[key]
+      if (!owned || owned.ownerToken !== ownerToken) throw Error('Floating toolbar keyboard observer token changed')
+      if (owned.editor !== editor || owned.shell !== owner || owned.toolbar !== toolbar || owned.more !== more || owned.target !== target) {
+        throw Error('Floating toolbar keyboard owner identity was replaced')
+      }
+    }
+  }
+  const active = document.activeElement
+  return { content: editor.innerHTML, documentTitle: one('.workspace-title-button').textContent.trim(),
+    selection: { text: selection.toString(), anchor: point(selection.anchorNode, selection.anchorOffset), focus: point(selection.focusNode, selection.focusOffset) },
+    owner: { editorRetained: true, toolbarRetained: true, targetEnabled: true, precedingControlEnabled: true },
+    menuOpen: Boolean(menu), fontAvailable: Boolean(font), fontExpanded: font ? font.getAttribute('aria-expanded') === 'true' : null,
+    active: active === editor ? 'editor' : active === font ? 'font' : active === more ? 'more' : active === target ? 'target' : 'other' }
+}
+
+function assertFloatingToolbarEntryPreserved(before, current) {
+  for (const field of ['content', 'documentTitle', 'selection', 'owner']) {
+    assert.deepEqual(current[field], before[field], 'Floating toolbar keyboard entry changed its original ' + field)
+  }
+}
+
+// Ctrl+Shift+F is the product's existing, documented fixed font shortcut.
+// It leaves Lexical's intentional Tab indentation through genuine keyboard
+// input. Close only the actual open popup/menu, retain their trigger's focus,
+// then run the original shared Shift+Tab/Tab proof without targeting Bold.
+export async function prepareFloatingToolbarKeyboardEntry(ctx) {
+  const { evaluate, until, shared, report, save } = ctx
+  const receipt = { group: report.fullAppUi.group, routeId: 'editor-floating', stateId: 'selection', ...ctx.matrix,
+    method: 'existing-native-font-shortcut', ownerToken: 'floating-toolbar:' + randomUUID(), ownerInstalled: false,
+    complete: false, entryComplete: false, inputs: [], observations: [] }
+  ;(report.fullAppUi.floatingToolbarKeyboardEntries ||= []).push(receipt)
+  const read = async (action = 'read') => {
+    const value = await evaluate(`(${observeFloatingToolbarKeyboardEntry.toString()})(${q(receipt.ownerToken)},${q(action)})`)
+    receipt.lastObservation = value
+    if (receipt.before) assertFloatingToolbarEntryPreserved(receipt.before, value)
+    return value
+  }
+  const press = async (key, modifiers = 0) => {
+    const input = { key, modifiers, completed: false }; receipt.inputs.push(input); save()
+    await shared.key(key, modifiers); input.completed = true; save()
+  }
+  const remember = (stage, value) => { receipt.stage = stage; receipt.observations.push({ stage, value }); save(); return value }
+  try {
+    receipt.eventStart = await evaluate('window.__fullAppUiEvents.length')
+    receipt.before = await read('install'); receipt.ownerInstalled = true; remember('before-shortcut', receipt.before)
+    assert.equal(receipt.before.active, 'editor', 'Selected editor must own the keyboard before the fixed font shortcut')
+    assert.equal(receipt.before.menuOpen, false, 'Floating toolbar entry requires the previous format menu to be closed')
+    await press('F', 10)
+    let current = remember('font-focused', await until(async () => {
+      const value = await read(); return value.menuOpen && value.fontAvailable && value.active === 'font' && value
+    }, 'Existing Ctrl+Shift+F did not focus the actual font selector'))
+    if (current.fontExpanded) {
+      await press('Escape')
+      current = remember('font-popup-closed', await until(async () => {
+        const value = await read()
+        assert.equal(value.active, 'font', 'Closing the actual font popup returned focus to another owner')
+        return value.menuOpen && value.fontAvailable && !value.fontExpanded && value
+      }, 'Actual font popup did not close through Escape'))
+    }
+    await press('Tab', 8)
+    remember('format-trigger-focused', await until(async () => {
+      const value = await read(); return value.active === 'more' && value
+    }, 'Actual reverse Tab did not reach the preceding format trigger'))
+    await press(' ')
+    remember('format-menu-closed', await until(async () => {
+      const value = await read()
+      assert.equal(value.active, 'more', 'Closing the actual format menu returned focus to the editor')
+      return !value.menuOpen && !value.fontAvailable && value
+    }, 'Actual Space did not close the format menu'))
+    const trace = await evaluate(`({events:window.__fullAppUiEvents.slice(${Number(receipt.eventStart)}),traceTruncated:window.__fullAppUiTraceTruncated})`)
+    Object.assign(receipt, trace)
+    assert.equal(trace.traceTruncated, false, 'Floating toolbar keyboard entry trace was truncated')
+    for (const input of receipt.inputs) assert.ok(trace.events.some(event => event.type === 'keydown' && event.key === input.key && event.trusted), 'Floating toolbar entry is missing a real trusted key: ' + input.key)
+    receipt.entryComplete = true; receipt.stage = 'ready-for-original-tab-proof'; save(); return receipt
+  } catch (error) {
+    receipt.stage = 'failed'; receipt.error = { name: error.name, message: error.message, stack: error.stack }
+    try { Object.assign(receipt, await evaluate(`({events:window.__fullAppUiEvents.slice(${Number(receipt.eventStart || 0)}),traceTruncated:window.__fullAppUiTraceTruncated})`)) }
+    catch (diagnostic) { receipt.traceError = String(diagnostic.message) }
+    await disposeFloatingToolbarKeyboardEntry(ctx, receipt, error)
+    try { save() } catch (diagnostic) { receipt.saveError = String(diagnostic.message) }
+    throw error
+  }
+}
+
+export async function disposeFloatingToolbarKeyboardEntry(ctx, receipt, originalError = null) {
+  if (receipt.ownerDisposal?.disposed === true) return receipt.ownerDisposal
+  try {
+    receipt.ownerDisposal = await ctx.evaluate(`(${observeFloatingToolbarKeyboardEntry.toString()})(${q(receipt.ownerToken)},'dispose')`)
+    assert.equal(receipt.ownerDisposal.disposed, true, 'Floating toolbar keyboard observer was not disposed')
+    if (receipt.ownerInstalled) assert.equal(receipt.ownerDisposal.absent, undefined, 'Floating toolbar keyboard observer disappeared before disposal')
+    if (!originalError) assert.equal(receipt.ownerDisposal.identityRetained, true, 'Floating toolbar owner identity changed before observer disposal')
+    ctx.save(); return receipt.ownerDisposal
+  } catch (error) {
+    receipt.ownerCleanupError = { name: error.name, message: error.message, stack: error.stack }
+    try { ctx.save() } catch (diagnostic) { receipt.saveError = String(diagnostic.message) }
+    if (!originalError) throw error
+  }
+}
+
+export async function finishFloatingToolbarKeyboardEntry(ctx, receipt) {
+  try {
+    receipt.afterNativeFocus = await ctx.evaluate(`(${observeFloatingToolbarKeyboardEntry.toString()})(${q(receipt.ownerToken)})`)
+    assertFloatingToolbarEntryPreserved(receipt.before, receipt.afterNativeFocus)
+    assert.equal(receipt.afterNativeFocus.active, 'target', 'Original native Tab proof did not leave the floating Bold control focused')
+    assert.equal(receipt.afterNativeFocus.menuOpen, false, 'Original native Tab proof reopened the format menu')
+    await disposeFloatingToolbarKeyboardEntry(ctx, receipt)
+    receipt.complete = true; receipt.stage = 'original-tab-proof-complete'; ctx.save()
+  } catch (error) {
+    receipt.complete = false; receipt.stage = 'failed'; receipt.error = { name: error.name, message: error.message, stack: error.stack }
+    await disposeFloatingToolbarKeyboardEntry(ctx, receipt, error)
+    try { ctx.save() } catch (diagnostic) { receipt.saveError = String(diagnostic.message) }
+    throw error
+  }
+}
+
 export async function verifyMainEditorPages(ctx) {
   await verifyNavigationPages(ctx)
   const { api, evaluate, click, until, cdp, shared, setup } = ctx
@@ -305,7 +478,18 @@ export async function verifyMainEditorPages(ctx) {
 
   await selectText(); await present('.floating-text-toolbar')
   await shot('editor-floating', 'selection', ['.floating-text-toolbar [aria-label="加粗"]'])
-  await focus('editor-floating', 'selection', '.floating-text-toolbar [aria-label="加粗"]')
+  const floatingEntry = await prepareFloatingToolbarKeyboardEntry(ctx)
+  let floatingFocusFailure = null
+  try {
+    await focus('editor-floating', 'selection', '.floating-text-toolbar [aria-label="加粗"]')
+    await finishFloatingToolbarKeyboardEntry(ctx, floatingEntry)
+  } catch (error) {
+    floatingFocusFailure = error
+    floatingEntry.focusError = { name: error.name, message: error.message, stack: error.stack }
+    throw error
+  } finally {
+    await disposeFloatingToolbarKeyboardEntry(ctx, floatingEntry, floatingFocusFailure)
+  }
   await selectText(); await hit('.editor-toolbar [aria-label="添加链接"]'); await present('.toolbar-link-popover')
   await shot('editor-link-create', 'draft', ['[aria-label="链接地址或章节锚点"]'])
   await focus('editor-link-create', 'draft', '[aria-label="链接地址或章节锚点"]')
