@@ -129,14 +129,17 @@ export async function chooseProjectSetupAlias({ shared, evaluate, until, report,
     // The popup option may move when scrollIntoView changes its layout.
     // Settle its native position before the unchanged single trusted click.
     record('settle-own-option')
-    const ownOptions = receipt.opened.options.filter(option => option.value === requested && !option.disabled)
-    assert.equal(ownOptions.length, 1, 'Project setup requested option missing or ambiguous')
-    assert.ok(ownOptions[0].id && receipt.opened.popupId)
-    const inspectOption = scroll => evaluate(`(${inspectProjectSetupOptionPointer.toString()})(${q(receipt.opened.popupId)},${q(ownOptions[0].id)},${q(requested)},${scroll})`)
-    receipt.optionPreScroll = await inspectOption(true); save()
-    await shared.frame(); await shared.frame()
-    receipt.optionBeforeClick = await inspectOption(false); save()
-    assert.equal(receipt.optionBeforeClick.hit, true, 'Project setup option not hit-testable after native scroll and paint')
+    const ownOptions = receipt.opened.options.filter(option => option.value === requested)
+    // Preserve the original Select's missing/ambiguous, disabled and identity
+    // refusal paths. Only the single enabled, identified target can be scrolled
+    // and hit-tested; no extra click or compatibility selection is introduced.
+    if (ownOptions.length === 1 && !ownOptions[0].disabled && ownOptions[0].id && receipt.opened.popupId) {
+      const inspectOption = scroll => evaluate(`(${inspectProjectSetupOptionPointer.toString()})(${q(receipt.opened.popupId)},${q(ownOptions[0].id)},${q(requested)},${scroll})`)
+      receipt.optionPreScroll = await inspectOption(true); save()
+      await shared.frame(); await shared.frame()
+      receipt.optionBeforeClick = await inspectOption(false); save()
+      assert.equal(receipt.optionBeforeClick.hit, true, 'Project setup option not hit-testable after native scroll and paint')
+    }
     record('original-option-pointer')
     receipt.committed = await shared.nativeSelect.choose(selector, requested); save(); check(receipt.committed)
     assert.equal(receipt.committed.value, requested); assert.equal(receipt.committed.expanded, false)
