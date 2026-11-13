@@ -153,3 +153,67 @@ describe('block embedding and reload boundaries', () => {
     api.mockResolvedValue({ ...file(body(paragraph('另一笔记', id))), id: 'other' });await act(async () => root.render(<BlockEmbedView id="other" title="另一来源" blockId={id} />));await flush();expect(uiQuery(host, 'pre')?.textContent).toBe('另一笔记');
   });
 });
+
+describe('native F6 keyboard access to a saved embedded block', () => {
+  test('enters the first real footer action from Lexical without changing body or Tab indentation', async () => {
+    await mount();
+    await input(blockLocator('source', id));
+    await click('读取来源块');
+    await changeUiValue(uiQuery(host, 'select'), 'embed', ['change']);
+    await click('确认插入嵌入');
+    await flush();
+
+    const editable = uiQuery(host, '.editor-input');
+    const first = uiQuery(host, '.block-reference-embed footer button:first-child');
+    const second = uiQuery(host, '.block-reference-embed footer button:nth-child(2)');
+    expect(first).toBeTruthy();
+    expect(second).toBeTruthy();
+    expect(uiText(first)).toBe('刷新来源');
+    const original = json(liveEditor);
+
+    await act(async () => editable.focus());
+    expect(document.activeElement).toBe(editable);
+    const entry = new KeyboardEvent('keydown', { key: 'F6', bubbles: true, cancelable: true });
+    await act(async () => editable.dispatchEvent(entry));
+    expect(entry.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(first);
+    expect(json(liveEditor)).toBe(original);
+
+    await act(async () => editable.focus());
+    for (const options of [
+      { shiftKey: true }, { altKey: true }, { ctrlKey: true },
+      { metaKey: true }, { isComposing: true }
+    ]) {
+      const rejected = new KeyboardEvent('keydown', { key: 'F6', bubbles: true, cancelable: true, ...options });
+      await act(async () => editable.dispatchEvent(rejected));
+      expect(rejected.defaultPrevented).toBe(false);
+      expect(document.activeElement).toBe(editable);
+    }
+    const tab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+    await act(async () => editable.dispatchEvent(tab));
+    expect(tab.defaultPrevented).toBe(false);
+    expect(document.activeElement).toBe(editable);
+    expect(json(liveEditor)).toBe(original);
+  });
+
+  test('F6 never steals focus from an action or from an editor without a block embed', async () => {
+    await mount();
+    await click('取消');
+    const editable = uiQuery(host, '.editor-input');
+    await act(async () => editable.focus());
+    const missing = new KeyboardEvent('keydown', { key: 'F6', bubbles: true, cancelable: true });
+    await act(async () => editable.dispatchEvent(missing));
+    expect(missing.defaultPrevented).toBe(false);
+    expect(document.activeElement).toBe(editable);
+
+    await act(async () => root.render(<BlockEmbedView id="source" title="来源" blockId={id} />));
+    await flush();
+    const first = uiQuery(host, '.block-reference-embed footer button:first-child');
+    expect(first).toBeTruthy();
+    await act(async () => first.focus());
+    const fromButton = new KeyboardEvent('keydown', { key: 'F6', bubbles: true, cancelable: true });
+    await act(async () => first.dispatchEvent(fromButton));
+    expect(fromButton.defaultPrevented).toBe(false);
+    expect(document.activeElement).toBe(first);
+  });
+});
