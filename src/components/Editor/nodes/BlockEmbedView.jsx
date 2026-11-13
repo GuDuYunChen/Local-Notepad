@@ -21,8 +21,30 @@ function Embed({ id, blockId, title }) {
     }
   }
   useEffect(() => { alive.current = true; void load(); return () => { alive.current = false; owner.current?.abort() } }, [])
+  const embedElement = useRef(null)
+  useEffect(() => {
+    // Lexical intentionally consumes plain Tab for indentation. F6 is a
+    // separate, keyboard-only route into a read-only block's real buttons.
+    // Keep the existing Tab/Shift+Tab editing semantics unchanged.
+    const embed = embedElement.current
+    const root = embed?.closest('.editor-input[contenteditable="true"]')
+    if (!root) return undefined
+    const enter = event => {
+      if (event.defaultPrevented || event.key !== 'F6' || event.altKey ||
+          event.ctrlKey || event.metaKey || event.shiftKey || event.isComposing ||
+          event.target !== root || root.ownerDocument.activeElement !== root) return
+      const first = root.querySelector('.block-reference-embed footer button:first-child')
+      if (!first || !embed.contains(first) || first.disabled || !first.isConnected) return
+      first.focus()
+      if (root.ownerDocument.activeElement !== first) return
+      event.preventDefault()
+      event.stopPropagation()
+    }
+    root.addEventListener('keydown', enter, true)
+    return () => root.removeEventListener('keydown', enter, true)
+  }, [])
   const stop = () => { owner.current?.abort(); setPhase('stopped'); setResult(null) }
-  return <section className="block-reference-embed" contentEditable={false} aria-label={'块嵌入：' + (result?.title || title || '笔记')}>
+  return <section ref={embedElement} className="block-reference-embed" contentEditable={false} title="按 F6 从编辑正文进入块嵌入操作" aria-label={'块嵌入：' + (result?.title || title || '笔记')}>
     <header><strong>{result?.title || title || '关联笔记'}</strong><span>只读块嵌入</span></header>
     {phase === 'loading' && <p role="status">正在读取来源的已保存正文…</p>}
     {phase === 'stopped' && <p role="status">读取已停止，未修改源笔记。</p>}
