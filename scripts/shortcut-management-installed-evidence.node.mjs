@@ -252,7 +252,7 @@ function assertWorkflowContract(rawWorkflow) {
   // This must never remove or relax individual route, screenshot or focus gates.
   assert.deepEqual(jobs['full-application-ui'].split('\n').filter(line => /^[ \t]*timeout-minutes:/.test(line)),
     ["    timeout-minutes: ${{ matrix.group == 'settings' && 40 || 25 }}"])
-  assert.match(jobs['full-application-ui'], /group: \\[settings, projects, research, editor, local-sync-lab\\]/)
+  assert.match(jobs['full-application-ui'], /group: \[settings, projects, research, editor, local-sync-lab\]/)
   assert.deepEqual(jobs['full-application-ui'].split('\n').filter(line => /^[ \t]*needs:/.test(line)), ['    needs: install-upgrade-uninstall'])
   assert.deepEqual(jobs['full-application-ui-acceptance'].split('\n').filter(line => /^[ \t]*timeout-minutes:/.test(line)), ['    timeout-minutes: 5'])
   assert.deepEqual(jobs['full-application-ui-acceptance'].split('\n').filter(line => /^[ \t]*needs:/.test(line)), ['    needs: [install-upgrade-uninstall, full-application-ui]'])
@@ -292,15 +292,15 @@ test('workflow accepts actual LF and CRLF checkout text with the same strict pre
 })
 
 test('Settings-specific CI wall budget rejects erased, broadened and increased exceptions', () => {
-  const raw = readFileSync(new URL('../.github/workflows/local-installation-2f86.yml', import.meta.url), 'utf8').replace(/\\r\\n/g, '\\n')
+  const raw = readFileSync(new URL('../.github/workflows/local-installation-2f86.yml', import.meta.url), 'utf8').replace(/\r\n/g, '\n')
   for (const bad of [
     "    timeout-minutes: 25",
     "    timeout-minutes: 40",
-    "    timeout-minutes: \${{ matrix.group == 'settings' && 41 || 25 }}",
-    "    timeout-minutes: \${{ matrix.group == 'settings' && 40 || 40 }}",
-    "    timeout-minutes: \${{ matrix.group == 'projects' && 40 || 25 }}",
+    "    timeout-minutes: ${{ matrix.group == 'settings' && 41 || 25 }}",
+    "    timeout-minutes: ${{ matrix.group == 'settings' && 40 || 40 }}",
+    "    timeout-minutes: ${{ matrix.group == 'projects' && 40 || 25 }}",
   ]) {
-    const altered = raw.replace("    timeout-minutes: \${{ matrix.group == 'settings' && 40 || 25 }}", bad)
+    const altered = raw.replace("    timeout-minutes: ${{ matrix.group == 'settings' && 40 || 25 }}", bad)
     assert.notEqual(altered, raw)
     assert.throws(() => assertWorkflowContract(altered))
   }
