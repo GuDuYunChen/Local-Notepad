@@ -1,5 +1,9 @@
-import outlineCss from './DocumentOutline.css?raw';
-import sharedControlCss from '~/components/ui/control-kit.css?raw';
+import { readFileSync } from 'node:fs';
+// Read the committed CSS itself: Vite's CSS transform can resolve `?raw` to an
+// empty stub in the test environment, which would make this safety assertion
+// fail before the actual selectors are checked.
+const outlineCss = readFileSync(new URL('./DocumentOutline.css', import.meta.url), 'utf8');
+const sharedControlCss = readFileSync(new URL('../../ui/control-kit.css', import.meta.url), 'utf8');
 import { uiQuery, uiText } from "~/test/uiControlDriver";import React, { act, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { test, expect, vi } from 'vitest';
