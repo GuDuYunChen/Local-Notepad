@@ -12,6 +12,7 @@ import controlEvidence from './check-ui-control-render.cjs'
 import { COLLAPSED_SIDEBAR_EXPAND, validateCollapsedSidebarObservation } from './full-app-ui-evidence.mjs'
 import { observeFullAppPopup, captureActualFullAppPopup, validateFullAppCaptureContinuity, validateFullAppPageSample, measureFullAppScrollCoverage, collectFullAppScrollOwners, createFullAppUiShared, withinActualClientPort, finiteOwnerMotionActive, waitForFiniteOwnerMotion } from './full-app-ui-shared.mjs'
 import { buildResearchImportFixtures, researchRoutes } from './full-app-ui-research.mjs'
+import { inspectProjectSetupOptionPointer } from './full-app-ui-projects.mjs'
 
 const clone = value => structuredClone(value)
 const hash = value => createHash('sha256').update(value).digest('hex')
@@ -1412,4 +1413,39 @@ test('graph selected screenshot uses only the direct detail button', t => {
   assert.equal(matched[0].textContent, '打开选中笔记')
   assert.equal(document.querySelectorAll('.local-graph-detail > button').length, 2,
     'Retain both direct user actions in their original order')
+})
+
+
+test('Project setup owns and settles its native popup option without dispatching a selection', () => {
+  const scrolls = [], marker = { getAttribute: () => 'target' }
+  const option = { getAttribute: k => k === 'role' ? 'option' : 'false',
+    querySelectorAll: () => [marker],
+    scrollIntoView: opts => scrolls.push(opts),
+    getBoundingClientRect: () => ({ left: 25, top: 40, width: 100, height: 32 }),
+    contains: node => node === marker }
+  const popup = { getAttribute: () => 'listbox', contains: node => node === option }
+  const page = { getElementById: id => id === 'own-list' ? popup : id === 'own-option' ? option : null,
+    elementFromPoint: () => marker }
+  const first = inspectProjectSetupOptionPointer('own-list', 'own-option', 'target', true, page)
+  const later = inspectProjectSetupOptionPointer('own-list', 'own-option', 'target', false, page)
+  assert.equal(first.hit, true); assert.equal(later.hit, true)
+  assert.deepEqual(later.center, { x: 75, y: 56 })
+  assert.deepEqual(scrolls, [{ block: 'center', inline: 'nearest', behavior: 'instant' }])
+})
+test('Project setup fails closed on foreign, wrong-value, disabled and occluded options', () => {
+  const marker = { getAttribute: () => 'target' }
+  const option = { getAttribute: k => k === 'role' ? 'option' : 'false',
+    querySelectorAll: () => [marker],
+    getBoundingClientRect: () => ({ left: 25, top: 40, width: 100, height: 32 }),
+    contains: node => node === marker }
+  const popup = { getAttribute: () => 'listbox', contains: node => node === option }
+  const page = { getElementById: id => id === 'own-list' ? popup : id === 'own-option' ? option : null,
+    elementFromPoint: () => marker }
+  assert.throws(() => inspectProjectSetupOptionPointer('foreign-list', 'own-option', 'target', false, page), /ownership/)
+  assert.throws(() => inspectProjectSetupOptionPointer('own-list', 'own-option', 'wrong', false, page), /identity/)
+  option.getAttribute = k => k === 'role' ? 'option' : k === 'aria-disabled' ? 'true' : null
+  assert.throws(() => inspectProjectSetupOptionPointer('own-list', 'own-option', 'target', false, page), /enabled state/)
+  option.getAttribute = k => k === 'role' ? 'option' : 'false'
+  page.elementFromPoint = () => ({ tagName: 'H4' })
+  assert.equal(inspectProjectSetupOptionPointer('own-list', 'own-option', 'target', false, page).hit, false)
 })
