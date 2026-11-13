@@ -318,7 +318,7 @@ test('workflow refuses missing changed or duplicated installation time budgets i
 test('workflow refuses missing changed or duplicated UI budgets and prerequisite jobs in both checkout formats', () => {
   const normalized = readFileSync(new URL('../.github/workflows/local-installation-2f86.yml', import.meta.url), 'utf8').replace(/\r\n/g, '\n')
   const fields = [
-    ['    timeout-minutes: 25\n', '    timeout-minutes: 26\n'],
+    ["    timeout-minutes: ${{ matrix.group == 'settings' && 40 || 25 }}\n", '    timeout-minutes: 26\n'],
     ['    timeout-minutes: 5\n', '    timeout-minutes: 6\n'],
     ['    needs: install-upgrade-uninstall\n', '    needs: full-application-ui-acceptance\n'],
     ['    needs: [install-upgrade-uninstall, full-application-ui]\n', '    needs: [full-application-ui]\n'],
