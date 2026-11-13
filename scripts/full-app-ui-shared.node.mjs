@@ -121,6 +121,43 @@ test('long-page coverage uses actual clipped image intervals, not nominal scroll
   assert.equal(measureFullAppScrollCoverage(surface, covered.samples, covered.images).complete, false, 'The true before/after image intersection must reach the last content')
 })
 
+
+test('pinned editor block popup keeps original full PNG coverage despite ancestor scroll', () => {
+  // Reproduce the actual failed 704x455 Windows menu: native ancestor 9..247,
+  // then 15..253, 24..262 and 33..271 as scrollTop moves 0,6,15,24.
+  const menu = { left: 80, top: 206.578125, right: 290, bottom: 446.578125, width: 210, height: 240 }
+  const outer = { left: 52, top: 198.578125, right: 704, bottom: 455, width: 652, height: 256.421875 }
+  const surface = { selector: '.editor-ancestor', ancestor: true, clientHeight: 256, scrollHeight: 371,
+    scrollTop: 0, requiredContentStart: 9, requiredContentEnd: 247,
+    contentTarget: { selector: '.block-menu', kind: 'nested-scroll-client-port' }, bounds: outer, ownerBounds: outer }
+  const offsets = [0, 6, 15, 24], images = offsets.map((_, i) => ({ filename: 'native-' + i + '.png' }))
+  const samples = offsets.flatMap((top, index) => ['before-capture', 'after-capture'].map(phase => ({
+    root: '.block-menu', rootBounds: { ...menu }, phase, image: images[index].filename,
+    scrollAreas: [{ ...surface, scrollTop: top, requiredContentStart: 9 + top, requiredContentEnd: 247 + top,
+      visibleContentStart: top, visibleContentEnd: top + 256 }]
+  })))
+  assert.equal(measureFullAppScrollCoverage(surface, samples, images).complete, true)
+  for (const change of [
+    s => { s.scrollAreas[0].requiredContentStart += 4 },
+    s => { s.scrollAreas[0].requiredContentEnd += 4 },
+    s => { s.rootBounds.top += 4 },
+    s => { s.scrollAreas[0].bounds.left += 4 },
+    s => { s.scrollAreas[0].contentTarget.kind = 'route-content' },
+    s => { s.scrollAreas[0].scrollHeight += 4 },
+  ]) {
+    const damaged = clone(samples); change(damaged.at(-1))
+    assert.throws(() => measureFullAppScrollCoverage(surface, damaged, images),
+      'Changed extent, owner, scrollport or root geometry must remain a failure')
+  }
+  const gaps = clone(samples)
+  for (const sample of gaps) {
+    sample.scrollAreas[0].visibleContentStart = 100
+    sample.scrollAreas[0].visibleContentEnd = 180
+  }
+  assert.equal(measureFullAppScrollCoverage(surface, gaps, images).complete, false,
+    'No pinned-content normalization may silently close a genuine photographed interval gap')
+})
+
 // Exercise the real current product's parsers, rather than duplicating their
 // accepted schemas in a verifier-only assertion. The bundle is a temporary
 // pure-Node reader, never a renderer or replacement product module.

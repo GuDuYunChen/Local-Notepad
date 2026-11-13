@@ -533,20 +533,46 @@ export function validateFullAppCaptureContinuity(before, actual, matrix) {
   return validateFullAppPageSample({ ...actual, controls, anchors }, matrix)
 }
 
+// A pinned nested popup can remain at one native viewport rectangle while
+// an enclosing editor scroller moves. The ancestor's content coordinates then
+// shift by exactly that native scroll offset. Accept this alternate coordinate
+// frame only with unchanged real root and scroll-port geometry, not missing PNG
+// intervals or genuine changes to content extent.
+function pinnedNestedAncestorRange(surface, baseline, sample, actual) {
+  const sameBounds = (left, right) => left && right && ['left', 'top', 'right', 'bottom', 'width', 'height'].every(
+    key => Number.isFinite(left[key]) && Number.isFinite(right[key]) && Math.abs(left[key] - right[key]) <= 0.6)
+  if (!surface.ancestor || surface.contentTarget?.kind !== 'nested-scroll-client-port' ||
+      surface.contentTarget?.selector !== baseline?.root || sample?.root !== baseline.root ||
+      actual.contentTarget?.kind !== surface.contentTarget.kind ||
+      actual.contentTarget?.selector !== surface.contentTarget.selector ||
+      !sameBounds(sample.rootBounds, baseline.rootBounds) || !sameBounds(actual.bounds, surface.bounds) ||
+      !sameBounds(actual.ownerBounds, surface.ownerBounds) ||
+      !Number.isFinite(actual.scrollTop) || !Number.isFinite(surface.scrollTop)) return false
+  const delta = actual.scrollTop - surface.scrollTop
+  return Math.abs(delta) > 1 &&
+    Math.abs(actual.requiredContentStart - surface.requiredContentStart - delta) <= 1 &&
+    Math.abs(actual.requiredContentEnd - surface.requiredContentEnd - delta) <= 1
+}
+
 export function measureFullAppScrollCoverage(surface, samples, images) {
   const start = surface.requiredContentStart, end = surface.requiredContentEnd
   assert.ok(Number.isFinite(start) && Number.isFinite(end) && start >= 0 && end >= start && end <= surface.scrollHeight)
+  const baseline = samples.find(sample => sample.scrollAreas?.some(item => item.selector === surface.selector))
   const intervals = []
   for (const image of images) {
-    const pair = ['before-capture', 'after-capture'].map(phase => samples.find(sample => sample.phase === phase && sample.image === image.filename)?.scrollAreas.find(item => item.selector === surface.selector))
-    if (pair.some(item => !item)) continue
-    for (const actual of pair) {
+    const pair = ['before-capture', 'after-capture'].map(phase => {
+      const sample = samples.find(sample => sample.phase === phase && sample.image === image.filename)
+      return { sample, actual: sample?.scrollAreas.find(item => item.selector === surface.selector) }
+    })
+    if (pair.some(({ actual }) => !actual)) continue
+    for (const { sample, actual } of pair) {
       assert.equal(actual.scrollHeight, surface.scrollHeight); assert.equal(actual.clientHeight, surface.clientHeight)
-      assert.ok(Math.abs(actual.requiredContentStart - start) <= 1 && Math.abs(actual.requiredContentEnd - end) <= 1, 'Actual long-page content range changed')
+      const originalRange = Math.abs(actual.requiredContentStart - start) <= 1 && Math.abs(actual.requiredContentEnd - end) <= 1
+      assert.ok(originalRange || pinnedNestedAncestorRange(surface, baseline, sample, actual), 'Actual long-page content range changed')
       assert.ok(Number.isFinite(actual.visibleContentStart) && Number.isFinite(actual.visibleContentEnd) && actual.visibleContentEnd >= actual.visibleContentStart)
     }
-    const from = Math.max(start, pair[0].visibleContentStart, pair[1].visibleContentStart)
-    const to = Math.min(end, pair[0].visibleContentEnd, pair[1].visibleContentEnd)
+    const from = Math.max(start, pair[0].actual.visibleContentStart, pair[1].actual.visibleContentStart)
+    const to = Math.min(end, pair[0].actual.visibleContentEnd, pair[1].actual.visibleContentEnd)
     if (to > from) intervals.push({ from, to, image: image.filename })
   }
   intervals.sort((a, b) => a.from - b.from || a.to - b.to)
