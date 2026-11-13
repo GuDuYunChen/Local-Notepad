@@ -140,6 +140,22 @@ export function editorInsertMenuOutsidePoint() {
   throw Error('No safe actual background surface to dismiss editor table picker')
 }
 
+// The highlight palette may cover its own format trigger on compact Windows
+// viewports. Dismiss it using a real, safely painted background pointer.
+export function editorFormatMenuOutsidePoint() {
+  const menu = document.querySelector('.toolbar-format-menu')
+  const picker = document.querySelector('[aria-label="高亮颜色选择"]')
+  if (!menu || !picker || !menu.contains(picker)) throw Error('Actual editor highlight picker ownership is missing')
+  const width = innerWidth, height = innerHeight
+  if (![width, height].every(value => Number.isFinite(value) && value > 32)) throw Error('Actual editor viewport is unavailable')
+  for (const [x, y] of [[width / 2, 8], [width / 3, 8], [width * 2 / 3, 8], [width / 2, height - 8], [width / 3, height - 8]]) {
+    const target = document.elementFromPoint(x, y)
+    if (!target || menu.contains(target) || target.closest('.toolbar-more-wrap,button,a,input,textarea,select,[role="button"],[role="link"],[contenteditable="true"]')) continue
+    return { x, y }
+  }
+  throw Error('No safe actual background surface to dismiss editor highlight picker')
+}
+
 export async function verifyMainEditorPages(ctx) {
   await verifyNavigationPages(ctx)
   const { api, evaluate, click, until, cdp, shared, setup } = ctx
@@ -280,7 +296,12 @@ export async function verifyMainEditorPages(ctx) {
   await press('.toolbar-format-menu .text-color-group', '文字颜色')
   await press('.toolbar-format-menu .text-color-group', '高亮'); await present('[aria-label="高亮颜色选择"]')
   await shot('editor-toolbar', 'highlight', ['[aria-label="高亮颜色选择"] button:first-child'], { root: '[aria-label="高亮颜色选择"]' })
-  await hit('.editor-toolbar [aria-label="更多格式"]'); await absent('.toolbar-format-menu')
+  const outsideHighlight = await evaluate(`(${editorFormatMenuOutsidePoint.toString()})()`)
+  for (const type of ['mousePressed', 'mouseReleased']) {
+    await cdp.send('Input.dispatchMouseEvent', { type, ...outsideHighlight, button: 'left', clickCount: 1 })
+  }
+  await absent('[aria-label="高亮颜色选择"]')
+  await absent('.toolbar-format-menu')
 
   await selectText(); await present('.floating-text-toolbar')
   await shot('editor-floating', 'selection', ['.floating-text-toolbar [aria-label="加粗"]'])
