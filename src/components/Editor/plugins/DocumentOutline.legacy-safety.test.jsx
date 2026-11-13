@@ -1,3 +1,5 @@
+import outlineCss from './DocumentOutline.css?raw';
+import sharedControlCss from '~/components/ui/control-kit.css?raw';
 import { uiQuery, uiText } from "~/test/uiControlDriver";import React, { act, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { test, expect, vi } from 'vitest';
@@ -14,3 +16,14 @@ async function real(check) {globalThis.IS_REACT_ACT_ENVIRONMENT = true;let edito
   try {await act(async () => root.render(<LexicalComposer initialConfig={{ namespace: 'outline-negative', nodes: [HeadingNode], onError: (e) => {throw e;} }}><div className="editor-shell"><DocumentOutlinePlugin documentId="A" documentTitle="标题" /><div className="editor-container"><RichTextPlugin contentEditable={<ContentEditable className="editor-input" />} placeholder={null} ErrorBoundary={LexicalErrorBoundary} /><Capture /></div></div></LexicalComposer>));await act(async () => editor.update(() => $getRoot().clear().append($createHeadingNode('h1').append($createTextNode('唯一标题')), $createParagraphNode().append($createTextNode('正文'))), { discrete: true }));await act(async () => {for (let i = 0; i < 10; i++) await Promise.resolve();});await check(host);} finally {await act(async () => root.unmount());host.remove();vi.restoreAllMocks();vi.unstubAllGlobals();delete globalThis.IS_REACT_ACT_ENVIRONMENT;}}
 test('single-heading documents retain the outline entry', async () => real(async (host) => expect(uiQuery(host, 'button[aria-label="文档目录"]')).toBeTruthy()));
 test('fallback clipboard returning false cannot be reported as copied', async () => real(async (host) => {vi.stubGlobal('navigator', {});const prior = document.execCommand;document.execCommand = vi.fn(() => false);try {await act(async () => window.dispatchEvent(new Event('editor:copy-current-reference')));await act(async () => {for (let i = 0; i < 20; i++) await Promise.resolve();});expect(document.execCommand).toHaveBeenCalled();expect(uiText(host)).toContain('复制未成功');} finally {document.execCommand = prior;}}));
+
+test('outline action rows use compact shared-control height, not the 40px form-toolbar minimum', async () => real(async (host) => {
+  await act(async () => host.querySelector('[aria-label="文档目录"]').click());
+  const controls = [...host.querySelectorAll('.document-outline-panel .outline-tools > button')];
+  expect(controls.length).toBeGreaterThanOrEqual(3);
+  expect(controls.every(button => button.getAttribute('data-ui-control') === 'button' &&
+    button.getAttribute('data-ui-layout') === 'action' && button.classList.contains('ant-btn-sm'))).toBe(true);
+  expect(sharedControlCss).toMatch(/\[data-ui-layout="action"\]\s*\{\s*min-height:\s*40px\s*;/);
+  const rule = outlineCss.match(/\.editor-shell \.local-outline \.outline-tools > \[data-ui-control="button"\]\[data-ui-layout="action"\]\s*\{([^}]*)\}/);
+  expect(rule?.[1]).toMatch(/min-height:\s*0\s*;/);
+}));
