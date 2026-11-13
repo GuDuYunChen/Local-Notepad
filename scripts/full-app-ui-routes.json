@@ -3,8 +3,8 @@
   "scope": "installed-actual-app-page-matrix",
   "sourceScope": "control-source entry coverage with declared states; not every possible failure combination",
   "productSource": {
-    "commit": "7c62a978653320397bbb1fec96735aea4ca93484",
-    "tree": "2a9ba7fcda5968190f57b4a3cc07c350b2ac1270",
+    "commit": "bf2e4307d3aff3e3381a6abf41507f3e23c50584",
+    "tree": "cedb8edaac41afe88a4864373bd23673157d8e6a",
     "dirty": false
   },
   "inventory": {

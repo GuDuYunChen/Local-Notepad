@@ -5,6 +5,9 @@
 .editor-shell .local-outline .document-outline-header small { display:block; margin-top:4px; }
 .editor-shell .local-outline button { cursor:pointer; }
 .editor-shell .local-outline .outline-tools { display:flex; flex-wrap:wrap; gap:6px; padding:8px 12px; }
+/* Outline actions use the Ant Design compact token. The generic -tools form-row
+   minimum is 40px; let the small button's own height win here. */
+.editor-shell .local-outline .outline-tools > [data-ui-control="button"][data-ui-layout="action"] { min-height:0; }
 .editor-shell .local-outline .outline-tools button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
 .editor-shell .local-outline .document-outline-header>button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:5px; padding:5px 8px; font:inherit; font-size:12px; }
 .editor-shell .local-outline .outline-query { display:flex; flex-direction:column; gap:6px; padding:8px 12px; font-size:12px; }
