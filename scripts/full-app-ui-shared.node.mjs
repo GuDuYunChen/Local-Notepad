@@ -989,7 +989,7 @@ const projectSetupRequested = 'index:project-setup-fixture-note'
 const projectSetupTarget = { id: 'project-alias-target', value: projectSetupRequested, disabled: false }
 
 function projectSetupAliasFixture(t, { appearAt = 0, choices = [projectSetupTarget], removeBeforeChoose = false,
-  clickFailure = null, truncateOnFailure = false } = {}) {
+  clickFailure = null, truncateOnFailure = false, occludedOption = false } = {}) {
   const dom = new ProjectSetupDOM('<div data-ui-control="select" data-ui-value=\'""\'><input id="project-alias-input" role="combobox" aria-label="选择实体别名对象" aria-expanded="false"></div>', { runScripts: 'outside-only' })
   t.after(() => dom.window.close())
   const { document } = dom.window, field = document.querySelector('input'), host = field.parentElement
@@ -997,6 +997,28 @@ function projectSetupAliasFixture(t, { appearAt = 0, choices = [projectSetupTarg
   const report = { fullAppUi: {} }, saved = [], keys = [], clicks = [], chooseCalls = [], waits = [], sleeps = []
   let clock = 0, available = choices, popup
   dom.window.__fullAppUiEvents = []; dom.window.__fullAppUiTraceTruncated = false
+  // JSDOM implements DOM ownership, not scrolling, box layout or hit-testing.
+  // Supply only deterministic fixture geometry; the installed-app runner still
+  // uses real renderer scrollIntoView, animation frames and elementFromPoint.
+  const scrolls = [], frames = []
+  dom.window.HTMLElement.prototype.getBoundingClientRect = function () {
+    if (this.getAttribute('role') !== 'option') return { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 }
+    const index = [...this.parentElement.children].indexOf(this)
+    const left = 40, top = 60 + index * 32, width = 180, height = 28
+    return { left, top, right: left + width, bottom: top + height, width, height }
+  }
+  dom.window.HTMLElement.prototype.scrollIntoView = function (options) {
+    assert.equal(this.getAttribute('role'), 'option')
+    assert.deepEqual({ ...options }, { block: 'center', inline: 'nearest', behavior: 'instant' })
+    scrolls.push(this.id)
+  }
+  document.elementFromPoint = (x, y) => {
+    const option = [...document.querySelectorAll('[role="option"]')].find(node => {
+      const box = node.getBoundingClientRect()
+      return x >= box.left && x <= box.right && y >= box.top && y <= box.bottom
+    })
+    return occludedOption && option ? field : option || null
+  }
   const renderOptions = () => {
     if (!popup) return
     popup.replaceChildren()
@@ -1036,6 +1058,7 @@ function projectSetupAliasFixture(t, { appearAt = 0, choices = [projectSetupTarg
     save: () => saved.push(clone(report.fullAppUi.setupInteractions?.[0] ?? null)),
     shared: {
       ensureVisible: async target => assert.equal(target, selector),
+      frame: async () => { frames.push(clock) },
       key: async key => {
         keys.push(key); assert.equal(key, 'ArrowDown'); assert.equal(document.activeElement, field)
         field.setAttribute('aria-expanded', 'true'); field.setAttribute('aria-controls', popupId)
@@ -1050,7 +1073,7 @@ function projectSetupAliasFixture(t, { appearAt = 0, choices = [projectSetupTarg
       } },
     },
   }
-  return { context, saved, keys, clicks, chooseCalls, waits, sleeps, dom, selector, popupId,
+  return { context, saved, keys, clicks, chooseCalls, waits, sleeps, scrolls, frames, dom, selector, popupId,
     elapsed: () => clock, receipt: () => report.fullAppUi.setupInteractions[0] }
 }
 
@@ -1073,10 +1096,24 @@ test('project setup waits for a delayed own target before one original option ch
   assert.ok(f.saved.some(item => item?.latestOpening?.popupReady && item.latestOpening.options.length === 1 && item.latestOpening.options[0].value === ''))
   assert.ok(receipt.opened.options.some(option => option.value === projectSetupRequested))
   assert.deepEqual(f.keys, ['ArrowDown']); assert.equal(f.clicks.length, 1)
+  assert.deepEqual(f.scrolls, ['project-alias-target']); assert.deepEqual(f.frames, [200, 200])
+  assert.equal(receipt.optionPreScroll.hit, true); assert.equal(receipt.optionBeforeClick.hit, true)
   assert.deepEqual(f.chooseCalls, [{ args: [f.selector, projectSetupRequested], at: 200 }])
   assert.deepEqual(f.sleeps, [100, 100]); assert.equal(f.waits[0].checks, 3); assert.equal(f.elapsed(), 200)
   assert.ok(f.waits.every(wait => wait.argumentCount === 2))
   assert.equal(receipt.events.length, 2); assert.equal(receipt.traceTruncated, false)
+})
+
+test('project setup refuses an occluded option after scroll and two frames without a trusted click', async t => {
+  const f = projectSetupAliasFixture(t, { occludedOption: true }); let failure
+  await assert.rejects(chooseProjectSetupAlias(f.context, projectSetupRequested), error => {
+    failure = error; return /not hit-testable after native scroll and paint/.test(error.message)
+  })
+  assert.deepEqual(f.scrolls, ['project-alias-target']); assert.deepEqual(f.frames, [0, 0])
+  assert.equal(f.receipt().optionPreScroll.hit, false)
+  assert.equal(f.receipt().optionBeforeClick.hit, false)
+  assert.equal(f.clicks.length, 0); assert.equal(f.chooseCalls.length, 0)
+  assertProjectSetupFailureTrace(f, failure)
 })
 
 test('project setup permanently missing target expires the original default budget without another input', async t => {
