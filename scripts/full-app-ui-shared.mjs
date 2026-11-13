@@ -631,6 +631,17 @@ export function createFullAppUiShared(ctx) {
     const seen = new Map(), wanted = new Map(), capturedAnchors = new Map()
     let index = 0
     const snap = async targetAnchors => {
+      // The Sync activity reader legitimately polls every five seconds and
+      // temporarily disables its refresh action during requests. Require the
+      // real read to settle before the original strict PNG continuity proof.
+      // Never mask a changed disabled value or remove the original assertion.
+      if (meta.routeId === 'sync-presentation') {
+        await until(() => evaluate(`(() => {
+          const matches = [...document.querySelectorAll('.sync-activity-heading button')]
+            .filter(node => node.textContent.trim() === '刷新任务状态')
+          return matches.length === 1 && !matches[0].disabled
+        })()`), 'Actual Sync activity refresh was not settled before native capture')
+      }
       const motion = { complete: false }; scene.motionReadiness.push(motion)
       await waitForFiniteOwnerMotion(() => evaluate(`(${observeFullAppOwnerMotion.toString()})(${q(root)})`), until, motion)
       const before = await samplePage(route, root, targetAnchors, onlySelectors, sidebarFocusRequired)
@@ -765,12 +776,30 @@ export function createFullAppUiShared(ctx) {
         await until(async () => !(await nativeSelect.inspect(selector)).expanded, 'Actual focus Select did not close')
       } else await click(selector)
     }
-    await key('Tab', 8)
     let reached = false, tabAttempts = 0
-    for (let index = 0; index < 256; index++) {
+    if (meta.routeId === 'projects-focus-session' && meta.stateId === 'focused' &&
+        selector === '.focus-session-actions > button:first-child') {
+      // Lexical consumes Tab as indent. The preceding trusted action toggle
+      // restored the real first button's focus; prove its *adjacent* keyboard
+      // traversal in both directions without accidentally entering Lexical.
+      assert.equal(await evaluate(`document.activeElement===document.querySelector(${q(selector)})`), true,
+        'Actual Session action did not own keyboard focus before native traversal')
       await key('Tab')
       tabAttempts++
-      if (await evaluate(`document.activeElement===document.querySelector(${q(selector)})`)) { reached = true; break }
+      assert.equal(await evaluate(`(() => {
+        const first = document.querySelector(${q(selector)})
+        const next = first?.nextElementSibling
+        return next?.tagName === 'BUTTON' && !next.disabled && document.activeElement === next
+      })()`), true, 'Actual Session actions are not adjacent in real forward Tab order')
+      await key('Tab', 8)
+      reached = await evaluate(`document.activeElement===document.querySelector(${q(selector)})`)
+    } else {
+      await key('Tab', 8)
+      for (let index = 0; index < 256; index++) {
+        await key('Tab')
+        tabAttempts++
+        if (await evaluate(`document.activeElement===document.querySelector(${q(selector)})`)) { reached = true; break }
+      }
     }
     if (!reached) {
       // Observe only an exhausted traversal. Keep the original input sequence,
