@@ -164,6 +164,7 @@ export default function FloatingTextToolbarPlugin() {
       aria-keyshortcuts="Alt+F10"
       style={{ top: position.top, left: position.left }}
       role="toolbar"
+      tabIndex={0}
       aria-label="选中文本格式"
       onMouseDown={preventBlur}
     >
