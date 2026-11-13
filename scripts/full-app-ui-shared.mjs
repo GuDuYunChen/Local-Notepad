@@ -7,7 +7,7 @@ const { hasVisibleBoxShadow, paintedPopupReader } = controlEvidence
 const q = JSON.stringify
 const heights = { small: 28, middle: 40, large: 44 }
 const keyCodes = { Tab: 9, Enter: 13, Escape: 27, Backspace: 8, Delete: 46, Home: 36, End: 35,
-  ArrowLeft: 37, ArrowUp: 38, ArrowRight: 39, ArrowDown: 40, ' ': 32, a: 65 }
+  ArrowLeft: 37, ArrowUp: 38, ArrowRight: 39, ArrowDown: 40, F10: 121, ' ': 32, a: 65 }
 const slug = value => String(value).replace(/[^a-zA-Z0-9_-]+/g, '-').slice(0, 90)
 
 export function withinActualClientPort(rect, bounds, metrics, overflowX, overflowY, tolerance = 1) {

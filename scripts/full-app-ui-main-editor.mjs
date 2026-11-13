@@ -225,6 +225,7 @@ export function observeFloatingToolbarKeyboardEntry(ownerToken = null, action = 
   return { content: editor.innerHTML, documentTitle: one('.workspace-title-button').textContent.trim(),
     selection: { text: selection.toString(), anchor: point(selection.anchorNode, selection.anchorOffset), focus: point(selection.focusNode, selection.focusOffset) },
     owner: { editorRetained: true, toolbarRetained: true, targetEnabled: true, precedingControlEnabled: true },
+    nativeShortcut: toolbar.getAttribute('aria-keyshortcuts') === 'Alt+F10' && toolbar.tabIndex === 0,
     menuOpen: Boolean(menu), fontAvailable: Boolean(font), fontExpanded: font ? font.getAttribute('aria-expanded') === 'true' : null,
     active: active === editor ? 'editor' : active === font ? 'font' : active === more ? 'more' : active === target ? 'target' : 'other' }
 }
@@ -261,6 +262,14 @@ export async function prepareFloatingToolbarKeyboardEntry(ctx) {
     receipt.before = await read('install'); receipt.ownerInstalled = true; remember('before-shortcut', receipt.before)
     assert.equal(receipt.before.active, 'editor', 'Selected editor must own the keyboard before the fixed font shortcut')
     assert.equal(receipt.before.menuOpen, false, 'Floating toolbar entry requires the previous format menu to be closed')
+    if (receipt.before.nativeShortcut) {
+      receipt.method = 'native-alt-f10-selected-toolbar'
+      await press('F10', 1)
+      remember('native-bold-focused', await until(async () => {
+        const value = await read()
+        return value.active === 'target' && !value.menuOpen && value
+      }, 'Native Alt+F10 did not focus the actual selected Bold control'))
+    } else {
     await press('F', 10)
     let current = remember('font-focused', await until(async () => {
       const value = await read(); return value.menuOpen && value.fontAvailable && value.active === 'font' && value
@@ -283,6 +292,7 @@ export async function prepareFloatingToolbarKeyboardEntry(ctx) {
       assert.equal(value.active, 'more', 'Closing the actual format menu returned focus to the editor')
       return !value.menuOpen && !value.fontAvailable && value
     }, 'Actual Space did not close the format menu'))
+    }
     const trace = await evaluate(`({events:window.__fullAppUiEvents.slice(${Number(receipt.eventStart)}),traceTruncated:window.__fullAppUiTraceTruncated})`)
     Object.assign(receipt, trace)
     assert.equal(trace.traceTruncated, false, 'Floating toolbar keyboard entry trace was truncated')

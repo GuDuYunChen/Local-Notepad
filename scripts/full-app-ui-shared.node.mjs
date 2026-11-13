@@ -1617,13 +1617,17 @@ test('ordinary runner clicks retain their original path without owned-option pre
 const { observeFloatingToolbarKeyboardEntry, prepareFloatingToolbarKeyboardEntry, finishFloatingToolbarKeyboardEntry,
   disposeFloatingToolbarKeyboardEntry } = await import('./full-app-ui-main-editor.mjs')
 
-function floatingKeyboardEntryFixture(t, { expanded = false, noShortcut = false, loseSelection = false,
+function floatingKeyboardEntryFixture(t, { expanded = false, noShortcut = false, nativeShortcut = false, loseSelection = false,
   changeContent = false, ignoreEscape = false, closeReturnsEditor = false, uncertainKey = null,
   truncated = false, replaceOwner = null } = {}) {
   const dom = new ProjectSetupDOM('<button class="workspace-title-button">Owned note</button><div class="editor-shell"><div class="editor-toolbar"><button id="preceding">Existing toolbar control</button><div class="toolbar-more-wrap"><button aria-label="更多格式">More</button></div></div><div class="block-reference-entry"><button>Reference</button></div><button class="editor-resource-toggle">Resources</button><div class="floating-text-toolbar" role="toolbar"><button aria-label="加粗">Bold</button><button>Italic</button></div><div class="editor-input" role="textbox" contenteditable="true" tabindex="0"><p>Selected original text</p></div></div>', { runScripts: 'outside-only' })
   t.after(() => dom.window.close())
   const document = dom.window.document, editor = document.querySelector('.editor-input')
   const more = document.querySelector('[aria-label="更多格式"]'), target = document.querySelector('[aria-label="加粗"]')
+  if (nativeShortcut) {
+    const toolbar = document.querySelector('.floating-text-toolbar')
+    toolbar.setAttribute('aria-keyshortcuts', 'Alt+F10'); toolbar.tabIndex = 0
+  }
   const prior = document.querySelector('#preceding'), selection = dom.window.getSelection()
   // JSDOM focus() collapses document Selection for every element, including
   // buttons and inputs. This protocol fixture models focus ownership separately;
@@ -1652,7 +1656,14 @@ function floatingKeyboardEntryFixture(t, { expanded = false, noShortcut = false,
   const key = async (value, modifiers = 0) => {
     keys.push({ key: value, modifiers }); event('keydown', value)
     if (uncertainKey === value) throw Error('Uncertain native entry key outcome')
-    if (value === 'F' && modifiers === 10) {
+    if (value === 'F10' && modifiers === 1) {
+      assert.equal(nativeShortcut, true); assert.equal(document.activeElement, editor)
+      if (noShortcut) return
+      // Emulate the product's trusted native keydown handling, not verifier DOM focus.
+      protocolActiveElement = target
+      if (loseSelection) selection.removeAllRanges()
+      if (changeContent) editor.firstChild.setAttribute('style', 'padding-left:40px')
+    } else if (value === 'F' && modifiers === 10) {
       assert.equal(document.activeElement, editor)
       if (noShortcut) return
       const menu = document.createElement('div'); menu.className = 'toolbar-format-menu'
@@ -1676,11 +1687,13 @@ function floatingKeyboardEntryFixture(t, { expanded = false, noShortcut = false,
       const font = document.querySelector('[aria-label="字体"]'); assert.equal(document.activeElement, font)
       if (!ignoreEscape) font.setAttribute('aria-expanded', 'false')
     } else if (value === 'Tab' && modifiers === 8) {
-      if (document.activeElement === document.querySelector('[aria-label="字体"]')) setProtocolFocus(more)
+      if (nativeShortcut && document.activeElement === target) setProtocolFocus(target.parentElement)
+      else if (document.activeElement === document.querySelector('[aria-label="字体"]')) setProtocolFocus(more)
       else if (document.activeElement === more) setProtocolFocus(prior)
       else throw Error('Unexpected reverse Tab owner in entry fixture')
     } else if (value === 'Tab' && modifiers === 0) {
-      assert.equal(document.activeElement, prior); setProtocolFocus(more)
+      if (nativeShortcut && document.activeElement === target.parentElement) protocolActiveElement = target
+      else { assert.equal(document.activeElement, prior); setProtocolFocus(more) }
     } else if (value === ' ') {
       assert.equal(document.activeElement, more)
       document.querySelector('.toolbar-format-menu').remove(); event('click')
@@ -1729,6 +1742,38 @@ test('the locked Lexical Tab handler consumes the original editor traversal as i
     })
     assert.equal(prevented.length, 257); assert.ok(prevented.every(Boolean))
   } finally { unregister() }
+})
+
+test('native Alt+F10 enters the actual selected floating Bold control through trusted keyboard input', async t => {
+  const f = floatingKeyboardEntryFixture(t, { nativeShortcut: true }), before = await f.observe()
+  const receipt = await prepareFloatingToolbarKeyboardEntry(f.context)
+  assert.deepEqual(f.keys, [{ key: 'F10', modifiers: 1 }])
+  assert.equal(receipt.method, 'native-alt-f10-selected-toolbar')
+  assert.equal(receipt.entryComplete, true); assert.equal(receipt.complete, false)
+  assert.equal(receipt.afterNativeFocus, undefined)
+  assert.equal(f.document.activeElement, f.target); assert.equal(f.stats().targetFocusCalls, 0)
+  assert.deepEqual(receipt.before.selection, before.selection)
+  await f.key('Tab', 8)
+  assert.equal(f.document.activeElement, f.target.parentElement)
+  await f.key('Tab')
+  assert.equal(f.document.activeElement, f.target)
+  await finishFloatingToolbarKeyboardEntry(f.context, receipt)
+  assert.equal(receipt.complete, true); assert.equal(receipt.stage, 'original-tab-proof-complete')
+  assert.equal(receipt.ownerDisposal.identityRetained, true)
+  assert.equal(f.dom.window.__fullAppFloatingToolbarKeyboardOwner, undefined)
+  assert.equal(f.stats().targetFocusCalls, 0)
+})
+
+test('native Alt+F10 selection loss and missing key handling remain strict failures', async t => {
+  const missing = floatingKeyboardEntryFixture(t, { nativeShortcut: true, noShortcut: true })
+  await assert.rejects(prepareFloatingToolbarKeyboardEntry(missing.context), /Native Alt\+F10 did not focus/)
+  assert.deepEqual(missing.keys, [{ key: 'F10', modifiers: 1 }])
+  assert.equal(missing.receipt().entryComplete, false)
+  const lost = floatingKeyboardEntryFixture(t, { nativeShortcut: true, loseSelection: true })
+  await assert.rejects(prepareFloatingToolbarKeyboardEntry(lost.context), /original editor selection/)
+  assert.deepEqual(lost.keys, [{ key: 'F10', modifiers: 1 }])
+  assert.equal(lost.receipt().complete, false)
+  assert.equal(lost.stats().targetFocusCalls, 0)
 })
 
 test('floating toolbar entry uses one existing font shortcut and leaves the original Tab proof at its real preceding control', async t => {

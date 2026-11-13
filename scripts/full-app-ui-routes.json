@@ -3,8 +3,8 @@
   "scope": "installed-actual-app-page-matrix",
   "sourceScope": "control-source entry coverage with declared states; not every possible failure combination",
   "productSource": {
-    "commit": "d4815857ce686e7bc4a50df7156e4ee99c0ff511",
-    "tree": "350577b1ddedd020d009c0eede249585bc37f778",
+    "commit": "9c78f4c7909d89c3d8279e836f720390ecd6a6b2",
+    "tree": "821e3d7cb7bc08b737b7ddd500a11efd25860522",
     "dirty": false
   },
   "inventory": {
@@ -2163,9 +2163,9 @@
     },
     {
       "file": "src/components/Editor/plugins/FloatingTextToolbarPlugin.jsx",
-      "bytes": 5225,
-      "sha256": "76a2dc8778ecf6d4d4d734b95199d48a7f8ef9d4beb559dac35c5f72ef858167",
-      "blob": "69e979a3f4ca8993d84d98672bb45061ec672f04",
+      "bytes": 7487,
+      "sha256": "a1012e47150d5ddd475723ee534505b017f2313ddf6edb5a8f8ae3296b4bf975",
+      "blob": "8a440db715f5a4d4fbb958480eb1a2699e039faf",
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [

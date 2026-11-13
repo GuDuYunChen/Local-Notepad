@@ -20,6 +20,7 @@ import CommandPalettePlugin from './CommandPalettePlugin';
 import EditorShortcutPlugin from './EditorShortcutPlugin';
 import TableSelectionPlugin from './TableSelectionPlugin';
 import ToolbarPlugin from './ToolbarPlugin';
+import FloatingTextToolbarPlugin from './FloatingTextToolbarPlugin';
 
 let root, host, editor, errors, frames, sequence, props, clipboard;
 const settle = async () => act(async () => {for (let i = 0; i < 10; i++) await Promise.resolve();});
@@ -35,7 +36,7 @@ function Capture({ editable }) {
   return null;
 }
 
-function Harness({ editable = true, documentId = 'note-A' }) {
+function Harness({ editable = true, documentId = 'note-A', floating = false }) {
   return <LexicalComposer initialConfig={{
     namespace: 'actual-editor-shortcut-preferences',
     nodes: [HeadingNode, QuoteNode, ListNode, ListItemNode, TableNode, TableRowNode, TableCellNode, FormulaNode],
@@ -49,6 +50,7 @@ function Harness({ editable = true, documentId = 'note-A' }) {
       <CommandPalettePlugin documentId={documentId} />
       <div className="editor-container">
         <RichTextPlugin contentEditable={<ContentEditable className="editor-input" />} placeholder={null} ErrorBoundary={LexicalErrorBoundary} />
+        {floating ? <FloatingTextToolbarPlugin /> : null}
         <ListPlugin />
         <CheckListPlugin />
         <EditorShortcutPlugin documentId={documentId} />
@@ -418,4 +420,37 @@ test('a selected table does not accept configured writes during another modal or
   await key('m', { shiftKey: true });
   expect(snapshot()).toEqual(before);
   expect(errors).toEqual([]);
+});
+
+test('Alt+F10 enters the real selected-text toolbar without changing the Lexical body or native selection', async () => {
+  vi.spyOn(Range.prototype, 'getBoundingClientRect').mockReturnValue({
+    left: 48, top: 130, right: 148, bottom: 150, width: 100, height: 20,
+  });
+  await render({ floating: true });
+  const input = editor.getRootElement();
+  await act(async () => input.focus());
+  await act(async () => editor.update(() => {
+    $getRoot().getChildren()[1].getFirstChild().select(0, 5);
+  }, { discrete: true }));
+  await tick();
+  await act(async () => document.dispatchEvent(new Event('selectionchange')));
+  await tick();
+  const bold = uiQuery(host, '.floating-text-toolbar [aria-label="加粗"]');
+  expect(bold).toBeTruthy();
+  const textBefore = window.getSelection().toString();
+  const bodyBefore = snapshot();
+  expect(textBefore).toBe('alpha');
+  expect(document.activeElement).toBe(input);
+  const entry = await key('F10', { ctrlKey: false, altKey: true }, input);
+  await tick();
+  expect(entry.defaultPrevented).toBe(true);
+  expect(document.activeElement).toBe(bold);
+  expect(uiQuery(host, '.floating-text-toolbar [aria-label="加粗"]')).toBe(bold);
+  expect(window.getSelection().toString()).toBe(textBefore);
+  expect(snapshot()).toEqual(bodyBefore);
+  expect(bold.closest('[aria-keyshortcuts="Alt+F10"]')).toBeTruthy();
+
+  const wrongModifiers = await key('F10', { altKey: true, ctrlKey: true }, input);
+  expect(wrongModifiers.defaultPrevented).toBe(false);
+  expect(snapshot()).toEqual(bodyBefore);
 });
