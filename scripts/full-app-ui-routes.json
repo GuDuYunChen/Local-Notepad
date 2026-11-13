@@ -3,8 +3,8 @@
   "scope": "installed-actual-app-page-matrix",
   "sourceScope": "control-source entry coverage with declared states; not every possible failure combination",
   "productSource": {
-    "commit": "9c78f4c7909d89c3d8279e836f720390ecd6a6b2",
-    "tree": "821e3d7cb7bc08b737b7ddd500a11efd25860522",
+    "commit": "720e3938af7e41ac15163a6fd78cedf65bfce5b6",
+    "tree": "1b2819e11a474d73ab2676891adb6435939c4a37",
     "dirty": false
   },
   "inventory": {
@@ -2184,9 +2184,9 @@
     },
     {
       "file": "src/components/Editor/plugins/LinkInteractionPlugin.jsx",
-      "bytes": 8079,
-      "sha256": "8e002d0d244fba6820afbea590b6cd78a850c077c1881a56da0bdc984c7f709a",
-      "blob": "4ce4662015ae5786011b0df198b1ccd588474084",
+      "bytes": 8239,
+      "sha256": "65fa08881ad303fa488bac74d19309acc692404152a3c5009c78f2c33cb38164",
+      "blob": "91cd95816e35b39d0bf0f2d6a435bc29837f34e3",
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [
