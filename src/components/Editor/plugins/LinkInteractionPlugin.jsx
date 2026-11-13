@@ -227,6 +227,9 @@ export default function LinkInteractionPlugin({ readOnly = false }) {
       style={{ top: popover.top, left: popover.left }}
       role="dialog"
       aria-label="链接操作"
+      // Keep a keyboard stop before the address input. Without it,
+      // Shift+Tab enters Lexical, where Tab intentionally indents text.
+      tabIndex={0}
       onMouseDown={event => event.stopPropagation()}
     >
       <div className="editor-link-popover-kicker">
