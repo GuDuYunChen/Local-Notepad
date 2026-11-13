@@ -10,7 +10,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { build } from 'esbuild'
 import controlEvidence from './check-ui-control-render.cjs'
 import { COLLAPSED_SIDEBAR_EXPAND, validateCollapsedSidebarObservation } from './full-app-ui-evidence.mjs'
-import { observeFullAppPopup, captureActualFullAppPopup, validateFullAppCaptureContinuity, validateFullAppPageSample, measureFullAppScrollCoverage, collectFullAppScrollOwners, createFullAppUiShared, traverseMarkdownSourceCloseWithNativeTabs, withinActualClientPort, finiteOwnerMotionActive, waitForFiniteOwnerMotion } from './full-app-ui-shared.mjs'
+import { observeFullAppPopup, captureActualFullAppPopup, validateFullAppCaptureContinuity, validateFullAppPageSample, measureFullAppScrollCoverage, collectFullAppScrollOwners, createFullAppUiShared, traverseMarkdownSourceCloseWithNativeTabs, traverseBlockEmbedWithNativeTabs, withinActualClientPort, finiteOwnerMotionActive, waitForFiniteOwnerMotion } from './full-app-ui-shared.mjs'
 import { buildResearchImportFixtures, researchRoutes } from './full-app-ui-research.mjs'
 
 const clone = value => structuredClone(value)
@@ -1394,6 +1394,43 @@ test('Markdown source native focus proof refuses a missing Close, wrong origin, 
     })
     assert.equal(result.reached, false, 'An incorrect native focus transition cannot pass')
     assert.equal(native.length, states.length === 1 ? 0 : 3)
+  }
+})
+
+
+test('block embedding requires the real F6 focus origin and native forward/reverse Tab adjacency', async () => {
+  const first = { ownerReady: true, firstFocused: true, secondFocused: false }
+  const second = { ownerReady: true, firstFocused: false, secondFocused: true }
+  const observations = [first, second, first], keys = []
+  const result = await traverseBlockEmbedWithNativeTabs({
+    key: async (...args) => keys.push(args),
+    evaluate: async expression => {
+      assert.match(expression, /block-reference-embed/)
+      return observations.shift()
+    },
+  })
+  assert.equal(result.reached, true)
+  assert.deepEqual(keys, [['Tab'], ['Tab', 8]])
+  assert.deepEqual([result.forwardTabs, result.reverseTabs], [1, 1])
+  assert.equal(observations.length, 0)
+})
+
+test('block embed never treats a missing, foreign or broken native focus sequence as successful', async () => {
+  const first = { ownerReady: true, firstFocused: true, secondFocused: false }
+  const second = { ownerReady: true, firstFocused: false, secondFocused: true }
+  const noFirst = { ownerReady: true, firstFocused: false, secondFocused: false }
+  const badOwner = { ...first, ownerReady: false }
+  for (const sequence of [
+    [badOwner], [noFirst], [first, noFirst, first],
+    [first, second, noFirst], [first, { ...second, ownerReady: false }, first],
+  ]) {
+    const samples = sequence.map(item => ({ ...item })), keys = []
+    const result = await traverseBlockEmbedWithNativeTabs({
+      key: async (...args) => keys.push(args),
+      evaluate: async () => samples.shift(),
+    })
+    assert.equal(result.reached, false, 'Incomplete real focus evidence is a strict rejection')
+    assert.equal(keys.length, sequence.length === 1 ? 0 : 2)
   }
 })
 
