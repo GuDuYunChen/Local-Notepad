@@ -1841,9 +1841,9 @@
     },
     {
       "file": "src/components/Editor/nodes/BlockEmbedView.jsx",
-      "bytes": 2525,
-      "sha256": "d9117a2711db63ab764b7314f0da9a9a674d20ff14d291d37ee441707ebd6e39",
-      "blob": "d25234ea4b6ae32ef9075869883033adff60129e",
+      "bytes": 3737,
+      "sha256": "1f4f2a26b9ca2eb62b766e9a097802f176f8f93426ef425110900a8385cf736f",
+      "blob": "0d82c71aeeea5a7d2331b5010c5303f0288a388c",
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [
