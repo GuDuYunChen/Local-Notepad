@@ -701,6 +701,30 @@ async function verifyEditorNodes(ctx) {
   await hit('[aria-label="关闭块引用"]'); await absent('.block-reference-panel')
   await openNote('引用来源'); await text('.block-reference-embed pre', '可读取的来源块内容')
   await shot('editor-block-embed', 'loaded', ['.block-reference-embed footer button:first-child'])
+  // The body owns ordinary Tab indentation. Enter the read-only decorator via
+  // its actual F6 keyboard shortcut, never by clicking or calling focus().
+  const embedBefore = await evaluate(`(() => {
+    const root = document.querySelector('.editor-input[contenteditable="true"]')
+    const embed = root?.querySelector('.block-reference-embed')
+    const first = embed?.querySelector('footer button:first-child')
+    return { editorFocused: !!root && document.activeElement === root,
+      firstReady: !!first && !first.disabled && first.tagName === 'BUTTON',
+      content: root?.innerHTML ?? null, eventCount: window.__fullAppUiEvents.length }
+  })()`)
+  assert.equal(embedBefore.editorFocused, true, 'Actual Lexical editor must own the F6 entry')
+  assert.equal(embedBefore.firstReady, true, 'Actual first embedded action is unavailable')
+  await shared.key('F6')
+  const embedAfter = await evaluate(`(() => {
+    const root = document.querySelector('.editor-input[contenteditable="true"]')
+    const first = root?.querySelector('.block-reference-embed footer button:first-child')
+    return { focused: !!first && document.activeElement === first, content: root?.innerHTML ?? null,
+      events: window.__fullAppUiEvents.slice(${Number(embedBefore.eventCount)}) }
+  })()`)
+  assert.equal(embedAfter.focused, true, 'Native F6 did not enter the real embedded block')
+  assert.equal(embedAfter.content, embedBefore.content, 'Native F6 changed Lexical body content')
+  assert.ok(embedAfter.events.some(event => event.type === 'keydown' && event.key === 'F6' &&
+    event.trusted && event.tag === 'DIV' && event.role === 'textbox'),
+  'Actual F6 entry lacked trusted keyboard evidence from Lexical')
   await focus('editor-block-embed', 'loaded', '.block-reference-embed footer button:first-child')
   await shared.hover('.editor-input .wiki-link[data-wiki-target-id=' + q(fixture.notes['基本编辑正文'].id) + ']')
   await present('.wiki-link-preview [data-wiki-control="true"]')
