@@ -94,7 +94,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: local-notepad-install-lifecycle-${{ github.sha }}
+          name: local-notepad-install-lifecycle-${{ github.sha }}-${{ github.run_attempt }}
           path: test-results/installer-lifecycle/
           if-no-files-found: error
           retention-days: 14
@@ -156,7 +156,7 @@ jobs:
       - name: Download the preceding original installed acceptance evidence
         uses: actions/download-artifact@v4
         with:
-          name: local-notepad-install-lifecycle-${{ github.sha }}
+          name: local-notepad-install-lifecycle-${{ github.sha }}-${{ github.run_attempt }}
           path: .accepted-installation
       # The pin reader imports original source validators; their ESM imports
       # require both canonical desktop fixture bundles even for `outputs`.
@@ -208,7 +208,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: local-notepad-full-app-ui-${{ matrix.group }}-${{ github.sha }}
+          name: local-notepad-full-app-ui-${{ matrix.group }}-${{ github.sha }}-${{ github.run_attempt }}
           path: |
             test-results/full-app-ui/${{ matrix.group }}/
           if-no-files-found: error
@@ -226,30 +226,30 @@ jobs:
           node-version: '24'
       - uses: actions/download-artifact@v4
         with:
-          name: local-notepad-full-app-ui-settings-${{ github.sha }}
+          name: local-notepad-full-app-ui-settings-${{ github.sha }}-${{ github.run_attempt }}
           path: test-results/full-app-ui/settings
       - uses: actions/download-artifact@v4
         with:
-          name: local-notepad-full-app-ui-projects-${{ github.sha }}
+          name: local-notepad-full-app-ui-projects-${{ github.sha }}-${{ github.run_attempt }}
           path: test-results/full-app-ui/projects
       - uses: actions/download-artifact@v4
         with:
-          name: local-notepad-full-app-ui-research-${{ github.sha }}
+          name: local-notepad-full-app-ui-research-${{ github.sha }}-${{ github.run_attempt }}
           path: test-results/full-app-ui/research
       - uses: actions/download-artifact@v4
         with:
-          name: local-notepad-full-app-ui-editor-${{ github.sha }}
+          name: local-notepad-full-app-ui-editor-${{ github.sha }}-${{ github.run_attempt }}
           path: test-results/full-app-ui/editor
       - uses: actions/download-artifact@v4
         with:
-          name: local-notepad-full-app-ui-local-sync-lab-${{ github.sha }}
+          name: local-notepad-full-app-ui-local-sync-lab-${{ github.sha }}-${{ github.run_attempt }}
           path: test-results/full-app-ui/local-sync-lab
       - name: Require all original prerequisites, all groups, and zero unmapped pages
         run: node scripts/full-app-ui-evidence.mjs aggregate
       - name: Retain the aggregate receipt without replacing original artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: local-notepad-full-app-ui-accepted-${{ github.sha }}
+          name: local-notepad-full-app-ui-accepted-${{ github.sha }}-${{ github.run_attempt }}
           path: test-results/full-app-ui/full-app-ui-accepted.json
           if-no-files-found: error
           retention-days: 14
