@@ -1198,9 +1198,15 @@
 
 .product-table-menu .table-action-menu-item:hover,
 .product-table-menu .table-action-menu-item:focus-visible {
-  outline: 0;
   background: var(--surface-hover) !important;
   color: var(--ink) !important;
+}
+
+/* Retain the single visible native keyboard focus ring on table actions. */
+.product-table-menu .table-action-menu-item:focus-visible {
+  outline: 2px solid var(--clay);
+  outline-offset: 2px;
+  box-shadow: none;
 }
 
 .product-table-menu .table-action-menu-item.danger:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {

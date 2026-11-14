@@ -1,4 +1,5 @@
 import React, { act, useLayoutEffect } from 'react'
+import { readFileSync } from 'node:fs'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, expect, test } from 'vitest'
 import { LexicalComposer } from '@lexical/react/LexicalComposer'
@@ -72,4 +73,22 @@ test('the real cell menu opens and enters existing multiselect without changing 
   expect(host.querySelector('[aria-label="表格操作"]')).toBeNull()
   expect(snapshot()).toEqual(before)
   expect(errors).toEqual([])
+})
+
+// Guard the shipped stylesheet, not a mocked component: native Tab focus
+// must be painted with one ring and never replaced by a hover-only highlight.
+test('table action keyboard focus has one visible outline without duplicate glow', () => {
+  const css = readFileSync('src/components/Editor/Editor.css', 'utf8')
+  // The preceding hover/focus-visible group paints the background; the
+  // later dedicated focus-visible rule owns the single keyboard outline.
+  // Inspect every matching rule so a hover rule cannot mask the focus ring.
+  const focusRules = [...css.matchAll(/\.product-table-menu \.table-action-menu-item:focus-visible\s*\{([^{}]*)\}/g)].map(match => match[1])
+  expect(focusRules.length).toBeGreaterThan(0)
+  const outlineRules = focusRules.filter(rule => /(?:^|;)\s*outline\s*:/.test(rule))
+  expect(outlineRules).toHaveLength(1)
+  const [rule] = outlineRules
+  expect(rule).toMatch(/outline:\s*2px solid var\(--clay\)\s*;/)
+  expect(rule).toMatch(/outline-offset:\s*2px\s*;/)
+  expect(rule).toMatch(/box-shadow:\s*none\s*;/)
+  expect(focusRules.join('\n')).not.toMatch(/(?:^|;)\s*outline\s*:\s*(?:0|none)\s*;/)
 })
