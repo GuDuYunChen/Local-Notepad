@@ -151,6 +151,34 @@ test('pointer exit cannot hide focused Wiki preview or restore Lexical Tab inden
   } finally { editable.removeEventListener('keydown', onLexicalKey) }
 })
 
+test('a pending keyboard Wiki preview preserves its native Tab destination', async () => {
+  api.mockReturnValue(new Promise(() => {}))
+  await act(async () => root.render(<div contentEditable suppressContentEditableWarning><WikiLinkView id="target" title="旧标题" /></div>))
+  await settle()
+  const link = host.querySelector('.wiki-link')
+  const editable = host.querySelector('[contenteditable="true"]')
+  const editorTabs = []
+  const onEditorKeydown = event => {
+    if (event.key === 'Tab') { editorTabs.push(event.target); event.preventDefault() }
+  }
+  editable.addEventListener('keydown', onEditorKeydown)
+  try {
+    await act(async () => link.focus())
+    await settle()
+    const control = host.querySelector('.wiki-link-preview [data-wiki-control="true"]')
+    expect(control).not.toBeNull()
+    expect(control.disabled).toBe(false)
+    expect(host.textContent).toContain('正在读取预览')
+    expect(document.activeElement).toBe(link)
+    const key = new KeyboardEvent('keydown', { key: 'Tab', code: 'Tab', bubbles: true, cancelable: true })
+    await act(async () => expect(link.dispatchEvent(key)).toBe(true))
+    expect(key.defaultPrevented).toBe(false)
+    expect(editorTabs).toEqual([])
+    expect(host.querySelector('.wiki-link-preview [data-wiki-control="true"]')).toBe(control)
+    expect(events).toEqual([])
+  } finally { editable.removeEventListener('keydown', onEditorKeydown) }
+})
+
 test('ordinary Wiki link Tab still reaches its editable ancestor', async () => {
   await render()
   const parentEvents = []

@@ -95,8 +95,8 @@ function Preview({ id, title, path, blockId }) {
       {preview?.titleChanged && <span className="wiki-link-preview-health">当前标题：{preview.title}</span>}
       {preview?.sectionMissing && <span className="wiki-link-preview-health">{preview.sectionState === 'ambiguous' ? '同名章节不唯一，打开前将拒绝猜测定位。' : '章节已改名或移除，可在“引用”面板核对。'}</span>}
       <span className={'wiki-link-preview-excerpt' + (error ? ' unavailable' : '')} role={error ? 'alert' : 'status'}>{loading ? '正在读取预览…' : error || preview?.excerpt}</span>
-      {!loading && <span className="wiki-link-preview-footer"><span>{preview ? preview.backlinkCount === null ? '反向链接暂不可用' : `${preview.backlinkCount} 个已索引反向链接` : '重试不会修改正文'}</span>
-        <UiButton density="compact" type="button" data-wiki-control="true" className="btn small" onClick={event => { event.preventDefault(); event.stopPropagation(); void load() }}>{error ? '重试预览' : '刷新预览'}</UiButton></span>}
+      <span className="wiki-link-preview-footer"><span>{loading ? '正在读取预览…' : preview ? preview.backlinkCount === null ? '反向链接暂不可用' : `${preview.backlinkCount} 个已索引反向链接` : '重试不会修改正文'}</span>
+        <UiButton density="compact" type="button" data-wiki-control="true" className="btn small" onClick={event => { event.preventDefault(); event.stopPropagation(); void load() }}>{error ? '重试预览' : '刷新预览'}</UiButton></span>
     </span>}
   </span>
 }
