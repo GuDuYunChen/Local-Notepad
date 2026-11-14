@@ -10,8 +10,23 @@ import { BLOCK_REFERENCE_SOURCES } from './block-references-evidence.mjs'
 import { replaceExactlyAndProveInverse } from './reading-mode-installed-evidence.mjs'
 import { extendShortcutManagementInstallation } from './shortcut-management-installed-evidence.mjs'
 import { extendLocalExportInstallation } from './local-export-installed-evidence.mjs'
-import { BLOCK_REFERENCE_INSTALLATION_GATE, validateBlockReferencePin, prepareBlockReferenceVerifierSources, validateGeneratedBlockReferenceSources, extendBlockReferenceInstallation } from './block-references-installed-evidence.mjs'
+import { BLOCK_REFERENCE_INSTALLATION_GATE, validateBlockReferencePin, prepareBlockReferenceVerifierSources, validateGeneratedBlockReferenceSources, extendBlockReferenceInstallation, assertIndependentInstalledModuleSessions } from './block-references-installed-evidence.mjs'
 const read=name=>source('scripts/'+name)
+test('Windows PID reuse after completed sequential module sessions is permitted, overlapping or unclean sessions are rejected',()=>{
+ const exits=[8376,1102,1103,1104,1105,1106].map(pid=>({pid,code:0,signal:null,nativeClose:true}))
+ const installation={appExits:exits,shortcutManagementRun:{processIDs:[3001,3002]},localExportRun:{processID:6112}}
+ const shortcuts={complete:true,cleanupComplete:true,forceTerminated:false,startedAt:'2026-11-14T08:32:58.239Z',finishedAt:'2026-11-14T08:33:05.100Z',launches:[{pid:3001},{pid:3002}],exits:[3001,3002].map(pid=>({pid,code:0,signal:null,nativeClose:true,backendStopped:true}))}
+ const localExport={complete:true,cleanupComplete:true,forceTerminated:false,startedAt:'2026-11-14T08:33:05.107Z',finishedAt:'2026-11-14T08:33:22.510Z',launch:{pid:6112},exit:{pid:6112,code:0,signal:null,nativeClose:true,backendStopped:true}}
+ const blocks={complete:true,cleanupComplete:true,forceTerminated:false,startedAt:'2026-11-14T08:33:23.091Z',completedAt:'2026-11-14T08:33:40.004Z',pid:8376,exit:{pid:8376,code:0,signal:null,normalClose:true},backendStopped:true}
+ assert.equal(assertIndependentInstalledModuleSessions(installation,shortcuts,localExport,blocks),true,'8376 is a valid recycled PID after the earlier process exited')
+ assert.throws(()=>assertIndependentInstalledModuleSessions(installation,shortcuts,{...localExport,finishedAt:'2026-11-14T08:33:24.000Z'},blocks),/Export session must exit/)
+ assert.throws(()=>assertIndependentInstalledModuleSessions(installation,{...shortcuts,finishedAt:'2026-11-14T08:33:06.000Z'},localExport,blocks),/Shortcut session must exit/)
+ assert.throws(()=>assertIndependentInstalledModuleSessions(installation,shortcuts,localExport,{...blocks,exit:{...blocks.exit,code:1}}))
+ assert.throws(()=>assertIndependentInstalledModuleSessions(installation,shortcuts,localExport,{...blocks,backendStopped:false}))
+ assert.throws(()=>assertIndependentInstalledModuleSessions(installation,shortcuts,{...localExport,cleanupComplete:false},blocks))
+ assert.throws(()=>assertIndependentInstalledModuleSessions(installation,shortcuts,localExport,{...blocks,startedAt:'invalid'}),/Invalid native session time/)
+ assert.throws(()=>assertIndependentInstalledModuleSessions({...installation,appExits:[...exits.slice(0,5),{...exits[5],nativeClose:false}]},shortcuts,localExport,blocks))
+})
 test('block source pins cover all product and runner files independently',()=>{
  const pin=blockPinFixture();assert.equal(validateBlockReferencePin(pin),true)
  for(const name of BLOCK_REFERENCE_SOURCES){const p=structuredClone(pin);delete p.blockReferenceSources[name];assert.throws(()=>validateBlockReferencePin(p));assert.throws(()=>prepareBlockReferenceVerifierSources(pin,n=>read(n)+(n==='../'+name?'\n// changed':'')))}
@@ -48,6 +63,7 @@ for(const ending of ['LF','CRLF'])test('complete '+ending+' preparation keeps al
   assert.equal(previousCore.REQUIRED_CHECKS.length,28);assert.equal(core.REQUIRED_CHECKS.length,29)
   assert.deepEqual(core.REQUIRED_CHECKS.filter(c=>c!==BLOCK_REFERENCE_INSTALLATION_GATE),previousCore.REQUIRED_CHECKS)
   assert.deepEqual(core.RELEASES,{previous:pin.previous,current:pin.current});assert.equal(core.PRODUCT_COMMIT,pin.product)
+  assert.ok(final.script.includes('assertIndependentInstalledModuleSessions(report,shortcutReport,exportReport,blocks)'))
   const call='await runBlockReferencesDesktop('
   assert.equal(final.script.split(call).length,2);assert.ok(final.script.indexOf(call)>final.script.indexOf("mark('installed-app-local-export-workflow')"));assert.ok(final.script.indexOf(call)<final.script.indexOf('const finalData=snapshotData()'))
   for(const call of ['await runLocalExportLifecycle(','await runShortcutManagementLifecycle(','await verifyReadingModeDesktop(','await verifyLocalImportRestart('])assert.equal(final.script.split(call).length,2)
