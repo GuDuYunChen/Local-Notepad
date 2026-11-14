@@ -59,10 +59,21 @@ export async function verifyFullAppUiDesktop(context) {
         if(window.__fullAppUiEvents.length>=200000){window.__fullAppUiTraceTruncated=true;return;}
         const field=event.target,option=type==='click'?field.closest?.('[role="option"]'):null;
         const marker=option?.querySelector('[data-ui-option-value]');
+        // Read-only native Tab ownership evidence. A generic BUTTON/SPAN trace
+        // cannot distinguish the hovered Wiki target from another link or
+        // prove which preview control was reached. Never change focus or input.
+        const nativeTab=type==='keydown'&&event.key==='Tab';
+        const wikiOwner=nativeTab?field.closest?.('.wiki-link'):null;
+        const wikiControl=nativeTab&&field.matches?.('.wiki-link-preview [data-wiki-control="true"]')===true;
         window.__fullAppUiEvents.push({type,key:event.key||null,trusted:event.isTrusted,time:performance.now(),
           tag:field.tagName,id:field.id||null,role:field.getAttribute?.('role')||null,
           fileCount:field.tagName==='INPUT'&&field.type==='file'?field.files?.length||0:null,
-          option:marker?{listboxId:option.closest('[role="listbox"]')?.id,value:marker.getAttribute('data-ui-option-value')}:null});
+          option:marker?{listboxId:option.closest('[role="listbox"]')?.id,value:marker.getAttribute('data-ui-option-value')}:null,
+          wikiNativeTab:nativeTab?{targetId:wikiOwner?.getAttribute('data-wiki-target-id')??null,
+            link:field.matches?.('.wiki-link')===true,
+            control:wikiControl,
+            firstControl:wikiControl&&field===document.querySelector('.wiki-link-preview [data-wiki-control="true"]'),
+            lexicalEditor:field.matches?.('.editor-input[contenteditable="true"]')===true}:null});
       },true);return true;
     })()`)
 
