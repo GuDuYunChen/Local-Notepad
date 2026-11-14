@@ -928,7 +928,15 @@ export function createFullAppUiShared(ctx) {
     } else {
       await key('Tab', 8)
       reverseTabs++
-      for (let index = 0; index < 256; index++) {
+      // The incoming reverse Tab is itself native evidence. In the installed
+      // Wiki trace, the *next* forward keydown originated on the exact target:
+      // the reverse Tab had already focused it before the forward loop began.
+      // Read the settled result before advancing and potentially losing it.
+      if (meta.routeId === 'editor-wiki-preview' && meta.stateId === 'preview') {
+        await frame()
+        reached = await evaluate(`document.activeElement===document.querySelector(${q(selector)})`)
+      }
+      for (let index = 0; index < 256 && !reached; index++) {
         await key('Tab')
         tabAttempts++
         if (await evaluate(`document.activeElement===document.querySelector(${q(selector)})`)) { reached = true; break }

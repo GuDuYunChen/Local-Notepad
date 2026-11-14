@@ -1303,7 +1303,7 @@ test('project setup retains an uncertain original click failure and its trace wi
 // Synthetic DOM/CDP protocol contracts for failed-focus serialization. These
 // records are not trusted native input or evidence from the earlier failed run.
 function focusFailureFixture({ reachAt = Infinity, traceLimit = Infinity, diagnosticFailure = null,
-  traceAvailable = true, saveFailure = null, routeId = 'nav-trash', lateFocusAt = Infinity } = {}) {
+  traceAvailable = true, saveFailure = null, routeId = 'nav-trash', lateFocusAt = Infinity, reverseFocus = false } = {}) {
   const f = overflowFixture(), selector = '#control', meta = { routeId, stateId: routeId === 'editor-wiki-preview' ? 'preview' : 'cancel-confirm' }
   Object.assign(f.control, { tagName: 'BUTTON', localName: 'button', type: 'button' })
   Object.assign(f.control.css, { outlineStyle: 'solid', outlineWidth: '2px', outlineColor: 'rgb(112, 87, 217)' })
@@ -1339,7 +1339,7 @@ function focusFailureFixture({ reachAt = Infinity, traceLimit = Infinity, diagno
       commands.push({ method, ...params })
       if (params.type !== 'rawKeyDown') return
       if (params.modifiers === 0) forwardTabs++
-      f.document.activeElement = forwardTabs === reachAt ? f.control : outside
+      f.document.activeElement = ((params.modifiers === 8 && reverseFocus) || (params.modifiers === 0 && forwardTabs === reachAt)) ? f.control : outside
       const trace = f.globals.window.__fullAppUiEvents
       if (trace.length >= traceLimit) f.globals.window.__fullAppUiTraceTruncated = true
       else trace.push({ type: 'keydown', key: 'Tab', trusted: true, tag: f.document.activeElement.tagName, id: f.document.activeElement.id })
@@ -1506,6 +1506,18 @@ test('block embed never treats a missing, foreign or broken native focus sequenc
   }
 })
 
+test('Wiki preview recognizes genuine reverse Tab arrival before a forward Tab can leave it', async () => {
+  const f = focusFailureFixture({ routeId: 'editor-wiki-preview', reverseFocus: true })
+  const receipt = await f.shared.focus(f.selector, f.meta)
+  assert.equal(f.report.fullAppUi.focusFailures, undefined)
+  assert.ok(receipt.trustedTab && receipt.focused && receipt.focusVisible && receipt.inViewport && receipt.hit)
+  assert.equal(receipt.outlines.length, 1); assert.deepEqual(receipt.shadows, [])
+  assert.deepEqual(f.commands.map(item => item.modifiers), [8, 8])
+  assert.equal(f.stats().forwardTabs, 0); assert.equal(f.stats().boundaryChecks, 1)
+  assert.equal(f.stats().frames, 4, 'The reverse native Tab is observed after one passive frame')
+  assert.equal(f.stats().diagnosticReads, 0)
+})
+
 test('Wiki preview waits for painted native focus before dispatching a second Tab', async () => {
   const f = focusFailureFixture({ routeId: 'editor-wiki-preview', lateFocusAt: 1 })
   const receipt = await f.shared.focus(f.selector, f.meta)
@@ -1515,8 +1527,8 @@ test('Wiki preview waits for painted native focus before dispatching a second Ta
   assert.equal(receipt.outlines.length, 1); assert.deepEqual(receipt.shadows, [])
   assert.equal(f.commands.length, 4, 'Only the reverse and one forward native Tab are sent')
   assert.deepEqual(f.commands.map(item => item.modifiers), [8, 8, 0, 0])
-  assert.equal(f.stats().forwardTabs, 1); assert.equal(f.stats().boundaryChecks, 2)
-  assert.equal(f.stats().frames, 4, 'One extra passive native paint is observed')
+  assert.equal(f.stats().forwardTabs, 1); assert.equal(f.stats().boundaryChecks, 3)
+  assert.equal(f.stats().frames, 6, 'Reverse entry and late forward focus each get a passive paint')
   assert.equal(f.stats().diagnosticReads, 0)
 })
 
@@ -1524,8 +1536,8 @@ test('Wiki preview still fails after 256 genuine Tabs if no native focus transit
   const f = focusFailureFixture({ routeId: 'editor-wiki-preview' })
   await assert.rejects(f.shared.focus(f.selector, f.meta), /Actual Tab order never reached control/)
   assert.equal(f.commands.length, 514)
-  assert.equal(f.stats().forwardTabs, 256); assert.equal(f.stats().boundaryChecks, 512)
-  assert.equal(f.stats().frames, 514)
+  assert.equal(f.stats().forwardTabs, 256); assert.equal(f.stats().boundaryChecks, 513)
+  assert.equal(f.stats().frames, 516)
   assert.equal(f.report.fullAppUi.focusFailures[0].complete, false)
   assert.deepEqual(f.report.fullAppUi.focus, [f.priorFocus])
 })
