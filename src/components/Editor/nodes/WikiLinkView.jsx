@@ -39,6 +39,13 @@ function Preview({ id, title, path, blockId }) {
     clearTimeout(timer.current)
     timer.current = setTimeout(() => { if (alive.current) { setOpen(true); void load() } }, 220)
   }
+  // Keyboard focus must reveal the preview before the first native Tab.
+  // Mouse hover retains its 220ms delay. A pending mouse-leave hide is
+  // cancelled so the focused link cannot re-enter Lexical's Tab indent path.
+  const showFocused = () => {
+    clearTimeout(timer.current)
+    if (alive.current && !open) { setOpen(true); void load() }
+  }
   const hide = () => {
     clearTimeout(timer.current)
     timer.current = setTimeout(() => { if (alive.current) { setOpen(false); owner.current?.abort() } }, 100)
@@ -54,7 +61,7 @@ function Preview({ id, title, path, blockId }) {
   return <span className={'wiki-link' + (error ? ' broken' : preview?.titleChanged || preview?.sectionMissing ? ' stale' : '')}
     data-wiki-target-id={typeof id === 'string' ? id : undefined}
     role="link" tabIndex={0} title={section ? '打开：' + title + ' › ' + section : '打开笔记：' + title}
-    onMouseEnter={show} onMouseLeave={hide} onFocus={event => { if (event.target === event.currentTarget) show() }}
+    onMouseEnter={show} onMouseLeave={hide} onFocus={event => { if (event.target === event.currentTarget) showFocused() }}
     onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) hide() }}
     onMouseDown={event => { if (!controls(event)) event.preventDefault() }} onClick={navigate}
     onKeyDownCapture={event => {
