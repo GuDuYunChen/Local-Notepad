@@ -3,8 +3,8 @@
   "scope": "installed-actual-app-page-matrix",
   "sourceScope": "control-source entry coverage with declared states; not every possible failure combination",
   "productSource": {
-    "commit": "7a236c5d94583e154726e13d0bf829a24178ee22",
-    "tree": "21ff558f067311b266e8bda926b5d0e914f5bbed",
+    "commit": "1f2c545dc9adf0dd74d6d04dde7b91b3f5bcab38",
+    "tree": "6db70c7e5a9e6cf05116fb2543a6afc69d1a2589",
     "dirty": false
   },
   "inventory": {
@@ -2031,9 +2031,9 @@
     },
     {
       "file": "src/components/Editor/nodes/WikiLinkView.jsx",
-      "bytes": 5503,
-      "sha256": "56da98a5f39975252497f3fe2d1d5841fd9a53e9bed2f4d989dfee1018baeee4",
-      "blob": "cc3b8c821e764e3f1b184da09d19d94bdc73379d",
+      "bytes": 5831,
+      "sha256": "3bf78be26f0f9b05f8387665a0f275e635b7baa7e61a7b4c1990b44c1c3501ec",
+      "blob": "8d3a9d3c3f329341fd2d58ce244769253e07e90a",
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [
