@@ -65,6 +65,33 @@ test('open Wiki preview forwards native Tab from its focused link without Lexica
   } finally { document.removeEventListener('keydown', onAncestorKey) }
 })
 
+test('open Wiki Tab is stopped before the native Lexical editable-host listener', async () => {
+  await act(async () => root.render(<div contentEditable suppressContentEditableWarning><WikiLinkView id="target" title="旧标题" /></div>))
+  await settle()
+  await show()
+  const editable = host.querySelector('[contenteditable="true"]')
+  const link = host.querySelector('.wiki-link')
+  const control = host.querySelector('.wiki-link-preview [data-wiki-control="true"]')
+  expect(control).not.toBeNull()
+  const nativeTabs = []
+  const onLexicalKey = event => {
+    if (event.key === 'Tab') { nativeTabs.push(event.target); event.preventDefault() }
+  }
+  editable.addEventListener('keydown', onLexicalKey)
+  try {
+    for (const target of [link, control]) {
+      for (const shiftKey of [false, true]) {
+        const key = new KeyboardEvent('keydown', { key: 'Tab', code: 'Tab', shiftKey, bubbles: true, cancelable: true })
+        await act(async () => { expect(target.dispatchEvent(key)).toBe(true) })
+        expect(key.defaultPrevented).toBe(false)
+      }
+    }
+    expect(nativeTabs).toEqual([])
+    expect(events).toEqual([])
+    expect(host.querySelector('.wiki-link-preview [data-wiki-control="true"]')).toBe(control)
+  } finally { editable.removeEventListener('keydown', onLexicalKey) }
+})
+
 test('ordinary Wiki link Tab still reaches its editable ancestor', async () => {
   await render()
   const parentEvents = []

@@ -57,14 +57,17 @@ function Preview({ id, title, path, blockId }) {
     onMouseEnter={show} onMouseLeave={hide} onFocus={event => { if (event.target === event.currentTarget) show() }}
     onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) hide() }}
     onMouseDown={event => { if (!controls(event)) event.preventDefault() }} onClick={navigate}
-    onKeyDown={event => {
-      // The preview control and its focused Wiki link share Lexical's editable
-      // ancestor. Once the preview is open, allow native Tab/Shift+Tab to
-      // traverse from the link into the button rather than indent the note.
-      // Preserve ordinary closed-link behavior and never preventDefault/focus.
+    onKeyDownCapture={event => {
+      // Lexical listens for native keydown on the editable host, before React's
+      // delegated bubble handler runs. Intercept only open-preview Tab (and
+      // its nested control) during capture so Lexical cannot indent or swallow
+      // the browser's native Tab/Shift+Tab focus movement.
+      // Never preventDefault, synthesize focus, or alter closed-link Tab.
       if (event.key === 'Tab' && (controls(event) || (open && event.target === event.currentTarget))) {
-        event.stopPropagation(); return
+        event.stopPropagation()
       }
+    }}
+    onKeyDown={event => {
       if (event.target === event.currentTarget && !event.nativeEvent.isComposing && event.keyCode !== 229 && ['Enter', ' '].includes(event.key)) navigate(event)
     }}>
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 4h10l2 2v14H6z" /><path d="M9 9h6M9 13h6M9 17h4" /></svg>
