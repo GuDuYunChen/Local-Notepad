@@ -55,6 +55,17 @@ export const mainEditorRoutes = [...navigationRoutes, ...editorRoutes]
 const q = JSON.stringify
 const sha = value => createHash('sha256').update(value).digest('hex')
 const miss = '不存在的合成匹配-NO-MATCH-750012'
+export function inspectEditorSwitchReadiness(doc) {
+  // The current App renders a shared save chip for dirty, saving and failed states.
+  const chip = doc.querySelector('.workspace-save-chip')
+  const legacy = doc.querySelector('.editor-unapplied-draft-pill,.save-state.error,.save-state.saving,.quit-save-veil')
+  const loading = Boolean(doc.querySelector('.content')?.textContent.includes('正在加载编辑器…'))
+  const confirmation = doc.querySelector('.consumer-confirm-modal')
+  return { ready: !chip && !legacy && !loading && !confirmation,
+    title: doc.querySelector('.workspace-title-button')?.textContent.trim() ?? null,
+    saveChip: chip ? { text: chip.textContent.trim(), className: String(chip.className) } : null,
+    legacyBusy: Boolean(legacy), loading, confirmation: Boolean(confirmation) }
+}
 const textNode = text => ({ detail: 0, format: 0, mode: 'normal', style: '', text, type: 'text', version: 1 })
 const element = (type, children, extra = {}) => ({ children, direction: null, format: '', indent: 0, type, version: 1, ...extra })
 const paragraph = text => element('paragraph', [textNode(text)], { textFormat: 0, textStyle: '' })
@@ -353,11 +364,36 @@ export async function verifyMainEditorPages(ctx) {
   const shot = (routeId, stateId, anchors, extra = {}) => shared.captureState({ routeId, stateId, root: roots[routeId], anchors, ...extra })
   const focus = (routeId, stateId, selector) => shared.focus(selector, { routeId, stateId })
   const popup = (routeId, stateId, selector) => { assert.equal(typeof shared.selectPreview, 'function'); return shared.selectPreview(selector, { routeId, stateId }) }
-  const clean = () => until(() => evaluate(`!document.querySelector('.editor-unapplied-draft-pill,.save-state.error,.save-state.saving,.quit-save-veil')&&!document.querySelector('.content')?.textContent.includes('正在加载编辑器…')`), 'Editor has an unsettled or unapplied draft')
+  const switchState = () => evaluate('(' + inspectEditorSwitchReadiness.toString() + ')(document)')
+  const clean = async stage => {
+    try { await until(async () => (await switchState()).ready, 'Editor has an unsettled or unapplied draft') }
+    catch (error) {
+      // Read-only failure evidence. Never save, discard, or dismiss an unsaved prompt.
+      const receipt = { stage, ...ctx.matrix, error: String(error.message), complete: false }
+      try {
+        receipt.renderer = await switchState()
+        const owned = Object.values(fixture.notes).find(note => note.title === receipt.renderer.title)
+        if (owned) {
+          const stored = await api('/api/files/' + encodeURIComponent(owned.id))
+          receipt.ownedNote = { id: owned.id, title: owned.title, fixtureSHA256: sha(owned.content),
+            storedSHA256: sha(stored.content), storedUnchanged: stored.content === owned.content }
+        }
+        const draft = await evaluate('(() => { const root = document.querySelector(".editor-input[contenteditable=true]"); const editor = root?.__lexicalEditor; let serialized = null, readError = null; try { if (editor?.getEditorState) serialized = JSON.stringify(editor.getEditorState()) } catch (failure) { readError = String(failure.message || failure) }; return { rootFound: Boolean(root), serialized, readError, outerHTML: root?.outerHTML.slice(0, 12000) ?? null } })()')
+        receipt.editor = { rootFound: draft.rootFound, readError: draft.readError,
+          serializedAvailable: typeof draft.serialized === 'string',
+          serializedSHA256: draft.serialized ? sha(draft.serialized) : null,
+          serializedBytes: draft.serialized?.length ?? null,
+          serializedExcerpt: draft.serialized?.slice(0, 12000) ?? null, outerHTML: draft.outerHTML }
+      } catch (diagnostic) { receipt.diagnosticError = String(diagnostic.message || diagnostic) }
+      try { (ctx.report.fullAppUi.editorSwitchFailures ||= []).push(receipt); ctx.save() }
+      catch (diagnostic) { receipt.saveError = String(diagnostic.message || diagnostic) }
+      throw error
+    }
+  }
   const closeInspector = async () => { if (await exists('.inspector-panel')) { await hit('.inspector-panel [aria-label="关闭详情"]'); await absent('.inspector-panel') } }
   const openNote = async name => {
     const note = fixture.notes[name]; assert.ok(note, 'Unregistered owned editor fixture: ' + name)
-    await clean(); await closeInspector(); await shared.openSearch(); await hit('#search-tab-search')
+    await clean('before-search:' + name); await closeInspector(); await shared.openSearch(); await hit('#search-tab-search')
     await press('.global-search-filters', '重置')
     await shared.text('[aria-label="全局检索关键词"]', note.title)
     // The global search legitimately includes related notes whose *body*
@@ -421,11 +457,12 @@ export async function verifyMainEditorPages(ctx) {
     await hit(row)
     await until(() => evaluate(`document.querySelector('.global-search-preview h3')?.textContent.trim()===${q(note.title)}`),
       'Exact owned search result did not become the real preview')
+    await clean('before-open:' + name)
     await press('.global-search-preview', '打开笔记')
     await absent('.global-search-panel')
     await until(() => evaluate(`document.querySelector('.workspace-title-button')?.textContent.trim()===${q(note.title)}&&Boolean(document.querySelector('.editor-input'))&&!document.querySelector('.content.switching')`), 'Selected owned note did not finish loading')
     if (await exists('[aria-label="切换到编辑模式"]')) await hit('[aria-label="切换到编辑模式"]')
-    await present('.editor-toolbar'); await shared.collapseSidebar(); await clean()
+    await present('.editor-toolbar'); await shared.collapseSidebar(); await clean('after-load:' + name)
     assert.equal((await api('/api/files/' + note.id)).content, note.content, 'Opening a page changed its saved body')
   }
   const inspector = async tab => {
@@ -739,6 +776,7 @@ async function verifyEditorNodes(ctx) {
   await hit('.wiki-navigation-status header strong')
   await focus('editor-wiki-navigation', 'missing-source', '[aria-label="关闭引用导航提示"]')
   await hit('[aria-label="关闭引用导航提示"]'); await absent('.wiki-navigation-status')
+  await clean('after-wiki-navigation-close')
 
   await openNote('表格'); await hit('.editor-input table tr:first-child > :first-child')
   await present('.table-action-menu-trigger'); await hit('.table-action-menu-trigger'); await present('.table-action-menu')

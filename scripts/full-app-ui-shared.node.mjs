@@ -12,10 +12,42 @@ import controlEvidence from './check-ui-control-render.cjs'
 import { COLLAPSED_SIDEBAR_EXPAND, validateCollapsedSidebarObservation } from './full-app-ui-evidence.mjs'
 import { observeFullAppPopup, captureActualFullAppPopup, validateFullAppCaptureContinuity, validateFullAppPageSample, measureFullAppScrollCoverage, collectFullAppScrollOwners, createFullAppUiShared, traverseMarkdownSourceCloseWithNativeTabs, traverseBlockEmbedWithNativeTabs, traverseWikiNavigationCloseWithNativeTabs, withinActualClientPort, finiteOwnerMotionActive, waitForFiniteOwnerMotion } from './full-app-ui-shared.mjs'
 import { buildResearchImportFixtures, researchRoutes } from './full-app-ui-research.mjs'
+import { inspectEditorSwitchReadiness } from './full-app-ui-main-editor.mjs'
 
 const clone = value => structuredClone(value)
 const hash = value => createHash('sha256').update(value).digest('hex')
 const matrix = { theme: 'light', viewport: { width: 704, height: 455 } }
+function editorGateDocument({ chip = null, legacy = false, loading = false, confirmation = false } = {}) {
+  const nodes = {
+    '.workspace-save-chip': chip && { className: 'workspace-save-chip ' + chip.className, textContent: chip.text },
+    '.editor-unapplied-draft-pill,.save-state.error,.save-state.saving,.quit-save-veil': legacy && { textContent: '未应用更改' },
+    '.content': { textContent: loading ? '正在加载编辑器…' : '编辑正文已显示' },
+    '.consumer-confirm-modal': confirmation && { textContent: '当前笔记未保存' },
+    '.workspace-title-button': { textContent: '合成引用来源' },
+  }
+  return { querySelector: selector => nodes[selector] || null }
+}
+test('installed editor switch guard refuses actual product dirty, saving and failed chips', () => {
+  for (const chip of [
+    { className: 'dirty', text: '未保存' }, { className: 'dirty', text: '未应用更改' },
+    { className: 'saving', text: '保存中…' }, { className: 'error', text: '保存失败' },
+  ]) {
+    const state = inspectEditorSwitchReadiness(editorGateDocument({ chip }))
+    assert.equal(state.ready, false)
+    assert.equal(state.title, '合成引用来源')
+    assert.equal(state.saveChip.text, chip.text)
+  }
+})
+test('installed editor switch guard keeps legacy, loading and modal refusals', () => {
+  for (const value of [{ legacy: true }, { loading: true }, { confirmation: true }]) {
+    assert.equal(inspectEditorSwitchReadiness(editorGateDocument(value)).ready, false)
+  }
+  const clean = inspectEditorSwitchReadiness(editorGateDocument())
+  assert.equal(clean.ready, true)
+  assert.equal(clean.saveChip, null)
+  assert.equal(clean.confirmation, false)
+})
+
 function pageSample() {
   const rect = { left: 20, top: 30, right: 180, bottom: 70, width: 160, height: 40, visible: true, inViewport: true, hit: true }
   return { root: '.actual-page', ...clone(matrix), rootBounds: { ...rect }, devicePixelRatio: 1, overflow: { document: 0, root: 0 },
