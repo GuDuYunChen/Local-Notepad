@@ -625,7 +625,7 @@ export async function verifyMainEditorPages(ctx) {
   // Remaining node and inspector routes follow below; every state must have a
   // real native observation before the ledger can report completion.
   await verifyEditorInspector({ ...ctx, fixture, openNote, inspector, closeInspector, shot, focus, hit, press, present, absent, text })
-  await verifyEditorNodes({ ...ctx, fixture, openNote, shot, focus, hit, press, present, absent, text, doubleClick, popup })
+  await verifyEditorNodes({ ...ctx, fixture, openNote, shot, focus, hit, press, present, absent, text, doubleClick, popup, clean })
   await verifyFileWorkspaces({ ...ctx, fixture, openNote, shot, focus, hit, press, present, absent, text, popup })
   await clean(); await closeInspector()
   for (const note of Object.values(fixture.notes)) assert.equal((await api('/api/files/' + note.id)).content, note.content, 'Editor UI inspection changed owned saved content: ' + note.title)
@@ -724,7 +724,7 @@ async function verifyEditorInspector(ctx) {
 }
 
 async function verifyEditorNodes(ctx) {
-  const { fixture, openNote, shot, focus, hit, press, present, absent, text, shared, evaluate, cdp, doubleClick, popup } = ctx
+  const { fixture, openNote, shot, focus, hit, press, present, absent, text, shared, evaluate, cdp, doubleClick, popup, clean } = ctx
   await openNote('基本编辑正文'); await hit('.block-reference-entry > button'); await present('.block-reference-panel')
   const blockInput = '.block-reference-panel input[placeholder="notepad://block/…"]'
   await shot('editor-block-reference', 'default', [blockInput]); await focus('editor-block-reference', 'default', blockInput)
