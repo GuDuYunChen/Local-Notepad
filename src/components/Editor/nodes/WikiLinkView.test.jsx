@@ -121,6 +121,36 @@ test('keyboard focus opens Wiki preview before the first native Tab without inde
   } finally { editable.removeEventListener('keydown', onLexicalKey) }
 })
 
+test('pointer exit cannot hide focused Wiki preview or restore Lexical Tab indentation', async () => {
+  await act(async () => root.render(<div contentEditable suppressContentEditableWarning><WikiLinkView id="target" title="旧标题" /></div>))
+  await settle()
+  const link = host.querySelector('.wiki-link')
+  const editable = host.querySelector('[contenteditable="true"]')
+  const nativeTabs = []
+  const onLexicalKey = event => {
+    if (event.key === 'Tab') { nativeTabs.push(event.target); event.preventDefault() }
+  }
+  editable.addEventListener('keydown', onLexicalKey)
+  try {
+    await act(async () => link.focus())
+    await settle()
+    expect(host.querySelector('.wiki-link-preview [data-wiki-control="true"]')).not.toBeNull()
+    // Mouse leave may occur while a keyboard user navigates the link; it must
+    // not close the preview while the link still owns document.activeElement.
+    await act(async () => {
+      link.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, relatedTarget: document.body }))
+    })
+    await act(async () => vi.advanceTimersByTimeAsync(101))
+    expect(document.activeElement).toBe(link)
+    expect(host.querySelector('.wiki-link-preview [data-wiki-control="true"]')).not.toBeNull()
+    const key = new KeyboardEvent('keydown', { key: 'Tab', code: 'Tab', bubbles: true, cancelable: true })
+    await act(async () => expect(link.dispatchEvent(key)).toBe(true))
+    expect(key.defaultPrevented).toBe(false)
+    expect(nativeTabs).toEqual([])
+    expect(events).toEqual([])
+  } finally { editable.removeEventListener('keydown', onLexicalKey) }
+})
+
 test('ordinary Wiki link Tab still reaches its editable ancestor', async () => {
   await render()
   const parentEvents = []

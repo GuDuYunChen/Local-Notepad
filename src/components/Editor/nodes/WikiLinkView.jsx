@@ -16,7 +16,7 @@ function Preview({ id, title, path, blockId }) {
   const [preview, setPreview] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const alive = useRef(false), timer = useRef(null), owner = useRef(null)
+  const alive = useRef(false), timer = useRef(null), owner = useRef(null), linkElement = useRef(null)
   useEffect(() => {
     alive.current = true
     return () => { alive.current = false; clearTimeout(timer.current); owner.current?.abort() }
@@ -48,7 +48,14 @@ function Preview({ id, title, path, blockId }) {
   }
   const hide = () => {
     clearTimeout(timer.current)
-    timer.current = setTimeout(() => { if (alive.current) { setOpen(false); owner.current?.abort() } }, 100)
+    timer.current = setTimeout(() => {
+      // Pointer exit alone must not hide the preview while keyboard focus
+      // remains on the Wiki link or one of its controls. That would reopen
+      // Lexical's Tab-indentation path mid-traversal.
+      if (alive.current && !linkElement.current?.contains(document.activeElement)) {
+        setOpen(false); owner.current?.abort()
+      }
+    }, 100)
   }
   const controls = event => event.target?.closest?.('[data-wiki-control]')
   const navigate = event => {
@@ -58,7 +65,7 @@ function Preview({ id, title, path, blockId }) {
     window.dispatchEvent(new CustomEvent('wikiLink:open', { detail: { id, title, headingPath: path, ...(blockId ? { blockId } : {}) } }))
   }
   const section = formatSectionPath(path)
-  return <span className={'wiki-link' + (error ? ' broken' : preview?.titleChanged || preview?.sectionMissing ? ' stale' : '')}
+  return <span ref={linkElement} className={'wiki-link' + (error ? ' broken' : preview?.titleChanged || preview?.sectionMissing ? ' stale' : '')}
     data-wiki-target-id={typeof id === 'string' ? id : undefined}
     role="link" tabIndex={0} title={section ? '打开：' + title + ' › ' + section : '打开笔记：' + title}
     onMouseEnter={show} onMouseLeave={hide} onFocus={event => { if (event.target === event.currentTarget) showFocused() }}
