@@ -78,7 +78,7 @@ test('the real cell menu opens and enters existing multiselect without changing 
 // Guard the shipped stylesheet, not a mocked component: native Tab focus
 // must be painted with one ring and never replaced by a hover-only highlight.
 test('table action keyboard focus has one visible outline without duplicate glow', () => {
-  const css = readFileSync(new URL('../Editor.css', import.meta.url), 'utf8')
+  const css = readFileSync('src/components/Editor/Editor.css', 'utf8')
   const rule = css.match(/\.product-table-menu \.table-action-menu-item:focus-visible\s*\{([^{}]*)\}/)
   expect(rule).not.toBeNull()
   expect(rule[1]).toMatch(/outline:\s*2px solid var\(--clay\)\s*;/)
