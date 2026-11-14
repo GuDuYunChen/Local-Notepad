@@ -151,6 +151,21 @@ test('pointer exit cannot hide focused Wiki preview or restore Lexical Tab inden
   } finally { editable.removeEventListener('keydown', onLexicalKey) }
 })
 
+test('Wiki link nested in an editable host keeps the preview in a non-editable keyboard island', async () => {
+  await act(async () => root.render(<div contentEditable suppressContentEditableWarning><WikiLinkView id="target" title="旧标题" /></div>))
+  await settle()
+  const editable = host.querySelector('[contenteditable="true"]')
+  const link = editable.querySelector('.wiki-link')
+  expect(link.getAttribute('contenteditable')).toBe('false')
+  await act(async () => link.focus())
+  await settle()
+  const control = link.querySelector('.wiki-link-preview [data-wiki-control="true"]')
+  expect(control).not.toBeNull()
+  expect(control.disabled).toBe(false)
+  expect(control.closest('[contenteditable="false"]')).toBe(link)
+  expect(document.activeElement).toBe(link)
+})
+
 test('a pending keyboard Wiki preview preserves its native Tab destination', async () => {
   api.mockReturnValue(new Promise(() => {}))
   await act(async () => root.render(<div contentEditable suppressContentEditableWarning><WikiLinkView id="target" title="旧标题" /></div>))
