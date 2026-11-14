@@ -65,7 +65,7 @@ function Preview({ id, title, path, blockId }) {
     window.dispatchEvent(new CustomEvent('wikiLink:open', { detail: { id, title, headingPath: path, ...(blockId ? { blockId } : {}) } }))
   }
   const section = formatSectionPath(path)
-  return <span ref={linkElement} className={'wiki-link' + (error ? ' broken' : preview?.titleChanged || preview?.sectionMissing ? ' stale' : '')}
+  // A nested control inside Lexical's contentEditable host is otherwise\n  // excluded from Chromium's native Tab order. Keep this decorated reference\n  // non-editable, without changing the surrounding editor's text behavior.\n  return <span contentEditable={false} ref={linkElement} className={'wiki-link' + (error ? ' broken' : preview?.titleChanged || preview?.sectionMissing ? ' stale' : '')}
     data-wiki-target-id={typeof id === 'string' ? id : undefined}
     role="link" tabIndex={0} title={section ? '打开：' + title + ' › ' + section : '打开笔记：' + title}
     onMouseEnter={show} onMouseLeave={hide} onFocus={event => { if (event.target === event.currentTarget) showFocused() }}
