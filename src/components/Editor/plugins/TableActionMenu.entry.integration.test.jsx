@@ -79,10 +79,16 @@ test('the real cell menu opens and enters existing multiselect without changing 
 // must be painted with one ring and never replaced by a hover-only highlight.
 test('table action keyboard focus has one visible outline without duplicate glow', () => {
   const css = readFileSync('src/components/Editor/Editor.css', 'utf8')
-  const rule = css.match(/\.product-table-menu \.table-action-menu-item:focus-visible\s*\{([^{}]*)\}/)
-  expect(rule).not.toBeNull()
-  expect(rule[1]).toMatch(/outline:\s*2px solid var\(--clay\)\s*;/)
-  expect(rule[1]).toMatch(/outline-offset:\s*2px\s*;/)
-  expect(rule[1]).toMatch(/box-shadow:\s*none\s*;/)
-  expect(rule[1]).not.toMatch(/outline:\s*(?:0|none)\s*;/)
+  // The preceding hover/focus-visible group paints the background; the
+  // later dedicated focus-visible rule owns the single keyboard outline.
+  // Inspect every matching rule so a hover rule cannot mask the focus ring.
+  const focusRules = [...css.matchAll(/\.product-table-menu \.table-action-menu-item:focus-visible\s*\{([^{}]*)\}/g)].map(match => match[1])
+  expect(focusRules.length).toBeGreaterThan(0)
+  const outlineRules = focusRules.filter(rule => /(?:^|;)\s*outline\s*:/.test(rule))
+  expect(outlineRules).toHaveLength(1)
+  const [rule] = outlineRules
+  expect(rule).toMatch(/outline:\s*2px solid var\(--clay\)\s*;/)
+  expect(rule).toMatch(/outline-offset:\s*2px\s*;/)
+  expect(rule).toMatch(/box-shadow:\s*none\s*;/)
+  expect(focusRules.join('\n')).not.toMatch(/(?:^|;)\s*outline\s*:\s*(?:0|none)\s*;/)
 })
