@@ -734,6 +734,9 @@ async function verifyEditorNodes(ctx) {
   await hit('.editor-input .wiki-link[data-wiki-target-id=' + q(fixture.missingId) + ']')
   await present('.wiki-navigation-status [role="alert"]')
   await shot('editor-wiki-navigation', 'missing-source', ['[aria-label="关闭引用导航提示"]'])
+  // A trusted click on the inert status title releases Lexical's Tab-indent
+  // ownership. The close action is reached only by a subsequent native Tab.
+  await hit('.wiki-navigation-status header strong')
   await focus('editor-wiki-navigation', 'missing-source', '[aria-label="关闭引用导航提示"]')
   await hit('[aria-label="关闭引用导航提示"]'); await absent('.wiki-navigation-status')
 

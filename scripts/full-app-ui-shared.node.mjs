@@ -10,7 +10,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { build } from 'esbuild'
 import controlEvidence from './check-ui-control-render.cjs'
 import { COLLAPSED_SIDEBAR_EXPAND, validateCollapsedSidebarObservation } from './full-app-ui-evidence.mjs'
-import { observeFullAppPopup, captureActualFullAppPopup, validateFullAppCaptureContinuity, validateFullAppPageSample, measureFullAppScrollCoverage, collectFullAppScrollOwners, createFullAppUiShared, traverseMarkdownSourceCloseWithNativeTabs, traverseBlockEmbedWithNativeTabs, withinActualClientPort, finiteOwnerMotionActive, waitForFiniteOwnerMotion } from './full-app-ui-shared.mjs'
+import { observeFullAppPopup, captureActualFullAppPopup, validateFullAppCaptureContinuity, validateFullAppPageSample, measureFullAppScrollCoverage, collectFullAppScrollOwners, createFullAppUiShared, traverseMarkdownSourceCloseWithNativeTabs, traverseBlockEmbedWithNativeTabs, traverseWikiNavigationCloseWithNativeTabs, withinActualClientPort, finiteOwnerMotionActive, waitForFiniteOwnerMotion } from './full-app-ui-shared.mjs'
 import { buildResearchImportFixtures, researchRoutes } from './full-app-ui-research.mjs'
 
 const clone = value => structuredClone(value)
@@ -27,6 +27,40 @@ function popupSample() {
     popup: { listId: 'original-control_list', optionId: 'option-a', ready: true, paintFrames: 2 } }
 }
 
+test('Wiki navigation close requires a neutral real pointer origin then one native forward Tab', async () => {
+  const before = { ownerReady: true, neutralOrigin: true, closeFocused: false }
+  const after = { ownerReady: true, neutralOrigin: false, closeFocused: true }
+  const reads = [before, after], keys = []
+  const result = await traverseWikiNavigationCloseWithNativeTabs({
+    key: async (...args) => keys.push(args), evaluate: async () => reads.shift(),
+  })
+  assert.deepEqual(keys, [['Tab']]); assert.equal(result.reached, true)
+  assert.equal(result.forwardTabs, 1); assert.equal(result.reverseTabs, 0)
+  assert.deepEqual(result.initial, before); assert.deepEqual(result.forward, after)
+})
+test('Wiki navigation refuses missing or foreign status and Lexical-owned Tab focus', async () => {
+  for (const initial of [
+    { ownerReady: false, neutralOrigin: true, closeFocused: false },
+    { ownerReady: true, neutralOrigin: false, closeFocused: false },
+    { ownerReady: true, neutralOrigin: true, closeFocused: true },
+  ]) {
+    const keys = []
+    const result = await traverseWikiNavigationCloseWithNativeTabs({
+      key: async (...args) => keys.push(args), evaluate: async () => initial,
+    })
+    assert.equal(result.reached, false); assert.deepEqual(keys, [])
+  }
+  for (const after of [
+    { ownerReady: false, neutralOrigin: false, closeFocused: true },
+    { ownerReady: true, neutralOrigin: true, closeFocused: false },
+  ]) {
+    const keys = [], reads = [{ ownerReady: true, neutralOrigin: true, closeFocused: false }, after]
+    const result = await traverseWikiNavigationCloseWithNativeTabs({
+      key: async (...args) => keys.push(args), evaluate: async () => reads.shift(),
+    })
+    assert.deepEqual(keys, [['Tab']]); assert.equal(result.reached, false)
+  }
+})
 test('capture continuity retains the exact real owner, control and anchor geometry', () => {
   const before = pageSample(), actual = clone(before)
   assert.equal(validateFullAppCaptureContinuity(before, actual, matrix).controls[0], actual.controls[0])

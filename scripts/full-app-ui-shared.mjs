@@ -549,6 +549,33 @@ export async function traverseBlockEmbedWithNativeTabs({ key, evaluate }) {
   return receipt
 }
 
+/**
+ * The original mouse click on a WikiLink leaves focus in Lexical, where Tab
+ * intentionally indents the document. After a real pointer moves to the
+ * status's inert heading, require one native Tab to reach its close button.
+ * No button is focused or clicked by the verifier and all original focus
+ * geometry, trusted-input and screenshot assertions remain in place.
+ */
+export async function traverseWikiNavigationCloseWithNativeTabs({ key, evaluate }) {
+  const observe = () => evaluate(`(() => {
+    const panels = [...document.querySelectorAll('.wiki-navigation-status[aria-label="引用导航状态"]')]
+    const panel = panels[0]
+    const heading = panel?.querySelector('header strong')
+    const close = panel?.querySelector('header button[aria-label="关闭引用导航提示"]')
+    const alerts = panel?.querySelectorAll('[role="alert"]')
+    return { ownerReady: panels.length === 1 && !!heading && heading.textContent.trim() === '打开引用' &&
+        !!close && close.tagName === 'BUTTON' && !close.disabled && alerts?.length === 1,
+      neutralOrigin: document.activeElement === document.body,
+      closeFocused: !!close && document.activeElement === close }
+  })()`)
+  const initial = await observe()
+  const receipt = { initial, forward: null, reverseTabs: 0, forwardTabs: 0, reached: false }
+  if (!initial.ownerReady || !initial.neutralOrigin || initial.closeFocused) return receipt
+  await key('Tab'); receipt.forwardTabs++
+  receipt.forward = await observe()
+  receipt.reached = receipt.forward.ownerReady && receipt.forward.closeFocused
+  return receipt
+}
 export function validateFullAppCaptureContinuity(before, actual, matrix) {
   assert.equal(actual.root, before.root, 'Actual page root changed across the native PNG')
   assert.deepEqual(actual.viewport, before.viewport); assert.equal(actual.theme, before.theme)
@@ -872,6 +899,12 @@ export function createFullAppUiShared(ctx) {
     } else if (meta.routeId === 'editor-block-embed' && meta.stateId === 'loaded' &&
         selector === '.block-reference-embed footer button:first-child') {
       nativeSourceOrder = await traverseBlockEmbedWithNativeTabs({ key, evaluate })
+      reached = nativeSourceOrder.reached
+      reverseTabs = nativeSourceOrder.reverseTabs
+      tabAttempts = nativeSourceOrder.forwardTabs
+    } else if (meta.routeId === 'editor-wiki-navigation' && meta.stateId === 'missing-source' &&
+        selector === '[aria-label="关闭引用导航提示"]') {
+      nativeSourceOrder = await traverseWikiNavigationCloseWithNativeTabs({ key, evaluate })
       reached = nativeSourceOrder.reached
       reverseTabs = nativeSourceOrder.reverseTabs
       tabAttempts = nativeSourceOrder.forwardTabs
