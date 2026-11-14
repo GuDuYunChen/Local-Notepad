@@ -85,7 +85,7 @@ export function extendLocalExportInstallation(prepared, pin) {
   const anchor = "  const finalData=snapshotData();await uninstall('final-uninstall');unchanged(finalData,'final-uninstall');mark('final-uninstall-preserves-data')"
   assert.equal(prepared.script.split(marker).length, 2)
   assert.ok(prepared.script.indexOf(marker) < prepared.script.indexOf(anchor))
-  const addition = `  assert.equal(report.appExits.length,6);assert.equal(report.shortcutManagementRun.processIDs.length,2)\n  const localExport=await runLocalExportLifecycle({executablePath:appExe,out,productCommit:PRODUCT_COMMIT,version:RELEASES.current.version,scope:'installed',ownedRoot:scratch})\n  assert.equal(report.appExits.length,6);assert.equal(report.appExits.some(exit=>exit.pid===localExport.launch.pid),false);assert.equal(report.shortcutManagementRun.processIDs.includes(localExport.launch.pid),false)\n  for(const key of ['executableSHA256','asarSHA256','backendSHA256'])assert.equal(localExport.app[key],report.shortcutManagementRun.application[key])\n  report.localExportSource={productCommit:PRODUCT_COMMIT,sources:${JSON.stringify(sourcesFor(pin))}}\n  report.localExportRun={report:'${LOCAL_EXPORT_REPORT}',sha256:sha(readFileSync(path.join(out,'${LOCAL_EXPORT_REPORT}'))),application:localExport.app,processID:localExport.launch.pid};save();mark('${LOCAL_EXPORT_INSTALLATION_GATE}')\n`
+  const addition = `  assert.equal(report.appExits.length,6);assert.equal(report.shortcutManagementRun.processIDs.length,2)\n  const localExport=await runLocalExportLifecycle({executablePath:appExe,out,productCommit:PRODUCT_COMMIT,version:RELEASES.current.version,scope:'installed',ownedRoot:scratch})\n  assert.equal(report.appExits.length,6);assert.equal(localExport.complete,true);assert.equal(localExport.cleanupComplete,true);assert.equal(localExport.forceTerminated,false);assert.equal(localExport.exit.pid,localExport.launch.pid);assert.equal(localExport.exit.code,0);assert.equal(localExport.exit.signal,null);assert.equal(localExport.exit.nativeClose,true);assert.equal(localExport.exit.backendStopped,true);assert.ok(Number.isFinite(Date.parse(shortcutManagement.finishedAt))&&Number.isFinite(Date.parse(localExport.startedAt))&&Date.parse(shortcutManagement.finishedAt)<=Date.parse(localExport.startedAt),'Export session must start after shortcut teardown')\n  for(const key of ['executableSHA256','asarSHA256','backendSHA256'])assert.equal(localExport.app[key],report.shortcutManagementRun.application[key])\n  report.localExportSource={productCommit:PRODUCT_COMMIT,sources:${JSON.stringify(sourcesFor(pin))}}\n  report.localExportRun={report:'${LOCAL_EXPORT_REPORT}',sha256:sha(readFileSync(path.join(out,'${LOCAL_EXPORT_REPORT}'))),application:localExport.app,processID:localExport.launch.pid};save();mark('${LOCAL_EXPORT_INSTALLATION_GATE}')\n`
   const script = "import {runLocalExportLifecycle} from './run-local-export-desktop.mjs'\n" + replaceExactlyAndProveInverse(prepared.script, [[anchor, addition + anchor]])
   const check = "'" + SHORTCUT_INSTALLATION_GATE + "',"
   const core = replaceExactlyAndProveInverse(prepared.core, [[check, check + " '" + LOCAL_EXPORT_INSTALLATION_GATE + "',"]])
@@ -99,8 +99,14 @@ export function validateInstalledLocalExport(report, exported, shortcut, pin, ve
   assert.deepEqual(report.localExportSource, { productCommit: pin.product, sources: sourcesFor(pin) })
   assert.equal(report.localExportRun.report, LOCAL_EXPORT_REPORT); assert.match(report.localExportRun.sha256, /^[a-f0-9]{64}$/)
   assert.equal(report.localExportRun.processID, exported.launch.pid); assert.deepEqual(report.localExportRun.application, exported.app)
-  assert.equal(report.appExits.some(exit => exit.pid === exported.launch.pid), false)
-  assert.equal(shortcut.launches.some(launch => launch.pid === exported.launch.pid), false)
+  // PID numbers may be recycled after a completed Windows process; prove
+  // chronological isolation and exact native teardown instead.
+  assert.equal(exported.exit.pid, exported.launch.pid, 'Export exit must match its own launch')
+  assert.equal(exported.exit.code, 0); assert.equal(exported.exit.signal, null)
+  assert.equal(exported.exit.nativeClose, true); assert.equal(exported.exit.backendStopped, true)
+  const shortcutEnd = Date.parse(shortcut.finishedAt), exportStart = Date.parse(exported.startedAt)
+  assert.ok(Number.isFinite(shortcutEnd) && Number.isFinite(exportStart) && shortcutEnd <= exportStart,
+    'Export session must start after completed shortcut teardown')
   for (const key of ['executable', 'executableSHA256', 'asarSHA256', 'backendSHA256']) assert.equal(exported.app[key], shortcut.app[key])
   assert.equal(report.checks.filter(check => check === LOCAL_EXPORT_INSTALLATION_GATE).length, 1)
   assert.ok(report.checks.indexOf(LOCAL_EXPORT_INSTALLATION_GATE) > report.checks.indexOf(SHORTCUT_INSTALLATION_GATE))

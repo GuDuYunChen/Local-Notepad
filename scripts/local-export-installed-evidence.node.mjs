@@ -90,8 +90,8 @@ test('installed export binds the same installed bytes and a ninth independent na
 })
 for (const [name, mutate] of [
   ['old version', f => { f.pin.current.version = '4.234.0' }], ['unresolved binary', f => { f.pin.current.sha256 = null }],
-  ['missing original close', f => f.report.appExits.pop()], ['reused original process', f => { f.report.appExits[0].pid = f.exported.launch.pid }],
-  ['reused shortcut process', f => { f.shortcut.launches[0].pid = f.exported.launch.pid }], ['missing old data comparison', f => f.report.dataComparisons.pop()],
+  ['missing original close', f => f.report.appExits.pop()], ['export exit is not its launch', f => { f.exported.exit.pid++ }],
+  ['export overlaps shortcut teardown', f => { f.exported.startedAt = '2026-10-20T12:00:30Z' }], ['missing old data comparison', f => f.report.dataComparisons.pop()],
   ['changed retained data', f => { f.report.dataComparisons[0].equal = false }], ['missing shortcut gate', f => { f.report.checks.splice(3, 1) }],
   ['missing export gate', f => { f.report.checks.splice(4, 1) }], ['duplicated export gate', f => f.report.checks.push(LOCAL_EXPORT_INSTALLATION_GATE)],
   ['export after final uninstall', f => { f.report.checks.splice(4, 1); f.report.checks.push(LOCAL_EXPORT_INSTALLATION_GATE) }],
@@ -102,6 +102,13 @@ for (const [name, mutate] of [
   ['packaged evidence substituted', f => { f.exported.scope = 'packaged' }], ['hidden minimum-window feedback', f => { f.exported.visibility.cancelled.feedback.rendered = false }],
 ]) test('installed export refuses ' + name, () => { const f = fixture(); mutate(f); assert.throws(() => validateInstalledLocalExport(f.report, f.exported, f.shortcut, f.pin, verifier)) })
 
+test('Windows may recycle an exited lifecycle PID for a later independent export session', () => {
+  const f = fixture()
+  f.report.appExits[0].pid = f.exported.launch.pid
+  assert.equal(validateInstalledLocalExport(f.report, f.exported, f.shortcut, f.pin, verifier), true)
+  f.exported.exit.backendStopped = false
+  assert.throws(() => validateInstalledLocalExport(f.report, f.exported, f.shortcut, f.pin, verifier))
+})
 test('every actual export source is pinned and cannot disappear or change before generation', () => {
   const pin = pinFixture(); assert.equal(validateLocalExportVerifierSources(pin, source), true)
   for (const [file, key] of Object.entries(LOCAL_EXPORT_INSTALLATION_SOURCES)) {

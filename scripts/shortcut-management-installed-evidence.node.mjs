@@ -64,6 +64,13 @@ test('installed shortcut report binds the exact installed image and two addition
   assert.equal(Object.keys(SHORTCUT_INSTALLATION_SOURCES).length, 8)
   assert.equal(new Set(Object.values(SHORTCUT_INSTALLATION_SOURCES)).size, 8)
 })
+test('Windows may recycle an original PID after its confirmed native close', () => {
+  const f = fixture()
+  f.report.appExits[0].pid = f.shortcut.launches[0].pid
+  assert.equal(validateInstalledShortcutManagement(f.report, f.shortcut, f.pin, verifier), true)
+  f.report.appExits[0].nativeClose = false
+  assert.throws(() => validateInstalledShortcutManagement(f.report, f.shortcut, f.pin, verifier))
+})
 for (const [name, mutate] of [
   ['old accepted reading version', f => { f.pin.current.version = '4.233.2' }],
   ['wrong accepted upgrade bytes', f => { f.pin.previous.bytes++ }],
@@ -75,7 +82,7 @@ for (const [name, mutate] of [
   ['changed default data path', f => { f.report.usedDefaultDataPath = false }],
   ['missing original sixth close', f => { f.report.appExits.pop() }],
   ['extra process mixed into original exits', f => { f.report.appExits.push({ ...f.shortcut.exits[0] }) }],
-  ['reused original process', f => { f.report.appExits[0].pid = f.shortcut.launches[0].pid }],
+  ['invalid original process identity', f => { f.report.appExits[0].pid = 0 }],
   ['forced original native close', f => { f.report.appExits[5].nativeClose = false }],
   ['missing original comparison', f => { f.report.dataComparisons.pop() }],
   ['changed retained data', f => { f.report.dataComparisons[5].equal = false }],

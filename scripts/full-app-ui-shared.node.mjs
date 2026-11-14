@@ -10,7 +10,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { build } from 'esbuild'
 import controlEvidence from './check-ui-control-render.cjs'
 import { COLLAPSED_SIDEBAR_EXPAND, validateCollapsedSidebarObservation } from './full-app-ui-evidence.mjs'
-import { observeFullAppPopup, captureActualFullAppPopup, validateFullAppCaptureContinuity, validateFullAppPageSample, measureFullAppScrollCoverage, collectFullAppScrollOwners, createFullAppUiShared, traverseMarkdownSourceCloseWithNativeTabs, traverseBlockEmbedWithNativeTabs, traverseWikiNavigationCloseWithNativeTabs, withinActualClientPort, finiteOwnerMotionActive, waitForFiniteOwnerMotion } from './full-app-ui-shared.mjs'
+import { observeFullAppPopup, captureActualFullAppPopup, validateFullAppCaptureContinuity, validateFullAppPageSample, measureFullAppScrollCoverage, collectFullAppScrollOwners, createFullAppUiShared, traverseMarkdownSourceCloseWithNativeTabs, traverseBlockEmbedWithNativeTabs, traverseWikiNavigationCloseWithNativeTabs, traverseTableActionMenuWithNativeTabs, withinActualClientPort, finiteOwnerMotionActive, waitForFiniteOwnerMotion } from './full-app-ui-shared.mjs'
 import { buildResearchImportFixtures, researchRoutes } from './full-app-ui-research.mjs'
 import { inspectEditorSwitchReadiness } from './full-app-ui-main-editor.mjs'
 
@@ -58,6 +58,38 @@ function popupSample() {
   return { inputId: 'original-control', value: 'a', options: [{ id: 'option-a', value: 'a', disabled: false, selected: true }],
     popup: { listId: 'original-control_list', optionId: 'option-a', ready: true, paintFrames: 2 } }
 }
+
+test('installed table action menu starts on its pointer-focused trigger and traverses both native directions', async () => {
+  const keys = [], sample = (triggerFocused, firstFocused, ownerReady = true) => ({ ownerReady, triggerFocused, firstFocused })
+  const reads = [sample(true, false), sample(false, true), sample(true, false), sample(false, true)]
+  const receipt = await traverseTableActionMenuWithNativeTabs({
+    key: async (...args) => keys.push(args), evaluate: async () => reads.shift(),
+  })
+  assert.equal(receipt.reached, true)
+  assert.deepEqual(keys, [['Tab'], ['Tab', 8], ['Tab']])
+  assert.equal(receipt.reverseTabs, 1); assert.equal(receipt.forwardTabs, 2)
+  assert.equal(receipt.returned.firstFocused, true)
+})
+test('table action menu cannot accept a missing menu, an unfocused trigger, or a failed native return', async () => {
+  const sample = (triggerFocused, firstFocused, ownerReady = true) => ({ ownerReady, triggerFocused, firstFocused })
+  for (const initial of [sample(true, false, false), sample(false, false), sample(false, true)]) {
+    const keys = [], receipt = await traverseTableActionMenuWithNativeTabs({
+      key: async (...args) => keys.push(args), evaluate: async () => initial,
+    })
+    assert.equal(receipt.reached, false); assert.deepEqual(keys, [])
+  }
+  for (const reads of [
+    [sample(true, false), sample(false, false)],
+    [sample(true, false), sample(false, true), sample(false, false), sample(false, true)],
+    [sample(true, false), sample(false, true), sample(true, false), sample(false, false)],
+  ]) {
+    const keys = [], receipt = await traverseTableActionMenuWithNativeTabs({
+      key: async (...args) => keys.push(args), evaluate: async () => reads.shift(),
+    })
+    assert.equal(receipt.reached, false)
+    assert.ok(keys.length > 0)
+  }
+})
 
 test('Wiki navigation close requires a neutral real pointer origin then one native forward Tab', async () => {
   const before = { ownerReady: true, neutralOrigin: true, closeFocused: false }

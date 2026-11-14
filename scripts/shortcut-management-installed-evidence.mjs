@@ -89,7 +89,7 @@ export function extendShortcutManagementInstallation(prepared, pin) {
   assert.ok(prepared.script.indexOf(marker) < prepared.script.indexOf(anchor), 'Shortcut run must follow the original sixth close and precede final retention snapshot')
   const originalPayload = "asarSHA256:sha(readFileSync(path.join(installDir,'resources','app.asar')))"
   const completePayload = originalPayload + ",executableSHA256:sha(readFileSync(appExe)),backendSHA256:sha(readFileSync(path.join(installDir,'resources','bin','notepad-server.exe')))"
-  const addition = `  assert.equal(report.appExits.length,6,'Original six native exits must finish before shortcut restart checks')\n  const shortcutManagement=await runShortcutManagementLifecycle({executablePath:appExe,out,productCommit:PRODUCT_COMMIT,version:RELEASES.current.version,scope:'installed',ownedRoot:scratch})\n  assert.equal(report.appExits.length,6);for(const launch of shortcutManagement.launches)assert.equal(report.appExits.some(exit=>exit.pid===launch.pid),false)\n  report.shortcutManagementSource={productCommit:PRODUCT_COMMIT,sources:${JSON.stringify(sourcesFor(pin))}}\n  report.shortcutManagementRun={report:'${SHORTCUT_MANAGEMENT_REPORT}',sha256:sha(readFileSync(path.join(out,'${SHORTCUT_MANAGEMENT_REPORT}'))),application:shortcutManagement.app,processIDs:shortcutManagement.launches.map(launch=>launch.pid)};save();mark('${SHORTCUT_INSTALLATION_GATE}')\n`
+  const addition = `  assert.equal(report.appExits.length,6,'Original six native exits must finish before shortcut restart checks')\n  const shortcutManagement=await runShortcutManagementLifecycle({executablePath:appExe,out,productCommit:PRODUCT_COMMIT,version:RELEASES.current.version,scope:'installed',ownedRoot:scratch})\n  assert.equal(report.appExits.length,6);assert.equal(shortcutManagement.launches.length,2);assert.equal(shortcutManagement.exits.length,2);for(let i=0;i<2;i++){const launch=shortcutManagement.launches[i],exit=shortcutManagement.exits[i];assert.equal(exit.pid,launch.pid);assert.equal(exit.code,0);assert.equal(exit.signal,null);assert.equal(exit.nativeClose,true);assert.equal(exit.backendStopped,true)}\n  report.shortcutManagementSource={productCommit:PRODUCT_COMMIT,sources:${JSON.stringify(sourcesFor(pin))}}\n  report.shortcutManagementRun={report:'${SHORTCUT_MANAGEMENT_REPORT}',sha256:sha(readFileSync(path.join(out,'${SHORTCUT_MANAGEMENT_REPORT}'))),application:shortcutManagement.app,processIDs:shortcutManagement.launches.map(launch=>launch.pid)};save();mark('${SHORTCUT_INSTALLATION_GATE}')\n`
   const script = "import {runShortcutManagementLifecycle} from './run-shortcut-management-desktop.mjs'\n" +
     replaceExactlyAndProveInverse(prepared.script, [[originalPayload, completePayload], [anchor, addition + anchor]])
   const check = "'reinstall-recovers-retained-data',"
@@ -115,7 +115,14 @@ export function validateInstalledShortcutManagement(report, shortcut, pin, verif
   for (const exit of report.appExits) {
     assert.equal(exit.code, 0); assert.equal(exit.signal, null); assert.equal(exit.nativeClose, true)
     assert.ok(Number.isSafeInteger(exit.pid) && exit.pid > 0)
-    assert.equal(shortcut.launches.some(item => item.pid === exit.pid), false, 'Shortcut restart cannot reuse an original lifecycle process')
+    // Windows may recycle a PID after this original process has exited. Native close is the boundary.
+  }
+  assert.equal(shortcut.launches.length, 2); assert.equal(shortcut.exits.length, 2)
+  for (let i = 0; i < 2; i++) {
+    const launch = shortcut.launches[i], exit = shortcut.exits[i]
+    assert.equal(exit.pid, launch.pid, 'Shortcut exit must match its own launch')
+    assert.equal(exit.code, 0); assert.equal(exit.signal, null)
+    assert.equal(exit.nativeClose, true); assert.equal(exit.backendStopped, true)
   }
   for (const comparison of report.dataComparisons) {
     assert.equal(comparison.equal, true); assert.ok(comparison.files > 0); assert.match(comparison.digest, /^[a-f0-9]{64}$/)

@@ -576,6 +576,27 @@ export async function traverseWikiNavigationCloseWithNativeTabs({ key, evaluate 
   receipt.reached = receipt.forward.ownerReady && receipt.forward.closeFocused
   return receipt
 }
+/**
+ * A pointer-opened table action menu leaves native focus on its real trigger.
+ * Its first menuitem comes NEXT in Tab order. A generic initial Shift+Tab
+ * instead escapes backward into Lexical, which owns Tab for text indentation.
+ * Verify forward, reverse and return using only genuine native key events.
+ * Shared screenshot, focus ring and hit-test assertions run unchanged.
+ */
+export async function traverseTableActionMenuWithNativeTabs({ key, evaluate }) {
+  const observe = () => evaluate('(() => { const host = document.querySelector(".editor-container"); const trigger = host?.querySelector(".table-action-menu-trigger"); const menu = host?.querySelector(".table-action-menu[role=menu]"); const first = menu?.querySelector(".product-table-menu-section:first-child .table-action-menu-item:first-of-type"); return { ownerReady: !!host && !!trigger && trigger.tagName === "BUTTON" && !trigger.disabled && !!menu && !!first && first.tagName === "BUTTON" && !first.disabled && first.getAttribute("role") === "menuitem" && document.querySelectorAll(".product-table-menu-section:first-child .table-action-menu-item:first-of-type").length === 1, triggerFocused: !!trigger && document.activeElement === trigger, firstFocused: !!first && document.activeElement === first }; })()')
+  const initial = await observe()
+  const receipt = { initial, forward: null, backward: null, returned: null, reverseTabs: 0, forwardTabs: 0, reached: false }
+  if (!initial.ownerReady || !initial.triggerFocused || initial.firstFocused) return receipt
+  await key('Tab'); receipt.forwardTabs++; receipt.forward = await observe()
+  if (!receipt.forward.ownerReady || !receipt.forward.firstFocused) return receipt
+  await key('Tab', 8); receipt.reverseTabs++; receipt.backward = await observe()
+  await key('Tab'); receipt.forwardTabs++; receipt.returned = await observe()
+  receipt.reached = receipt.backward.ownerReady && receipt.backward.triggerFocused &&
+    receipt.returned.ownerReady && receipt.returned.firstFocused
+  return receipt
+}
+
 export function validateFullAppCaptureContinuity(before, actual, matrix) {
   assert.equal(actual.root, before.root, 'Actual page root changed across the native PNG')
   assert.deepEqual(actual.viewport, before.viewport); assert.equal(actual.theme, before.theme)
@@ -905,6 +926,12 @@ export function createFullAppUiShared(ctx) {
     } else if (meta.routeId === 'editor-wiki-navigation' && meta.stateId === 'missing-source' &&
         selector === '[aria-label="关闭引用导航提示"]') {
       nativeSourceOrder = await traverseWikiNavigationCloseWithNativeTabs({ key, evaluate })
+      reached = nativeSourceOrder.reached
+      reverseTabs = nativeSourceOrder.reverseTabs
+      tabAttempts = nativeSourceOrder.forwardTabs
+    } else if (meta.routeId === 'editor-table-actions' && meta.stateId === 'actions' &&
+        selector === '.product-table-menu-section:first-child .table-action-menu-item:first-of-type') {
+      nativeSourceOrder = await traverseTableActionMenuWithNativeTabs({ key, evaluate })
       reached = nativeSourceOrder.reached
       reverseTabs = nativeSourceOrder.reverseTabs
       tabAttempts = nativeSourceOrder.forwardTabs
