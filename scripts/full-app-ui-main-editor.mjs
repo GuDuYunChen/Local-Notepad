@@ -725,6 +725,29 @@ async function verifyEditorInspector(ctx) {
 
 async function verifyEditorNodes(ctx) {
   const { fixture, openNote, shot, focus, hit, press, present, absent, text, shared, evaluate, cdp, doubleClick, popup, clean } = ctx
+  // Isolate the first real source-note mutation instead of letting a later
+  // unsaved-draft dialog obscure the responsible native input boundary.
+  // This probe only reads the public editor state and recorded key events; it
+  // never saves, discards, focuses, or changes the original Tab assertions.
+  const originalSourceIndent = JSON.parse(fixture.notes['引用来源'].content).root.children[0].indent
+  const verifySourceIndent = async stage => {
+    const observed = await evaluate(`(() => {
+      const root = document.querySelector('.editor-input[contenteditable="true"]')
+      const editor = root?.__lexicalEditor
+      const state = editor?.getEditorState && JSON.parse(JSON.stringify(editor.getEditorState()))
+      return { indent: state?.root?.children?.[0]?.indent ?? null,
+        chip: document.querySelector('.workspace-save-chip')?.textContent.trim() ?? null,
+        title: document.querySelector('.workspace-title-button')?.textContent.trim() ?? null,
+        keys: (window.__fullAppUiEvents || []).filter(e => e.type === 'keydown' &&
+          ['Tab', 'F6', 'Escape'].includes(e.key)).slice(-30) }
+    })()`)
+    if (observed.indent !== originalSourceIndent) {
+      ;(ctx.report.fullAppUi.editorSourceIndentDrift ||= []).push({ stage, ...ctx.matrix,
+        expectedIndent: originalSourceIndent, observed, savedNoteId: fixture.notes['引用来源'].id }); ctx.save()
+    }
+    assert.equal(observed.indent, originalSourceIndent,
+      'Actual owned source note indent changed at ' + stage)
+  }
   await openNote('基本编辑正文'); await hit('.block-reference-entry > button'); await present('.block-reference-panel')
   const blockInput = '.block-reference-panel input[placeholder="notepad://block/…"]'
   await shot('editor-block-reference', 'default', [blockInput]); await focus('editor-block-reference', 'default', blockInput)
@@ -736,8 +759,8 @@ async function verifyEditorNodes(ctx) {
   await text('.block-reference-panel [role="alert"]', '无效')
   await shot('editor-block-reference', 'invalid', [blockInput])
   await hit('[aria-label="关闭块引用"]'); await absent('.block-reference-panel')
-  await openNote('引用来源'); await text('.block-reference-embed pre', '可读取的来源块内容')
-  await shot('editor-block-embed', 'loaded', ['.block-reference-embed footer button:first-child'])
+  await openNote('引用来源'); await verifySourceIndent('after-open-source'); await text('.block-reference-embed pre', '可读取的来源块内容')
+  await shot('editor-block-embed', 'loaded', ['.block-reference-embed footer button:first-child']); await verifySourceIndent('after-embed-capture')
   // The body owns ordinary Tab indentation. Enter the read-only decorator via
   // its actual F6 keyboard shortcut, never by clicking or calling focus().
   const embedBefore = await evaluate(`(() => {
@@ -750,7 +773,7 @@ async function verifyEditorNodes(ctx) {
   })()`)
   assert.equal(embedBefore.editorFocused, true, 'Actual Lexical editor must own the F6 entry')
   assert.equal(embedBefore.firstReady, true, 'Actual first embedded action is unavailable')
-  await shared.key('F6')
+  await shared.key('F6'); await verifySourceIndent('after-native-F6')
   const embedAfter = await evaluate(`(() => {
     const root = document.querySelector('.editor-input[contenteditable="true"]')
     const first = root?.querySelector('.block-reference-embed footer button:first-child')
@@ -762,11 +785,11 @@ async function verifyEditorNodes(ctx) {
   assert.ok(embedAfter.events.some(event => event.type === 'keydown' && event.key === 'F6' &&
     event.trusted && event.tag === 'DIV' && event.role === 'textbox'),
   'Actual F6 entry lacked trusted keyboard evidence from Lexical')
-  await focus('editor-block-embed', 'loaded', '.block-reference-embed footer button:first-child')
+  await focus('editor-block-embed', 'loaded', '.block-reference-embed footer button:first-child'); await verifySourceIndent('after-embed-native-Tab')
   await shared.hover('.editor-input .wiki-link[data-wiki-target-id=' + q(fixture.notes['基本编辑正文'].id) + ']')
   await present('.wiki-link-preview [data-wiki-control="true"]')
   await shot('editor-wiki-preview', 'preview', ['.wiki-link-preview [data-wiki-control="true"]'])
-  await focus('editor-wiki-preview', 'preview', '.wiki-link-preview [data-wiki-control="true"]')
+  await focus('editor-wiki-preview', 'preview', '.wiki-link-preview [data-wiki-control="true"]'); await verifySourceIndent('after-wiki-preview-native-Tab')
   await shared.key('Escape'); await hit('.editor-input > p:first-of-type')
   await hit('.editor-input .wiki-link[data-wiki-target-id=' + q(fixture.missingId) + ']')
   await present('.wiki-navigation-status [role="alert"]')
@@ -774,7 +797,7 @@ async function verifyEditorNodes(ctx) {
   // A trusted click on the inert status title releases Lexical's Tab-indent
   // ownership. The close action is reached only by a subsequent native Tab.
   await hit('.wiki-navigation-status header strong')
-  await focus('editor-wiki-navigation', 'missing-source', '[aria-label="关闭引用导航提示"]')
+  await focus('editor-wiki-navigation', 'missing-source', '[aria-label="关闭引用导航提示"]'); await verifySourceIndent('after-wiki-status-native-Tab')
   await hit('[aria-label="关闭引用导航提示"]'); await absent('.wiki-navigation-status')
   await clean('after-wiki-navigation-close')
 
