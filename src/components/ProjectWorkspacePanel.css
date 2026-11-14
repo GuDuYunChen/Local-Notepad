@@ -67,7 +67,7 @@
   gap: 5px;
 }
 
-.project-actions-trigger span {
+.project-actions-trigger > span[aria-hidden="true"] {
   color: var(--ink-muted);
   font-size: 8px;
 }
@@ -90,24 +90,31 @@
 
 .project-actions-menu > button,
 .project-actions-type-switch button {
+  cursor: pointer;
+}
+
+.project-actions-menu > button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.project-actions-type-switch button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border: 0;
   border-radius: 6px;
   background: transparent;
   color: var(--ink-soft);
   font: inherit;
-  cursor: pointer;
 }
 
 .project-actions-menu > button {
   width: 100%;
+  text-align: left;
+}
+
+.project-actions-menu > button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   min-height: 30px;
   padding: 0 8px;
-  text-align: left;
   font-size: 8px;
 }
 
-.project-actions-menu > button:hover:not(:disabled),
-.project-actions-type-switch button:hover {
+.project-actions-menu > button:hover:not(:disabled):where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.project-actions-type-switch button:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   background: var(--paper);
   color: var(--ink);
 }
@@ -136,18 +143,21 @@
   gap: 3px;
 }
 
-.project-actions-type-switch button {
+.project-actions-type-switch button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   min-height: 27px;
   font-size: 8px;
 }
 
-.project-actions-type-switch button.active {
+.project-actions-type-switch button.active:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   background: var(--clay-light);
   color: var(--clay);
 }
 
 .project-workspace-toolbar-actions select {
   max-width: 180px;
+}
+
+.project-workspace-toolbar-actions select:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   height: 31px;
   padding: 0 8px;
   border: 1px solid var(--line);
@@ -170,16 +180,19 @@
 
 .project-type-switch button {
   min-width: 38px;
+  cursor: pointer;
+}
+
+.project-type-switch button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border: 0;
   border-radius: 5px;
   background: transparent;
   color: var(--ink-muted);
   font: inherit;
   font-size: 8px;
-  cursor: pointer;
 }
 
-.project-type-switch button.active {
+.project-type-switch button.active:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   background: var(--surface);
   color: var(--clay);
   box-shadow: var(--shadow-soft);
@@ -236,26 +249,29 @@
 
 .project-workspace-view-tabs button {
   min-width: 116px;
-  padding: 6px 10px;
   display: flex;
   flex-direction: column;
   justify-content: center;
   gap: 1px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.project-workspace-view-tabs button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
+  padding: 6px 10px;
   border: 1px solid transparent;
   border-radius: 8px;
   background: transparent;
   color: var(--ink-muted);
   font: inherit;
-  text-align: left;
-  cursor: pointer;
 }
 
-.project-workspace-view-tabs button:hover {
+.project-workspace-view-tabs button:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   background: var(--paper);
   color: var(--ink-soft);
 }
 
-.project-workspace-view-tabs button.active {
+.project-workspace-view-tabs button.active:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-color: var(--line);
   background: var(--paper);
   color: var(--ink);
@@ -300,7 +316,8 @@
 .project-workspace-view-content.view-project {
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .project-workspace-view-content.view-project .project-creative-console {
@@ -373,6 +390,9 @@
 .project-board-search input {
   min-width: 0;
   flex: 1;
+}
+
+.project-board-search input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border: 0;
   outline: 0;
   background: transparent;
@@ -381,7 +401,7 @@
   font-size: 9px;
 }
 
-.project-board-toolbar select {
+.project-board-toolbar select:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   height: 32px;
   padding: 0 26px 0 9px;
   border: 1px solid var(--line);
@@ -460,8 +480,8 @@
   line-height: 1.4;
 }
 
-.project-board-createbar select,
-.project-board-split-preview input {
+.project-board-createbar select:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.project-board-split-preview input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   height: 30px;
   padding: 0 9px;
   border: 1px solid var(--line);
@@ -476,10 +496,14 @@
 .project-board-createbar textarea {
   width: min(280px, 30vw);
   min-width: 170px;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.project-board-createbar textarea:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   min-height: 46px;
   max-height: 92px;
   padding: 6px 8px;
-  resize: vertical;
   border: 1px solid var(--line);
   border-radius: 7px;
   outline: 0;
@@ -488,11 +512,10 @@
   font: inherit;
   font-size: 8px;
   line-height: 1.4;
-  box-sizing: border-box;
 }
 
-.project-board-createbar textarea:focus,
-.project-board-split-preview input:focus {
+.project-board-createbar textarea:focus:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.project-board-split-preview input:focus:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-color: var(--clay);
   box-shadow: 0 0 0 2px var(--clay-light);
 }
@@ -586,8 +609,11 @@
 }
 
 .project-board-bulk-group select {
-  height: 28px;
   max-width: 132px;
+}
+
+.project-board-bulk-group select:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
+  height: 28px;
   padding: 0 24px 0 8px;
   border: 1px solid var(--line);
   border-radius: 7px;
@@ -614,7 +640,7 @@
   font-size: 12px;
 }
 
-.project-board-filter-empty span {
+.project-board-filter-empty > span {
   font-size: 9px;
 }
 
@@ -625,7 +651,8 @@
 
 .project-workspace-board {
   min-height: 0;
-  flex: 1;
+  /* Keep the real column controls reachable below a tall creative console. */
+  flex: 1 0 auto;
   padding: 14px 16px 18px;
   display: flex;
   align-items: flex-start;
@@ -674,7 +701,7 @@
   white-space: nowrap;
 }
 
-.project-volume-header span {
+.project-volume-header > .project-volume-copy > span {
   margin-top: 2px;
   color: var(--ink-muted);
   font-size: 8px;
@@ -709,15 +736,14 @@
 
 .project-volume-export .project-volume-manage {
   width: auto;
-  padding: 0 7px;
-}
-
-.project-volume-export .project-volume-create {
-  font-size: 11px;
 }
 
 .project-volume-export button {
   width: 25px;
+  cursor: pointer;
+}
+
+.project-volume-export button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   height: 24px;
   padding: 0;
   border: 1px solid transparent;
@@ -726,10 +752,9 @@
   color: var(--ink-muted);
   font: inherit;
   font-size: 7px;
-  cursor: pointer;
 }
 
-.project-volume-export button:hover:not(:disabled) {
+.project-volume-export button:hover:not(:disabled):where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-color: var(--line);
   background: var(--paper);
   color: var(--ink);
@@ -771,7 +796,7 @@
   font-size: 10px;
 }
 
-.project-volume-manager-head span {
+.project-volume-manager-head > div > span {
   margin-top: 3px;
   color: var(--ink-muted);
   font-size: 8px;
@@ -799,8 +824,8 @@
   font-weight: 650;
 }
 
-.project-volume-manager-grid input,
-.project-volume-manager-grid select {
+.project-volume-manager-grid input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.project-volume-manager-grid select:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   height: 30px;
   padding: 0 8px;
   border: 1px solid var(--line);
@@ -812,8 +837,8 @@
   font-size: 8px;
 }
 
-.project-volume-manager-grid input:focus,
-.project-volume-manager-grid select:focus {
+.project-volume-manager-grid input:focus:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.project-volume-manager-grid select:focus:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-color: var(--clay);
   box-shadow: 0 0 0 2px var(--clay-light);
 }
@@ -845,7 +870,7 @@
   max-width: 220px;
 }
 
-.project-volume-manager .btn.danger {
+.project-volume-manager .btn.danger:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-color: color-mix(in srgb, #b84444 28%, var(--line));
   color: #a63b3b;
 }
@@ -862,8 +887,10 @@
 
 .project-chapter-card {
   min-height: 58px;
+  flex: 0 0 auto;
   position: relative;
   display: flex;
+  flex-wrap: wrap;
   align-items: stretch;
   gap: 5px;
   padding: 5px;
@@ -954,22 +981,25 @@
 
 .project-chapter-open {
   min-width: 0;
-  flex: 1;
-  padding: 3px 4px;
-  border: 0;
-  background: transparent;
-  color: var(--ink);
-  font: inherit;
+  flex: 0 0 auto;
   text-align: left;
   cursor: pointer;
 }
 
-.project-chapter-open strong,
-.project-chapter-open span {
-  display: block;
+.project-chapter-open > span,
+.project-chapter-caption {
+  min-width: 0;
+  max-width: 100%;
 }
 
-.project-chapter-open strong {
+.project-chapter-caption,
+.project-chapter-caption strong,
+.project-chapter-meta {
+  display: block;
+  line-height: 1.2;
+}
+
+.project-chapter-caption strong {
   overflow: hidden;
   font-size: 9px;
   font-weight: 610;
@@ -977,8 +1007,11 @@
   white-space: nowrap;
 }
 
-.project-chapter-open span {
+.project-chapter-meta {
   margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--ink-muted);
   font-size: 7px;
 }
@@ -1000,6 +1033,10 @@
 
 .project-chapter-quick-actions button {
   min-width: 30px;
+  cursor: pointer;
+}
+
+.project-chapter-quick-actions button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   height: 23px;
   padding: 0 5px;
   border: 1px solid transparent;
@@ -1008,10 +1045,9 @@
   color: var(--ink-muted);
   font: inherit;
   font-size: 7px;
-  cursor: pointer;
 }
 
-.project-chapter-quick-actions button:hover:not(:disabled) {
+.project-chapter-quick-actions button:hover:not(:disabled):where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-color: var(--line);
   background: var(--surface);
   color: var(--ink);
@@ -1024,12 +1060,11 @@
 
 .project-chapter-status {
   min-width: 38px;
+  margin-left: auto;
   align-self: center;
   padding: 4px 5px;
   border: 0;
   border-radius: 99px;
-  font: inherit;
-  font-size: 7px;
   font-weight: 650;
   cursor: pointer;
 }
@@ -1092,7 +1127,7 @@
   font-size: 13px;
 }
 
-.project-workspace-empty span {
+.project-workspace-empty > span {
   max-width: 430px;
   font-size: 10px;
   line-height: 1.6;
@@ -1183,6 +1218,9 @@
 .project-target-input input {
   min-width: 0;
   flex: 1;
+}
+
+.project-target-input input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   height: 29px;
   padding: 0 8px;
   border: 1px solid var(--line);
@@ -1194,7 +1232,7 @@
   font-size: 9px;
 }
 
-.project-target-input input:focus {
+.project-target-input input:focus:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-color: var(--clay);
   box-shadow: 0 0 0 2px var(--clay-light);
 }
@@ -1259,20 +1297,23 @@
 
 .project-activity-list > button {
   min-width: 0;
-  padding: 5px 6px;
   display: flex;
   align-items: center;
   gap: 8px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.project-activity-list > button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
+  padding: 5px 6px;
   border: 0;
   border-radius: 6px;
   background: transparent;
   color: var(--ink);
   font: inherit;
-  text-align: left;
-  cursor: pointer;
 }
 
-.project-activity-list > button:hover {
+.project-activity-list > button:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   background: var(--surface-hover);
 }
 
@@ -1359,21 +1400,24 @@
 
 .project-index-items button {
   min-width: 0;
-  padding: 3px 4px;
   overflow: hidden;
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  color: var(--ink-soft);
-  font: inherit;
-  font-size: 7px;
   text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
   cursor: pointer;
 }
 
-.project-index-items button:hover {
+.project-index-items button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
+  padding: 3px 4px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 7px;
+}
+
+.project-index-items button:hover:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   background: var(--surface);
   color: var(--ink);
 }
@@ -1386,30 +1430,31 @@
 
 .project-chapter-main {
   min-width: 0;
-  flex: 1;
+  /* Give the title and summary their own row above the standard-size actions. */
+  flex: 1 1 100%;
   display: flex;
   flex-direction: column;
 }
 
+.project-chapter-card.selection-mode .project-chapter-main {
+  flex: 1;
+}
+
 .project-chapter-summary {
   min-width: 0;
+  flex: 0 0 auto;
   margin: 1px 4px 3px;
-  padding: 0;
   overflow: hidden;
-  border: 0;
-  background: transparent;
-  color: var(--ink-muted);
-  font: inherit;
-  font-size: 7px;
-  line-height: 1.45;
   text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
   cursor: text;
 }
 
-.project-chapter-summary:hover {
-  color: var(--ink-soft);
+.project-chapter-summary > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .project-chapter-summary-editor {
@@ -1418,9 +1463,13 @@
 
 .project-chapter-summary-editor textarea {
   width: 100%;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.project-chapter-summary-editor textarea:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   min-height: 52px;
   padding: 6px;
-  resize: vertical;
   border: 1px solid var(--line);
   border-radius: 6px;
   outline: 0;
@@ -1429,10 +1478,9 @@
   font: inherit;
   font-size: 8px;
   line-height: 1.45;
-  box-sizing: border-box;
 }
 
-.project-chapter-summary-editor textarea:focus {
+.project-chapter-summary-editor textarea:focus:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   border-color: var(--clay);
   box-shadow: 0 0 0 2px var(--clay-light);
 }
@@ -1445,6 +1493,10 @@
 }
 
 .project-chapter-summary-editor button {
+  cursor: pointer;
+}
+
+.project-chapter-summary-editor button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   min-height: 22px;
   padding: 0 6px;
   border: 1px solid var(--line);
@@ -1453,7 +1505,6 @@
   color: var(--ink-soft);
   font: inherit;
   font-size: 7px;
-  cursor: pointer;
 }
 
 @media (max-width: 1180px) {
@@ -1489,9 +1540,12 @@
 
   .project-workspace-view-tabs button {
     min-width: 64px;
-    padding: 6px 9px;
     align-items: center;
     text-align: center;
+  }
+
+  .project-workspace-view-tabs button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
+    padding: 6px 9px;
   }
 
   .project-workspace-view-tabs button span {
@@ -1518,10 +1572,6 @@
 
   .project-workspace-toolbar-actions select {
     max-width: min(42vw, 150px);
-  }
-
-  .project-actions-trigger {
-    padding-inline: 7px !important;
   }
 
   .project-actions-trigger span {
@@ -1646,10 +1696,6 @@
   .project-chapter-quick-actions {
     opacity: 1;
     transform: none;
-  }
-
-  .project-volume-export .project-volume-manage {
-    padding-inline: 6px;
   }
 }
 

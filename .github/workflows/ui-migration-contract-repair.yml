@@ -1,0 +1,81 @@
+name: Repair complete UI migration contracts
+on:
+  push:
+    branches: [fix/local-ui-consistency-2f116]
+    paths:
+      - .github/workflows/ui-migration-contract-repair.yml
+      - scripts/apply-ui-recovery-candidate.mjs
+      - scripts/ui-recovery-candidate.json
+permissions:
+  contents: write
+concurrency:
+  group: repair-ui-migration-2f116
+  cancel-in-progress: false
+jobs:
+  repair-and-verify-complete-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.24.11'
+          cache-dependency-path: server/go.sum
+      - name: Apply only the exact locally verified recovery candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = refs/heads/fix/local-ui-consistency-2f116
+          test -z "$(git status --porcelain)"
+          mkdir -p test-results/ui-contract-repair
+          node scripts/apply-ui-recovery-candidate.mjs --check
+          node scripts/apply-ui-recovery-candidate.mjs > test-results/ui-contract-repair/applied.json
+          git diff --check
+          git diff --exit-code -- package.json package-lock.json server electron
+      - name: Install committed dependencies without changing the lock
+        run: |
+          npm ci --no-audit --no-fund
+          git diff --exit-code -- package.json package-lock.json
+      - name: Bind the complete candidate to an exact commit before testing
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs'
+          import { execFileSync } from 'node:child_process'
+          const manifest=JSON.parse(fs.readFileSync('scripts/ui-recovery-candidate.json','utf8'))
+          execFileSync('git',['add','--',...manifest.files.map(file=>file.path)],{stdio:'inherit'})
+          NODE
+          git commit -m 'fix(ui): finish real control interaction and lifecycle regression recovery'
+          git rev-parse HEAD > test-results/ui-contract-repair/commit.txt
+          git rev-parse HEAD^{tree} > test-results/ui-contract-repair/tree.txt
+      - name: Verify Node fixtures use actual official component exports
+        run: node --test scripts/fixture-antd-node-imports.node.mjs
+      - name: Run all original unfiltered suites and builds on the exact candidate
+        run: node scripts/run-ui-complete-regression.mjs
+      - name: Publish only a fully passing candidate without overwriting another writer
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git ls-remote origin refs/heads/fix/local-ui-consistency-2f116 | cut -f1)" = "$GITHUB_SHA"
+          git diff --exit-code
+          git push origin HEAD:refs/heads/fix/local-ui-consistency-2f116
+          printf 'published=true\n' > test-results/ui-contract-repair/publication.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ui-contract-repair-${{ github.sha }}
+          path: |
+            test-results/ui-contract-repair/
+            test-results/ui-complete-regression/*.json
+            test-results/ui-complete-regression/*.log
+          retention-days: 30
+          if-no-files-found: warn

@@ -1,6 +1,8 @@
-import React from 'react'
+import React, { useLayoutEffect, useRef } from 'react'
 import { formatSectionPath } from './Editor/utils/referenceUtils'
 import './ReferenceRefactorDialog.css'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 function modeCopy(mode) {
   if (mode === 'rename') {
@@ -49,6 +51,38 @@ export default function ReferenceRefactorDialog({
   onCancel,
   onOpenSource,
 }) {
+  const panel = useRef(null)
+  const open = Boolean(plan)
+  useLayoutEffect(() => {
+    const dialog = panel.current
+    if (!open || !dialog) return undefined
+    const document = dialog.ownerDocument
+    const previous = document.activeElement
+    const controls = () => [...dialog.querySelectorAll('button:not(:disabled)')]
+      .filter(node => node.tabIndex >= 0 && !node.closest('[hidden], [inert]'))
+    const enter = () => (controls()[0] || dialog).focus({ preventScroll: true })
+    // The pending rename form can still be mounted behind this review. Move
+    // keyboard ownership here before Tab can enter the underlying editor.
+    enter()
+    const keydown = event => {
+      if (event.key !== 'Tab' || event.isComposing || event.keyCode === 229) return
+      const items = controls()
+      const index = items.indexOf(document.activeElement)
+      if (!items.length || index < 0 || (event.shiftKey ? index === 0 : index === items.length - 1)) {
+        event.preventDefault()
+        event.stopPropagation()
+        const target = (event.shiftKey ? items.at(-1) : items[0]) || dialog
+        target.focus()
+      }
+    }
+    document.addEventListener('keydown', keydown, true)
+    return () => {
+      document.removeEventListener('keydown', keydown, true)
+      if (previous?.isConnected && !previous.disabled && !previous.closest('[hidden], [inert]')) {
+        previous.focus({ preventScroll: true })
+      }
+    }
+  }, [open])
   if (!plan) return null
 
   const copy = modeCopy(mode)
@@ -69,6 +103,8 @@ export default function ReferenceRefactorDialog({
       }}
     >
       <section
+        ref={panel}
+        tabIndex={-1}
         className="modal consumer-modal reference-refactor-dialog"
         role="dialog"
         aria-modal="true"
@@ -80,7 +116,7 @@ export default function ReferenceRefactorDialog({
             <h2 id="reference-refactor-title">{copy.title}</h2>
             <p>{copy.intro}</p>
           </div>
-          <button
+          <UiButton
             type="button"
             className="icon-btn"
             onClick={onCancel}
@@ -89,7 +125,7 @@ export default function ReferenceRefactorDialog({
             title="关闭"
           >
             ×
-          </button>
+          </UiButton>
         </header>
 
         {(mode === 'rename' || mode === 'extract') && (
@@ -128,13 +164,13 @@ export default function ReferenceRefactorDialog({
             {sources.map(source => (
               <article key={source.id} className="reference-refactor-source">
                 <header>
-                  <button
+                  <UiButton
                     type="button"
                     onClick={() => onOpenSource?.(source.id)}
                     disabled={busy}
                   >
                     {source.title}
-                  </button>
+                  </UiButton>
                   <span>
                     {mode === 'delete'
                       ? source.references?.length || 0
@@ -214,17 +250,17 @@ export default function ReferenceRefactorDialog({
         </div>
 
         <div className="modal-actions consumer-modal-actions reference-refactor-actions">
-          <button type="button" className="btn" onClick={onCancel} disabled={busy}>
+          <UiButton size="middle" type="button" className="btn" onClick={onCancel} disabled={busy}>
             取消
-          </button>
-          <button
+          </UiButton>
+          <UiButton size="middle"
             type="button"
             className={'btn ' + (mode === 'delete' ? 'danger' : 'primary')}
             onClick={onConfirm}
             disabled={busy}
           >
             {busy ? '处理中…' : copy.action}
-          </button>
+          </UiButton>
         </div>
       </section>
     </div>

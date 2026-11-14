@@ -3,6 +3,8 @@ import ThemeToggle from './ThemeToggle'
 import { APP_ICON_DATA_URL } from '../assets/appIconData'
 import useLocalShortcuts from '../hooks/useLocalShortcuts'
 import { shortcutLabel } from '../services/localShortcuts'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 const Icon = ({ children, size = 18 }) => (
   <svg
@@ -93,89 +95,93 @@ export default function WorkspaceSidebar({
 
   return (
     <aside className={`workspace-sidebar file-sidebar${collapsed ? ' collapsed' : ''}`}>
-      <div className="workspace-sidebar-top">
-        <div className="workspace-sidebar-brand">
-          <button
-            type="button"
-            className="workspace-brand-mark"
-            onClick={() => navigate('notes')}
-            aria-label="返回笔记"
-            title="记事本"
-          >
-            <img src={APP_ICON_DATA_URL} alt="" aria-hidden="true" />
-          </button>
+      <div className="workspace-sidebar-scroll">
+        <div className="workspace-sidebar-top">
+          <div className="workspace-sidebar-brand">
+            <UiButton
+              type="button"
+              variant="text"
+              className="workspace-brand-mark"
+              icon={<img src={APP_ICON_DATA_URL} alt="" aria-hidden="true" />}
+              onClick={() => navigate('notes')}
+              aria-label="返回笔记"
+              title="记事本"
+            />
 
-          {!collapsed && (
-            <>
-              <div className="workspace-brand-copy">
-                <strong>记事本</strong>
-                <span>我的本地空间</span>
-              </div>
-              <button
-                type="button"
-                className="workspace-sidebar-collapse"
-                onClick={onToggleCollapsed}
-                aria-label="折叠侧边栏"
-                title="折叠侧边栏"
-              >
-                ‹
-              </button>
-            </>
+            {!collapsed && (
+              <>
+                <div className="workspace-brand-copy">
+                  <strong>记事本</strong>
+                  <span>我的本地空间</span>
+                </div>
+                <UiButton
+                  type="button"
+                  density="compact"
+                  variant="text"
+                  className="workspace-sidebar-collapse"
+                  icon={<span aria-hidden="true">‹</span>}
+                  onClick={onToggleCollapsed}
+                  aria-label="折叠侧边栏"
+                  title="折叠侧边栏"
+                />
+              </>
+            )}
+          </div>
+
+          {collapsed ? (
+            <UiButton
+              type="button"
+              className="workspace-sidebar-icon-btn"
+              onClick={onOpenSearch}
+              aria-label="搜索笔记"
+              title={`全局检索 (${shortcutLabel('globalSearch', shortcutBindings)})`}
+            >
+              <Icon><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></Icon>
+            </UiButton>
+          ) : (
+            <UiButton
+              type="button"
+              className="workspace-sidebar-search"
+              onClick={onOpenSearch}
+              aria-label="搜索笔记"
+            >
+              <Icon size={16}><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></Icon>
+              <span>搜索笔记</span>
+              <kbd>{shortcutLabel('globalSearch', shortcutBindings)}</kbd>
+            </UiButton>
           )}
+
+          {onOpenLocalActions && <UiButton type="button" className="workspace-sidebar-search" onClick={onOpenLocalActions} aria-label="打开快捷操作" title="查找本地功能"
+            icon={collapsed ? <Icon size={16}><path d="m9 4-5 8 5 8M15 4l5 8-5 8" /></Icon> : undefined}>
+            {collapsed ? null : [<Icon key="icon" size={16}><path d="m9 4-5 8 5 8M15 4l5 8-5 8" /></Icon>, <span key="label">快捷操作</span>]}
+          </UiButton>}
+          <nav className="workspace-sidebar-nav" aria-label="主要功能">
+            {navItems.map(item => (
+              <UiButton
+                key={item.id}
+                type="button"
+                className={`workspace-sidebar-nav-item${activeWorkspace === item.id ? ' active' : ''}`}
+                onClick={() => navigate(item.id)}
+                aria-pressed={activeWorkspace === item.id}
+                aria-label={item.label}
+                title={collapsed ? item.label : undefined}
+              >
+                {item.icon}
+                {!collapsed && <span>{item.label}</span>}
+              </UiButton>
+            ))}
+          </nav>
         </div>
 
-        {collapsed ? (
-          <button
-            type="button"
-            className="workspace-sidebar-icon-btn"
-            onClick={onOpenSearch}
-            aria-label="搜索笔记"
-            title={`全局检索 (${shortcutLabel('globalSearch', shortcutBindings)})`}
-          >
-            <Icon><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></Icon>
-          </button>
-        ) : (
-          <button
-            type="button"
-            className="workspace-sidebar-search"
-            onClick={onOpenSearch}
-            aria-label="搜索笔记"
-          >
-            <Icon size={16}><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></Icon>
-            <span>搜索笔记</span>
-            <kbd>{shortcutLabel('globalSearch', shortcutBindings)}</kbd>
-          </button>
+        {!collapsed && (
+          <div className="workspace-sidebar-library">
+            {children}
+          </div>
         )}
-
-        {onOpenLocalActions && <button type="button" className="workspace-sidebar-search" onClick={onOpenLocalActions} aria-label="打开快捷操作" title="查找本地功能">
-          <Icon size={16}><path d="m9 4-5 8 5 8M15 4l5 8-5 8" /></Icon>{!collapsed && <span>快捷操作</span>}
-        </button>}
-        <nav className="workspace-sidebar-nav" aria-label="主要功能">
-          {navItems.map(item => (
-            <button
-              key={item.id}
-              type="button"
-              className={`workspace-sidebar-nav-item${activeWorkspace === item.id ? ' active' : ''}`}
-              onClick={() => navigate(item.id)}
-              aria-pressed={activeWorkspace === item.id}
-              aria-label={item.label}
-              title={collapsed ? item.label : undefined}
-            >
-              {item.icon}
-              {!collapsed && <span>{item.label}</span>}
-            </button>
-          ))}
-        </nav>
       </div>
 
-      {!collapsed && (
-        <div className="workspace-sidebar-library">
-          {children}
-        </div>
-      )}
-
       <div className="workspace-sidebar-bottom" ref={moreRef}>
-        <button
+        <UiButton
           type="button"
           className={`workspace-sidebar-more${moreOpen ? ' active' : ''}`}
           onClick={() => setMoreOpen(prev => !prev)}
@@ -186,38 +192,38 @@ export default function WorkspaceSidebar({
         >
           <Icon><circle cx="5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /></Icon>
           {!collapsed && <span>更多</span>}
-        </button>
+        </UiButton>
 
         {collapsed && (
-          <button
+          <UiButton
             type="button"
+            variant="text"
             className="workspace-sidebar-expand"
+            icon={<span aria-hidden="true">›</span>}
             onClick={onToggleCollapsed}
             aria-label="展开侧边栏"
             title="展开侧边栏"
-          >
-            ›
-          </button>
+          />
         )}
 
         {moreOpen && (
           <div className={`workspace-sidebar-more-menu${collapsed ? ' from-collapsed' : ''}`} role="menu">
-            <button type="button" role="menuitem" onClick={() => navigate('trash')}>
+            <UiButton type="button" role="menuitem" onClick={() => navigate('trash')}>
               <Icon><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13" /></Icon>
               <span>回收站</span>
-            </button>
-            <button type="button" role="menuitem" onClick={() => navigate('settings')}>
+            </UiButton>
+            <UiButton type="button" role="menuitem" onClick={() => navigate('settings')}>
               <Icon><circle cx="12" cy="12" r="3" /><path d="M19 12a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z" /></Icon>
               <span>设置</span>
-            </button>
-            <button type="button" role="menuitem" onClick={() => { setMoreOpen(false); onOpenBackup?.() }}>
+            </UiButton>
+            <UiButton type="button" role="menuitem" onClick={() => { setMoreOpen(false); onOpenBackup?.() }}>
               <Icon><path d="M5 4h14v16H5z" /><path d="M8 4v6h8V5M8 20v-7h8v7" /></Icon>
               <span>备份与恢复</span>
-            </button>
-            <button type="button" role="menuitem" onClick={() => { setMoreOpen(false); onOpenShortcuts?.() }}>
+            </UiButton>
+            <UiButton type="button" role="menuitem" onClick={() => { setMoreOpen(false); onOpenShortcuts?.() }}>
               <Icon><rect x="3" y="6" width="18" height="12" rx="2" /><path d="M7 10h.01M11 10h.01M15 10h.01M8 14h8" /></Icon>
               <span>快捷键</span>
-            </button>
+            </UiButton>
             <div className="workspace-sidebar-menu-separator" />
             <div className="workspace-sidebar-theme">
               <span>外观</span>

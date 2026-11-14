@@ -12,6 +12,8 @@ import {
   repairWikiReferences,
 } from './Editor/utils/referenceUtils'
 import './LibraryReferenceHealthPanel.css'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 function pluralFiles(value) {
   return Number(value || 0).toLocaleString()
@@ -165,14 +167,14 @@ export default function LibraryReferenceHealthPanel({ onOpenFile }) {
             检查 WikiLink、章节路径和失效目标。扫描只读取本地数据，不会修改正文。
           </span>
         </div>
-        <button
+        <UiButton
           type="button"
           className="btn"
           disabled={scanning || repairing}
           onClick={() => void scan()}
         >
           {scanning ? '扫描中…' : diagnosis ? '重新扫描' : '开始扫描'}
-        </button>
+        </UiButton>
       </div>
 
       {!diagnosis && !scanning && (
@@ -219,14 +221,14 @@ export default function LibraryReferenceHealthPanel({ onOpenFile }) {
               </span>
             </div>
 
-            <button
+            <UiButton
               type="button"
               className="btn primary"
               disabled={!repairSources.length || repairing}
               onClick={() => setPreviewOpen(value => !value)}
             >
               {previewOpen ? '收起修复预览' : '预览安全修复'}
-            </button>
+            </UiButton>
           </div>
 
           {previewOpen && (
@@ -238,14 +240,14 @@ export default function LibraryReferenceHealthPanel({ onOpenFile }) {
                     只展示能够确定的新标题或唯一章节路径。无法唯一判断的引用不会进入此计划。
                   </span>
                 </div>
-                <button
+                <UiButton
                   type="button"
                   className="btn primary"
                   disabled={repairing || !repairSources.length}
                   onClick={() => void applyRepairPlan()}
                 >
                   {repairing ? '正在修复…' : '创建快照并执行修复'}
-                </button>
+                </UiButton>
               </div>
 
               {progress && (
@@ -276,12 +278,12 @@ export default function LibraryReferenceHealthPanel({ onOpenFile }) {
                             : ''}
                         </span>
                       </div>
-                      <button
+                      <UiButton
                         type="button"
                         onClick={() => onOpenFile?.(source.id)}
                       >
                         打开
-                      </button>
+                      </UiButton>
                     </header>
 
                     <div className="library-reference-change-list">
@@ -317,7 +319,7 @@ export default function LibraryReferenceHealthPanel({ onOpenFile }) {
               .filter(source => source.repairable || source.broken)
               .map(source => (
                 <article key={source.id} className="library-reference-diagnosis-row">
-                  <button
+                  <UiButton
                     type="button"
                     className="library-reference-diagnosis-main"
                     onClick={() => onOpenFile?.(source.id)}
@@ -328,7 +330,7 @@ export default function LibraryReferenceHealthPanel({ onOpenFile }) {
                       {source.repairable && source.broken ? ' · ' : ''}
                       {source.broken ? source.broken + ' 需处理' : ''}
                     </span>
-                  </button>
+                  </UiButton>
                   <div className="library-reference-diagnosis-badges">
                     {source.repairable > 0 && <span className="repairable">可修复</span>}
                     {source.broken > 0 && <span className="broken">需处理</span>}

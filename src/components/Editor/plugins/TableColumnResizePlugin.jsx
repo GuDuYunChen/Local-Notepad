@@ -193,7 +193,7 @@ export default function TableColumnResizePlugin() {
   }
 
   return (
-    <button
+    <button data-ui-native="editor-pointer-handle"
       type="button"
       className={`table-column-resizer${resizeState ? ' resizing' : ''}`}
       style={{

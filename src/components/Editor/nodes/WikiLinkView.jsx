@@ -3,6 +3,8 @@ import { api } from '~/services/api'
 import { readBlockReference } from '../../../services/blockReferences.mjs'
 import { readWikiPreview } from '../../../services/wikiNavigation.mjs'
 import { normalizeSectionPath, formatSectionPath } from '../utils/referenceUtils.js'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 export default function WikiLinkView({ id, title, sectionPath = [], blockId = '' }) {
   const path = normalizeSectionPath(sectionPath)
@@ -55,7 +57,19 @@ function Preview({ id, title, path, blockId }) {
     onMouseEnter={show} onMouseLeave={hide} onFocus={event => { if (event.target === event.currentTarget) show() }}
     onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) hide() }}
     onMouseDown={event => { if (!controls(event)) event.preventDefault() }} onClick={navigate}
-    onKeyDown={event => { if (event.target === event.currentTarget && !event.nativeEvent.isComposing && event.keyCode !== 229 && ['Enter', ' '].includes(event.key)) navigate(event) }}>
+    onKeyDownCapture={event => {
+      // Lexical listens for native keydown on the editable host, before React's
+      // delegated bubble handler runs. Intercept only open-preview Tab (and
+      // its nested control) during capture so Lexical cannot indent or swallow
+      // the browser's native Tab/Shift+Tab focus movement.
+      // Never preventDefault, synthesize focus, or alter closed-link Tab.
+      if (event.key === 'Tab' && (controls(event) || (open && event.target === event.currentTarget))) {
+        event.stopPropagation()
+      }
+    }}
+    onKeyDown={event => {
+      if (event.target === event.currentTarget && !event.nativeEvent.isComposing && event.keyCode !== 229 && ['Enter', ' '].includes(event.key)) navigate(event)
+    }}>
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 4h10l2 2v14H6z" /><path d="M9 9h6M9 13h6M9 17h4" /></svg>
     <span>{preview?.title || title}</span>
     {blockId && <small className="wiki-link-section">› 块</small>}
@@ -68,7 +82,7 @@ function Preview({ id, title, path, blockId }) {
       {preview?.sectionMissing && <span className="wiki-link-preview-health">{preview.sectionState === 'ambiguous' ? '同名章节不唯一，打开前将拒绝猜测定位。' : '章节已改名或移除，可在“引用”面板核对。'}</span>}
       <span className={'wiki-link-preview-excerpt' + (error ? ' unavailable' : '')} role={error ? 'alert' : 'status'}>{loading ? '正在读取预览…' : error || preview?.excerpt}</span>
       {!loading && <span className="wiki-link-preview-footer"><span>{preview ? preview.backlinkCount === null ? '反向链接暂不可用' : `${preview.backlinkCount} 个已索引反向链接` : '重试不会修改正文'}</span>
-        <button type="button" data-wiki-control="true" className="btn small" onClick={event => { event.preventDefault(); event.stopPropagation(); void load() }}>{error ? '重试预览' : '刷新预览'}</button></span>}
+        <UiButton density="compact" type="button" data-wiki-control="true" className="btn small" onClick={event => { event.preventDefault(); event.stopPropagation(); void load() }}>{error ? '重试预览' : '刷新预览'}</UiButton></span>}
     </span>}
   </span>
 }

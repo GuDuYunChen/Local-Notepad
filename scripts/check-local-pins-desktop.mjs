@@ -3,7 +3,9 @@ import {writeFileSync} from 'node:fs'
 import {createHash} from 'node:crypto'
 import path from 'node:path'
 import {desktopNote} from './desktop-save-fixture.mjs'
+import {createNativeUiSelect} from './native-ui-select.mjs'
 export async function verifyLocalPinsDesktop({evaluate,click,cdp,until,api,out,noteIDs}) {
+ const select=createNativeUiSelect({evaluate,click,cdp,until})
  const report={complete:false,commit:process.env.GITHUB_SHA,realPackagedApp:true,realBackend:true,syntheticData:true,checks:[],screenshots:[]}
  const save=()=>writeFileSync(path.join(out,'local-pins.json'),JSON.stringify(report,null,2)+'\n'),mark=n=>{report.checks.push(n);save()};save()
  const before=await Promise.all(noteIDs.map(id=>api('/api/files/'+id))),base='http://127.0.0.1:27121'
@@ -28,7 +30,7 @@ export async function verifyLocalPinsDesktop({evaluate,click,cdp,until,api,out,n
   try{await click('[data-pin-menu]')}finally{await evaluate("document.querySelector('[data-pin-menu]')?.removeAttribute('data-pin-menu')")}
  }
  const query=async value=>{await click('.pinned-workspace input[aria-label="查找置顶笔记"]');await key('a',65,2);if(value)await cdp.send('Input.insertText',{text:value});else await key('Backspace',8);await until(()=>evaluate(`document.querySelector('.pinned-workspace input')?.value===${JSON.stringify(value)}`),'Pin query missing')}
- const all=async()=>{await click('.pinned-workspace select[aria-label="置顶显示范围"]');await key('End',35);await key('Enter',13);await until(()=>evaluate("document.querySelector('.pinned-workspace select').value==='all'"),'All notes view missing')}
+ const all=()=>select.choose('.pinned-workspace [aria-label="置顶显示范围"]','all')
  const panel=async()=>{await click('.workspace-sidebar-nav-item[aria-label="置顶笔记"]');await has('篇已置顶')}
  const clean=()=>until(()=>evaluate("!document.querySelector('.workspace-save-chip, .save-state')"),'Original editor not clean')
  let intercept=false,detach=null,faultError=null;const tasks=new Set(),faults=[]

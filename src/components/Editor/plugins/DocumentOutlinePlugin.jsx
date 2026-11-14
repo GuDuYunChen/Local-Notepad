@@ -10,6 +10,8 @@ import useLocalShortcuts from '~/hooks/useLocalShortcuts'
 import {OUTLINE_LIMITS,outlineSnapshot,filterOutline,expandedOutlineKeys,copyOutlineText,resolveOutlinePath,
   calculateReadingProgress,getOutlineBreadcrumb,getCollapsedOutlineKeys,findOutlineHeadingForKey} from '~/services/documentOutline.mjs'
 import './DocumentOutline.css'
+import { UiButton, UiInput } from '~/components/ui/ControlKit'
+
 export {calculateReadingProgress,getOutlineBreadcrumb,getCollapsedOutlineKeys,findOutlineHeadingForKey,findHeadingByPath} from '~/services/documentOutline.mjs'
 
 export default function DocumentOutlinePlugin(props) {return <CurrentOutline key={props.documentId||''} {...props}/>}
@@ -178,7 +180,7 @@ function CurrentOutline({documentId='',documentTitle='',initialContent,requireLo
       const h=el&&root.contains(el)&&snapshot.headings.find(n=>editor.getElementByKey(n.key)===el)
       const index=h?snapshot.nodes.findIndex(n=>n.key===h.key):-1,after=snapshot.nodes[index+1]
       if(!h||!after||after.isHeading&&after.level<=h.level){hide();return}
-      const r=el.getBoundingClientRect();setBodyToggle({key:h.key,left:Math.max(6,r.left-32),top:r.top+Math.max(0,(r.height-24)/2)})
+      const r=el.getBoundingClientRect();setBodyToggle({key:h.key,left:Math.max(6,r.left-32),top:r.top+Math.max(0,(r.height-28)/2)})
     }
     root.addEventListener('mousemove',move);box.addEventListener('scroll',hide,{passive:true});window.addEventListener('resize',hide)
     return()=>{root.removeEventListener('mousemove',move);box.removeEventListener('scroll',hide);window.removeEventListener('resize',hide)}
@@ -190,28 +192,28 @@ function CurrentOutline({documentId='',documentTitle='',initialContent,requireLo
     if(a.top<b.top||a.bottom>b.bottom)list.current.scrollTo?.({top:Math.max(0,list.current.scrollTop+a.top-b.top-24),behavior:'auto'})
   },[open,active])
   return <>
-    {bodyToggle&&<button type="button" className={'heading-body-collapse'+(collapsed.has(bodyToggle.key)?' collapsed':'')} style={{top:bodyToggle.top,left:bodyToggle.left}} onMouseDown={e=>e.preventDefault()} onClick={()=>fold(bodyToggle.key)} aria-label={collapsed.has(bodyToggle.key)?'展开当前章节':'折叠当前章节'}>›</button>}
+    {bodyToggle&&<UiButton density="compact" type="button" className={'heading-body-collapse'+(collapsed.has(bodyToggle.key)?' collapsed':'')} style={{top:bodyToggle.top,left:bodyToggle.left}} onMouseDown={e=>e.preventDefault()} onClick={()=>fold(bodyToggle.key)} aria-label={collapsed.has(bodyToggle.key)?'展开当前章节':'折叠当前章节'}>›</UiButton>}
     <div className="document-reading-progress" aria-hidden="true"><span style={{width:progress+'%'}}/></div>
     <div className={'document-outline local-outline'+(open?' open':'')} onKeyDown={e=>{if(e.key==='Escape'&&!e.isComposing&&!composing.current&&open){e.preventDefault();e.stopPropagation();close()}}}>
-      <button ref={entry} type="button" className="document-outline-toggle" aria-label="文档目录" aria-expanded={open} title={`文档目录 (${shortcutLabel('outline',bindings)})`} onClick={()=>open?close():setOpen(true)}><span aria-hidden="true">☰</span><span>{snapshot.headings.length}</span></button>
+      <UiButton density="compact" ref={entry} type="button" className="document-outline-toggle" aria-label="文档目录" aria-expanded={open} title={`文档目录 (${shortcutLabel('outline',bindings)})`} onClick={()=>open?close():setOpen(true)}><span aria-hidden="true">☰</span><span>{snapshot.headings.length}</span></UiButton>
       {open&&<section className="document-outline-panel" aria-label="当前文档大纲">
-        <div className="document-outline-header"><div><strong>文档目录</strong><small>当前正文 · 只读导航</small></div><button type="button" aria-label="关闭文档目录" onClick={close}>×</button></div>
-        <div className="outline-tools"><button type="button" onClick={()=>{invalidate();collect()}}>重新读取大纲</button><button type="button" disabled={!collapsed.size} onClick={()=>{invalidate();setCollapsed(new Set())}}>展开全部</button><button type="button" onClick={()=>window.dispatchEvent(new Event('editor:open-structure-manager'))}>结构</button></div>
+        <div className="document-outline-header"><div><strong>文档目录</strong><small>当前正文 · 只读导航</small></div><UiButton density="compact" type="button" aria-label="关闭文档目录" onClick={close}>×</UiButton></div>
+        <div className="outline-tools"><UiButton density="compact" type="button" onClick={()=>{invalidate();collect()}}>重新读取大纲</UiButton><UiButton density="compact" type="button" disabled={!collapsed.size} onClick={()=>{invalidate();setCollapsed(new Set())}}>展开全部</UiButton><UiButton density="compact" type="button" onClick={()=>window.dispatchEvent(new Event('editor:open-structure-manager'))}>结构</UiButton></div>
         {status==='loading'&&<p role="status">正文正在加载，暂不显示旧目录。</p>}
         {(error||view.error)&&<p className="outline-error" role="alert">{error||view.error}</p>}
         {feedback&&<p className="outline-feedback" role="status">{feedback}</p>}
         {status==='ready'&&<>
           {!snapshot.headings.length?<p className="outline-empty" role="status">当前正文没有标题。使用编辑器的标题样式后，这里会自动生成目录。</p>:<>
-            <label className="outline-query">查找章节<input ref={queryInput} aria-label="查找章节" value={search} onCompositionStart={()=>{composing.current=true}} onCompositionEnd={e=>{composing.current=false;setQuery(e.currentTarget.value)}} onChange={e=>{setSearch(e.target.value);if(!composing.current)setQuery(e.target.value)}} onKeyDown={e=>{if(e.key==='Enter'&&!e.isComposing&&!composing.current){e.preventDefault();next(e.shiftKey?-1:1)}}} placeholder="标题或上级章节名称"/></label>
+            <label className="outline-query">查找章节<UiInput density="compact" ref={queryInput} aria-label="查找章节" value={search} onCompositionStart={()=>{composing.current=true}} onCompositionEnd={e=>{composing.current=false;setQuery(e.currentTarget.value)}} onChange={e=>{setSearch(e.target.value);if(!composing.current)setQuery(e.target.value)}} onKeyDown={e=>{if(e.key==='Enter'&&!e.isComposing&&!composing.current){e.preventDefault();next(e.shiftKey?-1:1)}}} placeholder="标题或上级章节名称"/></label>
             <p className="outline-count">显示 {view.rows.length} / {snapshot.headings.length} 个标题 · 阅读 {progress}%</p>
             {path.length>0&&<p className="outline-breadcrumb" aria-label="当前章节路径">{path.map(p=>p.text).join(' › ')}</p>}
-            <div className="outline-tools"><button type="button" disabled={!view.rows.length} onClick={()=>next(-1)}>上一章节</button><button type="button" disabled={!view.rows.length} onClick={()=>next(1)}>下一章节</button><button type="button" disabled={!caret} onClick={()=>scrollToKey(caret,{heading:false})}>光标</button><button type="button" disabled={origin===null} onClick={()=>{invalidate();const box=scroller();if(box&&ready()){box.scrollTo({top:origin,behavior:'auto'});setOrigin(null);setFeedback('已返回跳转前的位置')}}}>返回</button></div>
+            <div className="outline-tools"><UiButton density="compact" type="button" disabled={!view.rows.length} onClick={()=>next(-1)}>上一章节</UiButton><UiButton density="compact" type="button" disabled={!view.rows.length} onClick={()=>next(1)}>下一章节</UiButton><UiButton density="compact" type="button" disabled={!caret} onClick={()=>scrollToKey(caret,{heading:false})}>光标</UiButton><UiButton density="compact" type="button" disabled={origin===null} onClick={()=>{invalidate();const box=scroller();if(box&&ready()){box.scrollTo({top:origin,behavior:'auto'});setOrigin(null);setFeedback('已返回跳转前的位置')}}}>返回</UiButton></div>
             <div className="document-outline-list" ref={list}>
               {!view.rows.length&&!view.error&&<p role="status">没有匹配的章节，清除查找条件可查看完整目录。</p>}
               {view.rows.map(h=>{const index=snapshot.nodes.findIndex(n=>n.key===h.key),after=snapshot.nodes[index+1],collapsible=after&&(!after.isHeading||after.level>h.level);return <div key={h.key} data-outline-key={h.key} className={'document-outline-row level-'+Math.min(4,h.level)+(active===h.key?' active':'')}>
-                <button type="button" className="document-outline-collapse" disabled={!collapsible} aria-label={(collapsed.has(h.key)?'展开章节：':'折叠章节：')+h.text} aria-expanded={!collapsed.has(h.key)} onClick={()=>fold(h.key)}><span className={collapsed.has(h.key)?'':'open'}>›</span></button>
-                <button type="button" className="document-outline-item" onClick={()=>scrollToKey(h.key)} aria-current={active===h.key?'location':undefined} title={getOutlineBreadcrumb(snapshot.nodes,h.key).map(p=>p.text).join(' › ')}>{h.text}</button>
-                <button type="button" className="document-outline-anchor" disabled={copying} aria-label={'复制章节锚点：'+h.text} onClick={()=>void copyPath(h)}>#</button>
+                <UiButton density="compact" type="button" className="document-outline-collapse" disabled={!collapsible} aria-label={(collapsed.has(h.key)?'展开章节：':'折叠章节：')+h.text} aria-expanded={!collapsed.has(h.key)} onClick={()=>fold(h.key)}><span className={collapsed.has(h.key)?'':'open'}>›</span></UiButton>
+                <UiButton density="compact" type="button" className="document-outline-item" onClick={()=>scrollToKey(h.key)} aria-current={active===h.key?'location':undefined} title={getOutlineBreadcrumb(snapshot.nodes,h.key).map(p=>p.text).join(' › ')}>{h.text}</UiButton>
+                <UiButton density="compact" type="button" className="document-outline-anchor" disabled={copying} aria-label={'复制章节锚点：'+h.text} onClick={()=>void copyPath(h)}>#</UiButton>
               </div>})}
             </div>
           </>}

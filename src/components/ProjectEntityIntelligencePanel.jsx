@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from '~/services/toast'
 import { buildProjectEntityIntelligence } from './projectEntityIntelligenceUtils'
 import { getProjectRelationEntityTypes } from './projectRelationsUtils'
@@ -11,6 +11,8 @@ import {
 import ProjectEntityEvidencePanel from './ProjectEntityEvidencePanel'
 import { evidenceReview } from '~/services/evidenceReviewSession'
 import './ProjectEntityIntelligencePanel.css'
+import { UiButton, UiInput, UiSelect } from '~/components/ui/ControlKit'
+
 
 function stripExtension(value) {
   return String(value || '未命名').replace(/\.[^.]+$/, '')
@@ -27,6 +29,8 @@ export default function ProjectEntityIntelligencePanel({
     () => evidenceReview.getReturn(workspace?.project?.id)?.entityId || '',
   )
   const [aliasDraft, setAliasDraft] = useState('')
+  // An explicit '选择实体' action differs from an uninitialized or removed entity.
+  const manuallyClearedEntity = useRef({ active: false, projectId: null })
   const [heatmapLimit, setHeatmapLimit] = useState(12)
 
   const entityTypes = useMemo(() => getProjectRelationEntityTypes(), [])
@@ -48,6 +52,7 @@ export default function ProjectEntityIntelligencePanel({
     const returning = evidenceReview.getReturn(workspace?.project?.id)
     if (returning) {
       if (intelligence.entityById.has(returning.entityId)) {
+        manuallyClearedEntity.current = { active: false, projectId: null }
         setSelectedEntityId(returning.entityId)
         return
       }
@@ -60,6 +65,8 @@ export default function ProjectEntityIntelligencePanel({
     ) {
       return
     }
+    if (!selectedEntityId && manuallyClearedEntity.current.active &&
+      manuallyClearedEntity.current.projectId === workspace?.project?.id) return
     setSelectedEntityId(
       intelligence.entities.find(entity => entity.chapterCount > 0)?.id ||
       intelligence.entities[0]?.id ||
@@ -183,9 +190,10 @@ export default function ProjectEntityIntelligencePanel({
             <span>只识别你确认过的别名；单字代词默认不参与扫描，每个实体最多 24 个别名。</span>
           </header>
 
-          <select
+          <UiSelect
             value={selectedEntityId}
             onChange={event => {
+              manuallyClearedEntity.current = { active: event.target.value === '', projectId: workspace?.project?.id }
               setSelectedEntityId(event.target.value)
               setAliasDraft('')
             }}
@@ -197,7 +205,7 @@ export default function ProjectEntityIntelligencePanel({
                 {entity.label} · {typeLabel(entity.type)}
               </option>
             ))}
-          </select>
+          </UiSelect>
 
           {selectedEntity ? (
             <>
@@ -212,13 +220,13 @@ export default function ProjectEntityIntelligencePanel({
                   </small>
                 </div>
                 {selectedEntity.noteId && (
-                  <button
+                  <UiButton
                     type="button"
                     className="btn small"
                     onClick={() => onOpenFile?.(selectedEntity.noteId)}
                   >
                     打开实体笔记
-                  </button>
+                  </UiButton>
                 )}
               </div>
 
@@ -229,20 +237,20 @@ export default function ProjectEntityIntelligencePanel({
                 {selectedAliases.map(alias => (
                   <span key={alias}>
                     {alias}
-                    <button
+                    <UiButton
                       type="button"
                       onClick={() => removeAlias(alias)}
                       aria-label={'删除实体别名 ' + alias}
                     >
                       ×
-                    </button>
+                    </UiButton>
                   </span>
                 ))}
                 {!selectedAliases.length && <em>暂无别名</em>}
               </div>
 
               <div className="project-entity-alias-add">
-                <input
+                <UiInput
                   value={aliasDraft}
                   onChange={event => setAliasDraft(event.target.value)}
                   onKeyDown={event => {
@@ -254,13 +262,13 @@ export default function ProjectEntityIntelligencePanel({
                   placeholder="例如：关姑娘 / 小关"
                   aria-label="新增实体别名"
                 />
-                <button
+                <UiButton
                   type="button"
                   className="btn small primary"
                   onClick={addAlias}
                 >
                   添加别名
-                </button>
+                </UiButton>
               </div>
 
             </>
@@ -279,7 +287,7 @@ export default function ProjectEntityIntelligencePanel({
                 每格代表一个章节：W=WikiLink，N=原名，A=别名；颜色深浅代表该章提及次数。
               </span>
             </div>
-            <select
+            <UiSelect
               value={heatmapLimit}
               onChange={event => setHeatmapLimit(Number(event.target.value))}
               aria-label="实体热力图显示数量"
@@ -287,7 +295,7 @@ export default function ProjectEntityIntelligencePanel({
               <option value="8">前 8 个</option>
               <option value="12">前 12 个</option>
               <option value="20">前 20 个</option>
-            </select>
+            </UiSelect>
           </header>
 
           <div className="project-entity-heatmap">
@@ -315,14 +323,14 @@ export default function ProjectEntityIntelligencePanel({
                 className="project-entity-heatmap-row"
                 style={{ '--chapter-count': Math.max(1, intelligence.chapters.length) }}
               >
-                <button
+                <UiButton
                   type="button"
                   onClick={() => setSelectedEntityId(entity.id)}
                   title={entity.label}
                 >
                   <strong>{entity.label}</strong>
                   <small>{entity.chapterCount}章</small>
-                </button>
+                </UiButton>
 
                 {intelligence.chapters.map(chapter => {
                   const evidence = (
@@ -342,7 +350,7 @@ export default function ProjectEntityIntelligencePanel({
                         : ''
 
                   return (
-                    <button
+                    <UiButton
                       key={chapter.id}
                       type="button"
                       className={
@@ -361,7 +369,7 @@ export default function ProjectEntityIntelligencePanel({
                       }
                     >
                       {code || '·'}
-                    </button>
+                    </UiButton>
                   )
                 })}
               </div>

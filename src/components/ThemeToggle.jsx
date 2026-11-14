@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { UiButton, UiInput, UiSelect } from './ui/ControlKit'
 import { api } from '~/services/api'
 import {
   applyTheme,
@@ -75,14 +76,13 @@ export default function ThemeToggle() {
   }
 
   return (
-    <button
+    <UiButton
       type="button"
       className="btn header-btn theme-toggle"
       onClick={toggle}
       aria-label="切换主题"
       title={theme === 'light' ? '切换为深色主题' : '切换为浅色主题'}
-    >
-      {theme === 'light' ? (
+      icon={theme === 'light' ? (
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
         </svg>
@@ -99,6 +99,6 @@ export default function ThemeToggle() {
           <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
         </svg>
       )}
-    </button>
+    />
   )
 }

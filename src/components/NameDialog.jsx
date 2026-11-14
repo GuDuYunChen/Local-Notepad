@@ -1,4 +1,6 @@
 import React, { useEffect, useId, useMemo, useState } from 'react'
+import { UiButton, UiInput, UiSelect } from '~/components/ui/ControlKit'
+
 
 export default function NameDialog({
   defaultName = '未命名.md',
@@ -115,7 +117,7 @@ export default function NameDialog({
         <div className="name-dialog-field">
           <label htmlFor={inputId}>名称</label>
           <div className="name-dialog-input-wrap">
-            <input
+            <UiInput
               id={inputId}
               className="input name-dialog-input"
               autoFocus
@@ -134,7 +136,7 @@ export default function NameDialog({
 
         {hasSecondaryOptions && (
           <div className="name-dialog-secondary">
-            <button
+            <UiButton
               type="button"
               className="name-dialog-options-toggle"
               aria-expanded={showOptions}
@@ -142,7 +144,7 @@ export default function NameDialog({
             >
               <span>更多选项</span>
               <span aria-hidden="true">{showOptions ? '⌃' : '⌄'}</span>
-            </button>
+            </UiButton>
 
             {showOptions && (
               <div className="name-dialog-options">
@@ -152,7 +154,7 @@ export default function NameDialog({
                       <strong>保存格式</strong>
                       <small>{formatLabel}</small>
                     </span>
-                    <select
+                    <UiSelect
                       className="select"
                       value={format}
                       disabled={submitting}
@@ -161,7 +163,7 @@ export default function NameDialog({
                       <option value=".md">标准笔记 (.md)</option>
                       <option value=".txt">纯文本 (.txt)</option>
                       <option value=".docx">Word (.docx)</option>
-                    </select>
+                    </UiSelect>
                   </label>
                 )}
 
@@ -172,9 +174,9 @@ export default function NameDialog({
                       <small className="path-text" title={currentPathLabel}>{currentPathLabel}</small>
                     </span>
                     {onPathSelect && (
-                      <button type="button" className="btn small" onClick={onPathSelect} disabled={submitting}>
+                      <UiButton type="button" className="btn small" onClick={onPathSelect} disabled={submitting}>
                         更改
-                      </button>
+                      </UiButton>
                     )}
                   </div>
                 )}
@@ -186,10 +188,10 @@ export default function NameDialog({
         {err && <div className="modal-error" role="alert">{err}</div>}
 
         <div className="modal-actions consumer-modal-actions">
-          <button type="button" className="btn" onClick={onCancel} disabled={submitting}>取消</button>
-          <button type="submit" className="btn primary" disabled={submitting}>
+          <UiButton size="middle" type="button" className="btn" onClick={onCancel} disabled={submitting}>取消</UiButton>
+          <UiButton size="middle" type="submit" className="btn primary" disabled={submitting}>
             {submitting ? '正在处理…' : '确定'}
-          </button>
+          </UiButton>
         </div>
       </form>
     </div>

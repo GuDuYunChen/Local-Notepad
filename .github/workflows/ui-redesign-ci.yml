@@ -42,6 +42,9 @@ jobs:
       - name: Verify install preserved manifest and lock
         run: git diff --exit-code -- package.json package-lock.json
 
+      - name: Verify real-control drivers and current upgrade identity refusals
+        run: node --test scripts/fixture-antd-node-imports.node.mjs scripts/current-upgrade-input.node.mjs scripts/native-ui-select.node.mjs scripts/ui-control-render-evidence.node.cjs
+
       - name: Build Electron main/preload
         run: npm run build:main
 
@@ -60,6 +63,19 @@ jobs:
         run: |
           node --test scripts/editor-cache-regression.node.mjs
           npx vitest run --root=. src/components/TextEditor.test.jsx src/components/TextEditorLoad.test.jsx
+
+      - name: Diagnose real Ant Design Select popup lifecycle
+        continue-on-error: true
+        run: node scripts/probe-ui-select-runtime.mjs
+
+      - name: Upload Select lifecycle diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-select-lifecycle-${{ github.sha }}
+          path: test-results/ui-select-runtime/probe.log
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Run redesign smoke tests
         run: npm run test:ui
@@ -193,6 +209,9 @@ jobs:
       - name: Run editor tests
         run: npm run test:editor
 
+      - name: Run Node-based UI control audit tests
+        run: npm run test:ui-audit
+
       - name: Run complete unfiltered Vitest suite
         run: npx vitest run --root=.
 
@@ -313,6 +332,28 @@ jobs:
           path: test-results/local-package/
           if-no-files-found: error
           retention-days: 7
+
+      - name: Verify native shared control geometry and keyboard ownership
+        id: ui_controls
+        shell: pwsh
+        run: |
+          node scripts/build-ui-control-render-fixture.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npx --no-install electron scripts/check-ui-control-render.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Upload native shared control evidence
+        # The native checker records both success and failure. A skipped checker
+        # must not add an unrelated missing-artifact error.
+        if: always() && hashFiles('test-results/ui-controls-render/checks.json') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-notepad-ui-controls-${{ github.sha }}
+          path: |
+            test-results/ui-controls-render/*.json
+            test-results/ui-controls-render/*.png
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Verify real Windows image insertion and recovery UI
         shell: pwsh
@@ -460,6 +501,21 @@ jobs:
           name: local-notepad-windows-7bee8ed1effde41e3657a36a66b9a6ecec1c940b
           path: .installer-input/4.248.1
 
+      # Check the actual PR installer before the flaky historical-version quit path.
+      # Both independent upgrades remain required; neither failure permits installer upload.
+      - name: Verify accepted 4.248.1 to actual current package in-place upgrade
+        shell: pwsh
+        run: .\.github\scripts\windows-in-place-upgrade.ps1 -CurrentCandidate
+
+      - name: Upload current-package upgrade evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-notepad-current-in-place-upgrade-${{ github.sha }}
+          path: test-results/current-in-place-upgrade/*
+          if-no-files-found: warn
+          retention-days: 90
+
       - name: Verify actual 4.248.0 to 4.248.1 in-place upgrade and data retention
         shell: pwsh
         run: .\.github\scripts\windows-in-place-upgrade.ps1
@@ -480,3 +536,58 @@ jobs:
           path: release/Notepad-*-Setup.exe
           if-no-files-found: error
           retention-days: 90
+
+  native-controls:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Verify committed dependency lock
+        run: node scripts/verify-dependency-lock.mjs
+
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Verify install preserved manifest and lock
+        run: git diff --exit-code -- package.json package-lock.json
+
+      - name: Verify current upgrade readiness and PowerShell syntax
+        shell: pwsh
+        run: |
+          node --test scripts/upgraded-renderer-ready.node.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $upgradeTokens = $null
+          $upgradeParseErrors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD '.github/scripts/windows-in-place-upgrade.ps1'), [ref]$upgradeTokens, [ref]$upgradeParseErrors) | Out-Null
+          if ($upgradeParseErrors.Count -gt 0) { $upgradeParseErrors | ForEach-Object { Write-Error $_.Message }; throw 'Upgrade driver PowerShell syntax failed.' }
+
+      - name: Verify native shared control evidence contracts
+        run: node --test scripts/ui-control-render-evidence.node.cjs
+
+      - name: Verify native shared control geometry and keyboard ownership
+        shell: pwsh
+        run: |
+          node scripts/build-ui-control-render-fixture.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npx --no-install electron scripts/check-ui-control-render.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Upload early native shared control evidence
+        if: always() && hashFiles('test-results/ui-controls-render/checks.json') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-notepad-ui-controls-early-${{ github.sha }}
+          path: |
+            test-results/ui-controls-render/*.json
+            test-results/ui-controls-render/*.png
+          if-no-files-found: error
+          retention-days: 30

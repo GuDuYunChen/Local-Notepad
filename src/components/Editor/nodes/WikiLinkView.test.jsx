@@ -24,3 +24,84 @@ test('preview timeout offers an explicit retry instead of waiting forever',async
 test('refresh discards stale preview body and shows only the newest result',async()=>{await render();await show();api.mockImplementation(async path=>path.endsWith('/backlinks')?[]:{...target,content:'最新正文'});await click('刷新预览');expect(host.textContent).toContain('最新正文');expect(host.textContent).not.toContain('预览正文');expect(events).toEqual([])})
 test('link activation dispatches an explicit request rather than selecting from preview',async()=>{await render({sectionPath:['章节']});await act(async()=>host.querySelector('.wiki-link').click());expect(events).toEqual([{id:'target',title:'旧标题',headingPath:['章节']}]);expect(api).not.toHaveBeenCalled()})
 test('IME confirmation key is not mistaken for a request to follow a link',async()=>{await render();const link=host.querySelector('.wiki-link');await act(async()=>link.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',isComposing:true,bubbles:true})));expect(events).toEqual([]);await act(async()=>link.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true})));expect(events).toHaveLength(1)})
+
+test('preview control Tab and Shift+Tab stay native without changing the Lexical editor', async () => {
+  await render()
+  await show()
+  const control = host.querySelector('.wiki-link-preview [data-wiki-control="true"]')
+  expect(control).not.toBeNull()
+  const parentEvents = []
+  const onParentKey = event => parentEvents.push({ key: event.key, shift: event.shiftKey })
+  document.addEventListener('keydown', onParentKey)
+  try {
+    for (const shiftKey of [false, true]) {
+      const key = new KeyboardEvent('keydown', { key: 'Tab', code: 'Tab', shiftKey, bubbles: true, cancelable: true })
+      await act(async () => { expect(control.dispatchEvent(key)).toBe(true) })
+      expect(key.defaultPrevented).toBe(false)
+    }
+    expect(parentEvents).toEqual([])
+    expect(events).toEqual([])
+  } finally { document.removeEventListener('keydown', onParentKey) }
+})
+
+test('open Wiki preview forwards native Tab from its focused link without Lexical indentation', async () => {
+  await render()
+  await show()
+  const link = host.querySelector('.wiki-link')
+  const control = host.querySelector('.wiki-link-preview [data-wiki-control="true"]')
+  expect(control).not.toBeNull()
+  const ancestorEvents = []
+  const onAncestorKey = event => ancestorEvents.push({ key: event.key, shift: event.shiftKey })
+  document.addEventListener('keydown', onAncestorKey)
+  try {
+    for (const shiftKey of [false, true]) {
+      const key = new KeyboardEvent('keydown', { key: 'Tab', code: 'Tab', shiftKey, bubbles: true, cancelable: true })
+      await act(async () => { expect(link.dispatchEvent(key)).toBe(true) })
+      expect(key.defaultPrevented).toBe(false)
+      expect(host.querySelector('.wiki-link-preview [data-wiki-control="true"]')).toBe(control)
+    }
+    expect(ancestorEvents).toEqual([])
+    expect(events).toEqual([])
+  } finally { document.removeEventListener('keydown', onAncestorKey) }
+})
+
+test('open Wiki Tab is stopped before the native Lexical editable-host listener', async () => {
+  await act(async () => root.render(<div contentEditable suppressContentEditableWarning><WikiLinkView id="target" title="旧标题" /></div>))
+  await settle()
+  await show()
+  const editable = host.querySelector('[contenteditable="true"]')
+  const link = host.querySelector('.wiki-link')
+  const control = host.querySelector('.wiki-link-preview [data-wiki-control="true"]')
+  expect(control).not.toBeNull()
+  const nativeTabs = []
+  const onLexicalKey = event => {
+    if (event.key === 'Tab') { nativeTabs.push(event.target); event.preventDefault() }
+  }
+  editable.addEventListener('keydown', onLexicalKey)
+  try {
+    for (const target of [link, control]) {
+      for (const shiftKey of [false, true]) {
+        const key = new KeyboardEvent('keydown', { key: 'Tab', code: 'Tab', shiftKey, bubbles: true, cancelable: true })
+        await act(async () => { expect(target.dispatchEvent(key)).toBe(true) })
+        expect(key.defaultPrevented).toBe(false)
+      }
+    }
+    expect(nativeTabs).toEqual([])
+    expect(events).toEqual([])
+    expect(host.querySelector('.wiki-link-preview [data-wiki-control="true"]')).toBe(control)
+  } finally { editable.removeEventListener('keydown', onLexicalKey) }
+})
+
+test('ordinary Wiki link Tab still reaches its editable ancestor', async () => {
+  await render()
+  const parentEvents = []
+  const onParentKey = event => parentEvents.push(event.key)
+  document.addEventListener('keydown', onParentKey)
+  try {
+    const key = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
+    await act(async () => { expect(host.querySelector('.wiki-link').dispatchEvent(key)).toBe(true) })
+    expect(key.defaultPrevented).toBe(false)
+    expect(parentEvents).toEqual(['Tab'])
+    expect(events).toEqual([])
+  } finally { document.removeEventListener('keydown', onParentKey) }
+})

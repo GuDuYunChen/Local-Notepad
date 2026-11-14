@@ -1,4 +1,6 @@
 import React from 'react'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 export default function ConfirmDialog({ title, message, actions, onClose }) {
   const isAnyLoading = actions.some(action => action.loading)
@@ -33,6 +35,19 @@ export default function ConfirmDialog({ title, message, actions, onClose }) {
         aria-modal="true"
         aria-labelledby="consumer-confirm-title"
         aria-describedby={descriptionId}
+        onKeyDown={(event) => {
+          if (event.key !== 'Tab' || isAnyLoading || event.nativeEvent?.isComposing || event.keyCode === 229) return
+          const buttons = [...event.currentTarget.querySelectorAll('button:not(:disabled)')]
+          if (buttons.length === 0) return
+          const activeIndex = buttons.indexOf(document.activeElement)
+          const nextIndex = activeIndex < 0
+            ? (event.shiftKey ? buttons.length - 1 : 0)
+            : (activeIndex + (event.shiftKey ? -1 : 1) + buttons.length) % buttons.length
+          event.preventDefault()
+          // A parent workspace may have its own Tab trap; only this dialog owns these keys.
+          event.stopPropagation()
+          buttons[nextIndex].focus()
+        }}
       >
         <div className="consumer-modal-heading">
           <div className="modal-title" id="consumer-confirm-title">{title}</div>
@@ -45,7 +60,7 @@ export default function ConfirmDialog({ title, message, actions, onClose }) {
             const disabled = action.disabled || isAnyLoading
 
             return (
-              <button
+              <UiButton size="middle"
                 key={`${action.label}-${index}`}
                 ref={isPrimary ? primaryRef : undefined}
                 type="button"
@@ -62,7 +77,7 @@ export default function ConfirmDialog({ title, message, actions, onClose }) {
                     <span>处理中…</span>
                   </span>
                 ) : action.label}
-              </button>
+              </UiButton>
             )
           })}
         </div>

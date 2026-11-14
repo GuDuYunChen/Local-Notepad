@@ -5,6 +5,8 @@ import ConfirmDialog from './ConfirmDialog'
 import { readVersionHistory, sameHistoryVersion, formatHistoryTime, historyPreview,
   historyRestoreBlock, captureHistoryReview } from '../services/versionHistory.mjs'
 import './VersionHistory.css'
+import { UiButton, UiInput } from '~/components/ui/ControlKit'
+
 
 export default function VersionHistory({ fileId, editor }) {
   const [rows, setRows] = useState([]), [status, setStatus] = useState('loading')
@@ -130,14 +132,14 @@ export default function VersionHistory({ fileId, editor }) {
   if (!fileId) return null
   return <section ref={clearance} className="version-history" aria-label="版本历史与恢复">
     <header className="version-header inspector-section-header"><div><div className="inspector-section-eyebrow">本地快照</div><h3>版本历史</h3></div>
-      <button type="button" className="btn small" disabled={busy || status === 'loading'} onClick={() => void load({ preserve: true })}>刷新历史</button></header>
+      <UiButton type="button" className="btn small" disabled={busy || status === 'loading'} onClick={() => void load({ preserve: true })}>刷新历史</UiButton></header>
     <p className="version-explanation">历史快照不等于当前正文。恢复只替换正文，经过现有保存和冲突保护；不改标题、标签或位置。</p>
     {result && <div className={'version-feedback ' + result.kind} role={result.kind === 'error' ? 'alert' : 'status'}>{result.text}</div>}
-    {status === 'error' ? <div className="version-error" role="alert"><p>{problem}</p><button type="button" className="btn" onClick={() => void load()}>重试读取历史</button></div>
+    {status === 'error' ? <div className="version-error" role="alert"><p>{problem}</p><UiButton type="button" className="btn" onClick={() => void load()}>重试读取历史</UiButton></div>
       : status === 'loading' ? <p role="status">正在读取历史版本…</p>
       : rows.length === 0 ? <div className="version-empty"><strong>暂无版本历史</strong><p>保存有变动的正文后，原正文会保留为历史快照。这里没有可恢复的记录。</p></div>
       : <>
-        <label className="version-search">查找快照<input aria-label="查找历史快照" value={search} disabled={busy}
+        <label className="version-search">查找快照<UiInput aria-label="查找历史快照" value={search} disabled={busy}
           onCompositionStart={() => { composing.current = true }}
           onCompositionEnd={e => { composing.current = false; setQuery(e.currentTarget.value) }}
           onChange={e => { setSearch(e.target.value); if (!composing.current) setQuery(e.target.value) }} placeholder="标题、正文或时间" /></label>
@@ -145,24 +147,24 @@ export default function VersionHistory({ fileId, editor }) {
         <div className="version-list" role="list" aria-label="历史快照">
           {visible.length === 0 && <p className="version-empty">没有匹配的快照，清除查找条件可查看全部记录。</p>}
           {visible.map(row => <div key={row.id} role="listitem" className={'version-item' + (row.id === selectedId ? ' selected' : '')}>
-            <button type="button" className="version-select-action" data-version-id={row.id} aria-pressed={row.id === selectedId} disabled={busy}
+            <UiButton type="button" layout="content" className="version-select-action" data-version-id={row.id} aria-pressed={row.id === selectedId} disabled={busy}
               onClick={() => { setSelectedId(row.id); setPreviewPage(0); setShowCurrent(false); setResult(null) }}>
               <strong>历史快照 #{row.id}</strong><small>{formatHistoryTime(row.created_at)}</small><span>{row.title || '未命名'}</span>
-            </button></div>)}
+            </UiButton></div>)}
         </div>
         {selected && <div className="version-preview">
           {!visible.some(row => row.id === selected.id) && <p className="version-meta">当前预览的快照不在查找结果中。</p>}
           <div className="version-preview-header"><strong>正文对照</strong><span>{preview.total.toLocaleString()} 字符</span></div>
-          <div className="version-preview-switch"><button type="button" aria-pressed={!showCurrent} onClick={() => { setShowCurrent(false); setPreviewPage(0) }}>所选历史</button>
-            <button type="button" aria-pressed={showCurrent} onClick={() => { setShowCurrent(true); setPreviewPage(0) }}>当前编辑器</button></div>
+          <div className="version-preview-switch"><UiButton type="button" aria-pressed={!showCurrent} onClick={() => { setShowCurrent(false); setPreviewPage(0) }}>所选历史</UiButton>
+            <UiButton type="button" aria-pressed={showCurrent} onClick={() => { setShowCurrent(true); setPreviewPage(0) }}>当前编辑器</UiButton></div>
           <p className="version-meta">纯文本预览，不显示图片等嵌入内容；恢复使用完整原始正文，不使用预览文本。</p>
           <pre tabIndex={0} aria-label={showCurrent ? '当前正文预览' : '历史正文预览'}>{preview.text || '（空内容）'}</pre>
-          {preview.pages > 1 && <div className="version-pagination"><button type="button" disabled={preview.page === 0} onClick={() => setPreviewPage(preview.page - 1)}>上一段</button>
-            <span>{preview.page + 1} / {preview.pages}</span><button type="button" disabled={preview.page + 1 === preview.pages} onClick={() => setPreviewPage(preview.page + 1)}>下一段</button></div>}
+          {preview.pages > 1 && <div className="version-pagination"><UiButton type="button" disabled={preview.page === 0} onClick={() => setPreviewPage(preview.page - 1)}>上一段</UiButton>
+            <span>{preview.page + 1} / {preview.pages}</span><UiButton type="button" disabled={preview.page + 1 === preview.pages} onClick={() => setPreviewPage(preview.page + 1)}>下一段</UiButton></div>}
           {block && <p className="version-block" role="status">{block}</p>}
           {state?.ready && state.id === fileId && state.content !== state.saved && !state.pending && !state.uncertain &&
-            <button type="button" className="btn" disabled={busy} onClick={() => void saveCurrent()}>先保存当前笔记</button>}
-          <button type="button" className="btn primary version-restore-action" disabled={busy || !!block} onClick={requestRestore}>恢复此快照正文</button>
+            <UiButton type="button" className="btn" disabled={busy} onClick={() => void saveCurrent()}>先保存当前笔记</UiButton>}
+          <UiButton type="button" className="btn primary version-restore-action" disabled={busy || !!block} onClick={requestRestore}>恢复此快照正文</UiButton>
         </div>}
       </>}
     {review && <ConfirmDialog title="恢复所选历史正文？" message={<>
