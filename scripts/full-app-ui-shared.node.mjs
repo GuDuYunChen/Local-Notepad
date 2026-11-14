@@ -1303,8 +1303,8 @@ test('project setup retains an uncertain original click failure and its trace wi
 // Synthetic DOM/CDP protocol contracts for failed-focus serialization. These
 // records are not trusted native input or evidence from the earlier failed run.
 function focusFailureFixture({ reachAt = Infinity, traceLimit = Infinity, diagnosticFailure = null,
-  traceAvailable = true, saveFailure = null } = {}) {
-  const f = overflowFixture(), selector = '#control', meta = { routeId: 'nav-trash', stateId: 'cancel-confirm' }
+  traceAvailable = true, saveFailure = null, routeId = 'nav-trash', lateFocusAt = Infinity } = {}) {
+  const f = overflowFixture(), selector = '#control', meta = { routeId, stateId: routeId === 'editor-wiki-preview' ? 'preview' : 'cancel-confirm' }
   Object.assign(f.control, { tagName: 'BUTTON', localName: 'button', type: 'button' })
   Object.assign(f.control.css, { outlineStyle: 'solid', outlineWidth: '2px', outlineColor: 'rgb(112, 87, 217)' })
   const outside = f.make('div', 'background-editor', f.rectangle(440, 40, 200, 200), f.body)
@@ -1317,7 +1317,13 @@ function focusFailureFixture({ reachAt = Infinity, traceLimit = Infinity, diagno
   const priorFocus = { selector: '#previous-control', fixtureOnly: true }
   const report = { fullAppUi: { group: 'editor', focus: [priorFocus] } }, commands = [], saved = []
   let forwardTabs = 0, boundaryChecks = 0, diagnosticReads = 0, frames = 0
-  f.globals.requestAnimationFrame = callback => { frames++; callback() }
+  f.globals.requestAnimationFrame = callback => {
+    frames++
+    // Model a browser-native focus change landing on the following frame,
+    // after the immediate post-keyup read has already returned false.
+    if (routeId === 'editor-wiki-preview' && forwardTabs === lateFocusAt && boundaryChecks > 0) f.document.activeElement = f.control
+    callback()
+  }
   const context = { report, matrix, routes: [{ id: meta.routeId }],
     evaluate: async source => {
       if (source.startsWith('document.activeElement===document.querySelector(')) boundaryChecks++
@@ -1498,6 +1504,30 @@ test('block embed never treats a missing, foreign or broken native focus sequenc
     assert.equal(result.reached, false, 'Incomplete real focus evidence is a strict rejection')
     assert.equal(keys.length, sequence.length === 1 ? 0 : 2)
   }
+})
+
+test('Wiki preview waits for painted native focus before dispatching a second Tab', async () => {
+  const f = focusFailureFixture({ routeId: 'editor-wiki-preview', lateFocusAt: 1 })
+  const receipt = await f.shared.focus(f.selector, f.meta)
+  assert.equal(f.report.fullAppUi.focusFailures, undefined)
+  assert.equal(f.report.fullAppUi.focus.length, 2)
+  assert.ok(receipt.trustedTab && receipt.focused && receipt.focusVisible && receipt.inViewport && receipt.hit)
+  assert.equal(receipt.outlines.length, 1); assert.deepEqual(receipt.shadows, [])
+  assert.equal(f.commands.length, 4, 'Only the reverse and one forward native Tab are sent')
+  assert.deepEqual(f.commands.map(item => item.modifiers), [8, 8, 0, 0])
+  assert.equal(f.stats().forwardTabs, 1); assert.equal(f.stats().boundaryChecks, 2)
+  assert.equal(f.stats().frames, 4, 'One extra passive native paint is observed')
+  assert.equal(f.stats().diagnosticReads, 0)
+})
+
+test('Wiki preview still fails after 256 genuine Tabs if no native focus transition occurs', async () => {
+  const f = focusFailureFixture({ routeId: 'editor-wiki-preview' })
+  await assert.rejects(f.shared.focus(f.selector, f.meta), /Actual Tab order never reached control/)
+  assert.equal(f.commands.length, 514)
+  assert.equal(f.stats().forwardTabs, 256); assert.equal(f.stats().boundaryChecks, 512)
+  assert.equal(f.stats().frames, 514)
+  assert.equal(f.report.fullAppUi.focusFailures[0].complete, false)
+  assert.deepEqual(f.report.fullAppUi.focus, [f.priorFocus])
 })
 
 test('successful Tab focus keeps its original receipt and adds no failure observation or input', async () => {

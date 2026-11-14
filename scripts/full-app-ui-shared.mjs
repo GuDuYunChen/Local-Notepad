@@ -932,6 +932,13 @@ export function createFullAppUiShared(ctx) {
         await key('Tab')
         tabAttempts++
         if (await evaluate(`document.activeElement===document.querySelector(${q(selector)})`)) { reached = true; break }
+        // A native focus transition can settle after the immediate CDP key-up
+        // read. For the Wiki preview only, observe the next painted frame
+        // before sending another Tab; never focus a node or relax the proof.
+        if (meta.routeId === 'editor-wiki-preview' && meta.stateId === 'preview') {
+          await frame()
+          if (await evaluate(`document.activeElement===document.querySelector(${q(selector)})`)) { reached = true; break }
+        }
       }
     }
     if (!reached) {
