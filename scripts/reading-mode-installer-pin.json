@@ -1,5 +1,5 @@
 {
-  "product": "eb8d995f54bba46671b4a4656b21a60f75c99d91",
+  "product": "7a236c5d94583e154726e13d0bf829a24178ee22",
   "quickBlob": "c1e8f40862b770f82af47c26a455b57efc853700",
   "tagsBlob": "54bb56864e58e2aa3f5ed08aedb52a00de5f0769",
   "templateBlob": "42378f13f71a03c3e91cdfdcb6dec44dbbb05f33",
@@ -16,8 +16,8 @@
   "importEvidenceTestsBlob": "5a46ce6dad5fe757b1d2714e485242aa79959559",
   "current": {
     "version": "4.249.0",
-    "bytes": 115603305,
-    "sha256": "6ec3d52698f29ac58dcd184d0b1cb2c35aefc82de7b173723e097be575c186a3"
+    "bytes": 115601950,
+    "sha256": "9892fa901d11e2a209c46e99377a358d2efe78c7555b901820942ccaeaa991ee"
   },
   "previous": {
     "version": "4.232.0",
@@ -31,14 +31,14 @@
     "productSourceCommit": "1a8e17ba775312c359f4ac23851c8c365b57a9cb"
   },
   "currentSource": {
-    "run": 43501774842,
-    "artifact": 14075204545,
-    "name": "local-notepad-windows-eb8d995f54bba46671b4a4656b21a60f75c99d91",
-    "headSha": "2877773867258191bff612f7faad7c2fa4bb86cf",
+    "run": 43525181782,
+    "artifact": 14085502924,
+    "name": "local-notepad-windows-7a236c5d94583e154726e13d0bf829a24178ee22",
+    "headSha": "df3bb187e9e8604cb209d769126f20445da9afb0",
     "branch": "fix/local-ui-consistency-2f116",
     "repositoryId": 1105107817,
-    "archiveBytes": 115610331,
-    "archiveSha256": "9809fa7bd0c81e1a082254708a6e5d676763501fdf9657c6a314b805e58a5edb"
+    "archiveBytes": 115608955,
+    "archiveSha256": "92188a9bf902a0787595d520d6528fdded50a6da8d8686bb939b1b77129add13"
   },
   "readingDriverBlob": "6924b128c1125424c91f71dbd1ecc415762e2f77",
   "readingFixtureBlob": "0c7ffadbb187dd33a7bc6b5aa8c69427eec5cc34",
@@ -81,7 +81,7 @@
     "src/components/Editor/plugins/BlockReferencePlugin.jsx": "c24a21528168ceba50c09db3dc0f8bf745ad2181",
     "src/components/Editor/plugins/BlockReferences.css": "7189a7fc6483e56a68d0bf4fc0227c4d2ec1a48e",
     "src/components/Editor/utils/blockReferenceState.js": "36ead2f4c18d3d721fec0e23dde3ba184f6ad9cf",
-    "src/components/Editor/nodes/BlockEmbedView.jsx": "0d82c71aeeea5a7d2331b5010c5303f0288a388c",
+    "src/components/Editor/nodes/BlockEmbedView.jsx": "f17ae6aadd50934b106088e09b0fd0901ea6e392",
     "src/components/Editor/nodes/WikiLinkNode.jsx": "7764d6b5da9c464fa4bd7c35b292d784f5721f12",
     "src/components/Editor/nodes/WikiLinkView.jsx": "cc3b8c821e764e3f1b184da09d19d94bdc73379d",
     "src/components/Editor/nodes/CodeBlockNode.jsx": "c441fda099f91dc669cc81dd4f00350398cdb285",
