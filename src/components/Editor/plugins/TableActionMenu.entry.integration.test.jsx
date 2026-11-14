@@ -1,4 +1,5 @@
 import React, { act, useLayoutEffect } from 'react'
+import { readFileSync } from 'node:fs'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, expect, test } from 'vitest'
 import { LexicalComposer } from '@lexical/react/LexicalComposer'
@@ -72,4 +73,16 @@ test('the real cell menu opens and enters existing multiselect without changing 
   expect(host.querySelector('[aria-label="表格操作"]')).toBeNull()
   expect(snapshot()).toEqual(before)
   expect(errors).toEqual([])
+})
+
+// Guard the shipped stylesheet, not a mocked component: native Tab focus
+// must be painted with one ring and never replaced by a hover-only highlight.
+test('table action keyboard focus has one visible outline without duplicate glow', () => {
+  const css = readFileSync(new URL('../Editor.css', import.meta.url), 'utf8')
+  const rule = css.match(/\.product-table-menu \.table-action-menu-item:focus-visible\s*\{([^{}]*)\}/)
+  expect(rule).not.toBeNull()
+  expect(rule[1]).toMatch(/outline:\s*2px solid var\(--clay\)\s*;/)
+  expect(rule[1]).toMatch(/outline-offset:\s*2px\s*;/)
+  expect(rule[1]).toMatch(/box-shadow:\s*none\s*;/)
+  expect(rule[1]).not.toMatch(/outline:\s*(?:0|none)\s*;/)
 })
