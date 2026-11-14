@@ -83,7 +83,7 @@
     "src/components/Editor/utils/blockReferenceState.js": "36ead2f4c18d3d721fec0e23dde3ba184f6ad9cf",
     "src/components/Editor/nodes/BlockEmbedView.jsx": "f17ae6aadd50934b106088e09b0fd0901ea6e392",
     "src/components/Editor/nodes/WikiLinkNode.jsx": "7764d6b5da9c464fa4bd7c35b292d784f5721f12",
-    "src/components/Editor/nodes/WikiLinkView.jsx": "730c3f22fafebd1506cb8102e9087c80e50718dc",
+    "src/components/Editor/nodes/WikiLinkView.jsx": "dd7ce8a0e91aa633dd7ae654122730f9b36c9cee",
     "src/components/Editor/nodes/CodeBlockNode.jsx": "c441fda099f91dc669cc81dd4f00350398cdb285",
     "src/components/Editor/plugins/BlockHandlePlugin.jsx": "c4168c896f0f94d891a4e0c1551d171de51ceda1",
     "src/components/Editor/Editor.jsx": "08c6f8bb08d5f885b26ac97ad5f01bcb45265886",
