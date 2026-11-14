@@ -32,7 +32,7 @@ test('preview control Tab and Shift+Tab stay native without changing the Lexical
   expect(control).not.toBeNull()
   const parentEvents = []
   const onParentKey = event => parentEvents.push({ key: event.key, shift: event.shiftKey })
-  host.addEventListener('keydown', onParentKey)
+  document.addEventListener('keydown', onParentKey)
   try {
     for (const shiftKey of [false, true]) {
       const key = new KeyboardEvent('keydown', { key: 'Tab', code: 'Tab', shiftKey, bubbles: true, cancelable: true })
@@ -41,19 +41,19 @@ test('preview control Tab and Shift+Tab stay native without changing the Lexical
     }
     expect(parentEvents).toEqual([])
     expect(events).toEqual([])
-  } finally { host.removeEventListener('keydown', onParentKey) }
+  } finally { document.removeEventListener('keydown', onParentKey) }
 })
 
 test('ordinary Wiki link Tab still reaches its editable ancestor', async () => {
   await render()
   const parentEvents = []
   const onParentKey = event => parentEvents.push(event.key)
-  host.addEventListener('keydown', onParentKey)
+  document.addEventListener('keydown', onParentKey)
   try {
     const key = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
     await act(async () => { expect(host.querySelector('.wiki-link').dispatchEvent(key)).toBe(true) })
     expect(key.defaultPrevented).toBe(false)
     expect(parentEvents).toEqual(['Tab'])
     expect(events).toEqual([])
-  } finally { host.removeEventListener('keydown', onParentKey) }
+  } finally { document.removeEventListener('keydown', onParentKey) }
 })
