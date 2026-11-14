@@ -58,10 +58,13 @@ function Preview({ id, title, path, blockId }) {
     onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) hide() }}
     onMouseDown={event => { if (!controls(event)) event.preventDefault() }} onClick={navigate}
     onKeyDown={event => {
-      // The preview button lives inside Lexical's editable ancestor. Native
-      // Tab/Shift+Tab must move focus, not bubble to TabIndentationPlugin
-      // and change the source note. Do not preventDefault or synthesize focus.
-      if (event.key === 'Tab' && controls(event)) { event.stopPropagation(); return }
+      // The preview control and its focused Wiki link share Lexical's editable
+      // ancestor. Once the preview is open, allow native Tab/Shift+Tab to
+      // traverse from the link into the button rather than indent the note.
+      // Preserve ordinary closed-link behavior and never preventDefault/focus.
+      if (event.key === 'Tab' && (controls(event) || (open && event.target === event.currentTarget))) {
+        event.stopPropagation(); return
+      }
       if (event.target === event.currentTarget && !event.nativeEvent.isComposing && event.keyCode !== 229 && ['Enter', ' '].includes(event.key)) navigate(event)
     }}>
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 4h10l2 2v14H6z" /><path d="M9 9h6M9 13h6M9 17h4" /></svg>
