@@ -10,7 +10,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { build } from 'esbuild'
 import controlEvidence from './check-ui-control-render.cjs'
 import { COLLAPSED_SIDEBAR_EXPAND, validateCollapsedSidebarObservation } from './full-app-ui-evidence.mjs'
-import { observeFullAppPopup, captureActualFullAppPopup, validateFullAppCaptureContinuity, validateFullAppPageSample, measureFullAppScrollCoverage, collectFullAppScrollOwners, createFullAppUiShared, traverseMarkdownSourceCloseWithNativeTabs, traverseBlockEmbedWithNativeTabs, traverseWikiNavigationCloseWithNativeTabs, traverseTableActionMenuWithNativeTabs, withinActualClientPort, finiteOwnerMotionActive, waitForFiniteOwnerMotion } from './full-app-ui-shared.mjs'
+import { observeFullAppPopup, captureActualFullAppPopup, validateFullAppCaptureContinuity, validateFullAppPageSample, measureFullAppScrollCoverage, collectFullAppScrollOwners, createFullAppUiShared, traverseMarkdownSourceCloseWithNativeTabs, traverseBlockEmbedWithNativeTabs, traverseAttachmentPreviewWithNativeKeys, traverseWikiNavigationCloseWithNativeTabs, traverseTableActionMenuWithNativeTabs, withinActualClientPort, finiteOwnerMotionActive, waitForFiniteOwnerMotion } from './full-app-ui-shared.mjs'
 import { buildResearchImportFixtures, researchRoutes } from './full-app-ui-research.mjs'
 import { inspectEditorSwitchReadiness, resolveInstalledEditorMediaURL } from './full-app-ui-main-editor.mjs'
 
@@ -1552,6 +1552,52 @@ test('block embed never treats a missing, foreign or broken native focus sequenc
   }
 })
 
+
+test('Attachment Preview is reached only through the real F6 escape and adjacent native Tab round-trip', async () => {
+  const root = { ownerReady: true, editorFocused: true, firstFocused: false, previewFocused: false }
+  const first = { ownerReady: true, editorFocused: false, firstFocused: true, previewFocused: false }
+  const preview = { ownerReady: true, editorFocused: false, firstFocused: false, previewFocused: true }
+  const samples = [root, first, preview, first, preview], keys = []
+  const receipt = await traverseAttachmentPreviewWithNativeKeys({
+    key: async (...args) => keys.push(args),
+    evaluate: async expression => {
+      assert.match(expression, /attachment-block/)
+      return samples.shift()
+    },
+  })
+  assert.equal(receipt.reached, true)
+  assert.equal(receipt.nativeEntry, 'F6')
+  assert.deepEqual([receipt.forwardTabs, receipt.reverseTabs], [2, 1])
+  assert.deepEqual(keys, [['F6'], ['Tab'], ['Tab', 8], ['Tab']])
+  assert.equal(samples.length, 0)
+})
+
+test('Attachment keyboard proof rejects missing origin, failed F6, wrong Tab order and changed owner', async () => {
+  const root = { ownerReady: true, editorFocused: true, firstFocused: false, previewFocused: false }
+  const first = { ownerReady: true, editorFocused: false, firstFocused: true, previewFocused: false }
+  const preview = { ownerReady: true, editorFocused: false, firstFocused: false, previewFocused: true }
+  const none = { ...root, editorFocused: false }
+  for (const samples of [
+    [{ ...root, ownerReady: false }], [none], [root, none],
+    [root, first, first], [root, first, preview, preview],
+    [root, first, preview, first, first],
+    [root, { ...first, ownerReady: false }],
+    [root, first, { ...preview, ownerReady: false }],
+    [root, first, preview, { ...first, ownerReady: false }],
+    [root, first, preview, first, { ...preview, ownerReady: false }],
+  ]) {
+    const readings = samples.map(value => ({ ...value })), keys = []
+    const result = await traverseAttachmentPreviewWithNativeKeys({
+      key: async (...args) => keys.push(args),
+      evaluate: async () => readings.shift(),
+    })
+    assert.equal(result.reached, false)
+    assert.equal(readings.length, 0)
+    assert.equal(keys.length, samples.length - 1)
+    assert.deepEqual(keys.slice(0, 1), samples.length === 1 ? [] : [['F6']])
+  }
+})
+
 test('Wiki preview recognizes genuine reverse Tab arrival before a forward Tab can leave it', async () => {
   const f = focusFailureFixture({ routeId: 'editor-wiki-preview', reverseFocus: true })
   const receipt = await f.shared.focus(f.selector, f.meta)
@@ -2439,6 +2485,26 @@ test('Settings main captures bind the same real Sync activity loading and resour
   assert.equal(receipt.complete, true)
   assert.equal(receipt.disposal.cycles.length, 1)
   assert.equal(receipt.disposal.resources.length, 1)
+})
+
+
+test('Offline Sync Activity captures wait for a real completed five-second renderer poll without relaxing PNG continuity', async t => {
+  const f = syncCycleFixture(t), receipt = {}
+  const controller = syncCycleExports.createSyncActivityCaptureReadiness({
+    routeId: 'local-sync-activity', ownerToken: f.ownerToken, evaluate: f.evaluate,
+    until: async check => check(), receipt, save() {},
+  })
+  assert.ok(controller, 'The offline Settings refresh button must be observed at both PNG boundaries')
+  await controller.install(); await f.cycle()
+  const ticket = await controller.wait()
+  await controller.boundary(ticket, 'before-capture', 'offline-sync.png')
+  f.advance(40)
+  await controller.boundary(ticket, 'after-capture', 'offline-sync.png')
+  await controller.close()
+  assert.equal(receipt.complete, true)
+  assert.equal(receipt.disposal.cycles.length, 1)
+  assert.equal(receipt.disposal.resources.length, 1)
+  assert.equal(receipt.attempts[0].ticket.transitionVersion, ticket.transitionVersion)
 })
 
 test('Sync a complete intervening loading cycle is refused even if disabled is false again after PNG', async t => {

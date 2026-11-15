@@ -556,6 +556,46 @@ export async function traverseBlockEmbedWithNativeTabs({ key, evaluate }) {
  * No button is focused or clicked by the verifier and all original focus
  * geometry, trusted-input and screenshot assertions remain in place.
  */
+/**
+ * Lexical consumes plain Tab inside its editable root. The product's F6
+ * escape enters the first real attachment action; native Tab then reaches
+ * Preview, Shift+Tab returns to Replace, and Tab reaches Preview again.
+ * Do not set focus directly or substitute a mouse click for keyboard proof.
+ */
+export async function traverseAttachmentPreviewWithNativeKeys({ key, evaluate }) {
+  const observe = () => evaluate(`(() => {
+    const roots = [...document.querySelectorAll('.editor-input[contenteditable="true"]')]
+    const root = roots[0], blocks = root ? [...root.querySelectorAll('.attachment-block')] : []
+    const actions = blocks[0]?.querySelector('.attachment-actions')
+    const buttons = actions ? [...actions.querySelectorAll('button')] : []
+    const first = actions?.querySelector('.attachment-replace-button')
+    const preview = actions?.querySelector('.attachment-preview-button')
+    return {
+      ownerReady: roots.length === 1 && blocks.length === 1 &&
+        !!actions && buttons[0] === first && buttons[1] === preview &&
+        first?.tagName === 'BUTTON' && preview?.tagName === 'BUTTON' &&
+        !first.disabled && !preview.disabled &&
+        document.querySelectorAll('.attachment-preview-button').length === 1,
+      editorFocused: !!root && document.activeElement === root,
+      firstFocused: !!first && document.activeElement === first,
+      previewFocused: !!preview && document.activeElement === preview,
+    }
+  })()`)
+  const initial = await observe()
+  const receipt = { initial, entered: null, forward: null, backward: null,
+    returned: null, nativeEntry: null, reverseTabs: 0, forwardTabs: 0, reached: false }
+  if (!initial.ownerReady || !initial.editorFocused || initial.firstFocused || initial.previewFocused) return receipt
+  await key('F6'); receipt.nativeEntry = 'F6'; receipt.entered = await observe()
+  if (!receipt.entered.ownerReady || !receipt.entered.firstFocused) return receipt
+  await key('Tab'); receipt.forwardTabs++; receipt.forward = await observe()
+  if (!receipt.forward.ownerReady || !receipt.forward.previewFocused) return receipt
+  await key('Tab', 8); receipt.reverseTabs++; receipt.backward = await observe()
+  if (!receipt.backward.ownerReady || !receipt.backward.firstFocused) return receipt
+  await key('Tab'); receipt.forwardTabs++; receipt.returned = await observe()
+  receipt.reached = receipt.returned.ownerReady && receipt.returned.previewFocused
+  return receipt
+}
+
 export async function traverseWikiNavigationCloseWithNativeTabs({ key, evaluate }) {
   const observe = () => evaluate(`(() => {
     const panels = [...document.querySelectorAll('.wiki-navigation-status[aria-label="引用导航状态"]')]
@@ -753,7 +793,7 @@ export function createFullAppUiShared(ctx) {
       controls: [], anchors: [], images: [], geometry: { valid: false, failures: [] }, rawSamples: [], scrollCoverage: [], disclosures: [], motionReadiness: [] }
     ui.scenes.push(scene); save()
     const seen = new Map(), wanted = new Map(), capturedAnchors = new Map()
-    const syncReadiness = ['sync-presentation', 'settings-main'].includes(meta.routeId) ? createSyncActivityCaptureReadiness({ routeId: meta.routeId,
+    const syncReadiness = ['sync-presentation', 'settings-main', 'local-sync-activity'].includes(meta.routeId) ? createSyncActivityCaptureReadiness({ routeId: meta.routeId,
       ownerToken: JSON.stringify(meta), evaluate, until, receipt: (scene.syncActivityReadiness = {}), save }) : null
     let captureFailure = null
     let index = 0
@@ -920,6 +960,12 @@ export function createFullAppUiShared(ctx) {
     } else if (meta.routeId === 'editor-block-embed' && meta.stateId === 'loaded' &&
         selector === '.block-reference-embed footer button:first-child') {
       nativeSourceOrder = await traverseBlockEmbedWithNativeTabs({ key, evaluate })
+      reached = nativeSourceOrder.reached
+      reverseTabs = nativeSourceOrder.reverseTabs
+      tabAttempts = nativeSourceOrder.forwardTabs
+    } else if (meta.routeId === 'editor-attachment' && meta.stateId === 'default' &&
+        selector === '.attachment-preview-button') {
+      nativeSourceOrder = await traverseAttachmentPreviewWithNativeKeys({ key, evaluate })
       reached = nativeSourceOrder.reached
       reverseTabs = nativeSourceOrder.reverseTabs
       tabAttempts = nativeSourceOrder.forwardTabs
@@ -1367,7 +1413,7 @@ export function observeSyncActivityCaptureCycle(action, ownerToken) {
 }
 
 export function createSyncActivityCaptureReadiness({ routeId, ownerToken, evaluate, until, receipt, save }) {
-  if (!['sync-presentation', 'settings-main'].includes(routeId)) return null
+  if (!['sync-presentation', 'settings-main', 'local-sync-activity'].includes(routeId)) return null
   receipt.kind = 'passive-renderer-resource-and-owned-loading-cycle'; receipt.attempts = []; receipt.complete = false
   const call = action => evaluate(`(${observeSyncActivityCaptureCycle.toString()})(${JSON.stringify(action)},${JSON.stringify(ownerToken)})`)
   const valid = sample => {
