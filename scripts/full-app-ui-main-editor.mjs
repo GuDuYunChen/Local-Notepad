@@ -60,7 +60,7 @@ const miss = '不存在的合成匹配-NO-MATCH-750012'
 // /uploads/... API receipts used by these synthetic fixtures must preserve
 // exactly that product behavior in the file:// packaged renderer.
 export function resolveInstalledEditorMediaURL(uploadPath) {
-  assert.match(uploadPath, /^\\/uploads\\/[A-Za-z0-9][A-Za-z0-9_.-]{0,254}$/, 'Only a single owned backend upload path is permitted')
+  assert.match(uploadPath, new RegExp('^/uploads/[A-Za-z0-9][A-Za-z0-9_.-]{0,254}$'), 'Only a single owned backend upload path is permitted')
   return new URL(uploadPath, 'http://127.0.0.1:27121').href
 }
 
