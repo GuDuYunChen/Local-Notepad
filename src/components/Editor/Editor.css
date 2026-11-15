@@ -1024,6 +1024,12 @@
   left: 50%;
   z-index: 5;
   transform: translateX(-50%);
+  /* A selected narrow image must not make its action bar wider than the image stage. */
+  box-sizing: border-box;
+  width: max-content;
+  max-width: 100%;
+  flex-wrap: wrap;
+  justify-content: center;
   min-height: 34px;
   padding: 4px;
   display: flex;
@@ -1039,6 +1045,9 @@
 
 .editor-image-toolbar-group {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  min-width: 0;
   align-items: center;
   gap: 1px;
 }
