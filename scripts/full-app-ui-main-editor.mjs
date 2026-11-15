@@ -55,6 +55,15 @@ export const mainEditorRoutes = [...navigationRoutes, ...editorRoutes]
 const q = JSON.stringify
 const sha = value => createHash('sha256').update(value).digest('hex')
 const miss = '不存在的合成匹配-NO-MATCH-750012'
+
+// The installed renderer's uploadFile() returns absolute backend URLs. Raw
+// /uploads/... API receipts used by these synthetic fixtures must preserve
+// exactly that product behavior in the file:// packaged renderer.
+export function resolveInstalledEditorMediaURL(uploadPath) {
+  assert.match(uploadPath, /^\\/uploads\\/[A-Za-z0-9][A-Za-z0-9_.-]{0,254}$/, 'Only a single owned backend upload path is permitted')
+  return new URL(uploadPath, 'http://127.0.0.1:27121').href
+}
+
 export function inspectEditorSwitchReadiness(doc) {
   // The current App renders a shared save chip for dirty, saving and failed states.
   const chip = doc.querySelector('.workspace-save-chip')
@@ -97,9 +106,9 @@ export async function prepareEditor(ctx) {
     assetReceipts.push({ url: saved.url, name, mime, bytes: bytes.length, sha256: sha(bytes) }); return saved.url
   }
   const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jK1sAAAAASUVORK5CYII=', 'base64')
-  const imageURL = await upload(marker + '.png', 'image/png', png)
+  const imageURL = resolveInstalledEditorMediaURL(await upload(marker + '.png', 'image/png', png))
   const attachmentBytes = Buffer.from('仅本机合成附件。\n这段较长中文用于核对附件预览、换行与关闭按钮。\n' + '重复预览行：原文保持不变。\n'.repeat(12))
-  const attachmentURL = await upload(marker + '.txt', 'text/plain', attachmentBytes)
+  const attachmentURL = resolveInstalledEditorMediaURL(await upload(marker + '.txt', 'text/plain', attachmentBytes))
   const blockId = 'b-' + randomUUID().replaceAll('-', '')
   const missingId = 'missing-' + randomUUID()
   const body = [paragraph('界面验收正文：选择这段文字检查浮动工具栏，不改变原文。'),

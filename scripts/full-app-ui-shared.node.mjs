@@ -12,7 +12,7 @@ import controlEvidence from './check-ui-control-render.cjs'
 import { COLLAPSED_SIDEBAR_EXPAND, validateCollapsedSidebarObservation } from './full-app-ui-evidence.mjs'
 import { observeFullAppPopup, captureActualFullAppPopup, validateFullAppCaptureContinuity, validateFullAppPageSample, measureFullAppScrollCoverage, collectFullAppScrollOwners, createFullAppUiShared, traverseMarkdownSourceCloseWithNativeTabs, traverseBlockEmbedWithNativeTabs, traverseWikiNavigationCloseWithNativeTabs, traverseTableActionMenuWithNativeTabs, withinActualClientPort, finiteOwnerMotionActive, waitForFiniteOwnerMotion } from './full-app-ui-shared.mjs'
 import { buildResearchImportFixtures, researchRoutes } from './full-app-ui-research.mjs'
-import { inspectEditorSwitchReadiness } from './full-app-ui-main-editor.mjs'
+import { inspectEditorSwitchReadiness, resolveInstalledEditorMediaURL } from './full-app-ui-main-editor.mjs'
 
 const clone = value => structuredClone(value)
 const hash = value => createHash('sha256').update(value).digest('hex')
@@ -46,6 +46,20 @@ test('installed editor switch guard keeps legacy, loading and modal refusals', (
   assert.equal(clean.ready, true)
   assert.equal(clean.saveChip, null)
   assert.equal(clean.confirmation, false)
+})
+
+
+test('installed media fixtures use the same absolute backend upload URLs as real product uploads', () => {
+  assert.equal(resolveInstalledEditorMediaURL('/uploads/owned-image.png'), 'http://127.0.0.1:27121/uploads/owned-image.png')
+  assert.equal(resolveInstalledEditorMediaURL('/uploads/owned-attachment.txt'), 'http://127.0.0.1:27121/uploads/owned-attachment.txt')
+})
+test('installed media fixture refuses foreign, ambiguous, or non-upload URLs', () => {
+  for (const value of [
+    '', '/api/upload', '/uploads/', '/uploads/../x.png', '/uploads/a/b.png',
+    '/uploads/a.png?secret=1', '/uploads/a.png#fragment', '/uploads/%2e%2e',
+    '//outside.invalid/uploads/a.png', 'http://127.0.0.1:27121/uploads/a.png',
+    'file:///uploads/a.png',
+  ]) assert.throws(() => resolveInstalledEditorMediaURL(value), { code: 'ERR_ASSERTION' })
 })
 
 function pageSample() {
