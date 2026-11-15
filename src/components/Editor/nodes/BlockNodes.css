@@ -641,6 +641,16 @@
   font-size: 10px;
 }
 
+/* Keep the formula's existing 28px action buttons above the persistent
+   editor reading/status overlay in short Windows app viewports.  Compact
+   spacing only; do not change controls, keyboard paths or formulas. */
+@media (max-height: 520px) {
+  .editor-input .formula-editor {
+    gap: 3px;
+    padding: 6px;
+  }
+}
+
 /* Text attachment previews */
 .attachment-preview-body.text {
   padding: 0;

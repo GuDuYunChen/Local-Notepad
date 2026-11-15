@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "productCommit": "a2d027825cfc75688d664f8e3d4e799cdac483ff",
+  "productCommit": "b981ce69d8da2a8245aef587beb819d58a1da622",
   "sourceFiles": {
     "scripts/native-ui-select.mjs": "f657525153b5ce387421c91c134556a3c6e305ff",
     "scripts/check-ui-control-render.cjs": "f289ec146b2961b686f1df25897536499a1601cb",
