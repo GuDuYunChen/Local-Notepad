@@ -582,7 +582,7 @@ function ImageGridComponent({ nodeKey, items, columns, gap }) {
           >
             <div className="editor-image-grid-media">
               {selected && isEditable && (
-                <button data-ui-native="editor-pointer-handle"
+                <UiButton density="compact" layout="content"
                   type="button"
                   className="editor-image-grid-drag"
                   draggable
@@ -593,7 +593,7 @@ function ImageGridComponent({ nodeKey, items, columns, gap }) {
                   title="拖动排序"
                 >
                   ⋮⋮
-                </button>
+                </UiButton>
               )}
               <img
                 src={item.src}

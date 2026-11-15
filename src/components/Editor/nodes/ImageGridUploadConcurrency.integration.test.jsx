@@ -324,3 +324,20 @@ test('a partial multi-image upload retains successful additions and shows the fa
   expect(button('添加图片').disabled).toBe(false)
   expect(consoleError).toHaveBeenCalledTimes(1)
 })
+
+test('image drag handles use shared compact controls and retain native drag reorder', async () => {
+  const handles = [...host.querySelectorAll('.editor-image-grid-drag')]
+  expect(handles).toHaveLength(2)
+  handles.forEach((handle, index) => {
+    expect(handle.tagName).toBe('BUTTON')
+    expect(handle.getAttribute('type')).toBe('button')
+    expect(handle.getAttribute('data-ui-control')).toBe('button')
+    expect(handle.getAttribute('data-ui-layout')).toBe('content')
+    expect(handle.hasAttribute('data-ui-native')).toBe(false)
+    expect(handle.getAttribute('draggable')).toBe('true')
+    expect(handle.getAttribute('aria-label')).toBe(`拖动图片 ${index + 1} 排序`)
+  })
+  await reorder(0, 1)
+  expect(items()).toEqual([originalItems[1], originalItems[0]])
+  expect(errors).toEqual([])
+})
