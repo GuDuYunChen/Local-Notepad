@@ -10,7 +10,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { build } from 'esbuild'
 import controlEvidence from './check-ui-control-render.cjs'
 import { COLLAPSED_SIDEBAR_EXPAND, validateCollapsedSidebarObservation } from './full-app-ui-evidence.mjs'
-import { observeFullAppPopup, captureActualFullAppPopup, validateFullAppCaptureContinuity, validateFullAppPageSample, measureFullAppScrollCoverage, collectFullAppScrollOwners, createFullAppUiShared, traverseMarkdownSourceCloseWithNativeTabs, traverseBlockEmbedWithNativeTabs, traverseAttachmentPreviewWithNativeKeys, traverseWikiNavigationCloseWithNativeTabs, traverseTableActionMenuWithNativeTabs, withinActualClientPort, finiteOwnerMotionActive, waitForFiniteOwnerMotion } from './full-app-ui-shared.mjs'
+import { observeFullAppPopup, captureActualFullAppPopup, validateFullAppCaptureContinuity, validateFullAppPageSample, measureFullAppScrollCoverage, collectFullAppScrollOwners, createFullAppUiShared, traverseMarkdownSourceCloseWithNativeTabs, traverseBlockEmbedWithNativeTabs, traverseAttachmentPreviewWithNativeKeys, traverseTodoTextWithNativeKeys, traverseWikiNavigationCloseWithNativeTabs, traverseTableActionMenuWithNativeTabs, withinActualClientPort, finiteOwnerMotionActive, waitForFiniteOwnerMotion } from './full-app-ui-shared.mjs'
 import { buildResearchImportFixtures, researchRoutes } from './full-app-ui-research.mjs'
 import { inspectEditorSwitchReadiness, resolveInstalledEditorMediaURL } from './full-app-ui-main-editor.mjs'
 
@@ -1598,6 +1598,46 @@ test('Attachment keyboard proof rejects missing origin, failed F6, wrong Tab ord
   }
 })
 
+
+test('Todo keyboard action is reached through F6 and native checkbox/text Tab round trip', async () => {
+  const root = { ownerReady: true, editorFocused: true, checkboxFocused: false, textFocused: false }
+  const checkbox = { ownerReady: true, editorFocused: false, checkboxFocused: true, textFocused: false }
+  const text = { ownerReady: true, editorFocused: false, checkboxFocused: false, textFocused: true }
+  const states = [root, checkbox, text, checkbox, text], keys = []
+  const receipt = await traverseTodoTextWithNativeKeys({
+    key: async (...args) => keys.push(args),
+    evaluate: async expression => { assert.match(expression, /todo-block/); return states.shift() },
+  })
+  assert.equal(receipt.reached, true)
+  assert.equal(receipt.nativeEntry, 'F6')
+  assert.deepEqual([receipt.forwardTabs, receipt.reverseTabs], [2, 1])
+  assert.deepEqual(keys, [['F6'], ['Tab'], ['Tab', 8], ['Tab']])
+  assert.equal(states.length, 0)
+})
+test('Todo keyboard proof rejects missing owner, wrong focus origin, wrong key order and state changes', async () => {
+  const root = { ownerReady: true, editorFocused: true, checkboxFocused: false, textFocused: false }
+  const checkbox = { ownerReady: true, editorFocused: false, checkboxFocused: true, textFocused: false }
+  const text = { ownerReady: true, editorFocused: false, checkboxFocused: false, textFocused: true }
+  const nofocus = { ...root, editorFocused: false }
+  for (const samples of [
+    [{ ...root, ownerReady: false }], [nofocus], [root, nofocus],
+    [root, checkbox, checkbox], [root, checkbox, text, text],
+    [root, checkbox, text, checkbox, checkbox],
+    [root, { ...checkbox, ownerReady: false }], [root, checkbox, { ...text, ownerReady: false }],
+    [root, checkbox, text, { ...checkbox, ownerReady: false }],
+    [root, checkbox, text, checkbox, { ...text, ownerReady: false }],
+  ]) {
+    const readings = samples.map(s => ({ ...s })), keys = []
+    const result = await traverseTodoTextWithNativeKeys({
+      key: async (...args) => keys.push(args), evaluate: async () => readings.shift(),
+    })
+    assert.equal(result.reached, false)
+    assert.equal(readings.length, 0)
+    assert.equal(keys.length, samples.length - 1)
+    assert.deepEqual(keys.slice(0, 1), samples.length === 1 ? [] : [['F6']])
+  }
+})
+
 test('Wiki preview recognizes genuine reverse Tab arrival before a forward Tab can leave it', async () => {
   const f = focusFailureFixture({ routeId: 'editor-wiki-preview', reverseFocus: true })
   const receipt = await f.shared.focus(f.selector, f.meta)
@@ -2453,6 +2493,22 @@ test('Sync missing completion exhausts the original 15000ms and 100ms poll witho
   assert.equal(receipt.attempts[0].error.message, firstFailure.message)
   await controller.close(); assert.equal(receipt.complete, false); assert.equal(receipt.disposal.disposed, true)
   assert.equal(f.window.__fullAppSyncActivityCaptureCycle, undefined)
+})
+
+
+test('Sync capture waits for the fresh renderer cycle inside its PNG guard after motion', () => {
+  const source = createFullAppUiShared.toString()
+  const start = source.indexOf('const snap = async targetAnchors =>')
+  const end = source.indexOf('const focus = async (selector, meta)', start)
+  assert.ok(start > 0 && end > start)
+  const snap = source.slice(start, end)
+  const motion = snap.indexOf('await waitForFiniteOwnerMotion(')
+  const guard = snap.indexOf('const image = await capture(filename, async () => {')
+  const ticket = snap.indexOf('const syncTicket = syncReadiness ? await syncReadiness.wait() : null')
+  const sample = snap.indexOf('const fresh = await samplePage(')
+  const boundary = snap.indexOf("syncReadiness.boundary(syncTicket, 'before-capture', filename)")
+  assert.ok(motion >= 0 && guard > motion && ticket > guard && sample > ticket && boundary > sample)
+  assert.equal(snap.split('syncReadiness.wait()').length - 1, 1)
 })
 
 test('Sync one fresh cycle can cover consecutive PNGs without another forced five-second wait', async t => {

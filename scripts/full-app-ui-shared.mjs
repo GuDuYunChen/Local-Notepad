@@ -596,6 +596,41 @@ export async function traverseAttachmentPreviewWithNativeKeys({ key, evaluate })
   return receipt
 }
 
+
+/** Lexical consumes Tab; use its real F6 decorator escape and prove a Todo
+ * checkbox-to-text-button round trip with native keys and no fake focus. */
+export async function traverseTodoTextWithNativeKeys({ key, evaluate }) {
+  const observe = () => evaluate(`(() => {
+    const roots = [...document.querySelectorAll('.editor-input[contenteditable="true"]')]
+    const root = roots[0], todos = root ? [...root.querySelectorAll('.todo-block')] : []
+    const checkbox = todos[0]?.querySelector('input.todo-checkbox[type="checkbox"]')
+    const text = todos[0]?.querySelector('button.todo-text-button')
+    return {
+      ownerReady: roots.length === 1 && todos.length === 1 &&
+        checkbox?.tagName === 'INPUT' && !checkbox.disabled &&
+        text?.tagName === 'BUTTON' && !text.disabled &&
+        checkbox.parentElement === text.parentElement && checkbox.nextElementSibling === text &&
+        document.querySelectorAll('.todo-text-button').length === 1,
+      editorFocused: !!root && document.activeElement === root,
+      checkboxFocused: !!checkbox && document.activeElement === checkbox,
+      textFocused: !!text && document.activeElement === text,
+    }
+  })()`)
+  const initial = await observe()
+  const receipt = { initial, entered: null, forward: null, backward: null, returned: null,
+    nativeEntry: null, reverseTabs: 0, forwardTabs: 0, reached: false }
+  if (!initial.ownerReady || !initial.editorFocused || initial.checkboxFocused || initial.textFocused) return receipt
+  await key('F6'); receipt.nativeEntry = 'F6'; receipt.entered = await observe()
+  if (!receipt.entered.ownerReady || !receipt.entered.checkboxFocused) return receipt
+  await key('Tab'); receipt.forwardTabs++; receipt.forward = await observe()
+  if (!receipt.forward.ownerReady || !receipt.forward.textFocused) return receipt
+  await key('Tab', 8); receipt.reverseTabs++; receipt.backward = await observe()
+  if (!receipt.backward.ownerReady || !receipt.backward.checkboxFocused) return receipt
+  await key('Tab'); receipt.forwardTabs++; receipt.returned = await observe()
+  receipt.reached = receipt.returned.ownerReady && receipt.returned.textFocused
+  return receipt
+}
+
 export async function traverseWikiNavigationCloseWithNativeTabs({ key, evaluate }) {
   const observe = () => evaluate(`(() => {
     const panels = [...document.querySelectorAll('.wiki-navigation-status[aria-label="引用导航状态"]')]
@@ -800,7 +835,8 @@ export function createFullAppUiShared(ctx) {
     const snap = async targetAnchors => {
       // A momentary enabled button can be just before the next normal poll.
       // Observe a newly completed owned renderer read, without initiating one.
-      const syncTicket = syncReadiness ? await syncReadiness.wait() : null
+      // Obtain the renderer cycle only at the native PNG boundary; motion and
+      // preliminary layout reads can outlast its strict one-second validity.
       const motion = { complete: false }; scene.motionReadiness.push(motion)
       await waitForFiniteOwnerMotion(() => evaluate(`(${observeFullAppOwnerMotion.toString()})(${q(root)})`), until, motion)
       const before = await samplePage(route, root, targetAnchors, onlySelectors, sidebarFocusRequired)
@@ -817,6 +853,7 @@ export function createFullAppUiShared(ctx) {
       const filename = nameFor(meta, 'part-' + (++index))
       motion.image = filename
       const image = await capture(filename, async () => {
+        const syncTicket = syncReadiness ? await syncReadiness.wait() : null
         const fresh = await samplePage(route, root, targetAnchors, onlySelectors, sidebarFocusRequired)
         appendRaw(scene, { ...fresh, text: undefined, phase: 'before-capture', image: filename }); save()
         if (sidebarFocusRequired) validateCollapsedSidebarObservation(fresh.sidebarFocus, ctx.matrix)
@@ -966,6 +1003,12 @@ export function createFullAppUiShared(ctx) {
     } else if (meta.routeId === 'editor-attachment' && meta.stateId === 'default' &&
         selector === '.attachment-preview-button') {
       nativeSourceOrder = await traverseAttachmentPreviewWithNativeKeys({ key, evaluate })
+      reached = nativeSourceOrder.reached
+      reverseTabs = nativeSourceOrder.reverseTabs
+      tabAttempts = nativeSourceOrder.forwardTabs
+    } else if (meta.routeId === 'editor-todo' && meta.stateId === 'default' &&
+        selector === '.todo-text-button') {
+      nativeSourceOrder = await traverseTodoTextWithNativeKeys({ key, evaluate })
       reached = nativeSourceOrder.reached
       reverseTabs = nativeSourceOrder.reverseTabs
       tabAttempts = nativeSourceOrder.forwardTabs
