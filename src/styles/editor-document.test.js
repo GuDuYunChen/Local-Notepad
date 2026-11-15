@@ -152,17 +152,17 @@ describe('editor document presentation', () => {
 
   it('keeps the selected image toolbar within a narrow image stage without removing actions', () => {
     const css = read(['src', 'components', 'Editor', 'Editor.css'])
-    const toolbar = css.match(/\\.editor-image-toolbar\\s*\\{([^}]+)\\}/)?.[1]
-    const group = css.match(/\\.editor-image-toolbar-group\\s*\\{([^}]+)\\}/)?.[1]
+    const toolbar = css.match(/\.editor-image-toolbar\s*\{([^}]+)\}/)?.[1]
+    const group = css.match(/\.editor-image-toolbar-group\s*\{([^}]+)\}/)?.[1]
     expect(toolbar).toBeDefined()
-    expect(toolbar).toMatch(/\\bwidth:\\s*max-content\\s*;/)
-    expect(toolbar).toMatch(/\\bmax-width:\\s*100%\\s*;/)
-    expect(toolbar).toMatch(/\\bbox-sizing:\\s*border-box\\s*;/)
-    expect(toolbar).toMatch(/\\bflex-wrap:\\s*wrap\\s*;/)
-    expect(toolbar).toMatch(/\\bjustify-content:\\s*center\\s*;/)
+    expect(toolbar).toMatch(/\bwidth:\s*max-content\s*;/)
+    expect(toolbar).toMatch(/\bmax-width:\s*100%\s*;/)
+    expect(toolbar).toMatch(/\bbox-sizing:\s*border-box\s*;/)
+    expect(toolbar).toMatch(/\bflex-wrap:\s*wrap\s*;/)
+    expect(toolbar).toMatch(/\bjustify-content:\s*center\s*;/)
     expect(group).toBeDefined()
-    expect(group).toMatch(/\\bflex-wrap:\\s*wrap\\s*;/)
-    expect(group).toMatch(/\\bmin-width:\\s*0\\s*;/)
+    expect(group).toMatch(/\bflex-wrap:\s*wrap\s*;/)
+    expect(group).toMatch(/\bmin-width:\s*0\s*;/)
 
     const source = read(['src', 'components', 'Editor', 'nodes', 'ImageNode.jsx'])
     expect(source).toContain("maxWidth: '100%'")
