@@ -2503,11 +2503,21 @@ test('Sync capture waits for the fresh renderer cycle inside its PNG guard after
   assert.ok(start > 0 && end > start)
   const snap = source.slice(start, end)
   const motion = snap.indexOf('await waitForFiniteOwnerMotion(')
+  // The ticket now lives in snap scope so the after-PNG check can reuse it.
+  // The fresh request itself must still be awaited inside the capture guard.
+  const declaration = snap.indexOf('let syncTicket = null')
   const guard = snap.indexOf('const image = await capture(filename, async () => {')
-  const ticket = snap.indexOf('const syncTicket = syncReadiness ? await syncReadiness.wait() : null')
+  const ticket = snap.indexOf('syncTicket = syncReadiness ? await syncReadiness.wait() : null')
   const sample = snap.indexOf('const fresh = await samplePage(')
   const boundary = snap.indexOf("syncReadiness.boundary(syncTicket, 'before-capture', filename)")
-  assert.ok(motion >= 0 && guard > motion && ticket > guard && sample > ticket && boundary > sample)
+  const afterSample = snap.indexOf('afterCapture = await samplePage(', boundary)
+  const afterBoundary = snap.indexOf("syncReadiness.boundary(syncTicket, 'after-capture', image.filename)", afterSample)
+  assert.ok(motion >= 0 && declaration > motion && guard > declaration && ticket > guard && sample > ticket && boundary > sample)
+  assert.ok(afterSample > boundary && afterBoundary > afterSample)
+  assert.equal(snap.split('let syncTicket = null').length - 1, 1)
+  assert.equal(snap.split('syncTicket = syncReadiness ? await syncReadiness.wait() : null').length - 1, 1)
+  assert.equal(snap.split("syncReadiness.boundary(syncTicket, 'before-capture', filename)").length - 1, 1)
+  assert.equal(snap.split("syncReadiness.boundary(syncTicket, 'after-capture', image.filename)").length - 1, 1)
   assert.equal(snap.split('syncReadiness.wait()').length - 1, 1)
 })
 
