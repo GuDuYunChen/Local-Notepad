@@ -3,8 +3,8 @@
   "scope": "installed-actual-app-page-matrix",
   "sourceScope": "control-source entry coverage with declared states; not every possible failure combination",
   "productSource": {
-    "commit": "3c1d8c6d538f0c3eedb8118e3a864b997c5236a8",
-    "tree": "877a61caf4fc87935d6358e5aae9f24c45d3344d",
+    "commit": "143d9819ef6f772fb140c9db13baa0fbc0101ea7",
+    "tree": "69be36753ea9024ebfbd8a9969e6cb756bc26ebf",
     "dirty": false
   },
   "inventory": {
@@ -1926,9 +1926,9 @@
     },
     {
       "file": "src/components/Editor/nodes/FormulaNode.jsx",
-      "bytes": 12069,
-      "sha256": "ddd444389da48acec99582c52cc10eb22ca28784f769f32063137141b6459975",
-      "blob": "29216482c6a9b61bc7a58064b8d698368b049e65",
+      "bytes": 12499,
+      "sha256": "f0f0a7fe2ed4cc7fed2ed21f262a9f7dbf598dae9c5e06632ccef3d1c729758d",
+      "blob": "cb10d32c125bd7b0932b6764c76bb8a973946bda",
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [

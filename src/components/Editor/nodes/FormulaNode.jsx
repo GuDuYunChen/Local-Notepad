@@ -248,6 +248,15 @@ function FormulaComponent({ nodeKey, expression, displayMode }) {
           placeholder="例如：E = mc^2"
           rows={blockMode ? 3 : 1}
           autoFocus
+          // Ctrl+A inside this decorator edits the formula draft, not Lexical.
+          // Capture it before the parent contenteditable consumes select-all.
+          onKeyDownCapture={event => {
+            if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') {
+              event.stopPropagation()
+              event.preventDefault()
+              event.currentTarget.select()
+            }
+          }}
           onKeyDown={event => {
             if (!editor.isEditable()) return
             if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
