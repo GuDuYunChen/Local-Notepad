@@ -650,6 +650,21 @@
     gap: 3px;
     padding: 6px;
   }
+
+  /* On the actual 704×455 installed screen the last three formula actions
+     landed at y=423–451, beneath the fixed reading/status badge. Preserve
+     the full-height 28px buttons and all actions; allow the KaTeX preview
+     and three-row draft to scroll within smaller compact-view heights so
+     the entire action row remains hit-testable above the badge. */
+  .editor-input .formula-editor.block > .formula-editor-preview {
+    max-height: 64px;
+    overflow-y: auto;
+  }
+
+  .editor-input .formula-editor.block > textarea {
+    max-height: 56px;
+    overflow-y: auto;
+  }
 }
 @media (max-height: 520px) and (min-width: 680px) and (max-width: 760px) {
   .editor-input .formula-editor > .formula-editor-actions {
