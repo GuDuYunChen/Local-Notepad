@@ -73,6 +73,16 @@ export class EmbedNode extends DecoratorNode {
   }
 }
 
+// Nested decorator inputs own their native selection, not the outer Lexical editor.
+// Capture select-all before the contenteditable can intercept Ctrl/Cmd+A.
+function selectEmbedInputText(event) {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') {
+    event.stopPropagation()
+    event.preventDefault()
+    event.currentTarget.select()
+  }
+}
+
 function EmbedComponent({ nodeKey, url, title }) {
   const [editor] = useLexicalComposerContext()
   const isEditable = useLexicalEditable()
@@ -161,6 +171,7 @@ function EmbedComponent({ nodeKey, url, title }) {
         <UiInput density="compact"
           type="url"
           value={editUrl}
+          onKeyDownCapture={selectEmbedInputText}
           onChange={(event) => { if (editor.isEditable()) setEditUrl(event.target.value) }}
           placeholder="粘贴 YouTube、Bilibili 或其他支持的链接"
           className="embed-input"
@@ -168,6 +179,7 @@ function EmbedComponent({ nodeKey, url, title }) {
         <UiInput density="compact"
           type="text"
           value={editTitle}
+          onKeyDownCapture={selectEmbedInputText}
           onChange={(event) => { if (editor.isEditable()) setEditTitle(event.target.value) }}
           placeholder="标题（可选）"
           className="embed-input"

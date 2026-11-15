@@ -329,3 +329,43 @@ test('formula Ctrl+A selects the draft instead of reaching the Lexical editor', 
     outer.removeEventListener('keydown', check)
   }
 })
+
+test('embed URL and title Ctrl/Cmd+A select only their native drafts, not the Lexical document', async () => {
+  await mount(() => $createEmbedNode({ url: 'https://youtu.be/original123', title: '已应用标题' }))
+  const saved = snapshot()
+  await click(button('编辑嵌入内容'))
+  const outer = editor.getRootElement()
+  const fields = [
+    host.querySelector('.embed-editing input[type="url"]'),
+    host.querySelector('.embed-editing input[type="text"]'),
+  ]
+  let leaked = 0
+  const check = event => { if ((event.ctrlKey || event.metaKey) && event.key === 'a') leaked++ }
+  outer.addEventListener('keydown', check)
+  try {
+    for (const [fieldIndex, modifier, replacement] of [
+      [0, 'ctrlKey', 'https://youtu.be/draft999'],
+      [1, 'ctrlKey', '准备取消的标题'],
+      [1, 'metaKey', '最终未保存标题'],
+    ]) {
+      const input = fields[fieldIndex]
+      expect(input).toBeTruthy()
+      const event = new KeyboardEvent('keydown', { key: 'a', [modifier]: true, bubbles: true, cancelable: true })
+      await act(async () => input.dispatchEvent(event))
+      expect(event.defaultPrevented).toBe(true)
+      expect(input.selectionStart).toBe(0)
+      expect(input.selectionEnd).toBe(input.value.length)
+      await field(input, replacement)
+      expect(input.value).toBe(replacement)
+    }
+    expect(leaked).toBe(0)
+    expect(snapshot()).toBe(saved)
+    expect(registry.capture().drafts.map(item => item.label)).toEqual(['嵌入内容'])
+    await click(button('取消'))
+    expect(snapshot()).toBe(saved)
+    expect(registry.hasPending()).toBe(false)
+    expect(nodeJSON('embed')).toMatchObject({ url: 'https://youtu.be/original123', title: '已应用标题' })
+  } finally {
+    outer.removeEventListener('keydown', check)
+  }
+})

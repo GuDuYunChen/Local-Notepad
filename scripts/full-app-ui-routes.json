@@ -3,8 +3,8 @@
   "scope": "installed-actual-app-page-matrix",
   "sourceScope": "control-source entry coverage with declared states; not every possible failure combination",
   "productSource": {
-    "commit": "457c9aa6d4c188fd56d496cca554080ca5ff1874",
-    "tree": "0e4b69262296f8fe504711b4a039e7a51c4b1418",
+    "commit": "7e2307d0201cd3cf146f52ab5e8489a8480ef5c4",
+    "tree": "8f4b87677006a33eb864a4f1e1abfdff3e6bfbff",
     "dirty": false
   },
   "inventory": {
@@ -1905,9 +1905,9 @@
     },
     {
       "file": "src/components/Editor/nodes/EmbedNode.jsx",
-      "bytes": 6160,
-      "sha256": "a78ca6903e505d90e7251e7fca32c5152f158a9b09458d162b8de10ca27b34db",
-      "blob": "c158a5f30e08d289d00548523095b9f6a1022be9",
+      "bytes": 6631,
+      "sha256": "41b984f7642169835ec2388b7ef7cfa67b98ae6b42a653c2d30c27cafa8fd6c0",
+      "blob": "9af21a1abfaab585e7f716d57bae684cfde41ef5",
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [
