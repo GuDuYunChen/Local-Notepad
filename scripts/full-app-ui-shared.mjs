@@ -852,8 +852,11 @@ export function createFullAppUiShared(ctx) {
       let afterCapture
       const filename = nameFor(meta, 'part-' + (++index))
       motion.image = filename
+      // The same observed renderer request must cover both native PNG boundaries.
+      // Keep its ticket in the enclosing snap scope, not only the callback.
+      let syncTicket = null
       const image = await capture(filename, async () => {
-        const syncTicket = syncReadiness ? await syncReadiness.wait() : null
+        syncTicket = syncReadiness ? await syncReadiness.wait() : null
         const fresh = await samplePage(route, root, targetAnchors, onlySelectors, sidebarFocusRequired)
         appendRaw(scene, { ...fresh, text: undefined, phase: 'before-capture', image: filename }); save()
         if (sidebarFocusRequired) validateCollapsedSidebarObservation(fresh.sidebarFocus, ctx.matrix)
