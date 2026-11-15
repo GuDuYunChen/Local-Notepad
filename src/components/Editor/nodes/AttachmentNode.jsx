@@ -149,6 +149,7 @@ function AttachmentComponent({ nodeKey, src, name, size, mime }) {
   const [previewLoading, setPreviewLoading] = useState(false)
   const [replacing, setReplacing] = useState(false)
   const replaceInputRef = useRef(null)
+  const attachmentElementRef = useRef(null)
   const uploadGenerationRef = useRef(0)
   const previewType = getAttachmentPreviewType(name, mime)
 
@@ -165,6 +166,39 @@ function AttachmentComponent({ nodeKey, src, name, size, mime }) {
       unregister()
     }
   }, [editor])
+
+  useEffect(() => {
+    // Lexical owns plain Tab for indentation when its editable root is focused.
+    // Match the embedded-block F6 escape: move from the real editor root to
+    // the first enabled attachment action, then keep native Tab/Shift+Tab
+    // traversal among the actual buttons outside Lexical's Tab handler.
+    const block = attachmentElementRef.current
+    const root = block?.closest('.editor-input[contenteditable="true"]')
+    if (!root) return undefined
+    const enter = event => {
+      if (event.defaultPrevented || event.key !== 'F6' || event.altKey ||
+          event.ctrlKey || event.metaKey || event.shiftKey || event.isComposing ||
+          event.target !== root || root.ownerDocument.activeElement !== root) return
+      const first = block.querySelector('.attachment-actions button:not(:disabled)')
+      if (!first || first !== root.querySelector('.attachment-actions button:not(:disabled)') ||
+          !first.isConnected) return
+      first.focus()
+      if (root.ownerDocument.activeElement !== first) return
+      event.preventDefault()
+      event.stopPropagation()
+    }
+    const preserveActionTab = event => {
+      if (event.key !== 'Tab' || event.defaultPrevented || event.isComposing) return
+      const buttons = block.querySelectorAll('.attachment-actions button')
+      if ([...buttons].includes(event.target)) event.stopPropagation()
+    }
+    root.addEventListener('keydown', enter, true)
+    block.addEventListener('keydown', preserveActionTab)
+    return () => {
+      root.removeEventListener('keydown', enter, true)
+      block.removeEventListener('keydown', preserveActionTab)
+    }
+  }, [])
 
   useEffect(() => {
     if (!previewOpen) return undefined
@@ -330,7 +364,7 @@ function AttachmentComponent({ nodeKey, src, name, size, mime }) {
 
   return (
     <>
-      <div className="attachment-block">
+      <div ref={attachmentElementRef} className="attachment-block" title="按 F6 从编辑正文进入附件操作">
         <div className="attachment-type" aria-hidden="true">{fileTypeLabel(name, mime)}</div>
 
         <div className="attachment-info">

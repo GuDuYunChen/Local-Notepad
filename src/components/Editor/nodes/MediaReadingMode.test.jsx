@@ -48,7 +48,7 @@ async function mount(kind, editable = true) {
       editorState: () => $getRoot().append(fixtures[kind]()),
       onError: (error) => {errors.push(error);}
     }}>
-      <RichTextPlugin contentEditable={<ContentEditable />} placeholder={null} ErrorBoundary={LexicalErrorBoundary} />
+      <RichTextPlugin contentEditable={<ContentEditable className="editor-input" />} placeholder={null} ErrorBoundary={LexicalErrorBoundary} />
       <CaptureEditor />
     </LexicalComposer>
   ));
@@ -281,6 +281,58 @@ describe('media nodes with the actual Lexical editable state', () => {
     await click(button('下载'));
     expect(downloads).toEqual([{ href: imageSrc, name: 'original.png' }]);
     expect(documentJSON()).toEqual(before);
+  });
+
+  it('attachment F6 entry and native Tab traversal reach preview without changing Lexical content', async () => {
+    await mount('attachment');
+    const editable = uiQuery(host, '.editor-input');
+    const replace = uiQuery(host, '.attachment-replace-button');
+    const preview = uiQuery(host, '.attachment-preview-button');
+    const download = uiQuery(host, '.attachment-download');
+    expect(editable?.getAttribute('contenteditable')).toBe('true');
+    expect([replace, preview, download].every(Boolean)).toBe(true);
+    expect([replace, preview, download].every(action => !action.disabled)).toBe(true);
+    const before = documentJSON();
+
+    await act(async () => editable.focus());
+    expect(document.activeElement).toBe(editable);
+    const f6 = new KeyboardEvent('keydown', { key: 'F6', bubbles: true, cancelable: true });
+    await act(async () => editable.dispatchEvent(f6));
+    expect(f6.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(replace);
+
+    // JSDOM has no browser Tab default action: prove these real buttons keep
+    // Tab/Shift+Tab from bubbling to Lexical without preventing the default.
+    const rootTabs = [];
+    const observeRootTab = event => { if (event.key === 'Tab') rootTabs.push(event.shiftKey); };
+    editable.addEventListener('keydown', observeRootTab);
+    for (const action of [replace, preview, download]) {
+      for (const shiftKey of [false, true]) {
+        const tab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true, shiftKey });
+        await act(async () => action.dispatchEvent(tab));
+        expect(tab.defaultPrevented).toBe(false);
+      }
+    }
+    expect(rootTabs).toEqual([]);
+
+    await act(async () => editable.focus());
+    for (const options of [
+      { shiftKey: true }, { altKey: true }, { ctrlKey: true },
+      { metaKey: true }, { isComposing: true }
+    ]) {
+      const rejected = new KeyboardEvent('keydown', { key: 'F6', bubbles: true, cancelable: true, ...options });
+      await act(async () => editable.dispatchEvent(rejected));
+      expect(rejected.defaultPrevented).toBe(false);
+      expect(document.activeElement).toBe(editable);
+    }
+    await act(async () => preview.focus());
+    const fromAction = new KeyboardEvent('keydown', { key: 'F6', bubbles: true, cancelable: true });
+    await act(async () => preview.dispatchEvent(fromAction));
+    expect(fromAction.defaultPrevented).toBe(false);
+    expect(document.activeElement).toBe(preview);
+    editable.removeEventListener('keydown', observeRootTab);
+    expect(documentJSON()).toEqual(before);
+    expect(errors).toEqual([]);
   });
 
   it('attachment preview and download stay usable while both delete entries are closed', async () => {
