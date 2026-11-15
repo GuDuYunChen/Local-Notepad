@@ -179,7 +179,7 @@ export default function ResourceManagerPlugin({ readOnly = false }) {
             />
             <div className="editor-resource-filters">
               {FILTERS.map(([value, label]) => (
-                <UiButton density="compact"
+                <UiButton density="compact" layout="content"
                   type="button"
                   key={value}
                   className={filter === value ? 'active' : ''}
