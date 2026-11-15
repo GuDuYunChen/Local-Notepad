@@ -10,6 +10,7 @@ import { $getRoot } from 'lexical';
 import { ImageNode, $createImageNode } from './ImageNode';
 import { ImageGridNode, $createImageGridNode } from './ImageGridNode';
 import { AttachmentNode, $createAttachmentNode } from './AttachmentNode';
+import { TodoNode, $createTodoNode } from './TodoNode';
 import { uploadFile } from '../utils/fileUpload';
 
 vi.mock('../utils/fileUpload', () => ({ uploadFile: vi.fn() }));
@@ -22,7 +23,8 @@ const gridItems = [
 const fixtures = {
   image: () => $createImageNode({ src: imageSrc, originalSrc: imageSrc, alt: 'original.png', caption: '图片原说明', width: 640 }),
   grid: () => $createImageGridNode({ items: gridItems, columns: 2, gap: 8 }),
-  attachment: () => $createAttachmentNode({ src: 'data:text/plain,original', name: 'original.txt', size: 8, mime: 'text/plain' })
+  attachment: () => $createAttachmentNode({ src: 'data:text/plain,original', name: 'original.txt', size: 8, mime: 'text/plain' }),
+  todo: () => $createTodoNode({ text: '原始待办正文', checked: false })
 };
 const selectors = {
   image: { block: '.editor-image-block', caption: '.editor-image-caption-input', remove: '.editor-image-toolbar .danger' },
@@ -44,7 +46,7 @@ async function mount(kind, editable = true) {
     <LexicalComposer initialConfig={{
       namespace: 'media-reading-mode',
       editable,
-      nodes: [ImageNode, ImageGridNode, AttachmentNode],
+      nodes: [ImageNode, ImageGridNode, AttachmentNode, TodoNode],
       editorState: () => $getRoot().append(fixtures[kind]()),
       onError: (error) => {errors.push(error);}
     }}>
@@ -352,5 +354,54 @@ describe('media nodes with the actual Lexical editable state', () => {
     await click(uiQuery(host, '.attachment-preview-header-actions button'));
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(documentJSON()).toEqual(before);
+  });
+  it('Todo F6 enters its checkbox and preserves native Tab flow to the text action', async () => {
+    await mount('todo');
+    const editable = uiQuery(host, '.editor-input');
+    const checkbox = uiQuery(host, '.todo-block input.todo-checkbox[type="checkbox"]');
+    const textAction = uiQuery(host, '.todo-block button.todo-text-button');
+    expect(editable?.getAttribute('contenteditable')).toBe('true');
+    expect(checkbox?.disabled).toBe(false);
+    expect(textAction?.disabled).toBe(false);
+    expect(checkbox.nextElementSibling).toBe(textAction);
+    const before = documentJSON();
+
+    await act(async () => editable.focus());
+    expect(document.activeElement).toBe(editable);
+    const enter = new KeyboardEvent('keydown', { key: 'F6', bubbles: true, cancelable: true });
+    await act(async () => editable.dispatchEvent(enter));
+    expect(enter.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(checkbox);
+
+    // JSDOM lacks native Tab focus movement. Assert no cancellation or
+    // propagation to the Lexical indentation handler on either action.
+    const rootTabs = [];
+    const observeRootTab = event => { if (event.key === 'Tab') rootTabs.push(event.shiftKey); };
+    editable.addEventListener('keydown', observeRootTab);
+    for (const action of [checkbox, textAction]) {
+      for (const shiftKey of [false, true]) {
+        const tab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true, shiftKey });
+        await act(async () => action.dispatchEvent(tab));
+        expect(tab.defaultPrevented).toBe(false);
+      }
+    }
+    expect(rootTabs).toEqual([]);
+    editable.removeEventListener('keydown', observeRootTab);
+
+    await act(async () => editable.focus());
+    for (const options of [{ shiftKey: true }, { altKey: true }, { ctrlKey: true },
+      { metaKey: true }, { isComposing: true }]) {
+      const rejected = new KeyboardEvent('keydown', { key: 'F6', bubbles: true, cancelable: true, ...options });
+      await act(async () => editable.dispatchEvent(rejected));
+      expect(rejected.defaultPrevented).toBe(false);
+      expect(document.activeElement).toBe(editable);
+    }
+    await act(async () => checkbox.focus());
+    const fromAction = new KeyboardEvent('keydown', { key: 'F6', bubbles: true, cancelable: true });
+    await act(async () => checkbox.dispatchEvent(fromAction));
+    expect(fromAction.defaultPrevented).toBe(false);
+    expect(document.activeElement).toBe(checkbox);
+    expect(documentJSON()).toEqual(before);
+    expect(errors).toEqual([]);
   });
 });
