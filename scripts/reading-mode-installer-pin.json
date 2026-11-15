@@ -1,5 +1,5 @@
 {
-  "product": "9ac6fbed85a12e00079a3d73c379c6f0c256185a",
+  "product": "4a19b2773cf224e27627c949a87bf4f3130a586d",
   "quickBlob": "c1e8f40862b770f82af47c26a455b57efc853700",
   "tagsBlob": "54bb56864e58e2aa3f5ed08aedb52a00de5f0769",
   "templateBlob": "42378f13f71a03c3e91cdfdcb6dec44dbbb05f33",
@@ -16,8 +16,8 @@
   "importEvidenceTestsBlob": "5a46ce6dad5fe757b1d2714e485242aa79959559",
   "current": {
     "version": "4.249.0",
-    "bytes": 115605666,
-    "sha256": "11b1b9e070b9d873cef80cd20fa6de22cecdce40a6ec6fe7a4596907eff841e2"
+    "bytes": 115607966,
+    "sha256": "4222ba21329e41792bc8b48c91cb6a9212d13600d8155fe6a06cf22ac185e40d"
   },
   "previous": {
     "version": "4.232.0",
@@ -31,14 +31,14 @@
     "productSourceCommit": "1a8e17ba775312c359f4ac23851c8c365b57a9cb"
   },
   "currentSource": {
-    "run": 43651895950,
-    "artifact": 14136644092,
-    "name": "local-notepad-windows-9ac6fbed85a12e00079a3d73c379c6f0c256185a",
-    "headSha": "56ea13ef4fa1387ed42457e7a2c016b67ae4c451",
+    "run": 43663772709,
+    "artifact": 14142221791,
+    "name": "local-notepad-windows-4a19b2773cf224e27627c949a87bf4f3130a586d",
+    "headSha": "4336b6eac925c68ba0638e1e90f94fd48d425668",
     "branch": "fix/local-ui-consistency-2f116",
     "repositoryId": 1105107817,
-    "archiveBytes": 115612695,
-    "archiveSha256": "c8ce8b12cc18c01c06f4ba61dc6e148ac6c3187c75fb4b595257d16cb8ffb2d8"
+    "archiveBytes": 115614936,
+    "archiveSha256": "2751a5b4571491e89a21daf1eca58e746a08614bf4e23df7c99109d760f37a40"
   },
   "readingDriverBlob": "6924b128c1125424c91f71dbd1ecc415762e2f77",
   "readingFixtureBlob": "0c7ffadbb187dd33a7bc6b5aa8c69427eec5cc34",
