@@ -300,3 +300,32 @@ test('the editor registry can explicitly discard both pending decorators during 
   expect(host.querySelector('input[type="url"]').value).toBe('https://youtu.be/original123')
   expect(host.querySelector('input[type="text"]').value).toBe('已应用标题')
 })
+
+test('formula Ctrl+A selects the draft instead of reaching the Lexical editor', async () => {
+  await mount(() => $createFormulaNode({ expression: 'E=mc^2', displayMode: true }))
+  const saved = snapshot()
+  await editFormula()
+  const fieldNode = host.querySelector('.formula-editor textarea')
+  const outer = editor.getRootElement()
+  expect(fieldNode.value).toBe('E=mc^2')
+  let leaked = 0
+  const check = event => { if (event.ctrlKey && event.key === 'a') leaked++ }
+  outer.addEventListener('keydown', check)
+  try {
+    const event = new KeyboardEvent('keydown', { key: 'a', ctrlKey: true, bubbles: true, cancelable: true })
+    await act(async () => fieldNode.dispatchEvent(event))
+    expect(event.defaultPrevented).toBe(true)
+    expect(leaked).toBe(0)
+    expect(fieldNode.selectionStart).toBe(0)
+    expect(fieldNode.selectionEnd).toBe(fieldNode.value.length)
+    await field(fieldNode, '\\\\sum_{i=1}^{n} i')
+    expect(fieldNode.value).toBe('\\\\sum_{i=1}^{n} i')
+    expect(snapshot()).toBe(saved)
+    expect(registry.capture().drafts.map(item => item.label)).toEqual(['公式'])
+    await click(button('取消'))
+    expect(snapshot()).toBe(saved)
+    expect(registry.hasPending()).toBe(false)
+  } finally {
+    outer.removeEventListener('keydown', check)
+  }
+})
