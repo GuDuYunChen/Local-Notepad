@@ -2226,9 +2226,9 @@
     },
     {
       "file": "src/components/Editor/plugins/ResourceManagerPlugin.jsx",
-      "bytes": 7770,
-      "sha256": "49dd45295a285c590d33f67cde5ee0690fbdb227564f84a91c5853bbd34d5d9e",
-      "blob": "770314d82096d6a6ebb2fcaf4aa7f73f770fdae5",
+      "bytes": 7787,
+      "sha256": "0bc726da04203c0450d46d478b388d3d4ae4c0ad6e03012bd9789f45187321a6",
+      "blob": "31f3150eaeae34bcf82dff9c4811f848bd777623",
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [
