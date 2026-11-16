@@ -139,6 +139,7 @@ export async function verifyOfflineSettingsPages(ctx) {
   assert.equal(before.settings.sync_enabled, false)
   assert.equal(before.clock, null, 'The new isolated matrix profile has no saved display preference')
   const evidence = { ...matrix, scope: fixture.scope, complete: false, selectedFiles: [], historyPages: [], pairViews: [], localComparison: null }
+  evidence.viewport = { ...evidence.viewport }
   ;(report.fullAppUi.offlineSettings ||= []).push(evidence); save()
   const choose = async (selector, file) => { const receipt = await shared.chooseFile(selector, file); evidence.selectedFiles.push({ selector, file: { ...file }, trusted: receipt.events.some(event => event.type === 'change' && event.trusted) }); save() }
 
@@ -379,4 +380,7 @@ export async function verifyOfflineSettingsPages(ctx) {
   assert.deepEqual(await readHistory(), before.history, 'Offline files changed live conflict history')
   assert.equal(await evaluate(`localStorage.getItem(${q(SYNC_CLOCK_PREFERENCE_KEY)})`), before.clock, 'Time-display observations wrote a preference')
   evidence.complete = true; evidence.settingsUnchanged = true; evidence.liveHistoryUnchanged = true; evidence.clockPreferenceUnchanged = true; save()
+  ctx.evidenceStore?.sealStableJSON?.('fullAppUi.offlineSettings', evidence, {
+    protectedObjects: [ctx, matrix, matrix.viewport, setup, fixture, fixture.files, ...Object.values(fixture.files), report, report.fullAppUi],
+  })
 }

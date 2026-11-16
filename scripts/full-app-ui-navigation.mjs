@@ -79,36 +79,187 @@ export async function prepareNavigation({ api, evaluate }) {
     ] }, noteIDs: notes.map(file => file.id) }
 }
 
-export async function ensureNavigationSidebar({ evaluate, click, until }, expanded) {
-  const selector = '.workspace-sidebar [aria-label=' + q(expanded ? '展开侧边栏' : '折叠侧边栏') + ']'
-  if (await evaluate(`Boolean(document.querySelector(${q(selector)}))`)) await click(selector)
-  await until(() => evaluate(`document.querySelector('.workspace-sidebar')?.classList.contains('collapsed')===${!expanded}`), 'Actual sidebar did not change expansion state')
-  if (!expanded) return
+// A short-lived read-only observer retains class transitions that can finish
+// before the first CDP poll. It never changes application state or sends input.
+function navigationSidebarObservation(key, action) {
+  if (action === 'start') {
+    if (Object.hasOwn(document, key)) throw Error('Existing sidebar observation')
+    const owner = document.querySelector('.workspace-sidebar')
+    const state = { owner, entryCollapsed: Boolean(owner?.classList.contains('collapsed')),
+      lastCollapsed: Boolean(owner?.classList.contains('collapsed')), transitions: [], overflow: false,
+      mutationCollapseAfterExpansion: false, initialAttempted: false, initialDispatchComplete: false,
+      initialTrustedClicks: 0, correctiveTrustedClicks: 0, correctiveDispatchComplete: false, phase: null, armedButton: null,
+      observerSupported: typeof MutationObserver === 'function' && typeof owner?.addEventListener === 'function' && typeof owner?.removeEventListener === 'function' }
+    document[key] = state
+    state.note = (collapsed, source) => {
+      if (collapsed !== state.lastCollapsed) {
+        if (state.transitions.length < 8) state.transitions.push({ from: state.lastCollapsed, to: collapsed, source })
+        else state.overflow = true
+        if (!state.lastCollapsed && collapsed && source === 'mutation') state.mutationCollapseAfterExpansion = true
+      }
+      state.lastCollapsed = collapsed
+    }
+    state.consume = records => {
+      // oldValue preserves the expanded intermediate state even if both class
+      // changes arrive in one callback whose final DOM is already collapsed.
+      for (const record of records) {
+        if (record.target !== owner) { state.foreignOwner = true; continue }
+        state.note(String(record.oldValue ?? '').split(/\s+/).includes('collapsed'), 'mutation')
+      }
+      state.note(Boolean(owner?.classList.contains('collapsed')), 'mutation')
+    }
+    if (state.observerSupported) {
+      state.observer = new MutationObserver(state.consume)
+      state.observer.observe(owner, { attributes: true, attributeFilter: ['class'], attributeOldValue: true })
+      state.listener = event => {
+        const button = state.armedButton
+        if (!state.phase || !button || !event.isTrusted || !(event.target === button || button.contains?.(event.target))) return
+        if (state.phase === 'initial') {
+          // Neither a pre-arm transition nor one during CDP target lookup can
+          // authorize replay of this activation. Begin proof at its real event.
+          try {
+            const pending = state.observer.takeRecords()
+            if (pending.length) state.consume(pending)
+            state.mutationCollapseAfterExpansion = false
+            state.initialTrustedClicks++
+          } catch (error) { state.listenerError = error }
+        }
+        else if (state.phase === 'corrective') state.correctiveTrustedClicks++
+      }
+      owner.addEventListener('click', state.listener, true)
+    }
+  }
+  const state = document[key]
+  if (!state) throw Error('Missing sidebar observation')
+  const snapshot = () => {
+    const sidebar = document.querySelector('.workspace-sidebar'), sameOwner = Boolean(sidebar && sidebar === state.owner)
+    const library = sameOwner ? sidebar.querySelector('.file-list') : null
+    const expand = sameOwner ? sidebar.querySelector('button[aria-label="展开侧边栏"]') : null
+    const bounds = expand?.getBoundingClientRect()
+    return { present: Boolean(sidebar), sameOwner, collapsed: Boolean(sidebar?.classList.contains('collapsed')), narrow: innerWidth <= 720,
+      library: Boolean(library), tree: Boolean(library?.querySelector('.tree-list')), loading: Boolean(library?.querySelector(':scope > .placeholder')),
+      expandVisible: Boolean(expand && !expand.disabled && bounds && bounds.width > 0 && bounds.height > 0),
+      observerSupported: state.observerSupported, entryCollapsed: state.entryCollapsed,
+      mutationCollapseAfterExpansion: state.mutationCollapseAfterExpansion,
+      initialAttempted: state.initialAttempted, initialDispatchComplete: state.initialDispatchComplete,
+      initialTrustedClicks: state.initialTrustedClicks, correctiveTrustedClicks: state.correctiveTrustedClicks,
+      correctiveDispatchComplete: state.correctiveDispatchComplete,
+      transitions: state.transitions.slice(), overflow: state.overflow }
+  }
+  if (action === 'dispose') {
+    const failures = []
+    try { const pending = state.observer?.takeRecords(); if (pending?.length) state.consume(pending) } catch (error) { failures.push(error) }
+    try { state.observer?.disconnect() } catch (error) { failures.push(error) }
+    try { if (state.listener) state.owner.removeEventListener('click', state.listener, true) } catch (error) { failures.push(error) }
+    let result
+    try {
+      result = snapshot()
+      if (!result.sameOwner || state.foreignOwner) throw Error('Actual sidebar observation owner changed')
+      if (result.overflow) throw Error('Actual sidebar transition observation overflow')
+      if (state.listenerError) throw state.listenerError
+    } catch (error) { failures.push(error) }
+    delete document[key]
+    // Return the bounded final observation before the caller rejects cleanup;
+    // otherwise a final owner/overflow error would discard its own evidence.
+    return { ...result, disposalErrors: failures.map(error => ({ name: String(error.name).slice(0, 100), message: String(error.message).slice(0, 1000) })) }
+  }
+  const pending = state.observer?.takeRecords()
+  if (pending?.length) state.consume(pending)
+  if (document.querySelector('.workspace-sidebar') !== state.owner || !state.owner || state.foreignOwner) throw Error('Actual sidebar observation owner changed')
+  state.note(state.owner.classList.contains('collapsed'), 'poll')
+  if (state.overflow) throw Error('Actual sidebar transition observation overflow')
+  if (state.listenerError) throw state.listenerError
+  if (action === 'initial-start' || action === 'corrective-start') {
+    state.phase = action === 'initial-start' ? 'initial' : 'corrective'
+    state.armedButton = state.owner.querySelector('button[aria-label="展开侧边栏"]')
+    if (!state.armedButton || state.armedButton.disabled) throw Error('Actual sidebar expansion button changed')
+    if (state.phase === 'initial') { state.initialAttempted = true; state.mutationCollapseAfterExpansion = false }
+  } else if (action === 'initial-finish' || action === 'corrective-finish') {
+    if (action === 'initial-finish') state.initialDispatchComplete = true
+    else state.correctiveDispatchComplete = true
+    state.phase = null; state.armedButton = null
+  }
+  return snapshot()
+}
 
-  const observe = () => evaluate(`(() => {
-    const sidebar=document.querySelector('.workspace-sidebar'), library=sidebar?.querySelector('.file-list');
-    const expand=sidebar?.querySelector('button[aria-label="展开侧边栏"]'), bounds=expand?.getBoundingClientRect();
-    return {present:Boolean(sidebar),collapsed:Boolean(sidebar?.classList.contains('collapsed')),narrow:innerWidth<=720,
-      library:Boolean(library),tree:Boolean(library?.querySelector('.tree-list')),loading:Boolean(library?.querySelector(':scope > .placeholder')),
-      expandVisible:Boolean(bounds&&bounds.width>0&&bounds.height>0)};
-  })()`)
+export async function ensureNavigationSidebar(ctx, expanded) {
+  const { evaluate, click, until } = ctx
+  const selector = '.workspace-sidebar [aria-label=' + q(expanded ? '展开侧边栏' : '折叠侧边栏') + ']'
+  if (!expanded) {
+    if (await evaluate(`Boolean(document.querySelector(${q(selector)}))`)) await click(selector)
+    await until(() => evaluate("document.querySelector('.workspace-sidebar')?.classList.contains('collapsed')===true"), 'Actual sidebar did not change expansion state')
+    return
+  }
+  const key = '__fullAppUiSidebarObservation_' + randomUUID()
+  let observation, failure, correctiveExpansionRequested = false, earlyCorrectionRequested = false, earlyCorrectionUsed = false
+  const observe = async (action = 'read') => {
+    observation = await evaluate(`(${navigationSidebarObservation.toString()})(${q(key)},${q(action)})`)
+    if (action === 'dispose' && observation.disposalErrors.length) {
+      const errors = observation.disposalErrors.map(detail => Object.assign(new Error(detail.message), { name: detail.name }))
+      if (errors.length === 1) throw errors[0]
+      throw new AggregateError(errors, 'Sidebar observation disposal failed: ' + errors.map(error => error.message).join('; '))
+    }
+    return observation
+  }
+  const correct = async early => {
+    correctiveExpansionRequested = true // Consume before dispatch; never replay an uncertain click.
+    earlyCorrectionRequested = early
+    await observe('corrective-start')
+    await click(selector)
+    const state = await observe('corrective-finish')
+    if (state.observerSupported) assert.equal(state.correctiveTrustedClicks, 1, 'Actual trusted corrective sidebar click not observed exactly once')
+    earlyCorrectionUsed = early
+  }
+  const canCorrect = state => !correctiveExpansionRequested && state.sameOwner && state.narrow && state.collapsed && state.expandVisible
   const ready = state => state.present && !state.collapsed && state.library && state.tree && !state.loading
-  let correctiveExpansionRequested = false
-  await until(async () => {
-    let state = await observe()
-    if (ready(state)) {
-      await evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(true))))')
-      state = await observe()
-      if (ready(state)) return true
+  try {
+    await observe('start')
+    if (await evaluate(`Boolean(document.querySelector(${q(selector)}))`)) {
+      await observe('initial-start'); await click(selector); await observe('initial-finish')
     }
-    // The first expansion was observed above. FileList's initial real selection
-    // can fold the narrow sidebar again; correct only that observed transition.
-    if (!correctiveExpansionRequested && state.narrow && state.collapsed && state.expandVisible) {
-      correctiveExpansionRequested = true
-      await click(selector)
+    await until(async () => {
+      const state = await observe()
+      if (!state.collapsed) return true
+      const trustedInitial = state.initialAttempted
+        ? state.initialDispatchComplete && state.initialTrustedClicks === 1
+        : state.entryCollapsed === false
+      if (canCorrect(state) && state.observerSupported && state.mutationCollapseAfterExpansion && trustedInitial) await correct(true)
+      return false
+    }, 'Actual sidebar did not change expansion state')
+    await until(async () => {
+      let state = await observe()
+      if (ready(state)) {
+        await evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(true))))')
+        state = await observe()
+        if (ready(state)) return true
+      }
+      // Preserve the original sampled expanded-then-collapsed path. Older
+      // contexts without observer APIs cannot take the new pre-poll path.
+      if (canCorrect(state)) await correct(false)
+      return false
+    }, 'Actual navigation surface missing: .file-list')
+  } catch (error) { failure = error }
+  finally {
+    try {
+      await observe('dispose')
+      if (!failure && !ready(observation)) throw Error('Actual navigation surface missing: .file-list')
+    } catch (error) { failure = failure ? new AggregateError([failure, error], 'Sidebar operation and observation disposal failed: ' + failure.message + '; ' + error.message) : error }
+  }
+  const receipt = { schemaVersion: 1, matrix: ctx.matrix, complete: !failure,
+    earlyCorrectionRequested, earlyCorrectionUsed, correctiveExpansionRequested, observation,
+    ...(failure ? { error: { name: failure.name, message: String(failure.message).slice(0, 2000) } } : {}) }
+  if (ctx.report?.fullAppUi) {
+    // Two constant-size slots, never a growing call/poll history in the body.
+    if (failure) {
+      ctx.report.fullAppUi.navigationSidebarFailure = receipt
+      try { ctx.save() }
+      catch (error) { failure = new AggregateError([failure, error], 'Sidebar failure and diagnostic save failed: ' + failure.message) }
     }
-    return false
-  }, 'Actual navigation surface missing: .file-list')
+    else if (earlyCorrectionUsed && !ctx.report.fullAppUi.navigationSidebarEarlyCorrection) {
+      ctx.report.fullAppUi.navigationSidebarEarlyCorrection = receipt; ctx.save()
+    }
+  }
+  if (failure) throw failure
 }
 
 // Read existing App state only. The title and body jointly identify an owned

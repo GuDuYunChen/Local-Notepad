@@ -15,16 +15,36 @@ const own = (value, key) => Object.prototype.hasOwnProperty.call(value, key)
 const nativeJSONStringify = JSON.stringify
 const nativeJSONStringifyEligible = typeof nativeJSONStringify === 'function' && !stableJSONTypes.isProxy(nativeJSONStringify) &&
   Function.prototype.toString.call(nativeJSONStringify) === 'function stringify() { [native code] }'
+const nativeJSONParse = !stableJSONTypes.isProxy(JSON) ? Object.getOwnPropertyDescriptor(JSON, 'parse')?.value : undefined
+const nativeJSONParseEligible = typeof nativeJSONParse === 'function' && !stableJSONTypes.isProxy(nativeJSONParse) &&
+  Function.prototype.toString.call(nativeJSONParse) === 'function parse() { [native code] }'
+const applyJSON = !stableJSONTypes.isProxy(Reflect) ? Object.getOwnPropertyDescriptor(Reflect, 'apply')?.value : undefined
+const nativeJSONApplyEligible = typeof applyJSON === 'function' && !stableJSONTypes.isProxy(applyJSON) &&
+  Function.prototype.toString.call(applyJSON) === 'function apply() { [native code] }' &&
+  Object.getOwnPropertyDescriptor(applyJSON, 'length')?.value === 3
 const sha = bytes => createHash('sha256').update(bytes).digest('hex')
-const json = value => JSON.parse(JSON.stringify(value))
+const json = (value, observeProtocol, parsedSnapshot) => {
+  // A caller-controlled application helper was never part of the original
+  // expression. Leave that expression intact when native invocation is unproven.
+  if (!observeProtocol || !nativeJSONApplyEligible) return JSON.parse(JSON.stringify(value))
+  // Match the original call evaluation: parse is captured before stringify,
+  // and each call retains its own receiver even if a getter changes global JSON.
+  const parseReceiver = JSON, parse = parseReceiver.parse
+  const stringifyReceiver = JSON, stringify = stringifyReceiver.stringify
+  observeProtocol(parse, stringify)
+  const text = applyJSON(stringify, stringifyReceiver, [value])
+  const parsed = applyJSON(parse, parseReceiver, [text])
+  parsedSnapshot?.(parsed, text, parse, stringify)
+  return parsed
+}
 const encode = value => Buffer.from(JSON.stringify(value) + '\n', 'utf8')
 const same = (a, b, message) => assert.deepEqual(a, b, message)
-const identity = (scene, index) => json({ index, group: scene.group, routeId: scene.routeId,
-  stateId: scene.stateId, theme: scene.theme, viewport: scene.viewport })
-const binding = report => json({ productCommit: report.productCommit, productTree: report.productTree,
+const identity = (scene, index, observeProtocol) => json({ index, group: scene.group, routeId: scene.routeId,
+  stateId: scene.stateId, theme: scene.theme, viewport: scene.viewport }, observeProtocol)
+const binding = (report, observeProtocol) => json({ productCommit: report.productCommit, productTree: report.productTree,
   verifierCommit: report.verifierCommit, group: report.group, runner: report.runner,
-  sourceFiles: report.sourceFiles, startedAt: report.startedAt })
-const samplePosition = sample => json({ phase: sample.phase, image: sample.image })
+  sourceFiles: report.sourceFiles, startedAt: report.startedAt }, observeProtocol)
+const samplePosition = (sample, observeProtocol) => json({ phase: sample.phase, image: sample.image }, observeProtocol)
 const plain = value => value !== null && typeof value === 'object' && !Array.isArray(value)
 function freeze(value) {
   if (value && typeof value === 'object' && !Object.isFrozen(value)) {
@@ -259,7 +279,7 @@ export function createFullAppEvidenceWriter(filename, report, options) {
   const directoryPath = path.join(root, directory)
   mkdirSync(directoryPath) // Exclusive owned namespace; never mix previous runs.
   const stableJSON = createFullAppStableJSONEncoder(report)
-  const storeID = randomUUID(), bound = binding(report)
+  const storeID = randomUUID(), bound = binding(report, stableJSON.observeJSON)
   stableJSON.privateProtocolSafe()
   const owner = sha(encode({ storeID, binding: bound }))
   stableJSON.cachePrivateDescriptor(bound)
@@ -291,30 +311,31 @@ export function createFullAppEvidenceWriter(filename, report, options) {
     if (!entry) {
       assert.equal(index, entries.length, 'Evidence scenes must retain their original order')
       assert.ok(plain(scene) && Array.isArray(scene.rawSamples))
-      entry = { scene, index, identity: identity(scene, index), raw: [], objects: [], sealed: null }
+      entry = { scene, index, identity: identity(scene, index, stableJSON.observeJSON), raw: [], objects: [], sealed: null }
       entries.push(entry); byScene.set(scene, entry)
     }
-    assert.equal(entry.index, index); same(identity(scene, index), entry.identity, 'Evidence scene identity changed')
+    assert.equal(entry.index, index); same(identity(scene, index, stableJSON.observeJSON), entry.identity, 'Evidence scene identity changed')
     if (entry.sealed) return entry
     assert.ok(Array.isArray(scene.rawSamples) && scene.rawSamples.length >= entry.raw.length, 'Evidence raw sample prefix was removed')
     for (let i = 0; i < entry.raw.length; i++) assert.equal(scene.rawSamples[i], entry.objects[i], 'Evidence raw sample prefix was replaced or reordered')
     for (let i = entry.raw.length; i < scene.rawSamples.length; i++) {
       // JSON-domain snapshot owns its nested values; mutable page/aggregate
       // objects cannot later alter an already acknowledged observation.
-      const sample = freeze(json(scene.rawSamples[i])), position = samplePosition(sample)
+      const sample = freeze(json(scene.rawSamples[i], stableJSON.observeJSON)), position = samplePosition(sample, stableJSON.observeJSON)
       const ref = writePart('raw', rawContext(entry, i, position), sample)
       ref.position = position
       scene.rawSamples[i] = sample; entry.objects.push(sample); entry.raw.push(ref)
     }
     return entry
   }
-  function activeSlot(entry) {
-    const metadata = json(without(entry.scene, ['rawSamples']))
+  function activeSlot(entry, activeMetadata) {
+    const metadata = json(without(entry.scene, ['rawSamples']), stableJSON.observeJSON,
+      activeMetadata ? (value, text, parse, stringify) => stableJSON.trustActiveMetadata(activeMetadata, value, text, parse, stringify) : undefined)
     return { index: entry.index, identity: entry.identity, state: 'active', rawCount: entry.raw.length, keys: [...Object.keys(metadata), 'rawSamples'],
       value: { metadata, rawSamples: entry.raw } }
   }
-  function prepare() {
-    same(binding(report), bound, 'Evidence report changed its source/run binding')
+  function prepare(activeMetadata) {
+    same(binding(report, stableJSON.observeJSON), bound, 'Evidence report changed its source/run binding')
     const body = without(report, ['fullAppUi'])
     let scenes = [], scenesPresent = false, events = null
     if (own(report, 'fullAppUi')) {
@@ -327,7 +348,7 @@ export function createFullAppEvidenceWriter(filename, report, options) {
           scenes = ui.scenes.map((scene, index) => {
             if (entries[index]) assert.equal(scene, entries[index].scene, 'Evidence scene was removed or reordered')
             const entry = entryFor(scene, index)
-            return entry.sealed || activeSlot(entry)
+            return entry.sealed || activeSlot(entry, activeMetadata)
           })
         } else assert.equal(entries.length, 0)
         if (own(ui, 'events')) {
@@ -346,7 +367,8 @@ export function createFullAppEvidenceWriter(filename, report, options) {
   }
   function save() {
     stableJSON.privateProtocolSafe()
-    const publication = stableJSON.prepareManifest(prepare(), stableParts), bytes = publication.bytes
+    const activeMetadata = new WeakSet()
+    const publication = stableJSON.prepareManifest(prepare(activeMetadata), stableParts, activeMetadata), bytes = publication.bytes
     if (checkpoint === 0) writeFileSync(filename, bytes, { flag: 'wx' })
     else {
       // A failed write leaves the previous whole manifest. Unreferenced parts
@@ -404,7 +426,7 @@ export function createFullAppEvidenceWriter(filename, report, options) {
 
 // Explicitly published immutable receipts may reuse their original compact JSON.
 // Every checkpoint and the final full native encoding/hash check remain intact.
-const STABLE_JSON_COLLECTIONS = ['screenshots', 'fullAppUi.focus', 'fullAppUi.popups', 'fullAppUi.optionPointerPreparations']
+const STABLE_JSON_COLLECTIONS = ['screenshots', 'fullAppUi.focus', 'fullAppUi.popups', 'fullAppUi.optionPointerPreparations', 'fullAppUi.offlineSettings']
 const stableJSONAt = (root, route) => route.split('.').reduce((value, key) => value?.[key], root)
 
 // No getter or toJSON is invoked. Return the exact original object graph, not a
@@ -421,15 +443,14 @@ function stableJSONNodes(value, active = new Set(), seen = new Set(), result = [
     // Only dense own enumerable data indices. Native Get for holes, inherited
     // indices, hidden indices or extra properties is left to original stringify.
     if (keys.length !== value.length || ownKeys.length !== value.length + 1) return null
-    for (let index = 0; index < value.length; index++) {
-      const descriptor = Object.getOwnPropertyDescriptor(value, String(index))
-      if (!descriptor || !descriptor.enumerable || !('value' in descriptor)) return null
-    }
   } else if (ownKeys.length !== keys.length) return null
   active.add(value)
-  for (const key of keys) {
+  for (let index = 0; index < keys.length; index++) {
+    const key = keys[index]
+    if (array && key !== String(index)) return null
     const descriptor = Object.getOwnPropertyDescriptor(value, key)
-    if (!descriptor || !('value' in descriptor) || !stableJSONNodes(descriptor.value, active, seen, result, trusted)) return null
+    if (!descriptor || array && !descriptor.enumerable || !('value' in descriptor) ||
+        !stableJSONNodes(descriptor.value, active, seen, result, trusted)) return null
   }
   active.delete(value); seen.add(value); result.push(value)
   return result
@@ -437,18 +458,48 @@ function stableJSONNodes(value, active = new Set(), seen = new Set(), result = [
 
 function createFullAppStableJSONEncoder(report) {
   const sealed = new WeakMap()
-  let privateDescriptors = new WeakMap(), privateSafe = nativeJSONStringifyEligible
+  let privateDescriptors = new WeakMap(), privateSafe = nativeJSONStringifyEligible && nativeJSONParseEligible && nativeJSONApplyEligible
+  let screenshotAggregate = null, scenePrefix = null
   let published = new WeakMap(), lastPublishedManifest = null, publicationEligible = false
   const bytes = value => Buffer.from(value, 'utf8')
   const marks = Object.fromEntries(['{', '}', '[', ']', ',', '\n'].map(value => [value, bytes(value)]))
   const metrics = { sealedObjects: 0, sealedGraphNodes: 0, cachedHits: 0, ordinaryEncodes: 0, arrayFallbacks: 0,
-    privateDescriptorEncodes: 0, privateDescriptorHits: 0, eligibleArrayReuses: 0 }
-  const disablePrivate = () => { privateSafe = false; privateDescriptors = new WeakMap() }
+    privateDescriptorEncodes: 0, privateDescriptorHits: 0, eligibleArrayReuses: 0,
+    aggregateArrayEncodes: 0, aggregateArrayHits: 0, scenePrefixEncodes: 0, scenePrefixHits: 0,
+    offlineSettingsCachedHits: 0, activeMetadataCandidates: 0, activeMetadataTrusted: 0, activeMetadataQualificationHits: 0 }
+  const disablePrivate = () => { privateSafe = false; privateDescriptors = new WeakMap(); screenshotAggregate = scenePrefix = null }
   const privateProtocolSafe = () => {
-    // Native hooks or an observing stringify wrapper can retain private objects.
+    // Native hooks or observing parse/stringify wrappers can retain private objects.
     // Removing the hook later cannot prove those references did not escape.
-    if (privateSafe && (JSON.stringify !== nativeJSONStringify || 'toJSON' in Object.prototype || 'toJSON' in Array.prototype)) disablePrivate()
+    // Inspecting a parse descriptor does not invoke an accessor an extra time.
+    if (privateSafe && (stableJSONTypes.isProxy(JSON) || JSON.stringify !== nativeJSONStringify ||
+        Object.getOwnPropertyDescriptor(JSON, 'parse')?.value !== nativeJSONParse ||
+        'toJSON' in Object.prototype || 'toJSON' in Array.prototype)) disablePrivate()
     return privateSafe
+  }
+  // New aggregate proofs must not add member-getter calls to the old protocol
+  // checks. An accessor returning native stringify keeps its original path.
+  const aggregateProtocolSafe = () => privateSafe && !stableJSONTypes.isProxy(JSON) &&
+    Object.getOwnPropertyDescriptor(JSON, 'stringify')?.value === nativeJSONStringify &&
+    Object.getOwnPropertyDescriptor(JSON, 'parse')?.value === nativeJSONParse &&
+    !('toJSON' in Object.prototype) && !('toJSON' in Array.prototype)
+  const observeJSON = (parse, stringify) => {
+    // Observe the actual callees too: a getter may install a wrapper which
+    // removes itself before the subsequent protocol check can see it.
+    if (privateSafe && (parse !== nativeJSONParse || stringify !== nativeJSONStringify)) disablePrivate()
+  }
+  const trustActiveMetadata = (frame, value, text, parse, stringify) => {
+    metrics.activeMetadataCandidates++
+    // The two original calls already completed. Native parse with no reviver
+    // owns a fresh JSON graph; this root proof also excludes another realm.
+    if (!aggregateProtocolSafe() || parse !== nativeJSONParse || stringify !== nativeJSONStringify ||
+        !value || typeof value !== 'object' || Array.isArray(value) || Object.getPrototypeOf(value) !== Object.prototype ||
+        typeof text !== 'string' || text.includes('toJSON') || text.includes('\\u')) return
+    // Rejecting either substring is intentionally conservative: even escaped
+    // property spellings cannot hide a toJSON key. Opt-out keeps the old walk.
+    // The text is never reused as bytes: proxy integer order and rawJSON still
+    // receive the original later stringify of the parsed active slot.
+    frame.add(value); metrics.activeMetadataTrusted++
   }
   privateProtocolSafe()
   const privateFragment = value => {
@@ -467,11 +518,12 @@ function createFullAppStableJSONEncoder(report) {
     Object.keys(value).every(key => 'value' in Object.getOwnPropertyDescriptor(value, key))
   return {
     statistics: () => ({ ...metrics, privateCacheDisabled: !privateSafe }),
-    privateProtocolSafe, cachePrivateDescriptor,
+    privateProtocolSafe, cachePrivateDescriptor, observeJSON, trustActiveMetadata,
     sealStableJSON(collection, value, { protectedObjects = [] } = {}) {
       assert.ok(Array.isArray(protectedObjects), 'Stable JSON protected owners must be an Array')
       assert.ok(STABLE_JSON_COLLECTIONS.includes(collection), 'Unregistered producer collection')
       assert.ok(value && typeof value === 'object', 'Explicit sealed receipt must be an object')
+      if (collection === 'fullAppUi.offlineSettings' && !aggregateProtocolSafe()) return false
       assert.ok(lastPublishedManifest && stableJSONAt(report, collection)?.includes(value), 'Sealed value is not the original published collection object')
       const nodes = stableJSONNodes(value)
       if (!nodes) return false // Still writable/fully encoded: unsupported shapes are never guessed immutable.
@@ -490,10 +542,15 @@ function createFullAppStableJSONEncoder(report) {
       sealed.set(value, encoded); metrics.sealedObjects++; metrics.sealedGraphNodes += nodes.length
       return true
     },
-    prepareManifest(manifest, stableParts = null) {
+    prepareManifest(manifest, stableParts = null, activeMetadata = null) {
       const nextPublished = new WeakMap(), chunks = []
+      let nextScreenshotAggregate = null, nextScenePrefix = null
       privateProtocolSafe()
-      const trusted = { has: value => sealed.has(value) || privateSafe && privateDescriptors.has(value) }
+      const trusted = { has: value => {
+        if (sealed.has(value) || privateSafe && privateDescriptors.has(value)) return true
+        if (activeMetadata?.has(value) && aggregateProtocolSafe()) { metrics.activeMetadataQualificationHits++; return true }
+        return false
+      } }
       const eligibleNodes = ordinary(manifest) && !('toJSON' in Object.prototype) && !('toJSON' in Array.prototype)
         ? stableJSONNodes(manifest, new Set(), new Set(), [], trusted) : null
       // A changed global JSON protocol must not be hidden by cached inert data.
@@ -508,6 +565,14 @@ function createFullAppStableJSONEncoder(report) {
       // This proof belongs to this synchronous encoding only. Mutable arrays
       // and values are checked again at every save, including order/shape.
       const eligible = new Set(eligibleNodes)
+      const joined = fragments => {
+        const parts = []
+        for (let index = 0; index < fragments.length; index++) {
+          if (index) parts.push(marks[','])
+          parts.push(fragments[index])
+        }
+        return Buffer.concat(parts)
+      }
       function arrayFragments(value, collection) {
         const reuse = Array.isArray(value) && privateProtocolSafe() && eligible.has(value)
         if (reuse) metrics.eligibleArrayReuses++
@@ -517,34 +582,68 @@ function createFullAppStableJSONEncoder(report) {
           if (keys.length !== value.length || Reflect.ownKeys(value).length !== value.length + 1 ||
               keys.some(key => !/^(0|[1-9][0-9]*)$/.test(key) || Number(key) >= value.length)) return null
         }
-        const encoded = []
+        const encoded = [], items = []
+        let aggregate = collection === 'screenshots' && reuse && value.length > 0 && aggregateProtocolSafe()
+        let unchanged = aggregate && screenshotAggregate?.array === value && screenshotAggregate.items.length === value.length
         for (let index = 0; index < value.length; index++) {
           const descriptor = reuse ? null : Object.getOwnPropertyDescriptor(value, String(index))
           if (!reuse && (!descriptor || !descriptor.enumerable || !('value' in descriptor))) return null
           const item = reuse ? value[index] : descriptor.value
           const cached = item && typeof item === 'object' ? sealed.get(item) : undefined
           let fragment = cached
-          if (fragment) metrics.cachedHits++
+          if (fragment) {
+            metrics.cachedHits++
+            if (collection === 'fullAppUi.offlineSettings') metrics.offlineSettingsCachedHits++
+          }
           else {
             if (!reuse && !stableJSONNodes(item)) return null
             fragment = bytes(JSON.stringify(item) ?? 'null'); metrics.ordinaryEncodes++
           }
           if (item && typeof item === 'object') nextPublished.set(item, fragment)
+          if (aggregate) {
+            if (!cached) aggregate = false
+            else { items.push(item); unchanged &&= screenshotAggregate.items[index] === item }
+          }
           encoded.push(projection && cached && STABLE_RECEIPT_COLLECTIONS.includes(collection)
             ? projection.fragment(collection, index, item, fragment) : fragment)
+        }
+        if (aggregate && aggregateProtocolSafe()) {
+          if (unchanged) { nextScreenshotAggregate = screenshotAggregate; metrics.aggregateArrayHits++ }
+          else {
+            nextScreenshotAggregate = { array: value, items, bytes: Buffer.concat([marks['['], joined(encoded), marks[']']]) }
+            metrics.aggregateArrayEncodes++
+          }
+          return nextScreenshotAggregate.bytes
         }
         return encoded
       }
       function sceneFragments(value) {
         if (!privateProtocolSafe() || !eligible.has(value)) return null
-        return value.map(item => privateFragment(item) || bytes(JSON.stringify(item) ?? 'null'))
+        if (!aggregateProtocolSafe()) return value.map(item => privateFragment(item) || bytes(JSON.stringify(item) ?? 'null'))
+        const prefix = [], items = [], tail = []
+        let leading = true, unchanged = Boolean(scenePrefix)
+        for (const item of value) {
+          // Keep the original per-item dynamic guard and encoding order. Only
+          // already private, sealed leading descriptors can be concatenated.
+          const cached = privateFragment(item), fragment = cached || bytes(JSON.stringify(item) ?? 'null')
+          if (leading && cached && item.state === 'sealed') {
+            unchanged &&= scenePrefix.items[items.length] === item
+            items.push(item); prefix.push(fragment)
+          } else { leading = false; tail.push(fragment) }
+        }
+        if (!items.length || !aggregateProtocolSafe()) return [...prefix, ...tail]
+        if (unchanged && scenePrefix.items.length === items.length) { nextScenePrefix = scenePrefix; metrics.scenePrefixHits++ }
+        else { nextScenePrefix = { items, bytes: joined(prefix) }; metrics.scenePrefixEncodes++ }
+        return [nextScenePrefix.bytes, ...tail]
       }
       function object(value, currentPath) {
         chunks.push(marks['{']); let count = 0
         for (const key of Object.keys(value)) {
           const route = currentPath ? currentPath + '.' + key : key
           const item = route === 'stableReceipts' && projection ? projection.finishDescriptor() : value[key]
-          const selected = route.startsWith('body.') && STABLE_JSON_COLLECTIONS.includes(route.slice(5)), nested = ['body', 'body.fullAppUi'].includes(route) && ordinary(item)
+          const selected = route.startsWith('body.') && STABLE_JSON_COLLECTIONS.includes(route.slice(5)) &&
+            (route !== 'body.fullAppUi.offlineSettings' || aggregateProtocolSafe())
+          const nested = ['body', 'body.fullAppUi'].includes(route) && ordinary(item)
           const array = selected ? arrayFragments(item, route.slice(5)) : route === 'scenes' ? sceneFragments(item) : null
           if (selected && !array) metrics.arrayFallbacks++
           const cached = !nested && !array ? privateFragment(item) : null
@@ -552,12 +651,16 @@ function createFullAppStableJSONEncoder(report) {
           if (encoded === '') continue
           if (count++) chunks.push(marks[','])
           if (array) {
-            chunks.push(bytes(JSON.stringify(key) + ':'), marks['['])
-            for (let index = 0; index < array.length; index++) {
-              if (index) chunks.push(marks[','])
-              chunks.push(array[index])
+            chunks.push(bytes(JSON.stringify(key) + ':'))
+            if (Buffer.isBuffer(array)) chunks.push(array)
+            else {
+              chunks.push(marks['['])
+              for (let index = 0; index < array.length; index++) {
+                if (index) chunks.push(marks[','])
+                chunks.push(array[index])
+              }
+              chunks.push(marks[']'])
             }
-            chunks.push(marks[']'])
           } else if (cached) {
             chunks.push(bytes(JSON.stringify(key) + ':'), cached)
           } else if (nested) {
@@ -570,7 +673,14 @@ function createFullAppStableJSONEncoder(report) {
       const encoded = Buffer.concat(chunks)
       // A real writer must call this only after its original atomic save succeeds.
       return { bytes: encoded, storageVersion: projection ? 2 : VERSION,
-        commit() { projection?.commit(); published = nextPublished; lastPublishedManifest = manifest; publicationEligible = true } }
+        commit() {
+          projection?.commit()
+          // Publication alone may retain the one current vector and buffer.
+          // A failed atomic write or rolled-back seal cannot publish a prefix.
+          if (aggregateProtocolSafe()) { screenshotAggregate = nextScreenshotAggregate; scenePrefix = nextScenePrefix }
+          else screenshotAggregate = scenePrefix = null
+          published = nextPublished; lastPublishedManifest = manifest; publicationEligible = true
+        } }
     },
   }
 }
