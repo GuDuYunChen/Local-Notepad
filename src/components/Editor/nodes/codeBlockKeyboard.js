@@ -1,7 +1,7 @@
 // Keyboard access to the genuine code-language button inside a Lexical
 // decorator. Ordinary Tab still belongs to Lexical indentation when its root
 // is focused; F6 is a guarded entrance, matching existing embedded blocks.
-export function bindCodeBlockKeyboardAccess(block, isEditable) {
+export function bindCodeBlockKeyboardAccess(block, isEditable, preserveEmptySelection) {
   const root = block?.closest('.editor-input[contenteditable]');
   const header = block?.querySelector(':scope > .code-block-header');
   if (!root || !header) return () => {};
@@ -22,7 +22,8 @@ export function bindCodeBlockKeyboardAccess(block, isEditable) {
       .find(button => button.isConnected && button.tabIndex >= 0 &&
         button.closest('.editor-input[contenteditable]') === root);
     if (!first || first.closest('.code-block-header') !== header) return;
-    const selection = root.ownerDocument.getSelection();
+    const ownerDocument = root.ownerDocument;
+    const selection = ownerDocument.getSelection();
     const emptySelection = selection?.rangeCount === 0;
     first.focus();
     if (root.ownerDocument.activeElement !== first) return;
@@ -30,6 +31,16 @@ export function bindCodeBlockKeyboardAccess(block, isEditable) {
     // focus-only entrance must also retain an originally empty selection.
     if (emptySelection && selection === root.ownerDocument.getSelection() && selection.rangeCount > 0) {
       selection.removeAllRanges();
+    }
+    // A pending Lexical selection update can otherwise recreate the caret
+    // after this synchronous focus-only entrance. Only the successful owned
+    // empty-selection path may opt this one update out of DOM selection sync.
+    if (emptySelection && root.ownerDocument === ownerDocument && first.ownerDocument === ownerDocument &&
+        selection === ownerDocument.getSelection() && selection.rangeCount === 0 &&
+        ownsHeader() && first.isConnected && !first.disabled && first.tabIndex >= 0 && first.closest('.code-block-header') === header &&
+        first.closest('.editor-input[contenteditable]') === root && ownerDocument.activeElement === first &&
+        typeof preserveEmptySelection === 'function') {
+      preserveEmptySelection();
     }
     event.preventDefault();
     event.stopPropagation();

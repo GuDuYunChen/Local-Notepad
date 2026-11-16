@@ -2,7 +2,7 @@ import { DecoratorNode } from 'lexical';
 import React, { useRef, useEffect, useState } from 'react';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import { useLexicalEditable } from '@lexical/react/useLexicalEditable';
-import { $getNodeByKey } from 'lexical';
+import { $getNodeByKey, SKIP_DOM_SELECTION_TAG } from 'lexical';
 
 import 'highlight.js/styles/atom-one-dark.css';
 import { UiButton, UiInput } from '~/components/ui/ControlKit'
@@ -274,7 +274,9 @@ const CodeBlockComponent = React.memo(function CodeBlockComponent({ code, langua
 
   // Lexical consumes Tab while the editable body is focused. F6 enters the
   // real code language control without changing Tab indentation or code data.
-  useEffect(() => bindCodeBlockKeyboardAccess(codeBlockRef.current, () => editor.isEditable()), []);
+  useEffect(() => bindCodeBlockKeyboardAccess(codeBlockRef.current, () => editor.isEditable(), () => {
+    editor.update(() => {}, { tag: SKIP_DOM_SELECTION_TAG });
+  }), []);
 
   useEffect(() => {
     const cancelPaste = () => {
