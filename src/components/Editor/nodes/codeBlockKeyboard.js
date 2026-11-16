@@ -22,8 +22,15 @@ export function bindCodeBlockKeyboardAccess(block, isEditable) {
       .find(button => button.isConnected && button.tabIndex >= 0 &&
         button.closest('.editor-input[contenteditable]') === root);
     if (!first || first.closest('.code-block-header') !== header) return;
+    const selection = root.ownerDocument.getSelection();
+    const emptySelection = selection?.rangeCount === 0;
     first.focus();
     if (root.ownerDocument.activeElement !== first) return;
+    // Focusing a control inside contenteditable can create a DOM caret. An F6
+    // focus-only entrance must also retain an originally empty selection.
+    if (emptySelection && selection === root.ownerDocument.getSelection() && selection.rangeCount > 0) {
+      selection.removeAllRanges();
+    }
     event.preventDefault();
     event.stopPropagation();
   };
