@@ -2381,6 +2381,17 @@ test('v2 C09 the actual capture producer and unchanged canonical validator consu
     const missing = storageJSON(loaded.report.fullAppUi)
     missing.scenes.at(-1).rawSamples = missing.scenes.at(-1).rawSamples.filter(sample => sample.phase !== 'after-capture')
     assert.throws(() => validateFullAppUiEvidence(missing, ledger))
-    assert.equal(hash(readFileSync(new URL('./full-app-ui-evidence.mjs', import.meta.url))), '60039c19b8b8c58a20d1ac42e2b066a18d7ce87c5bd21149da319d5504baf92b')
+    const validatorSource = readFileSync(new URL('./full-app-ui-evidence.mjs', import.meta.url), 'utf8')
+    // Git's Windows checkout may use CRLF; only that representation is normalized.
+    const canonicalValidatorHash = source => hash(source.replace(/\r\n/g, '\n'))
+    const expectedValidatorHash = '60039c19b8b8c58a20d1ac42e2b066a18d7ce87c5bd21149da319d5504baf92b'
+    assert.equal(canonicalValidatorHash(validatorSource), expectedValidatorHash)
+    const lfSource = validatorSource.replace(/\r\n/g, '\n')
+    for (const source of [lfSource, lfSource.replace(/\n/g, '\r\n')]) {
+      assert.equal(canonicalValidatorHash(source), expectedValidatorHash)
+      const changedSource = source.replace('width: 704', 'width: 705')
+      assert.notEqual(changedSource, source)
+      assert.throws(() => assert.equal(canonicalValidatorHash(changedSource), expectedValidatorHash), { code: 'ERR_ASSERTION' })
+    }
   } finally { rmSync(directory, { recursive: true, force: true }) }
 })
