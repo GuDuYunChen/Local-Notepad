@@ -405,3 +405,64 @@ describe('media nodes with the actual Lexical editable state', () => {
     expect(errors).toEqual([]);
   });
 });
+
+
+it('F6 read-only-first transition: attachment entry follows the same editor into editing', async () => {
+  await mount('attachment', false);
+  const instance = editor;
+  const editable = editor.getRootElement();
+  const block = uiQuery(host, '.attachment-block');
+  const original = documentJSON();
+  expect(editable.getAttribute('contenteditable')).toBe('false');
+  expect(block).toBeTruthy();
+  expect(uiQuery(block, '.attachment-replace-button')).toBeNull();
+
+  await setEditable(true);
+  expect(editor).toBe(instance);
+  expect(editor.getRootElement()).toBe(editable);
+  expect(uiQuery(host, '.attachment-block')).toBe(block);
+  expect(editable.getAttribute('contenteditable')).toBe('true');
+  const first = uiQuery(block, '.attachment-replace-button');
+  const actions = [...block.querySelectorAll('.attachment-actions button')];
+  expect(first).toBeTruthy();
+  expect(first.disabled).toBe(false);
+  expect(actions[0]).toBe(first);
+  await act(async () => editable.focus());
+  expect(document.activeElement).toBe(editable);
+  const entry = new KeyboardEvent('keydown', { key: 'F6', bubbles: true, cancelable: true });
+  await act(async () => editable.dispatchEvent(entry));
+  expect(documentJSON()).toEqual(original);
+  expect(uploadFile).not.toHaveBeenCalled();
+  expect(errors).toEqual([]);
+  expect(entry.defaultPrevented).toBe(true);
+  expect(document.activeElement).toBe(first);
+
+  // The DOM fixture cannot execute Chromium's native Tab default action.
+  // Verify the actual controls retain that default and never pass Tab to
+  // the real editable ancestor, in either direction after the mode change.
+  const ancestorTabs = [];
+  const observe = event => { if (event.key === 'Tab') ancestorTabs.push(event.shiftKey); };
+  editable.addEventListener('keydown', observe);
+  try {
+    for (const action of actions) {
+      for (const shiftKey of [false, true]) {
+        const tab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true, shiftKey });
+        await act(async () => action.dispatchEvent(tab));
+        expect(tab.defaultPrevented).toBe(false);
+      }
+    }
+    expect(ancestorTabs).toEqual([]);
+  } finally { editable.removeEventListener('keydown', observe); }
+  await setEditable(false);
+  await setEditable(true);
+  expect(editor.getRootElement()).toBe(editable);
+  expect(uiQuery(host, '.attachment-block')).toBe(block);
+  await act(async () => editable.focus());
+  const reentry = new KeyboardEvent('keydown', { key: 'F6', bubbles: true, cancelable: true });
+  await act(async () => editable.dispatchEvent(reentry));
+  expect(reentry.defaultPrevented).toBe(true);
+  expect(document.activeElement).toBe(uiQuery(block, '.attachment-replace-button'));
+  expect(documentJSON()).toEqual(original);
+  expect(uploadFile).not.toHaveBeenCalled();
+  expect(errors).toEqual([]);
+});

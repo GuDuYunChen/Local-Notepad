@@ -27,10 +27,12 @@ function Embed({ id, blockId, title }) {
     // separate, keyboard-only route into a read-only block's real buttons.
     // Keep the existing Tab/Shift+Tab editing semantics unchanged.
     const embed = embedElement.current
-    const root = embed?.closest('.editor-input[contenteditable="true"]')
+    // The same root can begin in reading mode and become editable later.
+    const root = embed?.closest('.editor-input[contenteditable]')
     if (!root) return undefined
     const enter = event => {
-      if (event.defaultPrevented || event.key !== 'F6' || event.altKey ||
+      if (root.getAttribute('contenteditable') !== 'true' ||
+          event.defaultPrevented || event.key !== 'F6' || event.altKey ||
           event.ctrlKey || event.metaKey || event.shiftKey || event.isComposing ||
           event.target !== root || root.ownerDocument.activeElement !== root) return
       const first = root.querySelector('.block-reference-embed footer button:first-child')

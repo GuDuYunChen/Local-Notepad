@@ -235,3 +235,81 @@ describe('native F6 keyboard access to a saved embedded block', () => {
     expect(document.activeElement).toBe(first);
   });
 });
+
+
+test('F6 read-only-first transition: a saved block embed stays reachable without remounting', async () => {
+  await act(async () => root.render(
+    <LexicalComposer initialConfig={{
+      namespace: 'block-embed-readonly-first',
+      editable: false,
+      nodes,
+      editorState: () => $getRoot().append(
+        $createParagraphNode().append($createTextNode('保留正文')),
+        $createBlockReferenceNode('source', '来源', id, true)
+      ),
+      onError: error => { throw error; }
+    }}>
+      <RichTextPlugin contentEditable={<ContentEditable className="editor-input" />} placeholder={null} ErrorBoundary={LexicalErrorBoundary} />
+      <Probe />
+    </LexicalComposer>
+  ));
+  await flush();
+  const instance = liveEditor;
+  const editable = liveEditor.getRootElement();
+  const block = uiQuery(host, '.block-reference-embed');
+  expect(block).toBeTruthy();
+  const first = uiQuery(block, 'footer button:first-child');
+  const second = uiQuery(block, 'footer button:nth-child(2)');
+  expect(editable.getAttribute('contenteditable')).toBe('false');
+  expect(first).toBeTruthy();
+  expect(second).toBeTruthy();
+  expect(first.disabled).toBe(false);
+  expect(uiText(first)).toBe('刷新来源');
+  expect(uiText(second)).toBe('打开来源块');
+  expect(uiText(uiQuery(block, 'pre'))).toBe('来源正文');
+  const original = json(liveEditor);
+  const reads = api.mock.calls.length;
+
+  await act(async () => liveEditor.setEditable(true));
+  await flush();
+  expect(liveEditor).toBe(instance);
+  expect(liveEditor.getRootElement()).toBe(editable);
+  expect(uiQuery(host, '.block-reference-embed')).toBe(block);
+  expect(uiQuery(block, 'footer button:first-child')).toBe(first);
+  expect(editable.getAttribute('contenteditable')).toBe('true');
+  await act(async () => editable.focus());
+  expect(document.activeElement).toBe(editable);
+  const entry = new KeyboardEvent('keydown', { key: 'F6', bubbles: true, cancelable: true });
+  await act(async () => editable.dispatchEvent(entry));
+  expect(json(liveEditor)).toBe(original);
+  expect(api).toHaveBeenCalledTimes(reads);
+  expect(entry.defaultPrevented).toBe(true);
+  expect(document.activeElement).toBe(first);
+
+  const ancestorTabs = [];
+  const observe = event => { if (event.key === 'Tab') ancestorTabs.push(event.shiftKey); };
+  editable.addEventListener('keydown', observe);
+  try {
+    for (const action of [first, second]) {
+      for (const shiftKey of [false, true]) {
+        const tab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true, shiftKey });
+        await act(async () => action.dispatchEvent(tab));
+        expect(tab.defaultPrevented).toBe(false);
+      }
+    }
+    expect(ancestorTabs).toEqual([]);
+  } finally { editable.removeEventListener('keydown', observe); }
+  await act(async () => liveEditor.setEditable(false));
+  await flush();
+  await act(async () => liveEditor.setEditable(true));
+  await flush();
+  expect(liveEditor.getRootElement()).toBe(editable);
+  expect(uiQuery(host, '.block-reference-embed')).toBe(block);
+  await act(async () => editable.focus());
+  const reentry = new KeyboardEvent('keydown', { key: 'F6', bubbles: true, cancelable: true });
+  await act(async () => editable.dispatchEvent(reentry));
+  expect(reentry.defaultPrevented).toBe(true);
+  expect(document.activeElement).toBe(first);
+  expect(json(liveEditor)).toBe(original);
+  expect(api).toHaveBeenCalledTimes(reads);
+});
