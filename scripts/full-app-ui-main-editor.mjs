@@ -848,7 +848,18 @@ async function verifyEditorNodes(ctx) {
   await shot('editor-embed', 'default', ['.embed-editing input[type="url"]']); await focus('editor-embed', 'default', '.embed-editing input[type="url"]')
   await shared.text('.embed-editing input[type="text"]', '只保留在未应用草稿中的较长嵌入标题，不创建外部连接。'.repeat(4))
   await shot('editor-embed', 'draft', ['.embed-editing input[type="text"]']); await press('.embed-edit-actions', '取消'); await absent('.embed-editing')
-  await openNote('代码'); await shot('editor-code', 'default', ['.language-selector-button']); await focus('editor-code', 'default', '.language-selector-button')
+  await openNote('代码')
+  // Note-title navigation can finish before Lexical mounts its decorated code
+  // node. Wait for the single actual painted owner using the same bounded
+  // readiness poll; never synthesize the node or bypass motion/PNG assertions.
+  await until(() => evaluate(`(() => {
+    const painted = [...document.querySelectorAll('.code-block-wrapper')].filter(node => {
+      const rect = node.getBoundingClientRect()
+      return node.getClientRects().length > 0 && rect.width > 0 && rect.height > 0
+    })
+    return painted.length === 1 && Boolean(painted[0].querySelector('.language-selector-button'))
+  })()`), 'Actual selected code block did not mount as one painted owner')
+  await shot('editor-code', 'default', ['.language-selector-button']); await focus('editor-code', 'default', '.language-selector-button')
   await hit('.language-selector-button'); await present('.language-selector-dropdown')
   await shot('editor-code', 'languages', ['.language-selector-search'], { root: '.language-selector-dropdown' })
   await shared.text('.language-selector-search', miss); await text('.language-selector-list', 'No languages found')
