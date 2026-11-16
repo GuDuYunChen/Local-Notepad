@@ -99,7 +99,7 @@ export function createFullAppEvidenceCache() {
   }
 }
 
-function partAccess(filename, owner, withStable = false) {
+function partAccess(filename, owner, withStable = false, withIndex = false) {
   const root = path.dirname(path.resolve(filename)), directory = path.basename(filename) + '.parts'
   const directoryPath = path.join(root, directory)
   const directoryStat = lstatSync(directoryPath)
@@ -107,6 +107,7 @@ function partAccess(filename, owner, withStable = false) {
   const realDirectory = realpathSync(directoryPath)
   const reads = { rawParts: 0, rawBytes: 0, sceneParts: 0, sceneBytes: 0, eventsParts: 0, eventsBytes: 0 }
   if (withStable) Object.assign(reads, { stableParts: 0, stableBytes: 0 })
+  if (withIndex) Object.assign(reads, { indexParts: 0, indexBytes: 0 })
   const read = (ref, kind, context) => {
     assert.ok(plain(ref), 'Evidence part reference is required')
     assert.equal(ref.kind, kind); assert.match(ref.sha256 || '', /^[a-f0-9]{64}$/)
@@ -127,6 +128,10 @@ function partAccess(filename, owner, withStable = false) {
     if (kind === 'stable') {
       stableReceiptKeys(part, ['format', 'storageVersion', 'owner', 'kind', 'context', 'value'], 'Stable receipt part')
       assert.ok(part.value !== null && typeof part.value === 'object', 'Stable receipt part must retain its original object value')
+    }
+    if (kind === 'index') {
+      stableReceiptKeys(part, ['format', 'storageVersion', 'owner', 'kind', 'context', 'value'], 'Index page part')
+      assert.ok(Array.isArray(part.value), 'Index page must retain its ordered values')
     }
     return part.value
   }
@@ -210,8 +215,9 @@ export function readFullAppEvidence(filename, { cache = createFullAppEvidenceCac
     }
     return loaded
   }
-  if (manifest.storageVersion === 2) validateStableReceiptDescriptor(manifest)
+  if (manifest.storageVersion === 2 || manifest.storageVersion === 3) validateStableReceiptDescriptor(manifest)
   else assert.equal(manifest.storageVersion, VERSION, 'Unsupported evidence storage version')
+  if (manifest.storageVersion === 3) validateIndexPageDescriptor(manifest)
   assert.ok(Number.isSafeInteger(manifest.checkpoint) && manifest.checkpoint > 0)
   assert.match(manifest.storeID || '', /^[a-f0-9-]{36}$/)
   assert.ok(plain(manifest.body) && plain(manifest.binding))
@@ -220,7 +226,7 @@ export function readFullAppEvidence(filename, { cache = createFullAppEvidenceCac
   assert.ok(Array.isArray(manifest.scenes))
   assert.equal(manifest.sceneCount, manifest.scenes.length, 'Evidence scene tail was omitted')
   assert.equal(typeof manifest.scenesPresent, 'boolean')
-  const access = partAccess(filename, manifest.owner, manifest.storageVersion === 2), seen = new Set(), closure = createHash('sha256')
+  const access = partAccess(filename, manifest.owner, manifest.storageVersion >= 2, manifest.storageVersion === 3), seen = new Set(), closure = createHash('sha256')
   let partBytes = 0, rawCount = 0
   const visit = ref => {
     assert.ok(plain(ref) && typeof ref.file === 'string')
@@ -228,7 +234,8 @@ export function readFullAppEvidence(filename, { cache = createFullAppEvidenceCac
     seen.add(ref.file); closure.update(encode(ref)); partBytes += ref.bytes
   }
   const report = manifest.body
-  if (manifest.storageVersion === 2) restoreStableReceipts(manifest, access, visit)
+  if (manifest.storageVersion === 3) restoreIndexPages(manifest, access, visit)
+  if (manifest.storageVersion === 2 || manifest.storageVersion === 3) restoreStableReceipts(manifest, access, visit)
   if (manifest.scenesPresent) {
     assert.ok(plain(report.fullAppUi) && !own(report.fullAppUi, 'scenes'))
     report.fullAppUi.scenes = manifest.scenes.map((slot, index) => {
@@ -283,10 +290,12 @@ export function createFullAppEvidenceWriter(filename, report, options) {
   stableJSON.privateProtocolSafe()
   const owner = sha(encode({ storeID, binding: bound }))
   stableJSON.cachePrivateDescriptor(bound)
-  const access = partAccess(filename, owner, storageVersion === 2), cache = createFullAppEvidenceCache(), entries = [], byScene = new WeakMap(), written = new Set()
+  const access = partAccess(filename, owner, storageVersion >= 2, storageVersion === 3), cache = createFullAppEvidenceCache(), entries = [], byScene = new WeakMap(), written = new Set()
   const counters = { rawParts: 0, rawBytes: 0, sceneParts: 0, sceneBytes: 0, eventParts: 0, eventBytes: 0, partBytes: 0, checkpointBytes: 0, saves: 0, seals: 0 }
-  if (storageVersion === 2) Object.assign(counters, { stableParts: 0, stableBytes: 0, stableReferences: 0, stableRefCacheHits: 0, v2Saves: 0, nativeFallbackSaves: 0 })
-  const stableParts = storageVersion === 2 ? createStableReceiptProjection(writePart, counters, stableJSON) : null
+  if (storageVersion >= 2) Object.assign(counters, { stableParts: 0, stableBytes: 0, stableReferences: 0, stableRefCacheHits: 0, v2Saves: 0, nativeFallbackSaves: 0 })
+  if (storageVersion === 3) Object.assign(counters, { indexParts: 0, indexBytes: 0, indexReferences: 0, indexRefCacheHits: 0, v3Saves: 0 })
+  const stableParts = storageVersion >= 2 ? createStableReceiptProjection(writePart, counters, stableJSON) : null
+  const indexPages = storageVersion === 3 ? createIndexPageProjection(writePart, counters, stableJSON) : null
   let checkpoint = 0
   function writePart(kind, context, value, { fragment } = {}) {
     stableJSON.privateProtocolSafe()
@@ -302,6 +311,7 @@ export function createFullAppEvidenceWriter(filename, report, options) {
       if (kind === 'raw') { counters.rawParts++; counters.rawBytes += bytes.length }
       else if (kind === 'scene') { counters.sceneParts++; counters.sceneBytes += bytes.length }
       else if (kind === 'stable') { counters.stableParts++; counters.stableBytes += bytes.length }
+      else if (kind === 'index') { counters.indexParts++; counters.indexBytes += bytes.length }
       else { counters.eventParts++; counters.eventBytes += bytes.length }
     }
     return ref
@@ -368,7 +378,7 @@ export function createFullAppEvidenceWriter(filename, report, options) {
   function save() {
     stableJSON.privateProtocolSafe()
     const activeMetadata = new WeakSet()
-    const publication = stableJSON.prepareManifest(prepare(activeMetadata), stableParts, activeMetadata), bytes = publication.bytes
+    const publication = stableJSON.prepareManifest(prepare(activeMetadata), stableParts, activeMetadata, indexPages), bytes = publication.bytes
     if (checkpoint === 0) writeFileSync(filename, bytes, { flag: 'wx' })
     else {
       // A failed write leaves the previous whole manifest. Unreferenced parts
@@ -382,7 +392,7 @@ export function createFullAppEvidenceWriter(filename, report, options) {
       } finally { if (ownedTemporary && existsSync(temporary)) unlinkSync(temporary) }
     }
     publication.commit()
-    if (storageVersion === 2) counters[publication.storageVersion === 2 ? 'v2Saves' : 'nativeFallbackSaves']++
+    if (storageVersion >= 2) counters[publication.storageVersion === 3 ? 'v3Saves' : publication.storageVersion === 2 ? 'v2Saves' : 'nativeFallbackSaves']++
     checkpoint++; counters.saves++; counters.checkpointBytes += bytes.length
   }
   function appendRaw(scene, sample) {
@@ -416,7 +426,7 @@ export function createFullAppEvidenceWriter(filename, report, options) {
       assert.equal(loaded.report.complete, true); assert.equal(loaded.storage.owner, owner)
       const current = prepare(); current.checkpoint = checkpoint
       stableJSON.privateProtocolSafe()
-      if (loaded.storage.storageVersion === 2) comparePublishedStableReceipt(filename, current, loaded)
+      if (loaded.storage.storageVersion === 2 || loaded.storage.storageVersion === 3) comparePublishedStableReceipt(filename, current, loaded)
       else assert.equal(sha(encode(current)), loaded.fingerprint.sha256, 'Live evidence changed after its last complete checkpoint')
       return loaded.storage
     },
@@ -542,7 +552,7 @@ function createFullAppStableJSONEncoder(report) {
       sealed.set(value, encoded); metrics.sealedObjects++; metrics.sealedGraphNodes += nodes.length
       return true
     },
-    prepareManifest(manifest, stableParts = null, activeMetadata = null) {
+    prepareManifest(manifest, stableParts = null, activeMetadata = null, indexPages = null) {
       const nextPublished = new WeakMap(), chunks = []
       let nextScreenshotAggregate = null, nextScenePrefix = null
       privateProtocolSafe()
@@ -562,6 +572,10 @@ function createFullAppStableJSONEncoder(report) {
       // Qualify the original manifest before projecting any sealed value. A
       // native protocol fallback above remains the original whole v1 encoding.
       const projection = stableParts?.(manifest)
+      // Explicit v3 only observes already qualified, unescaped native JSON.
+      // Unsafe protocols keep the exact existing v2/v1 encoding path below.
+      const pages = indexPages && aggregateProtocolSafe() ? indexPages(projection.manifest,
+        value => privateFragment(value) || bytes(JSON.stringify(value) ?? 'null')) : null
       // This proof belongs to this synchronous encoding only. Mutable arrays
       // and values are checked again at every save, including order/shape.
       const eligible = new Set(eligibleNodes)
@@ -583,6 +597,7 @@ function createFullAppStableJSONEncoder(report) {
               keys.some(key => !/^(0|[1-9][0-9]*)$/.test(key) || Number(key) >= value.length)) return null
         }
         const encoded = [], items = []
+        const pageable = pages && ['screenshots', 'fullAppUi.offlineSettings'].includes(collection) ? [] : null
         let aggregate = collection === 'screenshots' && reuse && value.length > 0 && aggregateProtocolSafe()
         let unchanged = aggregate && screenshotAggregate?.array === value && screenshotAggregate.items.length === value.length
         for (let index = 0; index < value.length; index++) {
@@ -600,6 +615,8 @@ function createFullAppStableJSONEncoder(report) {
             fragment = bytes(JSON.stringify(item) ?? 'null'); metrics.ordinaryEncodes++
           }
           if (item && typeof item === 'object') nextPublished.set(item, fragment)
+          if (pageable) pageable.push(Boolean(cached) && plain(item) &&
+            (collection !== 'fullAppUi.offlineSettings' || Object.getOwnPropertyDescriptor(item, 'complete')?.value === true))
           if (aggregate) {
             if (!cached) aggregate = false
             else { items.push(item); unchanged &&= screenshotAggregate.items[index] === item }
@@ -607,6 +624,7 @@ function createFullAppStableJSONEncoder(report) {
           encoded.push(projection && cached && STABLE_RECEIPT_COLLECTIONS.includes(collection)
             ? projection.fragment(collection, index, item, fragment) : fragment)
         }
+        if (pageable) return pages.array(collection, value, pageable, encoded).fragments
         if (aggregate && aggregateProtocolSafe()) {
           if (unchanged) { nextScreenshotAggregate = screenshotAggregate; metrics.aggregateArrayHits++ }
           else {
@@ -620,6 +638,15 @@ function createFullAppStableJSONEncoder(report) {
       function sceneFragments(value) {
         if (!privateProtocolSafe() || !eligible.has(value)) return null
         if (!aggregateProtocolSafe()) return value.map(item => privateFragment(item) || bytes(JSON.stringify(item) ?? 'null'))
+        if (pages) {
+          const encoded = [], pageable = []
+          for (const item of value) {
+            const cached = privateFragment(item)
+            encoded.push(cached || bytes(JSON.stringify(item) ?? 'null'))
+            pageable.push(Boolean(cached) && item.state === 'sealed')
+          }
+          return pages.array('scenes', value, pageable, encoded).fragments
+        }
         const prefix = [], items = [], tail = []
         let leading = true, unchanged = Boolean(scenePrefix)
         for (const item of value) {
@@ -640,7 +667,9 @@ function createFullAppStableJSONEncoder(report) {
         chunks.push(marks['{']); let count = 0
         for (const key of Object.keys(value)) {
           const route = currentPath ? currentPath + '.' + key : key
-          const item = route === 'stableReceipts' && projection ? projection.finishDescriptor() : value[key]
+          const item = route === 'stableReceipts' && projection
+            ? pages ? pages.stableDescriptor(projection.finishDescriptor()) : projection.finishDescriptor()
+            : route === 'indexPages' && pages ? pages.finishDescriptor() : value[key]
           const selected = route.startsWith('body.') && STABLE_JSON_COLLECTIONS.includes(route.slice(5)) &&
             (route !== 'body.fullAppUi.offlineSettings' || aggregateProtocolSafe())
           const nested = ['body', 'body.fullAppUi'].includes(route) && ordinary(item)
@@ -669,12 +698,13 @@ function createFullAppStableJSONEncoder(report) {
         }
         chunks.push(marks['}'])
       }
-      object(projection?.manifest || manifest, ''); chunks.push(marks['\n'])
+      object(pages?.manifest || projection?.manifest || manifest, ''); chunks.push(marks['\n'])
       const encoded = Buffer.concat(chunks)
       // A real writer must call this only after its original atomic save succeeds.
-      return { bytes: encoded, storageVersion: projection ? 2 : VERSION,
+      return { bytes: encoded, storageVersion: pages ? 3 : projection ? 2 : VERSION,
         commit() {
           projection?.commit()
+          pages?.commit()
           // Publication alone may retain the one current vector and buffer.
           // A failed atomic write or rolled-back seal cannot publish a prefix.
           if (aggregateProtocolSafe()) { screenshotAggregate = nextScreenshotAggregate; scenePrefix = nextScenePrefix }
@@ -693,7 +723,7 @@ const STABLE_RECEIPT_FORMAT = FULL_APP_STORAGE_FORMAT + '-sealed-receipts'
 function stableReceiptWriterVersion(options) {
   if (options === undefined) return VERSION
   stableReceiptKeys(options, ['storageVersion'], 'Evidence writer options')
-  assert.ok([VERSION, 2].includes(options.storageVersion), 'Unsupported evidence storage version')
+  assert.ok([VERSION, 2, 3].includes(options.storageVersion), 'Unsupported evidence storage version')
   return options.storageVersion
 }
 function stableReceiptKeys(value, keys, label) {
@@ -811,6 +841,11 @@ function comparePublishedStableReceipt(filename, current, loaded) {
   assert.equal(sha(bytes), loaded.fingerprint.sha256, 'Evidence changed while reading its published representation')
   const committed = JSON.parse(bytes.toString('utf8'))
   validateStableReceiptDescriptor(committed)
+  if (committed.storageVersion === 3) {
+    validateIndexPageDescriptor(committed)
+    restoreIndexPages(committed, partAccess(filename, committed.owner, true, true), () => {})
+    delete committed.indexPages
+  }
   restoreStableReceipts(committed, partAccess(filename, committed.owner, true), () => {})
   committed.storageVersion = VERSION
   delete committed.stableReceipts
@@ -826,5 +861,169 @@ function comparePublishedStableReceipt(filename, current, loaded) {
     }
   }
   order(live, committed)
+}
+
+// Explicit v3 pages only immutable metadata. Original payload parts, default
+// v1, explicit v2 and their native-protocol fallback remain separate paths.
+const INDEX_PAGE_FORMAT = FULL_APP_STORAGE_FORMAT + '-index-pages'
+const INDEX_PAGE_COLLECTIONS = [
+  { path: 'scenes', size: 32 },
+  { path: 'screenshots', size: 128 },
+  { path: 'fullAppUi.focus', size: 64 },
+  { path: 'fullAppUi.popups', size: 64 },
+  { path: 'fullAppUi.optionPointerPreparations', size: 64 },
+  { path: 'fullAppUi.offlineSettings', size: 1 },
+]
+
+function validateIndexPageDescriptor(manifest) {
+  stableReceiptKeys(manifest, ['format', 'storageVersion', 'storeID', 'owner', 'binding', 'checkpoint',
+    'body', 'scenesPresent', 'sceneCount', 'scenes', 'events', 'stableReceipts', 'indexPages'], 'V3 manifest')
+  stableReceiptKeys(manifest.indexPages, ['format', 'schemaVersion', 'covered', 'pages'], 'Index page descriptor')
+  assert.equal(manifest.indexPages.format, INDEX_PAGE_FORMAT, 'Index page descriptor format differs')
+  assert.equal(manifest.indexPages.schemaVersion, 1, 'Index page descriptor version differs')
+  assert.ok(Array.isArray(manifest.indexPages.covered), 'Index page coverage is required')
+  assert.equal(manifest.indexPages.covered.length, INDEX_PAGE_COLLECTIONS.length, 'Index page coverage roster differs')
+  for (const [order, count] of manifest.indexPages.covered.entries()) assert.ok(Number.isSafeInteger(count) && count >= 0 &&
+    count % INDEX_PAGE_COLLECTIONS[order].size === 0, 'Index page coverage is invalid')
+  assert.ok(Array.isArray(manifest.indexPages.pages), 'Index page references are required')
+}
+
+function indexPageArray(manifest, collection) {
+  if (collection === 'scenes') return manifest.scenes
+  if (collection === 'screenshots') return manifest.body.screenshots
+  if (collection === 'fullAppUi.offlineSettings') {
+    assert.ok(plain(manifest.body.fullAppUi), 'Paged offline collection owner is required')
+    return manifest.body.fullAppUi.offlineSettings
+  }
+  const order = STABLE_RECEIPT_COLLECTIONS.indexOf(collection)
+  assert.ok(order >= 0, 'Unknown index page collection')
+  const descriptor = manifest.stableReceipts.collections[order]
+  stableReceiptKeys(descriptor, ['path', 'state', 'length', 'entries'], 'Paged stable receipt collection')
+  assert.equal(descriptor.path, collection, 'Paged stable receipt collection order differs')
+  assert.equal(descriptor.state, 'array', 'Paged stable receipt collection must be an Array')
+  assert.ok(Array.isArray(descriptor.entries)); assert.equal(descriptor.entries.length, descriptor.length)
+  return descriptor.entries
+}
+
+function restoreIndexPages(manifest, access, visit) {
+  const offsets = INDEX_PAGE_COLLECTIONS.map(() => 0)
+  let previousOrder = -1
+  for (const ref of manifest.indexPages.pages) {
+    stableReceiptKeys(ref, ['file', 'kind', 'bytes', 'sha256', 'context'], 'Index page reference')
+    stableReceiptKeys(ref.context, ['collection', 'offset', 'count'], 'Index page context')
+    const { collection, offset, count } = ref.context
+    const order = INDEX_PAGE_COLLECTIONS.findIndex(item => item.path === collection)
+    assert.ok(order >= 0, 'Unknown index page collection')
+    assert.ok(order >= previousOrder, 'Index page collection order differs')
+    assert.ok(Number.isSafeInteger(offset) && offset >= 0, 'Index page offset is invalid')
+    assert.equal(offset, offsets[order], 'Index page range has a gap, overlap or reordered prefix')
+    assert.equal(count, INDEX_PAGE_COLLECTIONS[order].size, 'Index page count differs')
+    assert.ok(offset + count <= manifest.indexPages.covered[order], 'Index page exceeds its declared coverage')
+    const array = indexPageArray(manifest, collection)
+    assert.ok(Array.isArray(array), 'Index page target must retain its Array')
+    assert.ok(offset + count <= array.length, 'Index page exceeds its collection length')
+    for (let index = offset; index < offset + count; index++) assert.equal(array[index], null, 'Index page would overwrite an inline value')
+    visit(ref)
+    const values = access.read(ref, 'index', { collection, offset, count })
+    assert.equal(values.length, count, 'Index page values were omitted or extended')
+    for (let position = 0; position < count; position++) {
+      const value = values[position], index = offset + position
+      assert.ok(plain(value), 'Index page must retain an original object value')
+      if (collection === 'scenes') {
+        stableReceiptKeys(value, ['index', 'identity', 'state', 'rawCount', 'keys', 'part'], 'Paged scene descriptor')
+        validateSlot(value, index); assert.equal(value.state, 'sealed', 'An active scene cannot be paged')
+      } else if (STABLE_RECEIPT_COLLECTIONS.includes(collection)) {
+        stableReceiptKeys(value, ['index', 'mode', 'ref'], 'Paged stable receipt entry')
+        assert.equal(value.index, index, 'Paged stable receipt ordinal differs')
+        assert.equal(value.mode, 'part', 'An inline stable receipt cannot be paged')
+      } else if (collection === 'fullAppUi.offlineSettings') assert.equal(value.complete, true, 'An incomplete offline receipt cannot be paged')
+      array[index] = value
+    }
+    offsets[order] += count; previousOrder = order
+  }
+  same(offsets, manifest.indexPages.covered, 'Index page tail was omitted')
+}
+
+function createIndexPageProjection(writePart, counters, stableJSON) {
+  let previous = new Map(), previousEnvelope = null, previousStableInput = null, previousStableOutput = null
+  const placeholder = Buffer.from('null'), open = Buffer.from('['), close = Buffer.from(']'), comma = Buffer.from(',')
+  const nullPages = new Map([[1, placeholder], ...[32, 64, 128].map(count =>
+    [count, Buffer.from('null' + ',null'.repeat(count - 1))])])
+  return (manifest, encodeItem) => {
+    const pending = new Map(), collections = new Set()
+    let envelope, stableInput, stableOutput
+    function array(collection, values, eligible, fragments) {
+      const spec = INDEX_PAGE_COLLECTIONS.find(item => item.path === collection)
+      assert.ok(spec && Array.isArray(values) && eligible.length === values.length)
+      assert.equal(collections.has(collection), false, 'Index collection was projected twice')
+      collections.add(collection)
+      let prefix = 0
+      while (prefix < values.length && eligible[prefix]) prefix++
+      const covered = Math.floor(prefix / spec.size) * spec.size
+      if (!covered) return { values, fragments }
+      const projected = values.slice(), encoded = fragments ? [] : undefined
+      for (let offset = 0; offset < covered; offset += spec.size) {
+        const key = collection + ':' + offset, prior = previous.get(key)
+        let entry
+        counters.indexReferences++
+        if (prior && prior.items.length === spec.size && prior.items.every((item, position) => item === values[offset + position])) {
+          entry = prior; counters.indexRefCacheHits++
+        } else {
+          const items = values.slice(offset, offset + spec.size), chunks = [open]
+          for (let position = 0; position < spec.size; position++) {
+            if (position) chunks.push(comma)
+            chunks.push(fragments ? fragments[offset + position] : encodeItem(items[position]))
+          }
+          chunks.push(close)
+          const ref = writePart('index', { collection, offset, count: spec.size }, items, { fragment: Buffer.concat(chunks) })
+          entry = { items, ref }
+        }
+        pending.set(key, entry)
+        for (let index = offset; index < offset + spec.size; index++) {
+          projected[index] = null
+        }
+        if (encoded) encoded.push(nullPages.get(spec.size))
+      }
+      if (encoded) for (let index = covered; index < fragments.length; index++) encoded.push(fragments[index])
+      return { values: projected, fragments: encoded }
+    }
+    return {
+      manifest: { ...manifest, storageVersion: 3, indexPages: null },
+      array,
+      stableDescriptor(descriptor) {
+        stableInput = descriptor
+        const projected = descriptor.collections.map(current => current.state === 'array'
+          ? { ...current, entries: array(current.path, current.entries, current.entries.map(entry => entry.mode === 'part')).values }
+          : current)
+        if (previousStableInput === descriptor) stableOutput = previousStableOutput
+        else {
+          stableOutput = { ...descriptor, collections: projected }
+          stableJSON.cachePrivateDescriptor(stableOutput)
+        }
+        return stableOutput
+      },
+      finishDescriptor() {
+        const pages = [], covered = []
+        for (const spec of INDEX_PAGE_COLLECTIONS) {
+          let offset = 0
+          for (; pending.has(spec.path + ':' + offset); offset += spec.size) pages.push(pending.get(spec.path + ':' + offset).ref)
+          covered.push(offset)
+        }
+        if (previousEnvelope && previousEnvelope.pages.length === pages.length && pages.every((ref, index) => ref === previousEnvelope.pages[index])) envelope = previousEnvelope
+        else {
+          envelope = { format: INDEX_PAGE_FORMAT, schemaVersion: 1, covered, pages }
+          stableJSON.cachePrivateDescriptor(envelope)
+        }
+        return envelope
+      },
+      commit() {
+        if (stableJSON.privateProtocolSafe()) {
+          previous = pending; previousEnvelope = envelope; previousStableInput = stableInput; previousStableOutput = stableOutput
+        } else {
+          previous = new Map(); previousEnvelope = previousStableInput = previousStableOutput = null
+        }
+      },
+    }
+  }
 }
 

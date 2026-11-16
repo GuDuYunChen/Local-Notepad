@@ -1587,7 +1587,8 @@ export function observeCodeLanguageKeyboardEntry(ownerToken, action = 'read') {
     try {
       document.removeEventListener('keydown', owned.onKey, true)
       return { disposed: true, ownerToken, identityRetained: Boolean(sameOwner(owned)),
-        ownedEvents: owned.events.slice(), ownedTraceTruncated: owned.truncated }
+        ownedEvents: owned.events.slice(), ownedTraceTruncated: owned.truncated,
+        ...(owned.failureDiagnostic ? { failureDiagnostic: owned.failureDiagnostic } : {}) }
     } finally { delete window[key] }
   }
   if (!ownerToken || !['read', 'install'].includes(action)) throw Error('Code language keyboard observer operation is invalid')
@@ -1650,7 +1651,36 @@ export function observeCodeLanguageKeyboardEntry(ownerToken, action = 'read') {
     window[key] = state
     document.addEventListener('keydown', state.onKey, { capture: true, passive: true })
   } else {
-    if (owned.selectionNodes[0] !== selection.anchorNode || owned.selectionNodes[1] !== selection.focusNode) throw Error('Code language keyboard original selection endpoints were replaced')
+    if (owned.selectionNodes[0] !== selection.anchorNode || owned.selectionNodes[1] !== selection.focusNode) {
+      // Keep only this failed read, before its original throw. The existing
+      // disposal response and finally save retain plain data without a reread,
+      // an additional checkpoint, or any repair of focus/selection/content.
+      try {
+        if (!owned.failureDiagnostic) {
+          const point = value => value && ({ path: value.path.slice(0, 64), pathLength: value.path.length,
+            pathTruncated: value.path.length > 64, type: value.type, offset: value.offset })
+          const compact = value => ({ rangeCount: value.rangeCount, collapsed: value.collapsed,
+            anchor: point(value.anchor), focus: point(value.focus) })
+          const role = node => node === editor ? 'editor' : node === target ? 'language' : node === next ? 'next' :
+            target.contains(node) ? 'language-descendant' : next.contains(node) ? 'next-descendant' :
+            node === header ? 'header' : node === owner ? 'owner' : editor.contains(node) ? 'editor-descendant' : 'other'
+          const describe = node => node && ({ nodeType: node.nodeType, nodeName: String(node.nodeName).slice(0, 64),
+            connectedAtFailure: node.isConnected, sameOwnerDocument: node.ownerDocument === document, role: role(node) })
+          owned.failureDiagnostic = { schemaVersion: 1, kind: 'selection-endpoint-identity', action: 'read',
+            before: compact(owned.snapshot.selection), after: compact(snapshot.selection),
+            anchorIdentityRetained: owned.selectionNodes[0] === selection.anchorNode,
+            focusIdentityRetained: owned.selectionNodes[1] === selection.focusNode,
+            active: document.activeElement === editor ? 'editor' : document.activeElement === target ? 'language' :
+              document.activeElement === next ? 'next' : 'other',
+            originalEndpoints: { anchor: describe(owned.selectionNodes[0]), focus: describe(owned.selectionNodes[1]) },
+            observedEndpoints: { anchor: describe(selection.anchorNode), focus: describe(selection.focusNode) } }
+        }
+      } catch {
+        // A diagnostic-only failure must never replace the existing rejection.
+        try { owned.failureDiagnostic ||= { schemaVersion: 1, kind: 'selection-endpoint-identity', action: 'read', captureFailed: true } } catch {}
+      }
+      throw Error('Code language keyboard original selection endpoints were replaced')
+    }
     for (const name of Object.keys(snapshot)) if (JSON.stringify(snapshot[name]) !== JSON.stringify(owned.snapshot[name])) {
       throw Error('Code language keyboard changed its original ' + name)
     }
