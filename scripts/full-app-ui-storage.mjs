@@ -291,9 +291,10 @@ export function createFullAppEvidenceWriter(filename, report, options) {
   const owner = sha(encode({ storeID, binding: bound }))
   stableJSON.cachePrivateDescriptor(bound)
   const access = partAccess(filename, owner, storageVersion >= 2, storageVersion === 3), cache = createFullAppEvidenceCache(), entries = [], byScene = new WeakMap(), written = new Set()
+  const frozenSceneIdentities = new WeakSet()
   const counters = { rawParts: 0, rawBytes: 0, sceneParts: 0, sceneBytes: 0, eventParts: 0, eventBytes: 0, partBytes: 0, checkpointBytes: 0, saves: 0, seals: 0 }
   if (storageVersion >= 2) Object.assign(counters, { stableParts: 0, stableBytes: 0, stableReferences: 0, stableRefCacheHits: 0, v2Saves: 0, nativeFallbackSaves: 0 })
-  if (storageVersion === 3) Object.assign(counters, { indexParts: 0, indexBytes: 0, indexReferences: 0, indexRefCacheHits: 0, v3Saves: 0 })
+  if (storageVersion === 3) Object.assign(counters, { indexParts: 0, indexBytes: 0, indexReferences: 0, indexRefCacheHits: 0, v3Saves: 0, sealedIdentityReuses: 0 })
   const stableParts = storageVersion >= 2 ? createStableReceiptProjection(writePart, counters, stableJSON) : null
   const indexPages = storageVersion === 3 ? createIndexPageProjection(writePart, counters, stableJSON) : null
   let checkpoint = 0
@@ -324,7 +325,15 @@ export function createFullAppEvidenceWriter(filename, report, options) {
       entry = { scene, index, identity: identity(scene, index, stableJSON.observeJSON), raw: [], objects: [], sealed: null }
       entries.push(entry); byScene.set(scene, entry)
     }
-    assert.equal(entry.index, index); same(identity(scene, index, stableJSON.observeJSON), entry.identity, 'Evidence scene identity changed')
+    assert.equal(entry.index, index)
+    // Only makeScene's successfully frozen, non-proxy view may reuse its
+    // writer-owned identity. The current array still visits every exact scene
+    // and checks its ordinal. Native JSON hooks must remain unescaped: a later
+    // accessor, wrapper or prototype protocol keeps the original snapshot path.
+    if (storageVersion === 3 && entry.sealed && frozenSceneIdentities.has(scene) && stableJSON.canReusePrivateIdentity()) {
+      counters.sealedIdentityReuses++; return entry
+    }
+    same(identity(scene, index, stableJSON.observeJSON), entry.identity, 'Evidence scene identity changed')
     if (entry.sealed) return entry
     assert.ok(Array.isArray(scene.rawSamples) && scene.rawSamples.length >= entry.raw.length, 'Evidence raw sample prefix was removed')
     for (let i = 0; i < entry.raw.length; i++) assert.equal(scene.rawSamples[i], entry.objects[i], 'Evidence raw sample prefix was replaced or reordered')
@@ -415,6 +424,11 @@ export function createFullAppEvidenceWriter(filename, report, options) {
     // No producer mutates a successfully returned scene. Keep the same object
     // identity but release its bulky values only after its checkpoint commits.
     makeScene(entry.sealed, access, cache, owner, scene)
+    if (storageVersion === 3 && !stableJSONTypes.isProxy(scene) &&
+        ['group', 'routeId', 'stateId', 'theme', 'viewport'].every(key =>
+          entry.sealed.keys.includes(key) && own(entry.identity, key) && own(scene, key))) {
+      frozenSceneIdentities.add(scene)
+    }
     entry.raw = entry.objects = null; cache.clear(); counters.seals++
   }
   return {
@@ -529,6 +543,7 @@ function createFullAppStableJSONEncoder(report) {
   return {
     statistics: () => ({ ...metrics, privateCacheDisabled: !privateSafe }),
     privateProtocolSafe, cachePrivateDescriptor, observeJSON, trustActiveMetadata,
+    canReusePrivateIdentity: aggregateProtocolSafe,
     sealStableJSON(collection, value, { protectedObjects = [] } = {}) {
       assert.ok(Array.isArray(protectedObjects), 'Stable JSON protected owners must be an Array')
       assert.ok(STABLE_JSON_COLLECTIONS.includes(collection), 'Unregistered producer collection')

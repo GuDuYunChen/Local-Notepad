@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import { createNativeUiSelect } from './native-ui-select.mjs'
 import controlEvidence from './check-ui-control-render.cjs'
 import { COLLAPSED_SIDEBAR_EXPAND, validateCollapsedSidebarObservation, validateCollapsedSidebarFocus } from './full-app-ui-evidence.mjs'
@@ -1585,10 +1586,13 @@ export function observeCodeLanguageKeyboardEntry(ownerToken, action = 'read') {
     if (!owned) return { disposed: true, absent: true, ownerToken }
     if (owned.ownerToken !== ownerToken) throw Error('Code language keyboard observer token changed')
     try {
-      document.removeEventListener('keydown', owned.onKey, true)
-      return { disposed: true, ownerToken, identityRetained: Boolean(sameOwner(owned)),
+      let originalRemovalError = null
+      try { document.removeEventListener('keydown', owned.onKey, true) } catch (error) { originalRemovalError = error }
+      const nativeCleanup = owned.disposeNativeTrace?.()
+      if (originalRemovalError) throw originalRemovalError
+      return { disposed: nativeCleanup !== false, ownerToken, identityRetained: Boolean(sameOwner(owned)),
         ownedEvents: owned.events.slice(), ownedTraceTruncated: owned.truncated,
-        ...(owned.failureDiagnostic ? { failureDiagnostic: owned.failureDiagnostic } : {}) }
+        ...(owned.failureDiagnostic ? { failureDiagnostic: owned.failureDiagnostic, nativeTrace: owned.nativeTrace } : {}) }
     } finally { delete window[key] }
   }
   if (!ownerToken || !['read', 'install'].includes(action)) throw Error('Code language keyboard observer operation is invalid')
@@ -1647,10 +1651,132 @@ export function observeCodeLanguageKeyboardEntry(ownerToken, action = 'read') {
         target: name(event.target), active: name(document.activeElement), shiftKey: event.shiftKey,
         ctrlKey: event.ctrlKey, altKey: event.altKey, metaKey: event.metaKey,
         composing: event.isComposing || event.keyCode === 229 || event.which === 229 })
+      if (event.key === 'F6') state.captureNativeF6?.(event)
     }
     window[key] = state
     document.addEventListener('keydown', state.onKey, { capture: true, passive: true })
+    // This diagnostic observes the real installed Editor. It never invokes
+    // editor.read/update/focus, synthesizes input, flushes, or edits a Selection.
+    // Extra native callbacks can still add microtask-checkpoint opportunities.
+    const native = state.nativeTrace = { schemaVersion: 1, mode: 'instrumented-readonly-observer',
+      available: false, unavailableReason: 'lexical-owner-missing-or-foreign', rowLimit: 64,
+      rows: [], attempts: 0, truncated: false, captureErrors: 0, ownerChanged: false, registrationCleanupUnknown: false,
+      observationComplete: false, productAccepted: false, originalWindowsProducerProven: false }
+    const disposers = [], objects = new WeakMap(), keys = new Map()
+    let nextObject = 0, nextKey = 0, sequence = 0, armed = false, closed = false, lexical = null
+    const data = (object, name) => {
+      if (!object || (typeof object !== 'object' && typeof object !== 'function')) return undefined
+      const descriptor = Object.getOwnPropertyDescriptor(object, name)
+      return descriptor && 'value' in descriptor ? descriptor.value : undefined
+    }
+    const id = value => {
+      if (!value) return null
+      if (!objects.has(value)) objects.set(value, ++nextObject)
+      return objects.get(value)
+    }
+    const keyID = value => {
+      if (typeof value !== 'string' || value.length > 128) throw Error('unsupported-logical-key')
+      if (!keys.has(value)) { if (keys.size >= 256) throw Error('logical-key-bound'); keys.set(value, ++nextKey) }
+      return keys.get(value)
+    }
+    const role = node => !node ? null : node === editor ? 'editor' : node === target ? 'language' : node === next ? 'next' :
+      node === owner ? 'owner' : node === header ? 'header' : editor.contains(node) ? 'editor-descendant' : 'other'
+    const domPoint = (node, offset) => node && ({ id: id(node), role: role(node), type: node.nodeType,
+      offset, connected: node.isConnected, sameDocument: node.ownerDocument === document })
+    const logical = value => {
+      if (value === null) return null
+      if (!value || typeof value !== 'object') throw Error('unsupported-logical-selection')
+      const anchor = data(value, 'anchor'), focus = data(value, 'focus')
+      const point = item => {
+        const offset = data(item, 'offset'), type = data(item, 'type')
+        if (!Number.isSafeInteger(offset) || offset < 0 || !['text', 'element'].includes(type)) throw Error('unsupported-logical-point')
+        return { keyID: keyID(data(item, 'key')), offset, type }
+      }
+      return { id: id(value), kind: anchor && focus ? 'points' : 'other',
+        anchor: anchor && focus ? point(anchor) : null, focus: anchor && focus ? point(focus) : null,
+        dirty: data(value, 'dirty') === true }
+    }
+    const tagSummary = tags => {
+      const count = Object.getOwnPropertyDescriptor(Set.prototype, 'size').get.call(tags)
+      const known = ['skip-dom-selection', 'focus', 'history-merge', 'history-push', 'historic', 'local-notepad:content-load', 'evidence-navigation']
+      return { count, known: known.filter(tag => Set.prototype.has.call(tags, tag)) }
+    }
+    const record = (stage, event = null, currentSelection = null, update = null) => {
+      if (closed || !native.available) return
+      if (native.attempts >= native.rowLimit) { native.truncated = true; return }
+      native.attempts++
+      try {
+        if (!sameOwner(state) || data(editor, '__lexicalEditor') !== lexical || data(lexical, '_rootElement') !== editor) {
+          native.ownerChanged = true; throw Error('native-owner-changed')
+        }
+        const current = data(lexical, '_editorState'), pending = data(lexical, '_pendingEditorState')
+        const selection = currentSelection || window.getSelection()
+        if (!selection || !current || (pending !== null && !pending)) throw Error('native-state-unavailable')
+        const dirtyType = data(lexical, '_dirtyType')
+        if (!Number.isSafeInteger(dirtyType) || dirtyType < 0) throw Error('native-dirty-state-unavailable')
+        native.rows.push({ sequence: ++sequence, stage, at: performance.now(),
+          event: event ? { id: id(event), type: event.type, key: event.key === 'F6' ? 'F6' : null,
+            trusted: event.isTrusted === true, phase: event.eventPhase, prevented: event.defaultPrevented === true,
+            target: role(event.target), shift: !!event.shiftKey, ctrl: !!event.ctrlKey, alt: !!event.altKey,
+            meta: !!event.metaKey, composing: !!event.isComposing || event.keyCode === 229 || event.which === 229 } : null,
+          dom: { objectID: id(selection), rangeCount: selection.rangeCount, collapsed: selection.isCollapsed,
+            anchor: domPoint(selection.anchorNode, selection.anchorOffset), focus: domPoint(selection.focusNode, selection.focusOffset),
+            active: role(document.activeElement) },
+          current: { id: id(current), selection: logical(data(current, '_selection')) },
+          pending: pending === null ? null : { id: id(pending), selection: logical(data(pending, '_selection')) },
+          dirtyType, pendingTags: tagSummary(data(lexical, '_updateTags')),
+          committed: update ? { id: id(update.editorState), tags: tagSummary(update.tags),
+            dirtyElements: update.dirtyElements.size, dirtyLeaves: update.dirtyLeaves.size } : null })
+      } catch { native.captureErrors++; native.firstCaptureError ||= stage }
+    }
+    const cleanup = () => {
+      closed = true
+      let errors = 0
+      for (const item of [...disposers].reverse()) if (item.active) {
+        try { item.remove(); item.active = false } catch { errors++ }
+      }
+      native.cleanup = { attempted: true, installed: disposers.length,
+        removed: disposers.filter(item => !item.active).length, errors, remaining: disposers.filter(item => item.active).length }
+      const downs = native.rows.filter(row => row.stage === 'document-keydown-capture')
+      const tails = native.rows.filter(row => row.stage === 'root-keydown-tail')
+      const ups = native.rows.filter(row => row.stage === 'document-keyup-capture')
+      const reads = native.rows.filter(row => row.stage === 'first-read-after-f6')
+      const input = row => row.event?.trusted && !row.event.shift && !row.event.ctrl && !row.event.alt && !row.event.meta && !row.event.composing
+      native.observationComplete = native.available && !native.truncated && !native.captureErrors && !native.ownerChanged &&
+        !native.registrationCleanupUnknown && errors === 0 && native.cleanup.remaining === 0 && downs.length === 1 && tails.length === 1 && ups.length === 1 && reads.length === 1 &&
+        input(downs[0]) && input(ups[0]) && tails[0].event.id === downs[0].event.id &&
+        downs[0].sequence < tails[0].sequence && tails[0].sequence < ups[0].sequence && ups[0].sequence < reads[0].sequence
+      return !native.registrationCleanupUnknown && errors === 0 && native.cleanup.remaining === 0
+    }
+    state.disposeNativeTrace = cleanup
+    state.captureNativeF6 = event => { if (!closed) { armed = true; record('document-keydown-capture', event) } }
+    state.readNativeTrace = currentSelection => {
+      if (!closed) { record(armed ? 'first-read-after-f6' : 'read-before-f6', null, currentSelection); if (armed) closed = true }
+    }
+    try {
+      lexical = data(editor, '__lexicalEditor')
+      if (lexical && data(lexical, '_rootElement') === editor && typeof lexical.registerUpdateListener === 'function') {
+        native.registrationCleanupUnknown = true
+        const remove = lexical.registerUpdateListener(update => { if (armed) record('lexical-committed-update', null, null, update) })
+        if (typeof remove !== 'function') throw Error('native-listener-disposer-unavailable')
+        disposers.push({ active: true, remove })
+        native.registrationCleanupUnknown = false
+        const listen = (node, type, callback, capture) => {
+          disposers.push({ active: true, remove: () => node.removeEventListener(type, callback, capture) })
+          node.addEventListener(type, callback, { capture, passive: true })
+        }
+        listen(editor, 'keydown', event => { if (armed && event.key === 'F6') record('root-keydown-tail', event) }, false)
+        listen(document, 'keyup', event => { if (armed && event.key === 'F6') record('document-keyup-capture', event) }, true)
+        listen(document, 'selectionchange', event => { if (armed) record('document-selectionchange', event) }, true)
+        native.available = true; native.unavailableReason = null
+        record('installed', null, selection)
+      }
+    } catch {
+      native.available = false; native.unavailableReason = 'native-trace-registration-failed'
+      cleanup()
+    }
   } else {
+    owned.readNativeTrace?.(selection)
     if (owned.selectionNodes[0] !== selection.anchorNode || owned.selectionNodes[1] !== selection.focusNode) {
       // Keep only this failed read, before its original throw. The existing
       // disposal response and finally save retain plain data without a reread,
@@ -1750,6 +1876,21 @@ export async function traverseCodeLanguageWithNativeKeys({ key, evaluate, receip
         try { await trace() } catch (error) { receipt.traceError = { name: error.name, message: error.message } }
       }
       receipt.disposal = await evaluate(`(${observeCodeLanguageKeyboardEntry.toString()})(${JSON.stringify(receipt.ownerToken)},'dispose')`)
+      if (receipt.disposal.nativeTrace) {
+        // Only bounded anonymous metadata leaves the renderer. Hash it during
+        // the original disposal/save path, never by another CDP read or wait.
+        try {
+          const bytes = Buffer.from(JSON.stringify(receipt.disposal.nativeTrace), 'utf8')
+          const sha256 = createHash('sha256').update(bytes).digest('hex')
+          receipt.disposal.nativeTrace = bytes.length <= 65536 ? { ...receipt.disposal.nativeTrace, bytes: bytes.length, sha256 } :
+            { schemaVersion: 1, mode: 'instrumented-readonly-observer', available: false, unavailableReason: 'serialized-metadata-limit',
+              observationComplete: false, productAccepted: false, originalWindowsProducerProven: false,
+              truncated: true, payloadRetained: false, bytes: bytes.length, sha256 }
+        } catch {
+          receipt.disposal.nativeTrace = { schemaVersion: 1, mode: 'instrumented-readonly-observer', available: false,
+            unavailableReason: 'metadata-hash-failed', observationComplete: false, productAccepted: false, originalWindowsProducerProven: false }
+        }
+      }
       receipt.ownedEvents ||= receipt.disposal.ownedEvents || []
       assert.equal(receipt.disposal.disposed, true, 'Code language keyboard observer was not disposed')
       if (receipt.ownerInstalled) assert.equal(receipt.disposal.absent, undefined, 'Code language keyboard observer disappeared before disposal')
