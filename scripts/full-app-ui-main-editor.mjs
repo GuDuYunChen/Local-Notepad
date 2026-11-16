@@ -481,7 +481,7 @@ export async function verifyMainEditorPages(ctx) {
   }
   const inspector = async tab => {
     if (!(await exists('.inspector-panel'))) await hit('button[aria-label="笔记详情"]')
-    await present('.inspector-panel'); await hit('#inspector-tab-' + tab)
+    await present('#inspector-tab-' + tab); await hit('#inspector-tab-' + tab)
     await present('#inspector-panel-' + tab)
   }
   const selectText = async () => {
