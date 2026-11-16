@@ -2742,13 +2742,18 @@ function pinnedReplayPage(frameIndex, offset = 0) {
   return page
 }
 const pinnedCentralSource = (await import('node:fs')).readFileSync(new URL('./full-app-ui-evidence.mjs', import.meta.url), 'utf8')
-const pinnedCentralStart = '        const start = surface.requiredContentStart, end = surface.requiredContentEnd\n'
-const pinnedCentralEnd = "        assert.ok(intervals.length > 0 && gaps.length === 0, 'Actual long-page content has an unphotographed interval')"
-const pinnedCentralFrom = pinnedCentralSource.indexOf(pinnedCentralStart)
-const pinnedCentralTo = pinnedCentralSource.indexOf(pinnedCentralEnd, pinnedCentralFrom)
-assert.ok(pinnedCentralFrom >= 0 && pinnedCentralTo > pinnedCentralFrom)
-const pinnedCentralCoverage = pinnedCentralSource.slice(pinnedCentralFrom, pinnedCentralTo + pinnedCentralEnd.length)
-assert.equal(hash(pinnedCentralCoverage), '5dadeeda9e7233591239f390dd0e9b4621f8ab47c1857625e485f64c208812ca', 'Execute the exact unchanged central coverage block')
+function pinnedCentralCoverageFrom(source) {
+  const pinnedCentralSource = source.replace(/\r\n/g, '\n')
+  const pinnedCentralStart = '        const start = surface.requiredContentStart, end = surface.requiredContentEnd\n'
+  const pinnedCentralEnd = "        assert.ok(intervals.length > 0 && gaps.length === 0, 'Actual long-page content has an unphotographed interval')"
+  const pinnedCentralFrom = pinnedCentralSource.indexOf(pinnedCentralStart)
+  const pinnedCentralTo = pinnedCentralSource.indexOf(pinnedCentralEnd, pinnedCentralFrom)
+  assert.ok(pinnedCentralFrom >= 0 && pinnedCentralTo > pinnedCentralFrom)
+  const pinnedCentralCoverage = pinnedCentralSource.slice(pinnedCentralFrom, pinnedCentralTo + pinnedCentralEnd.length)
+  assert.equal(hash(pinnedCentralCoverage), '5dadeeda9e7233591239f390dd0e9b4621f8ab47c1857625e485f64c208812ca', 'Execute the exact unchanged central coverage block')
+  return pinnedCentralCoverage
+}
+const pinnedCentralCoverage = pinnedCentralCoverageFrom(pinnedCentralSource)
 // Same realm preserves the original deepEqual semantics; this is the entire
 // original coverage block, not a claim of full validateFullAppUiEvidence.
 const assertPinnedCentralCoverage = new Function('scene', 'surface', 'assert', pinnedCentralCoverage)
@@ -2938,4 +2943,152 @@ test('actual runner seals its original owned-option receipt only after release a
   const ordinary = ownedOptionPointerFixture(t)
   await ordinary.click('[aria-label="ordinary-action"]')
   assert.deepEqual(ordinary.sealObservations, [], 'Ordinary clicks do not create or seal an owned-option receipt')
+})
+
+
+// Both checkout line endings must execute the same complete production block.
+// These are retained-data/DOM contracts, not a new native application run.
+test('pinned central coverage extraction preserves identical real LF and CRLF checks', async t => {
+  const lf = pinnedCentralSource.replace(/\r\n/g, '\n'), crlf = lf.replace(/\n/g, '\r\n')
+  assert.notEqual(crlf, lf, 'Use actual CRLF source bytes rather than a label')
+  assert.equal(crlf.replace(/\r\n/g, '\n'), lf)
+  const fixture = pinnedCaptureReplay(), scene = await fixture.run()
+  checkPinnedCanonicalReplay(fixture, scene)
+  for (const [ending, source] of [['LF', lf], ['CRLF', crlf]]) {
+    const coverage = pinnedCentralCoverageFrom(source)
+    assert.equal(coverage, pinnedCentralCoverage, 'Only checkout line-ending representation may differ')
+    const validate = new Function('scene', 'surface', 'assert', coverage)
+    for (const surface of scene.scrollCoverage) validate(scene, surface, assert)
+    const extent = clone(scene), target = extent.scrollCoverage[1]
+    extent.rawSamples.find(sample => sample.phase === 'before-capture').scrollAreas[1].requiredContentEnd += 2
+    assert.throws(() => validate(extent, target, assert), /Actual content extent changed across PNG captures/)
+    const duplicate = clone(scene), boundary = duplicate.rawSamples.find(sample => sample.phase === 'before-capture')
+    boundary.scrollAreas.push(clone(boundary.scrollAreas[1]))
+    assert.throws(() => validate(duplicate, duplicate.scrollCoverage[1], assert), /Ambiguous actual scroll-surface owner at PNG boundary/)
+    assert.throws(() => pinnedCentralCoverageFrom(source.replace('assert.equal(surface.contentStart, start);', 'assert.equal(surface.contentStart, start + 1);')),
+      /Execute the exact unchanged central coverage block/, 'A real central assertion change must not be normalized away')
+    t.diagnostic(JSON.stringify({ pinnedCentralSourceEnding: ending, coverageSHA256: hash(coverage),
+      actualRawSamples: scene.rawSamples.length, images: scene.images.length, surfacesExecuted: scene.scrollCoverage.length,
+      extentDriftRejected: true, duplicateOwnerRejected: true, changedBlockRejected: true }))
+  }
+})
+
+
+// Execute the real serialized page observer and actual shot/captureState calls.
+// DOM geometry and image receipts here are explicit synthetic contracts only.
+const codeCaptureRoutes = (await import('./full-app-ui-main-editor.mjs')).editorRoutes
+const codeCaptureLedger = JSON.parse((await import('node:fs')).readFileSync(new URL('./full-app-ui-routes.json', import.meta.url), 'utf8'))
+const codeCaptureRoute = codeCaptureRoutes.find(route => route.id === 'editor-code')
+const codeCaptureLedgerRoute = codeCaptureLedger.groups.editor.routes.find(route => route.id === 'editor-code')
+const codeCaptureConstants = runInNewContext(codeOwnerVerifierText.slice(
+  codeOwnerVerifierText.indexOf('const activeCodeRoot = '), codeOwnerVerifierText.indexOf('const stateRoots = ')) +
+  ';({ activeCodeRoot, activeCodeLanguage, activeCodeDropdown, activeCodeSearch })')
+function codeCaptureDOM(t, { state = 'default', copies = 1, distractions = false, reading = false, hidden = false, duplicatePopup = false } = {}) {
+  const popup = prefix => '<div class="language-selector-dropdown" id="' + prefix + '-dropdown">' +
+    '<input data-ui-control="input" class="ant-input ant-input-sm language-selector-search" id="' + prefix + '-search" placeholder="Search languages…">' +
+    '<div class="language-selector-list">' + (state === 'empty' ? '<div class="language-selector-item disabled">No languages found</div>' : '<div class="language-selector-item selected">JavaScript</div>') + '</div></div>'
+  const shell = prefix => '<div class="code-block-wrapper" id="' + prefix + '-shell"><div class="code-block-wrapper" id="' + prefix + '-decorator">' +
+    '<div class="code-block-header"><div class="code-block-header-left"><div class="language-selector">' +
+    '<button data-ui-control="button" data-ui-layout="action" class="ant-btn ant-btn-sm language-selector-button" id="' + prefix + '-language">JavaScript</button>' +
+    (state === 'default' ? '' : popup(prefix) + (duplicatePopup && prefix === 'active' ? popup(prefix + '-duplicate') : '')) +
+    '</div></div></div><div class="code-block-content"><div class="code-editor-container">' +
+    '<textarea data-ui-native="code-editor-textarea" class="code-textarea" id="' + prefix + '-source">const note = 1;</textarea></div></div></div></div>'
+  const dom = new ProjectSetupDOM((distractions ? '<aside class="preview">' + shell('preview') + '</aside><div class="reading editor-input" contenteditable="false">' + shell('reading') + '</div>' : '') +
+    '<div class="active-editor editor-input" contenteditable="' + (reading ? 'false' : 'true') + '"' + (hidden ? ' hidden' : '') + '>' + shell('active').repeat(copies) + '</div>')
+  t.after(() => dom.window.close())
+  const document = dom.window.document, rect = (left, top, width, height) => ({ left, top, right: left + width, bottom: top + height, width, height })
+  const box = node => {
+    if (node === document.documentElement || node === document.body) return rect(0, 0, 704, 455)
+    if (node.closest('.preview,.reading')) return rect(650, 10, 40, 40)
+    if (node.matches('.language-selector-button')) return rect(50, 125, 140, 28)
+    if (node.matches('.language-selector-search')) return rect(60, 168, 200, 28)
+    if (node.matches('.language-selector-dropdown,.language-selector-list,.language-selector-item')) return rect(50, 160, 220, 160)
+    if (node.matches('.code-textarea')) return rect(50, 200, 540, 120)
+    return rect(40, 120, 580, 240)
+  }
+  for (const node of document.querySelectorAll('*')) {
+    node.getBoundingClientRect = () => box(node); node.getClientRects = () => [box(node)]
+    node.getAnimations = () => []
+    node.scrollIntoView = () => assert.fail('Visible code fixture must not need a synthetic scroll')
+    for (const name of ['clientWidth', 'scrollWidth']) Object.defineProperty(node, name, { configurable: true, get: () => box(node).width })
+    for (const name of ['clientHeight', 'scrollHeight']) Object.defineProperty(node, name, { configurable: true, get: () => box(node).height })
+    Object.defineProperty(node, 'innerText', { configurable: true, get: () => node.textContent })
+  }
+  document.documentElement.dataset.theme = matrix.theme
+  Object.defineProperty(document, 'scrollingElement', { configurable: true, value: document.documentElement })
+  document.elementFromPoint = (x, y) => [...document.querySelectorAll('.active-editor input,.active-editor button,.active-editor textarea')].find(node => {
+    const b = box(node); return x >= b.left && x <= b.right && y >= b.top && y <= b.bottom
+  }) || document.body
+  const globals = { document, window: dom.window, innerWidth: 704, innerHeight: 455, devicePixelRatio: 1,
+    requestAnimationFrame: callback => callback(), getComputedStyle: node => ({
+      display: node.hidden ? 'none' : 'block', visibility: 'visible', opacity: '1', overflowX: 'visible', overflowY: 'visible',
+      position: 'static', transform: 'none', perspective: 'none', filter: 'none', backdropFilter: 'none', translate: 'none', rotate: 'none', scale: 'none',
+      contain: 'none', contentVisibility: 'visible', willChange: 'auto', color: 'rgb(0, 0, 0)', backgroundColor: 'rgb(255, 255, 255)', borderTopColor: 'rgb(0, 0, 0)',
+      whiteSpace: 'normal', lineHeight: '20px', fontSize: '14px', outlineStyle: 'none', outlineWidth: '0px', boxShadow: 'none',
+    }) }
+  const observe = root => JSON.parse(JSON.stringify(runInNewContext(`(()=>{const collectFullAppScrollOwners=${collectFullAppScrollOwners.toString()};return (${viewportObservers.observeFullAppPage.toString()})(${JSON.stringify({ root, editorExceptions: codeCaptureRoute.editorExceptions })},${withinActualClientPort.toString()},${viewportObservers.observeFullAppOverflowViewport.toString()},${viewportObservers.viewportFixedClipBoundary.toString()});})()`, globals)))
+  const report = { fullAppUi: { group: 'editor', scenes: [], focus: [], popups: [] } }, captures = [], observations = []
+  const context = { routes: codeCaptureRoutes, matrix: clone(matrix), report,
+    windowReceipt: { nativeWindow: true, viewport: clone(matrix.viewport), requested: clone(matrix.viewport), syntheticContractOnly: true },
+    evaluate: async expression => { observations.push(expression); return JSON.parse(JSON.stringify(await runInNewContext(expression, globals))) },
+    until: async check => { const value = await check(); assert.ok(value, 'Synthetic code DOM is already settled'); return value },
+    click() { assert.fail('Root binding must not dispatch native input') }, cdp: { send() { assert.fail('Root binding must not dispatch native input') } },
+    async capture(filename, guard) { if (guard) assert.ok(await guard()); captures.push({ filename, guarded: Boolean(guard) }); return { filename, bytes: 1, sha256: '0'.repeat(64), syntheticContractOnly: true } },
+    save() {},
+  }
+  const shared = createFullAppUiShared(context)
+  const shotSource = /^  const shot = (.+)$/m.exec(codeOwnerVerifierText); assert.ok(shotSource)
+  const shot = runInNewContext('(' + shotSource[1] + ')', { shared, roots: Object.fromEntries(codeCaptureRoutes.map(route => [route.id, route.root])) })
+  const runShot = () => {
+    const call = new RegExp("await shot\\('editor-code', '" + state + "',[^\\n]*?\\)").exec(codeOwnerVerifierText); assert.ok(call)
+    return runInNewContext('(async()=>{return ' + call[0] + ';})()', { shot, ...codeCaptureConstants })
+  }
+  return { document, observe, runShot, report, captures, observations }
+}
+
+test('editor code default uses its registered direct-header owner in actual page observation and capture', async t => {
+  const f = codeCaptureDOM(t)
+  assert.equal(f.document.querySelectorAll('.code-block-wrapper').length, 2, 'Retain both actual Lexical shell and component')
+  const sample = f.observe(codeCaptureRoute.root)
+  validateFullAppPageSample(sample, matrix)
+  assert.equal(sample.root, codeCaptureConstants.activeCodeRoot)
+  const scene = await f.runShot()
+  assert.equal(scene.complete, true); assert.equal(scene.root, codeCaptureConstants.activeCodeRoot)
+  assert.equal(codeCaptureLedgerRoute.root, scene.root)
+  assert.deepEqual(codeCaptureRoute.requiredStates, ['default', 'languages', 'empty'])
+  assert.deepEqual(codeCaptureLedgerRoute, codeCaptureRoute)
+  assert.equal(f.captures.length, 1); assert.ok(f.captures[0].guarded)
+  assert.equal(scene.rawSamples.length, 3)
+  assert.ok(f.observations.some(source => source.startsWith('(()=>{const collectFullAppScrollOwners=')))
+})
+
+test('editor code languages uses its exact registered popup root through the actual captureState entry', async t => {
+  const f = codeCaptureDOM(t, { state: 'languages', distractions: true }), scene = await f.runShot()
+  assert.equal(scene.complete, true); assert.equal(scene.root, codeCaptureConstants.activeCodeDropdown)
+  assert.equal(codeCaptureRoute.stateRoots.languages, scene.root); assert.equal(codeCaptureLedgerRoute.stateRoots.languages, scene.root)
+  assert.equal(f.document.querySelectorAll('.language-selector-dropdown').length, 3, 'Foreign preview and reading popups remain in the fixture')
+  assert.equal(scene.controls.length, 1); assert.equal(scene.controls[0].fieldSelector, '[id="active-search"]')
+  assert.equal(f.captures.length, 1); assert.ok(f.captures[0].guarded); assert.equal(scene.rawSamples.length, 3)
+})
+
+test('editor code empty uses its exact registered popup root through the actual captureState entry', async t => {
+  const f = codeCaptureDOM(t, { state: 'empty', distractions: true }), scene = await f.runShot()
+  assert.equal(scene.complete, true); assert.equal(scene.root, codeCaptureConstants.activeCodeDropdown)
+  assert.equal(codeCaptureRoute.stateRoots.empty, scene.root); assert.equal(codeCaptureLedgerRoute.stateRoots.empty, scene.root)
+  assert.match(f.document.querySelector(codeCaptureConstants.activeCodeDropdown).textContent, /No languages found/)
+  assert.equal(scene.controls.length, 1); assert.equal(scene.controls[0].fieldSelector, '[id="active-search"]')
+  assert.equal(f.captures.length, 1); assert.ok(f.captures[0].guarded); assert.equal(scene.rawSamples.length, 3)
+})
+
+test('editor code page roots still reject missing duplicate hidden and reading owners with foreign previews intact', t => {
+  const owned = codeCaptureDOM(t, { distractions: true })
+  assert.equal(owned.document.querySelectorAll('.code-block-wrapper').length, 6)
+  const sample = owned.observe(codeCaptureConstants.activeCodeRoot); validateFullAppPageSample(sample, matrix)
+  assert.deepEqual(sample.controls.map(control => control.fieldSelector), ['[id="active-language"]', '[id="active-source"]'])
+  for (const options of [{ copies: 0 }, { copies: 2 }, { hidden: true }, { reading: true }]) {
+    const f = codeCaptureDOM(t, { ...options, distractions: true })
+    assert.throws(() => f.observe(codeCaptureConstants.activeCodeRoot), /Expected one actual page root/)
+  }
+  const duplicate = codeCaptureDOM(t, { state: 'languages', duplicatePopup: true, distractions: true })
+  assert.throws(() => duplicate.observe(codeCaptureConstants.activeCodeDropdown), /Expected one actual page root/)
 })

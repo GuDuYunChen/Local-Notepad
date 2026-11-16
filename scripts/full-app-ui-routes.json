@@ -1420,15 +1420,15 @@
           "id": "editor-code",
           "title": "代码块语言",
           "source": "src/components/Editor/nodes/CodeBlockNode.jsx",
-          "root": ".code-block-wrapper",
+          "root": ".editor-input[contenteditable=\"true\"] .code-block-wrapper:has(> .code-block-header)",
           "requiredStates": [
             "default",
             "languages",
             "empty"
           ],
           "stateRoots": {
-            "languages": ".language-selector-dropdown",
-            "empty": ".language-selector-dropdown"
+            "languages": ".editor-input[contenteditable=\"true\"] .code-block-wrapper:has(> .code-block-header) .language-selector-dropdown",
+            "empty": ".editor-input[contenteditable=\"true\"] .code-block-wrapper:has(> .code-block-header) .language-selector-dropdown"
           },
           "editorExceptions": [
             {

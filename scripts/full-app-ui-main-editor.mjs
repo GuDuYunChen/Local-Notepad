@@ -17,7 +17,7 @@ const stateRoots = {
   'editor-source': { discard: '.consumer-confirm-modal' },
   'editor-history': { 'restore-confirmation': '.consumer-confirm-modal' },
   'editor-attachment': { preview: '.attachment-preview-dialog' },
-  'editor-code': { languages: '.language-selector-dropdown', empty: '.language-selector-dropdown' },
+  'editor-code': { languages: activeCodeDropdown, empty: activeCodeDropdown },
   'editor-commands': { 'block-menu': '.block-menu', 'wiki-completion': '.wiki-link-menu' },
   'editor-table-actions': { 'selection-mode': '.table-selection-modebar' },
 }
@@ -50,7 +50,7 @@ export const editorRoutes = [
   route('editor-todo', '待办内容', 'src/components/Editor/nodes/TodoNode.jsx', '.todo-block', ['default', 'edit']),
   route('editor-formula', '公式编辑', 'src/components/Editor/nodes/FormulaNode.jsx', '.formula-editor', ['default', 'draft']),
   route('editor-embed', '嵌入属性', 'src/components/Editor/nodes/EmbedNode.jsx', '.embed-block', ['default', 'draft']),
-  route('editor-code', '代码块语言', 'src/components/Editor/nodes/CodeBlockNode.jsx', '.code-block-wrapper', ['default', 'languages', 'empty'], ['.code-textarea']),
+  route('editor-code', '代码块语言', 'src/components/Editor/nodes/CodeBlockNode.jsx', activeCodeRoot, ['default', 'languages', 'empty'], ['.code-textarea']),
   route('editor-callout', '提示块', 'src/components/Editor/nodes/CalloutNode.jsx', '.callout-block', ['default', 'icons']),
   route('editor-toggle', '折叠块', 'src/components/Editor/nodes/ToggleNode.jsx', '.toggle-block', ['expanded', 'collapsed']),
   route('editor-file-import', '本地文档导入预检', 'src/components/ImportWorkspace.jsx', '.local-import-workspace', ['empty', 'prepared', 'destination-popup', 'long-title']),
