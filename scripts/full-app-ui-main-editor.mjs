@@ -872,7 +872,25 @@ async function verifyEditorNodes(ctx) {
           ownedLanguageCount: owners.length === 1 ? owners[0].querySelectorAll('.language-selector-button').length : 0,
           allPaintedCodeCount: [...document.querySelectorAll('.code-block-wrapper')].filter(painted).length,
           editableEditorCount: document.querySelectorAll('.editor-input[contenteditable="true"]').length,
-          title: document.querySelector('.workspace-title-button')?.textContent.trim() ?? null
+          title: document.querySelector('.workspace-title-button')?.textContent.trim() ?? null,
+          // Observe actual duplicate owners without accepting them or adding
+          // any user input: the one-owner assertion remains authoritative.
+          ownedDetails: owners.slice(0, 6).map((node, index) => {
+            const rect = node.getBoundingClientRect()
+            const field = node.querySelector('textarea.code-textarea')
+            const language = node.querySelector('.language-selector-button')
+            return {
+              index,
+              parentTag: node.parentElement?.tagName ?? null,
+              parentClass: String(node.parentElement?.className ?? '').slice(0, 160),
+              nestedCodeOwners: node.querySelectorAll('.code-block-wrapper').length,
+              languageButtons: node.querySelectorAll('.language-selector-button').length,
+              languageText: language?.textContent.trim().slice(0, 120) ?? null,
+              textareaText: field?.value.slice(0, 250) ?? null,
+              headerText: node.querySelector('.code-block-header')?.textContent.trim().slice(0, 160) ?? null,
+              rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
+            }
+          })
         }
       })()`)
       return codeOwnerObservation.ownedCount === 1 &&
