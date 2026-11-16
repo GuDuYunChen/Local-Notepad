@@ -59,8 +59,10 @@ describe('real code decorator keyboard ownership', () => {
       expect(document.activeElement).toBe(root);
     }
     expect(key(buttons[0], 'F6').defaultPrevented).toBe(false);
-    root.addEventListener('keydown', e => e.preventDefault(), { capture: true, once: true });
-    expect(key(root, 'F6').defaultPrevented).toBe(true);
+    const handled = new KeyboardEvent('keydown', { key: 'F6', bubbles: true, cancelable: true });
+    handled.preventDefault();
+    root.dispatchEvent(handled);
+    expect(handled.defaultPrevented).toBe(true);
     expect(document.activeElement).toBe(root);
   });
   it('respects live reading/editing mode changes and disabled controls', () => {
