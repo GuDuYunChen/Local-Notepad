@@ -274,7 +274,7 @@ const CodeBlockComponent = React.memo(function CodeBlockComponent({ code, langua
 
   // Lexical consumes Tab while the editable body is focused. F6 enters the
   // real code language control without changing Tab indentation or code data.
-  useEffect(() => bindCodeBlockKeyboardAccess(codeBlockRef.current), []);
+  useEffect(() => bindCodeBlockKeyboardAccess(codeBlockRef.current, () => editor.isEditable()), []);
 
   useEffect(() => {
     const cancelPaste = () => {

@@ -139,16 +139,27 @@ export default function BlockHandlePlugin() {
       return
     }
 
-    editor.getEditorState().read(() => {
+    const hasRootAnchor = editor.getEditorState().read(() => {
       const lexicalSelection = $getSelection()
       if (!$isRangeSelection(lexicalSelection)) return
 
       const anchorNode = lexicalSelection.anchor.getNode()
+      // Root selections do not identify one block, even while the DOM range
+      // still points at the previously selected paragraph.
+      if (anchorNode.getKey() === 'root') return true
       const blockNode = $getNearestBlockElementAncestorOrThrow(anchorNode)
       const type = getBlockTypeFromNode(blockNode)
       setBlockType(type || 'paragraph')
       setBlockKey(blockNode.getKey())
+      return false
     })
+
+    if (hasRootAnchor) {
+      activeBlockRef.current = null
+      setBlockKey('')
+      placeControls(null)
+      return
+    }
 
     activeBlockRef.current = element
     placeControls(layout)
