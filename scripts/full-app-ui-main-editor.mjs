@@ -6,7 +6,7 @@ import { desktopNote } from './desktop-save-fixture.mjs'
 
 // Installed production UI only. Fixture documents use the public local API;
 // observations never write editor state, dispatch application events or mount UI.
-const activeCodeRoot = '.editor-input[contenteditable="true"] .code-block-wrapper'
+// Lexical creates an outer .code-block-wrapper shell around the actual\n// CodeBlockNode decorator. Only a wrapper with its own direct header is the\n// real interactive owner; nested shells must not count as duplicate blocks.\nconst activeCodeRoot = '.editor-input[contenteditable="true"] .code-block-wrapper:has(> .code-block-header)'
 const activeCodeLanguage = activeCodeRoot + ' .language-selector-button'
 const activeCodeDropdown = activeCodeRoot + ' .language-selector-dropdown'
 const activeCodeSearch = activeCodeRoot + ' .language-selector-search'
