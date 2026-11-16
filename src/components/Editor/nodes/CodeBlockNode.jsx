@@ -6,6 +6,7 @@ import { $getNodeByKey } from 'lexical';
 
 import 'highlight.js/styles/atom-one-dark.css';
 import { UiButton, UiInput } from '~/components/ui/ControlKit'
+import { bindCodeBlockKeyboardAccess } from './codeBlockKeyboard'
 
 
 // Supported languages list
@@ -260,6 +261,7 @@ const CodeBlockComponent = React.memo(function CodeBlockComponent({ code, langua
   const isEditable = useLexicalEditable();
   const textareaRef = useRef(null);
   const preRef = useRef(null);
+  const codeBlockRef = useRef(null);
   const [autoHighlight, setAutoHighlight] = useState(true);
   const [showEnableButton, setShowEnableButton] = useState(false);
   const [wrapLines, setWrapLines] = useState(false);
@@ -269,6 +271,10 @@ const CodeBlockComponent = React.memo(function CodeBlockComponent({ code, langua
   const highlightRequestRef = useRef(0);
   const searchTargetTimeoutRef = useRef(null);
   const pasteTimeoutRef = useRef(null);
+
+  // Lexical consumes Tab while the editable body is focused. F6 enters the
+  // real code language control without changing Tab indentation or code data.
+  useEffect(() => bindCodeBlockKeyboardAccess(codeBlockRef.current), []);
 
   useEffect(() => {
     const cancelPaste = () => {
@@ -488,7 +494,7 @@ const CodeBlockComponent = React.memo(function CodeBlockComponent({ code, langua
   };
 
   return (
-    <div className={'code-block-wrapper' + (searchTarget ? ' search-target' : '')}>
+    <div ref={codeBlockRef} className={'code-block-wrapper' + (searchTarget ? ' search-target' : '')} title="按 F6 从编辑正文进入代码语言选择">
       <div className="code-block-header">
         <div className="code-block-header-left">
           <LanguageSelector value={language} onChange={handleLanguageChange} disabled={!isEditable} />
