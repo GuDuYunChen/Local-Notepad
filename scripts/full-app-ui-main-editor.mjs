@@ -6,13 +6,18 @@ import { desktopNote } from './desktop-save-fixture.mjs'
 
 // Installed production UI only. Fixture documents use the public local API;
 // observations never write editor state, dispatch application events or mount UI.
+const activeCodeRoot = '.editor-input[contenteditable="true"] .code-block-wrapper'
+const activeCodeLanguage = activeCodeRoot + ' .language-selector-button'
+const activeCodeDropdown = activeCodeRoot + ' .language-selector-dropdown'
+const activeCodeSearch = activeCodeRoot + ' .language-selector-search'
+const activeCodeList = activeCodeRoot + ' .language-selector-list'
 const stateRoots = {
   'editor-toolbar': { 'insert-menu': '.toolbar-insert-menu', 'format-menu': '.toolbar-format-menu', 'text-color': '[aria-label="文本颜色选择"]', highlight: '[aria-label="高亮颜色选择"]' },
   'editor-search': { confirmation: '.consumer-confirm-modal' },
   'editor-source': { discard: '.consumer-confirm-modal' },
   'editor-history': { 'restore-confirmation': '.consumer-confirm-modal' },
   'editor-attachment': { preview: '.attachment-preview-dialog' },
-  'editor-code': { languages: '.language-selector-dropdown', empty: '.language-selector-dropdown' },
+  'editor-code': { languages: activeCodeDropdown, empty: activeCodeDropdown },
   'editor-commands': { 'block-menu': '.block-menu', 'wiki-completion': '.wiki-link-menu' },
   'editor-table-actions': { 'selection-mode': '.table-selection-modebar' },
 }
@@ -45,7 +50,7 @@ export const editorRoutes = [
   route('editor-todo', '待办内容', 'src/components/Editor/nodes/TodoNode.jsx', '.todo-block', ['default', 'edit']),
   route('editor-formula', '公式编辑', 'src/components/Editor/nodes/FormulaNode.jsx', '.formula-editor', ['default', 'draft']),
   route('editor-embed', '嵌入属性', 'src/components/Editor/nodes/EmbedNode.jsx', '.embed-block', ['default', 'draft']),
-  route('editor-code', '代码块语言', 'src/components/Editor/nodes/CodeBlockNode.jsx', '.code-block-wrapper', ['default', 'languages', 'empty'], ['.code-textarea']),
+  route('editor-code', '代码块语言', 'src/components/Editor/nodes/CodeBlockNode.jsx', activeCodeRoot, ['default', 'languages', 'empty'], ['.code-textarea']),
   route('editor-callout', '提示块', 'src/components/Editor/nodes/CalloutNode.jsx', '.callout-block', ['default', 'icons']),
   route('editor-toggle', '折叠块', 'src/components/Editor/nodes/ToggleNode.jsx', '.toggle-block', ['expanded', 'collapsed']),
   route('editor-file-import', '本地文档导入预检', 'src/components/ImportWorkspace.jsx', '.local-import-workspace', ['empty', 'prepared', 'destination-popup', 'long-title']),
@@ -849,21 +854,46 @@ async function verifyEditorNodes(ctx) {
   await shared.text('.embed-editing input[type="text"]', '只保留在未应用草稿中的较长嵌入标题，不创建外部连接。'.repeat(4))
   await shot('editor-embed', 'draft', ['.embed-editing input[type="text"]']); await press('.embed-edit-actions', '取消'); await absent('.embed-editing')
   await openNote('代码')
-  // Note-title navigation can finish before Lexical mounts its decorated code
-  // node. Wait for the single actual painted owner using the same bounded
-  // readiness poll; never synthesize the node or bypass motion/PNG assertions.
-  await ctx.until(() => evaluate(`(() => {
-    const painted = [...document.querySelectorAll('.code-block-wrapper')].filter(node => {
-      const rect = node.getBoundingClientRect()
-      return node.getClientRects().length > 0 && rect.width > 0 && rect.height > 0
+  // A Search-opened note may leave a separately painted code preview in the
+  // document. Require exactly one real code decorator *inside the selected
+  // editable Lexical body*, not exactly one code block in the whole document.
+  // The original native screenshots, focus and popup checks still apply.
+  let codeOwnerObservation = null
+  try {
+    await ctx.until(async () => {
+      codeOwnerObservation = await evaluate(`(() => {
+        const painted = node => {
+          const rect = node.getBoundingClientRect()
+          return node.getClientRects().length > 0 && rect.width > 0 && rect.height > 0
+        }
+        const owners = [...document.querySelectorAll(${q(activeCodeRoot)})].filter(painted)
+        return {
+          ownedCount: owners.length,
+          ownedLanguageCount: owners.length === 1 ? owners[0].querySelectorAll('.language-selector-button').length : 0,
+          allPaintedCodeCount: [...document.querySelectorAll('.code-block-wrapper')].filter(painted).length,
+          editableEditorCount: document.querySelectorAll('.editor-input[contenteditable="true"]').length,
+          title: document.querySelector('.workspace-title-button')?.textContent.trim() ?? null
+        }
+      })()`)
+      return codeOwnerObservation.ownedCount === 1 &&
+        codeOwnerObservation.ownedLanguageCount === 1 &&
+        codeOwnerObservation.title === fixture.notes['代码'].title
+    }, 'Actual selected code block did not mount as one painted editor owner')
+  } catch (error) {
+    // Failure-only read-only evidence; never add an owner, retry user input or
+    // relabel the original full-page capture/keyboard assertions as success.
+    ;(ctx.report.fullAppUi.editorCodeOwnerFailures ||= []).push({
+      ...ctx.matrix, expectedTitle: fixture.notes['代码'].title,
+      observed: codeOwnerObservation, error: String(error.message)
     })
-    return painted.length === 1 && Boolean(painted[0].querySelector('.language-selector-button'))
-  })()`), 'Actual selected code block did not mount as one painted owner')
-  await shot('editor-code', 'default', ['.language-selector-button']); await focus('editor-code', 'default', '.language-selector-button')
-  await hit('.language-selector-button'); await present('.language-selector-dropdown')
-  await shot('editor-code', 'languages', ['.language-selector-search'], { root: '.language-selector-dropdown' })
-  await shared.text('.language-selector-search', miss); await text('.language-selector-list', 'No languages found')
-  await shot('editor-code', 'empty', ['.language-selector-search'], { root: '.language-selector-dropdown' }); await hit('.language-selector-button'); await absent('.language-selector-dropdown')
+    ctx.save()
+    throw error
+  }
+  await shot('editor-code', 'default', [activeCodeLanguage]); await focus('editor-code', 'default', activeCodeLanguage)
+  await hit(activeCodeLanguage); await present(activeCodeDropdown)
+  await shot('editor-code', 'languages', [activeCodeSearch], { root: activeCodeDropdown })
+  await shared.text(activeCodeSearch, miss); await text(activeCodeList, 'No languages found')
+  await shot('editor-code', 'empty', [activeCodeSearch], { root: activeCodeDropdown }); await hit(activeCodeLanguage); await absent(activeCodeDropdown)
   await openNote('提示'); await shot('editor-callout', 'default', ['[aria-label="选择提示图标"]']); await focus('editor-callout', 'default', '[aria-label="选择提示图标"]')
   await hit('[aria-label="选择提示图标"]'); await present('.callout-icon-picker')
   await shot('editor-callout', 'icons', ['.callout-icon-option:first-child']); await hit('[aria-label="选择提示图标"]'); await absent('.callout-icon-picker')
