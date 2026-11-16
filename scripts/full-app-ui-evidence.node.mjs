@@ -1852,3 +1852,120 @@ test('the original capture catch preserves a seal IO error and its failure PNG o
     assert.equal(writer.statistics().activeScenes, 1)
   } finally { rmSync(directory, { recursive: true, force: true }) }
 })
+
+// Explicit stable-JSON storage contracts. The first assertion measures the old
+// writer's real repeated serialization, rather than failing only on a new API.
+test('explicitly published stable receipts avoid repeated encoding while preserving every mutable and failure checkpoint', () => {
+  const f = storageCase()
+  try {
+    const receipt = { complete: true, nested: { retained: '完整 observed receipt', values: [1, null, false] } }
+    f.report.fullAppUi.popups = [receipt]; f.writer.save()
+    f.writer.sealStableJSON?.('fullAppUi.popups', receipt)
+    const originalStringify = JSON.stringify
+    let repeatedEncodes = 0
+    const contains = (value, seen = new Set()) => {
+      if (value === receipt) return true
+      if (!value || typeof value !== 'object' || seen.has(value)) return false
+      seen.add(value)
+      return Object.values(Object.getOwnPropertyDescriptors(value)).some(descriptor =>
+        'value' in descriptor && contains(descriptor.value, seen))
+    }
+    JSON.stringify = function (value, ...args) {
+      if (contains(value)) repeatedEncodes++
+      return originalStringify.call(this, value, ...args)
+    }
+    try {
+      for (let index = 0; index < 6; index++) { f.report.currentDiagnostic = { index }; f.writer.save() }
+    } finally { JSON.stringify = originalStringify }
+    assert.equal(repeatedEncodes, 0, 'A successfully sealed original receipt must not be JSON-encoded again at six later checkpoints')
+    assert.equal(Object.isFrozen(receipt), true); assert.equal(Object.isFrozen(receipt.nested), true)
+    assert.equal(f.report.fullAppUi.popups[0], receipt, 'Sealing must not replace a producer object with a detached clone')
+    assert.throws(() => { receipt.nested.retained = 'silently changed' }, TypeError)
+    assert.ok(f.writer.statistics().stableJSON.cachedHits >= 6)
+    assert.deepEqual(storageJSON(readFullAppEvidence(f.filename).report), storageJSON(f.report))
+    const accepted = storageFinish(f)
+    assert.deepEqual(storageJSON(readFullAppEvidence(f.filename, { accepted }).report), storageJSON(f.report))
+    f.report.newUnpublishedField = true
+    assert.throws(() => f.writer.receipt(), /changed after its last complete checkpoint/)
+  } finally { f.cleanup() }
+
+  const scenario = work => { const f = storageCase(); try { work(f) } finally { f.cleanup() } }
+  scenario(f => {
+    const pending = { complete: true, nested: { value: 1 } }
+    f.report.fullAppUi.focus = [pending]; f.report.fullAppUi.events = [{ trusted: true }]; f.writer.save()
+    assert.equal(Object.isFrozen(pending), false, 'complete:true is not an implicit seal')
+    pending.nested.value = 2; f.report.fullAppUi.events[0].trusted = false; f.writer.save()
+    f.report.fullAppUi.events = [{ replaced: true }]; f.writer.save()
+    assert.deepEqual(storageJSON(readFullAppEvidence(f.filename).report), storageJSON(f.report))
+  })
+  scenario(f => {
+    const prior = storageJSON(readFullAppEvidence(f.filename).report), value = { nested: { value: 1 } }
+    f.report.fullAppUi.focus = [value]; storageMkdir(f.filename + '.next')
+    assert.throws(() => f.writer.save())
+    assert.throws(() => f.writer.sealStableJSON('fullAppUi.focus', value), /successful publication/)
+    assert.equal(Object.isFrozen(value), false); assert.equal(Object.isFrozen(value.nested), false)
+    assert.deepEqual(storageJSON(readFullAppEvidence(f.filename).report), prior)
+    assert.ok(storageStat(f.filename + '.next').isDirectory(), 'A foreign staging path remains untouched')
+    rmSync(f.filename + '.next', { recursive: true })
+    value.nested.value = 2; f.writer.save(); f.writer.sealStableJSON('fullAppUi.focus', value)
+    assert.deepEqual(storageJSON(readFullAppEvidence(f.filename).report), storageJSON(f.report))
+  })
+  scenario(f => {
+    const value = { nested: { value: 1 } }; f.report.fullAppUi.focus = [value]; f.writer.save()
+    value.nested.value = 2
+    assert.throws(() => f.writer.sealStableJSON('fullAppUi.focus', value), /changed since/)
+    assert.equal(Object.isFrozen(value), false); assert.equal(Object.isFrozen(value.nested), false)
+    f.writer.save(); f.writer.sealStableJSON('fullAppUi.focus', value)
+    const replacement = { current: true }; f.report.fullAppUi.focus = [replacement, value]; f.writer.save()
+    f.report.fullAppUi.focus.reverse(); f.writer.save(); f.report.fullAppUi.focus.pop(); f.writer.save()
+    assert.deepEqual(storageJSON(readFullAppEvidence(f.filename).report), storageJSON(f.report))
+    assert.equal(Object.isFrozen(replacement), false)
+  })
+  scenario(f => {
+    const activeViewport = { width: 704, height: 455 }, value = { viewport: activeViewport }
+    f.report.fullAppUi.focus = [value]; f.writer.save()
+    assert.throws(() => f.writer.sealStableJSON('fullAppUi.focus', value, { protectedObjects: [activeViewport] }), /active external owner/)
+    assert.equal(Object.isFrozen(value), false); assert.equal(Object.isFrozen(activeViewport), false)
+    activeViewport.width = 710; f.writer.save()
+    assert.deepEqual(storageJSON(readFullAppEvidence(f.filename).report), storageJSON(f.report))
+  })
+  scenario(f => {
+    const image = { filename: 'original.png', bytes: 1234, sha256: 'a'.repeat(64) }, popup = { complete: false, image, capture: { image } }
+    f.report.screenshots = [image]; f.report.fullAppUi.popups = [popup]; f.writer.save()
+    f.writer.sealStableJSON('screenshots', image)
+    assert.equal(popup.image, image); assert.equal(popup.capture.image, image); assert.equal(Object.isFrozen(popup), false)
+    popup.keyboardCommitted = true; popup.complete = true; f.writer.save(); f.writer.sealStableJSON('fullAppUi.popups', popup)
+    assert.throws(() => { image.bytes++ }, TypeError)
+    assert.deepEqual(storageJSON(readFullAppEvidence(f.filename).report), storageJSON(f.report))
+  })
+  scenario(f => {
+    const child = { value: 1 }, array = []
+    Object.defineProperty(array, '0', { value: child, enumerable: false, writable: true, configurable: true })
+    const value = { array }; f.report.fullAppUi.focus = [value]; f.writer.save()
+    assert.equal(f.writer.sealStableJSON('fullAppUi.focus', value), false)
+    assert.equal(Object.isFrozen(array), false); assert.equal(Object.isFrozen(child), false)
+    child.value = 2; f.writer.save()
+    assert.deepEqual(storageJSON(readFullAppEvidence(f.filename).report), storageJSON(f.report))
+  })
+  scenario(f => {
+    assert.equal(Object.getOwnPropertyDescriptor(Array.prototype, '0'), undefined)
+    try {
+      Object.defineProperty(Array.prototype, '0', { value: { inherited: 'original Get' }, enumerable: false, writable: true, configurable: true })
+      f.report.fullAppUi.focus = new Array(1); f.writer.save()
+      assert.equal(f.writer.sealStableJSON('fullAppUi.focus', f.report.fullAppUi.focus[0]), false)
+      assert.equal(Object.isFrozen(Array.prototype[0]), false)
+      Array.prototype[0].inherited = 'updated original Get'; f.writer.save()
+      assert.deepEqual(storageJSON(readFullAppEvidence(f.filename).report), storageJSON(f.report))
+    } finally { delete Array.prototype[0] }
+  })
+  scenario(f => {
+    const trace = [], value = { current: true }; f.report.fullAppUi.focus = [value]
+    f.report.unknownRoot.protocol = { toJSON(key) { trace.push('toJSON:' + key); return { actualKey: key } } }
+    Object.defineProperty(f.report.unknownRoot, 'observedGetter', { enumerable: true, get() { trace.push('getter'); return 'actual getter value' } })
+    const expected = storageJSON(f.report), expectedTrace = [...trace]; trace.length = 0
+    f.writer.save(); assert.deepEqual(trace, expectedTrace)
+    assert.equal(f.writer.sealStableJSON('fullAppUi.focus', value), false, 'Whole native fallback must not introduce a new sealing failure')
+    assert.equal(Object.isFrozen(value), false)
+    assert.deepEqual(storageJSON(readFullAppEvidence(f.filename).report), expected)
+  })
+})

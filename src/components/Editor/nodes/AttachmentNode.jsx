@@ -173,10 +173,12 @@ function AttachmentComponent({ nodeKey, src, name, size, mime }) {
     // the first enabled attachment action, then keep native Tab/Shift+Tab
     // traversal among the actual buttons outside Lexical's Tab handler.
     const block = attachmentElementRef.current
-    const root = block?.closest('.editor-input[contenteditable="true"]')
+    // The same root can begin in reading mode and become editable later.
+    const root = block?.closest('.editor-input[contenteditable]')
     if (!root) return undefined
     const enter = event => {
-      if (event.defaultPrevented || event.key !== 'F6' || event.altKey ||
+      if (root.getAttribute('contenteditable') !== 'true' ||
+          event.defaultPrevented || event.key !== 'F6' || event.altKey ||
           event.ctrlKey || event.metaKey || event.shiftKey || event.isComposing ||
           event.target !== root || root.ownerDocument.activeElement !== root) return
       const first = block.querySelector('.attachment-actions button:not(:disabled)')

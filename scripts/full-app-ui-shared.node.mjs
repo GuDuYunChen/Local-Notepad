@@ -1895,7 +1895,7 @@ function ownedOptionPointerFixture(t, mode = 'stable') {
     }
     return JSON.parse(JSON.stringify(await dom.window.eval(expression)))
   }
-  const sleeps = [], waits = [], commands = [], saved = [], report = { fullAppUi: {} }
+  const sleeps = [], waits = [], commands = [], saved = [], sealObservations = [], report = { fullAppUi: {} }
   const actualUntil = runInNewContext(projectSetupUntilSource + '; until', {
     performance: { now: () => clock },
     sleep: async milliseconds => { sleeps.push(milliseconds); clock += milliseconds },
@@ -1918,11 +1918,18 @@ function ownedOptionPointerFixture(t, mode = 'stable') {
     const actualTarget = document.elementFromPoint(parameters.x, parameters.y)
     commands.push({ ...parameters, targetTag: actualTarget.tagName, ownedOptionHit: option.contains(actualTarget) })
   } }
-  const click = actualRunnerOptionClick({ evaluate, until, cdp, report, save: () => {
+  // This isolated runner closure needs the explicit storage dependency. Record
+  // its call boundary here; the real writer's sealing semantics have separate contracts.
+  const evidenceStore = { sealStableJSON(collection, value, options) {
+    sealObservations.push({ collection, value, options, timeline: structuredClone(timeline),
+      commands: structuredClone(commands), saved: structuredClone(saved.at(-1)) })
+    return true
+  } }
+  const click = actualRunnerOptionClick({ evaluate, until, cdp, report, evidenceStore, save: () => {
     timeline.push({ kind: 'save', inputDispatchComplete: report.fullAppUi.optionPointerPreparations?.[0]?.inputDispatchComplete })
     saved.push(structuredClone(report))
   } })
-  return { click, selector, commands, waits, sleeps, saved, report, dom, timeline,
+  return { click, selector, commands, waits, sleeps, saved, sealObservations, report, dom, timeline,
     frames: () => frameCount, scrolls: () => scrollCalls, elapsed: () => clock,
     receipt: () => report.fullAppUi.optionPointerPreparations?.[0] }
 }
@@ -2628,3 +2635,307 @@ test('Sync near-expired refresh waits for a new real cycle before PNG instead of
 
 // Execute the existing exact-title search contracts through the original full-app argv.
 await import('./full-app-ui-owned-search.test.mjs')
+
+
+// Match the actual two nested wrappers in the installed 59b first failure.
+// Geometry is a DOM fixture only; the original native failure remains evidence.
+const codeOwnerVerifierText = (await import('node:fs')).readFileSync(new URL('./full-app-ui-main-editor.mjs', import.meta.url), 'utf8')
+function observeCodeOwnerDOM(t, { copies = 1, preview = false, readOnly = false, missingLanguage = false, duplicateLanguage = false, painted = true } = {}) {
+  const component = '<div class="code-block-wrapper"><div class="code-block-header">' +
+    (missingLanguage ? '' : '<button class="language-selector-button">JavaScript</button>') +
+    (duplicateLanguage ? '<button class="language-selector-button">Other</button>' : '') +
+    '</div><textarea class="code-textarea">const note = 1;</textarea></div>'
+  const shell = '<div class="code-block-wrapper">' + component + '</div>'
+  const dom = new ProjectSetupDOM('<button class="workspace-title-button">Selected code</button>' +
+    (preview ? '<aside>' + shell + '</aside>' : '') +
+    '<div class="editor-input" contenteditable="' + (readOnly ? 'false' : 'true') + '">' + shell.repeat(copies) + '</div>')
+  t.after(() => dom.window.close())
+  for (const node of dom.window.document.querySelectorAll('.code-block-wrapper')) {
+    node.getBoundingClientRect = () => ({ x: 112, y: 243, width: painted ? 524 : 0, height: painted ? 343 : 0 })
+    node.getClientRects = () => painted ? [node.getBoundingClientRect()] : []
+  }
+  const matched = /^const activeCodeRoot = ('[^']+')$/m.exec(codeOwnerVerifierText)
+  assert.ok(matched, 'Use the actual runtime owner selector')
+  const selector = runInNewContext(matched[1])
+  const prefix = 'codeOwnerObservation = await evaluate(' + String.fromCharCode(96)
+  const start = codeOwnerVerifierText.indexOf(prefix)
+  assert.ok(start >= 0)
+  const end = codeOwnerVerifierText.indexOf(String.fromCharCode(96) + ')', start + prefix.length)
+  assert.ok(end > start)
+  const expression = codeOwnerVerifierText.slice(start + prefix.length, end)
+    .replace('$' + '{q(activeCodeRoot)}', JSON.stringify(selector))
+  return JSON.parse(JSON.stringify(runInNewContext(expression, { document: dom.window.document })))
+}
+
+test('installed code ownership selects the interactive component within its Lexical shell', t => {
+  const actual = observeCodeOwnerDOM(t, { preview: true })
+  assert.equal(actual.allPaintedCodeCount, 4, 'Retain both actual shell/component pairs in diagnostics')
+  assert.equal(actual.ownedCount, 1)
+  assert.equal(actual.ownedLanguageCount, 1)
+  assert.equal(actual.editableEditorCount, 1)
+  assert.equal(actual.title, 'Selected code')
+  assert.equal(actual.ownedDetails[0].parentClass, 'code-block-wrapper')
+  assert.equal(actual.ownedDetails[0].nestedCodeOwners, 0)
+  assert.equal(actual.ownedDetails[0].textareaText, 'const note = 1;')
+})
+
+test('installed code ownership still rejects multiple, missing, hidden and reading-mode targets', t => {
+  const duplicate = observeCodeOwnerDOM(t, { copies: 2 })
+  assert.equal(duplicate.ownedCount, 2)
+  assert.equal(duplicate.ownedLanguageCount, 0)
+  for (const value of [{ copies: 0 }, { painted: false }, { readOnly: true }]) {
+    assert.equal(observeCodeOwnerDOM(t, value).ownedCount, 0)
+  }
+  assert.equal(observeCodeOwnerDOM(t, { missingLanguage: true }).ownedLanguageCount, 0)
+  assert.equal(observeCodeOwnerDOM(t, { duplicateLanguage: true }).ownedLanguageCount, 2)
+})
+
+
+test('pinned PNG coverage cannot turn ancestor coordinate drift into photographed content', t => {
+  // This is a strict synthetic measurement counterexample, not a native PNG.
+  // The fixed menu remains clipped to the same first 200 physical pixels.
+  for (const baselineTop of [0, 73]) {
+    const rootBounds = { left: 0, top: 0, right: 200, bottom: 400, width: 200, height: 400 }
+    const port = { left: 0, top: 0, right: 200, bottom: 200, width: 200, height: 200 }
+    const surface = { selector: '.pinned-ancestor', ancestor: true, clientHeight: 200, scrollHeight: 1000,
+      scrollTop: baselineTop, requiredContentStart: baselineTop, requiredContentEnd: baselineTop + 400,
+      contentTarget: { selector: '.fixed-menu', kind: 'nested-scroll-client-port' }, bounds: port, ownerBounds: port }
+    // The last PNG also requires each capture phase to use its own offset.
+    const offsets = [[0, 0], [200, 200], [400, 200]]
+    const images = offsets.map((_, index) => ({ filename: 'pinned-frame-' + index + '.png' }))
+    const samples = offsets.flatMap((pair, index) => ['before-capture', 'after-capture'].map((phase, phaseIndex) => {
+      const top = baselineTop + pair[phaseIndex]
+      return { root: '.fixed-menu', rootBounds: { ...rootBounds }, phase, image: images[index].filename,
+        scrollAreas: [{ ...surface, scrollTop: top, requiredContentStart: top, requiredContentEnd: top + 400,
+          visibleHeight: 200, visibleContentStart: top, visibleContentEnd: top + 200 }] }
+    }))
+    const original = clone(samples)
+    const measured = measureFullAppScrollCoverage(surface, samples, images)
+    t.diagnostic(JSON.stringify({ syntheticPinnedCoordinateCase: baselineTop, measured }))
+    assert.equal(measured.complete, false, 'Ancestor displacement cannot photograph the still-clipped second half')
+    assert.deepEqual(measured.gaps, [{ from: baselineTop + 200, to: baselineTop + 400 }])
+    assert.deepEqual(measured.observedIntervals, images.map(image => ({
+      from: baselineTop, to: baselineTop + 200, image: image.filename,
+    })), 'Normalize before and after independently into the baseline frame before their intersection')
+    assert.deepEqual(samples, original, 'Coverage calculation must retain the original raw coordinates unchanged')
+  }
+})
+
+
+
+// Historical dfad artifact14033437408: exact selected fields from21 raw reads.
+// The7 PNG references and read values are fixtures only, never a new native run.
+const pinnedNativeTrace = {"base":{"root":".block-menu","viewport":{"width":704,"height":455},"devicePixelRatio":1,"theme":"light","rootBounds":{"left":80,"top":206.578125,"right":290,"bottom":446.578125,"width":210,"height":240},"scrollAreas":[{"selector":".block-menu","clientHeight":238,"scrollHeight":456,"scrollTop":0,"rangeStart":0,"rangeEnd":218,"ancestor":false,"bounds":{"left":80,"top":206.578125,"right":290,"bottom":446.578125,"width":210,"height":240},"requiredContentStart":0,"requiredContentEnd":456,"contentTarget":{"selector":".block-menu","kind":"route-content"},"visibleHeight":238,"visibleContentStart":0,"visibleContentEnd":238,"viewportScrollOwner":false,"ownerBounds":{"left":80,"top":206.578125,"right":290,"bottom":446.578125,"width":210,"height":240}},{"selector":"html > body:nth-child(2) > div:nth-child(1) > div:nth-child(1) > div:nth-child(1) > main:nth-child(1) > section:nth-child(2) > div:nth-child(3) > div:nth-child(1) > div:nth-child(6)","clientHeight":256,"scrollHeight":371,"scrollTop":0,"rangeStart":9,"rangeEnd":9,"ancestor":true,"bounds":{"left":52,"top":198.578125,"right":704,"bottom":455,"width":652,"height":256.421875},"requiredContentStart":9,"requiredContentEnd":247,"contentTarget":{"selector":".block-menu","kind":"nested-scroll-client-port"},"visibleHeight":256,"visibleContentStart":0,"visibleContentEnd":256,"viewportScrollOwner":false,"ownerBounds":{"left":52,"top":198.578125,"right":704,"bottom":455,"width":652,"height":256.421875}}],"overflow":{"document":0,"root":0,"allowed":[]},"controls":[{"selector":".block-menu > button:nth-child(1)","fieldSelector":".block-menu > button:nth-child(1)","kind":"button","layout":"content","size":"small","expectedHeight":null,"nativeType":null,"classification":"shared","disabled":false,"accessibleName":"↑上方插入空白块","selectedForProbe":false,"left":87,"top":213.578125,"right":275,"bottom":241.578125,"width":188,"height":28,"visible":true,"inViewport":true,"hit":true},{"selector":".block-menu > button:nth-child(2)","fieldSelector":".block-menu > button:nth-child(2)","kind":"button","layout":"content","size":"small","expectedHeight":null,"nativeType":null,"classification":"shared","disabled":false,"accessibleName":"↓下方插入空白块","selectedForProbe":false,"left":87,"top":241.578125,"right":275,"bottom":269.578125,"width":188,"height":28,"visible":true,"inViewport":true,"hit":true},{"selector":".block-menu > button:nth-child(4)","fieldSelector":".block-menu > button:nth-child(4)","kind":"button","layout":"content","size":"small","expectedHeight":null,"nativeType":null,"classification":"shared","disabled":false,"accessibleName":"⧉复制当前块","selectedForProbe":false,"left":87,"top":278.578125,"right":275,"bottom":306.578125,"width":188,"height":28,"visible":true,"inViewport":true,"hit":true},{"selector":".block-menu > button:nth-child(5)","fieldSelector":".block-menu > button:nth-child(5)","kind":"button","layout":"content","size":"small","expectedHeight":null,"nativeType":null,"classification":"shared","disabled":true,"accessibleName":"⇣粘贴复制块到下方","selectedForProbe":false,"left":87,"top":306.578125,"right":275,"bottom":334.578125,"width":188,"height":28,"visible":true,"inViewport":true,"hit":true},{"selector":".block-menu > button:nth-child(6)","fieldSelector":".block-menu > button:nth-child(6)","kind":"button","layout":"content","size":"small","expectedHeight":null,"nativeType":null,"classification":"shared","disabled":false,"accessibleName":"＋重复当前块","selectedForProbe":false,"left":87,"top":334.578125,"right":275,"bottom":362.578125,"width":188,"height":28,"visible":true,"inViewport":true,"hit":true},{"selector":".block-menu > button:nth-child(9)","fieldSelector":".block-menu > button:nth-child(9)","kind":"button","layout":"content","size":"small","expectedHeight":null,"nativeType":null,"classification":"shared","disabled":false,"accessibleName":"¶正文","selectedForProbe":false,"left":87,"top":396.96875,"right":275,"bottom":424.96875,"width":188,"height":28,"visible":true,"inViewport":true,"hit":true},{"selector":".block-menu > button:nth-child(10)","fieldSelector":".block-menu > button:nth-child(10)","kind":"button","layout":"content","size":"small","expectedHeight":null,"nativeType":null,"classification":"shared","disabled":false,"accessibleName":"H1一级标题","selectedForProbe":false,"left":87,"top":424.96875,"right":275,"bottom":452.96875,"width":188,"height":28,"visible":true,"inViewport":false,"hit":false},{"selector":".block-menu > button:nth-child(11)","fieldSelector":".block-menu > button:nth-child(11)","kind":"button","layout":"content","size":"small","expectedHeight":null,"nativeType":null,"classification":"shared","disabled":false,"accessibleName":"H2二级标题","selectedForProbe":false,"left":87,"top":452.96875,"right":275,"bottom":480.96875,"width":188,"height":28,"visible":true,"inViewport":false,"hit":false},{"selector":".block-menu > button:nth-child(12)","fieldSelector":".block-menu > button:nth-child(12)","kind":"button","layout":"content","size":"small","expectedHeight":null,"nativeType":null,"classification":"shared","disabled":false,"accessibleName":"H3三级标题","selectedForProbe":false,"left":87,"top":480.96875,"right":275,"bottom":508.96875,"width":188,"height":28,"visible":true,"inViewport":false,"hit":false},{"selector":".block-menu > button:nth-child(13)","fieldSelector":".block-menu > button:nth-child(13)","kind":"button","layout":"content","size":"small","expectedHeight":null,"nativeType":null,"classification":"shared","disabled":false,"accessibleName":"H4四级标题","selectedForProbe":false,"left":87,"top":508.96875,"right":275,"bottom":536.96875,"width":188,"height":28,"visible":true,"inViewport":false,"hit":false},{"selector":".block-menu > button:nth-child(14)","fieldSelector":".block-menu > button:nth-child(14)","kind":"button","layout":"content","size":"small","expectedHeight":null,"nativeType":null,"classification":"shared","disabled":false,"accessibleName":"❝引用","selectedForProbe":false,"left":87,"top":536.96875,"right":275,"bottom":564.96875,"width":188,"height":28,"visible":true,"inViewport":false,"hit":false},{"selector":".block-menu > button:nth-child(15)","fieldSelector":".block-menu > button:nth-child(15)","kind":"button","layout":"content","size":"small","expectedHeight":null,"nativeType":null,"classification":"shared","disabled":false,"accessibleName":"•无序列表","selectedForProbe":false,"left":87,"top":564.96875,"right":275,"bottom":592.96875,"width":188,"height":28,"visible":true,"inViewport":false,"hit":false},{"selector":".block-menu > button:nth-child(16)","fieldSelector":".block-menu > button:nth-child(16)","kind":"button","layout":"content","size":"small","expectedHeight":null,"nativeType":null,"classification":"shared","disabled":false,"accessibleName":"1.有序列表","selectedForProbe":false,"left":87,"top":592.96875,"right":275,"bottom":620.96875,"width":188,"height":28,"visible":true,"inViewport":false,"hit":false},{"selector":".block-menu > button:nth-child(18)","fieldSelector":".block-menu > button:nth-child(18)","kind":"button","layout":"content","size":"small","expectedHeight":null,"nativeType":null,"classification":"shared","disabled":false,"accessibleName":"⌫删除当前块","selectedForProbe":false,"left":87,"top":629.96875,"right":275,"bottom":657.96875,"width":188,"height":28,"visible":true,"inViewport":false,"hit":false}],"anchors":[{"selector":".block-menu .block-menu-item:first-child","left":87,"top":213.578125,"right":275,"bottom":241.578125,"width":188,"height":28,"visible":true,"inViewport":true,"hit":true}]},"areaFields":["scrollTop","rangeStart","rangeEnd","requiredContentStart","requiredContentEnd","visibleHeight","visibleContentStart","visibleContentEnd"],"controlFields":["left","top","right","bottom","width","height","visible","inViewport","hit"],"frames":[{"areas":[[0,0,218,0,456,238,0,238],[0,9,9,9,247,256,0,256]],"controls":[[87,213.578125,275,241.578125,188,28,true,true,true],[87,241.578125,275,269.578125,188,28,true,true,true],[87,278.578125,275,306.578125,188,28,true,true,true],[87,306.578125,275,334.578125,188,28,true,true,true],[87,334.578125,275,362.578125,188,28,true,true,true],[87,396.96875,275,424.96875,188,28,true,true,true],[87,424.96875,275,452.96875,188,28,true,false,false],[87,452.96875,275,480.96875,188,28,true,false,false],[87,480.96875,275,508.96875,188,28,true,false,false],[87,508.96875,275,536.96875,188,28,true,false,false],[87,536.96875,275,564.96875,188,28,true,false,false],[87,564.96875,275,592.96875,188,28,true,false,false],[87,592.96875,275,620.96875,188,28,true,false,false],[87,629.96875,275,657.96875,188,28,true,false,false]],"anchors":[{"selector":".block-menu .block-menu-item:first-child","left":87,"top":213.578125,"right":275,"bottom":241.578125,"width":188,"height":28,"visible":true,"inViewport":true,"hit":true}],"image":{"filename":"editor-light-704x455-editor-commands-block-menu-part-1.png","bytes":55537,"sha256":"628b28c8bb85d5e7f1ec42dc5201acd690a370085160bc8cb72e29af29b436ef"}},{"areas":[[112,0,218,0,456,238,112,350],[0,9,9,9,247,256,0,256]],"controls":[[87,101.578125,275,129.578125,188,28,true,false,false],[87,129.578125,275,157.578125,188,28,true,false,false],[87,166.578125,275,194.578125,188,28,true,false,false],[87,194.578125,275,222.578125,188,28,true,false,false],[87,222.578125,275,250.578125,188,28,true,true,true],[87,284.96875,275,312.96875,188,28,true,true,true],[87,312.96875,275,340.96875,188,28,true,true,true],[87,340.96875,275,368.96875,188,28,true,true,true],[87,368.96875,275,396.96875,188,28,true,true,true],[87,396.96875,275,424.96875,188,28,true,true,true],[87,424.96875,275,452.96875,188,28,true,false,false],[87,452.96875,275,480.96875,188,28,true,false,false],[87,480.96875,275,508.96875,188,28,true,false,false],[87,517.96875,275,545.96875,188,28,true,false,false]],"anchors":[{"selector":".block-menu > button:nth-child(10)","left":87,"top":312.96875,"right":275,"bottom":340.96875,"width":188,"height":28,"visible":true,"inViewport":true,"hit":true}],"image":{"filename":"editor-light-704x455-editor-commands-block-menu-part-2.png","bytes":55005,"sha256":"8c6e5705fd66603fc756839b7f8973b4946fdf7f64f6c85f8654a17a8212c445"}},{"areas":[[218,0,218,0,456,238,218,456],[6,15,15,15,253,256,6,262]],"controls":[[87,-4.421875,275,23.578125,188,28,true,false,false],[87,23.578125,275,51.578125,188,28,true,false,false],[87,60.578125,275,88.578125,188,28,true,false,false],[87,88.578125,275,116.578125,188,28,true,false,false],[87,116.578125,275,144.578125,188,28,true,false,false],[87,178.96875,275,206.96875,188,28,true,false,false],[87,206.96875,275,234.96875,188,28,true,true,true],[87,234.96875,275,262.96875,188,28,true,true,true],[87,262.96875,275,290.96875,188,28,true,true,true],[87,290.96875,275,318.96875,188,28,true,true,true],[87,318.96875,275,346.96875,188,28,true,true,true],[87,346.96875,275,374.96875,188,28,true,true,true],[87,374.96875,275,402.96875,188,28,true,true,true],[87,411.96875,275,439.96875,188,28,true,true,true]],"anchors":[{"selector":".block-menu > button:nth-child(14)","left":87,"top":318.96875,"right":275,"bottom":346.96875,"width":188,"height":28,"visible":true,"inViewport":true,"hit":true}],"image":{"filename":"editor-light-704x455-editor-commands-block-menu-part-3.png","bytes":54168,"sha256":"5fd454b12c3bf06883912822fcf7edf2f301123a7299ac170787c624ec9c387a"}},{"areas":[[0,0,218,0,456,238,0,238],[15,24,24,24,262,256,15,271]],"controls":[[87,213.578125,275,241.578125,188,28,true,true,true],[87,241.578125,275,269.578125,188,28,true,true,true],[87,278.578125,275,306.578125,188,28,true,true,true],[87,306.578125,275,334.578125,188,28,true,true,true],[87,334.578125,275,362.578125,188,28,true,true,true],[87,396.96875,275,424.96875,188,28,true,true,true],[87,424.96875,275,452.96875,188,28,true,false,false],[87,452.96875,275,480.96875,188,28,true,false,false],[87,480.96875,275,508.96875,188,28,true,false,false],[87,508.96875,275,536.96875,188,28,true,false,false],[87,536.96875,275,564.96875,188,28,true,false,false],[87,564.96875,275,592.96875,188,28,true,false,false],[87,592.96875,275,620.96875,188,28,true,false,false],[87,629.96875,275,657.96875,188,28,true,false,false]],"anchors":[],"image":{"filename":"editor-light-704x455-editor-commands-block-menu-part-4.png","bytes":53285,"sha256":"a845a4e1dea4285204cf1a9032082f94d45e908ec9b3797c852895941cff79f6"}},{"areas":[[178,0,218,0,456,238,178,416],[15,24,24,24,262,256,15,271]],"controls":[[87,35.578125,275,63.578125,188,28,true,false,false],[87,63.578125,275,91.578125,188,28,true,false,false],[87,100.578125,275,128.578125,188,28,true,false,false],[87,128.578125,275,156.578125,188,28,true,false,false],[87,156.578125,275,184.578125,188,28,true,false,false],[87,218.96875,275,246.96875,188,28,true,true,true],[87,246.96875,275,274.96875,188,28,true,true,true],[87,274.96875,275,302.96875,188,28,true,true,true],[87,302.96875,275,330.96875,188,28,true,true,true],[87,330.96875,275,358.96875,188,28,true,true,true],[87,358.96875,275,386.96875,188,28,true,true,true],[87,386.96875,275,414.96875,188,28,true,true,true],[87,414.96875,275,442.96875,188,28,true,true,true],[87,451.96875,275,479.96875,188,28,true,false,false]],"anchors":[],"image":{"filename":"editor-light-704x455-editor-commands-block-menu-part-5.png","bytes":53020,"sha256":"790bd173e0383bb353368f727bd04ee7c628da3f14d3af64d50c8700046d7b5e"}},{"areas":[[218,0,218,0,456,238,218,456],[15,24,24,24,262,256,15,271]],"controls":[[87,-4.421875,275,23.578125,188,28,true,false,false],[87,23.578125,275,51.578125,188,28,true,false,false],[87,60.578125,275,88.578125,188,28,true,false,false],[87,88.578125,275,116.578125,188,28,true,false,false],[87,116.578125,275,144.578125,188,28,true,false,false],[87,178.96875,275,206.96875,188,28,true,false,false],[87,206.96875,275,234.96875,188,28,true,true,true],[87,234.96875,275,262.96875,188,28,true,true,true],[87,262.96875,275,290.96875,188,28,true,true,true],[87,290.96875,275,318.96875,188,28,true,true,true],[87,318.96875,275,346.96875,188,28,true,true,true],[87,346.96875,275,374.96875,188,28,true,true,true],[87,374.96875,275,402.96875,188,28,true,true,true],[87,411.96875,275,439.96875,188,28,true,true,true]],"anchors":[],"image":{"filename":"editor-light-704x455-editor-commands-block-menu-part-6.png","bytes":53568,"sha256":"f4132a82903f227cd90e1c93c318e62df5020830a574b0ef723c724ee274a3c6"}},{"areas":[[218,0,218,0,456,238,218,456],[24,33,33,33,271,256,24,280]],"controls":[[87,-4.421875,275,23.578125,188,28,true,false,false],[87,23.578125,275,51.578125,188,28,true,false,false],[87,60.578125,275,88.578125,188,28,true,false,false],[87,88.578125,275,116.578125,188,28,true,false,false],[87,116.578125,275,144.578125,188,28,true,false,false],[87,178.96875,275,206.96875,188,28,true,false,false],[87,206.96875,275,234.96875,188,28,true,true,true],[87,234.96875,275,262.96875,188,28,true,true,true],[87,262.96875,275,290.96875,188,28,true,true,true],[87,290.96875,275,318.96875,188,28,true,true,true],[87,318.96875,275,346.96875,188,28,true,true,true],[87,346.96875,275,374.96875,188,28,true,true,true],[87,374.96875,275,402.96875,188,28,true,true,true],[87,411.96875,275,439.96875,188,28,true,true,true]],"anchors":[],"image":{"filename":"editor-light-704x455-editor-commands-block-menu-part-7.png","bytes":53288,"sha256":"0f093b4ce1c1753ed61356b9c003e676ff073c609bf609a30e6f43e2ac5b6aa1"}}],"rawSources":[{"sample":0,"bytes":37475,"sha256":"15059bdd4c6b2be5cc9879f507325331eada5cf373c8249626b492106d33430c"},{"sample":1,"bytes":37662,"sha256":"a48189df71409f70b202653f5b3c79259370157a617120db2e1f282470fb9800"},{"sample":2,"bytes":37660,"sha256":"8773c8eacae26a2a42f47d5bc3b72f5675ea5cf2a56df41426e73fd6e7d255ef"},{"sample":3,"bytes":37466,"sha256":"bfff61fecd7807fcc19118e9166047d4cda0c866745817bf5b351ca06467d9b3"},{"sample":4,"bytes":37653,"sha256":"ea7ac88f80b27b7b64f37201664ef049f7828406d535df9e1fac7bdc18eb5ee2"},{"sample":5,"bytes":37651,"sha256":"0caa50ee62d08d04e3ec03960040d77bfb889e00b4ea3afd06fc1aacb013e19c"},{"sample":6,"bytes":31085,"sha256":"5588e23412684eca6bb235506efe9f9d803abdbb22a299e26582521948fae612"},{"sample":7,"bytes":31272,"sha256":"6bc05729e0f762d719d8370d0a0625ce9fccbab42ed8d1927543848b23f7fd1f"},{"sample":8,"bytes":31270,"sha256":"604273111117c7f0ec39b9c5db7ffbe254d344b84b623ee85a288ed30d88f4e4"},{"sample":9,"bytes":37275,"sha256":"1e31a229decb7eb04f37c733999eb7fc6aaa118685edebc5725587af5fd31b55"},{"sample":10,"bytes":37463,"sha256":"73ce875f39cfc317d80a39f0b43ff4f7886696cd935ebb2b80c41f8879779dc8"},{"sample":11,"bytes":37461,"sha256":"4ee5b526b41151b82630c5e63ae9bbdb0f6eb0abba33c01bf27a44aa45e6bda6"},{"sample":12,"bytes":30894,"sha256":"b2e24addf6f5613bea19392c170682549aaf81a38081b2e06b74f817ba772a00"},{"sample":13,"bytes":31081,"sha256":"a26afe622c7e1e6c390b3ce1392c7a4e7ea296ae533578d155e846beab0257a2"},{"sample":14,"bytes":31079,"sha256":"cf6ab76545ba2e4c4f25b540c4c126e7affac97a06fc39186fef7b2627d338ba"},{"sample":15,"bytes":30891,"sha256":"d724e947f90515207a61abf0a81ca683ae491b39f9033312ab0e395acc2059ff"},{"sample":16,"bytes":31078,"sha256":"fabae5e52631f737b3f53c6ac77fc541783abd2682d4dac7fc969e45768b2bf4"},{"sample":17,"bytes":31076,"sha256":"da46dc0560928e096ed7514149422b1aad4fdca8e44400eb8045653cad41b714"},{"sample":18,"bytes":30891,"sha256":"32e4b7c8572bb8902cafc73893120ff107915711533faba5d9a578cf27a0ed68"},{"sample":19,"bytes":31078,"sha256":"1ba880aab12e058db76c386b2a69cc59b1584d5bfffaf5a17ec43ad1e49f98b7"},{"sample":20,"bytes":31076,"sha256":"644478e09d245e98e79d4098cf96c4c61ceb142ccf3efc472b56bf730353dce4"}]}
+
+// Pure replay of the retained dfad editor scene 89, artifact 14033437408.
+// These seven projected page states reproduce all 21 raw capture reads.
+// Planning reads below are synthetic repetitions, not claimed native history.
+// The original failed report/PNGs are never rewritten or declared accepted.
+const pinnedCoordinateKeys = ['requiredContentStart', 'requiredContentEnd', 'visibleContentStart', 'visibleContentEnd']
+function pinnedReplayPage(frameIndex, offset = 0) {
+  const page = clone(pinnedNativeTrace.base), frame = pinnedNativeTrace.frames[frameIndex]
+  page.scrollAreas.forEach((area, index) => pinnedNativeTrace.areaFields.forEach((key, field) => { area[key] = frame.areas[index][field] }))
+  page.controls.forEach((control, index) => pinnedNativeTrace.controlFields.forEach((key, field) => { control[key] = frame.controls[index][field] }))
+  page.anchors = clone(frame.anchors)
+  const outer = page.scrollAreas[1]
+  for (const key of ['scrollTop', 'rangeStart', 'rangeEnd', ...pinnedCoordinateKeys]) outer[key] += offset
+  return page
+}
+const pinnedCentralSource = (await import('node:fs')).readFileSync(new URL('./full-app-ui-evidence.mjs', import.meta.url), 'utf8')
+const pinnedCentralStart = '        const start = surface.requiredContentStart, end = surface.requiredContentEnd\n'
+const pinnedCentralEnd = "        assert.ok(intervals.length > 0 && gaps.length === 0, 'Actual long-page content has an unphotographed interval')"
+const pinnedCentralFrom = pinnedCentralSource.indexOf(pinnedCentralStart)
+const pinnedCentralTo = pinnedCentralSource.indexOf(pinnedCentralEnd, pinnedCentralFrom)
+assert.ok(pinnedCentralFrom >= 0 && pinnedCentralTo > pinnedCentralFrom)
+const pinnedCentralCoverage = pinnedCentralSource.slice(pinnedCentralFrom, pinnedCentralTo + pinnedCentralEnd.length)
+assert.equal(hash(pinnedCentralCoverage), '5dadeeda9e7233591239f390dd0e9b4621f8ab47c1857625e485f64c208812ca', 'Execute the exact unchanged central coverage block')
+// Same realm preserves the original deepEqual semantics; this is the entire
+// original coverage block, not a claim of full validateFullAppUiEvidence.
+const assertPinnedCentralCoverage = new Function('scene', 'surface', 'assert', pinnedCentralCoverage)
+function pinnedCaptureReplay({ offset = 0, mutate, withInitial = false, sharedContext } = {}) {
+  const report = sharedContext?.report || { fullAppUi: { group: 'editor', scenes: [], focus: [], popups: [] } }
+  const reads = [], appended = [], requests = [], captures = [], sealed = []
+  const order = [0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 5, 6, 6, 6, 6]
+  let at = 0, imageAt = 0, initialPending = withInitial
+  const stateId = withInitial ? 'second-origin' : 'block-menu'
+  const ctx = sharedContext?.ctx || {
+    matrix: clone(matrix), report,
+    routes: [{ id: 'editor-commands', root: '.block-menu', requiredStates: ['block-menu', 'second-origin'] }],
+    windowReceipt: { nativeWindow: true, viewport: clone(matrix.viewport), requested: clone(matrix.viewport) },
+    save() {},
+    click() { assert.fail('Replay must not add a native click') },
+    cdp: { send() { assert.fail('Replay must not add native input') } },
+  }
+  const io = {
+    async evaluate(expression) {
+      if (expression.startsWith('(()=>{const collectFullAppScrollOwners=')) {
+        if (initialPending) {
+          initialPending = false
+          const page = pinnedReplayPage(0, offset + 30); page.anchors = []
+          reads.push({ initialOnly: true, page: clone(page) }); return page
+        }
+        assert.ok(at < order.length, 'Replay must not hide additional renderer observations')
+        const frame = order[at++], page = pinnedReplayPage(frame, offset)
+        if (withInitial && frame === 0) page.anchors[0].selector = page.controls[0].selector
+        if (mutate) mutate(page, frame, at - 1)
+        reads.push({ frame, page: clone(page) }); return page
+      }
+      if (expression.startsWith('(function observeFullAppOwnerMotion(')) return { root: '.block-menu', owners: [], animations: [] }
+      if (expression.startsWith('(function ensureFullAppTargetVisible(')) return true
+      if (expression.startsWith('new Promise(resolve=>requestAnimationFrame')) return true
+      const requested = /\.scrollTo\(\{top:(-?[\d.]+),behavior:'instant'\}\)/.exec(expression)
+      if (requested) { requests.push(Number(requested[1])); return Number(requested[1]) }
+      if (expression.includes('.scrollIntoView({block:')) return true
+      assert.fail('Unexpected replay expression: ' + expression.slice(0, 100))
+    },
+    async until(check) { const result = await check(); assert.ok(result, 'The retained frame is already motion settled'); return result },
+    async capture(filename, guard) {
+      if (!guard) return { filename, bytes: 1, sha256: '0'.repeat(64), fixtureFailureOnly: true }
+      assert.ok(await guard())
+      assert.ok(imageAt < pinnedNativeTrace.frames.length)
+      const retained = pinnedNativeTrace.frames[imageAt++].image
+      captures.push({ filename, retained: clone(retained) })
+      return { ...retained, filename }
+    },
+    evidenceStore: {
+      appendRaw(scene, sample) { appended.push(clone(sample)); scene.rawSamples.push(clone(sample)) },
+      sealScene(scene) { sealed.push(scene.stateId) },
+    },
+  }
+  // The context owns stable forwarding functions so a second scene exercises
+  // the SAME createFullAppUiShared instance with a new per-scene input stream.
+  ctx.replayIO = io
+  if (!sharedContext) {
+    ctx.evaluate = (...args) => ctx.replayIO.evaluate(...args)
+    ctx.until = (...args) => ctx.replayIO.until(...args)
+    ctx.capture = (...args) => ctx.replayIO.capture(...args)
+    ctx.evidenceStore = { appendRaw: (...args) => ctx.replayIO.evidenceStore.appendRaw(...args), sealScene: (...args) => ctx.replayIO.evidenceStore.sealScene(...args) }
+  }
+  const shared = sharedContext?.shared || createFullAppUiShared(ctx)
+  const run = () => shared.captureState({ routeId: 'editor-commands', stateId,
+    anchors: withInitial ? [] : ['.block-menu .block-menu-item:first-child'] })
+  return { ctx, shared, report, reads, appended, requests, captures, sealed, run, offset }
+}
+function checkPinnedCanonicalReplay(fixture, scene) {
+  assert.equal(scene.complete, true)
+  assert.equal(scene.rawSamples.length, 21); assert.equal(scene.images.length, 7)
+  assert.deepEqual(scene.controlCoverage, { renderedCount: 14, observedCount: 14, unobserved: [] })
+  assert.equal(fixture.reads.filter(item => !item.initialOnly).length, 28)
+  assert.equal(fixture.captures.length, 7); assert.deepEqual(fixture.sealed, [scene.stateId])
+  assert.deepEqual(fixture.requests, [0, 178, 218, 24 + fixture.offset], 'Keep every native sweep position')
+  assert.equal(scene.scrollCoverage.length, 2)
+  for (const surface of scene.scrollCoverage) assertPinnedCentralCoverage(scene, surface, assert)
+  assert.deepEqual(scene.rawSamples, fixture.appended, 'Raw must be canonical when appended, never rewritten afterward')
+  const offset = fixture.offset, outerSelector = pinnedNativeTrace.base.scrollAreas[1].selector
+  for (let index = 0; index < scene.rawSamples.length; index++) {
+    const sample = scene.rawSamples[index], frame = Math.floor(index / 3)
+    const expected = pinnedReplayPage(frame, offset)
+    if (scene.stateId === 'second-origin' && frame === 0) expected.anchors[0].selector = expected.controls[0].selector
+    const restored = clone(sample); delete restored.phase; delete restored.image; delete restored.text
+    for (const area of restored.scrollAreas) {
+      if (area.nativeCoordinates) { Object.assign(area, area.nativeCoordinates); delete area.nativeCoordinates; delete area.coordinateFrame }
+    }
+    assert.deepEqual(restored, expected, 'Preserve every actual native coordinate, owner, control and bound')
+    const outer = sample.scrollAreas.find(area => area.selector === outerSelector)
+    assert.equal(outer.requiredContentStart, 9 + offset); assert.equal(outer.requiredContentEnd, 247 + offset)
+    assert.equal(outer.visibleContentStart, offset); assert.equal(outer.visibleContentEnd, 256 + offset)
+    assert.deepEqual(sample.scrollAreas[0], expected.scrollAreas[0], 'The ordinary menu scroller remains native')
+    if (frame >= 2) {
+      assert.deepEqual(outer.nativeCoordinates, Object.fromEntries(pinnedCoordinateKeys.map(key => [key, expected.scrollAreas[1][key]])))
+      assert.deepEqual(outer.coordinateFrame, { baselineScrollTop: offset, delta: expected.scrollAreas[1].scrollTop - offset })
+    } else assert.equal(outer.nativeCoordinates, undefined)
+  }
+  const covered = scene.scrollCoverage[1]
+  assert.equal(covered.scrollTop, offset + 6, 'Surface planning keeps its later actual native scrollTop')
+  assert.deepEqual([covered.requiredContentStart, covered.requiredContentEnd], [9 + offset, 247 + offset], 'Surface and first raw share the SAME initial frame')
+  assert.deepEqual(covered.initialRange, { start: 15 + offset, end: 15 + offset })
+  assert.deepEqual(covered.sweepRange, { start: 24 + offset, end: 24 + offset })
+  assert.equal(covered.step, 192)
+  assert.deepEqual(covered.positions.map(({ requested, actual }) => ({ requested, actual })), [{ requested: 24 + offset, actual: 24 + offset }])
+}
+
+test('retained pinned menu coordinates are canonical before raw append and satisfy the unchanged central coverage block', async () => {
+  const fixture = pinnedCaptureReplay(), before = clone(pinnedNativeTrace)
+  const scene = await fixture.run()
+  checkPinnedCanonicalReplay(fixture, scene)
+  assert.deepEqual(pinnedNativeTrace, before, 'The retained failed native measurements are immutable fixture input')
+})
+
+test('pinned coordinates use the first recorded sample independently for each scene, not an unrecorded anchor read', async () => {
+  const first = pinnedCaptureReplay(); checkPinnedCanonicalReplay(first, await first.run())
+  const second = pinnedCaptureReplay({ offset: 73, withInitial: true, sharedContext: first })
+  const scene = await second.run(); checkPinnedCanonicalReplay(second, scene)
+  assert.equal(second.reads.length, 29)
+  assert.equal(second.reads[0].initialOnly, true)
+  assert.equal(second.reads[0].page.scrollAreas[1].scrollTop, 103)
+  assert.equal(scene.rawSamples[0].scrollAreas[1].scrollTop, 73)
+  assert.equal(scene.scrollCoverage[1].coordinateFrame.baselineScrollTop, 73)
+  assert.equal(first.report.fullAppUi.scenes.length, 2)
+})
+
+test('pinned canonicalization preserves the original refusals for changed owners, real extent drift and photographed gaps', async t => {
+  const cases = [
+    ['start-drift', (page, frame) => { if (frame >= 2) page.scrollAreas[1].requiredContentStart += 2 }],
+    ['end-drift', (page, frame) => { if (frame >= 2) page.scrollAreas[1].requiredContentEnd += 2 }],
+    ['different-content-kind', page => { page.scrollAreas[1].contentTarget.kind = 'route-content' }],
+    ['different-content-target', page => { page.scrollAreas[1].contentTarget.selector = '.other-menu' }],
+    ['changed-client-port', (page, frame) => { if (frame >= 2) { page.scrollAreas[1].bounds.left += 2; page.scrollAreas[1].bounds.right += 2 } }],
+    ['changed-owner-bounds', (page, frame) => { if (frame >= 2) { page.scrollAreas[1].ownerBounds.left += 2; page.scrollAreas[1].ownerBounds.right += 2 } }],
+    ['changed-root-bounds', (page, frame) => { if (frame >= 2) { page.rootBounds.left += 2; page.rootBounds.right += 2 } }],
+    ['baseline-owner-absent', (page, frame) => { if (frame === 0) page.scrollAreas.pop() }],
+    ['baseline-owner-ambiguous', (page, frame) => { if (frame === 0) page.scrollAreas.push(clone(page.scrollAreas[1])) }],
+    ['capture-owner-ambiguous', (page, frame) => { if (frame === 4) page.scrollAreas.push(clone(page.scrollAreas[1])) }],
+    ['changed-ancestor-role', (page, frame) => { if (frame === 4) page.scrollAreas[1].ancestor = false }],
+    ['genuine-unphotographed-interval', page => {
+      const area = page.scrollAreas[1]; area.visibleHeight = 80
+      area.visibleContentStart = area.scrollTop + 100; area.visibleContentEnd = area.scrollTop + 180
+    }],
+  ]
+  for (const [name, mutate] of cases) {
+    let actualFaultReads = 0
+    const fixture = pinnedCaptureReplay({ mutate: (page, frame) => {
+      const before = JSON.stringify(page); mutate(page, frame)
+      if (JSON.stringify(page) !== before) actualFaultReads++
+    } })
+    let failure = null
+    try { const scene = await fixture.run(); for (const surface of scene.scrollCoverage) assertPinnedCentralCoverage(scene, surface, assert) }
+    catch (error) { failure = error }
+    assert.ok(actualFaultReads > 0, 'The actual producer must read the injected fault: ' + name)
+    assert.ok(failure, 'The original coverage gates must reject: ' + name)
+    assert.match(failure.message, /Actual long-page content range changed|Actual content extent changed across PNG captures|Ambiguous actual scroll-surface owner|unphotographed interval/, name)
+    t.diagnostic(JSON.stringify({ pinnedRefusal: name, actualFaultReads, message: failure.message }))
+  }
+})
+
+test('a renderer sample cannot smuggle an already normalized coordinate payload into a second conversion', async () => {
+  let injectedReads = 0
+  const fixture = pinnedCaptureReplay({ mutate: page => {
+    injectedReads++; page.scrollAreas[1].nativeCoordinates = { requiredContentStart: 900, requiredContentEnd: 901, visibleContentStart: 900, visibleContentEnd: 901 }
+  } })
+  await assert.rejects(fixture.run(), /Native scroll coordinates are already normalized/)
+  assert.ok(injectedReads > 0)
+  assert.equal(fixture.appended.length, 0, 'Reject a twice-normalized raw before it enters the evidence store')
+})
+
+test('actual runner seals its original owned-option receipt only after release and successful completion save', async t => {
+  const f = ownedOptionPointerFixture(t, 'align-after-scroll'), request = { selector: f.selector }
+  await f.click(request)
+  assert.equal(f.sealObservations.length, 1)
+  const call = f.sealObservations[0]
+  assert.equal(call.collection, 'fullAppUi.optionPointerPreparations')
+  assert.equal(call.value, f.receipt(), 'The original published receipt identity must reach the injected dependency')
+  assert.equal(call.value.complete, true)
+  assert.equal(call.value.inputDispatchComplete, true)
+  assert.equal(call.options.protectedObjects.length, 1)
+  assert.equal(call.options.protectedObjects[0], request, 'The original caller request remains protected')
+  assert.deepEqual(call.commands.map(item => item.type), ['mousePressed', 'mouseReleased'])
+  assert.deepEqual(call.saved, f.saved.at(-1))
+  assert.deepEqual(call.saved.fullAppUi.optionPointerPreparations[0], structuredClone(call.value))
+  assert.deepEqual(call.timeline, f.timeline, 'No original input or save is moved after sealing')
+  const release = call.timeline.findLastIndex(item => item.kind === 'input' && item.type === 'mouseReleased')
+  assert.ok(release >= 0)
+  assert.deepEqual(call.timeline.slice(release + 1), [{ kind: 'save', inputDispatchComplete: true }])
+  const ordinary = ownedOptionPointerFixture(t)
+  await ordinary.click('[aria-label="ordinary-action"]')
+  assert.deepEqual(ordinary.sealObservations, [], 'Ordinary clicks do not create or seal an owned-option receipt')
+})

@@ -254,6 +254,7 @@ export async function runFullAppUiInstalled({ group, pin, installerPath, origina
     windowHelper: { events: [] }, resizeCommands: [] }
   const reportPath = path.join(out, REPORT)
   const evidenceStore = createFullAppEvidenceWriter(reportPath, report)
+  assert.equal(typeof evidenceStore.sealStableJSON, 'function', 'Actual storage writer must expose explicit stable receipt sealing')
   let app, exited, cdp, windowSession, trace = '', closeRequested = false, uninstalled = false, activeLabBackend
   const liveCommands = new Set()
   const save = () => {
@@ -366,7 +367,10 @@ export async function runFullAppUiInstalled({ group, pin, installerPath, origina
     for (const type of ['mousePressed', 'mouseReleased']) await cdp.send('Input.dispatchMouseEvent', { type, ...point, button: 'left', clickCount: 1 })
     // This records completed protocol dispatch only. The original Select
     // value/closed-popup gates still decide whether the choice was accepted.
-    if (optionReceipt) { optionReceipt.inputDispatchComplete = true; save() }
+    if (optionReceipt) {
+      optionReceipt.inputDispatchComplete = true; save()
+      evidenceStore.sealStableJSON('fullAppUi.optionPointerPreparations', optionReceipt, { protectedObjects: [request] })
+    }
   }
   const capture = async (filename, observeBeforeCapture) => {
     assert.match(filename, /^[a-z0-9][a-z0-9_-]*\.png$/)
@@ -374,7 +378,9 @@ export async function runFullAppUiInstalled({ group, pin, installerPath, origina
     if (observeBeforeCapture) await observeBeforeCapture()
     const bytes = Buffer.from((await cdp.send('Page.captureScreenshot', { format: 'png' })).data, 'base64')
     assert.ok(bytes.length > 1000); writeFileSync(path.join(out, filename), bytes, { flag: 'wx' })
-    const record = { filename, bytes: bytes.length, sha256: sha(bytes) }; report.screenshots.push(record); save(); return record
+    const record = { filename, bytes: bytes.length, sha256: sha(bytes) }; report.screenshots.push(record); save()
+    evidenceStore.sealStableJSON('screenshots', record)
+    return record
   }
   const mainWindow = async () => {
     const window = selectDesktopMainWindow(await windowSession.inspect(report.pid, executablePath), report.pid, await evaluate('document.title'))

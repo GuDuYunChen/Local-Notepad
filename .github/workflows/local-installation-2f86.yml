@@ -107,10 +107,8 @@ jobs:
     name: Actual application UI / ${{ matrix.group }}
     needs: install-upgrade-uninstall
     runs-on: windows-latest
-    # Settings has 720 native scenes and a five-second real sync polling cycle.
-    # Only the hosted-job wall-clock limit increases; all native scene, keyboard,
-    # screenshot, per-assertion waiting and rejection budgets remain unchanged.
-    timeout-minutes: ${{ matrix.group == 'settings' && 40 || 25 }}
+    # Preserve the original hosted-job ceiling for every complete native group.
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       max-parallel: 4

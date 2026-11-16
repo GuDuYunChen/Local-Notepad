@@ -5,6 +5,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { closeSync, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, readSync,
   realpathSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { types as stableJSONTypes } from 'node:util'
 
 export const FULL_APP_STORAGE_FORMAT = 'local-notepad-full-app-ui-segmented'
 const PART_FORMAT = FULL_APP_STORAGE_FORMAT + '-part'
@@ -249,6 +250,7 @@ export function createFullAppEvidenceWriter(filename, report) {
   const storeID = randomUUID(), bound = binding(report), owner = sha(encode({ storeID, binding: bound }))
   const access = partAccess(filename, owner), cache = createFullAppEvidenceCache(), entries = [], byScene = new WeakMap(), written = new Set()
   const counters = { rawParts: 0, rawBytes: 0, sceneParts: 0, sceneBytes: 0, eventParts: 0, eventBytes: 0, partBytes: 0, checkpointBytes: 0, saves: 0, seals: 0 }
+  const stableJSON = createFullAppStableJSONEncoder(report)
   let checkpoint = 0
   function writePart(kind, context, value) {
     const bytes = encode({ format: PART_FORMAT, storageVersion: VERSION, owner, kind, context, value })
@@ -322,7 +324,7 @@ export function createFullAppEvidenceWriter(filename, report) {
       checkpoint: checkpoint + 1, body, scenesPresent, sceneCount: scenes.length, scenes, events }
   }
   function save() {
-    const bytes = encode(prepare())
+    const publication = stableJSON.prepareManifest(prepare()), bytes = publication.bytes
     if (checkpoint === 0) writeFileSync(filename, bytes, { flag: 'wx' })
     else {
       // A failed write leaves the previous whole manifest. Unreferenced parts
@@ -335,6 +337,7 @@ export function createFullAppEvidenceWriter(filename, report) {
         renameSync(temporary, filename); ownedTemporary = false
       } finally { if (ownedTemporary && existsSync(temporary)) unlinkSync(temporary) }
     }
+    publication.commit()
     checkpoint++; counters.saves++; counters.checkpointBytes += bytes.length
   }
   function appendRaw(scene, sample) {
@@ -359,7 +362,7 @@ export function createFullAppEvidenceWriter(filename, report) {
     entry.raw = entry.objects = null; cache.clear(); counters.seals++
   }
   return {
-    save, appendRaw, sealScene,
+    save, appendRaw, sealScene, sealStableJSON: stableJSON.sealStableJSON,
     receipt() {
       assert.equal(report.complete, true, 'An incomplete report cannot claim storage acceptance')
       assert.ok(entries.every(entry => entry.sealed), 'Every successful scene must be sealed before acceptance')
@@ -369,6 +372,133 @@ export function createFullAppEvidenceWriter(filename, report) {
       assert.equal(sha(encode(current)), loaded.fingerprint.sha256, 'Live evidence changed after its last complete checkpoint')
       return loaded.storage
     },
-    statistics() { return { ...counters, reads: access.statistics(), cache: cache.state(), activeScenes: entries.filter(entry => !entry.sealed).length } },
+    statistics() { return { ...counters, reads: access.statistics(), cache: cache.state(), stableJSON: stableJSON.statistics(), activeScenes: entries.filter(entry => !entry.sealed).length } },
   }
 }
+
+// Explicitly published immutable receipts may reuse their original compact JSON.
+// Every checkpoint and the final full native encoding/hash check remain intact.
+const STABLE_JSON_COLLECTIONS = ['screenshots', 'fullAppUi.focus', 'fullAppUi.popups', 'fullAppUi.optionPointerPreparations']
+const stableJSONAt = (root, route) => route.split('.').reduce((value, key) => value?.[key], root)
+
+// No getter or toJSON is invoked. Return the exact original object graph, not a
+// detached clone. Aliases are kept; cycles and custom/proxy objects are ineligible.
+function stableJSONNodes(value, active = new Set(), seen = new Set(), result = [], trusted = null) {
+  if (value === null || ['undefined', 'boolean', 'number', 'string'].includes(typeof value)) return result
+  if (typeof value !== 'object' || stableJSONTypes.isProxy(value) || active.has(value)) return null
+  if (trusted?.has(value) || seen.has(value)) return result
+  const array = Array.isArray(value), proto = Object.getPrototypeOf(value)
+  if (proto !== (array ? Array.prototype : Object.prototype) && !(proto === null && !array)) return null
+  if ('toJSON' in value) return null
+  const keys = Object.keys(value), ownKeys = Reflect.ownKeys(value)
+  if (array) {
+    // Only dense own enumerable data indices. Native Get for holes, inherited
+    // indices, hidden indices or extra properties is left to original stringify.
+    if (keys.length !== value.length || ownKeys.length !== value.length + 1) return null
+    for (let index = 0; index < value.length; index++) {
+      const descriptor = Object.getOwnPropertyDescriptor(value, String(index))
+      if (!descriptor || !descriptor.enumerable || !('value' in descriptor)) return null
+    }
+  } else if (ownKeys.length !== keys.length) return null
+  active.add(value)
+  for (const key of keys) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key)
+    if (!descriptor || !('value' in descriptor) || !stableJSONNodes(descriptor.value, active, seen, result, trusted)) return null
+  }
+  active.delete(value); seen.add(value); result.push(value)
+  return result
+}
+
+function createFullAppStableJSONEncoder(report) {
+  const sealed = new WeakMap()
+  let published = new WeakMap(), lastPublishedManifest = null, publicationEligible = false
+  const bytes = value => Buffer.from(value, 'utf8')
+  const marks = Object.fromEntries(['{', '}', '[', ']', ',', '\n'].map(value => [value, bytes(value)]))
+  const metrics = { sealedObjects: 0, sealedGraphNodes: 0, cachedHits: 0, ordinaryEncodes: 0, arrayFallbacks: 0 }
+  const ordinary = value => value && typeof value === 'object' && !Array.isArray(value) && !stableJSONTypes.isProxy(value) &&
+    [Object.prototype, null].includes(Object.getPrototypeOf(value)) && !('toJSON' in value) &&
+    Object.keys(value).every(key => 'value' in Object.getOwnPropertyDescriptor(value, key))
+  return {
+    statistics: () => ({ ...metrics }),
+    sealStableJSON(collection, value, { protectedObjects = [] } = {}) {
+      assert.ok(Array.isArray(protectedObjects), 'Stable JSON protected owners must be an Array')
+      assert.ok(STABLE_JSON_COLLECTIONS.includes(collection), 'Unregistered producer collection')
+      assert.ok(value && typeof value === 'object', 'Explicit sealed receipt must be an object')
+      assert.ok(lastPublishedManifest && stableJSONAt(report, collection)?.includes(value), 'Sealed value is not the original published collection object')
+      const nodes = stableJSONNodes(value)
+      if (!nodes) return false // Still writable/fully encoded: unsupported shapes are never guessed immutable.
+      if (!publicationEligible) return false // Whole native fallback must remain a non-disruptive optimization opt-out.
+      const last = published.get(value)
+      assert.ok(last, 'Explicit sealing requires successful publication of this exact object')
+      const protectedNow = new Set([...protectedObjects, report, report.fullAppUi, report.fullAppUi?.scenes,
+        report.fullAppUi?.events, report.runner, report.sourceFiles,
+        ...STABLE_JSON_COLLECTIONS.map(name => stableJSONAt(report, name))])
+      assert.ok(!nodes.some(node => protectedNow.has(node)), 'Refusing to freeze an active external owner')
+      const encoded = bytes(JSON.stringify(value) ?? 'null')
+      assert.deepEqual(encoded, last, 'Value changed since its last successful publication')
+      // All fallible eligibility/publication checks precede the first freeze.
+      // Only inert ordinary non-proxy nodes remain; no clone replaces the value.
+      for (const node of nodes) Object.freeze(node)
+      sealed.set(value, encoded); metrics.sealedObjects++; metrics.sealedGraphNodes += nodes.length
+      return true
+    },
+    prepareManifest(manifest) {
+      const nextPublished = new WeakMap(), chunks = []
+      // A changed global JSON protocol must not be hidden by cached inert data.
+      if (!ordinary(manifest) || 'toJSON' in Object.prototype || 'toJSON' in Array.prototype ||
+          !stableJSONNodes(manifest, new Set(), new Set(), [], sealed)) {
+        const encoded = encode(manifest)
+        return { bytes: encoded, commit() { published = nextPublished; lastPublishedManifest = manifest; publicationEligible = false } }
+      }
+      function arrayFragments(value) {
+        if (!Array.isArray(value) || stableJSONTypes.isProxy(value) || Object.getPrototypeOf(value) !== Array.prototype || 'toJSON' in value) return null
+        const keys = Object.keys(value)
+        if (keys.length !== value.length || Reflect.ownKeys(value).length !== value.length + 1 ||
+            keys.some(key => !/^(0|[1-9][0-9]*)$/.test(key) || Number(key) >= value.length)) return null
+        const encoded = []
+        for (let index = 0; index < value.length; index++) {
+          const descriptor = Object.getOwnPropertyDescriptor(value, String(index))
+          if (!descriptor || !descriptor.enumerable || !('value' in descriptor)) return null
+          const item = descriptor?.value
+          let fragment = item && typeof item === 'object' ? sealed.get(item) : undefined
+          if (fragment) metrics.cachedHits++
+          else {
+            if (!stableJSONNodes(item)) return null
+            fragment = bytes(JSON.stringify(item) ?? 'null'); metrics.ordinaryEncodes++
+          }
+          if (item && typeof item === 'object') nextPublished.set(item, fragment)
+          encoded.push(fragment)
+        }
+        return encoded
+      }
+      function object(value, currentPath) {
+        chunks.push(marks['{']); let count = 0
+        for (const key of Object.keys(value)) {
+          const item = value[key], route = currentPath ? currentPath + '.' + key : key
+          const selected = route.startsWith('body.') && STABLE_JSON_COLLECTIONS.includes(route.slice(5)), nested = ['body', 'body.fullAppUi'].includes(route) && ordinary(item)
+          const array = selected ? arrayFragments(item) : null
+          if (selected && !array) metrics.arrayFallbacks++
+          const encoded = !nested && !array ? JSON.stringify({ [key]: item }).slice(1, -1) : null
+          if (encoded === '') continue
+          if (count++) chunks.push(marks[','])
+          if (array) {
+            chunks.push(bytes(JSON.stringify(key) + ':'), marks['['])
+            for (let index = 0; index < array.length; index++) {
+              if (index) chunks.push(marks[','])
+              chunks.push(array[index])
+            }
+            chunks.push(marks[']'])
+          } else if (nested) {
+            chunks.push(bytes(JSON.stringify(key) + ':')); object(item, route)
+          } else chunks.push(bytes(encoded))
+        }
+        chunks.push(marks['}'])
+      }
+      object(manifest, ''); chunks.push(marks['\n'])
+      const encoded = Buffer.concat(chunks)
+      // A real writer must call this only after its original atomic save succeeds.
+      return { bytes: encoded, commit() { published = nextPublished; lastPublishedManifest = manifest; publicationEligible = true } }
+    },
+  }
+}
+

@@ -718,6 +718,30 @@ function pinnedNestedAncestorRange(surface, baseline, sample, actual) {
     Math.abs(actual.requiredContentEnd - surface.requiredContentEnd - delta) <= 1
 }
 
+// Keep raw PNG observations and later sweep planning in the SAME first recorded
+// scene frame. Only a proven pinned ancestor changes coordinates; native scroll
+// offsets, sweep ranges, geometry and the original four endpoints remain intact.
+function normalizePinnedSceneCoordinates(baseline, sample) {
+  const areas = sample.scrollAreas || []
+  for (const actual of areas) assert.ok(!Object.hasOwn(actual, 'nativeCoordinates') && !Object.hasOwn(actual, 'coordinateFrame'),
+    'Native scroll coordinates are already normalized')
+  const scrollAreas = areas.map(actual => {
+    const matches = baseline.scrollAreas?.filter(surface => surface.selector === actual.selector) || []
+    if (matches.length !== 1 || areas.filter(surface => surface.selector === actual.selector).length !== 1) return actual
+    const surface = matches[0]
+    const originalRange = Math.abs(actual.requiredContentStart - surface.requiredContentStart) <= 1 &&
+      Math.abs(actual.requiredContentEnd - surface.requiredContentEnd) <= 1
+    if (originalRange || !actual.ancestor || actual.scrollHeight !== surface.scrollHeight || actual.clientHeight !== surface.clientHeight ||
+        !pinnedNestedAncestorRange(surface, baseline, sample, actual)) return actual
+    const delta = actual.scrollTop - surface.scrollTop
+    const nativeCoordinates = Object.fromEntries(['requiredContentStart', 'requiredContentEnd', 'visibleContentStart', 'visibleContentEnd']
+      .map(key => [key, actual[key]]))
+    return { ...actual, ...Object.fromEntries(Object.entries(nativeCoordinates).map(([key, value]) => [key, value - delta])),
+      nativeCoordinates, coordinateFrame: { baselineScrollTop: surface.scrollTop, delta } }
+  })
+  return { ...sample, scrollAreas }
+}
+
 export function measureFullAppScrollCoverage(surface, samples, images) {
   const start = surface.requiredContentStart, end = surface.requiredContentEnd
   assert.ok(Number.isFinite(start) && Number.isFinite(end) && start >= 0 && end >= start && end <= surface.scrollHeight)
@@ -729,14 +753,19 @@ export function measureFullAppScrollCoverage(surface, samples, images) {
       return { sample, actual: sample?.scrollAreas.find(item => item.selector === surface.selector) }
     })
     if (pair.some(({ actual }) => !actual)) continue
+    const visible = []
     for (const { sample, actual } of pair) {
       assert.equal(actual.scrollHeight, surface.scrollHeight); assert.equal(actual.clientHeight, surface.clientHeight)
       const originalRange = Math.abs(actual.requiredContentStart - start) <= 1 && Math.abs(actual.requiredContentEnd - end) <= 1
       assert.ok(originalRange || pinnedNestedAncestorRange(surface, baseline, sample, actual), 'Actual long-page content range changed')
       assert.ok(Number.isFinite(actual.visibleContentStart) && Number.isFinite(actual.visibleContentEnd) && actual.visibleContentEnd >= actual.visibleContentStart)
+      // A pinned coordinate shift cannot reveal more content. Map each PNG
+      // boundary back to the baseline frame before intersecting its interval.
+      const delta = originalRange ? 0 : actual.scrollTop - surface.scrollTop
+      visible.push({ from: actual.visibleContentStart - delta, to: actual.visibleContentEnd - delta })
     }
-    const from = Math.max(start, pair[0].actual.visibleContentStart, pair[1].actual.visibleContentStart)
-    const to = Math.min(end, pair[0].actual.visibleContentEnd, pair[1].actual.visibleContentEnd)
+    const from = Math.max(start, visible[0].from, visible[1].from)
+    const to = Math.min(end, visible[0].to, visible[1].to)
     if (to > from) intervals.push({ from, to, image: image.filename })
   }
   intervals.sort((a, b) => a.from - b.from || a.to - b.to)
@@ -752,6 +781,10 @@ export function measureFullAppScrollCoverage(surface, samples, images) {
 export function createFullAppUiShared(ctx) {
   const { evaluate, click, cdp, until, capture, report, save } = ctx
   const ui = report.fullAppUi
+  const sealStableJSON = (collection, value) => ctx.evidenceStore?.sealStableJSON?.(collection, value, {
+    protectedObjects: [ctx, ...Object.values(ctx).filter(item => item && typeof item === 'object'),
+      ctx.matrix?.viewport, ctx.windowReceipt?.viewport, ctx.windowReceipt?.requested],
+  })
   const appendRaw = (scene, sample) => ctx.evidenceStore ? ctx.evidenceStore.appendRaw(scene, sample) : scene.rawSamples.push(sample)
   const frame = () => evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(true))))')
   const originalSelect = createNativeUiSelect({ evaluate, click, cdp, until })
@@ -814,6 +847,7 @@ export function createFullAppUiShared(ctx) {
   const nameFor = (meta, suffix) => `${slug(meta.group)}-${slug(meta.theme)}-${meta.viewport.width}x${meta.viewport.height}-${slug(meta.routeId)}-${slug(meta.stateId)}-${suffix}.png`
   const sidebarFocusExpression = `(${observeCollapsedSidebarFocus.toString()})(${q(COLLAPSED_SIDEBAR_EXPAND)},${observeFullAppFocus.toString()},${hasVisibleBoxShadow.toString()},${withinActualClientPort.toString()},${observeFullAppOverflowViewport.toString()},${viewportFixedClipBoundary.toString()})`
   const samplePage = (route, root, anchors, onlySelectors = [], sidebarFocusRequired = false) => evaluate(`(()=>{const collectFullAppScrollOwners=${collectFullAppScrollOwners.toString()};const page=(${observeFullAppPage.toString()})(${q({ root, anchors, onlySelectors, editorExceptions: route.editorExceptions || [] })},${withinActualClientPort.toString()},${observeFullAppOverflowViewport.toString()},${viewportFixedClipBoundary.toString()});${sidebarFocusRequired ? `page.sidebarFocus=${sidebarFocusExpression};` : ''}return page;})()`)
+  const nativeSamplePage = samplePage
   const captureState = async ({ routeId, stateId, root, anchors = [], requiredText = [], allowHorizontalScroll = [], coverageMode = 'route-controls', onlySelectors = [] }) => {
     const route = routeFor(routeId), registeredRoot = route.stateRoots?.[stateId] || route.root
     root ||= registeredRoot
@@ -831,6 +865,12 @@ export function createFullAppUiShared(ctx) {
     const syncReadiness = ['sync-presentation', 'settings-main', 'local-sync-activity'].includes(meta.routeId) ? createSyncActivityCaptureReadiness({ routeId: meta.routeId,
       ownerToken: JSON.stringify(meta), evaluate, until, receipt: (scene.syncActivityReadiness = {}), save }) : null
     let captureFailure = null
+    let coordinateBaseline = null
+    const samplePage = async (...args) => {
+      const sample = await nativeSamplePage(...args)
+      coordinateBaseline ||= structuredClone({ root: sample.root, rootBounds: sample.rootBounds, scrollAreas: sample.scrollAreas })
+      return normalizePinnedSceneCoordinates(coordinateBaseline, sample)
+    }
     let index = 0
     const snap = async targetAnchors => {
       // A momentary enabled button can be just before the next normal poll.
@@ -880,7 +920,7 @@ export function createFullAppUiShared(ctx) {
       if (syncReadiness) await syncReadiness.install()
       if (anchors.length) { await ensureVisible(anchors[0]); await snap([anchors[0]]) }
       else {
-        const initial = await samplePage(route, root, [])
+        const initial = await nativeSamplePage(route, root, [])
         const first = initial.controls.find(control => control.width <= meta.viewport.width && control.height <= meta.viewport.height)
         assert.ok(first, 'A page state needs a real small visible anchor, even when it has no controls')
         await ensureVisible(first.selector); await snap([first.selector])
@@ -1101,6 +1141,7 @@ export function createFullAppUiShared(ctx) {
     assert.ok(sample.trustedTab && sample.focused && sample.focusVisible && sample.inViewport && sample.hit, 'Actual keyboard focus was not visible and reachable')
     assert.equal(sample.outlines.length, 1, 'Actual control has no single focus outline'); assert.deepEqual(sample.shadows, [], 'Actual control has duplicate focus glow')
     if (sidebarFocusRequired) validateCollapsedSidebarFocus(sample, ctx.matrix)
+    sealStableJSON('fullAppUi.focus', pendingSidebarFocus || sample)
     return sample
   }
   const select = async (selector, { routeId, stateId, value, restore = true, captureScene = true }) => {
@@ -1164,6 +1205,7 @@ export function createFullAppUiShared(ctx) {
     receipt.events = await events(first); receipt.trustedPointer = receipt.events.some(event => event.type === 'click' && event.trusted)
     receipt.trustedKeyboard = ['ArrowDown', 'Enter', 'Escape'].every(key => receipt.events.some(event => event.type === 'keydown' && event.key === key && event.trusted))
     receipt.complete = true; save(); assert.ok(receipt.pointerCommitted && receipt.keyboardCommitted && receipt.focusReturned && receipt.trustedPointer && receipt.trustedKeyboard)
+    sealStableJSON('fullAppUi.popups', receipt)
     return receipt
   }
   const selectPreview = async (selector, { routeId, stateId, captureScene = true }) => {
@@ -1193,7 +1235,9 @@ export function createFullAppUiShared(ctx) {
     assert.equal(after.value, before.value, 'Preview-only popup changed the actual value')
     assert.equal(receipt.events.some(event => event.type === 'keydown' && event.key === 'Enter'), false, 'Preview-only gate must not commit a format')
     assert.ok(receipt.focusReturned && receipt.trustedPointer && receipt.trustedKeyboard)
-    receipt.complete = true; save(); return receipt
+    receipt.complete = true; save()
+    sealStableJSON('fullAppUi.popups', receipt)
+    return receipt
   }
   const collapseSidebar = async () => {
     const state = await evaluate(`(() => {const side=document.querySelector('.workspace-sidebar'); const button=side?.querySelector('[aria-label="折叠侧边栏"]'); return {narrow:innerWidth<=820,expanded:Boolean(button&&button.getBoundingClientRect().width>0)} })()`)
