@@ -1969,3 +1969,418 @@ test('explicitly published stable receipts avoid repeated encoding while preserv
     assert.deepEqual(storageJSON(readFullAppEvidence(f.filename).report), expected)
   })
 })
+
+// Opt-in storage v2 contracts. These use the real writer/reader and deliberate
+// synthetic inputs; they do not stand in for a native Windows matrix.
+import storageV2FS from 'node:fs'
+import { syncBuiltinESMExports as storageV2SyncBuiltins } from 'node:module'
+
+const storageV2Paths = ['fullAppUi.focus', 'fullAppUi.popups', 'fullAppUi.optionPointerPreparations']
+function storageV2Case(options = { storageVersion: 2 }) {
+  const directory = mkdtempSync(path.join(tmpdir(), 'notepad-storage-v2-contract-'))
+  const filename = path.join(directory, 'full-app-ui-installed.json'), report = storageReport()
+  const writer = createFullAppEvidenceWriter(filename, report, options)
+  return { directory, filename, report, writer, cleanup: () => rmSync(directory, { recursive: true, force: true }) }
+}
+function storageV2Expected(report) {
+  // Preserve v1's existing top/fullAppUi/scenes/events relocation explicitly.
+  // The three new receipt arrays keep their original position and key order.
+  const original = storageJSON(report), result = {}
+  for (const key of Object.keys(original)) if (key !== 'fullAppUi') result[key] = original[key]
+  if (Object.hasOwn(original, 'fullAppUi')) {
+    const ui = original.fullAppUi
+    if (ui && typeof ui === 'object' && !Array.isArray(ui)) {
+      result.fullAppUi = {}
+      for (const key of Object.keys(ui)) if (!['scenes', 'events'].includes(key)) result.fullAppUi[key] = ui[key]
+      if (Object.hasOwn(ui, 'events') && !Array.isArray(ui.events)) result.fullAppUi.events = ui.events
+      if (Object.hasOwn(ui, 'scenes')) result.fullAppUi.scenes = ui.scenes
+      if (Array.isArray(ui.events)) result.fullAppUi.events = ui.events
+    } else result.fullAppUi = ui
+  }
+  return result
+}
+function storageV2RoundTrip(f) {
+  const loaded = readFullAppEvidence(f.filename)
+  assert.deepEqual(storageJSON(loaded.report), storageJSON(f.report))
+  assert.equal(JSON.stringify(loaded.report), JSON.stringify(storageV2Expected(f.report)), 'Receipt values and recursive key order must retain the original v1 relocation rules')
+  return loaded
+}
+function storageV2Descriptor(f, name = 'fullAppUi.focus') {
+  const manifest = storageManifest(f)
+  assert.equal(manifest.storageVersion, 2, 'Explicit v2 requires its actual descriptor-bearing manifest')
+  const descriptor = manifest.stableReceipts.collections.find(item => item.path === name)
+  assert.ok(descriptor)
+  return { manifest, descriptor }
+}
+function storageV2Published(f) {
+  const value = { complete: true, nested: { text: '完整已发布原件', values: [0, null, false, ''] } }
+  f.report.fullAppUi.focus = [value]; f.writer.save()
+  assert.equal(f.writer.sealStableJSON('fullAppUi.focus', value), true)
+  f.writer.save()
+  return value
+}
+function storageV2Fault(method, factory, work) {
+  const original = storageV2FS[method]
+  storageV2FS[method] = factory(original); storageV2SyncBuiltins()
+  try { return work() }
+  finally { storageV2FS[method] = original; storageV2SyncBuiltins() }
+}
+
+test('v2 C01 explicitly sealed receipt payloads leave the manifest while original v1 and legacy guards remain', () => {
+  const f = storageV2Case(), original = storageCase()
+  try {
+    const value = storageV2Published(f)
+    assert.equal(storageManifest(f).body.fullAppUi.focus[0], null, 'A successfully sealed original receipt must not be recopied into each later manifest')
+    assert.equal(f.report.fullAppUi.focus[0], value, 'Offloading never replaces the producer object with a clone or reference')
+    const { manifest, descriptor } = storageV2Descriptor(f)
+    assert.deepEqual(manifest.stableReceipts.collections.map(item => item.path), storageV2Paths)
+    assert.equal(manifest.stableReceipts.format, FULL_APP_STORAGE_FORMAT + '-sealed-receipts')
+    assert.equal(manifest.stableReceipts.schemaVersion, 1)
+    assert.deepEqual(descriptor.entries.map(item => [item.index, item.mode]), [[0, 'part']])
+    const loaded = storageV2RoundTrip(f)
+    assert.equal(loaded.storage.parts.count, 1); assert.equal(loaded.statistics().reads.stableParts, 1)
+    assert.ok(Number.isSafeInteger(loaded.statistics().reads.stableBytes) && loaded.statistics().reads.stableBytes > 0)
+    original.writer.save(); assert.equal(storageManifest(original).storageVersion, 1)
+    const flipped = storageManifest(original); flipped.storageVersion = 2; storageWriteManifest(original, flipped)
+    assert.throws(() => readFullAppEvidence(original.filename), /storage version|receipt descriptor/i)
+    const unknown = storageManifest(f); unknown.storageVersion = 99; storageWriteManifest(f, unknown)
+    assert.throws(() => readFullAppEvidence(f.filename), /storage version/i)
+    const bad = path.join(f.directory, 'unsupported.json')
+    assert.throws(() => createFullAppEvidenceWriter(bad, storageReport(), { storageVersion: 99 }), /storage version/i)
+    assert.equal(storageV2FS.existsSync(bad + '.parts'), false)
+    const extra = path.join(f.directory, 'unknown-option.json')
+    assert.throws(() => createFullAppEvidenceWriter(extra, storageReport(), { storageVersion: 2, guess: true }), /writer options/i)
+    const legacy = { fullAppUi: { focus: [{ file: '../business.json', kind: 'stable', value: null }] }, other: '原业务数据' }
+    const legacyFile = path.join(f.directory, 'legacy.json'); writeFileSync(legacyFile, JSON.stringify(legacy))
+    assert.deepEqual(readFullAppEvidence(legacyFile).report, legacy)
+  } finally { f.cleanup(); original.cleanup() }
+})
+
+test('v2 C02 only the original explicit publication capability permits offload and active owners remain writable', () => {
+  const f = storageV2Case()
+  try {
+    const value = { complete: true, nested: { value: 1 } }; f.report.fullAppUi.focus = [value]
+    assert.throws(() => f.writer.sealStableJSON('fullAppUi.focus', value), /published collection object/)
+    f.writer.save()
+    assert.equal(storageV2Descriptor(f).descriptor.entries[0].mode, 'inline')
+    assert.equal(Object.isFrozen(value), false, 'complete:true does not authorize a part')
+    value.nested.value = 2
+    assert.throws(() => f.writer.sealStableJSON('fullAppUi.focus', value), /changed since/)
+    f.writer.save()
+    assert.throws(() => f.writer.sealStableJSON('fullAppUi.focus', value, { protectedObjects: [value.nested] }), /active external owner/)
+    assert.equal(Object.isFrozen(value.nested), false)
+    const detached = storageJSON(value)
+    assert.throws(() => f.writer.sealStableJSON('fullAppUi.focus', detached), /published collection object/)
+    const newlyAdded = { pending: true }; f.report.fullAppUi.focus.push(newlyAdded)
+    assert.throws(() => f.writer.sealStableJSON('fullAppUi.focus', newlyAdded), /successful publication/)
+    f.writer.save(); assert.equal(f.writer.sealStableJSON('fullAppUi.focus', value), true)
+    newlyAdded.pending = false; newlyAdded.failure = { retained: 'input failed after preparation' }; f.writer.save()
+    assert.deepEqual(storageV2Descriptor(f).descriptor.entries.map(entry => entry.mode), ['part', 'inline'])
+    assert.equal(Object.isFrozen(newlyAdded), false); storageV2RoundTrip(f)
+    const privatelyUnsealed = Object.freeze({ nested: Object.freeze({ retained: 'deep freeze is not a writer capability' }) })
+    f.report.fullAppUi.focus.push(privatelyUnsealed); f.writer.save()
+    assert.equal(storageV2Descriptor(f).descriptor.entries.at(-1).mode, 'inline', 'Deeply frozen objects still require the private publication seal')
+    const image = { filename: 'actual.png', bytes: 1500, sha256: 'a'.repeat(64) }
+    f.report.screenshots = [image]; f.writer.save(); f.writer.sealStableJSON('screenshots', image); f.writer.save()
+    assert.deepEqual(storageManifest(f).body.screenshots, [image], 'The existing screenshot collection stays inline')
+    assert.equal(storageV2Descriptor(f).manifest.stableReceipts.collections.length, 3)
+  } finally { f.cleanup() }
+})
+
+test('v2 C03 every mutable checkpoint and replaced reversed popped duplicated or moved array retains full values and order', () => {
+  const f = storageV2Case()
+  try {
+    const sealed = storageV2Published(f), active = { complete: false, data: [1], marker: { file: 'business', kind: 'stable', value: null } }
+    f.report.fullAppUi.focus.push(active)
+    f.report.fullAppUi.popups = [sealed]; f.report.fullAppUi.optionPointerPreparations = [sealed]
+    const check = () => {
+      f.writer.save(); storageV2RoundTrip(f)
+      const { manifest } = storageV2Descriptor(f), refs = []
+      for (const collection of manifest.stableReceipts.collections) if (collection.state === 'array') {
+        assert.equal(collection.entries.length, collection.length)
+        for (const [index, entry] of collection.entries.entries()) {
+          assert.equal(entry.index, index)
+          if (entry.mode === 'part') { assert.deepEqual(entry.ref.context, { collection: collection.path, ordinal: index }); refs.push(entry.ref.file) }
+        }
+      }
+      assert.equal(new Set(refs).size, refs.length, 'Every occurrence has its own current collection and ordinal context')
+    }
+    check(); active.data.push(2); f.report.newFailureDiagnostic = { sequence: 1 }; check()
+    f.report.fullAppUi.focus = [null, active, sealed, sealed]; check()
+    f.report.fullAppUi.focus.reverse(); check(); f.report.fullAppUi.focus.pop(); check()
+    f.report.fullAppUi.focus.unshift({ activeInsertion: true }); check()
+    active.complete = true; check(); f.writer.sealStableJSON('fullAppUi.focus', active); check()
+    f.report.fullAppUi.focus = []; check()
+    f.report.fullAppUi.popups = null; check()
+    delete f.report.fullAppUi.popups; check()
+    f.report.fullAppUi.popups = undefined; check()
+    assert.equal(Object.hasOwn(storageV2Descriptor(f).manifest.body.fullAppUi, 'popups'), false, 'Native JSON omits an own undefined collection')
+    f.report.fullAppUi.optionPointerPreparations = { unchangedNonArray: true }; check()
+    assert.deepEqual(storageV2Descriptor(f).manifest.stableReceipts.collections.map(entry => entry.state), ['array', 'absent', 'inline'])
+  } finally { f.cleanup() }
+})
+
+test('v2 C04 unsupported JSON protocols honestly fall back before projection including later global protocols and errors', () => {
+  const f = storageV2Case(), baseline = storageV2Case({ storageVersion: 1 })
+  try {
+    storageV2Published(f)
+    const other = { complete: true, nested: { text: '完整已发布原件', values: [0, null, false, ''] } }
+    baseline.report.fullAppUi.focus = [other]; baseline.writer.save(); baseline.writer.sealStableJSON('fullAppUi.focus', other); baseline.writer.save()
+    const trace = []; let first, second
+    assert.equal(Object.hasOwn(Object.prototype, 'toJSON'), false); assert.equal(Object.hasOwn(Array.prototype, 'toJSON'), false)
+    try {
+      Object.defineProperty(Object.prototype, 'toJSON', { configurable: true, value(key) { trace.push('object:' + key); return this } })
+      Object.defineProperty(Array.prototype, 'toJSON', { configurable: true, value(key) { trace.push('array:' + key); return this } })
+      baseline.writer.save(); first = trace.slice(); trace.length = 0
+      f.writer.save(); second = trace.slice(); trace.length = 0
+    } finally { delete Object.prototype.toJSON; delete Array.prototype.toJSON }
+    assert.deepEqual(second, first, 'Adding v2 must not add or suppress global native protocol calls')
+    assert.equal(storageManifest(f).storageVersion, 1, 'Unsupported global protocols explicitly publish the original v1 path')
+    storageV2RoundTrip(f)
+    const originalUI = f.report.fullAppUi
+    delete originalUI.focus
+    assert.equal(Object.hasOwn(Object.prototype, 'focus'), false); assert.equal(Object.hasOwn(Object.prototype, 'popups'), false)
+    try {
+      Object.defineProperty(Object.prototype, 'focus', { configurable: true, writable: true, value: [{ inherited: 'ignored by native JSON' }] })
+      Object.defineProperty(Object.prototype, 'popups', { configurable: true, writable: true, value: { inherited: true } })
+      f.writer.save()
+      const descriptors = storageV2Descriptor(f).manifest.stableReceipts.collections
+      assert.deepEqual(descriptors.map(item => item.state), ['absent', 'absent', 'absent'], 'Inherited ordinary collection fields are not JSON-domain presence')
+      storageV2RoundTrip(f)
+    } finally { delete Object.prototype.focus; delete Object.prototype.popups }
+    delete f.report.fullAppUi
+    assert.equal(Object.hasOwn(Object.prototype, 'fullAppUi'), false)
+    try {
+      Object.defineProperty(Object.prototype, 'fullAppUi', { configurable: true, writable: true, value: { focus: [{ inherited: 'UI owner itself is absent' }] } })
+      f.writer.save()
+      const descriptors = storageV2Descriptor(f).manifest.stableReceipts.collections
+      assert.deepEqual(descriptors.map(item => item.state), ['absent', 'absent', 'absent'], 'An inherited fullAppUi owner is not a published collection')
+      const current = storageV2RoundTrip(f); assert.equal(Object.hasOwn(current.report, 'fullAppUi'), false)
+    } finally { delete Object.prototype.fullAppUi; f.report.fullAppUi = originalUI }
+    const observations = [], current = { mutable: true }; f.report.fullAppUi.focus = [current]
+    f.report.unknownRoot.protocol = { toJSON(key) { observations.push('toJSON:' + key); return { nativeKey: key } } }
+    Object.defineProperty(f.report.unknownRoot, 'getter', { enumerable: true, configurable: true, get() { observations.push('get'); return 'value' } })
+    const expected = storageJSON(f.report), expectedCalls = observations.slice(); observations.length = 0
+    f.writer.save(); assert.deepEqual(observations, expectedCalls)
+    assert.equal(f.writer.sealStableJSON('fullAppUi.focus', current), false); assert.equal(Object.isFrozen(current), false)
+    assert.deepEqual(storageJSON(readFullAppEvidence(f.filename).report), expected)
+    delete f.report.unknownRoot.protocol; delete f.report.unknownRoot.getter
+    const hiddenChild = { change: 1 }, hidden = []
+    Object.defineProperty(hidden, '0', { value: hiddenChild, enumerable: false, writable: true, configurable: true })
+    const ineligible = { hidden }; f.report.fullAppUi.focus = [ineligible]; f.writer.save()
+    assert.equal(f.writer.sealStableJSON('fullAppUi.focus', ineligible), false)
+    assert.equal(Object.isFrozen(hiddenChild), false); hiddenChild.change = 2; f.writer.save(); storageV2RoundTrip(f)
+    assert.equal(Object.hasOwn(Array.prototype, '0'), false)
+    try {
+      Object.defineProperty(Array.prototype, '0', { value: { inherited: true }, configurable: true, writable: true })
+      f.report.fullAppUi.focus = new Array(1); f.writer.save()
+      assert.equal(storageManifest(f).storageVersion, 1); storageV2RoundTrip(f)
+    } finally { delete Array.prototype[0] }
+    const calls = [], target = { retained: true }
+    f.report.fullAppUi.focus = [new Proxy(target, { get(object, key, receiver) { calls.push('get:' + String(key)); return Reflect.get(object, key, receiver) }, ownKeys(object) { calls.push('keys'); return Reflect.ownKeys(object) } })]
+    storageJSON(f.report); const nativeCalls = calls.slice(); calls.length = 0
+    f.writer.save(); assert.deepEqual(calls, nativeCalls); assert.equal(storageManifest(f).storageVersion, 1)
+    f.report.fullAppUi.focus = [{ values: [undefined, Infinity, NaN, -0], absent: undefined }]; f.writer.save(); storageV2RoundTrip(f)
+    const preceding = readFileSync(f.filename), saves = f.writer.statistics().saves
+    f.report.cycle = f.report
+    assert.throws(() => f.writer.save(), /circular/i); assert.deepEqual(readFileSync(f.filename), preceding)
+    delete f.report.cycle; f.report.big = 1n
+    assert.throws(() => f.writer.save(), /BigInt/); assert.deepEqual(readFileSync(f.filename), preceding)
+    assert.equal(f.writer.statistics().saves, saves)
+  } finally { f.cleanup(); baseline.cleanup() }
+})
+
+test('v2 C05 every stable reference and owned part is strictly bound and corruptions are refused', t => {
+  const cases = [
+    ['descriptor-format', (f, m) => { m.stableReceipts.format += '-wrong' }, /receipt descriptor/i],
+    ['descriptor-version', (f, m) => { m.stableReceipts.schemaVersion = 99 }, /receipt descriptor/i],
+    ['collection-path', (f, m, d) => { d.path = 'fullAppUi.screenshots' }, /collection/i],
+    ['entry-ordinal', (f, m, d) => { d.entries[0].index = 1 }, /ordinal/i],
+    ['extra-entry', (f, m, d) => { d.entries.push(storageJSON(d.entries[0])) }, /length/i],
+    ['same-ref-at-two-valid-ordinals', (f, m, d, r) => { m.body.fullAppUi.focus.push(null); d.length = 2; d.entries.push({ index: 1, mode: 'part', ref: storageJSON(r) }) }, /Duplicate or aliased evidence part/],
+    ['extra-descriptor-reference', (f, m, d) => { d.extra = d.entries[0].ref }, /fields/i],
+    ['extra-ref-field', (f, m, d, r) => { r.extra = r.file }, /fields/i],
+    ['wrong-placeholder', (f, m) => { m.body.fullAppUi.focus[0] = { silentlyLost: true } }, /placeholder/i],
+    ['reference-kind', (f, m, d, r) => { r.kind = 'raw' }, /stable/],
+    ['reference-context', (f, m, d, r) => { r.context.ordinal = 7 }, /context/i],
+    ['reference-size', (f, m, d, r) => { r.bytes++ }, /truncated or extended/i],
+    ['reference-path', (f, m, d, r) => { r.file = '../escape.json' }, /path escapes/i],
+    ['missing-part', (f, m, d, r) => { storageUnlink(storagePartPath(f, r)) }, /ENOENT/],
+    ['truncated-part', (f, m, d, r) => { writeFileSync(storagePartPath(f, r), '{') }, /truncated or extended/],
+    ['modified-part', (f, m, d, r) => { const b = readFileSync(storagePartPath(f, r)); b[b.length - 1] = 32; writeFileSync(storagePartPath(f, r), b) }, /digest differs/],
+    ['payload-owner', (f, m, d, r) => { storageRehashPart(f, r, p => { p.owner = '0'.repeat(64) }) }, /another run\/source/],
+    ['payload-kind', (f, m, d, r) => { storageRehashPart(f, r, p => { p.kind = 'raw' }) }, /stable/],
+    ['payload-version', (f, m, d, r) => { storageRehashPart(f, r, p => { p.storageVersion = 2 }) }, /2 !== 1/],
+    ['payload-context', (f, m, d, r) => { storageRehashPart(f, r, p => { p.context = { collection: 'fullAppUi.popups', ordinal: 0 } }) }, /payload context/],
+    ['payload-extra-reference', (f, m, d, r) => { storageRehashPart(f, r, p => { p.extra = r.file }) }, /fields/i],
+    ['symlink', (f, m, d, r) => { const src = storagePartPath(f, r), target = path.join(f.directory, 'moved.json'); storageRename(src, target); storageSymlink(target, src) }, /owned regular file/],
+    ['hardlink', (f, m, d, r) => { storageLink(storagePartPath(f, r), path.join(f.directory, 'alias.json')) }, /owned regular file/],
+  ]
+  const observations = []
+  for (const [name, change, expected] of cases) {
+    const f = storageV2Case()
+    try {
+      storageV2Published(f); const { manifest, descriptor } = storageV2Descriptor(f), ref = descriptor.entries[0].ref
+      change(f, manifest, descriptor, ref); storageWriteManifest(f, manifest)
+      assert.throws(() => readFullAppEvidence(f.filename), error => { assert.match(error.message, expected, name); observations.push({ name, error: error.message }); return true }, name)
+    } finally { f.cleanup() }
+  }
+  const a = storageV2Case(), b = storageV2Case()
+  try {
+    storageV2Published(a); storageV2Published(b)
+    const current = storageV2Descriptor(a), foreign = storageV2Descriptor(b).descriptor.entries[0].ref
+    writeFileSync(storagePartPath(a, foreign), readFileSync(storagePartPath(b, foreign)))
+    current.descriptor.entries[0].ref = foreign; storageWriteManifest(a, current.manifest)
+    assert.throws(() => readFullAppEvidence(a.filename), /another run\/source/)
+    observations.push({ name: 'cross-owner-real-part', refused: true })
+  } finally { a.cleanup(); b.cleanup() }
+  t.diagnostic(JSON.stringify(observations))
+})
+
+test('v2 C06 actual part temporary and rename failures preserve committed checkpoints without false publication', t => {
+  const observations = []
+  for (const boundary of ['part-write', 'temporary-write', 'rename-before', 'rename-after']) {
+    const f = storageV2Case()
+    try {
+      const original = { retained: 'first published' }; f.report.fullAppUi.focus = [original]; f.writer.save()
+      f.writer.sealStableJSON('fullAppUi.focus', original)
+      const before = readFileSync(f.filename), beforeValues = storageJSON(readFullAppEvidence(f.filename).report), saves = f.writer.statistics().saves
+      const pending = { complete: false, failure: 'still mutable' }; f.report.fullAppUi.focus.push(pending)
+      const failure = new Error('v2 deliberate ' + boundary); let reached = 0
+      if (boundary === 'part-write') storageV2Fault('writeFileSync', originalWrite => function (target, data, ...rest) {
+        if (typeof target === 'string' && path.dirname(path.resolve(target)) === path.resolve(f.filename + '.parts') && /^stable-[a-f0-9]{64}\.json$/.test(path.basename(target))) { reached++; originalWrite(target, Buffer.from(data).subarray(0, 7), ...rest); throw failure }
+        return originalWrite(target, data, ...rest)
+      }, () => assert.throws(() => f.writer.save(), error => error === failure))
+      else if (boundary === 'temporary-write') storageV2Fault('writeFileSync', originalWrite => function (target, data, ...rest) {
+        if (typeof target === 'number') { reached++; originalWrite(target, Buffer.from(data).subarray(0, 7), ...rest); throw failure }
+        return originalWrite(target, data, ...rest)
+      }, () => assert.throws(() => f.writer.save(), error => error === failure))
+      else storageV2Fault('renameSync', originalRename => function (...args) {
+        reached++; if (boundary === 'rename-after') originalRename(...args); throw failure
+      }, () => assert.throws(() => f.writer.save(), error => error === failure))
+      assert.equal(reached, 1, boundary); assert.equal(f.writer.statistics().saves, saves)
+      assert.throws(() => f.writer.sealStableJSON('fullAppUi.focus', pending), /successful publication/)
+      assert.equal(Object.isFrozen(pending), false)
+      if (boundary === 'rename-after') {
+        assert.notDeepEqual(readFileSync(f.filename), before)
+        storageV2RoundTrip(f)
+        assert.equal(readFullAppEvidence(f.filename).storage.checkpoint, saves + 1, 'The renamed checkpoint is self-contained before memory commit')
+      } else {
+        assert.deepEqual(readFileSync(f.filename), before)
+        assert.deepEqual(storageJSON(readFullAppEvidence(f.filename).report), beforeValues)
+      }
+      observations.push({ boundary, injected: reached, inMemorySaves: f.writer.statistics().saves, diskCheckpoint: readFullAppEvidence(f.filename).storage.checkpoint })
+    } finally { f.cleanup() }
+  }
+  const first = storageV2Case()
+  try {
+    const failure = new Error('v2 deliberate first creation partial')
+    storageV2Fault('writeFileSync', originalWrite => function (target, data, ...rest) {
+      if (target === first.filename) { originalWrite(target, Buffer.from(data).subarray(0, 11), ...rest); throw failure }
+      return originalWrite(target, data, ...rest)
+    }, () => assert.throws(() => first.writer.save(), error => error === failure))
+    assert.equal(first.writer.statistics().saves, 0)
+    assert.throws(() => readFullAppEvidence(first.filename), SyntaxError)
+    assert.throws(() => createFullAppEvidenceWriter(first.filename, first.report, { storageVersion: 2 }), /existing evidence report/)
+    observations.push({ boundary: 'first-partial-creation', priorCheckpoint: null, rejected: true })
+  } finally { first.cleanup() }
+  t.diagnostic(JSON.stringify(observations))
+})
+
+test('v2 C07 a real unreferenced failed-publication orphan is outside closure but extra and duplicate references are refused', () => {
+  const f = storageV2Case()
+  try {
+    const value = { retained: true }; f.report.fullAppUi.focus = [value]; f.writer.save(); f.writer.sealStableJSON('fullAppUi.focus', value)
+    const before = readFileSync(f.filename), priorClosure = readFullAppEvidence(f.filename).storage.parts
+    storageMkdir(f.filename + '.next')
+    assert.throws(() => f.writer.save(), /EEXIST/)
+    assert.ok(storageStat(f.filename + '.next').isDirectory(), 'Foreign staging evidence is never removed')
+    assert.deepEqual(readFileSync(f.filename), before)
+    assert.equal(storageV2FS.readdirSync(f.filename + '.parts').filter(file => file.startsWith('stable-')).length, 1)
+    const prior = storageV2RoundTrip(f); assert.deepEqual(prior.storage.parts, priorClosure); assert.equal(prior.storage.parts.count, 0)
+    rmSync(f.filename + '.next', { recursive: true }); f.writer.save()
+    assert.equal(readFullAppEvidence(f.filename).storage.parts.count, 1)
+    const current = storageV2Descriptor(f)
+    current.manifest.stableReceipts.collections.push(storageJSON(current.descriptor)); storageWriteManifest(f, current.manifest)
+    assert.throws(() => readFullAppEvidence(f.filename), /collection/i)
+  } finally { f.cleanup() }
+})
+
+test('v2 C08 complete receipts rehash actual closure and reject unsaved live changes or stale accepted bytes', () => {
+  const f = storageV2Case()
+  try {
+    storageV2Published(f); f.report.fullAppUi.complete = true; f.report.complete = true; f.writer.save()
+    const accepted = { complete: true, report: fullAppEvidenceFingerprint(f.filename), storage: f.writer.receipt() }
+    assert.equal(accepted.storage.storageVersion, 2); assert.equal(accepted.storage.parts.count, 1)
+    assert.deepEqual(storageJSON(readFullAppEvidence(f.filename, { accepted }).report), storageJSON(f.report))
+    f.report.liveFailure = { newValue: true }
+    assert.throws(() => f.writer.receipt(), /changed after its last complete checkpoint/)
+    f.writer.save()
+    assert.throws(() => readFullAppEvidence(f.filename, { accepted }), /Accepted manifest bytes differ/)
+    const fresh = { complete: true, report: fullAppEvidenceFingerprint(f.filename), storage: f.writer.receipt() }
+    const wrong = storageJSON(fresh); wrong.storage.parts.count++
+    assert.throws(() => readFullAppEvidence(f.filename, { accepted: wrong }), /closure differs/)
+    const ref = storageV2Descriptor(f).descriptor.entries[0].ref, data = readFileSync(storagePartPath(f, ref)); data[data.length - 1] = 32
+    writeFileSync(storagePartPath(f, ref), data)
+    assert.throws(() => f.writer.receipt(), /digest differs/)
+    assert.throws(() => readFullAppEvidence(f.filename, { accepted: fresh }), /digest differs/)
+  } finally { f.cleanup() }
+  const inline = storageV2Case()
+  try {
+    const value = { complete: true, retained: { text: 'same published JSON value' } }
+    inline.report.fullAppUi.focus = [value]; inline.report.fullAppUi.complete = true; inline.report.complete = true
+    inline.writer.save()
+    const before = readFileSync(inline.filename), saves = inline.writer.statistics().saves
+    assert.equal(inline.writer.sealStableJSON('fullAppUi.focus', value), true)
+    const receipt = inline.writer.receipt()
+    assert.equal(receipt.storageVersion, 2); assert.equal(receipt.parts.count, 0, 'A private seal alone does not publish a part')
+    assert.deepEqual(readFileSync(inline.filename), before); assert.equal(inline.writer.statistics().saves, saves)
+    assert.deepEqual(storageV2FS.readdirSync(inline.filename + '.parts'), [])
+    inline.report.fullAppUi.focus[0] = storageJSON(value)
+    assert.deepEqual(inline.writer.receipt(), receipt, 'Same JSON values with a new object identity retain original receipt semantics')
+    inline.report.fullAppUi.focus[0].retained.text = 'actually unpublished mutation'
+    assert.throws(() => inline.writer.receipt(), /changed after its last complete checkpoint/)
+    assert.deepEqual(readFileSync(inline.filename), before); assert.equal(inline.writer.statistics().saves, saves)
+  } finally { inline.cleanup() }
+})
+
+test('v2 C09 the actual capture producer and unchanged canonical validator consume mixed inline and sealed receipt evidence', async () => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'notepad-storage-v2-producer-')), filename = path.join(directory, 'full-app-ui-installed.json')
+  const ledger = ledgerFixture(), ui = uiFixture('projects', ledger), route = ledger.groups.projects.routes[0], matrix = clone(FULL_APP_MATRIX[0])
+  const previous = ui.scenes.find(scene => scene.stateId === 'ready' && scene.theme === matrix.theme && scene.viewport.width === matrix.viewport.width)
+  ui.scenes.splice(ui.scenes.indexOf(previous), 1)
+  const report = storageReport(); report.fullAppUi = ui
+  const writer = createFullAppEvidenceWriter(filename, report, { storageVersion: 2 })
+  try {
+    writer.save()
+    for (const receipt of ui.focus) assert.equal(writer.sealStableJSON('fullAppUi.focus', receipt), true)
+    writer.save()
+    const early = JSON.parse(readFileSync(filename, 'utf8')); assert.equal(early.storageVersion, 2)
+    assert.ok(early.stableReceipts.collections.find(item => item.path === 'fullAppUi.focus').entries.some(item => item.mode === 'part'))
+    for (const scene of ui.scenes) writer.sealScene(scene)
+    const nativeContract = serializedSweepContract(route.root, matrix), captures = [], budgets = []
+    const shared = createFullAppUiShared({ evaluate: nativeContract.evaluate, report, routes: [route], matrix, evidenceStore: writer,
+      windowReceipt: { nativeWindow: true, viewport: clone(matrix.viewport), requested: clone(matrix.viewport) },
+      click: async () => { throw Error('Unexpected pointer input in v2 storage contract') },
+      cdp: { send: async () => { throw Error('Unexpected keyboard input in v2 storage contract') } },
+      until: async (check, label, ...extra) => { budgets.push(extra); const value = await check(); assert.ok(value, label); return value },
+      save: () => writer.save(), capture: async (name, guard) => {
+        if (guard) await guard()
+        const bytes = png(matrix.viewport.width, matrix.viewport.height), image = { filename: name, bytes: bytes.length, sha256: hash(bytes) }
+        writeFileSync(path.join(directory, name), bytes); captures.push(image); return image
+      } })
+    const scene = await shared.captureState({ routeId: route.id, stateId: 'ready', anchors: ['#owned-select'] })
+    assert.equal(scene, ui.scenes.at(-1)); assert.equal(Object.isFrozen(scene), true)
+    assert.equal(scene.images.length, 3); assert.equal(captures.length, 3)
+    assert.ok(budgets.every(value => value.length === 0))
+    assert.equal(validateFullAppUiEvidence(ui, ledger), ui)
+    const loaded = readFullAppEvidence(filename)
+    assert.deepEqual(storageJSON(loaded.report), storageJSON(report))
+    assert.equal(validateFullAppUiEvidence(loaded.report.fullAppUi, ledger), loaded.report.fullAppUi)
+    assert.ok(loaded.statistics().reads.stableParts > 0)
+    const missing = storageJSON(loaded.report.fullAppUi)
+    missing.scenes.at(-1).rawSamples = missing.scenes.at(-1).rawSamples.filter(sample => sample.phase !== 'after-capture')
+    assert.throws(() => validateFullAppUiEvidence(missing, ledger))
+    assert.equal(hash(readFileSync(new URL('./full-app-ui-evidence.mjs', import.meta.url))), '60039c19b8b8c58a20d1ac42e2b066a18d7ce87c5bd21149da319d5504baf92b')
+  } finally { rmSync(directory, { recursive: true, force: true }) }
+})

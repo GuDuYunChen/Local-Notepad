@@ -1055,6 +1055,16 @@ export function createFullAppUiShared(ctx) {
       reached = nativeSourceOrder.reached
       reverseTabs = nativeSourceOrder.reverseTabs
       tabAttempts = nativeSourceOrder.forwardTabs
+    } else if (meta.routeId === 'editor-code' && meta.stateId === 'default' &&
+        selector === '.editor-input[contenteditable="true"] .code-block-wrapper:has(> .code-block-header) .language-selector-button') {
+      const receipt = { ...binding(meta), selector, eventStart: first,
+        ownerToken: 'code-language:' + ui.focus.length + ':' + first,
+        method: 'native-f6-and-adjacent-tab-round-trip', reached: false }
+      ;(ui.codeLanguageKeyboardEntries ||= []).push(receipt)
+      nativeSourceOrder = await traverseCodeLanguageWithNativeKeys({ key, evaluate, receipt, save })
+      reached = nativeSourceOrder.reached
+      reverseTabs = nativeSourceOrder.reverseTabs
+      tabAttempts = nativeSourceOrder.forwardTabs
     } else if (meta.routeId === 'editor-wiki-navigation' && meta.stateId === 'missing-source' &&
         selector === '[aria-label="关闭引用导航提示"]') {
       nativeSourceOrder = await traverseWikiNavigationCloseWithNativeTabs({ key, evaluate })
@@ -1552,5 +1562,173 @@ export function createSyncActivityCaptureReadiness({ routeId, ownerToken, evalua
       receipt.complete = receipt.attempts.length > 0 && receipt.attempts.every(attempt => attempt.complete)
       save()
     },
+  }
+}
+
+// Renderer-only observation state. It holds original DOM references and a
+// passive key observer; it never focuses, clicks, restores a Range or edits UI.
+export function observeCodeLanguageKeyboardEntry(ownerToken, action = 'read') {
+  const key = '__fullAppCodeLanguageKeyboardOwner'
+  const owned = window[key]
+  const selectors = {
+    editor: '.editor-input[contenteditable="true"]',
+    owner: '.editor-input[contenteditable="true"] .code-block-wrapper:has(> .code-block-header)',
+    target: '.editor-input[contenteditable="true"] .code-block-wrapper:has(> .code-block-header) .language-selector-button',
+  }
+  const sameOwner = state => state && Object.entries(state.refs).every(([name, node]) => {
+    if (!node.isConnected) return false
+    if (name === 'header') return state.refs.owner.querySelector(':scope > .code-block-header') === node
+    if (name === 'next') return [...state.refs.header.querySelectorAll('button')].filter(button => !button.disabled && button.tabIndex >= 0)[1] === node
+    const nodes = document.querySelectorAll(selectors[name]); return nodes.length === 1 && nodes[0] === node
+  })
+  if (action === 'dispose') {
+    if (!owned) return { disposed: true, absent: true, ownerToken }
+    if (owned.ownerToken !== ownerToken) throw Error('Code language keyboard observer token changed')
+    try {
+      document.removeEventListener('keydown', owned.onKey, true)
+      return { disposed: true, ownerToken, identityRetained: Boolean(sameOwner(owned)),
+        ownedEvents: owned.events.slice(), ownedTraceTruncated: owned.truncated }
+    } finally { delete window[key] }
+  }
+  if (!ownerToken || !['read', 'install'].includes(action)) throw Error('Code language keyboard observer operation is invalid')
+  const one = selector => {
+    const nodes = document.querySelectorAll(selector)
+    if (nodes.length !== 1) throw Error('Code language keyboard owner missing or ambiguous: ' + selector)
+    return nodes[0]
+  }
+  const editor = one(selectors.editor), owner = one(selectors.owner), target = one(selectors.target)
+  const header = owner.querySelector(':scope > .code-block-header')
+  const buttons = header ? [...header.querySelectorAll('button')].filter(button => !button.disabled && button.tabIndex >= 0) : []
+  const next = buttons[1], refs = { editor, owner, header, target, next }
+  if (action === 'read') {
+    if (!owned || owned.ownerToken !== ownerToken) throw Error('Code language keyboard observer token changed')
+    if (Object.keys(refs).some(name => owned.refs[name] !== refs[name])) throw Error('Code language keyboard owner identity was replaced')
+  }
+  if (!header || !Object.values(refs).every(node => node?.isConnected) || owner.closest('.editor-input[contenteditable]') !== editor ||
+      target.tagName !== 'BUTTON' || next?.tagName !== 'BUTTON' || target.disabled || next.disabled ||
+      buttons[0] !== target || target.tabIndex < 0 || next.tabIndex < 0 ||
+      target.closest('.code-block-header') !== header || next.closest('.code-block-header') !== header ||
+      next.closest('.code-block-toolbar')?.parentElement !== header ||
+      !['自动换行', '取消换行'].includes(next.textContent.trim())) {
+    throw Error('Code language keyboard does not own the actual enabled adjacent header controls')
+  }
+  if (owner.querySelector('.language-selector-dropdown')) throw Error('Code language keyboard unexpectedly opened its language popup')
+  if (document.querySelector('.workspace-save-chip,.editor-unapplied-draft-pill,.save-state.error,.save-state.saving,.quit-save-veil,.consumer-confirm-modal')) {
+    throw Error('Code language keyboard changed the clean note or entered a pending action')
+  }
+  const fields = owner.querySelectorAll('textarea.code-textarea'), previews = owner.querySelectorAll('pre.code-preview')
+  if (fields.length !== 1 || previews.length !== 1 || fields[0].readOnly || fields[0].disabled) throw Error('Code language keyboard lost its editable source')
+  const selection = window.getSelection()
+  if (!selection || selection.rangeCount > 1) throw Error('Code language keyboard selection is unavailable or ambiguous')
+  const point = (node, offset) => {
+    if (!node) return null
+    if (node !== editor && !editor.contains(node)) throw Error('Code language keyboard selection left its editor')
+    const path = [], type = node.nodeType
+    while (node !== editor) { const parent = node.parentNode; path.unshift([...parent.childNodes].indexOf(node)); node = parent }
+    return { path, type, offset }
+  }
+  // Header button styles are presentation, not saved rich-text content. The
+  // unchanged shared.focus gates below inspect their actual computed outline,
+  // shadow, viewport and hit state; paragraph/code styles remain in this copy.
+  const content = editor.cloneNode(true)
+  for (const button of content.querySelectorAll('.code-block-wrapper > .code-block-header button')) button.removeAttribute('style')
+  const snapshot = { content: content.innerHTML, code: fields[0].value, previewText: previews[0].textContent,
+    language: target.textContent.trim(), documentTitle: one('.workspace-title-button').textContent.trim(),
+    selection: { rangeCount: selection.rangeCount, collapsed: selection.isCollapsed, text: selection.toString(),
+      anchor: point(selection.anchorNode, selection.anchorOffset), focus: point(selection.focusNode, selection.focusOffset) } }
+  if (action === 'install') {
+    if (owned) throw Error('Code language keyboard previous observer was not disposed')
+    const state = { ownerToken, refs, snapshot, selectionNodes: [selection.anchorNode, selection.focusNode], events: [], truncated: false, onKey: null }
+    state.onKey = event => {
+      if (state.events.length >= 8) { state.truncated = true; return }
+      const name = node => node === editor ? 'editor' : node === target ? 'language' : node === next ? 'next' : 'other'
+      state.events.push({ type: event.type, key: event.key, trusted: event.isTrusted,
+        target: name(event.target), active: name(document.activeElement), shiftKey: event.shiftKey,
+        ctrlKey: event.ctrlKey, altKey: event.altKey, metaKey: event.metaKey,
+        composing: event.isComposing || event.keyCode === 229 || event.which === 229 })
+    }
+    window[key] = state
+    document.addEventListener('keydown', state.onKey, { capture: true, passive: true })
+  } else {
+    if (owned.selectionNodes[0] !== selection.anchorNode || owned.selectionNodes[1] !== selection.focusNode) throw Error('Code language keyboard original selection endpoints were replaced')
+    for (const name of Object.keys(snapshot)) if (JSON.stringify(snapshot[name]) !== JSON.stringify(owned.snapshot[name])) {
+      throw Error('Code language keyboard changed its original ' + name)
+    }
+  }
+  const state = window[key]
+  return { ...snapshot, ownerToken, ownerReady: true,
+    active: document.activeElement === editor ? 'editor' : document.activeElement === target ? 'language' : document.activeElement === next ? 'next' : 'other',
+    ownedEvents: state.events.slice(), ownedTraceTruncated: state.truncated }
+}
+
+/** New product F6 entry plus genuine adjacent Tab round-trip. Only the exact
+ * code/default route opts in; generic 1 reverse / 256 forward is unchanged. */
+export async function traverseCodeLanguageWithNativeKeys({ key, evaluate, receipt, save }) {
+  Object.assign(receipt, { nativeEntry: null, forwardTabs: 0, reverseTabs: 0, reached: false,
+    observations: [], inputs: [], ownerInstalled: false })
+  let failure = null
+  const read = async (stage, action = 'read') => {
+    const value = await evaluate(`(${observeCodeLanguageKeyboardEntry.toString()})(${JSON.stringify(receipt.ownerToken)},${JSON.stringify(action)})`)
+    if (action === 'install') receipt.ownerInstalled = true
+    receipt.observations.push({ stage, value }); receipt.stage = stage; save()
+    return value
+  }
+  const input = async (name, modifiers = 0) => {
+    const item = { key: name, modifiers, complete: false }; receipt.inputs.push(item); save()
+    // A checkpoint can take time. Re-read the real identity and focus after it,
+    // immediately before sending the key; never repair a changed entry point.
+    item.before = await evaluate(`(${observeCodeLanguageKeyboardEntry.toString()})(${JSON.stringify(receipt.ownerToken)},'read')`)
+    assert.equal(item.before.active, name === 'F6' ? 'editor' : modifiers === 8 ? 'next' : 'language', 'Code language keyboard focus changed before its next native input')
+    await key(name, modifiers); item.complete = true
+  }
+  const trace = async () => {
+    const result = await evaluate(`({events:window.__fullAppUiEvents.slice(${Number(receipt.eventStart)}),traceTruncated:window.__fullAppUiTraceTruncated})`)
+    Object.assign(receipt, result)
+    assert.equal(result.traceTruncated, false, 'Code language keyboard trace was truncated')
+    return result
+  }
+  save()
+  try {
+    const initial = await read('initial', 'install')
+    if (initial.active !== 'editor') { receipt.refusal = { stage: 'initial', expected: 'editor', actual: initial.active }; return receipt }
+    await input('F6'); receipt.nativeEntry = 'F6'
+    const entered = await read('entered')
+    if (entered.active !== 'language') { receipt.refusal = { stage: 'entered', expected: 'language', actual: entered.active }; return receipt }
+    await input('Tab'); receipt.forwardTabs++
+    const forward = await read('forward')
+    if (forward.active !== 'next') { receipt.refusal = { stage: 'forward', expected: 'next', actual: forward.active }; return receipt }
+    await input('Tab', 8); receipt.reverseTabs++
+    const returned = await read('returned')
+    if (returned.active !== 'language') { receipt.refusal = { stage: 'returned', expected: 'language', actual: returned.active }; return receipt }
+    receipt.ownedEvents = returned.ownedEvents
+    assert.equal(returned.ownedTraceTruncated, false, 'Code language keyboard owned trace was truncated')
+    const expected = [['F6', false, 'editor'], ['Tab', false, 'language'], ['Tab', true, 'next']]
+    assert.deepEqual(receipt.ownedEvents.map(event => [event.key, event.shiftKey, event.target]), expected, 'Code language keyboard trusted owner trace did not prove the exact adjacent traversal')
+    assert.ok(receipt.ownedEvents.every(event => event.type === 'keydown' && event.trusted && !event.ctrlKey && !event.altKey && !event.metaKey && !event.composing && event.target === event.active), 'Code language keyboard requires actual trusted unmodified owned input')
+    const current = await trace(), keys = current.events.filter(event => event.type === 'keydown')
+    assert.deepEqual(keys.map(event => event.key), ['F6', 'Tab', 'Tab'], 'Code language keyboard global trace is missing the original real key sequence')
+    assert.ok(keys.every(event => event.trusted), 'Code language keyboard global trace contains untrusted input')
+    receipt.reached = true
+    return receipt
+  } catch (error) {
+    failure = error; receipt.reached = false
+    receipt.error = { name: error.name, message: error.message, stack: error.stack }
+    throw error
+  } finally {
+    try {
+      if (!receipt.events) {
+        try { await trace() } catch (error) { receipt.traceError = { name: error.name, message: error.message } }
+      }
+      receipt.disposal = await evaluate(`(${observeCodeLanguageKeyboardEntry.toString()})(${JSON.stringify(receipt.ownerToken)},'dispose')`)
+      receipt.ownedEvents ||= receipt.disposal.ownedEvents || []
+      assert.equal(receipt.disposal.disposed, true, 'Code language keyboard observer was not disposed')
+      if (receipt.ownerInstalled) assert.equal(receipt.disposal.absent, undefined, 'Code language keyboard observer disappeared before disposal')
+      if (!failure) assert.equal(receipt.disposal.identityRetained, true, 'Code language keyboard owner changed before disposal')
+    } catch (error) {
+      receipt.reached = false; receipt.cleanupError = { name: error.name, message: error.message }
+      if (!failure) throw error
+    } finally {
+      try { save() } catch (error) { if (!failure) throw error; receipt.saveError = { name: error.name, message: error.message } }
+    }
   }
 }

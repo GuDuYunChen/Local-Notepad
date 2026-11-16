@@ -253,7 +253,7 @@ export async function runFullAppUiInstalled({ group, pin, installerPath, origina
     checks: [], screenshots: [], windowSizes: [], commands: [], runtimeErrors: [], fixtureInputs: [], fixtureInputsVerified: false,
     windowHelper: { events: [] }, resizeCommands: [] }
   const reportPath = path.join(out, REPORT)
-  const evidenceStore = createFullAppEvidenceWriter(reportPath, report)
+  const evidenceStore = createFullAppEvidenceWriter(reportPath, report, { storageVersion: 2 })
   assert.equal(typeof evidenceStore.sealStableJSON, 'function', 'Actual storage writer must expose explicit stable receipt sealing')
   let app, exited, cdp, windowSession, trace = '', closeRequested = false, uninstalled = false, activeLabBackend
   const liveCommands = new Set()

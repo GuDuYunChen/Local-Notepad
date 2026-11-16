@@ -3,18 +3,18 @@
   "scope": "installed-actual-app-page-matrix",
   "sourceScope": "control-source entry coverage with declared states; not every possible failure combination",
   "productSource": {
-    "commit": "eb46bea8352ad3dd503685e80b063a76326e380a",
-    "tree": "6b4e915d9b8147d808c959d002fca250d2b51cec",
+    "commit": "46f376c73e0b6d87568d7119963fbd847d148593",
+    "tree": "3112f78e96d9010447e63ca6e1fa959c2da7caae",
     "dirty": false
   },
   "inventory": {
     "file": "inventory.json",
-    "sha256": "702e20e7d96cee95d838d6bc6f1fcd4d97ae621d50c225bbf6dc2559b1256367",
+    "sha256": "d976a51384bdc9ed57614729707553ee13238ec3ea3e382e5981e535885f4f1d",
     "originalDirty": false,
-    "currentCodeFilesHashRevalidated": 347,
+    "currentCodeFilesHashRevalidated": 348,
     "currentControlsFiles": 137,
-    "sourceCommit": "73a637c9c2a0af64e1b6071bba89c66844638b40",
-    "sourceTree": "6b4e915d9b8147d808c959d002fca250d2b51cec",
+    "sourceCommit": "881ee498dd045aa03b11f1705aec67a43cfa5335",
+    "sourceTree": "3112f78e96d9010447e63ca6e1fa959c2da7caae",
     "currentStylesheetsHashRevalidated": 98
   },
   "matrix": [
@@ -1884,9 +1884,9 @@
     },
     {
       "file": "src/components/Editor/nodes/CodeBlockNode.jsx",
-      "bytes": 19301,
-      "sha256": "d0bed965bbef31abfe6ae577413453b7cd97a72b8bebea5ab9db591ab15939c7",
-      "blob": "c441fda099f91dc669cc81dd4f00350398cdb285",
+      "bytes": 19735,
+      "sha256": "6ddcd79af80ddbf3e037797fa3d10b96482b2d000e7858b02dac52293cdd167e",
+      "blob": "a279d24b9f5ed4ea9abe771b3d2a908f3a5b7e18",
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [
@@ -2053,9 +2053,9 @@
     },
     {
       "file": "src/components/Editor/plugins/BlockHandlePlugin.jsx",
-      "bytes": 14139,
-      "sha256": "f07cabc38fc687865c92afc74fedb55a5832dcbd472800b6a038728362b7f756",
-      "blob": "c4168c896f0f94d891a4e0c1551d171de51ceda1",
+      "bytes": 14500,
+      "sha256": "4a8118eb094a237cd99dbcfb198c8c0cbb7c03b14d5309035f084af21feb67ce",
+      "blob": "ac31d8b560a1194490da4ce46b80827fc475c7ea",
       "classification": "planned-nested-controls",
       "reason": "Production controls are rendered within the declared actual route. Scope is the listed route states; unvisited conditional child panels remain explicit gaps below.",
       "routeIds": [

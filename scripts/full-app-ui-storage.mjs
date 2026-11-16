@@ -76,13 +76,14 @@ export function createFullAppEvidenceCache() {
   }
 }
 
-function partAccess(filename, owner) {
+function partAccess(filename, owner, withStable = false) {
   const root = path.dirname(path.resolve(filename)), directory = path.basename(filename) + '.parts'
   const directoryPath = path.join(root, directory)
   const directoryStat = lstatSync(directoryPath)
   assert.ok(directoryStat.isDirectory() && !directoryStat.isSymbolicLink(), 'Evidence part directory must not be a link')
   const realDirectory = realpathSync(directoryPath)
   const reads = { rawParts: 0, rawBytes: 0, sceneParts: 0, sceneBytes: 0, eventsParts: 0, eventsBytes: 0 }
+  if (withStable) Object.assign(reads, { stableParts: 0, stableBytes: 0 })
   const read = (ref, kind, context) => {
     assert.ok(plain(ref), 'Evidence part reference is required')
     assert.equal(ref.kind, kind); assert.match(ref.sha256 || '', /^[a-f0-9]{64}$/)
@@ -100,6 +101,10 @@ function partAccess(filename, owner) {
     assert.equal(part.format, PART_FORMAT); assert.equal(part.storageVersion, VERSION)
     assert.equal(part.owner, owner, 'Evidence part belongs to another run/source')
     assert.equal(part.kind, kind); same(part.context, context, 'Evidence part payload context differs')
+    if (kind === 'stable') {
+      stableReceiptKeys(part, ['format', 'storageVersion', 'owner', 'kind', 'context', 'value'], 'Stable receipt part')
+      assert.ok(part.value !== null && typeof part.value === 'object', 'Stable receipt part must retain its original object value')
+    }
     return part.value
   }
   return { read, directory, directoryPath, statistics: () => ({ ...reads }) }
@@ -182,7 +187,8 @@ export function readFullAppEvidence(filename, { cache = createFullAppEvidenceCac
     }
     return loaded
   }
-  assert.equal(manifest.storageVersion, VERSION, 'Unsupported evidence storage version')
+  if (manifest.storageVersion === 2) validateStableReceiptDescriptor(manifest)
+  else assert.equal(manifest.storageVersion, VERSION, 'Unsupported evidence storage version')
   assert.ok(Number.isSafeInteger(manifest.checkpoint) && manifest.checkpoint > 0)
   assert.match(manifest.storeID || '', /^[a-f0-9-]{36}$/)
   assert.ok(plain(manifest.body) && plain(manifest.binding))
@@ -191,7 +197,7 @@ export function readFullAppEvidence(filename, { cache = createFullAppEvidenceCac
   assert.ok(Array.isArray(manifest.scenes))
   assert.equal(manifest.sceneCount, manifest.scenes.length, 'Evidence scene tail was omitted')
   assert.equal(typeof manifest.scenesPresent, 'boolean')
-  const access = partAccess(filename, manifest.owner), seen = new Set(), closure = createHash('sha256')
+  const access = partAccess(filename, manifest.owner, manifest.storageVersion === 2), seen = new Set(), closure = createHash('sha256')
   let partBytes = 0, rawCount = 0
   const visit = ref => {
     assert.ok(plain(ref) && typeof ref.file === 'string')
@@ -199,6 +205,7 @@ export function readFullAppEvidence(filename, { cache = createFullAppEvidenceCac
     seen.add(ref.file); closure.update(encode(ref)); partBytes += ref.bytes
   }
   const report = manifest.body
+  if (manifest.storageVersion === 2) restoreStableReceipts(manifest, access, visit)
   if (manifest.scenesPresent) {
     assert.ok(plain(report.fullAppUi) && !own(report.fullAppUi, 'scenes'))
     report.fullAppUi.scenes = manifest.scenes.map((slot, index) => {
@@ -229,7 +236,7 @@ export function readFullAppEvidence(filename, { cache = createFullAppEvidenceCac
     assert.ok(manifest.scenes.every(slot => slot.state === 'sealed'), 'Complete evidence cannot contain an uncommitted active scene')
   }
   const loaded = { report, fingerprint, statistics: () => ({ reads: access.statistics(), cache: cache.state() }), storage: {
-    format: FULL_APP_STORAGE_FORMAT, storageVersion: VERSION, owner: manifest.owner, checkpoint: manifest.checkpoint,
+    format: FULL_APP_STORAGE_FORMAT, storageVersion: manifest.storageVersion, owner: manifest.owner, checkpoint: manifest.checkpoint,
     manifest: fingerprint, parts: { count: seen.size, bytes: partBytes, sha256: closure.digest('hex') },
     scenes: manifest.scenes.length, rawSamples: rawCount, events: eventCount,
   } }
@@ -241,19 +248,25 @@ export function readFullAppEvidence(filename, { cache = createFullAppEvidenceCac
   return loaded
 }
 
-export function createFullAppEvidenceWriter(filename, report) {
+export function createFullAppEvidenceWriter(filename, report, options) {
+  const storageVersion = stableReceiptWriterVersion(options)
   assert.ok(plain(report)); assert.equal(existsSync(filename), false, 'Refusing an existing evidence report')
   const root = path.dirname(path.resolve(filename)), directory = path.basename(filename) + '.parts'
   assert.ok(lstatSync(root).isDirectory())
   const directoryPath = path.join(root, directory)
   mkdirSync(directoryPath) // Exclusive owned namespace; never mix previous runs.
   const storeID = randomUUID(), bound = binding(report), owner = sha(encode({ storeID, binding: bound }))
-  const access = partAccess(filename, owner), cache = createFullAppEvidenceCache(), entries = [], byScene = new WeakMap(), written = new Set()
+  const access = partAccess(filename, owner, storageVersion === 2), cache = createFullAppEvidenceCache(), entries = [], byScene = new WeakMap(), written = new Set()
   const counters = { rawParts: 0, rawBytes: 0, sceneParts: 0, sceneBytes: 0, eventParts: 0, eventBytes: 0, partBytes: 0, checkpointBytes: 0, saves: 0, seals: 0 }
+  if (storageVersion === 2) Object.assign(counters, { stableParts: 0, stableBytes: 0, stableReferences: 0, stableRefCacheHits: 0, v2Saves: 0, nativeFallbackSaves: 0 })
   const stableJSON = createFullAppStableJSONEncoder(report)
+  const stableParts = storageVersion === 2 ? createStableReceiptProjection(writePart, counters) : null
   let checkpoint = 0
-  function writePart(kind, context, value) {
-    const bytes = encode({ format: PART_FORMAT, storageVersion: VERSION, owner, kind, context, value })
+  function writePart(kind, context, value, { fragment } = {}) {
+    const bytes = fragment ? Buffer.concat([
+      Buffer.from(JSON.stringify({ format: PART_FORMAT, storageVersion: VERSION, owner, kind, context }).slice(0, -1) + ',"value":'),
+      fragment, Buffer.from('}\n'),
+    ]) : encode({ format: PART_FORMAT, storageVersion: VERSION, owner, kind, context, value })
     const digest = sha(bytes), file = directory + '/' + kind + '-' + digest + '.json'
     const ref = { file, kind, bytes: bytes.length, sha256: digest, context }
     if (!written.has(file)) {
@@ -261,6 +274,7 @@ export function createFullAppEvidenceWriter(filename, report) {
       written.add(file); counters.partBytes += bytes.length
       if (kind === 'raw') { counters.rawParts++; counters.rawBytes += bytes.length }
       else if (kind === 'scene') { counters.sceneParts++; counters.sceneBytes += bytes.length }
+      else if (kind === 'stable') { counters.stableParts++; counters.stableBytes += bytes.length }
       else { counters.eventParts++; counters.eventBytes += bytes.length }
     }
     return ref
@@ -324,7 +338,7 @@ export function createFullAppEvidenceWriter(filename, report) {
       checkpoint: checkpoint + 1, body, scenesPresent, sceneCount: scenes.length, scenes, events }
   }
   function save() {
-    const publication = stableJSON.prepareManifest(prepare()), bytes = publication.bytes
+    const publication = stableJSON.prepareManifest(prepare(), stableParts), bytes = publication.bytes
     if (checkpoint === 0) writeFileSync(filename, bytes, { flag: 'wx' })
     else {
       // A failed write leaves the previous whole manifest. Unreferenced parts
@@ -338,6 +352,7 @@ export function createFullAppEvidenceWriter(filename, report) {
       } finally { if (ownedTemporary && existsSync(temporary)) unlinkSync(temporary) }
     }
     publication.commit()
+    if (storageVersion === 2) counters[publication.storageVersion === 2 ? 'v2Saves' : 'nativeFallbackSaves']++
     checkpoint++; counters.saves++; counters.checkpointBytes += bytes.length
   }
   function appendRaw(scene, sample) {
@@ -369,7 +384,8 @@ export function createFullAppEvidenceWriter(filename, report) {
       const loaded = readFullAppEvidence(filename)
       assert.equal(loaded.report.complete, true); assert.equal(loaded.storage.owner, owner)
       const current = prepare(); current.checkpoint = checkpoint
-      assert.equal(sha(encode(current)), loaded.fingerprint.sha256, 'Live evidence changed after its last complete checkpoint')
+      if (loaded.storage.storageVersion === 2) comparePublishedStableReceipt(filename, current, loaded)
+      else assert.equal(sha(encode(current)), loaded.fingerprint.sha256, 'Live evidence changed after its last complete checkpoint')
       return loaded.storage
     },
     statistics() { return { ...counters, reads: access.statistics(), cache: cache.state(), stableJSON: stableJSON.statistics(), activeScenes: entries.filter(entry => !entry.sealed).length } },
@@ -442,7 +458,7 @@ function createFullAppStableJSONEncoder(report) {
       sealed.set(value, encoded); metrics.sealedObjects++; metrics.sealedGraphNodes += nodes.length
       return true
     },
-    prepareManifest(manifest) {
+    prepareManifest(manifest, stableParts = null) {
       const nextPublished = new WeakMap(), chunks = []
       // A changed global JSON protocol must not be hidden by cached inert data.
       if (!ordinary(manifest) || 'toJSON' in Object.prototype || 'toJSON' in Array.prototype ||
@@ -450,7 +466,10 @@ function createFullAppStableJSONEncoder(report) {
         const encoded = encode(manifest)
         return { bytes: encoded, commit() { published = nextPublished; lastPublishedManifest = manifest; publicationEligible = false } }
       }
-      function arrayFragments(value) {
+      // Qualify the original manifest before projecting any sealed value. A
+      // native protocol fallback above remains the original whole v1 encoding.
+      const projection = stableParts?.(manifest)
+      function arrayFragments(value, collection) {
         if (!Array.isArray(value) || stableJSONTypes.isProxy(value) || Object.getPrototypeOf(value) !== Array.prototype || 'toJSON' in value) return null
         const keys = Object.keys(value)
         if (keys.length !== value.length || Reflect.ownKeys(value).length !== value.length + 1 ||
@@ -460,14 +479,16 @@ function createFullAppStableJSONEncoder(report) {
           const descriptor = Object.getOwnPropertyDescriptor(value, String(index))
           if (!descriptor || !descriptor.enumerable || !('value' in descriptor)) return null
           const item = descriptor?.value
-          let fragment = item && typeof item === 'object' ? sealed.get(item) : undefined
+          const cached = item && typeof item === 'object' ? sealed.get(item) : undefined
+          let fragment = cached
           if (fragment) metrics.cachedHits++
           else {
             if (!stableJSONNodes(item)) return null
             fragment = bytes(JSON.stringify(item) ?? 'null'); metrics.ordinaryEncodes++
           }
           if (item && typeof item === 'object') nextPublished.set(item, fragment)
-          encoded.push(fragment)
+          encoded.push(projection && cached && STABLE_RECEIPT_COLLECTIONS.includes(collection)
+            ? projection.fragment(collection, index, item, fragment) : fragment)
         }
         return encoded
       }
@@ -476,7 +497,7 @@ function createFullAppStableJSONEncoder(report) {
         for (const key of Object.keys(value)) {
           const item = value[key], route = currentPath ? currentPath + '.' + key : key
           const selected = route.startsWith('body.') && STABLE_JSON_COLLECTIONS.includes(route.slice(5)), nested = ['body', 'body.fullAppUi'].includes(route) && ordinary(item)
-          const array = selected ? arrayFragments(item) : null
+          const array = selected ? arrayFragments(item, route.slice(5)) : null
           if (selected && !array) metrics.arrayFallbacks++
           const encoded = !nested && !array ? JSON.stringify({ [key]: item }).slice(1, -1) : null
           if (encoded === '') continue
@@ -494,11 +515,137 @@ function createFullAppStableJSONEncoder(report) {
         }
         chunks.push(marks['}'])
       }
-      object(manifest, ''); chunks.push(marks['\n'])
+      object(projection?.manifest || manifest, ''); chunks.push(marks['\n'])
       const encoded = Buffer.concat(chunks)
       // A real writer must call this only after its original atomic save succeeds.
-      return { bytes: encoded, commit() { published = nextPublished; lastPublishedManifest = manifest; publicationEligible = true } }
+      return { bytes: encoded, storageVersion: projection ? 2 : VERSION,
+        commit() { projection?.commit(); published = nextPublished; lastPublishedManifest = manifest; publicationEligible = true } }
     },
   }
+}
+
+// Explicit opt-in v2 is a compatible format extension, not a change to default
+// v1 or to the semantic validators. Only these three producer capabilities can
+// offload data. Original screenshots, mutable values and failures stay inline.
+const STABLE_RECEIPT_COLLECTIONS = ['fullAppUi.focus', 'fullAppUi.popups', 'fullAppUi.optionPointerPreparations']
+const STABLE_RECEIPT_FORMAT = FULL_APP_STORAGE_FORMAT + '-sealed-receipts'
+function stableReceiptWriterVersion(options) {
+  if (options === undefined) return VERSION
+  stableReceiptKeys(options, ['storageVersion'], 'Evidence writer options')
+  assert.ok([VERSION, 2].includes(options.storageVersion), 'Unsupported evidence storage version')
+  return options.storageVersion
+}
+function stableReceiptKeys(value, keys, label) {
+  assert.ok(plain(value), label + ' must be an object')
+  same(Object.keys(value), keys, label + ' fields differ')
+}
+function validateStableReceiptDescriptor(manifest) {
+  assert.ok(plain(manifest.stableReceipts), 'A v2 receipt descriptor is required')
+  stableReceiptKeys(manifest.stableReceipts, ['format', 'schemaVersion', 'collections'], 'Stable receipt descriptor')
+  assert.equal(manifest.stableReceipts.format, STABLE_RECEIPT_FORMAT, 'Stable receipt descriptor format differs')
+  assert.equal(manifest.stableReceipts.schemaVersion, 1, 'Stable receipt descriptor version differs')
+  assert.ok(Array.isArray(manifest.stableReceipts.collections), 'Stable receipt collections are required')
+  assert.equal(manifest.stableReceipts.collections.length, STABLE_RECEIPT_COLLECTIONS.length, 'Stable receipt collection roster differs')
+}
+function restoreStableReceipts(manifest, access, visit) {
+  const ui = own(manifest.body, 'fullAppUi') ? manifest.body.fullAppUi : undefined
+  for (const [order, collection] of STABLE_RECEIPT_COLLECTIONS.entries()) {
+    const descriptor = manifest.stableReceipts.collections[order], key = collection.slice('fullAppUi.'.length)
+    assert.ok(plain(descriptor), 'Stable receipt collection descriptor is required')
+    assert.equal(descriptor.path, collection, 'Stable receipt collection order or path differs')
+    const present = plain(ui) && own(ui, key), value = present ? ui[key] : undefined
+    if (descriptor.state === 'absent') {
+      stableReceiptKeys(descriptor, ['path', 'state'], 'Absent stable receipt collection')
+      assert.equal(present, false, 'Absent receipt collection has inline data')
+    } else if (descriptor.state === 'inline') {
+      stableReceiptKeys(descriptor, ['path', 'state'], 'Inline stable receipt collection')
+      assert.ok(present && !Array.isArray(value), 'Inline receipt collection type differs')
+    } else {
+      assert.equal(descriptor.state, 'array', 'Unknown stable receipt collection state')
+      stableReceiptKeys(descriptor, ['path', 'state', 'length', 'entries'], 'Array stable receipt collection')
+      assert.ok(present && Array.isArray(value), 'Stable receipt collection Array is required')
+      assert.ok(Number.isSafeInteger(descriptor.length) && descriptor.length >= 0, 'Stable receipt collection length is invalid')
+      assert.equal(descriptor.length, value.length, 'Stable receipt collection length differs')
+      assert.ok(Array.isArray(descriptor.entries), 'Stable receipt ordinal entries are required')
+      assert.equal(descriptor.entries.length, descriptor.length, 'Stable receipt entry length differs')
+      for (const [index, entry] of descriptor.entries.entries()) {
+        assert.ok(plain(entry), 'Stable receipt ordinal entry is required')
+        assert.equal(entry.index, index, 'Stable receipt ordinal differs')
+        if (entry.mode === 'inline') stableReceiptKeys(entry, ['index', 'mode'], 'Inline stable receipt entry')
+        else {
+          assert.equal(entry.mode, 'part', 'Unknown stable receipt entry mode')
+          stableReceiptKeys(entry, ['index', 'mode', 'ref'], 'Stable receipt part entry')
+          stableReceiptKeys(entry.ref, ['file', 'kind', 'bytes', 'sha256', 'context'], 'Stable receipt reference')
+          stableReceiptKeys(entry.ref.context, ['collection', 'ordinal'], 'Stable receipt context')
+          assert.equal(value[index], null, 'Stable receipt part placeholder must be null')
+          visit(entry.ref)
+          value[index] = access.read(entry.ref, 'stable', { collection, ordinal: index })
+        }
+      }
+    }
+  }
+}
+function createStableReceiptProjection(writePart, counters) {
+  const refs = new WeakMap(), placeholder = Buffer.from('null')
+  return manifest => {
+    const pending = []
+    const collections = STABLE_RECEIPT_COLLECTIONS.map(collection => {
+      const ui = own(manifest.body, 'fullAppUi') ? manifest.body.fullAppUi : undefined
+      const key = collection.slice('fullAppUi.'.length), value = plain(ui) && own(ui, key) ? ui[key] : undefined
+      if (value === undefined) return { path: collection, state: 'absent' }
+      if (!Array.isArray(value)) return { path: collection, state: 'inline' }
+      return { path: collection, state: 'array', length: value.length,
+        entries: value.map((_, index) => ({ index, mode: 'inline' })) }
+    })
+    return {
+      manifest: { ...manifest, storageVersion: 2,
+        stableReceipts: { format: STABLE_RECEIPT_FORMAT, schemaVersion: 1, collections } },
+      fragment(collection, ordinal, value, fragment) {
+        const contexts = refs.get(value)
+        const contextKey = collection + ':' + ordinal
+        let ref = contexts?.get(contextKey)
+        counters.stableReferences++; if (ref) counters.stableRefCacheHits++
+        if (!ref) {
+          ref = writePart('stable', { collection, ordinal }, value, { fragment })
+          pending.push({ value, contextKey, ref })
+        }
+        collections[STABLE_RECEIPT_COLLECTIONS.indexOf(collection)].entries[ordinal] = { index: ordinal, mode: 'part', ref }
+        return placeholder
+      },
+      commit() {
+        for (const { value, contextKey, ref } of pending) {
+          let contexts = refs.get(value)
+          if (!contexts) { contexts = new Map(); refs.set(value, contexts) }
+          contexts.set(contextKey, ref)
+        }
+      },
+    }
+  }
+}
+
+function comparePublishedStableReceipt(filename, current, loaded) {
+  // The caller already verified the actual manifest and every referenced part.
+  // Re-read exactly those manifest bytes, then restore only its published v2
+  // slots. A newly granted private seal is not a new checkpoint or business edit.
+  const bytes = readFileSync(filename)
+  assert.equal(bytes.length, loaded.fingerprint.bytes, 'Evidence changed while reading its published representation')
+  assert.equal(sha(bytes), loaded.fingerprint.sha256, 'Evidence changed while reading its published representation')
+  const committed = JSON.parse(bytes.toString('utf8'))
+  validateStableReceiptDescriptor(committed)
+  restoreStableReceipts(committed, partAccess(filename, committed.owner, true), () => {})
+  committed.storageVersion = VERSION
+  delete committed.stableReceipts
+  // Exactly one fresh native encoding of live values. Do not stringify the
+  // parsed committed copy: a later global toJSON must not receive extra calls.
+  const live = JSON.parse(encode(current).toString('utf8'))
+  const message = 'Live evidence changed after its last complete checkpoint'
+  same(live, committed, message)
+  const order = (actual, expected) => {
+    if (expected !== null && typeof expected === 'object') {
+      same(Object.keys(actual), Object.keys(expected), message)
+      for (const key of Object.keys(expected)) order(actual[key], expected[key])
+    }
+  }
+  order(live, committed)
 }
 

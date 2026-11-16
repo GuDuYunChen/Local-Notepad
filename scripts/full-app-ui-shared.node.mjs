@@ -3092,3 +3092,185 @@ test('editor code page roots still reject missing duplicate hidden and reading o
   const duplicate = codeCaptureDOM(t, { state: 'languages', duplicatePopup: true, distractions: true })
   assert.throws(() => duplicate.observe(codeCaptureConstants.activeCodeDropdown), /Expected one actual page root/)
 })
+
+// Code-language native-entry protocol contracts. This real-shaped DOM and
+// modeled CDP boundary are NOT native Windows or product keyboard evidence.
+// The actual product's mounted Lexical regressions are recorded separately.
+const codeLanguageSelector = '.editor-input[contenteditable="true"] .code-block-wrapper:has(> .code-block-header) .language-selector-button'
+function codeLanguageEntryFixture(t, fault = null) {
+  const dom = new ProjectSetupDOM(`<!doctype html><html><body><button class="workspace-title-button">Owned code note</button>
+    <div class="editor-shell"><div class="editor-input" contenteditable="true" role="textbox" tabindex="0">
+      <div class="code-block-wrapper" data-lexical-decorator="true" contenteditable="false"><div class="code-block-wrapper">
+        <div class="code-block-header"><div class="code-block-header-left"><button type="button" class="language-selector-button">Plain Text</button><span class="code-block-meta">2 行</span></div>
+          <div class="code-block-toolbar" role="toolbar" aria-label="代码块工具"><button type="button">自动换行</button><button type="button">复制</button><button type="button" class="danger">删除</button></div></div>
+        <div class="code-block-content"><textarea class="code-textarea">const original = 1;\nreturn original;</textarea><pre class="code-preview">const original = 1;\nreturn original;</pre></div>
+      </div></div></div></div></body></html>`, { runScripts: 'outside-only' })
+  t.after(() => dom.window.close())
+  const document = dom.window.document, editor = document.querySelector('.editor-input')
+  let owner = editor.querySelector('.code-block-wrapper:has(> .code-block-header)'), header = owner.querySelector('.code-block-header')
+  let target = header.querySelector('.language-selector-button'), next = header.querySelector('.code-block-toolbar button')
+  const original = { editor, owner, header, target, next }
+  let active = fault === 'initial-not-root' ? document.body : editor
+  // JSDOM focus() collapses document Selection. Model browser focus ownership
+  // independently, never restore a Range after an action or call target.focus().
+  Object.defineProperty(document, 'activeElement', { configurable: true, get: () => active?.isConnected ? active : document.body })
+  for (const node of [editor, target, next]) node.focus = () => assert.fail('Verifier must not programmatically focus a required code control')
+  const range = document.createRange(); range.setStart(editor, 0); range.collapse(true)
+  document.getSelection().removeAllRanges(); document.getSelection().addRange(range)
+  const initialRange = { anchor: document.getSelection().anchorNode, offset: document.getSelection().anchorOffset }
+  const rectangle = (left = 0, top = 0, width = 704, height = 455) => ({ x: left, y: top, left, top, width, height, right: left + width, bottom: top + height })
+  const bounds = node => node === target ? rectangle(60, 80, 140, 28) : node === next ? rectangle(220, 80, 90, 28) : rectangle()
+  const prepare = node => {
+    Object.assign(node.style, { display: 'block', opacity: '1', visibility: 'visible', overflowX: 'visible', overflowY: 'visible',
+      contain: 'none', contentVisibility: 'visible', outlineStyle: 'none', outlineWidth: '0px', boxShadow: 'none',
+      transform: 'none', perspective: 'none', filter: 'none', backdropFilter: 'none', translate: 'none', rotate: 'none', scale: 'none', willChange: 'auto' })
+    node.getBoundingClientRect = () => bounds(node)
+    node.getClientRects = () => [bounds(node)]
+    for (const [key, value] of Object.entries({ clientLeft: 0, clientTop: 0, clientWidth: 704, clientHeight: 455 })) Object.defineProperty(node, key, { configurable: true, value })
+    node.scrollIntoView = () => assert.fail('All fixture controls already fit; the verifier must not create another scroll')
+  }
+  for (const node of document.querySelectorAll('*')) prepare(node)
+  target.style.outlineStyle = 'solid'; target.style.outlineWidth = '2px'; target.style.outlineColor = 'rgb(112, 87, 217)'
+  const nativeMatches = dom.window.Element.prototype.matches
+  dom.window.Element.prototype.matches = function(selector) {
+    if (selector === ':focus-visible') return this === active && fault !== 'focus-ring-hidden'
+    return nativeMatches.call(this, selector)
+  }
+  Object.defineProperty(dom.window, 'innerWidth', { value: 704 }); Object.defineProperty(dom.window, 'innerHeight', { value: 455 })
+  document.elementFromPoint = () => fault === 'hit-obscured' ? document.body : target
+  let frames = 0
+  dom.window.requestAnimationFrame = callback => { frames++; callback(); return frames }
+  const observers = new Set(), nativeAdd = document.addEventListener.bind(document), nativeRemove = document.removeEventListener.bind(document)
+  document.addEventListener = (type, listener, options) => { if (type === 'keydown') observers.add(listener); return nativeAdd(type, listener, options) }
+  document.removeEventListener = (type, listener, options) => { if (type === 'keydown') observers.delete(listener); return nativeRemove(type, listener, options) }
+  dom.window.__fullAppUiEvents = []; dom.window.__fullAppUiTraceTruncated = fault === 'truncated-trace'
+  const report = { fullAppUi: { group: 'editor', focus: [] } }, commands = [], saved = [], seals = []
+  let f6Entered = false, mutationReached = false, uncertain = null
+  const replace = name => {
+    const old = original[name], replacement = old.cloneNode(true); old.replaceWith(replacement)
+    for (const node of [replacement, ...replacement.querySelectorAll('*')]) prepare(node)
+    owner = document.querySelector('.editor-input .code-block-wrapper:has(> .code-block-header)')
+    header = owner.querySelector('.code-block-header'); target = header.querySelector('.language-selector-button'); next = header.querySelector('.code-block-toolbar button')
+    active = target; mutationReached = true
+  }
+  const cdp = { send: async (method, params) => {
+    assert.equal(method, 'Input.dispatchKeyEvent'); commands.push({ method, ...params })
+    if (params.type !== 'rawKeyDown') return
+    const event = { type: 'keydown', key: params.key, target: document.activeElement, isTrusted: fault !== 'untrusted-f6' || params.key !== 'F6',
+      ctrlKey: Boolean(params.modifiers & 2), altKey: Boolean(params.modifiers & 1), metaKey: Boolean(params.modifiers & 4), shiftKey: Boolean(params.modifiers & 8),
+      isComposing: false, keyCode: params.windowsVirtualKeyCode, which: params.windowsVirtualKeyCode }
+    // Explicit protocol model: invoke only the production observer's passive
+    // listener with the modeled browser event, never dispatch a fake trusted DOM event.
+    for (const observer of observers) observer(event)
+    if (!(fault === 'missing-tab-trace' && params.key === 'Tab')) dom.window.__fullAppUiEvents.push({ type: 'keydown', key: params.key, trusted: event.isTrusted,
+      tag: event.target.tagName, id: event.target.id, role: event.target.getAttribute('role'), lexicalEditor: event.target === editor })
+    if (fault === 'uncertain-f6' && params.key === 'F6') { uncertain = new Error('Original native input transport outcome is uncertain'); throw uncertain }
+    if (params.key === 'F6') {
+      f6Entered = true
+      if (fault !== 'ignored-f6') active = target
+      if (fault?.startsWith('replace-')) replace(fault.slice('replace-'.length))
+      if (fault === 'disable-next') { next.disabled = true; mutationReached = true }
+      if (fault === 'change-code') { owner.querySelector('textarea').value += ' changed'; mutationReached = true }
+      if (fault === 'change-language') { target.textContent = 'JavaScript'; mutationReached = true }
+      if (fault === 'change-markup') { owner.querySelector('pre').textContent += ' changed'; mutationReached = true }
+      if (fault === 'dirty-note') { const chip = document.createElement('div'); chip.className = 'workspace-save-chip dirty'; document.body.append(chip); mutationReached = true }
+      if (fault === 'change-selection') { document.getSelection().collapse(editor, 1); mutationReached = true }
+      if (fault === 'opened-popup') { const popup = document.createElement('div'); popup.className = 'language-selector-dropdown'; owner.append(popup); mutationReached = true }
+    } else if (params.key === 'Tab' && f6Entered) {
+      if (params.modifiers === 8) active = fault === 'ignored-reverse' ? next : target
+      else active = fault === 'wrong-forward' ? document.body : next
+    }
+    if (fault === 'missing-outline' && f6Entered) target.style.outlineWidth = '0px'
+  } }
+  const context = { report, matrix, routes: [{ id: 'editor-code' }], cdp,
+    evaluate: async source => JSON.parse(JSON.stringify(await dom.window.eval(source))),
+    click: () => assert.fail('The code keyboard route must never click'),
+    until: () => assert.fail('The code keyboard route must not add a readiness budget or retry'),
+    capture: () => assert.fail('Focus traversal must not create replacement scenes'),
+    save: () => saved.push(structuredClone(report)),
+    evidenceStore: { sealStableJSON: (...args) => { seals.push(args); return true } },
+  }
+  return { dom, document, original, report, commands, saved, seals, context, shared: createFullAppUiShared(context),
+    meta: { routeId: 'editor-code', stateId: 'default' }, selector: codeLanguageSelector,
+    receipt: () => report.fullAppUi.codeLanguageKeyboardEntries?.[0],
+    current: () => ({ active, frames, mutationReached, uncertain, observerCount: observers.size, initialRange }) }
+}
+
+test('code language native route proves F6 then adjacent Tab and ShiftTab through original shared focus gates', async t => {
+  const f = codeLanguageEntryFixture(t), result = await f.shared.focus(f.selector, f.meta)
+  assert.deepEqual(f.commands.map(({ type, key, modifiers }) => [type, key, modifiers]), [
+    ['rawKeyDown', 'F6', 0], ['keyUp', 'F6', 0], ['rawKeyDown', 'Tab', 0], ['keyUp', 'Tab', 0], ['rawKeyDown', 'Tab', 8], ['keyUp', 'Tab', 8]])
+  assert.ok(result.focused && result.focusVisible && result.hit && result.inViewport && result.trustedTab)
+  assert.equal(result.outlines.length, 1); assert.deepEqual(result.shadows, [])
+  assert.equal(result.nativeSourceOrder, f.receipt()); assert.equal(f.receipt().reached, true)
+  assert.equal(f.receipt().nativeEntry, 'F6'); assert.equal(f.receipt().forwardTabs, 1); assert.equal(f.receipt().reverseTabs, 1)
+  assert.deepEqual(f.receipt().observations.map(value => value.stage), ['initial', 'entered', 'forward', 'returned'])
+  assert.deepEqual(f.receipt().ownedEvents.map(value => [value.key, value.shiftKey, value.target]), [['F6', false, 'editor'], ['Tab', false, 'language'], ['Tab', true, 'next']])
+  assert.ok(f.receipt().ownedEvents.every(value => value.trusted)); assert.equal(f.receipt().traceTruncated, false)
+  assert.equal(f.receipt().disposal.disposed, true); assert.equal(f.current().observerCount, 0)
+  assert.equal(f.dom.window.__fullAppCodeLanguageKeyboardOwner, undefined)
+  assert.equal(f.current().frames, 2); assert.equal(f.report.fullAppUi.focusFailures, undefined)
+  assert.equal(f.seals.length, 1); assert.equal(f.seals[0][0], 'fullAppUi.focus')
+  assert.equal(f.document.getSelection().anchorNode, f.current().initialRange.anchor)
+  assert.equal(f.document.getSelection().anchorOffset, f.current().initialRange.offset)
+})
+
+for (const [fault, keys] of [['initial-not-root', []], ['ignored-f6', ['F6']], ['wrong-forward', ['F6', 'Tab']], ['ignored-reverse', ['F6', 'Tab', 'Tab']]]) {
+  test(`code language route refuses ${fault} without fallback, key replay or a successful focus receipt`, async t => {
+    const f = codeLanguageEntryFixture(t, fault)
+    await assert.rejects(f.shared.focus(f.selector, f.meta), /Actual Tab order never reached control/)
+    assert.deepEqual(f.commands.filter(value => value.type === 'rawKeyDown').map(value => value.key), keys)
+    assert.equal(f.receipt().reached, false); assert.equal(f.report.fullAppUi.focus.length, 0)
+    assert.equal(f.report.fullAppUi.focusFailures[0].nativeSourceOrder, f.receipt())
+    assert.equal(f.current().observerCount, 0); assert.equal(f.receipt().disposal.disposed, true)
+  })
+}
+
+for (const name of ['editor', 'owner', 'header', 'target', 'next']) {
+  test(`code language observer refuses sameHTML replacement of its original ${name} reference`, async t => {
+    const f = codeLanguageEntryFixture(t, 'replace-' + name)
+    await assert.rejects(f.shared.focus(f.selector, f.meta), /Code language keyboard owner identity was replaced/)
+    assert.equal(f.current().mutationReached, true); assert.equal(f.commands.length, 2)
+    assert.equal(f.receipt().reached, false); assert.equal(f.report.fullAppUi.focus.length, 0)
+    assert.equal(f.current().observerCount, 0); assert.equal(f.dom.window.__fullAppCodeLanguageKeyboardOwner, undefined)
+    assert.match(f.receipt().error.message, /identity was replaced/)
+  })
+}
+
+for (const fault of ['disable-next', 'change-code', 'change-language', 'change-markup', 'dirty-note', 'change-selection', 'opened-popup']) {
+  test(`code language observer refuses ${fault} at the actual first changed phase`, async t => {
+    const f = codeLanguageEntryFixture(t, fault)
+    await assert.rejects(f.shared.focus(f.selector, f.meta), /Code language keyboard/)
+    assert.equal(f.current().mutationReached, true); assert.equal(f.commands.length, 2)
+    assert.equal(f.receipt().reached, false); assert.equal(f.report.fullAppUi.focus.length, 0)
+    assert.equal(f.current().observerCount, 0); assert.equal(f.dom.window.__fullAppCodeLanguageKeyboardOwner, undefined)
+    assert.ok(f.receipt().error.message)
+  })
+}
+
+for (const fault of ['truncated-trace', 'untrusted-f6', 'missing-tab-trace']) {
+  test(`code language route refuses ${fault} even if the modeled controls reached the intended focus`, async t => {
+    const f = codeLanguageEntryFixture(t, fault)
+    await assert.rejects(f.shared.focus(f.selector, f.meta), /Code language keyboard.*(?:trace|trusted)/)
+    assert.equal(f.receipt().reached, false); assert.equal(f.report.fullAppUi.focus.length, 0)
+    assert.equal(f.current().observerCount, 0); assert.equal(f.dom.window.__fullAppCodeLanguageKeyboardOwner, undefined)
+  })
+}
+
+for (const [fault, message] of [['focus-ring-hidden', /Actual keyboard focus was not visible and reachable/], ['hit-obscured', /Actual keyboard focus was not visible and reachable/], ['missing-outline', /Actual control has no single focus outline/]]) {
+  test(`code language F6 and adjacent Tabs cannot bypass original ${fault} refusal`, async t => {
+    const f = codeLanguageEntryFixture(t, fault)
+    await assert.rejects(f.shared.focus(f.selector, f.meta), message)
+    assert.equal(f.commands.length, 6); assert.equal(f.receipt().reached, true)
+    assert.equal(f.current().observerCount, 0); assert.equal(f.seals.length, 0)
+  })
+}
+
+test('code language uncertain native key preserves its exact error and records cleanup without replay', async t => {
+  const f = codeLanguageEntryFixture(t, 'uncertain-f6')
+  await assert.rejects(f.shared.focus(f.selector, f.meta), error => error === f.current().uncertain)
+  assert.equal(f.commands.length, 1); assert.equal(f.commands[0].type, 'rawKeyDown')
+  assert.equal(f.receipt().reached, false); assert.equal(f.current().observerCount, 0)
+  assert.equal(f.dom.window.__fullAppCodeLanguageKeyboardOwner, undefined)
+  assert.equal(f.report.fullAppUi.focus.length, 0)
+})

@@ -6,7 +6,7 @@ import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext
 import { ContentEditable } from '@lexical/react/LexicalContentEditable'
 import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin'
 import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary'
-import { $createParagraphNode, $createTextNode, $getRoot } from 'lexical'
+import { $createParagraphNode, $createRangeSelection, $createTextNode, $getRoot, $getSelection, $setSelection, SKIP_DOM_SELECTION_TAG } from 'lexical'
 import UiThemeProvider from '../../ui/UiThemeProvider'
 import BlockHandlePlugin from './BlockHandlePlugin'
 import DragDropPlugin from './DragDropPlugin'
@@ -191,6 +191,51 @@ test('the original outside mousedown closes the menu without changing the select
   await openMenu()
   await mouse(document.body, 'mousedown', 10, 10)
   expect(host.querySelector('.block-menu')).toBeNull()
+  expect(serialized()).toBe(before)
+  expect(errors).toEqual([])
+})
+
+test.each([
+  ['collapsed root caret', 0],
+  ['root range across the source block', 1],
+])('a %s hides stale block actions without throwing or rewriting the selection', async (_label, focusOffset) => {
+  const before = serialized()
+  const { handle } = await openMenu()
+  const originalKey = handle.dataset.blockKey
+  const domSelection = window.getSelection()
+  const originalDOMAnchor = domSelection.anchorNode
+  const originalDOMOffset = domSelection.anchorOffset
+
+  // A committed Lexical root selection can arrive before the DOM selection
+  // catches up. Keep the real paragraph geometry and prior DOM range, as in
+  // the installed failure, and run the actual update/resize listeners.
+  await act(async () => editor.update(() => {
+    const selection = $createRangeSelection()
+    selection.anchor.set('root', 0, 'element')
+    selection.focus.set('root', focusOffset, 'element')
+    $setSelection(selection)
+  }, { discrete: true, tag: SKIP_DOM_SELECTION_TAG }))
+  await act(async () => window.dispatchEvent(new Event('resize')))
+
+  expect(errors).toEqual([])
+  expect(host.querySelector('.block-handle')).toBeNull()
+  expect(host.querySelector('.block-menu')).toBeNull()
+  expect(serialized()).toBe(before)
+  expect(domSelection.anchorNode).toBe(originalDOMAnchor)
+  expect(domSelection.anchorOffset).toBe(originalDOMOffset)
+  editor.getEditorState().read(() => {
+    const selection = $getSelection()
+    expect(selection.anchor.key).toBe('root')
+    expect(selection.anchor.offset).toBe(0)
+    expect(selection.focus.key).toBe('root')
+    expect(selection.focus.offset).toBe(focusOffset)
+  })
+
+  await act(async () => editor.update(() => {
+    $getRoot().getFirstChild().selectStart()
+  }, { discrete: true }))
+  await act(async () => window.dispatchEvent(new Event('resize')))
+  expect(host.querySelector('.block-handle')?.dataset.blockKey).toBe(originalKey)
   expect(serialized()).toBe(before)
   expect(errors).toEqual([])
 })

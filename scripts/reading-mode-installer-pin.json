@@ -1,5 +1,5 @@
 {
-  "product": "eb46bea8352ad3dd503685e80b063a76326e380a",
+  "product": "46f376c73e0b6d87568d7119963fbd847d148593",
   "quickBlob": "c1e8f40862b770f82af47c26a455b57efc853700",
   "tagsBlob": "54bb56864e58e2aa3f5ed08aedb52a00de5f0769",
   "templateBlob": "42378f13f71a03c3e91cdfdcb6dec44dbbb05f33",
@@ -16,8 +16,8 @@
   "importEvidenceTestsBlob": "5a46ce6dad5fe757b1d2714e485242aa79959559",
   "current": {
     "version": "4.249.0",
-    "bytes": 115595036,
-    "sha256": "367006fe89cfdfdef1b87783627776856d07eb19d4b470fa23b31e3718f08897"
+    "bytes": 115598854,
+    "sha256": "c9f77ec0116d579f1da1972b8d5f54fd677db29843ceb9184a9eb7bdcedfed86"
   },
   "previous": {
     "version": "4.232.0",
@@ -31,14 +31,14 @@
     "productSourceCommit": "1a8e17ba775312c359f4ac23851c8c365b57a9cb"
   },
   "currentSource": {
-    "run": 43804298776,
-    "artifact": 14198811204,
-    "name": "local-notepad-windows-eb46bea8352ad3dd503685e80b063a76326e380a",
-    "headSha": "73a637c9c2a0af64e1b6071bba89c66844638b40",
+    "run": 43826258371,
+    "artifact": 14207980852,
+    "name": "local-notepad-windows-46f376c73e0b6d87568d7119963fbd847d148593",
+    "headSha": "881ee498dd045aa03b11f1705aec67a43cfa5335",
     "branch": "fix/local-ui-consistency-2f116",
     "repositoryId": 1105107817,
-    "archiveBytes": 115602000,
-    "archiveSha256": "1ffe3321a7c765fd35c4dc961fa2c7e57bfa5f269bb126bced9a937d2d7c0f03"
+    "archiveBytes": 115605721,
+    "archiveSha256": "011a4b19cb66e94bb6925789469c04b73d01148088e2a1b7db01e5df9e6f2387"
   },
   "readingDriverBlob": "6924b128c1125424c91f71dbd1ecc415762e2f77",
   "readingFixtureBlob": "0c7ffadbb187dd33a7bc6b5aa8c69427eec5cc34",
@@ -84,8 +84,8 @@
     "src/components/Editor/nodes/BlockEmbedView.jsx": "e3fa665d764a1eeb3440068524fe13062659409c",
     "src/components/Editor/nodes/WikiLinkNode.jsx": "7764d6b5da9c464fa4bd7c35b292d784f5721f12",
     "src/components/Editor/nodes/WikiLinkView.jsx": "b294e8e3fb7f695dec25717e37c07259e0099744",
-    "src/components/Editor/nodes/CodeBlockNode.jsx": "c441fda099f91dc669cc81dd4f00350398cdb285",
-    "src/components/Editor/plugins/BlockHandlePlugin.jsx": "c4168c896f0f94d891a4e0c1551d171de51ceda1",
+    "src/components/Editor/nodes/CodeBlockNode.jsx": "a279d24b9f5ed4ea9abe771b3d2a908f3a5b7e18",
+    "src/components/Editor/plugins/BlockHandlePlugin.jsx": "ac31d8b560a1194490da4ce46b80827fc475c7ea",
     "src/components/Editor/Editor.jsx": "08c6f8bb08d5f885b26ac97ad5f01bcb45265886",
     "src/services/wikiNavigation.mjs": "4ecc8c52880deb514cdb950c9432dcabd13da110",
     "src/hooks/useGuardedNoteOpener.js": "13c0ae3b56a7df0c8954ce9113c0b46352162d98",

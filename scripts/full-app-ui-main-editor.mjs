@@ -907,7 +907,10 @@ async function verifyEditorNodes(ctx) {
     ctx.save()
     throw error
   }
+  const codeSavedBeforeKeyboard = await ctx.api('/api/files/' + fixture.notes['代码'].id)
+  assert.equal(codeSavedBeforeKeyboard.content, fixture.notes['代码'].content, 'Code language entry must start with its original saved body')
   await shot('editor-code', 'default', [activeCodeLanguage]); await focus('editor-code', 'default', activeCodeLanguage)
+  assert.deepEqual(await ctx.api('/api/files/' + fixture.notes['代码'].id), codeSavedBeforeKeyboard, 'Code language keyboard traversal changed its saved note')
   await hit(activeCodeLanguage); await present(activeCodeDropdown)
   await shot('editor-code', 'languages', [activeCodeSearch], { root: activeCodeDropdown })
   await shared.text(activeCodeSearch, miss); await text(activeCodeList, 'No languages found')
