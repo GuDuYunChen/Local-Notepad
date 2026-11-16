@@ -852,7 +852,7 @@ async function verifyEditorNodes(ctx) {
   // Note-title navigation can finish before Lexical mounts its decorated code
   // node. Wait for the single actual painted owner using the same bounded
   // readiness poll; never synthesize the node or bypass motion/PNG assertions.
-  await until(() => evaluate(`(() => {
+  await ctx.until(() => evaluate(`(() => {
     const painted = [...document.querySelectorAll('.code-block-wrapper')].filter(node => {
       const rect = node.getBoundingClientRect()
       return node.getClientRects().length > 0 && rect.width > 0 && rect.height > 0
