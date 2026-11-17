@@ -17,6 +17,21 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => root.unmount()); container.remove(); vi.restoreAllMocks(); globalThis.IS_REACT_ACT_ENVIRONMENT = actMode
 })
+it('multi-line navigation cards retain descriptions and refuse unavailable destinations', async () => {
+  await render();
+  const cards = [...container.querySelectorAll('.sync-overview-link')];expect(cards.length).toBeGreaterThan(1);
+  for (const card of cards) {
+    expect(card.querySelector('strong').textContent).toContain(card.getAttribute('aria-label').slice(2));
+    expect(card.querySelector('strong + span').textContent).not.toBe('');
+  }
+  expect(navigate).not.toHaveBeenCalled();await click(button('连接配置'));
+  expect(navigate).toHaveBeenCalledTimes(1);expect(navigate).toHaveBeenCalledWith('connection');
+  props.settings.sync_enabled = false;await render();
+  const unavailable = button('预演与执行');expect(unavailable.disabled).toBe(true);
+  expect(unavailable.querySelector('strong + span').textContent).toContain('启用同步后');
+  await click(unavailable);expect(navigate).toHaveBeenCalledTimes(1);
+  for (const card of container.querySelectorAll('.sync-overview-link')) expect(card.getAttribute('data-ui-layout')).toBe('content');
+});
 it('mount and StrictMode replay do not focus, navigate or execute', async () => {
   await render(true); expect(navigate).not.toHaveBeenCalled()
   expect(container.textContent).toContain('同步总览'); expect(button('预演与执行').disabled).toBe(false)
@@ -62,7 +77,11 @@ it('busy operation still allows read-only navigation, not a stop or retry button
   expect(query).toBeTruthy()
   const fileInput = container.querySelector('[data-history-file-viewer] input[type="file"][data-history-file-input]')
   expect(fileInput?.hidden).toBe(true)
-  expect([...container.querySelectorAll('input,textarea')]).toEqual([query, fileInput])
+  const filters = ['冲突记录类型', '筛选记录对象类型', '筛选记录处理结果', '处理日期筛选方式']
+    .map(label => container.querySelector(`input[role="combobox"][aria-label="${label}"]`))
+  expect(filters.every(Boolean)).toBe(true)
+  expect(filters.every(input => input.readOnly && input.closest('[data-ui-control="select"]'))).toBe(true)
+  expect(new Set(container.querySelectorAll('input,textarea'))).toEqual(new Set([query, fileInput, ...filters]))
   await act(async () => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(query, 'local-only')
     query.dispatchEvent(new Event('input', { bubbles: true }))

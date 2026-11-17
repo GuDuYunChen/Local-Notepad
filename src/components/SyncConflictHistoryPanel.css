@@ -6,7 +6,8 @@
 .sync-conflict-history-note{margin:0 0 12px}.sync-conflict-history-note:last-child{margin:12px 0 0}
 .sync-conflict-history-controls{display:flex;flex-wrap:wrap;align-items:end;gap:10px;margin:12px 0}
 .sync-conflict-history-controls label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--ink)}
-.sync-conflict-history-controls select{max-width:100%;min-height:36px;padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--ink);font:inherit}
+.sync-conflict-history-controls select{max-width:100%}
+.sync-conflict-history-controls select:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)){min-height:36px;padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--ink);font:inherit}
 .sync-conflict-history-feedback{font-size:12px;line-height:1.8;margin:10px 0;color:var(--ink);overflow-wrap:anywhere}
 .sync-conflict-history-scroll{max-height:460px;overflow:auto;overscroll-behavior:contain;border:1px solid var(--line);border-radius:8px;margin:12px 0;padding:0 12px}
 .sync-conflict-history-list{list-style:none;margin:0;padding:0;min-width:0}
@@ -18,8 +19,8 @@
 .sync-conflict-history-list dt,.sync-conflict-history-list dd{margin:0;font-size:12px;line-height:1.8;overflow-wrap:anywhere;color:var(--ink)}
 .sync-conflict-history-list details{font-size:12px;line-height:1.8;color:var(--ink)}.sync-conflict-history-list details summary{padding:6px 0;cursor:pointer;color:var(--ink)}
 .sync-conflict-history-list details p{margin:4px 0}.sync-conflict-history-list code{font:inherit;overflow-wrap:anywhere;white-space:normal}
-.sync-overview .sync-conflict-history .btn{color:var(--ink)!important}
-.sync-conflict-history :is(button,input,select,summary,.sync-conflict-history-scroll):focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.sync-overview .sync-conflict-history .btn:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)){color:var(--ink)!important}
+.sync-conflict-history :is(button,input,select,summary,.sync-conflict-history-scroll):focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)){outline:2px solid var(--ink);outline-offset:2px}
 @media(max-width:600px){.sync-conflict-history-list dl{grid-template-columns:1fr}.sync-conflict-history>summary>span{display:block;margin-left:0}.sync-conflict-history-scroll{max-height:400px}}
 
 .sync-conflict-history [aria-disabled="true"]{opacity:.65;cursor:wait}
@@ -30,9 +31,12 @@
 .sync-history-search-fields{display:flex;flex-wrap:wrap;align-items:end;gap:10px}
 .sync-history-search-fields label{display:flex;flex:1 1 140px;min-width:0;flex-direction:column;gap:5px;font-size:12px;color:var(--ink)}
 .sync-history-search-fields .sync-history-search-query{flex:2 1 220px}
-.sync-history-search-fields :is(input,select){box-sizing:border-box;width:100%;min-width:0;min-height:38px;padding:7px 10px;border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--ink);font:inherit}
-.sync-history-search-fields input::placeholder{color:var(--ink-soft);opacity:1}
-.sync-history-search-fields button{min-height:38px;white-space:normal}
+.sync-history-search-fields :is(input,select){box-sizing:border-box;width:100%;min-width:0}
+.sync-history-search-fields :is(input,select):where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)){min-height:38px;padding:7px 10px;border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--ink);font:inherit}
+.sync-history-search-fields input::placeholder{opacity:1}
+.sync-history-search-fields input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *))::placeholder{color:var(--ink-soft)}
+.sync-history-search-fields button{white-space:normal}
+.sync-history-search-fields button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)){min-height:38px}
 @media(max-width:600px){.sync-history-search-fields .sync-history-search-query{flex-basis:100%}.sync-history-search-fields label{flex-basis:calc(50% - 10px)}}
 
 .sync-history-export{border-top:1px solid var(--line);margin-top:14px;padding-top:12px;min-width:0}

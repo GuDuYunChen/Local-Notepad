@@ -1,3 +1,4 @@
+import UiThemeProvider from './ui/UiThemeProvider'
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { beforeEach, afterEach, it, expect, vi } from 'vitest'
@@ -15,7 +16,7 @@ const rows = (count = 61) => Array.from({ length: count }, (_, i) => ({ id: 'r' 
 const raw = (records = rows()) => prepareHistoryExport({ snapshot: { items: records, filter: 'all', hasMore: true }, phase: 'ready' }, new Date('2026-10-01T10:00:00Z')).raw
 const c = key => host.querySelector('[data-history-file-' + key + ']')
 const ids = () => [...host.querySelectorAll('[data-history-file-row]')].map(n => n.querySelectorAll('code')[1].textContent)
-async function mount() { await act(async () => root.render(<Viewer/>)); host.querySelector('details').open = true }
+async function mount() { await act(async () => root.render(<UiThemeProvider><Viewer/></UiThemeProvider>)); host.querySelector('details').open = true }
 async function open(text = raw(), name = 'history.json') {
   await act(async () => {
     Object.defineProperty(c('input'), 'files', { configurable: true, value: [new File([text], name, { type: 'application/json' })] })
@@ -107,12 +108,12 @@ it('modified Enter and composing/keyCode229 events are not consumed', async () =
   }
 })
 it('ordinary parent rerender preserves the in-progress jump input and focus', async () => {
-  await loaded(); const input = c('jump-input'); input.focus(); await type('2'); await act(async () => root.render(<Viewer/>))
+  await loaded(); const input = c('jump-input'); input.focus(); await type('2'); await act(async () => root.render(<UiThemeProvider><Viewer/></UiThemeProvider>))
   expect(c('jump-input')).toBe(input); expect(input.value).toBe('2'); expect(document.activeElement).toBe(input); expect(ids()[0]).toBe('r0')
 })
 it('page navigation neither reads again nor changes source metadata or live history', async () => {
   const fetch = vi.spyOn(globalThis, 'fetch'), store = vi.spyOn(Storage.prototype, 'setItem'), download = vi.spyOn(HTMLAnchorElement.prototype, 'click')
-  await act(async () => root.render(<Overview {...overviewFixture()}/>)); host.querySelector('[data-history-file-viewer]').open = true; await open()
+  await act(async () => root.render(<UiThemeProvider><Overview {...overviewFixture()}/></UiThemeProvider>)); host.querySelector('[data-history-file-viewer]').open = true; await open()
   const live = host.querySelector('[data-sync-conflict-history]').textContent, scope = c('scope').textContent
   await click('last'); await type('2'); await click('jump'); await click('first')
   expect(host.querySelector('[data-sync-conflict-history]').textContent).toBe(live); expect(c('scope').textContent).toBe(scope)

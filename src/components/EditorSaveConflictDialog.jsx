@@ -2,6 +2,8 @@ import React, { useEffect, useId, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { extractLexicalText } from '~/utils/lexicalText'
 import './EditorSaveConflictDialog.css'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 export default function EditorSaveConflictDialog({ draft, database, busy, problem, onClose, onResolve }) {
   const titleID = useId(), messageID = useId(), panel = useRef(null)
@@ -33,9 +35,9 @@ export default function EditorSaveConflictDialog({ draft, database, busy, proble
       <p className="editor-save-conflict-note">仅预览各版本前 1600 个字符；不会把格式、图片或附件转换为预览文字后保存。</p>
       {problem && <p className="editor-save-conflict-problem" role="alert">{problem}</p>}
       <div className="modal-actions consumer-modal-actions">
-        <button type="button" className="btn" data-conflict-cancel disabled={busy} onClick={onClose}>暂不处理</button>
-        <button type="button" className="btn" disabled={busy} onClick={() => { void onResolve('database') }}>采用数据库正文</button>
-        <button type="button" className="btn primary" disabled={busy} onClick={() => { void onResolve('keep') }}>保留我的正文</button>
+        <UiButton size="middle" type="button" className="btn" data-conflict-cancel disabled={busy} onClick={onClose}>暂不处理</UiButton>
+        <UiButton size="middle" type="button" className="btn" disabled={busy} onClick={() => { void onResolve('database') }}>采用数据库正文</UiButton>
+        <UiButton size="middle" type="button" className="btn primary" disabled={busy} onClick={() => { void onResolve('keep') }}>保留我的正文</UiButton>
       </div>
     </section>
   </div>, document.body)

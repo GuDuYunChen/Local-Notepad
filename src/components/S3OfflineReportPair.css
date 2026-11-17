@@ -3,7 +3,8 @@
 .offline-pair-inputs fieldset { min-width: 0; margin: 0; padding: 12px; border: 1px solid var(--line); border-radius: 8px; }
 .offline-pair-inputs legend { padding: 0 6px; font-weight: 600; color: var(--ink, var(--fg)); }
 .offline-pair-inputs label { display: block; margin-bottom: 8px; }
-.offline-pair-inputs input { width: 100%; max-width: 100%; color: inherit; }
+.offline-pair-inputs input { width: 100%; max-width: 100%; }
+.offline-pair-inputs input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { color: inherit; }
 .offline-pair-inputs time { overflow-wrap: anywhere; }
-.offline-report-pair :is(input, button, summary):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.offline-report-pair :is(input, button, summary):focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { outline: 2px solid var(--accent); outline-offset: 3px; }
 @media (max-width: 620px) { .offline-pair-inputs { grid-template-columns: 1fr; } }

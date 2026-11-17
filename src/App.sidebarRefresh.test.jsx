@@ -8,6 +8,7 @@ import { execFile } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import App from './App'
+import UiThemeProvider from './components/ui/UiThemeProvider'
 import { api, listAllFiles } from '~/services/api'
 
 const fixture = vi.hoisted(() => ({ rows: [], releaseRefresh: null, delayed: false }))
@@ -63,7 +64,7 @@ beforeEach(async () => {
   host = document.createElement('div'); document.body.append(host); root = createRoot(host)
   // Use the existing App-test startup clock only for its intentional 100ms mount.
   vi.useFakeTimers()
-  await act(async () => root.render(<DndProvider backend={TestBackend}><App /></DndProvider>))
+  await act(async () => root.render(<UiThemeProvider><DndProvider backend={TestBackend}><App /></DndProvider></UiThemeProvider>))
   await act(async () => vi.advanceTimersByTimeAsync(100))
   vi.useRealTimers(); await flush()
 })

@@ -8,6 +8,8 @@ import { toast } from '~/services/toast'
 import { useEditorWriteScope } from '../hooks/useEditorWriteScope'
 import { isShortcutContextBlocked, matchShortcut, shortcutLabel } from '~/services/localShortcuts'
 import useLocalShortcuts from '~/hooks/useLocalShortcuts'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 export function forEachSelectedTableCell(tables, rects, callback) {
   for (const rect of Array.isArray(rects) ? rects : []) {
@@ -1046,18 +1048,18 @@ export default function TableSelectionPlugin({ documentId }) {
             <span>{selectedCellCount > 0 ? `已选择 ${selectedCellCount} 个单元格` : '拖动鼠标框选连续单元格，按 Ctrl/Cmd 可追加区域'}</span>
           </div>
           <div className="table-selection-modebar-actions">
-            <button type="button" onClick={copySelection} disabled={selectedCellCount === 0}>复制</button>
-            <button type="button" onClick={pasteSelection} disabled={selectedCellCount === 0}>粘贴</button>
-            <button type="button" onClick={() => applyBackground('#fff3cd')} disabled={selectedCellCount === 0}>浅黄</button>
-            <button type="button" onClick={() => applyBackground('')} disabled={selectedCellCount === 0}>清底色</button>
-            <button type="button" onClick={() => applyHorizontal('left')} disabled={selectedCellCount === 0}>左对齐</button>
-            <button type="button" onClick={() => applyHorizontal('center')} disabled={selectedCellCount === 0}>居中</button>
-            <button type="button" onClick={() => applyHorizontal('right')} disabled={selectedCellCount === 0}>右对齐</button>
-            <button type="button" onClick={() => applyAlign('middle')} disabled={selectedCellCount === 0}>垂直居中</button>
-            <button type="button" onClick={doMerge} disabled={selectedCellCount < 2} title={`合并 (${shortcutLabel('mergeCells', bindings)})`}>合并</button>
-            <button type="button" onClick={doSplit} disabled={selectedCellCount === 0} title={`拆分 (${shortcutLabel('splitCell', bindings)})`}>拆分</button>
-            <button type="button" onClick={() => doClear()} disabled={selectedCellCount === 0}>清空</button>
-            <button type="button" className="primary" onClick={exitSelectionMode}>完成</button>
+            <UiButton density="compact" type="button" onClick={copySelection} disabled={selectedCellCount === 0}>复制</UiButton>
+            <UiButton density="compact" type="button" onClick={pasteSelection} disabled={selectedCellCount === 0}>粘贴</UiButton>
+            <UiButton density="compact" type="button" onClick={() => applyBackground('#fff3cd')} disabled={selectedCellCount === 0}>浅黄</UiButton>
+            <UiButton density="compact" type="button" onClick={() => applyBackground('')} disabled={selectedCellCount === 0}>清底色</UiButton>
+            <UiButton density="compact" type="button" onClick={() => applyHorizontal('left')} disabled={selectedCellCount === 0}>左对齐</UiButton>
+            <UiButton density="compact" type="button" onClick={() => applyHorizontal('center')} disabled={selectedCellCount === 0}>居中</UiButton>
+            <UiButton density="compact" type="button" onClick={() => applyHorizontal('right')} disabled={selectedCellCount === 0}>右对齐</UiButton>
+            <UiButton density="compact" type="button" onClick={() => applyAlign('middle')} disabled={selectedCellCount === 0}>垂直居中</UiButton>
+            <UiButton density="compact" type="button" onClick={doMerge} disabled={selectedCellCount < 2} title={`合并 (${shortcutLabel('mergeCells', bindings)})`}>合并</UiButton>
+            <UiButton density="compact" type="button" onClick={doSplit} disabled={selectedCellCount === 0} title={`拆分 (${shortcutLabel('splitCell', bindings)})`}>拆分</UiButton>
+            <UiButton density="compact" type="button" onClick={() => doClear()} disabled={selectedCellCount === 0}>清空</UiButton>
+            <UiButton density="compact" type="button" className="primary" onClick={exitSelectionMode}>完成</UiButton>
           </div>
         </div>
       )}
@@ -1065,7 +1067,7 @@ export default function TableSelectionPlugin({ documentId }) {
         <div key={i} className="table-selection-outline" style={{ position: 'absolute', left: b.x, top: b.y, width: b.w, height: b.h }} />
       ))}
       {addBtnPos && hoverTable !== null && (
-        <button onClick={() => addColForTable(hoverTable)} className="table-add-col-btn" style={{ pointerEvents: 'auto', position: 'absolute', left: addBtnPos.x, top: addBtnPos.y, transform: 'translateY(-50%)' }}>+列</button>
+        <UiButton density="compact" onClick={() => addColForTable(hoverTable)} className="table-add-col-btn" style={{ pointerEvents: 'auto', position: 'absolute', left: addBtnPos.x, top: addBtnPos.y, transform: 'translateY(-50%)' }}>+列</UiButton>
       )}
     </div>
   )

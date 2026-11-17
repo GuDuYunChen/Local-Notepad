@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { $getSelection, $isRangeSelection } from 'lexical'
+import { UiButton, UiSelect } from '~/components/ui/ControlKit'
+
 
 const STORAGE_KEY = 'localNotepad.editorView.v1'
 const VISUAL_DENSITY_VERSION_KEY = 'localNotepad.editorView.visualDensityVersion'
@@ -131,9 +133,9 @@ function Stepper({ label, value, onChange, min, max, step = 1, suffix = '' }) {
     <div className="editor-view-setting-row">
       <span>{label}</span>
       <div className="editor-view-stepper">
-        <button type="button" onClick={() => onChange(Math.max(min, value - step))}>−</button>
+        <UiButton density="compact" type="button" onClick={() => onChange(Math.max(min, value - step))}>−</UiButton>
         <strong>{Number.isInteger(value) ? value : value.toFixed(1)}{suffix}</strong>
-        <button type="button" onClick={() => onChange(Math.min(max, value + step))}>＋</button>
+        <UiButton density="compact" type="button" onClick={() => onChange(Math.min(max, value + step))}>＋</UiButton>
       </div>
     </div>
   )
@@ -275,7 +277,7 @@ export default function EditorViewSettingsPlugin({ readOnly = false }) {
               <strong>写作视图</strong>
               <span>只影响显示，不修改正文格式 · Ctrl/Cmd + 滚轮快速调字号</span>
             </div>
-            <button type="button" onClick={() => setOpen(false)} aria-label="关闭">×</button>
+            <UiButton density="compact" type="button" onClick={() => setOpen(false)} aria-label="关闭">×</UiButton>
           </header>
 
           <div className="editor-view-settings-body">
@@ -301,28 +303,28 @@ export default function EditorViewSettingsPlugin({ readOnly = false }) {
               <span>正文宽度</span>
               <div className="editor-view-segments">
                 {WIDTH_OPTIONS.map(option => (
-                  <button
+                  <UiButton density="compact"
                     type="button"
                     key={option.value}
                     className={settings.pageWidth === option.value ? 'active' : ''}
                     onClick={() => update({ pageWidth: option.value })}
                   >
                     {option.label}
-                  </button>
+                  </UiButton>
                 ))}
               </div>
             </div>
 
             <div className="editor-view-setting-row">
               <span>写作字体</span>
-              <select
+              <UiSelect density="compact"
                 value={settings.fontFamily}
                 onChange={event => update({ fontFamily: event.target.value })}
               >
                 {FONT_OPTIONS.map(option => (
                   <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
-              </select>
+              </UiSelect>
             </div>
 
             {!readOnly && (
@@ -331,7 +333,7 @@ export default function EditorViewSettingsPlugin({ readOnly = false }) {
                   <strong>Typewriter 模式</strong>
                   <small>让当前输入位置保持在视口中部</small>
                 </span>
-                <input
+                <input data-ui-native="checkbox"
                   type="checkbox"
                   checked={settings.typewriter}
                   onChange={event => update({ typewriter: event.target.checked })}
@@ -341,7 +343,7 @@ export default function EditorViewSettingsPlugin({ readOnly = false }) {
           </div>
 
           <footer>
-            <button type="button" onClick={reset}>恢复默认</button>
+            <UiButton density="compact" type="button" onClick={reset}>恢复默认</UiButton>
           </footer>
         </section>
       )}

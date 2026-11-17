@@ -1,4 +1,7 @@
-import { Button, Input, Space, Tooltip } from 'antd'
+import Button from 'antd/es/button'
+import Input from 'antd/es/input'
+import Space from 'antd/es/space'
+import Tooltip from 'antd/es/tooltip'
 import {
   SearchOutlined,
   PlusOutlined,

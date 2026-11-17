@@ -1,3 +1,4 @@
+import UiThemeProvider from './ui/UiThemeProvider'
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { beforeEach, afterEach, it, expect, vi } from 'vitest'
@@ -11,7 +12,7 @@ const rows=()=>Array.from({length:61},(_,i)=>({id:'r'+i,itemID:[0,30,60].include
 const raw=(records=rows())=>prepareHistoryExport({snapshot:{items:records,filter:'all',hasMore:true},phase:'ready'},new Date('2026-10-02T02:00:00Z')).raw
 const c=key=>host.querySelector('[data-history-file-'+key+']')
 const ids=()=>[...host.querySelectorAll('[data-history-file-row]')].map(n=>n.querySelectorAll('code')[1].textContent)
-async function mount(){await act(async()=>root.render(<Viewer/>));host.querySelector('[data-history-file-viewer]').open=true}
+async function mount(){await act(async()=>root.render(<UiThemeProvider><Viewer/></UiThemeProvider>));host.querySelector('[data-history-file-viewer]').open=true}
 async function open(text=raw(),name='history.json',wait=true){await act(async()=>{Object.defineProperty(c('input'),'files',{configurable:true,value:[new File([text],name,{type:'application/json'})]});c('input').dispatchEvent(new Event('change',{bubbles:true}));await Promise.resolve();if(wait)await readHistoryFile.mock.results.at(-1).value.catch(()=>{})})}
 async function click(node){await act(async()=>node.click())}
 async function type(value){await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(c('query'),value);c('query').dispatchEvent(new InputEvent('input',{bubbles:true}))})}

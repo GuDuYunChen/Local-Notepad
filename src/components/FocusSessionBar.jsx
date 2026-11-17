@@ -5,6 +5,8 @@ import {
   getFocusSessionRemainingSeconds,
 } from './focusSessionUtils'
 import './FocusSessionBar.css'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 function stripExtension(value) {
   return String(value || '').replace(/\.[^.]+$/, '')
@@ -63,20 +65,20 @@ export default function FocusSessionBar({
       </div>
 
       <div className="focus-session-actions">
-        <button
+        <UiButton size="middle"
           type="button"
           onClick={onToggleFocus}
           title={focused ? '显示普通界面' : '返回无干扰写作'}
         >
           {focused ? '显示界面' : '继续专注'}
-        </button>
-        <button
+        </UiButton>
+        <UiButton size="middle"
           type="button"
           className="primary"
           onClick={() => onEnd?.(timerDone ? 'timer' : 'manual')}
         >
           结束 Session
-        </button>
+        </UiButton>
       </div>
     </div>
   )

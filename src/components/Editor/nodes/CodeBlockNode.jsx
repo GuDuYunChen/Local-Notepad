@@ -2,9 +2,12 @@ import { DecoratorNode } from 'lexical';
 import React, { useRef, useEffect, useState } from 'react';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import { useLexicalEditable } from '@lexical/react/useLexicalEditable';
-import { $getNodeByKey } from 'lexical';
+import { $getNodeByKey, SKIP_DOM_SELECTION_TAG } from 'lexical';
 
 import 'highlight.js/styles/atom-one-dark.css';
+import { UiButton, UiInput } from '~/components/ui/ControlKit'
+import { bindCodeBlockKeyboardAccess } from './codeBlockKeyboard'
+
 
 // Supported languages list
 export const SUPPORTED_LANGUAGES = [
@@ -210,7 +213,7 @@ function LanguageSelector({ value, onChange, disabled = false }) {
 
   return (
     <div className="language-selector" ref={dropdownRef}>
-      <button
+      <UiButton density="compact"
         className="language-selector-button"
         onClick={() => !disabled && setIsOpen(!isOpen)}
         type="button"
@@ -218,11 +221,11 @@ function LanguageSelector({ value, onChange, disabled = false }) {
       >
         {currentLanguageLabel}
         <span className="language-selector-arrow">{isOpen ? '▲' : '▼'}</span>
-      </button>
+      </UiButton>
       
       {isOpen && !disabled && (
         <div className="language-selector-dropdown">
-          <input
+          <UiInput density="compact"
             type="text"
             className="language-selector-search"
             placeholder="Search languages…"
@@ -258,6 +261,7 @@ const CodeBlockComponent = React.memo(function CodeBlockComponent({ code, langua
   const isEditable = useLexicalEditable();
   const textareaRef = useRef(null);
   const preRef = useRef(null);
+  const codeBlockRef = useRef(null);
   const [autoHighlight, setAutoHighlight] = useState(true);
   const [showEnableButton, setShowEnableButton] = useState(false);
   const [wrapLines, setWrapLines] = useState(false);
@@ -267,6 +271,12 @@ const CodeBlockComponent = React.memo(function CodeBlockComponent({ code, langua
   const highlightRequestRef = useRef(0);
   const searchTargetTimeoutRef = useRef(null);
   const pasteTimeoutRef = useRef(null);
+
+  // Lexical consumes Tab while the editable body is focused. F6 enters the
+  // real code language control without changing Tab indentation or code data.
+  useEffect(() => bindCodeBlockKeyboardAccess(codeBlockRef.current, () => editor.isEditable(), () => {
+    editor.update(() => {}, { tag: SKIP_DOM_SELECTION_TAG });
+  }), []);
 
   useEffect(() => {
     const cancelPaste = () => {
@@ -486,7 +496,7 @@ const CodeBlockComponent = React.memo(function CodeBlockComponent({ code, langua
   };
 
   return (
-    <div className={'code-block-wrapper' + (searchTarget ? ' search-target' : '')}>
+    <div ref={codeBlockRef} className={'code-block-wrapper' + (searchTarget ? ' search-target' : '')} title="按 F6 从编辑正文进入代码语言选择">
       <div className="code-block-header">
         <div className="code-block-header-left">
           <LanguageSelector value={language} onChange={handleLanguageChange} disabled={!isEditable} />
@@ -498,18 +508,18 @@ const CodeBlockComponent = React.memo(function CodeBlockComponent({ code, langua
 
         <div className="code-block-toolbar" role="toolbar" aria-label="代码块工具">
           {showEnableButton && isEditable && (
-            <button type="button" onClick={handleEnableHighlight}>启用高亮</button>
+            <UiButton density="compact" type="button" onClick={handleEnableHighlight}>启用高亮</UiButton>
           )}
-          <button
+          <UiButton density="compact"
             type="button"
             className={wrapLines ? 'active' : ''}
             onClick={() => setWrapLines(value => !value)}
           >
             {wrapLines ? '取消换行' : '自动换行'}
-          </button>
-          <button type="button" onClick={copyCode}>{copied ? '已复制' : '复制'}</button>
+          </UiButton>
+          <UiButton density="compact" type="button" onClick={copyCode}>{copied ? '已复制' : '复制'}</UiButton>
           {isEditable && (
-            <button type="button" className="danger" onClick={removeCodeBlock}>删除</button>
+            <UiButton density="compact" type="button" className="danger" onClick={removeCodeBlock}>删除</UiButton>
           )}
         </div>
       </div>
@@ -522,7 +532,7 @@ const CodeBlockComponent = React.memo(function CodeBlockComponent({ code, langua
           ))}
         </div>
         <div className="code-editor-container">
-          <textarea
+          <textarea data-ui-native="code-editor-textarea"
             ref={textareaRef}
             value={code}
             onChange={handleTextareaChange}

@@ -1,4 +1,5 @@
 import React, { act } from 'react'
+import { uiValue } from '~/test/uiControlDriver'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import EvidenceReviewArchives, { SaveReviewArchiveButton } from './EvidenceReviewArchives'
@@ -98,8 +99,8 @@ describe('explicit local review archives', () => {
     const data = fixture(); reviewArchives.save(data.data)
     await act(async () => root.render(<ProjectEntityEvidencePanel projectId="p1" entityId="index:char-a" intelligence={data.intelligence} projectMeta={data.meta} onOpenFile={vi.fn()} />))
     await click(button('恢复此存档')); await click(button('恢复并重新核对'))
-    expect(byLabel('实体证据来源筛选').value).toBe('alias')
-    expect(byLabel('实体证据卷筛选').value).toBe(JSON.stringify(''))
+    expect(uiValue(byLabel('实体证据来源筛选'))).toBe('alias')
+    expect(uiValue(byLabel('实体证据卷筛选'))).toBe(JSON.stringify(''))
     expect(byLabel('正文证据章节 13')).toBeTruthy()
     expect(container.querySelector('.project-entity-evidence-pagination').textContent).toContain('第 3 / 3 页')
   })
@@ -178,7 +179,7 @@ describe('explicit local review archives', () => {
     await inputFile({ size: 2000, text: async () => JSON.stringify(archive) })
     expect(reviewArchives.list().entries).toHaveLength(1)
     expect(evidenceReview.getSnapshot()).toBe(active)
-    expect(byLabel('存档查看范围').value).toBe('all')
+    expect(uiValue(byLabel('存档查看范围'))).toBe('all')
   })
   it('does not import a file after the owning component was unmounted', async () => {
     const data = fixture(); const archive = reviewArchives.save(data.data); localStorage.clear()

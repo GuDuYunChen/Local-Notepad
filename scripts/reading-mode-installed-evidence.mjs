@@ -11,7 +11,17 @@ export const ACCEPTED_READING_SEED_SOURCE = Object.freeze({ run: 40184977753, ar
   name: 'local-notepad-historical-4.232.0-seed', productSourceCommit: '1a8e17ba775312c359f4ac23851c8c365b57a9cb' })
 export const READING_SOURCE_KEYS = Object.freeze([...IMPORT_PIN_BLOBS,
   'readingDriverBlob', 'readingFixtureBlob', 'readingEvidenceBlob', 'readingBuilderBlob', 'readingInputBlob',
-  'readingWindowSessionBlob', 'readingWindowTargetBlob', 'readingWindowWorkerBlob', 'historyDriverBlob'])
+  'readingWindowSessionBlob', 'readingWindowTargetBlob', 'readingWindowWorkerBlob', 'nativeUiSelectBlob', 'historyDriverBlob'])
+export const IMPORT_DRIVER_CONTROL_CHANGES = Object.freeze([
+  [
+    "import { createLocalImportDesktopFixtures } from './local-import-desktop-fixture.mjs'",
+    "import { createLocalImportDesktopFixtures } from './local-import-desktop-fixture.mjs'\nimport { createNativeUiSelect } from './native-ui-select.mjs'"
+  ],
+  [
+    "  const destination = async (row, value) => {\n    const control = selector(row.id) + ' [data-local-import-destination]'\n    await until(() => evaluate(`(()=>{const n=document.querySelector(${JSON.stringify(control)});return !!n&&!n.disabled&&Array.from(n.options).some(option=>option.value===${JSON.stringify(value)})})()`), 'Complete live destination choices have not loaded')\n    const index = await evaluate(`Array.from(document.querySelector(${JSON.stringify(control)}).options).findIndex(option=>option.value===${JSON.stringify(value)})`)\n    assert.ok(index >= 0, 'Requested live destination missing from original select')\n    await action(control); await keys('Home', 36)\n    for (let i = 0; i < index; i++) await keys('ArrowDown', 40)\n    await keys('Enter', 13)\n    await until(() => evaluate(`document.querySelector(${JSON.stringify(control)})?.value===${JSON.stringify(value)}`), 'Original destination select did not change')\n  }\n",
+    "  const destination = async (row, value) => {\n    const control = selector(row.id) + ' [data-local-import-destination]'\n    await settle()\n    await createNativeUiSelect({ evaluate, click, cdp, until }).choose(control, value)\n  }\n"
+  ]
+].map(change => Object.freeze(change)))
 const gitBlob = source => createHash('sha1').update('blob ' + Buffer.byteLength(source) + '\0').update(source).digest('hex')
 
 export function validateReadingModePin(pin) {
@@ -19,7 +29,7 @@ export function validateReadingModePin(pin) {
   for (const key of ['product', ...READING_SOURCE_KEYS]) assert.match(pin[key] || '', /^[a-f0-9]{40}$/, 'Unresolved or invalid pin: ' + key)
   assert.deepEqual(pin.previous, ACCEPTED_READING_SEED)
   assert.deepEqual(pin.previousSource, ACCEPTED_READING_SEED_SOURCE)
-  assert.equal(pin.current?.version, '4.248.1')
+  assert.equal(pin.current?.version, '4.249.0')
   assert.ok(Number.isSafeInteger(pin.current.bytes) && pin.current.bytes > 0, 'Current installer bytes are unresolved')
   assert.match(pin.current.sha256 || '', /^[a-f0-9]{64}$/, 'Current installer digest is unresolved')
   for (const key of ['run', 'artifact']) assert.ok(Number.isSafeInteger(pin.currentSource?.[key]) && pin.currentSource[key] > 0, 'Current artifact identity is unresolved: ' + key)
@@ -33,6 +43,10 @@ export function validateReadingModeHistorySource(pin, readSource) {
   assert.equal(typeof source, 'string', 'Current history driver source is missing')
   assert.equal(gitBlob(source.replace(/\r\n/g, '\n')), pin.historyDriverBlob,
     'Current history driver source differs from product pin')
+  const select = readSource('native-ui-select.mjs')
+  assert.equal(typeof select, 'string', 'Current native Select driver source is missing')
+  assert.equal(gitBlob(select.replace(/\r\n/g, '\n')), pin.nativeUiSelectBlob,
+    'Current native Select driver source differs from product pin')
   return true
 }
 
@@ -53,8 +67,9 @@ export function replaceExactlyAndProveInverse(original, changes) {
 }
 
 // Historical templates retain their exact identities. The three shared import
-// sources may also come from the product checkout, but only their pinned version
-// change can be reversed to those same templates before generating the copies.
+// sources may also come from the product checkout. Only the declared version
+// and real-control driver adaptations may be reversed to the fixed historical
+// templates. Every historical assertion remains source-identity checked.
 // Generated checks never manufacture successful native reports.
 export function prepareReadingModeVerifierSources(pin, readSource) {
   validateReadingModeHistorySource(pin, readSource)
@@ -63,19 +78,20 @@ export function prepareReadingModeVerifierSources(pin, readSource) {
     { source: 'local-import-installed-evidence.mjs', output: 'reading-import-validator.mjs', hash: 'b70f45bceea1b299d18beefd5b985851cf753f9e', changes: [
       ["version: '4.231.2', bytes: 104320482", "version: '4.232.0', bytes: 104335117"],
       ["sha256: '5327515821f06c1d471ed038a32e14d02a178e9eebdff7899f94f437512f8c71'", "sha256: 'd3a152a1e4c36eba88513cc8748cee81eb68178470cf209bb21aa98de6fd7754'"],
-      ["assert.equal(pin.current.version, '4.232.0')", "assert.equal(pin.current.version, '4.248.1')"],
+      ["assert.equal(pin.current.version, '4.232.0')", "assert.equal(pin.current.version, '4.249.0')"],
       ["from './local-import-desktop-evidence.mjs'", "from './reading-import-desktop-validator.mjs'"],
       ["from './check-local-import-desktop.mjs'", "from './reading-import-desktop-driver.mjs'"],
     ] },
     { source: 'local-import-desktop-evidence.mjs', output: 'reading-import-desktop-validator.mjs', hash: '6fc3c3d069384fc2bd7c671987ace423d004ddf8', productPin: 'importEvidenceBlob', changes: [
-      ["assert.equal(report.appVersion, '4.232.0')", "assert.equal(report.appVersion, '4.248.1')"],
+      ["assert.equal(report.appVersion, '4.232.0')", "assert.equal(report.appVersion, '4.249.0')"],
     ] },
-    { source: 'check-local-import-desktop.mjs', output: 'reading-import-desktop-driver.mjs', hash: '6f0bfd54c7b7e1ea673e80b55a91be82244dfcef', productPin: 'importBlob', changes: [
-      ["assert.equal(diagnostics.version, '4.232.0')", "assert.equal(diagnostics.version, '4.248.1')"],
+    { source: 'check-local-import-desktop.mjs', output: 'reading-import-desktop-driver.mjs', hash: '6f0bfd54c7b7e1ea673e80b55a91be82244dfcef', productPin: 'importBlob', productChangeCount: 3, changes: [
+      ["assert.equal(diagnostics.version, '4.232.0')", "assert.equal(diagnostics.version, '4.249.0')"],
+      ...IMPORT_DRIVER_CONTROL_CHANGES,
       ["from './local-import-desktop-evidence.mjs'", "from './reading-import-desktop-validator.mjs'"],
     ] },
     { source: 'local-import-desktop-evidence.node.mjs', output: 'reading-import-desktop-validator.node.mjs', hash: '12cc53ff2ff11d2aa8d6508feadd2a4734077bb3', productPin: 'importEvidenceTestsBlob', changes: [
-      ["appVersion: '4.232.0'", "appVersion: '4.248.1'"],
+      ["appVersion: '4.232.0'", "appVersion: '4.249.0'"],
       ["from './local-import-desktop-evidence.mjs'", "from './reading-import-desktop-validator.mjs'"],
     ] },
     { source: 'pin-local-import-installer.mjs', output: 'pin-reading-import-generated.mjs', hash: 'ef3ce5e4e2f0b4952107bfae81d556fd0c7fc036', changes: [
@@ -94,7 +110,7 @@ export function prepareReadingModeVerifierSources(pin, readSource) {
       ["['./check-local-import-desktop.mjs',pin.importBlob]", `['./check-local-import-desktop.mjs','${sourceHashes.get('check-local-import-desktop.mjs')}']`],
       ["['./local-import-desktop-evidence.mjs',pin.importEvidenceBlob]", `['./local-import-desktop-evidence.mjs','${sourceHashes.get('local-import-desktop-evidence.mjs')}']`],
       ["['./local-import-desktop-evidence.node.mjs',pin.importEvidenceTestsBlob]", `['./local-import-desktop-evidence.node.mjs','${sourceHashes.get('local-import-desktop-evidence.node.mjs')}']`],
-      [`['./local-import-desktop-evidence.node.mjs','${sourceHashes.get('local-import-desktop-evidence.node.mjs')}']`, `['./local-import-desktop-evidence.node.mjs','${sourceHashes.get('local-import-desktop-evidence.node.mjs')}'],['./check-reading-mode-desktop.mjs',pin.readingDriverBlob],['./reading-mode-desktop-fixture.jsx',pin.readingFixtureBlob],['./reading-mode-desktop-evidence.mjs',pin.readingEvidenceBlob],['./build-reading-mode-fixture.mjs',pin.readingBuilderBlob],['./reading-mode-native-input.mjs',pin.readingInputBlob],['./desktop-window-session.mjs',pin.readingWindowSessionBlob],['./desktop-window-target.mjs',pin.readingWindowTargetBlob],['./desktop-window-worker.ps1',pin.readingWindowWorkerBlob]`],
+      [`['./local-import-desktop-evidence.node.mjs','${sourceHashes.get('local-import-desktop-evidence.node.mjs')}']`, `['./local-import-desktop-evidence.node.mjs','${sourceHashes.get('local-import-desktop-evidence.node.mjs')}'],['./check-reading-mode-desktop.mjs',pin.readingDriverBlob],['./reading-mode-desktop-fixture.jsx',pin.readingFixtureBlob],['./reading-mode-desktop-evidence.mjs',pin.readingEvidenceBlob],['./build-reading-mode-fixture.mjs',pin.readingBuilderBlob],['./reading-mode-native-input.mjs',pin.readingInputBlob],['./desktop-window-session.mjs',pin.readingWindowSessionBlob],['./desktop-window-target.mjs',pin.readingWindowTargetBlob],['./desktop-window-worker.ps1',pin.readingWindowWorkerBlob],['./native-ui-select.mjs',pin.nativeUiSelectBlob]`],
       ["const preparedFile=new URL(", "validateGeneratedReadingModeSources(pin,name=>read('./'+name))\nconst preparedFile=new URL("],
       ['prepared=extendLocalImportInstallation(wikiPrepared,pin);', 'importPrepared=extendLocalImportInstallation(wikiPrepared,pin),prepared=extendReadingModeInstallation(importPrepared,pin);'],
       ["imported=verifyLocalImportDesktopReport(out,process.env.GITHUB_SHA)", "imported=verifyLocalImportDesktopReport(out,process.env.GITHUB_SHA),reading=verifyReadingModeInstalledReport(out,pin,process.env.GITHUB_SHA)"],
@@ -112,12 +128,12 @@ export function prepareReadingModeVerifierSources(pin, readSource) {
     let original = normalized
     if (spec.productPin && sourceHash !== spec.hash) {
       assert.equal(sourceHash, pin[spec.productPin], 'Current import source differs from product pin: ' + spec.productPin)
-      const [before, after] = changes[0]
-      original = replaceExactlyAndProveInverse(normalized, [[after, before]])
+      const productChanges = changes.slice(0, spec.productChangeCount ?? 1)
+      original = replaceExactlyAndProveInverse(normalized, [...productChanges].reverse().map(([before, after]) => [after, before]))
     }
     assert.equal(gitBlob(original), spec.hash, 'Original verifier source identity changed: ' + spec.source)
-    const productSource = spec.productPin ? replaceExactlyAndProveInverse(original, [changes[0]]) : null
-    if (spec.productPin) assert.equal(gitBlob(productSource), pin[spec.productPin], 'Generated version-only copy does not match target product source: ' + spec.productPin)
+    const productSource = spec.productPin ? replaceExactlyAndProveInverse(original, changes.slice(0, spec.productChangeCount ?? 1)) : null
+    if (spec.productPin) assert.equal(gitBlob(productSource), pin[spec.productPin], 'Generated audited copy does not match target product source: ' + spec.productPin)
     sourceHashes.set(spec.source, sourceHash)
     return { ...spec, changes, original, productSource, sourceHash, pinned: replaceExactlyAndProveInverse(original, changes) }
   })

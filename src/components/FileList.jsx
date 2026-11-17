@@ -16,6 +16,8 @@ import {
   findFirstFileInTree as findFirstFileInTreeUtil,
   getFolderPathLabel,
 } from './fileTreeUtils'
+import { UiButton, UiInput } from '~/components/ui/ControlKit'
+
 
 export { compareLibraryItems } from './fileTreeUtils'
 
@@ -152,12 +154,12 @@ const FileNode = ({
             </div>
           </div>
           <div className="actions">
-            <button tabIndex={-1} className="action-btn" onClick={(e) => { e.stopPropagation(); onRename(node); }} title="重命名" aria-label={`重命名 ${node.title}`}>
+            <UiButton size="middle" tabIndex={-1} className="action-btn" onClick={(e) => { e.stopPropagation(); onRename(node); }} title="重命名" aria-label={`重命名 ${node.title}`}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-            </button>
-            <button tabIndex={-1} className="action-btn danger" onClick={(e) => { e.stopPropagation(); onDelete(node); }} title="删除" aria-label={`删除 ${node.title}`}>
+            </UiButton>
+            <UiButton size="middle" tabIndex={-1} className="action-btn danger" onClick={(e) => { e.stopPropagation(); onDelete(node); }} title="删除" aria-label={`删除 ${node.title}`}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-            </button>
+            </UiButton>
           </div>
         </div>
     )
@@ -1516,7 +1518,8 @@ export default function FileList({
     // unless Ctrl/Shift is pressed? Context menu usually selects the item if not selected.
     // If item IS in selection, keep selection (to allow operation on batch).
     if (!selectedIds.has(item.id)) {
-        onSelect(item) // This triggers single selection logic
+        // The original guarded selection must keep this menu's owner mounted.
+        onSelect(item, { preserveSidebar: true }) // This triggers single selection logic
         // But wait, onSelect might be async or dependent on prop update.
         // For context menu, we might want to force update selectedIds locally?
         // Actually, let's just use the item passed to context menu if it's not selected.
@@ -1560,7 +1563,7 @@ export default function FileList({
     
     return (
       <React.Fragment key={node.id}>
-        <FileNode 
+        <FileNode
             node={node}
             level={level}
             isSelected={isSelected}
@@ -1599,7 +1602,7 @@ export default function FileList({
 
           <div className="file-library-actions">
             <div className="btn-group file-new-wrap" style={{ position: 'relative' }}>
-              <button
+              <UiButton size="middle"
                 className="btn primary file-new-btn"
                 onClick={() => setShowNewMenu(!showNewMenu)}
                 title="新建"
@@ -1610,7 +1613,7 @@ export default function FileList({
                   <line x1="5" y1="12" x2="19" y2="12"/>
                 </svg>
                 新建
-              </button>
+              </UiButton>
               {showNewMenu && (
                 <FileNewMenu
                   menuRef={newMenuRef}
@@ -1621,7 +1624,7 @@ export default function FileList({
             </div>
 
             <div className="file-more-wrap" ref={libraryMenuRef}>
-              <button
+              <UiButton size="middle"
                 className={`icon-btn file-more-btn${showLibraryMenu ? ' active' : ''}`}
                 onClick={() => setShowLibraryMenu(prev => !prev)}
                 title="更多笔记操作"
@@ -1632,7 +1635,7 @@ export default function FileList({
                   <circle cx="12" cy="12" r="1.8"/>
                   <circle cx="19" cy="12" r="1.8"/>
                 </svg>
-              </button>
+              </UiButton>
               {showLibraryMenu && (
                 <FileLibraryMenu
                   selectedCount={selectedIds.size}
@@ -1662,7 +1665,7 @@ export default function FileList({
               <path d="m20 20-4-4"/>
             </svg>
           </div>
-          <input
+          <UiInput
             className="file-search-input"
             placeholder="搜索标题或正文"
             value={q}
@@ -1673,7 +1676,7 @@ export default function FileList({
             aria-label="搜索笔记"
           />
           {q && (
-            <button
+            <UiButton
               type="button"
               className="file-search-clear"
               onClick={() => setQ('')}
@@ -1681,7 +1684,7 @@ export default function FileList({
               title="清除搜索"
             >
               ×
-            </button>
+            </UiButton>
           )}
         </div>
       </div>
@@ -1718,8 +1721,8 @@ export default function FileList({
                 <div className="empty-title">还没有笔记</div>
                 <div className="empty-desc">写下第一条想法，之后都可以在这里继续整理。</div>
                 <div className="empty-actions">
-                  <button className="btn primary" onClick={() => onNewFileCheck()}>新建笔记</button>
-                  <button className="btn" onClick={() => onNewFolderCheck()}>新建文件夹</button>
+                  <UiButton size="middle" className="btn primary" onClick={() => onNewFileCheck()}>新建笔记</UiButton>
+                  <UiButton size="middle" className="btn" onClick={() => onNewFolderCheck()}>新建文件夹</UiButton>
                 </div>
                 <div className="empty-tips">
                   <div>快捷键：{shortcutLabel('newNote', shortcutBindings)} 新建笔记 · {shortcutLabel('newFolder', shortcutBindings)} 新建文件夹</div>
@@ -1837,7 +1840,7 @@ export default function FileList({
         onClose={() => setPendingExport(null)}
         onReselect={() => { setPendingExport(null); setShowExport(true) }} />}
       {showFolderSelector && (
-          <FileSelectorDialog 
+          <FileSelectorDialog
               open={showFolderSelector}
               onClose={() => setShowFolderSelector(false)}
               items={items}

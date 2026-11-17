@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { SYNC_PLAN_FILTERS, syncPlanPage } from '~/services/syncPlanView.mjs'
 import './SyncPlanPanel.css'
+import { UiButton, UiInput, UiSelect } from '~/components/ui/ControlKit'
+
 
 const timestamp = value => value === null ? '时间不可用' : new Date(value).toLocaleString('zh-CN', { hour12: false })
 
@@ -18,7 +20,7 @@ export default function SyncPlanPanel({ snapshot, onPreview, disabled = false })
   return <section className="sync-plan-view" aria-label="同步计划详情">
     <div className="sync-plan-view-heading">
       <div><h4>最近同步计划</h4><span>{historical ? '执行时计划（历史）' : '预演快照（只读）'} · {timestamp(snapshot.capturedAt)}</span></div>
-      <button type="button" className="btn small" disabled={disabled || typeof onPreview !== 'function'} onClick={() => onPreview()}>重新预演</button>
+      <UiButton type="button" className="btn small" disabled={disabled || typeof onPreview !== 'function'} onClick={() => onPreview()}>重新预演</UiButton>
     </div>
     <p className="sync-plan-boundary">{historical
       ? '这是该次执行使用的计划，不是剩余任务或实际写入数量；执行结果以同步状态和冲突中心为准。'
@@ -33,10 +35,10 @@ export default function SyncPlanPanel({ snapshot, onPreview, disabled = false })
     {snapshot.detailState === 'unavailable' && <p className="sync-plan-notice" role="status">{snapshot.message}</p>}
     {complete && <>
       <div className="sync-plan-tools">
-        <label>方向<select aria-label="同步计划方向" value={filter} onChange={event => { setFilter(event.target.value); setPage(1) }}>
+        <label>方向<UiSelect size="middle" aria-label="同步计划方向" value={filter} onChange={event => { setFilter(event.target.value); setPage(1) }}>
           {SYNC_PLAN_FILTERS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-        </select></label>
-        <label className="sync-plan-search">搜索对象<input type="search" aria-label="同步计划搜索" maxLength={256} value={query}
+        </UiSelect></label>
+        <label className="sync-plan-search">搜索对象<UiInput size="middle" type="search" aria-label="同步计划搜索" maxLength={256} value={query}
           placeholder="对象编号或附件名称" onChange={event => { setQuery(event.target.value); setPage(1) }}/></label>
       </div>
       <p className="sync-plan-boundary">上传：本机 → 远端；下载：远端 → 本机；冲突：需要人工处理，不在这里选边。方向不代表新增、编辑或删除。笔记 / 文件夹仅显示编号，接口未提供标题和具体类型。</p>
@@ -52,9 +54,9 @@ export default function SyncPlanPanel({ snapshot, onPreview, disabled = false })
         : view.filter === 'changes' && !query.trim() ? '该次计划没有变化或冲突；可切换“全部对象”查看无变化项。'
           : '没有匹配对象；请调整方向或搜索条件。这不代表整个计划为空。'}</p>}
       <nav className="sync-plan-pagination" aria-label="同步计划分页">
-        <button type="button" className="btn small" disabled={view.page <= 1} onClick={() => setPage(view.page - 1)}>上一页</button>
+        <UiButton type="button" className="btn small" disabled={view.page <= 1} onClick={() => setPage(view.page - 1)}>上一页</UiButton>
         <span>第 {view.page} / {view.pages} 页</span>
-        <button type="button" className="btn small" disabled={view.page >= view.pages} onClick={() => setPage(view.page + 1)}>下一页</button>
+        <UiButton type="button" className="btn small" disabled={view.page >= view.pages} onClick={() => setPage(view.page + 1)}>下一页</UiButton>
       </nav>
     </>}
   </section>

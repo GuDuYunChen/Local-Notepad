@@ -3,6 +3,8 @@ import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext
 import { $getSelection, $isRangeSelection } from 'lexical'
 import { $isTableCellNode } from '@lexical/table'
 import { createPortal } from 'react-dom'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 const BACKGROUND_COLORS = [
   { hex: '', label: '无背景' },
@@ -125,7 +127,7 @@ export default function TableActionMenuPlugin() {
 
   return createPortal(
     <>
-      <button
+      <UiButton density="compact"
         ref={buttonRef}
         type="button"
         className="table-action-menu-trigger"
@@ -140,7 +142,7 @@ export default function TableActionMenuPlugin() {
         title="表格操作"
       >
         ···
-      </button>
+      </UiButton>
 
       {isMenuOpen && (
         <TableActionMenu
@@ -203,7 +205,7 @@ function TableActionMenu({ menuRef, pos, dispatch, enterSelectionMode }) {
       <MenuSection label="样式">
         <div className="table-color-palette" aria-label="单元格背景">
           {BACKGROUND_COLORS.map(color => (
-            <button
+            <UiButton density="compact"
               type="button"
               key={color.label}
               className={`table-color-swatch${!color.hex ? ' clear' : ''}`}
@@ -216,9 +218,9 @@ function TableActionMenu({ menuRef, pos, dispatch, enterSelectionMode }) {
         </div>
 
         <div className="table-action-row">
-          <button type="button" onClick={() => dispatch('alignVertical', 'top')}>上对齐</button>
-          <button type="button" onClick={() => dispatch('alignVertical', 'middle')}>居中</button>
-          <button type="button" onClick={() => dispatch('alignVertical', 'bottom')}>下对齐</button>
+          <UiButton density="compact" type="button" onClick={() => dispatch('alignVertical', 'top')}>上对齐</UiButton>
+          <UiButton density="compact" type="button" onClick={() => dispatch('alignVertical', 'middle')}>居中</UiButton>
+          <UiButton density="compact" type="button" onClick={() => dispatch('alignVertical', 'bottom')}>下对齐</UiButton>
         </div>
 
         <MenuItem onClick={() => dispatch('toggleRowStriping')} label="隔行底色" />
@@ -251,13 +253,13 @@ function MenuSection({ label, children }) {
 
 function MenuItem({ label, onClick, danger = false }) {
   return (
-    <button
+    <UiButton density="compact"
       type="button"
       className={`table-action-menu-item${danger ? ' danger' : ''}`}
       onClick={onClick}
       role="menuitem"
     >
       <span>{label}</span>
-    </button>
+    </UiButton>
   )
 }

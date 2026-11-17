@@ -11,6 +11,8 @@ import S3OfflineBatchDrop from './S3OfflineBatchDrop.jsx'
 import { OFFLINE_BATCH_NOTICE, readOfflinePairFiles, selectOfflinePairFiles } from '../services/s3OfflinePairBatch.mjs'
 import { offlinePairOrderedRows } from '../services/s3OfflinePairOrder.mjs'
 import { offlinePairViewDescription } from '../services/s3OfflinePairViewDescription.mjs'
+import { UiButton, UiSelect } from '~/components/ui/ControlKit'
+
 
 const idle = () => ({ state: 'idle', report: null, message: '尚未选择报告。' })
 const initial = () => ({ a: idle(), b: idle(), comparison: null, error: '' })
@@ -138,21 +140,21 @@ export default function S3OfflineReportPair() {
     <summary>比较两份离线统计报告</summary>
     <p id={`${id}-notice`}>{OFFLINE_PAIR_NOTICE} 无需读取本地统计。关闭此面板会清空本次选择。</p>
     <div className="local-inventory-actions">
-      <button type="button" className="btn small" data-offline-batch-toggle aria-expanded={batchOpen}
+      <UiButton size="middle" type="button" className="btn small" data-offline-batch-toggle aria-expanded={batchOpen}
         aria-controls={`${id}-batch`} onClick={() => {
           if (batchOpen) { cancelBatch(); setBatchMessage('') }
           setBatchOpen(!batchOpen)
-        }}>{batchOpen ? '收起双文件选择' : '一次选择两份报告'}</button>
+        }}>{batchOpen ? '收起双文件选择' : '一次选择两份报告'}</UiButton>
     </div>
     {batchOpen && <section id={`${id}-batch`} data-offline-batch aria-label="一次选择两份离线报告">
       <S3OfflineBatchDrop revision={view} onFiles={files => openBatch(selectOfflinePairFiles(files))} />
       <p id={`${id}-batch-hint`}>{OFFLINE_BATCH_NOTICE}</p>
       <label htmlFor={`${id}-batch-input`}>选择两份统计 JSON（每份最多 4 KiB）</label>
-      <input id={`${id}-batch-input`} ref={batchInput} type="file" multiple accept=".json,application/json"
+      <input data-ui-native="file" id={`${id}-batch-input`} ref={batchInput} type="file" multiple accept=".json,application/json"
         data-offline-batch-input aria-describedby={`${id}-batch-hint ${id}-batch-status`} onChange={chooseBatch} />
-      {batchReading && <button type="button" className="btn small" data-offline-batch-stop onClick={() => {
+      {batchReading && <UiButton type="button" className="btn small" data-offline-batch-stop onClick={() => {
         cancelBatch(); setBatchMessage('已停止本次双文件读取；此前已完成的选择保留。')
-      }}>停止双文件读取</button>}
+      }}>停止双文件读取</UiButton>}
       <p id={`${id}-batch-status`} role="status" aria-live="polite" data-offline-batch-reading={batchReading ? 'true' : 'false'}>{batchMessage}</p>
     </section>}
     <div className="offline-pair-inputs">
@@ -160,23 +162,23 @@ export default function S3OfflineReportPair() {
         <legend>报告 {side.toUpperCase()}</legend>
         <S3OfflineReportDrop side={side} revision={view[side]} onFile={file => openFile(side, file)}>
         <label htmlFor={`${id}-${side}`}>选择报告 {side.toUpperCase()}（JSON，最多 4 KiB）</label>
-        <input id={`${id}-${side}`} ref={node => { inputs.current[side] = node }} type="file" accept=".json,application/json"
+        <input data-ui-native="file" id={`${id}-${side}`} ref={node => { inputs.current[side] = node }} type="file" accept=".json,application/json"
           aria-describedby={`${id}-notice ${id}-${side}-state`} onChange={event => choose(side, event)} />
         <p id={`${id}-${side}-state`} role="status" aria-live="polite" data-offline-state={view[side].state}>{view[side].message}</p>
         {view[side].report && <p>文件声明生成时间（UTC）：<time>{view[side].report.generatedAtUTC}</time>，不是读取完成时间。</p>}
-        <button type="button" className="btn small" disabled={view[side].state === 'idle'} onClick={() => clear(side)}>
-          {view[side].state === 'reading' ? '停止读取' : '清除'}报告 {side.toUpperCase()}</button>
+        <UiButton type="button" className="btn small" disabled={view[side].state === 'idle'} onClick={() => clear(side)}>
+          {view[side].state === 'reading' ? '停止读取' : '清除'}报告 {side.toUpperCase()}</UiButton>
         </S3OfflineReportDrop>
       </fieldset>)}
     </div>
     <div className="local-inventory-actions">
-      <button type="button" className="btn" data-offline-compare disabled={!ready} onClick={compare}>比较报告 B − A</button>
-      <button type="button" className="btn small" data-offline-swap disabled={!ready} onClick={swap}>交换 A / B</button>
-      <button type="button" className="btn small" data-offline-reset onClick={reset}>清空两份报告</button>
+      <UiButton size="middle" type="button" className="btn" data-offline-compare disabled={!ready} onClick={compare}>比较报告 B − A</UiButton>
+      <UiButton size="middle" type="button" className="btn small" data-offline-swap disabled={!ready} onClick={swap}>交换 A / B</UiButton>
+      <UiButton size="middle" type="button" className="btn small" data-offline-reset onClick={reset}>清空两份报告</UiButton>
     </div>
     <p role="status" aria-live="polite" data-offline-feedback>{view.error || (result ? `${result.changed} / 12 项指标有差异；这不是变化的笔记数。` : '两份文件都校验通过后，点击比较；不会自动比较或扫描。')}</p>
     {result && <div className="local-inventory-actions" data-offline-filter>
-      <label><input type="checkbox" checked={onlyDifferences} data-offline-differences
+      <label><input data-ui-native="checkbox" type="checkbox" checked={onlyDifferences} data-offline-differences
         aria-controls={`${id}-metrics`} aria-describedby={`${id}-filter-status`}
         onChange={event => {
           if (owner.current && model.current.comparison === view.comparison) {
@@ -187,7 +189,7 @@ export default function S3OfflineReportPair() {
           }
         }} /> 仅看有差异的指标</label>
       {onlyDifferences && <label className="offline-direction">差异方向（B − A）
-        <select data-offline-direction value={direction} aria-controls={`${id}-metrics`} aria-describedby={`${id}-filter-status`}
+        <UiSelect size="middle" data-offline-direction value={direction} aria-controls={`${id}-metrics`} aria-describedby={`${id}-filter-status`}
           onChange={event => {
             const value = event.target.value
             if (owner.current && model.current.comparison === view.comparison && ['all', 'increase', 'decrease'].includes(value)) {
@@ -197,10 +199,10 @@ export default function S3OfflineReportPair() {
           <option value="all">全部差异</option>
           <option value="increase">仅增加（正差值）</option>
           <option value="decrease">仅减少（负差值）</option>
-        </select>
+        </UiSelect>
       </label>}
       {onlyDifferences && <label className="offline-direction">差异指标类型
-        <select data-offline-scope value={scope} aria-controls={`${id}-metrics`} aria-describedby={`${id}-filter-status`}
+        <UiSelect size="middle" data-offline-scope value={scope} aria-controls={`${id}-metrics`} aria-describedby={`${id}-filter-status`}
           onChange={event => {
             const value = event.target.value
             if (owner.current && model.current.comparison === view.comparison && ['all', 'counts', 'bytes'].includes(value)) {
@@ -211,10 +213,10 @@ export default function S3OfflineReportPair() {
           <option value="all">全部指标</option>
           <option value="counts">仅数量（项）</option>
           <option value="bytes">仅容量（B）</option>
-        </select>
+        </UiSelect>
       </label>}
       {onlyDifferences && scope !== 'all' && <label className="offline-direction">同单位差异排序
-        <select data-offline-order value={order} aria-controls={`${id}-metrics`} aria-describedby={`${id}-order-hint ${id}-filter-status`}
+        <UiSelect size="middle" data-offline-order value={order} aria-controls={`${id}-metrics`} aria-describedby={`${id}-order-hint ${id}-filter-status`}
           onChange={event => {
             const value = event.target.value
             if (owner.current && model.current.comparison === view.comparison && ['original', 'largest', 'smallest'].includes(value)) {
@@ -224,11 +226,11 @@ export default function S3OfflineReportPair() {
           <option value="original">原始指标顺序</option>
           <option value="largest">差异幅度从大到小</option>
           <option value="smallest">差异幅度从小到大</option>
-        </select>
+        </UiSelect>
         <span id={`${id}-order-hint`}>按差值绝对值排序，同幅度保留原序；数量和容量不混排，概览与导出不变。</span>
       </label>}
-      <button type="button" className="btn small" data-offline-view-reset disabled={!onlyDifferences}
-        aria-controls={`${id}-metrics`} aria-describedby={`${id}-view-hint`} onClick={restoreView}>恢复完整视图</button>
+      <UiButton size="middle" type="button" className="btn small" data-offline-view-reset disabled={!onlyDifferences}
+        aria-controls={`${id}-metrics`} aria-describedby={`${id}-view-hint`} onClick={restoreView}>恢复完整视图</UiButton>
       <span id={`${id}-filter-status`} role="status" aria-live="polite" aria-atomic="true">
         显示 {visibleRows.length} / 12 项指标；导出仍保留全部 12 项。{order !== 'original' && ` 当前按差异幅度${order === 'largest' ? '从大到小' : '从小到大'}排列。`}
       </span>

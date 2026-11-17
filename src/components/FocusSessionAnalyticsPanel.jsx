@@ -12,6 +12,8 @@ import {
   getSessionTrend,
 } from './focusSessionAnalyticsUtils'
 import './FocusSessionAnalyticsPanel.css'
+import { UiButton, UiTextarea } from '~/components/ui/ControlKit'
+
 
 function stripExtension(value) {
   return String(value || '').replace(/\.[^.]+$/, '')
@@ -255,14 +257,14 @@ export default function FocusSessionAnalyticsPanel({
             </div>
             <div className="focus-trend-switch">
               {[7, 30].map(value => (
-                <button
+                <UiButton
                   key={value}
                   type="button"
                   className={trendDays === value ? 'active' : ''}
                   onClick={() => setTrendDays(value)}
                 >
                   {value} 天
-                </button>
+                </UiButton>
               ))}
             </div>
           </header>
@@ -305,7 +307,7 @@ export default function FocusSessionAnalyticsPanel({
 
           <div className="focus-chapter-efficiency-list">
             {chapters.slice(0, 8).map(item => (
-              <button
+              <UiButton
                 key={item.noteId}
                 type="button"
                 onClick={() => onOpenFile?.(item.noteId)}
@@ -315,7 +317,7 @@ export default function FocusSessionAnalyticsPanel({
                   <small>{item.sessions} 次 · {formatWords(item.words)} 字</small>
                 </span>
                 <em>{formatWords(item.wordsPerHour)} / 时</em>
-              </button>
+              </UiButton>
             ))}
           </div>
         </article>
@@ -332,7 +334,7 @@ export default function FocusSessionAnalyticsPanel({
             {history.slice(0, 8).map(session => (
               <div key={session.id}>
                 <div className="focus-session-review-head">
-                  <button
+                  <UiButton
                     type="button"
                     onClick={() => onOpenFile?.(session.noteId)}
                   >
@@ -342,21 +344,21 @@ export default function FocusSessionAnalyticsPanel({
                       {' '}{formatMinutes(session.elapsedSeconds)} ·
                       {' '}{formatWords(session.wordDelta)} 字
                     </small>
-                  </button>
+                  </UiButton>
                   {editingId !== session.id && (
-                    <button
+                    <UiButton
                       type="button"
                       className="focus-session-review-edit"
                       onClick={() => beginReview(session)}
                     >
                       {String(session.reviewNote || '').trim() ? '编辑' : '复盘'}
-                    </button>
+                    </UiButton>
                   )}
                 </div>
 
                 {editingId === session.id ? (
                   <div className="focus-session-review-editor">
-                    <textarea
+                    <UiTextarea
                       value={reviewDraft}
                       onChange={event => setReviewDraft(event.target.value)}
                       placeholder="这一场为什么顺 / 为什么卡？下次怎样进入状态更快？"
@@ -366,7 +368,7 @@ export default function FocusSessionAnalyticsPanel({
                     />
                     <div>
                       <span>{reviewDraft.length}/600</span>
-                      <button
+                      <UiButton
                         type="button"
                         onClick={() => {
                           setEditingId('')
@@ -374,14 +376,14 @@ export default function FocusSessionAnalyticsPanel({
                         }}
                       >
                         取消
-                      </button>
-                      <button
+                      </UiButton>
+                      <UiButton
                         type="button"
                         className="primary"
                         onClick={() => saveReview(session)}
                       >
                         保存复盘
-                      </button>
+                      </UiButton>
                     </div>
                   </div>
                 ) : (

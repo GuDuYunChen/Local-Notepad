@@ -51,20 +51,8 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 16px;
   cursor: pointer;
-  font-size: 14px;
-  color: var(--fg, #1f2d3d);
   transition: background-color 0.15s ease;
-}
-
-.block-menu-item:hover {
-  background-color: var(--toolbar-btn-hover, rgba(0,0,0,0.04));
-}
-
-.block-menu-item.active {
-  background-color: var(--accent, rgba(126,91,239,0.1));
-  color: var(--accent, #7e5bef);
 }
 
 .block-menu-divider {
@@ -112,13 +100,6 @@
   min-width: 210px;
 }
 
-.block-menu-item {
-  min-height: 34px;
-  padding: 6px 9px;
-  border-radius: 7px;
-  font-size: 11px;
-}
-
 .block-menu-label {
   padding: 7px 9px 4px;
   font-size: 9px;
@@ -134,23 +115,5 @@
 
 .block-menu .block-menu-item {
   width: 100%;
-  border: 0;
-  background: transparent;
   text-align: left;
-  font: inherit;
-}
-
-.block-menu .block-menu-item:focus-visible {
-  outline: 0;
-  background: var(--toolbar-btn-hover, rgba(0,0,0,.05));
-}
-
-.block-menu .block-menu-item.danger {
-  color: var(--red, #c7433c);
-}
-
-.block-menu .block-menu-item.danger:hover,
-.block-menu .block-menu-item.danger:focus-visible {
-  background: var(--red-light, rgba(199,67,60,.1));
-  color: var(--red, #c7433c);
 }

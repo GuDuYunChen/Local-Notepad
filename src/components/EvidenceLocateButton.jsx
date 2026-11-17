@@ -4,6 +4,8 @@ import { evidenceNavigation } from '~/services/evidenceNavigation'
 import { createTextEvidenceTarget, createWikiEvidenceTarget } from './Editor/utils/evidenceNavigationUtils'
 
 import './Editor/plugins/EvidenceNavigationPlugin.css'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 export default function EvidenceLocateButton({ chapterId, content, sample, noteId, occurrence = 0, onOpenFile, label }) {
   const locate = () => {
@@ -25,9 +27,9 @@ export default function EvidenceLocateButton({ chapterId, content, sample, noteI
     } catch { failed() }
   }
   return (
-    <button type="button" className="project-entity-evidence-locate"
+    <UiButton type="button" className="project-entity-evidence-locate"
       disabled={!chapterId || !onOpenFile || content == null} aria-label={label} onClick={locate}>
       定位此处
-    </button>
+    </UiButton>
   )
 }

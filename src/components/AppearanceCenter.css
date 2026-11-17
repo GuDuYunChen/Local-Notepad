@@ -1,10 +1,12 @@
 .appearance-overlay { position: fixed; inset: 0; z-index: 12000; display: grid; place-items: center; padding: 16px; background: rgba(10, 16, 24, .48); }
 .appearance-center { display: flex; flex-direction: column; width: min(840px, 100%); max-height: calc(100dvh - 32px); min-width: 0; border: 1px solid var(--line-strong); border-radius: 14px; background: var(--surface); color: var(--ink); box-shadow: var(--shadow-pop); font-size: 14px; line-height: 1.55; }
-.appearance-center button, .appearance-center input { font: inherit; }
-.appearance-center button { cursor: pointer; padding: 8px 12px; min-height: 36px; border: 1px solid var(--line-strong); border-radius: 7px; background: var(--surface); color: var(--ink); }
-.appearance-center button:hover:not(:disabled) { background: var(--clay-light); }
-.appearance-center button:disabled { opacity: .55; cursor: not-allowed; }
-.appearance-center :is(button, input):focus-visible { outline: 2px solid var(--clay); outline-offset: 2px; }
+.appearance-center button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.appearance-center input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { font: inherit; }
+.appearance-center button { cursor: pointer; }
+.appearance-center button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { padding: 8px 12px; min-height: 36px; border: 1px solid var(--line-strong); border-radius: 7px; background: var(--surface); color: var(--ink); }
+.appearance-center button:hover:not(:disabled):where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { background: var(--clay-light); }
+.appearance-center button:disabled:where(:not([data-ui-control], .ant-btn)) { opacity: .55; cursor: not-allowed; }
+.appearance-center :is(button, input):focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { outline: 2px solid var(--clay); outline-offset: 2px; }
 .appearance-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 20px 24px 16px; border-bottom: 1px solid var(--line); }
 .appearance-header h2 { margin: 0; font-size: 21px; font-weight: 650; }
 .appearance-header p { margin: 6px 0 0; color: var(--ink-soft); }
@@ -13,16 +15,21 @@
 .appearance-fields { border: 0; min-width: 0; padding: 0; margin: 0; }
 .appearance-fields legend { padding: 0; margin-bottom: 12px; font-weight: 600; }
 .appearance-schemes { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 10px; }
-.appearance-schemes button { display: flex; align-items: center; gap: 8px; text-align: left; min-width: 0; }
-.appearance-schemes button > span:not(.appearance-swatch) { overflow-wrap: anywhere; }
-.appearance-schemes button[aria-pressed="true"] { border-color: var(--clay); background: var(--clay-light); box-shadow: 0 0 0 1px var(--clay); }
-.appearance-schemes small { font-size: 12px; color: var(--ink-soft); margin-left: auto; white-space: nowrap; }
+.appearance-schemes button { display: flex; align-items: center; gap: 8px; text-align: left; min-width: 0; overflow: hidden; }
+/* Ant Design may wrap all children in .ant-btn-content. Both its wrapped and
+   unwrapped forms must keep a long custom scheme name inside the button. */
+.appearance-schemes button .ant-btn-content { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; max-width: 100%; overflow: hidden; }
+.appearance-schemes button > span:not(.appearance-swatch):not(.ant-btn-content),
+.appearance-schemes button .ant-btn-content > span:not(.appearance-swatch) { flex: 1 1 0; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.appearance-schemes button[aria-pressed="true"]:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { border-color: var(--clay); background: var(--clay-light); box-shadow: 0 0 0 1px var(--clay); }
+.appearance-schemes small { font-size: 12px; color: var(--ink-soft); flex: 0 0 auto; margin-left: auto; white-space: nowrap; }
 .appearance-swatch { width: 16px; height: 16px; border-radius: 50%; flex-shrink: 0; }
 .appearance-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 16px 0; }
 .appearance-tools > span { margin-left: auto; color: var(--ink-soft); }
 .appearance-edit { display: grid; grid-template-columns: 1.5fr 1fr 1fr; gap: 12px; }
 .appearance-edit label { display: flex; flex-direction: column; gap: 6px; min-width: 0; font-weight: 550; }
-.appearance-edit input { width: 100%; min-width: 0; box-sizing: border-box; padding: 9px; border: 1px solid var(--line-strong); border-radius: 7px; color: var(--ink); background: var(--paper); }
+.appearance-edit input { width: 100%; min-width: 0; box-sizing: border-box; }
+.appearance-edit input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { padding: 9px; border: 1px solid var(--line-strong); border-radius: 7px; color: var(--ink); background: var(--paper); }
 .appearance-hint { color: var(--ink-soft); font-size: 13px; margin: 12px 0 16px; }
 .appearance-examples { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .appearance-examples article { padding: 16px; border: 1px solid var(--line-strong); border-radius: 9px; overflow-wrap: anywhere; }
@@ -37,8 +44,6 @@
 .appearance-confirm button + button { margin-left: 8px; }
 .appearance-footer { border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 14px 24px; }
 .appearance-footer > span { margin-right: auto; color: var(--ink-soft); font-size: 13px; }
-.appearance-center .appearance-apply { background: var(--clay); color: var(--on-accent, #fff); border-color: var(--clay); }
-.appearance-center .appearance-apply:hover:not(:disabled) { background: var(--clay-hover); }
 @media (max-width: 600px) {
   .appearance-overlay { padding: 8px; }
   .appearance-center { max-height: calc(100dvh - 16px); }

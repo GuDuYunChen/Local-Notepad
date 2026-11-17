@@ -10,7 +10,7 @@
 .export-format { display: flex; flex-wrap: wrap; gap: 12px; border: 0; margin: 0 0 18px; padding: 0; min-width: 0; }
 .export-format legend { font-weight: 600; margin-bottom: 8px; font-size: 13px; }
 .export-format label { flex: 1 1 240px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; border: 1px solid var(--border-color, #d9dce3); border-radius: 10px; padding: 12px; font-size: 14px; cursor: pointer; }
-.export-format label:has(input:checked) { border-color: var(--clay, #7057d9); background: var(--clay-light, #f0ecff); }
+.export-format label:has(input:checked):where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { border-color: var(--clay, #7057d9); background: var(--clay-light, #f0ecff); }
 .export-format small { flex-basis: 100%; padding-left: 24px; color: var(--ink-soft, #626979); font-size: 12px; }
 .export-destination { border: 1px solid var(--border-color, #d9dce3); border-radius: 10px; padding: 14px; margin-bottom: 20px; }
 .export-destination > div { min-width: 0; }
@@ -41,7 +41,9 @@
 .export-workspace-notice .export-source { margin-top: 6px; }
 .export-workspace-footer { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 26px; border-top: 1px solid var(--border-color, #d9dce3); }
 .export-secondary-actions, .export-primary-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.export-workspace button:focus-visible, .export-workspace input:focus-visible, .export-workspace summary:focus-visible { outline: 2px solid var(--clay, #7057d9); outline-offset: 3px; }
+.export-workspace summary:focus-visible,
+.export-workspace button:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.export-workspace input:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { outline: 2px solid var(--clay, #7057d9); outline-offset: 3px; }
 @media (max-width: 620px), (max-height: 560px) {
   .export-workspace-overlay { padding: 8px; }
   .export-workspace { max-height: calc(100dvh - 16px); border-radius: 10px; }

@@ -12,6 +12,8 @@ import {
   getProjectRelationTypes,
 } from './projectRelationsUtils'
 import './ProjectRelationGraphPanel.css'
+import { UiButton, UiInput, UiSelect } from '~/components/ui/ControlKit'
+
 
 function typeLabel(types, value) {
   return types.find(item => item.id === value)?.label || value
@@ -326,14 +328,14 @@ export default function ProjectRelationGraphPanel({
       <div className="project-relation-controls">
         <div className="project-relation-search">
           <span aria-hidden="true">⌕</span>
-          <input
+          <UiInput size="middle"
             value={query}
             onChange={event => setQuery(event.target.value)}
             placeholder="搜索实体"
             aria-label="搜索实体关系图"
           />
         </div>
-        <select
+        <UiSelect size="middle"
           value={entityType}
           onChange={event => setEntityType(event.target.value)}
           aria-label="关系图实体类型筛选"
@@ -342,8 +344,8 @@ export default function ProjectRelationGraphPanel({
           {entityTypes.map(item => (
             <option key={item.id} value={item.id}>{item.label}</option>
           ))}
-        </select>
-        <select
+        </UiSelect>
+        <UiSelect size="middle"
           value={relationType}
           onChange={event => setRelationType(event.target.value)}
           aria-label="关系图关系类型筛选"
@@ -352,12 +354,12 @@ export default function ProjectRelationGraphPanel({
           {relationTypes.map(item => (
             <option key={item.id} value={item.id}>{item.label}</option>
           ))}
-        </select>
+        </UiSelect>
         <span className="project-relation-visible">
           {filtered.nodes.length} 节点 · {filtered.edges.length} 关系
         </span>
         {filterActive && (
-          <button
+          <UiButton size="middle"
             type="button"
             className="btn small"
             onClick={() => {
@@ -368,7 +370,7 @@ export default function ProjectRelationGraphPanel({
             }}
           >
             清除筛选
-          </button>
+          </UiButton>
         )}
       </div>
 
@@ -379,7 +381,7 @@ export default function ProjectRelationGraphPanel({
             <span>适合势力、器物、概念等不一定需要独立笔记的节点。</span>
           </header>
           <div>
-            <select
+            <UiSelect
               value={entityKind}
               onChange={event => setEntityKind(event.target.value)}
               aria-label="自定义实体类型"
@@ -387,26 +389,26 @@ export default function ProjectRelationGraphPanel({
               {entityTypes.map(item => (
                 <option key={item.id} value={item.id}>{item.label}</option>
               ))}
-            </select>
-            <input
+            </UiSelect>
+            <UiInput
               value={entityLabel}
               onChange={event => setEntityLabel(event.target.value)}
               placeholder="实体名称"
               aria-label="自定义实体名称"
             />
-            <input
+            <UiInput
               value={entityDescription}
               onChange={event => setEntityDescription(event.target.value)}
               placeholder="一句说明（可选）"
               aria-label="自定义实体说明"
             />
-            <button
+            <UiButton
               type="button"
               className="btn small primary"
               onClick={createEntity}
             >
               添加实体
-            </button>
+            </UiButton>
           </div>
         </article>
 
@@ -416,7 +418,7 @@ export default function ProjectRelationGraphPanel({
             <span>方向箭头从左侧实体指向右侧实体。</span>
           </header>
           <div>
-            <select
+            <UiSelect
               value={sourceId}
               onChange={event => setSourceId(event.target.value)}
               aria-label="关系源实体"
@@ -427,8 +429,8 @@ export default function ProjectRelationGraphPanel({
                   {node.label} · {typeLabel(entityTypes, node.type)}
                 </option>
               ))}
-            </select>
-            <select
+            </UiSelect>
+            <UiSelect
               value={newRelationType}
               onChange={event => {
                 const value = event.target.value
@@ -441,8 +443,8 @@ export default function ProjectRelationGraphPanel({
               {relationTypes.map(item => (
                 <option key={item.id} value={item.id}>{item.label}</option>
               ))}
-            </select>
-            <select
+            </UiSelect>
+            <UiSelect
               value={targetId}
               onChange={event => setTargetId(event.target.value)}
               aria-label="关系目标实体"
@@ -453,35 +455,35 @@ export default function ProjectRelationGraphPanel({
                   {node.label} · {typeLabel(entityTypes, node.type)}
                 </option>
               ))}
-            </select>
+            </UiSelect>
             <label className="project-relation-direction">
-              <input
+              <input data-ui-native="checkbox"
                 type="checkbox"
                 checked={relationDirected}
                 onChange={event => setRelationDirected(event.target.checked)}
               />
               <span>{relationDirected ? '有方向' : '双向'}</span>
             </label>
-            <input
+            <UiInput
               value={relationLabel}
               onChange={event => setRelationLabel(event.target.value)}
               placeholder={relationTypeConfig?.label || '关系标签'}
               aria-label="自定义关系标签"
             />
-            <input
+            <UiInput
               value={relationNote}
               onChange={event => setRelationNote(event.target.value)}
               placeholder="关系说明（可选）"
               aria-label="关系说明"
             />
-            <button
+            <UiButton
               type="button"
               className="btn small primary"
               onClick={createRelation}
               disabled={!graph.nodes.length}
             >
               添加关系
-            </button>
+            </UiButton>
           </div>
         </article>
       </div>
@@ -622,7 +624,7 @@ export default function ProjectRelationGraphPanel({
                   <strong>{selectedNode.label}</strong>
                   <small>{selectedNode.degree} 条关系</small>
                 </div>
-                <button
+                <UiButton
                   type="button"
                   className="btn small"
                   onClick={() => setFocusId(
@@ -630,7 +632,7 @@ export default function ProjectRelationGraphPanel({
                   )}
                 >
                   {focusId === selectedNode.id ? '显示全部' : '只看相邻'}
-                </button>
+                </UiButton>
               </header>
 
               {selectedNode.description && (
@@ -638,13 +640,13 @@ export default function ProjectRelationGraphPanel({
               )}
 
               {selectedNode.noteId && (
-                <button
+                <UiButton
                   type="button"
                   className="btn small"
                   onClick={() => onOpenFile?.(selectedNode.noteId)}
                 >
                   打开关联笔记
-                </button>
+                </UiButton>
               )}
 
               <div className="project-relation-neighbors">
@@ -655,7 +657,7 @@ export default function ProjectRelationGraphPanel({
                   const other = graph.nodeById.get(otherId)
                   if (!other) return null
                   return (
-                    <button
+                    <UiButton
                       key={edge.id}
                       type="button"
                       onClick={() => {
@@ -665,14 +667,14 @@ export default function ProjectRelationGraphPanel({
                     >
                       <span>{relationDisplayLabel(edge)}</span>
                       <strong>{other.label}</strong>
-                    </button>
+                    </UiButton>
                   )
                 })}
                 {!connectedRelations.length && <em>暂无关联实体</em>}
               </div>
 
               {selectedNode.source === 'custom' && (
-                <button
+                <UiButton
                   type="button"
                   className="btn small danger"
                   onClick={() => removeCustomEntity(selectedNode.id)}
@@ -680,7 +682,7 @@ export default function ProjectRelationGraphPanel({
                   {deleteConfirm === selectedNode.id
                     ? '确认删除实体及关系'
                     : '删除自定义实体'}
-                </button>
+                </UiButton>
               )}
             </>
           ) : selectedRelation ? (
@@ -709,7 +711,7 @@ export default function ProjectRelationGraphPanel({
               </div>
 
               <div className="project-relation-evolution-form">
-                <select
+                <UiSelect
                   value={evolutionChapterId}
                   onChange={event => setEvolutionChapterId(event.target.value)}
                   aria-label="关系变化章节"
@@ -720,8 +722,8 @@ export default function ProjectRelationGraphPanel({
                       #{chapter.ordinal} {chapter.title.replace(/\.[^.]+$/, '')}
                     </option>
                   ))}
-                </select>
-                <select
+                </UiSelect>
+                <UiSelect
                   value={evolutionEventType}
                   onChange={event => setEvolutionEventType(event.target.value)}
                   aria-label="关系变化类型"
@@ -729,8 +731,8 @@ export default function ProjectRelationGraphPanel({
                   {relationEventTypes.map(item => (
                     <option key={item.id} value={item.id}>{item.label}</option>
                   ))}
-                </select>
-                <select
+                </UiSelect>
+                <UiSelect
                   value={evolutionRelationType}
                   onChange={event => setEvolutionRelationType(event.target.value)}
                   aria-label="变化后的关系类型"
@@ -739,27 +741,27 @@ export default function ProjectRelationGraphPanel({
                   {relationTypes.map(item => (
                     <option key={item.id} value={item.id}>{item.label}</option>
                   ))}
-                </select>
-                <input
+                </UiSelect>
+                <UiInput
                   value={evolutionLabel}
                   onChange={event => setEvolutionLabel(event.target.value)}
                   placeholder="变化标签（可选）"
                   aria-label="关系变化标签"
                 />
-                <input
+                <UiInput
                   value={evolutionNote}
                   onChange={event => setEvolutionNote(event.target.value)}
                   placeholder="关系变化说明（可选）"
                   aria-label="关系变化说明"
                 />
-                <button
+                <UiButton
                   type="button"
                   className="btn small primary"
                   disabled={!evolutionChapterId}
                   onClick={addRelationEvolution}
                 >
                   记录关系变化
-                </button>
+                </UiButton>
               </div>
 
               <div className="project-relation-evolution-list">
@@ -768,7 +770,7 @@ export default function ProjectRelationGraphPanel({
                     key={event.id}
                     className={!event.chapter ? 'orphan' : ''}
                   >
-                    <button
+                    <UiButton
                       type="button"
                       disabled={!event.chapter}
                       onClick={() => event.chapter && onOpenFile?.(event.noteId)}
@@ -785,8 +787,8 @@ export default function ProjectRelationGraphPanel({
                         {event.label ? ' · ' + event.label : ''}
                       </small>
                       {event.note && <em>{event.note}</em>}
-                    </button>
-                    <button
+                    </UiButton>
+                    <UiButton
                       type="button"
                       className="remove"
                       onClick={() => removeRelationEvolution(
@@ -796,7 +798,7 @@ export default function ProjectRelationGraphPanel({
                       aria-label={'删除关系变化 ' + event.eventLabel}
                     >
                       ×
-                    </button>
+                    </UiButton>
                   </div>
                 ))}
                 {!selectedRelation.events?.length && (
@@ -804,13 +806,13 @@ export default function ProjectRelationGraphPanel({
                 )}
               </div>
 
-              <button
+              <UiButton
                 type="button"
                 className="btn small danger"
                 onClick={() => removeRelation(selectedRelation.id)}
               >
                 删除关系
-              </button>
+              </UiButton>
             </>
           ) : (
             <div className="project-relation-detail-empty">
@@ -841,7 +843,7 @@ export default function ProjectRelationGraphPanel({
               .filter(chapter => chapter.events.length > 0)
               .map(chapter => (
                 <article key={chapter.id}>
-                  <button
+                  <UiButton
                     type="button"
                     className="project-relation-timeline-chapter"
                     onClick={() => onOpenFile?.(chapter.id)}
@@ -849,10 +851,10 @@ export default function ProjectRelationGraphPanel({
                     <b>#{chapter.ordinal}</b>
                     <strong>{chapter.title.replace(/\.[^.]+$/, '')}</strong>
                     <span>{chapter.events.length} 项关系变化</span>
-                  </button>
+                  </UiButton>
                   <div>
                     {chapter.events.map(event => (
-                      <button
+                      <UiButton
                         key={event.eventId}
                         type="button"
                         onClick={() => {
@@ -870,7 +872,7 @@ export default function ProjectRelationGraphPanel({
                           {event.resultingTypeLabel}
                           {event.note ? ' · ' + event.note : ''}
                         </small>
-                      </button>
+                      </UiButton>
                     ))}
                   </div>
                 </article>

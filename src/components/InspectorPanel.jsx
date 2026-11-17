@@ -6,6 +6,8 @@ import VersionHistory from './VersionHistory'
 import TagSelector from './TagSelector'
 import { toast } from '~/services/toast'
 import { rememberReference } from './Editor/utils/referenceUtils'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 function formatUpdated(ts) {
   if (!ts) return '—'
@@ -130,11 +132,11 @@ export default function InspectorPanel({
           <div className="inspector-eyebrow">笔记详情</div>
           <div className="inspector-title" title={file.title}>{file.title || '未命名'}</div>
         </div>
-        <button className="icon-btn" onClick={onClose} title="关闭详情" aria-label="关闭详情">×</button>
+        <UiButton className="icon-btn" onClick={onClose} title="关闭详情" aria-label="关闭详情">×</UiButton>
       </div>
 
       <div className="inspector-quick-actions">
-        <button
+        <UiButton size="middle"
           type="button"
           className={`inspector-action-btn${file.is_pinned ? ' active' : ''}`}
           onClick={() => void togglePinned()}
@@ -142,20 +144,20 @@ export default function InspectorPanel({
         >
           <span aria-hidden="true">{file.is_pinned ? '★' : '☆'}</span>
           {pinBusy ? '处理中…' : file.is_pinned ? '取消置顶' : '置顶'}
-        </button>
-        <button
+        </UiButton>
+        <UiButton size="middle"
           type="button"
           className="inspector-action-btn"
           onClick={() => void copyWikiReference()}
         >
           <span aria-hidden="true">[[]]</span>
           复制 Wiki 引用
-        </button>
+        </UiButton>
       </div>
 
       <div className="inspector-tabs" role="tablist" aria-label="笔记信息">
         {tabs.map(([id, label], index) => (
-          <button
+          <UiButton
             key={id}
             id={`inspector-tab-${id}`}
             className={`inspector-tab${activeTab === id ? ' active' : ''}`}
@@ -167,7 +169,7 @@ export default function InspectorPanel({
             tabIndex={activeTab === id ? 0 : -1}
           >
             {label}
-          </button>
+          </UiButton>
         ))}
       </div>
 

@@ -13,6 +13,8 @@ import {
   getProjectStorylineTypes,
 } from './projectStorylineUtils'
 import './ProjectStructurePanel.css'
+import { UiButton, UiInput, UiSelect } from '~/components/ui/ControlKit'
+
 
 function stripExtension(value) {
   return String(value || '未命名').replace(/\.[^.]+$/, '')
@@ -324,21 +326,21 @@ export default function ProjectStructurePanel({
           </span>
         </div>
         <div>
-          <button
+          <UiButton
             type="button"
             className="btn small"
             onClick={() => onNavigateView?.('project')}
           >
             返回项目看板
-          </button>
-          <button
+          </UiButton>
+          <UiButton
             type="button"
             className={'btn small' + (detailMode ? ' active' : '')}
             aria-pressed={detailMode}
             onClick={() => setDetailMode(value => !value)}
           >
             {detailMode ? '精简节点' : '显示摘要'}
-          </button>
+          </UiButton>
         </div>
       </header>
 
@@ -388,7 +390,7 @@ export default function ProjectStructurePanel({
       <section className="project-structure-controls" aria-label="结构图筛选">
         <div className="project-structure-search">
           <span aria-hidden="true">⌕</span>
-          <input
+          <UiInput size="middle"
             type="search"
             value={query}
             onChange={event => setQuery(event.target.value)}
@@ -397,7 +399,7 @@ export default function ProjectStructurePanel({
           />
         </div>
 
-        <select
+        <UiSelect size="middle"
           value={status}
           onChange={event => setStatus(event.target.value)}
           aria-label="故事地图状态筛选"
@@ -406,9 +408,9 @@ export default function ProjectStructurePanel({
           <option value="draft">草稿</option>
           <option value="review">修订</option>
           <option value="done">完成</option>
-        </select>
+        </UiSelect>
 
-        <select
+        <UiSelect size="middle"
           value={marker}
           onChange={event => setMarker(event.target.value)}
           aria-label="故事地图索引筛选"
@@ -417,7 +419,7 @@ export default function ProjectStructurePanel({
           <option value="characters">人物</option>
           <option value="locations">地点</option>
           <option value="foreshadows">伏笔</option>
-        </select>
+        </UiSelect>
 
         <div className="project-structure-filter-summary">
           <strong>{visibleCount}</strong>
@@ -425,7 +427,7 @@ export default function ProjectStructurePanel({
         </div>
 
         {filterActive && (
-          <button
+          <UiButton size="middle"
             type="button"
             className="btn small"
             onClick={() => {
@@ -435,7 +437,7 @@ export default function ProjectStructurePanel({
             }}
           >
             清除筛选
-          </button>
+          </UiButton>
         )}
       </section>
 
@@ -470,7 +472,7 @@ export default function ProjectStructurePanel({
         </header>
 
         <div className="project-storyline-create">
-          <select
+          <UiSelect
             value={storylineType}
             onChange={event => {
               setStorylineType(event.target.value)
@@ -481,10 +483,10 @@ export default function ProjectStructurePanel({
             {storylineTypes.map(item => (
               <option key={item.id} value={item.id}>{item.label}</option>
             ))}
-          </select>
+          </UiSelect>
 
           {(storylineType === 'character' || storylineType === 'foreshadow') && (
-            <select
+            <UiSelect
               value={storylineSource}
               onChange={event => {
                 const value = event.target.value
@@ -504,28 +506,28 @@ export default function ProjectStructurePanel({
                   {stripExtension(item.title)}
                 </option>
               ))}
-            </select>
+            </UiSelect>
           )}
 
-          <input
+          <UiInput
             value={storylineTitle}
             onChange={event => setStorylineTitle(event.target.value)}
             placeholder="轨迹名称"
             aria-label="轨迹名称"
           />
-          <button
+          <UiButton
             type="button"
             className="btn small primary"
             onClick={createStoryline}
           >
             新建轨迹
-          </button>
+          </UiButton>
         </div>
 
         <div className="project-storyline-workspace">
           <aside className="project-storyline-list">
             {storylineModel.tracks.map(track => (
-              <button
+              <UiButton
                 key={track.id}
                 type="button"
                 className={
@@ -547,7 +549,7 @@ export default function ProjectStructurePanel({
                       ? '进行中'
                       : '未开始'}
                 </small>
-              </button>
+              </UiButton>
             ))}
             {!storylineModel.tracks.length && (
               <div className="project-storyline-empty">
@@ -578,7 +580,7 @@ export default function ProjectStructurePanel({
                 <div className="project-storyline-fields">
                   <label>
                     <span>名称</span>
-                    <input
+                    <UiInput
                       value={selectedTrack.title}
                       onChange={event => updateTrack({
                         title: event.target.value,
@@ -588,7 +590,7 @@ export default function ProjectStructurePanel({
                   </label>
                   <label className="wide">
                     <span>轨迹说明</span>
-                    <input
+                    <UiInput
                       value={selectedTrack.description}
                       onChange={event => updateTrack({
                         description: event.target.value,
@@ -598,15 +600,15 @@ export default function ProjectStructurePanel({
                     />
                   </label>
                   {selectedTrack.sourceNoteId && (
-                    <button
+                    <UiButton
                       type="button"
                       className="btn small"
                       onClick={() => onOpenFile?.(selectedTrack.sourceNoteId)}
                     >
                       打开关联索引
-                    </button>
+                    </UiButton>
                   )}
-                  <button
+                  <UiButton
                     type="button"
                     className="btn small danger"
                     onClick={deleteSelectedTrack}
@@ -614,11 +616,11 @@ export default function ProjectStructurePanel({
                     {deleteConfirmId === selectedTrack.id
                       ? '确认删除'
                       : '删除轨迹'}
-                  </button>
+                  </UiButton>
                 </div>
 
                 <div className="project-storyline-event-form">
-                  <select
+                  <UiSelect
                     value={eventChapterId}
                     onChange={event => setEventChapterId(event.target.value)}
                     aria-label="轨迹节点章节"
@@ -629,8 +631,8 @@ export default function ProjectStructurePanel({
                         #{chapter.ordinal} {stripExtension(chapter.title)}
                       </option>
                     ))}
-                  </select>
-                  <select
+                  </UiSelect>
+                  <UiSelect
                     value={eventStage}
                     onChange={event => setEventStage(event.target.value)}
                     aria-label="轨迹生命周期阶段"
@@ -640,21 +642,21 @@ export default function ProjectStructurePanel({
                         {stage.label}
                       </option>
                     ))}
-                  </select>
-                  <input
+                  </UiSelect>
+                  <UiInput
                     value={eventNote}
                     onChange={event => setEventNote(event.target.value)}
                     placeholder="节点说明（可选）"
                     aria-label="轨迹节点说明"
                   />
-                  <button
+                  <UiButton
                     type="button"
                     className="btn small primary"
                     disabled={!eventChapterId}
                     onClick={addTrackEvent}
                   >
                     添加节点
-                  </button>
+                  </UiButton>
                 </div>
               </>
             ) : (
@@ -686,7 +688,7 @@ export default function ProjectStructurePanel({
                       key={event.id}
                       className={'project-storyline-event' + (!event.chapter ? ' orphan' : '')}
                     >
-                      <button
+                      <UiButton
                         type="button"
                         disabled={!event.chapter}
                         onClick={() => event.chapter && onOpenFile?.(event.noteId)}
@@ -699,16 +701,16 @@ export default function ProjectStructurePanel({
                             : '原章节已不存在'}
                         </em>
                         {event.note && <small>{event.note}</small>}
-                      </button>
+                      </UiButton>
                       {selectedTrackId === track.id && (
-                        <button
+                        <UiButton
                           type="button"
                           className="remove"
                           onClick={() => removeTrackEvent(track.id, event.id)}
                           aria-label={'删除轨迹节点 ' + event.stageLabel}
                         >
                           ×
-                        </button>
+                        </UiButton>
                       )}
                     </span>
                   ))}
@@ -790,13 +792,13 @@ export default function ProjectStructurePanel({
                     className={'project-storyline-matrix-row type-' + track.type}
                     style={{ '--story-volume-count': Math.max(1, (workspace.volumes || []).length) }}
                   >
-                    <button
+                    <UiButton
                       type="button"
                       onClick={() => setSelectedTrackId(track.id)}
                       title={track.title}
                     >
                       {track.title}
-                    </button>
+                    </UiButton>
                     {(workspace.volumes || []).map(volume => {
                       const key = String(volume.id || '__ungrouped__')
                       const cell = track.byVolume[key] || { count: 0, stages: [] }
@@ -822,7 +824,7 @@ export default function ProjectStructurePanel({
               </header>
               <div className="project-storyline-rhythm-list">
                 {storylineDiagnostics.tracks.map(track => (
-                  <button
+                  <UiButton
                     key={track.id}
                     type="button"
                     onClick={() => setSelectedTrackId(track.id)}
@@ -848,7 +850,7 @@ export default function ProjectStructurePanel({
                             ? '尚未收束'
                             : '节奏连续'}
                     </em>
-                  </button>
+                  </UiButton>
                 ))}
               </div>
             </article>
@@ -860,7 +862,7 @@ export default function ProjectStructurePanel({
               </header>
               <div className="project-storyline-stage-list">
                 {storylineDiagnostics.tracks.map(track => (
-                  <button
+                  <UiButton
                     key={track.id}
                     type="button"
                     onClick={() => setSelectedTrackId(track.id)}
@@ -871,7 +873,7 @@ export default function ProjectStructurePanel({
                         ? track.missingStages.join(' · ')
                         : '阶段已覆盖'}
                     </span>
-                  </button>
+                  </UiButton>
                 ))}
               </div>
             </article>
@@ -884,7 +886,7 @@ export default function ProjectStructurePanel({
                 {storylineDiagnostics.chapterLoad
                   .filter(item => item.intersection)
                   .map(item => (
-                    <button
+                    <UiButton
                       key={item.id}
                       type="button"
                       className={item.overloaded ? 'overloaded' : ''}
@@ -893,7 +895,7 @@ export default function ProjectStructurePanel({
                       <b>#{item.ordinal}</b>
                       <span>{stripExtension(item.title)}</span>
                       <em>{item.trackCount} 条轨迹 / {item.eventCount} 节点</em>
-                    </button>
+                    </UiButton>
                   ))}
               </div>
             </div>
@@ -946,9 +948,10 @@ export default function ProjectStructurePanel({
 
               <div className="project-story-track">
                 {volume.chapters.map(chapter => (
-                  <button
+                  <UiButton
                     key={chapter.id}
                     type="button"
+                    layout="content"
                     className={
                       'project-story-node status-' + chapter.status +
                       ' word-' + chapter.wordBand +
@@ -1011,7 +1014,7 @@ export default function ProjectStructurePanel({
                         )}
                       </span>
                     )}
-                  </button>
+                  </UiButton>
                 ))}
 
                 {!volume.chapters.length && (
@@ -1036,14 +1039,14 @@ export default function ProjectStructurePanel({
             </header>
             <div>
               {group.items.slice(0, 10).map(item => (
-                <button
+                <UiButton
                   key={item.id}
                   type="button"
                   onClick={() => onOpenFile?.(item.id)}
                   title={stripExtension(item.title)}
                 >
                   {stripExtension(item.title)}
-                </button>
+                </UiButton>
               ))}
               {!group.items.length && <em>暂无索引项</em>}
               {group.items.length > 10 && (

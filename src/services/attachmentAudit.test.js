@@ -14,6 +14,29 @@ describe('bounded read-only attachment inspection',()=>{
  it('filters/sorts in one frozen result and limits selection arguments',()=>{const s=validateAttachmentAudit(fixture(60));expect(auditItems(s,{filter:'missing'})).toHaveLength(15);expect(auditItems(s,{query:'ASSET-001'}).map(i=>i.state)).toEqual(['missing']);expect(auditItems(s,{sort:'size'})[0].bytes).toBe(20);expect(()=>auditItems(s,{filter:'delete'})).toThrow();expect(()=>auditItems(s,{query:'a'.repeat(129)})).toThrow()})
  it('exports aggregate data by default, not names, titles, paths or query text',()=>{const f=fixture();const r=attachmentAuditReport(f,{query:'asset',filter:'all'});expect(r).not.toContain('来源笔记');expect(r).not.toContain('asset-000');const out=JSON.parse(r);expect(out.items).toBeUndefined();expect(out.notes).toBeUndefined();expect(out.selection.query).toBe('');expect(out.selection.query_omitted).toBe(true);expect(out.contains_details).toBe(false);expect(out.limitations).toContain('unreferenced does not mean safe to delete')})
  it('exports only explicitly selected details and related note metadata',()=>{const r=JSON.parse(attachmentAuditReport(fixture(),{filter:'missing'},true));expect(r.items).toHaveLength(1);expect(r.notes).toHaveLength(3);expect(r.contains_details).toBe(true);expect(r.items[0].state).toBe('missing');expect(r.notes.every(n=>!Object.hasOwn(n,'content'))).toBe(true)})
- it('uses one GET, refuses cancelled and timed-out late data',async()=>{const load=vi.fn(async()=>fixture());expect((await readAttachmentAudit(load)).complete).toBe(true);expect(load).toHaveBeenCalledWith('/api/attachment-audit',expect.objectContaining({signal:expect.any(AbortSignal)}));const ctl=new AbortController();ctl.abort();await expect(readAttachmentAudit(load,ctl.signal)).rejects.toThrow();vi.useFakeTimers();let finish;const p=readAttachmentAudit(()=>new Promise(r=>{finish=r}),undefined,50);const rejection=expect(p).rejects.toThrow();await vi.advanceTimersByTimeAsync(51);await rejection;finish(fixture())})
+ it('uses one GET, refuses cancelled and timed-out late data',async()=>{
+  const load=vi.fn(async()=>fixture());
+  expect((await readAttachmentAudit(load)).complete).toBe(true);
+  expect(load).toHaveBeenCalledWith('/api/attachment-audit',expect.objectContaining({signal:expect.any(AbortSignal)}));
+  const ctl=new AbortController();ctl.abort();
+  await expect(readAttachmentAudit(load,ctl.signal)).rejects.toThrow();
+  expect(load).toHaveBeenCalledTimes(1);
+  // Keep the request deadline and scheduled timeout on the same virtual clock.
+  vi.useFakeTimers({toFake:['setTimeout','clearTimeout','setInterval','clearInterval','setImmediate','clearImmediate','Date','performance']});
+  let finish,entered;
+  const sent=new Promise(resolve=>{entered=resolve});
+  const deferred=vi.fn(()=>new Promise(resolve=>{finish=resolve;entered()}));
+  const p=readAttachmentAudit(deferred,undefined,50);
+  const rejection=expect(p).rejects.toThrow();
+  await Promise.race([sent,p]);
+  expect(deferred).toHaveBeenCalledTimes(1);
+  expect(typeof finish).toBe('function');
+  await vi.advanceTimersByTimeAsync(51);
+  await rejection;
+  expect(deferred.mock.calls[0][1].signal.aborted).toBe(true);
+  finish(fixture());
+  await expect(p).rejects.toMatchObject({code:'timeout'});
+  expect(deferred).toHaveBeenCalledTimes(1);
+ })
  it('cleans both anchor and object URL even when download dispatch throws',()=>{vi.useFakeTimers();const revoke=vi.fn();vi.stubGlobal('URL',{createObjectURL:()=> 'blob:audit',revokeObjectURL:revoke});vi.spyOn(HTMLAnchorElement.prototype,'click').mockImplementation(()=>{throw Error('denied')});expect(()=>downloadAttachmentAudit(fixture(),{})).toThrow('denied');expect(document.querySelector('a[download]')).toBeNull();vi.advanceTimersByTime(1000);expect(revoke).toHaveBeenCalledWith('blob:audit')})
 })

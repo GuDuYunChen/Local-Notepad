@@ -1,5 +1,7 @@
 import TemplateLibrary from './TemplateLibrary'
 import React, { useEffect, useState } from 'react'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 const TEMPLATES = [
   {
@@ -157,15 +159,16 @@ export default function TemplateSelector({ open, onClose, onSelect, onCreated, b
             <h2 id="template-title">从哪里开始？</h2>
             <p>直接空白开始，或者先套一个轻量结构，之后都可以自由修改。</p>
           </div>
-          <button type="button" className="icon-btn" onClick={onClose} aria-label="关闭" title="关闭">×</button>
+          <UiButton type="button" className="icon-btn" onClick={onClose} aria-label="关闭" title="关闭">×</UiButton>
         </header>
 
-        <button type="button" className="btn" onClick={() => { setSeed(null); setLibraryOpen(true) }}>管理我的模板</button>
+        <UiButton type="button" className="btn" onClick={() => { setSeed(null); setLibraryOpen(true) }}>管理我的模板</UiButton>
         <div className="template-grid">
           {TEMPLATES.map((template, index) => (
-            <button
+            <UiButton
               key={template.id}
               type="button"
+              layout="content"
               className={`template-card${index === 0 ? ' primary-template' : ''}`}
               onClick={() => choose(template)}
             >
@@ -189,7 +192,7 @@ export default function TemplateSelector({ open, onClose, onSelect, onCreated, b
               </span>
 
               <span className="template-card-arrow" aria-hidden="true">→</span>
-            </button>
+            </UiButton>
           ))}
         </div>
       </section>

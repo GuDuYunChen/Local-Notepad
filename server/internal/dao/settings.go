@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"notepad-server/internal/model"
 )
@@ -54,19 +55,51 @@ func (d *SettingsDAO) Get(ctx context.Context) (*model.Settings, error) {
 	return &s, nil
 }
 
-func (d *SettingsDAO) Update(ctx context.Context, s *model.Settings) error {
-	editorJSON, err := json.Marshal(s.EditorOpts)
-	if err != nil {
-		return fmt.Errorf("序列化 editor_opts 失败: %w", err)
+func (d *SettingsDAO) Update(ctx context.Context, s *model.Settings, patch *model.SettingsPatch) error {
+	var columns []string
+	var values []interface{}
+	set := func(column string, value interface{}) {
+		columns = append(columns, column+" = ?")
+		values = append(values, value)
 	}
-
-	_, err = d.DB.ExecContext(ctx,
-		`UPDATE settings
-		 SET theme = ?, editor_opts = ?, sync_enabled = ?, sync_endpoint = ?, sync_provider = ?,
-		     sync_username = ?, sync_password = ?, sync_auto_enabled = ?, sync_interval_minutes = ?
-		 WHERE id = 1`,
-		s.Theme, string(editorJSON), s.SyncEnabled, s.SyncEndpoint, s.SyncProvider, s.SyncUsername, s.SyncPassword,
-		s.SyncAutoEnabled, s.SyncIntervalMinutes)
+	// Presence comes from the validated request (and explicit derived changes).
+	// Do not serialize normalized read defaults into unrelated stored columns.
+	if patch.Theme != nil {
+		set("theme", s.Theme)
+	}
+	if patch.EditorOpts != nil {
+		editorJSON, err := json.Marshal(s.EditorOpts)
+		if err != nil {
+			return fmt.Errorf("序列化 editor_opts 失败: %w", err)
+		}
+		set("editor_opts", string(editorJSON))
+	}
+	if patch.SyncEnabled != nil {
+		set("sync_enabled", s.SyncEnabled)
+	}
+	if patch.SyncEndpoint != nil {
+		set("sync_endpoint", s.SyncEndpoint)
+	}
+	if patch.SyncProvider != nil {
+		set("sync_provider", s.SyncProvider)
+	}
+	if patch.SyncUsername != nil {
+		set("sync_username", s.SyncUsername)
+	}
+	if patch.SyncPassword != nil {
+		set("sync_password", s.SyncPassword)
+	}
+	if patch.SyncAutoEnabled != nil {
+		set("sync_auto_enabled", s.SyncAutoEnabled)
+	}
+	if patch.SyncIntervalMinutes != nil {
+		set("sync_interval_minutes", s.SyncIntervalMinutes)
+	}
+	if len(columns) == 0 {
+		return nil
+	}
+	_, err := d.DB.ExecContext(ctx,
+		"UPDATE settings SET "+strings.Join(columns, ", ")+" WHERE id = 1", values...)
 	return err
 }
 

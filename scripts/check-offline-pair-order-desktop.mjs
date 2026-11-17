@@ -3,10 +3,12 @@ import assert from 'node:assert/strict'
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { createHash } from 'node:crypto'
+import { createNativeUiSelect } from './native-ui-select.mjs'
 
-// Real file inputs, native keyboard and downloads in the existing isolated app.
+// Real file inputs, native control input and downloads in the existing isolated app.
 // Restore the prior statistics before returning to the older acceptance chain.
 export async function verifyOfflinePairOrderDesktop({ evaluate, click, cdp, until, api, out, noteIDs, metrics }) {
+  const select = createNativeUiSelect({ evaluate, click, cdp, until })
   const before = await Promise.all(noteIDs.map(id => api('/api/files/' + id)))
   const hash = bytes => createHash('sha256').update(bytes).digest('hex')
   const keys = ['records','recordBytes','attachmentBytes','baseItems','file:records','file:bytes','tag:records','tag:bytes','file-tag:records','file-tag:bytes','attachment:records','attachment:bytes']
@@ -31,26 +33,20 @@ export async function verifyOfflinePairOrderDesktop({ evaluate, click, cdp, unti
     assert.ok(input.nodeId);await cdp.send('DOM.setFileInputFiles',{nodeId:input.nodeId,files:[path.join(out,filename)]})
     await until(()=>evaluate(`document.querySelector('[data-offline-side="${side}"] [data-offline-state]').dataset.offlineState==='ready'`),'Order report did not become ready')
   }
-  const select=async(selector,index,value)=>{
-    await evaluate(`document.querySelector('${selector}').focus()`)
-    for(const key of ['Home',...Array(index).fill('ArrowDown'),'Enter'])for(const type of ['keyDown','keyUp'])
-      await cdp.send('Input.dispatchKeyEvent',{type,key,code:key,windowsVirtualKeyCode:{Home:36,ArrowDown:40,Enter:13}[key]})
-    await until(()=>evaluate(`document.querySelector('${selector}').value==='${value}'`),'Order native selector did not update')
-  }
   const snapshot=()=>evaluate("[...document.querySelectorAll('[data-offline-result] tbody tr')].map(r=>({key:r.dataset.offlineMetric,a:Number(r.cells[1].textContent),b:Number(r.cells[2].textContent),delta:Number(r.cells[3].textContent),unit:r.cells[4].textContent}))")
   const overview=()=>evaluate("document.querySelector('[data-offline-summary]').textContent")
   await choose('a',inputs[0].filename);await choose('b',inputs[1].filename);await click('[data-offline-compare]')
   assert.deepEqual(await snapshot(),expected);const completeOverview=await overview()
   await click('[data-offline-differences]');assert.equal(await evaluate("!!document.querySelector('[data-offline-order]')"),false)
-  await select('[data-offline-scope]',1,'counts');await select('[data-offline-order]',1,'largest')
+  await select.choose('[data-offline-scope]','counts');await select.choose('[data-offline-order]','largest')
   const largest=['tag:records','file:records','records'].map(key=>expected.find(row=>row.key===key))
   assert.deepEqual(await snapshot(),largest)
-  await select('[data-offline-order]',2,'smallest');assert.deepEqual((await snapshot()).map(r=>r.delta),[2,-9,11])
-  await select('[data-offline-order]',1,'largest');await select('[data-offline-direction]',1,'increase')
-  assert.deepEqual((await snapshot()).map(r=>r.delta),[11,2]);await select('[data-offline-scope]',2,'bytes')
-  assert.equal(await evaluate("document.querySelector('[data-offline-order]').value"),'original')
-  await select('[data-offline-order]',1,'largest');assert.deepEqual((await snapshot()).map(r=>r.delta),[704,128])
-  await select('[data-offline-direction]',0,'all');assert.deepEqual((await snapshot()).map(r=>r.delta),[704,-576,128])
+  await select.choose('[data-offline-order]','smallest');assert.deepEqual((await snapshot()).map(r=>r.delta),[2,-9,11])
+  await select.choose('[data-offline-order]','largest');await select.choose('[data-offline-direction]','increase')
+  assert.deepEqual((await snapshot()).map(r=>r.delta),[11,2]);await select.choose('[data-offline-scope]','bytes')
+  assert.equal(await select.value('[data-offline-order]'),'original')
+  await select.choose('[data-offline-order]','largest');assert.deepEqual((await snapshot()).map(r=>r.delta),[704,128])
+  await select.choose('[data-offline-direction]','all');assert.deepEqual((await snapshot()).map(r=>r.delta),[704,-576,128])
   assert.equal(await overview(),completeOverview)
   const directory=path.join(out,'offline-order-exports');mkdirSync(directory,{recursive:true});assert.equal(readdirSync(directory).length,0)
   await cdp.send('Browser.setDownloadBehavior',{behavior:'allow',downloadPath:directory})
@@ -70,8 +66,8 @@ export async function verifyOfflinePairOrderDesktop({ evaluate, click, cdp, unti
   await evaluate("document.querySelector('[data-offline-filter]').scrollIntoView({block:'center'});new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))")
   const png=Buffer.from((await cdp.send('Page.captureScreenshot',{format:'png'})).data,'base64');writeFileSync(path.join(out,'offline-order.png'),png)
   await click('[data-offline-differences]');assert.deepEqual(await snapshot(),expected)
-  await click('[data-offline-differences]');await select('[data-offline-scope]',1,'counts');assert.equal(await evaluate("document.querySelector('[data-offline-order]').value"),'original')
-  await select('[data-offline-order]',1,'largest');await click('[data-offline-swap]');assert.equal(await evaluate("!!document.querySelector('[data-offline-order]')"),false)
+  await click('[data-offline-differences]');await select.choose('[data-offline-scope]','counts');assert.equal(await select.value('[data-offline-order]'),'original')
+  await select.choose('[data-offline-order]','largest');await click('[data-offline-swap]');assert.equal(await evaluate("!!document.querySelector('[data-offline-order]')"),false)
   await click('[data-offline-compare]');assert.deepEqual(await snapshot(),expected.map(r=>({...r,a:r.b,b:r.a,delta:-r.delta||0})))
   await choose('a',inputs[2].filename);await choose('b',inputs[3].filename);await click('[data-offline-compare]');assert.deepEqual(await snapshot(),metrics.map(project))
   assert.deepEqual(await Promise.all(noteIDs.map(id=>api('/api/files/'+id))),before)

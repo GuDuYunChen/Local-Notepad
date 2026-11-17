@@ -5,6 +5,8 @@ import { readQuickResults, readQuickTarget, QUICK_RESULT_LIMIT } from '../servic
 import './QuickSwitcher.css'
 import useLocalShortcuts from '../hooks/useLocalShortcuts'
 import { shortcutLabel } from '../services/localShortcuts'
+import { UiButton, UiInput } from '~/components/ui/ControlKit'
+
 
 export function buildHighlightSegments(text, query) {
   const source = String(text || '')
@@ -201,30 +203,30 @@ export default function QuickSwitcher({ open, onClose, onSelectFile, onOpenSearc
     onMouseDown={e => { if (e.target === e.currentTarget) close() }}>
     <section ref={panelRef} className="quick-switcher" role="dialog" aria-modal="true" aria-label="快速搜索笔记">
       <div className="quick-switcher-search">
-        <input ref={inputRef} value={query} disabled={!!opening} placeholder="搜索标题或正文…" aria-label="搜索标题或正文" role="combobox"
+        <UiInput ref={inputRef} value={query} disabled={!!opening} placeholder="搜索标题或正文…" aria-label="搜索标题或正文" role="combobox"
           aria-controls="quick-switcher-results" aria-expanded={status === 'ready' && visibleResults.length > 0} aria-autocomplete="list"
           aria-activedescendant={status === 'ready' && visibleResults[activeIndex] ? `quick-result-${visibleResults[activeIndex].id}` : undefined}
           onChange={e => edit(e.target.value)} onKeyDown={keys}
           onCompositionStart={() => { composing.current = true; cancelReading(); setResults([]); setStatus('loading') }}
           onCompositionEnd={e => { composing.current = false; edit(e.currentTarget.value, true) }} />
-        <kbd>{shortcutLabel('quickSwitch', shortcutBindings)}</kbd><button type="button" className="btn small" aria-label="关闭快速搜索" onClick={close}>关闭</button>
+        <kbd>{shortcutLabel('quickSwitch', shortcutBindings)}</kbd><UiButton type="button" className="btn small" aria-label="关闭快速搜索" onClick={close}>关闭</UiButton>
       </div>
       <div className="quick-switcher-meta" role="status"><span>{applied.trim() ? '搜索结果' : '最近修改 · 置顶优先'}</span><span>{status === 'loading' ? '搜索中…' : status === 'error' ? '读取失败' : `${visibleResults.length} 项`}</span></div>
       {notice && <div className="quick-switcher-notice" role="status">{notice}</div>}
       {error && <div className="quick-switcher-notice" role="alert"><strong>{status === 'error' ? '快速搜索未完成' : '笔记未打开'}</strong><p>{error}</p>
-        <button type="button" className="btn small" disabled={!!opening} onClick={() => { cancelReading(); setRetry(v => v + 1); setNotice('') }}>{status === 'error' ? '重试快速搜索' : '刷新快速结果'}</button></div>}
-      {opening === 'reading' && <button className="btn small quick-switcher-stop" type="button" onClick={() => { cancelOpening(); setOpening(''); setNotice('已停止打开，未切换笔记。'); window.setTimeout(() => { if (alive.current && !choosing.current) inputRef.current?.focus() }, 0) }}>停止打开</button>}
+        <UiButton type="button" className="btn small" disabled={!!opening} onClick={() => { cancelReading(); setRetry(v => v + 1); setNotice('') }}>{status === 'error' ? '重试快速搜索' : '刷新快速结果'}</UiButton></div>}
+      {opening === 'reading' && <UiButton className="btn small quick-switcher-stop" type="button" onClick={() => { cancelOpening(); setOpening(''); setNotice('已停止打开，未切换笔记。'); window.setTimeout(() => { if (alive.current && !choosing.current) inputRef.current?.focus() }, 0) }}>停止打开</UiButton>}
       <div id="quick-switcher-results" ref={resultsRef} className="quick-switcher-results" role="listbox" aria-label="搜索结果" aria-busy={status === 'loading'}>
         {status === 'ready' && !visibleResults.length && <div className="quick-switcher-empty"><strong>{applied.trim() ? '没有找到匹配的笔记' : '还没有可打开的笔记'}</strong><span>{applied.trim() ? '换一个关键词，或进入完整检索。' : '创建笔记后可在这里查找和打开。'}</span></div>}
-        {visibleResults.map((file, index) => <button type="button" tabIndex={-1} disabled={status !== 'ready' || !!opening} id={`quick-result-${file.id}`} data-result-index={index} key={file.id}
+        {visibleResults.map((file, index) => <UiButton type="button" tabIndex={-1} disabled={status !== 'ready' || !!opening} id={`quick-result-${file.id}`} data-result-index={index} key={file.id}
           className={`quick-switcher-result${index === activeIndex ? ' active' : ''}`} onMouseEnter={() => setActiveIndex(index)} onClick={() => void choose(file)} role="option" aria-selected={index === activeIndex}>
           <span className="quick-switcher-result-main"><span className="quick-switcher-result-title-row"><span className="quick-switcher-result-title">{file.is_pinned ? <span aria-label="已置顶">★</span> : null}<HighlightMatch text={file.title} query={applied} /></span>
             <span className="quick-switcher-match-badge">{{title:'标题命中',content:'正文命中',pinned:'已置顶',recent:'最近修改'}[getSearchMatchScope(file, applied)] || '匹配结果'}</span></span>
             <span className="quick-switcher-result-preview"><HighlightMatch text={buildPreview(file.content, applied)} query={applied} /></span></span>
           <span className="quick-switcher-result-time">{formatRelativeTime(file.updated_at)}</span>
-        </button>)}
+        </UiButton>)}
       </div>
-      <div className="quick-switcher-meta">{onOpenSearchWorkspace && <button type="button" className="btn small" disabled={!!opening || composing.current} onClick={() => { accepted.current = true; cancelReading(); latest.current.onOpenSearchWorkspace(query) }}>完整检索与筛选</button>}<span>快速结果最多展示 20 项{!applied.trim() ? '，最近候选最多 200 条' : ''}</span></div>
+      <div className="quick-switcher-meta">{onOpenSearchWorkspace && <UiButton type="button" className="btn small" disabled={!!opening || composing.current} onClick={() => { accepted.current = true; cancelReading(); latest.current.onOpenSearchWorkspace(query) }}>完整检索与筛选</UiButton>}<span>快速结果最多展示 20 项{!applied.trim() ? '，最近候选最多 200 条' : ''}</span></div>
       <footer className="quick-switcher-footer"><span><kbd>↑</kbd><kbd>↓</kbd> 选择</span><span><kbd>Enter</kbd> 打开</span><span><kbd>Esc</kbd> 关闭</span></footer>
     </section>
   </div>

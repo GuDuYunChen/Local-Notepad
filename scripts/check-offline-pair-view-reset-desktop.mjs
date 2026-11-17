@@ -3,10 +3,12 @@ import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { createHash } from 'node:crypto'
 import { verifyOfflinePairDownloadInvariance } from './offline-pair-download-evidence.mjs'
+import { createNativeUiSelect } from './native-ui-select.mjs'
 
 // Exercise the existing packaged application, native keyboard and real downloads.
 // No replacement of readers, comparison functions, click handlers or note APIs.
 export async function verifyOfflinePairViewResetDesktop({ evaluate, click, cdp, until, api, out, noteIDs }) {
+  const select = createNativeUiSelect({ evaluate, click, cdp, until })
   const hash = raw => createHash('sha256').update(raw).digest('hex')
   const before = await Promise.all(noteIDs.map(id => api('/api/files/' + id)))
   const snapshot = () => evaluate("[...document.querySelectorAll('[data-offline-result] tbody tr')].map(r=>({key:r.dataset.offlineMetric,label:r.cells[0].textContent,a:Number(r.cells[1].textContent),b:Number(r.cells[2].textContent),delta:Number(r.cells[3].textContent),unit:r.cells[4].textContent}))")
@@ -14,14 +16,8 @@ export async function verifyOfflinePairViewResetDesktop({ evaluate, click, cdp, 
   const overview = () => evaluate("document.querySelector('[data-offline-summary]').textContent")
   const original = await snapshot(), originalSides = await sides(), originalOverview = await overview()
   assert.equal(original.length,12)
-  const select = async (selector,index,value) => {
-    await evaluate(`document.querySelector('${selector}').focus()`)
-    for (const key of ['Home',...Array(index).fill('ArrowDown'),'Enter']) for (const type of ['keyDown','keyUp'])
-      await cdp.send('Input.dispatchKeyEvent',{type,key,code:key,windowsVirtualKeyCode:{Home:36,ArrowDown:40,Enter:13}[key]})
-    await until(()=>evaluate(`document.querySelector('${selector}').value==='${value}'`),'View recovery selector did not update')
-  }
-  await click('[data-offline-differences]');await select('[data-offline-scope]',1,'counts')
-  await select('[data-offline-order]',1,'largest');await select('[data-offline-direction]',2,'decrease')
+  await click('[data-offline-differences]');await select.choose('[data-offline-scope]','counts')
+  await select.choose('[data-offline-order]','largest');await select.choose('[data-offline-direction]','decrease')
   const filtered = await snapshot()
   assert.deepEqual(filtered,original.filter(r=>r.unit==='项'&&r.delta<0).sort((a,b)=>Math.abs(b.delta)-Math.abs(a.delta)))
   assert.match(await evaluate("document.querySelector('[data-offline-view-description]').textContent"),/仅数量（项） · 仅减少 · 幅度从大到小/)
@@ -57,12 +53,12 @@ export async function verifyOfflinePairViewResetDesktop({ evaluate, click, cdp, 
   const downloadInvariance=verifyOfflinePairDownloadInvariance(withBytes(filteredFiles),withBytes(restoredFiles),original)
   const exported=JSON.parse(readFileSync(path.join(out,restoredFiles[0].filename),'utf8'))
   assert.deepEqual(exported.metrics,original)
-  await click('[data-offline-differences]');assert.equal(await evaluate("document.querySelector('[data-offline-scope]').value"),'all')
-  assert.equal(await evaluate("document.querySelector('[data-offline-direction]').value"),'all')
-  await select('[data-offline-scope]',1,'counts');assert.equal(await evaluate("document.querySelector('[data-offline-order]').value"),'original')
+  await click('[data-offline-differences]');assert.equal(await select.value('[data-offline-scope]'),'all')
+  assert.equal(await select.value('[data-offline-direction]'),'all')
+  await select.choose('[data-offline-scope]','counts');assert.equal(await select.value('[data-offline-order]'),'original')
   // The inherited restored fixture has no positive quantity deltas.
   assert.equal(original.filter(r=>r.unit==='项'&&r.delta>0).length,0)
-  await select('[data-offline-direction]',1,'increase');assert.equal((await snapshot()).length,0)
+  await select.choose('[data-offline-direction]','increase');assert.equal((await snapshot()).length,0)
   assert.match(await evaluate("document.querySelector('[data-offline-no-differences]').textContent"),/恢复完整视图/)
   await click('[data-offline-view-reset]');assert.deepEqual(await snapshot(),original)
   await evaluate("document.querySelector('[data-offline-view-description]').scrollIntoView({block:'center'});new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))")

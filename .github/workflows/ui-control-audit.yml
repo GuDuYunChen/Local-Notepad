@@ -1,0 +1,39 @@
+name: UI control source inventory
+on:
+  push:
+    branches: [fix/local-ui-consistency-2f116]
+    paths:
+      - .github/workflows/ui-control-audit.yml
+      - scripts/audit-ui-controls.mjs
+      - scripts/audit-ui-controls.test.mjs
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ui-control-source-inventory-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - name: Install the committed dependency lock without adding a UI library
+        run: npm ci --no-audit --no-fund
+      - name: Verify manifest and lock are unchanged
+        run: git diff --exit-code -- package.json package-lock.json
+      - name: Test the source inventory tool (not product regression)
+        run: node --test scripts/audit-ui-controls.test.mjs
+      - name: Inventory every tracked production source file
+        run: node scripts/audit-ui-controls.mjs
+      - name: Preserve source inventory (not UI acceptance)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-control-source-inventory-${{ github.sha }}
+          path: test-results/ui-control-audit/
+          retention-days: 30
+          if-no-files-found: warn

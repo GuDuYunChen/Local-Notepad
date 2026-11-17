@@ -3,6 +3,8 @@ import { api } from '~/services/api'
 import { readBlockReference } from '../../../services/blockReferences.mjs'
 import { readWikiPreview } from '../../../services/wikiNavigation.mjs'
 import { normalizeSectionPath, formatSectionPath } from '../utils/referenceUtils.js'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 export default function WikiLinkView({ id, title, sectionPath = [], blockId = '' }) {
   const path = normalizeSectionPath(sectionPath)
@@ -14,7 +16,7 @@ function Preview({ id, title, path, blockId }) {
   const [preview, setPreview] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const alive = useRef(false), timer = useRef(null), owner = useRef(null)
+  const alive = useRef(false), timer = useRef(null), owner = useRef(null), linkElement = useRef(null)
   useEffect(() => {
     alive.current = true
     return () => { alive.current = false; clearTimeout(timer.current); owner.current?.abort() }
@@ -37,9 +39,23 @@ function Preview({ id, title, path, blockId }) {
     clearTimeout(timer.current)
     timer.current = setTimeout(() => { if (alive.current) { setOpen(true); void load() } }, 220)
   }
+  // Keyboard focus must reveal the preview before the first native Tab.
+  // Mouse hover retains its 220ms delay. A pending mouse-leave hide is
+  // cancelled so the focused link cannot re-enter Lexical's Tab indent path.
+  const showFocused = () => {
+    clearTimeout(timer.current)
+    if (alive.current && !open) { setOpen(true); void load() }
+  }
   const hide = () => {
     clearTimeout(timer.current)
-    timer.current = setTimeout(() => { if (alive.current) { setOpen(false); owner.current?.abort() } }, 100)
+    timer.current = setTimeout(() => {
+      // Pointer exit alone must not hide the preview while keyboard focus
+      // remains on the Wiki link or one of its controls. That would reopen
+      // Lexical's Tab-indentation path mid-traversal.
+      if (alive.current && !linkElement.current?.contains(document.activeElement)) {
+        setOpen(false); owner.current?.abort()
+      }
+    }, 100)
   }
   const controls = event => event.target?.closest?.('[data-wiki-control]')
   const navigate = event => {
@@ -49,13 +65,28 @@ function Preview({ id, title, path, blockId }) {
     window.dispatchEvent(new CustomEvent('wikiLink:open', { detail: { id, title, headingPath: path, ...(blockId ? { blockId } : {}) } }))
   }
   const section = formatSectionPath(path)
-  return <span className={'wiki-link' + (error ? ' broken' : preview?.titleChanged || preview?.sectionMissing ? ' stale' : '')}
+  // A nested control inside Lexical's contentEditable host is otherwise
+  // excluded from Chromium's native Tab order. Keep this decorated reference
+  // non-editable, without changing the surrounding editor's text behavior.
+  return <span contentEditable={false} ref={linkElement} className={'wiki-link' + (error ? ' broken' : preview?.titleChanged || preview?.sectionMissing ? ' stale' : '')}
     data-wiki-target-id={typeof id === 'string' ? id : undefined}
     role="link" tabIndex={0} title={section ? '打开：' + title + ' › ' + section : '打开笔记：' + title}
-    onMouseEnter={show} onMouseLeave={hide} onFocus={event => { if (event.target === event.currentTarget) show() }}
+    onMouseEnter={show} onMouseLeave={hide} onFocus={event => { if (event.target === event.currentTarget) showFocused() }}
     onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) hide() }}
     onMouseDown={event => { if (!controls(event)) event.preventDefault() }} onClick={navigate}
-    onKeyDown={event => { if (event.target === event.currentTarget && !event.nativeEvent.isComposing && event.keyCode !== 229 && ['Enter', ' '].includes(event.key)) navigate(event) }}>
+    onKeyDownCapture={event => {
+      // Lexical listens for native keydown on the editable host, before React's
+      // delegated bubble handler runs. Intercept only open-preview Tab (and
+      // its nested control) during capture so Lexical cannot indent or swallow
+      // the browser's native Tab/Shift+Tab focus movement.
+      // Never preventDefault, synthesize focus, or alter closed-link Tab.
+      if (event.key === 'Tab' && (controls(event) || (open && event.target === event.currentTarget))) {
+        event.stopPropagation()
+      }
+    }}
+    onKeyDown={event => {
+      if (event.target === event.currentTarget && !event.nativeEvent.isComposing && event.keyCode !== 229 && ['Enter', ' '].includes(event.key)) navigate(event)
+    }}>
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 4h10l2 2v14H6z" /><path d="M9 9h6M9 13h6M9 17h4" /></svg>
     <span>{preview?.title || title}</span>
     {blockId && <small className="wiki-link-section">› 块</small>}
@@ -67,8 +98,8 @@ function Preview({ id, title, path, blockId }) {
       {preview?.titleChanged && <span className="wiki-link-preview-health">当前标题：{preview.title}</span>}
       {preview?.sectionMissing && <span className="wiki-link-preview-health">{preview.sectionState === 'ambiguous' ? '同名章节不唯一，打开前将拒绝猜测定位。' : '章节已改名或移除，可在“引用”面板核对。'}</span>}
       <span className={'wiki-link-preview-excerpt' + (error ? ' unavailable' : '')} role={error ? 'alert' : 'status'}>{loading ? '正在读取预览…' : error || preview?.excerpt}</span>
-      {!loading && <span className="wiki-link-preview-footer"><span>{preview ? preview.backlinkCount === null ? '反向链接暂不可用' : `${preview.backlinkCount} 个已索引反向链接` : '重试不会修改正文'}</span>
-        <button type="button" data-wiki-control="true" className="btn small" onClick={event => { event.preventDefault(); event.stopPropagation(); void load() }}>{error ? '重试预览' : '刷新预览'}</button></span>}
+      <span className="wiki-link-preview-footer"><span>{loading ? '正在读取预览…' : preview ? preview.backlinkCount === null ? '反向链接暂不可用' : `${preview.backlinkCount} 个已索引反向链接` : '重试不会修改正文'}</span>
+        <UiButton density="compact" type="button" data-wiki-control="true" className="btn small" onClick={event => { event.preventDefault(); event.stopPropagation(); void load() }}>{error ? '重试预览' : '刷新预览'}</UiButton></span>
     </span>}
   </span>
 }

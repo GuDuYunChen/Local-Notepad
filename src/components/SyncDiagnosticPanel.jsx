@@ -1,6 +1,8 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { captureSyncDiagnostic, syncDiagnosticFacts, copySyncDiagnostic } from '~/services/syncDiagnostic.mjs'
 import './SyncDiagnosticPanel.css'
+import { UiButton, UiTextarea } from '~/components/ui/ControlKit'
+
 
 // The only side effect here is the user's explicit copy of the visible text.
 // No refresh/run/resolve callback is supplied; a report cannot authorize sync.
@@ -34,17 +36,17 @@ export default function SyncDiagnosticPanel(props) {
   }
   return <section className="sync-diagnostic-panel" aria-label="同步诊断摘要">
     <div className="sync-diagnostic-heading"><h4>同步诊断摘要</h4>
-      <button ref={opener} type="button" className="btn small" onClick={generate}>{snapshot ? '重新生成摘要' : '生成诊断摘要'}</button>
+      <UiButton ref={opener} type="button" className="btn small" onClick={generate}>{snapshot ? '重新生成摘要' : '生成诊断摘要'}</UiButton>
     </div>
     <p className="sync-diagnostic-caption">用于手动排障和分享，不含正文、名称、账号、地址、凭据或错误原文。不自动上传，生成摘要也不会重新读取或执行同步。</p>
     {snapshot && <>
       <p className="sync-diagnostic-caption">复制的是下方这份快照。它仍含计数和时间，请先核对再分享；不是匿名或实时状态保证。</p>
       {changed && <p className="sync-diagnostic-notice" role="status">可见诊断字段已变化。下面保留原摘要，请重新生成后再分享；恢复原值不会自动更新旧摘要。</p>}
-      <textarea ref={area} aria-label="可复制的诊断摘要" readOnly spellCheck={false} value={snapshot.text}/>
+      <UiTextarea ref={area} aria-label="可复制的诊断摘要" readOnly spellCheck={false} value={snapshot.text}/>
       <div className="sync-diagnostic-actions">
-        <button type="button" className="btn small" disabled={copying} onClick={() => void copy()}>{copying ? '等待复制结果…' : '复制诊断摘要'}</button>
-        <button type="button" className="btn small" onClick={() => { area.current?.focus(); area.current?.select() }}>选择摘要</button>
-        <button type="button" className="btn small" onClick={close}>收起诊断摘要</button>
+        <UiButton size="middle" type="button" className="btn small" disabled={copying} onClick={() => void copy()}>{copying ? '等待复制结果…' : '复制诊断摘要'}</UiButton>
+        <UiButton size="middle" type="button" className="btn small" onClick={() => { area.current?.focus(); area.current?.select() }}>选择摘要</UiButton>
+        <UiButton size="middle" type="button" className="btn small" onClick={close}>收起诊断摘要</UiButton>
       </div>
       {message && <p className="sync-diagnostic-notice" role="status">{message}</p>}
     </>}

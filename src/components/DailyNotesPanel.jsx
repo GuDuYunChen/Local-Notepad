@@ -3,6 +3,8 @@ import { api } from '~/services/api'
 import ConfirmDialog from './ConfirmDialog'
 import { createDailyWorkspace, dailyCalendar, dailyDate, dailyDateKey, moveDailyMonth, readDailyIndex, validDailyDate } from '../services/dailyNotes.mjs'
 import './DailyNotesPanel.css'
+import { UiButton, UiInput } from '~/components/ui/ControlKit'
+
 
 const sharedDailyWorkspace = createDailyWorkspace(api)
 const PAGE_SIZE = 14
@@ -88,54 +90,54 @@ export default function DailyNotesPanel({ onSelectFile, onClose, session = share
     <header className="daily-notes-header daily-workspace-toolbar">
       <div className="daily-workspace-heading"><strong>每日笔记</strong><span>{monthLabel}</span></div>
       <div className="daily-notes-header-actions">
-        <button type="button" className="btn small" disabled={busy || !previousMonth} aria-label="上个月" onClick={() => choose(previousMonth)}>‹</button>
-        <button type="button" className="btn small daily-today-btn" disabled={busy} onClick={() => choose(dailyDateKey())}>今天</button>
-        <button type="button" className="btn small" disabled={busy || !nextMonth} aria-label="下个月" onClick={() => choose(nextMonth)}>›</button>
-        <button type="button" className="btn small close-panel-btn" onClick={close} title="返回笔记" aria-label="返回笔记">×</button>
+        <UiButton size="middle" type="button" className="btn small" disabled={busy || !previousMonth} aria-label="上个月" onClick={() => choose(previousMonth)}>‹</UiButton>
+        <UiButton size="middle" type="button" className="btn small daily-today-btn" disabled={busy} onClick={() => choose(dailyDateKey())}>今天</UiButton>
+        <UiButton size="middle" type="button" className="btn small" disabled={busy || !nextMonth} aria-label="下个月" onClick={() => choose(nextMonth)}>›</UiButton>
+        <UiButton size="middle" type="button" className="btn small close-panel-btn" onClick={close} title="返回笔记" aria-label="返回笔记">×</UiButton>
       </div>
     </header>
     <div className="daily-workspace-body">
       <section className="calendar-card">
         <div className="daily-section-heading"><div><strong>选择日期</strong><span>已有记录直接打开；点击空日期创建一份根目录每日笔记。</span></div></div>
-        <div className="daily-jump"><label>跳转日期<input type="date" aria-label="跳转日期" min="0001-01-01" max="9999-12-31" value={jump} disabled={busy} onChange={event => setJump(event.target.value)} /></label>
-          <button type="button" className="btn small" disabled={busy} onClick={jumpToDate}>查看日期</button></div>
+        <div className="daily-jump"><label>跳转日期<UiInput size="middle" type="date" aria-label="跳转日期" min="0001-01-01" max="9999-12-31" value={jump} disabled={busy} onChange={event => setJump(event.target.value)} /></label>
+          <UiButton size="middle" type="button" className="btn" disabled={busy} onClick={jumpToDate}>查看日期</UiButton></div>
         {problem && <div className="daily-feedback error" role="alert">{problem}</div>}
         {operation.message && <div className={'daily-feedback ' + operation.kind} role={['error', 'uncertain'].includes(operation.kind) ? 'alert' : 'status'}>
           <p>{operation.message}</p>
-          {busy && <button type="button" className="btn small" onClick={() => session.cancel()}>停止等待</button>}
+          {busy && <UiButton type="button" className="btn small" onClick={() => session.cancel()}>停止等待</UiButton>}
           {!busy && operation.date && ['error', 'uncertain', 'empty', 'stopped'].includes(operation.kind) &&
-            <button type="button" className="btn small" onClick={() => void open(operation.date, { inspectOnly: true })}>核对并打开记录</button>}
-          {!busy && operation.kind === 'uncertain' && <button type="button" className="btn small" onClick={() => setConfirm(operation.date)}>重新创建该日记录…</button>}
+            <UiButton type="button" className="btn small" onClick={() => void open(operation.date, { inspectOnly: true })}>核对并打开记录</UiButton>}
+          {!busy && operation.kind === 'uncertain' && <UiButton type="button" className="btn small" onClick={() => setConfirm(operation.date)}>重新创建该日记录…</UiButton>}
         </div>}
         {operation.uncertain.length > 0 && <details className="daily-unconfirmed"><summary>待核对日期（{operation.uncertain.length}）</summary>
-          {operation.uncertain.map(date => <button type="button" className="btn small" key={date} disabled={busy} onClick={() => void open(date, { inspectOnly: true })}>{date}</button>)}
+          {operation.uncertain.map(date => <UiButton type="button" className="btn small" key={date} disabled={busy} onClick={() => void open(date, { inspectOnly: true })}>{date}</UiButton>)}
           <p>这是本次应用会话的未确认创建记录；核对只读取，不重新创建。</p></details>}
         <div className="calendar-grid" aria-label={monthLabel}>
           {['日', '一', '二', '三', '四', '五', '六'].map(day => <div key={day} className="calendar-weekday">{day}</div>)}
-          {days.map((day, index) => day ? <button type="button" key={day.key}
+          {days.map((day, index) => day ? <UiButton type="button" key={day.key}
             className={`calendar-day${day.key === selectedDate ? ' selected' : ''}${day.key === today ? ' today' : ''}${noteDates.has(day.key) ? ' has-note' : ''}`}
             disabled={busy || loadState !== 'ready'} aria-current={day.key === today ? 'date' : undefined} aria-pressed={day.key === selectedDate}
             aria-label={`${day.key}${conflicts.has(day.key) ? ' 日期冲突' : noteDates.has(day.key) ? ' 已有笔记' : ' 创建每日笔记'}`}
-            onClick={() => void open(day.key)}><span>{day.date}</span>{noteDates.has(day.key) && <span className="calendar-note-dot" aria-hidden="true" />}</button>
+            onClick={() => void open(day.key)}><span>{day.date}</span>{noteDates.has(day.key) && <span className="calendar-note-dot" aria-hidden="true" />}</UiButton>
             : <div key={'empty-' + index} className="calendar-day empty" aria-hidden="true" />)}
         </div>
         <p className="daily-scope">按本机日期记录；仅将根目录中标题为有效 YYYY-MM-DD 的笔记列为每日笔记。子文件夹里的同名笔记不会被误打开或覆盖。</p>
       </section>
       <section className="daily-recent-card">
         <div className="daily-notes-list-header"><div><strong>最近记录</strong><span>打开后沿用编辑器原有的保存、草稿和退出保护。</span></div>
-          <button type="button" className="icon-btn" onClick={() => void refresh()} disabled={busy || loadState === 'loading'} title="刷新" aria-label="刷新">↻</button></div>
-        <label className="daily-search">查找日期<input aria-label="查找每日笔记" value={search} placeholder="例如 2026-10" disabled={busy}
+          <UiButton type="button" className="icon-btn" onClick={() => void refresh()} disabled={busy || loadState === 'loading'} title="刷新" aria-label="刷新">↻</UiButton></div>
+        <label className="daily-search">查找日期<UiInput aria-label="查找每日笔记" value={search} placeholder="例如 2026-10" disabled={busy}
           onCompositionStart={() => { composing.current = true }} onCompositionEnd={event => { composing.current = false; setQuery(event.currentTarget.value); setPage(1) }}
           onChange={event => { setSearch(event.target.value); if (!composing.current) { setQuery(event.target.value); setPage(1) } }} /></label>
         {loadState === 'loading' ? <div className="placeholder" role="status">加载中…</div> : loadState === 'error' ?
-          <div className="daily-feedback error"><strong>列表尚未读取成功</strong><p>当前没有可用于判断存在与否的列表。</p><button type="button" className="btn" onClick={() => void refresh()}>重试读取每日笔记</button></div> :
+          <div className="daily-feedback error"><strong>列表尚未读取成功</strong><p>当前没有可用于判断存在与否的列表。</p><UiButton type="button" className="btn" onClick={() => void refresh()}>重试读取每日笔记</UiButton></div> :
           index.notes.length === 0 ? <div className="empty-state daily-empty-state"><div className="empty-title">还没有每日笔记</div><div className="empty-desc">从日历选择一天开始记录；不会自动创建今日笔记。</div></div> :
-            filtered.length === 0 ? <div className="empty-state"><p>没有匹配日期的记录。</p><button type="button" className="btn" onClick={() => { setSearch(''); setQuery(''); setPage(1) }}>清除查找</button></div> : <>
-              <ul className="daily-recent-list">{notes.map(note => <li key={note.id}><button type="button" className="daily-note-item" disabled={busy} onClick={() => void open(note.title, { inspectOnly: true })}>
+            filtered.length === 0 ? <div className="empty-state"><p>没有匹配日期的记录。</p><UiButton type="button" className="btn" onClick={() => { setSearch(''); setQuery(''); setPage(1) }}>清除查找</UiButton></div> : <>
+              <ul className="daily-recent-list">{notes.map(note => <li key={note.id}><UiButton type="button" className="daily-note-item" disabled={busy} onClick={() => void open(note.title, { inspectOnly: true })}>
                 <span className="daily-note-date"><strong>{dateLabel(note.title)}</strong><small>{conflicts.has(note.title) ? '需要处理同名冲突' : '已有记录'}</small></span><span className="daily-note-title">{note.title}</span>
-              </button></li>)}</ul>
-              <nav className="daily-pagination" aria-label="每日笔记分页"><button type="button" className="btn small" disabled={busy || currentPage === 1} onClick={() => setPage(currentPage - 1)}>上一页</button>
-                <span>{currentPage} / {pages} · 共 {filtered.length} 条</span><button type="button" className="btn small" disabled={busy || currentPage === pages} onClick={() => setPage(currentPage + 1)}>下一页</button></nav>
+              </UiButton></li>)}</ul>
+              <nav className="daily-pagination" aria-label="每日笔记分页"><UiButton type="button" className="btn small" disabled={busy || currentPage === 1} onClick={() => setPage(currentPage - 1)}>上一页</UiButton>
+                <span>{currentPage} / {pages} · 共 {filtered.length} 条</span><UiButton type="button" className="btn small" disabled={busy || currentPage === pages} onClick={() => setPage(currentPage + 1)}>下一页</UiButton></nav>
             </>}
       </section>
     </div>

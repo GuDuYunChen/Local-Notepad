@@ -3,35 +3,29 @@ import assert from 'node:assert/strict'
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { createHash } from 'node:crypto'
+import { createNativeUiSelect } from './native-ui-select.mjs'
 
-// Extend the original isolated packaged-app test. Native keyboard selection,
+// Extend the original isolated packaged-app test. Native control input,
 // real production comparison and actual downloads; no replaced renderer or I/O.
 export async function verifyOfflinePairScopeDesktop({ evaluate, click, cdp, until, api, out, noteIDs, metrics }) {
+  const select = createNativeUiSelect({ evaluate, click, cdp, until })
   const before = await Promise.all(noteIDs.map(id => api('/api/files/' + id)))
   const overview = () => evaluate("document.querySelector('[data-offline-summary]').textContent")
   const originalOverview = await overview()
   const snapshot = () => evaluate("[...document.querySelectorAll('[data-offline-result] tbody tr')].map(r=>({key:r.dataset.offlineMetric,a:Number(r.cells[1].textContent),b:Number(r.cells[2].textContent),delta:Number(r.cells[3].textContent),unit:r.cells[4].textContent}))")
   const project = row => ({ key: row.key, a: row.a, b: row.b, delta: row.delta, unit: row.unit })
-  const select = async (selector, index, value) => {
-    await evaluate(`document.querySelector('${selector}').focus()`)
-    for (const key of ['Home', ...Array(index).fill('ArrowDown'), 'Enter']) {
-      await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key, code: key, windowsVirtualKeyCode: { Home: 36, ArrowDown: 40, Enter: 13 }[key] })
-      await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key, code: key, windowsVirtualKeyCode: { Home: 36, ArrowDown: 40, Enter: 13 }[key] })
-    }
-    await until(() => evaluate(`document.querySelector('${selector}').value==='${value}'`), 'Native selector did not update: ' + selector)
-  }
   assert.equal(await evaluate("document.querySelector('[data-offline-differences]').checked"), false)
   await click('[data-offline-differences]')
-  await select('[data-offline-scope]', 1, 'counts')
+  await select.choose('[data-offline-scope]', 'counts')
   const quantity = metrics.filter(row => row.delta !== 0 && row.unit === '项').map(project)
   assert.deepEqual(await snapshot(), quantity); assert.equal(quantity.length, 2)
-  await select('[data-offline-scope]', 2, 'bytes')
+  await select.choose('[data-offline-scope]', 'bytes')
   assert.deepEqual(await snapshot(), metrics.filter(row => row.delta !== 0 && row.unit === 'B').map(project))
-  await select('[data-offline-direction]', 1, 'increase')
+  await select.choose('[data-offline-direction]', 'increase')
   assert.deepEqual(await snapshot(), metrics.filter(row => row.delta > 0 && row.unit === 'B').map(project))
   assert.match(await evaluate("document.querySelector('[data-offline-no-differences]').textContent"), /不代表两份报告相同/)
-  await select('[data-offline-direction]', 2, 'decrease')
-  await select('[data-offline-scope]', 1, 'counts')
+  await select.choose('[data-offline-direction]', 'decrease')
+  await select.choose('[data-offline-scope]', 'counts')
   assert.deepEqual(await snapshot(), quantity); assert.equal(await overview(), originalOverview)
   const directory = path.join(out, 'offline-scope-exports'); mkdirSync(directory, { recursive: true })
   assert.equal(readdirSync(directory).length, 0)
@@ -57,8 +51,8 @@ export async function verifyOfflinePairScopeDesktop({ evaluate, click, cdp, unti
   const png = Buffer.from((await cdp.send('Page.captureScreenshot', { format: 'png' })).data, 'base64')
   writeFileSync(path.join(out, 'offline-scope.png'), png)
   await click('[data-offline-differences]'); assert.equal((await snapshot()).length, 12)
-  await click('[data-offline-differences]'); assert.equal(await evaluate("document.querySelector('[data-offline-scope]').value"), 'all')
-  await select('[data-offline-scope]', 2, 'bytes'); await click('[data-offline-swap]')
+  await click('[data-offline-differences]'); assert.equal(await select.value('[data-offline-scope]'), 'all')
+  await select.choose('[data-offline-scope]', 'bytes'); await click('[data-offline-swap]')
   assert.equal(await evaluate("!!document.querySelector('[data-offline-scope]')"), false)
   await click('[data-offline-compare]'); assert.equal((await snapshot()).length, 12)
   await click('[data-offline-swap]'); await click('[data-offline-compare]')

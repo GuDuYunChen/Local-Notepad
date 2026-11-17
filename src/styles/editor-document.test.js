@@ -8,6 +8,20 @@ function read(path) {
 }
 
 describe('editor document presentation', () => {
+  it('paints the portalled Markdown source discard dialog above its source overlay', () => {
+    const css = read(['src', 'components', 'Editor', 'Editor.css'])
+    const sourceOverlay = css.match(/\.markdown-source-overlay\s*\{[^}]*z-index:\s*(\d+)/s)
+    const confirmation = css.match(/body:has\(\.markdown-source-overlay\)\s*>\s*\.consumer-modal-overlay\s*\{[^}]*z-index:\s*(\d+)/s)
+    expect(sourceOverlay).not.toBeNull()
+    expect(confirmation).not.toBeNull()
+    expect(Number(confirmation[1])).toBeGreaterThan(Number(sourceOverlay[1]))
+    const source = read(['src', 'components', 'Editor', 'plugins', 'MarkdownSourcePlugin.jsx'])
+    expect(source).toContain('closeReview && createPortal(<ConfirmDialog')
+    expect(source).toContain('document.body)')
+    expect(read(['src', 'components', 'ConfirmDialog.jsx'])).toContain('modal-overlay consumer-modal-overlay')
+  })
+
+
   it('loads the document visual layer after the global redesign', () => {
     const main = read(['src', 'main.jsx'])
     const redesign = main.indexOf("import './styles/redesign.css'")
@@ -135,4 +149,26 @@ describe('editor document presentation', () => {
     expect(css).toContain('box-shadow: none !important')
     expect(css).toContain('.focus-session-active .editor-input')
   })
+
+  it('keeps the selected image toolbar within a narrow image stage without removing actions', () => {
+    const css = read(['src', 'components', 'Editor', 'Editor.css'])
+    const toolbar = css.match(/\.editor-image-toolbar\s*\{([^}]+)\}/)?.[1]
+    const group = css.match(/\.editor-image-toolbar-group\s*\{([^}]+)\}/)?.[1]
+    expect(toolbar).toBeDefined()
+    expect(toolbar).toMatch(/\bwidth:\s*max-content\s*;/)
+    expect(toolbar).toMatch(/\bmax-width:\s*100%\s*;/)
+    expect(toolbar).toMatch(/\bbox-sizing:\s*border-box\s*;/)
+    expect(toolbar).toMatch(/\bflex-wrap:\s*wrap\s*;/)
+    expect(toolbar).toMatch(/\bjustify-content:\s*center\s*;/)
+    expect(group).toBeDefined()
+    expect(group).toMatch(/\bflex-wrap:\s*wrap\s*;/)
+    expect(group).toMatch(/\bmin-width:\s*0\s*;/)
+
+    const source = read(['src', 'components', 'Editor', 'nodes', 'ImageNode.jsx'])
+    expect(source).toContain("maxWidth: '100%'")
+    for (const action of ['图片尺寸', '图片对齐', '替换', '下载', '删除']) {
+      expect(source).toContain(action)
+    }
+  })
+
 })

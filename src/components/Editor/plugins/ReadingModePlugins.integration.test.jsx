@@ -184,6 +184,21 @@ test('a Wiki insertion click already queued at the mode boundary cannot rewrite 
   expect(snapshot()).toBe(before)
 })
 
+test('an editable link dialog has a native keyboard stop before its URL field without changing text', async () => {
+  await mount(() => $createParagraphNode().append($createLinkNode('https://example.test/original').append($createTextNode('read this link'))))
+  await click(host.querySelector('a.editor-link'))
+  const before = snapshot()
+  const dialog = host.querySelector('.editor-link-popover[role="dialog"][aria-label="链接操作"]')
+  const address = dialog?.querySelector('input[aria-label="链接地址"]')
+  expect(dialog).toBeTruthy()
+  expect(address).toBeTruthy()
+  expect(dialog.tabIndex).toBe(0)
+  const order = [dialog, ...dialog.querySelectorAll('input, button, [tabindex]')]
+    .filter(element => element.tabIndex >= 0 && !element.disabled)
+  expect(order.slice(0, 2)).toEqual([dialog, address])
+  expect(snapshot()).toBe(before)
+})
+
 test.each(['应用', '移除'])('a queued link %s action cannot mutate readonly text and links still open', async action => {
   const open = vi.spyOn(window, 'open').mockImplementation(() => null)
   await mount(() => $createParagraphNode().append($createLinkNode('https://example.test/original').append($createTextNode('read this link'))))

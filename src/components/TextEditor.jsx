@@ -20,6 +20,8 @@ import { createEditorSaveAttempt, commitEditorSave, boundedEditorRequest } from 
 import { captureEditorDraftRecovery, recoverEditorDraft } from '~/services/editorDraftRecovery.mjs'
 import EditorSaveConflictDialog from './EditorSaveConflictDialog'
 import { loadEditorMode, saveEditorMode } from '~/services/editorReadingMode.mjs'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 const Editor = React.lazy(() => import('./Editor/Editor'))
 
@@ -816,9 +818,9 @@ function TextEditorInternal({
           <div className="empty-editor-title">从这里开始</div>
           <div className="empty-editor-desc">创建一篇新笔记，或快速回到已有内容。数据始终保存在本地。</div>
           <div className="empty-editor-actions">
-            <button className="btn primary" onClick={onCreateNote}>新建笔记</button>
-            <button className="btn" onClick={onOpenSearch}>快速搜索</button>
-            <button className="btn" onClick={onOpenDaily}>每日笔记</button>
+            <UiButton size="middle" className="btn primary" onClick={onCreateNote}>新建笔记</UiButton>
+            <UiButton size="middle" className="btn" onClick={onOpenSearch}>快速搜索</UiButton>
+            <UiButton size="middle" className="btn" onClick={onOpenDaily}>每日笔记</UiButton>
           </div>
           <div className="empty-editor-shortcuts">
             <span><kbd>Ctrl N</kbd> 新建</span>
@@ -828,7 +830,7 @@ function TextEditorInternal({
       ) : loadError ? (
         <div className="placeholder" role="alert">
           正文加载失败，尚未打开编辑器。
-          <button type="button" className="btn" onClick={() => setLoadAttempt(value => value + 1)}>重试加载正文</button>
+          <UiButton type="button" className="btn" onClick={() => setLoadAttempt(value => value + 1)}>重试加载正文</UiButton>
         </div>
       ) : loading || loadedDocumentId !== activeId ? (
         <div className="placeholder">加载中…</div>
@@ -838,9 +840,9 @@ function TextEditorInternal({
             <div className="save-state error" role="alert" data-draft-persistence-warning
               style={{ padding: '8px 12px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
               <span>当前正文草稿未能写入恢复缓存，关闭或崩溃后可能无法恢复。请先保存正文，或重试草稿备份。</span>
-              <button type="button" className="status-retry-btn" onClick={() => {
+              <UiButton type="button" className="status-retry-btn" onClick={() => {
                 if (currentIdRef.current === activeId && loadedDocumentRef.current === activeId) cachePendingBodyForRetry(activeId, contentRef.current)
-              }}>重试草稿备份</button>
+              }}>重试草稿备份</UiButton>
             </div>
           )}
           <React.Suspense fallback={<div className="placeholder">正在加载编辑器…</div>}>
@@ -860,15 +862,15 @@ function TextEditorInternal({
                 {saveError ? '保存未确认' : '保存中…'}
                 {saveError && <span role="status">{saveProblem}</span>}
                 {saveError && saveConflictsRef.current.has(activeId) ? (
-                  <button type="button" className="status-retry-btn" onClick={openSaveConflict} disabled={saving}>处理保存冲突</button>
+                  <UiButton type="button" className="status-retry-btn" onClick={openSaveConflict} disabled={saving}>处理保存冲突</UiButton>
                 ) : saveError && (
-                  <button
+                  <UiButton
                     className="status-retry-btn"
                     onClick={() => { void saveNow('retry').catch(() => {}) }}
                     disabled={saving}
                   >
                     重试
-                  </button>
+                  </UiButton>
                 )}
               </span>
             )}
@@ -891,9 +893,9 @@ function TextEditorInternal({
                 <span className="selection-mode-pill editor-reading-draft-pill" role="status">阅读模式 · 未保存草稿已保留</span>
               )}
               {modePreferenceWarning && <span className="editor-mode-preference-warning" role="status">模式偏好未能保存，本次会话仍生效</span>}
-              <button type="button" className={`editor-mode-toggle${editorMode === 'reading' ? ' active' : ''}`} aria-pressed={editorMode === 'reading'} aria-label={editorMode === 'reading' ? '切换到编辑模式' : '切换到阅读模式'} title="切换阅读/编辑模式；不会丢弃或覆盖未保存草稿" onClick={toggleEditorMode}>
+              <UiButton type="button" className={`editor-mode-toggle${editorMode === 'reading' ? ' active' : ''}`} aria-pressed={editorMode === 'reading'} aria-label={editorMode === 'reading' ? '切换到编辑模式' : '切换到阅读模式'} title="切换阅读/编辑模式；不会丢弃或覆盖未保存草稿" onClick={toggleEditorMode}>
                 {editorMode === 'reading' ? '进入编辑模式' : '阅读模式'}
-              </button>
+              </UiButton>
               <span>{wordCount.toLocaleString()} 字</span>
             </span>
           </div>

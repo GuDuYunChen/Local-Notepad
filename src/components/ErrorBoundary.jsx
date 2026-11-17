@@ -1,4 +1,6 @@
 import React from 'react'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 export default class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -29,9 +31,9 @@ export default class ErrorBoundary extends React.Component {
           <div className="error-icon">⚠️</div>
           <div className="error-title">{label}发生错误</div>
           <div className="error-message">{this.state.error?.message || '未知错误'}</div>
-          <button className="btn primary" onClick={this.handleReset}>
+          <UiButton className="btn primary" onClick={this.handleReset}>
             重试
-          </button>
+          </UiButton>
         </div>
       )
     }

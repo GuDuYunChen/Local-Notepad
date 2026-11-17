@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef } from 'react'
+import { selectOwnsEscape } from '~/components/ui/keyboard'
 
 const controls = 'button, a[href], input, select, textarea, summary, [tabindex], [contenteditable="true"]'
 function visible(element) {
@@ -52,10 +53,20 @@ export default function useBackupDialogFocus(overlayRef, dialogRef, headingRef, 
         event.preventDefault(); event.stopImmediatePropagation(); return
       }
       const scope = activeDialog()
+      // The capture owner must let an expanded field dismiss its own popup
+      // first. Once it is collapsed, the next Escape still closes this dialog.
+      // Only yield to the event's own control inside the active scope.
+      if (selectOwnsEscape(event, scope)) return
       if (event.key === 'Escape' && scope === dialog) {
         event.preventDefault(); event.stopImmediatePropagation(); close.current?.(); return
       }
       if (event.key !== 'Tab') return
+      // ConfirmDialog owns Tab cycling for its enabled buttons in the bubble phase.
+      // The outer capture trap must not move focus first: otherwise Shift+Tab at
+      // the first button wraps twice and lands back on the same button.
+      // Keep the outer trap active while the nested confirmation is busy.
+      if (scope !== dialog && scope.classList.contains('consumer-confirm-modal') &&
+        scope.contains(event.target) && focusable(scope).length > 0) return
       const items = focusable(scope)
       const index = items.indexOf(document.activeElement)
       if (!items.length) { event.preventDefault(); return }

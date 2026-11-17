@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 const Icon = ({ children, size = 16 }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -403,12 +405,12 @@ export default function FileSelectorDialog({
              const isChecked = singleSelectedId === node.id;
              return (
                  <div key={node.id}>
-                    <div 
+                    <div
                         className={`tree-item ${isChecked ? 'selected' : ''}`}
                         style={{ paddingLeft: level * 20 + 10 }}
                         onClick={(e) => handleSelect(node, true, e)}
                     >
-                        <button
+                        <UiButton
                             type="button"
                             className="toggle selector-tree-toggle"
                             onClick={(e) => { e.stopPropagation(); node.is_folder && handleExpand(node.id, e); }}
@@ -416,7 +418,7 @@ export default function FileSelectorDialog({
                             aria-label={isExpanded ? '收起文件夹' : '展开文件夹'}
                         >
                             <ChevronIcon expanded={isExpanded} />
-                        </button>
+                        </UiButton>
                         <span className="icon"><FolderIcon expanded={isExpanded} /></span>
                         <span className="title">{node.title}</span>
                     </div>
@@ -473,22 +475,28 @@ export default function FileSelectorDialog({
 
         return (
             <div key={node.id}>
-                <div 
-                    className={`tree-item ${isDisabled ? 'disabled' : ''}`} 
+                <div
+                    className={`tree-item ${isDisabled ? 'disabled' : ''}`}
                     style={{ paddingLeft: level * 20 + 10 }}
                     title={tooltip}
                 >
-                    <button
-                        type="button"
-                        className="toggle selector-tree-toggle"
-                        onClick={(e) => { e.stopPropagation(); node.is_folder && handleExpand(node.id, e); }}
-                        style={{ visibility: node.is_folder ? 'visible' : 'hidden' }}
-                        aria-label={isExpanded ? '收起文件夹' : '展开文件夹'}
-                    >
-                        <ChevronIcon expanded={isExpanded} />
-                    </button>
-                    <input 
-                        type="checkbox" 
+                    {node.is_folder ? (
+                        <UiButton
+                            type="button"
+                            className="toggle selector-tree-toggle"
+                            onClick={(e) => handleExpand(node.id, e)}
+                            aria-label={isExpanded ? '收起文件夹' : '展开文件夹'}
+                        >
+                            <ChevronIcon expanded={isExpanded} />
+                        </UiButton>
+                    ) : (
+                        // Reserve the row's original 32x28 toggle footprint without
+                        // advertising a permanently hidden, unreachable button.
+                        <span className="toggle selector-tree-spacer" aria-hidden="true"
+                            style={{ display: 'block', width: 32, minWidth: 32, height: 28, flex: '0 0 32px' }} />
+                    )}
+                    <input data-ui-native="checkbox"
+                        type="checkbox"
                         checked={allChildrenSelected}
                         disabled={isDisabled}
                         ref={el => el && (el.indeterminate = someChildrenSelected && !allChildrenSelected)}
@@ -531,7 +539,7 @@ export default function FileSelectorDialog({
                                     : '选择需要处理的内容。'}
                         </div>
                     </div>
-                    <button
+                    <UiButton
                         type="button"
                         className="icon-btn selector-close-btn"
                         onClick={onClose}
@@ -540,7 +548,7 @@ export default function FileSelectorDialog({
                         title="关闭"
                     >
                         ×
-                    </button>
+                    </UiButton>
                 </header>
 
                 {showDeleteWarning && (
@@ -551,9 +559,9 @@ export default function FileSelectorDialog({
 
                 <div className="selector-toolbar">
                     {mode !== 'single-folder' ? (
-                        <button type="button" className="btn small" onClick={handleSelectAll} disabled={processing}>
+                        <UiButton type="button" className="btn small" onClick={handleSelectAll} disabled={processing}>
                             {isAllSelected ? '取消全选' : '全选'}
-                        </button>
+                        </UiButton>
                     ) : (
                         <span>保存位置</span>
                     )}
@@ -583,15 +591,15 @@ export default function FileSelectorDialog({
                         {processing ? processingText : ''}
                     </span>
                     <div className="btn-group">
-                        <button type="button" className="btn" onClick={onClose} disabled={processing}>取消</button>
-                        <button
+                        <UiButton type="button" className="btn" onClick={onClose} disabled={processing}>取消</UiButton>
+                        <UiButton
                             type="button"
                             className="btn primary"
                             onClick={handleConfirmAction}
                             disabled={processing || (mode !== 'single-folder' && selectedIds.size === 0)}
                         >
                             {processing ? processingText : confirmText}
-                        </button>
+                        </UiButton>
                     </div>
                 </footer>
             </section>

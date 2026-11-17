@@ -5,6 +5,8 @@ import { blockRegistry } from '../utils/blockRegistry'
 import { useEditorWriteScope } from '../hooks/useEditorWriteScope'
 import { isShortcutContextBlocked, matchShortcut, shortcutLabel } from '~/services/localShortcuts'
 import useLocalShortcuts from '~/hooks/useLocalShortcuts'
+import { UiButton, UiInput } from '~/components/ui/ControlKit'
+
 
 const EXTRA_COMMANDS = [
   {
@@ -179,7 +181,7 @@ export default function CommandPalettePlugin({ documentId } = {}) {
       >
         <div className="editor-command-palette-search">
           <span aria-hidden="true">⌘</span>
-          <input
+          <UiInput density="compact"
             ref={inputRef}
             value={query}
             onCompositionStart={() => { composing.current = true }}
@@ -212,7 +214,7 @@ export default function CommandPalettePlugin({ documentId } = {}) {
 
         <div className="editor-command-palette-list" role="listbox">
           {filtered.length ? filtered.map((command, index) => (
-            <button
+            <UiButton density="compact"
               type="button"
               key={command.id}
               className={`editor-command-item${index === selectedIndex ? ' active' : ''}`}
@@ -226,7 +228,7 @@ export default function CommandPalettePlugin({ documentId } = {}) {
                 <small>{command.description}</small>
               </span>
               <span className="editor-command-arrow" aria-hidden="true">↵</span>
-            </button>
+            </UiButton>
           )) : (
             <div className="editor-command-empty">没有匹配的命令</div>
           )}

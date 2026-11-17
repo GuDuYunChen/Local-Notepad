@@ -1,0 +1,31 @@
+name: Diagnose real migrated Select interaction
+on:
+  push:
+    branches: [fix/local-ui-consistency-2f116]
+    paths: [.github/workflows/ui-select-runtime-probe.yml, scripts/probe-ui-select-runtime.mjs]
+permissions:
+  contents: read
+jobs:
+  real-component-events:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+      - run: npm ci --no-audit --no-fund
+      - name: Inspect locked real component events without mocking
+        run: node scripts/probe-ui-select-runtime.mjs
+      - if: always()
+        run: git diff --exit-code
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: select-runtime-${{ github.sha }}
+          path: test-results/ui-select-runtime/
+          retention-days: 30
+          if-no-files-found: error

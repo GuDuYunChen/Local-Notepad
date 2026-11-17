@@ -1,15 +1,17 @@
 .evidence-review-records { width: 100%; min-width: 0; color: var(--ink); font-size: 12px; line-height: 1.6; }
 .evidence-review-records-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .evidence-review-records-tools > span { flex: 1 1 240px; overflow-wrap: anywhere; color: var(--ink-soft); }
-.evidence-review-records :is(button, input, select, textarea) {
+.evidence-review-records :is(button, input, select, textarea) { min-width: 0;
+}
+.evidence-review-records :is(button, input, select, textarea):where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {
   font: inherit; color: var(--ink); background: var(--paper); border: 1px solid var(--line);
-  border-radius: 7px; min-width: 0; min-height: 36px; padding: 6px 10px;
+  border-radius: 7px; min-height: 36px; padding: 6px 10px;
 }
 .evidence-review-records button { cursor: pointer; }
-.evidence-review-records button:hover:not(:disabled),
-.evidence-review-records button[aria-pressed="true"] { border-color: var(--clay); background: var(--clay-light); }
-.evidence-review-records button:disabled { opacity: .5; cursor: default; }
-.evidence-review-records :is(button, input, textarea, select, summary):focus-visible { outline: 2px solid var(--clay); outline-offset: 2px; }
+.evidence-review-records button:hover:not(:disabled):where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.evidence-review-records button[aria-pressed="true"]:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { border-color: var(--clay); background: var(--clay-light); }
+.evidence-review-records button:disabled:where(:not([data-ui-control], .ant-btn)) { opacity: .5; cursor: default; }
+.evidence-review-records :is(button, input, textarea, select, summary):focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { outline: 2px solid var(--clay); outline-offset: 2px; }
 .evidence-review-records-details { margin-top: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
 .evidence-review-records-details > summary { padding: 8px 12px; cursor: pointer; min-height: 36px; color: var(--ink); }
 .evidence-review-records-body { max-height: 38vh; overflow: auto; padding: 0 12px 12px; overscroll-behavior: contain; }
@@ -18,7 +20,8 @@
 .evidence-review-records-grid section { min-width: 0; }
 .evidence-review-note-editor > strong { display: block; overflow-wrap: anywhere; margin-bottom: 8px; }
 .evidence-review-records label { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.evidence-review-note-editor textarea { width: 100%; box-sizing: border-box; resize: vertical; max-height: 22vh; }
+.evidence-review-note-editor textarea { width: 100%; box-sizing: border-box; resize: vertical; }
+.evidence-review-note-editor textarea:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { max-height: 22vh; }
 .evidence-review-note-editor > small { display: block; color: var(--ink-muted); margin: 4px 0 8px; }
 .evidence-review-records-filters { display: flex; flex-wrap: wrap; gap: 8px; }
 .evidence-review-records-filters > label { flex: 1 1 120px; }

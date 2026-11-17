@@ -14,6 +14,8 @@ import {
   prioritizeChapterQueue,
 } from './projectPlanningUtils'
 import './ProjectPlanningPanel.css'
+import { UiButton, UiInput } from '~/components/ui/ControlKit'
+
 
 function stripExtension(value) {
   return String(value || '').replace(/\.[^.]+$/, '')
@@ -131,14 +133,14 @@ export default function ProjectPlanningPanel({
           <strong>创作计划</strong>
           <span>把目标、截止日期、卷级里程碑和下一章节排到同一处。</span>
         </div>
-        <button
+        <UiButton
           type="button"
           className="btn small"
           onClick={applyPreset}
           title={preset.description}
         >
           应用{preset.label}
-        </button>
+        </UiButton>
       </div>
 
       <div className="project-planning-grid">
@@ -156,7 +158,7 @@ export default function ProjectPlanningPanel({
           <div className="project-plan-fields">
             <label>
               <span>日目标</span>
-              <input
+              <UiInput
                 type="number"
                 min="0"
                 step="100"
@@ -170,7 +172,7 @@ export default function ProjectPlanningPanel({
             </label>
             <label>
               <span>周目标</span>
-              <input
+              <UiInput
                 type="number"
                 min="0"
                 step="500"
@@ -184,7 +186,7 @@ export default function ProjectPlanningPanel({
             </label>
             <label>
               <span>完稿截止</span>
-              <input
+              <UiInput
                 type="date"
                 value={projectMeta.deadline || ''}
                 onChange={event => updateMeta({
@@ -245,7 +247,7 @@ export default function ProjectPlanningPanel({
                       : ''}
                   </span>
                 </div>
-                <input
+                <UiInput
                   type="number"
                   min="0"
                   step="1000"
@@ -256,7 +258,7 @@ export default function ProjectPlanningPanel({
                   })}
                   aria-label={'设置' + item.title + '目标字数'}
                 />
-                <input
+                <UiInput
                   type="date"
                   value={item.deadline || ''}
                   onChange={event => setMilestone(item.key, {
@@ -295,39 +297,39 @@ export default function ProjectPlanningPanel({
               return (
                 <div key={note.id}>
                   <span className="project-queue-number">{index + 1}</span>
-                  <button
+                  <UiButton
                     type="button"
                     className="project-queue-open"
                     onClick={() => onOpenFile?.(note.id)}
                   >
                     <strong>{stripExtension(note.title)}</strong>
                     <small>{note.volumeTitle || '未分卷'} · {note.status === 'review' ? '修订' : '草稿'}</small>
-                  </button>
+                  </UiButton>
                   <div className="project-queue-actions">
-                    <button
+                    <UiButton size="middle"
                       type="button"
                       disabled={queueIndex <= 0}
                       onClick={() => moveQueueItem(note.id, 'up')}
                       title="上移"
                     >
                       ↑
-                    </button>
-                    <button
+                    </UiButton>
+                    <UiButton size="middle"
                       type="button"
                       disabled={queueIndex < 0 || queueIndex >= queue.length - 1}
                       onClick={() => moveQueueItem(note.id, 'down')}
                       title="下移"
                     >
                       ↓
-                    </button>
-                    <button
+                    </UiButton>
+                    <UiButton size="middle"
                       type="button"
                       disabled={queueIndex <= 0}
                       onClick={() => prioritize(note.id)}
                       title="设为下一章"
                     >
                       首
-                    </button>
+                    </UiButton>
                   </div>
                 </div>
               )

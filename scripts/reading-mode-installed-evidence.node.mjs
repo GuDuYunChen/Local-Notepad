@@ -6,7 +6,7 @@ import { createHash } from 'node:crypto'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { ACCEPTED_READING_SEED, ACCEPTED_READING_SEED_SOURCE, READING_SOURCE_KEYS,
+import { ACCEPTED_READING_SEED, ACCEPTED_READING_SEED_SOURCE, READING_SOURCE_KEYS, IMPORT_DRIVER_CONTROL_CHANGES,
   validateReadingModePin, validateReadingModeHistorySource, prepareReadingModeVerifierSources, extendReadingModeInstallation,
   replaceExactlyAndProveInverse, validateInstalledReadingMode, validateGeneratedReadingModeSources } from './reading-mode-installed-evidence.mjs'
 import { readingEvidenceFixture } from './reading-mode-test-fixture.mjs'
@@ -22,14 +22,15 @@ function fixture() {
     previousArtifactMetadata: { headSha: 'f'.repeat(40), branch: 'ci/rebuild-legacy-seed-4-232',
       repositoryId: 1105107817, archiveBytes: 100, archiveSha256: createHash('sha256').update('synthetic archive').digest('hex'),
       productSourceSha: ACCEPTED_READING_SEED_SOURCE.productSourceCommit },
-    current: { version: '4.248.1', bytes: 1001, sha256: createHash('sha256').update('synthetic-reading-mode-contract-input').digest('hex') },
+    current: { version: '4.249.0', bytes: 1001, sha256: createHash('sha256').update('synthetic-reading-mode-contract-input').digest('hex') },
     currentSource: { run: 100, artifact: 200, name: 'local-notepad-windows-' + 'a'.repeat(40),
       headSha: 'c'.repeat(40), branch: 'feature/local-export-2f102-closure', repositoryId: 1105107817,
       archiveBytes: 100, archiveSha256: createHash('sha256').update('synthetic archive').digest('hex') } }
   for (const key of READING_SOURCE_KEYS) pin[key] = 'd'.repeat(40)
-  Object.assign(pin, { importBlob: 'ef7d4296bb5765a5f805d01c8266df9e29221dcc',
-    importEvidenceBlob: '3b692dd559dab7aa33dad8595b0c22319461ed5c',
-    importEvidenceTestsBlob: 'db089b71820bd810dca9a58c4f821a9e254d5be4',
+  Object.assign(pin, { importBlob: '82d9827657da7feb09ce84052012711faa021f56',
+    importEvidenceBlob: 'd0554d012b5f9e150bbc395fa2b8a7a675c8f397',
+    importEvidenceTestsBlob: '5a46ce6dad5fe757b1d2714e485242aa79959559',
+    nativeUiSelectBlob: blob(source('native-ui-select.mjs').replace(/\r\n/g, '\n')),
     historyDriverBlob: blob(source('check-version-history-desktop.mjs').replace(/\r\n/g, '\n')) })
   const report = { productCommit: pin.product, verifierCommit: verifier, complete: true, cleanupComplete: true,
     syntheticData: true, usedDefaultDataPath: true, forceTerminated: false, platform: 'win32', runnerEnvironment: 'github-hosted',
@@ -47,8 +48,8 @@ function fixture() {
 }
 test('installation binds accepted 4.232.0 seed and new reading report to the actual fifth native process', () => {
   const f = fixture(); assert.equal(validateReadingModePin(f.pin), true)
-  assert.equal(READING_SOURCE_KEYS.length, 23)
-  assert.equal(new Set(READING_SOURCE_KEYS).size, 23)
+  assert.equal(READING_SOURCE_KEYS.length, 24)
+  assert.equal(new Set(READING_SOURCE_KEYS).size, 24)
   assert.equal(READING_SOURCE_KEYS.at(-1), 'historyDriverBlob')
   assert.equal(validateInstalledReadingMode(f.report, f.reading, f.pin, verifier), true)
 })
@@ -111,7 +112,7 @@ test('all generated import copies retain exact inverse source identity', () => {
     ['reading-mode-desktop-evidence.mjs', 'readingEvidenceBlob'], ['build-reading-mode-fixture.mjs', 'readingBuilderBlob'],
     ['reading-mode-native-input.mjs', 'readingInputBlob'], ['desktop-window-session.mjs', 'readingWindowSessionBlob'],
     ['desktop-window-target.mjs', 'readingWindowTargetBlob'], ['desktop-window-worker.ps1', 'readingWindowWorkerBlob'],
-    ['check-version-history-desktop.mjs', 'historyDriverBlob'],
+    ['check-version-history-desktop.mjs', 'historyDriverBlob'], ['native-ui-select.mjs', 'nativeUiSelectBlob'],
   ]) assert.ok(generated.find(item => item.output === 'run-reading-import-generated.mjs').pinned.includes("['./" + file + "',pin." + key + "]"),
     'Native reading and owned-window dependencies must remain source-bound in the actual installer runner: ' + file)
   for (const item of generated) assert.equal(replaceExactlyAndProveInverse(item.pinned, [...item.changes].reverse().map(([before, after]) => [after, before])), item.original)
@@ -123,11 +124,11 @@ test('all generated import copies retain exact inverse source identity', () => {
 })
 const importCheckoutSources = [
   { source: 'local-import-desktop-evidence.mjs', pin: 'importEvidenceBlob', hash: '6fc3c3d069384fc2bd7c671987ace423d004ddf8',
-    old: "assert.equal(report.appVersion, '4.232.0')", current: "assert.equal(report.appVersion, '4.248.1')" },
+    old: "assert.equal(report.appVersion, '4.232.0')", current: "assert.equal(report.appVersion, '4.249.0')" },
   { source: 'check-local-import-desktop.mjs', pin: 'importBlob', hash: '6f0bfd54c7b7e1ea673e80b55a91be82244dfcef',
-    old: "assert.equal(diagnostics.version, '4.232.0')", current: "assert.equal(diagnostics.version, '4.248.1')" },
+    old: "assert.equal(diagnostics.version, '4.232.0')", current: "assert.equal(diagnostics.version, '4.249.0')" },
   { source: 'local-import-desktop-evidence.node.mjs', pin: 'importEvidenceTestsBlob', hash: '12cc53ff2ff11d2aa8d6508feadd2a4734077bb3',
-    old: "appVersion: '4.232.0'", current: "appVersion: '4.248.1'" },
+    old: "appVersion: '4.232.0'", current: "appVersion: '4.249.0'" },
 ]
 for (const lineEnding of ['LF', 'CRLF']) {
   const checkout = text => lineEnding === 'CRLF' ? text.replace(/\n/g, '\r\n') : text
@@ -136,7 +137,9 @@ for (const lineEnding of ['LF', 'CRLF']) {
     const spec = importCheckoutSources.find(item => item.source === name), text = current(name)
     if (!spec) return text
     assert.equal(text.split(spec.current).length, 2)
-    const legacy = text.replace(spec.current, spec.old)
+    let legacy = text.replace(spec.current, spec.old)
+    if (name === 'check-local-import-desktop.mjs') legacy = replaceExactlyAndProveInverse(legacy,
+      [...IMPORT_DRIVER_CONTROL_CHANGES].reverse().map(([before, after]) => [after, before]))
     assert.equal(blob(legacy), spec.hash, 'Historical test input must retain the original complete source')
     return legacy
   }
@@ -168,7 +171,7 @@ for (const lineEnding of ['LF', 'CRLF']) {
         error => error.code === 'ERR_ASSERTION' && error.message.startsWith('Original verifier source identity changed: ' + spec.source))
     })
     test(lineEnding + ' refuses unsupported product import version even with a matching replacement pin: ' + spec.source, () => {
-      const { pin } = fixture(), changed = current(spec.source).replace(spec.current, spec.current.replace('4.248.1', '4.234.0'))
+      const { pin } = fixture(), changed = current(spec.source).replace(spec.current, spec.current.replace('4.249.0', '4.234.0'))
       pin[spec.pin] = blob(changed)
       assert.throws(() => prepareReadingModeVerifierSources(pin, name => checkout(name === spec.source ? changed : current(name))),
         /Original verifier anchor missing or ambiguous/)
@@ -297,7 +300,7 @@ for (const lineEnding of ['LF', 'CRLF']) test('offline complete ' + lineEnding +
     assert.equal(final.script.match(/await verifyLocalImportRestart\(/g).length, 1)
     assert.ok(final.script.indexOf('await verifyReadingModeDesktop(') > final.script.indexOf('await verifyLocalImportRestart('))
     assert.equal(final.core.match(/'installed-app-reading-mode-workflow'/g).length, 1)
-    assert.ok(final.core.includes('4.248.1')); assert.ok(final.core.includes('4.232.0'))
+    assert.ok(final.core.includes('4.249.0')); assert.ok(final.core.includes('4.232.0'))
     for (const marker of REQUIRED_CHECKS) assert.ok(final.core.includes(marker), marker)
     assert.ok(final.core.includes(LEGACY_DEFECT.sha256))
     assert.ok(final.script.includes("assert.equal(observedDirectory,legacyTarget.split(' ')[0],'Old directory truncation was not reproduced')"))
@@ -325,4 +328,14 @@ for (const lineEnding of ['LF', 'CRLF']) test('offline complete ' + lineEnding +
     assert.match(child.stdout, /^# pass 848$/m)
     t.diagnostic(lineEnding + ': prepared original 17 refusal files and generated import refusal file all passed (848 assertions). Synthetic contract inputs only; no native installation executed.')
   } finally { rmSync(directory, { recursive: true, force: true }) }
+})
+
+
+test('current native Select helper is source-bound before original preparation', () => {
+  const { pin } = fixture()
+  assert.equal(validateReadingModeHistorySource(pin, source), true)
+  for (const mutated of [undefined, source('native-ui-select.mjs') + '\n// changed native interaction policy']) {
+    assert.throws(() => prepareReadingModeVerifierSources(pin, name => name === 'native-ui-select.mjs' ? mutated : source(name)),
+      /native Select driver source/)
+  }
 })

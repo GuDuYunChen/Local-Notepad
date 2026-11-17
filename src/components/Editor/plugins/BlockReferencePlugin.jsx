@@ -10,6 +10,8 @@ import { readBlockReference } from '../../../services/blockReferences.mjs'
 import { $blockId, $ensureBlockId, $referenceBlockNodes } from '../utils/blockReferenceState.js'
 import { $createBlockReferenceNode } from '../nodes/WikiLinkNode.jsx'
 import './BlockReferences.css'
+import { UiButton, UiInput, UiSelect } from '~/components/ui/ControlKit'
+
 
 export function $captureBlockReferenceSelection(editor) {
   const focused = document.activeElement
@@ -170,17 +172,17 @@ function CurrentBlockReferences({ documentId, documentTitle, initialContent }) {
     }
   }
   return <>
-    <div className="block-reference-entry"><button ref={entry} type="button" aria-haspopup="dialog" aria-expanded={open} disabled={!editable || !documentId} onMouseDown={e => e.preventDefault()} onClick={show}>块引用</button>
+    <div className="block-reference-entry"><UiButton density="compact" ref={entry} type="button" aria-haspopup="dialog" aria-expanded={open} disabled={!editable || !documentId} onMouseDown={e => e.preventDefault()} onClick={show}>块引用</UiButton>
       {!open && (error || message) && <span role={error ? 'alert' : 'status'}>{error || message}</span>}</div>
     {open && <div className="block-reference-shade"><section ref={panel} className="block-reference-panel" role="dialog" aria-modal="true" aria-label="本地块引用与嵌入" onKeyDown={keyboard}>
-      <header><div><strong>块引用与嵌入</strong><p>引用已保存的正文块，不复制或覆盖来源。</p></div><button type="button" aria-label="关闭块引用" onClick={close}>×</button></header>
-      <section><h3>1 · 引用当前块</h3><p>支持顶层段落、标题、引用、列表、代码与表格。生成标识属于一次普通正文编辑。</p><div className="block-reference-actions"><button type="button" disabled={busy} onClick={createAnchor}>为当前块创建引用</button><button type="button" disabled={busy} onClick={copySource}>核对保存并复制引用</button></div>
-      {sourceAddress && <label>已保存的块引用地址<input readOnly value={sourceAddress} onFocus={e => e.target.select()} /></label>}</section>
-      <section><h3>2 · 插入来源块</h3><label>块引用地址<input value={address} disabled={busy} placeholder="notepad://block/…" onChange={e => { setAddress(e.target.value); setPreview(null); setError(''); setMessage('') }} /></label>
-        <div className="block-reference-actions"><button type="button" disabled={busy || !address.trim()} onClick={readTarget}>读取来源块</button><label>展示方式<select value={embedded ? 'embed' : 'link'} disabled={busy} onChange={e => setEmbedded(e.target.value === 'embed')}><option value="link">行内引用</option><option value="embed">只读内容嵌入</option></select></label></div>
+      <header><div><strong>块引用与嵌入</strong><p>引用已保存的正文块，不复制或覆盖来源。</p></div><UiButton density="compact" type="button" aria-label="关闭块引用" onClick={close}>×</UiButton></header>
+      <section><h3>1 · 引用当前块</h3><p>支持顶层段落、标题、引用、列表、代码与表格。生成标识属于一次普通正文编辑。</p><div className="block-reference-actions"><UiButton density="compact" type="button" disabled={busy} onClick={createAnchor}>为当前块创建引用</UiButton><UiButton density="compact" type="button" disabled={busy} onClick={copySource}>核对保存并复制引用</UiButton></div>
+      {sourceAddress && <label>已保存的块引用地址<UiInput density="compact" readOnly value={sourceAddress} onFocus={e => e.target.select()} /></label>}</section>
+      <section><h3>2 · 插入来源块</h3><label>块引用地址<UiInput density="compact" value={address} disabled={busy} placeholder="notepad://block/…" onChange={e => { setAddress(e.target.value); setPreview(null); setError(''); setMessage('') }} /></label>
+        <div className="block-reference-actions"><UiButton density="compact" type="button" disabled={busy || !address.trim()} onClick={readTarget}>读取来源块</UiButton><label>展示方式<UiSelect density="compact" value={embedded ? 'embed' : 'link'} disabled={busy} onChange={e => setEmbedded(e.target.value === 'embed')}><option value="link">行内引用</option><option value="embed">只读内容嵌入</option></UiSelect></label></div>
         {preview && <div className="block-reference-preview"><strong>{preview.title}</strong><pre>{preview.text}</pre><p>嵌入保留正文文字；图片、附件和嵌套引用显示说明，打开来源可查看原控件。</p></div>}</section>
       {message && <p role="status">{message}</p>}{error && <p role="alert">{error}</p>}
-      <footer>{busy && <button type="button" onClick={() => { invalidateRead(); setBusy(false); setPreview(null); setMessage('读取已停止，未插入内容。') }}>停止读取</button>}<button type="button" onClick={close}>取消</button><button type="button" disabled={busy || !preview} onClick={insert}>{busy ? '正在核对…' : embedded ? '确认插入嵌入' : '确认插入引用'}</button></footer>
+      <footer>{busy && <UiButton density="compact" type="button" onClick={() => { invalidateRead(); setBusy(false); setPreview(null); setMessage('读取已停止，未插入内容。') }}>停止读取</UiButton>}<UiButton density="compact" type="button" onClick={close}>取消</UiButton><UiButton density="compact" type="button" disabled={busy || !preview} onClick={insert}>{busy ? '正在核对…' : embedded ? '确认插入嵌入' : '确认插入引用'}</UiButton></footer>
     </section></div>}
   </>
 }

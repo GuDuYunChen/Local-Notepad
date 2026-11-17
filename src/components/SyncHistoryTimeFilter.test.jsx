@@ -1,3 +1,4 @@
+import { changeUiValue, uiQuery, uiValue } from '~/test/uiControlDriver'
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { beforeEach, afterEach, it, expect, vi } from 'vitest'
@@ -14,12 +15,12 @@ const pageRows=()=>[
  {...historyRow('before','resolved','local',at('2026-09-30T23:59:59')),current_title:'之前'},
  {...historyRow('missing','resolved','unknown',0),current_title:'时间缺失',kind:'tag'},
 ]
-const el=k=>host.querySelector('[data-history-'+k+']')
+const el=k=>uiQuery(host, '[data-history-'+k+']')
 const ids=()=>[...host.querySelectorAll('[data-history-row] code')].filter((_,i)=>i%2===1).map(n=>n.textContent)
 const captured=async()=>JSON.parse(await blobs.at(-1).text())
 async function render(){await act(async()=>root.render(<Panel/>));await act(async()=>{host.querySelector('details').open=true})}
 async function click(k){await act(async()=>{el(k).focus();el(k).click();await Promise.resolve()})}
-async function choose(k,value){await act(async()=>{el(k).value=value;el(k).dispatchEvent(new Event('change',{bubbles:true}))})}
+async function choose(k,value){await changeUiValue(el(k),value)}
 async function input(k,value){await act(async()=>{const n=el(k);Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(n,value);n.dispatchEvent(new Event('input',{bubbles:true}))})}
 async function dates(from,to){await choose('time-mode','range');await input('time-from',from);await input('time-to',to)}
 async function read(){await render();await click('read');await act(async()=>{el('time-controls').open=true})}
@@ -97,11 +98,11 @@ it('no-op Apply retains the current feedback and does not reset disclosure or fo
 })
 it('global clear resets applied dates, unapplied edits and all local filters without fetching',async()=>{
  await read();await dates('2026-10-01','2026-10-01');await click('time-apply');await input('query','星');await choose('outcome','local');await input('time-from','2026-10-02')
- await click('clear');expect(ids()).toHaveLength(5);expect(el('time-mode').value).toBe('all');expect(el('time-from')).toBeNull();expect(el('time-applied')).toBeNull()
+ await click('clear');expect(ids()).toHaveLength(5);expect(uiValue(el('time-mode'))).toBe('all');expect(el('time-from')).toBeNull();expect(el('time-applied')).toBeNull()
  expect(el('time-error')).toBeNull();expect(el('query').value).toBe('');expect(document.activeElement).toBe(el('query'));expect(api).toHaveBeenCalledTimes(1)
 })
 it('global clear also discards a draft when no date condition was ever applied',async()=>{
- await read();await dates('2026-10-01','');await click('clear');expect(el('time-mode').value).toBe('all');expect(el('time-pending')).toBeNull();expect(ids()).toHaveLength(5)
+ await read();await dates('2026-10-01','');await click('clear');expect(uiValue(el('time-mode'))).toBe('all');expect(el('time-pending')).toBeNull();expect(ids()).toHaveLength(5)
 })
 it('composition retains the committed query intersected with applied dates',async()=>{
  await read();await dates('2026-10-01','2026-10-01');await click('time-apply');await input('query','星')

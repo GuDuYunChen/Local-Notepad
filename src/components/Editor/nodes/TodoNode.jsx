@@ -1,7 +1,9 @@
 import { $getNodeByKey, DecoratorNode } from 'lexical'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { useLexicalEditable } from '@lexical/react/useLexicalEditable'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
+import { UiButton, UiInput } from '~/components/ui/ControlKit'
+
 
 export class TodoNode extends DecoratorNode {
   __checked
@@ -76,6 +78,39 @@ function TodoComponent({ nodeKey, checked, text }) {
   const [isChecked, setIsChecked] = useState(Boolean(checked))
   const [editText, setEditText] = useState(text || '')
   const [isEditing, setIsEditing] = useState(!text)
+  const todoElementRef = useRef(null)
+
+  useEffect(() => {
+    // Lexical uses Tab for indentation while its editable root owns focus.
+    // F6 enters the first enabled Todo checkbox; native Tab then reaches the
+    // adjacent text button without changing the saved Todo content.
+    const block = todoElementRef.current
+    const root = block?.closest('.editor-input[contenteditable="true"]')
+    if (!root || !isEditable) return undefined
+    const enter = event => {
+      if (event.defaultPrevented || event.key !== 'F6' || event.altKey ||
+          event.ctrlKey || event.metaKey || event.shiftKey || event.isComposing ||
+          event.target !== root || root.ownerDocument.activeElement !== root) return
+      const first = block.querySelector('input.todo-checkbox[type="checkbox"]:not(:disabled)')
+      if (!first || first !== root.querySelector('.todo-block input.todo-checkbox[type="checkbox"]:not(:disabled)') ||
+          !first.isConnected) return
+      first.focus()
+      if (root.ownerDocument.activeElement !== first) return
+      event.preventDefault()
+      event.stopPropagation()
+    }
+    const preserveTodoTab = event => {
+      if (event.key !== 'Tab' || event.defaultPrevented || event.isComposing) return
+      if (event.target === block.querySelector('.todo-checkbox') ||
+          event.target === block.querySelector('.todo-text-button')) event.stopPropagation()
+    }
+    root.addEventListener('keydown', enter, true)
+    block.addEventListener('keydown', preserveTodoTab)
+    return () => {
+      root.removeEventListener('keydown', enter, true)
+      block.removeEventListener('keydown', preserveTodoTab)
+    }
+  }, [isEditable])
 
   useEffect(() => {
     setIsChecked(Boolean(checked))
@@ -117,8 +152,8 @@ function TodoComponent({ nodeKey, checked, text }) {
   }
 
   return (
-    <div className={`todo-block${isChecked ? ' checked' : ''}`}>
-      <input
+    <div ref={todoElementRef} className={`todo-block${isChecked ? ' checked' : ''}`} title="按 F6 从编辑正文进入待办操作">
+      <input data-ui-native="checkbox"
         type="checkbox"
         checked={isChecked}
         disabled={!isEditable}
@@ -128,7 +163,7 @@ function TodoComponent({ nodeKey, checked, text }) {
       />
 
       {isEditing ? (
-        <input
+        <UiInput density="compact"
           type="text"
           value={editText}
           readOnly={!isEditable}
@@ -151,7 +186,7 @@ function TodoComponent({ nodeKey, checked, text }) {
           autoFocus={isEditable}
         />
       ) : (
-        <button
+        <UiButton density="compact"
           type="button"
           className="todo-text todo-text-button"
           onClick={() => { if (editor.isEditable()) setIsEditing(true) }}
@@ -159,7 +194,7 @@ function TodoComponent({ nodeKey, checked, text }) {
           title={isEditable ? '点击编辑' : undefined}
         >
           {editText || '待办事项'}
-        </button>
+        </UiButton>
       )}
     </div>
   )

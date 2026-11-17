@@ -3,6 +3,8 @@ import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext
 import { $getSelection, $isRangeSelection } from 'lexical'
 import { $patchStyleText } from '@lexical/selection'
 import './TextColorPlugin.css'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 const TEXT_COLORS = [
   { label: '默认', value: '' },
@@ -72,7 +74,7 @@ export default function TextColorPlugin() {
   return (
     <div className="text-color-toolbar" ref={pickerRef}>
       <div className="text-color-group">
-        <button
+        <UiButton density="compact"
           className="text-color-btn"
           onClick={() => {
             setShowColorPicker(!showColorPicker)
@@ -82,11 +84,11 @@ export default function TextColorPlugin() {
           aria-label="文本颜色"
         >
           <span className="text-color-icon">A</span>
-        </button>
+        </UiButton>
         {showColorPicker && (
           <div className="color-picker-dropdown" role="listbox" aria-label="文本颜色选择">
             {TEXT_COLORS.map((color) => (
-              <button
+              <UiButton density="compact"
                 key={color.value || 'default'}
                 className="color-option"
                 onClick={() => applyTextColor(color.value)}
@@ -97,14 +99,14 @@ export default function TextColorPlugin() {
                   className="color-swatch"
                   style={{ backgroundColor: color.value || 'transparent', border: !color.value ? '1px dashed var(--muted)' : 'none' }}
                 />
-              </button>
+              </UiButton>
             ))}
           </div>
         )}
       </div>
 
       <div className="text-color-group">
-        <button
+        <UiButton density="compact"
           className="text-color-btn"
           onClick={() => {
             setShowHighlightPicker(!showHighlightPicker)
@@ -114,11 +116,11 @@ export default function TextColorPlugin() {
           aria-label="文本高亮"
         >
           <span className="highlight-icon">🖍</span>
-        </button>
+        </UiButton>
         {showHighlightPicker && (
           <div className="color-picker-dropdown" role="listbox" aria-label="高亮颜色选择">
             {HIGHLIGHT_COLORS.map((color) => (
-              <button
+              <UiButton density="compact"
                 key={color.value || 'default'}
                 className="color-option"
                 onClick={() => applyHighlight(color.value)}
@@ -129,7 +131,7 @@ export default function TextColorPlugin() {
                   className="color-swatch"
                   style={{ backgroundColor: color.value || 'transparent', border: !color.value ? '1px dashed var(--muted)' : 'none' }}
                 />
-              </button>
+              </UiButton>
             ))}
           </div>
         )}

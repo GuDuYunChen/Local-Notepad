@@ -1,6 +1,7 @@
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { openUiSelect } from '~/test/uiControlDriver'
 import LocalActions from './LocalActions'
 let host,root,entry,execute,close,props
 const drain=async()=>{for(let i=0;i<8;i++)await Promise.resolve()}
@@ -11,6 +12,25 @@ const input=async(value)=>act(async()=>{const n=document.querySelector('input');
 beforeEach(async()=>{vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT',true);host=document.createElement('div');entry=document.createElement('button');entry.textContent='Entry';document.body.append(entry,host);entry.focus();root=createRoot(host);execute=vi.fn(async id=>({accepted:true,id}));close=vi.fn();props={open:true,onExecute:execute,onClose:close,contextVersion:1};await render();await act(async()=>{await new Promise(r=>setTimeout(r,1))})})
 afterEach(async()=>{await act(async()=>root.unmount());host.remove();entry.remove();vi.restoreAllMocks();vi.unstubAllGlobals()})
 it('opens all17 local entries and moves focus; cancel restores prior focus',async()=>{expect(document.querySelectorAll('[role=option]')).toHaveLength(17);expect(document.activeElement).toBe(document.querySelector('input'));await key('Escape');expect(close).toHaveBeenCalledTimes(1);expect(execute).not.toHaveBeenCalled();await render({open:false});expect(document.activeElement).toBe(entry)})
+it('Escape dismisses the category popup before the palette and preserves selector focus',async()=>{
+ const selector=host.querySelector('[role="combobox"][aria-label="本地功能分类"]')
+ await openUiSelect(selector);await act(async()=>selector.focus())
+ await key('Escape',{isComposing:true,keyCode:229},selector)
+ expect(close).not.toHaveBeenCalled();expect(selector.getAttribute('aria-expanded')).toBe('true')
+ await key('Escape',{code:'Escape',keyCode:27},selector)
+ expect(close).not.toHaveBeenCalled();expect(selector.getAttribute('aria-expanded')).toBe('false')
+ expect(document.activeElement).toBe(selector);expect(execute).not.toHaveBeenCalled()
+ await key('Escape',{code:'Escape',keyCode:27},selector)
+ expect(close).toHaveBeenCalledTimes(1);expect(execute).not.toHaveBeenCalled()
+})
+it('the query combobox retains its own Escape policy after an input composition ends',async()=>{
+ const query=host.querySelector('[aria-label="查找本地功能"]')
+ expect(query.getAttribute('role')).toBe('combobox');expect(query.getAttribute('aria-expanded')).toBe('true')
+ await act(async()=>query.dispatchEvent(new CompositionEvent('compositionstart',{bubbles:true})))
+ await key('Escape',{},query);expect(close).not.toHaveBeenCalled()
+ await act(async()=>query.dispatchEvent(new CompositionEvent('compositionend',{bubbles:true})))
+ await key('Escape',{},query);expect(close).toHaveBeenCalledTimes(1);expect(execute).not.toHaveBeenCalled()
+})
 it('searches by actual input and executes the matching action from Enter',async()=>{await input('附件');expect(document.querySelectorAll('[role=option]')).toHaveLength(1);await key('Enter');expect(execute).toHaveBeenCalledWith('attachments',expect.objectContaining({signal:expect.any(AbortSignal)}));expect(close).toHaveBeenCalledTimes(1)})
 it('arrow selection wraps and clicking a row executes its own ID',async()=>{await key('ArrowUp');expect(document.querySelector('[aria-selected=true]').dataset.localAction).toBe('settings');await key('ArrowDown');expect(document.querySelector('[aria-selected=true]').dataset.localAction).toBe('notes');await click('[data-local-action=tasks]');expect(execute.mock.calls[0][0]).toBe('tasks')})
 it('empty search cannot dispatch or retain an obsolete selected ID',async()=>{await input('不存在的功能');expect(document.querySelector('[aria-selected=true]')).toBeNull();await key('Enter');expect(execute).not.toHaveBeenCalled();expect(document.querySelector('footer button').disabled).toBe(true)})

@@ -6,7 +6,8 @@
 .quick-switcher-notice[role="alert"] { border-inline-start: 3px solid var(--danger, #b23b35); padding-inline-start: 10px; }
 .quick-switcher-notice p { margin: 4px 0 8px; }
 .quick-switcher-stop { align-self: flex-start; margin: 4px 14px; }
-.quick-switcher button:focus-visible, .quick-switcher input:focus-visible { outline: 2px solid var(--clay); outline-offset: 2px; }
+.quick-switcher button:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.quick-switcher input:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { outline: 2px solid var(--clay); outline-offset: 2px; }
 @media (max-width: 520px), (max-height: 620px) {
   .quick-switcher-overlay { padding: 14px 10px; }
   .quick-switcher { max-height: calc(100dvh - 28px); }

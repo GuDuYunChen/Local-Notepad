@@ -354,7 +354,7 @@ export function registerS3LocalOverviewTests(test) {
     // saveNow, CAS/receipt service, 30s autosave and the quit participant stay
     // unchanged. Preserve all six exact LF-normalized source pins.
     for (const [file, expected] of [
-      ['src/components/TextEditor.jsx', 'f9ae29dcb35bd11b9a8fad1a0fff4e61f534a1b70e476324992c69bcef2dba04'],
+      ['src/components/TextEditor.jsx', '403e77f72a20a40ea42e350fea3f34e3bd4c86957869e119327f9a1cefac4e9a'],
       ['src/services/editorDraftCache.js', '8f464fe90922201c29c7acb334065397f3efe1971f918d77eb55b356924eddc4'],
       ['src/services/editorSaveTransaction.mjs', 'b449dad16834a936fbd5fad318352c961e160e11723cb6627d6a47714d4d36e2'],
       ['src/services/editorQuit.mjs', 'abc21ea59352fede521e6ce6f6904f67af8f3d00b2378efae6a5e6b45c48c205'],

@@ -1,10 +1,12 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { UiInput } from './ui/ControlKit'
+import { UiButton } from './ui/ControlKit'
 import { createPortal } from 'react-dom'
 import { api } from '~/services/api'
 import { FOLDER_JOURNAL, FOLDER_CHANGED, createFolderJournal, folderChildren, folderCurrentMatches, folderIntent, folderPath, readFolderWorkspace, sendFolderChange } from '~/services/folderWorkspace.mjs'
 import './FolderWorkspace.css'
 
-const controls = node => [...(node?.querySelectorAll('button:not(:disabled),input:not(:disabled),select:not(:disabled),[tabindex="0"]') || [])].filter(n => !n.closest('fieldset:disabled,[hidden]'))
+const controls = node => [...(node?.querySelectorAll('button:not(:disabled),input:not(:disabled),select:not(:disabled),[tabindex="0"],summary') || [])].filter(n => !n.closest('fieldset:disabled,[hidden]'))
 const blank = () => ({ kind:'create', name:'' })
 export default function FolderWorkspace({ onClose, onOpenFile }) {
   const [snapshot,setSnapshot] = useState(null), [loading,setLoading] = useState(false), [busy,setBusy] = useState(false), [opening,setOpening] = useState(false), [stale,setStale] = useState(false)
@@ -111,37 +113,37 @@ export default function FolderWorkspace({ onClose, onOpenFile }) {
       : busy ? '停止等待并关闭？已发送的修改可能仍完成，待核对记录会保留，不会自动重发。' : '放弃尚未提交的名称输入并继续？已保存目录不会改变。'
   return createPortal(<div className="folder-workspace-overlay" data-opening={opening ? 'true' : undefined} onMouseDown={e => { if (e.target === e.currentTarget) close() }}>
     <section className="folder-workspace" ref={panel} role="dialog" aria-modal="true" aria-label="本地文件夹整理工作台" onKeyDown={keyboard} onCompositionStart={() => { composing.current = true }} onCompositionEnd={() => { composing.current = false }}>
-      <header><div><h2>文件夹整理工作台</h2><p>选择来源 → 浏览目标目录 → 预览并确认移动</p></div><button type="button" aria-label="关闭文件夹整理" disabled={!!confirmation} onClick={close}>×</button></header>
+      <header><div><h2>文件夹整理工作台</h2><p>选择来源 → 浏览目标目录 → 预览并确认移动</p></div><UiButton type="button" aria-label="关闭文件夹整理" disabled={!!confirmation} onClick={close}>×</UiButton></header>
       <div className="folder-workspace-scroll" aria-busy={loading || busy}>
         <p className="folder-workspace-scope">整理本机普通笔记和目录；不改正文、标签或附件。模板与回收站不显示为可移动项，但会参与空目录检查。移走文件夹不会删除内部资料。</p>
         {loading && <p>正在读取完整目录…可以取消。</p>}
         {snapshot && <>
-          <nav className="folder-workspace-path" aria-label="当前目录"><button type="button" disabled={busy || opening || !!confirmation || !current} onClick={() => browse('')}>根目录</button><button type="button" disabled={busy || opening || !!confirmation || !current} onClick={() => browse(folder?.parent_id || '')}>上一级</button><strong title={folderPath(snapshot,current)}>{folderPath(snapshot,current)}</strong></nav>
+          <nav className="folder-workspace-path" aria-label="当前目录"><UiButton type="button" disabled={busy || opening || !!confirmation || !current} onClick={() => browse('')}>根目录</UiButton><UiButton type="button" disabled={busy || opening || !!confirmation || !current} onClick={() => browse(folder?.parent_id || '')}>上一级</UiButton><strong title={folderPath(snapshot,current)}>{folderPath(snapshot,current)}</strong></nav>
           <p>{snapshot.items.filter(n => n.is_folder).length} 个普通文件夹 · {snapshot.items.filter(n => !n.is_folder).length} 篇普通笔记 · {snapshot.hidden_count} 个模板/回收站项目不在移动列表{stale ? ' · 结果已过时' : ''}</p>
           <fieldset className="folder-workspace-tools" disabled={busy || opening || !!confirmation}>
-            <label>当前目录查找<input aria-label="文件夹内容查找" maxLength={128} value={query} onChange={e => { setQuery(e.target.value); setPage(0); quiet() }} /></label>
-            <button type="button" disabled={!selected.length} onClick={() => { setSelected([]); quiet() }}>清空选择</button>
-            <button type="button" disabled={blocked || !selected.length} onClick={() => propose('move',{ ids:selected,parent_id:current })}>移动所选到当前目录</button>
+            <label>当前目录查找<UiInput size="middle" aria-label="文件夹内容查找" maxLength={128} value={query} onChange={e => { setQuery(e.target.value); setPage(0); quiet() }} /></label>
+            <UiButton size="middle" type="button" disabled={!selected.length} onClick={() => { setSelected([]); quiet() }}>清空选择</UiButton>
+            <UiButton size="middle" type="button" disabled={blocked || !selected.length} onClick={() => propose('move',{ ids:selected,parent_id:current })}>移动所选到当前目录</UiButton>
           </fieldset>
           <div className="folder-workspace-items" role="group" aria-label="目录项目">{rows.slice(page*50,(page+1)*50).map(row => <article key={row.id} data-folder-item={row.id} data-kind={row.is_folder ? 'folder' : 'note'}>
-            <label><input type="checkbox" aria-label={`选择 ${row.title}`} disabled={blocked || !!confirmation} checked={selected.includes(row.id)} onChange={() => toggle(row.id)} /><span aria-hidden="true">{row.is_folder ? '▣' : '▤'}</span><strong>{row.title || '未命名'}</strong></label>
-            <button type="button" disabled={busy || opening || !!confirmation || (!row.is_folder && (stale || !onOpenFile))} onClick={() => row.is_folder ? browse(row.id) : void openNote(row.id)}>{row.is_folder ? '浏览目录' : '打开笔记'}</button>
+            <label><input data-ui-native="checkbox" type="checkbox" aria-label={`选择 ${row.title}`} disabled={blocked || !!confirmation} checked={selected.includes(row.id)} onChange={() => toggle(row.id)} /><span aria-hidden="true">{row.is_folder ? '▣' : '▤'}</span><strong>{row.title || '未命名'}</strong></label>
+            <UiButton type="button" disabled={busy || opening || !!confirmation || (!row.is_folder && (stale || !onOpenFile))} onClick={() => row.is_folder ? browse(row.id) : void openNote(row.id)}>{row.is_folder ? '浏览目录' : '打开笔记'}</UiButton>
             {row.is_folder && <small>{snapshot.items.filter(n => n.parent_id === row.id).length} 个普通子项 · {row.hidden_children} 个隐藏子项</small>}
           </article>)}</div>
           {!rows.length && <p>{query ? '当前目录没有符合查找条件的项目。' : '当前目录没有普通项目。隐藏子项不等于可删除。'}</p>}
-          <nav aria-label="目录分页"><span>{rows.length} 项 · 第 {page+1}/{pages} 页</span><button type="button" disabled={page===0 || busy || opening || !!confirmation} onClick={() => setPage(p=>p-1)}>上一页</button><button type="button" disabled={page+1>=pages || busy || opening || !!confirmation} onClick={() => setPage(p=>p+1)}>下一页</button></nav>
+          <nav aria-label="目录分页"><span>{rows.length} 项 · 第 {page+1}/{pages} 页</span><UiButton type="button" disabled={page===0 || busy || opening || !!confirmation} onClick={() => setPage(p=>p-1)}>上一页</UiButton><UiButton type="button" disabled={page+1>=pages || busy || opening || !!confirmation} onClick={() => setPage(p=>p+1)}>下一页</UiButton></nav>
           {!!selected.length && <details><summary>已选择 {selected.length} 项（跨目录保留选择）</summary><ul>{selected.map(id => <li key={id}>{folderPath(snapshot,id)}</li>)}</ul></details>}
           <form onSubmit={e => { e.preventDefault(); propose(form.kind,{ ids:current ? [current] : [],name:form.name,parent_id:form.kind === 'create' ? current : '' }) }}>
-            <fieldset disabled={blocked || !!confirmation}><legend>{form.kind === 'create' ? '在当前目录新建文件夹' : '重命名当前文件夹'}</legend><label>文件夹名称<input aria-label="整理文件夹名称" value={form.name} onChange={e => { setForm({ ...form,name:e.target.value }); quiet() }} onKeyDown={e => { if (e.key === 'Enter' && (composing.current || e.nativeEvent?.isComposing || e.keyCode === 229)) e.preventDefault() }} /></label><button type="submit" disabled={!dirty}>预览名称操作</button><button type="button" disabled={!current} onClick={() => setEdit(form.kind === 'create' ? { kind:'rename',name:folder.title } : blank())}>{form.kind === 'create' ? '改为重命名当前目录' : '改为新建目录'}</button><button type="button" disabled={!current} onClick={() => propose('trash-empty',{ ids:[current] })}>将当前空目录移到回收站</button></fieldset>
+            <fieldset disabled={blocked || !!confirmation}><legend>{form.kind === 'create' ? '在当前目录新建文件夹' : '重命名当前文件夹'}</legend><label>文件夹名称<UiInput aria-label="整理文件夹名称" value={form.name} onChange={e => { setForm({ ...form,name:e.target.value }); quiet() }} onKeyDown={e => { if (e.key === 'Enter' && (composing.current || e.nativeEvent?.isComposing || e.keyCode === 229)) e.preventDefault() }} /></label><UiButton type="submit" disabled={!dirty}>预览名称操作</UiButton><UiButton type="button" disabled={!current} onClick={() => setEdit(form.kind === 'create' ? { kind:'rename',name:folder.title } : blank())}>{form.kind === 'create' ? '改为重命名当前目录' : '改为新建目录'}</UiButton><UiButton type="button" disabled={!current} onClick={() => propose('trash-empty',{ ids:[current] })}>将当前空目录移到回收站</UiButton></fieldset>
           </form>
         </>}
       </div>
       <div className="folder-workspace-feedback" aria-label="目录操作反馈">
-        {confirmation && <div role="alertdialog" aria-modal="true" aria-label="确认目录操作"><p>{confirmText}</p><button type="button" onClick={() => setConfirmation(null)}>取消操作</button><button type="button" onClick={confirm}>确认继续</button></div>}
+        {confirmation && <div role="alertdialog" aria-modal="true" aria-label="确认目录操作"><p>{confirmText}</p><UiButton type="button" onClick={() => setConfirmation(null)}>取消操作</UiButton><UiButton type="button" onClick={confirm}>确认继续</UiButton></div>}
         {error && <p role="alert">{error}</p>}{message && <p role="status">{message}</p>}
-        {(pending || corrupt) && <div className="folder-workspace-recovery"><strong>{corrupt ? '操作记录损坏或不可读取' : '有待核对的目录操作'}</strong><button type="button" disabled={busy || loading || opening || !!confirmation || corrupt} onClick={() => void load(true)}>核对当前状态</button><button type="button" disabled={busy || loading || opening || !!confirmation || (!corrupt && !reviewed)} onClick={clearRecord}>{corrupt ? '清除损坏记录' : '结束待核对记录'}</button></div>}
+        {(pending || corrupt) && <div className="folder-workspace-recovery"><strong>{corrupt ? '操作记录损坏或不可读取' : '有待核对的目录操作'}</strong><UiButton type="button" disabled={busy || loading || opening || !!confirmation || corrupt} onClick={() => void load(true)}>核对当前状态</UiButton><UiButton type="button" disabled={busy || loading || opening || !!confirmation || (!corrupt && !reviewed)} onClick={clearRecord}>{corrupt ? '清除损坏记录' : '结束待核对记录'}</UiButton></div>}
       </div>
-      <footer><span>{busy ? '修改已发送；停止等待不等于撤销' : opening ? '等待原保存保护…' : `已选 ${selected.length}/100 项 · 正文保持不变`}</span><button type="button" disabled={busy || loading || opening || !!confirmation} onClick={refresh}>重新读取目录</button>{loading && <button type="button" onClick={cancelRead}>取消读取</button>}{busy && <button type="button" disabled={!!confirmation} onClick={() => writer.current?.abort()}>停止等待</button>}{opening && <button type="button" onClick={() => { navigator.current?.abort(); setOpening(false); setMessage('打开已取消。') }}>取消打开</button>}</footer>
+      <footer><span>{busy ? '修改已发送；停止等待不等于撤销' : opening ? '等待原保存保护…' : `已选 ${selected.length}/100 项 · 正文保持不变`}</span><UiButton type="button" disabled={busy || loading || opening || !!confirmation} onClick={refresh}>重新读取目录</UiButton>{loading && <UiButton type="button" onClick={cancelRead}>取消读取</UiButton>}{busy && <UiButton type="button" disabled={!!confirmation} onClick={() => writer.current?.abort()}>停止等待</UiButton>}{opening && <UiButton type="button" onClick={() => { navigator.current?.abort(); setOpening(false); setMessage('打开已取消。') }}>取消打开</UiButton>}</footer>
     </section>
   </div>,document.body)
 }

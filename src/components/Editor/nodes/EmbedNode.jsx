@@ -3,6 +3,8 @@ import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext
 import { useLexicalEditable } from '@lexical/react/useLexicalEditable'
 import React, { useEffect, useState } from 'react'
 import { useEditorPendingDraft } from '../hooks/useEditorPendingDraft'
+import { UiButton, UiInput } from '~/components/ui/ControlKit'
+
 
 export class EmbedNode extends DecoratorNode {
   __url
@@ -68,6 +70,16 @@ export class EmbedNode extends DecoratorNode {
 
   decorate() {
     return <EmbedComponent nodeKey={this.__key} url={this.__url} title={this.__title} />
+  }
+}
+
+// Nested decorator inputs own their native selection, not the outer Lexical editor.
+// Capture select-all before the contenteditable can intercept Ctrl/Cmd+A.
+function selectEmbedInputText(event) {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') {
+    event.stopPropagation()
+    event.preventDefault()
+    event.currentTarget.select()
   }
 }
 
@@ -156,27 +168,29 @@ function EmbedComponent({ nodeKey, url, title }) {
   if (isEditing && isEditable) {
     return (
       <div className="embed-block embed-editing">
-        <input
+        <UiInput density="compact"
           type="url"
           value={editUrl}
+          onKeyDownCapture={selectEmbedInputText}
           onChange={(event) => { if (editor.isEditable()) setEditUrl(event.target.value) }}
           placeholder="粘贴 YouTube、Bilibili 或其他支持的链接"
           className="embed-input"
         />
-        <input
+        <UiInput density="compact"
           type="text"
           value={editTitle}
+          onKeyDownCapture={selectEmbedInputText}
           onChange={(event) => { if (editor.isEditable()) setEditTitle(event.target.value) }}
           placeholder="标题（可选）"
           className="embed-input"
         />
         <div className="embed-edit-actions">
-          <button type="button" className="btn" onClick={discardDraft}>
+          <UiButton density="compact" type="button" className="btn" onClick={discardDraft}>
             取消
-          </button>
-          <button type="button" onClick={handleSave} className="embed-save-btn" disabled={!editUrl.trim()}>
+          </UiButton>
+          <UiButton density="compact" type="button" onClick={handleSave} className="embed-save-btn" disabled={!editUrl.trim()}>
             保存
-          </button>
+          </UiButton>
         </div>
       </div>
     )
@@ -203,9 +217,9 @@ function EmbedComponent({ nodeKey, url, title }) {
           有未应用的嵌入修改，返回编辑模式后继续或取消。
         </div>
       )}
-      {isEditable && <button type="button" onClick={() => { if (editor.isEditable()) setIsEditing(true) }} className="embed-edit-btn" aria-label="编辑嵌入内容">
+      {isEditable && <UiButton density="compact" type="button" onClick={() => { if (editor.isEditable()) setIsEditing(true) }} className="embed-edit-btn" aria-label="编辑嵌入内容">
         编辑嵌入
-      </button>}
+      </UiButton>}
     </div>
   )
 }

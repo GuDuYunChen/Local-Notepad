@@ -1,6 +1,8 @@
 import React, { useMemo, useRef, useState } from 'react'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { INSERT_TABLE_COMMAND } from '@lexical/table'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 export default function TableMenu() {
   const [editor] = useLexicalComposerContext()
@@ -43,7 +45,7 @@ export default function TableMenu() {
 
   return (
     <div className="table-menu-host">
-      <button
+      <UiButton density="compact"
         type="button"
         className="btn toolbar-menu-action table-insert-trigger"
         onClick={() => setOpen(prev => !prev)}
@@ -52,7 +54,7 @@ export default function TableMenu() {
       >
         表格
         <span className="table-insert-size">{hoverRect.row} × {hoverRect.col}</span>
-      </button>
+      </UiButton>
 
       {open && (
         <div className="table-menu product-table-insert-menu" role="dialog" aria-label="插入表格">
@@ -75,7 +77,7 @@ export default function TableMenu() {
                 {row.map((cell, colIndex) => {
                   const selected = rowIndex < hoverRect.row && colIndex < hoverRect.col
                   return (
-                    <button
+                    <UiButton density="compact"
                       type="button"
                       key={colIndex}
                       className={`tm-grid-cell${selected ? ' selected' : ''}`}

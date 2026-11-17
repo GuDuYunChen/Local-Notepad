@@ -14,7 +14,7 @@ if(!process.versions.electron){
   const {app,BrowserWindow}=require('electron'),{build}=require('esbuild'),{pathToFileURL}=require('node:url')
   app.setPath('userData',fs.mkdtempSync(path.join(os.tmpdir(),'notepad-history-ui-')));app.on('window-all-closed',()=>{})
   const watchdog=setTimeout(()=>app.exit(1),85000),delay=ms=>new Promise(r=>setTimeout(r,ms))
-  function inspect(){
+  function inspect(readSelect){
     const panel=document.querySelector('[data-sync-conflict-history]'),overview=document.querySelector('.sync-overview')
     if(!panel)return null
     const shown=n=>n.getClientRects().length>0&&getComputedStyle(n).visibility!=='hidden'
@@ -32,7 +32,8 @@ if(!process.versions.electron){
       return{final:fg.every((v,i)=>v===expected[i]),ratio:(Math.max(a,b)+.05)/(Math.min(a,b)+.05)}
     })
     const rows=[...panel.querySelectorAll('[data-history-row]')]
-    return{filter:panel.querySelector('select').value,ids:rows.map(n=>n.querySelectorAll('code')[1].textContent),
+    const filter=panel.querySelector('[aria-label="冲突记录类型"]')
+    return{filter:readSelect('[data-sync-conflict-history] [aria-label="冲突记录类型"]').value,ids:rows.map(n=>n.querySelectorAll('code')[1].textContent),
       outcomes:rows.map(n=>n.querySelector('.sync-conflict-history-outcome').textContent).join(' / '),
       feedback:panel.querySelector('.sync-conflict-history-feedback').textContent,requests:window.__requests,
       cancelledRead:window.__cancelledRead===true,mutations:window.__mutations,networkRequests:window.__networkRequests,navigationCalls:window.__navigationCalls,
@@ -40,15 +41,18 @@ if(!process.versions.electron){
       iso:[...overview.querySelectorAll('.sync-overview-metrics time,.sync-overview-note time')].map(n=>n.dateTime),
       counts:[...overview.querySelectorAll('.sync-overview-metrics dd')].slice(0,2).map(n=>n.textContent),
       privateText:panel.textContent.includes('PRIVATE_'),activeMarkup:panel.querySelectorAll('script,img,iframe,a').length,
-      controlsVisible:visible(panel.querySelector('select'))&&visible(panel.querySelector('[data-history-read]')),
+      controlsVisible:visible(filter.closest('[data-ui-control="select"]')||filter)&&visible(panel.querySelector('[data-history-read]')),
       focusInside:panel.contains(document.activeElement),colors,viewport:{width:innerWidth,height:innerHeight},overflow:document.documentElement.scrollWidth-innerWidth}
   }
   app.whenReady().then(async()=>{
+    const {createNativeUiSelect,inspectNativeUiSelect}=await import('./native-ui-select.mjs')
+    const inspectSource='('+inspect.toString()+')('+inspectNativeUiSelect.toString()+')'
     fs.mkdirSync(out,{recursive:true})
     await build({absWorkingDir:root,bundle:true,format:'iife',platform:'browser',alias:{'~':path.join(root,'src')},define:{'process.env.NODE_ENV':'"production"'},outfile:path.join(out,'fixture.js'),
       plugins:[{name:'synthetic-history-api',setup(b){b.onResolve({filter:/^~\/services\/api$/},()=>({path:'api',namespace:'history-fixture'}));b.onLoad({filter:/.*/,namespace:'history-fixture'},()=>({contents:'export const api=(...args)=>window.__historyLoad(...args)',loader:'js'}));b.onLoad({filter:/[\\/]src[\\/]services[\\/]api\.js$/},()=>({contents:'export const api=(...args)=>window.__historyLoad(...args)',loader:'js'}))}}],
       stdin:{resolveDir:root,loader:'jsx',contents:`
         import React from 'react';import{createRoot}from'react-dom/client';import Overview from './src/components/SyncOverviewPanel.jsx';
+        import UiThemeProvider from './src/components/ui/UiThemeProvider.jsx';
         import{overviewFixture}from'./scripts/fixtures/sync-overview.mjs';import{historyRow,historyPage}from'./scripts/fixtures/sync-conflict-history.mjs';import './src/components/SyncCenterPanel.css';
         const scene=new URLSearchParams(location.search).get('scene');document.documentElement.dataset.theme=scene==='history-light'?'light':'dark';
         window.__requests=[];window.__mutations=0;window.__networkRequests=0;window.__navigationCalls=0;
@@ -62,7 +66,7 @@ if(!process.versions.electron){
           if(count===5)return Promise.resolve(historyPage([],'superseded'));
           return Promise.reject(Error('PRIVATE_UNEXPECTED_REQUEST'));
         };
-        createRoot(document.getElementById('root')).render(<Overview {...overviewFixture()} onNavigate={()=>{window.__navigationCalls++;return true}}/>);
+        createRoot(document.getElementById('root')).render(<UiThemeProvider><Overview {...overviewFixture()} onNavigate={()=>{window.__navigationCalls++;return true}}/></UiThemeProvider>);
       `}})
     const index=fs.readFileSync(path.join(root,'dist/index.html'),'utf8'),styles=[...index.matchAll(/<link\b[^>]*href="([^"]+\.css)"[^>]*>/g)].map(m=>pathToFileURL(path.resolve(root,'dist',m[1].replace(/^\//,''))).href)
     if(!styles.length)throw Error('Missing production CSS')
@@ -74,13 +78,18 @@ if(!process.versions.electron){
     for(const name of names){
       const win=new BrowserWindow({show:true,width:name==='history-narrow'?560:1000,height:900,useContentSize:true,webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false,backgroundThrottling:false}})
       const exec=code=>win.webContents.executeJavaScript(code)
-      const wait=async code=>{for(let i=0;i<60;i++){if(await exec(code))return;await delay(80)}throw Error('History wait failed '+name+' '+code)}
+      const wait=async(code,label)=>{for(let i=0;i<60;i++){const result=await(typeof code==='function'?code():exec(code));if(result)return result;await delay(80)}throw Error(label||'History wait failed '+name+' '+code)}
+      const nativeClick=async selector=>{
+        const point=await wait(()=>exec(`(()=>{const nodes=[...document.querySelectorAll(${JSON.stringify(selector)})];if(nodes.length!==1)return null;const n=nodes[0];n.scrollIntoView({block:'center',behavior:'instant'});const r=n.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+r.height/2,hit=document.elementFromPoint(x,y);return r.width>0&&r.height>0&&hit&&n.contains(hit)?{x,y}:null})()`),'Select control missing, ambiguous or occluded: '+selector)
+        for(const type of ['mousePressed','mouseReleased'])await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent',{type,...point,button:'left',clickCount:1})
+      }
+      const select=createNativeUiSelect({evaluate:exec,click:nativeClick,cdp:{send:(method,params)=>win.webContents.debugger.sendCommand(method,params)},until:wait})
       const click=selector=>exec(`(()=>{const n=document.querySelector('[data-sync-conflict-history]').querySelector(${JSON.stringify(selector)});n.focus({preventScroll:true});n.click();return true})()`)
       const frames=[],scene={name,frames};report.scenes.push(scene)
       const capture=async phase=>{
         await exec(`document.querySelector('[data-sync-conflict-history]').scrollIntoView({block:'start',behavior:'instant'})`)
         let f,last='',stable=0
-        for(let i=0;i<60;i++){await delay(90);f=await exec('('+inspect.toString()+')()');const sig=JSON.stringify(f)
+        for(let i=0;i<60;i++){await delay(90);f=await exec(inspectSource);const sig=JSON.stringify(f)
           const valid=f&&f.colors.length>=4&&f.colors.every(c=>c.final&&c.ratio>=4.5)&&f.controlsVisible&&f.focusInside&&f.overflow<=1
           stable=valid?(sig===last?stable+1:1):0;last=sig;if(stable>=3)break}
         if(stable<3)throw Error('Invalid history frame '+name+' '+phase+' '+JSON.stringify(f))
@@ -89,20 +98,20 @@ if(!process.versions.electron){
         await exec('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>r(true))))')
         let bytes,lastHash='',rasterSamples=0
         for(let i=0;i<40;i++){const b=(await win.capturePage()).toPNG(),sha=createHash('sha256').update(b).digest('hex');let matches=false;try{matches=verifyRasterWitness(b,code)}catch{}
-          if(JSON.stringify(await exec('('+inspect.toString()+')()'))!==JSON.stringify(f))throw Error('History DOM changed during screenshot')
+          if(JSON.stringify(await exec(inspectSource))!==JSON.stringify(f))throw Error('History DOM changed during screenshot')
           rasterSamples=matches?(sha===lastHash?rasterSamples+1:1):0;lastHash=sha;if(rasterSamples>=2){bytes=b;break}await delay(90)}
         if(!bytes)throw Error('Missing matching history raster');const png=name+'-'+phase+'.png';fs.writeFileSync(path.join(out,png),bytes)
         frames.push({phase,...f,stableSamples:stable,rasterCode:code,rasterSamples,png,bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')});save()
       }
       try{
-        win.setMenu(null);await win.loadFile(file,{query:{scene:name}});await wait('!!document.querySelector("[data-sync-conflict-history]")');await exec('document.fonts.ready.then(()=>true)')
+        win.setMenu(null);win.webContents.debugger.attach('1.3');await win.loadFile(file,{query:{scene:name}});await wait('!!document.querySelector("[data-sync-conflict-history]")');await exec('document.fonts.ready.then(()=>true)')
         await exec(`(()=>{window.__guidance=document.querySelector('[data-sync-guidance]').textContent;return true})()`)
         await click(':scope>summary');await capture('unread')
         await click('[data-history-read]');await wait('document.querySelectorAll("[data-history-row]").length===2');await capture('loaded')
         await click('[data-history-more]');await wait('document.querySelectorAll("[data-history-row]").length===3');await capture('more')
         await click('[data-history-read]');await wait('document.querySelector(".sync-conflict-history-feedback").textContent.includes("未能读取")');await capture('refresh-failed')
         await click('[data-history-read]');await wait('!!document.querySelector("[data-history-stop]")');await click('[data-history-stop]');await wait('window.__cancelledRead===true');await exec('window.__late()');await capture('stopped')
-        await exec(`(()=>{const s=document.querySelector('[data-sync-conflict-history] select');s.focus({preventScroll:true});s.value='superseded';s.dispatchEvent(new Event('change',{bubbles:true}));return true})()`)
+        await select.choose('[data-sync-conflict-history] [aria-label="冲突记录类型"]','superseded')
         await wait('document.querySelector(".sync-conflict-history-feedback").textContent.includes("本次读取没有")');await capture('empty')
         verifyHistoryScene(scene)
       }finally{win.destroy()}

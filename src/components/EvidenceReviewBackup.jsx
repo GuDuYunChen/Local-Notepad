@@ -3,6 +3,8 @@ import { reviewArchives } from '~/services/evidenceReviewArchives'
 import { buildReviewBackup, downloadReviewBackup, planReviewBackupImport,
   importReviewBackup, MAX_REVIEW_BACKUP_LENGTH } from '~/services/evidenceReviewBackup'
 import './EvidenceReviewBackup.css'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 const statusLabel = { new: '将新增', existing: '本地已有，跳过', duplicate: '文件内重复，跳过' }
 
@@ -67,16 +69,16 @@ export default function EvidenceReviewBackup({ entries = [], storageError = '', 
     <div className="evidence-review-backup-body">
       <p>一次备份{scopeLabel}的全部 {entries.length} 份存档，覆盖所有分页。仅包含已存档的核对记录与备注，不含正文、未存档进度或应用设置。</p>
       <div className="evidence-review-backup-tools">
-        <button type="button" disabled={reading || Boolean(storageError) || !entries.length} onClick={() => {
+        <UiButton size="middle" type="button" disabled={reading || Boolean(storageError) || !entries.length} onClick={() => {
           try {
             downloadReviewBackup(buildReviewBackup(entries, reviewArchives))
             setMessage({ error: false, text: `已发起 ${entries.length} 份存档备份下载，请确认文件实际保存。不会清空本地记录。` })
           } catch (error) { setMessage({ error: true, text: error.message || '备份失败，原记录未改动' }) }
-        }}>备份当前范围全部存档</button>
-        <button type="button" disabled={reading} onClick={() => input.current?.click()}>选择备份文件并预检</button>
-        <input ref={input} type="file" accept=".json,application/json" aria-label="预检核对备份文件" hidden onChange={event => void readFile(event)} />
-        {(reading || raw !== null) && <button type="button" onClick={clear}>{reading ? '取消读取' : '关闭导入预检'}</button>}
-        {raw !== null && !reading && !preview && <button type="button" onClick={() => preflight(raw)}>重新预检此文件</button>}
+        }}>备份当前范围全部存档</UiButton>
+        <UiButton size="middle" type="button" disabled={reading} onClick={() => input.current?.click()}>选择备份文件并预检</UiButton>
+        <input data-ui-native="file" ref={input} type="file" accept=".json,application/json" aria-label="预检核对备份文件" hidden onChange={event => void readFile(event)} />
+        {(reading || raw !== null) && <UiButton size="middle" type="button" onClick={clear}>{reading ? '取消读取' : '关闭导入预检'}</UiButton>}
+        {raw !== null && !reading && !preview && <UiButton size="middle" type="button" onClick={() => preflight(raw)}>重新预检此文件</UiButton>}
       </div>
       <p>支持本功能导出的整包 JSON 和原有单份存档 JSON。选择文件只预览，不自动导入。重复判定比较历史保存时间和完整核对内容，不按文件名或存档 ID 猜测。</p>
       {reading && <p role="status">正在读取备份文件，尚未写入存档…</p>}
@@ -92,7 +94,7 @@ export default function EvidenceReviewBackup({ entries = [], storageError = '', 
         <p role="status">文件共 {preview.items.length} 份；将新增 {preview.newCount} 份；重复跳过 {preview.skippedCount} 份；本地剩余 {preview.available} 个存档位置。</p>
         <p>请核对下方项目与实体。确认后仅新增独立存档，不创建正文或自动恢复核对；中途失败会停止并保留成功项，剩余可重试。</p>
         {!preview.fits && <p role="alert">容量不足，不能确认导入。请先备份并手动整理本地存档，再重新预检；不会自动删除旧记录。</p>}
-        <button type="button" className="evidence-review-backup-confirm" disabled={reading || Boolean(storageError) || !preview.fits || !preview.newCount} onClick={confirm}>确认导入新增 {preview.newCount} 份</button>
+        <UiButton type="button" className="evidence-review-backup-confirm" disabled={reading || Boolean(storageError) || !preview.fits || !preview.newCount} onClick={confirm}>确认导入新增 {preview.newCount} 份</UiButton>
         <ul aria-label="备份内存档清单">
           {preview.items.slice((currentPage - 1) * 8, currentPage * 8).map(item => <li key={item.index}>
             <div><strong>{item.archive.data.entityLabel || '未命名实体'}</strong><span>{statusLabel[item.status]}</span></div>
@@ -101,9 +103,9 @@ export default function EvidenceReviewBackup({ entries = [], storageError = '', 
           </li>)}
         </ul>
         {pages > 1 && <nav aria-label="备份预检分页">
-          <button type="button" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>上一页预检</button>
+          <UiButton type="button" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>上一页预检</UiButton>
           <span>{currentPage} / {pages}</span>
-          <button type="button" disabled={currentPage >= pages} onClick={() => setPage(currentPage + 1)}>下一页预检</button>
+          <UiButton type="button" disabled={currentPage >= pages} onClick={() => setPage(currentPage + 1)}>下一页预检</UiButton>
         </nav>}
         <p>确认时再次校验本地存档。批量写入不是整包事务：中途空间不足或出现变化时立即停止，已成功新增的记录保留，并显示实际新增与剩余数量。</p>
       </section>}

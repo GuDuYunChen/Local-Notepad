@@ -9,6 +9,8 @@ import {
   readDailyReview,
 } from './projectSprintUtils'
 import './ProjectTodayCenter.css'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 function stripExtension(value) {
   return String(value || '').replace(/\.[^.]+$/, '')
@@ -77,21 +79,21 @@ export default function ProjectTodayCenter({
         </div>
 
         <div className="project-today-center-actions">
-          <button
+          <UiButton size="middle"
             type="button"
             className="btn"
             onClick={() => onNavigateView?.('planning')}
           >
             查看计划
-          </button>
+          </UiButton>
           {primary && (
-            <button
+            <UiButton size="middle"
               type="button"
               className="btn primary"
               onClick={() => onStartFocus?.(primary, 50)}
             >
               开始下一章 · 50 分钟
-            </button>
+            </UiButton>
           )}
         </div>
       </div>
@@ -109,7 +111,7 @@ export default function ProjectTodayCenter({
             {todayQueue.length ? todayQueue.map((note, index) => (
               <div key={note.id}>
                 <span className="project-today-task-order">{index + 1}</span>
-                <button
+                <UiButton
                   type="button"
                   className="project-today-task-open"
                   onClick={() => onOpenFile?.(note.id)}
@@ -119,29 +121,29 @@ export default function ProjectTodayCenter({
                     {note.volumeTitle || '未分卷'} ·
                     {note.status === 'review' ? ' 修订' : ' 草稿'}
                   </small>
-                </button>
+                </UiButton>
                 <div className="project-today-focus-actions">
-                  <button
+                  <UiButton size="middle"
                     type="button"
                     onClick={() => onStartFocus?.(note, 25)}
                     title="25 分钟专注"
                   >
                     25
-                  </button>
-                  <button
+                  </UiButton>
+                  <UiButton size="middle"
                     type="button"
                     onClick={() => onStartFocus?.(note, 50)}
                     title="50 分钟专注"
                   >
                     50
-                  </button>
-                  <button
+                  </UiButton>
+                  <UiButton size="middle"
                     type="button"
                     onClick={() => onStartFocus?.(note, 90)}
                     title="90 分钟专注"
                   >
                     90
-                  </button>
+                  </UiButton>
                 </div>
               </div>
             )) : (
@@ -149,12 +151,12 @@ export default function ProjectTodayCenter({
                 <strong>当前没有待写章节</strong>
                 <span>可以到“项目”检查卷章结构，或到“计划”调整下一章节队列。</span>
                 <div>
-                  <button type="button" onClick={() => onNavigateView?.('project')}>
+                  <UiButton type="button" onClick={() => onNavigateView?.('project')}>
                     查看项目
-                  </button>
-                  <button type="button" onClick={() => onNavigateView?.('planning')}>
+                  </UiButton>
+                  <UiButton type="button" onClick={() => onNavigateView?.('planning')}>
                     调整计划
-                  </button>
+                  </UiButton>
                 </div>
               </div>
             )}
@@ -200,9 +202,9 @@ export default function ProjectTodayCenter({
                   : '尚未记录，结束写作后补一句即可。'}
               </span>
             </div>
-            <button type="button" onClick={scrollToReview}>
+            <UiButton type="button" onClick={scrollToReview}>
               {todayReview ? '查看' : '去复盘'}
-            </button>
+            </UiButton>
           </div>
         </article>
 
@@ -216,7 +218,7 @@ export default function ProjectTodayCenter({
 
           <div className="project-today-history-list">
             {history.length ? history.slice(0, 6).map(item => (
-              <button
+              <UiButton
                 key={item.id}
                 type="button"
                 onClick={() => onOpenFile?.(item.noteId)}
@@ -230,7 +232,7 @@ export default function ProjectTodayCenter({
                   </small>
                 </span>
                 <em>{formatTime(item.endedAt)}</em>
-              </button>
+              </UiButton>
             )) : (
               <div className="project-today-empty">
                 完成第一个专注 Session 后，这里会留下记录。

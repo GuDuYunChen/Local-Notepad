@@ -13,17 +13,20 @@
 .s3-inspection-wide { grid-column: 1 / -1; }
 .s3-inspection-field { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
 .s3-inspection-field label { font-size: 13px; font-weight: 600; }
-.s3-inspection-field input { box-sizing: border-box; width: 100%; min-width: 0; min-height: 38px; border: 1px solid var(--line, #d2d7df); border-radius: 6px; padding: 8px 10px; background: var(--surface, #fff); color: inherit; font: inherit; font-size: 14px; }
+.s3-inspection-field input { box-sizing: border-box; width: 100%; min-width: 0; }
+.s3-inspection-field input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { min-height: 38px; border: 1px solid var(--line, #d2d7df); border-radius: 6px; padding: 8px 10px; background: var(--surface, #fff); color: inherit; font: inherit; font-size: 14px; }
 .s3-inspection-field small { color: var(--ink-soft, #606877); font-size: 12px; line-height: 1.65; overflow-wrap: anywhere; }
-.s3-inspection input:focus-visible, .s3-inspection button:focus-visible { outline: 2px solid var(--clay, #4568c7); outline-offset: 3px; }
-.s3-inspection-field input[aria-invalid="true"] { border-color: var(--danger, #b33232); }
+.s3-inspection input:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)),
+.s3-inspection button:focus-visible:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { outline: 2px solid var(--clay, #4568c7); outline-offset: 3px; }
+.s3-inspection-field input[aria-invalid="true"]:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { border-color: var(--danger, #b33232); }
 .s3-inspection-error, .s3-inspection-error-summary { color: var(--danger, #b33232); font-size: 13px; line-height: 1.65; margin: 0; overflow-wrap: anywhere; }
 .s3-inspection-error-summary, .s3-inspection-unavailable { padding: 12px 0; }
 .s3-inspection-unavailable { line-height: 1.65; font-weight: 600; }
 .s3-inspection-consent { display: flex; align-items: flex-start; gap: 10px; margin: 18px 0 10px; line-height: 1.7; font-size: 13px; }
-.s3-inspection-consent input { flex: none; width: 17px; height: 17px; margin: 3px 0; accent-color: var(--clay, #4568c7); }
+.s3-inspection-consent input { flex: none; width: 17px; margin: 3px 0; accent-color: var(--clay, #4568c7); }
+.s3-inspection-consent input:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { height: 17px; }
 .s3-inspection-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
-.s3-inspection-actions button { min-height: 36px; }
+.s3-inspection-actions button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { min-height: 36px; }
 .s3-inspection-shortcuts, .s3-inspection-limitation { color: var(--ink-soft, #606877); font-size: 12px; line-height: 1.7; margin: 12px 0 0; }
 .s3-inspection-result { padding: 16px; border: 1px solid var(--line, #d2d7df); border-radius: 8px; background: var(--paper, #f5f7fa); line-height: 1.7; }
 .s3-inspection-result h4 { font-size: 15px; margin: 0 0 8px; }

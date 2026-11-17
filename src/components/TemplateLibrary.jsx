@@ -6,6 +6,8 @@ import ConfirmDialog from './ConfirmDialog'
 import { dailyRequest } from '../services/dailyNotes.mjs'
 import { createTemplateJournal, createTemplateOperations, readTemplateLibrary, templateName, textTemplateDocument, editableTemplateText, validTemplate, TEMPLATE_DRAFT_KEY } from '../services/templateLibrary.mjs'
 import './TemplateLibrary.css'
+import { UiButton, UiInput, UiTextarea } from '~/components/ui/ControlKit'
+
 
 let memoryDraft = null, quitUnregister = null
 function syncDraftQuitGuard() {
@@ -128,33 +130,33 @@ export default function TemplateLibrary({ onClose, onCreated, beforeCreate, pare
   const modal = confirmation
   return <div className="modal-overlay template-library-overlay" onMouseDown={e => { if (e.target === e.currentTarget) close() }}>
     <section ref={panelRef} className="template-library" role="dialog" aria-modal="true" aria-labelledby="template-library-title">
-      <header><div><small>本地资料 · 模板</small><h2 id="template-library-title">我的模板库</h2><p>管理可复用的文本结构，创建独立笔记；不会覆盖当前正文。</p></div><button type="button" className="btn" onClick={close}>{busy ? '停止等待' : '返回模板选择'}</button></header>
+      <header><div><small>本地资料 · 模板</small><h2 id="template-library-title">我的模板库</h2><p>管理可复用的文本结构，创建独立笔记；不会覆盖当前正文。</p></div><UiButton type="button" className="btn" onClick={close}>{busy ? '停止等待' : '返回模板选择'}</UiButton></header>
       {message && <p className="template-library-feedback" role="status">{message}</p>}
       <div className="template-library-layout">
         <section className="template-library-index" aria-label="模板列表">
-          <div className="template-library-actions"><button className="btn primary" disabled={busy} onClick={() => startEdit()}>新建模板</button><button className="btn" disabled={busy || status === 'loading'} onClick={() => void load()}>刷新模板库</button></div>
-          <label>查找模板<input value={searchInput} onCompositionStart={() => { searchComposing.current = true }} onCompositionEnd={e => { searchComposing.current = false; setQuery(e.currentTarget.value); setPage(0) }} onChange={e => { setSearchInput(e.target.value); if (!searchComposing.current) { setQuery(e.target.value); setPage(0) } }} /></label>
-          <label className="template-library-check"><input type="checkbox" checked={archived} onChange={e => { setArchived(e.target.checked); setPage(0) }} />查看已移除模板</label>
+          <div className="template-library-actions"><UiButton size="middle" className="btn primary" disabled={busy} onClick={() => startEdit()}>新建模板</UiButton><UiButton size="middle" className="btn" disabled={busy || status === 'loading'} onClick={() => void load()}>刷新模板库</UiButton></div>
+          <label>查找模板<UiInput value={searchInput} onCompositionStart={() => { searchComposing.current = true }} onCompositionEnd={e => { searchComposing.current = false; setQuery(e.currentTarget.value); setPage(0) }} onChange={e => { setSearchInput(e.target.value); if (!searchComposing.current) { setQuery(e.target.value); setPage(0) } }} /></label>
+          <label className="template-library-check"><input data-ui-native="checkbox" type="checkbox" checked={archived} onChange={e => { setArchived(e.target.checked); setPage(0) }} />查看已移除模板</label>
           {archived && <p>已移除模板可恢复；原有30天清理策略仍适用。</p>}
           {status === 'loading' ? <p role="status">正在读取模板库…</p> : status === 'error' ? <p role="alert">模板库读取失败，不能据此判断为空。请刷新重试。</p> : <>
             <p>{visible.length} 个模板</p>
             {!visible.length && <p>{query ? '没有匹配的模板。' : '暂无模板，可以新建一个。'}</p>}
-            <ul>{visible.slice(currentPage * 12, currentPage * 12 + 12).map(row => <li key={row.id}><button className="template-library-row" aria-pressed={selected?.id === row.id} onClick={() => { setSelected(row); setName(row.title + '.md') }} disabled={busy}><strong>{row.title}</strong><span>{row.archived ? '已移除' : '本地模板'}</span></button><div><button className="btn small" disabled={busy || row.archived} onClick={() => startEdit(row)}>编辑</button><button className="btn small" disabled={busy} onClick={() => archive(row)}>{row.archived ? '恢复模板' : '移除模板'}</button></div></li>)}</ul>
-            {maxPage > 0 && <nav aria-label="模板分页"><button disabled={!currentPage} onClick={() => setPage(currentPage-1)}>上一页</button><span>{currentPage+1} / {maxPage+1}</span><button disabled={currentPage===maxPage} onClick={() => setPage(currentPage+1)}>下一页</button></nav>}
+            <ul>{visible.slice(currentPage * 12, currentPage * 12 + 12).map(row => <li key={row.id}><UiButton className="template-library-row" aria-pressed={selected?.id === row.id} onClick={() => { setSelected(row); setName(row.title + '.md') }} disabled={busy}><strong>{row.title}</strong><span>{row.archived ? '已移除' : '本地模板'}</span></UiButton><div><UiButton className="btn small" disabled={busy || row.archived} onClick={() => startEdit(row)}>编辑</UiButton><UiButton className="btn small" disabled={busy} onClick={() => archive(row)}>{row.archived ? '恢复模板' : '移除模板'}</UiButton></div></li>)}</ul>
+            {maxPage > 0 && <nav aria-label="模板分页"><UiButton disabled={!currentPage} onClick={() => setPage(currentPage-1)}>上一页</UiButton><span>{currentPage+1} / {maxPage+1}</span><UiButton disabled={currentPage===maxPage} onClick={() => setPage(currentPage+1)}>下一页</UiButton></nav>}
           </>}
         </section>
         <section className="template-library-detail" aria-label={editing ? '编辑模板' : '模板预览与新建'}>
-          {editing ? <><h3>{draft.original ? '编辑模板' : '新建文本模板'}</h3><label>模板名称<input aria-label="模板名称" maxLength={120} disabled={busy || draft.corrupt} value={draft.title} onChange={e => persistDraft({ ...draft, title: e.target.value })} /></label>
-            <label>模板正文<textarea aria-label="模板正文" value={draft.text} disabled={busy || draft.corrupt || !!draft.original && editableTemplateText(draft.original.content) === null} onChange={e => persistDraft({ ...draft, text: e.target.value })} /></label>
+          {editing ? <><h3>{draft.original ? '编辑模板' : '新建文本模板'}</h3><label>模板名称<UiInput aria-label="模板名称" maxLength={120} disabled={busy || draft.corrupt} value={draft.title} onChange={e => persistDraft({ ...draft, title: e.target.value })} /></label>
+            <label>模板正文<UiTextarea aria-label="模板正文" value={draft.text} disabled={busy || draft.corrupt || !!draft.original && editableTemplateText(draft.original.content) === null} onChange={e => persistDraft({ ...draft, text: e.target.value })} /></label>
             {draft.original && editableTemplateText(draft.original.content) === null && <p>这是旧富文本模板，本页仅改名并保留完整原文；创建笔记时会明确使用文本副本。</p>}
             <p>{draft.error || (draft.dirty ? '草稿已保存在本机应用配置中，尚未保存到模板库。' : '模板正文支持多行文本；空白正文也可保存。')}</p>
-            <div className="template-library-actions"><button className="btn primary" disabled={busy || draft.corrupt} onClick={() => void saveTemplate()}>保存模板</button><button className="btn" disabled={busy} onClick={() => setConfirmation({ type: 'discard' })}>放弃草稿</button>{draft.error && !draft.corrupt && <button className="btn" onClick={() => persistDraft(draft)}>重试保存草稿</button>}</div>
-          </> : selected ? <><h3>{selected.title}</h3><p>纯文本预览；创建的是独立文本笔记，不复制图片、附件等嵌入对象，原模板不变。</p><pre tabIndex={0} aria-label="模板正文预览">{selectedText || '（空白模板）'}</pre><label>新笔记名称<input aria-label="新笔记名称" disabled={busy} value={name} maxLength={120} onChange={e => setName(e.target.value)} /></label><p>创建位置：{parentLabel}。目录失效时不会改存根目录。</p><button className="btn primary" disabled={busy || selected.archived} onClick={() => void createCopy()}>从预览创建文本笔记</button></> : <p>选择模板查看内容，或新建自己的文本模板。</p>}
-          {result?.confirmed && <section className="template-library-result" aria-label="操作结果"><strong>{result.message}</strong>{result.receipt?.state === 'available' && result.entry.value.payload?.kind === 'note' && <button className="btn primary" disabled={busy} onClick={() => void openCreated()}>打开已创建的笔记</button>}</section>}
+            <div className="template-library-actions"><UiButton size="middle" className="btn primary" disabled={busy || draft.corrupt} onClick={() => void saveTemplate()}>保存模板</UiButton><UiButton size="middle" className="btn" disabled={busy} onClick={() => setConfirmation({ type: 'discard' })}>放弃草稿</UiButton>{draft.error && !draft.corrupt && <UiButton size="middle" className="btn" onClick={() => persistDraft(draft)}>重试保存草稿</UiButton>}</div>
+          </> : selected ? <><h3>{selected.title}</h3><p>纯文本预览；创建的是独立文本笔记，不复制图片、附件等嵌入对象，原模板不变。</p><pre tabIndex={0} aria-label="模板正文预览">{selectedText || '（空白模板）'}</pre><label>新笔记名称<UiInput aria-label="新笔记名称" disabled={busy} value={name} maxLength={120} onChange={e => setName(e.target.value)} /></label><p>创建位置：{parentLabel}。目录失效时不会改存根目录。</p><UiButton className="btn primary" disabled={busy || selected.archived} onClick={() => void createCopy()}>从预览创建文本笔记</UiButton></> : <p>选择模板查看内容，或新建自己的文本模板。</p>}
+          {result?.confirmed && <section className="template-library-result" aria-label="操作结果"><strong>{result.message}</strong>{result.receipt?.state === 'available' && result.entry.value.payload?.kind === 'note' && <UiButton className="btn primary" disabled={busy} onClick={() => void openCreated()}>打开已创建的笔记</UiButton>}</section>}
         </section>
       </div>
       <details className="template-library-records" open={entries.length > 0}><summary>本机操作记录（{entries.length}）</summary><p>写入前保存操作编号。超时不代表失败；先核对，重试复用同一编号。重新打开不会自动发送。</p>
-        {entries.map(entry => <article key={entry.key}><span>{entry.error || (entry.value.type === 'create' ? '创建：' + entry.value.payload.title : '修改：' + entry.value.next.title)}</span><div>{!entry.error && <><button className="btn small" disabled={busy} onClick={() => void run(entry, false)}>核对操作结果</button><button className="btn small" disabled={busy} onClick={() => void run(entry, true)}>重试同一操作</button></>}<button className="btn small" disabled={busy} onClick={() => setConfirmation({ type: 'clear', entry })}>清除这条记录</button></div></article>)}
+        {entries.map(entry => <article key={entry.key}><span>{entry.error || (entry.value.type === 'create' ? '创建：' + entry.value.payload.title : '修改：' + entry.value.next.title)}</span><div>{!entry.error && <><UiButton className="btn small" disabled={busy} onClick={() => void run(entry, false)}>核对操作结果</UiButton><UiButton className="btn small" disabled={busy} onClick={() => void run(entry, true)}>重试同一操作</UiButton></>}<UiButton className="btn small" disabled={busy} onClick={() => setConfirmation({ type: 'clear', entry })}>清除这条记录</UiButton></div></article>)}
       </details>
       {modal && <ConfirmDialog title={modal.title || (modal.type === 'clear' ? '清除本机操作记录？' : '处理尚未保存的模板草稿')} message={modal.type === 'archive' ? '只影响选定模板，不删除已用它创建的笔记。恢复遇到同名项时会拒绝覆盖。' : modal.type === 'clear' ? '仅移除本机查询编号，不撤销后端操作。尚未确认的创建可能已经完成，清除后请勿靠新请求重复创建。' : '保留草稿后可重新打开继续；明确放弃才会清除。'} onClose={() => setConfirmation(null)} actions={[
         { label: '取消', onClick: () => setConfirmation(null) },

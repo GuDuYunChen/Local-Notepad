@@ -1,7 +1,10 @@
-import { $getNodeByKey, DecoratorNode } from 'lexical'
+import { $getNodeByKey, DecoratorNode, SKIP_DOM_SELECTION_TAG } from 'lexical'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { useLexicalEditable } from '@lexical/react/useLexicalEditable'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
+import { UiButton, UiTextarea } from '~/components/ui/ControlKit'
+import { bindDecoratorKeyboardAccess } from './decoratorKeyboard'
+
 
 const CALLOUT_ICONS = ['💡', '⚠️', 'ℹ️', '✅', '❌', '📌', '🔔', '💬']
 
@@ -78,6 +81,12 @@ function CalloutComponent({ nodeKey, icon, text }) {
   const [currentIcon, setCurrentIcon] = useState(icon || '💡')
   const [editText, setEditText] = useState(text || '')
   const [showIconPicker, setShowIconPicker] = useState(false)
+  const blockRef = useRef(null)
+
+  useEffect(() => bindDecoratorKeyboardAccess(
+    blockRef.current, '.callout-block > .callout-header .callout-icon-btn:not(:disabled)',
+    () => editor.isEditable(), () => editor.update(() => {}, { tag: SKIP_DOM_SELECTION_TAG })
+  ), [editor, isEditable])
 
   useEffect(() => setCurrentIcon(icon || '💡'), [icon])
   useEffect(() => setEditText(text || ''), [text])
@@ -108,9 +117,9 @@ function CalloutComponent({ nodeKey, icon, text }) {
   }
 
   return (
-    <div className="callout-block">
+    <div ref={blockRef} className="callout-block" title="按 F6 从编辑正文进入提示图标操作">
       <div className="callout-header">
-        <button
+        <UiButton density="compact"
           type="button"
           className="callout-icon-btn"
           onClick={() => { if (editor.isEditable()) setShowIconPicker(prev => !prev) }}
@@ -119,12 +128,12 @@ function CalloutComponent({ nodeKey, icon, text }) {
           aria-expanded={showIconPicker && isEditable}
         >
           {currentIcon}
-        </button>
+        </UiButton>
 
         {showIconPicker && isEditable && (
           <div className="callout-icon-picker">
             {CALLOUT_ICONS.map(item => (
-              <button
+              <UiButton density="compact"
                 type="button"
                 key={item}
                 className="callout-icon-option"
@@ -132,14 +141,14 @@ function CalloutComponent({ nodeKey, icon, text }) {
                 aria-label={`选择图标 ${item}`}
               >
                 {item}
-              </button>
+              </UiButton>
             ))}
           </div>
         )}
       </div>
 
       <div className="callout-content">
-        <textarea
+        <UiTextarea density="compact"
           value={editText}
           readOnly={!isEditable}
           onChange={handleTextChange}

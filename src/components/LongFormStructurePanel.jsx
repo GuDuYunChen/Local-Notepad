@@ -7,6 +7,8 @@ import {
   moveStructureSectionAdjacent,
 } from './Editor/utils/structureUtils'
 import './LongFormStructurePanel.css'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 function typeLabel(level) {
   if (level === 1) return '卷'
@@ -155,7 +157,7 @@ export default function LongFormStructurePanel({
             style={{ width: String(depth * 13) + 'px' }}
           />
 
-          <button
+          <UiButton
             type="button"
             className="long-structure-expand"
             disabled={!hasChildren}
@@ -171,7 +173,7 @@ export default function LongFormStructurePanel({
             aria-label={expanded ? '收起子章节' : '展开子章节'}
           >
             {hasChildren ? (expanded ? '⌄' : '›') : '·'}
-          </button>
+          </UiButton>
 
           <span className={'long-structure-kind level-' + section.level}>
             {typeLabel(section.level)}
@@ -183,7 +185,7 @@ export default function LongFormStructurePanel({
           </div>
 
           <div className="long-structure-actions">
-            <button
+            <UiButton size="middle"
               type="button"
               disabled={busy || siblingIndex <= 0}
               onClick={() => applyMove(section.id, 'up')}
@@ -191,8 +193,8 @@ export default function LongFormStructurePanel({
               aria-label={'上移 ' + section.text}
             >
               ↑
-            </button>
-            <button
+            </UiButton>
+            <UiButton size="middle"
               type="button"
               disabled={busy || siblingIndex < 0 || siblingIndex >= siblings.length - 1}
               onClick={() => applyMove(section.id, 'down')}
@@ -200,23 +202,23 @@ export default function LongFormStructurePanel({
               aria-label={'下移 ' + section.text}
             >
               ↓
-            </button>
-            <button
+            </UiButton>
+            <UiButton size="middle"
               type="button"
               disabled={busy || siblingIndex <= 0}
               onClick={() => mergePrevious(section)}
               title="合并到上一个同级章节"
             >
               合
-            </button>
-            <button
+            </UiButton>
+            <UiButton size="middle"
               type="button"
               disabled={busy}
               onClick={() => onExtractSection?.(section)}
               title="拆出为独立笔记"
             >
               拆
-            </button>
+            </UiButton>
           </div>
         </div>
 

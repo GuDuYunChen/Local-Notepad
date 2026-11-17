@@ -3,6 +3,8 @@ import SyncConflictReview from './SyncConflictReview'
 import { indexConflictQueue, conflictQueuePage, CONFLICT_QUEUE_FILTERS, CONFLICT_QUEUE_ORDERS, formatConflictCreatedAt } from '~/services/syncConflictQueue.mjs'
 import { CONFLICT_RISK_FILTERS } from '~/services/syncConflictRisk.mjs'
 import './SyncConflictQueue.css'
+import { UiButton, UiInput, UiSelect } from '~/components/ui/ControlKit'
+
 
 export default function SyncConflictQueue({ conflicts, scope, busy = false, disabled = false, onResolve, onRefresh }) {
   const [browse, setBrowse] = useState({ query: '', kind: 'all', risk: 'all', order: 'server', page: 1, epoch: 0 })
@@ -48,23 +50,23 @@ export default function SyncConflictQueue({ conflicts, scope, busy = false, disa
     <p className="sync-queue-hint">搜索两端名称或编号，不搜索正文。筛选、排序、清空条件或翻页会收起对照并清除旧确认，不会处理冲突。</p>
     {!model.valid ? <p className="sync-queue-notice" role="alert">{model.message}</p> : <>
       <div className="sync-queue-tools">
-        <label className="sync-queue-search">搜索冲突<input type="search" aria-label="搜索冲突" maxLength={256}
+        <label className="sync-queue-search">搜索冲突<UiInput size="middle" type="search" aria-label="搜索冲突" maxLength={256}
           placeholder="两端标题、附件名或编号" value={browse.query} disabled={locked}
           onChange={event => change({ query: event.target.value, page: 1 })}/></label>
-        <label>对象类型<select aria-label="冲突对象类型" value={browse.kind} disabled={locked}
+        <label>对象类型<UiSelect size="middle" aria-label="冲突对象类型" value={browse.kind} disabled={locked}
           onChange={event => change({ kind: event.target.value, page: 1 })}>
           {CONFLICT_QUEUE_FILTERS.map(([value, title]) => <option key={value} value={value}>{title}（{value === 'all' ? model.total : model.counts[value]}）</option>)}
-        </select></label>
-        <label>关注项<select aria-label="冲突关注项" value={browse.risk} disabled={locked}
+        </UiSelect></label>
+        <label>关注项<UiSelect size="middle" aria-label="冲突关注项" value={browse.risk} disabled={locked}
           onChange={event => change({ risk: event.target.value, page: 1 })}>
           {CONFLICT_RISK_FILTERS.map(([value, title]) => <option key={value} value={value}>{title}（{value === 'all' ? model.total : model.riskCounts[value]}）</option>)}
-        </select></label>
-        <label>查看顺序<select aria-label="冲突查看顺序" value={browse.order} disabled={locked}
+        </UiSelect></label>
+        <label>查看顺序<UiSelect size="middle" aria-label="冲突查看顺序" value={browse.order} disabled={locked}
           onChange={event => change({ order: event.target.value, page: 1 })}>
           {CONFLICT_QUEUE_ORDERS.map(([value, title]) => <option key={value} value={value}>{title}</option>)}
-        </select></label>
-        <button type="button" className="btn small" disabled={locked || (!browse.query && browse.kind === 'all' && browse.risk === 'all')}
-          onClick={() => change({ query: '', kind: 'all', risk: 'all', page: 1 })}>清空筛选</button>
+        </UiSelect></label>
+        <UiButton size="middle" type="button" className="btn small" disabled={locked || (!browse.query && browse.kind === 'all' && browse.risk === 'all')}
+          onClick={() => change({ query: '', kind: 'all', risk: 'all', page: 1 })}>清空筛选</UiButton>
       </div>
       <p className="sync-queue-count" role="status">匹配 {view.matched} / 当前列表 {view.total} 条 · 显示 {view.from}–{view.to}</p>
       <p className="sync-queue-hint">类型数量基于最近读取的完整列表，不随搜索条件变化；新记录需刷新状态。默认情况下，列表保留服务端顺序。</p>
@@ -85,11 +87,11 @@ export default function SyncConflictQueue({ conflicts, scope, busy = false, disa
           : '没有匹配的冲突，不代表冲突已解决。请调整条件或清空筛选。'}</p>}
       </div>
       <nav className="sync-queue-pagination" aria-label="冲突列表分页">
-        <button type="button" className="btn small" disabled={locked || view.page <= 1} onClick={() => change({ page: 1 }, true)}>首页冲突</button>
-        <button type="button" className="btn small" disabled={locked || view.page <= 1} onClick={() => change({ page: view.page - 1 }, true)}>上一页冲突</button>
+        <UiButton type="button" className="btn small" disabled={locked || view.page <= 1} onClick={() => change({ page: 1 }, true)}>首页冲突</UiButton>
+        <UiButton type="button" className="btn small" disabled={locked || view.page <= 1} onClick={() => change({ page: view.page - 1 }, true)}>上一页冲突</UiButton>
         <span>第 {view.page} / {view.pages} 页</span>
-        <button type="button" className="btn small" disabled={locked || view.page >= view.pages} onClick={() => change({ page: view.page + 1 }, true)}>下一页冲突</button>
-        <button type="button" className="btn small" disabled={locked || view.page >= view.pages} onClick={() => change({ page: view.pages }, true)}>末页冲突</button>
+        <UiButton type="button" className="btn small" disabled={locked || view.page >= view.pages} onClick={() => change({ page: view.page + 1 }, true)}>下一页冲突</UiButton>
+        <UiButton type="button" className="btn small" disabled={locked || view.page >= view.pages} onClick={() => change({ page: view.pages }, true)}>末页冲突</UiButton>
       </nav>
     </>}
   </section>

@@ -5,6 +5,8 @@ import { toast } from '~/services/toast'
 import { nextUnreviewedChapter, getReviewAnnotation } from '~/services/evidenceReviewReport'
 import EvidenceReviewRecords from './EvidenceReviewRecords'
 import './EvidenceReviewBar.css'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 export default function EvidenceReviewBar({ documentId, dirty = false, onOpenFile, onReturn }) {
   const session = useSyncExternalStore(evidenceReview.subscribe, evidenceReview.getSnapshot, () => null)
@@ -59,17 +61,17 @@ export default function EvidenceReviewBar({ documentId, dirty = false, onOpenFil
         <small>范围来自进入时的筛选；相邻按钮打开整章，返回列表可定位具体片段。</small>
       </div>
       <div className="evidence-review-actions">
-        <button type="button" disabled={busy || index <= 0 || !onOpenFile} onClick={() => void openChapter(session.chapters[index - 1])}>上一证据章</button>
-        <button type="button" disabled={busy || index < 0 || index >= session.chapters.length - 1 || !onOpenFile} onClick={() => void openChapter(session.chapters[index + 1])}>下一证据章</button>
-        <button type="button" aria-pressed={reviewed} disabled={busy || index < 0 || dirty || needsChanges}
+        <UiButton size="middle" type="button" disabled={busy || index <= 0 || !onOpenFile} onClick={() => void openChapter(session.chapters[index - 1])}>上一证据章</UiButton>
+        <UiButton size="middle" type="button" disabled={busy || index < 0 || index >= session.chapters.length - 1 || !onOpenFile} onClick={() => void openChapter(session.chapters[index + 1])}>下一证据章</UiButton>
+        <UiButton size="middle" type="button" aria-pressed={reviewed} disabled={busy || index < 0 || dirty || needsChanges}
           title={dirty ? '保存修改后再标记；编辑会清除本章的已核对标记' : '仅记录本轮进度，不确认关系或修改正文'}
           onClick={() => evidenceReview.setReviewed(session.id, documentId, !reviewed)}>
           {dirty ? '保存后可标记' : needsChanges ? '处理待修改后可标记' : reviewed ? '已核对' : '标记已核对'}
-        </button>
-        <button type="button" className="evidence-review-return" disabled={busy || !onReturn}
-          onClick={() => { if (!sourceModeBlocksNavigation()) onReturn?.(session.id) }}>返回证据列表</button>
-        <button type="button" disabled={busy || !next || !onOpenFile}
-          onClick={() => void openChapter(next)}>下一未核对章</button>
+        </UiButton>
+        <UiButton size="middle" type="button" className="evidence-review-return" disabled={busy || !onReturn}
+          onClick={() => { if (!sourceModeBlocksNavigation()) onReturn?.(session.id) }}>返回证据列表</UiButton>
+        <UiButton size="middle" type="button" disabled={busy || !next || !onOpenFile}
+          onClick={() => void openChapter(next)}>下一未核对章</UiButton>
       </div>
       <EvidenceReviewRecords documentId={documentId} dirty={dirty} busy={busy}
         onOpenFile={onOpenFile ? id => openChapter(session.chapters.find(item => item.id === id)) : undefined} />

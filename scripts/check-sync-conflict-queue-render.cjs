@@ -26,24 +26,43 @@ function inspectQueue() {
   const luminance = rgb => rgb.map(n => { n /= 255; return n <= .04045 ? n / 12.92 : ((n + .055) / 1.055) ** 2.4 })
     .reduce((sum, n, i) => sum + n * [.2126, .7152, .0722][i], 0)
   const colors = []
-  for (const [selector, token] of [
+  for (const [selector, token, actionLabel] of [
     ['.sync-conflict-heading>strong', '--ink'], ['.sync-queue-hint', '--ink-soft'],
     ['.sync-queue-search', '--ink'], ['.sync-queue-tools input', '--ink'],
-    ['.sync-queue-tools select', '--ink'], ['.sync-queue-count', '--ink'],
+    ['.sync-queue-tools [data-ui-control="select"] .ant-select-content', '--ink'], ['.sync-queue-count', '--ink'],
     ['.sync-queue-identifiers', '--ink-soft'], ['.sync-conflict-item>div>strong', '--ink'],
     ['.sync-conflict-item>div>span', '--ink-soft'],
+    ['.sync-conflict-actions>[data-ui-control="button"]:nth-child(1)', '@button', '对照版本'],
+    ['.sync-conflict-actions>[data-ui-control="button"]:nth-child(2)', '@button', '采用远端'],
+    ['.sync-conflict-actions>[data-ui-control="button"]:nth-child(3)', '@button', '保留本机'],
   ]) {
     const el = queue.querySelector(selector)
     if (!el) return { ready: false, missing: selector }
-    const style = getComputedStyle(el), chain = []
-    for (let node = el; node; node = node.parentElement) chain.unshift(node)
+    const button = token === '@button' ? el : null
+    if (token === '@button' && (button.tagName !== 'BUTTON' || button.getAttribute('data-ui-control') !== 'button' ||
+        !button.classList.contains('ant-btn') || button.disabled || button.matches(':disabled') || button.getAttribute('aria-disabled') === 'true')) return { ready: false, invalidButton: selector }
+    // The root locates the real control; its own color cannot stand in for the
+    // actual direct text span when an inherited caption rule changes that span.
+    const labels = button ? [...button.children].filter(node => node.tagName === 'SPAN' &&
+      !node.classList.contains('ant-btn-icon') && node.textContent.trim() === actionLabel) : null
+    if (button && (button.textContent.trim() !== actionLabel || labels.length !== 1 ||
+        labels[0].parentElement !== button || labels[0].children.length !== 0)) return { ready: false, missing: 'enabled action label: ' + selector }
+    const text = button ? labels[0] : el
+    const buttonStyle = button ? getComputedStyle(button) : null
+    const style = getComputedStyle(text), chain = []
+    for (let node = text; node; node = node.parentElement) chain.unshift(node)
     ctx.clearRect(0, 0, 1, 1); paint('#fff')
     for (const node of chain) paint(getComputedStyle(node).backgroundColor)
     const background = pixel(); paint(style.color); const foreground = pixel()
     const a = luminance(foreground), b = luminance(background)
-    ctx.clearRect(0, 0, 1, 1); paint(style.getPropertyValue(token).trim()); const expected = pixel()
+    ctx.clearRect(0, 0, 1, 1); paint(buttonStyle ? buttonStyle.color : style.getPropertyValue(token).trim()); const expected = pixel()
     colors.push({ selector, foreground, background, ratio: (Math.max(a, b) + .05) / (Math.min(a, b) + .05),
-      finalColor: foreground.every((n, i) => n === expected[i]) })
+      actionLabel: actionLabel || null, enabled: actionLabel ? !button.disabled && !button.matches(':disabled') && button.getAttribute('aria-disabled') !== 'true' : null,
+      antControl: actionLabel ? button.classList.contains('ant-btn') : null,
+      fontSize: actionLabel ? Number.parseFloat(style.fontSize) : null,
+      finalColor: foreground.every((n, i) => n === expected[i]) && (!buttonStyle || style.fontSize === buttonStyle.fontSize),
+      ...(buttonStyle ? { button: { enabled: true, rootColor: buttonStyle.color, rootFontSize: buttonStyle.fontSize,
+        labelColor: style.color, labelFontSize: style.fontSize, labelText: text.textContent } } : {}) })
   }
   const rect = queue.getBoundingClientRect()
   return { ready: true, colors, count: queue.querySelectorAll('[data-conflict-id]').length,
@@ -60,11 +79,12 @@ app.whenReady().then(async () => {
       import React from 'react'; import { createRoot } from 'react-dom/client';
       import './src/components/SyncCenterPanel.css';
       import Queue from './src/components/SyncConflictQueue.jsx';
+      import UiThemeProvider from './src/components/ui/UiThemeProvider.jsx';
       import { queueFixture, queueAttachment } from './scripts/fixtures/sync-conflict-queue.mjs';
       window.__queueWrites = 0;
       const conflicts = [...queueFixture(24), queueAttachment()];
       conflicts[0].local_record.file.title = '保持纯文本：<img src=x onerror=alert(1)>';
-      createRoot(document.getElementById('root')).render(<div className="settings-card consumer-settings-section sync-center-card"><Queue conflicts={conflicts} scope="synthetic" onResolve={() => { window.__queueWrites++; return false }}/></div>);
+      createRoot(document.getElementById('root')).render(<UiThemeProvider><div className="settings-card consumer-settings-section sync-center-card"><Queue conflicts={conflicts} scope="synthetic" onResolve={() => { window.__queueWrites++; return false }}/></div></UiThemeProvider>);
     ` } })
   const index = fs.readFileSync(path.join(root, 'dist/index.html'), 'utf8')
   const styles = [...index.matchAll(/<link\b[^>]*href="([^"]+\.css)"[^>]*>/g)]
@@ -77,7 +97,8 @@ app.whenReady().then(async () => {
     for (let i = 0; i < 40; i++) {
       await delay(100); data = await inspect(win)
       const valid = data.ready && data.count === expectedRows && data.overflow <= 1 && data.writes === 0 && data.activeMarkup === 0 &&
-        data.colors.every(c => c.finalColor && Number.isFinite(c.ratio) && c.ratio >= 4.5)
+        data.colors.every(c => c.finalColor && Number.isFinite(c.ratio) && c.ratio >= 4.5 &&
+          (!c.actionLabel || (c.enabled === true && c.antControl === true && Number.isFinite(c.fontSize) && c.fontSize >= 13)))
       const signature = JSON.stringify(data)
       samples = valid ? (signature === previous ? samples + 1 : 1) : 0; previous = signature
       if (samples >= 3) break

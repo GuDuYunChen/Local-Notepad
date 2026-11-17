@@ -3,6 +3,8 @@ import { api } from '~/services/api'
 import { createSyncStatusReader } from '~/services/syncStatusReader.mjs'
 import { parseSyncActivity, requestSyncCancellation, syncActivityLabel } from '~/services/syncActivity.mjs'
 import './SyncActivityPanel.css'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 // Independent from the parent's paused state reader and SQLite-backed endpoints.
 export default function SyncActivityPanel({ wakeKey = '', onSettled = () => {} }) {
@@ -18,6 +20,9 @@ export default function SyncActivityPanel({ wakeKey = '', onSettled = () => {} }
   const cancelRequest = useRef(null)
   const requestedID = useRef('')
   const stopCancelWait = useRef(null)
+  // Keep ownership of the delivery timeout outside the async continuation so
+  // unmount can synchronously clear it even when the HTTP client ignores abort.
+  const cancelTimeout = useRef(null)
   wake.current = wakeKey
   settled.current = onSettled
 
@@ -48,6 +53,9 @@ export default function SyncActivityPanel({ wakeKey = '', onSettled = () => {} }
       live.current = false
       monitor.dispose()
       if (reader.current === monitor) reader.current = null
+      // Clear synchronously: a pending cancel request is allowed to ignore abort.
+      if (cancelTimeout.current !== null) clearTimeout(cancelTimeout.current)
+      cancelTimeout.current = null
       cancelRequest.current?.abort()
       stopCancelWait.current?.()
     }
@@ -60,10 +68,13 @@ export default function SyncActivityPanel({ wakeKey = '', onSettled = () => {} }
     const controller = new AbortController()
     cancelRequest.current = controller
     setSending(true)
-    let timer
     try {
       const timeout = new Promise((_, reject) => {
-        timer = setTimeout(() => { controller.abort(); reject(new Error('取消结果尚未确认')) }, 5_000)
+        cancelTimeout.current = setTimeout(() => {
+          cancelTimeout.current = null
+          controller.abort()
+          reject(new Error('取消结果尚未确认'))
+        }, 5_000)
       })
       const stopped = new Promise((_, reject) => { stopCancelWait.current = () => reject(new Error('面板已关闭')) })
       const receipt = await Promise.race([
@@ -87,7 +98,8 @@ export default function SyncActivityPanel({ wakeKey = '', onSettled = () => {} }
         void reader.current?.refresh()
       }
     } finally {
-      clearTimeout(timer)
+      if (cancelTimeout.current !== null) clearTimeout(cancelTimeout.current)
+      cancelTimeout.current = null
       stopCancelWait.current = null
       if (cancelRequest.current === controller) cancelRequest.current = null
       if (live.current) setSending(false)
@@ -97,14 +109,14 @@ export default function SyncActivityPanel({ wakeKey = '', onSettled = () => {} }
   return <div className="sync-activity" aria-label="当前同步任务">
     <div className="sync-activity-heading">
       <strong role="status">{health.error ? '任务状态暂时不可用，以下为上次读取结果' : activity ? syncActivityLabel(activity) : '正在读取当前任务'}</strong>
-      <button className="btn small" disabled={health.loading} onClick={() => void reader.current?.refresh()}>刷新任务状态</button>
+      <UiButton className="btn small" disabled={health.loading} onClick={() => void reader.current?.refresh()}>刷新任务状态</UiButton>
     </div>
     {activity?.active && <>
       <span>开始时间：{new Date(activity.started_at * 1000).toLocaleString('zh-CN', { hour12: false })}</span>
       <span>{activity.phase === 'applying' ? '已进入可能写入阶段；取消不能撤销已提交的数据。' : '正在准备或读取远端；阶段可能随时推进，取消仍需核查结果。'}</span>
-      <button className="btn" disabled={sending || !!health.error || activity.cancel_requested} onClick={() => void cancelCurrent()}>
+      <UiButton className="btn" disabled={sending || !!health.error || activity.cancel_requested} onClick={() => void cancelCurrent()}>
         {sending ? '正在请求取消…' : activity.cancel_requested ? '正在取消…' : '取消当前任务'}
-      </button>
+      </UiButton>
       <small>仅取消本次任务，不关闭自动同步；只读预检取消后，后续计划仍可能再次运行。</small>
     </>}
     {health.error && <p role="status">无法确认任务是否仍在运行；不会把读取失败当作任务结束。</p>}

@@ -2,6 +2,8 @@ import React,{useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react'
 import {api} from '../services/api'
 import {readBacklinkSnapshot,readBacklinkDestination,filterBacklinkSources,backlinkPreview,BACKLINK_PAGE} from '../services/backlinkSources.mjs'
 import './BacklinksPanel.css'
+import { UiButton, UiInput } from '~/components/ui/ControlKit'
+
 
 export default function BacklinksPanel({fileId,onSelectFile}){
  return fileId?<BacklinkWorkspace key={fileId} fileId={fileId} onSelectFile={onSelectFile}/>:null
@@ -73,42 +75,42 @@ function BacklinkWorkspace({fileId,onSelectFile}){
  const summary=snapshot?{verified:snapshot.sources.filter(r=>r.analysis?.state==='verified').length,unavailable:snapshot.sources.filter(r=>!r.available).length,uncertain:snapshot.sources.filter(r=>r.available&&r.analysis?.state!=='verified').length}:null
  return <section ref={panel} className="backlinks-panel local-backlinks" aria-label="反向链接与来源定位">
   <header className="backlinks-header"><div><div className="inspector-section-eyebrow">本地引用</div><h3>反向链接</h3></div>
-   <button type="button" className="btn small" disabled={status==='loading'||opening} onClick={()=>void load()}>刷新来源</button></header>
+   <UiButton type="button" className="btn small" disabled={status==='loading'||opening} onClick={()=>void load()}>刷新来源</UiButton></header>
   <p className="backlink-explanation">查看已保存笔记中指向当前笔记的索引与引用位置。未保存草稿不计入；这里不会修改正文或重建引用。</p>
   {problem&&<p className="backlink-feedback error" role="alert">{problem}</p>}
   {notice&&<p className="backlink-feedback" role="status">{notice}</p>}
-  {(status==='loading'||opening)&&<button type="button" className="btn small" onClick={stop}>{opening?'停止打开来源':'停止读取来源'}</button>}
+  {(status==='loading'||opening)&&<UiButton type="button" className="btn small" onClick={stop}>{opening?'停止打开来源':'停止读取来源'}</UiButton>}
   {status==='loading'&&<p role="status">正在读取来源与已保存正文…</p>}
-  {(status==='error'||status==='stopped')&&<button type="button" className="btn" onClick={()=>void load()}>重新读取来源</button>}
+  {(status==='error'||status==='stopped')&&<UiButton type="button" className="btn" onClick={()=>void load()}>重新读取来源</UiButton>}
   {status==='ready'&&snapshot&&<>
    <p className="backlink-summary">已索引 {snapshot.indexed_count} 个来源 · 正文确认 {summary.verified} 个</p>
    {(summary.unavailable>0||summary.uncertain>0)&&<p className="backlink-explanation">不可用来源 {summary.unavailable} 个；索引待更新或正文无法解析 {summary.uncertain} 个。这些不会当作已确认引用位置。</p>}
    {snapshot.indexed_count===0?<div className="backlinks-empty">暂无已索引的反向链接。其他笔记保存 Wiki 引用后可刷新查看。</div>:<>
-    <label className="backlink-search">查找来源<input ref={input} aria-label="查找反向来源" value={query} disabled={opening}
+    <label className="backlink-search">查找来源<UiInput ref={input} aria-label="查找反向来源" value={query} disabled={opening}
      onCompositionStart={()=>{composing.current=true;cancelOpen()}}
      onCompositionEnd={e=>{composing.current=false;edit(e.currentTarget.value,true)}}
      onChange={e=>edit(e.target.value)} placeholder="来源标题或章节名称"/></label>
     <p className="backlink-explanation">匹配 {rows.length} / {snapshot.sources.length} 个来源；每页 {BACKLINK_PAGE} 项。</p>
     <div className="backlinks-list" role="list" aria-label="反向来源列表">
      {visible.map(row=><div className="backlink-source" key={row.source_id} role="listitem">
-      <button type="button" className="backlink-source-select" data-backlink-source={row.source_id} disabled={opening} aria-pressed={selectedId===row.source_id}
+      <UiButton type="button" layout="content" className="backlink-source-select" data-backlink-source={row.source_id} disabled={opening} aria-pressed={selectedId===row.source_id}
        onClick={()=>{cancelOpen();setSelectedId(row.source_id);setPreviewPage(0);setProblem('');setNotice('')}}>
        <strong>{row.file?.title||'来源不可用'}</strong><span>{!row.available?'已删除、在回收站、模板或目录':row.analysis.state==='verified'?`${row.analysis.occurrences} 处引用` : row.analysis.state==='stale'?'索引待更新：已保存正文中未找到引用':'已索引：正文格式无法定位'}</span>
-      </button>
+      </UiButton>
      </div>)}
      {rows.length===0&&<p>没有匹配的来源，清除查找条件可查看全部。</p>}
     </div>
-    {pages>1&&<nav className="backlink-pages" aria-label="来源分页"><button type="button" disabled={opening||currentPage===0} onClick={()=>{setPage(currentPage-1);setSelectedId(null)}}>上一页来源</button><span>{currentPage+1} / {pages}</span><button type="button" disabled={opening||currentPage+1===pages} onClick={()=>{setPage(currentPage+1);setSelectedId(null)}}>下一页来源</button></nav>}
+    {pages>1&&<nav className="backlink-pages" aria-label="来源分页"><UiButton type="button" disabled={opening||currentPage===0} onClick={()=>{setPage(currentPage-1);setSelectedId(null)}}>上一页来源</UiButton><span>{currentPage+1} / {pages}</span><UiButton type="button" disabled={opening||currentPage+1===pages} onClick={()=>{setPage(currentPage+1);setSelectedId(null)}}>下一页来源</UiButton></nav>}
     {selected&&<section className="backlink-detail" aria-label="来源预览">
      <h4>{selected.file?.title||'来源不可用'}</h4>
      {!selected.available?<p>该来源没有可打开的普通笔记，刷新后可核对最新状态。</p>:<>
-      <button type="button" className="btn primary" disabled={opening} onClick={()=>void open(null)}>打开来源笔记</button>
+      <UiButton type="button" className="btn primary" disabled={opening} onClick={()=>void open(null)}>打开来源笔记</UiButton>
       <p className="backlink-explanation">只读纯文本预览，不加载图片或执行嵌入内容。打开前重新核对来源；正文变化后须先刷新。</p>
       <pre tabIndex={0} aria-label="来源正文预览">{preview.text||'（空正文）'}</pre>
-      {preview.pages>1&&<nav className="backlink-pages" aria-label="正文预览分页"><button type="button" disabled={opening||preview.page===0} onClick={()=>setPreviewPage(preview.page-1)}>上一段正文</button><span>{preview.page+1} / {preview.pages}</span><button type="button" disabled={opening||preview.page+1===preview.pages} onClick={()=>setPreviewPage(preview.page+1)}>下一段正文</button></nav>}
+      {preview.pages>1&&<nav className="backlink-pages" aria-label="正文预览分页"><UiButton type="button" disabled={opening||preview.page===0} onClick={()=>setPreviewPage(preview.page-1)}>上一段正文</UiButton><span>{preview.page+1} / {preview.pages}</span><UiButton type="button" disabled={opening||preview.page+1===preview.pages} onClick={()=>setPreviewPage(preview.page+1)}>下一段正文</UiButton></nav>}
       {selected.analysis.sections.map((section,index)=><div className="backlink-location" key={JSON.stringify(section.path)}>
        <span>{section.path.join(' › ')||'正文开头'} · {section.count} 处{section.ambiguous?'（同名章节，无法唯一定位）':''}</span>
-       <button type="button" className="btn small" data-backlink-location={index} disabled={opening||section.ambiguous} onClick={()=>void open(section.path)}>定位引用章节</button>
+       <UiButton type="button" className="btn small" data-backlink-location={index} disabled={opening||section.ambiguous} onClick={()=>void open(section.path)}>定位引用章节</UiButton>
       </div>)}
       {selected.analysis.state!=='verified'&&<p className="backlink-explanation">这里仅保留索引线索，不提供未经确认的章节定位；仍可打开来源查看。</p>}
      </>}

@@ -57,6 +57,8 @@ import { useEditorWriteScope } from '../hooks/useEditorWriteScope'
 import { isShortcutContextBlocked, shortcutFromEvent, shortcutLabel } from '~/services/localShortcuts'
 import useLocalShortcuts from '~/hooks/useLocalShortcuts'
 import './TextColorPlugin.css'
+import { UiButton, UiInput, UiSelect } from '~/components/ui/ControlKit'
+
 
 const FontOptions = [
   { label: '系统默认', value: '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif' },
@@ -544,7 +546,7 @@ export default function ToolbarPlugin({ documentId } = {}) {
   return (
     <div className="editor-toolbar product-editor-toolbar">
       <div className="toolbar-group compact-history" aria-label="历史操作">
-        <button
+        <UiButton density="compact"
           type="button"
           disabled={!canUndo}
           onClick={() => editor.dispatchCommand(UNDO_COMMAND)}
@@ -553,8 +555,8 @@ export default function ToolbarPlugin({ documentId } = {}) {
           title="撤销 (Ctrl+Z)"
         >
           ↶
-        </button>
-        <button
+        </UiButton>
+        <UiButton density="compact"
           type="button"
           disabled={!canRedo}
           onClick={() => editor.dispatchCommand(REDO_COMMAND)}
@@ -563,12 +565,12 @@ export default function ToolbarPlugin({ documentId } = {}) {
           title="重做 (Ctrl+Y)"
         >
           ↷
-        </button>
+        </UiButton>
       </div>
 
       <span className="divider" />
 
-      <select
+      <UiSelect density="compact"
         className="select toolbar-block-select"
         value={blockType}
         onChange={event => formatBlock(event.target.value)}
@@ -578,12 +580,12 @@ export default function ToolbarPlugin({ documentId } = {}) {
         {BLOCK_OPTIONS.map(([value, label]) => (
           <option key={value} value={value}>{label}</option>
         ))}
-      </select>
+      </UiSelect>
 
       <span className="divider" />
 
       <div className="toolbar-group compact-format" aria-label="文字格式">
-        <button
+        <UiButton density="compact"
           type="button"
           onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'bold')}
           className={`btn fw-bold${isBold ? ' active' : ''}`}
@@ -591,8 +593,8 @@ export default function ToolbarPlugin({ documentId } = {}) {
           title="加粗 (Ctrl+B)"
         >
           B
-        </button>
-        <button
+        </UiButton>
+        <UiButton density="compact"
           type="button"
           onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'italic')}
           className={`btn fst-italic${isItalic ? ' active' : ''}`}
@@ -600,8 +602,8 @@ export default function ToolbarPlugin({ documentId } = {}) {
           title="斜体 (Ctrl+I)"
         >
           I
-        </button>
-        <button
+        </UiButton>
+        <UiButton density="compact"
           type="button"
           onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'underline')}
           className={`btn text-decoration-underline${isUnderline ? ' active' : ''}`}
@@ -609,8 +611,8 @@ export default function ToolbarPlugin({ documentId } = {}) {
           title="下划线 (Ctrl+U)"
         >
           U
-        </button>
-        <button
+        </UiButton>
+        <UiButton density="compact"
           type="button"
           onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'code')}
           className={`btn toolbar-inline-code${isCode ? ' active' : ''}`}
@@ -618,13 +620,13 @@ export default function ToolbarPlugin({ documentId } = {}) {
           title="行内代码"
         >
           &lt;/&gt;
-        </button>
+        </UiButton>
       </div>
 
       <span className="divider" />
 
       <div className="toolbar-group toolbar-structure" aria-label="结构">
-        <button
+        <UiButton density="compact"
           type="button"
           className={`btn toolbar-text-btn${isBulletList ? ' active' : ''}`}
           onClick={() => toggleList('bullet')}
@@ -632,8 +634,8 @@ export default function ToolbarPlugin({ documentId } = {}) {
           title="无序列表"
         >
           <span aria-hidden="true">•≡</span>
-        </button>
-        <button
+        </UiButton>
+        <UiButton density="compact"
           type="button"
           className={`btn toolbar-text-btn${isNumberList ? ' active' : ''}`}
           onClick={() => toggleList('number')}
@@ -641,8 +643,8 @@ export default function ToolbarPlugin({ documentId } = {}) {
           title="有序列表"
         >
           <span aria-hidden="true">1.</span>
-        </button>
-        <button
+        </UiButton>
+        <UiButton density="compact"
           type="button"
           className={`btn toolbar-text-btn${isCheckList ? ' active' : ''}`}
           onClick={() => toggleList('check')}
@@ -650,11 +652,11 @@ export default function ToolbarPlugin({ documentId } = {}) {
           title={`待办清单 · ${shortcutLabel('checklist', bindings)} · Tab/Shift+Tab 调整层级`}
         >
           <span aria-hidden="true">☑</span>
-        </button>
+        </UiButton>
       </div>
 
       <div className="toolbar-link-wrap" ref={linkRef}>
-        <button
+        <UiButton density="compact"
           type="button"
           className={`btn toolbar-text-btn${linkOpen ? ' active' : ''}`}
           disabled={!hasSelection}
@@ -663,11 +665,11 @@ export default function ToolbarPlugin({ documentId } = {}) {
           title={hasSelection ? '添加链接' : '先选中文字'}
         >
           <span aria-hidden="true">⌁</span>
-        </button>
+        </UiButton>
 
         {linkOpen && (
           <div className="toolbar-link-popover">
-            <input
+            <UiInput density="compact"
               autoFocus
               className="input"
               value={linkUrl}
@@ -685,19 +687,19 @@ export default function ToolbarPlugin({ documentId } = {}) {
               placeholder="https:// 或 #heading/章节"
               aria-label="链接地址或章节锚点"
             />
-            <button type="button" className="btn primary small" onClick={applyLink} disabled={!linkUrl.trim()}>
+            <UiButton density="compact" type="button" className="btn primary small" onClick={applyLink} disabled={!linkUrl.trim()}>
               应用
-            </button>
-            <button type="button" className="btn small" onClick={removeLink}>
+            </UiButton>
+            <UiButton density="compact" type="button" className="btn small" onClick={removeLink}>
               移除
-            </button>
+            </UiButton>
           </div>
         )}
       </div>
 
       <div className="toolbar-spacer" />
 
-      <button
+      <UiButton density="compact"
         type="button"
         className="btn toolbar-text-btn toolbar-find-btn"
         onClick={() => window.dispatchEvent(new Event('editor:open-search'))}
@@ -705,9 +707,9 @@ export default function ToolbarPlugin({ documentId } = {}) {
         title={`文内查找与替换 (${shortcutLabel('find', bindings)})`}
       >
         <span aria-hidden="true">⌕</span>
-      </button>
+      </UiButton>
 
-      <button
+      <UiButton density="compact"
         type="button"
         className="btn toolbar-text-btn toolbar-command-btn"
         onClick={() => window.dispatchEvent(new Event('editor:open-command-palette'))}
@@ -715,9 +717,9 @@ export default function ToolbarPlugin({ documentId } = {}) {
         title={`编辑器命令 (${shortcutLabel('commandPalette', bindings)})`}
       >
         <span aria-hidden="true">⌘</span>
-      </button>
+      </UiButton>
 
-      <button
+      <UiButton density="compact"
         type="button"
         className="btn toolbar-text-btn toolbar-view-btn"
         onClick={() => window.dispatchEvent(new Event('editor:toggle-view-settings'))}
@@ -725,9 +727,9 @@ export default function ToolbarPlugin({ documentId } = {}) {
         title="写作视图设置"
       >
         <span aria-hidden="true">◫</span>
-      </button>
+      </UiButton>
 
-      <button
+      <UiButton density="compact"
         type="button"
         className="btn toolbar-text-btn toolbar-source-btn"
         onClick={() => window.dispatchEvent(new Event('editor:toggle-source-mode'))}
@@ -735,17 +737,17 @@ export default function ToolbarPlugin({ documentId } = {}) {
         title="Markdown 源码 / 视觉编辑"
       >
         <span aria-hidden="true">&lt;/&gt;</span>
-      </button>
+      </UiButton>
 
       <span className="toolbar-slash-hint">输入 / 快速插入</span>
       {isUploading && <span className="toolbar-progress" role="status">处理中…</span>}
       {imageUploads.busy && <div className="editor-image-upload-status" role="status" aria-label="图片上传进度">
         <span className="toolbar-progress">正在插入图片…</span>
-        <button type="button" className="btn small" autoFocus onClick={() => { imageUploads.cancel(); toast.warning('已取消上传，未插入图片') }}>取消图片上传</button>
+        <UiButton density="compact" type="button" className="btn small" autoFocus onClick={() => { imageUploads.cancel(); toast.warning('已取消上传，未插入图片') }}>取消图片上传</UiButton>
       </div>}
 
       <div className="toolbar-more-wrap" ref={insertMenuRef}>
-        <button
+        <UiButton density="compact"
           type="button"
           className={`btn toolbar-more-trigger${insertOpen ? ' active' : ''}`}
           onClick={() => {
@@ -756,7 +758,7 @@ export default function ToolbarPlugin({ documentId } = {}) {
           title="插入内容"
         >
           <span className="toolbar-plus">＋</span>
-        </button>
+        </UiButton>
 
         {insertOpen && (
           <div className="toolbar-more-menu toolbar-insert-menu">
@@ -765,17 +767,17 @@ export default function ToolbarPlugin({ documentId } = {}) {
               <div className="toolbar-menu-grid toolbar-insert-grid">
                 <label className="btn toolbar-menu-action">
                   附件
-                  <input type="file" hidden onChange={handleAttachment} />
+                  <input data-ui-native="file" type="file" hidden onChange={handleAttachment} />
                 </label>
                 <label className="btn toolbar-menu-action">
                   图片
-                  <input type="file" accept="image/*" multiple hidden disabled={imageUploads.busy} onChange={handleImage} />
+                  <input data-ui-native="file" type="file" accept="image/*" multiple hidden disabled={imageUploads.busy} onChange={handleImage} />
                 </label>
                 <label className="btn toolbar-menu-action">
                   视频
-                  <input type="file" accept="video/*" hidden onChange={handleVideo} />
+                  <input data-ui-native="file" type="file" accept="video/*" hidden onChange={handleVideo} />
                 </label>
-                <button
+                <UiButton density="compact"
                   type="button"
                   className="btn toolbar-menu-action"
                   onClick={() => {
@@ -784,25 +786,25 @@ export default function ToolbarPlugin({ documentId } = {}) {
                   }}
                 >
                   代码块
-                </button>
-                <button type="button" className="btn toolbar-menu-action" onClick={() => insertNode($createFormulaNode())} title={shortcutLabel('formula', bindings)}>
+                </UiButton>
+                <UiButton density="compact" type="button" className="btn toolbar-menu-action" onClick={() => insertNode($createFormulaNode())} title={shortcutLabel('formula', bindings)}>
                   数学公式
-                </button>
-                <button type="button" className="btn toolbar-menu-action" onClick={() => insertNode($createCalloutNode())}>
+                </UiButton>
+                <UiButton density="compact" type="button" className="btn toolbar-menu-action" onClick={() => insertNode($createCalloutNode())}>
                   提示块
-                </button>
-                <button type="button" className="btn toolbar-menu-action" onClick={() => insertNode($createToggleNode())}>
+                </UiButton>
+                <UiButton density="compact" type="button" className="btn toolbar-menu-action" onClick={() => insertNode($createToggleNode())}>
                   折叠块
-                </button>
-                <button type="button" className="btn toolbar-menu-action" onClick={() => insertNode($createDividerNode())}>
+                </UiButton>
+                <UiButton density="compact" type="button" className="btn toolbar-menu-action" onClick={() => insertNode($createDividerNode())}>
                   分割线
-                </button>
-                <button type="button" className="btn toolbar-menu-action" onClick={() => insertNode($createEmbedNode())}>
+                </UiButton>
+                <UiButton density="compact" type="button" className="btn toolbar-menu-action" onClick={() => insertNode($createEmbedNode())}>
                   嵌入
-                </button>
+                </UiButton>
                 <label className="btn toolbar-menu-action">
                   Excel
-                  <input type="file" accept=".xlsx,.xls" hidden onChange={handleExcel} />
+                  <input data-ui-native="file" type="file" accept=".xlsx,.xls" hidden onChange={handleExcel} />
                 </label>
               </div>
 
@@ -815,7 +817,7 @@ export default function ToolbarPlugin({ documentId } = {}) {
       </div>
 
       <div className="toolbar-more-wrap" ref={moreMenuRef}>
-        <button
+        <UiButton density="compact"
           type="button"
           className={`btn toolbar-format-more${moreOpen ? ' active' : ''}`}
           onClick={() => {
@@ -826,14 +828,14 @@ export default function ToolbarPlugin({ documentId } = {}) {
           title="更多格式"
         >
           •••
-        </button>
+        </UiButton>
 
         {moreOpen && (
           <div className="toolbar-more-menu toolbar-format-menu">
             <div className="toolbar-menu-section">
               <div className="toolbar-menu-label">文字样式</div>
               <div className="toolbar-menu-row">
-                <select
+                <UiSelect density="compact"
                   ref={fontSelectRef}
                   value={fontFamily}
                   onChange={handleFontChange}
@@ -843,8 +845,8 @@ export default function ToolbarPlugin({ documentId } = {}) {
                   {FontOptions.map(option => (
                     <option key={option.value} value={option.value}>{option.label}</option>
                   ))}
-                </select>
-                <select
+                </UiSelect>
+                <UiSelect density="compact"
                   value={fontSize}
                   onChange={event => {
                     setFontSize(event.target.value)
@@ -854,19 +856,19 @@ export default function ToolbarPlugin({ documentId } = {}) {
                   aria-label="字号"
                 >
                   {FontSizeOptions.map(option => <option key={option} value={option}>{option}</option>)}
-                </select>
+                </UiSelect>
               </div>
 
               <div className="toolbar-menu-row">
-                <button
+                <UiButton density="compact"
                   type="button"
                   className={`btn${isStrikethrough ? ' active' : ''}`}
                   onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'strikethrough')}
                 >
                   删除线
-                </button>
+                </UiButton>
                 <div className="text-color-group" ref={colorPickerRef}>
-                  <button
+                  <UiButton density="compact"
                     type="button"
                     className="btn"
                     onClick={() => {
@@ -875,11 +877,11 @@ export default function ToolbarPlugin({ documentId } = {}) {
                     }}
                   >
                     文字颜色
-                  </button>
+                  </UiButton>
                   {showColorPicker && (
                     <div className="color-picker-dropdown" role="listbox" aria-label="文本颜色选择">
                       {TEXT_COLORS.map(color => (
-                        <button
+                        <UiButton density="compact"
                           type="button"
                           key={color.value || 'default'}
                           className="color-option"
@@ -894,13 +896,13 @@ export default function ToolbarPlugin({ documentId } = {}) {
                               border: !color.value ? '1px dashed var(--muted)' : 'none',
                             }}
                           />
-                        </button>
+                        </UiButton>
                       ))}
                     </div>
                   )}
                 </div>
                 <div className="text-color-group">
-                  <button
+                  <UiButton density="compact"
                     type="button"
                     className="btn"
                     onClick={() => {
@@ -909,11 +911,11 @@ export default function ToolbarPlugin({ documentId } = {}) {
                     }}
                   >
                     高亮
-                  </button>
+                  </UiButton>
                   {showHighlightPicker && (
                     <div className="color-picker-dropdown" role="listbox" aria-label="高亮颜色选择">
                       {HIGHLIGHT_COLORS.map(color => (
-                        <button
+                        <UiButton density="compact"
                           type="button"
                           key={color.value || 'default'}
                           className="color-option"
@@ -928,7 +930,7 @@ export default function ToolbarPlugin({ documentId } = {}) {
                               border: !color.value ? '1px dashed var(--muted)' : 'none',
                             }}
                           />
-                        </button>
+                        </UiButton>
                       ))}
                     </div>
                   )}
@@ -939,35 +941,35 @@ export default function ToolbarPlugin({ documentId } = {}) {
             <div className="toolbar-menu-section">
               <div className="toolbar-menu-label">段落</div>
               <div className="toolbar-menu-row">
-                <button
+                <UiButton density="compact"
                   type="button"
                   onClick={() => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'left')}
                   className={`btn${elementFormat === 'left' ? ' active' : ''}`}
                 >
                   左对齐
-                </button>
-                <button
+                </UiButton>
+                <UiButton density="compact"
                   type="button"
                   onClick={() => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'center')}
                   className={`btn${elementFormat === 'center' ? ' active' : ''}`}
                 >
                   居中
-                </button>
-                <button
+                </UiButton>
+                <UiButton density="compact"
                   type="button"
                   onClick={() => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'right')}
                   className={`btn${elementFormat === 'right' ? ' active' : ''}`}
                 >
                   右对齐
-                </button>
+                </UiButton>
               </div>
               <div className="toolbar-menu-row">
-                <button type="button" className="btn" onClick={() => editor.dispatchCommand(OUTDENT_CONTENT_COMMAND)}>
+                <UiButton density="compact" type="button" className="btn" onClick={() => editor.dispatchCommand(OUTDENT_CONTENT_COMMAND)}>
                   减少缩进
-                </button>
-                <button type="button" className="btn" onClick={() => editor.dispatchCommand(INDENT_CONTENT_COMMAND)}>
+                </UiButton>
+                <UiButton density="compact" type="button" className="btn" onClick={() => editor.dispatchCommand(INDENT_CONTENT_COMMAND)}>
                   增加缩进
-                </button>
+                </UiButton>
               </div>
             </div>
           </div>

@@ -7,6 +7,8 @@ import {
   $insertNodes,
   $isRangeSelection,
   $isTextNode,
+  COMMAND_PRIORITY_HIGH,
+  KEY_ESCAPE_COMMAND,
 } from 'lexical'
 import { api, searchFiles } from '~/services/api'
 import { $createWikiLinkNode, WikiLinkNode } from '../nodes/WikiLinkNode'
@@ -18,6 +20,8 @@ import {
   rememberReference,
 } from '../utils/referenceUtils'
 import './WikiLinkPlugin.css'
+import { UiButton } from '~/components/ui/ControlKit'
+
 
 const MAX_RESULTS = 8
 const MAX_SECTION_FILES = 5
@@ -279,6 +283,23 @@ export default function WikiLinkPlugin() {
   useEffect(() => {
     if (!isOpen) return undefined
 
+    // RichText handles Escape at the editor root before document listeners
+    // and blurs its caret. The active completion owns dismissal first, so
+    // the next editing shortcut still reaches this editor and its history.
+    return editor.registerCommand(KEY_ESCAPE_COMMAND, event => {
+      const root = editor.getRootElement()
+      if (!editor.isEditable() || editor.isComposing() || !event || event.isComposing || event.keyCode === 229 ||
+        !root?.contains(event.target) || !root.contains(root.ownerDocument.activeElement)) return false
+      event.preventDefault()
+      event.stopPropagation()
+      close()
+      return true
+    }, COMMAND_PRIORITY_HIGH)
+  }, [editor, isOpen, close])
+
+  useEffect(() => {
+    if (!isOpen) return undefined
+
     const handleKeyDown = (event) => {
       if (!editor.isEditable()) { close(); return }
       if (event.key === 'Escape') {
@@ -356,7 +377,7 @@ export default function WikiLinkPlugin() {
           const sectionLabel = formatSectionPath(file.sectionPath)
 
           return (
-            <button
+            <UiButton density="compact"
               type="button"
               key={resultKey(file)}
               className={'wiki-link-menu-item' + (index === selectedIndex ? ' selected' : '')}
@@ -378,7 +399,7 @@ export default function WikiLinkPlugin() {
                   <small className="wiki-link-menu-section">{sectionLabel}</small>
                 )}
               </span>
-            </button>
+            </UiButton>
           )
         })
       )}

@@ -1,4 +1,4 @@
-import { Dropdown } from 'antd'
+import Dropdown from 'antd/es/dropdown'
 
 export function FileContextMenu({ items, onSelect }) {
   const menuItems = [
