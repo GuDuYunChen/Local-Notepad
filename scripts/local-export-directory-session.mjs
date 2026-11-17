@@ -90,6 +90,58 @@ export function validateExportDirectoryResult(result, binding, operation, direct
   return true
 }
 
+export function validateExportDirectoryReadiness(result, binding, expectedDialog) {
+  validateExportDirectoryObservation(result?.dialog, binding)
+  if (expectedDialog) assert.deepEqual(result.dialog, expectedDialog, 'Owned directory dialog identity changed before choice')
+  assert.equal(result.action, 'inspect-choice'); assert.equal(typeof result.controlsReady, 'boolean')
+  assert.equal(result.valueWrites, 0); assert.equal(result.invocations, 0); assert.equal(result.closePosts, 0)
+  assert.equal(result.selectedPath, null); assert.equal(result.dialogClosed, false)
+  assert.ok(Array.isArray(result.controls) && result.controls.length <= 128)
+  for (const control of result.controls) {
+    assert.ok(control && typeof control === 'object' && !Array.isArray(control))
+    for (const key of ['id', 'name', 'cls', 'type']) assert.equal(typeof control[key], 'string')
+    assert.ok(['ControlType.Edit', 'ControlType.Button'].includes(control.type))
+    assert.equal(typeof control.enabled, 'boolean'); assert.equal(typeof control.offscreen, 'boolean')
+  }
+  const available = result.controls.filter(control => control.enabled && !control.offscreen)
+  const inputs = available.filter(control => control.type === 'ControlType.Edit' && ['Folder:', '文件夹:', '文件夹：'].includes(control.name))
+  const buttons = available.filter(control => control.type === 'ControlType.Button' && control.name === '选择此目录')
+  assert.ok(inputs.length <= 1 && buttons.length <= 1, 'Directory controls are ambiguous')
+  assert.equal(result.controlsReady, inputs.length === 1 && buttons.length === 1)
+  if (result.controlsReady) {
+    assert.equal(result.inputID, inputs[0].id); assert.equal(result.inputName, inputs[0].name)
+    assert.equal(result.buttonName, buttons[0].name)
+  } else {
+    assert.equal(result.inputID, null); assert.equal(result.inputName, null); assert.equal(result.buttonName, null)
+  }
+  return true
+}
+
+// The existing caller owns the single 15-second / 100-ms observation loop.
+// Only read-only requests can repeat; the native action remains outside it.
+export async function actOnExportDirectory({ directorySession, binding, until }, operation, directory) {
+  assert.ok(['choose', 'cancel'].includes(operation)); assertExportDirectoryBinding(binding)
+  const ownedBinding = structuredClone(binding)
+  if (operation === 'cancel') {
+    await until(() => directorySession.inspect(ownedBinding), 'Owned native directory picker missing')
+    return directorySession.cancel(ownedBinding)
+  }
+  let observedDialog
+  const ready = await until(async () => {
+    const observation = await directorySession.inspectChoice(ownedBinding, observedDialog)
+    if (observation === null) {
+      assert.equal(observedDialog, undefined, 'Owned directory dialog disappeared before choice')
+      return null
+    }
+    validateExportDirectoryReadiness(observation, ownedBinding, observedDialog)
+    observedDialog ??= structuredClone(observation.dialog)
+    return observation.controlsReady ? observation : null
+  }, 'Owned native directory picker missing')
+  validateExportDirectoryReadiness(ready, ownedBinding, observedDialog)
+  assert.equal(ready.controlsReady, true)
+  return directorySession.choose(ownedBinding, directory, ready.dialog)
+}
+
 // One prewarmed MTA helper per isolated run. Its pipe/error/timeout handling
 // retains listeners through disposal; an uncertain native operation is never
 // replayed and only this owned helper may be terminated.
@@ -165,7 +217,13 @@ export function createExportDirectorySession({ ownedRoot, spawnWorker = spawn,
         assert.equal(value.result?.width, 720); assert.equal(value.result?.height, 520); assert.equal(value.result?.applied, true)
       } else if (request.op === 'inspect') {
         if (value.dialog !== null) validateExportDirectoryObservation(value.dialog, request.binding)
-      } else validateExportDirectoryResult(value.result, request.binding, request.op, request.directory)
+      } else if (request.op === 'inspect-choice') {
+        if (value.result === null) assert.equal(request.expectedDialog, undefined)
+        else validateExportDirectoryReadiness(value.result, request.binding, request.expectedDialog)
+      } else {
+        validateExportDirectoryResult(value.result, request.binding, request.op, request.directory)
+        if (request.expectedDialog) assert.deepEqual(value.result.dialog, request.expectedDialog)
+      }
     } catch { fail('IDENTITY_OR_ACTION_MISMATCH'); return }
     pending = undefined; clearTimeout(request.timer)
     const result = request.op === 'inspect' ? value.dialog : value.result
@@ -200,9 +258,14 @@ export function createExportDirectorySession({ ownedRoot, spawnWorker = spawn,
     child.on('exit', (code, signal) => { lifecycle.exit = terminal(code, signal); if (!disposed) fail('EARLY_EXIT') })
     startupTimer = setTimeout(() => fail('STARTUP_TIMEOUT'), startupMs)
   } catch (error) { recordError('spawn', error); fail('SPAWN_ERROR'); if (!child) resolveClosed(null) }
-  const request = async (op, binding, directory) => {
+  const request = async (op, binding, directory, expectedDialog) => {
     assertExportDirectoryBinding(binding)
     if (op === 'choose') assertExportOwnedDirectory(ownedRoot, directory)
+    const expected = expectedDialog === undefined ? undefined : structuredClone(expectedDialog)
+    if (expected !== undefined) {
+      assert.ok(['inspect-choice', 'choose'].includes(op))
+      validateExportDirectoryObservation(expected, binding)
+    }
     if (disposed) throw failure('DISPOSED')
     await ready
     if (state !== 'ready' || disposed) throw failure('UNAVAILABLE')
@@ -210,9 +273,10 @@ export function createExportDirectorySession({ ownedRoot, spawnWorker = spawn,
     const id = ++sequence
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => fail('REQUEST_TIMEOUT'), requestMs)
-      pending = { id, op, binding: structuredClone(binding), directory, timer, resolve, reject }
+      pending = { id, op, binding: structuredClone(binding), directory, expectedDialog: expected, timer, resolve, reject }
       try {
-        child.stdin.write(JSON.stringify({ id, op, ...binding, ...(directory ? { directory } : {}) }) + '\n', error => {
+        child.stdin.write(JSON.stringify({ id, op, ...binding, ...(directory ? { directory } : {}),
+          ...(expected ? { expectedHandle: expected.handle, expectedOwnerChain: expected.ownerChain } : {}) }) + '\n', error => {
           if (error && pending?.id === id) fail('PIPE_ERROR')
         })
       } catch { fail('PIPE_ERROR') }
@@ -221,7 +285,8 @@ export function createExportDirectorySession({ ownedRoot, spawnWorker = spawn,
   return Object.freeze({ ready,
     minimumWindow: binding => request('minimum-window', binding),
     inspect: binding => request('inspect', binding),
-    choose: (binding, directory) => request('choose', binding, directory),
+    inspectChoice: (binding, expectedDialog) => request('inspect-choice', binding, undefined, expectedDialog),
+    choose: (binding, directory, expectedDialog) => request('choose', binding, directory, expectedDialog),
     cancel: binding => request('cancel', binding),
     events: () => structuredClone(events),
     diagnostics,

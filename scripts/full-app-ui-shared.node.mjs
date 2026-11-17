@@ -2634,7 +2634,7 @@ test('Sync near-expired refresh waits for a new real cycle before PNG instead of
 })
 
 // Execute the existing exact-title search contracts through the original full-app argv.
-await import('./full-app-ui-owned-search.test.mjs')
+await import('./full-app-ui-owned-search.node.mjs')
 
 
 // Match the actual two nested wrappers in the installed 59b first failure.

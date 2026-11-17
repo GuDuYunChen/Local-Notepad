@@ -1,5 +1,5 @@
 {
-  "product": "07e4894fb3f38980f5fb5649be09b538250158ca",
+  "product": "4fb5f1a74b18e90b7c3fa69afd40c84fe1c3dd09",
   "quickBlob": "c1e8f40862b770f82af47c26a455b57efc853700",
   "tagsBlob": "54bb56864e58e2aa3f5ed08aedb52a00de5f0769",
   "templateBlob": "42378f13f71a03c3e91cdfdcb6dec44dbbb05f33",
@@ -16,8 +16,8 @@
   "importEvidenceTestsBlob": "5a46ce6dad5fe757b1d2714e485242aa79959559",
   "current": {
     "version": "4.249.0",
-    "bytes": 115609443,
-    "sha256": "91e4ed619b4e527ef331cd9eddddfb7da00b9b79c8689dc803224efc9304462c"
+    "bytes": 115609106,
+    "sha256": "1341638c0ba7fecb7f707ee78a97f9ccabc571822ae81abc7ce034608be94e7b"
   },
   "previous": {
     "version": "4.232.0",
@@ -31,14 +31,14 @@
     "productSourceCommit": "1a8e17ba775312c359f4ac23851c8c365b57a9cb"
   },
   "currentSource": {
-    "run": 43920098096,
-    "artifact": 14253839601,
-    "name": "local-notepad-windows-07e4894fb3f38980f5fb5649be09b538250158ca",
-    "headSha": "89cb319ab3c3925cf0c0468540eff51e7221c9ff",
+    "run": 44020207540,
+    "artifact": 14300908643,
+    "name": "local-notepad-windows-4fb5f1a74b18e90b7c3fa69afd40c84fe1c3dd09",
+    "headSha": "583aa9e7493d6b3c2eee5dc4f692b1bd3bd6c1b7",
     "branch": "fix/local-ui-consistency-2f116",
     "repositoryId": 1105107817,
-    "archiveBytes": 115616478,
-    "archiveSha256": "1bc66e7a4eaa3ba49df01f84887e26a9bda4b4b37351143e733e3ffacc58774d"
+    "archiveBytes": 115616087,
+    "archiveSha256": "416c519911db3781250ae7d4106d44b138efd6c270b5976d30cc337c96fc8baf"
   },
   "readingDriverBlob": "6924b128c1125424c91f71dbd1ecc415762e2f77",
   "readingFixtureBlob": "0c7ffadbb187dd33a7bc6b5aa8c69427eec5cc34",
@@ -54,14 +54,14 @@
   "shortcutManagementEvidenceBlob": "c45f55e311f46579756d0836fafdd7640c003ed9",
   "shortcutManagementFixtureBlob": "eb49f859eb9c9b51f8c31d3354f81231c647fb87",
   "shortcutManagementCanonicalFixtureBlob": "f86598e0d552a5d884eff9e30739617366c685c9",
-  "localExportDriverBlob": "154b4552317cedf9c0e94c3fbbebeffb6b025f1b",
+  "localExportDriverBlob": "e1a4484a5a4df6aec2ae35c805042620a59c2cec",
   "localExportRunnerBlob": "1d7a20cdfce4cf48334556e803709e6b2f9a3d12",
   "localExportEvidenceBlob": "901304d6bada0d6acd408bb9e00bea365b60eafc",
   "localExportValuesBlob": "8c2af4276b34c42e5b346b666c08adc402470672",
   "localExportFixtureBlob": "802be649735c7ce56dab17bc15647934c036662c",
   "localExportBuilderBlob": "b6cc718d677d84952a74194a4a1ad356ea56fab2",
-  "localExportDirectorySessionBlob": "ece2c7b2a39900bc48228b23e42a0bf482251075",
-  "localExportDirectoryWorkerBlob": "690929d434c14b317ef8e5cc4d6b468895d4f37c",
+  "localExportDirectorySessionBlob": "32873f250faac68c9af8f9cd89b04fefc6d657ca",
+  "localExportDirectoryWorkerBlob": "e54d1877463fa110574b0b7573415c7874dafc80",
   "previousArtifactMetadata": {
     "headSha": "7280b794814eb282a1f882adf39179eb5c47b519",
     "branch": "ci/rebuild-legacy-seed-4-232",
@@ -86,7 +86,7 @@
     "src/components/Editor/nodes/WikiLinkView.jsx": "b294e8e3fb7f695dec25717e37c07259e0099744",
     "src/components/Editor/nodes/CodeBlockNode.jsx": "89179bd7332b284a10fa47266116b3e19acb315a",
     "src/components/Editor/plugins/BlockHandlePlugin.jsx": "ac31d8b560a1194490da4ce46b80827fc475c7ea",
-    "src/components/Editor/Editor.jsx": "08c6f8bb08d5f885b26ac97ad5f01bcb45265886",
+    "src/components/Editor/Editor.jsx": "68e0f997ee269012f498fff8b428e5e1fc01a29d",
     "src/services/wikiNavigation.mjs": "4ecc8c52880deb514cdb950c9432dcabd13da110",
     "src/hooks/useGuardedNoteOpener.js": "13c0ae3b56a7df0c8954ce9113c0b46352162d98",
     "src/App.jsx": "e21c0e3fa79faa2794ff5e63595d24b972e9702f",

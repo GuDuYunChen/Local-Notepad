@@ -13,7 +13,7 @@ import { MarkdownShortcutPlugin } from '@lexical/react/LexicalMarkdownShortcutPl
 import { TRANSFORMERS } from '@lexical/markdown';
 import {LexicalErrorBoundary} from '@lexical/react/LexicalErrorBoundary';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
-import { $getRoot, $createParagraphNode, $createTextNode } from 'lexical';
+import { $getRoot, $createParagraphNode, $createTextNode, $getSelection, $addUpdateTag, SKIP_SCROLL_INTO_VIEW_TAG } from 'lexical';
 
 import { HeadingNode, QuoteNode } from "@lexical/rich-text";
 import { TableNode, TableCellNode, TableRowNode } from "@lexical/table";
@@ -149,9 +149,25 @@ function OnChangePlugin({ onChange }) {
 
 export function LoadContentPlugin({ content, documentId }) {
   const [editor] = useLexicalComposerContext();
+  const currentLoad = useRef(null);
   useEffect(() => {
     let cancelled = false;
     const loadToken = beginEvidenceContentLoad(editor, documentId, content);
+    currentLoad.current = loadToken;
+    const rootElement = editor.getRootElement();
+    const ownerDocument = rootElement?.ownerDocument;
+    const isCurrent = () => !cancelled && currentLoad.current === loadToken &&
+      rootElement?.isConnected && editor.getRootElement() === rootElement &&
+      rootElement.ownerDocument === ownerDocument;
+    const ownsFocus = () => isCurrent() && editor.isEditable() &&
+      ownerDocument.activeElement === rootElement && ownerDocument.hasFocus() &&
+      ownerDocument.visibilityState === 'visible';
+    const hasEmptyDOMSelection = () => {
+      const selection = ownerDocument?.getSelection();
+      return selection !== null && selection !== undefined && selection.rangeCount === 0 &&
+        selection.anchorNode === null && selection.focusNode === null;
+    };
+    const hasCommittedSelection = () => editor.getEditorState().read(() => $getSelection() !== null);
     const run = () => {
       if (cancelled) return;
       // Flush already accepted edits before adding the load tag. Otherwise
@@ -159,9 +175,42 @@ export function LoadContentPlugin({ content, documentId }) {
       editor.read(() => {});
       if (cancelled) return;
 
+      let completing = false;
       const complete = () => {
-        if (!cancelled) completeEvidenceContentLoad(editor, loadToken);
+        if (completing || !isCurrent()) return;
+        completing = true;
+        const finish = () => {
+          if (isCurrent()) completeEvidenceContentLoad(editor, loadToken);
+        };
+        // Loading parsed JSON can remove the caret installed by AutoFocus
+        // without blurring the root. Repair that empty state once, before
+        // announcing readiness; never take focus or replace a user's range.
+        if (!ownsFocus() || !hasEmptyDOMSelection() || hasCommittedSelection() ||
+          editor.read('pending', () => $getSelection() !== null)) {
+          finish();
+          return;
+        }
+        let attempted = false;
+        let selected = false;
+        editor.update(() => {
+          // onUpdate may enqueue this callback behind another real update.
+          // Recheck its current selection and ownership at execution time.
+          if (!ownsFocus() || !hasEmptyDOMSelection() || hasCommittedSelection() || $getSelection() !== null) return;
+          attempted = true;
+          $getRoot().selectStart();
+          selected = true;
+          $addUpdateTag(SKIP_SCROLL_INTO_VIEW_TAG);
+        }, { discrete: true, onUpdate: () => {
+          if (!attempted) {
+            finish();
+            return;
+          }
+          const selection = ownerDocument.getSelection();
+          if (selected && hasCommittedSelection() && selection?.rangeCount > 0 &&
+            rootElement.contains(selection.anchorNode) && rootElement.contains(selection.focusNode)) finish();
+        } });
       };
+      let loaded = false;
       if (content) {
         try {
           const state = editor.parseEditorState(content);
@@ -169,11 +218,16 @@ export function LoadContentPlugin({ content, documentId }) {
           // Keep load completion tied to an actual committed state, and keep
           // the following user update outside this tagged load boundary.
           editor.read(() => {});
-          complete();
-          return;
+          loaded = true;
         } catch {
           // Preserve the existing plain-text fallback for non-Lexical bodies.
         }
+      }
+      if (loaded) {
+        // A focus-repair error is not a JSON parse failure. Keep it outside
+        // the original plain-text fallback boundary.
+        complete();
+        return;
       }
 
       editor.update(() => {

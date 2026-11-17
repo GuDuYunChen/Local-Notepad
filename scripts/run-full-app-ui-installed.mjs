@@ -376,7 +376,7 @@ export async function runFullAppUiInstalled({ group, pin, installerPath, origina
     assert.match(filename, /^[a-z0-9][a-z0-9_-]*\.png$/)
     await evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(true))))')
     if (observeBeforeCapture) await observeBeforeCapture()
-    const bytes = Buffer.from((await cdp.send('Page.captureScreenshot', { format: 'png' })).data, 'base64')
+    const bytes = Buffer.from((await cdp.send('Page.captureScreenshot', { format: 'png', optimizeForSpeed: true })).data, 'base64')
     assert.ok(bytes.length > 1000); writeFileSync(path.join(out, filename), bytes, { flag: 'wx' })
     const record = { filename, bytes: bytes.length, sha256: sha(bytes) }; report.screenshots.push(record); save()
     evidenceStore.sealStableJSON('screenshots', record)

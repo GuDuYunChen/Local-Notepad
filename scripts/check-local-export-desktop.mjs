@@ -5,6 +5,7 @@ import { setTimeout as sleep } from 'node:timers/promises'
 import { localExportDesktopDocument } from './local-export-desktop-fixture.bundle.mjs'
 import { LOCAL_EXPORT_FIXTURE as F } from './local-export-desktop-values.mjs'
 import { exportSHA256, validateExportFeedbackVisibility } from './local-export-desktop-evidence.mjs'
+import { actOnExportDirectory } from './local-export-directory-session.mjs'
 
 const q = JSON.stringify, panel = '[data-local-export-workspace]'
 const itemSelector = id => '[data-local-export-item=' + q(id) + ']'
@@ -184,8 +185,7 @@ export async function verifyLocalExportDesktop(context) {
     const directory = cancel ? undefined : path.join(ownedRoot, 'exports', label)
     if (directory) mkdirSync(directory, { recursive: true })
     await click('[data-local-export-choose]')
-    await until(() => directorySession.inspect(binding), 'Owned native directory picker missing')
-    const result = cancel ? await directorySession.cancel(binding) : await directorySession.choose(binding, directory)
+    const result = await actOnExportDirectory({ directorySession, binding, until }, cancel ? 'cancel' : 'choose', directory)
     report.directoryActions.push({ binding: structuredClone(binding), ...(directory ? { directory } : {}), result }); save()
     await until(() => evaluate(`!document.querySelector('[data-local-export-choose]')?.disabled`), 'Native directory result not returned to original workbench')
     return directory

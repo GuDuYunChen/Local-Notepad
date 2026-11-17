@@ -24,7 +24,11 @@ assert.ok([
   '1779b317c0b27a29d5f42015726a5df6c8cbfb322e3cb1ec87445e3716fff661',
 ].includes(sha(mainSource)), 'The behavior control must use actual b3 or this frozen one-line candidate')
 assert.equal(sha(sharedSource), '5b819baf8153bc992168ff45c1408f9a53bbf6c57c41631e341fa984813861f9')
-assert.equal(sha(runnerSource), 'eaf27dadcdc8a8544fefb02f78e87ad8ed0e8a853358d7a124a777f3ac6b9091')
+const originalCaptureLine = "    const bytes = Buffer.from((await cdp.send('Page.captureScreenshot', { format: 'png' })).data, 'base64')"
+const fastCaptureLine = originalCaptureLine.replace("{ format: 'png' }", "{ format: 'png', optimizeForSpeed: true }")
+assert.equal(runnerSource.split(fastCaptureLine).length, 2, 'Exactly one speed-only PNG capture change is required')
+assert.equal(runnerSource.includes(originalCaptureLine), false, 'The candidate must use the unique updated capture call')
+assert.equal(sha(runnerSource.replace(fastCaptureLine, originalCaptureLine)), 'eaf27dadcdc8a8544fefb02f78e87ad8ed0e8a853358d7a124a777f3ac6b9091')
 
 function section(text, start, end) {
   assert.equal(text.split(start).length, 2, start)
