@@ -13,7 +13,7 @@ import UiThemeProvider from '~/components/ui/UiThemeProvider'
 import { CalloutNode, $createCalloutNode } from './CalloutNode'
 import { ToggleNode, $createToggleNode } from './ToggleNode'
 
-let host, reactRoot, editor, errors
+let host, reactRoot, editor, errors, originalRangeGeometry
 function Capture() {
   const [instance] = useLexicalComposerContext()
   useEffect(() => { editor = instance }, [instance])
@@ -70,6 +70,15 @@ beforeEach(() => {
     unobserve() {}
     disconnect() {}
   })
+  // jsdom lacks Range geometry used by Lexical when committing a DOM
+  // selection. Only supply the absent layout API, not key/focus semantics.
+  originalRangeGeometry = Object.getOwnPropertyDescriptor(Range.prototype, 'getBoundingClientRect')
+  if (typeof Range.prototype.getBoundingClientRect !== 'function') {
+    Object.defineProperty(Range.prototype, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => new DOMRect(0, 0, 0, 0),
+    })
+  }
   host = document.createElement('div')
   document.body.append(host)
   reactRoot = createRoot(host)
@@ -80,6 +89,8 @@ afterEach(async () => {
   await act(async () => reactRoot.unmount())
   host.remove()
   vi.restoreAllMocks()
+  if (originalRangeGeometry) Object.defineProperty(Range.prototype, 'getBoundingClientRect', originalRangeGeometry)
+  else delete Range.prototype.getBoundingClientRect
   vi.unstubAllGlobals()
   delete globalThis.IS_REACT_ACT_ENVIRONMENT
 })
@@ -87,10 +98,16 @@ describe('real Lexical decorator F6 entry and browser-owned Tab boundary', () =>
   for (const fixture of cases) {
     it(`${fixture.name} enters the first owned action without clicking or altering source content`, async () => {
       await mount(fixture, 2)
-      await act(async () => { root().focus(); editor.update(() =>
-        $getRoot().getFirstChildOrThrow().getFirstChildOrThrow().select(1, 3), { discrete: true }) })
+      await act(async () => { root().focus(); editor.update(() => {
+        const textNode = $getRoot().getFirstChildOrThrow().getFirstChildOrThrow()
+        // The fixture text is bold. Seed the selected typing format to the
+        // actual node format rather than letting Lexical normalize an
+        // artificially plain selection during a subsequent focus change.
+        textNode.select(1, 3).format = textNode.getFormat()
+      }, { discrete: true }) })
       await settle()
       const before = model(), selection = logical()
+      expect(selection?.[4]).toBe(1) // the preselected text retains its bold format
       const action = root().querySelector(fixture.selector)
       const click = vi.fn()
       action.addEventListener('click', click)
