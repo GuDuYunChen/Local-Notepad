@@ -200,6 +200,13 @@ export function observeFullAppPage({ root, anchors = [], editorExceptions = [], 
     if (!selectors.has(node)) selectors.set(node, readSelector(node))
     return selectors.get(node)
   }
+  const diagnosticClientPorts = new Map()
+  const diagnosticClientPort = (node, clip) => {
+    if (!diagnosticClientPorts.has(node)) diagnosticClientPorts.set(node, {
+      left: clip.left + node.clientLeft, top: clip.top + node.clientTop, width: node.clientWidth, height: node.clientHeight,
+    })
+    return { ...diagnosticClientPorts.get(node) }
+  }
   const observe = (node, checkPaintedFragments = false) => {
     const box = bounds(node), visible = painted(node), clippingAncestors = []
     const clipBoundary = fixedBoundary(node)
@@ -210,7 +217,7 @@ export function observeFullAppPage({ root, anchors = [], editorExceptions = [], 
       if (!beyondFixed) inViewport &&= withinClientPort(box, clip, parent, applied.x, applied.y)
       if (parent === clipBoundary) beyondFixed = true
       clippingAncestors.push({ tag: parent.tagName, id: parent.id, bounds: clip,
-        clientPort: { left: clip.left + parent.clientLeft, top: clip.top + parent.clientTop, width: parent.clientWidth, height: parent.clientHeight },
+        clientPort: diagnosticClientPort(parent, clip),
         overflowX: css.overflowX, overflowY: css.overflowY, appliedOverflowX: applied.x, appliedOverflowY: applied.y, viewportApplied: applied.viewportApplied })
     }
     // An inline label can wrap into separate painted boxes. The centre of

@@ -24,10 +24,23 @@ const sha = value => createHash('sha256').update(value).digest('hex')
 const filteredScrollOwner = '    if (!/auto|scroll/.test(overflowY)) continue\n    const clientHeight = viewportScrollOwner ? viewport.height : owner.clientHeight\n    if ((!viewportScrollOwner && !rendered(owner)) || owner.scrollHeight <= clientHeight + 1) continue'
 const originalScrollOwner = '    const clientHeight = viewportScrollOwner ? viewport.height : owner.clientHeight\n    if ((!viewportScrollOwner && !rendered(owner)) || !/auto|scroll/.test(overflowY) || owner.scrollHeight <= clientHeight + 1) continue'
 let sharedIdentitySource = sharedSource
-if (sharedSource.includes(filteredScrollOwner)) {
-  assert.equal(sharedSource.split(filteredScrollOwner).length, 2, 'Unique reviewed scroll-owner predicate order')
-  assert.equal(sharedSource.includes(originalScrollOwner), false, 'The candidate must contain only the reviewed predicate order')
-  sharedIdentitySource = sharedSource.replace(filteredScrollOwner, originalScrollOwner)
+// First undo only the single-observation diagnostic cache. The real predicate
+// and every other byte must still recover the previously reviewed 2787 source.
+const diagnosticPortHelper = '  const diagnosticClientPorts = new Map()\n  const diagnosticClientPort = (node, clip) => {\n    if (!diagnosticClientPorts.has(node)) diagnosticClientPorts.set(node, {\n      left: clip.left + node.clientLeft, top: clip.top + node.clientTop, width: node.clientWidth, height: node.clientHeight,\n    })\n    return { ...diagnosticClientPorts.get(node) }\n  }\n'
+const cachedDiagnosticPort = '        clientPort: diagnosticClientPort(parent, clip),'
+const originalDiagnosticPort = '        clientPort: { left: clip.left + parent.clientLeft, top: clip.top + parent.clientTop, width: parent.clientWidth, height: parent.clientHeight },'
+if (sharedIdentitySource.includes(diagnosticPortHelper)) {
+  assert.equal(sharedIdentitySource.split(diagnosticPortHelper).length, 2, 'Unique reviewed single-observation diagnostic cache')
+  assert.equal(sharedIdentitySource.split(cachedDiagnosticPort).length, 2, 'Unique reviewed diagnostic client-port call')
+  assert.equal(sharedIdentitySource.includes(originalDiagnosticPort), false, 'Only the diagnostic construction may use the new cache')
+  sharedIdentitySource = sharedIdentitySource.replace(diagnosticPortHelper, '').replace(cachedDiagnosticPort, originalDiagnosticPort)
+  assert.equal(sha(sharedIdentitySource), 'e72e3dc3728e6254c4deaca5a4c12bd9ba9b26980ad6c2a8a0d90c79b05f29a5',
+    'The inverse diagnostic change must recover the exact 2787 shared source')
+}
+if (sharedIdentitySource.includes(filteredScrollOwner)) {
+  assert.equal(sharedIdentitySource.split(filteredScrollOwner).length, 2, 'Unique reviewed scroll-owner predicate order')
+  assert.equal(sharedIdentitySource.includes(originalScrollOwner), false, 'The candidate must contain only the reviewed predicate order')
+  sharedIdentitySource = sharedIdentitySource.replace(filteredScrollOwner, originalScrollOwner)
   assert.equal(sha(sharedIdentitySource), '92bd7f6a2b448247178e456484be08d6a18397b7c1885d77b29c6f1a2ae512bd',
     'The inverse predicate change must recover the exact ad46 shared source')
 }

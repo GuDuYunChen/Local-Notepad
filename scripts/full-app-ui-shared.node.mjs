@@ -592,6 +592,91 @@ test('serialized scroll-owner discovery skips non-scroll geometry while preservi
   }
 })
 
+test('serialized page diagnostic client ports reuse native reads without changing real predicates or later samples', () => {
+  const helper = '  const diagnosticClientPorts = new Map()\n  const diagnosticClientPort = (node, clip) => {\n    if (!diagnosticClientPorts.has(node)) diagnosticClientPorts.set(node, {\n      left: clip.left + node.clientLeft, top: clip.top + node.clientTop, width: node.clientWidth, height: node.clientHeight,\n    })\n    return { ...diagnosticClientPorts.get(node) }\n  }\n'
+  const cachedPort = '        clientPort: diagnosticClientPort(parent, clip),'
+  const originalPort = '        clientPort: { left: clip.left + parent.clientLeft, top: clip.top + parent.clientTop, width: parent.clientWidth, height: parent.clientHeight },'
+  const currentSource = viewportObservers.observeFullAppPage.toString().replace(/\r\n/g, '\n')
+  const restore = source => {
+    const normalized = source.replace(/\r\n/g, '\n')
+    assert.equal(normalized.split(helper).length, 2, 'The single-sample diagnostic cache must be inside the serialized observer')
+    assert.equal(normalized.split(cachedPort).length, 2, 'Only the diagnostic client-port construction changes')
+    assert.equal(normalized.includes(originalPort), false)
+    return normalized.replace(helper, '').replace(cachedPort, originalPort)
+  }
+  const legacySource = restore(currentSource)
+  assert.equal(restore(currentSource.replace(/\n/g, '\r\n')), legacySource, 'Both checkout line-ending representations restore the identical observer')
+  const f = overflowFixture()
+  let parent = f.page
+  for (let depth = 0; depth < 8; depth++) parent = f.make('div', 'diagnostic-common-' + depth, f.rectangle(10, 20, 400, 200), parent)
+  f.page.children = f.page.children.filter(node => node !== f.control)
+  parent.children.push(f.control); f.control.parentElement = parent
+  for (let index = 1; index < 40; index++) {
+    const control = f.make('input', 'diagnostic-field-' + index, f.rectangle(20, 40 + index * 45, 160, 40), parent)
+    control.dataset.uiControl = 'input'; control.className = 'ant-input app-ui-input'
+  }
+  const nodes = new Set([f.html, ...f.html.querySelectorAll('*')])
+  let counts, insidePredicate = false
+  for (const node of nodes) for (const property of ['clientLeft', 'clientTop', 'clientWidth', 'clientHeight']) {
+    let value = node[property]
+    Object.defineProperty(node, property, { get() {
+      counts.total++
+      if (insidePredicate) counts.predicateReads.push([node.id || node.tagName, property, value])
+      return value
+    }, set(next) { value = next } })
+  }
+  f.globals.trackPredicate = (predicate, box, clip, node, x, y) => {
+    assert.ok(nodes.has(node), 'The real predicate must receive the original DOM node, never cached metrics')
+    counts.predicateCalls.push([node.id || node.tagName, { ...box }, { ...clip }, x, y])
+    insidePredicate = true
+    try { return predicate(box, clip, node, x, y) } finally { insidePredicate = false }
+  }
+  const serialize = source => runInNewContext(`(()=>{const collectFullAppScrollOwners=${collectFullAppScrollOwners.toString()};
+    const read=${source};return ()=>read({root:'.actual-page',anchors:['#control']},
+    (box,clip,node,x,y)=>trackPredicate(${withinActualClientPort.toString()},box,clip,node,x,y),
+    ${viewportObservers.observeFullAppOverflowViewport.toString()},${viewportObservers.viewportFixedClipBoundary.toString()})})()`, f.globals)
+  // These same serialized functions and realms survive every later DOM change.
+  const legacy = serialize(legacySource), current = serialize(currentSource)
+  const read = observe => {
+    counts = { total: 0, predicateCalls: [], predicateReads: [] }
+    try {
+      const raw = observe(), json = JSON.stringify(raw)
+      return { raw, json, value: JSON.parse(json), counts }
+    } catch (error) { return { error: { name: error.name, message: error.message }, counts } }
+  }
+  const compare = () => {
+    const expected = read(legacy), actual = read(current)
+    assert.deepEqual(actual.counts.predicateCalls, expected.counts.predicateCalls, 'Every actual predicate argument and short-circuit call remains identical')
+    assert.deepEqual(actual.counts.predicateReads, expected.counts.predicateReads, 'Actual predicate getter values and read order must not be cached')
+    assert.deepEqual(actual.error, expected.error)
+    if (expected.error) {
+      assert.deepEqual(expected.error, { name: 'Error', message: 'Actual client-port metrics are required' })
+    } else {
+      assert.equal(actual.json, expected.json, 'The complete serialized observation, including every diagnostic field, stays equal')
+      assert.ok(actual.counts.total < expected.counts.total, 'Only repeated diagnostic native getters are removed')
+    }
+    return actual
+  }
+  const first = compare(), savedFirst = first.json
+  assert.equal(first.value.controls.length, 40)
+  const ports = first.raw.controls.flatMap(control => control.clippingAncestors).filter(ancestor => ancestor.id === parent.id).map(ancestor => ancestor.clientPort)
+  assert.ok(ports.length > 1)
+  assert.equal(new Set(ports).size, ports.length, 'Every emitted diagnostic owns a fresh client-port object')
+  const otherWidth = ports[1].width
+  ports[0].width = -999
+  assert.equal(ports[1].width, otherWidth, 'Mutating one result must not mutate another result')
+  parent.css.overflowY = 'hidden'; parent.clientLeft = 3; parent.clientTop = 7; parent.clientWidth = 123; parent.clientHeight = 31
+  const changed = compare()
+  assert.notEqual(changed.json, savedFirst)
+  assert.equal(JSON.stringify(first.value), savedFirst, 'Later DOM changes must not mutate an earlier captured observation')
+  assert.deepEqual(changed.value.controls.flatMap(control => control.clippingAncestors).find(ancestor => ancestor.id === parent.id).clientPort,
+    { left: 13, top: 27, width: 123, height: 31 })
+  parent.clientWidth = -1
+  assert.ok(compare().error, 'The original real client-port refusal must still throw')
+  parent.clientWidth = 123
+  assert.equal(compare().json, changed.json, 'A later observer call reads restored DOM metrics without retaining either prior cache or output mutation')
+})
+
 async function serializedEnsureVisible(fixture) {
   const shared = createFullAppUiShared({ evaluate: async source => runInNewContext(source, fixture.globals), click() {},
     cdp: { send() {} }, until: async check => check(), capture() {}, save() {}, report: { fullAppUi: {} }, routes: [], matrix })
