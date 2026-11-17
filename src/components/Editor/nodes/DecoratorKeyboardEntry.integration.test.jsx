@@ -20,9 +20,13 @@ function Capture() {
   return null
 }
 const settle = async () => act(async () => { for (let i = 0; i < 8; i++) await Promise.resolve() })
-function key(target, name = 'F6', options = {}) {
+async function key(target, name = 'F6', options = {}) {
   const event = new KeyboardEvent('keydown', { key: name, bubbles: true, cancelable: true, ...options })
-  return act(async () => { target.dispatchEvent(event) }).then(async () => { await settle(); return event })
+  // React act exposes a thenable but does not guarantee that chaining its
+  // .then returns a Promise. Capture and return the original dispatched event.
+  await act(async () => { target.dispatchEvent(event) })
+  await settle()
+  return event
 }
 const cases = [
   { name: 'callout', create: () => $createCalloutNode({ icon: '💡', text: '原有提示内容' }),
