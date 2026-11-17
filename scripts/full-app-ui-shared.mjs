@@ -186,12 +186,21 @@ export function observeFullAppPage({ root, anchors = [], editorExceptions = [], 
   const visibleRoots = [...document.querySelectorAll(root)].filter(rendered)
   if (visibleRoots.length !== 1) throw Error('Expected one actual page root: ' + root + ' (' + visibleRoots.length + ')')
   const area = visibleRoots[0]
+  const childPositions = new Map()
+  const childPosition = (parent, child) => {
+    if (!childPositions.has(parent)) {
+      const positions = new Map()
+      for (const [index, sibling] of [...parent.children].entries()) if (!positions.has(sibling)) positions.set(sibling, index + 1)
+      childPositions.set(parent, positions)
+    }
+    return childPositions.get(parent).get(child) ?? 0
+  }
   const readSelector = node => {
     if (node === document.documentElement) return 'html'
     if (node.id && document.querySelectorAll('[id=' + JSON.stringify(node.id) + ']').length === 1) return '[id=' + JSON.stringify(node.id) + ']'
     const parts = []
     for (let owner = node; owner && owner !== document.documentElement; owner = owner.parentElement) {
-      parts.unshift(owner.tagName.toLowerCase() + ':nth-child(' + ([...owner.parentElement.children].indexOf(owner) + 1) + ')')
+      parts.unshift(owner.tagName.toLowerCase() + ':nth-child(' + childPosition(owner.parentElement, owner) + ')')
       if (owner === area) return root + (parts.length > 1 ? ' > ' + parts.slice(1).join(' > ') : '')
     }
     return 'html > ' + parts.join(' > ')
@@ -1325,7 +1334,7 @@ export function fullAppOwnedOptionRequest(request) {
 // Self-contained because it is serialized into the actual installed renderer.
 // A semantic listbox alone is not evidence that its option is painted at the
 // point which will receive the one original mouse press/release.
-export function observeFullAppOwnedOptionPointer(request, scroll = false) {
+export function observeFullAppOwnedOptionPointer(request, scroll = false, readOwnerMotion) {
   const unavailable = (reason, details = {}) => ({ ready: false, reason, scrolled: false, ...details })
   const nodes = [...document.querySelectorAll(request.selector)]
   if (nodes.length !== 1) return unavailable('option-count', { count: nodes.length })
@@ -1363,6 +1372,7 @@ export function observeFullAppOwnedOptionPointer(request, scroll = false) {
   return { identity, rect, popup, listbox, trigger, viewport, point, visible, inViewport, ownedHit,
     hit: hit ? { tag: hit.tagName, id: hit.id || null, role: hit.getAttribute('role') } : null,
     scrolled: scroll, ready: visible && inViewport && ownedHit,
+    ownerMotion: visible && inViewport && ownedHit ? readOwnerMotion('[id=' + JSON.stringify(field.id) + ']') : null,
     reason: !visible ? 'not-painted' : !inViewport ? 'outside-viewport' : !ownedHit ? 'foreign-hit' : null }
 }
 
@@ -1374,7 +1384,7 @@ export async function prepareFullAppOwnedOptionPointer({ request, evaluate, unti
   save()
   let scrolled = false, identity = null
   const read = async (phase, shouldScroll = false, checkpoint = true) => {
-    const sample = await evaluate(`(${observeFullAppOwnedOptionPointer.toString()})(${JSON.stringify(owned)},${shouldScroll})`)
+    const sample = await evaluate(`(${observeFullAppOwnedOptionPointer.toString()})(${JSON.stringify(owned)},${shouldScroll},${observeFullAppOwnerMotion.toString()})`)
     receipt.samples.push({ phase, sample })
     if (receipt.samples.length > 8) { receipt.samples.splice(1, 1); receipt.omittedSamples++ }
     receipt.lastPhase = phase
@@ -1392,7 +1402,7 @@ export async function prepareFullAppOwnedOptionPointer({ request, evaluate, unti
     const stable = await until(async () => {
       receipt.checks++
       const first = await read('before-frame', !scrolled)
-      if (!first.ready) return false
+      if (!first.ready || finiteOwnerMotionActive(first.ownerMotion)) return false
       await frame()
       const second = await read('first-frame')
       if (!second.ready || geometry(first) !== geometry(second)) return false

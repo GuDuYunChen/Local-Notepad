@@ -677,6 +677,94 @@ test('serialized page diagnostic client ports reuse native reads without changin
   assert.equal(compare().json, changed.json, 'A later observer call reads restored DOM metrics without retaining either prior cache or output mutation')
 })
 
+test('serialized page selectors reuse sibling positions only within one observation and retain later DOM changes', () => {
+  const helper = '  const childPositions = new Map()\n  const childPosition = (parent, child) => {\n    if (!childPositions.has(parent)) {\n      const positions = new Map()\n      for (const [index, sibling] of [...parent.children].entries()) if (!positions.has(sibling)) positions.set(sibling, index + 1)\n      childPositions.set(parent, positions)\n    }\n    return childPositions.get(parent).get(child) ?? 0\n  }\n'
+  const cached = "      parts.unshift(owner.tagName.toLowerCase() + ':nth-child(' + childPosition(owner.parentElement, owner) + ')')"
+  const original = "      parts.unshift(owner.tagName.toLowerCase() + ':nth-child(' + ([...owner.parentElement.children].indexOf(owner) + 1) + ')')"
+  const source = viewportObservers.observeFullAppPage.toString().replace(/\r\n/g, '\n')
+  assert.equal(source.split(helper).length, 2); assert.equal(source.split(cached).length, 2)
+  const legacySource = source.replace(helper, '').replace(cached, original)
+  assert.equal(source.replace(/\n/g, '\r\n').replace(/\r\n/g, '\n').replace(helper, '').replace(cached, original), legacySource)
+  const f = overflowFixture(), fields = [f.control]
+  f.page.id = ''
+  const outer = f.make('div', '', f.rectangle(0, 0, 704, 455), f.body)
+  outer.css.overflowY = 'auto'; outer.scrollHeight = 900
+  f.body.children = f.body.children.filter(node => node !== f.page)
+  outer.children.push(f.page); f.page.parentElement = outer
+  let parent = f.page
+  for (let depth = 0; depth < 4; depth++) parent = f.make('div', 'selector-ancestor-' + depth, f.rectangle(10, 20, 400, 200), parent)
+  f.page.children = f.page.children.filter(node => node !== f.control)
+  parent.children.push(f.control); f.control.parentElement = parent
+  for (let index = 1; index < 8; index++) {
+    const field = f.make('input', '', f.rectangle(20, 40 + index * 45, 160, 40), parent)
+    field.dataset.uiControl = 'input'; field.className = 'ant-input app-ui-input'; fields.push(field)
+  }
+  const nodes = new Map(), children = new Map()
+  let counts
+  const instrument = node => {
+    const id = nodes.size; nodes.set(node, id); children.set(node, node.children)
+    Object.defineProperty(node, 'children', { get() { counts.children.set(id, (counts.children.get(id) || 0) + 1); return children.get(node) }, set(value) { children.set(node, value) } })
+    // Native contains/querySelector do not call the public children getter.
+    node.contains = other => { for (let item = other; item; item = item.parentElement) if (item === node) return true; return false }
+    const nativeRect = node.getBoundingClientRect
+    node.getBoundingClientRect = function () { counts.native.push(['rect', id]); return nativeRect.call(this) }
+    for (const property of ['clientLeft', 'clientTop', 'clientWidth', 'clientHeight']) {
+      let value = node[property]
+      Object.defineProperty(node, property, { get() { counts.native.push([property, id, value]); return value }, set(next) { value = next } })
+    }
+  }
+  for (const node of [f.html, ...f.html.querySelectorAll('*')]) instrument(node)
+  f.globals.getComputedStyle = node => { counts.native.push(['style', nodes.get(node)]); return node.css }
+  f.globals.trackPredicate = (predicate, box, clip, node, x, y) => {
+    assert.ok(nodes.has(node))
+    counts.native.push(['predicate', nodes.get(node), { ...box }, { ...clip }, x, y])
+    try { const result = predicate(box, clip, node, x, y); counts.native.push(['result', result]); return result }
+    catch (error) { counts.native.push(['error', error.name, error.message]); throw error }
+  }
+  const serialize = text => runInNewContext(`(()=>{const collectFullAppScrollOwners=${collectFullAppScrollOwners.toString()};const read=${text};
+    return ()=>read({root:'.actual-page',anchors:['.actual-page']},(box,clip,node,x,y)=>trackPredicate(${withinActualClientPort.toString()},box,clip,node,x,y),
+    ${viewportObservers.observeFullAppOverflowViewport.toString()},${viewportObservers.viewportFixedClipBoundary.toString()})})()`, f.globals)
+  const legacy = serialize(legacySource), current = serialize(source)
+  const read = observe => {
+    counts = { native: [], children: new Map() }
+    try { const json = JSON.stringify(observe()); return { json, value: JSON.parse(json), counts } }
+    catch (error) { return { error: { name: error.name, message: error.message }, counts } }
+  }
+  const compare = () => {
+    const before = read(legacy), after = read(current)
+    assert.deepEqual(after.counts.native, before.counts.native, 'Style/rectangle/client getters and actual predicate arguments, results and errors remain in their original order')
+    assert.deepEqual(after.error, before.error)
+    if (!before.error) {
+      assert.equal(after.json, before.json, 'Every original observation and selector field remains identical')
+      const total = sample => [...sample.counts.children.values()].reduce((sum, value) => sum + value, 0)
+      assert.ok(total(before) > total(after))
+      assert.equal(after.counts.children.get(nodes.get(f.html)), 2, 'Keep the original viewport firstBody read plus the one cached HTML selector enumeration')
+      assert.ok([...after.counts.children].every(([id, value]) => value === (id === nodes.get(f.html) ? 2 : 1)), 'Only selector sibling lookups share the per-parent enumeration')
+    }
+    return after
+  }
+  const first = compare()
+  assert.equal(first.value.controls[0].fieldSelector, '[id="control"]')
+  assert.ok(first.value.controls[1].fieldSelector.startsWith('.actual-page > div:nth-child('))
+  assert.equal(first.value.anchors[0].selector, '.actual-page')
+  assert.ok(first.value.scrollAreas.some(area => area.selector.startsWith('html > body:nth-child(')))
+  const inserted = f.make('span', '', f.rectangle(20, 30, 10, 10), parent); instrument(inserted)
+  parent.children = [inserted, ...children.get(parent).filter(node => node !== inserted)]
+  const insertion = compare(); assert.notEqual(insertion.value.controls[1].fieldSelector, first.value.controls[1].fieldSelector)
+  parent.children = [...children.get(parent)].reverse()
+  const reordered = compare(); assert.notEqual(reordered.value.controls[1].fieldSelector, insertion.value.controls[1].fieldSelector)
+  parent.children = children.get(parent).filter(node => node !== inserted); inserted.parentElement = null; inserted.isConnected = false
+  compare()
+  fields[1].id = 'control'
+  const duplicate = compare(); assert.ok(duplicate.value.controls[0].fieldSelector.startsWith('.actual-page >'))
+  // An explicit inconsistent fixture exercises indexOf's original missing-child
+  // result0; ordinary DOM cannot retain a parent while missing that child.
+  parent.children = children.get(parent).filter(node => node !== fields[2])
+  const missing = compare(); assert.ok(missing.value.controls[2].fieldSelector.endsWith('input:nth-child(0)'))
+  parent.clientWidth = -1
+  assert.deepEqual(compare().error, { name: 'Error', message: 'Actual client-port metrics are required' })
+})
+
 async function serializedEnsureVisible(fixture) {
   const shared = createFullAppUiShared({ evaluate: async source => runInNewContext(source, fixture.globals), click() {},
     cdp: { send() {} }, until: async check => check(), capture() {}, save() {}, report: { fullAppUi: {} }, routes: [], matrix })
@@ -2058,6 +2146,8 @@ function ownedOptionPointerFixture(t, mode = 'stable') {
   for (const element of document.querySelectorAll('*')) {
     element.style.opacity = '1'; element.style.visibility = 'visible'
     element.getBoundingClientRect = () => rect(0, 0, 1280, 800)
+    element.getClientRects = () => [element.getBoundingClientRect()]
+    element.getAnimations = () => []
   }
   option.getBoundingClientRect = () => rect(left, 100, 160, 32)
   list.getBoundingClientRect = () => rect(80, 80, 500, 200)
@@ -2220,6 +2310,121 @@ test('ordinary runner clicks retain their original path without owned-option pre
   assert.equal(f.receipt(), undefined)
   assert.equal(f.frames(), 0); assert.equal(f.scrolls(), 1)
   assert.equal(f.waits.length, 1); assert.equal(f.waits[0].argumentCount, 2)
+})
+
+// Synthetic owner-motion contracts, not a reconstruction of the old native
+// animation: that receipt did not contain trigger-owner motion observations.
+function originalOwnedPointerPreparation() {
+  const currentObserver = observeFullAppOwnedOptionPointer.toString().replace(/\r\n/g, '\n')
+  const currentPreparation = prepareFullAppOwnedOptionPointer.toString().replace(/\r\n/g, '\n')
+  const restore = (source, changes) => {
+    for (const [current, original] of changes) {
+      assert.equal(source.split(current).length, 2, 'Each owned-motion source change has one exact inverse')
+      source = source.replace(current, original)
+    }
+    return source
+  }
+  const observer = runInNewContext('(' + restore(currentObserver, [
+    ['function observeFullAppOwnedOptionPointer(request, scroll = false, readOwnerMotion) {', 'function observeFullAppOwnedOptionPointer(request, scroll = false) {'],
+    ["    ownerMotion: visible && inViewport && ownedHit ? readOwnerMotion('[id=' + JSON.stringify(field.id) + ']') : null,\n", ''],
+  ]) + ')')
+  const preparation = restore(currentPreparation, [
+    ['    const sample = await evaluate(`(${observeFullAppOwnedOptionPointer.toString()})(${JSON.stringify(owned)},${shouldScroll},${observeFullAppOwnerMotion.toString()})`)',
+      '    const sample = await evaluate(`(${observeFullAppOwnedOptionPointer.toString()})(${JSON.stringify(owned)},${shouldScroll})`)'],
+    ['      if (!first.ready || finiteOwnerMotionActive(first.ownerMotion)) return false', '      if (!first.ready) return false'],
+  ])
+  return { observer, prepare: runInNewContext('(' + preparation + ')', { assert, fullAppOwnedOptionRequest, observeFullAppOwnedOptionPointer: observer }) }
+}
+
+function ownedFiniteMotionFixture(t, mode = 'settle', original = null) {
+  const f = ownedOptionPointerFixture(t), field = f.dom.window.document.querySelector('[role="combobox"]')
+  let clock = 0, reads = 0, motionReads = 0
+  const sleeps = [], waits = [], commands = [], saved = [], report = { fullAppUi: {} }
+  field.getBoundingClientRect = () => {
+    const top = mode === 'settle' && (clock >= 100 || reads >= 4) ? 422.78125 : 422.546875
+    return { left: 302, top, right: 385.125, bottom: top + 22, width: 83.125, height: 22 }
+  }
+  field.getAnimations = function (options) {
+    assert.equal(this, field); assert.equal(options.subtree, false); assert.equal(Object.keys(options).length, 1)
+    motionReads++
+    const active = mode !== 'settle' || clock < 100
+    return [{ playState: active ? 'running' : 'finished', pending: active, transitionProperty: 'transform',
+      effect: { getComputedTiming: () => ({ duration: mode === 'invalid' ? null : 150, iterations: 1, endTime: 150 }) } }]
+  }
+  const observer = original?.observer || observeFullAppOwnedOptionPointer
+  const prefix = '(' + observer.toString() + ')'
+  const evaluate = async expression => {
+    if (expression.startsWith(prefix)) reads++
+    return JSON.parse(JSON.stringify(await f.dom.window.eval(expression)))
+  }
+  const actualUntil = runInNewContext(projectSetupUntilSource + '; until', {
+    performance: { now: () => clock }, sleep: async milliseconds => { sleeps.push(milliseconds); clock += milliseconds },
+  })
+  const until = async (...args) => { waits.push({ argumentCount: args.length, label: args[1] }); return actualUntil(...args) }
+  // Execute the same actual installed-runner click closure with either exact
+  // original or current preparation; no alternative input path is modeled.
+  const createClick = runInNewContext('(' + actualRunnerOptionClick.toString() + ')', {
+    assert, runInNewContext, parseProjectSetupSource, projectSetupRunnerSource, fullAppOwnedOptionRequest,
+    prepareFullAppOwnedOptionPointer: original?.prepare || prepareFullAppOwnedOptionPointer,
+  })
+  const click = createClick({ evaluate, until, report, save: () => saved.push(structuredClone(report)),
+    evidenceStore: { sealStableJSON: () => true }, cdp: { send: async (method, parameters) => {
+      assert.equal(method, 'Input.dispatchMouseEvent')
+      const hit = f.dom.window.document.elementFromPoint(parameters.x, parameters.y)
+      assert.ok(f.dom.window.document.querySelector('[role="option"]').contains(hit))
+      commands.push({ ...parameters })
+    } } })
+  return { ...f, click, commands, waits, sleeps, saved, report, reads: () => reads, motionReads: () => motionReads,
+    elapsed: () => clock, receipt: () => report.fullAppUi.optionPointerPreparations?.[0] }
+}
+
+test('owned pointer waits for finite trigger-owner motion even when its first geometry samples are equal', async t => {
+  const original = ownedFiniteMotionFixture(t, 'settle', originalOwnedPointerPreparation())
+  await assert.rejects(original.click(original.selector), /Actual owned Select option moved before native pointer/)
+  assert.deepEqual(original.commands, []); assert.deepEqual(original.sleeps, [])
+  assert.equal(original.motionReads(), 0)
+  assert.equal(original.receipt().checks, 1)
+  assert.equal(new Set(original.receipt().stableSamples.map(sample => JSON.stringify(sample.trigger))).size, 1)
+  assert.equal(original.receipt().samples.at(-1).sample.trigger.top - original.receipt().stableSamples.at(-1).trigger.top, 0.234375)
+
+  const current = ownedFiniteMotionFixture(t)
+  await current.click(current.selector)
+  assert.deepEqual(current.sleeps, [100]); assert.equal(current.elapsed(), 100)
+  assert.equal(current.waits.length, 1); assert.equal(current.waits[0].argumentCount, 2)
+  assert.equal(current.receipt().checks, 2); assert.equal(current.scrolls(), 1); assert.equal(current.frames(), 2)
+  assert.equal(current.motionReads(), current.reads(), 'The injected owner observer executes in every ready renderer sample')
+  assert.deepEqual(current.receipt().samples.map(item => item.phase), ['before-frame', 'before-frame', 'first-frame', 'second-frame', 'fresh-before-input'])
+  const first = current.receipt().samples[0].sample
+  assert.equal(first.ownerMotion.root, '[id="owned-field"]')
+  assert.equal(first.ownerMotion.owners[0].id, first.identity.inputId)
+  assert.equal(first.ownerMotion.animations[0].pending, true)
+  assert.ok(current.receipt().stableSamples.every(sample => sample.ownerMotion.animations[0].playState === 'finished'))
+  assert.equal(current.receipt().fresh.trigger.top, 422.78125)
+  assert.deepEqual(current.commands.map(command => command.type), ['mousePressed', 'mouseReleased'])
+  assert.equal(current.receipt().complete, true); assert.equal(current.receipt().inputDispatchComplete, true)
+  assert.equal(current.receipt().nativeInputSentByPreparation, 0)
+})
+
+test('owned pointer finite-owner motion shares the original single 15000ms and 100ms readiness budget', async t => {
+  const f = ownedFiniteMotionFixture(t, 'never')
+  await assert.rejects(f.click(f.selector), /Actual owned Select option did not settle before native pointer/)
+  assert.deepEqual(f.commands, [])
+  assert.equal(f.elapsed(), 15000); assert.equal(f.sleeps.length, 150); assert.ok(f.sleeps.every(value => value === 100))
+  assert.equal(f.waits.length, 1); assert.equal(f.waits[0].argumentCount, 2)
+  assert.equal(f.receipt().checks, 150); assert.equal(f.scrolls(), 1); assert.equal(f.frames(), 0)
+  assert.equal(f.receipt().samples.length, 8); assert.ok(f.receipt().omittedSamples > 0)
+  assert.equal(f.receipt().samples.at(-1).sample.ownerMotion.animations[0].pending, true)
+  assert.equal(f.receipt().complete, false); assert.equal(f.receipt().inputDispatchComplete, false)
+  assert.ok(f.saved.at(-1).fullAppUi.optionPointerPreparations[0].error)
+})
+
+test('owned pointer rejects unavailable finite-owner timing instead of accepting unchanged geometry', async t => {
+  const f = ownedFiniteMotionFixture(t, 'invalid')
+  await assert.rejects(f.click(f.selector), /Finite owner animation timing is unavailable/)
+  assert.deepEqual(f.commands, []); assert.deepEqual(f.sleeps, [])
+  assert.equal(f.waits.length, 1); assert.equal(f.frames(), 0)
+  assert.equal(f.receipt().samples[0].sample.ownerMotion.animations[0].duration, null)
+  assert.equal(f.receipt().complete, false); assert.equal(f.receipt().inputDispatchComplete, false)
 })
 
 // Floating-toolbar entry contracts. DOM routing below is an explicit protocol

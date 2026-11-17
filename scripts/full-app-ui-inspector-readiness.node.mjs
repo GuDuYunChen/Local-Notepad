@@ -24,6 +24,38 @@ const sha = value => createHash('sha256').update(value).digest('hex')
 const filteredScrollOwner = '    if (!/auto|scroll/.test(overflowY)) continue\n    const clientHeight = viewportScrollOwner ? viewport.height : owner.clientHeight\n    if ((!viewportScrollOwner && !rendered(owner)) || owner.scrollHeight <= clientHeight + 1) continue'
 const originalScrollOwner = '    const clientHeight = viewportScrollOwner ? viewport.height : owner.clientHeight\n    if ((!viewportScrollOwner && !rendered(owner)) || !/auto|scroll/.test(overflowY) || owner.scrollHeight <= clientHeight + 1) continue'
 let sharedIdentitySource = sharedSource
+// Undo only the current-observation sibling-position cache, then retain the
+// already reviewed owned-motion/diagnostic/scroll source identities below.
+const selectorPositionHelper = '  const childPositions = new Map()\n  const childPosition = (parent, child) => {\n    if (!childPositions.has(parent)) {\n      const positions = new Map()\n      for (const [index, sibling] of [...parent.children].entries()) if (!positions.has(sibling)) positions.set(sibling, index + 1)\n      childPositions.set(parent, positions)\n    }\n    return childPositions.get(parent).get(child) ?? 0\n  }\n'
+const cachedSelectorPosition = "      parts.unshift(owner.tagName.toLowerCase() + ':nth-child(' + childPosition(owner.parentElement, owner) + ')')"
+const originalSelectorPosition = "      parts.unshift(owner.tagName.toLowerCase() + ':nth-child(' + ([...owner.parentElement.children].indexOf(owner) + 1) + ')')"
+if (sharedIdentitySource.includes(selectorPositionHelper)) {
+  assert.equal(sharedIdentitySource.split(selectorPositionHelper).length, 2, 'Unique reviewed same-observation sibling cache')
+  assert.equal(sharedIdentitySource.split(cachedSelectorPosition).length, 2, 'Unique reviewed selector position lookup')
+  assert.equal(sharedIdentitySource.includes(originalSelectorPosition), false, 'Only the reviewed position lookup may replace the original enumeration')
+  sharedIdentitySource = sharedIdentitySource.replace(selectorPositionHelper, '').replace(cachedSelectorPosition, originalSelectorPosition)
+  assert.equal(sha(sharedIdentitySource), 'd2e3ee08e1addde58f79f8b01319ac20e5d409d64a253947dfd657e085bb1d05',
+    'The inverse selector-position change must recover the exact owned-motion shared source')
+}
+// Undo only the reviewed owned-trigger finite-motion prerequisite. Keep the
+// original raw-source strategy and recover the exact 668 observer before the
+// earlier diagnostic/scroll inverses below; no new whole-file allowlist entry.
+const ownedMotionInverse = [
+  ['export function observeFullAppOwnedOptionPointer(request, scroll = false, readOwnerMotion) {',
+    'export function observeFullAppOwnedOptionPointer(request, scroll = false) {'],
+  ["    ownerMotion: visible && inViewport && ownedHit ? readOwnerMotion('[id=' + JSON.stringify(field.id) + ']') : null,\n", ''],
+  ['    const sample = await evaluate(`(${observeFullAppOwnedOptionPointer.toString()})(${JSON.stringify(owned)},${shouldScroll},${observeFullAppOwnerMotion.toString()})`)',
+    '    const sample = await evaluate(`(${observeFullAppOwnedOptionPointer.toString()})(${JSON.stringify(owned)},${shouldScroll})`)'],
+  ['      if (!first.ready || finiteOwnerMotionActive(first.ownerMotion)) return false', '      if (!first.ready) return false'],
+]
+if (sharedIdentitySource.includes(ownedMotionInverse[0][0])) {
+  for (const [current, original] of ownedMotionInverse) {
+    assert.equal(sharedIdentitySource.split(current).length, 2, 'Unique reviewed owned-trigger motion change')
+    sharedIdentitySource = sharedIdentitySource.replace(current, original)
+  }
+  assert.equal(sha(sharedIdentitySource), '04a7dcffa5e30b2bf09eeadcd24d6ce29b636f82192565f475b140dcffdfce95',
+    'The inverse owned-motion change must recover the exact 668 shared source')
+}
 // First undo only the single-observation diagnostic cache. The real predicate
 // and every other byte must still recover the previously reviewed 2787 source.
 const diagnosticPortHelper = '  const diagnosticClientPorts = new Map()\n  const diagnosticClientPort = (node, clip) => {\n    if (!diagnosticClientPorts.has(node)) diagnosticClientPorts.set(node, {\n      left: clip.left + node.clientLeft, top: clip.top + node.clientTop, width: node.clientWidth, height: node.clientHeight,\n    })\n    return { ...diagnosticClientPorts.get(node) }\n  }\n'
