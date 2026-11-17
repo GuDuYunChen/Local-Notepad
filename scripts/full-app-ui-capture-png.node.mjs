@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto'
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { createFullAppCapturePaint } from './full-app-ui-capture-paint.mjs'
 
 // Execute the actual nested capture function, with controlled protocol/frame
 // dependencies and real exclusive file writes. The opaque synthetic payload
@@ -13,23 +14,59 @@ const source = readFileSync(new URL('./run-full-app-ui-installed.mjs', import.me
 const digest = value => createHash('sha256').update(value).digest('hex')
 const originalCaptureLine = "    const bytes = Buffer.from((await cdp.send('Page.captureScreenshot', { format: 'png' })).data, 'base64')"
 const fastCaptureLine = originalCaptureLine.replace("{ format: 'png' }", "{ format: 'png', optimizeForSpeed: true }")
+// Undo only the reviewed paint-ticket wiring before retaining the original
+// whole-runner fingerprint. Every literal must occur exactly once.
+const withoutPreparedCapturePaint = text => {
+  const changes = [
+  [
+    "import { createFullAppCapturePaint } from './full-app-ui-capture-paint.mjs'\n",
+    ""
+  ],
+  [
+    "  const capturePaint = createFullAppCapturePaint(() => evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(true))))'))\n",
+    ""
+  ],
+  [
+    "  const capture = async (filename, observeBeforeCapture, paintTicket) => {",
+    "  const capture = async (filename, observeBeforeCapture) => {"
+  ],
+  [
+    "    await capturePaint.wait(filename, paintTicket)",
+    "    await evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(true))))')"
+  ],
+  [
+    "  capture.preparePaint = capturePaint.prepare\n",
+    ""
+  ]
+]
+  const present = text.includes(changes[0][0])
+  if (!present) return text
+  for (const [current, original] of changes) {
+    assert.equal(text.split(current).length - 1, 1, 'Unique reviewed paint-ticket source change')
+    text = text.replace(current, original)
+  }
+  return text
+}
 const oldCount = source.split(originalCaptureLine).length - 1
 const newCount = source.split(fastCaptureLine).length - 1
 assert.equal(oldCount + newCount, 1, 'Use the unique actual6dae capture call or its one-line PNG-speed candidate')
 assert.ok((oldCount === 1 && newCount === 0) || (oldCount === 0 && newCount === 1))
-assert.equal(digest(source.replace(fastCaptureLine, originalCaptureLine)),
+assert.equal(digest(withoutPreparedCapturePaint(source).replace(fastCaptureLine, originalCaptureLine)),
   'eaf27dadcdc8a8544fefb02f78e87ad8ed0e8a853358d7a124a777f3ac6b9091',
   'The whole actual runner must equal6dae after only the declared inverse change')
-const startAnchor = '  const capture = async (filename, observeBeforeCapture) => {'
+const startAnchor = source.includes("import { createFullAppCapturePaint }")
+  ? '  const capturePaint = createFullAppCapturePaint('
+  : '  const capture = async (filename, observeBeforeCapture) => {'
 const endAnchor = '\n  const mainWindow = async () => {'
 assert.equal(source.split(startAnchor).length, 2)
 assert.equal(source.split(endAnchor).length, 2)
 const start = source.indexOf(startAnchor), end = source.indexOf(endAnchor, start)
 assert.ok(end > start)
 const actualCaptureDeclaration = source.slice(start, end)
-const createCapture = new Function('dependencies',
+const instantiateCapture = new Function('dependencies', 'createFullAppCapturePaint',
   'const { assert, evaluate, cdp, Buffer, writeFileSync, path, out, sha, report, save, evidenceStore } = dependencies;\n' +
   actualCaptureDeclaration + '\nreturn capture')
+const createCapture = dependencies => instantiateCapture(dependencies, createFullAppCapturePaint)
 
 const frameExpression = 'new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(true))))'
 const filename = 'ordinary-capture.png'

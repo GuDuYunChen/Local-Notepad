@@ -3,18 +3,18 @@
   "scope": "installed-actual-app-page-matrix",
   "sourceScope": "control-source entry coverage with declared states; not every possible failure combination",
   "productSource": {
-    "commit": "3e3f6e9a6f216375d02c2cb724b51a706b6ec379",
-    "tree": "d9b054d88a5f5771ce4972dc200c10d6d3d5a686",
+    "commit": "b30f119d9fd6e41cfdd9dbb9bb829d73d96950d9",
+    "tree": "721ab5be1444c0491f45a97d2b703f9063e55a6d",
     "dirty": false
   },
   "inventory": {
     "file": "inventory.json",
-    "sha256": "59b6eba35b098f8eb812e63587a3a8f117d68b374c41d02c91d2adecd5c80ad3",
+    "sha256": "9b40549a948874c4a8ab01c28cfd487c5f76e155f23ff861771d17d9fa3ed529",
     "originalDirty": false,
     "currentCodeFilesHashRevalidated": 349,
     "currentControlsFiles": 137,
-    "sourceCommit": "9c227c7309a9b175184fb4bef86f0872b86ef6db",
-    "sourceTree": "d9b054d88a5f5771ce4972dc200c10d6d3d5a686",
+    "sourceCommit": "af12261c28bc9fc681e8d313c233bd9a3b66a533",
+    "sourceTree": "721ab5be1444c0491f45a97d2b703f9063e55a6d",
     "currentStylesheetsHashRevalidated": 98
   },
   "matrix": [
@@ -2829,9 +2829,9 @@
     },
     {
       "file": "src/components/GraphPanel.jsx",
-      "bytes": 10972,
-      "sha256": "12fc01ce44e9ef477f725b0aa539f23bedbb3bea0d099965b7046769caf9ff5d",
-      "blob": "e5b2d5416d870ee7c84f1a9770b6f10881a9aa25",
+      "bytes": 10989,
+      "sha256": "cdab395cd257f2cc0ae2962d7a5cd6224c4851bfda0836565821cce662493195",
+      "blob": "6d94fd1ff7240398c385c82c2e0979ec142049a1",
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [

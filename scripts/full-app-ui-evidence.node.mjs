@@ -2387,9 +2387,13 @@ test('v2 C09 the actual capture producer and unchanged canonical validator consu
     const originalOwnedSearch = "'scripts/full-app-ui-owned-search.test.mjs'"
     const canonicalValidatorHash = source => {
       const canonical = source.replace(/\r\n/g, '\n')
+      const addedPaintSources = "  'scripts/full-app-ui-capture-paint.mjs', 'scripts/full-app-ui-capture-paint.node.mjs',\n"
+      assert.equal(canonical.split(addedPaintSources).length - 1, 1)
+      const prePaintSource = canonical.replace(addedPaintSources, '')
+      assert.equal(hash(prePaintSource), '0b78ed5c7ebc9c43cfd11a84da2d3123a2c1ee446c30ab7a00b0b478316199e1')
       const addedDecoratorSources = "  'scripts/full-app-ui-decorator-keyboard.mjs', 'scripts/full-app-ui-decorator-keyboard.node.mjs',\n"
-      assert.equal(canonical.split(addedDecoratorSources).length - 1, 1)
-      const originalSources = canonical.replace(addedDecoratorSources, '')
+      assert.equal(prePaintSource.split(addedDecoratorSources).length - 1, 1)
+      const originalSources = prePaintSource.replace(addedDecoratorSources, '')
       assert.equal(hash(originalSources), '2997fd8943dc91678c7544628912406eda03bc5255dc8a752ed529bcc7a39317')
       assert.equal(canonical.split(currentOwnedSearch).length - 1, 1)
       assert.equal(canonical.split(originalOwnedSearch).length - 1, 0)
@@ -2398,7 +2402,7 @@ test('v2 C09 the actual capture producer and unchanged canonical validator consu
     const expectedValidatorHash = '60039c19b8b8c58a20d1ac42e2b066a18d7ce87c5bd21149da319d5504baf92b'
     assert.equal(canonicalValidatorHash(validatorSource), expectedValidatorHash)
     const lfSource = validatorSource.replace(/\r\n/g, '\n')
-    assert.equal(hash(lfSource), '0b78ed5c7ebc9c43cfd11a84da2d3123a2c1ee446c30ab7a00b0b478316199e1')
+    assert.equal(hash(lfSource), '9da6e7ef65382881a9a69ddd6653da27f7179552febe39f45acca0ff7c970954')
     for (const source of [lfSource, lfSource.replace(/\n/g, '\r\n')]) {
       assert.equal(canonicalValidatorHash(source), expectedValidatorHash)
       const changedSource = source.replace('width: 704', 'width: 705')

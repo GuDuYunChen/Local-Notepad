@@ -28,12 +28,46 @@ assert.ok([
 assert.ok([
   '5b819baf8153bc992168ff45c1408f9a53bbf6c57c41631e341fa984813861f9',
   '7778fcceadf8794e3454a4c426c55f1f67953535d050b7889e25f7d46a0a9c51',
+  '92bd7f6a2b448247178e456484be08d6a18397b7c1885d77b29c6f1a2ae512bd',
 ].includes(sha(sharedSource)), 'The behavior control must use the frozen shared source or the reviewed capture/keyboard candidate')
+// Undo only the reviewed paint-ticket wiring before retaining the original
+// whole-runner fingerprint. Every literal must occur exactly once.
+const withoutPreparedCapturePaint = text => {
+  const changes = [
+  [
+    "import { createFullAppCapturePaint } from './full-app-ui-capture-paint.mjs'\n",
+    ""
+  ],
+  [
+    "  const capturePaint = createFullAppCapturePaint(() => evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(true))))'))\n",
+    ""
+  ],
+  [
+    "  const capture = async (filename, observeBeforeCapture, paintTicket) => {",
+    "  const capture = async (filename, observeBeforeCapture) => {"
+  ],
+  [
+    "    await capturePaint.wait(filename, paintTicket)",
+    "    await evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(true))))')"
+  ],
+  [
+    "  capture.preparePaint = capturePaint.prepare\n",
+    ""
+  ]
+]
+  const present = text.includes(changes[0][0])
+  if (!present) return text
+  for (const [current, original] of changes) {
+    assert.equal(text.split(current).length - 1, 1, 'Unique reviewed paint-ticket source change')
+    text = text.replace(current, original)
+  }
+  return text
+}
 const originalCaptureLine = "    const bytes = Buffer.from((await cdp.send('Page.captureScreenshot', { format: 'png' })).data, 'base64')"
 const fastCaptureLine = originalCaptureLine.replace("{ format: 'png' }", "{ format: 'png', optimizeForSpeed: true }")
 assert.equal(runnerSource.split(fastCaptureLine).length, 2, 'Exactly one speed-only PNG capture change is required')
 assert.equal(runnerSource.includes(originalCaptureLine), false, 'The candidate must use the unique updated capture call')
-assert.equal(sha(runnerSource.replace(fastCaptureLine, originalCaptureLine)), 'eaf27dadcdc8a8544fefb02f78e87ad8ed0e8a853358d7a124a777f3ac6b9091')
+assert.equal(sha(withoutPreparedCapturePaint(runnerSource).replace(fastCaptureLine, originalCaptureLine)), 'eaf27dadcdc8a8544fefb02f78e87ad8ed0e8a853358d7a124a777f3ac6b9091')
 
 function section(text, start, end) {
   assert.equal(text.split(start).length, 2, start)

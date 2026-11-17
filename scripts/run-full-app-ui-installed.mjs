@@ -20,6 +20,7 @@ import { UI_INSTALLED_REGISTRATION_QUERY, validateUiInstalledRegistration, verif
 import { FULL_APP_GROUPS, FULL_APP_MATRIX, FULL_APP_PRODUCT_SOURCE_FILES, FULL_APP_RUNTIME_SOURCE_FILES, FULL_APP_VERIFIER_SOURCE_FILES, fullAppProductPageSources, validateFullAppUiLedger, validateFullAppLedgerSourceIdentity, verifyFullAppUiFiles, validateFullAppInstalledReport, validateFullAppPrerequisites, validateNativeWindowResize, validateFullAppFixtureFile, validateLocalSyncLabBackendProcess, validateLocalSyncLabBackendExit } from './full-app-ui-evidence.mjs'
 import { createFullAppEvidenceWriter, fullAppEvidenceFingerprint } from './full-app-ui-storage.mjs'
 import { fullAppOwnedOptionRequest, prepareFullAppOwnedOptionPointer } from './full-app-ui-shared.mjs'
+import { createFullAppCapturePaint } from './full-app-ui-capture-paint.mjs'
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url))
 const VERSION = '4.249.0'
@@ -372,9 +373,10 @@ export async function runFullAppUiInstalled({ group, pin, installerPath, origina
       evidenceStore.sealStableJSON('fullAppUi.optionPointerPreparations', optionReceipt, { protectedObjects: [request] })
     }
   }
-  const capture = async (filename, observeBeforeCapture) => {
+  const capturePaint = createFullAppCapturePaint(() => evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(true))))'))
+  const capture = async (filename, observeBeforeCapture, paintTicket) => {
     assert.match(filename, /^[a-z0-9][a-z0-9_-]*\.png$/)
-    await evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(true))))')
+    await capturePaint.wait(filename, paintTicket)
     if (observeBeforeCapture) await observeBeforeCapture()
     const bytes = Buffer.from((await cdp.send('Page.captureScreenshot', { format: 'png', optimizeForSpeed: true })).data, 'base64')
     assert.ok(bytes.length > 1000); writeFileSync(path.join(out, filename), bytes, { flag: 'wx' })
@@ -382,6 +384,7 @@ export async function runFullAppUiInstalled({ group, pin, installerPath, origina
     evidenceStore.sealStableJSON('screenshots', record)
     return record
   }
+  capture.preparePaint = capturePaint.prepare
   const mainWindow = async () => {
     const window = selectDesktopMainWindow(await windowSession.inspect(report.pid, executablePath), report.pid, await evaluate('document.title'))
     assertDesktopWindowImage(window, executablePath); return window

@@ -636,10 +636,14 @@ test('v3 C29 the unchanged real capture producer and canonical validator consume
     assert.throws(() => validateFullAppUiEvidence(missing, ledger))
     const currentValidatorSource = fs.readFileSync(new URL('./full-app-ui-evidence.mjs', import.meta.url), 'utf8')
     const lfSource = currentValidatorSource.replace(/\r\n/g, '\n')
-    assert.equal(sha(lfSource), '0b78ed5c7ebc9c43cfd11a84da2d3123a2c1ee446c30ab7a00b0b478316199e1')
+    assert.equal(sha(lfSource), '9da6e7ef65382881a9a69ddd6653da27f7179552febe39f45acca0ff7c970954')
+    const addedPaintSources = "  'scripts/full-app-ui-capture-paint.mjs', 'scripts/full-app-ui-capture-paint.node.mjs',\n"
+    assert.equal(lfSource.split(addedPaintSources).length - 1, 1)
+    const prePaintSource = lfSource.replace(addedPaintSources, '')
+    assert.equal(sha(prePaintSource), '0b78ed5c7ebc9c43cfd11a84da2d3123a2c1ee446c30ab7a00b0b478316199e1')
     const addedDecoratorSources = "  'scripts/full-app-ui-decorator-keyboard.mjs', 'scripts/full-app-ui-decorator-keyboard.node.mjs',\n"
-    assert.equal(lfSource.split(addedDecoratorSources).length - 1, 1)
-    const originalSources = lfSource.replace(addedDecoratorSources, '')
+    assert.equal(prePaintSource.split(addedDecoratorSources).length - 1, 1)
+    const originalSources = prePaintSource.replace(addedDecoratorSources, '')
     assert.equal(sha(originalSources), '2997fd8943dc91678c7544628912406eda03bc5255dc8a752ed529bcc7a39317')
     const currentOwnedSearch = "'scripts/full-app-ui-owned-search.node.mjs'"
     const originalOwnedSearch = "'scripts/full-app-ui-owned-search.test.mjs'"

@@ -41,6 +41,7 @@ export const FULL_APP_VERIFIER_SOURCE_FILES = Object.freeze([
   'scripts/ui-screens-evidence.mjs', 'scripts/ui-screens-evidence.node.mjs', '.github/workflows/local-installation-2f86.yml',
   'scripts/full-app-ui-owned-search.mjs', 'scripts/full-app-ui-owned-search.node.mjs',
   'scripts/full-app-ui-decorator-keyboard.mjs', 'scripts/full-app-ui-decorator-keyboard.node.mjs',
+  'scripts/full-app-ui-capture-paint.mjs', 'scripts/full-app-ui-capture-paint.node.mjs',
 ])
 export const FULL_APP_MATRIX = Object.freeze(['light', 'dark'].flatMap(theme =>
   [{ width: 704, height: 455 }, { width: 1280, height: 800 }, { width: 1920, height: 1080 }]

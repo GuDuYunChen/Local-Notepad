@@ -33,6 +33,34 @@ test('multi-line graph cards keep relation metadata and explicit selection witho
   expect(select).not.toHaveBeenCalled();expect(adopted).not.toHaveBeenCalled();expect(api).toHaveBeenCalledTimes(1);
   for (const card of [first, second]) expect(card.getAttribute('data-ui-layout')).toBe('content');
 });
+test('long relationship labels retain complete native button content and only select until the guarded opener runs', async () => {
+  const label = 'NAV-5eb67ea9 中文长标题笔记用于侧栏截断、菜单和确认窗口的真实布局检查.md';
+  current.nodes[1] = n('乙', { label, incoming: 1 });
+  api.mockImplementation(async path => path === '/api/local-graph' ? current : {
+    id: '乙', title: label, content: 'latest-long-label-body', is_folder: false, is_deleted: false,
+  });
+  await mount();
+  await choose('甲');
+  const neighbor = host.querySelector('.local-graph-neighbors button');
+  expect(neighbor.tagName).toBe('BUTTON');
+  expect(neighbor.type).toBe('button');
+  expect(neighbor.getAttribute('data-ui-layout')).toBe('content');
+  expect(neighbor.textContent).toBe('引用了：' + label);
+  expect(neighbor.disabled).toBe(false);
+  await act(async () => neighbor.click());
+  await flush();
+  expect(host.querySelector('.local-graph-detail h3').textContent).toBe(label);
+  expect(host.querySelector('.local-graph-neighbors button').textContent).toBe('被引用：甲');
+  expect(select).not.toHaveBeenCalled();
+  expect(adopted).not.toHaveBeenCalled();
+  expect(api).toHaveBeenCalledTimes(1);
+  await click('打开选中笔记');
+  expect(select).toHaveBeenCalledTimes(1);
+  expect(select.mock.calls[0][0]).toBe('乙');
+  expect(adopted.mock.calls[0][0]).toEqual({ id: '乙', title: label, content: 'latest-long-label-body', is_folder: false, is_deleted: false });
+  expect(api).toHaveBeenCalledTimes(2);
+  expect(close).not.toHaveBeenCalled();
+});
 test('complete entry preserves isolated notes and selection does not open', async () => {await mount();expect(uiText(host)).toContain('3 篇可用笔记');expect(uiQueryAll(host, '[data-graph-note-id]')).toHaveLength(3);await choose();expect(uiText(uiQuery(host, '[aria-label="选中笔记关系"]'))).toContain('引用了：乙');expect(select).not.toHaveBeenCalled();});
 test('genuine empty snapshot is different from a failed load', async () => {current = { scope: current.scope, complete: true, nodes: [], edges: [] };await mount();expect(uiText(host)).toContain('还没有可用笔记');expect(uiQuery(host, '[role=alert]')).toBeNull();});
 test('failed read gives retry, never an empty success and never backend private text', async () => {api.mockRejectedValue(Error('PRIVATE_SQL'));await mount();expect(uiQuery(host, '[role=alert]')).toBeTruthy();expect(uiText(host)).not.toContain('还没有可用笔记');expect(uiText(host)).not.toContain('PRIVATE_SQL');api.mockResolvedValue(current);await click('重新读取图谱');expect(uiText(host)).toContain('3 篇可用笔记');});

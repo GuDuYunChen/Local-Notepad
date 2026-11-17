@@ -899,6 +899,10 @@ export function createFullAppUiShared(ctx) {
       const motion = { complete: false }; scene.motionReadiness.push(motion)
       await waitForFiniteOwnerMotion(() => evaluate(`(${observeFullAppOwnerMotion.toString()})(${q(root)})`), until, motion)
       const before = await samplePage(route, root, targetAnchors, onlySelectors, sidebarFocusRequired)
+      // Only renderer painting overlaps the following synchronous host work.
+      // Keep the actual filename/index/motion receipt updates in their original
+      // positions, so an earlier evidence or geometry failure stays earlier.
+      const paintTicket = capture.preparePaint?.(nameFor(meta, 'part-' + (index + 1)))
       appendRaw(scene, { ...before, text: undefined }); save()
       if (sidebarFocusRequired) validateCollapsedSidebarObservation(before.sidebarFocus, ctx.matrix)
       assert.deepEqual(before.viewport, meta.viewport); assert.equal(before.theme, meta.theme)
@@ -922,7 +926,7 @@ export function createFullAppUiShared(ctx) {
         validateFullAppCaptureContinuity(measured, fresh, ctx.matrix)
         if (syncReadiness) await syncReadiness.boundary(syncTicket, 'before-capture', filename)
         return true
-      })
+      }, paintTicket)
       scene.images.push(image); scene.image ||= image; scene.devicePixelRatio = before.devicePixelRatio
       for (const item of controls) seen.set(item.selector, { ...item, image: image.filename })
       for (const item of before.anchors) capturedAnchors.set(item.selector, { ...item, image: image.filename })
