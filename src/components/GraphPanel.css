@@ -32,7 +32,7 @@
 .local-graph-detail { padding-top:16px; margin-top:16px; border-top:1px solid var(--line,#dadce2); }
 .local-graph-detail > button { display:block; width:100%; margin:8px 0; }
 .local-graph-neighbors { margin:0; padding:0; list-style:none; max-height:220px; overflow:auto; }
-.local-graph-neighbors button { text-align:left; cursor:pointer; overflow-wrap:anywhere; }
+.local-graph-neighbors button { width:100%; min-width:0; text-align:left; cursor:pointer; overflow-wrap:anywhere; }
 .local-graph-neighbors button:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) { color:inherit; font:inherit; font-size:12px; padding:7px 0; border:0; background:none; }
 .local-graph-state,.local-graph-no-matches { padding:24px; text-align:center; line-height:1.8; font-size:13px; }
 .local-graph-state h3 { font-size:16px; }
