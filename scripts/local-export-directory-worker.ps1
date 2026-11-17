@@ -33,7 +33,7 @@ public class ExportDialogControl {
 public class ExportDialogResult {
   public ExportDialogIdentity dialog; public List<ExportDialogControl> controls = new List<ExportDialogControl>();
   public string action; public string selectedPath; public string inputID; public string inputName;
-  public string buttonName; public int valueWrites; public int invocations; public int closePosts; public bool dialogClosed;
+  public string buttonName; public int valueWrites; public int invocations; public int closePosts; public bool dialogClosed; public bool controlsReady;
 }
 public class ExportWindowSize { public long handle; public uint pid; public int width; public int height; public bool applied; }
 public static class ExportDialog {
@@ -110,12 +110,57 @@ public static class ExportDialog {
     var fresh=Find(pid,main,executable);
     if(fresh==null||fresh.handle!=previous.handle||fresh.owner!=previous.owner||fresh.pid!=previous.pid)
       throw new InvalidOperationException("DIRECTORY_DIALOG_CHANGED");
+    RequireExpectedDialog(fresh,previous.handle,previous.ownerChain.ToArray());
   }
-  public static ExportDialogResult Act(uint pid,long main,string executable,string action,string directory) {
+  static void RequireExpectedDialog(ExportDialogIdentity dialog,long expectedHandle,long[] expectedOwners) {
+    if(expectedHandle==0) {
+      if(expectedOwners!=null&&expectedOwners.Length!=0)throw new ArgumentException("INVALID_EXPECTED_DIALOG");
+      return;
+    }
+    if(expectedHandle<0||dialog==null||dialog.handle!=expectedHandle||expectedOwners==null||
+      expectedOwners.Length==0||expectedOwners.Length>16||dialog.ownerChain.Count!=expectedOwners.Length)
+      throw new InvalidOperationException("DIRECTORY_DIALOG_CHANGED");
+    for(int i=0;i<expectedOwners.Length;i++)if(expectedOwners[i]<=0||dialog.ownerChain[i]!=expectedOwners[i])
+      throw new InvalidOperationException("DIRECTORY_DIALOG_CHANGED");
+  }
+  public static ExportDialogResult InspectChoice(uint pid,long main,string executable,long expectedHandle,long[] expectedOwners) {
+    LastObservation=null;
+    var dialog=Find(pid,main,executable);RequireExpectedDialog(dialog,expectedHandle,expectedOwners);
+    if(dialog==null)return null;
+    var result=new ExportDialogResult {action="inspect-choice",dialog=dialog};LastObservation=result;
+    var root=AutomationElement.FromHandle(new IntPtr(dialog.handle));
+    if(root==null||root.Current.ProcessId!=pid)throw new InvalidOperationException("UIA_ROOT_IDENTITY");
+    var nodes=root.FindAll(TreeScope.Descendants,Condition.TrueCondition);
+    if(nodes.Count>512)throw new InvalidOperationException("UIA_ELEMENT_LIMIT");
+    var inputs=new List<AutomationElement>();var buttons=new List<AutomationElement>();
+    for(int i=0;i<nodes.Count;i++) {
+      var node=nodes[i];var value=node.Current;
+      if(value.ProcessId!=pid)throw new InvalidOperationException("UIA_FOREIGN_PROCESS");
+      if(value.ControlType!=ControlType.Edit&&value.ControlType!=ControlType.Button)continue;
+      if(result.controls.Count>=128)throw new InvalidOperationException("UIA_CONTROL_LIMIT");
+      result.controls.Add(new ExportDialogControl {id=value.AutomationId,name=value.Name,cls=value.ClassName,
+        type=value.ControlType.ProgrammaticName,enabled=value.IsEnabled,offscreen=value.IsOffscreen});
+      if(!value.IsEnabled||value.IsOffscreen)continue;
+      if(value.ControlType==ControlType.Button&&value.Name=="选择此目录")buttons.Add(node);
+      if(value.ControlType==ControlType.Edit&&(value.Name=="Folder:"||value.Name=="文件夹:"||value.Name=="文件夹："))inputs.Add(node);
+    }
+    if(inputs.Count>1||buttons.Count>1)throw new InvalidOperationException("DIRECTORY_CONTROLS_MISSING_OR_AMBIGUOUS");
+    Revalidate(dialog,pid,main,executable);
+    if(inputs.Count!=1||buttons.Count!=1)return result;
+    var input=inputs[0];var button=buttons[0];object rawValue,rawInvoke;
+    if(!input.TryGetCurrentPattern(ValuePattern.Pattern,out rawValue)||!button.TryGetCurrentPattern(InvokePattern.Pattern,out rawInvoke))
+      throw new InvalidOperationException("DIRECTORY_CONTROL_PATTERN_UNAVAILABLE");
+    if(((ValuePattern)rawValue).Current.IsReadOnly)throw new InvalidOperationException("DIRECTORY_INPUT_READ_ONLY");
+    result.inputID=input.Current.AutomationId;result.inputName=input.Current.Name;result.buttonName=button.Current.Name;
+    Revalidate(dialog,pid,main,executable);result.controlsReady=true;
+    return result;
+  }
+  public static ExportDialogResult Act(uint pid,long main,string executable,string action,string directory,long expectedHandle,long[] expectedOwners) {
     LastObservation=null;
     if(action!="choose"&&action!="cancel")throw new ArgumentException("INVALID_ACTION");
     var dialog=Find(pid,main,executable);if(dialog==null)throw new InvalidOperationException("DIRECTORY_DIALOG_MISSING");
     var result=new ExportDialogResult {action=action,dialog=dialog};LastObservation=result;
+    RequireExpectedDialog(dialog,expectedHandle,expectedOwners);
     if(action=="cancel") {
       Revalidate(dialog,pid,main,executable);
       if(!PostMessage(new IntPtr(dialog.handle),0x0010,IntPtr.Zero,IntPtr.Zero))throw new InvalidOperationException("CANCEL_NOT_POSTED");
@@ -220,8 +265,11 @@ while ($null -ne ($line = [Console]::ReadLine())) {
     } elseif ($request.op -eq 'inspect') {
       $dialog = [ExportDialog]::Find([uint32]$request.pid,[long]$request.mainHandle,[string]$request.executable)
       $reply = @{id=$request.id;ok=$true;dialog=$dialog}
+    } elseif ($request.op -eq 'inspect-choice') {
+      $result = [ExportDialog]::InspectChoice([uint32]$request.pid,[long]$request.mainHandle,[string]$request.executable,[long]$request.expectedHandle,[long[]]$request.expectedOwnerChain)
+      $reply = @{id=$request.id;ok=$true;result=$result}
     } elseif ($request.op -eq 'choose' -or $request.op -eq 'cancel') {
-      $result = [ExportDialog]::Act([uint32]$request.pid,[long]$request.mainHandle,[string]$request.executable,[string]$request.op,[string]$request.directory)
+      $result = [ExportDialog]::Act([uint32]$request.pid,[long]$request.mainHandle,[string]$request.executable,[string]$request.op,[string]$request.directory,[long]$request.expectedHandle,[long[]]$request.expectedOwnerChain)
       $reply = @{id=$request.id;ok=$true;result=$result}
     } else { throw 'INVALID_OPERATION' }
     [Console]::WriteLine((ConvertTo-Json -InputObject $reply -Depth 8 -Compress))

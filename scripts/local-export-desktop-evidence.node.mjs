@@ -23,6 +23,7 @@ import { LOCAL_EXPORT_VERSION, LOCAL_EXPORT_REPORT, LOCAL_EXPORT_CHECKS, LOCAL_E
 import { assertExportDirectoryBinding, assertExportOwnedDirectory, validateExportDirectoryObservation,
   validateExportDirectoryResult, createExportDirectorySession } from './local-export-directory-session.mjs'
 import { desktopWindowWorkerArguments } from './desktop-window-session.mjs'
+import { restorePreReadinessWorker } from './local-export-directory-readiness.node.mjs'
 
 // All fixtures in this file are contract inputs. Passing these cases does not
 // claim that a Windows process, native picker or installed app has been tested.
@@ -193,7 +194,7 @@ test('one native helper decodes exact UTF8 worker below CreateProcessW limit and
   const text = source.toString('utf8')
   assert.equal((text.match(/\bValidateMainWindow\(/g) || []).length, 5)
   assert.doesNotMatch(text, /\bMain\(/)
-  const originalNaming = Buffer.from(text.replace(/\bValidateMainWindow\(/g, 'Main('))
+  const originalNaming = Buffer.from(restorePreReadinessWorker(text).replace(/\bValidateMainWindow\(/g, 'Main('))
   const csharp = originalNaming.toString('utf8').match(/Add-Type -TypeDefinition @'\r?\n([\s\S]*?)\r?\n'@ -ReferencedAssemblies \$references/)?.[1]
   const references = text.match(/  \$references = @\([\s\S]*?\r?\n    \[System\.Windows\.Automation\.TreeScope\]\.Assembly\.Location, \[System\.Windows\.DependencyObject\]\.Assembly\.Location\)/)?.[0]
   assert.ok(csharp && references)
