@@ -19,6 +19,18 @@ const mainSource = source('full-app-ui-main-editor.mjs')
 const sharedSource = source('full-app-ui-shared.mjs')
 const runnerSource = source('run-full-app-ui-installed.mjs')
 const sha = value => createHash('sha256').update(value).digest('hex')
+// Undo only the reviewed early non-scroll rejection. The result must
+// still be the exact ad46 shared source, not a new whole-file allowlist entry.
+const filteredScrollOwner = '    if (!/auto|scroll/.test(overflowY)) continue\n    const clientHeight = viewportScrollOwner ? viewport.height : owner.clientHeight\n    if ((!viewportScrollOwner && !rendered(owner)) || owner.scrollHeight <= clientHeight + 1) continue'
+const originalScrollOwner = '    const clientHeight = viewportScrollOwner ? viewport.height : owner.clientHeight\n    if ((!viewportScrollOwner && !rendered(owner)) || !/auto|scroll/.test(overflowY) || owner.scrollHeight <= clientHeight + 1) continue'
+let sharedIdentitySource = sharedSource
+if (sharedSource.includes(filteredScrollOwner)) {
+  assert.equal(sharedSource.split(filteredScrollOwner).length, 2, 'Unique reviewed scroll-owner predicate order')
+  assert.equal(sharedSource.includes(originalScrollOwner), false, 'The candidate must contain only the reviewed predicate order')
+  sharedIdentitySource = sharedSource.replace(filteredScrollOwner, originalScrollOwner)
+  assert.equal(sha(sharedIdentitySource), '92bd7f6a2b448247178e456484be08d6a18397b7c1885d77b29c6f1a2ae512bd',
+    'The inverse predicate change must recover the exact ad46 shared source')
+}
 const mainSourceHash = sha(mainSource)
 assert.ok([
   '9b9872dc4a08a550c11e7127d2317bff5b0583b378869145fea39e2867eb30a2',
@@ -29,7 +41,7 @@ assert.ok([
   '5b819baf8153bc992168ff45c1408f9a53bbf6c57c41631e341fa984813861f9',
   '7778fcceadf8794e3454a4c426c55f1f67953535d050b7889e25f7d46a0a9c51',
   '92bd7f6a2b448247178e456484be08d6a18397b7c1885d77b29c6f1a2ae512bd',
-].includes(sha(sharedSource)), 'The behavior control must use the frozen shared source or the reviewed capture/keyboard candidate')
+].includes(sha(sharedIdentitySource)), 'The behavior control must use the frozen shared source or the reviewed capture/keyboard candidate')
 // Undo only the reviewed paint-ticket wiring before retaining the original
 // whole-runner fingerprint. Every literal must occur exactly once.
 const withoutPreparedCapturePaint = text => {

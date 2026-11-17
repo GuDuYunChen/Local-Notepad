@@ -526,6 +526,72 @@ test('serialized page observations bound repeated native reads to one synchronou
   assert.ok(clipped.clippingAncestors.some(item => item.id === 'page' && item.clientPort.height === 30))
 })
 
+test('serialized scroll-owner discovery skips non-scroll geometry while preserving candidate output and later DOM changes', () => {
+  const currentSource = viewportObservers.observeFullAppPage.toString().replace(/\r\n/g, '\n')
+  const legacySource = currentSource.replace(
+    '    if (!/auto|scroll/.test(overflowY)) continue\n    const clientHeight = viewportScrollOwner ? viewport.height : owner.clientHeight\n    if ((!viewportScrollOwner && !rendered(owner)) || owner.scrollHeight <= clientHeight + 1) continue',
+    '    const clientHeight = viewportScrollOwner ? viewport.height : owner.clientHeight\n    if ((!viewportScrollOwner && !rendered(owner)) || !/auto|scroll/.test(overflowY) || owner.scrollHeight <= clientHeight + 1) continue')
+  for (const mode of ['ordinary', 'nested-auto', 'hidden-scroll', 'closed-details', 'fixed-overlay', 'root-scroller']) {
+    const f = overflowFixture(), decorations = []
+    let parent = f.page
+    for (let depth = 0; depth < 8; depth++) parent = f.make('div', 'non-scroll-ancestor-' + depth, f.rectangle(10, 20, 400, 200), parent)
+    for (let index = 0; index < 128; index++) decorations.push(f.make('span', 'non-scroll-' + index, f.rectangle(20, 40, 24, 16), parent))
+    if (mode === 'nested-auto' || mode === 'hidden-scroll') {
+      const scroller = f.make('div', 'nested-scroll', f.rectangle(20, 80, 180, 60), f.page)
+      scroller.css.overflowY = 'auto'; scroller.scrollHeight = 360
+      if (mode === 'hidden-scroll') scroller.css.display = 'none'
+    }
+    if (mode === 'closed-details') {
+      const details = f.make('details', 'closed-details', f.rectangle(20, 80, 180, 60), f.page); details.open = false
+      const summary = f.make('summary', 'details-summary', f.rectangle(20, 80, 180, 30), details)
+      summary.css.overflowY = 'auto'; summary.scrollHeight = 90
+      const hidden = f.make('div', 'details-hidden-scroll', f.rectangle(20, 110, 180, 30), details)
+      hidden.css.overflowY = 'scroll'; hidden.scrollHeight = 360
+    }
+    if (mode === 'fixed-overlay') f.page.css.position = 'fixed'
+    if (mode === 'root-scroller') {
+      f.html.css.overflowY = 'auto'; f.html.css.overflowX = 'auto'
+      f.body.css.overflowY = 'visible'; f.body.css.overflowX = 'visible'
+    }
+    const reads = new Map(), heightReads = new Map()
+    for (const node of decorations) {
+      const nativeRect = node.getBoundingClientRect
+      node.getBoundingClientRect = function () { reads.set(node, (reads.get(node) || 0) + 1); return nativeRect.call(this) }
+      const clientHeight = node.clientHeight
+      Object.defineProperty(node, 'clientHeight', { get() { heightReads.set(node, (heightReads.get(node) || 0) + 1); return clientHeight } })
+    }
+    const serialize = source => runInNewContext(`(()=>{const collectFullAppScrollOwners=${collectFullAppScrollOwners.toString()};
+      const read=${source};return ()=>read({root:'.actual-page',anchors:['#control']},${withinActualClientPort.toString()},
+      ${viewportObservers.observeFullAppOverflowViewport.toString()},${viewportObservers.viewportFixedClipBoundary.toString()})})()`, f.globals)
+    const legacy = serialize(legacySource), current = serialize(currentSource)
+    const expected = JSON.parse(JSON.stringify(legacy()))
+    assert.equal(reads.size, decorations.length, 'The old ordering measures every irrelevant decoration')
+    assert.equal(heightReads.size, decorations.length, 'The old ordering reads every irrelevant client height')
+    reads.clear(); heightReads.clear()
+    const actual = JSON.parse(JSON.stringify(current()))
+    assert.deepEqual(actual, expected, mode + ': every control, ancestor and scroll-owner field must remain equal')
+    assert.equal(reads.size, 0, 'A non-scroll decoration does not need a geometry observation')
+    assert.equal(heightReads.size, 0, 'A non-scroll decoration does not need a client-height observation')
+    if (mode === 'closed-details') {
+      assert.ok(actual.scrollAreas.some(area => area.selector === '[id="details-summary"]'))
+      assert.ok(!actual.scrollAreas.some(area => area.selector === '[id="details-hidden-scroll"]'))
+    }
+    // Keep the same serialized functions alive: the skipped node must be fully
+    // observed on the next sample if its actual scroll eligibility changes.
+    const changed = decorations[0]
+    changed.css.overflowY = 'auto'; changed.scrollHeight = changed.clientHeight + 100
+    reads.clear()
+    const next = JSON.parse(JSON.stringify(current()))
+    assert.equal(reads.get(changed), 1)
+    assert.ok(next.scrollAreas.some(area => area.selector === '[id="non-scroll-0"]'))
+    assert.deepEqual(next, JSON.parse(JSON.stringify(legacy())))
+    changed.css.display = 'none'
+    const hidden = JSON.parse(JSON.stringify(current()))
+    assert.ok(!hidden.scrollAreas.some(area => area.selector === '[id="non-scroll-0"]'))
+    assert.deepEqual(hidden, JSON.parse(JSON.stringify(legacy())))
+  }
+})
+
 async function serializedEnsureVisible(fixture) {
   const shared = createFullAppUiShared({ evaluate: async source => runInNewContext(source, fixture.globals), click() {},
     cdp: { send() {} }, until: async check => check(), capture() {}, save() {}, report: { fullAppUi: {} }, routes: [], matrix })

@@ -3,18 +3,18 @@
   "scope": "installed-actual-app-page-matrix",
   "sourceScope": "control-source entry coverage with declared states; not every possible failure combination",
   "productSource": {
-    "commit": "b30f119d9fd6e41cfdd9dbb9bb829d73d96950d9",
-    "tree": "721ab5be1444c0491f45a97d2b703f9063e55a6d",
+    "commit": "7e05fccb5722108234c6b1e0aec3afd1b0277af2",
+    "tree": "a5f407666565d8b028c8b48cd1de4059eaa2f1bc",
     "dirty": false
   },
   "inventory": {
     "file": "inventory.json",
-    "sha256": "9b40549a948874c4a8ab01c28cfd487c5f76e155f23ff861771d17d9fa3ed529",
+    "sha256": "fef2c6e446620e68490944828a030c2798c0d905ddeb9d8f6b521e7cf056f130",
     "originalDirty": false,
     "currentCodeFilesHashRevalidated": 349,
     "currentControlsFiles": 137,
-    "sourceCommit": "af12261c28bc9fc681e8d313c233bd9a3b66a533",
-    "sourceTree": "721ab5be1444c0491f45a97d2b703f9063e55a6d",
+    "sourceCommit": "916de426cde76b1708d20eb86184bea62a3b2cd9",
+    "sourceTree": "a5f407666565d8b028c8b48cd1de4059eaa2f1bc",
     "currentStylesheetsHashRevalidated": 98
   },
   "matrix": [
@@ -2412,9 +2412,9 @@
     },
     {
       "file": "src/components/Editor/plugins/WikiLinkPlugin.jsx",
-      "bytes": 11874,
-      "sha256": "274bbd0cdbc2dfc6387230c228c1db573ecf76046587efe2c078a4ff77ea33bd",
-      "blob": "23ab8a58644b31a040cda3024411bc3b2d41490b",
+      "bytes": 12681,
+      "sha256": "063cc38d14b47e15a2a68a649bc086d0d4cd4b2efabc28239d80b172de52a2f6",
+      "blob": "5ebd7689fb5739d5f077821743b9bf6de42ed293",
       "classification": "planned-nested-controls",
       "reason": "Production controls are rendered within the declared actual route. Scope is the listed route states; unvisited conditional child panels remain explicit gaps below.",
       "routeIds": [

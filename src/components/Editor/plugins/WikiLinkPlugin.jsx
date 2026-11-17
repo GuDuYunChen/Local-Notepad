@@ -7,6 +7,8 @@ import {
   $insertNodes,
   $isRangeSelection,
   $isTextNode,
+  COMMAND_PRIORITY_HIGH,
+  KEY_ESCAPE_COMMAND,
 } from 'lexical'
 import { api, searchFiles } from '~/services/api'
 import { $createWikiLinkNode, WikiLinkNode } from '../nodes/WikiLinkNode'
@@ -277,6 +279,23 @@ export default function WikiLinkPlugin() {
 
     return () => window.clearTimeout(timer)
   }, [isOpen, isEditable, queryInfo])
+
+  useEffect(() => {
+    if (!isOpen) return undefined
+
+    // RichText handles Escape at the editor root before document listeners
+    // and blurs its caret. The active completion owns dismissal first, so
+    // the next editing shortcut still reaches this editor and its history.
+    return editor.registerCommand(KEY_ESCAPE_COMMAND, event => {
+      const root = editor.getRootElement()
+      if (!editor.isEditable() || editor.isComposing() || !event || event.isComposing || event.keyCode === 229 ||
+        !root?.contains(event.target) || !root.contains(root.ownerDocument.activeElement)) return false
+      event.preventDefault()
+      event.stopPropagation()
+      close()
+      return true
+    }, COMMAND_PRIORITY_HIGH)
+  }, [editor, isOpen, close])
 
   useEffect(() => {
     if (!isOpen) return undefined

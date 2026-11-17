@@ -279,8 +279,9 @@ export function observeFullAppPage({ root, anchors = [], editorExceptions = [], 
     const css = style(owner), viewportScrollOwner = overflowViewport.isViewportScroller(owner)
     if (overflowViewport.propagated(owner) && !viewportScrollOwner) continue
     const overflowY = viewportScrollOwner ? overflowViewport.viewportOverflowY : css.overflowY
+    if (!/auto|scroll/.test(overflowY)) continue
     const clientHeight = viewportScrollOwner ? viewport.height : owner.clientHeight
-    if ((!viewportScrollOwner && !rendered(owner)) || !/auto|scroll/.test(overflowY) || owner.scrollHeight <= clientHeight + 1) continue
+    if ((!viewportScrollOwner && !rendered(owner)) || owner.scrollHeight <= clientHeight + 1) continue
     const ownerBounds = bounds(owner), box = viewportScrollOwner ? viewport : ownerBounds, maximum = owner.scrollHeight - clientHeight
     const ancestor = owner !== area && owner.contains(area)
     // An independently swept nested scroll surface owns its content. Its
