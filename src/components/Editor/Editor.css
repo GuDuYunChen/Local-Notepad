@@ -1922,6 +1922,7 @@
 
 .table-selection-modebar-actions {
   flex: 0 0 auto;
+  max-width: 60%;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -2037,10 +2038,6 @@
 @media (max-width: 860px) {
   .table-selection-modebar {
     align-items: flex-start;
-  }
-
-  .table-selection-modebar-actions {
-    max-width: 60%;
   }
 }
 
