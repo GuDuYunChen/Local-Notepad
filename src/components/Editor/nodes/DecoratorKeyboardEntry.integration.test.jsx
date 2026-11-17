@@ -59,6 +59,13 @@ function logical() {
 }
 beforeEach(() => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true
+  // jsdom has no layout ResizeObserver. Supply only its missing interface;
+  // real native focus/Tab acceptance remains reserved for installed Windows.
+  vi.stubGlobal('ResizeObserver', class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  })
   host = document.createElement('div')
   document.body.append(host)
   reactRoot = createRoot(host)
@@ -69,6 +76,7 @@ afterEach(async () => {
   await act(async () => reactRoot.unmount())
   host.remove()
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
   delete globalThis.IS_REACT_ACT_ENVIRONMENT
 })
 describe('real Lexical decorator F6 entry and browser-owned Tab boundary', () => {
