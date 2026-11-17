@@ -636,12 +636,16 @@ test('v3 C29 the unchanged real capture producer and canonical validator consume
     assert.throws(() => validateFullAppUiEvidence(missing, ledger))
     const currentValidatorSource = fs.readFileSync(new URL('./full-app-ui-evidence.mjs', import.meta.url), 'utf8')
     const lfSource = currentValidatorSource.replace(/\r\n/g, '\n')
-    assert.equal(sha(lfSource), '2997fd8943dc91678c7544628912406eda03bc5255dc8a752ed529bcc7a39317')
+    assert.equal(sha(lfSource), '0b78ed5c7ebc9c43cfd11a84da2d3123a2c1ee446c30ab7a00b0b478316199e1')
+    const addedDecoratorSources = "  'scripts/full-app-ui-decorator-keyboard.mjs', 'scripts/full-app-ui-decorator-keyboard.node.mjs',\n"
+    assert.equal(lfSource.split(addedDecoratorSources).length - 1, 1)
+    const originalSources = lfSource.replace(addedDecoratorSources, '')
+    assert.equal(sha(originalSources), '2997fd8943dc91678c7544628912406eda03bc5255dc8a752ed529bcc7a39317')
     const currentOwnedSearch = "'scripts/full-app-ui-owned-search.node.mjs'"
     const originalOwnedSearch = "'scripts/full-app-ui-owned-search.test.mjs'"
     assert.equal(lfSource.split(currentOwnedSearch).length - 1, 1)
     assert.equal(lfSource.split(originalOwnedSearch).length - 1, 0)
-    const canonical = lfSource.replace(currentOwnedSearch, originalOwnedSearch)
+    const canonical = originalSources.replace(currentOwnedSearch, originalOwnedSearch)
     assert.equal(sha(canonical.replace(/\r\n/g, '\n')), '60039c19b8b8c58a20d1ac42e2b066a18d7ce87c5bd21149da319d5504baf92b')
   } finally { f.cleanup() }
 })

@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 import { createNativeUiSelect } from './native-ui-select.mjs'
 import controlEvidence from './check-ui-control-render.cjs'
 import { COLLAPSED_SIDEBAR_EXPAND, validateCollapsedSidebarObservation, validateCollapsedSidebarFocus } from './full-app-ui-evidence.mjs'
+import { decoratorKeyboardKind, traverseDecoratorWithNativeKeys } from './full-app-ui-decorator-keyboard.mjs'
 
 const { hasVisibleBoxShadow, paintedPopupReader } = controlEvidence
 const q = JSON.stringify
@@ -22,12 +23,12 @@ export function withinActualClientPort(rect, bounds, metrics, overflowX, overflo
 /* CSS fixed elements escape ordinary ancestors' overflow, but not a
    transform/filter/contain-created fixed containing block. This boundary
    never replaces the actual viewport, modal scroll-port or painted hit gates. */
-export function viewportFixedClipBoundary(node) {
+export function viewportFixedClipBoundary(node, readStyle = getComputedStyle) {
   for (let fixed = node; fixed; fixed = fixed.parentElement) {
-    if (getComputedStyle(fixed).position !== 'fixed') continue
+    if (readStyle(fixed).position !== 'fixed') continue
     let contained = false
     for (let ancestor = fixed.parentElement; ancestor; ancestor = ancestor.parentElement) {
-      const css = getComputedStyle(ancestor)
+      const css = readStyle(ancestor)
       if ((css.transform && css.transform !== 'none') ||
           (css.perspective && css.perspective !== 'none') ||
           (css.filter && css.filter !== 'none') ||
@@ -141,9 +142,22 @@ export function collectFullAppScrollOwners(area, fixedBoundaryFor = () => null) 
 
 export function observeFullAppPage({ root, anchors = [], editorExceptions = [], onlySelectors = [] }, withinClientPort, readOverflowViewport, fixedBoundaryFor = () => null) {
   const overflowViewport = readOverflowViewport(), viewport = overflowViewport.bounds
+  // One synchronous renderer observation repeatedly visits the same ancestors
+  // for each control, anchor and scroll surface. Reuse only native reads made
+  // during this call. Every later observation (including both PNG boundaries)
+  // starts fresh, so scroll, style, disabled state and owner changes stay real.
+  const styles = new Map(), rectangles = new Map(), selectors = new Map()
+  const style = node => {
+    if (!styles.has(node)) styles.set(node, getComputedStyle(node))
+    return styles.get(node)
+  }
+  const fixedBoundary = node => fixedBoundaryFor(node, style)
   const bounds = node => {
+    if (rectangles.has(node)) return rectangles.get(node)
     const box = node.getBoundingClientRect()
-    return { left: box.left, top: box.top, right: box.right, bottom: box.bottom, width: box.width, height: box.height }
+    const value = { left: box.left, top: box.top, right: box.right, bottom: box.bottom, width: box.width, height: box.height }
+    rectangles.set(node, value)
+    return value
   }
   const hiddenByClosedDetails = node => {
     // Closed native details may retain nonzero descendant boxes. Only its
@@ -158,21 +172,21 @@ export function observeFullAppPage({ root, anchors = [], editorExceptions = [], 
   const painted = node => {
     if (hiddenByClosedDetails(node)) return false
     for (let owner = node; owner; owner = owner.parentElement) {
-      const css = getComputedStyle(owner)
+      const css = style(owner)
       if (css.display === 'none' || css.visibility !== 'visible' || Number(css.opacity) <= 0) return false
     }
     return true
   }
   const rendered = node => {
     if (!node.isConnected || hiddenByClosedDetails(node)) return false
-    for (let owner = node; owner; owner = owner.parentElement) if (getComputedStyle(owner).display === 'none') return false
+    for (let owner = node; owner; owner = owner.parentElement) if (style(owner).display === 'none') return false
     const box = bounds(node)
     return box.width > 0 && box.height > 0
   }
   const visibleRoots = [...document.querySelectorAll(root)].filter(rendered)
   if (visibleRoots.length !== 1) throw Error('Expected one actual page root: ' + root + ' (' + visibleRoots.length + ')')
   const area = visibleRoots[0]
-  const selector = node => {
+  const readSelector = node => {
     if (node === document.documentElement) return 'html'
     if (node.id && document.querySelectorAll('[id=' + JSON.stringify(node.id) + ']').length === 1) return '[id=' + JSON.stringify(node.id) + ']'
     const parts = []
@@ -182,15 +196,19 @@ export function observeFullAppPage({ root, anchors = [], editorExceptions = [], 
     }
     return 'html > ' + parts.join(' > ')
   }
+  const selector = node => {
+    if (!selectors.has(node)) selectors.set(node, readSelector(node))
+    return selectors.get(node)
+  }
   const observe = (node, checkPaintedFragments = false) => {
     const box = bounds(node), visible = painted(node), clippingAncestors = []
-    const fixedBoundary = fixedBoundaryFor(node)
-    let beyondFixed = fixedBoundary === node
+    const clipBoundary = fixedBoundary(node)
+    let beyondFixed = clipBoundary === node
     let inViewport = box.left >= -1 && box.top >= -1 && box.right <= viewport.right + 1 && box.bottom <= viewport.bottom + 1
     for (let parent = node.parentElement; parent; parent = parent.parentElement) {
-      const css = getComputedStyle(parent), clip = bounds(parent), applied = overflowViewport.local(parent, css)
+      const css = style(parent), clip = bounds(parent), applied = overflowViewport.local(parent, css)
       if (!beyondFixed) inViewport &&= withinClientPort(box, clip, parent, applied.x, applied.y)
-      if (parent === fixedBoundary) beyondFixed = true
+      if (parent === clipBoundary) beyondFixed = true
       clippingAncestors.push({ tag: parent.tagName, id: parent.id, bounds: clip,
         clientPort: { left: clip.left + parent.clientLeft, top: clip.top + parent.clientTop, width: parent.clientWidth, height: parent.clientHeight },
         overflowX: css.overflowX, overflowY: css.overflowY, appliedOverflowX: applied.x, appliedOverflowY: applied.y, viewportApplied: applied.viewportApplied })
@@ -238,14 +256,14 @@ export function observeFullAppPage({ root, anchors = [], editorExceptions = [], 
       accessibleName: field?.getAttribute('aria-label') || node.getAttribute('aria-label') || node.textContent.trim().slice(0, 250),
       selectedForProbe: onlySelectors.some(target => node.matches(target) || visual.matches(target) || field?.matches(target)),
       ...observe(visual) }
-    const css = getComputedStyle(visual)
+    const css = style(visual)
     item.computed = { color: css.color, background: css.backgroundColor, border: css.borderTopColor, whiteSpace: css.whiteSpace,
       lineHeight: css.lineHeight, fontSize: css.fontSize, overflowX: css.overflowX, opacity: css.opacity }
     if (nativeCheckboxMark) item.nativePresentation = { owner: 'project-chapter-select-label',
       inputChecked: Boolean(node.checked), inputNativeType: node.type, visibleMarkSelector: selector(nativeCheckboxMark) }
     if (exception) item.semanticException = { selector: exception.selector, source: exception.source, reason: exception.reason }
     if (kind === 'password' && field) {
-      const css = getComputedStyle(field)
+      const css = style(field)
       item.innerPadding = ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft'].map(name => Number.parseFloat(css[name]))
     }
     controls.push(item)
@@ -255,10 +273,10 @@ export function observeFullAppPage({ root, anchors = [], editorExceptions = [], 
     if (matches.length !== 1) throw Error('Expected one rendered anchor: ' + target + ' (' + matches.length + ')')
     return { selector: target, ...observe(matches[0], true) }
   })
-  const scrollOwners = collectFullAppScrollOwners(area, fixedBoundaryFor)
+  const scrollOwners = collectFullAppScrollOwners(area, fixedBoundary)
   const scrollAreas = []
   for (const owner of scrollOwners) {
-    const css = getComputedStyle(owner), viewportScrollOwner = overflowViewport.isViewportScroller(owner)
+    const css = style(owner), viewportScrollOwner = overflowViewport.isViewportScroller(owner)
     if (overflowViewport.propagated(owner) && !viewportScrollOwner) continue
     const overflowY = viewportScrollOwner ? overflowViewport.viewportOverflowY : css.overflowY
     const clientHeight = viewportScrollOwner ? viewport.height : owner.clientHeight
@@ -270,7 +288,7 @@ export function observeFullAppPage({ root, anchors = [], editorExceptions = [], 
     // stable content extent that this ancestor must photograph.
     let contentOwner = area, nestedContent = false
     if (ancestor) for (let nested = area; nested && nested !== owner; nested = nested.parentElement) {
-      const nestedStyle = getComputedStyle(nested), nestedViewportOwner = overflowViewport.isViewportScroller(nested)
+      const nestedStyle = style(nested), nestedViewportOwner = overflowViewport.isViewportScroller(nested)
       if (overflowViewport.propagated(nested) && !nestedViewportOwner) continue
       const nestedOverflow = nestedViewportOwner ? overflowViewport.viewportOverflowY : nestedStyle.overflowY
       const nestedHeight = nestedViewportOwner ? viewport.height : nested.clientHeight
@@ -289,15 +307,15 @@ export function observeFullAppPage({ root, anchors = [], editorExceptions = [], 
     // transform/contain-created fixed containing block makes that clip real.
     // Apply the same boundary already used for native control observations;
     // keep every actual viewport and in-boundary client-port gate intact.
-    const fixedBoundary = fixedBoundaryFor(owner)
-    let beyondFixed = fixedBoundary === owner
+    const clipBoundary = fixedBoundary(owner)
+    let beyondFixed = clipBoundary === owner
     for (let parent = owner.parentElement; parent; parent = parent.parentElement) {
-      const clipCss = getComputedStyle(parent), applied = overflowViewport.local(parent, clipCss)
+      const clipCss = style(parent), applied = overflowViewport.local(parent, clipCss)
       if (!beyondFixed && /hidden|auto|scroll|clip/.test(applied.y)) {
         const clip = bounds(parent), top = clip.top + parent.clientTop
         visibleTop = Math.max(visibleTop, top); visibleBottom = Math.min(visibleBottom, top + parent.clientHeight)
       }
-      if (parent === fixedBoundary) beyondFixed = true
+      if (parent === clipBoundary) beyondFixed = true
     }
     // Native scroll offsets can be quantized while CSS boxes are fractional.
     // Request outward integer endpoints using the actual clipped client port;
@@ -1009,6 +1027,7 @@ export function createFullAppUiShared(ctx) {
   }
   const focus = async (selector, meta) => {
     routeFor(meta.routeId)
+    const decoratorKind = decoratorKeyboardKind(meta.routeId, meta.stateId, selector)
     const sidebarFocusRequired = meta.routeId === 'nav-sidebar' && meta.stateId === 'collapsed'
     let beforeTab, motion, pendingSidebarFocus
     if (sidebarFocusRequired) {
@@ -1022,7 +1041,7 @@ export function createFullAppUiShared(ctx) {
       validateCollapsedSidebarObservation(beforeTab, ctx.matrix, { focusRequired: false })
     } else await ensureVisible(selector)
     const first = await eventCount(), field = await evaluate(`(()=>{const n=document.querySelector(${q(selector)});return {tag:n?.tagName,type:n?.type}})()`)
-    if (field.tag === 'TEXTAREA' || (field.tag === 'INPUT' && ['text', 'search', 'email', 'url', 'tel', 'password', 'number'].includes(field.type))) {
+    if (!decoratorKind && (field.tag === 'TEXTAREA' || (field.tag === 'INPUT' && ['text', 'search', 'email', 'url', 'tel', 'password', 'number'].includes(field.type)))) {
       const select = await nativeSelect.inspect(selector)
       if (select.kind === 'shared') {
         if (!select.expanded) await click('[data-ui-control="select"]:has([role="combobox"][id=' + q(select.inputId) + '])')
@@ -1032,7 +1051,16 @@ export function createFullAppUiShared(ctx) {
       } else await click(selector)
     }
     let reached = false, tabAttempts = 0, reverseTabs = 0, nativeSourceOrder = null
-    if (meta.routeId === 'editor-source' && meta.stateId === 'default' &&
+    if (decoratorKind) {
+      const receipt = { ...binding(meta), selector, kind: decoratorKind, eventStart: first,
+        ownerToken: 'decorator:' + decoratorKind + ':' + ui.focus.length + ':' + first,
+        method: 'native-f6-and-adjacent-tab-round-trip', reached: false }
+      ;(ui.decoratorKeyboardEntries ||= []).push(receipt)
+      nativeSourceOrder = await traverseDecoratorWithNativeKeys({ key, evaluate, receipt, save })
+      reached = nativeSourceOrder.reached
+      reverseTabs = nativeSourceOrder.reverseTabs
+      tabAttempts = nativeSourceOrder.forwardTabs
+    } else if (meta.routeId === 'editor-source' && meta.stateId === 'default' &&
         selector === '.markdown-source-actions button:last-child') {
       nativeSourceOrder = await traverseMarkdownSourceCloseWithNativeTabs({ key, evaluate })
       reached = nativeSourceOrder.reached

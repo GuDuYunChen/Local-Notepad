@@ -19,11 +19,16 @@ const mainSource = source('full-app-ui-main-editor.mjs')
 const sharedSource = source('full-app-ui-shared.mjs')
 const runnerSource = source('run-full-app-ui-installed.mjs')
 const sha = value => createHash('sha256').update(value).digest('hex')
+const mainSourceHash = sha(mainSource)
 assert.ok([
   '9b9872dc4a08a550c11e7127d2317bff5b0583b378869145fea39e2867eb30a2',
   '1779b317c0b27a29d5f42015726a5df6c8cbfb322e3cb1ec87445e3716fff661',
-].includes(sha(mainSource)), 'The behavior control must use actual b3 or this frozen one-line candidate')
-assert.equal(sha(sharedSource), '5b819baf8153bc992168ff45c1408f9a53bbf6c57c41631e341fa984813861f9')
+  'f91c50e63b104aec8567b77ed74c7c64b45ff293ba7ae9fc1c373dcdf5cb4551',
+].includes(mainSourceHash), 'The behavior control must use actual b3, the frozen inspector repair or the reviewed decorator candidate')
+assert.ok([
+  '5b819baf8153bc992168ff45c1408f9a53bbf6c57c41631e341fa984813861f9',
+  '7778fcceadf8794e3454a4c426c55f1f67953535d050b7889e25f7d46a0a9c51',
+].includes(sha(sharedSource)), 'The behavior control must use the frozen shared source or the reviewed capture/keyboard candidate')
 const originalCaptureLine = "    const bytes = Buffer.from((await cdp.send('Page.captureScreenshot', { format: 'png' })).data, 'base64')"
 const fastCaptureLine = originalCaptureLine.replace("{ format: 'png' }", "{ format: 'png', optimizeForSpeed: true }")
 assert.equal(runnerSource.split(fastCaptureLine).length, 2, 'Exactly one speed-only PNG capture change is required')
@@ -47,6 +52,21 @@ const presentDeclaration = declaration('  const present = selector => until(')
 const hitDeclaration = declaration('  const hit = async selector => {')
 const ensureDeclaration = section(sharedSource, 'export function ensureFullAppTargetVisible(', '\nexport function observeFullAppPopup(').replace(/^export /, '')
 const untilDeclaration = section(runnerSource, 'async function until(', '\nasync function freePort(')
+// The current whole files also contain unrelated decorator-keyboard and
+// synchronous capture-read caching changes. Bind every closure actually
+// executed below to the exact 8a02d0f source bytes, independently of that
+// whole-file allowlist. Keep b3's original panel-only closure as the failing
+// behavior control; its original source hash and all eleven cases remain.
+for (const [name, actual, expected] of [
+  ['inspector', inspectorDeclaration, mainSourceHash === '9b9872dc4a08a550c11e7127d2317bff5b0583b378869145fea39e2867eb30a2'
+    ? 'a0abba44fe7f2183ca085c928812d14fa9aa6cff5a7891565e846208bc5442fe'
+    : '0f71217e4404ac3d1e5f140423434984cb12a88062b12973dbaf83d886e869d2'],
+  ['exists', existsDeclaration, '1c06b9c1898a0f29999480cb208c7281dd1c4bb5315c5eac91aeb961c36b3327'],
+  ['present', presentDeclaration, '759872452a2fc7686d11ed842bc7ca21545aca1b05c815120f178cfdb203e15e'],
+  ['hit', hitDeclaration, '041e60caee2c6d577c00fadd05709ee4bbf353009e67a10b6b216f1e6fc8496b'],
+  ['ensure', ensureDeclaration, '31f6ff1b8e25c9a27c9ffef5ef3a781cf278c22308a7360585c31c0f579c992d'],
+  ['until', untilDeclaration, '0b78f43c4329091d3a42b54a009e59834ada2b65d820d972a9822c5957aff196'],
+]) assert.equal(sha(actual), expected, 'The executed ' + name + ' closure must retain its original source bytes')
 const properties = '#inspector-tab-properties'
 const history = '#inspector-tab-history'
 const details = 'button[aria-label="笔记详情"]'

@@ -1,8 +1,9 @@
-import { $getNodeByKey, DecoratorNode } from 'lexical'
+import { $getNodeByKey, DecoratorNode, SKIP_DOM_SELECTION_TAG } from 'lexical'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { useLexicalEditable } from '@lexical/react/useLexicalEditable'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { UiButton, UiTextarea } from '~/components/ui/ControlKit'
+import { bindDecoratorKeyboardAccess } from './decoratorKeyboard'
 
 
 const CALLOUT_ICONS = ['💡', '⚠️', 'ℹ️', '✅', '❌', '📌', '🔔', '💬']
@@ -80,6 +81,12 @@ function CalloutComponent({ nodeKey, icon, text }) {
   const [currentIcon, setCurrentIcon] = useState(icon || '💡')
   const [editText, setEditText] = useState(text || '')
   const [showIconPicker, setShowIconPicker] = useState(false)
+  const blockRef = useRef(null)
+
+  useEffect(() => bindDecoratorKeyboardAccess(
+    blockRef.current, '.callout-block > .callout-header .callout-icon-btn:not(:disabled)',
+    () => editor.isEditable(), () => editor.update(() => {}, { tag: SKIP_DOM_SELECTION_TAG })
+  ), [editor, isEditable])
 
   useEffect(() => setCurrentIcon(icon || '💡'), [icon])
   useEffect(() => setEditText(text || ''), [text])
@@ -110,7 +117,7 @@ function CalloutComponent({ nodeKey, icon, text }) {
   }
 
   return (
-    <div className="callout-block">
+    <div ref={blockRef} className="callout-block" title="按 F6 从编辑正文进入提示图标操作">
       <div className="callout-header">
         <UiButton density="compact"
           type="button"

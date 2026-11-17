@@ -1,8 +1,9 @@
-import { $getNodeByKey, DecoratorNode } from 'lexical'
+import { $getNodeByKey, DecoratorNode, SKIP_DOM_SELECTION_TAG } from 'lexical'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { useLexicalEditable } from '@lexical/react/useLexicalEditable'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { UiButton, UiInput, UiTextarea } from '~/components/ui/ControlKit'
+import { bindDecoratorKeyboardAccess } from './decoratorKeyboard'
 
 
 export class ToggleNode extends DecoratorNode {
@@ -97,6 +98,12 @@ function ToggleComponent({ nodeKey, title, content, collapsed }) {
   const [isCollapsed, setIsCollapsed] = useState(Boolean(collapsed))
   const [editTitle, setEditTitle] = useState(title || '')
   const [editContent, setEditContent] = useState(content || '')
+  const blockRef = useRef(null)
+
+  useEffect(() => bindDecoratorKeyboardAccess(
+    blockRef.current, '.toggle-block > .toggle-header .toggle-arrow-button:not(:disabled)',
+    () => editor.isEditable(), () => editor.update(() => {}, { tag: SKIP_DOM_SELECTION_TAG })
+  ), [editor, isEditable])
 
   useEffect(() => setIsCollapsed(Boolean(collapsed)), [collapsed])
   useEffect(() => setEditTitle(title || ''), [title])
@@ -122,7 +129,7 @@ function ToggleComponent({ nodeKey, title, content, collapsed }) {
   }
 
   return (
-    <div className="toggle-block">
+    <div ref={blockRef} className="toggle-block" title="按 F6 从编辑正文进入折叠操作">
       <div className="toggle-header">
         <UiButton density="compact"
           type="button"

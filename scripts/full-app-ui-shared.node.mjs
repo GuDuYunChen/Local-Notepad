@@ -481,6 +481,51 @@ function serializedOverflowObservation(fixture, kind) {
     : `(${viewportObservers.observeFullAppFocus.toString()})('#control',()=>false,${port},${helper})`
   return JSON.parse(JSON.stringify(runInNewContext(source, fixture.globals)))
 }
+
+test('serialized page observations bound repeated native reads to one synchronous sample without retaining the next PNG boundary', () => {
+  const f = overflowFixture(), controls = [f.control]
+  let parent = f.page
+  for (let index = 0; index < 8; index++) parent = f.make('div', 'common-ancestor-' + index, f.rectangle(10, 20, 400, 200), parent)
+  f.page.children = f.page.children.filter(node => node !== f.control)
+  parent.children.push(f.control); f.control.parentElement = parent
+  for (let index = 1; index < 62; index++) {
+    const field = f.make('input', 'observed-' + index, f.rectangle(20, 40 + index * 45, 160, 40), parent)
+    field.dataset.uiControl = 'input'; field.className = 'ant-input app-ui-input'; controls.push(field)
+  }
+  const styleReads = new Map(), rectangleReads = new Map(), nativeStyle = f.globals.getComputedStyle
+  f.globals.getComputedStyle = node => { styleReads.set(node, (styleReads.get(node) || 0) + 1); return nativeStyle(node) }
+  for (const node of [f.html, ...f.html.querySelectorAll('*')]) {
+    const nativeRect = node.getBoundingClientRect
+    node.getBoundingClientRect = function () {
+      rectangleReads.set(node, (rectangleReads.get(node) || 0) + 1); return nativeRect.call(this)
+    }
+  }
+  // Keep the very same serialized renderer function and realm alive for both
+  // reads. Recreating the realm would hide an accidentally persistent cache.
+  const observe = runInNewContext(`(()=>{const collectFullAppScrollOwners=${collectFullAppScrollOwners.toString()};
+    const read=${viewportObservers.observeFullAppPage.toString()};return ()=>read({root:'.actual-page',anchors:['#control']},
+    ${withinActualClientPort.toString()},${viewportObservers.observeFullAppOverflowViewport.toString()},${viewportObservers.viewportFixedClipBoundary.toString()})})()`, f.globals)
+  const first = JSON.parse(JSON.stringify(observe()))
+  assert.equal(first.controls.length, 62)
+  for (const node of [f.page, parent, ...controls]) {
+    assert.equal(styleReads.get(node), 1, 'The same renderer CSS node must not be reread for every common ancestor traversal')
+    assert.equal(rectangleReads.get(node), 1, 'The same native rectangle must not be reread for control/anchor/scroll classification')
+  }
+  f.control.disabled = true; f.control.css.color = 'rgb(200, 0, 0)'; f.control.box = f.rectangle(25, 40, 160, 40)
+  const second = JSON.parse(JSON.stringify(observe())), target = second.controls.find(item => item.fieldSelector === '[id="control"]')
+  assert.equal(target.disabled, true); assert.equal(target.computed.color, 'rgb(200, 0, 0)'); assert.equal(target.left, 25)
+  for (const node of [f.page, parent, ...controls]) { assert.equal(styleReads.get(node), 2); assert.equal(rectangleReads.get(node), 2) }
+  assert.throws(() => validateFullAppCaptureContinuity(first, second, matrix), /Actual target moved across the native PNG/)
+  f.control.css.visibility = 'hidden'
+  const hidden = JSON.parse(JSON.stringify(observe())).controls.find(item => item.fieldSelector === '[id="control"]')
+  assert.equal(hidden.visible, false); assert.equal(hidden.hit, false)
+  f.control.css.visibility = 'visible'; f.page.css.overflowY = 'hidden'; f.page.clientHeight = 30
+  f.page.box = f.rectangle(10, 20, 400, 30)
+  const clipped = JSON.parse(JSON.stringify(observe())).controls.find(item => item.fieldSelector === '[id="control"]')
+  assert.equal(clipped.visible, true); assert.equal(clipped.inViewport, false)
+  assert.ok(clipped.clippingAncestors.some(item => item.id === 'page' && item.clientPort.height === 30))
+})
+
 async function serializedEnsureVisible(fixture) {
   const shared = createFullAppUiShared({ evaluate: async source => runInNewContext(source, fixture.globals), click() {},
     cdp: { send() {} }, until: async check => check(), capture() {}, save() {}, report: { fullAppUi: {} }, routes: [], matrix })
