@@ -1,3 +1,56 @@
+# 4.249.1 focus/hover repair execution record
+
+Preserve the prior accepted 4.249.0 evidence and every original failure. The user
+reported visual defects after delivery; the old keyboard-outline and list tests
+did not assert pointer-outline extent or hover continuity. Do not cite old green
+results as proof that these new reported conditions pass.
+
+This environment successfully executed npm ci with the original lock. Its
+`/usr/bin/go` was not the Go compiler, so the failed `go version` result was kept;
+Go1.24.11 was downloaded from the official source and hash verified separately.
+Several bounded investigation outputs were still truncated; their records are
+kept and subsequent reads use exact paths/fields. Missing optional Product Design
+reference resources were not treated as user approvals or product failures.
+Vite's non-loopback interface enumeration failed with uv_interface_addresses;
+that failed operation was not repeated unchanged. A cloud browser local-page
+navigation failed, then observation was explicitly denied by browser safety
+policy. That browser operation was stopped; no alternate browser, raw CDP or
+policy bypass may be used to repeat it. The independent required Windows native
+CI workflow remains the product acceptance path, and must supply actual evidence.
+These observations do not establish the cause of ChatGPT message interruptions.
+
+The initial version/upgrade contract run missed the generated export/reading
+fixture precondition and retained an obsolete current-upgrade step-name
+expectation. Preserve that failure. Build the declared fixtures before the
+dependent contracts, and update only the current-version workflow anchor.
+The next rejection exposed stale active synthetic import-source identities;
+update their exact current blobs without changing historical template hashes
+or inverse assertions. The resulting 156-contract pass does not overwrite
+either original failed log and is not native installation acceptance.
+
+The new tree-cancel regression first reproduced two real focus-loss failures.
+After the production fix, its new arrow-navigation expectation incorrectly
+assumed ascending folder order. Preserve that failure too; use the actual
+rendered tree order while retaining same-item focus, adjacent navigation and
+zero-write assertions. A full rerun was started prematurely before inspecting
+that targeted result, and its test source changed while it was running. That
+run is ineligible as final evidence regardless of its exit code. Freeze the
+corrected source and rerun the required full checks; inspect dependent results
+before starting the next action.
+
+The complete installer preparation later rejected three shortcut contracts:
+their synthetic import-source blobs still described 4.249.0. The same bounded
+check found the export fixture had the identical omission. Running both original
+contracts in the product checkout reproduced 74 passes and six failures out of
+80, with no skipped tests. Keep that TAP and the earlier 500/503 verifier result.
+Update only the two current synthetic fixtures' three source identities; retain
+the strict source comparison, historical templates, LF/CRLF inverse proofs and
+existing PID assertions. Product CI now prepares both canonical fixtures and
+explicitly executes these two original contract files before packaging, so this
+failure cannot be hidden by unrelated green suites. Prior candidate CI, images
+and installers remain their own evidence; final acceptance must use the repaired
+commit and its actual build, without relabeling the earlier package.
+
 # 2F.114 导航修补接续
 
 上一阶段原可视/原生场景的首处差异在第一页，未覆盖长公共前缀后的唯一变化，本轮补真实组件反例。新测试沿用固定8ms drain在首次并行完整回归中出现一次过早读取；保存5819/5820结果，改为等待实际比较结果，不增加生产超时或请求。旧源码在该正确前置下仍四项拒绝。

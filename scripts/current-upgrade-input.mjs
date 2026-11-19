@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { checkAppVersion } from './check-app-version.mjs'
 import { digest, installerVersion } from './windows-package-core.mjs'
 
-const PREVIOUS_VERSION = '4.248.1'
+const PREVIOUS_VERSION = '4.249.0'
 const BUILD_STAGES = Object.freeze(['version-check', 'npm-check', 'go-check', 'install-locked-dependencies', 'build'])
 const objectId = value => typeof value === 'string' && /^[a-f0-9]{40}$/.test(value)
 const parse = (bytes, maximum, label) => {

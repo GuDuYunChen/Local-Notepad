@@ -183,6 +183,7 @@ export default function WorkspaceSidebar({
       <div className="workspace-sidebar-bottom" ref={moreRef}>
         <UiButton
           type="button"
+          variant="text"
           className={`workspace-sidebar-more${moreOpen ? ' active' : ''}`}
           onClick={() => setMoreOpen(prev => !prev)}
           aria-expanded={moreOpen}

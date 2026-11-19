@@ -1,3 +1,23 @@
+# Current repair: focus and hover stability / 4.249.1 candidate
+
+Accepted master is `e9da2419e073af155d9a8458c8508ce8d03b600b` (4.249.0).
+PR29/Issue28 are accepted history. New user-reported focus rings and sidebar/notebook
+hover movement are tracked in Issue31 on `fix/ui-focus-hover-stability-4-249-1`.
+Read `docs/LOCAL_UI_FOCUS_HOVER_4_249_1.md` and current remote identities first.
+Do not resume PR30 or reopen historical failures as current without evidence.
+
+Keep the existing Ant Design architecture, schema14, dependencies and original
+save/draft/quit/data semantics. Repair pointer/keyboard focus and hover layout
+together, including the active name dialog's duplicated input border. Preserve
+all original assertions, full local regressions, six native matrices and budgets.
+Add genuine baseline rejection and current UI measurements; a component fixture
+is not full application or backend acceptance. The current upgrade baseline is
+4.249.0; preserve the independent original 4.248.0-to-4.248.1 upgrade and historical
+installer hashes. Exact current product/native evidence and independent review
+must pass before PR merge. main stays unchanged. A retained merged branch is
+maintenance only. Record final state in Issue31/PR/evidence, not a status-only
+source commit. The older headings below are retained historical instructions.
+
 # Current module: complete UI control migration / 2F.116 / 4.249.0 candidate
 
 The accepted master baseline is `1c8ec5689847a580ce307b9157fbbc8c1ac43a8f` (4.248.1).

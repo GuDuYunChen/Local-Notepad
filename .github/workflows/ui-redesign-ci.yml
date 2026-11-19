@@ -51,12 +51,14 @@ jobs:
       - name: Build renderer
         run: npm run build:renderer
 
-      # Contract imports share the native export driver; a clean Ubuntu checkout
-      # needs its generated fixture just as the independent Windows runner does.
+      # Installation contracts share the reading/export drivers; prepare both
+      # canonical fixtures before checking their current source bindings.
       - name: Verify block-reference source and installation preservation contracts
         run: |
+          node scripts/build-reading-mode-fixture.mjs
           node scripts/build-local-export-fixture.mjs
           node --test scripts/block-references-evidence.node.mjs scripts/block-references-installed-evidence.node.mjs
+          node --test scripts/shortcut-management-installed-evidence.node.mjs scripts/local-export-installed-evidence.node.mjs
           node --test scripts/native-helper-lifecycle.node.mjs
 
       - name: Verify editor cache and save receipt regressions
@@ -501,9 +503,17 @@ jobs:
           name: local-notepad-windows-7bee8ed1effde41e3657a36a66b9a6ecec1c940b
           path: .installer-input/4.248.1
 
+      - name: Download exact accepted 4.249.0 installer
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 44130882822
+          name: local-notepad-windows-cd5b6381f9e10ba08e38747bc0e1db450435b738
+          path: .installer-input/4.249.0
+
       # Check the actual PR installer before the flaky historical-version quit path.
       # Both independent upgrades remain required; neither failure permits installer upload.
-      - name: Verify accepted 4.248.1 to actual current package in-place upgrade
+      - name: Verify accepted 4.249.0 to actual current package in-place upgrade
         shell: pwsh
         run: .\.github\scripts\windows-in-place-upgrade.ps1 -CurrentCandidate
 
@@ -589,5 +599,54 @@ jobs:
           path: |
             test-results/ui-controls-render/*.json
             test-results/ui-controls-render/*.png
+          if-no-files-found: error
+          retention-days: 30
+
+  ui-feedback-baseline:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact candidate verifier
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Checkout immutable accepted product
+        uses: actions/checkout@v7
+        with:
+          ref: e9da2419e073af155d9a8458c8508ce8d03b600b
+          path: baseline
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install candidate locked dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Install baseline locked dependencies
+        working-directory: baseline
+        run: npm ci --no-audit --no-fund
+
+      - name: Verify baseline rejection contracts
+        run: node --test scripts/ui-feedback-baseline.node.mjs scripts/ui-control-render-evidence.node.cjs
+
+      - name: Reproduce original focus and hover defects
+        run: node scripts/ui-feedback-baseline.mjs --baseline-dir baseline
+
+      - name: Preserve original rejected native evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-notepad-ui-feedback-baseline-${{ github.sha }}
+          path: |
+            test-results/ui-feedback-baseline/
+            baseline/test-results/ui-controls-render/*.json
+            baseline/test-results/ui-controls-render/*.png
           if-no-files-found: error
           retention-days: 30
