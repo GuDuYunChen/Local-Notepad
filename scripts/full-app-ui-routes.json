@@ -3,18 +3,18 @@
   "scope": "installed-actual-app-page-matrix",
   "sourceScope": "control-source entry coverage with declared states; not every possible failure combination",
   "productSource": {
-    "commit": "cd5b6381f9e10ba08e38747bc0e1db450435b738",
-    "tree": "bc510d581c3b54f38702912701abcb305408d71d",
+    "commit": "0908e77d5e5820f107a8b8e694831baaa280e4b1",
+    "tree": "6a5b9f65b35e644c898b22a0d94aa7920b546510",
     "dirty": false
   },
   "inventory": {
     "file": "inventory.json",
-    "sha256": "7b16ca60e9120b64c01d44e4a2612740ae791b9610954fbac91f65a28bb5a5d0",
+    "sha256": "9718f02f0f7016a0364c9bd93e7074bf9d1ff0c9d14e37b626d129e9be26cc97",
     "originalDirty": false,
     "currentCodeFilesHashRevalidated": 349,
     "currentControlsFiles": 137,
-    "sourceCommit": "8a1dc597d6f88b3f9d3874f330d27bede02301be",
-    "sourceTree": "bc510d581c3b54f38702912701abcb305408d71d",
+    "sourceCommit": "42e0a6e2612bb07d13a1af1bdd00e6ae3ee4bcfa",
+    "sourceTree": "6a5b9f65b35e644c898b22a0d94aa7920b546510",
     "currentStylesheetsHashRevalidated": 98
   },
   "matrix": [
@@ -2650,9 +2650,9 @@
     },
     {
       "file": "src/components/FileList.jsx",
-      "bytes": 70906,
-      "sha256": "1683351f030ccedd4419e1a9f5276cddef98815dd55d54e3ad1f0ed32c84ab2a",
-      "blob": "bc8a801ef94035eca6985ac345dbdaa6378130b9",
+      "bytes": 71456,
+      "sha256": "c38dc69fe8b2e5640bd30b057b96906573509c7e4a3f69ed6e8e3022429b089f",
+      "blob": "b08c60db7dae6015d926eaabeaa129e46d62f02e",
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [
@@ -2993,9 +2993,9 @@
     },
     {
       "file": "src/components/NameDialog.jsx",
-      "bytes": 6384,
-      "sha256": "ec6bfa8483744e0a79b66d64fcf84d786b3f70f7d8962a5e0f035e4cfc8f178c",
-      "blob": "c3f51a394f9a0bf83b3f39d7c2171fe04499ab66",
+      "bytes": 6415,
+      "sha256": "cbf05cab1836371aa36d21f265a9e6ba877d93ff0240487946934c8cb7c134c2",
+      "blob": "72823963fa83e6f68ec0da1d8bdef6094e6e2cc3",
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [
@@ -4320,9 +4320,9 @@
     },
     {
       "file": "src/components/WorkspaceSidebar.jsx",
-      "bytes": 8373,
-      "sha256": "4b538da222ec940d62d1c16361782eba719b3f2b0198be6786ab83f0bf4f594e",
-      "blob": "6ecfe1c6dd3f671771200964bebeba87b070fa11",
+      "bytes": 8398,
+      "sha256": "f10df561e4a91e8e0bb7e303c619839a72276706eaa2cbd5d042cf683a6ad76e",
+      "blob": "adfddf25c997f366f79f521769e74c956ae370bc",
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [

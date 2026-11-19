@@ -629,15 +629,23 @@ body {
 }
 
 .list-item .actions {
-  display: none;
+  /* Reserve the official action controls before hover so the title and the
+     following rows keep the same geometry when the actions become available. */
+  display: flex;
   gap: 2px;
   flex-shrink: 0;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .list-item:hover .actions,
+.list-item:focus-within .actions,
+.list-item.keyboard-focus .actions,
 .list-item.active .actions {
-  display: flex;
-  animation: fadeIn 0.15s;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
 }
 
 .list-item .actions .btn:where(:not([data-ui-control], [data-ui-control] *, .ant-btn, .ant-input, .ant-input-affix-wrapper, .ant-select, .ant-select *)) {

@@ -3,13 +3,13 @@ import assert from 'node:assert/strict'
 import { UI_SCREEN_COLLECTION_PREFIX, UI_INSTALLED_REGISTRATION_QUERY, validateUiInstalledRegistration, createUiScreenPopupReader, captureUiScreenPopup, captureUiScreenPage, validateUiScreenPopupObservation, validateUiScreensEvidence } from './ui-screens-evidence.mjs'
 
 const ownedInstallation = 'D:\\a\\_temp\\ui-owned-test\\中文 安装目录'
-const installedRegistration = () => ({ scope: 'HKCU', key: 'f98bf979-44e1-593d-831a-a4f3cba3a24b', version: '4.249.0',
+const installedRegistration = () => ({ scope: 'HKCU', key: 'f98bf979-44e1-593d-831a-a4f3cba3a24b', version: '4.249.1',
   location: ownedInstallation, installRegistryKey: 'HKCU:\\Software\\f98bf979-44e1-593d-831a-a4f3cba3a24b',
   uninstallLocation: null, uninstall: '"' + ownedInstallation + '\\Uninstall 记事本.exe" /currentuser' })
 
 test('actual NSIS install-key location and exact uninstall command establish the same owned installation', () => {
   const registration = installedRegistration()
-  assert.equal(validateUiInstalledRegistration([registration], ownedInstallation, '4.249.0'), registration)
+  assert.equal(validateUiInstalledRegistration([registration], ownedInstallation, '4.249.1'), registration)
   assert.equal(registration.uninstallLocation, null, 'The absent location on the distinct Uninstall key is not invented')
   assert.match(UI_INSTALLED_REGISTRATION_QUERY, /\$installKey=\$scope\+':\\Software\\'\+\$key/)
   assert.match(UI_INSTALLED_REGISTRATION_QUERY, /Get-ItemProperty -LiteralPath \$installKey -ErrorAction Stop/)
@@ -36,11 +36,11 @@ for (const [name, alter] of [
   ['conflicting uninstall-entry location', value => { value.uninstallLocation = 'D:\\other' }],
 ]) test('installed UI refuses ' + name, () => {
   const registration = installedRegistration(); alter(registration)
-  assert.throws(() => validateUiInstalledRegistration([registration], ownedInstallation, '4.249.0'))
+  assert.throws(() => validateUiInstalledRegistration([registration], ownedInstallation, '4.249.1'))
 })
 test('installed UI refuses missing or duplicated registrations before page input', () => {
-  assert.throws(() => validateUiInstalledRegistration([], ownedInstallation, '4.249.0'))
-  assert.throws(() => validateUiInstalledRegistration([installedRegistration(), installedRegistration()], ownedInstallation, '4.249.0'))
+  assert.throws(() => validateUiInstalledRegistration([], ownedInstallation, '4.249.1'))
+  assert.throws(() => validateUiInstalledRegistration([installedRegistration(), installedRegistration()], ownedInstallation, '4.249.1'))
 })
 
 const focus = () => ({ focused: true, focusVisible: true, inViewport: true, hit: true,

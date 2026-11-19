@@ -1,3 +1,27 @@
+# Current handoff: 4.249.1 focus/hover repair candidate
+
+4.249.0 is accepted at master `e9da2419e073af155d9a8458c8508ce8d03b600b`.
+The user subsequently reports an extra outer input focus ring and hover movement
+in the left navigation/notebook rows. Issue31 and
+`docs/LOCAL_UI_FOCUS_HOVER_4_249_1.md` define the current repair and acceptance.
+Use `fix/ui-focus-hover-stability-4-249-1`; PR30 is an unrelated old implementation
+route, and the completed PR29 evidence remains preserved.
+
+The original shared-control checker verifies keyboard focus but permits a
+separated outline. Notebook actions also enter layout only on hover, and sidebar
+legacy border ownership conflicts with official Ant Design hover styles. These
+specific conditions must receive current actual native measurements, not just
+existing CSS or component tests. Current code-ready, local regression, native UI,
+Windows/install, independent review and merge are separate states.
+
+Current npm ci completed with the original dependency lock; Go1.24.11 was
+obtained from the official distribution and SHA256 verified. The cloud-browser
+local-page attempt was explicitly rejected by its safety policy and stopped.
+Do not retry it using another browser or raw protocol. Use the project's
+independent required Windows native CI evidence; before that exists, UI remains
+unverified. Full status and first-failure checkpoints live with Issue31/PR and
+current exact-source evidence. No next business/cloud module is authorized here.
+
 # Current handoff: 2F.116 full UI migration, 4.249.0 candidate
 
 Accepted master: `1c8ec5689847a580ce307b9157fbbc8c1ac43a8f`, version 4.248.1.

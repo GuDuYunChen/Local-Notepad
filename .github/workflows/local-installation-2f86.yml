@@ -61,7 +61,7 @@ jobs:
           path: .installer-input/previous
       - name: Restore unchanged old path-failure counterexample
         run: node scripts/prepare-legacy-installer.mjs
-      - name: Download source-bound 4.249.0 installer
+      - name: Download source-bound 4.249.1 installer
         uses: actions/download-artifact@v4
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -128,7 +128,7 @@ jobs:
           $ledger = Get-Content -Raw -LiteralPath scripts/full-app-ui-routes.json | ConvertFrom-Json
           $expected = [string]$pin.product
           if ($expected -cnotmatch '^[a-f0-9]{40}$') { throw 'Invalid product commit pin' }
-          git fetch --no-tags origin refs/pull/29/merge
+          git fetch --no-tags origin refs/pull/32/merge
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $actual = (git rev-parse --verify FETCH_HEAD).Trim()
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

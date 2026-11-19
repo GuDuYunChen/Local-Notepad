@@ -13,6 +13,29 @@ const KINDS = Object.freeze(['button', 'input', 'password', 'select'])
 const VIEWPORTS = Object.freeze([[704, 455], [1280, 800], [1920, 1080]])
 const BUDGET_MS = 90000
 const TOLERANCE = 0.6
+const STABILITY_TOLERANCE = 0.01
+const POINTER_CASES = Object.freeze([
+  ...['normal', 'error', 'warning'].flatMap(status => ['input', 'password', 'textarea', 'textarea-clear', 'select']
+    .map(kind => ({ id: `pointer-${status}-${kind}`, kind, status, disabled: false, readOnly: false }))),
+  ...['input', 'textarea'].map(kind => ({ id: `pointer-readonly-${kind}`, kind, status: 'normal', disabled: false, readOnly: true })),
+  ...['input', 'password', 'textarea', 'select'].map(kind => ({ id: `pointer-disabled-${kind}`, kind, status: 'normal', disabled: true, readOnly: false })),
+  { id: 'name-dialog-rename', kind: 'input', status: 'normal', disabled: false, readOnly: false }
+])
+const HOVER_CASES = Object.freeze([
+  { id: 'nav-selected', selector: '.workspace-sidebar-nav-item[aria-label="笔记"]', text: true, pressed: 'true' },
+  { id: 'nav-unselected', selector: '.workspace-sidebar-nav-item[aria-label="项目"]', text: true, pressed: 'false' },
+  { id: 'nav-more', selector: '.workspace-sidebar-more', text: true },
+  { id: 'note-long', selector: '#file-tree-item-hover-long', next: '#file-tree-item-hover-selected', note: true, text: true, selected: 'false' },
+  { id: 'note-selected', selector: '#file-tree-item-hover-selected', next: '#file-tree-item-hover-short', note: true, text: true, selected: 'true' },
+  { id: 'note-short', selector: '#file-tree-item-hover-short', next: '#file-tree-item-hover-last', note: true, text: true, selected: 'false' },
+  { id: 'note-folder', selector: '#file-tree-item-hover-folder', next: '#file-tree-item-hover-nested', note: true, text: true },
+  { id: 'note-nested', selector: '#file-tree-item-hover-nested', next: '#file-tree-item-hover-nested-next', note: true, text: true },
+  { id: 'note-rename-action', selector: '#file-tree-item-hover-long', target: '.actions .action-btn:not(.danger)', next: '#file-tree-item-hover-selected', note: true, text: true, baseHover: true },
+  { id: 'note-delete-action', selector: '#file-tree-item-hover-long', target: '.actions .action-btn.danger', next: '#file-tree-item-hover-selected', note: true, text: true, baseHover: true },
+  { id: 'collapsed-selected', selector: '.workspace-sidebar-nav-item[aria-label="笔记"]', collapsed: true, pressed: 'true' },
+  { id: 'collapsed-unselected', selector: '.workspace-sidebar-nav-item[aria-label="项目"]', collapsed: true, pressed: 'false' },
+  { id: 'collapsed-more', selector: '.workspace-sidebar-more', collapsed: true }
+])
 const hash = bytes => createHash('sha256').update(bytes).digest('hex')
 
 // Runs in the actual fixture page. Preserve the original toolbar geometry and
@@ -148,9 +171,269 @@ function verifyFocus(sample) {
   assert.equal(sample.inViewport, true, `${sample.id}: focused control must be visible`)
 }
 
+function feedbackAssert(condition, category, message, actual, expected) {
+  if (condition) return
+  const error = new assert.AssertionError({ message, actual, expected, operator: 'native-feedback' })
+  error.regressionCategory = category
+  throw error
+}
+
+function finiteRect(rect, label) {
+  feedbackAssert(!!rect && ['left', 'top', 'right', 'bottom', 'width', 'height'].every(key => Number.isFinite(rect[key])),
+    'native-evidence', label + ': real finite rectangle is required', rect, 'finite DOM rectangle')
+}
+
+function stableRect(before, after, category, label) {
+  finiteRect(before, label); finiteRect(after, label)
+  for (const key of ['left', 'top', 'right', 'bottom', 'width', 'height']) {
+    feedbackAssert(Math.abs(before[key] - after[key]) <= STABILITY_TOLERANCE, category,
+      `${label}: ${key} moved`, after[key], before[key])
+  }
+}
+
+function verifyPointerFeedback(record, expected) {
+  feedbackAssert(record?.executionComplete === true && !!record.before && !!record.after, 'native-evidence',
+    expected.id + ': complete native pointer observations required', record?.executionComplete, true)
+  const { before, after } = record
+  feedbackAssert(before.focused === false, 'native-evidence', expected.id + ': pointer entry must start outside the input', before.focused, false)
+  for (const sample of [before, after]) {
+    feedbackAssert(sample.id === record.domId, 'native-evidence', expected.id + ': actual input identity changed', sample.id, record.domId)
+    for (const key of ['disabled', 'readOnly', 'status']) feedbackAssert(sample[key] === expected[key], 'focus-state',
+      `${expected.id}: ${key} semantics changed`, sample[key], expected[key])
+  }
+  stableRect(before.rect, after.rect, 'pointer-geometry', expected.id)
+  feedbackAssert(JSON.stringify(before.value) === JSON.stringify(after.value), 'focus-state', expected.id + ': pointer focus changed value', after.value, before.value)
+  feedbackAssert(after.hit && after.inViewport && record.trustedPointer === true, 'native-evidence',
+    expected.id + ': pointer target and trusted native input required', { hit: after.hit, inViewport: after.inViewport, trustedPointer: record.trustedPointer }, true)
+  if (expected.disabled) {
+    feedbackAssert(!after.focused && after.outlines.length === 0 && after.shadows.length === 0, 'focus-state',
+      expected.id + ': disabled input acquired focus decoration', { focused: after.focused, outlines: after.outlines, shadows: after.shadows }, 'disabled without focus')
+    return
+  }
+  for (const [stage, sample] of [['pointer', after], ['keyboard', record.keyboard]]) {
+    feedbackAssert(!!sample && sample.focused && sample.hit && sample.inViewport, 'native-evidence',
+      `${expected.id}: ${stage} actual focus required`, sample && { focused: sample.focused, hit: sample.hit, inViewport: sample.inViewport }, true)
+    for (const key of ['disabled', 'readOnly', 'status']) feedbackAssert(sample[key] === expected[key], 'focus-state',
+      `${expected.id}: ${stage} ${key} semantics changed`, sample[key], expected[key])
+    feedbackAssert(sample.outlines.length === 1 && sample.outlines[0].owner === 'root' && sample.outlines[0].width >= 1.5,
+      'focus-decoration', `${expected.id}: ${stage} must retain one visible root focus cue`, sample.outlines, 'one visible root outline')
+    const outline = sample.outlines[0]
+    feedbackAssert(Number.isFinite(outline.width) && Number.isFinite(outline.offset), 'native-evidence',
+      expected.id + ': real outline offset required', outline, 'finite width and offset')
+    feedbackAssert(outline.width + outline.offset <= STABILITY_TOLERANCE && sample.shadows.length === 0,
+      'focus-outline-outside', `${expected.id}: ${stage} paints an additional outside focus border`,
+      { width: outline.width, offset: outline.offset, shadows: sample.shadows }, 'focus paint remains inside the control border')
+    const root = sample.diagnostics?.nodes?.find(node => node.owner === 'root')
+    feedbackAssert(!!root && root.computed['border-top-color'] === outline.color, 'focus-state-color',
+      `${expected.id}: ${stage} focus cue must preserve its actual status border color`, outline.color, root?.computed['border-top-color'])
+  }
+  // Preserve the original keyboard contract, including its minimum visible cue.
+  verifyFocus(record.keyboard)
+  stableRect(before.rect, record.keyboard.rect, 'pointer-geometry', expected.id + ' keyboard')
+  feedbackAssert(JSON.stringify(before.value) === JSON.stringify(record.keyboard.value), 'focus-state', expected.id + ': keyboard focus changed value', record.keyboard.value, before.value)
+}
+
+// Executed in the real renderer. Text ranges and descendants are measured as
+// well as row bounds: a stable outer row can still hide moving text or icons.
+function hoverSnapshot(spec) {
+  const workspace = document.getElementById('hover-workspace')
+  const matches = workspace.querySelectorAll(spec.selector)
+  if (matches.length !== 1) throw Error('Actual hover target missing or ambiguous: ' + spec.id)
+  const root = matches[0], target = spec.target ? root.querySelector(spec.target) : root
+  if (!target) throw Error('Actual action target missing: ' + spec.id)
+  const bounds = node => {
+    if (!node) return null
+    const r = node.getBoundingClientRect()
+    return { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height }
+  }
+  const isHit = node => {
+    if (!node) return false
+    const r = node.getBoundingClientRect(), hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)
+    return r.width > 0 && r.height > 0 && (hit === node || node.contains(hit))
+  }
+  const text = spec.note ? root.querySelector('.title') : [...root.querySelectorAll('span')].find(node => node.textContent.trim())
+  const textRanges = []
+  if (text) {
+    const walker = document.createTreeWalker(text, NodeFilter.SHOW_TEXT)
+    for (let node; (node = walker.nextNode());) {
+      if (!node.textContent.trim()) continue
+      const range = document.createRange(); range.selectNodeContents(node)
+      for (const r of range.getClientRects()) textRanges.push({ left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height })
+    }
+  }
+  const actions = root.querySelector('.actions'), css = getComputedStyle(root), targetRect = bounds(target)
+  const actionStates = actions ? [...actions.querySelectorAll('button')].map(node => {
+    const style = getComputedStyle(node)
+    return { rect: bounds(node), visibility: style.visibility, pointerEvents: style.pointerEvents, hit: isHit(node) }
+  }) : []
+  const actionCSS = actions ? getComputedStyle(actions) : null
+  return { id: spec.id, root: bounds(root), target: targetRect, text: bounds(text), textRanges,
+    textContent: text?.textContent || '', icon: bounds(root.querySelector(spec.note ? '.icon' : 'svg')),
+    actions: bounds(actions), next: bounds(spec.next ? workspace.querySelector(spec.next) : null), actionStates,
+    actionsVisible: !!actionCSS && actionCSS.display !== 'none' && actionCSS.visibility === 'visible' && Number(actionCSS.opacity) > 0,
+    borderWidths: ['Top', 'Right', 'Bottom', 'Left'].map(side => parseFloat(css['border' + side + 'Width'])),
+    rootHovered: root.matches(':hover'), targetHovered: target.matches(':hover'),
+    visible: css.display !== 'none' && css.visibility === 'visible' && Number(css.opacity) > 0,
+    targetHit: isHit(target), targetInViewport: targetRect.left >= -1 && targetRect.top >= -1 && targetRect.right <= innerWidth + 1 && targetRect.bottom <= innerHeight + 1,
+    state: { selected: root.getAttribute('aria-selected'), pressed: root.getAttribute('aria-pressed'), expanded: root.getAttribute('aria-expanded'),
+      keyboardFocus: root.classList.contains('keyboard-focus'), focusWithin: root.matches(':focus-within'), activeElement: document.activeElement?.id || document.activeElement?.tagName },
+    collapsed: workspace.querySelector('.workspace-sidebar').classList.contains('collapsed') }
+}
+
+function verifyHoverFeedback(record, spec) {
+  feedbackAssert(record?.executionComplete === true, 'native-evidence', spec.id + ': complete native hover observations required', record?.executionComplete, true)
+  const samples = [record.before, record.hover, record.out]
+  for (const [index, sample] of samples.entries()) {
+    feedbackAssert(!!sample && sample.id === spec.id && sample.visible && sample.collapsed === !!spec.collapsed,
+      'native-evidence', spec.id + ': real component and requested mode required', sample && { id: sample.id, visible: sample.visible, collapsed: sample.collapsed }, { id: spec.id, visible: true, collapsed: !!spec.collapsed })
+    feedbackAssert(sample.rootHovered === (index === 1 || !!spec.baseHover) && sample.targetHovered === (index === 1 || !!spec.baseHover && !spec.target),
+      'native-evidence', spec.id + ': native hover transition required', { rootHovered: sample.rootHovered, targetHovered: sample.targetHovered }, { rootHovered: index === 1 || !!spec.baseHover, targetHovered: index === 1 })
+    finiteRect(sample.root, spec.id + ' root'); finiteRect(sample.icon, spec.id + ' icon')
+    for (const key of ['selected', 'pressed']) if (spec[key] !== undefined) feedbackAssert(sample.state[key] === spec[key], 'hover-state',
+      `${spec.id}: expected ${key} state missing`, sample.state[key], spec[key])
+    feedbackAssert(sample.root.width > 0 && sample.root.height > 0 && sample.icon.width > 0 && sample.icon.height > 0,
+      'native-evidence', spec.id + ': painted root and icon required', sample.icon, 'positive painted geometry')
+    if (spec.text) feedbackAssert(!!sample.text && sample.textContent.length > 0 && sample.textRanges.length > 0,
+      'native-evidence', spec.id + ': actual text ranges required', sample.textRanges, 'painted text ranges')
+  }
+  feedbackAssert(record.trustedPointer === true && record.hover.targetHit && record.hover.targetInViewport,
+    'native-evidence', spec.id + ': trusted pointer and hit-tested hover target required', record.trustedPointer, true)
+  for (const sample of samples.slice(1)) {
+    for (const key of ['root', 'target', 'icon', 'text', 'actions', 'next']) {
+      if (record.before[key] || sample[key]) stableRect(record.before[key], sample[key], 'hover-geometry', spec.id + ' ' + key)
+    }
+    feedbackAssert(sample.textContent === record.before.textContent && sample.textRanges.length === record.before.textRanges.length,
+      'hover-geometry', spec.id + ': text flow changed', { text: sample.textContent, ranges: sample.textRanges.length }, { text: record.before.textContent, ranges: record.before.textRanges.length })
+    for (let i = 0; i < record.before.textRanges.length; i++) stableRect(record.before.textRanges[i], sample.textRanges[i], 'hover-geometry', spec.id + ' text range ' + i)
+    feedbackAssert(sample.borderWidths.length === 4 && sample.borderWidths.every((width, index) => Number.isFinite(width) && Math.abs(width - record.before.borderWidths[index]) <= STABILITY_TOLERANCE),
+      'hover-geometry', spec.id + ': border widths changed on hover', sample.borderWidths, record.before.borderWidths)
+    feedbackAssert(JSON.stringify(sample.state) === JSON.stringify(record.before.state), 'hover-state', spec.id + ': hovering changed semantic state', sample.state, record.before.state)
+  }
+  if (spec.note) for (const sample of samples) {
+    feedbackAssert(sample.actions?.width > 0 && sample.actions?.height > 0 && sample.actionStates.length === 2,
+      'hover-geometry', spec.id + ': action space must exist before hovering', sample.actions, 'two reserved action slots')
+    const shown = sample.rootHovered || sample.state.selected === 'true' || sample.state.keyboardFocus || sample.state.focusWithin
+    feedbackAssert(sample.actionsVisible === shown, 'hover-state', spec.id + ': action visibility changed incorrectly', sample.actionsVisible, shown)
+    for (const [index, action] of sample.actionStates.entries()) {
+      stableRect(record.before.actionStates[index].rect, action.rect, 'hover-geometry', spec.id + ' action ' + index)
+      feedbackAssert(shown ? action.visibility === 'visible' && action.pointerEvents !== 'none' && action.hit : action.visibility === 'hidden' && action.pointerEvents === 'none' && !action.hit,
+        'hover-state', spec.id + ': hidden actions must not intercept input, visible actions must be clickable', action, shown ? 'visible and hit-testable' : 'hidden and not hit-testable')
+    }
+  }
+}
+
+function canonicalFeedbackFailure(scene, category, probeId, stage, error) {
+  const details = { name: String(error?.name || 'Error'), message: String(error?.message || error) }
+  for (const key of ['actual', 'expected', 'operator']) if (error && key in error) details[key] = error[key]
+  return { scene, category, probeId, stage, error: details }
+}
+
+function treeStateSnapshot() {
+  const workspace = document.getElementById('hover-workspace'), tree = workspace.querySelector('.tree-list')
+  if (!tree || tree.getAttribute('role') !== 'tree') throw Error('Actual FileList tree is required')
+  const output = JSON.parse(document.getElementById('hover-fixture-output').textContent)
+  return { treeFocused: document.activeElement === tree, activeElement: { tag: document.activeElement?.tagName, id: document.activeElement?.id || null },
+    activeDescendant: tree.getAttribute('aria-activedescendant'), selectedId: output.selectedId,
+    selectedIds: [...tree.querySelectorAll('[role="treeitem"][aria-selected="true"]')].map(node => node.dataset.fileId),
+    visibleIds: [...tree.querySelectorAll('[role="treeitem"]')].map(node => node.dataset.fileId), loadedIds: output.loadedIds }
+}
+
+function verifyTreeCancel(record, id) {
+  feedbackAssert(record?.executionComplete === true && record.closed === true && record.trustedOpen === true && record.trustedCancel === true && record.dialog?.role === 'dialog',
+    'native-evidence', id + ': actual dialog opening and trusted cancellation required', record, 'complete native cancellation')
+  feedbackAssert(record.dialog.title === (id === 'tree-rename-cancel' ? '重命名笔记' : '移到回收站？'),
+    'tree-state', id + ': actual dialog title changed', record.dialog.title, id === 'tree-rename-cancel' ? '重命名笔记' : '移到回收站？')
+  feedbackAssert(record.before?.treeFocused === true && record.before.activeDescendant === 'file-tree-item-hover-selected',
+    'native-evidence', id + ': dialog must start from the real selected tree item', record.before, 'focused selected tree item')
+  feedbackAssert(record.before.selectedId === 'hover-selected' && JSON.stringify(record.before.selectedIds) === JSON.stringify(['hover-selected']) &&
+    Array.isArray(record.before.loadedIds) && record.before.loadedIds.length === 7 && new Set(record.before.loadedIds).size === 7 &&
+    Array.isArray(record.before.visibleIds) &&
+    JSON.stringify([...record.before.visibleIds].sort()) === JSON.stringify([...record.before.loadedIds].sort()),
+  'native-evidence', id + ': isolated expanded file data required', record.before, 'seven visible isolated records and one selected note')
+  if (id === 'tree-delete-cancel') feedbackAssert(JSON.stringify(record.dialog.buttons) === JSON.stringify(['取消', '移到回收站']) &&
+    record.dialog.focusedButton === '移到回收站' && record.dialog.message === '“已选中的笔记.md”会移到回收站，30 天内可以恢复。',
+  'tree-state', id + ': actual delete confirmation changed', record.dialog, 'selected note delete confirmation with cancel')
+  for (const key of ['selectedId', 'selectedIds', 'visibleIds', 'loadedIds']) feedbackAssert(JSON.stringify(record.after?.[key]) === JSON.stringify(record.before[key]),
+    'tree-state', id + ': cancellation changed ' + key, record.after?.[key], record.before[key])
+  feedbackAssert(record.after?.treeFocused === true && record.after.activeDescendant === record.before.activeDescendant,
+    'tree-focus-return', id + ': cancellation did not return focus to its tree item', record.after, record.before)
+}
+
+function verifyTreeNavigation(record) {
+  feedbackAssert(record?.executionComplete === true && record.downTrusted === true && record.upTrusted === true,
+    'native-evidence', 'tree-navigation: real ArrowDown and ArrowUp required', record, 'complete trusted key traversal')
+  for (const [stage, expected] of [['before', 'file-tree-item-hover-selected'], ['down', 'file-tree-item-hover-short'], ['up', 'file-tree-item-hover-selected']]) {
+    const sample = record[stage]
+    feedbackAssert(sample?.treeFocused === true && sample.activeDescendant === expected,
+      'tree-navigation', 'tree-navigation: ' + stage + ' keyboard position changed', sample, expected)
+    for (const key of ['selectedId', 'selectedIds', 'visibleIds', 'loadedIds']) feedbackAssert(JSON.stringify(sample[key]) === JSON.stringify(record.before[key]),
+      'tree-state', 'tree-navigation: arrows changed ' + key, sample[key], record.before[key])
+  }
+}
+
+function collectFeedbackFailures(scenes) {
+  const failures = []
+  for (const scene of scenes) {
+    const feedback = scene.feedback
+    assert.equal(feedback?.executionComplete, true, scene.name + ': new native collection must complete')
+    assert.equal(feedback.backendExercised, false)
+    assert.equal(feedback.scope, 'production-components-with-readonly-synthetic-files')
+    assert.deepEqual(feedback.pointer.map(record => record.id), POINTER_CASES.map(spec => spec.id), 'Exact pointer / status matrix required')
+    assert.deepEqual(feedback.hover.map(record => record.id), HOVER_CASES.map(spec => spec.id), 'Exact expanded / collapsed hover matrix required')
+    assert.ok(feedback.libraryRequests.length > 0 && feedback.libraryRequests.every(request => request.accepted && request.method === 'GET' && request.path === '/api/files'), 'Only actual read-only synthetic file reads are allowed')
+    assert.equal(feedback.nameDialog.cancelled, true)
+    assert.equal(feedback.nameDialog.suffixBefore, '.md'); assert.equal(feedback.nameDialog.suffixAfter, '.md')
+    assert.equal(feedback.nameDialog.valueBefore, '已选中的笔记')
+    assert.equal(feedback.nameDialog.valueAfter, feedback.nameDialog.valueBefore)
+    assert.equal(feedback.images.length, 11, 'All five native pointer and three paired hover PNGs are required')
+    assert.equal(new Set(feedback.images.map(image => image.name)).size, feedback.images.length)
+    for (const image of feedback.images) assert.ok(image.bytes > 100 && /^[a-f\d]{64}$/.test(image.sha256) && image.width > 0 && image.height > 0)
+    const picture = (receipt, suffix) => {
+      assert.equal(receipt?.name, `${scene.name}-feedback-${suffix}.png`, 'Fresh PNG must belong to its actual probe')
+      assert.deepEqual(receipt, feedback.images.find(image => image.name === receipt.name), 'PNG receipt must be present in the native image manifest')
+    }
+    for (const id of ['pointer-normal-input', 'pointer-error-password', 'pointer-warning-textarea-clear', 'pointer-normal-select', 'name-dialog-rename']) {
+      picture(feedback.pointer.find(record => record.id === id).pointerImage, id + '-pointer')
+    }
+    for (const id of ['nav-unselected', 'note-long', 'collapsed-unselected']) {
+      const record = feedback.hover.find(record => record.id === id)
+      picture(record.beforeImage, id + '-before'); picture(record.hoverImage, id + '-hover')
+    }
+    const rename = feedback.pointer.find(record => record.id === 'name-dialog-rename')
+    assert.equal(rename.before.value, feedback.nameDialog.valueBefore)
+    assert.equal(rename.after.value, feedback.nameDialog.valueAfter)
+    for (const [kind, specs, verify] of [['pointer', POINTER_CASES, verifyPointerFeedback], ['hover', HOVER_CASES, verifyHoverFeedback]]) {
+      for (let index = 0; index < specs.length; index++) {
+        try { verify(feedback[kind][index], specs[index]) }
+        catch (error) { failures.push(canonicalFeedbackFailure(scene.name, error.regressionCategory || 'native-evidence', specs[index].id, kind === 'pointer' ? 'focus' : 'hover', error)) }
+      }
+    }
+    assert.equal(feedback.treeFlow?.executionComplete, true, 'Both cancellation and keyboard traversal observations are required')
+    for (const [id, record] of [['tree-rename-cancel', feedback.treeFlow.rename], ['tree-delete-cancel', feedback.treeFlow.delete]]) {
+      try { verifyTreeCancel(record, id) }
+      catch (error) { failures.push(canonicalFeedbackFailure(scene.name, error.regressionCategory || 'native-evidence', id, 'tree', error)) }
+    }
+    try { verifyTreeNavigation(feedback.treeFlow.navigation) }
+    catch (error) { failures.push(canonicalFeedbackFailure(scene.name, error.regressionCategory || 'native-evidence', 'tree-navigation', 'tree', error)) }
+  }
+  return failures
+}
+
+function verifyFeedbackScenes(scenes) {
+  assert.equal(scenes.length, 6, 'All original theme and viewport combinations must collect feedback')
+  assert.deepEqual(scenes.map(scene => scene.name).sort(), ['light', 'dark'].flatMap(theme => VIEWPORTS.map(([width, height]) => `${theme}-${width}x${height}`)).sort(), 'Feedback must cover the original exact native matrix')
+  const failures = collectFeedbackFailures(scenes)
+  if (failures.length) {
+    const error = Error(`Native focus/hover regressions: ${failures.length}; ${failures[0].error.message}`)
+    error.code = 'UI_FEEDBACK_REGRESSIONS'; error.failures = failures
+    throw error
+  }
+  return { passed: true, failures }
+}
+
 function failureDetails(error) {
   const details = { name: String(error?.name || 'Error'), message: String(error?.message || error), stack: error?.stack || null }
-  for (const key of ['actual', 'expected', 'operator']) if (error != null && key in Object(error)) {
+  for (const key of ['actual', 'expected', 'operator', 'code', 'regressionCategory']) if (error != null && key in Object(error)) {
     try { details[key] = JSON.parse(JSON.stringify(error[key])) }
     catch { details[key] = String(error[key]) }
   }
@@ -324,14 +607,22 @@ function focusSnapshot(id, shadowIsVisible) {
         '--ant-color-primary', '--ant-control-outline', '--ant-control-outline-width'].map(name => [name, css.getPropertyValue(name)])) })
     if (bounds.width <= 0 || bounds.height <= 0 || css.visibility === 'hidden' || css.opacity === '0') continue
     const owner = index === 0 ? 'root' : node.tagName.toLowerCase() + ':' + index
-    if (css.outlineStyle !== 'none' && parseFloat(css.outlineWidth) > 0) outlines.push({ owner, width: parseFloat(css.outlineWidth), color: css.outlineColor })
+    if (css.outlineStyle !== 'none' && parseFloat(css.outlineWidth) > 0) outlines.push({ owner, width: parseFloat(css.outlineWidth), color: css.outlineColor, offset: parseFloat(css.outlineOffset) })
     if (css.boxShadow !== 'none') {
       const sample = { owner, value: css.boxShadow, visible: shadowIsVisible(css.boxShadow) }
       shadowStyles.push(sample)
       if (sample.visible) shadows.push(sample)
     }
   }
+  const select = root.closest('[data-ui-control="select"]')
+  const status = /ant-(?:input|select)-status-(error|warning)/.exec(root.className)?.[1] || 'normal'
   return { id, focused: document.activeElement === element, focusVisible: element.matches(':focus-visible'), outlines, shadows, shadowStyles,
+    rect: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, width: rect.width, height: rect.height },
+    disabled: element.matches(':disabled') || element.getAttribute('aria-disabled') === 'true' || root.classList.contains('ant-select-disabled'),
+    // A non-searchable Select's internal search input is readOnly by design;
+    // that is not a public read-only field state. Its value belongs to the host.
+    readOnly: select ? false : !!element.readOnly,
+    status, value: select ? JSON.parse(select.dataset.uiValue) : element.value,
     diagnostics: { activeElement: identity(document.activeElement), documentHasFocus: document.hasFocus(),
       visibilityState: document.visibilityState, nodes },
     hit: hit === root || root.contains(hit),
@@ -470,14 +761,15 @@ async function main() {
     }
     const events = () => evaluate(() => window.__uiControlEvents || [])
     const inputKey = async (key, modifiers = 0) => {
-      const definitions = { Tab: ['Tab', 9], Enter: ['Enter', 13], Escape: ['Escape', 27],
-        ArrowDown: ['ArrowDown', 40], a: ['KeyA', 65] }
+      const definitions = { Tab: ['Tab', 9], Enter: ['Enter', 13], Escape: ['Escape', 27], F2: ['F2', 113],
+        ArrowDown: ['ArrowDown', 40], ArrowUp: ['ArrowUp', 38], Delete: ['Delete', 46], a: ['KeyA', 65] }
       const [code, virtual] = definitions[key], before = (await events()).length
       const event = { key, code, modifiers, windowsVirtualKeyCode: virtual, nativeVirtualKeyCode: virtual }
       await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyDown', ...event,
         ...(key === 'Enter' ? { text: '\r', unmodifiedText: '\r' } : {}) })
       await win.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyUp', ...event })
-      await until(events, list => list.slice(before).some(item => item.type === 'keydown' && item.key === key && item.trusted), 'trusted ' + key)
+      const observed = await until(events, list => list.slice(before).some(item => item.type === 'keydown' && item.key === key && item.trusted), 'trusted ' + key)
+      return { trusted: observed.slice(before).some(item => item.type === 'keydown' && item.key === key && item.trusted) }
     }
     const click = async (selector, disabled = false) => {
       await evaluate(selector => {
@@ -500,6 +792,37 @@ async function main() {
       win.webContents.sendInputEvent({ type: 'mouseUp', x: point.x, y: point.y, button: 'left', clickCount: 1 })
       if (!disabled) await until(events, list => list.slice(before).some(item => item.type === 'click' && item.trusted), 'trusted pointer click')
       else await pause(40)
+      return { trusted: (await events()).slice(before).some(item => ['mousemove', 'mousedown', 'click'].includes(item.type) && item.trusted), point }
+    }
+    const settle = async selector => {
+      await until(() => evaluate(selector => {
+        const node = document.querySelector(selector)
+        if (!node) throw Error('Missing painted target: ' + selector)
+        const root = node.closest('.ant-input-affix-wrapper, .ant-select') || node
+        return root.getAnimations({ subtree: true }).filter(animation => animation.pending || animation.playState === 'running').length
+      }, selector), count => count === 0, 'settled actual target ' + selector)
+      await evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve(true)))))
+    }
+    const scrollTarget = selector => evaluate(selector => {
+      const node = document.querySelector(selector)
+      if (!node) throw Error('Missing actual scroll target: ' + selector)
+      node.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'instant' })
+    }, selector)
+    const movePointer = async selector => {
+      const point = await evaluate(selector => {
+        const node = document.querySelector(selector)
+        if (!node) throw Error('Missing actual hover target: ' + selector)
+        const rect = node.getBoundingClientRect(), x = Math.round(rect.left + rect.width / 2), y = Math.round(rect.top + rect.height / 2)
+        const hit = document.elementFromPoint(x, y)
+        return { x, y, hit: hit === node || node.contains(hit), width: rect.width, height: rect.height,
+          inViewport: x >= 0 && y >= 0 && x < innerWidth && y < innerHeight }
+      }, selector)
+      assert.ok(point.width > 0 && point.height > 0 && point.hit && point.inViewport, 'Actual hover target must be hit-testable: ' + selector)
+      const before = (await events()).length
+      win.webContents.sendInputEvent({ type: 'mouseMove', x: point.x, y: point.y })
+      await until(events, list => list.slice(before).some(event => event.type === 'mousemove' && event.trusted), 'trusted native hover ' + selector)
+      await settle(selector)
+      return { point, trusted: (await events()).slice(before).some(event => event.type === 'mousemove' && event.trusted) }
     }
     const selectState = id => evaluate(selectStateSnapshot, id)
     const opened = async id => {
@@ -531,6 +854,133 @@ async function main() {
       const receipt = { name, bytes: bytes.length, sha256: hash(bytes), ...decoded.getSize() }
       if (!diagnostic) scene.images.push(receipt)
       persist(); return receipt
+    }
+    const parkPointer = async () => {
+      if (!await evaluate(() => document.getElementById('native-pointer-neutral').matches(':hover'))) await movePointer('#native-pointer-neutral')
+    }
+    const feedbackCapture = async (scene, suffix) => {
+      const receipt = await capture(scene, 'feedback-' + suffix, true)
+      scene.feedback.images.push(receipt); persist(); return receipt
+    }
+    const collectPointer = async (scene, spec, domId = spec.id) => {
+      const selector = '[id=' + JSON.stringify(domId) + ']', record = { id: spec.id, domId, executionComplete: false }
+      scene.feedback.pointer.push(record); persist()
+      await scrollTarget(selector); await click('#native-pointer-neutral'); await settle(selector)
+      record.before = await readFocus(domId); persist()
+      const receipt = await click(selector, spec.disabled)
+      await settle(selector)
+      if (!spec.disabled) await until(() => readFocus(domId), sample => sample.focused, spec.id + ' pointer focus')
+      record.after = await readFocus(domId); record.trustedPointer = receipt.trusted; persist()
+      if (['pointer-normal-input', 'pointer-error-password', 'pointer-warning-textarea-clear', 'pointer-normal-select', 'name-dialog-rename'].includes(spec.id)) {
+        record.pointerImage = await feedbackCapture(scene, spec.id + '-pointer')
+      }
+      if (!spec.disabled) {
+        if (spec.kind === 'select') { await inputKey('Escape'); await closed(domId) }
+        // Leave and return by native Tab traversal. Never programmatically focus
+        // a field or change its tabIndex to manufacture keyboard evidence.
+        await inputKey('Tab', 8); await inputKey('Tab')
+        await until(() => readFocus(domId), sample => sample.focused && sample.focusVisible, spec.id + ' native keyboard return')
+        await settle(selector); record.keyboard = await readFocus(domId)
+      }
+      record.executionComplete = true; persist()
+      return record
+    }
+    const collectHover = async (scene, spec) => {
+      const selector = '#hover-workspace ' + spec.selector
+      const targetSelector = selector + (spec.target ? ' ' + spec.target : '')
+      const record = { id: spec.id, executionComplete: false }; scene.feedback.hover.push(record); persist()
+      await parkPointer(); await scrollTarget(selector); await parkPointer()
+      if (spec.baseHover) await movePointer(selector + ' .icon')
+      await settle(selector); record.before = await evaluate(hoverSnapshot, spec); persist()
+      if (['nav-unselected', 'note-long', 'collapsed-unselected'].includes(spec.id)) record.beforeImage = await feedbackCapture(scene, spec.id + '-before')
+      const receipt = await movePointer(targetSelector)
+      record.hover = await evaluate(hoverSnapshot, spec); record.trustedPointer = receipt.trusted; persist()
+      if (record.beforeImage) record.hoverImage = await feedbackCapture(scene, spec.id + '-hover')
+      if (spec.baseHover) await movePointer(selector + ' .icon')
+      else await parkPointer()
+      await settle(selector); record.out = await evaluate(hoverSnapshot, spec)
+      record.executionComplete = true; persist()
+    }
+    const collectFeedback = async scene => {
+      scene.feedback = { scope: 'production-components-with-readonly-synthetic-files', backendExercised: false,
+        pointer: [], hover: [], images: [], libraryRequests: [], nameDialog: {}, treeFlow: { executionComplete: false }, failures: [], executionComplete: false, passed: false }
+      persist()
+      for (const spec of POINTER_CASES.filter(spec => spec.id !== 'name-dialog-rename')) await collectPointer(scene, spec)
+      await until(() => evaluate(() => JSON.parse(document.getElementById('hover-fixture-output').textContent).loadedIds),
+        ids => ids.length === 7 && new Set(ids).size === 7, 'actual FileList read-only synthetic records')
+      await click('#file-tree-item-hover-folder .icon')
+      await until(() => evaluate(() => document.getElementById('file-tree-item-hover-folder').getAttribute('aria-expanded')), value => value === 'true', 'actual folder expansion')
+      for (const spec of HOVER_CASES.filter(spec => !spec.collapsed)) await collectHover(scene, spec)
+
+      // Exercise the production rename entry and cancel path without saving.
+      await click('#file-tree-item-hover-selected .icon'); await settle('#hover-workspace .tree-list')
+      const renameFlow = scene.feedback.treeFlow.rename = { before: await evaluate(treeStateSnapshot), executionComplete: false }
+      renameFlow.trustedOpen = (await inputKey('F2')).trusted
+      const nameBefore = await until(() => evaluate(() => {
+        const input = document.querySelector('.name-dialog input.name-dialog-input')
+        return input && { id: input.id, value: input.value, suffix: document.querySelector('.name-dialog .static-ext')?.textContent,
+          dialog: { role: document.querySelector('.name-dialog').getAttribute('role'), title: document.getElementById('name-dialog-title').textContent } }
+      }), value => value && value.value === '已选中的笔记', 'actual FileList rename dialog')
+      renameFlow.dialog = nameBefore.dialog
+      scene.feedback.nameDialog = { valueBefore: nameBefore.value, suffixBefore: nameBefore.suffix, cancelled: false }; persist()
+      // The modal overlay intentionally covers the neutral corner; blur through
+      // its actual heading rather than clicking outside and cancelling it.
+      const renameSpec = POINTER_CASES.find(spec => spec.id === 'name-dialog-rename')
+      await click('#name-dialog-title')
+      const selector = '[id=' + JSON.stringify(nameBefore.id) + ']'
+      const rename = { id: renameSpec.id, domId: nameBefore.id, executionComplete: false }
+      scene.feedback.pointer.push(rename); await settle(selector); rename.before = await readFocus(nameBefore.id); persist()
+      const receipt = await click(selector); await settle(selector)
+      rename.after = await readFocus(nameBefore.id); rename.trustedPointer = receipt.trusted
+      rename.pointerImage = await feedbackCapture(scene, 'name-dialog-rename-pointer')
+      await inputKey('Tab', 8); await inputKey('Tab')
+      await until(() => readFocus(nameBefore.id), sample => sample.focused && sample.focusVisible, 'actual rename keyboard return')
+      await settle(selector); rename.keyboard = await readFocus(nameBefore.id); rename.executionComplete = true
+      const nameAfter = await evaluate(() => ({ value: document.querySelector('.name-dialog input.name-dialog-input').value,
+        suffix: document.querySelector('.name-dialog .static-ext')?.textContent }))
+      Object.assign(scene.feedback.nameDialog, { valueAfter: nameAfter.value, suffixAfter: nameAfter.suffix }); persist()
+      const renameCancel = await click('.name-dialog .modal-actions button[type="button"]')
+      renameFlow.closed = await until(() => evaluate(() => !document.querySelector('.name-dialog')), Boolean, 'actual rename cancellation')
+      await settle('#hover-workspace .tree-list'); renameFlow.after = await evaluate(treeStateSnapshot)
+      renameFlow.trustedCancel = renameCancel.trusted; renameFlow.executionComplete = true
+      scene.feedback.nameDialog.cancelled = renameFlow.closed; persist()
+      // Preserve the original cancellation observation. A failing old build may
+      // be clicked again to continue independent key traversal, never silently
+      // focused by script or certified by the later successful observation.
+      const recovery = scene.feedback.treeFlow.renameRecovery = { needed: !renameFlow.after.treeFocused, usedNativeClick: false }
+      if (recovery.needed) {
+        const actualClick = await click('#file-tree-item-hover-selected .icon')
+        recovery.usedNativeClick = true; recovery.trustedPointer = actualClick.trusted
+        await settle('#hover-workspace .tree-list')
+      }
+      recovery.after = await evaluate(treeStateSnapshot); persist()
+      const navigation = scene.feedback.treeFlow.navigation = { before: await evaluate(treeStateSnapshot), executionComplete: false }
+      navigation.downTrusted = (await inputKey('ArrowDown')).trusted
+      await settle('#hover-workspace .tree-list'); navigation.down = await evaluate(treeStateSnapshot)
+      navigation.upTrusted = (await inputKey('ArrowUp')).trusted
+      await settle('#hover-workspace .tree-list'); navigation.up = await evaluate(treeStateSnapshot)
+      navigation.executionComplete = true; persist()
+      const deleteFlow = scene.feedback.treeFlow.delete = { before: await evaluate(treeStateSnapshot), executionComplete: false }
+      deleteFlow.trustedOpen = (await inputKey('Delete')).trusted
+      deleteFlow.dialog = await until(() => evaluate(() => {
+        const dialog = document.querySelector('.consumer-confirm-modal')
+        if (!dialog) return null
+        return { role: dialog.getAttribute('role'), title: document.getElementById('consumer-confirm-title').textContent,
+          message: document.getElementById('consumer-confirm-description').textContent,
+          buttons: [...dialog.querySelectorAll('button')].map(button => button.textContent.trim()),
+          focusedButton: dialog.contains(document.activeElement) ? document.activeElement.textContent.trim() : null }
+      }), value => value?.focusedButton === '移到回收站', 'actual keyboard delete confirmation')
+      persist()
+      const deleteCancel = await click('.consumer-confirm-modal .modal-actions button:first-child')
+      deleteFlow.closed = await until(() => evaluate(() => !document.querySelector('.consumer-confirm-modal')), Boolean, 'actual delete cancellation')
+      await settle('#hover-workspace .tree-list'); deleteFlow.after = await evaluate(treeStateSnapshot)
+      deleteFlow.trustedCancel = deleteCancel.trusted; deleteFlow.executionComplete = true
+      scene.feedback.treeFlow.executionComplete = true; persist()
+      await click('#hover-workspace .workspace-sidebar-collapse')
+      await until(() => evaluate(() => JSON.parse(document.getElementById('hover-fixture-output').textContent).collapsed), Boolean, 'actual collapsed sidebar')
+      for (const spec of HOVER_CASES.filter(spec => spec.collapsed)) await collectHover(scene, spec)
+      scene.feedback.libraryRequests = await evaluate(() => window.__uiLibraryRequests)
+      scene.feedback.executionComplete = true; persist()
     }
     for (const theme of ['light', 'dark']) for (const [width, height] of VIEWPORTS) {
       const scene = { name: `${theme}-${width}x${height}`, theme, requested: [width, height], complete: false,
@@ -637,18 +1087,32 @@ async function main() {
       assert.equal(await evaluate(() => document.activeElement?.id), 'open-modal', 'Native modal cleanup returns trigger focus')
       assert.equal(await evaluate(() => Number(document.getElementById('modal-output').textContent)), 1)
       scene.modal = { complete: true, firstEscapeKeptDialog: true, secondEscapeClosed: true, focusReturned: true, closeCount: 1 }
+      await collectFeedback(scene)
       scene.events = await events(); scene.errors = await evaluate(() => window.__uiControlErrors)
       assert.equal(scene.errors.length, 0)
       scene.complete = true; persist()
     }
     verifyScenes(report.scenes)
+    // Capture every matrix first. The accepted baseline must retain both the
+    // outside focus border and hover-shift observations before rejection.
+    report.feedbackFailures = collectFeedbackFailures(report.scenes)
+    for (const scene of report.scenes) {
+      scene.feedback.failures = report.feedbackFailures.filter(failure => failure.scene === scene.name)
+      scene.feedback.passed = scene.feedback.failures.length === 0
+    }
+    persist()
+    verifyFeedbackScenes(report.scenes)
     verified = true; quitting = true; report.status = 'quitting'; persist()
     win.webContents.debugger.detach()
     app.quit()
   } catch (error) { fail(error) }
 }
 
-module.exports = { verifyGeometry, verifyFocus, verifyScenes, hasVisibleBoxShadow, HEIGHTS, VIEWPORTS, BUDGET_MS, failureDetails, recordFocusEvidence, captureMatchedFocusStyles, selectStateSnapshot, paintedPopupReader, toolbarSnapshot, verifyToolbarSnapshot, verifyToolbarContinuity, captureToolbarEvidence }
+module.exports = { verifyGeometry, verifyFocus, verifyScenes, hasVisibleBoxShadow, HEIGHTS, VIEWPORTS, BUDGET_MS,
+  failureDetails, recordFocusEvidence, captureMatchedFocusStyles, selectStateSnapshot, paintedPopupReader,
+  toolbarSnapshot, verifyToolbarSnapshot, verifyToolbarContinuity, captureToolbarEvidence,
+  POINTER_CASES, HOVER_CASES, STABILITY_TOLERANCE, focusSnapshot, hoverSnapshot,
+  verifyPointerFeedback, verifyHoverFeedback, treeStateSnapshot, verifyTreeCancel, verifyTreeNavigation, collectFeedbackFailures, verifyFeedbackScenes }
 // Electron 31's ESM default_app imports the CLI file, so require.main does not
 // identify it. Only the actual browser-process CLI entry may start this runner;
 // importing the exported evidence helpers must remain side-effect free.

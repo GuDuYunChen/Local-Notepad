@@ -3267,6 +3267,7 @@ body {
 
 .file-sidebar .list-item:hover .actions,
 .file-sidebar .list-item:focus-within .actions,
+.file-sidebar .list-item.keyboard-focus .actions,
 .file-sidebar .list-item.active .actions {
   opacity: 1;
 }
@@ -3434,21 +3435,6 @@ body {
   font-weight: 650;
 }
 
-.name-dialog-input-wrap {
-  display: flex;
-  align-items: center;
-  min-height: 42px;
-  border: 1px solid var(--line-strong);
-  border-radius: 11px;
-  background: var(--surface);
-  transition: border-color .12s ease, box-shadow .12s ease;
-}
-
-.name-dialog-input-wrap:focus-within {
-  border-color: var(--clay);
-  box-shadow: none;
-}
-
 .name-dialog-input {
   min-width: 0;
   flex: 1;
@@ -3456,7 +3442,6 @@ body {
 
 .name-dialog .static-ext {
   flex: 0 0 auto;
-  margin-right: 11px;
   color: var(--ink-muted);
   font-size: 12px;
 }
@@ -4669,7 +4654,6 @@ body {
   display: flex;
   align-items: center;
   gap: 9px;
-  border: 0;
   border-radius: 8px;
   background: transparent;
   color: var(--ink-soft);

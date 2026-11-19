@@ -689,6 +689,27 @@ export default function FileList({
       })
   }, [])
 
+  function returnFocusToTree(preferredId) {
+      const target = visibleNodes.find(node => node.id === preferredId)
+          || visibleNodes.find(node => node.id === keyboardFocusId)
+          || visibleNodes[0]
+      treeListRef.current?.focus({ preventScroll: true })
+      if (target) focusTreeItem(target.id)
+      else setKeyboardFocusId('')
+  }
+
+  function cancelRename() {
+      const id = renaming?.id
+      setRenaming(null)
+      returnFocusToTree(id)
+  }
+
+  function cancelDelete() {
+      const id = deleteConfirm?.id
+      setDeleteConfirm(null)
+      returnFocusToTree(id)
+  }
+
   function handleTreeKeyDown(event) {
       if (visibleNodes.length === 0) return
 
@@ -1779,11 +1800,11 @@ export default function FileList({
               ? `“${deleteConfirm.title}”以及其中 ${deleteConfirm.count} 项内容会移到回收站，30 天内可以恢复。`
               : `“${deleteConfirm.title}”会移到回收站，30 天内可以恢复。`
           }
-          onClose={() => setDeleteConfirm(null)}
+          onClose={cancelDelete}
           actions={[
             {
               label: '取消',
-              onClick: () => setDeleteConfirm(null),
+              onClick: cancelDelete,
             },
             {
               label: '移到回收站',
@@ -1862,7 +1883,7 @@ export default function FileList({
           message={renaming.is_folder ? `当前名称：${renaming.title}` : '输入新的笔记名称。'}
           validate={renaming.is_folder ? validateFolderInput : validateName}
           onConfirm={(name) => onRenameConfirm(renaming.id, name)}
-          onCancel={() => setRenaming(null)}
+          onCancel={cancelRename}
           isRename={!renaming.is_folder}
         />
       )}

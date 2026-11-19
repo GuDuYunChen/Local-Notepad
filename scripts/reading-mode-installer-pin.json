@@ -1,5 +1,5 @@
 {
-  "product": "cd5b6381f9e10ba08e38747bc0e1db450435b738",
+  "product": "0908e77d5e5820f107a8b8e694831baaa280e4b1",
   "quickBlob": "c1e8f40862b770f82af47c26a455b57efc853700",
   "tagsBlob": "54bb56864e58e2aa3f5ed08aedb52a00de5f0769",
   "templateBlob": "42378f13f71a03c3e91cdfdcb6dec44dbbb05f33",
@@ -10,14 +10,14 @@
   "pinsBlob": "37663a1b980a405d05b330fe2c8020fc072d98ea",
   "recentBlob": "cbe5a8897c082210363357fd33f2cb0f3d7bd1cc",
   "wikiBlob": "8cb64e31bf79c3ec2b17d5b8c152eccc0f2de6ca",
-  "importBlob": "82d9827657da7feb09ce84052012711faa021f56",
+  "importBlob": "5502f0da749494ce8cd240d40b7111679ad9ebeb",
   "importFixtureBlob": "022e484ef96e8a2dd6b2f57601bda8af29869666",
-  "importEvidenceBlob": "d0554d012b5f9e150bbc395fa2b8a7a675c8f397",
-  "importEvidenceTestsBlob": "5a46ce6dad5fe757b1d2714e485242aa79959559",
+  "importEvidenceBlob": "f7652b2cb00e0ca7e12ba6b64ca6e509632f67f5",
+  "importEvidenceTestsBlob": "24579797d91a3950957102e6680d36f00e359cce",
   "current": {
-    "version": "4.249.0",
-    "bytes": 115601444,
-    "sha256": "2f32acf01ca07cba6c63ab43fdc48700f0f2c9e98ce05c8c93b2a011901e7c52"
+    "version": "4.249.1",
+    "bytes": 115609886,
+    "sha256": "50adde837f1e6891c22b09de86dc8e5b66ee3e3bf23f2e11b9582b9cfaadf9f5"
   },
   "previous": {
     "version": "4.232.0",
@@ -31,18 +31,18 @@
     "productSourceCommit": "1a8e17ba775312c359f4ac23851c8c365b57a9cb"
   },
   "currentSource": {
-    "run": 44130882822,
-    "artifact": 14349999314,
-    "name": "local-notepad-windows-cd5b6381f9e10ba08e38747bc0e1db450435b738",
-    "headSha": "8a1dc597d6f88b3f9d3874f330d27bede02301be",
-    "branch": "fix/local-ui-consistency-2f116",
+    "run": 44460582379,
+    "artifact": 14500870439,
+    "name": "local-notepad-windows-0908e77d5e5820f107a8b8e694831baaa280e4b1",
+    "headSha": "42e0a6e2612bb07d13a1af1bdd00e6ae3ee4bcfa",
+    "branch": "fix/ui-focus-hover-stability-4-249-1",
     "repositoryId": 1105107817,
-    "archiveBytes": 115608335,
-    "archiveSha256": "f40128369a1fc2d4f3479ad81aba34fe2eaa25e949c68f0333ee9f14d2e583ae"
+    "archiveBytes": 115616895,
+    "archiveSha256": "0e3fd9c862c8cb4ec9dfb596d485f058bcee1b281c6c9ca74cc6a1781bf9cf1d"
   },
   "readingDriverBlob": "6924b128c1125424c91f71dbd1ecc415762e2f77",
   "readingFixtureBlob": "0c7ffadbb187dd33a7bc6b5aa8c69427eec5cc34",
-  "readingEvidenceBlob": "c27321e0a91d90e945016c4d96ebd7ab2444e8ec",
+  "readingEvidenceBlob": "9626e1678c6e9a2ebe02654f547a095549bd3460",
   "readingBuilderBlob": "6ba3841e0d544e3ec151f4c24144c31c86017483",
   "readingInputBlob": "b69a1d282926cb7cc40375d58feeea7970a33a4d",
   "readingWindowSessionBlob": "d298f7163131df889a1df491338457e17531d42f",
@@ -51,12 +51,12 @@
   "historyDriverBlob": "cca9480ce41883f1f64fc37bbc655e5f5c51582b",
   "shortcutManagementDriverBlob": "a728dd1e03bc75eecec1aa85df5d33085066751d",
   "shortcutManagementRunnerBlob": "0fada01b2c802b0299c2c606a0004c4657f0e1c2",
-  "shortcutManagementEvidenceBlob": "c45f55e311f46579756d0836fafdd7640c003ed9",
+  "shortcutManagementEvidenceBlob": "7d6000d51de0b0adefbd95eefe6c6f574faab883",
   "shortcutManagementFixtureBlob": "eb49f859eb9c9b51f8c31d3354f81231c647fb87",
   "shortcutManagementCanonicalFixtureBlob": "f86598e0d552a5d884eff9e30739617366c685c9",
   "localExportDriverBlob": "e1a4484a5a4df6aec2ae35c805042620a59c2cec",
   "localExportRunnerBlob": "1d7a20cdfce4cf48334556e803709e6b2f9a3d12",
-  "localExportEvidenceBlob": "901304d6bada0d6acd408bb9e00bea365b60eafc",
+  "localExportEvidenceBlob": "345452e2743315c5449b68cdf906f622841e5249",
   "localExportValuesBlob": "8c2af4276b34c42e5b346b666c08adc402470672",
   "localExportFixtureBlob": "802be649735c7ce56dab17bc15647934c036662c",
   "localExportBuilderBlob": "b6cc718d677d84952a74194a4a1ad356ea56fab2",
@@ -74,7 +74,7 @@
   "blockReferenceSources": {
     "scripts/block-references-desktop-driver.mjs": "fc93da233708cb1d16d1c6336a4b19d467670028",
     "scripts/run-block-references-desktop.mjs": "fe5d43271b7e2916ddcaf7182e0d1e2775c3a238",
-    "scripts/block-references-evidence.mjs": "9ed5183cf37be50e42820ca47cf814592b499b75",
+    "scripts/block-references-evidence.mjs": "7f3b5d621d56e0543bf258734f20859feb0348bc",
     "scripts/native-ui-select.mjs": "f657525153b5ce387421c91c134556a3c6e305ff",
     "src/services/blockReferenceModel.mjs": "192a962099478836bb8e97d66a39853cc4f365ac",
     "src/services/blockReferences.mjs": "f260d8b5a08c1d1aa139777e3a3dfcfbfd9fdb9c",

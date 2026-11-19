@@ -116,22 +116,22 @@ export default function NameDialog({
 
         <div className="name-dialog-field">
           <label htmlFor={inputId}>名称</label>
-          <div className="name-dialog-input-wrap">
-            <UiInput
-              id={inputId}
-              className="input name-dialog-input"
-              autoFocus
-              value={name}
-              disabled={submitting}
-              onChange={(event) => {
-                setName(event.target.value)
-                if (err) setErr('')
-              }}
-              placeholder="例如：旅行计划"
-              aria-invalid={Boolean(err)}
-            />
-            {isRename && format && <span className="static-ext">{format}</span>}
-          </div>
+          <UiInput
+            id={inputId}
+            className="input"
+            classNames={{ input: 'name-dialog-input' }}
+            suffix={<span className="static-ext">{isRename ? format : ''}</span>}
+            styles={{ suffix: isRename && format ? undefined : { display: 'none' } }}
+            autoFocus
+            value={name}
+            disabled={submitting}
+            onChange={(event) => {
+              setName(event.target.value)
+              if (err) setErr('')
+            }}
+            placeholder="例如：旅行计划"
+            aria-invalid={Boolean(err)}
+          />
         </div>
 
         {hasSecondaryOptions && (

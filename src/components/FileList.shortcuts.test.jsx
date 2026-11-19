@@ -71,6 +71,34 @@ it('does not create while a shortcut recorder or another modal owns input', asyn
   try {await key('n', {}, field);expect(beforeNew).not.toHaveBeenCalled();} finally {modal.remove();}
 });
 
+it.each(['F2', 'Delete'])('returns keyboard focus to the same tree item after cancelling %s', async (shortcut) => {
+  const tree = uiQuery(host, '[role="tree"]');
+  await act(async () => tree.focus());
+  const focusedItem = tree.getAttribute('aria-activedescendant');
+  const itemOrder = uiQueryAll(tree, '[role="treeitem"]').map(item => item.id);
+  const currentIndex = itemOrder.indexOf(focusedItem);
+  expect(currentIndex).toBeGreaterThanOrEqual(0);
+  expect(itemOrder).toHaveLength(2);
+  const nextIndex = currentIndex === 0 ? 1 : currentIndex - 1;
+  const forwardKey = nextIndex > currentIndex ? 'ArrowDown' : 'ArrowUp';
+  const returnKey = forwardKey === 'ArrowDown' ? 'ArrowUp' : 'ArrowDown';
+  await key(shortcut, { ctrlKey: false }, tree);
+  const dialog = uiQuery(host, '[role="dialog"]');
+  expect(dialog).toBeTruthy();
+  const cancel = uiQueryAll(dialog, 'button').find(button => uiText(button) === '取消');
+  expect(cancel).toBeTruthy();
+  await act(async () => { cancel.focus(); cancel.click(); });
+  await tick();
+  expect(uiQuery(host, '[role="dialog"]')).toBeNull();
+  expect(document.activeElement).toBe(tree);
+  expect(tree.getAttribute('aria-activedescendant')).toBe(focusedItem);
+  await key(forwardKey, { ctrlKey: false }, document.activeElement);
+  expect(tree.getAttribute('aria-activedescendant')).toBe(itemOrder[nextIndex]);
+  await key(returnKey, { ctrlKey: false }, document.activeElement);
+  expect(tree.getAttribute('aria-activedescendant')).toBe(focusedItem);
+  expect(api.mock.calls.some(([, options]) => options?.method && options.method !== 'GET')).toBe(false);
+});
+
 // Populate the real component's history through its existing naming form. The
 // API is isolated, but creation, history dispatch, reload and UI are production.
 async function createFolderHistory() {

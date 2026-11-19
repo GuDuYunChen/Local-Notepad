@@ -635,7 +635,31 @@ test('v3 C29 the unchanged real capture producer and canonical validator consume
     missing.scenes.at(-1).rawSamples = missing.scenes.at(-1).rawSamples.filter(sample => sample.phase !== 'after-capture')
     assert.throws(() => validateFullAppUiEvidence(missing, ledger))
     const currentValidatorSource = fs.readFileSync(new URL('./full-app-ui-evidence.mjs', import.meta.url), 'utf8')
-    const lfSource = currentValidatorSource.replace(/\r\n/g, '\n')
+    // Invert only the two explicit release-version assertions; all original
+    // canonical source hashes below remain byte-for-byte historical guards.
+    const releaseStatements = [
+      "commit(pin.product); commit(verifierCommit); assert.equal(pin.current.version, '4.249.1')",
+      "assert.equal(report.version, '4.249.1'); commit(report.productCommit); commit(report.productTree); commit(report.verifierCommit)",
+    ]
+    const restoreReleaseVersion = source => {
+      const current = source.replace(/\r\n/g, '\n')
+      let original = current
+      for (const statement of releaseStatements) {
+        const previous = statement.replace("'4.249.1'", "'4.249.0'")
+        assert.equal(original.split(statement).length - 1, 1)
+        assert.equal(original.split(previous).length - 1, 0)
+        original = original.replace(statement, previous)
+      }
+      let inverse = original
+      for (const statement of [...releaseStatements].reverse()) {
+        const previous = statement.replace("'4.249.1'", "'4.249.0'")
+        assert.equal(inverse.split(previous).length - 1, 1)
+        inverse = inverse.replace(previous, statement)
+      }
+      assert.equal(inverse, current)
+      return original
+    }
+    const lfSource = restoreReleaseVersion(currentValidatorSource)
     assert.equal(sha(lfSource), '9da6e7ef65382881a9a69ddd6653da27f7179552febe39f45acca0ff7c970954')
     const addedPaintSources = "  'scripts/full-app-ui-capture-paint.mjs', 'scripts/full-app-ui-capture-paint.node.mjs',\n"
     assert.equal(lfSource.split(addedPaintSources).length - 1, 1)
@@ -651,6 +675,23 @@ test('v3 C29 the unchanged real capture producer and canonical validator consume
     assert.equal(lfSource.split(originalOwnedSearch).length - 1, 0)
     const canonical = originalSources.replace(currentOwnedSearch, originalOwnedSearch)
     assert.equal(sha(canonical.replace(/\r\n/g, '\n')), '60039c19b8b8c58a20d1ac42e2b066a18d7ce87c5bd21149da319d5504baf92b')
+    const currentLf = currentValidatorSource.replace(/\r\n/g, '\n')
+    for (const current of [currentLf, currentLf.replace(/\n/g, '\r\n')]) {
+      assert.equal(sha(restoreReleaseVersion(current)), '9da6e7ef65382881a9a69ddd6653da27f7179552febe39f45acca0ff7c970954')
+      for (const statement of releaseStatements) {
+        for (const replacement of ['', statement + '\n' + statement,
+          statement.replace("'4.249.1'", "'4.249.2'"), statement.replace("'4.249.1'", "'4.249.0'"),
+          statement.replace('assert.equal(', 'assert.equal( ')]) {
+          const changed = current.replace(statement, replacement)
+          assert.notEqual(changed, current)
+          assert.throws(() => restoreReleaseVersion(changed), { code: 'ERR_ASSERTION' })
+        }
+      }
+      const changed = current.replace('width: 704', 'width: 705')
+      assert.notEqual(changed, current)
+      assert.throws(() => assert.equal(sha(restoreReleaseVersion(changed)),
+        '9da6e7ef65382881a9a69ddd6653da27f7179552febe39f45acca0ff7c970954'), { code: 'ERR_ASSERTION' })
+    }
   } finally { f.cleanup() }
 })
 

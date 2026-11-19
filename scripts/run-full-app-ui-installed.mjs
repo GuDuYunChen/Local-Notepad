@@ -23,7 +23,7 @@ import { fullAppOwnedOptionRequest, prepareFullAppOwnedOptionPointer } from './f
 import { createFullAppCapturePaint } from './full-app-ui-capture-paint.mjs'
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url))
-const VERSION = '4.249.0'
+const VERSION = '4.249.1'
 const API_BASE = 'http://127.0.0.1:27121'
 const REPORT = 'full-app-ui-installed.json'
 const LEDGER_FILE = 'scripts/full-app-ui-routes.json'

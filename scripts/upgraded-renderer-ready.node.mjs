@@ -4,7 +4,7 @@ import test from 'node:test'
 import vm from 'node:vm'
 import { isUpgradedRendererReady, observeUpgradedQuit, upgradedRendererSnapshot, waitForUpgradedRenderer } from './upgraded-renderer-ready.mjs'
 
-const expected = { url: 'file:///D:/owned/resources/app.asar/dist/index.html', noteId: 'retained-note', marker: 'UPGRADE-PRESERVE-real-marker-SAVED-BY-4.249.0' }
+const expected = { url: 'file:///D:/owned/resources/app.asar/dist/index.html', noteId: 'retained-note', marker: 'UPGRADE-PRESERVE-real-marker-SAVED-BY-4.249.1' }
 const ready = () => ({ url: expected.url, readyState: 'complete', timeOrigin: 1, rootMounted: true,
   rootInert: false, appVisible: true, editorVisible: true, retainedMarkerVisible: true,
   editorText: expected.marker, retainedNotePresent: true, preload: true, pending: [], quitVeil: false })
@@ -151,7 +151,7 @@ test('historical and current upgrades wait for the real mounted editor before th
 test('the current installer upgrade runs before historical upgrade, retaining both strict gates', () => {
   const workflow = readFileSync(new URL('../.github/workflows/ui-redesign-ci.yml', import.meta.url), 'utf8').replace(/\r\n/g, '\n')
   const steps = [
-    'Verify accepted 4.248.1 to actual current package in-place upgrade',
+    'Verify accepted 4.249.0 to actual current package in-place upgrade',
     'Upload current-package upgrade evidence',
     'Verify actual 4.248.0 to 4.248.1 in-place upgrade and data retention',
     'Upload in-place upgrade evidence',

@@ -17,6 +17,16 @@ const fastCaptureLine = originalCaptureLine.replace("{ format: 'png' }", "{ form
 // Undo only the reviewed paint-ticket wiring before retaining the original
 // whole-runner fingerprint. Every literal must occur exactly once.
 const withoutPreparedCapturePaint = text => {
+  // Invert only the unique current release declaration before the unchanged
+  // reviewed paint/speed identity chain. Executed closures keep the raw source.
+  const currentVersion = "const VERSION = '4.249.1'"
+  const previousVersion = "const VERSION = '4.249.0'"
+  const currentSource = text.replace(/\r\n/g, '\n')
+  assert.equal(currentSource.split(currentVersion).length - 1, 1)
+  assert.equal(currentSource.split(previousVersion).length - 1, 0)
+  text = currentSource.replace(currentVersion, previousVersion)
+  assert.equal(text.split(previousVersion).length - 1, 1)
+  assert.equal(text.replace(previousVersion, currentVersion), currentSource)
   const changes = [
   [
     "import { createFullAppCapturePaint } from './full-app-ui-capture-paint.mjs'\n",
@@ -54,6 +64,24 @@ assert.ok((oldCount === 1 && newCount === 0) || (oldCount === 0 && newCount === 
 assert.equal(digest(withoutPreparedCapturePaint(source).replace(fastCaptureLine, originalCaptureLine)),
   'eaf27dadcdc8a8544fefb02f78e87ad8ed0e8a853358d7a124a777f3ac6b9091',
   'The whole actual runner must equal6dae after only the declared inverse change')
+// Keep the real runner bytes for capture/until execution; only the exact
+// whole-file identity adapter above may undo its one release declaration.
+const releaseIdentitySource = source.replace(/\r\n/g, '\n')
+const releaseFingerprint = value => digest(withoutPreparedCapturePaint(value).replace(fastCaptureLine, originalCaptureLine))
+for (const current of [releaseIdentitySource, releaseIdentitySource.replace(/\n/g, '\r\n')]) {
+  assert.equal(releaseFingerprint(current), 'eaf27dadcdc8a8544fefb02f78e87ad8ed0e8a853358d7a124a777f3ac6b9091')
+  const statement = "const VERSION = '4.249.1'"
+  for (const replacement of ['', statement + '\n' + statement,
+    "const VERSION = '4.249.0'", "const VERSION = '4.249.2'", "const  VERSION = '4.249.1'"]) {
+    const changed = current.replace(statement, replacement)
+    assert.notEqual(changed, current)
+    assert.throws(() => releaseFingerprint(changed), { code: 'ERR_ASSERTION' })
+  }
+  const changed = current.replace('const API_BASE =', 'const ALTERED_API_BASE =')
+  assert.notEqual(changed, current)
+  assert.throws(() => assert.equal(releaseFingerprint(changed),
+    'eaf27dadcdc8a8544fefb02f78e87ad8ed0e8a853358d7a124a777f3ac6b9091'), { code: 'ERR_ASSERTION' })
+}
 const startAnchor = source.includes("import { createFullAppCapturePaint }")
   ? '  const capturePaint = createFullAppCapturePaint('
   : '  const capture = async (filename, observeBeforeCapture) => {'
