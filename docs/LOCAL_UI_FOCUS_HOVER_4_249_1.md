@@ -110,3 +110,14 @@ correctly rejected three stale synthetic source blobs. Rebinding only those
 active product blobs to the 4.249.1 sources retained every historical template
 hash and inverse proof. The subsequent 156-contract run passed; these contract
 results do not claim an actual installation.
+
+The later complete installer preparation also found stale current import-source
+bindings in the original shortcut and export installed-evidence test fixtures.
+Both original product contracts reproduced 74/80 passes and six failures before
+the correction. Their current synthetic blobs are rebound to the exact audited
+sources without changing historical template hashes, generated-source identity,
+inverse proofs, PID rules or any original assertion. The existing product CI
+contract step now builds both canonical fixtures and runs these original two
+test files explicitly. Preserve the failed TAP and obtain new current-commit CI,
+binary and full installed acceptance after this source change; an earlier
+candidate's successful package is not the final artifact by implication.

@@ -51,12 +51,14 @@ jobs:
       - name: Build renderer
         run: npm run build:renderer
 
-      # Contract imports share the native export driver; a clean Ubuntu checkout
-      # needs its generated fixture just as the independent Windows runner does.
+      # Installation contracts share the reading/export drivers; prepare both
+      # canonical fixtures before checking their current source bindings.
       - name: Verify block-reference source and installation preservation contracts
         run: |
+          node scripts/build-reading-mode-fixture.mjs
           node scripts/build-local-export-fixture.mjs
           node --test scripts/block-references-evidence.node.mjs scripts/block-references-installed-evidence.node.mjs
+          node --test scripts/shortcut-management-installed-evidence.node.mjs scripts/local-export-installed-evidence.node.mjs
           node --test scripts/native-helper-lifecycle.node.mjs
 
       - name: Verify editor cache and save receipt regressions

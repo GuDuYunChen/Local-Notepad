@@ -38,6 +38,19 @@ run is ineligible as final evidence regardless of its exit code. Freeze the
 corrected source and rerun the required full checks; inspect dependent results
 before starting the next action.
 
+The complete installer preparation later rejected three shortcut contracts:
+their synthetic import-source blobs still described 4.249.0. The same bounded
+check found the export fixture had the identical omission. Running both original
+contracts in the product checkout reproduced 74 passes and six failures out of
+80, with no skipped tests. Keep that TAP and the earlier 500/503 verifier result.
+Update only the two current synthetic fixtures' three source identities; retain
+the strict source comparison, historical templates, LF/CRLF inverse proofs and
+existing PID assertions. Product CI now prepares both canonical fixtures and
+explicitly executes these two original contract files before packaging, so this
+failure cannot be hidden by unrelated green suites. Prior candidate CI, images
+and installers remain their own evidence; final acceptance must use the repaired
+commit and its actual build, without relabeling the earlier package.
+
 # 2F.114 导航修补接续
 
 上一阶段原可视/原生场景的首处差异在第一页，未覆盖长公共前缀后的唯一变化，本轮补真实组件反例。新测试沿用固定8ms drain在首次并行完整回归中出现一次过早读取；保存5819/5820结果，改为等待实际比较结果，不增加生产超时或请求。旧源码在该正确前置下仍四项拒绝。
