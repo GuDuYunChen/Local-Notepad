@@ -7,8 +7,12 @@ import '../src/styles/editor-quit.css'
 import '../src/components/PinnedNotesPanel.css'
 import React, { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import { DndProvider } from 'react-dnd'
+import { HTML5Backend } from 'react-dnd-html5-backend'
 import UiThemeProvider from '../src/components/ui/UiThemeProvider'
-import { UiButton, UiInput, UiPassword, UiSelect } from '../src/components/ui/ControlKit'
+import { UiButton, UiInput, UiPassword, UiSelect, UiTextarea } from '../src/components/ui/ControlKit'
+import WorkspaceSidebar from '../src/components/WorkspaceSidebar'
+import FileList from '../src/components/FileList'
 import useBackupDialogFocus from '../src/hooks/useBackupDialogFocus'
 
 const theme = new URLSearchParams(location.search).get('theme')
@@ -16,7 +20,7 @@ if (!['light', 'dark'].includes(theme)) throw new Error('Explicit fixture theme 
 document.documentElement.dataset.theme = theme
 window.__uiControlEvents = []
 window.__uiControlErrors = []
-for (const type of ['mousedown', 'mouseup', 'click', 'keydown', 'keyup', 'input', 'change', 'focusin', 'submit', 'reset']) {
+for (const type of ['mousemove', 'mousedown', 'mouseup', 'click', 'keydown', 'keyup', 'input', 'change', 'focusin', 'submit', 'reset']) {
   document.addEventListener(type, event => {
     if (window.__uiControlEvents.length >= 1000) return
     const target = event.target
@@ -27,6 +31,35 @@ for (const type of ['mousedown', 'mouseup', 'click', 'keydown', 'keyup', 'input'
 }
 window.addEventListener('error', event => window.__uiControlErrors.push(String(event.message)))
 window.addEventListener('unhandledrejection', event => window.__uiControlErrors.push(String(event.reason?.message || event.reason)))
+
+// A layout fixture, not a backend test. The real FileList and API pagination
+// parser read isolated records through this strict in-page read boundary.
+// No request is forwarded to a backend, user workspace or external address.
+const libraryRecords = Object.freeze([
+  { id: 'hover-folder', title: '合成目录', is_folder: true, parent_id: '', sort_order: 500, created_at: 1700000000 },
+  { id: 'hover-nested', title: '嵌套的长笔记标题 用于真实文字范围与按钮占位检查.md', is_folder: false, parent_id: 'hover-folder', sort_order: 400, created_at: 1700000000 },
+  { id: 'hover-nested-next', title: '嵌套下一行.md', is_folder: false, parent_id: 'hover-folder', sort_order: 300, created_at: 1700000000 },
+  { id: 'hover-long', title: '未选中的长笔记标题 中文和 English 标题必须在悬停时保持原位不跳动.md', is_folder: false, parent_id: '', sort_order: 400, created_at: 1700000000 },
+  { id: 'hover-selected', title: '已选中的笔记.md', is_folder: false, parent_id: '', sort_order: 300, created_at: 1700000000 },
+  { id: 'hover-short', title: '普通笔记.md', is_folder: false, parent_id: '', sort_order: 200, created_at: 1700000000 },
+  { id: 'hover-last', title: '最后一行.md', is_folder: false, parent_id: '', sort_order: 100, created_at: 1700000000 },
+].map(record => Object.freeze(record)))
+window.__uiLibraryRequests = []
+async function readFixtureLibrary(input, init = {}, records = libraryRecords) {
+  const url = new URL(typeof input === 'string' ? input : input.url)
+  const method = String(init.method || input?.method || 'GET').toUpperCase()
+  const accepted = url.origin === 'http://ui-control-fixture.invalid' && url.pathname === '/api/files' &&
+    method === 'GET' && url.searchParams.get('page') === '1' && url.searchParams.get('size') === '200' &&
+    url.searchParams.get('compact') === '1' && !url.searchParams.get('q') &&
+    [...url.searchParams.keys()].every(key => ['page', 'size', 'compact', 'q'].includes(key))
+  window.__uiLibraryRequests.push({ method, path: url.pathname, query: url.search, accepted })
+  if (!accepted) throw new Error('Shared-control fixture refuses non-library reads and every write')
+  return new Response(JSON.stringify({ code: 0, data: records }), {
+    status: 200, headers: { 'Content-Type': 'application/json' },
+  })
+}
+window.__API_BASE__ = 'http://ui-control-fixture.invalid'
+window.fetch = readFixtureLibrary
 
 const densities = [
   { name: 'ordinary', title: '普通 40px', props: {} },
@@ -51,6 +84,64 @@ function ProbeDialog({ onClose }) {
       <UiButton type="button" onClick={onClose}>关闭</UiButton>
     </section>
   </div>
+}
+function PointerControl({ kind, id, status, disabled = false, readOnly = false }) {
+  const props = { id, 'aria-label': id, 'data-pointer-probe': id, status: status === 'normal' ? undefined : status,
+    disabled, readOnly, defaultValue: kind === 'select' ? 'alpha' : '合成输入 synthetic value' }
+  if (kind === 'password') return <UiPassword {...props} />
+  if (kind === 'textarea' || kind === 'textarea-clear') {
+    return <UiTextarea {...props} rows={2} allowClear={kind === 'textarea-clear'} />
+  }
+  if (kind === 'select') return <UiSelect {...props}>{choices}</UiSelect>
+  return <UiInput {...props} />
+}
+function InteractionRegressionSection() {
+  const [collapsed, setCollapsed] = useState(false)
+  const [activeWorkspace, setActiveWorkspace] = useState('notes')
+  const [selectedId, setSelectedId] = useState('hover-selected')
+  const [loadedIds, setLoadedIds] = useState([])
+  const [navigation, setNavigation] = useState([])
+  const navigate = workspace => {
+    setActiveWorkspace(workspace)
+    setNavigation(old => [...old, workspace])
+  }
+  return <section id="interaction-regression-section">
+    <h2>真实鼠标焦点与悬停位置回归</h2>
+    <p className="probe-description">真实生产控件、侧栏和笔记列表；资料读取仅限本页合成记录，不验收后端或保存业务。</p>
+    <div id="pointer-probes">
+      {['normal', 'error', 'warning'].map(status => <div className="probe-pointer-group" key={status} data-pointer-status={status}>
+        <h3>{status}</h3>
+        <div className="probe-pointer-grid">
+          {['input', 'password', 'textarea', 'textarea-clear', 'select'].map(kind => {
+            const id = 'pointer-' + status + '-' + kind
+            return <label key={id} className="probe-cell" htmlFor={id}>{kind}<PointerControl id={id} kind={kind} status={status} /></label>
+          })}
+        </div>
+      </div>)}
+      <div className="probe-pointer-grid">
+        {['input', 'textarea'].map(kind => {
+          const id = 'pointer-readonly-' + kind
+          return <label key={id} className="probe-cell" htmlFor={id}>只读 {kind}<PointerControl id={id} kind={kind} status="normal" readOnly /></label>
+        })}
+        {['input', 'password', 'textarea', 'select'].map(kind => {
+          const id = 'pointer-disabled-' + kind
+          return <label key={id} className="probe-cell" htmlFor={id}>禁用 {kind}<PointerControl id={id} kind={kind} status="normal" disabled /></label>
+        })}
+      </div>
+    </div>
+    <div id="hover-workspace" className="probe-workspace-shell">
+      <DndProvider backend={HTML5Backend}>
+        <WorkspaceSidebar activeWorkspace={activeWorkspace} collapsed={collapsed}
+          onToggleCollapsed={() => setCollapsed(value => !value)} onChangeWorkspace={navigate}
+          onOpenSearch={() => navigate('search')} onOpenLocalActions={() => navigate('actions')}
+          onOpenBackup={() => navigate('backup')} onOpenShortcuts={() => navigate('shortcuts')}>
+          <FileList selectedId={selectedId} onSelect={item => setSelectedId(item.id)} onItemsChanged={items => setLoadedIds(items.map(item => item.id))} />
+        </WorkspaceSidebar>
+      </DndProvider>
+    </div>
+    <output id="hover-fixture-output" className="probe-receipt">{JSON.stringify({ collapsed, activeWorkspace, selectedId, loadedIds, navigation })}</output>
+    <div id="native-pointer-neutral" aria-hidden="true" />
+  </section>
 }
 function Fixture() {
   const [values, setValues] = useState({ ordinary: 'alpha', compact: 'alpha', large: 'alpha' })
@@ -121,6 +212,7 @@ function Fixture() {
       <output id="modal-output" className="probe-receipt">{closedDialogs}</output>
     </section>
     {modal && <ProbeDialog onClose={() => { setModal(false); setClosedDialogs(value => value + 1) }} />}
+    <InteractionRegressionSection />
   </main>
 }
 createRoot(document.getElementById('root')).render(<UiThemeProvider><Fixture /></UiThemeProvider>)

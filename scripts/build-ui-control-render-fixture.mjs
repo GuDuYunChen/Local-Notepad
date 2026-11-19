@@ -46,6 +46,10 @@ html,body,#root{height:100%;margin:0}body{overflow:auto;background:var(--paper);
 .probe-dialog-overlay{position:fixed;inset:0;z-index:1500;display:flex;align-items:center;justify-content:center}
 .probe-dialog{padding:20px;max-width:480px;width:calc(100% - 32px);background:var(--surface);border:1px solid var(--line);border-radius:12px}
 .probe-dialog>[data-ui-control="select"]{width:100%;margin-bottom:14px}
+.probe-pointer-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:12px 0}
+.probe-pointer-group h3{font-size:13px;margin:12px 0 4px}
+.probe-workspace-shell{display:flex;position:relative;height:calc(100vh - 32px);width:360px;max-width:100%;overflow:hidden}
+#native-pointer-neutral{position:fixed;right:0;top:0;width:8px;height:8px;z-index:9999}
 </style></head><body><div id="root"></div><script src="fixture.js"></script></body></html>`
   fs.writeFileSync(path.join(output, 'fixture.html'), html)
   const sourcePaths = new Set(Object.keys(result.metafile.inputs).filter(name => !name.startsWith('node_modules/')))

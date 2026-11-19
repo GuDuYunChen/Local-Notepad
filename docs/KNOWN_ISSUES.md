@@ -1,3 +1,14 @@
+# 4.249.1 candidate: reported focus border and hover movement
+
+After accepted PR29/4.249.0, the user reported a separated outer input focus border
+and sidebar/notebook hover movement. This is tracked in Issue31 and
+`LOCAL_UI_FOCUS_HOVER_4_249_1.md`, with the original PR29/Issue28 evidence preserved.
+The new repair must reject outward focus rings and hover-dependent row/border
+geometry in actual native rendering, while preserving keyboard focus, official
+Ant Design error/disabled semantics, original regression scopes and data behavior.
+Source fixes and local tests do not by themselves close these visual defects;
+read the current Issue31/PR and bound Windows evidence for final status.
+
 # 新复现：2F.114 首处差异位于后页（4.247.1 本地修补中）
 
 4.247.0的结果初始页固定为0，当第一处变化位于第60行以后，导航显示第一处却没有渲染该目标；只有一处变化时前后按钮均禁用。旧组件四个反例已复现；完整修补/边界/待验收项见LOCAL_NOTE_COMPARISON_NAVIGATION_FIX_2F114_1.md。尚未发布或取得新版本Windows结果，不能写成远端已修。原46条历史结构化索引不改写，新增发现单独追溯。

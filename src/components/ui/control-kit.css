@@ -2,10 +2,14 @@
 /* Input, password and Select geometry comes from the shared Ant Design
    height tokens. Do not pad native affix children a second time or override
    compact controls independently of their matching buttons. */
-/* Tokens suppress the extra glow; the actual control root owns one keyboard cue. */
+/* Text fields can match :focus-visible after a pointer click as well as Tab.
+   Keep one focus stroke inside the existing field edge, without a detached ring. */
 .app-ui-input.ant-input:focus-visible,
-.app-ui-input.ant-input-affix-wrapper:has(input:focus-visible) { outline:2px solid var(--clay); outline-offset:2px; }
-.app-ui-select-host .app-ui-select.ant-select-focused:has([role="combobox"]:focus-visible) { outline:2px solid var(--clay); outline-offset:2px; }
+.app-ui-input.ant-input-affix-wrapper:has(:is(input, textarea):focus-visible) { outline:2px solid var(--ant-input-active-border-color, var(--clay)); outline-offset:-2px; }
+/* State focus must also outrank Ant Design's status-specific outline reset. */
+.app-ui-input:is(.ant-input, .ant-input-affix-wrapper).ant-input-status-error:not(.ant-input-disabled, .ant-input-affix-wrapper-disabled):is(:focus-visible, :has(:is(input, textarea):focus-visible)) { outline:2px solid var(--ant-color-error, var(--danger)); outline-offset:-2px; }
+.app-ui-input:is(.ant-input, .ant-input-affix-wrapper).ant-input-status-warning:not(.ant-input-disabled, .ant-input-affix-wrapper-disabled):is(:focus-visible, :has(:is(input, textarea):focus-visible)) { outline:2px solid var(--ant-color-warning, var(--warning)); outline-offset:-2px; }
+.app-ui-select-host .app-ui-select.ant-select-focused:has([role="combobox"]:focus-visible) { outline:2px solid var(--ant-select-border-color, var(--clay)); outline-offset:-2px; }
 
 .app-ui-select-host { display:inline-flex; min-width:0; vertical-align:middle; position:relative; }
 .app-ui-select-host > .app-ui-select { width:100%; min-width:0; }

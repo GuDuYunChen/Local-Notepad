@@ -2,6 +2,8 @@ const test = require('node:test')
 const assert = require('node:assert/strict')
 const vm = require('node:vm')
 const { verifyGeometry, verifyFocus, verifyScenes, hasVisibleBoxShadow, HEIGHTS } = require('./check-ui-control-render.cjs')
+const { POINTER_CASES, HOVER_CASES, VIEWPORTS, verifyPointerFeedback, verifyHoverFeedback,
+  verifyTreeCancel, verifyTreeNavigation, verifyFeedbackScenes, collectFeedbackFailures } = require('./check-ui-control-render.cjs')
 
 function geometry() {
   return { viewport: { width: 704, height: 455 }, overflow: 0,
@@ -76,6 +78,227 @@ test('refuses a focused but hidden, obscured or unpainted control', () => {
 })
 test('cannot report a partial scene list as successful native evidence', () => {
   assert.throws(() => verifyScenes([]), /every viewport/)
+})
+
+// These are refusal contracts for the native evidence validator, not UI
+// acceptance. The release gate separately requires actual renderer samples and
+// native PNGs from the unchanged six-scene Electron matrix.
+function feedbackRect(left = 20, top = 40, width = 240, height = 40) {
+  return { left, top, width, height, right: left + width, bottom: top + height }
+}
+function pointerEvidence(spec) {
+  const value = spec.id === 'name-dialog-rename' ? '已选中的笔记' : spec.kind === 'select' ? 'alpha' : 'synthetic input'
+  const sample = { id: spec.id, disabled: spec.disabled, readOnly: spec.readOnly, status: spec.status, value,
+    focused: !spec.disabled, focusVisible: !spec.disabled, hit: true, inViewport: true, rect: feedbackRect(),
+    outlines: spec.disabled ? [] : [{ owner: 'root', width: 2, offset: -2, color: 'rgb(80, 60, 160)' }], shadows: [],
+    diagnostics: { nodes: [{ owner: 'root', computed: { 'border-top-color': 'rgb(80, 60, 160)' } }] } }
+  return { id: spec.id, domId: spec.id, executionComplete: true, trustedPointer: true,
+    before: { ...structuredClone(sample), focused: false, focusVisible: false, outlines: [] },
+    after: structuredClone(sample), ...(spec.disabled ? {} : { keyboard: structuredClone(sample) }) }
+}
+function hoverEvidence(spec) {
+  const base = { id: spec.id, root: feedbackRect(), target: feedbackRect(), icon: feedbackRect(30, 50, 18, 18),
+    text: spec.text ? feedbackRect(56, 50, 110, 18) : null,
+    textRanges: spec.text ? [feedbackRect(56, 50, 150, 18)] : [], textContent: spec.text ? 'actual measured label' : '',
+    actions: spec.note ? feedbackRect(180, 40, 80, 40) : null, next: spec.next ? feedbackRect(20, 80, 240, 40) : null,
+    borderWidths: [1, 1, 1, 1], visible: true, targetHit: true, targetInViewport: true,
+    state: { selected: spec.selected || 'false', pressed: spec.pressed || null, expanded: null,
+      keyboardFocus: false, focusWithin: false, activeElement: 'BODY' }, collapsed: !!spec.collapsed }
+  if (spec.target) base.target = feedbackRect(spec.id.includes('delete') ? 220 : 180, 40, 40, 40)
+  const observation = hovered => {
+    const sample = structuredClone(base)
+    sample.rootHovered = hovered || !!spec.baseHover
+    sample.targetHovered = hovered
+    const shown = sample.rootHovered || sample.state.selected === 'true'
+    sample.actionsVisible = !!spec.note && shown
+    sample.actionStates = spec.note ? [180, 220].map(left => ({ rect: feedbackRect(left, 40, 40, 40),
+      visibility: shown ? 'visible' : 'hidden', pointerEvents: shown ? 'auto' : 'none', hit: shown })) : []
+    return sample
+  }
+  return { id: spec.id, executionComplete: true, trustedPointer: true, before: observation(false), hover: observation(true), out: observation(false) }
+}
+function treeFlowEvidence() {
+  const state = { treeFocused: true, activeElement: { tag: 'DIV', id: null }, activeDescendant: 'file-tree-item-hover-selected',
+    selectedId: 'hover-selected', selectedIds: ['hover-selected'],
+    visibleIds: ['hover-folder', 'hover-nested', 'hover-nested-next', 'hover-long', 'hover-selected', 'hover-short', 'hover-last'],
+    loadedIds: ['hover-folder', 'hover-nested', 'hover-nested-next', 'hover-long', 'hover-selected', 'hover-short', 'hover-last'] }
+  const cancel = title => ({ before: structuredClone(state), after: structuredClone(state), dialog: { role: 'dialog', title },
+    closed: true, trustedOpen: true, trustedCancel: true, executionComplete: true })
+  const rename = cancel('重命名笔记'), deletion = cancel('移到回收站？')
+  Object.assign(deletion.dialog, { message: '“已选中的笔记.md”会移到回收站，30 天内可以恢复。', buttons: ['取消', '移到回收站'], focusedButton: '移到回收站' })
+  return { executionComplete: true, rename, delete: deletion,
+    renameRecovery: { needed: false, usedNativeClick: false, after: structuredClone(state) },
+    navigation: { before: structuredClone(state), down: { ...structuredClone(state), activeDescendant: 'file-tree-item-hover-short' },
+      up: structuredClone(state), downTrusted: true, upTrusted: true, executionComplete: true } }
+}
+function feedbackScenes() {
+  return ['light', 'dark'].flatMap(theme => VIEWPORTS.map(([width, height]) => {
+    const name = `${theme}-${width}x${height}`, images = []
+    const picture = suffix => {
+      const image = { name: `${name}-feedback-${suffix}.png`, bytes: 1234, sha256: 'a'.repeat(64), width, height }
+      images.push(image); return image
+    }
+    const pointer = POINTER_CASES.map(pointerEvidence), hover = HOVER_CASES.map(hoverEvidence)
+    for (const id of ['pointer-normal-input', 'pointer-error-password', 'pointer-warning-textarea-clear', 'pointer-normal-select', 'name-dialog-rename']) {
+      pointer.find(record => record.id === id).pointerImage = picture(id + '-pointer')
+    }
+    for (const id of ['nav-unselected', 'note-long', 'collapsed-unselected']) {
+      const record = hover.find(record => record.id === id)
+      record.beforeImage = picture(id + '-before'); record.hoverImage = picture(id + '-hover')
+    }
+    return { name, theme, requested: [width, height], feedback: { scope: 'production-components-with-readonly-synthetic-files',
+      backendExercised: false, executionComplete: true, pointer, hover, images,
+      treeFlow: treeFlowEvidence(),
+      libraryRequests: [{ method: 'GET', path: '/api/files', accepted: true }],
+      nameDialog: { cancelled: true, valueBefore: '已选中的笔记', valueAfter: '已选中的笔记', suffixBefore: '.md', suffixAfter: '.md' } } }
+  }))
+}
+const rejectsCategory = (run, category) => assert.throws(run, error => error.regressionCategory === category)
+
+test('feedback contract accepts inset pointer and original keyboard cues for the complete status and state matrix', () => {
+  const scenes = feedbackScenes(), original = JSON.stringify(scenes)
+  assert.deepEqual(verifyFeedbackScenes(scenes), { passed: true, failures: [] })
+  assert.equal(JSON.stringify(scenes), original)
+})
+test('feedback contract rejects the actual +2px outside outline condition without reading a CSS source string', () => {
+  const spec = POINTER_CASES[0], record = pointerEvidence(spec)
+  record.after.outlines[0].offset = 2
+  rejectsCategory(() => verifyPointerFeedback(record, spec), 'focus-outline-outside')
+  record.after.outlines[0].offset = -2; record.keyboard.outlines[0].offset = 2
+  rejectsCategory(() => verifyPointerFeedback(record, spec), 'focus-outline-outside')
+})
+test('feedback contract keeps missing status cues, duplicates, visible glow and wrong status colors as failures', () => {
+  const spec = POINTER_CASES.find(item => item.id === 'pointer-error-password')
+  for (const mutate of [record => { record.after.outlines = [] }, record => { record.after.outlines.push({ owner: 'input:1', width: 2, offset: -2 }) }]) {
+    const record = pointerEvidence(spec); mutate(record)
+    rejectsCategory(() => verifyPointerFeedback(record, spec), 'focus-decoration')
+  }
+  const glow = pointerEvidence(spec); glow.after.shadows.push({ owner: 'root', value: '0 0 0 2px red' })
+  rejectsCategory(() => verifyPointerFeedback(glow, spec), 'focus-outline-outside')
+  const wrong = pointerEvidence(spec); wrong.after.outlines[0].color = 'rgb(255, 0, 0)'
+  rejectsCategory(() => verifyPointerFeedback(wrong, spec), 'focus-state-color')
+})
+test('feedback contract preserves disabled, readonly, value and original keyboard visibility semantics', () => {
+  const normal = POINTER_CASES[0], disabled = POINTER_CASES.find(item => item.disabled), readonly = POINTER_CASES.find(item => item.readOnly)
+  for (const [spec, mutate, category] of [
+    [normal, record => { record.after.value = 'changed merely by focus' }, 'focus-state'],
+    [normal, record => { record.after.status = 'error' }, 'focus-state'],
+    [disabled, record => { record.after.focused = true }, 'focus-state'],
+    [readonly, record => { record.after.readOnly = false }, 'focus-state'],
+    [readonly, record => { record.keyboard.readOnly = false }, 'focus-state'],
+    [normal, record => { record.after.rect.left += 1 }, 'pointer-geometry'],
+    [normal, record => { record.trustedPointer = false }, 'native-evidence'],
+  ]) {
+    const record = pointerEvidence(spec); mutate(record)
+    rejectsCategory(() => verifyPointerFeedback(record, spec), category)
+  }
+  const keyboard = pointerEvidence(normal); keyboard.keyboard.focusVisible = false
+  assert.throws(() => verifyPointerFeedback(keyboard, normal), /keyboard focus must be visible/)
+})
+test('hover contract rejects hidden-action zero geometry becoming flex space and moving a following row', () => {
+  const spec = HOVER_CASES.find(item => item.id === 'note-long')
+  const inserted = hoverEvidence(spec)
+  inserted.before.actions = feedbackRect(0, 0, 0, 0)
+  inserted.before.actionStates.forEach(action => { action.rect = feedbackRect(0, 0, 0, 0) })
+  rejectsCategory(() => verifyHoverFeedback(inserted, spec), 'hover-geometry')
+  const next = hoverEvidence(spec); next.hover.next.top += 23; next.hover.next.bottom += 23
+  rejectsCategory(() => verifyHoverFeedback(next, spec), 'hover-geometry')
+})
+test('hover contract rejects text-range and icon shifts even when row and title boxes stay fixed', () => {
+  const spec = HOVER_CASES.find(item => item.id === 'nav-unselected')
+  for (const mutate of [record => { record.hover.textRanges[0].left += 1 }, record => { record.hover.icon.left += 1 },
+    record => { record.hover.borderWidths = [0, 1, 1, 1] }]) {
+    const record = hoverEvidence(spec); mutate(record)
+    rejectsCategory(() => verifyHoverFeedback(record, spec), 'hover-geometry')
+  }
+  const border = hoverEvidence(spec); border.before.borderWidths = [0, 0, 0, 0]
+  rejectsCategory(() => verifyHoverFeedback(border, spec), 'hover-geometry')
+})
+test('hover contract requires unchanged selection and genuinely noninteractive hidden actions', () => {
+  const spec = HOVER_CASES.find(item => item.id === 'note-long')
+  for (const mutate of [record => { record.before.actionStates[0].pointerEvents = 'auto' },
+    record => { record.before.actionStates[0].hit = true }, record => { record.hover.state.selected = 'true' },
+    record => { record.hover.actionStates[0].hit = false }]) {
+    const record = hoverEvidence(spec); mutate(record)
+    rejectsCategory(() => verifyHoverFeedback(record, spec), 'hover-state')
+  }
+})
+test('tree contract refuses lost cancellation focus even if a later native recovery and Arrow traversal succeed', () => {
+  const scenes = feedbackScenes(), flow = scenes[0].feedback.treeFlow
+  flow.rename.after.treeFocused = false; flow.rename.after.activeElement = { tag: 'BODY', id: null }
+  flow.delete.after.treeFocused = false; flow.delete.after.activeElement = { tag: 'BODY', id: null }
+  flow.renameRecovery.needed = true; flow.renameRecovery.usedNativeClick = true; flow.renameRecovery.trustedPointer = true
+  verifyTreeNavigation(flow.navigation)
+  rejectsCategory(() => verifyTreeCancel(flow.rename, 'tree-rename-cancel'), 'tree-focus-return')
+  rejectsCategory(() => verifyTreeCancel(flow.delete, 'tree-delete-cancel'), 'tree-focus-return')
+  const failures = collectFeedbackFailures(scenes)
+  assert.deepEqual(failures.map(failure => [failure.category, failure.probeId]), [
+    ['tree-focus-return', 'tree-rename-cancel'], ['tree-focus-return', 'tree-delete-cancel']])
+  assert.equal(flow.rename.after.treeFocused, false)
+})
+test('tree contract refuses cancelled dialogs that alter data or selection or omit trusted open and cancel', () => {
+  for (const [mutate, category] of [
+    [record => { record.after.loadedIds.pop() }, 'tree-state'],
+    [record => { record.after.selectedId = 'hover-short' }, 'tree-state'],
+    [record => { record.dialog.message = 'different target' }, 'tree-state'],
+    [record => { record.closed = false }, 'native-evidence'],
+    [record => { record.trustedOpen = false }, 'native-evidence'],
+    [record => { record.trustedCancel = false }, 'native-evidence'],
+  ]) {
+    const record = treeFlowEvidence().delete; mutate(record)
+    rejectsCategory(() => verifyTreeCancel(record, 'tree-delete-cancel'), category)
+  }
+})
+test('tree contract requires actual Down and Up navigation while selection and all records remain unchanged', () => {
+  for (const [mutate, category] of [
+    [record => { record.down.activeDescendant = 'file-tree-item-hover-selected' }, 'tree-navigation'],
+    [record => { record.up.treeFocused = false }, 'tree-navigation'],
+    [record => { record.down.selectedId = 'hover-short' }, 'tree-state'],
+    [record => { record.up.loadedIds.pop() }, 'tree-state'],
+    [record => { record.downTrusted = false }, 'native-evidence'],
+  ]) {
+    const record = treeFlowEvidence().navigation; mutate(record)
+    rejectsCategory(() => verifyTreeNavigation(record), category)
+  }
+})
+test('feedback contract aggregates both original user regressions from raw samples without accepting partial evidence', () => {
+  const scenes = feedbackScenes()
+  scenes[0].feedback.pointer[0].after.outlines[0].offset = 2
+  scenes[5].feedback.hover[1].hover.textRanges[0].left += 1
+  const failures = collectFeedbackFailures(scenes)
+  assert.deepEqual(failures.map(failure => failure.category), ['focus-outline-outside', 'hover-geometry'])
+  assert.throws(() => verifyFeedbackScenes(scenes), error => {
+    assert.equal(error.code, 'UI_FEEDBACK_REGRESSIONS'); assert.deepEqual(error.failures, failures)
+    assert.equal(failureDetails(error).code, error.code); return true
+  })
+  for (const mutate of [list => { list.pop() }, list => { list[1].name = list[0].name },
+    list => { list[0].feedback.executionComplete = false }, list => { list[0].feedback.pointer.pop() },
+    list => { list[0].feedback.hover.pop() }, list => { list[0].feedback.images.pop() },
+    list => { list[0].feedback.libraryRequests[0].method = 'PUT' },
+    list => { list[0].feedback.treeFlow.executionComplete = false },
+    list => { list[0].feedback.nameDialog.cancelled = false }, list => { list[0].feedback.nameDialog.suffixAfter = '.txt' },
+    list => { list[0].feedback.pointer[0].pointerImage = { ...list[0].feedback.pointer[0].pointerImage, sha256: 'b'.repeat(64) } }]) {
+    const broken = feedbackScenes(); mutate(broken); assert.throws(() => verifyFeedbackScenes(broken))
+  }
+})
+test('real fixture read boundary refuses every write, nonlibrary path, foreign origin and unsupported query', async () => {
+  const source = require('node:fs').readFileSync(require.resolve('./ui-control-render-fixture.jsx'), 'utf8')
+  const start = source.indexOf('async function readFixtureLibrary('), end = source.indexOf('\nwindow.__API_BASE__', start)
+  assert.ok(start > 0 && end > start)
+  const window = { __uiLibraryRequests: [] }, records = [{ id: 'isolated-contract-record', title: 'Synthetic' }]
+  const read = vm.runInNewContext(`(${source.slice(start, end)})`, { URL, Response, window, libraryRecords: records })
+  const valid = 'http://ui-control-fixture.invalid/api/files?page=1&size=200&compact=1'
+  const response = await read(valid)
+  assert.equal(response.status, 200); assert.deepEqual(await response.json(), { code: 0, data: records })
+  for (const [input, init] of [[valid, { method: 'PUT' }], [valid, { method: 'DELETE' }], [valid, { method: 'POST' }],
+    [new Request(valid, { method: 'POST' }), {}], [valid.replace('/api/files?', '/api/settings?'), {}],
+    [valid.replace('ui-control-fixture.invalid', 'localhost'), {}], [valid.replace('page=1', 'page=2'), {}],
+    [valid + '&q=user-content', {}], [valid + '&includeContent=true', {}]]) {
+    await assert.rejects(() => read(input, init), /refuses non-library reads and every write/)
+  }
+  assert.equal(window.__uiLibraryRequests.length, 10)
+  assert.equal(window.__uiLibraryRequests[0].accepted, true)
+  assert.ok(window.__uiLibraryRequests.slice(1).every(request => request.accepted === false))
 })
 
 // Startup contracts only. These load the actual checker source with an inert
