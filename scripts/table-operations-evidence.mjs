@@ -100,7 +100,11 @@ export function validateTableOperationsReport(report, { commit, verifier = commi
   for (const view of [imeControl.before, imeControl.composing, imeControl.committed]) {
     assert.equal(view.rootFocused, true); assert.equal(view.modebarFocused, false); assert.equal(view.editable, 'true'); assert.equal(view.tables, 1)
   }
-  for (const view of [imeControl.composing, imeControl.committed]) assert.deepEqual(view.rows.map(row => row.map(cell => cell.text)), originalRows)
+  const composingRows = imeControl.composing.rows.map(row => row.map(cell => cell.text))
+  assert.match(composingRows[2][2], /^R3C3\\u200b?$/)
+  composingRows[2][2] = 'R3C3' // only the in-flight Chromium composition sentinel is ignored
+  assert.deepEqual(composingRows, originalRows)
+  assert.deepEqual(imeControl.committed.rows.map(row => row.map(cell => cell.text)), originalRows)
   compositionInput(inputRange(imeControl, 'compositionInput'), 'R3C3', 4)
   assert.equal(imeControl.commitInputStart, imeControl.compositionInputEnd)
   textInput(inputRange(imeControl, 'commitInput'), 'R3C3')

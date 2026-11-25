@@ -172,7 +172,10 @@ export async function verifyTableOperationsDesktop(context) {
       assert.equal(control.before.rootFocused, true); assert.equal(control.before.rows[2][2].text, '')
       await recordInput('Input.imeSetComposition', { text: control.text, selectionStart: 4, selectionEnd: 4 }); await settle()
       control.compositionInputEnd = report.nativeInputs.length; control.composing = await observe(); save()
-      assert.equal(control.composing.rootFocused, true); assert.equal(control.composing.rows[2][2].text, 'R3C3')
+      assert.equal(control.composing.rootFocused, true)
+      // Chromium exposes a transient U+200B composition sentinel in the DOM
+      // until ImeCommitText commits the candidate. It is not document text.
+      assert.match(control.composing.rows[2][2].text, /^R3C3\\u200b?$/)
       control.commitInputStart = report.nativeInputs.length
       await type(control.text); await settle()
       control.commitInputEnd = report.nativeInputs.length; control.committed = await observe(); save()
