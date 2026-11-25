@@ -102,7 +102,11 @@ export default function TableActionMenuPlugin({ documentId }) {
     if (!signature) return
     let retainedSelection = null
     editor.read('latest', () => { retainedSelection = $getSelection()?.clone() || null })
-    openedRef.current = { info: tableInfo, signature, canWrite, retainedSelection }
+    const root = editor.getRootElement()
+    const nativeSelection = root?.ownerDocument?.getSelection()
+    const retainedDOMRange = nativeSelection?.rangeCount && root.contains(nativeSelection.anchorNode) &&
+      root.contains(nativeSelection.focusNode) ? nativeSelection.getRangeAt(0).cloneRange() : null
+    openedRef.current = { info: tableInfo, signature, canWrite, retainedSelection, retainedDOMRange }
     setIsMenuOpen(true)
   }
   const validMenu = () => {
@@ -127,6 +131,20 @@ export default function TableActionMenuPlugin({ documentId }) {
       if (opened.retainedSelection) $setSelection(opened.retainedSelection.clone())
     }, { discrete: true })
     if (editor.isEditable()) editor.focus()
+    // The browser clears its native DOM range when the menu's first item
+    // receives focus. Lexical state alone does not synchronously recreate the
+    // browser range in every Chromium build, so restore the captured DOM range
+    // after the menu portal has unmounted and the editor root owns focus again.
+    requestAnimationFrame(() => {
+      const root = editor.getRootElement()
+      const range = opened.retainedDOMRange
+      if (!root || !range || !editor.isEditable() ||
+          !root.contains(range.startContainer) || !root.contains(range.endContainer)) return
+      const selection = root.ownerDocument.getSelection()
+      if (!selection) return
+      selection.removeAllRanges()
+      selection.addRange(range)
+    })
     dispatchTableEvent(editor, 'tableSelection:mode', true)
   }
   const dispatch = (type, payload) => {
