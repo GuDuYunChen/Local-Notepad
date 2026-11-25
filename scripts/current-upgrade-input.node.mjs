@@ -12,15 +12,15 @@ import { fixturePE } from './windows-package-cases.mjs'
 function fixture() {
   const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url)))
   const lock = JSON.parse(readFileSync(new URL('../package-lock.json', import.meta.url)))
-  manifest.version = lock.version = lock.packages[''].version = '4.249.1'
+  manifest.version = lock.version = lock.packages[''].version = '4.249.2'
   const f = { manifestBytes: Buffer.from(JSON.stringify(manifest)), lockBytes: Buffer.from(JSON.stringify(lock)),
-    installerBytes: fixturePE([4, 249, 1, 0]),
+    installerBytes: fixturePE([4, 249, 2, 0]),
     source: { commit: 'a'.repeat(40), expectedCommit: 'a'.repeat(40), tree: 'b'.repeat(40), expectedTree: 'b'.repeat(40), clean: true } }
-  f.receipt = { format: 'local-notepad-local-package', schemaVersion: 1, complete: true, version: '4.249.1', commit: f.source.commit,
+  f.receipt = { format: 'local-notepad-local-package', schemaVersion: 1, complete: true, version: '4.249.2', commit: f.source.commit,
     manifestSHA256: digest(f.manifestBytes), lockSHA256: digest(f.lockBytes), installationTested: false,
     startedAt: '2026-11-09T10:00:00.000Z', finishedAt: '2026-11-09T10:01:00.000Z',
     stages: ['version-check', 'npm-check', 'go-check', 'install-locked-dependencies', 'build'].map(name => ({ name, exitCode: 0 })),
-    installer: { filename: 'Notepad-4.249.1-Setup.exe', bytes: f.installerBytes.length, sha256: digest(f.installerBytes), fileVersion: '4.249.1.0', productVersion: '4.249.1.0' } }
+    installer: { filename: 'Notepad-4.249.2-Setup.exe', bytes: f.installerBytes.length, sha256: digest(f.installerBytes), fileVersion: '4.249.2.0', productVersion: '4.249.2.0' } }
   f.inputs = () => ({ ...f, receipts: [{ file: 'test-results/local-package/owned-build/receipt.json', bytes: Buffer.from(JSON.stringify(f.receipt)) }] })
   return f
 }
@@ -28,8 +28,8 @@ function fixture() {
 test('candidate input binds exact current checkout, build receipt, lock and actual PE without claiming an installation', () => {
   const f = fixture(), input = f.inputs(), before = JSON.stringify(input), result = validateCurrentUpgradeInput(input)
   assert.equal(result.inputVerified, true)
-  assert.equal(result.previousVersion, '4.249.0')
-  assert.equal(result.current.version, '4.249.1')
+  assert.equal(result.previousVersion, '4.249.1')
+  assert.equal(result.current.version, '4.249.2')
   assert.equal(result.current.sha256, digest(f.installerBytes))
   assert.equal(result.current.bytes, f.installerBytes.length)
   assert.equal(result.source.commit, f.source.commit)
@@ -83,7 +83,7 @@ test('candidate input refuses same or older actual release even when all receipt
   assert.throws(() => validateCurrentUpgradeInput(f.inputs()), /must increase/)
 })
 
-test('candidate input refuses the latest accepted 4.249.0 even with a self-consistent receipt', () => {
+test('candidate input refuses the earlier accepted 4.249.0 even with a self-consistent receipt', () => {
   const f = fixture(), manifest = JSON.parse(f.manifestBytes), lock = JSON.parse(f.lockBytes)
   manifest.version = lock.version = lock.packages[''].version = '4.249.0'
   f.manifestBytes = Buffer.from(JSON.stringify(manifest)); f.lockBytes = Buffer.from(JSON.stringify(lock))
@@ -94,10 +94,21 @@ test('candidate input refuses the latest accepted 4.249.0 even with a self-consi
   assert.throws(() => validateCurrentUpgradeInput(f.inputs()), /must increase/)
 })
 
+test('candidate input refuses the latest accepted 4.249.1 even with a self-consistent receipt', () => {
+  const f = fixture(), manifest = JSON.parse(f.manifestBytes), lock = JSON.parse(f.lockBytes)
+  manifest.version = lock.version = lock.packages[''].version = '4.249.1'
+  f.manifestBytes = Buffer.from(JSON.stringify(manifest)); f.lockBytes = Buffer.from(JSON.stringify(lock))
+  Object.assign(f.receipt, { version: '4.249.1', manifestSHA256: digest(f.manifestBytes), lockSHA256: digest(f.lockBytes) })
+  f.installerBytes = fixturePE([4, 249, 1, 0])
+  Object.assign(f.receipt.installer, { filename: 'Notepad-4.249.1-Setup.exe', bytes: f.installerBytes.length,
+    sha256: digest(f.installerBytes), fileVersion: '4.249.1.0', productVersion: '4.249.1.0' })
+  assert.throws(() => validateCurrentUpgradeInput(f.inputs()), /must increase/)
+})
+
 test('candidate receipt selection keeps unrelated historical successes but refuses duplicate current successes', () => {
   const f = fixture(), input = f.inputs(), historical = { ...f.receipt, commit: 'd'.repeat(40), version: '4.248.1' }
   input.receipts.push({ file: 'test-results/local-package/historical/receipt.json', bytes: Buffer.from(JSON.stringify(historical)) })
-  assert.equal(validateCurrentUpgradeInput(input).current.version, '4.249.1')
+  assert.equal(validateCurrentUpgradeInput(input).current.version, '4.249.2')
   input.receipts.push({ ...input.receipts[0], file: 'test-results/local-package/duplicate/receipt.json' })
   assert.throws(() => validateCurrentUpgradeInput(input), /Exactly one/)
 })
@@ -122,7 +133,7 @@ test('filesystem input inspection chooses exact release and refuses an active or
     writeFileSync(path.join(root, 'release', f.receipt.installer.filename), f.installerBytes)
     writeFileSync(path.join(root, 'release', 'Notepad-4.248.1-Setup.exe'), fixturePE([4, 248, 1, 0]))
     writeFileSync(path.join(directory, 'receipt.json'), JSON.stringify(f.receipt))
-    assert.equal(inspectCurrentUpgradeInput(root, f.source).current.version, '4.249.1')
+    assert.equal(inspectCurrentUpgradeInput(root, f.source).current.version, '4.249.2')
     const running = path.join(root, 'test-results', 'local-package', 'running.lock')
     writeFileSync(running, 'owned packaging run is unfinished')
     assert.throws(() => inspectCurrentUpgradeInput(root, f.source), /Packaging is still running/)

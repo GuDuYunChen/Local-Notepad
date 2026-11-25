@@ -1,263 +1,219 @@
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
-import { $getNodeByKey, $getRoot } from 'lexical'
-import { TableCellNode, TableNode, TableRowNode } from '@lexical/table'
+import { $getNearestNodeFromDOMNode, $getNodeByKey, HISTORY_PUSH_TAG } from 'lexical'
+import { TableCellNode, TableNode } from '@lexical/table'
+import { useEditorWriteScope } from '../hooks/useEditorWriteScope'
+import { $getTableModel, $moveTableColumn, $moveTableRow } from '../utils/tableModel'
+import { toast } from '~/services/toast'
+
+const REORDER_MIME = 'application/x-local-notepad-table-reorder'
+let dragSequence = 0
 
 function findCellInfo(editor, cellElement) {
   let result = null
-
   editor.getEditorState().read(() => {
-    const walk = node => {
-      if (result || !node?.getChildren) return
-
-      if (node instanceof TableNode) {
-        const rows = node.getChildren()
-        for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
-          const row = rows[rowIndex]
-          const cells = row.getChildren()
-
-          for (let colIndex = 0; colIndex < cells.length; colIndex++) {
-            const cell = cells[colIndex]
-            if (!(cell instanceof TableCellNode)) continue
-            if (editor.getElementByKey(cell.getKey()) !== cellElement) continue
-
-            result = {
-              tableKey: node.getKey(),
-              rowKey: row.getKey(),
-              cellKey: cell.getKey(),
-              rowIndex,
-              colIndex,
-              rowSpan: cell.getRowSpan?.() || 1,
-              colSpan: cell.getColSpan?.() || 1,
-            }
-            return
-          }
-        }
-      }
-
-      for (const child of node.getChildren?.() || []) walk(child)
+    const cell = $getNearestNodeFromDOMNode(cellElement)
+    const table = cell instanceof TableCellNode ? cell.getParent()?.getParent() : null
+    if (!(table instanceof TableNode) || !table.isAttached()) return
+    const model = $getTableModel(table), location = model?.locations.get(cell.getKey())
+    if (!location || editor.getElementByKey(cell.getKey()) !== cellElement) return
+    result = {
+      tableKey: table.getKey(), rowKey: model.rows[location.rowIndex].getKey(), cellKey: cell.getKey(),
+      rowIndex: location.rowIndex, colIndex: location.columnIndex,
+      colSpan: location.colSpan, signature: model.signature,
     }
-
-    walk($getRoot())
-  })
-
+  }, { editor })
   return result
 }
 
-function reorderRow(editor, tableKey, fromIndex, toIndex) {
-  editor.update(() => {
-    const table = $getNodeByKey(tableKey)
-    if (!(table instanceof TableNode)) return
-
-    const rows = table.getChildren()
-    const row = rows[fromIndex]
-    const target = rows[toIndex]
-    if (!(row instanceof TableRowNode) || !(target instanceof TableRowNode) || row === target) return
-
-    if (toIndex < fromIndex) target.insertBefore(row)
-    else target.insertAfter(row)
-  })
+function $validSession(session) {
+  if (!session.canWrite()) return null
+  const table = $getNodeByKey(session.tableKey)
+  if (!(table instanceof TableNode) || !table.isAttached()) return null
+  const model = $getTableModel(table)
+  const source = model?.locations.get(session.cellKey)
+  if (!source || model.signature !== session.signature || model.rows[source.rowIndex]?.getKey() !== session.rowKey) return null
+  return { table, model, source }
 }
 
-function reorderColumn(editor, tableKey, fromIndex, toIndex) {
-  editor.update(() => {
-    const table = $getNodeByKey(tableKey)
-    if (!(table instanceof TableNode)) return
-
-    const rows = table.getChildren()
-
-    for (const row of rows) {
-      const cells = row.getChildren()
-      const source = cells[fromIndex]
-      const target = cells[toIndex]
-      if (!(source instanceof TableCellNode) || !(target instanceof TableCellNode)) return
-      if ((source.getColSpan?.() || 1) !== 1 || (target.getColSpan?.() || 1) !== 1) return
-    }
-
-    for (const row of rows) {
-      const cells = row.getChildren()
-      const source = cells[fromIndex]
-      const target = cells[toIndex]
-
-      if (toIndex < fromIndex) target.insertBefore(source)
-      else target.insertAfter(source)
-    }
-  })
-}
-
-export default function TableReorderPlugin() {
+export default function TableReorderPlugin({ documentId }) {
   const [editor] = useLexicalComposerContext()
+  const beginWrite = useEditorWriteScope(editor, documentId)
   const [handle, setHandle] = useState(null)
-  const [dragState, setDragState] = useState(null)
+  const sessionRef = useRef(null)
+  const rowButtonRef = useRef(null), colButtonRef = useRef(null)
+  const targetsRef = useRef([])
+
+  const clearTargets = useCallback(() => {
+    for (const element of targetsRef.current) element.classList.remove('table-row-drop-target', 'table-col-drop-target')
+    targetsRef.current = []
+  }, [])
+  const cancel = useCallback(() => {
+    sessionRef.current = null
+    clearTargets()
+    setHandle(null)
+  }, [clearTargets])
 
   useEffect(() => {
-    const rootElement = editor.getRootElement()
-    const container = rootElement?.closest('.editor-container')
-    if (!rootElement || !container) return undefined
-
     let frame = 0
-
-    const updateHandle = event => {
-      if (dragState) return
-      if (frame) window.cancelAnimationFrame(frame)
-
-      frame = window.requestAnimationFrame(() => {
-        const cellElement = event.target?.closest?.('td, th')
-        if (!cellElement || !rootElement.contains(cellElement)) {
-          setHandle(null)
-          return
-        }
-
-        const info = findCellInfo(editor, cellElement)
-        if (!info) {
-          setHandle(null)
-          return
-        }
-
-        const rowElement = cellElement.parentElement
-        const tableElement = cellElement.closest('table')
-        if (!rowElement || !tableElement) return
-
-        const cellRect = cellElement.getBoundingClientRect()
-        const rowRect = rowElement.getBoundingClientRect()
-        const tableRect = tableElement.getBoundingClientRect()
-        const containerRect = container.getBoundingClientRect()
-
-        setHandle({
-          ...info,
-          tableElement,
-          rowElement,
-          row: {
-            top: rowRect.top - containerRect.top + container.scrollTop + rowRect.height / 2 - 13,
-            left: tableRect.left - containerRect.left + container.scrollLeft - 28,
-          },
-          col: {
-            top: tableRect.top - containerRect.top + container.scrollTop - 28,
-            left: cellRect.left - containerRect.left + container.scrollLeft + cellRect.width / 2 - 13,
-          },
+    let removeRootEvents = () => {}
+    const stopFrame = () => { if (frame) window.cancelAnimationFrame(frame); frame = 0 }
+    const clear = () => { stopFrame(); cancel() }
+    const ownsHandle = target => rowButtonRef.current?.contains(target) || colButtonRef.current?.contains(target)
+    const ownsDrag = event => sessionRef.current && Array.from(event.dataTransfer?.types || []).includes(REORDER_MIME)
+    const unregisterRoot = editor.registerRootListener(rootElement => {
+      removeRootEvents()
+      clear()
+      const container = rootElement?.closest('.editor-container')
+      if (!container) return
+      const updateHandle = event => {
+        if (sessionRef.current || ownsHandle(event.target)) { stopFrame(); return }
+        stopFrame()
+        if (!editor.isEditable()) { setHandle(null); return }
+        const target = event.target
+        frame = window.requestAnimationFrame(() => {
+          frame = 0
+          if (!editor.isEditable() || sessionRef.current) return
+          const cellElement = target?.closest?.('td, th')
+          if (!cellElement || !rootElement.contains(cellElement)) { setHandle(null); return }
+          const info = findCellInfo(editor, cellElement)
+          if (!info) { setHandle(null); return }
+          const rowElement = cellElement.closest('tr'), tableElement = cellElement.closest('table')
+          if (!rowElement || !tableElement) return
+          const cellRect = cellElement.getBoundingClientRect(), rowRect = rowElement.getBoundingClientRect()
+          const tableRect = tableElement.getBoundingClientRect(), containerRect = container.getBoundingClientRect()
+          setHandle({
+            ...info, cellElement,
+            row: {
+              top: rowRect.top - containerRect.top + container.scrollTop + rowRect.height / 2 - 13,
+              left: tableRect.left - containerRect.left + container.scrollLeft - 28,
+            },
+            col: {
+              top: tableRect.top - containerRect.top + container.scrollTop - 28,
+              left: cellRect.left - containerRect.left + container.scrollLeft + cellRect.width / 2 - 13,
+            },
+          })
         })
-      })
-    }
-
-    const hide = event => {
-      if (dragState) return
-      if (event.relatedTarget?.closest?.('.table-reorder-handle')) return
-      setHandle(null)
-    }
-
-    container.addEventListener('mousemove', updateHandle)
-    container.addEventListener('mouseleave', hide)
-
-    return () => {
-      if (frame) window.cancelAnimationFrame(frame)
-      container.removeEventListener('mousemove', updateHandle)
-      container.removeEventListener('mouseleave', hide)
-    }
-  }, [editor, dragState])
-
-  useEffect(() => {
-    if (!dragState) return undefined
-
-    const rootElement = editor.getRootElement()
-    const container = rootElement?.closest('.editor-container')
-    if (!rootElement || !container) return undefined
-
-    const clearTargets = () => {
-      container.querySelectorAll('.table-row-drop-target,.table-col-drop-target').forEach(element => {
-        element.classList.remove('table-row-drop-target', 'table-col-drop-target')
-      })
-    }
-
-    const onDragOver = event => {
-      const cellElement = event.target?.closest?.('td, th')
-      if (!cellElement || !rootElement.contains(cellElement)) return
-
-      const info = findCellInfo(editor, cellElement)
-      if (!info || info.tableKey !== dragState.tableKey) return
-
-      event.preventDefault()
-      clearTargets()
-
-      if (dragState.type === 'row') {
-        const rowElement = cellElement.parentElement
-        rowElement?.classList.add('table-row-drop-target')
-        setDragState(previous => previous ? { ...previous, targetIndex: info.rowIndex } : previous)
-      } else {
-        const tableElement = cellElement.closest('table')
-        for (const row of Array.from(tableElement?.rows || [])) {
-          row.cells?.[info.colIndex]?.classList.add('table-col-drop-target')
-        }
-        setDragState(previous => previous ? { ...previous, targetIndex: info.colIndex } : previous)
       }
-
-      event.dataTransfer.dropEffect = 'move'
-    }
-
-    const onDrop = event => {
-      event.preventDefault()
-      clearTargets()
-
-      if (
-        dragState.targetIndex === undefined ||
-        dragState.targetIndex === dragState.sourceIndex
-      ) {
-        setDragState(null)
+      const leave = event => { if (!sessionRef.current && !ownsHandle(event.relatedTarget)) { stopFrame(); setHandle(null) } }
+      const scroll = () => {
+        stopFrame()
+        // Native drag scrolling is needed to reach rows outside the viewport.
+        // Discard its old marker; drop will resolve the actual destination.
+        if (sessionRef.current) clearTargets()
+        else setHandle(null)
+      }
+      const targetInfo = event => {
+        const session = sessionRef.current
+        const cell = event.target?.closest?.('td, th')
+        if (!session?.canWrite() || !cell || !rootElement.contains(cell)) return null
+        const info = findCellInfo(editor, cell)
+        return info?.tableKey === session.tableKey && info.signature === session.signature ? { info, cell } : null
+      }
+      const dragOver = event => {
+        if (!ownsDrag(event)) return
+        event.preventDefault(); event.stopPropagation()
+        clearTargets()
+        const target = targetInfo(event), session = sessionRef.current
+        if (!target) { event.dataTransfer.dropEffect = 'none'; return }
+        event.dataTransfer.dropEffect = 'move'
+        if (session.type === 'row') {
+          const row = target.cell.closest('tr')
+          if (row) targetsRef.current.push(row)
+        } else {
+          editor.getEditorState().read(() => {
+            const current = $validSession(session)
+            if (!current) return
+            for (const { cell, columnIndex, colSpan } of current.model.locations.values()) {
+              if (columnIndex <= target.info.colIndex && columnIndex + colSpan > target.info.colIndex) {
+                const element = editor.getElementByKey(cell.getKey())
+                if (element) targetsRef.current.push(element)
+              }
+            }
+          })
+        }
+        for (const element of targetsRef.current) element.classList.add(session.type === 'row' ? 'table-row-drop-target' : 'table-col-drop-target')
+      }
+      const drop = event => {
+        if (!ownsDrag(event)) return
+        event.preventDefault(); event.stopPropagation()
+        const session = sessionRef.current
+        const target = event.dataTransfer.getData(REORDER_MIME) === session.token ? targetInfo(event) : null
+        clear()
+        if (!target) return
+        editor.update(() => {
+          const current = $validSession(session)
+          if (!current) return
+          const destination = current.model.locations.get(target.info.cellKey)
+          if (!destination) return
+          const originIndex = session.type === 'row' ? current.source.rowIndex : current.source.columnIndex
+          const destinationIndex = session.type === 'row' ? destination.rowIndex : destination.columnIndex
+          const move = session.type === 'row' ? $moveTableRow : $moveTableColumn
+          const result = move(current.table, originIndex, destinationIndex - originIndex)
+          if (!result.changed && result.reason) toast.warning(result.reason)
+        }, { tag: HISTORY_PUSH_TAG })
+      }
+      // Own table drags must be handled before Lexical's content-drop handler.
+      // Unrelated text, file, and whole-block drag events remain untouched.
+      container.addEventListener('mousemove', updateHandle)
+      container.addEventListener('mouseleave', leave)
+      container.addEventListener('scroll', scroll, true)
+      container.addEventListener('dragover', dragOver, true)
+      container.addEventListener('drop', drop, true)
+      removeRootEvents = () => {
+        container.removeEventListener('mousemove', updateHandle)
+        container.removeEventListener('mouseleave', leave)
+        container.removeEventListener('scroll', scroll, true)
+        container.removeEventListener('dragover', dragOver, true)
+        container.removeEventListener('drop', drop, true)
+      }
+    })
+    const unregisterEditable = editor.registerEditableListener(clear)
+    const unregisterUpdate = editor.registerUpdateListener(({ editorState, dirtyElements, dirtyLeaves }) => {
+      const session = sessionRef.current
+      if (!session) {
+        if (dirtyElements.size || dirtyLeaves.size) { stopFrame(); setHandle(null) }
         return
       }
-
-      if (dragState.type === 'row') {
-        reorderRow(editor, dragState.tableKey, dragState.sourceIndex, dragState.targetIndex)
-      } else {
-        reorderColumn(editor, dragState.tableKey, dragState.sourceIndex, dragState.targetIndex)
-      }
-
-      setDragState(null)
-      setHandle(null)
-    }
-
-    const onDragEnd = () => {
-      clearTargets()
-      setDragState(null)
-      setHandle(null)
-    }
-
-    container.addEventListener('dragover', onDragOver)
-    container.addEventListener('drop', onDrop)
-    container.addEventListener('dragend', onDragEnd, true)
-
+      let valid = false
+      editorState.read(() => { valid = Boolean($validSession(session)) })
+      if (!valid) clear()
+    })
+    const key = event => { if (event.key === 'Escape' && sessionRef.current) { event.preventDefault(); clear() } }
+    window.addEventListener('dragend', clear, true)
+    window.addEventListener('drop', clear)
+    window.addEventListener('blur', clear)
+    window.addEventListener('resize', clear)
+    window.addEventListener('keydown', key, true)
     return () => {
-      clearTargets()
-      container.removeEventListener('dragover', onDragOver)
-      container.removeEventListener('drop', onDrop)
-      container.removeEventListener('dragend', onDragEnd, true)
+      unregisterRoot(); removeRootEvents(); unregisterEditable(); unregisterUpdate()
+      window.removeEventListener('dragend', clear, true)
+      window.removeEventListener('drop', clear)
+      window.removeEventListener('blur', clear)
+      window.removeEventListener('resize', clear)
+      window.removeEventListener('keydown', key, true)
+      stopFrame(); sessionRef.current = null; clearTargets()
     }
-  }, [editor, dragState])
+  }, [editor, documentId, cancel, clearTargets])
 
   if (!handle) return null
-
   const startDrag = (event, type) => {
     event.stopPropagation()
-
-    if (type === 'col' && handle.colSpan !== 1) {
-      event.preventDefault()
-      return
+    const canWrite = beginWrite()
+    const info = canWrite() && handle.cellElement.isConnected ? findCellInfo(editor, handle.cellElement) : null
+    if (!info || info.signature !== handle.signature || (type === 'col' && info.colSpan !== 1)) {
+      event.preventDefault(); cancel(); return
     }
-
-    const sourceIndex = type === 'row' ? handle.rowIndex : handle.colIndex
+    const token = `${info.tableKey}:${++dragSequence}`
     event.dataTransfer.effectAllowed = 'move'
-    event.dataTransfer.setData('application/x-local-notepad-table-reorder', type)
-
-    setDragState({
-      type,
-      tableKey: handle.tableKey,
-      sourceIndex,
-      targetIndex: sourceIndex,
-    })
+    event.dataTransfer.setData(REORDER_MIME, token)
+    sessionRef.current = { ...info, type, token, canWrite }
   }
 
   return (
     <>
       <button data-ui-native="editor-pointer-handle"
+        ref={rowButtonRef}
         type="button"
         className="table-reorder-handle row"
         draggable
@@ -265,11 +221,9 @@ export default function TableReorderPlugin() {
         onDragStart={event => startDrag(event, 'row')}
         aria-label="拖动当前行排序"
         title="拖动当前行"
-      >
-        ⋮⋮
-      </button>
-
+      >⋮⋮</button>
       <button data-ui-native="editor-pointer-handle"
+        ref={colButtonRef}
         type="button"
         className="table-reorder-handle col"
         draggable={handle.colSpan === 1}
@@ -278,9 +232,7 @@ export default function TableReorderPlugin() {
         onDragStart={event => startDrag(event, 'col')}
         aria-label="拖动当前列排序"
         title={handle.colSpan === 1 ? '拖动当前列' : '合并单元格所在列暂不支持拖动'}
-      >
-        ⋮⋮
-      </button>
+      >⋮⋮</button>
     </>
   )
 }

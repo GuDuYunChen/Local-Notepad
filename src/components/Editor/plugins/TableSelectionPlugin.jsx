@@ -1,53 +1,128 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { useLexicalEditable } from '@lexical/react/useLexicalEditable'
-import { $getRoot, $createParagraphNode, $createTextNode, FORMAT_ELEMENT_COMMAND, $getSelection } from 'lexical'
-import { TableNode, TableRowNode, TableCellNode, $createTableCellNode, $createTableRowNode, TableCellHeaderStates } from '@lexical/table'
-import { $getNodeByKey } from 'lexical'
+import { $createParagraphNode, $createTextNode, $getNearestNodeFromDOMNode, $getNodeByKey, $getSelection, HISTORY_PUSH_TAG } from 'lexical'
+import { $isTableCellNode, TableCellHeaderStates } from '@lexical/table'
 import { toast } from '~/services/toast'
 import { useEditorWriteScope } from '../hooks/useEditorWriteScope'
 import { isShortcutContextBlocked, matchShortcut, shortcutLabel } from '~/services/localShortcuts'
 import useLocalShortcuts from '~/hooks/useLocalShortcuts'
 import { UiButton } from '~/components/ui/ControlKit'
+import { dispatchTableEvent, isTableEventForEditor } from '../utils/tableEvents'
+import { $getTableModel, $resolveTableCell, $insertRowAtCell, $insertColumnAtCell, $deleteRowAtCell, $deleteColumnAtCell, $mergeTableCells, $splitTableCell, $moveTableRow, $moveTableColumn } from '../utils/tableModel'
 
-
+// Retain coordinate-based helpers for existing callers. Live selection keeps
+// node keys: removing an earlier row must not silently retarget another cell.
 export function forEachSelectedTableCell(tables, rects, callback) {
+  const visited = new Set()
   for (const rect of Array.isArray(rects) ? rects : []) {
-    const table = tables?.[rect.tableIndex]
-    if (!(table instanceof TableNode)) continue
-
-    const rows = table.getChildren()
-    for (let rr = rect.r1; rr <= rect.r2; rr++) {
-      const row = rows[rr]
-      if (!(row instanceof TableRowNode)) continue
-      const cells = row.getChildren()
-
-      for (let cc = rect.c1; cc <= rect.c2 && cc < cells.length; cc++) {
-        const cell = cells[cc]
-        if (cell instanceof TableCellNode) callback(cell, rect, rr, cc)
+    const table = rect.tableKey ? tables?.find(node => node.getKey() === rect.tableKey) : tables?.[rect.tableIndex]
+    const model = $getTableModel(table)
+    if (!model) continue
+    const visit = location => {
+      if (!location || visited.has(location.cell.getKey())) return
+      visited.add(location.cell.getKey())
+      callback(location.cell, rect, location.rowIndex, location.columnIndex)
+    }
+    if (rect.cellKeys) rect.cellKeys.forEach(key => visit(model.locations.get(key)))
+    else if ([rect.r1, rect.r2, rect.c1, rect.c2].every(Number.isSafeInteger)) {
+      for (let r = Math.max(0, rect.r1); r <= Math.min(rect.r2, model.rowCount - 1); r++) {
+        for (let c = Math.max(0, rect.c1); c <= Math.min(rect.c2, model.columnCount - 1); c++) visit(model.grid[r][c])
       }
     }
   }
 }
 
 export function countSelectedTableCells(rects) {
-  return (Array.isArray(rects) ? rects : []).reduce((total, rect) => {
-    const rows = rect.r2 - rect.r1 + 1
-    const cols = rect.c2 - rect.c1 + 1
-    return total + rows * cols
-  }, 0)
+  const keys = new Set(), regions = new Map()
+  for (const rect of Array.isArray(rects) ? rects : []) {
+    if (rect.cellKeys) { rect.cellKeys.forEach(key => keys.add(key)); continue }
+    if (![rect.r1, rect.r2, rect.c1, rect.c2].every(value => Number.isSafeInteger(value) && value >= 0) || rect.r2 < rect.r1 || rect.c2 < rect.c1) continue
+    const table = rect.tableIndex ?? rect.tableKey ?? 0
+    if (!regions.has(table)) regions.set(table, [])
+    regions.get(table).push(rect)
+  }
+  let count = keys.size
+  // Count the union without expanding large rectangles into individual cells.
+  for (const group of regions.values()) {
+    const boundaries = [...new Set(group.flatMap(r => [r.r1, r.r2 + 1]))].sort((a, b) => a - b)
+    for (let i = 0; i < boundaries.length - 1; i++) {
+      const intervals = group.filter(r => r.r1 <= boundaries[i] && r.r2 >= boundaries[i]).map(r => [r.c1, r.c2 + 1]).sort((a, b) => a[0] - b[0])
+      let width = 0, end = -1
+      for (const [start, nextEnd] of intervals) { width += Math.max(0, nextEnd - Math.max(start, end)); end = Math.max(end, nextEnd) }
+      count += width * (boundaries[i + 1] - boundaries[i])
+    }
+  }
+  return count
 }
 
 export function tableMatrixToTSV(matrix) {
-  return (Array.isArray(matrix) ? matrix : [])
-    .map(row => (Array.isArray(row) ? row : []).map(value => String(value ?? '').replace(/[\t\r\n]+/g, ' ')).join('\t'))
-    .join('\n')
+  return (Array.isArray(matrix) ? matrix : []).map(row => (Array.isArray(row) ? row : []).map(value => String(value ?? '').replace(/[\t\r\n]+/g, ' ')).join('\t')).join('\n')
 }
-
 export function parseTableTSV(text) {
   const normalized = String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
   if (!normalized) return []
-  return normalized.split('\n').map(row => row.split('\t'))
+  // A spreadsheet clipboard commonly ends its last record with LF.
+  return normalized.replace(/\n$/, '').split('\n').map(row => row.split('\t'))
+}
+function $currentCell() {
+  const selection = $getSelection()
+  let node = selection?.anchor?.getNode?.() || selection?.getNodes?.()[0]
+  while (node && !$isTableCellNode(node)) node = node.getParent()
+  return node ? $resolveTableCell(node.getKey()) : null
+}
+function $target(payload, groups) {
+  if (payload?.cellKey) return $resolveTableCell(payload.cellKey, payload.tableKey)
+  if (payload?.tableKey) {
+    const model = $getTableModel($getNodeByKey(payload.tableKey))
+    const cell = model?.grid[payload.ri ?? 0]?.[payload.ci ?? 0]?.cell
+    return cell ? $resolveTableCell(cell.getKey(), payload.tableKey) : null
+  }
+  if (groups[0]?.cellKeys[0]) return $resolveTableCell(groups[0].cellKeys[0], groups[0].tableKey)
+  return $currentCell()
+}
+function $selectedCells(groups, payload) {
+  if (payload?.cellKey || payload?.tableKey) {
+    const current = $target(payload, [])
+    return current ? [current.cell] : []
+  }
+  if (!groups.length) { const current = $currentCell(); return current ? [current.cell] : [] }
+  const cells = new Map()
+  for (const group of groups) {
+    const model = $getTableModel($getNodeByKey(group.tableKey))
+    if (!model) continue
+    for (const key of group.cellKeys) {
+      const location = model.locations.get(key)
+      if (location) cells.set(key, location.cell)
+    }
+  }
+  return [...cells.values()]
+}
+function $groupBounds(model, keys) {
+  const locations = keys.map(key => model.locations.get(key)).filter(Boolean)
+  if (!locations.length) return null
+  return {
+    top: Math.min(...locations.map(p => p.rowIndex)), left: Math.min(...locations.map(p => p.columnIndex)),
+    bottom: Math.max(...locations.map(p => p.rowIndex + p.rowSpan - 1)), right: Math.max(...locations.map(p => p.columnIndex + p.colSpan - 1)),
+  }
+}
+function $selectionGroup(anchorKey, focusKey) {
+  const anchor = $resolveTableCell(anchorKey), focus = $resolveTableCell(focusKey, anchor?.table.getKey())
+  if (!anchor || !focus) return null
+  const { model, table } = anchor
+  let bounds = $groupBounds(model, [anchorKey, focusKey]), expanded = true
+  const keys = new Set([anchorKey, focusKey])
+  while (expanded) {
+    const before = keys.size
+    for (let r = bounds.top; r <= bounds.bottom; r++) for (let c = bounds.left; c <= bounds.right; c++) keys.add(model.grid[r][c].cell.getKey())
+    bounds = $groupBounds(model, [...keys]); expanded = keys.size !== before
+  }
+  return { tableKey: table.getKey(), cellKeys: [...keys] }
+}
+function $serialize(node) {
+  const value = node.exportJSON()
+  if (node.getChildren) value.children = node.getChildren().map($serialize)
+  return value
 }
 
 export default function TableSelectionPlugin({ documentId }) {
@@ -55,1020 +130,367 @@ export default function TableSelectionPlugin({ documentId }) {
   const { bindings } = useLocalShortcuts()
   const isEditable = useLexicalEditable()
   const beginWrite = useEditorWriteScope(editor, documentId)
-  const [active, setActive] = useState(false)
-  const [rects, setRects] = useState([]) // {tableIndex,r1,c1,r2,c2}
-  const startRef = useRef(null)
-  const overlayRef = useRef(null)
-  const ctrlRef = useRef(false)
-  const draggingRef = useRef(false)
-  const [hoverTable, setHoverTable] = useState(null)
-  const [addBtnPos, setAddBtnPos] = useState(null)
+  const [active, setActive] = useState(false), [groups, setGroups] = useState([]), [busy, setBusy] = useState(false)
+  const [geometry, setGeometry] = useState({ outlines: [], top: 10, add: null })
+  const activeRef = useRef(false), groupsRef = useRef([]), dragRef = useRef(null), epochRef = useRef(0), busyRef = useRef(null)
+  const hoverRef = useRef(null), handlersRef = useRef({})
 
-  const updateEditable = useCallback((update, canWrite = beginWrite(), options) => {
-    if (!canWrite()) return
-    const apply = () => { if (canWrite()) update() }
-    editor.update(apply, options)
-  }, [editor, beginWrite])
-
-  useEffect(() => {
-    const onMode = (e) => { setActive(!!e.detail); if (!e.detail) setRects([]) }
-    window.addEventListener('tableSelection:mode', onMode)
-    return () => window.removeEventListener('tableSelection:mode', onMode)
+  const replaceGroups = useCallback(next => {
+    if (JSON.stringify(next) === JSON.stringify(groupsRef.current)) return
+    epochRef.current += 1; groupsRef.current = next; setGroups(next)
   }, [])
-
-  useEffect(() => {
-    const onAction = (e) => {
-      if (!editor.isEditable()) return
-      const { type, payload } = e.detail || {}
-      if (type === 'mergeCells') { if (!rects[0]) { toast.warning('请先框选多个单元格'); return } doMerge() }
-      else if (type === 'splitCells') doSplit()
-      else if (type === 'alignVertical') applyAlign(payload)
-      else if (type === 'alignHorizontal') applyHorizontal(payload)
-      else if (type === 'borderPreset') applyBorder(payload)
-      else if (type === 'background') applyBackground(payload)
-      else if (type === 'autoFitWindow') autoSize('fitWindow')
-      else if (type === 'autoFitContent') autoSize('fitContent')
-      else if (type === 'sortAsc') sortByFirstCol('asc')
-      else if (type === 'sortDesc') sortByFirstCol('desc')
-      else if (type === 'filterContains') filterRowsContains(payload)
-      else if (type === 'paginate') paginateRows(Number(payload) || 10)
-      else if (type === 'insertRow' || type === 'insertRowAbove' || type === 'insertRowBelow') doAddRow(payload)
-      else if (type === 'deleteRow') doDelRow(payload)
-      else if (type === 'insertCol' || type === 'insertColLeft' || type === 'insertColRight') doAddCol(payload)
-      else if (type === 'deleteCol') doDelCol(payload)
-      else if (type === 'deleteTable') doDelTable(payload)
-      else if (type === 'clear') doClear(payload)
-      else if (type === 'toggleRowStriping') toggleRowStriping(payload)
-      else if (type === 'toggleFrozenRow') toggleFrozenRow(payload)
-      else if (type === 'toggleFrozenColumn') toggleFrozenColumn(payload)
-      else if (type === 'toggleRowHeader') toggleRowHeader(payload)
-      else if (type === 'toggleColumnHeader') toggleColumnHeader(payload)
-      
-      // 恢复编辑器焦点，防止操作后失焦无法输入
-      setTimeout(() => editor.focus(), 0)
-    }
-    window.addEventListener('tableAction', onAction)
-    return () => window.removeEventListener('tableAction', onAction)
-  }, [editor, rects])
-
-  useEffect(() => {
-    if (!active) return
-    const container = document.querySelector('.editor-container')
-    if (!container) return
-
-    const getCell = (el) => {
-      while (el && el !== container) { if (el.tagName === 'TD') return el; el = el.parentElement }
-      return null
-    }
-    const indexOf = (cell) => {
-      const row = cell.parentElement
-      const table = row?.parentElement
-      const rIdx = Array.from(table.children).indexOf(row)
-      const cIdx = Array.from(row.children).indexOf(cell)
-      const tableIndex = Array.from(container.querySelectorAll('table')).indexOf(table)
-      return { r: rIdx, c: cIdx, table, tableIndex }
-    }
-
-    const onKey = (e) => { ctrlRef.current = e.ctrlKey || e.metaKey }
-    const onShortcut = (e) => {
-      if (!editor.isEditable() || editor.isComposing() || isShortcutContextBlocked(e)) return
-      const target = e.target?.nodeType === 1 ? e.target : document.activeElement
-      if (target?.closest?.('input,textarea,select')) return
-      if (target && target !== document.body && !container.contains(target) && !overlayRef.current?.contains(target)) return
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        setRects([])
-        setActive(false)
-        window.dispatchEvent(new CustomEvent('tableSelection:mode', { detail: false }))
-        editor.focus()
-        return
-      }
-      const modifier = e.ctrlKey || e.metaKey
-      const key = e.key.toLowerCase()
-
-      if (modifier && !e.altKey && !e.shiftKey && key === 'c') {
-        e.preventDefault()
-        void copySelection()
-        return
-      }
-      if (modifier && !e.altKey && !e.shiftKey && key === 'v') {
-        if (!navigator.clipboard?.readText) return
-        e.preventDefault()
-        void pasteSelection()
-        return
-      }
-
-      if (matchShortcut(e, 'mergeCells')) { e.preventDefault(); doMerge(); return }
-      if (matchShortcut(e, 'splitCell')) { e.preventDefault(); doSplit() }
-    }
-    const onDown = (e) => {
-      const cell = getCell(e.target)
-      if (!cell) return
-      draggingRef.current = true
-      startRef.current = cell
-      // e.preventDefault() // Removed to allow focus/input
-    }
-    let lastKey = ''
-    const onMove = (e) => {
-      if (!draggingRef.current || !startRef.current) return
-      const a = startRef.current
-      const b = getCell(e.target) || a
-      const ai = indexOf(a), bi = indexOf(b)
-      if (!ai.table || ai.table !== bi.table) return
-      const r1 = Math.min(ai.r, bi.r), r2 = Math.max(ai.r, bi.r)
-      const c1 = Math.min(ai.c, bi.c), c2 = Math.max(ai.c, bi.c)
-      const key = `${ai.tableIndex}-${r1}-${c1}-${r2}-${c2}`
-      if (key === lastKey) return
-      lastKey = key
-      const rect = { tableIndex: ai.tableIndex, r1, c1, r2, c2 }
-      setRects((prev) => ctrlRef.current ? [...prev, rect] : [rect])
-    }
-    const onUp = () => { draggingRef.current = false; startRef.current = null }
-    const onLeave = () => { draggingRef.current = false }
-    const onOver = (e) => {
-      const table = e.target.closest('table')
-      if (!table) { setHoverTable(null); setAddBtnPos(null); return }
-      const rootRect = container.getBoundingClientRect()
-      const tRect = table.getBoundingClientRect()
-      const idx = Array.from(container.querySelectorAll('table')).indexOf(table)
-      setHoverTable(idx)
-      setAddBtnPos({ x: tRect.right - rootRect.left + 6, y: tRect.top - rootRect.top + tRect.height / 2 })
-    }
-
-    container.addEventListener('mousedown', onDown)
-    container.addEventListener('mousemove', onMove)
-    container.addEventListener('mouseup', onUp)
-    container.addEventListener('mouseleave', onLeave)
-    container.addEventListener('mouseover', onOver)
-    window.addEventListener('keydown', onKey)
-    window.addEventListener('keydown', onShortcut)
-    window.addEventListener('keyup', onKey)
-    return () => {
-      container.removeEventListener('mousedown', onDown)
-      container.removeEventListener('mousemove', onMove)
-      container.removeEventListener('mouseup', onUp)
-      container.removeEventListener('mouseleave', onLeave)
-      window.removeEventListener('keydown', onKey)
-      window.removeEventListener('keydown', onShortcut)
-      window.removeEventListener('keyup', onKey)
-      container.removeEventListener('mouseover', onOver)
-    }
-  }, [active, rects, editor])
-
-
-  const getCurrentCellInfo = () => {
-    const selection = $getSelection()
-    const node = selection?.getNodes?.()[0]
-    let cell = node
-
-    while (cell && !(cell instanceof TableCellNode)) {
-      cell = cell.getParent?.()
-    }
-
-    if (!(cell instanceof TableCellNode)) return null
-
-    const row = cell.getParent?.()
-    const table = row?.getParent?.()
-    if (!(row instanceof TableRowNode) || !(table instanceof TableNode)) return null
-
-    return {
-      cell,
-      row,
-      table,
-      ri: row.getIndexWithinParent?.() ?? 0,
-      ci: cell.getIndexWithinParent?.() ?? 0,
-    }
-  }
-
-
-  const doMerge = () => {
-    const r = rects[0]
-    if (!r) return
-    updateEditable(() => {
-      const tables = []
-      const walk = (node) => { if (!node.getChildren) return; const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
-      walk($getRoot())
-      const table = tables[r.tableIndex]
-      if (!table) return
-      const rows = table.getChildren()
-      const tl = rows[r.r1].getChildren()[r.c1]
-      if (!(tl instanceof TableCellNode)) return
-      tl.setColSpan(r.c2 - r.c1 + 1)
-      tl.setRowSpan(r.r2 - r.r1 + 1)
-      for (let rr = r.r1; rr <= r.r2; rr++) {
-        const row = rows[rr]
-        const cells = row.getChildren()
-        const start = rr === r.r1 ? r.c1 + 1 : r.c1
-        for (let cc = start; cc <= r.c2 && cc < cells.length; cc++) {
-          const cell = cells[start]
-          if (!cell) break
-          const kids = cell.getChildren()
-          for (const k of kids) { tl.append(k) }
-          cell.remove()
-        }
-      }
+  const reset = useCallback(() => {
+    epochRef.current += 1; activeRef.current = false; groupsRef.current = []; dragRef.current = null; hoverRef.current = null; busyRef.current = null
+    setActive(false); setGroups([]); setBusy(false); setGeometry({ outlines: [], top: 10, add: null })
+  }, [])
+  const exit = useCallback(() => {
+    reset(); dispatchTableEvent(editor, 'tableSelection:mode', false)
+    if (editor.isEditable()) editor.focus()
+  }, [editor, reset])
+  useLayoutEffect(() => {
+    reset()
+    const unregister = editor.registerEditableListener(editable => {
+      if (!editable) { reset(); dispatchTableEvent(editor, 'tableSelection:mode', false) }
     })
-    setRects([])
-  }
+    return () => { epochRef.current += 1; busyRef.current = null; activeRef.current = false; unregister() }
+  }, [editor, documentId, reset])
 
-  const doDelTable = (payload) => {
-    updateEditable(() => {
-      const table = getTable(payload)
-      if (table) table.remove()
-    })
+  const run = (operation, canWrite = beginWrite()) => {
+    if (!canWrite()) return false
+    let result
+    editor.update(() => { if (canWrite()) result = operation() }, { discrete: true, tag: HISTORY_PUSH_TAG })
+    if (result?.reason && canWrite()) toast.warning(result.reason)
+    return !!result?.changed
   }
-
-  const toggleRowStriping = (payload) => {
-    updateEditable(() => {
-      const table = getTable(payload)
-      if (table) {
-        table.setRowStriping(!table.getRowStriping())
-      }
-    })
-  }
-
-  const toggleFrozenRow = (payload) => {
-    updateEditable(() => {
-      const table = getTable(payload)
-      if (table) {
-        table.setFrozenRows(table.getFrozenRows() === 0 ? 1 : 0)
-      }
-    })
-  }
-
-  const toggleFrozenColumn = (payload) => {
-    updateEditable(() => {
-      const table = getTable(payload)
-      if (table) {
-        table.setFrozenColumns(table.getFrozenColumns() === 0 ? 1 : 0)
-      }
-    })
-  }
-
-  const toggleRowHeader = (payload) => {
-    updateEditable(() => {
-      const table = getTable(payload)
-      if (!table) return
-      const rows = table.getChildren()
-      const row = rows[0]
-      if (!row) return
-      const cells = row.getChildren()
-      cells.forEach(cell => {
-        if (cell.toggleHeaderStyle) {
-          cell.toggleHeaderStyle(TableCellHeaderStates.ROW)
-        }
-      })
-    })
-  }
-
-  const toggleColumnHeader = (payload) => {
-    updateEditable(() => {
-      const table = getTable(payload)
-      if (!table) return
-      const rows = table.getChildren()
-      rows.forEach(row => {
-        const cell = row.getChildren()[0]
-        if (cell && cell.toggleHeaderStyle) {
-          cell.toggleHeaderStyle(TableCellHeaderStates.COLUMN)
-        }
-      })
-    })
-  }
-
-  const doSplit = () => {
-    const r = rects[0]
-    updateEditable(() => {
-      const tables = []
-      const walk = (node) => { if (!node.getChildren) return; const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
-      walk($getRoot())
-      if (r) {
-        const table = tables[r.tableIndex]
-        if (!table) return
-        const rows = table.getChildren()
-        const target = rows[r.r1]?.getChildren()?.[r.c1]
-        if (!(target instanceof TableCellNode)) return
-        const rs = target.getRowSpan?.() || 1
-        const cs = target.getColSpan?.() || 1
-        if (rs === 1 && cs === 1) return
-        target.setRowSpan?.(1)
-        target.setColSpan?.(1)
-        for (let rr = r.r1; rr < r.r1 + rs; rr++) {
-          const row = rows[rr]
-          for (let cc = r.c1; cc < r.c1 + cs; cc++) {
-            if (rr === r.r1 && cc === r.c1) continue
-            const cell = $createTableCellNode()
-            cell.append($createParagraphNode())
-            row.splice(Math.min(cc, row.getChildrenSize()), 0, [cell])
-          }
-        }
-      } else {
-        const sel = $getSelection()
-        const node = sel?.getNodes?.()[0]
-        let cell = node
-        while (cell && !(cell instanceof TableCellNode)) { cell = cell.getParent?.() }
-        if (!(cell instanceof TableCellNode)) return
-        const row = cell.getParent()
-        const table = row?.getParent?.()
-        const rs = cell.getRowSpan?.() || 1
-        const cs = cell.getColSpan?.() || 1
-        if (rs === 1 && cs === 1) return
-        cell.setRowSpan?.(1)
-        cell.setColSpan?.(1)
-        const rowIndex = row.getIndexWithinParent?.() ?? 0
-        const colIndex = cell.getIndexWithinParent?.() ?? 0
-        const rows = table.getChildren()
-        for (let rr = rowIndex; rr < rowIndex + rs; rr++) {
-          const rNode = rows[rr]
-          for (let cc = colIndex; cc < colIndex + cs; cc++) {
-            if (rr === rowIndex && cc === colIndex) continue
-            const nc = $createTableCellNode()
-            nc.append($createParagraphNode())
-            rNode.splice(Math.min(cc, rNode.getChildrenSize()), 0, [nc])
-          }
-        }
-      }
-    })
-    setRects([])
-  }
-
-  const getRectTable = (rect) => {
-    if (!rect) return null
-    const tables = []
-    const walk = node => {
-      if (!node?.getChildren) return
-      for (const child of node.getChildren()) {
-        if (child instanceof TableNode) tables.push(child)
-        walk(child)
-      }
+  const perform = (type, payload) => run(() => {
+    const selection = groupsRef.current, current = $target(payload, selection)
+    if (type === 'mergeCells') {
+      const tableKey = selection[0]?.tableKey
+      if (!tableKey || selection.some(group => group.tableKey !== tableKey) || (payload?.tableKey && payload.tableKey !== tableKey)) return { reason: '请先在同一表格中框选连续单元格' }
+      return $mergeTableCells($getNodeByKey(tableKey), selection.flatMap(group => group.cellKeys))
     }
-    walk($getRoot())
-    return tables[rect.tableIndex] || null
-  }
-
-  const copySelection = async () => {
-    const rect = rects[0]
-    if (!rect) return
-
-    let text = ''
-    editor.getEditorState().read(() => {
-      const table = getRectTable(rect)
-      if (!table) return
-
-      const rows = table.getChildren()
-      const matrix = []
-      for (let rr = rect.r1; rr <= rect.r2; rr++) {
-        const row = rows[rr]
-        if (!(row instanceof TableRowNode)) continue
-        const cells = row.getChildren()
-        const values = []
-        for (let cc = rect.c1; cc <= rect.c2; cc++) {
-          values.push(cells[cc]?.getTextContent?.() || '')
-        }
-        matrix.push(values)
+    if (type === 'splitCells') {
+      let changed = false
+      for (const cell of $selectedCells(selection, payload)) {
+        if (cell.getColSpan() > 1 || cell.getRowSpan() > 1) changed = $splitTableCell(cell).changed || changed
       }
-      text = tableMatrixToTSV(matrix)
-    })
-
-    if (!text && selectedCellCount === 0) return
-
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(text)
-      } else {
-        const textarea = document.createElement('textarea')
-        textarea.value = text
-        textarea.setAttribute('readonly', '')
-        textarea.style.position = 'fixed'
-        textarea.style.opacity = '0'
-        document.body.appendChild(textarea)
-        textarea.select()
-        document.execCommand('copy')
-        textarea.remove()
-      }
-      toast.success(rects.length > 1 ? '已复制第一个连续选区' : '已复制所选单元格')
-    } catch (error) {
-      console.error('复制表格内容失败', error)
-      toast.error('复制失败，请检查剪贴板权限')
+      return { changed }
     }
-  }
+    if (['clear', 'background', 'alignVertical', 'alignHorizontal'].includes(type)) {
+      const cells = $selectedCells(selection, payload), value = payload?.value ?? payload
+      if ((type === 'alignVertical' && !['top', 'middle', 'bottom'].includes(value)) || (type === 'alignHorizontal' && !['left', 'center', 'right', 'justify'].includes(value))) return { changed: false }
+      if (type === 'background' && typeof value !== 'string') return { changed: false }
+      for (const cell of cells) {
+        if (type === 'clear') cell.clear().append($createParagraphNode())
+        if (type === 'background') cell.setBackgroundColor(value || null)
+        if (type === 'alignVertical') cell.setVerticalAlign(value)
+        if (type === 'alignHorizontal') { cell.setFormat(value); for (const child of cell.getChildren()) child.setFormat?.(value) }
+      }
+      return { changed: cells.length > 0 }
+    }
+    if (!current) return { changed: false }
+    const { cell, table, model, rowIndex, columnIndex } = current
+    if (['insertRow', 'insertRowAbove', 'insertRowBelow'].includes(type)) return $insertRowAtCell(cell, type !== 'insertRowAbove' && payload?.mode !== 'above')
+    if (['insertCol', 'insertColLeft', 'insertColRight'].includes(type)) return $insertColumnAtCell(cell, type !== 'insertColLeft' && payload?.mode !== 'left')
+    if (type === 'deleteRow') return $deleteRowAtCell(cell)
+    if (type === 'deleteCol') return $deleteColumnAtCell(cell)
+    if (type === 'moveRowUp' || type === 'moveRowDown') return $moveTableRow(table, rowIndex, type === 'moveRowUp' ? -1 : 1)
+    if (type === 'moveColLeft' || type === 'moveColRight') return $moveTableColumn(table, columnIndex, type === 'moveColLeft' ? -1 : 1)
+    if (type === 'deleteTable') {
+      const paragraph = $createParagraphNode()
+      table.insertAfter(paragraph); paragraph.selectStart(); table.remove()
+    } else if (type === 'toggleRowStriping') table.setRowStriping(!table.getRowStriping())
+    else if (type === 'toggleFrozenRow') table.setFrozenRows(table.getFrozenRows() ? 0 : 1)
+    else if (type === 'toggleFrozenColumn') table.setFrozenColumns(table.getFrozenColumns() ? 0 : 1)
+    else if (type === 'toggleRowHeader' || type === 'toggleColumnHeader') {
+      const mask = type === 'toggleRowHeader' ? TableCellHeaderStates.ROW : TableCellHeaderStates.COLUMN
+      const locations = type === 'toggleRowHeader' ? model.grid[0] : model.grid.map(row => row[0])
+      const cells = [...new Map(locations.map(p => [p.cell.getKey(), p.cell])).values()]
+      const enabled = !cells.every(node => (node.getHeaderStyles() & mask) !== 0)
+      cells.forEach(node => node.setHeaderStyles(enabled ? mask : 0, mask))
+    } else return { changed: false }
+    return { changed: true }
+  })
 
-  const pasteSelection = async () => {
-    const rect = rects[0]
+  const beginClipboard = () => {
+    if (busyRef.current || !activeRef.current || !groupsRef.current.length) return null
     const canWrite = beginWrite()
-    if (!rect || !canWrite()) return
-
+    if (!canWrite()) return null
+    const token = { epoch: epochRef.current, canWrite, groups: groupsRef.current }
+    busyRef.current = token; setBusy(true)
+    token.valid = () => busyRef.current === token && !token.cancelled && epochRef.current === token.epoch && canWrite() && activeRef.current
+    return token
+  }
+  const endClipboard = token => { if (busyRef.current === token) { busyRef.current = null; setBusy(false) } }
+  const copySelection = async () => {
+    const token = beginClipboard()
+    if (!token) return
     try {
-      if (!navigator.clipboard?.readText) {
-        toast.warning('当前环境不支持读取剪贴板')
-        return
+      let text
+      editor.getEditorState().read(() => {
+        const group = token.groups[0], model = $getTableModel($getNodeByKey(group.tableKey))
+        if (!model) return
+        const bounds = $groupBounds(model, group.cellKeys)
+        if (!bounds) return
+        const selected = new Set(group.cellKeys), matrix = []
+        for (let r = bounds.top; r <= bounds.bottom; r++) {
+          const row = []
+          for (let c = bounds.left; c <= bounds.right; c++) {
+            const p = model.grid[r][c]
+            row.push(selected.has(p.cell.getKey()) && p.rowIndex === r && p.columnIndex === c ? p.cell.getTextContent() : '')
+          }
+          matrix.push(row)
+        }
+        text = tableMatrixToTSV(matrix)
+      })
+      if (text === undefined) return
+      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text)
+      else {
+        const textarea = document.createElement('textarea'), focused = document.activeElement
+        textarea.value = text; textarea.readOnly = true; textarea.style.cssText = 'position:fixed;opacity:0;pointer-events:none'
+        document.body.append(textarea)
+        try { textarea.select(); if (!document.execCommand('copy')) throw new Error('Clipboard copy refused') }
+        finally { textarea.remove(); if (token.valid() && focused?.isConnected) focused.focus() }
       }
+      if (token.valid()) toast.success(token.groups.length > 1 ? '已复制第一个连续选区' : '已复制所选单元格')
+    } catch (error) { if (token.valid()) toast.error('复制失败，请检查剪贴板权限') }
+    finally { endClipboard(token) }
+  }
+  const pasteSelection = async () => {
+    const token = beginClipboard()
+    if (!token) return
+    try {
+      if (!navigator.clipboard?.readText) { toast.warning('当前环境不支持读取剪贴板'); return }
+      let snapshot
+      editor.getEditorState().read(() => {
+        const group = token.groups[0], model = $getTableModel($getNodeByKey(group.tableKey))
+        if (!model) return
+        const bounds = $groupBounds(model, group.cellKeys)
+        if (bounds) snapshot = { tableKey: group.tableKey, bounds, signature: model.signature, content: JSON.stringify($serialize(model.table)) }
+      })
+      if (!snapshot) return
+      token.snapshot = snapshot
       const text = await navigator.clipboard.readText()
-      if (!canWrite()) return
+      if (!token.valid()) return
       const matrix = parseTableTSV(text)
-      if (!matrix.length) {
-        toast.warning('剪贴板里没有可粘贴的表格内容')
-        return
-      }
-
-      let applied = false
-      updateEditable(() => {
-        const table = getRectTable(rect)
-        if (!table) return
-        const rows = table.getChildren()
-
-        for (let rowOffset = 0; rowOffset < matrix.length; rowOffset++) {
-          const row = rows[rect.r1 + rowOffset]
-          if (!(row instanceof TableRowNode)) break
-          const cells = row.getChildren()
-
-          for (let colOffset = 0; colOffset < matrix[rowOffset].length; colOffset++) {
-            const cell = cells[rect.c1 + colOffset]
-            if (!(cell instanceof TableCellNode)) break
-
-            for (const child of cell.getChildren()) child.remove()
-            const paragraph = $createParagraphNode()
-            const value = matrix[rowOffset][colOffset]
-            if (value) paragraph.append($createTextNode(value))
-            cell.append(paragraph)
-            applied = true
-          }
+      if (!matrix.length) { toast.warning('剪贴板里没有可粘贴的表格内容'); return }
+      token.applying = true
+      const changed = run(() => {
+        const model = $getTableModel($getNodeByKey(snapshot.tableKey))
+        if (!model || model.signature !== snapshot.signature || JSON.stringify($serialize(model.table)) !== snapshot.content) return { reason: '表格内容已变化，请重新选择后粘贴' }
+        const { top, left } = snapshot.bounds, targets = [], seen = new Set()
+        for (let r = 0; r < matrix.length; r++) for (let c = 0; c < matrix[r].length; c++) {
+          const location = model.grid[top + r]?.[left + c]
+          if (!location) return { reason: '粘贴内容超出表格范围，请先增加行或列' }
+          if (seen.has(location.cell.getKey()) || location.rowIndex !== top + r || location.columnIndex !== left + c) return { reason: '粘贴区域包含合并单元格，请先拆分后粘贴' }
+          seen.add(location.cell.getKey()); targets.push([location.cell, matrix[r][c]])
         }
-      }, canWrite, {
-        onUpdate: () => { if (applied && canWrite()) toast.success('已粘贴到所选区域') },
-      })
-    } catch (error) {
-      if (!canWrite()) return
-      console.error('粘贴表格内容失败', error)
-      toast.error('粘贴失败，请检查剪贴板权限')
+        for (const [cell, value] of targets) {
+          const paragraph = $createParagraphNode()
+          if (value) paragraph.append($createTextNode(value))
+          cell.clear().append(paragraph)
+        }
+        return { changed: targets.length > 0 }
+      }, token.valid)
+      token.applying = false
+      if (changed && token.valid()) toast.success('已粘贴到所选区域')
+    } catch (error) { if (token.valid()) toast.error('粘贴失败，请检查剪贴板权限') }
+    finally { endClipboard(token) }
+  }
+  handlersRef.current = { perform, copySelection, pasteSelection }
+
+  useEffect(() => {
+    const onMode = event => {
+      if (!isTableEventForEditor(editor, event)) return
+      if (event.detail === true && beginWrite()()) { activeRef.current = true; setActive(true) } else reset()
     }
-  }
-
-  const doClear = (payload) => {
-    updateEditable(() => {
-      const clearCell = cell => {
-        if (!(cell instanceof TableCellNode)) return
-        for (const child of cell.getChildren()) child.remove()
-        cell.append($createParagraphNode())
-      }
-
-      if (rects.length) {
-        const tables = []
-        const walk = node => {
-          if (!node.getChildren) return
-          for (const child of node.getChildren()) {
-            if (child instanceof TableNode) tables.push(child)
-            walk(child)
-          }
-        }
-        walk($getRoot())
-        forEachSelectedTableCell(tables, rects, clearCell)
-        return
-      }
-
-      const target = payload?.cellKey ? $getNodeByKey(payload.cellKey) : getCurrentCellInfo()?.cell
-      clearCell(target)
-    })
-  }
-
-  const getTable = (payload) => {
-    if (payload?.tableKey) return $getNodeByKey(payload.tableKey)
-
-    if (payload?.tIndex !== undefined) {
-      const tables = []
-      const walk = (node) => {
-        if (!node.getChildren) return
-        for (const child of node.getChildren()) {
-          if (child instanceof TableNode) tables.push(child)
-          walk(child)
-        }
-      }
-      walk($getRoot())
-      return tables[payload.tIndex]
+    const onAction = event => {
+      if (!isTableEventForEditor(editor, event) || !beginWrite()()) return
+      const { type, payload } = event.detail || {}
+      handlersRef.current.perform(type, payload)
     }
+    window.addEventListener('tableSelection:mode', onMode); window.addEventListener('tableAction', onAction)
+    return () => { window.removeEventListener('tableSelection:mode', onMode); window.removeEventListener('tableAction', onAction) }
+  }, [editor, beginWrite, reset])
 
-    return getCurrentCellInfo()?.table || null
-  }
-
-  const doAddRow = (payload) => {
-    updateEditable(() => {
-      const current = getCurrentCellInfo()
-      const ri = payload?.ri ?? current?.ri ?? 0
-      const mode = payload?.mode || 'below'
-      const table = getTable(payload) || current?.table
-      if (!table) return
-      const rows = table.getChildren()
-      const cols = rows[0]?.getChildren().length || 1
-      const row = $createTableRowNode()
-      
-      // Get reference row to copy styles
-      const refRow = rows[ri]
-      const refCells = refRow ? refRow.getChildren() : null
-
-      for (let i = 0; i < cols; i++) { 
-        const cell = $createTableCellNode(); 
-        cell.append($createParagraphNode()); 
-        
-        // Copy styles from reference cell
-        if (refCells && refCells[i]) {
-          const refCell = refCells[i]
-          if (refCell.getBackgroundColor()) cell.setBackgroundColor(refCell.getBackgroundColor())
-          if (refCell.getVerticalAlign()) cell.setVerticalAlign(refCell.getVerticalAlign())
-          if (refCell.getWidth()) cell.setWidth(refCell.getWidth())
-          if (refCell.getStyle && cell.setStyle) {
-             cell.setStyle(refCell.getStyle())
-          }
-        }
-        
-        row.append(cell) 
-      }
-      
-      const targetRow = rows[ri]
-      if (targetRow) {
-        if (mode === 'above') {
-          targetRow.insertBefore(row)
-        } else {
-          targetRow.insertAfter(row)
-        }
-      } else {
-        table.append(row)
-      }
-    })
-  }
-
-  const doDelRow = (payload) => {
-    updateEditable(() => {
-      const current = getCurrentCellInfo()
-      const ri = payload?.ri ?? current?.ri ?? 0
-      const table = getTable(payload) || current?.table
-      if (!table) return
-      const rows = table.getChildren()
-      const row = rows[ri]
-      if (row) row.remove()
-    })
-  }
-
-  const doAddCol = (payload) => {
-    updateEditable(() => {
-      const current = getCurrentCellInfo()
-      const ci = payload?.ci ?? current?.ci ?? 0
-      const mode = payload?.mode || 'right'
-      const table = getTable(payload) || current?.table
-      if (!table) return
-      const rows = table.getChildren()
-      for (const r of rows) { 
-        const cell = $createTableCellNode(); 
-        cell.append($createParagraphNode()); 
-        
-        // Copy styles from reference cell in the same row
-        const cells = r.getChildren()
-        const refCell = cells[ci]
-        if (refCell) {
-           if (refCell.getBackgroundColor()) cell.setBackgroundColor(refCell.getBackgroundColor())
-           if (refCell.getVerticalAlign()) cell.setVerticalAlign(refCell.getVerticalAlign())
-           if (refCell.getWidth()) cell.setWidth(refCell.getWidth())
-           
-           if (refCell.getStyle && cell.setStyle) {
-              cell.setStyle(refCell.getStyle())
-           }
-           if (refCell.getHeaderStyles) {
-             cell.setHeaderStyles(refCell.getHeaderStyles())
-           }
-        }
-
-        if (refCell) {
-          if (mode === 'left') {
-            refCell.insertBefore(cell)
-          } else {
-            refCell.insertAfter(cell)
-          }
-        } else {
-          r.append(cell)
-        }
-      }
-    })
-  }
-
-  const addColForTable = (tIndex) => {
-    updateEditable(() => {
-      const tables = []
-      const walk = (node) => { if (!node.getChildren) return; const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
-      walk($getRoot())
-      const table = tables[tIndex]
-      if (!table) return
-      const rows = table.getChildren()
-      const headerState = (() => { const first = rows[0]?.getChildren()?.[0]; try { return first?.getHeaderState?.() ?? 0 } catch { return 0 } })()
-      rows.forEach((row, ri) => { const cell = $createTableCellNode(); cell.append($createParagraphNode()); try { if (ri === 0) cell.setHeaderState?.(headerState) } catch {}; row.append(cell) })
-    })
-  }
-
-  const doDelCol = (payload) => {
-    updateEditable(() => {
-      const current = getCurrentCellInfo()
-      const ci = payload?.ci ?? current?.ci ?? 0
-      const table = getTable(payload) || current?.table
-      if (!table) return
-      const rows = table.getChildren()
-      for (const r of rows) { const cells = r.getChildren(); const target = cells[ci]; if (target) target.remove() }
-    })
-  }
-
-  const doMoveRow = (payload, direction) => {
-    updateEditable(() => {
-      const current = getCurrentCellInfo()
-      const ri = payload?.ri ?? current?.ri ?? 0
-      const table = getTable(payload) || current?.table
-      if (!table) return
-
-      const rows = table.getChildren()
-      const targetIndex = ri + direction
-      if (targetIndex < 0 || targetIndex >= rows.length) return
-
-      const row = rows[ri]
-      const target = rows[targetIndex]
-      if (!row || !target) return
-
-      if (direction < 0) target.insertBefore(row)
-      else target.insertAfter(row)
-    })
-  }
-
-  const doMoveCol = (payload, direction) => {
-    updateEditable(() => {
-      const current = getCurrentCellInfo()
-      const ci = payload?.ci ?? current?.ci ?? 0
-      const table = getTable(payload) || current?.table
-      if (!table) return
-
-      const rows = table.getChildren()
-      const targetIndex = ci + direction
-      if (targetIndex < 0) return
-
-      for (const row of rows) {
-        const cells = row.getChildren()
-        if (targetIndex >= cells.length) return
-
-        const cell = cells[ci]
-        const target = cells[targetIndex]
-        if (!(cell instanceof TableCellNode) || !(target instanceof TableCellNode)) return
-
-        if ((cell.getColSpan?.() || 1) !== 1 || (target.getColSpan?.() || 1) !== 1) {
-          toast.warning('合并单元格暂不支持直接移动列')
-          return
-        }
-      }
-
-      for (const row of rows) {
-        const cells = row.getChildren()
-        const cell = cells[ci]
-        const target = cells[targetIndex]
-        if (direction < 0) target.insertBefore(cell)
-        else target.insertAfter(cell)
-      }
-    })
-  }
-
-  const sortByFirstCol = (dir) => {
-    updateEditable(() => {
-      const tables = []
-      const walk = (node) => { if (!node.getChildren) return; const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
-      walk($getRoot())
-      const container = document.querySelector('.editor-container')
-      const tableEls = container ? Array.from(container.querySelectorAll('table')) : []
-      const tIndex = hoverTable ?? 0
-      const table = tables[tIndex]
-      const tableEl = tableEls[tIndex]
-      if (!table || !tableEl) return
-      const rows = table.getChildren()
-      const bodyRows = rows.slice(1)
-      const sorted = bodyRows.slice().sort((a, b) => {
-        const ta = a.getChildren?.()[0]
-        const tb = b.getChildren?.()[0]
-        const va = String(ta?.getTextContent?.() || '')
-        const vb = String(tb?.getTextContent?.() || '')
-        return dir === 'asc' ? va.localeCompare(vb, 'zh-CN') : vb.localeCompare(va, 'zh-CN')
+  useEffect(() => {
+    if (!active || !isEditable) return
+    let detach = () => {}, frame = 0
+    const refresh = () => {
+      frame = 0
+      const root = editor.getRootElement(), container = root?.closest('.editor-container')
+      if (!container || !activeRef.current) return
+      let next = []
+      editor.getEditorState().read(() => {
+        next = groupsRef.current.map(group => {
+          const model = $getTableModel($getNodeByKey(group.tableKey))
+          return model ? { ...group, cellKeys: group.cellKeys.filter(key => model.locations.has(key)) } : null
+        }).filter(group => group?.cellKeys.length)
       })
-      bodyRows.forEach(r => r.remove())
-      sorted.forEach(r => table.append(r))
-    })
-  }
-
-  const filterRowsContains = (payload) => {
-    const q = payload?.value ?? payload
-    if (!q) return
-    updateEditable(() => {
-      const tables = []
-      const walk = (node) => { if (!node.getChildren) return; const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
-      walk($getRoot())
-      const tIndex = hoverTable ?? 0
-      const table = tables[tIndex]
-      if (!table) return
-      const rows = table.getChildren()
-      const header = rows[0]
-      const remain = [header]
-      rows.slice(1).forEach(r => {
-        const text = r.getTextContent?.() || ''
-        if (text.includes(q)) remain.push(r)
-        else r.remove()
-      })
-    })
-  }
-
-  const paginateRows = (payload) => {
-    const pageSize = Number(payload?.value ?? payload)
-    updateEditable(() => {
-      const tables = []
-      const walk = (node) => { if (!node.getChildren) return; const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
-      walk($getRoot())
-      const tIndex = hoverTable ?? 0
-      const table = tables[tIndex]
-      if (!table) return
-      const rows = table.getChildren()
-      const header = rows[0]
-      let group = []
-      let remaining = rows.slice(1)
-      const parent = table.getParent?.()
-      if (!parent) return
-      const makeTable = (rowsGroup) => {
-        const nt = new TableNode()
-        const newRows = [header.clone?.() || header]
-        rowsGroup.forEach(r => newRows.push(r))
-        newRows.forEach(r => nt.append(r))
-        parent.insertAfter(nt, table)
-        return nt
-      }
-      while (remaining.length > 0) {
-        group = remaining.splice(0, pageSize)
-        makeTable(group)
-      }
-      // Original table will keep only header
-      rows.slice(1).forEach(r => r.remove())
-    })
-  }
-
-  const outlines = (() => {
-    if (typeof document === 'undefined') return []
-    const container = document.querySelector('.editor-container')
-    if (!container) return []
-    const tables = Array.from(container.querySelectorAll('table'))
-    return rects.map(r => {
-      const table = tables[r.tableIndex]
-      if (!table) return null
+      replaceGroups(next)
       const host = container.getBoundingClientRect()
-      const tlCell = table.rows[r.r1]?.children?.[r.c1]
-      const brCell = table.rows[r.r2]?.children?.[r.c2]
-      if (!tlCell || !brCell) return null
-      const tl = tlCell.getBoundingClientRect()
-      const br = brCell.getBoundingClientRect()
-      const x = tl.left - host.left
-      const y = tl.top - host.top
-      const w = br.right - tl.left
-      const h = br.bottom - tl.top
-      return { x, y, w, h }
-    }).filter(Boolean)
-  })()
-
-  const applyAlign = payload => {
-    const value = payload?.value ?? payload
-
-    updateEditable(() => {
-      if (rects.length) {
-        const tables = []
-        const walk = node => {
-          if (!node.getChildren) return
-          for (const child of node.getChildren()) {
-            if (child instanceof TableNode) tables.push(child)
-            walk(child)
+      const viewports = new Map()
+      const outlines = next.flatMap(group => group.cellKeys.map(key => {
+        const cell = editor.getElementByKey(key)
+        if (!cell || !root.contains(cell)) return null
+        const box = cell.getBoundingClientRect()
+        let left = box.left, top = box.top, right = box.right, bottom = box.bottom
+        const table = cell.closest('table')
+        if (table && !viewports.has(table)) {
+          const bounds = table.getBoundingClientRect()
+          viewports.set(table, {
+            bounds,
+            left: bounds.left + table.clientLeft, top: bounds.top + table.clientTop,
+            right: bounds.left + table.clientLeft + (table.clientWidth || bounds.width),
+            bottom: bounds.top + table.clientTop + (table.clientHeight || bounds.height),
+            frozenRow: table.dataset.lexicalFrozenRow === 'true' ? table.rows[0] : null,
+            frozenRowCells: table.dataset.lexicalFrozenRow === 'true'
+              ? [...(table.rows[0]?.cells || [])].map(node => node.getBoundingClientRect()) : [],
+            frozenColumns: table.dataset.lexicalFrozenColumn === 'true'
+              ? [...table.querySelectorAll('[data-table-column="0"]')].map(node => node.getBoundingClientRect()) : [],
+          })
+        }
+        const viewport = viewports.get(table)
+        if (viewport?.bounds.width > 0 && viewport.bounds.height > 0) {
+          left = Math.max(left, viewport.left); top = Math.max(top, viewport.top)
+          right = Math.min(right, viewport.right); bottom = Math.min(bottom, viewport.bottom)
+          // These outlines live outside the scrolling TABLE. Clip both the
+          // viewport and sticky cells so hidden selections cannot paint over
+          // nearby text or over the visible frozen row/column.
+          if (cell.dataset.tableColumn !== '0') {
+            for (const frozen of viewport.frozenColumns) {
+              if (frozen.top < bottom && frozen.bottom > top) left = Math.max(left, frozen.right)
+            }
           }
-        }
-        walk($getRoot())
-        forEachSelectedTableCell(tables, rects, cell => cell.setVerticalAlign?.(value))
-        return
-      }
-
-      if (payload?.cellKey) {
-        const cell = $getNodeByKey(payload.cellKey)
-        if (cell?.setVerticalAlign) cell.setVerticalAlign(value)
-        return
-      }
-
-      const selection = $getSelection()
-      let cell = selection?.getNodes?.()[0]
-      while (cell && !(cell instanceof TableCellNode)) cell = cell.getParent?.()
-      cell?.setVerticalAlign?.(value)
-    })
-
-    if (!active) setRects([])
-  }
-
-  const applyHorizontal = payload => {
-    const value = payload?.value ?? payload
-    const patch = `text-align: ${value};`
-
-    updateEditable(() => {
-      const applyCell = cell => {
-        const previous = cell.getStyle?.() || ''
-        cell.setStyle?.(mergeStyle(previous, patch))
-      }
-
-      if (rects.length) {
-        const tables = []
-        const walk = node => {
-          if (!node.getChildren) return
-          for (const child of node.getChildren()) {
-            if (child instanceof TableNode) tables.push(child)
-            walk(child)
+          if (viewport.frozenRow && cell.parentElement !== viewport.frozenRow) {
+            // Sticky positioning belongs to TD/TH; the TR scrolls normally.
+            for (const frozen of viewport.frozenRowCells) {
+              if (frozen.left < right && frozen.right > left) top = Math.max(top, frozen.bottom)
+            }
           }
+          if (right <= left || bottom <= top) return null
         }
-        walk($getRoot())
-        forEachSelectedTableCell(tables, rects, applyCell)
+        return { key, x: left - host.left + container.scrollLeft, y: top - host.top + container.scrollTop, w: right - left, h: bottom - top }
+      }).filter(Boolean))
+      let add = null
+      const tableElement = hoverRef.current && editor.getElementByKey(hoverRef.current.tableKey)
+      if (tableElement && root.contains(tableElement)) {
+        const box = tableElement.getBoundingClientRect()
+        add = { x: Math.max(0, Math.min(box.right - host.left + 6, host.width - 48)) + container.scrollLeft, y: box.top - host.top + box.height / 2 + container.scrollTop }
+      }
+      setGeometry({ outlines: [...new Map(outlines.map(outline => [outline.key, outline])).values()], top: container.scrollTop + 10, add })
+    }
+    const schedule = () => { if (!frame) frame = requestAnimationFrame(refresh) }
+    const unregisterUpdate = editor.registerUpdateListener(({ editorState, dirtyElements, dirtyLeaves, tags }) => {
+      if (tags.has('local-notepad:content-load')) {
+        reset(); dispatchTableEvent(editor, 'tableSelection:mode', false)
         return
       }
-
-      if (payload?.cellKey) {
-        const cell = $getNodeByKey(payload.cellKey)
-        if (cell) applyCell(cell)
-        return
-      }
-
-      const selection = $getSelection()
-      let cell = selection?.getNodes?.()[0]
-      while (cell && !(cell instanceof TableCellNode)) cell = cell.getParent?.()
-      if (cell) applyCell(cell)
-    })
-
-    if (!active) setRects([])
-  }
-
-  const applyBorder = payload => {
-    const preset = payload?.value ?? payload
-    const style = preset === 'none'
-      ? 'border: 0;'
-      : preset === 'thin'
-        ? 'border: 1px solid #999;'
-        : preset === 'bold'
-          ? 'border: 2px solid #333;'
-          : preset === 'dashed'
-            ? 'border: 2px dashed #666;'
-            : ''
-
-    updateEditable(() => {
-      const applyCell = cell => {
-        const previous = cell.getStyle?.() || ''
-        cell.setStyle?.(mergeStyle(previous, style))
-      }
-
-      if (rects.length) {
-        const tables = []
-        const walk = node => {
-          if (!node.getChildren) return
-          for (const child of node.getChildren()) {
-            if (child instanceof TableNode) tables.push(child)
-            walk(child)
-          }
-        }
-        walk($getRoot())
-        forEachSelectedTableCell(tables, rects, applyCell)
-        return
-      }
-
-      if (payload?.cellKey) {
-        const cell = $getNodeByKey(payload.cellKey)
-        if (cell) applyCell(cell)
-        return
-      }
-
-      const selection = $getSelection()
-      let cell = selection?.getNodes?.()[0]
-      while (cell && !(cell instanceof TableCellNode)) cell = cell.getParent?.()
-      if (cell) applyCell(cell)
-    })
-
-    if (!active) setRects([])
-  }
-
-  const applyBackground = payload => {
-    const color = payload?.value ?? payload
-
-    updateEditable(() => {
-      if (rects.length) {
-        const tables = []
-        const walk = node => {
-          if (!node.getChildren) return
-          for (const child of node.getChildren()) {
-            if (child instanceof TableNode) tables.push(child)
-            walk(child)
-          }
-        }
-        walk($getRoot())
-        forEachSelectedTableCell(tables, rects, cell => cell.setBackgroundColor?.(color))
-        return
-      }
-
-      if (payload?.cellKey) {
-        const cell = $getNodeByKey(payload.cellKey)
-        if (cell?.setBackgroundColor) cell.setBackgroundColor(color)
-        return
-      }
-
-      const selection = $getSelection()
-      let cell = selection?.getNodes?.()[0]
-      while (cell && !(cell instanceof TableCellNode)) cell = cell.getParent?.()
-      cell?.setBackgroundColor?.(color)
-    })
-
-    if (!active) setRects([])
-  }
-
-  const mergeStyle = (prev, patch) => {
-    const map = {}
-    const put = (s) => { s.split(';').map(x=>x.trim()).filter(Boolean).forEach((kv)=>{ const i=kv.indexOf(':'); if(i>0){ const k=kv.slice(0,i).trim(); const v=kv.slice(i+1).trim(); map[k]=v } }) }
-    put(prev || '')
-    put(patch || '')
-    return Object.entries(map).map(([k,v])=>`${k}: ${v};`).join(' ')
-  }
-
-  const autoSize = (mode) => {
-    updateEditable(() => {
-      const tables = []
-      const walk = (node) => { if (!node.getChildren) return; const kids = node.getChildren(); for (const k of kids) { if (k instanceof TableNode) tables.push(k); walk(k) } }
-      walk($getRoot())
-      const container = document.querySelector('.editor-container')
-      const tableEls = container ? Array.from(container.querySelectorAll('table')) : []
-      let tableIndex = hoverTable
-      if (tableIndex === null || tableIndex === undefined) {
-        const sel = $getSelection()
-        const node = sel?.getNodes?.()[0]
-        let tableNode = node
-        while (tableNode && !(tableNode instanceof TableNode)) { tableNode = tableNode.getParent?.() }
-        if (tableNode) {
-          const list = []
-          const walk2 = (n) => { if (!n.getChildren) return; const kids = n.getChildren(); for (const k of kids) { if (k instanceof TableNode) list.push(k); walk2(k) } }
-          walk2($getRoot())
-          tableIndex = list.indexOf(tableNode)
-        } else {
-          tableIndex = 0
-        }
-      }
-      const table = tables[tableIndex]
-      const tableEl = tableEls[tableIndex]
-      if (!table || !tableEl) return
-      const rows = table.getChildren()
-      const colsCount = rows[0]?.getChildren()?.length || 1
-      if (mode === 'fitWindow') {
-        const hostW = container.getBoundingClientRect().width - 20
-        const colW = Math.max(60, Math.floor(hostW / colsCount))
-        rows.forEach((row) => { const cells = row.getChildren(); cells.forEach((cell)=>cell.setWidth?.(colW)) })
-      } else if (mode === 'fitContent') {
-        const measures = new Array(colsCount).fill(60)
-        Array.from(tableEl.rows).forEach((r) => {
-          Array.from(r.cells).forEach((c, ci) => { const w = Math.ceil(c.scrollWidth) + 24; measures[ci] = Math.max(measures[ci], w) })
+      const token = busyRef.current
+      if (token?.snapshot && !token.applying && !token.cancelled && (dirtyElements.size || dirtyLeaves.size)) {
+        editorState.read(() => {
+          const table = $getNodeByKey(token.snapshot.tableKey), model = $getTableModel(table)
+          if (!model || model.signature !== token.snapshot.signature || JSON.stringify($serialize(table)) !== token.snapshot.content) token.cancelled = true
         })
-        rows.forEach((row) => { const cells = row.getChildren(); cells.forEach((cell, ci)=>cell.setWidth?.(measures[ci])) })
       }
+      schedule()
     })
-  }
-
-  const selectedCellCount = countSelectedTableCells(rects)
-
-  const exitSelectionMode = () => {
-    setRects([])
-    setActive(false)
-    window.dispatchEvent(new CustomEvent('tableSelection:mode', { detail: false }))
-    editor.focus()
-  }
+    const unregisterRoot = editor.registerRootListener(root => {
+      detach()
+      if (!root) { dragRef.current = null; return }
+      const container = root.closest('.editor-container') || root
+      const cellKey = target => {
+        const dom = target?.closest?.('td,th')
+        if (!dom || !root.contains(dom)) return null
+        return editor.getEditorState().read(() => {
+          const node = $getNearestNodeFromDOMNode(dom)
+          return $isTableCellNode(node) ? node.getKey() : null
+        }, { editor })
+      }
+      const onDown = event => {
+        if (event.button !== 0 || !beginWrite()()) return
+        const anchorKey = cellKey(event.target)
+        if (!anchorKey) return
+        const group = editor.getEditorState().read(() => $selectionGroup(anchorKey, anchorKey))
+        if (!group) return
+        const previous = event.ctrlKey || event.metaKey ? groupsRef.current : []
+        dragRef.current = { anchorKey, previous }
+        replaceGroups([...previous, group]); schedule()
+        event.preventDefault(); event.stopPropagation()
+        root.focus({ preventScroll: true })
+      }
+      const onMove = event => {
+        const key = cellKey(event.target)
+        if (!key) return
+        editor.getEditorState().read(() => {
+          const current = $resolveTableCell(key)
+          if (current) hoverRef.current = { tableKey: current.table.getKey(), cellKey: current.model.grid[0][current.model.columnCount - 1].cell.getKey() }
+          const drag = dragRef.current
+          if (drag && beginWrite()()) {
+            const group = $selectionGroup(drag.anchorKey, key)
+            if (group) replaceGroups([...drag.previous, group])
+          }
+        })
+        if (dragRef.current) { event.preventDefault(); event.stopPropagation() }
+        schedule()
+      }
+      const onUp = () => { dragRef.current = null }
+      const onKey = event => {
+        if (!beginWrite()() || editor.isComposing() || isShortcutContextBlocked(event)) return
+        const target = event.target?.nodeType === 1 ? event.target : document.activeElement
+        if (target?.closest?.('input,textarea,select')) return
+        if (target === document.body && !isTableEventForEditor(editor, { target: window })) return
+        const focusedEditor = target?.closest?.('[data-lexical-editor="true"]')
+        if (focusedEditor && focusedEditor !== root) return
+        if (target && target !== document.body && !container.contains(target)) return
+        if (event.key === 'Escape') { event.preventDefault(); exit(); return }
+        const modifier = event.ctrlKey || event.metaKey, key = event.key.toLowerCase()
+        if (modifier && !event.altKey && !event.shiftKey && key === 'c') { event.preventDefault(); void handlersRef.current.copySelection(); return }
+        if (modifier && !event.altKey && !event.shiftKey && key === 'v') { event.preventDefault(); void handlersRef.current.pasteSelection(); return }
+        if (matchShortcut(event, 'mergeCells')) { event.preventDefault(); handlersRef.current.perform('mergeCells') }
+        if (matchShortcut(event, 'splitCell')) { event.preventDefault(); handlersRef.current.perform('splitCells') }
+      }
+      root.addEventListener('mousedown', onDown, true); root.addEventListener('mousemove', onMove, true); root.addEventListener('mouseover', onMove)
+      document.addEventListener('mouseup', onUp); window.addEventListener('blur', onUp); window.addEventListener('keydown', onKey)
+      window.addEventListener('resize', schedule); container.addEventListener('scroll', schedule, true)
+      detach = () => {
+        root.removeEventListener('mousedown', onDown, true); root.removeEventListener('mousemove', onMove, true); root.removeEventListener('mouseover', onMove)
+        document.removeEventListener('mouseup', onUp); window.removeEventListener('blur', onUp); window.removeEventListener('keydown', onKey)
+        window.removeEventListener('resize', schedule); container.removeEventListener('scroll', schedule, true)
+      }
+      schedule()
+    })
+    return () => { unregisterRoot(); detach(); unregisterUpdate(); if (frame) cancelAnimationFrame(frame); dragRef.current = null }
+  }, [active, isEditable, editor, documentId, beginWrite, replaceGroups, exit, reset])
 
   if (!isEditable) return null
-
+  const selectedCellCount = countSelectedTableCells(groups), disabled = selectedCellCount === 0 || busy
   return (
-    <div ref={overlayRef} className="table-selection-overlay" style={{ pointerEvents: 'none' }}>
+    <div className="table-selection-overlay" style={{ pointerEvents: 'none' }}>
       {active && (
-        <div className="table-selection-modebar" style={{ pointerEvents: 'auto' }}>
+        <div className="table-selection-modebar" style={{ pointerEvents: 'auto', top: geometry.top }} aria-busy={busy}>
           <div className="table-selection-modebar-copy">
             <strong>单元格多选</strong>
-            <span>{selectedCellCount > 0 ? `已选择 ${selectedCellCount} 个单元格` : '拖动鼠标框选连续单元格，按 Ctrl/Cmd 可追加区域'}</span>
+            <span>{selectedCellCount ? '已选择 ' + selectedCellCount + ' 个单元格' : '拖动鼠标框选连续单元格，按 Ctrl/Cmd 可追加区域'}</span>
           </div>
           <div className="table-selection-modebar-actions">
-            <UiButton density="compact" type="button" onClick={copySelection} disabled={selectedCellCount === 0}>复制</UiButton>
-            <UiButton density="compact" type="button" onClick={pasteSelection} disabled={selectedCellCount === 0}>粘贴</UiButton>
-            <UiButton density="compact" type="button" onClick={() => applyBackground('#fff3cd')} disabled={selectedCellCount === 0}>浅黄</UiButton>
-            <UiButton density="compact" type="button" onClick={() => applyBackground('')} disabled={selectedCellCount === 0}>清底色</UiButton>
-            <UiButton density="compact" type="button" onClick={() => applyHorizontal('left')} disabled={selectedCellCount === 0}>左对齐</UiButton>
-            <UiButton density="compact" type="button" onClick={() => applyHorizontal('center')} disabled={selectedCellCount === 0}>居中</UiButton>
-            <UiButton density="compact" type="button" onClick={() => applyHorizontal('right')} disabled={selectedCellCount === 0}>右对齐</UiButton>
-            <UiButton density="compact" type="button" onClick={() => applyAlign('middle')} disabled={selectedCellCount === 0}>垂直居中</UiButton>
-            <UiButton density="compact" type="button" onClick={doMerge} disabled={selectedCellCount < 2} title={`合并 (${shortcutLabel('mergeCells', bindings)})`}>合并</UiButton>
-            <UiButton density="compact" type="button" onClick={doSplit} disabled={selectedCellCount === 0} title={`拆分 (${shortcutLabel('splitCell', bindings)})`}>拆分</UiButton>
-            <UiButton density="compact" type="button" onClick={() => doClear()} disabled={selectedCellCount === 0}>清空</UiButton>
-            <UiButton density="compact" type="button" className="primary" onClick={exitSelectionMode}>完成</UiButton>
+            <UiButton density="compact" type="button" onClick={copySelection} disabled={disabled}>复制</UiButton>
+            <UiButton density="compact" type="button" onClick={pasteSelection} disabled={disabled}>粘贴</UiButton>
+            <UiButton density="compact" type="button" onClick={() => perform('background', '#fff3cd')} disabled={disabled}>浅黄</UiButton>
+            <UiButton density="compact" type="button" onClick={() => perform('background', '')} disabled={disabled}>清底色</UiButton>
+            <UiButton density="compact" type="button" onClick={() => perform('alignHorizontal', 'left')} disabled={disabled}>左对齐</UiButton>
+            <UiButton density="compact" type="button" onClick={() => perform('alignHorizontal', 'center')} disabled={disabled}>居中</UiButton>
+            <UiButton density="compact" type="button" onClick={() => perform('alignHorizontal', 'right')} disabled={disabled}>右对齐</UiButton>
+            <UiButton density="compact" type="button" onClick={() => perform('alignVertical', 'middle')} disabled={disabled}>垂直居中</UiButton>
+            <UiButton density="compact" type="button" onClick={() => perform('mergeCells')} disabled={disabled || selectedCellCount < 2} title={'合并 (' + shortcutLabel('mergeCells', bindings) + ')'}>合并</UiButton>
+            <UiButton density="compact" type="button" onClick={() => perform('splitCells')} disabled={disabled} title={'拆分 (' + shortcutLabel('splitCell', bindings) + ')'}>拆分</UiButton>
+            <UiButton density="compact" type="button" onClick={() => perform('clear')} disabled={disabled}>清空</UiButton>
+            <UiButton density="compact" type="button" className="primary" onClick={exit}>完成</UiButton>
           </div>
         </div>
       )}
-      {outlines.map((b, i) => (
-        <div key={i} className="table-selection-outline" style={{ position: 'absolute', left: b.x, top: b.y, width: b.w, height: b.h }} />
-      ))}
-      {addBtnPos && hoverTable !== null && (
-        <UiButton density="compact" onClick={() => addColForTable(hoverTable)} className="table-add-col-btn" style={{ pointerEvents: 'auto', position: 'absolute', left: addBtnPos.x, top: addBtnPos.y, transform: 'translateY(-50%)' }}>+列</UiButton>
-      )}
+      {active && geometry.outlines.map(box => <div key={box.key} className="table-selection-outline" style={{ position: 'absolute', left: box.x, top: box.y, width: box.w, height: box.h }} />)}
+      {active && geometry.add && <UiButton density="compact" type="button" onClick={() => perform('insertColRight', hoverRef.current)} className="table-add-col-btn" style={{ pointerEvents: 'auto', position: 'absolute', left: geometry.add.x, top: geometry.add.y, transform: 'translateY(-50%)' }}>+列</UiButton>}
     </div>
   )
 }

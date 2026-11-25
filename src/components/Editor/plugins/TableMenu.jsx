@@ -1,12 +1,19 @@
-import React, { useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { INSERT_TABLE_COMMAND } from '@lexical/table'
+import { HISTORY_PUSH_TAG } from 'lexical'
 import { UiButton } from '~/components/ui/ControlKit'
+import { useEditorWriteScope } from '../hooks/useEditorWriteScope'
 
 
-export default function TableMenu() {
+export default function TableMenu({ documentId, onInsert } = {}) {
   const [editor] = useLexicalComposerContext()
+  const captureWrite = useEditorWriteScope(editor, documentId)
   const [open, setOpen] = useState(false)
+  const [editable, setEditable] = useState(editor.isEditable())
+  const hostRef = useRef(null)
+  const triggerRef = useRef(null)
+  const openWriteRef = useRef(null)
   const gridRef = useRef(null)
   const grid = useMemo(
     () => Array.from({ length: 8 }, (_, row) =>
@@ -16,14 +23,46 @@ export default function TableMenu() {
   )
   const [hoverRect, setHoverRect] = useState({ row: 3, col: 3 })
 
-  const pick = (row, col) => {
-    editor.dispatchCommand(INSERT_TABLE_COMMAND, {
-      columns: String(col),
-      rows: String(row),
-    })
+  useEffect(() => {
     setOpen(false)
+    openWriteRef.current = null
     setHoverRect({ row: 3, col: 3 })
-    editor.focus()
+    setEditable(editor.isEditable())
+    return editor.registerEditableListener(value => {
+      setEditable(value)
+      openWriteRef.current = null
+      setOpen(false)
+    })
+  }, [editor, documentId])
+
+  useEffect(() => {
+    if (!open) return undefined
+    const closeOutside = event => {
+      if (!hostRef.current?.contains(event.target)) {
+        setOpen(false)
+        openWriteRef.current = null
+      }
+    }
+    document.addEventListener('mousedown', closeOutside)
+    return () => document.removeEventListener('mousedown', closeOutside)
+  }, [open])
+
+  const pick = (row, col) => {
+    const canWrite = openWriteRef.current
+    if (!canWrite?.()) return
+    let inserted = false
+    editor.update(() => {
+      if (!canWrite()) return
+      inserted = editor.dispatchCommand(INSERT_TABLE_COMMAND, {
+        columns: String(col), rows: String(row),
+      })
+    }, { tag: HISTORY_PUSH_TAG, discrete: true })
+    if (!inserted) return
+    setOpen(false)
+    openWriteRef.current = null
+    setHoverRect({ row: 3, col: 3 })
+    onInsert?.()
+    if (canWrite()) editor.focus()
   }
 
   const updateHoverFromPointer = (event) => {
@@ -44,11 +83,27 @@ export default function TableMenu() {
   }
 
   return (
-    <div className="table-menu-host">
+    <div className="table-menu-host" ref={hostRef} onKeyDown={event => {
+      if (open && event.key === 'Escape') {
+        event.preventDefault()
+        event.stopPropagation()
+        setOpen(false)
+        openWriteRef.current = null
+        triggerRef.current?.focus()
+      }
+    }}>
       <UiButton density="compact"
+        ref={triggerRef}
         type="button"
         className="btn toolbar-menu-action table-insert-trigger"
-        onClick={() => setOpen(prev => !prev)}
+        disabled={!editable}
+        onClick={() => {
+          if (open) { setOpen(false); openWriteRef.current = null; return }
+          const canWrite = captureWrite()
+          if (!canWrite()) return
+          openWriteRef.current = canWrite
+          setOpen(true)
+        }}
         aria-expanded={open}
         aria-haspopup="dialog"
       >
@@ -61,7 +116,7 @@ export default function TableMenu() {
           <div className="tm-title-row">
             <div>
               <strong>插入表格</strong>
-              <span>移动鼠标选择行列</span>
+              <span>选择需要的行列</span>
             </div>
             <span className="tm-size-preview">{hoverRect.row} × {hoverRect.col}</span>
           </div>
@@ -82,6 +137,7 @@ export default function TableMenu() {
                       key={colIndex}
                       className={`tm-grid-cell${selected ? ' selected' : ''}`}
                       onMouseEnter={() => setHoverRect(cell)}
+                      onFocus={() => setHoverRect(cell)}
                       onClick={() => pick(cell.row, cell.col)}
                       aria-label={`${cell.row} 行 ${cell.col} 列`}
                     />

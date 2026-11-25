@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import {
   $createTableCellNode,
   $createTableNode,
   $createTableRowNode,
+  $isTableSelection,
 } from '@lexical/table'
 import {
   INSERT_CHECK_LIST_COMMAND,
@@ -22,13 +23,16 @@ import {
 import {
   $createParagraphNode,
   $createTextNode,
+  $getRoot,
   $getSelection,
   $insertNodes,
   $isRangeSelection,
+  $setSelection,
   CAN_REDO_COMMAND,
   CAN_UNDO_COMMAND,
   FORMAT_ELEMENT_COMMAND,
   FORMAT_TEXT_COMMAND,
+  HISTORY_PUSH_TAG,
   INDENT_CONTENT_COMMAND,
   OUTDENT_CONTENT_COMMAND,
   REDO_COMMAND,
@@ -54,6 +58,7 @@ import { toast } from '~/services/toast'
 import TableMenu from './TableMenu'
 import { normalizeLinkUrl } from '../utils/linkUtils'
 import { useEditorWriteScope } from '../hooks/useEditorWriteScope'
+import { readExcelTableRows } from '../utils/excelTable'
 import { isShortcutContextBlocked, shortcutFromEvent, shortcutLabel } from '~/services/localShortcuts'
 import useLocalShortcuts from '~/hooks/useLocalShortcuts'
 import './TextColorPlugin.css'
@@ -113,6 +118,8 @@ export default function ToolbarPlugin({ documentId } = {}) {
     localStorage.getItem('editor-font-family') || FontOptions[0].value
   ))
   const [isUploading, setIsUploading] = useState(false)
+  const [excelBusy, setExcelBusy] = useState(false)
+  const excelRequestRef = useRef(null)
   const [isBold, setIsBold] = useState(false)
   const [isItalic, setIsItalic] = useState(false)
   const [isUnderline, setIsUnderline] = useState(false)
@@ -137,6 +144,18 @@ export default function ToolbarPlugin({ documentId } = {}) {
   const insertMenuRef = useRef(null)
   const moreMenuRef = useRef(null)
   const linkRef = useRef(null)
+
+  useLayoutEffect(() => {
+    setExcelBusy(false)
+    const unregister = editor.registerEditableListener(() => {
+      excelRequestRef.current?.cancel()
+      setExcelBusy(false)
+    })
+    return () => {
+      unregister()
+      excelRequestRef.current?.cancel()
+    }
+  }, [editor, documentId])
 
   useEffect(() => {
     if (!moreOpen || !fontFocusRequestedRef.current) return
@@ -485,32 +504,78 @@ export default function ToolbarPlugin({ documentId } = {}) {
   }
 
   const handleExcel = async (event) => {
+    if (excelRequestRef.current) return
     const canWrite = captureWrite()
     if (!canWrite()) return
-    const file = event.target.files?.[0]
+    const input = event.target
+    const file = input.files?.[0]
     if (!file) return
 
-    if (file.size > 5 * 1024 * 1024) {
-      toast.warning('Excel 文件不能超过 5 MB')
-      event.target.value = ''
+    let insertionSelection = null, insideTable = false
+    editor.read('latest', () => {
+      const selection = $getSelection()
+      insertionSelection = selection?.clone() || null
+      insideTable = $isTableSelection(selection)
+      // A wiki-link selected by evidence navigation is a NodeSelection, not a
+      // range. Its insertion point still belongs to its containing table cell.
+      const nodes = $isRangeSelection(selection)
+        ? [selection.anchor.getNode(), selection.focus.getNode()]
+        : selection?.getNodes?.() || []
+      for (const selected of nodes) {
+        for (let node = selected; node; node = node.getParent()) {
+          if (node.getType() === 'table') insideTable = true
+        }
+      }
+    })
+    if (insideTable) {
+      toast.warning('请先将光标放到表格外的正文中，再插入 Excel 表格')
+      input.value = ''
       return
     }
 
-    setIsUploading(true)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.warning('Excel 文件不能超过 5 MB')
+      input.value = ''
+      return
+    }
+
+    setExcelBusy(true)
     const reader = new FileReader()
+    const task = {
+      changed: false,
+      cancel() {
+        if (excelRequestRef.current === task) excelRequestRef.current = null
+        task.unsubscribe?.()
+        reader.onload = reader.onerror = reader.onabort = null
+        if (reader.readyState === 1) reader.abort()
+        input.value = ''
+      },
+    }
+    excelRequestRef.current = task
+    task.unsubscribe = editor.registerUpdateListener(({ dirtyElements, dirtyLeaves }) => {
+      if (dirtyElements.size || dirtyLeaves.size) task.changed = true
+    })
+    const isCurrent = () => excelRequestRef.current === task && canWrite()
+    const finish = () => {
+      if (excelRequestRef.current !== task) return
+      task.cancel()
+      setExcelBusy(false)
+    }
 
     reader.onload = async (loadEvent) => {
       try {
-        if (!canWrite()) return
+        if (!isCurrent()) return
         const XLSX = await loadXLSX()
-        if (!canWrite()) return
+        if (!isCurrent()) return
+        if (task.changed) throw new Error('导入期间正文已变化，请重新选择 Excel 文件；未插入过期表格')
         const data = new Uint8Array(loadEvent.target.result)
-        const workbook = XLSX.read(data, { type: 'array' })
-        const sheet = workbook.Sheets[workbook.SheetNames[0]]
-        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
+        const rows = readExcelTableRows(XLSX, data)
 
+        let inserted = false
         editor.update(() => {
-          if (!canWrite()) return
+          if (!isCurrent()) return
+          if (insertionSelection) $setSelection(insertionSelection.clone())
+          else $getRoot().selectEnd()
           const table = $createTableNode()
           for (const rowData of rows) {
             const tableRow = $createTableRowNode()
@@ -524,23 +589,26 @@ export default function ToolbarPlugin({ documentId } = {}) {
             table.append(tableRow)
           }
           $insertNodes([table])
-        })
+          inserted = true
+        }, { tag: HISTORY_PUSH_TAG, discrete: true })
+        if (inserted && isCurrent()) {
+          setInsertOpen(false)
+          editor.focus()
+        }
       } catch (error) {
-        console.error('Excel 解析失败', error)
-        toast.error('Excel 解析失败')
+        if (isCurrent()) toast.error(error.message || 'Excel 解析失败')
       } finally {
-        setIsUploading(false)
-        event.target.value = ''
+        finish()
       }
     }
 
     reader.onerror = () => {
-      setIsUploading(false)
-      event.target.value = ''
-      if (canWrite()) toast.error('读取 Excel 文件失败')
+      if (isCurrent()) toast.error('读取 Excel 文件失败')
+      finish()
     }
-
-    reader.readAsArrayBuffer(file)
+    reader.onabort = finish
+    try { reader.readAsArrayBuffer(file) }
+    catch { reader.onerror() }
   }
 
   return (
@@ -740,7 +808,7 @@ export default function ToolbarPlugin({ documentId } = {}) {
       </UiButton>
 
       <span className="toolbar-slash-hint">输入 / 快速插入</span>
-      {isUploading && <span className="toolbar-progress" role="status">处理中…</span>}
+      {(isUploading || excelBusy) && <span className="toolbar-progress" role="status">处理中…</span>}
       {imageUploads.busy && <div className="editor-image-upload-status" role="status" aria-label="图片上传进度">
         <span className="toolbar-progress">正在插入图片…</span>
         <UiButton density="compact" type="button" className="btn small" autoFocus onClick={() => { imageUploads.cancel(); toast.warning('已取消上传，未插入图片') }}>取消图片上传</UiButton>
@@ -804,12 +872,12 @@ export default function ToolbarPlugin({ documentId } = {}) {
                 </UiButton>
                 <label className="btn toolbar-menu-action">
                   Excel
-                  <input data-ui-native="file" type="file" accept=".xlsx,.xls" hidden onChange={handleExcel} />
+                  <input data-ui-native="file" type="file" accept=".xlsx,.xls" hidden disabled={excelBusy} onChange={handleExcel} />
                 </label>
               </div>
 
               <div className="toolbar-table-section">
-                <TableMenu />
+                <TableMenu documentId={documentId} onInsert={() => setInsertOpen(false)} />
               </div>
             </div>
           </div>

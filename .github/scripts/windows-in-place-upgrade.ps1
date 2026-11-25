@@ -11,9 +11,9 @@ if($CurrentCandidate){
  $candidateInput=($verified -join [Environment]::NewLine)|ConvertFrom-Json
  if(!$candidateInput.inputVerified){throw 'Current candidate installer has no verified build identity.'}
  $oldVersion=$candidateInput.previousVersion;$newVersion=$candidateInput.current.version
- $oldExpected='2f32acf01ca07cba6c63ab43fdc48700f0f2c9e98ce05c8c93b2a011901e7c52'
+ $oldExpected='50adde837f1e6891c22b09de86dc8e5b66ee3e3bf23f2e11b9582b9cfaadf9f5'
  $newExpected=$candidateInput.current.sha256
- $old=Get-Item -LiteralPath (Join-Path $root '.installer-input\4.249.0\Notepad-4.249.0-Setup.exe')
+ $old=Get-Item -LiteralPath (Join-Path $root '.installer-input\4.249.1\Notepad-4.249.1-Setup.exe')
  $new=Get-Item -LiteralPath (Join-Path $root ('release\'+$candidateInput.current.filename))
  $installName='notepad-current-upgrade-install';$outputName='test-results\current-in-place-upgrade'
 }else{

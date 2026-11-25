@@ -19,6 +19,7 @@ export const ACCEPTANCE_VERSION_FIELDS = Object.freeze([
   ['scripts/reading-mode-installed-evidence.mjs', ", \"assert.equal(report.appVersion, '"],
   ['scripts/reading-mode-installed-evidence.mjs', ", \"assert.equal(diagnostics.version, '"],
   ['scripts/reading-mode-installed-evidence.mjs', ", \"appVersion: '"],
+  ['scripts/table-operations-evidence.mjs', "export const TABLE_OPERATIONS_VERSION = '"],
 ])
 
 export function inspectAcceptanceVersions(read) {

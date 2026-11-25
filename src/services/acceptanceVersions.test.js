@@ -6,7 +6,7 @@ const read = file => readFileSync(new URL('../../' + file, import.meta.url), 'ut
 const release = JSON.parse(read('package.json')).version
 describe('complete acceptance release bindings', () => {
   it('checks every active runner and generated release against the manifest', () => {
-    expect(inspectAcceptanceVersions(read)).toEqual({ version: release, checks: 13, valid: true, errors: [] })
+    expect(inspectAcceptanceVersions(read)).toEqual({ version: release, checks: 14, valid: true, errors: [] })
   })
   it.each(ACCEPTANCE_VERSION_FIELDS)('rejects stale release in %s at %s', (file, anchor) => {
     const result = inspectAcceptanceVersions(name => name === file ? read(name).replace(anchor + release, anchor + '0.0.0') : read(name))
@@ -15,7 +15,7 @@ describe('complete acceptance release bindings', () => {
   })
   it('reports multiple mismatches together rather than only the first', () => {
     const result = inspectAcceptanceVersions(file => file === 'package.json' ? JSON.stringify({ version: '0.0.0' }) : read(file))
-    expect(result.errors.filter(error => error.reason === 'release-mismatch')).toHaveLength(13)
+    expect(result.errors.filter(error => error.reason === 'release-mismatch')).toHaveLength(14)
   })
   it('rejects a missing generated-version anchor', () => {
     const [file, anchor] = ACCEPTANCE_VERSION_FIELDS.at(-1)
