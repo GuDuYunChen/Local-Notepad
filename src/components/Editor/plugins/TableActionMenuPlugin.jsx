@@ -123,29 +123,31 @@ export default function TableActionMenuPlugin({ documentId }) {
   const enterSelectionMode = () => {
     const opened = openedRef.current
     if (!validMenu() || !opened) return
-    // The menu autofocuses its first item. Preserve the actual Lexical
-    // selection before that focus change and restore it after closing; merely
-    // focusing the root cannot recover a selection already cleared by blur.
+    // The menu autofocuses its first item and clears Chromium's native range.
+    // Restore Lexical's selection only after the menu is closed, then enter
+    // bulk mode after that update commits. Restore the DOM range in the next
+    // frame so Lexical's pending reconciliation cannot immediately erase it.
     close()
     editor.update(() => {
       if (opened.retainedSelection) $setSelection(opened.retainedSelection.clone())
-    }, { discrete: true })
-    if (editor.isEditable()) editor.focus()
-    // The browser clears its native DOM range when the menu's first item
-    // receives focus. Lexical state alone does not synchronously recreate the
-    // browser range in every Chromium build, so restore the captured DOM range
-    // after the menu portal has unmounted and the editor root owns focus again.
-    requestAnimationFrame(() => {
-      const root = editor.getRootElement()
-      const range = opened.retainedDOMRange
-      if (!root || !range || !editor.isEditable() ||
-          !root.contains(range.startContainer) || !root.contains(range.endContainer)) return
-      const selection = root.ownerDocument.getSelection()
-      if (!selection) return
-      selection.removeAllRanges()
-      selection.addRange(range)
+    }, {
+      discrete: true,
+      onUpdate: () => {
+        if (!editor.isEditable()) return
+        editor.focus()
+        dispatchTableEvent(editor, 'tableSelection:mode', true)
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          const root = editor.getRootElement()
+          const range = opened.retainedDOMRange
+          if (!root || !range || !editor.isEditable() ||
+              !root.contains(range.startContainer) || !root.contains(range.endContainer)) return
+          const selection = root.ownerDocument.getSelection()
+          if (!selection) return
+          selection.removeAllRanges()
+          selection.addRange(range)
+        }))
+      },
     })
-    dispatchTableEvent(editor, 'tableSelection:mode', true)
   }
   const dispatch = (type, payload) => {
     const info = validMenu()
