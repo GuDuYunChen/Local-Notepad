@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
-import { $getSelection, $isRangeSelection } from 'lexical'
+import { $getSelection, $setSelection, $isRangeSelection } from 'lexical'
 import { $isTableCellNode } from '@lexical/table'
 import { createPortal } from 'react-dom'
 import { UiButton } from '~/components/ui/ControlKit'
@@ -100,7 +100,9 @@ export default function TableActionMenuPlugin({ documentId }) {
     let signature
     editor.getEditorState().read(() => { signature = $resolveTableCell(tableInfo.cellKey, tableInfo.tableKey)?.model.signature })
     if (!signature) return
-    openedRef.current = { info: tableInfo, signature, canWrite }
+    let retainedSelection = null
+    editor.read('latest', () => { retainedSelection = $getSelection()?.clone() || null })
+    openedRef.current = { info: tableInfo, signature, canWrite, retainedSelection }
     setIsMenuOpen(true)
   }
   const validMenu = () => {
@@ -115,13 +117,17 @@ export default function TableActionMenuPlugin({ documentId }) {
     return opened.info
   }
   const enterSelectionMode = () => {
-    if (!validMenu()) return
-    // The menu autofocuses its first item for keyboard accessibility. Restore
-    // the owning editor focus after closing so Lexical can reinstate its
-    // retained text range before the bulk-cell overlay starts.
-    dispatchTableEvent(editor, 'tableSelection:mode', true)
+    const opened = openedRef.current
+    if (!validMenu() || !opened) return
+    // The menu autofocuses its first item. Preserve the actual Lexical
+    // selection before that focus change and restore it after closing; merely
+    // focusing the root cannot recover a selection already cleared by blur.
     close()
+    editor.update(() => {
+      if (opened.retainedSelection) $setSelection(opened.retainedSelection.clone())
+    }, { discrete: true })
     if (editor.isEditable()) editor.focus()
+    dispatchTableEvent(editor, 'tableSelection:mode', true)
   }
   const dispatch = (type, payload) => {
     const info = validMenu()
