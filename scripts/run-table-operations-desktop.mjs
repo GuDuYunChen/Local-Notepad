@@ -60,14 +60,120 @@ async function connect(url, observe) {
   return {
     close: () => socket.close(),
     onEvent(listener) { listeners.add(listener); return () => listeners.delete(listener) },
-    send(method, params = {}) {
+    send(method, params = {}, timeoutMs = 12000) {
       return new Promise((resolve, reject) => {
         const sequence = ++id
-        const timer = setTimeout(() => { pending.delete(sequence); reject(new Error('Table debugger command deadline: ' + method)) }, 12000)
-        pending.set(sequence, { resolve, reject, timer }); socket.send(q({ id: sequence, method, params }))
+        const timer = setTimeout(() => { pending.delete(sequence); reject(new Error('Table debugger command deadline: ' + method)) }, timeoutMs)
+        pending.set(sequence, { resolve, reject, timer })
+        try { socket.send(q({ id: sequence, method, params })) }
+        catch (error) { pending.delete(sequence); clearTimeout(timer); reject(error) }
       })
     },
   }
+}
+
+async function waitForTableCleanup(promise, label, budget) {
+  let timer
+  return Promise.race([promise, new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(label)), budget)
+  })]).finally(() => clearTimeout(timer))
+}
+
+// A failed drag can leave a real mouse button pressed. Cancel it before asking
+// the already verified native window to close; never turn failed checks green.
+export async function closeTableOperationsApp({ report, child, exited, cdp, windowSession, boundWindow, failed }, {
+  wait = waitForTableCleanup,
+  backendStopped = async () => {
+    await tableOperationsUntil(async () => {
+      try { await fetch(apiBase + '/api/health', { signal: AbortSignal.timeout(400) }); return false }
+      catch { return true }
+    }, 'Owned Table backend remained alive', 5000)
+    return true
+  },
+  forceKill = pid => spawnSync('taskkill.exe', ['/PID', String(pid), '/T', '/F'], { timeout: 10000, stdio: 'ignore' }),
+} = {}) {
+  const cleanup = report.cleanup = {
+    started: Number.isSafeInteger(child?.pid) && child.pid > 0 && typeof exited?.then === 'function',
+    inputRelease: [], closeRequested: false, closeConfirmed: false, exitObserved: false, backendChecked: false,
+  }
+  const error = value => { report.cleanupError = [report.cleanupError, String(value?.message || value)].filter(Boolean).join('\n') }
+  if (!cleanup.started) return false
+  const running = () => child.exitCode === null && child.signalCode == null
+  let actualExit, closeExpired = false
+  const observed = exited.then(value => { actualExit = value; return value })
+  void observed.catch(() => {})
+  try {
+    await wait((async () => {
+      assert.ok(running(), 'Table app exited before native close')
+      assert.ok(boundWindow && windowSession, 'No verified native Table window binding')
+      selectDesktopMainWindow([boundWindow], child.pid, boundWindow?.title)
+      assertDesktopWindowImage(boundWindow, report.executable)
+      if (failed && cdp) {
+        let buttons = 0, point, modifiers = 0
+        const keys = new Map(), buttonBits = { left: 1, right: 2, middle: 4, back: 8, forward: 16 }
+        for (const input of report.nativeInputs || []) {
+          if (input.method === 'Input.dispatchMouseEvent') {
+            if (Number.isFinite(input.x) && Number.isFinite(input.y)) point = { x: input.x, y: input.y }
+            if (Number.isInteger(input.buttons)) buttons = input.buttons
+            else if (input.type === 'mousePressed') buttons |= buttonBits[input.button] || 0
+            else if (input.type === 'mouseReleased') buttons &= ~(buttonBits[input.button] || 0)
+          } else if (input.method === 'Input.dispatchKeyEvent') {
+            modifiers = input.modifiers || 0
+            if (input.type === 'keyUp') keys.delete(input.key)
+            else if (input.key) keys.set(input.key, input.windowsVirtualKeyCode)
+          }
+        }
+        const commands = ['rawKeyDown', 'keyUp'].map(type => ['Input.dispatchKeyEvent', { type, key: 'Escape', windowsVirtualKeyCode: 27, modifiers: 0 }])
+        for (const [key, windowsVirtualKeyCode] of keys) commands.push(['Input.dispatchKeyEvent', { type: 'keyUp', key, windowsVirtualKeyCode, modifiers: 0 }])
+        for (const [mask, key, windowsVirtualKeyCode] of [[1, 'Alt', 18], [2, 'Control', 17], [4, 'Meta', 91], [8, 'Shift', 16]]) {
+          if (modifiers & mask) commands.push(['Input.dispatchKeyEvent', { type: 'keyUp', key, windowsVirtualKeyCode, modifiers: 0 }])
+        }
+        if (point) for (const [button, mask] of Object.entries(buttonBits)) if (buttons & mask) {
+          buttons &= ~mask
+          commands.push(['Input.dispatchMouseEvent', { type: 'mouseReleased', ...point, button, buttons, clickCount: 1, modifiers: 0 }])
+        }
+        commands.push(['Input.setInterceptDrags', { enabled: false }], ['Network.setBlockedURLs', { urls: [] }])
+        const releaseDeadline = performance.now() + 1500
+        for (const [method, params] of commands) {
+          if (closeExpired || performance.now() >= releaseDeadline) break
+          const item = { method, params, confirmed: false }; cleanup.inputRelease.push(item)
+          try { await cdp.send(method, params, Math.max(1, Math.min(500, releaseDeadline - performance.now()))); item.confirmed = true }
+          catch (failure) { item.error = String(failure.message || failure) }
+        }
+      }
+      if (closeExpired) return
+      cleanup.closeRequested = true
+      assert.equal(await windowSession.close(boundWindow), true, 'Native Table close was not confirmed')
+      cleanup.closeConfirmed = true
+      await observed
+    })(), 'Table app native close deadline', 15000)
+  } catch (failure) { closeExpired = true; error(failure) }
+  if (!actualExit && running()) {
+    report.forceTerminated = true
+    try {
+      const result = forceKill(child.pid)
+      cleanup.forceKill = { status: result?.status ?? null, signal: result?.signal ?? null, error: result?.error ? String(result.error.message || result.error) : null }
+      assert.equal(result?.status, 0, 'Owned Table force cleanup failed')
+    } catch (failure) { error(failure) }
+  }
+  if (!actualExit) {
+    try { await wait(observed, 'Owned Table exit was not observed', 3000) }
+    catch (failure) { error(failure) }
+  }
+  if (actualExit) {
+    cleanup.exitObserved = true
+    report.exit = { pid: child.pid, ...actualExit,
+      normalClose: cleanup.closeConfirmed && !report.forceTerminated && actualExit.code === 0 && actualExit.signal === null }
+    if (!report.exit.normalClose) error('Table app did not exit normally after confirmed native close')
+    if (report.realBackend === true) {
+      cleanup.backendChecked = true
+      try {
+        assert.equal(await wait(backendStopped(), 'Owned Table backend remained alive', 5000), true, 'Owned Table backend stop was not confirmed')
+        report.backendStopped = true
+      } catch (failure) { error(failure) }
+    }
+  }
+  return report.exit?.normalClose === true && report.backendStopped === true
 }
 
 export async function runTableOperationsDesktop({ executablePath, out = path.join(root, 'test-results/table-operations'),
@@ -111,7 +217,7 @@ export async function runTableOperationsDesktop({ executablePath, out = path.joi
   for (const name of Object.keys(environment)) if (/TOKEN|SECRET|PASSWORD|CREDENTIAL/i.test(name)) delete environment[name]
   for (const name of ['ELECTRON_RUN_AS_NODE', 'NOTEPAD_DATA', 'PORT']) delete environment[name]
   if (scope === 'packaged') { environment.NOTEPAD_DATA = data; environment.PORT = '27121' }
-  let child, exited, cdp, windowSession, resizeSession, trace = '', businessDeadline = Infinity
+  let child, exited, cdp, windowSession, resizeSession, boundWindow, businessError, trace = '', businessDeadline = Infinity
   const traceData = bytes => { trace = (trace + String(bytes)).slice(-200000) }
   const until = (check, label, budget = 15000) => tableOperationsUntil(check, label, Math.max(1, Math.min(budget, businessDeadline - performance.now())))
   const evaluate = async expression => {
@@ -152,6 +258,7 @@ export async function runTableOperationsDesktop({ executablePath, out = path.joi
   const binding = async () => {
     const window = selectDesktopMainWindow(await windowSession.inspect(child.pid, executablePath), child.pid, await evaluate('document.title'))
     assertDesktopWindowImage(window, executablePath)
+    boundWindow = window
     return window
   }
   try {
@@ -206,39 +313,41 @@ export async function runTableOperationsDesktop({ executablePath, out = path.joi
     businessDeadline = performance.now() + TABLE_OPERATIONS_BUDGET_MS
     await verifyTableOperationsDesktop({ api, evaluate, click, cdp, until, capture, report, save, resizeSmall })
     businessDeadline = Infinity
-    const window = await binding()
-    await windowSession.close(window)
-    let timer
-    const exit = await Promise.race([exited, new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Table app native close deadline')), 15000) })]).finally(() => clearTimeout(timer))
-    assert.deepEqual(exit, { code: 0, signal: null })
-    report.exit = { pid: child.pid, ...exit, normalClose: true }; child = null; cdp.close(); cdp = null
-    await until(async () => {
-      try { await fetch(apiBase + '/api/health', { signal: AbortSignal.timeout(400) }); return false } catch { return true }
-    }, 'Owned Table backend remained alive', 5000)
-    report.backendStopped = true
-    assert.equal(await resizeSession.dispose(), true); resizeSession = null
-    assert.equal(await windowSession.dispose(), true); windowSession = null
-    rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
-    report.cleanupComplete = true; report.complete = true; report.finishedAt = new Date().toISOString(); save()
+    await binding()
+  } catch (error) {
+    businessError = error
+    report.complete = false; report.error = String(error.stack || error)
+    try { save() } catch (failure) { report.cleanupError = String(failure.message || failure) }
+    if (cdp) await capture('table-native-failure.png').catch(() => {})
+  } finally {
+    businessDeadline = Infinity
+    const cleanupFailure = error => { report.cleanupError = [report.cleanupError, String(error.message || error)].filter(Boolean).join('\n') }
+    let graceful = false
+    try { graceful = await closeTableOperationsApp({ report, child, exited, cdp, windowSession, boundWindow, failed: !!businessError }) }
+    catch (error) { cleanupFailure(error) }
+    try { cdp?.close() } catch (error) { cleanupFailure(error) }
+    for (const session of [resizeSession, windowSession]) if (session) {
+      try { assert.equal(await session.dispose(), true, 'Owned Table helper did not stop cleanly') }
+      catch (error) { cleanupFailure(error) }
+    }
+    if (graceful && !report.cleanupError) {
+      try {
+        rmSync(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
+        report.cleanupComplete = true
+      } catch (error) { cleanupFailure(error) }
+    }
+    try { writeFileSync(path.join(out, 'table-native-runtime.log'), trace) } catch (error) { cleanupFailure(error) }
+    if (report.cleanupError) report.cleanupComplete = false
+    report.complete = !businessError && report.cleanupComplete
+    report.finishedAt = new Date().toISOString()
+    try { save() } catch (error) { businessError ||= error }
+  }
+  if (businessError) throw businessError
+  try {
+    assert.equal(report.cleanupComplete, true, report.cleanupError || 'Table cleanup was not confirmed')
     return verifyTableOperationsReport(out, { commit: productCommit, verifier: process.env.GITHUB_SHA, scope, sources: expectedSources })
   } catch (error) {
-    report.complete = false; report.error = String(error.stack || error); save()
-    if (cdp) await capture('table-native-failure.png').catch(() => {})
-    throw error
-  } finally {
-    cdp?.close()
-    if (child && child.exitCode === null && Number.isSafeInteger(child.pid)) {
-      report.complete = false; report.forceTerminated = true; save()
-      spawnSync('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], { timeout: 10000, stdio: 'ignore' })
-      await Promise.race([exited.catch(() => {}), sleep(3000)])
-    }
-    for (const session of [resizeSession, windowSession]) if (session) {
-      try { if (!await session.dispose()) report.cleanupError = 'Owned Table helper did not stop cleanly' }
-      catch (error) { report.cleanupError = String(error.message || error) }
-    }
-    writeFileSync(path.join(out, 'table-native-runtime.log'), trace)
-    if (report.cleanupError) { report.complete = false; report.cleanupComplete = false }
-    save()
+    report.complete = false; report.error = String(error.stack || error); save(); throw error
   }
 }
 

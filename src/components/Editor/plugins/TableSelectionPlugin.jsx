@@ -435,6 +435,50 @@ export default function TableSelectionPlugin({ documentId }) {
         schedule()
       }
       const onUp = () => { dragRef.current = null }
+      let inputHintShown = false
+      const ownsInput = event => activeRef.current && beginWrite()() && isTableEventForEditor(editor, event)
+      const stopInput = event => { event.preventDefault(); event.stopPropagation() }
+      const refuseTextInput = event => {
+        if (!ownsInput(event)) return
+        stopInput(event)
+        if (!inputHintShown) {
+          inputHintShown = true
+          toast.warning('请先完成单元格多选，再输入、删除或剪切文字')
+        }
+      }
+      const onBeforeInput = event => {
+        if (!['historyUndo', 'historyRedo'].includes(event.inputType)) refuseTextInput(event)
+      }
+      const focusModeControl = backwards => {
+        const buttons = [...container.querySelectorAll('.table-selection-modebar button:not(:disabled)')]
+        const nextButton = backwards ? buttons.at(-1) : buttons[0]
+        nextButton?.focus()
+      }
+      const onCompositionStart = event => {
+        if (!ownsInput(event)) return
+        refuseTextInput(event)
+        // compositionstart and composition input are not necessarily
+        // cancelable. Move native IME focus out of the editable surface before
+        // it can replace the retained text range, even before beforeinput.
+        focusModeControl(false)
+      }
+      const onEditorKey = event => {
+        if (!ownsInput(event)) return
+        if (['Backspace', 'Delete', 'Enter'].includes(event.key) ||
+          ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'x')) {
+          refuseTextInput(event)
+        } else if (event.key === 'Tab') {
+          // Native table Tab can append a row at the old text caret. In this
+          // mode, Tab belongs to the visible bulk-operation controls instead.
+          stopInput(event)
+          focusModeControl(event.shiftKey)
+        }
+      }
+      const onClipboard = event => {
+        if (!ownsInput(event)) return
+        stopInput(event)
+        void handlersRef.current[event.type === 'copy' ? 'copySelection' : 'pasteSelection']()
+      }
       const onKey = event => {
         if (!beginWrite()() || editor.isComposing() || isShortcutContextBlocked(event)) return
         const target = event.target?.nodeType === 1 ? event.target : document.activeElement
@@ -451,10 +495,20 @@ export default function TableSelectionPlugin({ documentId }) {
         if (matchShortcut(event, 'splitCell')) { event.preventDefault(); handlersRef.current.perform('splitCells') }
       }
       root.addEventListener('mousedown', onDown, true); root.addEventListener('mousemove', onMove, true); root.addEventListener('mouseover', onMove)
+      // These listeners precede Lexical's root handlers. A window bubble
+      // listener is too late: the retained text caret may already be edited.
+      root.addEventListener('keydown', onEditorKey, true); root.addEventListener('beforeinput', onBeforeInput, true)
+      root.addEventListener('compositionstart', onCompositionStart, true); root.addEventListener('compositionend', refuseTextInput, true)
+      root.addEventListener('input', refuseTextInput, true)
+      root.addEventListener('cut', refuseTextInput, true); root.addEventListener('copy', onClipboard, true); root.addEventListener('paste', onClipboard, true)
       document.addEventListener('mouseup', onUp); window.addEventListener('blur', onUp); window.addEventListener('keydown', onKey)
       window.addEventListener('resize', schedule); container.addEventListener('scroll', schedule, true)
       detach = () => {
         root.removeEventListener('mousedown', onDown, true); root.removeEventListener('mousemove', onMove, true); root.removeEventListener('mouseover', onMove)
+        root.removeEventListener('keydown', onEditorKey, true); root.removeEventListener('beforeinput', onBeforeInput, true)
+        root.removeEventListener('compositionstart', onCompositionStart, true); root.removeEventListener('compositionend', refuseTextInput, true)
+        root.removeEventListener('input', refuseTextInput, true)
+        root.removeEventListener('cut', refuseTextInput, true); root.removeEventListener('copy', onClipboard, true); root.removeEventListener('paste', onClipboard, true)
         document.removeEventListener('mouseup', onUp); window.removeEventListener('blur', onUp); window.removeEventListener('keydown', onKey)
         window.removeEventListener('resize', schedule); container.removeEventListener('scroll', schedule, true)
       }

@@ -54,7 +54,9 @@ export function validateTableOperationsReport(report, { commit, verifier = commi
 
   const expectedSnapshots = [
     'initial', 'insert-row', 'delete-row', 'insert-column', 'delete-column', 'menu-row-move', 'menu-row-undo',
-    'menu-column-move', 'menu-column-undo', 'selected-background', 'merged', 'split', 'split-undo', 'merge-undo',
+    'menu-column-move', 'menu-column-undo',
+    'selection-input-insert-text', 'selection-input-backspace', 'selection-input-delete', 'selection-input-enter', 'selection-input-cut', 'selection-input-ime',
+    'selected-background', 'merged', 'split', 'split-undo', 'merge-undo',
     'clipboard-copied', 'clipboard-cleared', 'clipboard-pasted', 'clipboard-paste-undo', 'clipboard-clear-undo', 'clipboard-clear-redo', 'clipboard-paste-redo',
     'styled', 'row-dragged', 'row-drag-undo', 'row-drag-redo', 'row-drag-restored',
     'column-dragged', 'column-drag-undo', 'column-drag-redo', 'column-drag-restored',
@@ -72,6 +74,95 @@ export function validateTableOperationsReport(report, { commit, verifier = commi
   for (const name of ['delete-row', 'delete-column', 'menu-row-undo', 'menu-column-undo']) sameJSON(content(name), content('initial'))
   assert.deepEqual(tableTextRows(content('menu-row-move')), [originalRows[1], originalRows[0], originalRows[2]])
   assert.deepEqual(tableTextRows(content('menu-column-move')), originalRows.map(row => [row[1], row[0], row[2]]))
+  const inputRange = (record, prefix = 'input') => {
+    const start = record[prefix + 'Start'], end = record[prefix + 'End']
+    assert.ok(Number.isSafeInteger(start) && start >= 0)
+    assert.ok(Number.isSafeInteger(end) && end > start && end <= report.nativeInputs.length)
+    return report.nativeInputs.slice(start, end)
+  }
+  const keyInputs = (inputs, key, windowsVirtualKeyCode, modifiers = 0) => assert.deepEqual(
+    inputs.map(input => ({ method: input.method, type: input.type, key: input.key, windowsVirtualKeyCode: input.windowsVirtualKeyCode, modifiers: input.modifiers })),
+    ['rawKeyDown', 'keyUp'].map(type => ({ method: 'Input.dispatchKeyEvent', type, key, windowsVirtualKeyCode, modifiers })),
+  )
+  const compositionInput = (inputs, text, offset) => {
+    assert.equal(inputs.length, 1)
+    assert.deepEqual({ method: inputs[0].method, text: inputs[0].text, selectionStart: inputs[0].selectionStart, selectionEnd: inputs[0].selectionEnd },
+      { method: 'Input.imeSetComposition', text, selectionStart: offset, selectionEnd: offset })
+    assert.equal(inputs[0].replacementStart, undefined); assert.equal(inputs[0].replacementEnd, undefined)
+  }
+  const textInput = (inputs, text) => {
+    assert.equal(inputs.length, 1); assert.equal(inputs[0].method, 'Input.insertText'); assert.equal(inputs[0].text, text)
+  }
+  const imeControl = report.imeControl
+  assert.equal(imeControl.text, 'R3C3'); assert.equal(imeControl.snapshot, 'initial')
+  const beforeIME = originalRows.map(row => [...row]); beforeIME[2][2] = ''
+  assert.deepEqual(imeControl.before.rows.map(row => row.map(cell => cell.text)), beforeIME)
+  for (const view of [imeControl.before, imeControl.composing, imeControl.committed]) {
+    assert.equal(view.rootFocused, true); assert.equal(view.modebarFocused, false); assert.equal(view.editable, 'true'); assert.equal(view.tables, 1)
+  }
+  for (const view of [imeControl.composing, imeControl.committed]) assert.deepEqual(view.rows.map(row => row.map(cell => cell.text)), originalRows)
+  compositionInput(inputRange(imeControl, 'compositionInput'), 'R3C3', 4)
+  assert.equal(imeControl.commitInputStart, imeControl.compositionInputEnd)
+  textInput(inputRange(imeControl, 'commitInput'), 'R3C3')
+  assert.equal(imeControl.saveInputStart, imeControl.commitInputEnd)
+  keyInputs(inputRange(imeControl, 'saveInput'), 's', 83, 2)
+  const selectedView = (view, rootFocused = true) => {
+    assert.equal(view.rootFocused, rootFocused, 'Selection isolation requires the expected native focus owner')
+    assert.equal(view.modebarFocused, !rootFocused)
+    assert.equal(view.editable, 'true'); assert.equal(view.tables, 1)
+    assert.match(view.selection, /已选择 2 个单元格/)
+    assert.deepEqual(view.rows.map(row => row.map(cell => cell.text)), originalRows, 'Selection input changed a selected or unselected cell')
+  }
+  const isolation = report.selectionIsolation
+  for (const range of [isolation.source, isolation.retainedRange]) {
+    assert.equal(range.rootFocused, true); assert.equal(range.text, 'R1C3')
+    for (const endpoint of [range.anchor, range.focus]) assert.deepEqual(endpoint, { row: 0, column: 2, text: 'R1C3' })
+  }
+  const sourceInputs = inputRange(isolation.source)
+  assert.equal(sourceInputs.length, 6)
+  assert.deepEqual(sourceInputs.slice(0, 2).map(input => [input.method, input.type]), [
+    ['Input.dispatchMouseEvent', 'mousePressed'], ['Input.dispatchMouseEvent', 'mouseReleased'],
+  ])
+  keyInputs(sourceInputs.slice(2, 4), 'Home', 36); keyInputs(sourceInputs.slice(4), 'End', 35, 8)
+  const rectangleInputs = inputRange(isolation.rectangle)
+  assert.ok(isolation.rectangle.inputStart > isolation.source.inputEnd)
+  assert.deepEqual(rectangleInputs.map(input => [input.method, input.type, input.buttons, input.button]), [
+    ['Input.dispatchMouseEvent', 'mouseMoved', 0, 'none'], ['Input.dispatchMouseEvent', 'mousePressed', 1, 'left'],
+    ['Input.dispatchMouseEvent', 'mouseMoved', 1, 'left'], ['Input.dispatchMouseEvent', 'mouseReleased', 0, 'left'],
+  ])
+  assert.ok(rectangleInputs[2].x > rectangleInputs[0].x)
+  assert.equal(rectangleInputs[0].x, rectangleInputs[1].x); assert.equal(rectangleInputs[2].x, rectangleInputs[3].x)
+  assert.ok(rectangleInputs.every(input => Number.isFinite(input.x) && Number.isFinite(input.y) && Math.abs(input.y - rectangleInputs[0].y) <= 1))
+  selectedView(isolation.selected)
+  const isolationCases = [['insert-text'], ['backspace', 'Backspace', 8], ['delete', 'Delete', 46], ['enter', 'Enter', 13], ['cut', 'x', 88, 2]]
+  assert.deepEqual(isolation.operations.map(operation => operation.name), isolationCases.map(([name]) => name))
+  let priorInputEnd = isolation.rectangle.inputEnd
+  for (let index = 0; index < isolationCases.length; index++) {
+    const [name, key, code, modifiers] = isolationCases[index], operation = isolation.operations[index]
+    assert.equal(operation.inputStart, priorInputEnd, 'Each isolation action requires its own next native input receipt')
+    const inputs = inputRange(operation)
+    if (name === 'insert-text') {
+      assert.equal(inputs.length, 1); assert.equal(inputs[0].method, 'Input.insertText')
+      assert.equal(inputs[0].text, 'TABLE-SELECTION-INPUT-MUST-NOT-WRITE')
+    } else keyInputs(inputs, key, code, modifiers)
+    selectedView(operation.before); selectedView(operation.after)
+    assert.equal(operation.snapshot, 'selection-input-' + name)
+    assert.equal(operation.saveInputStart, operation.inputEnd)
+    keyInputs(inputRange(operation, 'saveInput'), 's', 83, 2)
+    sameJSON(content(operation.snapshot), content('initial')); selectedView(report.snapshots[operation.snapshot].ui)
+    priorInputEnd = operation.saveInputEnd
+  }
+  const ime = isolation.ime
+  assert.equal(ime.compositionInputStart, priorInputEnd)
+  selectedView(ime.before)
+  compositionInput(inputRange(ime, 'compositionInput'), '表', 1)
+  selectedView(ime.composing, false)
+  assert.equal(ime.commitInputStart, ime.compositionInputEnd)
+  textInput(inputRange(ime, 'commitInput'), '表'); selectedView(ime.committed, false)
+  assert.equal(ime.saveInputStart, ime.commitInputEnd)
+  keyInputs(inputRange(ime, 'saveInput'), 's', 83, 2)
+  assert.equal(ime.snapshot, 'selection-input-ime')
+  sameJSON(content(ime.snapshot), content('initial')); selectedView(report.snapshots[ime.snapshot].ui, false)
   const colored = tableFromContent(content('selected-background'))
   assert.ok(colored.children[1].children.slice(0, 2).every(cell => cell.backgroundColor === '#fff3cd'))
   assert.equal(tableFromContent(content('merged')).children[1].children[0].colSpan, 2)
@@ -157,8 +248,34 @@ export function validateTableOperationsReport(report, { commit, verifier = commi
   assert.ok(report.nativeInputs.length > 100)
   report.nativeInputs.forEach((input, index) => {
     assert.equal(input.sequence, index + 1)
-    assert.ok(['Input.dispatchKeyEvent', 'Input.insertText', 'Input.dispatchMouseEvent', 'Input.dispatchDragEvent'].includes(input.method))
+    assert.ok(['Input.dispatchKeyEvent', 'Input.insertText', 'Input.imeSetComposition', 'Input.dispatchMouseEvent', 'Input.dispatchDragEvent'].includes(input.method))
+    if (input.method === 'Input.dispatchMouseEvent' && input.type === 'mouseMoved' && input.buttons & 1) {
+      assert.equal(input.button, 'left', 'Chromium drag movement requires button:left in addition to buttons:1')
+    }
   })
+  assert.deepEqual(report.nativeDrags.map(drag => drag.kind), ['row', 'col'])
+  for (const drag of report.nativeDrags) {
+    assert.equal(drag.completed, true)
+    const inputs = inputRange(drag)
+    assert.deepEqual(inputs.map(input => [input.method, input.type]), [
+      ['Input.dispatchMouseEvent', 'mouseMoved'], ['Input.dispatchMouseEvent', 'mouseMoved'],
+      ['Input.dispatchMouseEvent', 'mousePressed'], ['Input.dispatchMouseEvent', 'mouseMoved'],
+      ['Input.dispatchDragEvent', 'dragEnter'], ['Input.dispatchDragEvent', 'dragOver'], ['Input.dispatchDragEvent', 'drop'],
+      ['Input.dispatchMouseEvent', 'mouseReleased'],
+    ])
+    assert.deepEqual(inputs.slice(0, 4).map(input => [input.buttons, input.button]), [[0, 'none'], [0, 'none'], [1, 'left'], [1, 'left']])
+    assert.equal(inputs[1].x, drag.source.x); assert.equal(inputs[1].y, drag.source.y)
+    assert.equal(inputs[2].x, drag.source.x); assert.equal(inputs[2].y, drag.source.y)
+    assert.equal(inputs[3].x, drag.source.x + 9); assert.equal(inputs[3].y, drag.source.y + 9)
+    assert.equal(drag.intercepted.length, 1)
+    const intercepted = drag.intercepted[0]
+    assert.equal(intercepted.afterInputSequence, inputs[3].sequence)
+    assert.ok(intercepted.data.dragOperationsMask & 16, 'Native Table drag must allow a move')
+    assert.ok(intercepted.data.items.some(item => item.mimeType === 'application/x-local-notepad-table-reorder' && item.data))
+    for (const input of inputs.slice(4, 7)) assert.deepEqual(input.data, intercepted.data, 'Drop data must come from this native drag interception')
+    for (const input of inputs.slice(4)) { assert.equal(input.x, drag.target.x); assert.equal(input.y, drag.target.y) }
+    assert.equal(inputs[7].buttons, 0); assert.equal(inputs[7].button, 'left')
+  }
   const drops = report.nativeInputs.filter(input => input.method === 'Input.dispatchDragEvent' && input.type === 'drop')
   assert.equal(drops.length, 2)
   for (const drop of drops) assert.ok(drop.data.items.some(item => item.mimeType === 'application/x-local-notepad-table-reorder' && item.data))

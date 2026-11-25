@@ -68,7 +68,8 @@ export async function verifyTableOperationsDesktop(context) {
   const cellSelector = (row, column) => `.editor-input table tr:nth-of-type(${row + 1}) > :is(td,th):nth-child(${column + 1})`
   const observe = () => evaluate(`(() => {
     const root=document.querySelector('.editor-input'),table=root?.querySelector('table')
-    return {editable:root?.getAttribute('contenteditable'),width:innerWidth,height:innerHeight,
+    return {editable:root?.getAttribute('contenteditable'),rootFocused:document.activeElement===root,
+      modebarFocused:!!document.querySelector('.table-selection-modebar')?.contains(document.activeElement),width:innerWidth,height:innerHeight,
       overflow:document.documentElement.scrollWidth>innerWidth+1,
       tables:root?.querySelectorAll('table').length||0,selection:document.querySelector('.table-selection-modebar')?.textContent||'',
       rows:table?[...table.rows].map(row=>[...row.cells].map(cell=>({text:cell.textContent,colSpan:cell.colSpan,rowSpan:cell.rowSpan,tag:cell.tagName,
@@ -84,7 +85,10 @@ export async function verifyTableOperationsDesktop(context) {
     const r=node.getBoundingClientRect(),x=${edge ? 'r.right-1' : 'r.x+r.width/2'},y=r.y+Math.min(r.height/2,18),hit=document.elementFromPoint(x,y)
     return x>=0&&x<innerWidth&&y>=0&&y<innerHeight&&hit&&node.contains(hit)?{x,y,width:r.width}:null
   })()`), 'Native table target missing, ambiguous, or covered: ' + selector)
-  const move = (p, buttons = 0) => recordInput('Input.dispatchMouseEvent', { type: 'mouseMoved', x: p.x, y: p.y, buttons })
+  // Chromium 126 MouseEventManager::HandleMouseDraggedEvent requires button
+  // kLeft as well as the pressed-buttons mask; an omitted button cancels drag.
+  // https://github.com/chromium/chromium/blob/126.0.6478.234/third_party/blink/renderer/core/input/mouse_event_manager.cc
+  const move = (p, buttons = 0) => recordInput('Input.dispatchMouseEvent', { type: 'mouseMoved', x: p.x, y: p.y, buttons, button: buttons & 1 ? 'left' : 'none' })
   const press = p => recordInput('Input.dispatchMouseEvent', { type: 'mousePressed', x: p.x, y: p.y, button: 'left', buttons: 1, clickCount: 1 })
   const release = p => recordInput('Input.dispatchMouseEvent', { type: 'mouseReleased', x: p.x, y: p.y, button: 'left', buttons: 0, clickCount: 1 })
   const wheel = (p, deltaX, deltaY) => recordInput('Input.dispatchMouseEvent', { type: 'mouseWheel', x: p.x, y: p.y, deltaX, deltaY })
@@ -158,9 +162,27 @@ export async function verifyTableOperationsDesktop(context) {
 
   const originalRows = Array.from({ length: 3 }, (_, row) => Array.from({ length: 3 }, (_, col) => `R${row + 1}C${col + 1}`))
   for (let row = 0; row < 3; row++) for (let col = 0; col < 3; col++) {
-    await click(cellSelector(row, col) + ' p'); await type(originalRows[row][col])
+    await click(cellSelector(row, col) + ' p')
+    if (row === 2 && col === 2) {
+      // The pinned protocol defines imeSetComposition(text, selectionStart,
+      // selectionEnd). InputHandler::InsertText commits through ImeCommitText.
+      // https://github.com/chromium/chromium/blob/126.0.6478.234/third_party/blink/public/devtools_protocol/browser_protocol.pdl
+      const control = { text: originalRows[row][col], before: await observe(), compositionInputStart: report.nativeInputs.length }
+      report.imeControl = control; save()
+      assert.equal(control.before.rootFocused, true); assert.equal(control.before.rows[2][2].text, '')
+      await recordInput('Input.imeSetComposition', { text: control.text, selectionStart: 4, selectionEnd: 4 }); await settle()
+      control.compositionInputEnd = report.nativeInputs.length; control.composing = await observe(); save()
+      assert.equal(control.composing.rootFocused, true); assert.equal(control.composing.rows[2][2].text, 'R3C3')
+      control.commitInputStart = report.nativeInputs.length
+      await type(control.text); await settle()
+      control.commitInputEnd = report.nativeInputs.length; control.committed = await observe(); save()
+      assert.equal(control.committed.rootFocused, true)
+      assert.deepEqual(control.committed.rows.map(row => row.map(cell => cell.text)), originalRows)
+    } else await type(originalRows[row][col])
   }
+  report.imeControl.saveInputStart = report.nativeInputs.length
   const initial = await checkpoint('initial', expectRows(originalRows))
+  report.imeControl.saveInputEnd = report.nativeInputs.length; report.imeControl.snapshot = 'initial'; save()
   assert.ok(tableFromContent(initial).children.every(row => row.children.length === 3))
   await capture('table-native-inserted.png'); mark('native-cell-edit-and-exact-save')
 
@@ -178,11 +200,72 @@ export async function verifyTableOperationsDesktop(context) {
   await undo(); await checkpoint('menu-column-undo', exact(initial))
   mark('row-column-insert-delete-and-menu-move')
 
-  await menu(1, 0, '多选单元格…')
+  // Retain a real text range in an unselected cell before entering the bulk
+  // mode. Native editing must not act on that older range behind the two-cell
+  // overlay. Selection and focus are observed through DOM APIs only.
+  report.selectionIsolation = { operations: [] }; save()
+  const sourceInputStart = report.nativeInputs.length
+  await click(cellSelector(0, 2) + ' p'); await key('Home', 36); await key('End', 35, 8)
+  const textSelection = () => evaluate(`(() => {
+    const root=document.querySelector('.editor-input'),table=root?.querySelector('table'),selection=window.getSelection()
+    const location=node=>{const element=node?.nodeType===1?node:node?.parentElement,cell=element?.closest('td,th')
+      if(!cell||!table?.contains(cell))return null
+      return {row:[...table.rows].indexOf(cell.parentElement),column:[...cell.parentElement.cells].indexOf(cell),text:cell.textContent}}
+    return {rootFocused:document.activeElement===root,text:selection?.toString()||'',anchor:location(selection?.anchorNode),focus:location(selection?.focusNode)}
+  })()`)
+  report.selectionIsolation.source = { inputStart: sourceInputStart, inputEnd: report.nativeInputs.length, ...(await textSelection()) }; save()
+  assert.equal(report.selectionIsolation.source.rootFocused, true)
+  assert.equal(report.selectionIsolation.source.text, 'R1C3', 'Native text range must cover the unselected source cell')
+  await click('[aria-label="表格单元格操作"]')
+  await until(() => evaluate("!!document.querySelector('.table-action-menu[role=menu]')"), 'Table action menu did not open')
+  await click({ selector: '.table-action-menu button', text: '多选单元格…' }); await settle()
   const start = await point(cellSelector(1, 0)), end = await point(cellSelector(1, 1))
+  const selectionInputStart = report.nativeInputs.length
   await move(start); await press(start); await move(end, 1); await release(end); await settle()
-  assert.match((await observe()).selection, /已选择 2 个单元格/)
+  report.selectionIsolation.rectangle = { inputStart: selectionInputStart, inputEnd: report.nativeInputs.length }
+  report.selectionIsolation.selected = await observe()
+  report.selectionIsolation.retainedRange = await textSelection(); save()
+  assert.match(report.selectionIsolation.selected.selection, /已选择 2 个单元格/)
+  assert.equal(report.selectionIsolation.selected.rootFocused, true, 'Bulk selection must leave native keyboard input on the editor root')
+  assert.equal(report.selectionIsolation.retainedRange.text, 'R1C3', 'Isolation exercise requires the retained unselected text range')
   assert.equal(await body(), initial, 'Selection alone wrote the document')
+  for (const [name, action] of [
+    ['insert-text', () => type('TABLE-SELECTION-INPUT-MUST-NOT-WRITE')],
+    ['backspace', () => key('Backspace', 8)], ['delete', () => key('Delete', 46)],
+    ['enter', () => key('Enter', 13)], ['cut', () => key('x', 88, 2)],
+  ]) {
+    const operation = { name, inputStart: report.nativeInputs.length, before: await observe() }
+    report.selectionIsolation.operations.push(operation); save()
+    assert.equal(operation.before.rootFocused, true, 'Isolation input lost editor focus: ' + name)
+    assert.match(operation.before.selection, /已选择 2 个单元格/)
+    await action(); await settle()
+    operation.inputEnd = report.nativeInputs.length; operation.after = await observe(); save()
+    assert.equal(operation.after.rootFocused, true, 'Blocked input moved editor focus: ' + name)
+    assert.match(operation.after.selection, /已选择 2 个单元格/)
+    assert.deepEqual(operation.after.rows.map(row => row.map(cell => cell.text)), originalRows, 'Bulk selection leaked native input into a cell: ' + name)
+    operation.snapshot = 'selection-input-' + name; operation.saveInputStart = report.nativeInputs.length; save()
+    await checkpoint(operation.snapshot, exact(initial))
+    operation.saveInputEnd = report.nativeInputs.length; save()
+  }
+  // Composition begins before cancelable beforeinput. Blocking it may move
+  // native focus to the existing bulk controls, unlike the five key cases.
+  const ime = { before: await observe(), compositionInputStart: report.nativeInputs.length }
+  report.selectionIsolation.ime = ime; save()
+  assert.equal(ime.before.rootFocused, true)
+  await recordInput('Input.imeSetComposition', { text: '表', selectionStart: 1, selectionEnd: 1 }); await settle()
+  ime.compositionInputEnd = report.nativeInputs.length; ime.composing = await observe(); save()
+  assert.equal(ime.composing.rootFocused, false); assert.equal(ime.composing.modebarFocused, true)
+  assert.match(ime.composing.selection, /已选择 2 个单元格/)
+  assert.deepEqual(ime.composing.rows.map(row => row.map(cell => cell.text)), originalRows)
+  ime.commitInputStart = report.nativeInputs.length
+  await type('表'); await settle()
+  ime.commitInputEnd = report.nativeInputs.length; ime.committed = await observe(); save()
+  assert.equal(ime.committed.rootFocused, false); assert.equal(ime.committed.modebarFocused, true)
+  assert.match(ime.committed.selection, /已选择 2 个单元格/)
+  assert.deepEqual(ime.committed.rows.map(row => row.map(cell => cell.text)), originalRows)
+  ime.snapshot = 'selection-input-ime'; ime.saveInputStart = report.nativeInputs.length; save()
+  await checkpoint(ime.snapshot, exact(initial))
+  ime.saveInputEnd = report.nativeInputs.length; save()
   await click({ selector: '.table-selection-modebar button', text: '浅黄' })
   const colored = await checkpoint('selected-background', value => {
     const table = tableFromContent(value)
@@ -257,12 +340,19 @@ export async function verifyTableOperationsDesktop(context) {
   await capture('table-native-styled.png'); mark('cell-background-header-striping-and-frozen-state')
 
   const nativeDrag = async (kind, fromRow, fromCol, toRow, toCol) => {
+    const receipt = { kind, inputStart: report.nativeInputs.length, intercepted: [], completed: false }
+    report.nativeDrags ||= []; report.nativeDrags.push(receipt); save()
     const sourceCell = await point(cellSelector(fromRow, fromCol))
     await move(sourceCell); await settle()
     const control = kind === 'row' ? '.table-reorder-handle.row' : '.table-reorder-handle.col'
     const source = await point(control), target = await point(cellSelector(toRow, toCol))
+    receipt.source = source; receipt.target = target; save()
     let intercepted
-    const detach = cdp.onEvent(event => { if (event.method === 'Input.dragIntercepted') intercepted = event.params.data })
+    const detach = cdp.onEvent(event => {
+      if (event.method !== 'Input.dragIntercepted') return
+      intercepted = event.params.data
+      receipt.intercepted.push({ afterInputSequence: report.nativeInputs.length, data: structuredClone(intercepted) }); save()
+    })
     try {
       await cdp.send('Input.setInterceptDrags', { enabled: true })
       await move(source); await press(source)
@@ -271,7 +361,8 @@ export async function verifyTableOperationsDesktop(context) {
       assert.ok(intercepted.items.some(item => item.mimeType === 'application/x-local-notepad-table-reorder'))
       for (const type of ['dragEnter', 'dragOver', 'drop']) await recordInput('Input.dispatchDragEvent', { type, x: target.x, y: target.y, data: intercepted })
       await release(target); await settle()
-    } finally { await cdp.send('Input.setInterceptDrags', { enabled: false }); detach() }
+      receipt.inputEnd = report.nativeInputs.length; receipt.completed = true; save()
+    } finally { try { await cdp.send('Input.setInterceptDrags', { enabled: false }) } finally { detach() } }
   }
   await nativeDrag('row', 0, 0, 2, 0)
   const rowDragged = await checkpoint('row-dragged', expectRows([originalRows[1], originalRows[2], originalRows[0]]))
