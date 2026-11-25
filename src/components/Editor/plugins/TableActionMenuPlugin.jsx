@@ -116,8 +116,12 @@ export default function TableActionMenuPlugin({ documentId }) {
   }
   const enterSelectionMode = () => {
     if (!validMenu()) return
+    // The menu autofocuses its first item for keyboard accessibility. Restore
+    // the owning editor focus after closing so Lexical can reinstate its
+    // retained text range before the bulk-cell overlay starts.
     dispatchTableEvent(editor, 'tableSelection:mode', true)
     close()
+    if (editor.isEditable()) editor.focus()
   }
   const dispatch = (type, payload) => {
     const info = validMenu()
