@@ -175,7 +175,7 @@ export async function verifyTableOperationsDesktop(context) {
       assert.equal(control.composing.rootFocused, true)
       // Chromium exposes a transient U+200B composition sentinel in the DOM
       // until ImeCommitText commits the candidate. It is not document text.
-      assert.match(control.composing.rows[2][2].text, /^R3C3\\u200b?$/)
+      assert.match(control.composing.rows[2][2].text, /^R3C3\u200b?$/)
       control.commitInputStart = report.nativeInputs.length
       await type(control.text); await settle()
       control.commitInputEnd = report.nativeInputs.length; control.committed = await observe(); save()
