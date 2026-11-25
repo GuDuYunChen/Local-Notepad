@@ -10,6 +10,7 @@ import { TablePlugin } from '@lexical/react/LexicalTablePlugin'
 import { $createParagraphNode, $createTextNode, $getRoot, $getSelection, $isRangeSelection, CAN_USE_BEFORE_INPUT } from 'lexical'
 import { $createTableCellNode, $createTableNode, $createTableRowNode, TableCellNode, TableNode, TableRowNode } from '@lexical/table'
 import TableSelectionPlugin from './TableSelectionPlugin'
+import { isTableSelectionActive } from '../utils/tableEvents'
 
 // happy-dom lacks only this capability probe. Enable the same beforeinput
 // listener used by Chromium; each input event below supplies the actual DOM
@@ -135,6 +136,34 @@ async function composition(type, data = '') {
   await act(async () => editor.getRootElement().dispatchEvent(new CompositionEvent(type, { bubbles: true, data })))
   await settle()
 }
+
+
+test.each([
+  ['b', false], ['i', false], ['u', false], ['e', false], ['x', true],
+])('bulk selection blocks text-format shortcut Ctrl+%s without touching retained text', async (key, shiftKey) => {
+  await selectOtherCells()
+  const before = editor.getEditorState().toJSON()
+  expect(isTableSelectionActive(editor)).toBe(true)
+  const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ctrlKey: true, shiftKey })
+  await act(async () => editor.getRootElement().dispatchEvent(event)); await settle()
+  expect(event.defaultPrevented).toBe(true)
+  expect(editor.getEditorState().toJSON()).toEqual(before)
+  expect(values()[0][0]).toBe('OLD-CELL')
+  expect(errors).toEqual([])
+})
+
+test('toolbar bulk-selection guard is scoped to the owning editor container', async () => {
+  const other = document.createElement('div')
+  other.className = 'editor-container'
+  const otherRoot = document.createElement('div')
+  otherRoot.setAttribute('data-lexical-editor', 'true')
+  other.append(otherRoot, Object.assign(document.createElement('div'), { className: 'table-selection-modebar' }))
+  document.body.append(other)
+  expect(isTableSelectionActive(editor)).toBe(false)
+  await selectOtherCells()
+  expect(isTableSelectionActive(editor)).toBe(true)
+  other.remove()
+})
 
 test('positive control: compositionstart alone replaces a selected range before any beforeinput event', async () => {
   await composition('compositionstart')

@@ -23,3 +23,17 @@ export function isTableEventForRoot(root, event) {
   if (focusedEditor) return focusedEditor === root
   return doc.querySelectorAll('[data-lexical-editor="true"]').length === 1
 }
+
+// Bulk cell selection owns a separate logical selection. Toolbar formatting
+// must not fall through to Lexical's retained text caret in another cell.
+export function isTableSelectionActive(editor) {
+  const root = editor?.getRootElement?.()
+  const container = root?.closest?.('.editor-container')
+  return !!container?.querySelector('.table-selection-modebar')
+}
+
+export function isTableTextFormattingShortcut(event) {
+  if (!(event?.ctrlKey || event?.metaKey) || event.altKey) return false
+  const key = String(event.key || '').toLowerCase()
+  return ['b', 'i', 'u', 'e'].includes(key) || (event.shiftKey && key === 'x')
+}

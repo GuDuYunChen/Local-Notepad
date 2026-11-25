@@ -8,7 +8,7 @@ import { useEditorWriteScope } from '../hooks/useEditorWriteScope'
 import { isShortcutContextBlocked, matchShortcut, shortcutLabel } from '~/services/localShortcuts'
 import useLocalShortcuts from '~/hooks/useLocalShortcuts'
 import { UiButton } from '~/components/ui/ControlKit'
-import { dispatchTableEvent, isTableEventForEditor } from '../utils/tableEvents'
+import { dispatchTableEvent, isTableEventForEditor, isTableTextFormattingShortcut } from '../utils/tableEvents'
 import { $getTableModel, $resolveTableCell, $insertRowAtCell, $insertColumnAtCell, $deleteRowAtCell, $deleteColumnAtCell, $mergeTableCells, $splitTableCell, $moveTableRow, $moveTableColumn } from '../utils/tableModel'
 
 // Retain coordinate-based helpers for existing callers. Live selection keeps
@@ -464,6 +464,14 @@ export default function TableSelectionPlugin({ documentId }) {
       }
       const onEditorKey = event => {
         if (!ownsInput(event)) return
+        if (isTableTextFormattingShortcut(event)) {
+          stopInput(event)
+          if (!inputHintShown) {
+            inputHintShown = true
+            toast.warning('请先完成单元格多选，再使用文字格式工具')
+          }
+          return
+        }
         if (['Backspace', 'Delete', 'Enter'].includes(event.key) ||
           ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'x')) {
           refuseTextInput(event)

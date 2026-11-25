@@ -57,6 +57,7 @@ import { useImageUploadSession } from '../hooks/useImageUploadSession'
 import { toast } from '~/services/toast'
 import TableMenu from './TableMenu'
 import { normalizeLinkUrl } from '../utils/linkUtils'
+import { isTableSelectionActive } from '../utils/tableEvents'
 import { useEditorWriteScope } from '../hooks/useEditorWriteScope'
 import { readExcelTableRows } from '../utils/excelTable'
 import { isShortcutContextBlocked, shortcutFromEvent, shortcutLabel } from '~/services/localShortcuts'
@@ -213,28 +214,45 @@ export default function ToolbarPlugin({ documentId } = {}) {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  const ensureFormattingAllowed = () => {
+    if (!editor.isEditable()) return false
+    if (isTableSelectionActive(editor)) {
+      toast.warning('请先点击“完成”退出单元格多选，再使用文字格式工具')
+      return false
+    }
+    return true
+  }
+
+  const dispatchTextFormat = format => {
+    if (!ensureFormattingAllowed()) return false
+    return editor.dispatchCommand(FORMAT_TEXT_COMMAND, format)
+  }
+
   const applyStyle = (style, value) => {
+    if (!ensureFormattingAllowed()) return false
     editor.update(() => {
       const selection = $getSelection()
       if ($isRangeSelection(selection)) {
         $patchStyleText(selection, { [style]: value })
       }
     })
+    return true
   }
 
   const applyTextColor = (color) => {
-    applyStyle('color', color)
+    if (!applyStyle('color', color)) return
     setShowColorPicker(false)
     editor.focus()
   }
 
   const applyHighlight = (color) => {
-    applyStyle('background-color', color)
+    if (!applyStyle('background-color', color)) return
     setShowHighlightPicker(false)
     editor.focus()
   }
 
   const handleFontChange = (event) => {
+    if (!ensureFormattingAllowed()) return
     const value = event.target.value
     setFontFamily(value)
     localStorage.setItem('editor-font-family', value)
@@ -309,6 +327,7 @@ export default function ToolbarPlugin({ documentId } = {}) {
   ), [editor, updateToolbar])
 
   const formatBlock = (nextType) => {
+    if (!ensureFormattingAllowed()) return
     editor.dispatchCommand(REMOVE_LIST_COMMAND)
 
     editor.update(() => {
@@ -328,6 +347,7 @@ export default function ToolbarPlugin({ documentId } = {}) {
   }
 
   const toggleList = (type) => {
+    if (!ensureFormattingAllowed()) return
     const active = type === 'bullet'
       ? isBulletList
       : type === 'number'
@@ -353,6 +373,7 @@ export default function ToolbarPlugin({ documentId } = {}) {
   }
 
   const applyLink = () => {
+    if (!ensureFormattingAllowed()) return
     const url = normalizeLinkUrl(linkUrl)
     if (!url || !hasSelection) {
       if (linkUrl.trim()) toast.warning('请输入有效网页链接或章节锚点')
@@ -365,6 +386,7 @@ export default function ToolbarPlugin({ documentId } = {}) {
   }
 
   const removeLink = () => {
+    if (!ensureFormattingAllowed()) return
     editor.dispatchCommand(TOGGLE_LINK_COMMAND, null)
     setLinkOpen(false)
     setLinkUrl('')
@@ -655,7 +677,7 @@ export default function ToolbarPlugin({ documentId } = {}) {
       <div className="toolbar-group compact-format" aria-label="文字格式">
         <UiButton density="compact"
           type="button"
-          onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'bold')}
+          onClick={() => dispatchTextFormat('bold')}
           className={`btn fw-bold${isBold ? ' active' : ''}`}
           aria-label="加粗"
           title="加粗 (Ctrl+B)"
@@ -664,7 +686,7 @@ export default function ToolbarPlugin({ documentId } = {}) {
         </UiButton>
         <UiButton density="compact"
           type="button"
-          onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'italic')}
+          onClick={() => dispatchTextFormat('italic')}
           className={`btn fst-italic${isItalic ? ' active' : ''}`}
           aria-label="斜体"
           title="斜体 (Ctrl+I)"
@@ -673,7 +695,7 @@ export default function ToolbarPlugin({ documentId } = {}) {
         </UiButton>
         <UiButton density="compact"
           type="button"
-          onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'underline')}
+          onClick={() => dispatchTextFormat('underline')}
           className={`btn text-decoration-underline${isUnderline ? ' active' : ''}`}
           aria-label="下划线"
           title="下划线 (Ctrl+U)"
@@ -682,7 +704,7 @@ export default function ToolbarPlugin({ documentId } = {}) {
         </UiButton>
         <UiButton density="compact"
           type="button"
-          onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'code')}
+          onClick={() => dispatchTextFormat('code')}
           className={`btn toolbar-inline-code${isCode ? ' active' : ''}`}
           aria-label="行内代码"
           title="行内代码"
@@ -917,6 +939,7 @@ export default function ToolbarPlugin({ documentId } = {}) {
                 <UiSelect density="compact"
                   value={fontSize}
                   onChange={event => {
+                    if (!ensureFormattingAllowed()) return
                     setFontSize(event.target.value)
                     applyStyle('font-size', event.target.value)
                   }}
@@ -931,7 +954,7 @@ export default function ToolbarPlugin({ documentId } = {}) {
                 <UiButton density="compact"
                   type="button"
                   className={`btn${isStrikethrough ? ' active' : ''}`}
-                  onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'strikethrough')}
+                  onClick={() => dispatchTextFormat('strikethrough')}
                 >
                   删除线
                 </UiButton>
@@ -1011,31 +1034,31 @@ export default function ToolbarPlugin({ documentId } = {}) {
               <div className="toolbar-menu-row">
                 <UiButton density="compact"
                   type="button"
-                  onClick={() => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'left')}
+                  onClick={() => ensureFormattingAllowed() && editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'left')}
                   className={`btn${elementFormat === 'left' ? ' active' : ''}`}
                 >
                   左对齐
                 </UiButton>
                 <UiButton density="compact"
                   type="button"
-                  onClick={() => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'center')}
+                  onClick={() => ensureFormattingAllowed() && editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'center')}
                   className={`btn${elementFormat === 'center' ? ' active' : ''}`}
                 >
                   居中
                 </UiButton>
                 <UiButton density="compact"
                   type="button"
-                  onClick={() => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'right')}
+                  onClick={() => ensureFormattingAllowed() && editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'right')}
                   className={`btn${elementFormat === 'right' ? ' active' : ''}`}
                 >
                   右对齐
                 </UiButton>
               </div>
               <div className="toolbar-menu-row">
-                <UiButton density="compact" type="button" className="btn" onClick={() => editor.dispatchCommand(OUTDENT_CONTENT_COMMAND)}>
+                <UiButton density="compact" type="button" className="btn" onClick={() => ensureFormattingAllowed() && editor.dispatchCommand(OUTDENT_CONTENT_COMMAND)}>
                   减少缩进
                 </UiButton>
-                <UiButton density="compact" type="button" className="btn" onClick={() => editor.dispatchCommand(INDENT_CONTENT_COMMAND)}>
+                <UiButton density="compact" type="button" className="btn" onClick={() => ensureFormattingAllowed() && editor.dispatchCommand(INDENT_CONTENT_COMMAND)}>
                   增加缩进
                 </UiButton>
               </div>
