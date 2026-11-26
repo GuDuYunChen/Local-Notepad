@@ -95,3 +95,18 @@ export function searchDOMRange(editor, match) {
   if (!start || !end) return null
   const range = document.createRange(); range.setStart(...start); range.setEnd(...end); return range
 }
+
+
+// Reveal the actual matched paragraph/cell, not only its top-level Table node.
+// scrollIntoView on a large Table can leave a match deep below the visible viewport.
+export function scrollSearchMatchIntoView(editor, match) {
+  const range = searchDOMRange(editor, match)
+  if (!range) return false
+  const start = range.startContainer.nodeType === Node.TEXT_NODE
+    ? range.startContainer.parentElement
+    : range.startContainer
+  const target = start?.closest?.('p, li, td, th, pre, [data-lexical-code-block]') || start
+  if (!target?.isConnected) return false
+  target.scrollIntoView?.({ block: 'center', inline: 'nearest', behavior: 'auto' })
+  return true
+}
