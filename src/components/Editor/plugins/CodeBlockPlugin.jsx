@@ -5,8 +5,10 @@ import {
   $isRangeSelection,
   $createParagraphNode,
   COMMAND_PRIORITY_LOW,
+  COMMAND_PRIORITY_HIGH,
   COMMAND_PRIORITY_EDITOR,
   createCommand,
+  KEY_DOWN_COMMAND,
   KEY_ENTER_COMMAND,
   KEY_TAB_COMMAND,
   KEY_ESCAPE_COMMAND,
@@ -15,6 +17,7 @@ import {
   KEY_BACKSPACE_COMMAND,
   DELETE_CHARACTER_COMMAND,
   $getNodeByKey,
+  $getNearestNodeFromDOMNode,
   $getRoot,
 } from 'lexical';
 import { $createCodeBlockNode, $isCodeBlockNode } from '../nodes/CodeBlockNode';
@@ -97,6 +100,20 @@ export default function CodeBlockPlugin() {
 
     // Register keyboard event handlers for special keys
     const removeKeyboardHandlers = mergeRegister(
+      editor.registerCommand(
+        KEY_DOWN_COMMAND,
+        (event) => {
+          const root = editor.getRootElement();
+          const target = event.target?.nodeType === 1 ? event.target : event.target?.parentElement;
+          const control = target?.closest('input,textarea,select,button');
+          if (!root || !control || !root.contains(control) || root.ownerDocument.activeElement !== control ||
+              control.closest('[data-lexical-editor="true"]') !== root) return false;
+          // Native controls own their keyboard defaults and DOM bubbling.
+          // Only stop Lexical from applying this key to its retained body caret.
+          return $isCodeBlockNode($getNearestNodeFromDOMNode(control));
+        },
+        COMMAND_PRIORITY_HIGH
+      ),
       // Handle Tab key - insert tab character instead of moving focus
       editor.registerCommand(
         KEY_TAB_COMMAND,

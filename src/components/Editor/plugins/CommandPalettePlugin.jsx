@@ -1,12 +1,13 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { $insertNodes } from 'lexical'
 import { blockRegistry } from '../utils/blockRegistry'
 import { useEditorWriteScope } from '../hooks/useEditorWriteScope'
-import { dispatchTableEvent } from '../utils/tableEvents'
+import { captureTableSelectionWrite, dispatchTableEvent } from '../utils/tableEvents'
 import { isShortcutContextBlocked, matchShortcut, shortcutLabel } from '~/services/localShortcuts'
 import useLocalShortcuts from '~/hooks/useLocalShortcuts'
 import { UiButton, UiInput } from '~/components/ui/ControlKit'
+import { toast } from '~/services/toast'
 
 
 const EXTRA_COMMANDS = [
@@ -61,14 +62,14 @@ export function filterCommandPaletteCommands(commands, query) {
   })
 }
 
-function buildCommands(editor, captureWrite) {
+function buildCommands(editor) {
   const blockCommands = blockRegistry.map(block => ({
     id: 'block:' + block.type,
     label: block.label,
     description: block.description || '插入内容块',
     keywords: block.keywords || [],
-    run: async () => {
-      const canWrite = captureWrite()
+    writesContent: true,
+    run: async canWrite => {
       if (!canWrite()) return
       if (block.run) {
         await block.run(editor, canWrite)
@@ -81,7 +82,6 @@ function buildCommands(editor, captureWrite) {
         const node = block.createNode()
         if (node) $insertNodes([node])
       })
-      editor.focus()
     },
   }))
 
@@ -100,16 +100,36 @@ export default function CommandPalettePlugin({ documentId } = {}) {
   const [selectedIndex, setSelectedIndex] = useState(0)
   const inputRef = useRef(null)
   const composing = useRef(false)
-  const commands = useMemo(() => buildCommands(editor, captureWrite), [editor, captureWrite])
+  const openedScopeRef = useRef(null)
+  const commands = useMemo(() => buildCommands(editor), [editor])
   const filtered = useMemo(
     () => filterCommandPaletteCommands(commands, query),
     [commands, query]
   )
 
+  useLayoutEffect(() => {
+    const invalidate = () => {
+      openedScopeRef.current = null
+      composing.current = false
+      setOpen(false)
+      setQuery('')
+    }
+    invalidate()
+    const unregister = editor.registerEditableListener(invalidate)
+    return () => {
+      openedScopeRef.current = null
+      unregister()
+    }
+  }, [editor, documentId])
+
   useEffect(() => {
     if (!open) return
     setSelectedIndex(0)
-    window.requestAnimationFrame(() => inputRef.current?.focus())
+    const opened = openedScopeRef.current
+    const frame = window.requestAnimationFrame(() => {
+      if (opened === openedScopeRef.current && opened?.canWriteDocument()) inputRef.current?.focus()
+    })
+    return () => window.cancelAnimationFrame(frame)
   }, [open])
 
   useEffect(() => {
@@ -119,7 +139,11 @@ export default function CommandPalettePlugin({ documentId } = {}) {
 
   useEffect(() => {
     const openPalette = () => {
-      if (!editor.isEditable() || !editor.getRootElement()?.isConnected) return
+      const canWriteDocument = captureWrite()
+      if (!canWriteDocument() || !editor.getRootElement()?.isConnected) return
+      // A content command belongs to the document and text-selection owner
+      // which opened the panel, including any later file-picker completion.
+      openedScopeRef.current = { canWriteDocument, ownsSelection: captureTableSelectionWrite(editor) }
       composing.current = false
       setOpen(true)
       setQuery('')
@@ -142,25 +166,37 @@ export default function CommandPalettePlugin({ documentId } = {}) {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('editor:open-command-palette', openPalette)
     }
-  }, [editor])
+  }, [editor, captureWrite])
 
   const close = () => {
+    const opened = openedScopeRef.current
+    openedScopeRef.current = null
     composing.current = false
     setOpen(false)
     setQuery('')
-    editor.focus()
+    if (opened?.canWriteDocument() && opened.ownsSelection()) editor.focus()
   }
 
   const runCommand = async command => {
-    const canWrite = captureWrite()
-    if (!command || !canWrite()) return
+    if (!command) return
+    const opened = openedScopeRef.current
+    const canWrite = () => !!opened?.canWriteDocument() && (!command.writesContent || opened.ownsSelection())
+    openedScopeRef.current = null
     composing.current = false
     setOpen(false)
     setQuery('')
+    if (!canWrite()) {
+      if (opened?.canWriteDocument()) toast.warning('请先点击“完成”退出单元格多选，再输入或修改正文')
+      return
+    }
     try {
-      await command.run()
+      // Restore native focus before the content update, while this opening
+      // still owns the text selection. A later focus update must not revive
+      // the old caret after table ownership or the document has changed.
+      if (command.writesContent) editor.getRootElement()?.focus({ preventScroll: true })
+      await command.run(canWrite)
     } finally {
-      if (canWrite()) editor.focus()
+      if (canWrite() && opened.ownsSelection()) editor.focus()
     }
   }
 

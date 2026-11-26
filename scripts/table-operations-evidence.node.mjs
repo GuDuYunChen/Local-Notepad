@@ -102,6 +102,29 @@ function syntheticReport() {
   putInputs(inputIndex, [{ method: 'Input.imeSetComposition', text: '表', selectionStart: 1, selectionEnd: 1 },
     { method: 'Input.insertText', text: '表' }, ...keyInputs('s', 83, 2)])
   set('selection-input-ime', table); report.snapshots['selection-input-ime'].ui = clone(imeModebarView)
+  inputIndex = ime.saveInputEnd
+  const paletteWarning = '请先点击“完成”退出单元格多选，再输入或修改正文'
+  const closedPalette = { ...clone(selectedView), rootFocused: false, modebarFocused: false,
+    dialogCount: 0, searchInputFocused: false, query: null, options: [], warnings: [] }
+  const dividerOption = { label: '分割线', selected: true, disabled: false }
+  const palette = {
+    label: '编辑器命令', query: 'divider', command: '分割线', feedback: paletteWarning, snapshot: 'selection-input-palette',
+    launcher: { label: '编辑器命令', disabled: false, left: 20, top: 40, width: 30, height: 30 },
+    before: { ...clone(closedPalette), modebarFocused: true },
+    opened: { ...clone(closedPalette), dialogCount: 1, searchInputFocused: true, query: '', options: [clone(dividerOption)] },
+    filtered: { ...clone(closedPalette), dialogCount: 1, searchInputFocused: true, query: 'divider', options: [clone(dividerOption)] },
+    after: { ...clone(closedPalette), warnings: [paletteWarning] },
+    inputStart: inputIndex, inputEnd: inputIndex + 7, openInputStart: inputIndex, openInputEnd: inputIndex + 2,
+    queryInputStart: inputIndex + 2, queryInputEnd: inputIndex + 3, executeInputStart: inputIndex + 3, executeInputEnd: inputIndex + 5,
+    saveInputStart: inputIndex + 5, saveInputEnd: inputIndex + 7,
+  }
+  report.selectionIsolation.palette = palette
+  putInputs(inputIndex, [
+    ...['mousePressed', 'mouseReleased'].map(type => ({ method: 'Input.dispatchMouseEvent', type, x: 35, y: 55, button: 'left', clickCount: 1 })),
+    { method: 'Input.insertText', text: 'divider' }, ...keyInputs('Enter', 13), ...keyInputs('s', 83, 2),
+  ])
+  set(palette.snapshot, table); report.snapshots[palette.snapshot].ui = clone(palette.after)
+  const paletteInputCount = palette.inputEnd - palette.inputStart
   const colored = clone(table); colored.children[1].children.slice(0, 2).forEach(cell => { cell.backgroundColor = '#fff3cd' })
   set('selected-background', colored)
   const merged = clone(colored); merged.children[1].children[0].colSpan = 2
@@ -114,8 +137,8 @@ function syntheticReport() {
   set('clipboard-copied', colored); set('clipboard-cleared', cleared); set('clipboard-pasted', colored)
   set('clipboard-paste-undo', cleared); set('clipboard-clear-undo', colored); set('clipboard-clear-redo', cleared); set('clipboard-paste-redo', colored)
   report.clipboard = { method: 'native-copy-and-paste-buttons', selection: '已选择 2 个单元格',
-    copy: { label: '复制', feedback: '已复制所选单元格', inputStart: 54, inputEnd: 56 },
-    paste: { label: '粘贴', feedback: '已粘贴到所选区域', inputStart: 58, inputEnd: 60 },
+    copy: { label: '复制', feedback: '已复制所选单元格', inputStart: 54 + paletteInputCount, inputEnd: 56 + paletteInputCount },
+    paste: { label: '粘贴', feedback: '已粘贴到所选区域', inputStart: 58 + paletteInputCount, inputEnd: 60 + paletteInputCount },
   }
   const styled = clone(colored); styled.rowStriping = true; styled.frozenRowCount = 1; styled.frozenColumnCount = 1
   styled.children[0].children[1].backgroundColor = '#cff4fc'
@@ -148,7 +171,7 @@ function syntheticReport() {
   report.saved = { main: { id: 'main', content: doc(retried) }, large: { id: 'large', content: doc(large) }, destination: { id: 'destination', content: tableOperationSeed('synthetic destination') } }
   report.nativeInputs[1] = { sequence: 2, method: 'Input.dispatchKeyEvent', type: 'rawKeyDown', key: 'Escape' }
   report.nativeDrags = []
-  for (const [kind, inputStart, target] of [['row', 70, { x: 30, y: 240 }], ['col', 82, { x: 270, y: 60 }]]) {
+  for (const [kind, inputStart, target] of [['row', 70 + paletteInputCount, { x: 30, y: 240 }], ['col', 82 + paletteInputCount, { x: 270, y: 60 }]]) {
     const source = { x: 30, y: 60, width: 26 }, data = { items: [{ mimeType: 'application/x-local-notepad-table-reorder', data: 'real-start-token-placeholder-' + kind }], dragOperationsMask: 16 }
     report.nativeDrags.push({ kind, inputStart, inputEnd: inputStart + 8, source, target, completed: true,
       intercepted: [{ afterInputSequence: inputStart + 4, data: clone(data) }] })
@@ -225,6 +248,33 @@ const refusals = [
     value.root.children[0].children[0].children[2].children[0].children[0].text = '\u200b'
     snapshot.content = JSON.stringify(value); snapshot.sha256 = tableOperationsHash(snapshot.content)
   }],
+  ['missing native command palette isolation', report => { delete report.selectionIsolation.palette }],
+  ['palette receipt overlaps the existing IME save', report => { report.selectionIsolation.palette.inputStart -= 1 }],
+  ['palette opened without an actual native toolbar click', report => { report.selectionIsolation.palette.openInputEnd -= 1 }],
+  ['palette click targets the wrong toolbar label', report => { report.selectionIsolation.palette.launcher.label = '插入内容' }],
+  ['palette click lands outside the observed launcher', report => { report.nativeInputs[report.selectionIsolation.palette.openInputStart].x = 1000 }],
+  ['palette opens without focusing its actual search input', report => { report.selectionIsolation.palette.opened.searchInputFocused = false }],
+  ['palette query was not sent by native text input', report => { report.nativeInputs[report.selectionIsolation.palette.queryInputStart].method = 'Input.dispatchKeyEvent' }],
+  ['palette native input sends the wrong query', report => { report.nativeInputs[report.selectionIsolation.palette.queryInputStart].text = 'image' }],
+  ['palette observed search input contains the wrong query', report => { report.selectionIsolation.palette.filtered.query = 'image' }],
+  ['palette query resolves to multiple options', report => { report.selectionIsolation.palette.filtered.options.push({ label: '图片', selected: false, disabled: false }) }],
+  ['palette query resolves to the wrong option', report => { report.selectionIsolation.palette.filtered.options[0].label = '图片' }],
+  ['palette divider option was not selected for Enter', report => { report.selectionIsolation.palette.filtered.options[0].selected = false }],
+  ['palette divider option was disabled instead of exercising refusal', report => { report.selectionIsolation.palette.filtered.options[0].disabled = true }],
+  ['palette command was never executed by native Enter', report => { report.nativeInputs[report.selectionIsolation.palette.executeInputStart].key = 'Escape' }],
+  ['palette dialog remains open after refused content command', report => { report.selectionIsolation.palette.after.dialogCount = 1 }],
+  ['palette reuses a previous warning instead of observing new refusal', report => { report.selectionIsolation.palette.before.warnings.push(report.selectionIsolation.palette.feedback) }],
+  ['palette refusal has no observed warning', report => { report.selectionIsolation.palette.after.warnings = [] }],
+  ['palette refusal reports the wrong warning', report => { report.selectionIsolation.palette.feedback = '成功' }],
+  ['palette command loses the two selected cells', report => { report.selectionIsolation.palette.after.selection = '已选择 1 个单元格' }],
+  ['palette command alters retained unselected R1C3', report => { report.selectionIsolation.palette.after.rows[0][2].text = '' }],
+  ['palette refusal is not followed by native Save', report => { report.nativeInputs[report.selectionIsolation.palette.saveInputStart].modifiers = 0 }],
+  ['palette receipt omits the final Save release', report => { report.selectionIsolation.palette.inputEnd -= 1 }],
+  ['palette command inserts outside the table despite a valid JSON checksum', report => {
+    const snapshot = report.snapshots['selection-input-palette'], value = JSON.parse(snapshot.content)
+    value.root.children.push({ type: 'divider', version: 1 })
+    snapshot.content = JSON.stringify(value); snapshot.sha256 = tableOperationsHash(snapshot.content)
+  }],
   ['missing native clipboard workflow', report => { report.checks = report.checks.filter(check => check !== 'native-clipboard-copy-clear-paste-and-history') }],
   ['copy without a native click receipt', report => { report.clipboard.copy.inputEnd = report.clipboard.copy.inputStart }],
   ['paste without real success feedback', report => { report.clipboard.paste.feedback = '' }],
@@ -245,6 +295,16 @@ const refusals = [
   ['stale image paste source pin', report => { report.sourceFiles['src/components/Editor/plugins/PasteImagePlugin.jsx'] = '0'.repeat(40) }],
   ['missing shared image ownership source pin', report => { delete report.sourceFiles['src/components/Editor/hooks/useImageUploadSession.js'] }],
   ['stale shared image ownership source pin', report => { report.sourceFiles['src/components/Editor/hooks/useImageUploadSession.js'] = '0'.repeat(40) }],
+  ...[
+    'src/components/Editor/plugins/CommandPalettePlugin.jsx', 'src/components/Editor/plugins/SlashMenuPlugin.jsx',
+    'src/components/Editor/plugins/CodeBlockPlugin.jsx',
+    'src/components/Editor/plugins/BlockHandlePlugin.jsx', 'src/components/Editor/plugins/DragDropPlugin.jsx',
+    'src/components/Editor/plugins/WikiLinkPlugin.jsx', 'src/components/Editor/plugins/MentionPlugin.jsx',
+    'src/components/Editor/plugins/BlockReferencePlugin.jsx', 'src/components/Editor/utils/blockRegistry.js',
+  ].flatMap(source => [
+    ['missing Table content-entry source pin: ' + source, report => { delete report.sourceFiles[source] }],
+    ['stale Table content-entry source pin: ' + source, report => { report.sourceFiles[source] = '0'.repeat(40) }],
+  ]),
   ['missing native input', report => { report.nativeInputs = [] }],
   ['invented drag data', report => { report.nativeInputs[report.nativeDrags[0].inputStart + 6].data.items = [] }],
   ['old native drag movement omitted its left button', report => { delete report.nativeInputs[report.nativeDrags[0].inputStart + 3].button }],
@@ -277,6 +337,10 @@ test('Table native wait propagates an uncertain action immediately without repla
 })
 
 test('new Table gate uses trusted native input and preserves existing native control matrix and budget', () => {
+  assert.equal(TABLE_OPERATIONS_CHECKS.length, 14)
+  assert.equal(TABLE_OPERATIONS_SCREENSHOTS.length, 9)
+  assert.equal(TABLE_OPERATIONS_BUDGET_MS, 180000)
+  assert.equal(TABLE_OPERATIONS_SOURCES.length, 41)
   const driver = readFileSync(new URL('./table-operations-desktop-driver.mjs', import.meta.url), 'utf8')
   assert.doesNotMatch(driver, /new\s+(?:MouseEvent|DragEvent|KeyboardEvent)|\.setEditorState\(|\.dispatchCommand\(|Object\.defineProperty|Emulation\.setDeviceMetricsOverride/)
   assert.match(driver, /Input\.dragIntercepted/); assert.match(driver, /Input\.dispatchMouseEvent/)

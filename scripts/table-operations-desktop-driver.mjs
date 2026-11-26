@@ -286,6 +286,61 @@ export async function verifyTableOperationsDesktop(context) {
   ime.snapshot = 'selection-input-ime'; ime.saveInputStart = report.nativeInputs.length; save()
   await checkpoint(ime.snapshot, exact(initial))
   ime.saveInputEnd = report.nativeInputs.length; save()
+
+  // The command panel is another content-entry path. Exercise its real search
+  // input and Enter handler while the rectangle still owns editing, then save
+  // the complete document so an inserted block outside the table cannot hide.
+  const paletteWarning = '请先点击“完成”退出单元格多选，再输入或修改正文'
+  const paletteView = async () => ({ ...(await observe()), ...(await evaluate(`(() => {
+    const dialogs=[...document.querySelectorAll('.editor-command-palette[role="dialog"][aria-label="编辑器命令"]')]
+    const dialog=dialogs[0],input=dialog?.querySelector('input[aria-label="搜索编辑器命令"]')
+    return {dialogCount:dialogs.length,searchInputFocused:!!input&&document.activeElement===input,query:input?.value??null,
+      options:dialog?[...dialog.querySelectorAll('.editor-command-item[role="option"]')].map(option=>({
+        label:option.querySelector('strong')?.textContent.trim(),selected:option.getAttribute('aria-selected')==='true',disabled:option.disabled})):[],
+      warnings:[...document.querySelectorAll('.app-toast.warning .app-toast-content')].map(node=>node.textContent.trim())}
+  })()`)) })
+  await until(async () => !(await paletteView()).warnings.includes(paletteWarning), 'Previous bulk-input feedback did not expire before the command-panel action')
+  const palette = { label: '编辑器命令', query: 'divider', command: '分割线', before: await paletteView(), inputStart: report.nativeInputs.length }
+  report.selectionIsolation.palette = palette; save()
+  palette.openInputStart = report.nativeInputs.length
+  palette.launcher = await evaluate(`(() => {
+    const buttons=[...document.querySelectorAll('.editor-toolbar button[aria-label="编辑器命令"]')]
+    if(buttons.length!==1)return null
+    const button=buttons[0],r=button.getBoundingClientRect()
+    return {label:button.getAttribute('aria-label'),disabled:button.disabled,left:r.left,top:r.top,width:r.width,height:r.height}
+  })()`)
+  assert.equal(palette.launcher?.label, palette.label); assert.equal(palette.launcher.disabled, false)
+  await click('.editor-toolbar button[aria-label="编辑器命令"]')
+  palette.openInputEnd = report.nativeInputs.length
+  palette.opened = await until(async () => {
+    const view = await paletteView()
+    return view.dialogCount === 1 && view.searchInputFocused && view.query === '' ? view : false
+  }, 'Native command panel did not focus its actual search input'); save()
+  palette.queryInputStart = report.nativeInputs.length
+  await type(palette.query); await settle()
+  palette.queryInputEnd = report.nativeInputs.length
+  palette.filtered = await until(async () => {
+    const view = await paletteView()
+    return view.dialogCount === 1 && view.searchInputFocused && view.query === palette.query && view.options.length === 1 &&
+      view.options[0].label === palette.command && view.options[0].selected && !view.options[0].disabled ? view : false
+  }, 'Native command search did not resolve to the single divider action'); save()
+  palette.executeInputStart = report.nativeInputs.length
+  await key('Enter', 13)
+  palette.executeInputEnd = report.nativeInputs.length
+  palette.after = await until(async () => {
+    const view = await paletteView()
+    return view.dialogCount === 0 && view.warnings.includes(paletteWarning) ? view : false
+  }, 'Native command panel did not close with the bulk-selection refusal'); save()
+  palette.feedback = palette.after.warnings.find(value => value === paletteWarning)
+  for (const view of [palette.before, palette.opened, palette.filtered, palette.after]) {
+    assert.match(view.selection, /已选择 2 个单元格/)
+    assert.deepEqual(view.rows.map(row => row.map(cell => cell.text)), originalRows)
+  }
+  palette.snapshot = 'selection-input-palette'; palette.saveInputStart = report.nativeInputs.length; save()
+  await checkpoint(palette.snapshot, exact(initial))
+  palette.saveInputEnd = report.nativeInputs.length; palette.inputEnd = report.nativeInputs.length; save()
+  assert.match(report.snapshots[palette.snapshot].ui.selection, /已选择 2 个单元格/)
+  assert.deepEqual(report.snapshots[palette.snapshot].ui.rows.map(row => row.map(cell => cell.text)), originalRows)
   await click({ selector: '.table-selection-modebar button', text: '浅黄' })
   const colored = await checkpoint('selected-background', value => {
     const table = tableFromContent(value)
