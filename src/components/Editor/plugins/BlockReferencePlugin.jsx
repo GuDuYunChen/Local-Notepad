@@ -9,11 +9,23 @@ import { blockLocator, parseBlockLocator, removeCopiedBlockIds, validBlockId } f
 import { readBlockReference } from '../../../services/blockReferences.mjs'
 import { $blockId, $ensureBlockId, $referenceBlockNodes } from '../utils/blockReferenceState.js'
 import { $createBlockReferenceNode } from '../nodes/WikiLinkNode.jsx'
+import { useEditorWriteScope } from '../hooks/useEditorWriteScope'
+import { captureTableSelectionWrite } from '../utils/tableEvents'
 import './BlockReferences.css'
 import { UiButton, UiInput, UiSelect } from '~/components/ui/ControlKit'
 
+// Table cells are Lexical shadow roots. A stable source address belongs to
+// the table under the document root, not to a paragraph inside one cell.
+function $referenceRootBlock(node) {
+  let block = node
+  while (block && block.getParent()?.getType() !== 'root') block = block.getParent()
+  return block
+}
 
-export function $captureBlockReferenceSelection(editor) {
+export function $captureBlockReferenceSelection(editor, canWrite = () => editor.isEditable()) {
+  const canUseSelection = captureTableSelectionWrite(editor)
+  if (!canUseSelection()) throw Error('请先完成单元格多选，再打开块引用。')
+  const valid = () => canWrite() && canUseSelection()
   const focused = document.activeElement
   const root = editor.getRootElement()
   // A code decorator uses its own textarea, not a RangeSelection. Capture it
@@ -21,15 +33,17 @@ export function $captureBlockReferenceSelection(editor) {
   if (focused && root?.contains(focused) && focused.matches('textarea')) {
     const node = $getNearestNodeFromDOMNode(focused)
     const block = node?.getTopLevelElement()
-    if (block?.getType() === 'code-block') return { selection: null, blockKey: block.getKey(), content: JSON.stringify(editor.getEditorState()) }
+    const referenceBlock = $referenceRootBlock(block)
+    if (block?.getType() === 'code-block' && referenceBlock) return { selection: null, blockKey: referenceBlock.getKey(), content: JSON.stringify(editor.getEditorState()), canWrite: valid }
   }
   const selection = $getSelection()
   if (!$isRangeSelection(selection) || !selection.isCollapsed()) throw Error('请先把光标放在目标位置，再打开块引用。')
-  const node = selection.anchor.getNode(), block = node.getTopLevelElement()
+  const block = $referenceRootBlock(selection.anchor.getNode())
   if (!block) throw Error('当前光标不在可引用的正文块中。')
-  return { selection: selection.clone(), blockKey: block.getKey(), content: JSON.stringify(editor.getEditorState()) }
+  return { selection: selection.clone(), blockKey: block.getKey(), content: JSON.stringify(editor.getEditorState()), canWrite: valid }
 }
 export function $insertReviewedBlockReference(editor, ticket, target, embedded) {
+  if (!ticket.canWrite?.()) throw Error('当前笔记、编辑状态或表格选择已变化，请重新打开块引用。')
   if (!editor.isEditable() || JSON.stringify(editor.getEditorState()) !== ticket.content) throw Error('正文已变化，请关闭面板后重新选择插入位置。')
   if (!ticket.selection) throw Error('代码块只提供来源引用；请关闭面板，把光标放在正文段落再插入。')
   if (!$getNodeByKey(ticket.selection.anchor.key) || !$getNodeByKey(ticket.selection.focus.key)) throw Error('插入位置已失效，请重新选择。')
@@ -40,6 +54,7 @@ export function $insertReviewedBlockReference(editor, ticket, target, embedded) 
 export default function BlockReferencePlugin(props) { return <CurrentBlockReferences key={props.documentId || ''} {...props} /> }
 function CurrentBlockReferences({ documentId, documentTitle, initialContent }) {
   const [editor] = useLexicalComposerContext(), editable = useLexicalEditable()
+  const captureWrite = useEditorWriteScope(editor, documentId)
   const [open, setOpen] = useState(false), [busy, setBusy] = useState(false), [message, setMessage] = useState('')
   const [error, setError] = useState(''), [address, setAddress] = useState(''), [sourceAddress, setSourceAddress] = useState('')
   const [preview, setPreview] = useState(null), [embedded, setEmbedded] = useState(false)
@@ -55,12 +70,13 @@ function CurrentBlockReferences({ documentId, documentTitle, initialContent }) {
     invalidateRead(); setPreview(null); setSourceAddress(''); setAddress(''); setError(''); setMessage(''); setBusy(false)
     try {
       if (!ready()) throw Error('正文尚未加载完成。')
-      editor.getEditorState().read(() => { ticket.current = $captureBlockReferenceSelection(editor) })
+      editor.getEditorState().read(() => { ticket.current = $captureBlockReferenceSelection(editor, captureWrite()) })
       active.current = true; setOpen(true)
     } catch (failure) { setError(failure.message) }
   }
   const current = () => {
     if (!alive.current || !active.current || !ready() || !editor.isEditable() || !ticket.current) throw Error('当前笔记或编辑状态已变化，请重新打开块引用。')
+    if (!ticket.current.canWrite()) throw Error('当前笔记、编辑状态或表格选择已变化，请重新打开块引用。')
     if (JSON.stringify(editor.getEditorState()) !== ticket.current.content) throw Error('正文已变化，请关闭面板后重新选择插入位置。')
     return ticket.current
   }
@@ -73,11 +89,19 @@ function CurrentBlockReferences({ documentId, documentTitle, initialContent }) {
   }
   const createAnchor = () => {
     try {
-      const captured = current(); let id, failure
-      editor.update(() => { try { if (!editor.isEditable()) throw Error('阅读模式不能创建块标识。'); id = $ensureBlockId($getNodeByKey(captured.blockKey)) } catch (error) { failure = error } }, { discrete: true })
-      if (failure) throw failure
-      captured.content = JSON.stringify(editor.getEditorState()); captured.blockId = id
-      setMessage('块标识已加入当前草稿，沿用原有自动保存。核对保存成功后才能复制引用。'); setError(''); setSourceAddress('')
+      const captured = current(); let id
+      editor.update(() => {
+        try {
+          if (current() !== captured) throw Error('块引用面板已变化，请重新选择。')
+          id = $ensureBlockId($getNodeByKey(captured.blockKey))
+        } catch (failure) {
+          if (alive.current && active.current && ticket.current === captured) { setError(failure.message); setMessage('') }
+        }
+      }, { discrete: true, onUpdate: () => {
+        if (!id || !alive.current || !active.current || ticket.current !== captured || !captured.canWrite() || !ready()) return
+        captured.content = JSON.stringify(editor.getEditorState()); captured.blockId = id
+        setMessage('块标识已加入当前草稿，沿用原有自动保存。核对保存成功后才能复制引用。'); setError(''); setSourceAddress('')
+      } })
     } catch (failure) { setError(failure.message) }
   }
   const copySource = () => void run(async (controller, valid) => {

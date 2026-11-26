@@ -696,7 +696,7 @@ async function main() {
     syntheticRecords: true, isolatedProfile: true, cleanQuit: false, budgetMs: BUDGET_MS,
     runId: process.env.GITHUB_RUN_ID || null, attempt: process.env.GITHUB_RUN_ATTEMPT || null, scenes: [] }
   let win, quitting = false, verified = false
-  const persist = () => fs.writeFileSync(reportFile, JSON.stringify({ ...report, elapsedMs: Date.now() - started }, null, 2))
+  const persist = () => fs.writeFileSync(reportFile, JSON.stringify({ ...report, elapsedMs: Date.now() - started }))
   const fail = error => {
     if (quitting) return
     quitting = true; report.status = 'failed'; report.error = String(error.message || error)

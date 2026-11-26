@@ -1,7 +1,9 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
-import { $getSelection, $isRangeSelection, $createTextNode, $isParagraphNode, $isTextNode } from 'lexical'
+import { $getSelection, $isRangeSelection, $createTextNode, $isParagraphNode, $isTextNode, COMMAND_PRIORITY_HIGH, KEY_DOWN_COMMAND } from 'lexical'
 import { $createMentionNode } from '../nodes/MentionNode'
+import { useEditorWriteScope } from '../hooks/useEditorWriteScope'
+import { captureTableSelectionWrite, isTableEventForEditor, isTableSelectionActive } from '../utils/tableEvents'
 import './MentionPlugin.css'
 
 const MENTION_TRIGGER = '@'
@@ -14,19 +16,22 @@ const DEFAULT_SUGGESTIONS = [
   { id: '5', name: '孙七' },
 ]
 
-export default function MentionPlugin({ suggestions = DEFAULT_SUGGESTIONS }) {
+export default function MentionPlugin({ suggestions = DEFAULT_SUGGESTIONS, documentId }) {
   const [editor] = useLexicalComposerContext()
+  const captureWrite = useEditorWriteScope(editor, documentId)
   const [isOpen, setIsOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [position, setPosition] = useState({ top: 0, left: 0 })
   const [selectedIndex, setSelectedIndex] = useState(0)
   const menuRef = useRef(null)
+  const completionWrite = useRef(null)
 
   const filteredSuggestions = suggestions.filter((s) =>
     s.name.toLowerCase().includes(query.toLowerCase())
   )
 
   const closeMenu = useCallback(() => {
+    completionWrite.current = null
     setIsOpen(false)
     setQuery('')
     setSelectedIndex(0)
@@ -34,9 +39,12 @@ export default function MentionPlugin({ suggestions = DEFAULT_SUGGESTIONS }) {
 
   const selectMention = useCallback(
     (suggestion) => {
+      const ticket = completionWrite.current
+      if (!ticket?.canWrite()) { closeMenu(); return }
       editor.update(() => {
+        if (completionWrite.current !== ticket || !ticket.canWrite()) return
         const selection = $getSelection()
-        if (!$isRangeSelection(selection)) return
+        if (!$isRangeSelection(selection) || !selection.is(ticket.selection)) return
 
         const anchor = selection.anchor
         const anchorNode = anchor.getNode()
@@ -62,18 +70,30 @@ export default function MentionPlugin({ suggestions = DEFAULT_SUGGESTIONS }) {
               const remainingNode = $createTextNode(textAfterCursor)
               selection.insertNodes([remainingNode])
             }
+            closeMenu()
+            editor.focus()
           }
         }
       })
-
-      closeMenu()
-      editor.focus()
     },
     [editor, closeMenu]
   )
 
+  useEffect(() => editor.registerEditableListener(editable => {
+    if (!editable) closeMenu()
+  }), [editor, closeMenu])
+  useEffect(() => { closeMenu() }, [documentId, closeMenu])
+  useEffect(() => {
+    const onTableMode = event => {
+      if (event.detail === true && isTableEventForEditor(editor, event)) closeMenu()
+    }
+    window.addEventListener('tableSelection:mode', onTableMode)
+    return () => window.removeEventListener('tableSelection:mode', onTableMode)
+  }, [editor, closeMenu])
+
   useEffect(() => {
     const removeListener = editor.registerUpdateListener(({ editorState }) => {
+      if (!editor.isEditable() || isTableSelectionActive(editor)) { closeMenu(); return }
       editorState.read(() => {
         const selection = $getSelection()
         if (!$isRangeSelection(selection)) {
@@ -112,6 +132,8 @@ export default function MentionPlugin({ suggestions = DEFAULT_SUGGESTIONS }) {
 
         const domRange = domSelection.getRangeAt(0)
         const rect = domRange.getBoundingClientRect()
+        const canWrite = captureWrite(), canUseSelection = captureTableSelectionWrite(editor)
+        completionWrite.current = { canWrite: () => canWrite() && canUseSelection(), selection: selection.clone() }
 
         setIsOpen(true)
         setQuery(textAfterAt)
@@ -124,42 +146,41 @@ export default function MentionPlugin({ suggestions = DEFAULT_SUGGESTIONS }) {
     })
 
     return removeListener
-  }, [editor, closeMenu])
+  }, [editor, closeMenu, captureWrite])
 
   useEffect(() => {
     if (!isOpen) return
 
     const handleKeyDown = (e) => {
+      if (!editor.isEditable() || !completionWrite.current?.canWrite()) { closeMenu(); return false }
+      const root = editor.getRootElement(), focused = root?.ownerDocument.activeElement
+      const target = e?.target?.nodeType === 1 ? e.target : e?.target?.parentElement
+      const control = node => node?.closest?.('input,textarea,select,button,[contenteditable="false"]')
+      if (!e || editor.isComposing() || e.isComposing || e.keyCode === 229 ||
+        !root?.contains(target) || !root.contains(focused) || control(target) || control(focused)) return false
       if (e.key === 'Escape') {
-        e.preventDefault()
         closeMenu()
-        return
-      }
-
-      if (e.key === 'ArrowDown') {
-        e.preventDefault()
+      } else if (!filteredSuggestions.length) return false
+      else if (e.key === 'ArrowDown') {
         setSelectedIndex((prev) => (prev + 1) % filteredSuggestions.length)
-        return
-      }
-
-      if (e.key === 'ArrowUp') {
-        e.preventDefault()
+      } else if (e.key === 'ArrowUp') {
         setSelectedIndex((prev) => (prev - 1 + filteredSuggestions.length) % filteredSuggestions.length)
-        return
-      }
-
-      if (e.key === 'Enter' || e.key === 'Tab') {
-        e.preventDefault()
+      } else if (e.key === 'Enter' || e.key === 'Tab') {
         if (filteredSuggestions[selectedIndex]) {
           selectMention(filteredSuggestions[selectedIndex])
         }
-        return
-      }
+      } else return false
+      e.preventDefault()
+      e.stopPropagation()
+      return true
     }
-
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, filteredSuggestions, selectedIndex, selectMention, closeMenu])
+    const dismiss = event => {
+      if (event.key === 'Escape' && !editor.isComposing() && !event.isComposing && event.keyCode !== 229) closeMenu()
+    }
+    const unregister = editor.registerCommand(KEY_DOWN_COMMAND, handleKeyDown, COMMAND_PRIORITY_HIGH)
+    document.addEventListener('keydown', dismiss)
+    return () => { unregister(); document.removeEventListener('keydown', dismiss) }
+  }, [editor, isOpen, filteredSuggestions, selectedIndex, selectMention, closeMenu])
 
   useEffect(() => {
     if (!isOpen || !menuRef.current) return

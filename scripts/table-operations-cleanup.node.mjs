@@ -200,3 +200,253 @@ test('a clean application exit does not assert that an unconfirmed backend stopp
   assert.equal(f.report.error, 'Original Table business assertion failed')
   assert.equal(f.report.complete, false)
 })
+
+import { readFileSync } from 'node:fs'
+import { Script } from 'node:vm'
+import { JSDOM } from 'jsdom'
+
+// Execute the actual runner click closure, including its renderer expression.
+// DOM selection/containment are real; rectangles and elementFromPoint below are
+// an explicit geometry contract, not Chromium layout or native UI acceptance.
+// A local counterexample run may supply the exact old runner from git show;
+// normal CI always reads the current source beside this unchanged test file.
+const nativeClickSource = readFileSync(process.env.TABLE_CLICK_SOURCE_FIXTURE ||
+  new URL('./run-table-operations-desktop.mjs', import.meta.url), 'utf8')
+const clickStart = nativeClickSource.indexOf('  const click = async target => {')
+const clickEnd = nativeClickSource.indexOf('\n  const capture = async filename => {', clickStart)
+assert.ok(clickStart >= 0 && clickEnd > clickStart, 'Exercise the actual native click closure')
+const actualClickClosure = nativeClickSource.slice(clickStart, clickEnd) + '\nclick'
+const plain = value => JSON.parse(JSON.stringify(value))
+const within = (x, y, box) => x >= box.x && x < box.x + box.width && y >= box.y && y < box.y + box.height
+
+function nativeClickScene(options = {}) {
+  const tag = options.tag || 'p'
+  const dom = new JSDOM(`<div id="outer"><div id="clip"><table><tbody><tr>
+    <td data-table-column="0"><p id="frozen">frozen</p></td>
+    <td data-table-column="1"><${tag} class="native-target"><span>target</span></${tag}></td>
+    <td><p id="neighbor">neighbor</p></td></tr></tbody></table></div></div>`, { runScripts: 'outside-only' })
+  const { window } = dom, { document } = window
+  const target = document.querySelector('.native-target'), descendant = target.querySelector('span')
+  const table = document.querySelector('table'), outer = document.querySelector('#outer'), clip = document.querySelector('#clip')
+  const frozen = document.querySelector('#frozen'), neighbor = document.querySelector('#neighbor')
+  const rectangles = new Map(), hitCalls = [], scrollCalls = [], calls = []
+  const report = { nativeInputs: [] }
+  const scene = { dom, window, document, target, descendant, table, outer, clip, frozen, neighbor,
+    rectangles, hitCalls, scrollCalls, calls, report, attempts: 0, saves: 0 }
+  window.innerWidth = options.viewport?.width || 600
+  window.innerHeight = options.viewport?.height || 460
+  scene.box = (node, value) => {
+    const box = { x: 0, y: 0, width: 600, height: 460, ...value }
+    rectangles.set(node, box)
+    node.getBoundingClientRect = () => ({ ...box, left: box.x, top: box.y, right: box.x + box.width, bottom: box.y + box.height })
+    for (const [name, fallback] of Object.entries({ clientLeft: 0, clientTop: 0, clientWidth: box.width, clientHeight: box.height })) {
+      Object.defineProperty(node, name, { configurable: true, value: box[name] ?? fallback })
+    }
+  }
+  scene.box(table, {})
+  scene.box(outer, {})
+  scene.box(clip, {})
+  scene.box(target, { x: 100, y: 80, width: 120, height: 24, ...options.targetRect })
+  target.scrollIntoView = value => {
+    scrollCalls.push(plain(value))
+    options.onScroll?.(scene)
+  }
+  target.click = () => { throw new Error('DOM click cannot replace native input') }
+  document.elementFromPoint = (x, y) => {
+    hitCalls.push({ x, y })
+    if (!within(x, y, { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight })) return null
+    if (!within(x, y, rectangles.get(target))) return neighbor
+    if (options.hit) return options.hit(x, y, scene)
+    return descendant
+  }
+  scene.click = new Script(actualClickClosure).runInNewContext({
+    q: JSON.stringify, report,
+    save() { scene.saves++ },
+    async until(check, label) {
+      for (let attempt = 0; attempt < (options.attempts || 2); attempt++) {
+        scene.attempts++
+        options.onAttempt?.(scene)
+        const point = await check()
+        if (point) return point
+      }
+      throw new Error(label)
+    },
+    async evaluate(expression) { return plain(new Script(expression).runInContext(dom.getInternalVMContext())) },
+    cdp: { async send(method, params) {
+      calls.push({ method, params: plain(params) })
+      if (options.inputError) throw options.inputError
+    } },
+  })
+  return scene
+}
+
+async function clicked(scene, request = '.native-target') {
+  await scene.click(request)
+  assert.equal(scene.attempts, 1, 'An exposed point does not need another poll')
+  assert.equal(scene.calls.length, 2)
+  assert.equal(scene.saves, 2)
+  const [down, up] = scene.report.nativeInputs
+  assert.equal(down.sequence, 1); assert.equal(up.sequence, 2)
+  assert.equal(down.method, 'Input.dispatchMouseEvent'); assert.equal(up.method, down.method)
+  assert.equal(down.type, 'mousePressed'); assert.equal(up.type, 'mouseReleased')
+  assert.equal(down.button, 'left'); assert.equal(up.button, 'left')
+  assert.equal(down.clickCount, 1); assert.equal(up.clickCount, 1)
+  assert.equal(down.x, up.x); assert.equal(down.y, up.y)
+  assert.ok(within(down.x, down.y, scene.rectangles.get(scene.target)), 'A native click remains inside its actual target')
+  assert.ok(within(down.x, down.y, { x: 0, y: 0, width: scene.window.innerWidth, height: scene.window.innerHeight }),
+    'A native click remains inside the actual viewport')
+  assert.ok(scene.hitCalls.length <= 5, 'Each observation uses at most five actual hit tests')
+  assert.equal(scene.report.failedClick, undefined)
+  assert.deepEqual(scene.scrollCalls, [{ block: 'nearest', inline: 'nearest' }])
+  return { x: down.x, y: down.y }
+}
+
+async function refused(scene, request = '.native-target') {
+  await assert.rejects(scene.click(request), /Native Table control missing, ambiguous, disabled, or covered/)
+  assert.deepEqual(scene.report.nativeInputs, [])
+  assert.deepEqual(scene.calls, [])
+  assert.equal(scene.saves, 0, 'Only the existing outer failure path persists the last measurement')
+  assert.ok(scene.hitCalls.length <= scene.attempts * 5)
+}
+
+for (const [label, targetRect, expected] of [
+  ['ordinary control', { x: 100, y: 80, width: 120, height: 24 }, { x: 160, y: 92 }],
+  ['tall paragraph first line', { x: 100, y: 80, width: 120, height: 180 }, { x: 160, y: 98 }],
+]) test('native Table click keeps the original centre for an exposed ' + label, async () => {
+  const scene = nativeClickScene({ targetRect })
+  try { assert.deepEqual(await clicked(scene), expected); assert.equal(scene.hitCalls.length, 1) }
+  finally { scene.dom.window.close() }
+})
+
+for (const [label, targetRect, visible] of [
+  ['left viewport edge', { x: -260, y: 80, width: 300, height: 24 }, { x: 0, y: 80, width: 40, height: 24 }],
+  ['bottom viewport edge', { x: 100, y: 450, width: 120, height: 100 }, { x: 100, y: 450, width: 120, height: 10 }],
+]) test('native Table click reaches the actual target at a clipped ' + label, async () => {
+  const scene = nativeClickScene({ targetRect })
+  try { const point = await clicked(scene); assert.ok(within(point.x, point.y, visible)) }
+  finally { scene.dom.window.close() }
+})
+
+for (const [axis, visible] of [
+  ['x', { x: 430, y: 80, width: 70, height: 220 }],
+  ['y', { x: 200, y: 160, width: 300, height: 100 }],
+]) test('native Table click respects the ancestor client clip on the ' + axis + ' axis', async () => {
+  const scene = nativeClickScene({ targetRect: { x: 200, y: 80, width: 300, height: 220 },
+    hit: (x, y, f) => within(x, y, visible) ? f.descendant : f.neighbor })
+  scene.box(scene.clip, axis === 'x' ? { x: 420, y: 0, width: 140, height: 460, clientLeft: 10, clientWidth: 100 } :
+    { x: 0, y: 150, width: 600, height: 140, clientTop: 10, clientHeight: 100 })
+  scene.clip.style[axis === 'x' ? 'overflowX' : 'overflowY'] = 'auto'
+  try { const point = await clicked(scene); assert.ok(within(point.x, point.y, visible)) }
+  finally { scene.dom.window.close() }
+})
+
+test('native Table click intersects independent nested clips and keeps inside their borders', async () => {
+  const visible = { x: 430, y: 160, width: 70, height: 100 }
+  const scene = nativeClickScene({ targetRect: { x: 200, y: 80, width: 300, height: 220 },
+    hit: (x, y, f) => within(x, y, visible) ? f.descendant : f.neighbor })
+  scene.box(scene.clip, { x: 420, y: 0, width: 140, height: 460, clientLeft: 10, clientWidth: 100 })
+  scene.clip.style.overflowX = 'hidden'
+  scene.box(scene.outer, { x: 0, y: 150, width: 600, height: 140, clientTop: 10, clientHeight: 100 })
+  scene.outer.style.overflowY = 'clip'
+  try {
+    const point = await clicked(scene)
+    assert.ok(point.x > visible.x && point.x < visible.x + visible.width)
+    assert.ok(point.y > visible.y && point.y < visible.y + visible.height)
+  } finally { scene.dom.window.close() }
+})
+
+for (const [label, exposed] of [
+  ['frozen first column', (x, y) => x > 580],
+  ['frozen first row', (x, y) => y > 145],
+  ['both frozen edges', (x, y) => x > 580 && y > 145],
+]) test('native Table click uses the exposed part of the same paragraph beside the ' + label, async () => {
+  // This models the observed condition: a scrolled paragraph remains inside
+  // the table scrollport, but its centre is under a sticky sibling. It does
+  // not invent a final scrollLeft measurement for the Windows failure report.
+  const scene = nativeClickScene({ viewport: { width: 1008, height: 655 },
+    targetRect: { x: 396, y: 120, width: 293, height: 40 },
+    hit: (x, y, f) => exposed(x, y) ? f.descendant : f.frozen })
+  scene.box(scene.table, { x: 340, y: 100, width: 600, height: 500, clientWidth: 589 })
+  scene.table.style.overflowX = 'auto'; scene.table.style.overflowY = 'auto'
+  try {
+    const point = await clicked(scene)
+    assert.ok(exposed(point.x, point.y))
+    assert.ok(scene.hitCalls.length > 1, 'The original covered centre is refused before an exposed point is used')
+  } finally { scene.dom.window.close() }
+})
+
+for (const [label, request, arrange] of [
+  ['exact text', { selector: '.native-target', text: 'target' }, () => {}],
+  ['exact accessible label', { selector: '.native-target', text: 'accessible target' }, f => f.target.setAttribute('aria-label', 'accessible target')],
+]) test('native Table click preserves matching by ' + label, async () => {
+  const scene = nativeClickScene()
+  arrange(scene)
+  try { assert.deepEqual(await clicked(scene, request), { x: 160, y: 92 }) }
+  finally { scene.dom.window.close() }
+})
+
+for (const [label, options, arrange] of [
+  ['no target', {}, f => f.target.remove()],
+  ['multiple visible targets', {}, f => { const duplicate = f.target.cloneNode(true); f.target.parentElement.append(duplicate); f.box(duplicate, { x: 250, y: 80, width: 120, height: 24 }) }],
+  ['disabled target', { tag: 'button' }, f => { f.target.disabled = true }],
+  ['zero width', { targetRect: { width: 0 } }, () => {}],
+  ['zero height', { targetRect: { height: 0 } }, () => {}],
+  ['outside viewport', { targetRect: { x: 700 } }, () => {}],
+  ['fully clipped ancestor', { hit: (x, y, f) => f.neighbor }, f => { f.box(f.clip, { x: 300, y: 0, width: 100, height: 460 }); f.clip.style.overflowX = 'auto' }],
+  ['covered by another cell', { hit: (x, y, f) => f.frozen }, () => {}],
+  ['neighbor paragraph hit', { hit: (x, y, f) => f.neighbor }, () => {}],
+  ['text mismatch', {}, () => {}],
+]) test('native Table click still refuses ' + label + ' without any native input', async () => {
+  const scene = nativeClickScene(options)
+  arrange(scene)
+  try { await refused(scene, label === 'text mismatch' ? { selector: '.native-target', text: 'other' } : '.native-target') }
+  finally { scene.dom.window.close() }
+})
+
+test('native Table click never retries uncertain native input after finding a valid point', async () => {
+  const error = new Error('native press uncertain'), scene = nativeClickScene({ inputError: error })
+  try {
+    await assert.rejects(scene.click('.native-target'), failure => failure === error)
+    assert.equal(scene.attempts, 1)
+    assert.equal(scene.calls.length, 1)
+    assert.equal(scene.report.nativeInputs.length, 1)
+    assert.equal(scene.report.nativeInputs[0].type, 'mousePressed')
+    assert.equal(scene.report.failedClick, undefined, 'An input failure is not reported as a measured hit-test failure')
+  } finally { scene.dom.window.close() }
+})
+
+test('native Table click diagnostics retain only the latest failed measurement without extra observation or input', async () => {
+  const scene = nativeClickScene({ hit: (x, y, f) => f.frozen,
+    onAttempt: f => { f.table.scrollLeft = f.attempts * 30; f.table.scrollTop = f.attempts * 90 } })
+  try {
+    await refused(scene)
+    assert.equal(scene.scrollCalls.length, 2)
+    assert.equal(scene.hitCalls.length, 10)
+    const failure = plain(scene.report.failedClick)
+    assert.deepEqual(failure.request, { selector: '.native-target' })
+    assert.equal(failure.measurement.matchedCount, 1)
+    assert.equal(failure.measurement.eligibleCount, 1)
+    assert.equal(failure.measurement.disabledCount, 0)
+    assert.equal(failure.measurement.target.disabled, false)
+    assert.equal(failure.measurement.table.scrollLeft, 60)
+    assert.equal(failure.measurement.table.scrollTop, 180)
+    assert.equal(failure.measurement.points.length, 5)
+    assert.ok(failure.measurement.points.every(point => point.hit.tag === 'P' && point.hit.className === ''))
+    assert.equal(failure.measurement.point, null)
+    assert.doesNotMatch(JSON.stringify(failure), /textContent|innerHTML|>frozen</)
+  } finally { scene.dom.window.close() }
+})
+
+test('native Table click diagnostics distinguish a disabled target without hit testing or scrolling it', async () => {
+  const scene = nativeClickScene({ tag: 'button' })
+  scene.target.disabled = true
+  try {
+    await refused(scene)
+    assert.equal(scene.scrollCalls.length, 0); assert.equal(scene.hitCalls.length, 0)
+    const failure = plain(scene.report.failedClick)
+    assert.equal(failure.measurement.matchedCount, 1)
+    assert.equal(failure.measurement.eligibleCount, 0)
+    assert.equal(failure.measurement.disabledCount, 1)
+    assert.equal(failure.measurement.point, null)
+  } finally { scene.dom.window.close() }
+})

@@ -310,10 +310,10 @@ export default function Editor({ documentId, documentTitle, initialContent, onCh
           <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
           {!readOnly && <CodeBlockPlugin />}
           {!readOnly && <SlashMenuPlugin documentId={documentId} />}
-          {!readOnly && <BlockHandlePlugin />}
-          {!readOnly && <MentionPlugin />}
-          <WikiLinkPlugin />
-          {!readOnly && <DragDropPlugin />}
+          {!readOnly && <BlockHandlePlugin documentId={documentId} />}
+          {!readOnly && <MentionPlugin documentId={documentId} />}
+          <WikiLinkPlugin documentId={documentId} />
+          {!readOnly && <DragDropPlugin documentId={documentId} />}
           {!readOnly && <EditorShortcutPlugin documentId={documentId} />}
           {!readOnly && <FormulaShortcutPlugin />}
           {!readOnly && <ChecklistKeyboardPlugin />}

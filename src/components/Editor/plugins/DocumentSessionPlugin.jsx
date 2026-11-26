@@ -11,6 +11,7 @@ import {
 } from 'lexical'
 
 import { evidenceNavigation } from '~/services/evidenceNavigation'
+import { captureTableSelectionWrite, getTableSelectionSessionRange } from '../utils/tableEvents'
 
 const STORAGE_PREFIX = 'localNotepad.editorSession.v2:'
 
@@ -141,8 +142,7 @@ function pointToSnapshot(point) {
   }
 }
 
-export function captureDocumentSelectionSnapshot() {
-  const selection = $getSelection()
+export function captureDocumentSelectionSnapshot(selection = $getSelection()) {
   if (!$isRangeSelection(selection)) return null
 
   const anchor = pointToSnapshot(selection.anchor)
@@ -239,17 +239,22 @@ export default function DocumentSessionPlugin({ documentId, restoreSelection = t
     selectionRef.current = session?.selection ?? null
     const skipRestore = Boolean(evidenceNavigation.peek(documentId))
     const navigationVersion = evidenceNavigation.version()
+    const canRestoreSelection = captureTableSelectionWrite(editor)
     let cancelled = false
+    const canRestore = () => !cancelled && !skipRestore && !evidenceNavigation.peek(documentId) &&
+      evidenceNavigation.version() === navigationVersion && canRestoreSelection()
 
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        if (cancelled || skipRestore || evidenceNavigation.peek(documentId) ||
-          evidenceNavigation.version() !== navigationVersion) return
+        // A later bulk gesture owns the selection, even after that mode ends.
+        // An old frame must not reopen an IME-blocked range or replace a new caret.
+        if (!canRestore()) return
 
         scroller.scrollTop = session?.scrollTop ?? 0
 
         if (restoreSelection && session?.selection) {
           editor.update(() => {
+            if (!canRestore()) return
             restoreDocumentSelectionSnapshot(session.selection)
           })
         }
@@ -271,7 +276,10 @@ export default function DocumentSessionPlugin({ documentId, restoreSelection = t
     const unregister = editor.registerUpdateListener(({ editorState }) => {
       if (!restoreSelection) return
       editorState.read(() => {
-        selectionRef.current = captureDocumentSelectionSnapshot()
+        // An IME-blocked bulk operation temporarily owns no writable text
+        // selection. Persist its still-valid caret through the existing path
+        // serializer, without restoring that range into the editor or DOM.
+        selectionRef.current = captureDocumentSelectionSnapshot($getSelection() || getTableSelectionSessionRange(editor))
       })
     })
 

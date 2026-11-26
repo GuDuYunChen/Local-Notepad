@@ -18,6 +18,11 @@ export const TABLE_OPERATIONS_SOURCES = Object.freeze([
   'src/components/Editor/plugins/EditorShortcutPlugin.jsx', 'src/components/Editor/plugins/PasteImagePlugin.jsx',
   'src/components/Editor/plugins/TablePresentationPlugin.jsx', 'src/components/Editor/plugins/DocumentSessionPlugin.jsx',
   'src/components/Editor/plugins/CommandPalettePlugin.jsx',
+  'src/components/Editor/plugins/CodeBlockPlugin.jsx',
+  'src/components/Editor/plugins/SlashMenuPlugin.jsx', 'src/components/Editor/plugins/BlockHandlePlugin.jsx',
+  'src/components/Editor/plugins/DragDropPlugin.jsx', 'src/components/Editor/plugins/WikiLinkPlugin.jsx',
+  'src/components/Editor/plugins/MentionPlugin.jsx', 'src/components/Editor/plugins/BlockReferencePlugin.jsx',
+  'src/components/Editor/utils/blockRegistry.js',
   'src/components/Editor/utils/tableModel.js', 'src/components/Editor/utils/tableEvents.js', 'src/components/Editor/hooks/useEditorWriteScope.js',
   'src/components/Editor/hooks/useImageUploadSession.js',
   'src/components/Editor/utils/excelTable.js', 'src/services/tableImportLimits.js', 'src/services/importContent.js',
@@ -58,7 +63,7 @@ export function validateTableOperationsReport(report, { commit, verifier = commi
   const expectedSnapshots = [
     'initial', 'insert-row', 'delete-row', 'insert-column', 'delete-column', 'menu-row-move', 'menu-row-undo',
     'menu-column-move', 'menu-column-undo',
-    'selection-input-insert-text', 'selection-input-backspace', 'selection-input-delete', 'selection-input-enter', 'selection-input-cut', 'selection-input-ime',
+    'selection-input-insert-text', 'selection-input-backspace', 'selection-input-delete', 'selection-input-enter', 'selection-input-cut', 'selection-input-ime', 'selection-input-palette',
     'selected-background', 'merged', 'split', 'split-undo', 'merge-undo',
     'clipboard-copied', 'clipboard-cleared', 'clipboard-pasted', 'clipboard-paste-undo', 'clipboard-clear-undo', 'clipboard-clear-redo', 'clipboard-paste-redo',
     'styled', 'row-dragged', 'row-drag-undo', 'row-drag-redo', 'row-drag-restored',
@@ -190,6 +195,44 @@ export function validateTableOperationsReport(report, { commit, verifier = commi
   keyInputs(inputRange(ime, 'saveInput'), 's', 83, 2)
   assert.equal(ime.snapshot, 'selection-input-ime')
   sameJSON(content(ime.snapshot), content('initial')); selectedView(report.snapshots[ime.snapshot].ui, false)
+  const palette = isolation.palette
+  const paletteWarning = '请先点击“完成”退出单元格多选，再输入或修改正文'
+  assert.equal(palette.label, '编辑器命令'); assert.equal(palette.query, 'divider'); assert.equal(palette.command, '分割线')
+  assert.equal(palette.inputStart, ime.saveInputEnd); assert.equal(palette.openInputStart, palette.inputStart)
+  const launcher = palette.launcher, openInputs = inputRange(palette, 'openInput')
+  assert.equal(launcher.label, palette.label); assert.equal(launcher.disabled, false)
+  for (const field of ['left', 'top', 'width', 'height']) assert.ok(Number.isFinite(launcher[field]))
+  assert.ok(launcher.left >= 0 && launcher.top >= 0 && launcher.width > 0 && launcher.height > 0)
+  assert.deepEqual(openInputs.map(input => [input.method, input.type, input.button, input.clickCount]), [
+    ['Input.dispatchMouseEvent', 'mousePressed', 'left', 1], ['Input.dispatchMouseEvent', 'mouseReleased', 'left', 1],
+  ])
+  assert.equal(openInputs[0].x, openInputs[1].x); assert.equal(openInputs[0].y, openInputs[1].y)
+  for (const input of openInputs) {
+    assert.ok(input.x >= launcher.left && input.x <= launcher.left + launcher.width)
+    assert.ok(input.y >= launcher.top && input.y <= launcher.top + launcher.height)
+  }
+  assert.equal(palette.before.dialogCount, 0); assert.equal(palette.before.searchInputFocused, false)
+  assert.ok(!palette.before.warnings.includes(paletteWarning), 'Refusal feedback must belong to this command action')
+  assert.equal(palette.opened.dialogCount, 1); assert.equal(palette.opened.searchInputFocused, true); assert.equal(palette.opened.query, '')
+  assert.equal(palette.queryInputStart, palette.openInputEnd); textInput(inputRange(palette, 'queryInput'), palette.query)
+  assert.equal(palette.filtered.dialogCount, 1); assert.equal(palette.filtered.searchInputFocused, true); assert.equal(palette.filtered.query, palette.query)
+  assert.deepEqual(palette.filtered.options, [{ label: palette.command, selected: true, disabled: false }])
+  assert.equal(palette.executeInputStart, palette.queryInputEnd); keyInputs(inputRange(palette, 'executeInput'), 'Enter', 13)
+  assert.equal(palette.after.dialogCount, 0); assert.equal(palette.after.searchInputFocused, false)
+  assert.equal(palette.after.query, null); assert.deepEqual(palette.after.options, [])
+  assert.equal(palette.feedback, paletteWarning); assert.ok(palette.after.warnings.includes(paletteWarning))
+  assert.equal(palette.saveInputStart, palette.executeInputEnd); keyInputs(inputRange(palette, 'saveInput'), 's', 83, 2)
+  assert.equal(palette.inputEnd, palette.saveInputEnd); assert.equal(inputRange(palette).length, 7)
+  assert.equal(palette.snapshot, 'selection-input-palette'); sameJSON(content(palette.snapshot), content('initial'))
+  for (const view of [palette.before, palette.opened, palette.filtered, palette.after, report.snapshots[palette.snapshot].ui]) {
+    // Closing a focused dialog may leave native focus on body. The selection
+    // and complete content remain mandatory without inventing a focus owner.
+    assert.equal(typeof view.rootFocused, 'boolean'); assert.equal(typeof view.modebarFocused, 'boolean')
+    assert.equal(view.editable, 'true'); assert.equal(view.tables, 1)
+    assert.match(view.selection, /已选择 2 个单元格/)
+    assert.deepEqual(view.selectionOutlineBackgrounds, ['rgba(0, 0, 0, 0)', 'rgba(0, 0, 0, 0)'])
+    assert.deepEqual(view.rows.map(row => row.map(cell => cell.text)), originalRows)
+  }
   const colored = tableFromContent(content('selected-background'))
   assert.ok(colored.children[1].children.slice(0, 2).every(cell => cell.backgroundColor === '#fff3cd'))
   assert.equal(tableFromContent(content('merged')).children[1].children[0].colSpan, 2)

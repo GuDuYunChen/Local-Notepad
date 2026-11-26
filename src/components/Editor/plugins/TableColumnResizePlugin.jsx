@@ -5,6 +5,8 @@ import { TableCellNode, TableNode } from '@lexical/table'
 import { useEditorWriteScope } from '../hooks/useEditorWriteScope'
 import { $getTableModel } from '../utils/tableModel'
 
+const PREVIEW_WIDTH_PROPERTY = '--table-cell-preview-width'
+
 export function clampTableColumnWidth(width) {
   return Math.max(70, Math.min(600, Math.round(Number(width) || 70)))
 }
@@ -85,6 +87,8 @@ function measureContentWidth(editor, session) {
     copy.removeAttribute('id')
     copy.removeAttribute('rowspan')
     copy.querySelectorAll('[id]').forEach(child => child.removeAttribute('id'))
+    copy.style.removeProperty('--table-cell-width')
+    copy.style.removeProperty(PREVIEW_WIDTH_PROPERTY)
     Object.assign(copy.style, {
       width: 'auto', minWidth: '0', maxWidth: 'none', whiteSpace: 'pre',
       font: computed.font, letterSpacing: computed.letterSpacing,
@@ -105,28 +109,39 @@ function measureContentWidth(editor, session) {
 // Preview changes never enter the editor state or autosave. Restore only styles
 // still owned by this gesture; a newer Lexical reconciliation takes precedence.
 function restorePreview(session) {
-  for (const [element, { original, preview }] of session?.previews || []) {
-    if (element.style.width === preview) element.style.width = original
+  for (const [element, properties] of session?.previews || []) {
+    for (const [property, { original, priority, preview }] of properties) {
+      if (element.style.getPropertyValue(property) !== preview || element.style.getPropertyPriority(property)) continue
+      if (original) element.style.setProperty(property, original, priority)
+      else element.style.removeProperty(property)
+    }
   }
 }
 
 function previewWidth(editor, session, width) {
   const widths = [...session.widths]
   widths[session.colIndex] = width
-  const write = (element, nextWidth) => {
+  const write = (element, property, nextWidth) => {
     if (!element) return
-    let saved = session.previews.get(element)
+    let properties = session.previews.get(element)
+    if (!properties) { properties = new Map(); session.previews.set(element, properties) }
+    let saved = properties.get(property)
     if (!saved) {
-      saved = { original: element.style.width }
-      session.previews.set(element, saved)
+      saved = { original: element.style.getPropertyValue(property), priority: element.style.getPropertyPriority(property) }
+      properties.set(property, saved)
     }
     saved.preview = `${nextWidth}px`
-    element.style.width = saved.preview
+    element.style.setProperty(property, saved.preview)
   }
-  write(session.tableElement.querySelectorAll(':scope > colgroup > col')[session.colIndex], width)
+  write(session.tableElement.querySelectorAll(':scope > colgroup > col')[session.colIndex], 'width', width)
   for (const cell of session.cells) {
     if (cell.columnIndex <= session.colIndex && cell.columnIndex + cell.colSpan > session.colIndex) {
-      write(editor.getElementByKey(cell.key), widths.slice(cell.columnIndex, cell.columnIndex + cell.colSpan).reduce((sum, item) => sum + item, 0))
+      const element = editor.getElementByKey(cell.key)
+      const nextWidth = widths.slice(cell.columnIndex, cell.columnIndex + cell.colSpan).reduce((sum, item) => sum + item, 0)
+      write(element, 'width', nextWidth)
+      // A separate variable allows shrinking below the saved minimum. The
+      // presentation plugin can refresh the saved constraint independently.
+      write(element, PREVIEW_WIDTH_PROPERTY, nextWidth)
     }
   }
 }

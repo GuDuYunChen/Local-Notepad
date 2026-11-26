@@ -3,18 +3,18 @@
   "scope": "installed-actual-app-page-matrix",
   "sourceScope": "control-source entry coverage with declared states; not every possible failure combination",
   "productSource": {
-    "commit": "0908e77d5e5820f107a8b8e694831baaa280e4b1",
-    "tree": "6a5b9f65b35e644c898b22a0d94aa7920b546510",
+    "commit": "944830e4777400a1a1755abf215c8c7bf6a02d49",
+    "tree": "4111f3e2fe501b2a3077940aed9bb44c6d5989bf",
     "dirty": false
   },
   "inventory": {
     "file": "inventory.json",
-    "sha256": "9718f02f0f7016a0364c9bd93e7074bf9d1ff0c9d14e37b626d129e9be26cc97",
+    "sha256": "2daad73679ba971650fcc6d1e74988bad2bc8a62c6dcce75555b2e6cd57860d6",
     "originalDirty": false,
-    "currentCodeFilesHashRevalidated": 349,
-    "currentControlsFiles": 137,
-    "sourceCommit": "42e0a6e2612bb07d13a1af1bdd00e6ae3ee4bcfa",
-    "sourceTree": "6a5b9f65b35e644c898b22a0d94aa7920b546510",
+    "currentCodeFilesHashRevalidated": 354,
+    "currentControlsFiles": 135,
+    "sourceCommit": "5a7846f0df403356feb55f72a6fef7d616799ba4",
+    "sourceTree": "4111f3e2fe501b2a3077940aed9bb44c6d5989bf",
     "currentStylesheetsHashRevalidated": 98
   },
   "matrix": [
@@ -2053,9 +2053,9 @@
     },
     {
       "file": "src/components/Editor/plugins/BlockHandlePlugin.jsx",
-      "bytes": 14500,
-      "sha256": "4a8118eb094a237cd99dbcfb198c8c0cbb7c03b14d5309035f084af21feb67ce",
-      "blob": "ac31d8b560a1194490da4ce46b80827fc475c7ea",
+      "bytes": 15970,
+      "sha256": "e39d415078b28ddc4a2d21c5e24b9a4e179c643a398e73480c9069665c84bf93",
+      "blob": "1879fbb9cda109e861d8a1301d5fbf4b156dc823",
       "classification": "planned-nested-controls",
       "reason": "Production controls are rendered within the declared actual route. Scope is the listed route states; unvisited conditional child panels remain explicit gaps below.",
       "routeIds": [
@@ -2079,9 +2079,9 @@
     },
     {
       "file": "src/components/Editor/plugins/BlockReferencePlugin.jsx",
-      "bytes": 16209,
-      "sha256": "53f2892afc5635f4848a95709bdd140acd2265f1c7e6825cbc2b71f448ed4355",
-      "blob": "c24a21528168ceba50c09db3dc0f8bf745ad2181",
+      "bytes": 17622,
+      "sha256": "97776ee891bc8fc308d982c41560d75789816c5b8868f124511b0161f83f4fe2",
+      "blob": "71927bf64ab439163d4e5512f83ed11ae269b6a9",
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [
@@ -2100,9 +2100,9 @@
     },
     {
       "file": "src/components/Editor/plugins/CommandPalettePlugin.jsx",
-      "bytes": 8162,
-      "sha256": "ff19234fd6655053cd006fe507412d22c5cb3bc5bddd701687a71e1c1503c6cf",
-      "blob": "f05d3837b5f76646918b84b47176ea84125e6c51",
+      "bytes": 9978,
+      "sha256": "8499b5b72523bc309b65f5f343dff25bae175e6f8fa211e515e0d00c5d0c84e9",
+      "blob": "b80d602511f30366dfac6e98480defeb097cfb6a",
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [
@@ -2163,9 +2163,9 @@
     },
     {
       "file": "src/components/Editor/plugins/FloatingTextToolbarPlugin.jsx",
-      "bytes": 7487,
-      "sha256": "a1012e47150d5ddd475723ee534505b017f2313ddf6edb5a8f8ae3296b4bf975",
-      "blob": "8a440db715f5a4d4fbb958480eb1a2699e039faf",
+      "bytes": 8052,
+      "sha256": "4e7a028f52cd5a7fb5626e9a56976d0b11a3ffe308c9d85417d3edb2b36e81e3",
+      "blob": "144f993e145337a61e79c7b522645da01004eb1d",
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [
@@ -2268,9 +2268,9 @@
     },
     {
       "file": "src/components/Editor/plugins/TableActionMenuPlugin.jsx",
-      "bytes": 8966,
-      "sha256": "93331fe57a8bb0ddac48526911174d6f2dab4b4779c4676aa76d251f7e3520e6",
-      "blob": "b4504601cb9460066be3d1b04e9ad9d1f5d9cb77",
+      "bytes": 13585,
+      "sha256": "0415b77d9c7200105b0e97d21c3048c18e9aea80cfadc5765017637c1231f5fe",
+      "blob": "35f4739e6f849a32c4c6e39bfd65bd4fa7243887",
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [
@@ -2289,9 +2289,9 @@
     },
     {
       "file": "src/components/Editor/plugins/TableColumnResizePlugin.jsx",
-      "bytes": 6778,
-      "sha256": "a8710b7b9dc3433177e94e60f24af79bdfd830d8325e12f570213c8b02b8b305",
-      "blob": "7cf1b8bb663ccb396c7ab3b791ccc6e5a09ae93f",
+      "bytes": 15266,
+      "sha256": "bc874f24b2dd88edecc5c09f1d92b1872d55b21c7ba619809ecdc12dbadf99e5",
+      "blob": "b4a51492ad658db46a1451cedc1788e7e43fddad",
       "classification": "shared-or-browser-semantic-helper",
       "reason": "Existing data-ui-native=editor-pointer-handle button implements direct mouse column resizing and double-click width calculation. It is an intentionally native editor pointer surface, not an ordinary migrated form button; this read/cancel matrix does not claim a resize gesture.",
       "routeIds": [],
@@ -2308,9 +2308,9 @@
     },
     {
       "file": "src/components/Editor/plugins/TableMenu.jsx",
-      "bytes": 3249,
-      "sha256": "1ae79d0dc9b528cad03167d0a240e8de7301349f665e0be01f24189fd04e3297",
-      "blob": "7b70d960490c9293c50da06ee17a3e88be1d94e4",
+      "bytes": 5370,
+      "sha256": "cfb3f53b20d27a55e69337df19e6ce28f2cebee6509f63639cd87e55a19f37c7",
+      "blob": "31a4c9d3669708ab5e98305142da16f96cc01214",
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [
@@ -2330,9 +2330,9 @@
     },
     {
       "file": "src/components/Editor/plugins/TableReorderPlugin.jsx",
-      "bytes": 8906,
-      "sha256": "5f89100258287598b31be329fc37759d6c2ab3c374960ea6796e5c7e3041ede6",
-      "blob": "5ef30986b72f367a87ec4a9229290fa9911a2b01",
+      "bytes": 11341,
+      "sha256": "743e71424ccea41a4ddd37aa5897d3bf4011cf27379f53fafab201a6e424048e",
+      "blob": "8e9b4a74ceca0159a6b7674ffb9f38f2795ed681",
       "classification": "shared-or-browser-semantic-helper",
       "reason": "Existing data-ui-native=editor-pointer-handle draggable row/column buttons retain real HTML drag-and-drop and colspan disabling semantics. They are documented native editor pointer handles, not unmigrated ordinary controls or an independent settings page; no drag acceptance is claimed here.",
       "routeIds": [],
@@ -2349,9 +2349,9 @@
     },
     {
       "file": "src/components/Editor/plugins/TableSelectionPlugin.jsx",
-      "bytes": 39521,
-      "sha256": "81aec56bcef7c77eb02ff5c695d2f14ec2d3dd7f95bfdf7bf3e5f28dc8cb6fc1",
-      "blob": "5f0b5dfeee2fca6338ff2be35711562d6b0f178b",
+      "bytes": 37442,
+      "sha256": "3d453ad6854d8fa0fc0377613675087a74d68fb88fd0d2c99bd21971d2db187e",
+      "blob": "5771e438311a058f17e80fc9b88de3bfb1a5ef61",
       "classification": "planned-nested-controls",
       "reason": "Production controls are rendered within the declared actual route. Scope is the listed route states; unvisited conditional child panels remain explicit gaps below.",
       "routeIds": [
@@ -2390,9 +2390,9 @@
     },
     {
       "file": "src/components/Editor/plugins/ToolbarPlugin.jsx",
-      "bytes": 34894,
-      "sha256": "c64d13129fa5b7228c67860b4852abe5ecc1b5d5f6c2d7c37bb30039b9262aaa",
-      "blob": "0976b1f0f6d1ddd432c35b5415df22285a49ee02",
+      "bytes": 39642,
+      "sha256": "7e8c0abc58ae92a1ea758413aa4427e58ba4b5672b0f6c5ef6e256beda0f9d4f",
+      "blob": "034a63d3d2f9f2f01ad3ec8b7d45739cf31e7155",
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [
@@ -2412,9 +2412,9 @@
     },
     {
       "file": "src/components/Editor/plugins/WikiLinkPlugin.jsx",
-      "bytes": 12681,
-      "sha256": "063cc38d14b47e15a2a68a649bc086d0d4cd4b2efabc28239d80b172de52a2f6",
-      "blob": "5ebd7689fb5739d5f077821743b9bf6de42ed293",
+      "bytes": 14154,
+      "sha256": "2e3f3a87ad5a08270a11ffd1b20ee7fb1e197dcc0c39d4fbc73ad0534aa6f532",
+      "blob": "842d1aebff20afd5d10bf127096fda77ae131049",
       "classification": "planned-nested-controls",
       "reason": "Production controls are rendered within the declared actual route. Scope is the listed route states; unvisited conditional child panels remain explicit gaps below.",
       "routeIds": [
@@ -4173,9 +4173,9 @@
     },
     {
       "file": "src/components/TextEditor.jsx",
-      "bytes": 42701,
-      "sha256": "403e77f72a20a40ea42e350fea3f34e3bd4c86957869e119327f9a1cefac4e9a",
-      "blob": "57d4cf575192292ca2cdfd0fa1623ac6070efeac",
+      "bytes": 43043,
+      "sha256": "7b0333410d25082826c5b357949dd944a0f14d361bf8e2e500208527fd5dff87",
+      "blob": "4b3ed93ed2ee14492491a92a9ce9dda95c4a07c0",
       "classification": "planned-nested-controls",
       "reason": "Production controls are rendered within the declared actual route. Scope is the listed route states; unvisited conditional child panels remain explicit gaps below.",
       "routeIds": [

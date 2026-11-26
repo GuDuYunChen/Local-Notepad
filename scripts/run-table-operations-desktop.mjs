@@ -232,16 +232,57 @@ export async function runTableOperationsDesktop({ executablePath, out = path.joi
   }
   const click = async target => {
     const request = typeof target === 'string' ? { selector: target } : target
-    const point = await until(() => evaluate(`(() => {
-      const request=${q(request)}
-      const nodes=[...document.querySelectorAll(request.selector)].filter(node=>!node.disabled&&
-        (request.text===undefined||node.textContent.trim()===request.text||node.getAttribute('aria-label')===request.text)&&
-        node.getBoundingClientRect().width>0&&node.getBoundingClientRect().height>0)
-      if(nodes.length!==1)return null
-      const node=nodes[0];node.scrollIntoView({block:'nearest',inline:'nearest'})
-      const r=node.getBoundingClientRect(),x=r.x+r.width/2,y=r.y+Math.min(r.height/2,18),hit=document.elementFromPoint(x,y)
-      return hit&&node.contains(hit)?{x,y}:null
-    })()`), 'Native Table control missing, ambiguous, disabled, or covered: ' + q(request))
+    let point, lastAttempt
+    try {
+      point = await until(async () => {
+        lastAttempt = await evaluate(`(() => {
+          const request=${q(request)},matched=[...document.querySelectorAll(request.selector)]
+          const nodes=matched.filter(node=>!node.disabled&&
+            (request.text===undefined||node.textContent.trim()===request.text||node.getAttribute('aria-label')===request.text)&&
+            node.getBoundingClientRect().width>0&&node.getBoundingClientRect().height>0)
+          const observed={matchedCount:matched.length,eligibleCount:nodes.length,
+            disabledCount:matched.filter(node=>!!node.disabled).length,point:null,points:[]}
+          if(nodes.length!==1)return observed
+          const node=nodes[0];node.scrollIntoView({block:'nearest',inline:'nearest'})
+          const r=node.getBoundingClientRect(),clip={left:Math.max(0,r.left),top:Math.max(0,r.top),
+            right:Math.min(innerWidth,r.right),bottom:Math.min(innerHeight,r.bottom)}
+          observed.target={left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height,disabled:!!node.disabled}
+          for(let parent=node.parentElement;parent;parent=parent.parentElement){
+            const style=getComputedStyle(parent),clips=value=>['auto','scroll','hidden','clip'].includes(value)
+            const clipsX=clips(style.overflowX),clipsY=clips(style.overflowY)
+            if(!clipsX&&!clipsY)continue
+            const box=parent.getBoundingClientRect(),left=box.left+parent.clientLeft,top=box.top+parent.clientTop
+            if(clipsX){clip.left=Math.max(clip.left,left);clip.right=Math.min(clip.right,left+parent.clientWidth)}
+            if(clipsY){clip.top=Math.max(clip.top,top);clip.bottom=Math.min(clip.bottom,top+parent.clientHeight)}
+          }
+          observed.clip=clip
+          const table=node.closest('table')
+          observed.table=table?{scrollLeft:table.scrollLeft,scrollTop:table.scrollTop,
+            clientWidth:table.clientWidth,clientHeight:table.clientHeight,scrollWidth:table.scrollWidth,scrollHeight:table.scrollHeight}:null
+          if(clip.right<=clip.left||clip.bottom<=clip.top)return observed
+          // Keep ordinary clicks unchanged. Frozen rows/columns can cover the
+          // centre while leaving an edge visible; each fallback must still hit
+          // the same target through the browser's real hit testing.
+          const insetX=Math.min(2,(clip.right-clip.left)/4),insetY=Math.min(2,(clip.bottom-clip.top)/4)
+          const candidates=[{x:r.x+r.width/2,y:r.y+Math.min(r.height/2,18)},
+            {x:clip.left+insetX,y:clip.top+insetY},{x:clip.right-insetX,y:clip.top+insetY},
+            {x:clip.left+insetX,y:clip.bottom-insetY},{x:clip.right-insetX,y:clip.bottom-insetY}]
+          for(const {x,y} of candidates){
+            const inside=x>=clip.left&&x<clip.right&&y>=clip.top&&y<clip.bottom
+            const hit=inside?document.elementFromPoint(x,y):null
+            observed.points.push({x,y,inside,hit:hit?{tag:hit.tagName,className:hit.getAttribute('class')||''}:null})
+            if(hit&&node.contains(hit)){observed.point={x,y};break}
+          }
+          return observed
+        })()`)
+        return lastAttempt.point
+      }, 'Native Table control missing, ambiguous, disabled, or covered: ' + q(request))
+    } catch (error) {
+      // The existing outer failure path persists only this latest observation,
+      // together with the original error; polling changes neither content nor evidence.
+      report.failedClick = { request, measurement: lastAttempt || null }
+      throw error
+    }
     for (const type of ['mousePressed', 'mouseReleased']) {
       const params = { type, ...point, button: 'left', clickCount: 1 }
       report.nativeInputs.push({ sequence: report.nativeInputs.length + 1, method: 'Input.dispatchMouseEvent', ...params }); save()

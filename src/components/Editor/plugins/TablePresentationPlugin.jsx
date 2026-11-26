@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { $getRoot } from 'lexical'
 import { $isTableNode, TableNode, TableRowNode, TableCellNode } from '@lexical/table'
-import { $getTableModel } from '../utils/tableModel'
+import { $getTableColumnWidths, $getTableModel, getTableSpanWidth } from '../utils/tableModel'
 import { contrastRatio } from '~/services/localAppearance'
 
 export function tableBackgroundTextColor(background) {
@@ -33,10 +33,17 @@ export default function TablePresentationPlugin() {
             else table?.removeAttribute('data-lexical-frozen-row')
             if (node.getFrozenColumns()) table?.setAttribute('data-lexical-frozen-column', 'true')
             else table?.removeAttribute('data-lexical-frozen-column')
-            for (const { cell, columnIndex } of model.locations.values()) {
+            const widths = $getTableColumnWidths(model)
+            for (const { cell, columnIndex, colSpan } of model.locations.values()) {
               const dom = editor.getElementByKey(cell.getKey())
               if (!dom) continue
               dom.setAttribute('data-table-column', String(columnIndex))
+              // An auto-layout table can shrink a cell's preferred width. Keep
+              // known column constraints inside the scroll viewport, including
+              // table-only and legacy widths, without changing document data.
+              const width = getTableSpanWidth(widths, columnIndex, colSpan)
+              if (width !== undefined) dom.style.setProperty('--table-cell-width', `${Math.max(70, width)}px`)
+              else dom.style.removeProperty('--table-cell-width')
               const background = cell.getBackgroundColor()
               const foreground = background && (tableBackgroundTextColor(background) || tableBackgroundTextColor(dom.style.backgroundColor))
               if (foreground) {
