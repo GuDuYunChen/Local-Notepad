@@ -19,7 +19,7 @@ const fastCaptureLine = originalCaptureLine.replace("{ format: 'png' }", "{ form
 const withoutPreparedCapturePaint = text => {
   // Invert only the unique current release declaration before the unchanged
   // reviewed paint/speed identity chain. Executed closures keep the raw source.
-  const currentVersion = "const VERSION = '4.249.1'"
+  const currentVersion = "const VERSION = '4.249.2'"
   const previousVersion = "const VERSION = '4.249.0'"
   const currentSource = text.replace(/\r\n/g, '\n')
   assert.equal(currentSource.split(currentVersion).length - 1, 1)
@@ -27,6 +27,15 @@ const withoutPreparedCapturePaint = text => {
   text = currentSource.replace(currentVersion, previousVersion)
   assert.equal(text.split(previousVersion).length - 1, 1)
   assert.equal(text.replace(previousVersion, currentVersion), currentSource)
+  // The added Table prerequisite is the only other current runner change.
+  // Reverse it exactly before checking the unchanged historical fingerprint.
+  const currentPrerequisite = "'installed-app-block-reference-workflow', 'installed-app-table-operations-workflow', 'final-uninstall-preserves-data'"
+  const previousPrerequisite = "'installed-app-block-reference-workflow', 'final-uninstall-preserves-data'"
+  assert.equal(text.split(currentPrerequisite).length - 1, 1)
+  assert.equal(text.split(previousPrerequisite).length - 1, 0)
+  const withTablePrerequisite = text
+  text = text.replace(currentPrerequisite, previousPrerequisite)
+  assert.equal(text.replace(previousPrerequisite, currentPrerequisite), withTablePrerequisite)
   const changes = [
   [
     "import { createFullAppCapturePaint } from './full-app-ui-capture-paint.mjs'\n",
@@ -70,9 +79,9 @@ const releaseIdentitySource = source.replace(/\r\n/g, '\n')
 const releaseFingerprint = value => digest(withoutPreparedCapturePaint(value).replace(fastCaptureLine, originalCaptureLine))
 for (const current of [releaseIdentitySource, releaseIdentitySource.replace(/\n/g, '\r\n')]) {
   assert.equal(releaseFingerprint(current), 'eaf27dadcdc8a8544fefb02f78e87ad8ed0e8a853358d7a124a777f3ac6b9091')
-  const statement = "const VERSION = '4.249.1'"
+  const statement = "const VERSION = '4.249.2'"
   for (const replacement of ['', statement + '\n' + statement,
-    "const VERSION = '4.249.0'", "const VERSION = '4.249.2'", "const  VERSION = '4.249.1'"]) {
+    "const VERSION = '4.249.0'", "const VERSION = '4.249.3'", "const  VERSION = '4.249.2'"]) {
     const changed = current.replace(statement, replacement)
     assert.notEqual(changed, current)
     assert.throws(() => releaseFingerprint(changed), { code: 'ERR_ASSERTION' })
@@ -81,6 +90,11 @@ for (const current of [releaseIdentitySource, releaseIdentitySource.replace(/\n/
   assert.notEqual(changed, current)
   assert.throws(() => assert.equal(releaseFingerprint(changed),
     'eaf27dadcdc8a8544fefb02f78e87ad8ed0e8a853358d7a124a777f3ac6b9091'), { code: 'ERR_ASSERTION' })
+  for (const replacement of ['', "'installed-app-table-operations-workflow', 'installed-app-table-operations-workflow', ", "'unverified-table-workflow', "]) {
+    const changed = current.replace("'installed-app-table-operations-workflow', ", replacement)
+    assert.notEqual(changed, current)
+    assert.throws(() => releaseFingerprint(changed), { code: 'ERR_ASSERTION' })
+  }
 }
 const startAnchor = source.includes("import { createFullAppCapturePaint }")
   ? '  const capturePaint = createFullAppCapturePaint('

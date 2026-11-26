@@ -3,6 +3,7 @@ import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext
 import { $insertNodes } from 'lexical'
 import { blockRegistry } from '../utils/blockRegistry'
 import { useEditorWriteScope } from '../hooks/useEditorWriteScope'
+import { dispatchTableEvent } from '../utils/tableEvents'
 import { isShortcutContextBlocked, matchShortcut, shortcutLabel } from '~/services/localShortcuts'
 import useLocalShortcuts from '~/hooks/useLocalShortcuts'
 import { UiButton, UiInput } from '~/components/ui/ControlKit'
@@ -42,7 +43,7 @@ const EXTRA_COMMANDS = [
     label: '表格多选模式',
     description: '框选多个单元格并批量操作',
     keywords: ['table', '表格', '多选', '合并', '单元格'],
-    run: () => window.dispatchEvent(new CustomEvent('tableSelection:mode', { detail: true })),
+    run: editor => dispatchTableEvent(editor, 'tableSelection:mode', true),
   },
 ]
 
@@ -85,7 +86,7 @@ function buildCommands(editor, captureWrite) {
   }))
 
   return [
-    ...EXTRA_COMMANDS,
+    ...EXTRA_COMMANDS.map(command => ({ ...command, run: () => command.run(editor) })),
     ...blockCommands,
   ]
 }

@@ -18,7 +18,7 @@ import { FULL_APP_GROUPS, FULL_APP_MATRIX, FULL_APP_PRODUCT_SOURCE_FILES, FULL_A
 const clone = value => structuredClone(value)
 const hash = bytes => createHash('sha256').update(bytes).digest('hex')
 const fp = filename => ({ filename, bytes: 1600, sha256: '1'.repeat(64) })
-const application = { executable: 'C:\\owned\\application\\记事本.exe', version: '4.249.1', packaged: true,
+const application = { executable: 'C:\\owned\\application\\记事本.exe', version: '4.249.2', packaged: true,
   executableSHA256: '2'.repeat(64), asarSHA256: '3'.repeat(64), backendSHA256: '4'.repeat(64) }
 function ledgerFixture() {
   const routes = FULL_APP_GROUPS.map(group => ({ id: 'contract-' + group, title: 'Synthetic contract route',
@@ -188,10 +188,10 @@ function resizeFixture(viewport = { width: 704, height: 455 }) {
 function installedFixture(group = 'projects', ledger = ledgerFixture()) {
   const runner = { runID: '1000', runAttempt: '1', job: 'full-application-ui', group, machine: 'SYNTHETIC-CONTRACT-MACHINE' }
   const defaultSnapshot = { exists: false, files: 0, bytes: 0, sha256: hash('[]') }
-  const report = { schemaVersion: 1, scope: ledger.scope + '-group', group, version: '4.249.1', productCommit: 'a'.repeat(40), productTree: '9'.repeat(40), verifierCommit: 'b'.repeat(40),
+  const report = { schemaVersion: 1, scope: ledger.scope + '-group', group, version: '4.249.2', productCommit: 'a'.repeat(40), productTree: '9'.repeat(40), verifierCommit: 'b'.repeat(40),
     platform: 'win32', runnerEnvironment: 'github-hosted', complete: true, cleanupComplete: true, syntheticData: true, realBackend: true,
     backendDataVerified: true, backendStopped: true, uninstalled: true, bridgeOverridden: false, timerAccelerated: false, emulatedViewport: false, forceTerminated: false,
-    runtimeErrors: [], pid: 100, runner, installer: { version: '4.249.1', bytes: 123, sha256: '5'.repeat(64) }, ledger: { ...fp('full-app-ui-routes.json'), canonicalization: 'git-LF' },
+    runtimeErrors: [], pid: 100, runner, installer: { version: '4.249.2', bytes: 123, sha256: '5'.repeat(64) }, ledger: { ...fp('full-app-ui-routes.json'), canonicalization: 'git-LF' },
     dataIsolation: { ownedRoot: 'C:\\owned\\synthetic-job', baselineScope: 'this-matrix-job-only', baselineOwner: [runner.runID, runner.runAttempt, runner.job, group].join(':'),
       defaultBefore: clone(defaultSnapshot), defaultAfter: clone(defaultSnapshot), defaultUnchanged: true },
     originalInstallation: { allOriginalGatesPassed: true, reportsUnchanged: true, application: clone(application), report: fp('installation.json'),
@@ -272,7 +272,7 @@ function addLocalLabFixture(report) {
       openConflictsUnchanged: true, historyRead: 26, previewOnly: true, choiceCancelled: true, resolveCalled: false })) }
 }
 function prerequisitesFixture() {
-  const pin = { product: 'a'.repeat(40), current: { version: '4.249.1', bytes: 123, sha256: '5'.repeat(64) }, previous: { version: '4.232.0', bytes: 456, sha256: '6'.repeat(64) } }
+  const pin = { product: 'a'.repeat(40), current: { version: '4.249.2', bytes: 123, sha256: '5'.repeat(64) }, previous: { version: '4.232.0', bytes: 456, sha256: '6'.repeat(64) } }
   const identity = { productCommit: pin.product, verifierCommit: 'b'.repeat(40) }
   return { pin, verifierCommit: identity.verifierCommit, runID: '1000', runAttempt: '1',
     original: { ...identity, complete: true, cleanupComplete: true, forceTerminated: false, installers: { current: pin.current, previous: pin.previous },
@@ -2385,21 +2385,21 @@ test('v2 C09 the actual capture producer and unchanged canonical validator consu
     // Invert only the two explicit release-version assertions; all original
     // canonical source hashes below remain byte-for-byte historical guards.
     const releaseStatements = [
-      "commit(pin.product); commit(verifierCommit); assert.equal(pin.current.version, '4.249.1')",
-      "assert.equal(report.version, '4.249.1'); commit(report.productCommit); commit(report.productTree); commit(report.verifierCommit)",
+      "commit(pin.product); commit(verifierCommit); assert.equal(pin.current.version, '4.249.2')",
+      "assert.equal(report.version, '4.249.2'); commit(report.productCommit); commit(report.productTree); commit(report.verifierCommit)",
     ]
     const restoreReleaseVersion = source => {
       const current = source.replace(/\r\n/g, '\n')
       let original = current
       for (const statement of releaseStatements) {
-        const previous = statement.replace("'4.249.1'", "'4.249.0'")
+        const previous = statement.replace("'4.249.2'", "'4.249.0'")
         assert.equal(original.split(statement).length - 1, 1)
         assert.equal(original.split(previous).length - 1, 0)
         original = original.replace(statement, previous)
       }
       let inverse = original
       for (const statement of [...releaseStatements].reverse()) {
-        const previous = statement.replace("'4.249.1'", "'4.249.0'")
+        const previous = statement.replace("'4.249.2'", "'4.249.0'")
         assert.equal(inverse.split(previous).length - 1, 1)
         inverse = inverse.replace(previous, statement)
       }
@@ -2439,7 +2439,7 @@ test('v2 C09 the actual capture producer and unchanged canonical validator consu
       assert.equal(hash(restoreReleaseVersion(current)), '9da6e7ef65382881a9a69ddd6653da27f7179552febe39f45acca0ff7c970954')
       for (const statement of releaseStatements) {
         for (const replacement of ['', statement + '\n' + statement,
-          statement.replace("'4.249.1'", "'4.249.2'"), statement.replace("'4.249.1'", "'4.249.0'"),
+          statement.replace("'4.249.2'", "'4.249.3'"), statement.replace("'4.249.2'", "'4.249.0'"),
           statement.replace('assert.equal(', 'assert.equal( ')]) {
           const changed = current.replace(statement, replacement)
           assert.notEqual(changed, current)

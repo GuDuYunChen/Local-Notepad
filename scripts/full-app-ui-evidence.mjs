@@ -595,7 +595,7 @@ export function validateFullAppFixtureFile({ name, bytes }) {
 
 export function validateFullAppPrerequisites({ pin, original, accepted, sourceProof, threeReport, threeAccepted, preparation,
   verifierCommit, runID, runAttempt, threeReportFingerprint }) {
-  commit(pin.product); commit(verifierCommit); assert.equal(pin.current.version, '4.249.1')
+  commit(pin.product); commit(verifierCommit); assert.equal(pin.current.version, '4.249.2')
   digest(pin.current.sha256); assert.ok(Number.isSafeInteger(pin.current.bytes) && pin.current.bytes > 0)
   for (const report of [original, accepted, sourceProof, threeReport, threeAccepted]) {
     assert.equal(report.productCommit, pin.product); assert.equal(report.verifierCommit, verifierCommit)
@@ -794,7 +794,7 @@ export function validateLocalSyncLabLifecycle(report) {
 export function validateFullAppInstalledReport(report, ledger) {
   assert.equal(report.schemaVersion, 1); assert.equal(report.scope, SCOPE + '-group')
   assert.equal(report.complete, true); assert.equal(report.cleanupComplete, true)
-  assert.equal(report.version, '4.249.1'); commit(report.productCommit); commit(report.productTree); commit(report.verifierCommit)
+  assert.equal(report.version, '4.249.2'); commit(report.productCommit); commit(report.productTree); commit(report.verifierCommit)
   assert.equal(report.platform, 'win32'); assert.equal(report.runnerEnvironment, 'github-hosted')
   for (const key of ['syntheticData', 'realBackend', 'backendDataVerified', 'backendStopped', 'uninstalled']) assert.equal(report[key], true)
   for (const key of ['bridgeOverridden', 'timerAccelerated', 'emulatedViewport', 'forceTerminated']) assert.equal(report[key], false)

@@ -1,5 +1,6 @@
 import { useCallback, useLayoutEffect, useState } from 'react'
 import { useEditorWriteScope } from './useEditorWriteScope'
+import { captureTableSelectionWrite } from '../utils/tableEvents'
 
 // Toolbar and paste plugins live in the same Lexical editor. They must share
 // one session so a paste cannot race a toolbar batch (or vice versa).
@@ -44,12 +45,12 @@ export function useImageUploadSession(editor, documentId) {
   const begin = useCallback(() => {
     const session = getSession(editor)
     if (session.active) return null
-    const canWrite = captureWrite()
-    if (!canWrite()) return null
+    const canWrite = captureWrite(), ownsSelection = captureTableSelectionWrite(editor)
+    if (!canWrite() || !ownsSelection()) return null
     const controller = new AbortController()
     const task = {
       controller, signal: controller.signal,
-      current: () => !controller.signal.aborted && canWrite(),
+      current: () => !controller.signal.aborted && canWrite() && ownsSelection(),
       finish: () => {
         if (session.active === task) {
           session.active = null

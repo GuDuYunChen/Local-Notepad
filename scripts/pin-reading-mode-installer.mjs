@@ -9,6 +9,7 @@ import { validateReadingModePin } from './reading-mode-installed-evidence.mjs'
 import { prepareShortcutManagementVerifierSources, validateShortcutManagementInstallerPin } from './shortcut-management-installed-evidence.mjs'
 import { prepareLocalExportVerifierSources, validateLocalExportInstallerPin } from './local-export-installed-evidence.mjs'
 import {prepareBlockReferenceVerifierSources,validateBlockReferencePin} from './block-references-installed-evidence.mjs'
+import { prepareTableOperationsVerifierSources, validateTableOperationsInstallerPin } from './table-operations-installed-evidence.mjs'
 import { buildReadingModeFixture } from './build-reading-mode-fixture.mjs'
 
 const blob = source => createHash('sha1').update('blob ' + Buffer.byteLength(source) + '\0').update(source).digest('hex')
@@ -42,6 +43,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   validateShortcutManagementInstallerPin(pin)
   validateLocalExportInstallerPin(pin)
   validateBlockReferencePin(pin)
+  validateTableOperationsInstallerPin(pin)
   const command = process.argv[2]
   const out = path.resolve('test-results/installer-lifecycle')
   if (command === 'outputs') {
@@ -74,7 +76,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     assert.equal(metadata.exactArtifactMetadataVerified, true)
     for (const which of ['previous', 'current']) validateReadingArtifact(pin, which, metadata.metadata[which])
     const inherited = prepareShortcutManagementVerifierSources(pin, name => readFileSync(new URL('./' + name, import.meta.url), 'utf8'))
-    const generated = prepareBlockReferenceVerifierSources(pin, name => readFileSync(new URL('./' + name, import.meta.url), 'utf8'))
+    const generated = prepareTableOperationsVerifierSources(pin, name => readFileSync(new URL('./' + name, import.meta.url), 'utf8'))
     assert.equal(generated.length, inherited.length)
     for (const [index, item] of inherited.entries()) assert.equal(generated[index].original, item.original)
     mkdirSync(out, { recursive: true })

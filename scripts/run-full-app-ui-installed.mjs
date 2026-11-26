@@ -23,7 +23,7 @@ import { fullAppOwnedOptionRequest, prepareFullAppOwnedOptionPointer } from './f
 import { createFullAppCapturePaint } from './full-app-ui-capture-paint.mjs'
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url))
-const VERSION = '4.249.1'
+const VERSION = '4.249.2'
 const API_BASE = 'http://127.0.0.1:27121'
 const REPORT = 'full-app-ui-installed.json'
 const LEDGER_FILE = 'scripts/full-app-ui-routes.json'
@@ -49,7 +49,7 @@ export function validateFullAppOriginalInstallation({ pin, original, accepted, s
   assert.deepEqual(original.installers, { current: pin.current, previous: pin.previous })
   assert.equal(original.appExits.length, 6); assert.equal(original.dataComparisons.length, 6)
   for (const name of ['installed-app-reading-mode-workflow', 'installed-app-shortcut-management-workflow',
-    'installed-app-local-export-workflow', 'installed-app-block-reference-workflow', 'final-uninstall-preserves-data']) {
+    'installed-app-local-export-workflow', 'installed-app-block-reference-workflow', 'installed-app-table-operations-workflow', 'final-uninstall-preserves-data']) {
     assert.equal(original.checks.filter(value => value === name).length, 1, 'Original installation gate missing: ' + name)
   }
   assert.equal(accepted.complete, true); assert.equal(accepted.productCommit, pin.product)

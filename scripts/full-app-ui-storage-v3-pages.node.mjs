@@ -638,21 +638,21 @@ test('v3 C29 the unchanged real capture producer and canonical validator consume
     // Invert only the two explicit release-version assertions; all original
     // canonical source hashes below remain byte-for-byte historical guards.
     const releaseStatements = [
-      "commit(pin.product); commit(verifierCommit); assert.equal(pin.current.version, '4.249.1')",
-      "assert.equal(report.version, '4.249.1'); commit(report.productCommit); commit(report.productTree); commit(report.verifierCommit)",
+      "commit(pin.product); commit(verifierCommit); assert.equal(pin.current.version, '4.249.2')",
+      "assert.equal(report.version, '4.249.2'); commit(report.productCommit); commit(report.productTree); commit(report.verifierCommit)",
     ]
     const restoreReleaseVersion = source => {
       const current = source.replace(/\r\n/g, '\n')
       let original = current
       for (const statement of releaseStatements) {
-        const previous = statement.replace("'4.249.1'", "'4.249.0'")
+        const previous = statement.replace("'4.249.2'", "'4.249.0'")
         assert.equal(original.split(statement).length - 1, 1)
         assert.equal(original.split(previous).length - 1, 0)
         original = original.replace(statement, previous)
       }
       let inverse = original
       for (const statement of [...releaseStatements].reverse()) {
-        const previous = statement.replace("'4.249.1'", "'4.249.0'")
+        const previous = statement.replace("'4.249.2'", "'4.249.0'")
         assert.equal(inverse.split(previous).length - 1, 1)
         inverse = inverse.replace(previous, statement)
       }
@@ -680,7 +680,7 @@ test('v3 C29 the unchanged real capture producer and canonical validator consume
       assert.equal(sha(restoreReleaseVersion(current)), '9da6e7ef65382881a9a69ddd6653da27f7179552febe39f45acca0ff7c970954')
       for (const statement of releaseStatements) {
         for (const replacement of ['', statement + '\n' + statement,
-          statement.replace("'4.249.1'", "'4.249.2'"), statement.replace("'4.249.1'", "'4.249.0'"),
+          statement.replace("'4.249.2'", "'4.249.3'"), statement.replace("'4.249.2'", "'4.249.0'"),
           statement.replace('assert.equal(', 'assert.equal( ')]) {
           const changed = current.replace(statement, replacement)
           assert.notEqual(changed, current)

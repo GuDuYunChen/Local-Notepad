@@ -22,6 +22,7 @@ import { $convertFromMarkdownString, TRANSFORMERS } from '@lexical/markdown'
 import { DividerNode, $createDividerNode } from '~/components/Editor/nodes/DividerNode'
 import { FormulaNode, $createFormulaNode } from '~/components/Editor/nodes/FormulaNode'
 import { CodeBlockNode, $createCodeBlockNode, validateLanguage } from '~/components/Editor/nodes/CodeBlockNode'
+import { TABLE_IMPORT_LIMITS } from './tableImportLimits'
 
 const IMPORT_NODES = [
   HeadingNode,
@@ -283,7 +284,7 @@ function extractMarkdownTables(markdown, prefix, bounded, officeFormat, officeTe
   let cellCount = 0
   const checkCells = row => {
     cellCount += row.length
-    if (bounded && cellCount > 4000) throw new Error('表格合计超过 4000 单元格，请拆分文件后导入；未创建不完整表格')
+    if (bounded && cellCount > TABLE_IMPORT_LIMITS.cells) throw new Error('表格合计超过 4000 单元格，请拆分文件后导入；未创建不完整表格')
   }
 
   for (let index = 0; index < lines.length;) {
@@ -440,7 +441,7 @@ function decodeOfficeTables(tables, source, bounded, officeTextPrefix) {
       const parts = value.split('\n')
       lines += parts.length - 1
       nodes += 2 + parts.length - 1 + parts.filter(Boolean).length
-      if (bounded && (lines > 10000 || bytes > 2 * 1024 * 1024 || nodes > 20000)) {
+      if (bounded && (lines > TABLE_IMPORT_LIMITS.lines || bytes > TABLE_IMPORT_LIMITS.contentBytes || nodes > TABLE_IMPORT_LIMITS.nodes)) {
         throw new Error('Office 表格解码后超过 2 MiB、10000 行或 20000 节点，请拆分文件后导入；内容未截断')
       }
       return value

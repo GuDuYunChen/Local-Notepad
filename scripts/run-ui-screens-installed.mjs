@@ -17,7 +17,7 @@ import { verifyUiScreensDesktop } from './check-ui-screens-desktop.mjs'
 import { UI_INSTALLED_REGISTRATION_QUERY, validateUiInstalledRegistration, verifyUiScreensFiles } from './ui-screens-evidence.mjs'
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url))
-const VERSION = '4.249.1'
+const VERSION = '4.249.2'
 const API_BASE = 'http://127.0.0.1:27121'
 const REPORT = 'ui-screens-installed.json'
 const PRODUCT_SOURCE_FILE = 'scripts/ui-screens-product-sources.json'
@@ -47,7 +47,7 @@ export function validateUiScreensOriginalInstallation({ pin, original, accepted,
   assert.deepEqual(original.installers, { current: pin.current, previous: pin.previous })
   assert.equal(original.appExits.length, 6); assert.equal(original.dataComparisons.length, 6)
   for (const name of ['installed-app-reading-mode-workflow', 'installed-app-shortcut-management-workflow',
-    'installed-app-local-export-workflow', 'installed-app-block-reference-workflow', 'final-uninstall-preserves-data']) {
+    'installed-app-local-export-workflow', 'installed-app-block-reference-workflow', 'installed-app-table-operations-workflow', 'final-uninstall-preserves-data']) {
     assert.equal(original.checks.filter(value => value === name).length, 1, 'Original installation gate missing: ' + name)
   }
   assert.equal(accepted.complete, true); assert.equal(accepted.productCommit, pin.product)
