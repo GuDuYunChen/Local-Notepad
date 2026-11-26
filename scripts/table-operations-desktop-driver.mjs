@@ -47,9 +47,17 @@ export function tableOperationSeed(marker) {
 // event; scrollIntoView only reveals native targets. Owned notes use the real
 // API for initial seeding; all Table operations use Chromium mouse/keyboard input.
 export async function verifyTableOperationsDesktop(context) {
-  const { api, evaluate, click, cdp, until, capture, report, save, resizeSmall } = context
+  const { api, evaluate, click, cdp, until, capture: captureNative, report, save, resizeSmall } = context
   const started = performance.now()
   const settle = () => evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve(true))))')
+  const capture = async filename => {
+    // Let the real transient feedback expire before reviewing Table controls.
+    // Keep error feedback visible for failed-save evidence. The shared until
+    // remains bounded by the original business deadline; timers and DOM stay
+    // untouched, and the runner's emergency failure capture is independent.
+    await until(() => evaluate("!document.querySelector('.app-toast.success,.app-toast.warning')"), 'Transient Table feedback did not finish before capture')
+    await captureNative(filename)
+  }
   const recordInput = (method, params) => {
     report.nativeInputs.push({ sequence: report.nativeInputs.length + 1, method, ...params })
     save()
@@ -72,6 +80,7 @@ export async function verifyTableOperationsDesktop(context) {
       modebarFocused:!!document.querySelector('.table-selection-modebar')?.contains(document.activeElement),width:innerWidth,height:innerHeight,
       overflow:document.documentElement.scrollWidth>innerWidth+1,
       tables:root?.querySelectorAll('table').length||0,selection:document.querySelector('.table-selection-modebar')?.textContent||'',
+      selectionOutlineBackgrounds:[...document.querySelectorAll('.table-selection-outline')].map(outline=>getComputedStyle(outline).backgroundColor),
       rows:table?[...table.rows].map(row=>[...row.cells].map(cell=>({text:cell.textContent,colSpan:cell.colSpan,rowSpan:cell.rowSpan,tag:cell.tagName,
         width:cell.getBoundingClientRect().width,inlineWidth:cell.style.width,background:getComputedStyle(cell).backgroundColor,
         position:getComputedStyle(cell).position,top:cell.getBoundingClientRect().top}))):[],
@@ -206,7 +215,7 @@ export async function verifyTableOperationsDesktop(context) {
   // Retain a real text range in an unselected cell before entering the bulk
   // mode. Native editing must not act on that older range behind the two-cell
   // overlay. Selection and focus are observed through DOM APIs only.
-  report.selectionIsolation = { operations: [] }; save()
+  report.selectionIsolation = { rangeStages: [], operations: [] }; save()
   const sourceInputStart = report.nativeInputs.length
   await click(cellSelector(0, 2) + ' p'); await key('Home', 36); await key('End', 35, 8)
   const textSelection = () => evaluate(`(() => {
@@ -216,19 +225,27 @@ export async function verifyTableOperationsDesktop(context) {
       return {row:[...table.rows].indexOf(cell.parentElement),column:[...cell.parentElement.cells].indexOf(cell),text:cell.textContent}}
     return {rootFocused:document.activeElement===root,text:selection?.toString()||'',anchor:location(selection?.anchorNode),focus:location(selection?.focusNode)}
   })()`)
+  const observeRangeStage = async stage => {
+    report.selectionIsolation.rangeStages.push({ stage, afterInput: report.nativeInputs.length, ...(await textSelection()) }); save()
+  }
   report.selectionIsolation.source = { inputStart: sourceInputStart, inputEnd: report.nativeInputs.length, ...(await textSelection()) }; save()
   assert.equal(report.selectionIsolation.source.rootFocused, true)
   assert.equal(report.selectionIsolation.source.text, 'R1C3', 'Native text range must cover the unselected source cell')
   await click('[aria-label="表格单元格操作"]')
   await until(() => evaluate("!!document.querySelector('.table-action-menu[role=menu]')"), 'Table action menu did not open')
+  await observeRangeStage('menu-opened')
   await click({ selector: '.table-action-menu button', text: '多选单元格…' }); await settle()
+  await observeRangeStage('mode-entered')
   const start = await point(cellSelector(1, 0)), end = await point(cellSelector(1, 1))
   const selectionInputStart = report.nativeInputs.length
-  await move(start); await press(start); await move(end, 1); await release(end); await settle()
+  await move(start); await press(start); await observeRangeStage('rectangle-started')
+  await move(end, 1); await observeRangeStage('rectangle-moved')
+  await release(end); await settle()
   report.selectionIsolation.rectangle = { inputStart: selectionInputStart, inputEnd: report.nativeInputs.length }
   report.selectionIsolation.selected = await observe()
   report.selectionIsolation.retainedRange = await textSelection(); save()
   assert.match(report.selectionIsolation.selected.selection, /已选择 2 个单元格/)
+  assert.deepEqual(report.selectionIsolation.selected.selectionOutlineBackgrounds, ['rgba(0, 0, 0, 0)', 'rgba(0, 0, 0, 0)'], 'Bulk selection outlines must not cover cell text or saved colours')
   assert.equal(report.selectionIsolation.selected.rootFocused, true, 'Bulk selection must leave native keyboard input on the editor root')
   assert.equal(report.selectionIsolation.retainedRange.text, 'R1C3', 'Isolation exercise requires the retained unselected text range')
   assert.equal(await body(), initial, 'Selection alone wrote the document')

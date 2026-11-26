@@ -4,6 +4,7 @@ import { INSERT_TABLE_COMMAND } from '@lexical/table'
 import { HISTORY_PUSH_TAG } from 'lexical'
 import { UiButton } from '~/components/ui/ControlKit'
 import { useEditorWriteScope } from '../hooks/useEditorWriteScope'
+import { captureTableSelectionWrite } from '../utils/tableEvents'
 
 
 export default function TableMenu({ documentId, onInsert } = {}) {
@@ -99,7 +100,8 @@ export default function TableMenu({ documentId, onInsert } = {}) {
         disabled={!editable}
         onClick={() => {
           if (open) { setOpen(false); openWriteRef.current = null; return }
-          const canWrite = captureWrite()
+          const canWriteDocument = captureWrite(), ownsSelection = captureTableSelectionWrite(editor)
+          const canWrite = () => canWriteDocument() && ownsSelection()
           if (!canWrite()) return
           openWriteRef.current = canWrite
           setOpen(true)

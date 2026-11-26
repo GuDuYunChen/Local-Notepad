@@ -5,6 +5,8 @@ import { INSERT_CHECK_LIST_COMMAND } from '@lexical/list'
 import { $createFormulaNode } from '../nodes/FormulaNode'
 import { isShortcutContextBlocked, matchShortcut } from '~/services/localShortcuts'
 import { useEditorWriteScope } from '../hooks/useEditorWriteScope'
+import { captureTableSelectionWrite } from '../utils/tableEvents'
+import { toast } from '~/services/toast'
 
 export function getEditorShortcut(event, bindings) {
   if (matchShortcut(event, 'formula', bindings)) return 'formula'
@@ -27,10 +29,16 @@ export default function EditorShortcutPlugin({ documentId } = {}) {
       const activeElement = document.activeElement
       if (!root || !activeElement || !root.contains(activeElement)) return
       if (activeElement.closest?.('input,textarea,select')) return
-      const canWrite = captureWrite()
-      if (!canWrite()) return
+      const canWriteDocument = captureWrite()
+      if (!canWriteDocument()) return
+      const ownsSelection = action === 'copy-reference' ? () => true : captureTableSelectionWrite(editor)
+      const canWrite = () => canWriteDocument() && ownsSelection()
 
       event.preventDefault()
+      if (!ownsSelection()) {
+        toast.warning('请先点击“完成”退出单元格多选，再输入或修改正文')
+        return
+      }
 
       if (action === 'formula') {
         editor.update(() => {

@@ -57,7 +57,7 @@ import { useImageUploadSession } from '../hooks/useImageUploadSession'
 import { toast } from '~/services/toast'
 import TableMenu from './TableMenu'
 import { normalizeLinkUrl } from '../utils/linkUtils'
-import { isTableSelectionActive } from '../utils/tableEvents'
+import { captureTableSelectionWrite, isTableSelectionActive } from '../utils/tableEvents'
 import { useEditorWriteScope } from '../hooks/useEditorWriteScope'
 import { readExcelTableRows } from '../utils/excelTable'
 import { isShortcutContextBlocked, shortcutFromEvent, shortcutLabel } from '~/services/localShortcuts'
@@ -110,7 +110,11 @@ const BLOCK_OPTIONS = [
 export default function ToolbarPlugin({ documentId } = {}) {
   const [editor] = useLexicalComposerContext()
   const { bindings } = useLocalShortcuts()
-  const captureWrite = useEditorWriteScope(editor, documentId)
+  const captureDocumentWrite = useEditorWriteScope(editor, documentId)
+  const captureWrite = useCallback(() => {
+    const canWrite = captureDocumentWrite(), ownsSelection = captureTableSelectionWrite(editor)
+    return () => canWrite() && ownsSelection()
+  }, [captureDocumentWrite, editor])
   const imageUploads = useImageUploadSession(editor, documentId)
   const [canUndo, setCanUndo] = useState(false)
   const [canRedo, setCanRedo] = useState(false)
@@ -145,6 +149,7 @@ export default function ToolbarPlugin({ documentId } = {}) {
   const insertMenuRef = useRef(null)
   const moreMenuRef = useRef(null)
   const linkRef = useRef(null)
+  const linkWriteRef = useRef(null)
 
   useLayoutEffect(() => {
     setExcelBusy(false)
@@ -185,6 +190,9 @@ export default function ToolbarPlugin({ documentId } = {}) {
 
   useEffect(() => {
     const openLink = () => {
+      const canWrite = captureWrite()
+      if (!canWrite()) return
+      linkWriteRef.current = canWrite
       setLinkOpen(true)
       setInsertOpen(false)
       setMoreOpen(false)
@@ -192,7 +200,7 @@ export default function ToolbarPlugin({ documentId } = {}) {
 
     window.addEventListener('editor:open-link', openLink)
     return () => window.removeEventListener('editor:open-link', openLink)
-  }, [])
+  }, [captureWrite])
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -217,7 +225,7 @@ export default function ToolbarPlugin({ documentId } = {}) {
   const ensureFormattingAllowed = () => {
     if (!editor.isEditable()) return false
     if (isTableSelectionActive(editor)) {
-      toast.warning('请先点击“完成”退出单元格多选，再使用文字格式工具')
+      toast.warning('请先点击“完成”退出单元格多选，再输入或修改正文')
       return false
     }
     return true
@@ -364,16 +372,27 @@ export default function ToolbarPlugin({ documentId } = {}) {
     editor.focus()
   }
 
-  const insertNode = (node) => {
+  const insertNode = (createNode) => {
+    if (!ensureFormattingAllowed()) return
+    const canWrite = captureWrite()
     editor.update(() => {
-      $insertNodes([node])
+      if (canWrite()) $insertNodes([createNode()])
     })
     setInsertOpen(false)
     editor.focus()
   }
 
+  const canApplyLink = () => {
+    if (!ensureFormattingAllowed()) return false
+    if (linkWriteRef.current?.()) return true
+    linkWriteRef.current = null
+    setLinkOpen(false)
+    toast.warning('编辑选区已变化，请重新选中文字后设置链接')
+    return false
+  }
+
   const applyLink = () => {
-    if (!ensureFormattingAllowed()) return
+    if (!canApplyLink()) return
     const url = normalizeLinkUrl(linkUrl)
     if (!url || !hasSelection) {
       if (linkUrl.trim()) toast.warning('请输入有效网页链接或章节锚点')
@@ -386,7 +405,7 @@ export default function ToolbarPlugin({ documentId } = {}) {
   }
 
   const removeLink = () => {
-    if (!ensureFormattingAllowed()) return
+    if (!canApplyLink()) return
     editor.dispatchCommand(TOGGLE_LINK_COMMAND, null)
     setLinkOpen(false)
     setLinkUrl('')
@@ -403,6 +422,7 @@ export default function ToolbarPlugin({ documentId } = {}) {
   }
 
   const handleAttachment = async (event) => {
+    if (!ensureFormattingAllowed()) { event.target.value = ''; return }
     const canWrite = captureWrite()
     if (!canWrite()) return
     const file = event.target.files?.[0]
@@ -441,7 +461,7 @@ export default function ToolbarPlugin({ documentId } = {}) {
     const input = event.target
     const files = Array.from(input.files || [])
     input.value = '' // Selecting the same failed image again must dispatch change.
-    if (!files.length) return
+    if (!files.length || !ensureFormattingAllowed()) return
     const task = imageUploads.begin()
     if (!task) { toast.warning('图片正在处理中，请先完成或取消当前上传'); return }
     setInsertOpen(false)
@@ -481,6 +501,7 @@ export default function ToolbarPlugin({ documentId } = {}) {
   }
 
   const handleVideo = async (event) => {
+    if (!ensureFormattingAllowed()) { event.target.value = ''; return }
     const canWrite = captureWrite()
     if (!canWrite()) return
     const file = event.target.files?.[0]
@@ -527,6 +548,7 @@ export default function ToolbarPlugin({ documentId } = {}) {
 
   const handleExcel = async (event) => {
     if (excelRequestRef.current) return
+    if (!ensureFormattingAllowed()) { event.target.value = ''; return }
     const canWrite = captureWrite()
     if (!canWrite()) return
     const input = event.target
@@ -750,7 +772,13 @@ export default function ToolbarPlugin({ documentId } = {}) {
           type="button"
           className={`btn toolbar-text-btn${linkOpen ? ' active' : ''}`}
           disabled={!hasSelection}
-          onClick={() => setLinkOpen(prev => !prev)}
+          onClick={() => {
+            if (linkOpen) { linkWriteRef.current = null; setLinkOpen(false); return }
+            const canWrite = captureWrite()
+            if (!canWrite()) return
+            linkWriteRef.current = canWrite
+            setLinkOpen(true)
+          }}
           aria-label="添加链接"
           title={hasSelection ? '添加链接' : '先选中文字'}
         >
@@ -871,25 +899,26 @@ export default function ToolbarPlugin({ documentId } = {}) {
                   type="button"
                   className="btn toolbar-menu-action"
                   onClick={() => {
+                    if (!ensureFormattingAllowed()) return
                     editor.dispatchCommand(INSERT_CODE_BLOCK_COMMAND)
                     setInsertOpen(false)
                   }}
                 >
                   代码块
                 </UiButton>
-                <UiButton density="compact" type="button" className="btn toolbar-menu-action" onClick={() => insertNode($createFormulaNode())} title={shortcutLabel('formula', bindings)}>
+                <UiButton density="compact" type="button" className="btn toolbar-menu-action" onClick={() => insertNode($createFormulaNode)} title={shortcutLabel('formula', bindings)}>
                   数学公式
                 </UiButton>
-                <UiButton density="compact" type="button" className="btn toolbar-menu-action" onClick={() => insertNode($createCalloutNode())}>
+                <UiButton density="compact" type="button" className="btn toolbar-menu-action" onClick={() => insertNode($createCalloutNode)}>
                   提示块
                 </UiButton>
-                <UiButton density="compact" type="button" className="btn toolbar-menu-action" onClick={() => insertNode($createToggleNode())}>
+                <UiButton density="compact" type="button" className="btn toolbar-menu-action" onClick={() => insertNode($createToggleNode)}>
                   折叠块
                 </UiButton>
-                <UiButton density="compact" type="button" className="btn toolbar-menu-action" onClick={() => insertNode($createDividerNode())}>
+                <UiButton density="compact" type="button" className="btn toolbar-menu-action" onClick={() => insertNode($createDividerNode)}>
                   分割线
                 </UiButton>
-                <UiButton density="compact" type="button" className="btn toolbar-menu-action" onClick={() => insertNode($createEmbedNode())}>
+                <UiButton density="compact" type="button" className="btn toolbar-menu-action" onClick={() => insertNode($createEmbedNode)}>
                   嵌入
                 </UiButton>
                 <label className="btn toolbar-menu-action">

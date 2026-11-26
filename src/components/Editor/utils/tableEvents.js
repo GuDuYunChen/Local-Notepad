@@ -24,12 +24,29 @@ export function isTableEventForRoot(root, event) {
   return doc.querySelectorAll('[data-lexical-editor="true"]').length === 1
 }
 
-// Bulk cell selection owns a separate logical selection. Toolbar formatting
-// must not fall through to Lexical's retained text caret in another cell.
+// Selection ownership changes synchronously, before React paints the modebar.
+// It is scoped to the editor, not to DOM classes or a neighbouring editor.
+const tableSelectionOwners = new WeakMap()
+function tableSelectionOwner(editor) {
+  let owner = tableSelectionOwners.get(editor)
+  if (!owner) { owner = { active: false, epoch: 0 }; tableSelectionOwners.set(editor, owner) }
+  return owner
+}
+
+export function setTableSelectionActive(editor, active) {
+  const owner = tableSelectionOwner(editor)
+  if (owner.active !== active) { owner.active = active; owner.epoch += 1 }
+}
+
 export function isTableSelectionActive(editor) {
-  const root = editor?.getRootElement?.()
-  const container = root?.closest?.('.editor-container')
-  return !!container?.querySelector('.table-selection-modebar')
+  return !!editor && !!tableSelectionOwners.get(editor)?.active
+}
+
+// A pending insertion must not revive after the user enters bulk selection
+// and later leaves it. Document/editability validity is checked by its caller.
+export function captureTableSelectionWrite(editor) {
+  const owner = tableSelectionOwner(editor), epoch = owner.epoch, startedActive = owner.active
+  return () => !startedActive && !owner.active && owner.epoch === epoch
 }
 
 export function isTableTextFormattingShortcut(event) {

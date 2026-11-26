@@ -8,7 +8,7 @@ import { useEditorWriteScope } from '../hooks/useEditorWriteScope'
 import { isShortcutContextBlocked, matchShortcut, shortcutLabel } from '~/services/localShortcuts'
 import useLocalShortcuts from '~/hooks/useLocalShortcuts'
 import { UiButton } from '~/components/ui/ControlKit'
-import { dispatchTableEvent, isTableEventForEditor, isTableTextFormattingShortcut } from '../utils/tableEvents'
+import { dispatchTableEvent, isTableEventForEditor, isTableTextFormattingShortcut, setTableSelectionActive } from '../utils/tableEvents'
 import { $getTableModel, $resolveTableCell, $insertRowAtCell, $insertColumnAtCell, $deleteRowAtCell, $deleteColumnAtCell, $mergeTableCells, $splitTableCell, $moveTableRow, $moveTableColumn } from '../utils/tableModel'
 
 // Retain coordinate-based helpers for existing callers. Live selection keeps
@@ -141,8 +141,9 @@ export default function TableSelectionPlugin({ documentId }) {
   }, [])
   const reset = useCallback(() => {
     epochRef.current += 1; activeRef.current = false; groupsRef.current = []; dragRef.current = null; hoverRef.current = null; busyRef.current = null
+    setTableSelectionActive(editor, false)
     setActive(false); setGroups([]); setBusy(false); setGeometry({ outlines: [], top: 10, add: null })
-  }, [])
+  }, [editor])
   const exit = useCallback(() => {
     reset(); dispatchTableEvent(editor, 'tableSelection:mode', false)
     if (editor.isEditable()) editor.focus()
@@ -152,7 +153,7 @@ export default function TableSelectionPlugin({ documentId }) {
     const unregister = editor.registerEditableListener(editable => {
       if (!editable) { reset(); dispatchTableEvent(editor, 'tableSelection:mode', false) }
     })
-    return () => { epochRef.current += 1; busyRef.current = null; activeRef.current = false; unregister() }
+    return () => { epochRef.current += 1; busyRef.current = null; activeRef.current = false; setTableSelectionActive(editor, false); unregister() }
   }, [editor, documentId, reset])
 
   const run = (operation, canWrite = beginWrite()) => {
@@ -302,7 +303,9 @@ export default function TableSelectionPlugin({ documentId }) {
   useEffect(() => {
     const onMode = event => {
       if (!isTableEventForEditor(editor, event)) return
-      if (event.detail === true && beginWrite()()) { activeRef.current = true; setActive(true) } else reset()
+      if (event.detail === true && beginWrite()()) {
+        activeRef.current = true; setTableSelectionActive(editor, true); setActive(true)
+      } else reset()
     }
     const onAction = event => {
       if (!isTableEventForEditor(editor, event) || !beginWrite()()) return
@@ -407,6 +410,15 @@ export default function TableSelectionPlugin({ documentId }) {
           return $isTableCellNode(node) ? node.getKey() : null
         }, { editor })
       }
+      const onPointerDown = event => {
+        if (event.button !== 0 || !activeRef.current || !beginWrite()() || !cellKey(event.target)) return
+        // Chromium delivers pointerdown before the compatibility mousedown.
+        // Lexical's window pointer observer would otherwise start a second
+        // selection gesture and replace the retained text range on pointermove.
+        // Keep the default: cancelling pointerdown suppresses the mousedown
+        // which drives our existing logical-cell selection below.
+        event.stopPropagation()
+      }
       const onDown = event => {
         if (event.button !== 0 || !beginWrite()()) return
         const anchorKey = cellKey(event.target)
@@ -502,6 +514,7 @@ export default function TableSelectionPlugin({ documentId }) {
         if (matchShortcut(event, 'mergeCells')) { event.preventDefault(); handlersRef.current.perform('mergeCells') }
         if (matchShortcut(event, 'splitCell')) { event.preventDefault(); handlersRef.current.perform('splitCells') }
       }
+      root.addEventListener('pointerdown', onPointerDown, true)
       root.addEventListener('mousedown', onDown, true); root.addEventListener('mousemove', onMove, true); root.addEventListener('mouseover', onMove)
       // These listeners precede Lexical's root handlers. A window bubble
       // listener is too late: the retained text caret may already be edited.
@@ -512,6 +525,7 @@ export default function TableSelectionPlugin({ documentId }) {
       document.addEventListener('mouseup', onUp); window.addEventListener('blur', onUp); window.addEventListener('keydown', onKey)
       window.addEventListener('resize', schedule); container.addEventListener('scroll', schedule, true)
       detach = () => {
+        root.removeEventListener('pointerdown', onPointerDown, true)
         root.removeEventListener('mousedown', onDown, true); root.removeEventListener('mousemove', onMove, true); root.removeEventListener('mouseover', onMove)
         root.removeEventListener('keydown', onEditorKey, true); root.removeEventListener('beforeinput', onBeforeInput, true)
         root.removeEventListener('compositionstart', onCompositionStart, true); root.removeEventListener('compositionend', refuseTextInput, true)

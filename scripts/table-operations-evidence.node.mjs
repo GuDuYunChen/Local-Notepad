@@ -59,11 +59,18 @@ function syntheticReport() {
     { method: 'Input.imeSetComposition', text: 'R3C3', selectionStart: 4, selectionEnd: 4 },
     { method: 'Input.insertText', text: 'R3C3' }, ...keyInputs('s', 83, 2),
   ])
-  const selectedView = { ...view(table), editable: 'true', rootFocused: true, selection: '已选择 2 个单元格' }
+  const selectedView = { ...view(table), editable: 'true', rootFocused: true, selection: '已选择 2 个单元格',
+    selectionOutlineBackgrounds: ['rgba(0, 0, 0, 0)', 'rgba(0, 0, 0, 0)'] }
   const retainedRange = { rootFocused: true, text: 'R1C3', anchor: { row: 0, column: 2, text: 'R1C3' }, focus: { row: 0, column: 2, text: 'R1C3' } }
   report.selectionIsolation = {
     source: { inputStart: 12, inputEnd: 18, ...clone(retainedRange) }, retainedRange: clone(retainedRange),
     rectangle: { inputStart: 22, inputEnd: 26 }, selected: clone(selectedView), operations: [],
+    rangeStages: [
+      { stage: 'menu-opened', afterInput: 20, ...clone(retainedRange), rootFocused: false },
+      { stage: 'mode-entered', afterInput: 22, ...clone(retainedRange) },
+      { stage: 'rectangle-started', afterInput: 24, ...clone(retainedRange) },
+      { stage: 'rectangle-moved', afterInput: 25, ...clone(retainedRange) },
+    ],
   }
   putInputs(12, [
     ...['mousePressed', 'mouseReleased'].map(type => ({ method: 'Input.dispatchMouseEvent', type, x: 270, y: 60 })),
@@ -182,6 +189,12 @@ const refusals = [
   ['fake successful failed save', report => { report.failedSave.persisted = report.snapshots.retried.content }],
   ['wrong row restored by undo', report => { report.snapshots['row-drag-undo'] = report.snapshots['row-dragged'] }],
   ['missing native selection isolation workflow', report => { delete report.selectionIsolation }],
+  ['missing native selection handoff observations', report => { delete report.selectionIsolation.rangeStages }],
+  ['range observations skip the native pointer movement', report => { report.selectionIsolation.rangeStages.pop() }],
+  ['range observation is attributed to a later native input', report => { report.selectionIsolation.rangeStages[2].afterInput += 1 }],
+  ['range observation omits native focus ownership', report => { delete report.selectionIsolation.rangeStages[1].rootFocused }],
+  ['missing actual native selection outlines', report => { report.selectionIsolation.selected.selectionOutlineBackgrounds = [] }],
+  ['opaque selection overlay covers text despite intact cell data', report => { report.selectionIsolation.selected.selectionOutlineBackgrounds[0] = 'rgb(233, 223, 209)' }],
   ['collapsed old source range', report => { report.selectionIsolation.source.text = '' }],
   ['old source range points at a bulk-selected cell', report => { report.selectionIsolation.retainedRange.anchor.row = 1 }],
   ['bulk selection without a native drag', report => { report.nativeInputs[report.selectionIsolation.rectangle.inputStart + 2].buttons = 0 }],
@@ -224,6 +237,14 @@ const refusals = [
     report.snapshots['large-saved'].content = JSON.stringify(value); report.snapshots['large-saved'].sha256 = tableOperationsHash(report.snapshots['large-saved'].content)
   }],
   ['stale current sources', report => { report.sourceFiles[TABLE_OPERATIONS_SOURCES[0]] = '0'.repeat(40) }],
+  ['missing floating toolbar source pin', report => { delete report.sourceFiles['src/components/Editor/plugins/FloatingTextToolbarPlugin.jsx'] }],
+  ['stale floating toolbar source pin', report => { report.sourceFiles['src/components/Editor/plugins/FloatingTextToolbarPlugin.jsx'] = '0'.repeat(40) }],
+  ['missing editor shortcut source pin', report => { delete report.sourceFiles['src/components/Editor/plugins/EditorShortcutPlugin.jsx'] }],
+  ['stale editor shortcut source pin', report => { report.sourceFiles['src/components/Editor/plugins/EditorShortcutPlugin.jsx'] = '0'.repeat(40) }],
+  ['missing image paste source pin', report => { delete report.sourceFiles['src/components/Editor/plugins/PasteImagePlugin.jsx'] }],
+  ['stale image paste source pin', report => { report.sourceFiles['src/components/Editor/plugins/PasteImagePlugin.jsx'] = '0'.repeat(40) }],
+  ['missing shared image ownership source pin', report => { delete report.sourceFiles['src/components/Editor/hooks/useImageUploadSession.js'] }],
+  ['stale shared image ownership source pin', report => { report.sourceFiles['src/components/Editor/hooks/useImageUploadSession.js'] = '0'.repeat(40) }],
   ['missing native input', report => { report.nativeInputs = [] }],
   ['invented drag data', report => { report.nativeInputs[report.nativeDrags[0].inputStart + 6].data.items = [] }],
   ['old native drag movement omitted its left button', report => { delete report.nativeInputs[report.nativeDrags[0].inputStart + 3].button }],

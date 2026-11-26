@@ -14,9 +14,12 @@ export const TABLE_OPERATIONS_SOURCES = Object.freeze([
   'src/components/Editor/plugins/TableMenu.jsx', 'src/components/Editor/plugins/TableActionMenuPlugin.jsx',
   'src/components/Editor/plugins/TableSelectionPlugin.jsx', 'src/components/Editor/plugins/TableColumnResizePlugin.jsx',
   'src/components/Editor/plugins/TableReorderPlugin.jsx', 'src/components/Editor/plugins/ToolbarPlugin.jsx',
+  'src/components/Editor/plugins/FloatingTextToolbarPlugin.jsx',
+  'src/components/Editor/plugins/EditorShortcutPlugin.jsx', 'src/components/Editor/plugins/PasteImagePlugin.jsx',
   'src/components/Editor/plugins/TablePresentationPlugin.jsx', 'src/components/Editor/plugins/DocumentSessionPlugin.jsx',
   'src/components/Editor/plugins/CommandPalettePlugin.jsx',
   'src/components/Editor/utils/tableModel.js', 'src/components/Editor/utils/tableEvents.js', 'src/components/Editor/hooks/useEditorWriteScope.js',
+  'src/components/Editor/hooks/useImageUploadSession.js',
   'src/components/Editor/utils/excelTable.js', 'src/services/tableImportLimits.js', 'src/services/importContent.js',
   'src/components/TextEditor.jsx', 'src/services/editorDraftCache.js', 'src/styles/editor-document.css', 'src/services/localAppearance.js',
 ])
@@ -115,9 +118,29 @@ export function validateTableOperationsReport(report, { commit, verifier = commi
     assert.equal(view.modebarFocused, !rootFocused)
     assert.equal(view.editable, 'true'); assert.equal(view.tables, 1)
     assert.match(view.selection, /已选择 2 个单元格/)
+    assert.deepEqual(view.selectionOutlineBackgrounds, ['rgba(0, 0, 0, 0)', 'rgba(0, 0, 0, 0)'], 'Selection outlines must leave cell text and saved colours visible')
     assert.deepEqual(view.rows.map(row => row.map(cell => cell.text)), originalRows, 'Selection input changed a selected or unselected cell')
   }
   const isolation = report.selectionIsolation
+  // Native pointer events are emitted before their compatibility mouse events.
+  // Keep each observed transition so a failed range-retention gate identifies
+  // the actual handoff; these are read-only DOM observations, not test writes.
+  assert.deepEqual(isolation.rangeStages.map(stage => [stage.stage, stage.afterInput]), [
+    ['menu-opened', isolation.source.inputEnd + 2],
+    ['mode-entered', isolation.rectangle.inputStart],
+    ['rectangle-started', isolation.rectangle.inputStart + 2],
+    ['rectangle-moved', isolation.rectangle.inputStart + 3],
+  ])
+  for (const stage of isolation.rangeStages) {
+    assert.equal(typeof stage.rootFocused, 'boolean')
+    assert.equal(typeof stage.text, 'string')
+    for (const endpoint of [stage.anchor, stage.focus]) {
+      if (endpoint === null) continue
+      assert.ok(Number.isSafeInteger(endpoint.row) && endpoint.row >= 0)
+      assert.ok(Number.isSafeInteger(endpoint.column) && endpoint.column >= 0)
+      assert.equal(typeof endpoint.text, 'string')
+    }
+  }
   for (const range of [isolation.source, isolation.retainedRange]) {
     assert.equal(range.rootFocused, true); assert.equal(range.text, 'R1C3')
     for (const endpoint of [range.anchor, range.focus]) assert.deepEqual(endpoint, { row: 0, column: 2, text: 'R1C3' })

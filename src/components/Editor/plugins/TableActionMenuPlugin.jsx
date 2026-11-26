@@ -70,7 +70,13 @@ export default function TableActionMenuPlugin({ documentId }) {
   }, [editor, documentId, close, updateMenu])
   useEffect(() => {
     let detach = () => {}
-    const unregister = editor.registerUpdateListener(updateMenu)
+    const unregister = editor.registerUpdateListener(({ dirtyElements, dirtyLeaves }) => {
+      // Content changes may replace retained text endpoints while leaving the
+      // cell and grid keys intact. Refuse that opened action synchronously;
+      // selection-only updates still keep the current menu available.
+      if (openedRef.current && (dirtyElements.size || dirtyLeaves.size)) close()
+      updateMenu()
+    })
     const unregisterRoot = editor.registerRootListener(root => {
       detach()
       const container = root?.closest('.editor-container')
@@ -80,7 +86,7 @@ export default function TableActionMenuPlugin({ documentId }) {
     })
     window.addEventListener('resize', updateMenu)
     return () => { unregister(); unregisterRoot(); detach(); window.removeEventListener('resize', updateMenu) }
-  }, [editor, updateMenu])
+  }, [editor, updateMenu, close])
   useEffect(() => {
     const onPointerDown = event => {
       if (openedRef.current && !menuRef.current?.contains(event.target) && !buttonRef.current?.contains(event.target)) close()
@@ -102,11 +108,7 @@ export default function TableActionMenuPlugin({ documentId }) {
     if (!signature) return
     let retainedSelection = null
     editor.read('latest', () => { retainedSelection = $getSelection()?.clone() || null })
-    const root = editor.getRootElement()
-    const nativeSelection = root?.ownerDocument?.getSelection()
-    const retainedDOMRange = nativeSelection?.rangeCount && root.contains(nativeSelection.anchorNode) &&
-      root.contains(nativeSelection.focusNode) ? nativeSelection.getRangeAt(0).cloneRange() : null
-    openedRef.current = { info: tableInfo, signature, canWrite, retainedSelection, retainedDOMRange }
+    openedRef.current = { info: tableInfo, signature, canWrite, retainedSelection }
     setIsMenuOpen(true)
   }
   const validMenu = () => {
@@ -123,31 +125,17 @@ export default function TableActionMenuPlugin({ documentId }) {
   const enterSelectionMode = () => {
     const opened = openedRef.current
     if (!validMenu() || !opened) return
-    // The menu autofocuses its first item and clears Chromium's native range.
-    // Restore Lexical's selection only after the menu is closed, then enter
-    // bulk mode after that update commits. Restore the DOM range in the next
-    // frame so Lexical's pending reconciliation cannot immediately erase it.
+    // Hand focus back before restoring the editor-owned selection, so the
+    // menu's blur and Lexical's focus handling finish before reconciliation.
+    // A later animation-frame restoration could overwrite a newer pointer
+    // gesture or another document's caret.
     close()
+    editor.getRootElement()?.focus({ preventScroll: true })
     editor.update(() => {
-      if (opened.retainedSelection) $setSelection(opened.retainedSelection.clone())
-    }, {
-      discrete: true,
-      onUpdate: () => {
-        if (!editor.isEditable()) return
-        editor.focus()
-        dispatchTableEvent(editor, 'tableSelection:mode', true)
-        requestAnimationFrame(() => requestAnimationFrame(() => {
-          const root = editor.getRootElement()
-          const range = opened.retainedDOMRange
-          if (!root || !range || !editor.isEditable() ||
-              !root.contains(range.startContainer) || !root.contains(range.endContainer)) return
-          const selection = root.ownerDocument.getSelection()
-          if (!selection) return
-          selection.removeAllRanges()
-          selection.addRange(range)
-        }))
-      },
-    })
+      if (opened.canWrite() && opened.retainedSelection) $setSelection(opened.retainedSelection.clone())
+    }, { discrete: true })
+    if (!opened.canWrite()) return
+    dispatchTableEvent(editor, 'tableSelection:mode', true)
   }
   const dispatch = (type, payload) => {
     const info = validMenu()

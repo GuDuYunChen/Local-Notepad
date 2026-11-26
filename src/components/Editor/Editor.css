@@ -187,7 +187,7 @@
 .editor-table-row-striping tr:nth-child(even) { background: var(--hover-bg); }
 
 .table-selection-overlay { position: absolute; inset: 0; }
-.table-selection-outline { background: var(--clay-light); outline: 2px solid var(--clay); border-radius: 4px; }
+.table-selection-outline { background: transparent; outline: 2px solid var(--clay); border-radius: 4px; }
 
 .table-context-menu {
   position: fixed;
