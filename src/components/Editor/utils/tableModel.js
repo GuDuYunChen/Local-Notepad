@@ -132,6 +132,10 @@ function spanWidth(widths, columnIndex, colSpan) {
     ? values.reduce((sum, width) => sum + width, 0) : undefined
 }
 
+// Presentation reads the same canonical/legacy constraints as structure edits,
+// without calling $syncWidths or adding guessed widths to automatic columns.
+export { getWidths as $getTableColumnWidths, spanWidth as getTableSpanWidth }
+
 function $syncWidths(model, widths) {
   if (!model || !widths) return
   // COLGROUP requires a complete list. Keep partial legacy sizing on cells so

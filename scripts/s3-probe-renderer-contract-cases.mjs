@@ -91,7 +91,7 @@ export async function verifyS3RendererBackendContract({ check, withObjectServer,
         f.connect(); f.binding.invalidate()
         assert.deepEqual(f.counts(), { nativeCalls: 0, requests: 0, bridgeReads: 0 }); assert.equal(gets, 0)
         const result = await f.binding.read(payload(endpoint, { key: '目录/e\u0301 %2F.json', sessionToken: 'PRIVATE_TOKEN' }))
-        publicOnly(result); assert.equal(result.state, 'readable'); assert.equal(result.serviceStatus, 200)
+        publicOnly(result); assert.equal(result.state, 'readable', JSON.stringify({ state: result.state, code: result.code, serviceStatus: result.serviceStatus, summary: result.summary })); assert.equal(result.serviceStatus, 200)
         assert.deepEqual(result.summary, { outcome: 'readable', httpStatus: 200, acceptedBytes: body.length })
         await f.drained(); assert.equal(gets, 1)
         assert.deepEqual(f.counts(), { nativeCalls: 1, requests: 1, bridgeReads: 1 })

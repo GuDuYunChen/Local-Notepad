@@ -565,6 +565,7 @@ export async function verifyTableOperationsDesktop(context) {
   await wheel(horizontalPoint, -1000, 0)
   await until(async () => (await frozenView()).scrollLeft <= 1, 'Native horizontal wheel did not return Table to its first column')
   const horizontalBefore = await frozenView()
+  report.frozenScroll.horizontal = { before: horizontalBefore }; save()
   assert.ok(horizontalBefore.scrollWidth - horizontalBefore.clientWidth > 40, 'Wide Table fixture does not exercise real horizontal overflow')
   await wheel(horizontalPoint, 120, 0)
   const horizontalAfter = await until(async () => {

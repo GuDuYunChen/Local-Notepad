@@ -753,7 +753,7 @@
 
 /* Inline cell colours and saved widths take precedence over document defaults. */
 .editor-input .editor-table .editor-table-cell[style*="width"] {
-  min-width: 70px;
+  min-width: var(--table-cell-preview-width, var(--table-cell-width, 70px));
   max-width: none;
 }
 
