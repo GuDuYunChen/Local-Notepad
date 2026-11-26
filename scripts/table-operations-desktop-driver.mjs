@@ -41,6 +41,61 @@ export function tableOperationSeed(marker) {
   ] } })
 }
 
+// A new renderer profile can initially be light while the retained installed
+// backend is dark. Opening the menu mounts ThemeToggle and starts its async
+// settings read. Wait for its public, persisted and rendered state to agree
+// before deciding whether a native click is needed. This is an acceptance
+// prerequisite; unavailable storage or an uninitialized fallback is not proof
+// that the product's fallback theme is defective.
+export async function ensureTableDarkTheme({ evaluate, click, until, report, save }) {
+  const selector = '.theme-toggle[aria-label="切换主题"]'
+  const observe = () => evaluate(`(() => {
+    const nodes=[...document.querySelectorAll(${q(selector)})],button=nodes.length===1?nodes[0]:null
+    const theme=document.documentElement.getAttribute('data-theme'),colorScheme=document.documentElement.style.colorScheme
+    let storedTheme=null,storageReadable=true
+    try{storedTheme=localStorage.getItem('localNotepad.theme.v1')}catch{storageReadable=false}
+    const title=button?.getAttribute('title')||null,disabled=!!button&&(button.matches(':disabled')||button.getAttribute('aria-disabled')==='true')
+    const ready=storageReadable&&['light','dark'].includes(storedTheme)&&storedTheme===theme&&colorScheme===theme&&
+      nodes.length===1&&!disabled&&title===(theme==='light'?'切换为深色主题':'切换为浅色主题')
+    return {theme,colorScheme,storedTheme,storageReadable,buttonCount:nodes.length,title,disabled,ready}
+  })()`)
+  const receipt = report.themeTransition = {
+    inputStart: report.nativeInputs.length, inputEnd: null,
+    before: null, ready: null, last: null, after: null,
+    clickRequired: null, clicked: false, complete: false,
+  }
+  try {
+    // One original until owns initialization and the final dark assertion;
+    // do not add another deadline, a fixed sleep, or repeated toggle clicks.
+    await until(async () => {
+      const state = await observe(); receipt.last = state
+      if (!receipt.before) { receipt.before = state; save() }
+      if (!receipt.ready) {
+        if (!state.ready) return false
+        receipt.ready = state; receipt.clickRequired = state.theme === 'light'
+        if (receipt.clickRequired) receipt.clickInputStart = report.nativeInputs.length
+        save()
+        if (receipt.clickRequired) {
+          await click(selector)
+          receipt.clicked = true; receipt.clickInputEnd = report.nativeInputs.length
+          return false
+        }
+      }
+      if (!state.ready || state.theme !== 'dark') return false
+      receipt.after = state; receipt.inputEnd = report.nativeInputs.length; receipt.complete = true
+      save()
+      return true
+    }, 'Actual Table dark theme did not settle')
+    return receipt
+  } catch (error) {
+    receipt.inputEnd = report.nativeInputs.length; receipt.error = String(error.message || error)
+    // Keep the latest read even when initialization fails. Evidence persistence
+    // must not replace the original deadline or native-input failure.
+    try { save() } catch (failure) { receipt.saveError = String(failure.message || failure) }
+    throw error
+  }
+}
+
 // This driver is shared by packaged and installed applications. It never reads
 // private Lexical state, dispatches synthetic Table/input events, sets input
 // values, or replaces transport/timers. Library refresh is the existing setup
@@ -584,9 +639,8 @@ export async function verifyTableOperationsDesktop(context) {
   assert.equal((await api(largeRoute)).content, largeSaved)
   mark('native-minimum-window-menu-is-reachable')
   await click('.workspace-sidebar-more[aria-label="更多功能"]')
-  if (await evaluate("document.documentElement.getAttribute('data-theme')!=='dark'")) await click('.theme-toggle[aria-label="切换主题"]')
+  await ensureTableDarkTheme({ evaluate, click, until, report, save })
   await click('.workspace-sidebar-more[aria-label="更多功能"]')
-  await until(() => evaluate("document.documentElement.getAttribute('data-theme')==='dark'"), 'Actual Table dark theme did not settle')
   await menu(79, 1)
   report.darkMenu = await menuView()
   report.darkMenu.theme = await evaluate("document.documentElement.getAttribute('data-theme')")
