@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
 import { contrastRatio } from '../src/services/localAppearance.js'
+import { countLexicalCharacters } from '../src/utils/lexicalText.js'
 
 export const TABLE_OPERATIONS_CHECKS = Object.freeze([
   'native-insertion-cancel-and-create', 'native-cell-edit-and-exact-save',
@@ -609,6 +610,28 @@ export async function verifyTableOperationsDesktop(context) {
   const largeSaved = await checkpoint('large-saved', value => tableTextRows(value)[79][2].endsWith('-tail-saved'), largeRoute)
   const largeExpected = tableTextRows(large.content); largeExpected[79][2] += '-tail-saved'
   assert.deepEqual(tableTextRows(largeSaved), largeExpected)
+  const expectedStatusCount = countLexicalCharacters(largeSaved)
+  const statusCount = () => evaluate("document.querySelector('.status-right > span:last-child')?.textContent?.trim()||null")
+  await until(async () => await statusCount() === expectedStatusCount.toLocaleString() + ' 字', 'Actual editor status-bar character count did not match the saved long Table')
+  // Start from the top so the last-row result must drive native scroll navigation.
+  await wheel(await point('.editor-input table'), 0, -10000)
+  await until(async () => (await frozenView()).scrollTop <= 1, 'Long Table did not return to its first row before search')
+  const searchInputStart = report.nativeInputs.length
+  await key('f', 70, 2)
+  await until(() => evaluate("!!document.querySelector('.document-search input[aria-label=\"查找内容\"]')"), 'Native document search did not open')
+  await click('.document-search input[aria-label="查找内容"]')
+  await type('LONG-80-3-value-tail-saved')
+  await until(() => evaluate("document.querySelector('.document-search .search-count')?.textContent==='1/1'"), 'Native search did not find the unique final-row marker')
+  const searchVisible = await until(() => evaluate(`(() => {
+    const table=document.querySelector('.editor-input table'),target=table?.rows[79]?.cells[2]?.querySelector('p')
+    if(!table||!target)return null
+    const view=table.getBoundingClientRect(),match=target.getBoundingClientRect(),top=view.top+table.clientTop,bottom=top+table.clientHeight
+    return table.scrollTop>0&&match.height>0&&match.top>=top-1&&match.bottom<=bottom+1
+      ?{scrollTop:table.scrollTop,matchTop:match.top,matchBottom:match.bottom,viewportTop:top,viewportBottom:bottom,text:target.textContent}:null
+  })()`), 'Search found the final row but did not reveal its actual matching paragraph')
+  report.searchNavigation = { inputStart: searchInputStart, inputEnd: report.nativeInputs.length, match: searchVisible,
+    statusCount: { expected: expectedStatusCount, actual: await statusCount() } }; save()
+  await click('.document-search button[aria-label="关闭文内查找"]')
   await menu(79, 1)
   await capture('table-native-long.png'); await key('Escape', 27)
   mark('large-long-text-table-keeps-final-row-identity')
