@@ -546,9 +546,9 @@ export async function verifyTableOperationsDesktop(context) {
   const verticalAfter = await until(async () => {
     const view = await frozenView(); return view.scrollTop - verticalBefore.scrollTop > 20 && view
   }, 'Real native wheel did not scroll the frozen table vertically')
+  report.frozenScroll = { vertical: { before: verticalBefore, after: verticalAfter } }; save()
   assert.ok(Math.abs(verticalAfter.headTop - verticalBefore.headTop) <= 1)
   assert.ok(verticalBefore.normalTop - verticalAfter.normalTop > 20)
-  report.frozenScroll = { vertical: { before: verticalBefore, after: verticalAfter } }; save()
   assert.equal((await api(largeRoute)).content, large.content, 'Frozen scrolling changed persisted Table state')
   await click(cellSelector(79, 2) + ' p'); await key('End', 35); await type('-tail-saved')
   const largeSaved = await checkpoint('large-saved', value => tableTextRows(value)[79][2].endsWith('-tail-saved'), largeRoute)
@@ -570,9 +570,9 @@ export async function verifyTableOperationsDesktop(context) {
   const horizontalAfter = await until(async () => {
     const view = await frozenView(); return view.scrollLeft - horizontalBefore.scrollLeft > 20 && view
   }, 'Real native wheel did not scroll the frozen table horizontally')
+  report.frozenScroll.horizontal = { before: horizontalBefore, after: horizontalAfter }; save()
   assert.ok(Math.abs(horizontalAfter.headLeft - horizontalBefore.headLeft) <= 1)
   assert.ok(horizontalBefore.normalLeft - horizontalAfter.normalLeft > 20)
-  report.frozenScroll.horizontal = { before: horizontalBefore, after: horizontalAfter }; save()
   await menu(79, 1)
   const menuView = () => evaluate(`(() => {const node=document.querySelector('.table-action-menu'),r=node?.getBoundingClientRect();return r?{left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:innerWidth,height:innerHeight,overflow:document.documentElement.scrollWidth>innerWidth+1}:null})()`)
   report.smallMenu = await menuView()
