@@ -42,6 +42,26 @@ export function isTableSelectionActive(editor) {
   return !!editor && !!tableSelectionOwners.get(editor)?.active
 }
 
+// Queued work inside bulk selection belongs to that exact mode session.
+// Changing selected cells does not end it, but leaving and re-entering does.
+export function captureTableSelectionSession(editor) {
+  const owner = tableSelectionOwner(editor), epoch = owner.epoch, startedActive = owner.active
+  return () => startedActive && owner.active && owner.epoch === epoch
+}
+
+// Session persistence reads the suspended caret without making it writable.
+// The owner validates the original nodes in the caller's editor-state read.
+export function registerTableSelectionSessionRange(editor, readRange) {
+  const owner = tableSelectionOwner(editor)
+  owner.readSessionRange = readRange
+  return () => { if (owner.readSessionRange === readRange) owner.readSessionRange = null }
+}
+
+export function getTableSelectionSessionRange(editor) {
+  const owner = tableSelectionOwners.get(editor)
+  return owner?.active ? owner.readSessionRange?.() ?? null : null
+}
+
 // A pending insertion must not revive after the user enters bulk selection
 // and later leaves it. Document/editability validity is checked by its caller.
 export function captureTableSelectionWrite(editor) {

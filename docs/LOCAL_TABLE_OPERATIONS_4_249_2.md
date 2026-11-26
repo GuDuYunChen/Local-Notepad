@@ -76,7 +76,7 @@ paginate/autoFitWindow/autoFitContent/borderPreset` 分支没有可达产品入�
 | 代码块控件按键写入旧表格光标 | 即使关闭补全，Lexical 的默认键处理仍会作用于保留的单元格选区；仅在焦点确属当前编辑器的实际代码块输入/按钮时阻止 Lexical 继续处理，保留原生默认行为、DOM 冒泡、F6 与全局保存快捷键 |
 | 单元格内无法为整表创建块引用 | 旧 getTopLevelElement 停在单元格内部；引用来源改为文档根下的整张 Table，并以完整表格保存字节复核，不能只验证一个单元格 |
 | 菜单仍引用已替换的文字节点 | 行列结构未变不代表文字端点仍存在；真实正文更新使菜单同步失效，纯选区更新不关闭菜单 |
-| 中文输入法在 beforeinput 之前破坏旧文字选区 | 非可取消的 compositionstart 已触发 Lexical 替换；提前消费组合事件并把原生输入焦点移到批量控件，同时隔离随后 input/end 的旧目标回写 |
+| 中文输入法仍修改多选前的文字光标 | 浏览器在 compositionstart 后继续使用保留的原生文字范围，单独阻止事件和转移焦点不足以阻止默认组合编辑；组合开始时同步解除原生及 Lexical 文字选区，把原端点保存在受文档/编辑会话约束的恢复票据中，显式完成时仅恢复仍有效的位置，不回填正文 |
 | 菜单关闭/只读/换文档后旧回调 | 打开时捕获会话和结构，执行前重验；Escape/键盘导航/焦点移出按同一规则处理 |
 | Excel 空表、超范围或重复读入 | 复用原导入预算，展开前验证实际有效区域；高起始行的一格数据不误报空表；一次读入原子提交 |
 | Excel 读取期间位置改变或正文更新 | 保留启动插入点；正文更新、换文档、只读、卸载时拒绝旧任务 |
@@ -146,6 +146,35 @@ fixture 摘要完全一致；后者为 83,835ms，前者为 90,137ms，最后一
 原件、预算和全部检查保留，最终产品仍需以最新修复提交通过整套 Windows 门禁。
 原生 Table 流程在原 IME 隔离之后另验证真实命令面板的搜索、Enter 拒绝反馈及
 Ctrl+S 后完整 JSON 不变；原 14 项检查、9 张截图和 180 秒业务预算保持。
+
+Windows run `45744705933`（HEAD `fc5c71ee376557e5137f24ffa5f026e3d3c20438`）
+的完整未过滤测试和 Windows 打包内原 90 秒控件检查通过；真实 Table 流程中，
+保留的 R1C3 文字范围、原生 pointer 多选及五类普通输入/整份 JSON 保存均通过。
+随后原生 `Input.imeSetComposition` 仍将未选中的 R1C3 可见内容改为“表”，
+并使焦点停留在编辑器。artifact `15083128432`（123424 bytes，SHA-256
+`3ebeb8f1bd7f955040109e14793c18b7c2a45948a21f5f64a732a4f776ac8516`）
+及原始失败截图保留；此轮没有通过后续 IME 保存、升级或安装包验收。
+
+锁定的 Electron 31.7.7 对应 Chromium 126.0.6478.234。该版本
+[InputMethodController](https://github.com/chromium/chromium/blob/126.0.6478.234/third_party/blink/renderer/core/editing/ime/input_method_controller.cc)
+在派发 compositionstart 后继续调用默认组合编辑，不以事件的取消结果判断是否停止。
+[TypingCommand](https://github.com/chromium/chromium/blob/126.0.6478.234/third_party/blink/renderer/core/editing/commands/typing_command.cc)
+重新读取当前 FrameSelection，范围为空时才停止插入。Lexical 的 MutationObserver
+会独立接收仍然发生的 DOM 文字变化，随后选区协调可能重新聚焦正文。
+因此该修复同步解除两份选区，只在明确完成且位置仍有效时恢复；文档、阅读模式、
+卸载、原端点变化或新的文字选区取得所有权后，旧票据不能恢复。
+原有光标会话继续通过既有路径序列化器读取仍有效的挂起位置，避免被拒输入后
+直接刷新或切换笔记丢失位置；这个只读读取不恢复可写选区，不改变存储格式。
+排队的组合处理和退出恢复还绑定各自的模式代次，退出后重进不能复活旧回调。
+原有页面会话的两帧恢复也校验调度时的同一代次，并在实际更新回调内复核，
+防止旧帧重新打开已解除的可写范围，或覆盖退出多选后用户新选中的文字位置。
+
+新增完整 Editor 回归使用真实 UiButton 和 DOM 选区，不手工改正文即可证明旧实现
+只转移焦点仍保留可写范围。另一独立回归按已核对的 Blink 默认编辑过程建立模型，
+由真正的 Lexical MutationObserver 接收 DOM 变化；它明确属于模拟环境中的机制测试，
+不代替 Windows 验收。jsdom 的 button.focus 会自动折叠 DOM 选区，不能用于证明
+旧实现安全；该差异、原测试日志和新增修复前反例均保留。原生驱动的焦点、内容、
+完整 JSON、普通 IME 正向对照及全部原断言继续保留。
 
 新插表 integration 使用 jsdom 的异步 `selectionchange`，保持原生 TablePlugin、
 HistoryPlugin 和撤销断言；只补该环境缺失的 Range 几何接口。happy-dom 同步

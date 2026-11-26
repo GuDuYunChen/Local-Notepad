@@ -1,14 +1,14 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { useLexicalEditable } from '@lexical/react/useLexicalEditable'
-import { $createParagraphNode, $createTextNode, $getNearestNodeFromDOMNode, $getNodeByKey, $getSelection, HISTORY_PUSH_TAG } from 'lexical'
+import { $createParagraphNode, $createTextNode, $getNearestNodeFromDOMNode, $getNodeByKey, $getSelection, $isElementNode, $isRangeSelection, $isTextNode, $setSelection, HISTORY_PUSH_TAG } from 'lexical'
 import { $isTableCellNode, TableCellHeaderStates } from '@lexical/table'
 import { toast } from '~/services/toast'
 import { useEditorWriteScope } from '../hooks/useEditorWriteScope'
 import { isShortcutContextBlocked, matchShortcut, shortcutLabel } from '~/services/localShortcuts'
 import useLocalShortcuts from '~/hooks/useLocalShortcuts'
 import { UiButton } from '~/components/ui/ControlKit'
-import { dispatchTableEvent, isTableEventForEditor, isTableTextFormattingShortcut, setTableSelectionActive } from '../utils/tableEvents'
+import { captureTableSelectionSession, captureTableSelectionWrite, dispatchTableEvent, isTableEventForEditor, isTableTextFormattingShortcut, registerTableSelectionSessionRange, setTableSelectionActive } from '../utils/tableEvents'
 import { $getTableModel, $resolveTableCell, $insertRowAtCell, $insertColumnAtCell, $deleteRowAtCell, $deleteColumnAtCell, $mergeTableCells, $splitTableCell, $moveTableRow, $moveTableColumn } from '../utils/tableModel'
 
 // Retain coordinate-based helpers for existing callers. Live selection keeps
@@ -125,6 +125,20 @@ function $serialize(node) {
   return value
 }
 
+function $rangeEndpoint(point) {
+  const node = $getNodeByKey(point.key)
+  if (!node?.isAttached() || !Number.isSafeInteger(point.offset) || point.offset < 0) return null
+  const cell = [node, ...node.getParents()].find($isTableCellNode)
+  const identity = { key: point.key, type: point.type, parent: node.getParent()?.getKey(), cell: cell?.getKey() }
+  if (point.type === 'text' && $isTextNode(node) && point.offset <= node.getTextContentSize()) return { ...identity, text: node.getTextContent() }
+  if (point.type === 'element' && $isElementNode(node) && point.offset <= node.getChildrenSize()) return { ...identity, children: node.getChildrenKeys() }
+  return null
+}
+function $canRestoreRange(ticket) {
+  return JSON.stringify($rangeEndpoint(ticket.selection.anchor)) === JSON.stringify(ticket.anchor) &&
+    JSON.stringify($rangeEndpoint(ticket.selection.focus)) === JSON.stringify(ticket.focus)
+}
+
 export default function TableSelectionPlugin({ documentId }) {
   const [editor] = useLexicalComposerContext()
   const { bindings } = useLocalShortcuts()
@@ -133,7 +147,7 @@ export default function TableSelectionPlugin({ documentId }) {
   const [active, setActive] = useState(false), [groups, setGroups] = useState([]), [busy, setBusy] = useState(false)
   const [geometry, setGeometry] = useState({ outlines: [], top: 10, add: null })
   const activeRef = useRef(false), groupsRef = useRef([]), dragRef = useRef(null), epochRef = useRef(0), busyRef = useRef(null)
-  const hoverRef = useRef(null), handlersRef = useRef({})
+  const hoverRef = useRef(null), handlersRef = useRef({}), suspendedRangeRef = useRef(null)
 
   const replaceGroups = useCallback(next => {
     if (JSON.stringify(next) === JSON.stringify(groupsRef.current)) return
@@ -141,19 +155,37 @@ export default function TableSelectionPlugin({ documentId }) {
   }, [])
   const reset = useCallback(() => {
     epochRef.current += 1; activeRef.current = false; groupsRef.current = []; dragRef.current = null; hoverRef.current = null; busyRef.current = null
+    suspendedRangeRef.current = null
     setTableSelectionActive(editor, false)
     setActive(false); setGroups([]); setBusy(false); setGeometry({ outlines: [], top: 10, add: null })
   }, [editor])
   const exit = useCallback(() => {
+    const suspended = suspendedRangeRef.current
     reset(); dispatchTableEvent(editor, 'tableSelection:mode', false)
-    if (editor.isEditable()) editor.focus()
+    if (!editor.isEditable()) return
+    const canRestoreSession = captureTableSelectionWrite(editor)
+    const root = editor.getRootElement()
+    if (canRestoreSession() && suspended?.canWrite() && suspended.root === root && editor.getEditorState().read(() => $getSelection() === null && $canRestoreRange(suspended))) {
+      // Focus belongs to the explicit finish action. Restore only a still-owned
+      // text position, never text content or a delayed browser Range snapshot.
+      const focusOwner = root.ownerDocument.activeElement
+      editor.update(() => {
+        if (!canRestoreSession() || !suspended.canWrite() || suspended.root !== editor.getRootElement() || root.ownerDocument.activeElement !== focusOwner || $getSelection() !== null || !$canRestoreRange(suspended)) return
+        root.focus({ preventScroll: true })
+        $setSelection(suspended.selection.clone())
+      }, { discrete: true })
+    } else editor.focus()
   }, [editor, reset])
   useLayoutEffect(() => {
     reset()
+    const unregisterRange = registerTableSelectionSessionRange(editor, () => {
+      const ticket = suspendedRangeRef.current
+      return ticket?.canWrite() && ticket.root === editor.getRootElement() && $getSelection() === null && $canRestoreRange(ticket) ? ticket.selection : null
+    })
     const unregister = editor.registerEditableListener(editable => {
       if (!editable) { reset(); dispatchTableEvent(editor, 'tableSelection:mode', false) }
     })
-    return () => { epochRef.current += 1; busyRef.current = null; activeRef.current = false; setTableSelectionActive(editor, false); unregister() }
+    return () => { epochRef.current += 1; busyRef.current = null; activeRef.current = false; suspendedRangeRef.current = null; setTableSelectionActive(editor, false); unregisterRange(); unregister() }
   }, [editor, documentId, reset])
 
   const run = (operation, canWrite = beginWrite()) => {
@@ -389,6 +421,11 @@ export default function TableSelectionPlugin({ documentId }) {
         reset(); dispatchTableEvent(editor, 'tableSelection:mode', false)
         return
       }
+      if (suspendedRangeRef.current) {
+        const ticket = suspendedRangeRef.current
+        if (!ticket.canWrite() || editorState.read(() => $getSelection() !== null ||
+          ((dirtyElements.size || dirtyLeaves.size) && !$canRestoreRange(ticket)))) suspendedRangeRef.current = null
+      }
       const token = busyRef.current
       if (token?.snapshot && !token.applying && !token.cancelled && (dirtyElements.size || dirtyLeaves.size)) {
         editorState.read(() => {
@@ -469,9 +506,22 @@ export default function TableSelectionPlugin({ documentId }) {
       const onCompositionStart = event => {
         if (!ownsInput(event)) return
         refuseTextInput(event)
-        // compositionstart and composition input are not necessarily
-        // cancelable. Move native IME focus out of the editable surface before
-        // it can replace the retained text range, even before beforeinput.
+        const canWrite = beginWrite(), ownsSession = captureTableSelectionSession(editor)
+        editor.update(() => {
+          if (!ownsSession() || !canWrite() || editor.getRootElement() !== root) return
+          const selection = $getSelection()
+          if (!suspendedRangeRef.current && $isRangeSelection(selection)) {
+            const anchor = $rangeEndpoint(selection.anchor), focus = $rangeEndpoint(selection.focus)
+            if (anchor && focus) suspendedRangeRef.current = { selection: selection.clone(), anchor, focus, canWrite, root }
+          }
+          $setSelection(null)
+        }, { discrete: true })
+        // Chromium continues its non-cancelable IME default after this event.
+        // Button focus alone leaves the old FrameSelection writable. Clear it
+        // synchronously even if Lexical had to queue the update above, and keep
+        // its own selection null so reconciliation cannot refocus that range.
+        const domSelection = root.ownerDocument.getSelection()
+        if (domSelection && root.contains(domSelection.anchorNode) && root.contains(domSelection.focusNode)) domSelection.removeAllRanges()
         focusModeControl(false)
       }
       const onEditorKey = event => {
