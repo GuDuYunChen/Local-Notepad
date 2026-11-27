@@ -35,6 +35,8 @@ jobs:
           remote=$(git ls-remote origin refs/heads/fix/local-ui-consistency-2f116 | cut -f1)
           test "$remote" = "$GITHUB_SHA"
           git diff --exit-code
+      - name: Verify committed dependency lock
+        run: node scripts/verify-dependency-lock.mjs
       - name: Install committed lock without changing dependencies
         run: npm ci --no-audit --no-fund
       - name: Migrate every tracked production control and isolate legacy paint
