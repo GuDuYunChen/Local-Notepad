@@ -21,6 +21,8 @@ jobs:
           run-id: 42183541578
           name: complete-ui-migration-75a663aba9358da335f127e45d67f26134e9a1cc
           path: prior-evidence
+      - name: Verify committed dependency lock
+        run: node scripts/verify-dependency-lock.mjs
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Read original failures and source drivers without re-running tests
         run: node scripts/inspect-ui-migration-failures.mjs

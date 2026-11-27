@@ -4,6 +4,7 @@ import { restoreEditorHistory } from '~/services/versionHistory.mjs'
 import { countLexicalCharacters } from '~/utils/lexicalText'
 import { normalizeLegacyTableBreakMarkup } from '~/services/legacyContentCompatibility'
 import { hasHeadingStructureChanged } from './Editor/utils/referenceUtils'
+import { isTableEventForRoot } from './Editor/utils/tableEvents'
 import {
   readEditorDraft,
   readEditorDraftDurable,
@@ -76,6 +77,7 @@ function TextEditorInternal({
   const [structureDirty, setStructureDirty] = useState(false)
   const [dragOver, setDragOver] = useState(false)
   const statusRef = useRef(null)
+  const surfaceRef = useRef(null)
   const pendingStructureMappingsRef = useRef([])
   const [editorContent, setEditorContent] = useState('')
   const [editorMode, setEditorMode] = useState(loadEditorMode)
@@ -672,13 +674,19 @@ function TextEditorInternal({
     }
     apply()
     window.addEventListener('resize', apply)
-    const onMode = (e) => setSelMode(!!e.detail)
+    const onMode = (e) => {
+      const root = surfaceRef.current?.querySelector('[data-lexical-editor="true"]')
+      if (!isTableEventForRoot(root, e)) return
+      setSelMode(e.detail === true)
+    }
     window.addEventListener('tableSelection:mode', onMode)
     return () => {
       window.removeEventListener('resize', apply)
       window.removeEventListener('tableSelection:mode', onMode)
     }
   }, [])
+
+  useEffect(() => { setSelMode(false) }, [activeId, editorMode])
 
   const toggleEditorMode = () => {
     const nextMode = editorMode === 'reading' ? 'editing' : 'reading'
@@ -794,6 +802,7 @@ function TextEditorInternal({
 
   return (
     <div
+      ref={surfaceRef}
       className={switching ? 'content switching' : 'content'}
       style={{ display: 'flex', flexDirection: 'column', height: '100%' }}
       onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}

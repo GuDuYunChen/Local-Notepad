@@ -7,6 +7,8 @@ import {
 } from 'lexical'
 import { $patchStyleText } from '@lexical/selection'
 import { UiButton } from '~/components/ui/ControlKit'
+import { isTableSelectionActive } from '../utils/tableEvents'
+import { toast } from '~/services/toast'
 
 
 export default function FloatingTextToolbarPlugin() {
@@ -23,6 +25,7 @@ export default function FloatingTextToolbarPlugin() {
   })
 
   const updateToolbar = useCallback(() => {
+    if (isTableSelectionActive(editor)) { setVisible(false); return }
     const rootElement = editor.getRootElement()
     const domSelection = window.getSelection()
 
@@ -114,7 +117,7 @@ export default function FloatingTextToolbarPlugin() {
     // the font combobox or changing Lexical's Tab indentation semantics.
     const enterSelectedToolbar = (event) => {
       if (event.defaultPrevented || event.repeat || event.key !== 'F10' || !event.altKey ||
-          event.ctrlKey || event.metaKey || event.shiftKey || !editor.isEditable()) return
+          event.ctrlKey || event.metaKey || event.shiftKey || !editor.isEditable() || isTableSelectionActive(editor)) return
       const rootElement = editor.getRootElement()
       if (!rootElement?.contains(event.target)) return
       const selected = window.getSelection()
@@ -140,13 +143,24 @@ export default function FloatingTextToolbarPlugin() {
     event.preventDefault()
   }
 
+  const ensureFormattingAllowed = () => {
+    if (!editor.isEditable()) return false
+    if (isTableSelectionActive(editor)) {
+      toast.warning('请先点击“完成”退出单元格多选，再使用文字格式工具')
+      return false
+    }
+    return true
+  }
+
   const toggleFormat = (format) => {
+    if (!ensureFormattingAllowed()) return
     editor.dispatchCommand(FORMAT_TEXT_COMMAND, format)
     editor.focus()
     window.requestAnimationFrame(updateToolbar)
   }
 
   const toggleHighlight = () => {
+    if (!ensureFormattingAllowed()) return
     editor.update(() => {
       const selection = $getSelection()
       if (!$isRangeSelection(selection)) return

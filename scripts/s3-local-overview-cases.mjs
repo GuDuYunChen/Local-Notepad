@@ -352,9 +352,10 @@ export function registerS3LocalOverviewTests(test) {
     // 2F.104: reviewed durable-cache generation/commit/deadline handling and
     // the editor's read-side revision recheck and backup warning/retry.
     // saveNow, CAS/receipt service, 30s autosave and the quit participant stay
-    // unchanged. Preserve all six exact LF-normalized source pins.
+    // unchanged. 4.249.2 only scopes/resets the Table selection status listener
+    // and adds its surface ref; retain all six exact LF-normalized source pins.
     for (const [file, expected] of [
-      ['src/components/TextEditor.jsx', '403e77f72a20a40ea42e350fea3f34e3bd4c86957869e119327f9a1cefac4e9a'],
+      ['src/components/TextEditor.jsx', '7b0333410d25082826c5b357949dd944a0f14d361bf8e2e500208527fd5dff87'],
       ['src/services/editorDraftCache.js', '8f464fe90922201c29c7acb334065397f3efe1971f918d77eb55b356924eddc4'],
       ['src/services/editorSaveTransaction.mjs', 'b449dad16834a936fbd5fad318352c961e160e11723cb6627d6a47714d4d36e2'],
       ['src/services/editorQuit.mjs', 'abc21ea59352fede521e6ce6f6904f67af8f3d00b2378efae6a5e6b45c48c205'],

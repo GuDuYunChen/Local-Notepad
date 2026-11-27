@@ -1,0 +1,539 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import { readFileSync } from 'node:fs'
+import { JSDOM } from 'jsdom'
+import { TABLE_OPERATIONS_BUDGET_MS, TABLE_OPERATIONS_CHECKS, observeTableSearchRange, tableFromContent, tableOperationSeed } from './table-operations-desktop-driver.mjs'
+import { TABLE_OPERATIONS_VERSION, TABLE_OPERATIONS_SOURCES, TABLE_OPERATIONS_SCREENSHOTS,
+  tableOperationsHash, validateTableOperationsReport } from './table-operations-evidence.mjs'
+import { tableOperationsUntil } from './run-table-operations-desktop.mjs'
+import { countLexicalCharacters } from '../src/utils/lexicalText.js'
+
+// Synthetic reports test refusal rules only. They never constitute a native
+// application, installation, screenshot, or persistence acceptance receipt.
+function syntheticReport() {
+  const clone = value => structuredClone(value)
+  const rowValues = Array.from({ length: 3 }, (_, row) => Array.from({ length: 3 }, (_, col) => `R${row + 1}C${col + 1}`))
+  const cell = (value, width = 120) => ({ type: 'tablecell', version: 1, colSpan: 1, rowSpan: 1, headerState: 0, backgroundColor: null, width,
+    children: [{ type: 'paragraph', version: 1, children: [{ type: 'text', version: 1, text: value }] }] })
+  const table = { type: 'table', version: 1, colWidths: [120, 160, 200], rowStriping: false, frozenRowCount: 0, frozenColumnCount: 0,
+    children: rowValues.map(values => ({ type: 'tablerow', version: 1, children: values.map((value, col) => cell(value, [120, 160, 200][col])) })) }
+  const doc = table => JSON.stringify({ root: { type: 'root', version: 1, children: [clone(table)] } })
+  const view = table => ({ tables: 1, editable: 'true', rootFocused: true, modebarFocused: false, selection: '',
+    characterCount: { locale: 'en-US', text: new Intl.NumberFormat('en-US').format(countLexicalCharacters(doc(table))) + ' 字' },
+    rows: table.children.map(row => row.children.map(cell => ({
+    text: cell.children.map(paragraph => paragraph.children.map(text => text.text).join('')).join(''), background: 'rgb(207, 244, 252)',
+  }))) })
+  const sources = Object.fromEntries(TABLE_OPERATIONS_SOURCES.map(name => [name, 'b'.repeat(40)]))
+  const report = {
+    schemaVersion: 1, module: 'notepad-table', version: TABLE_OPERATIONS_VERSION, productCommit: 'a'.repeat(40), verifierCommit: 'a'.repeat(40),
+    platform: 'win32', runnerEnvironment: 'github-hosted', scope: 'packaged', app: { packaged: true, version: TABLE_OPERATIONS_VERSION },
+    complete: true, cleanupComplete: true, realBackend: true, realPreload: true, syntheticData: true, backendStopped: true,
+    bridgeOverridden: false, timerAccelerated: false, forceTerminated: false, businessBudgetMs: TABLE_OPERATIONS_BUDGET_MS, businessElapsedMs: 70000,
+    pid: 500, executable: 'C:\\synthetic\\Local-Notepad.exe', executableSHA256: 'c'.repeat(64), asarSHA256: 'd'.repeat(64), backendSHA256: 'e'.repeat(64),
+    exit: { pid: 500, code: 0, signal: null, normalClose: true }, sourceFiles: sources, checks: [...TABLE_OPERATIONS_CHECKS],
+    fixture: { mainID: 'main', destinationID: 'destination', largeID: 'large' }, snapshots: {},
+    nativeInputs: Array.from({ length: 101 }, (_, index) => ({ sequence: index + 1, method: 'Input.dispatchMouseEvent', type: 'mouseMoved', x: 30, y: 60 })),
+    requests: [
+      { path: '/api/files/main', method: 'PUT', status: 200, postData: 'initial' },
+      { path: '/api/files/main', method: 'PUT', status: null, postData: '-offline-retry', failure: { errorText: 'net::ERR_BLOCKED_BY_CLIENT' } },
+      { path: '/api/files/main', method: 'PUT', status: 200, postData: '-offline-retry' },
+    ],
+    screenshots: TABLE_OPERATIONS_SCREENSHOTS.map(filename => ({ filename, bytes: 12000, sha256: 'f'.repeat(64) })),
+  }
+  const set = (name, table) => { const content = doc(table); report.snapshots[name] = { content, sha256: tableOperationsHash(content), ui: view(table) } }
+  set('initial', table)
+  const addedRow = clone(table); addedRow.children.splice(1, 0, { type: 'tablerow', children: [cell(''), cell(''), cell('')] })
+  set('insert-row', addedRow); set('delete-row', table)
+  const addedColumn = clone(table); addedColumn.children.forEach(row => row.children.splice(1, 0, cell('')))
+  set('insert-column', addedColumn); set('delete-column', table)
+  const rowMoved = clone(table); rowMoved.children.splice(1, 0, rowMoved.children.shift())
+  set('menu-row-move', rowMoved); set('menu-row-undo', table)
+  const columnMoved = clone(table); columnMoved.children.forEach(row => row.children.splice(1, 0, row.children.shift()))
+  set('menu-column-move', columnMoved); set('menu-column-undo', table)
+  const putInputs = (start, inputs) => inputs.forEach((input, offset) => {
+    report.nativeInputs[start + offset] = { sequence: start + offset + 1, ...input }
+  })
+  const keyInputs = (key, windowsVirtualKeyCode, modifiers = 0) => ['rawKeyDown', 'keyUp'].map(type => ({
+    method: 'Input.dispatchKeyEvent', type, key, windowsVirtualKeyCode, modifiers,
+  }))
+  const beforeIME = clone(table); beforeIME.children[2].children[2].children[0].children[0].text = ''
+  report.imeControl = { text: 'R3C3', snapshot: 'initial', before: view(beforeIME), composing: view(table), committed: view(table),
+    compositionInputStart: 4, compositionInputEnd: 5, commitInputStart: 5, commitInputEnd: 6, saveInputStart: 6, saveInputEnd: 8 }
+  putInputs(4, [
+    { method: 'Input.imeSetComposition', text: 'R3C3', selectionStart: 4, selectionEnd: 4 },
+    { method: 'Input.insertText', text: 'R3C3' }, ...keyInputs('s', 83, 2),
+  ])
+  const selectedView = { ...view(table), editable: 'true', rootFocused: true, selection: '已选择 2 个单元格',
+    selectionOutlineBackgrounds: ['rgba(0, 0, 0, 0)', 'rgba(0, 0, 0, 0)'] }
+  const retainedRange = { rootFocused: true, text: 'R1C3', anchor: { row: 0, column: 2, text: 'R1C3' }, focus: { row: 0, column: 2, text: 'R1C3' } }
+  report.selectionIsolation = {
+    source: { inputStart: 12, inputEnd: 18, ...clone(retainedRange) }, retainedRange: clone(retainedRange),
+    rectangle: { inputStart: 22, inputEnd: 26 }, selected: clone(selectedView), operations: [],
+    rangeStages: [
+      { stage: 'menu-opened', afterInput: 20, ...clone(retainedRange), rootFocused: false },
+      { stage: 'mode-entered', afterInput: 22, ...clone(retainedRange) },
+      { stage: 'rectangle-started', afterInput: 24, ...clone(retainedRange) },
+      { stage: 'rectangle-moved', afterInput: 25, ...clone(retainedRange) },
+    ],
+  }
+  putInputs(12, [
+    ...['mousePressed', 'mouseReleased'].map(type => ({ method: 'Input.dispatchMouseEvent', type, x: 270, y: 60 })),
+    ...keyInputs('Home', 36), ...keyInputs('End', 35, 8),
+  ])
+  putInputs(22, [
+    { type: 'mouseMoved', x: 30, buttons: 0 }, { type: 'mousePressed', x: 30, buttons: 1 },
+    { type: 'mouseMoved', x: 150, buttons: 1 }, { type: 'mouseReleased', x: 150, buttons: 0 },
+  ].map(input => ({ method: 'Input.dispatchMouseEvent', y: 120, button: input.type === 'mouseMoved' && !input.buttons ? 'none' : 'left', ...input })))
+  let inputIndex = 26
+  for (const [name, inputs] of [
+    ['insert-text', [{ method: 'Input.insertText', text: 'TABLE-SELECTION-INPUT-MUST-NOT-WRITE' }]],
+    ['backspace', keyInputs('Backspace', 8)], ['delete', keyInputs('Delete', 46)],
+    ['enter', keyInputs('Enter', 13)], ['cut', keyInputs('x', 88, 2)],
+  ]) {
+    const snapshot = 'selection-input-' + name
+    set(snapshot, table); report.snapshots[snapshot].ui = clone(selectedView)
+    const operation = { name, snapshot, inputStart: inputIndex, inputEnd: inputIndex + inputs.length,
+      before: clone(selectedView), after: clone(selectedView), saveInputStart: inputIndex + inputs.length, saveInputEnd: inputIndex + inputs.length + 2 }
+    report.selectionIsolation.operations.push(operation)
+    putInputs(inputIndex, inputs); putInputs(operation.saveInputStart, keyInputs('s', 83, 2))
+    inputIndex = operation.saveInputEnd
+  }
+  const imeModebarView = { ...clone(selectedView), rootFocused: false, modebarFocused: true }
+  const ime = { before: clone(selectedView), composing: clone(imeModebarView), committed: clone(imeModebarView), snapshot: 'selection-input-ime',
+    compositionInputStart: inputIndex, compositionInputEnd: inputIndex + 1, commitInputStart: inputIndex + 1, commitInputEnd: inputIndex + 2,
+    saveInputStart: inputIndex + 2, saveInputEnd: inputIndex + 4 }
+  report.selectionIsolation.ime = ime
+  putInputs(inputIndex, [{ method: 'Input.imeSetComposition', text: '表', selectionStart: 1, selectionEnd: 1 },
+    { method: 'Input.insertText', text: '表' }, ...keyInputs('s', 83, 2)])
+  set('selection-input-ime', table); report.snapshots['selection-input-ime'].ui = clone(imeModebarView)
+  inputIndex = ime.saveInputEnd
+  const paletteWarning = '请先点击“完成”退出单元格多选，再输入或修改正文'
+  const closedPalette = { ...clone(selectedView), rootFocused: false, modebarFocused: false,
+    dialogCount: 0, searchInputFocused: false, query: null, options: [], warnings: [] }
+  const dividerOption = { label: '分割线', selected: true, disabled: false }
+  const palette = {
+    label: '编辑器命令', query: 'divider', command: '分割线', feedback: paletteWarning, snapshot: 'selection-input-palette',
+    launcher: { label: '编辑器命令', disabled: false, left: 20, top: 40, width: 30, height: 30 },
+    before: { ...clone(closedPalette), modebarFocused: true },
+    opened: { ...clone(closedPalette), dialogCount: 1, searchInputFocused: true, query: '', options: [clone(dividerOption)] },
+    filtered: { ...clone(closedPalette), dialogCount: 1, searchInputFocused: true, query: 'divider', options: [clone(dividerOption)] },
+    after: { ...clone(closedPalette), warnings: [paletteWarning] },
+    inputStart: inputIndex, inputEnd: inputIndex + 7, openInputStart: inputIndex, openInputEnd: inputIndex + 2,
+    queryInputStart: inputIndex + 2, queryInputEnd: inputIndex + 3, executeInputStart: inputIndex + 3, executeInputEnd: inputIndex + 5,
+    saveInputStart: inputIndex + 5, saveInputEnd: inputIndex + 7,
+  }
+  report.selectionIsolation.palette = palette
+  putInputs(inputIndex, [
+    ...['mousePressed', 'mouseReleased'].map(type => ({ method: 'Input.dispatchMouseEvent', type, x: 35, y: 55, button: 'left', clickCount: 1 })),
+    { method: 'Input.insertText', text: 'divider' }, ...keyInputs('Enter', 13), ...keyInputs('s', 83, 2),
+  ])
+  set(palette.snapshot, table); report.snapshots[palette.snapshot].ui = clone(palette.after)
+  const paletteInputCount = palette.inputEnd - palette.inputStart
+  const colored = clone(table); colored.children[1].children.slice(0, 2).forEach(cell => { cell.backgroundColor = '#fff3cd' })
+  set('selected-background', colored)
+  const merged = clone(colored); merged.children[1].children[0].colSpan = 2
+  merged.children[1].children[0].children.push(...merged.children[1].children[1].children); merged.children[1].children.splice(1, 1)
+  set('merged', merged)
+  const split = clone(merged); split.children[1].children[0].colSpan = 1; split.children[1].children.splice(1, 0, cell(''))
+  set('split', split); set('split-undo', merged); set('merge-undo', colored)
+  const cleared = clone(colored)
+  cleared.children[1].children.slice(0, 2).forEach(cell => { cell.children[0].children = [] })
+  set('clipboard-copied', colored); set('clipboard-cleared', cleared); set('clipboard-pasted', colored)
+  set('clipboard-paste-undo', cleared); set('clipboard-clear-undo', colored); set('clipboard-clear-redo', cleared); set('clipboard-paste-redo', colored)
+  report.clipboard = { method: 'native-copy-and-paste-buttons', selection: '已选择 2 个单元格',
+    copy: { label: '复制', feedback: '已复制所选单元格', inputStart: 54 + paletteInputCount, inputEnd: 56 + paletteInputCount },
+    paste: { label: '粘贴', feedback: '已粘贴到所选区域', inputStart: 58 + paletteInputCount, inputEnd: 60 + paletteInputCount },
+  }
+  const styled = clone(colored); styled.rowStriping = true; styled.frozenRowCount = 1; styled.frozenColumnCount = 1
+  styled.children[0].children[1].backgroundColor = '#cff4fc'
+  styled.children.forEach((row, r) => row.children.forEach((cell, c) => { cell.headerState = (r === 0 ? 1 : 0) ^ (c === 0 ? 2 : 0) }))
+  set('styled', styled); report.styledView = { ...view(styled), rowStriping: true, frozenRow: 'true', frozenColumn: 'true' }
+  const rowDragged = clone(styled); rowDragged.children.push(rowDragged.children.shift())
+  set('row-dragged', rowDragged); set('row-drag-undo', styled); set('row-drag-redo', rowDragged); set('row-drag-restored', styled)
+  const columnDragged = clone(styled); columnDragged.children.forEach(row => row.children.push(row.children.shift()))
+  set('column-dragged', columnDragged); set('column-drag-undo', styled); set('column-drag-redo', columnDragged); set('column-drag-restored', styled)
+  set('resize-cancelled', styled)
+  const resized = clone(styled); resized.colWidths[0] = 170; resized.children.forEach(row => { row.children[0].width = 170 })
+  set('resized', resized); set('resize-undo', styled); set('resize-redo', resized)
+  const fitted = clone(resized); fitted.colWidths[0] = 90; fitted.children.forEach(row => { row.children[0].width = 90 })
+  set('autofit', fitted); set('autofit-repeat', fitted); set('autofit-undo', resized); set('autofit-redo', fitted)
+  const retried = clone(fitted); retried.children[2].children[2].children[0].children[0].text += '-offline-retry'
+  report.failedSave = { persisted: doc(fitted), visible: view(retried), duplicateSaveKeys: 2, requestStartIndex: 1, successfulWrites: 1 }; set('retried', retried)
+  report.reloaded = { content: doc(retried), sha256: tableOperationsHash(doc(retried)), ui: view(retried), originBefore: 1, originAfter: 2 }
+  const large = clone(table)
+  large.children = Array.from({ length: 80 }, (_, row) => ({ type: 'tablerow', children: [cell(`LONG-${row + 1}-1-` + 'long'.repeat(36)), cell(`LONG-${row + 1}-2-value`), cell(`LONG-${row + 1}-3-value`)] }))
+  report.largeSeed = { content: doc(large), sha256: tableOperationsHash(doc(large)) }
+  large.children[79].children[2].children[0].children[0].text += '-tail-saved'; set('large-saved', large)
+  large.children[79].children[1].backgroundColor = '#cff4fc'; set('large-dark-saved', large)
+  report.smallMenu = { left: 20, right: 258, top: 10, bottom: 380, width: 704, height: 455, overflow: false }
+  report.darkMenu = { ...report.smallMenu, theme: 'dark' }; report.minimumWindow = { pid: report.pid, applied: true, width: 720, height: 520 }
+  report.darkCell = { text: 'LONG-80-2-value', foreground: 'rgb(0, 0, 0)', background: 'rgb(207, 244, 252)' }
+  report.frozenScroll = {
+    vertical: { before: { scrollTop: 0, headTop: 100, normalTop: 140 }, after: { scrollTop: 120, headTop: 100, normalTop: 20 } },
+    horizontal: { before: { scrollLeft: 0, scrollWidth: 800, clientWidth: 500, headLeft: 100, normalLeft: 340 }, after: { scrollLeft: 120, headLeft: 100, normalLeft: 220 } },
+  }
+  report.saved = { main: { id: 'main', content: doc(retried) }, large: { id: 'large', content: doc(large) }, destination: { id: 'destination', content: tableOperationSeed('synthetic destination') } }
+  report.nativeInputs[1] = { sequence: 2, method: 'Input.dispatchKeyEvent', type: 'rawKeyDown', key: 'Escape' }
+  report.nativeDrags = []
+  for (const [kind, inputStart, target] of [['row', 70 + paletteInputCount, { x: 30, y: 240 }], ['col', 82 + paletteInputCount, { x: 270, y: 60 }]]) {
+    const source = { x: 30, y: 60, width: 26 }, data = { items: [{ mimeType: 'application/x-local-notepad-table-reorder', data: 'real-start-token-placeholder-' + kind }], dragOperationsMask: 16 }
+    report.nativeDrags.push({ kind, inputStart, inputEnd: inputStart + 8, source, target, completed: true,
+      intercepted: [{ afterInputSequence: inputStart + 4, data: clone(data) }] })
+    putInputs(inputStart, [
+      { method: 'Input.dispatchMouseEvent', type: 'mouseMoved', x: 90, y: 50, buttons: 0, button: 'none' },
+      { method: 'Input.dispatchMouseEvent', type: 'mouseMoved', ...source, buttons: 0, button: 'none' },
+      { method: 'Input.dispatchMouseEvent', type: 'mousePressed', ...source, buttons: 1, button: 'left', clickCount: 1 },
+      { method: 'Input.dispatchMouseEvent', type: 'mouseMoved', x: source.x + 9, y: source.y + 9, buttons: 1, button: 'left' },
+      ...['dragEnter', 'dragOver', 'drop'].map(type => ({ method: 'Input.dispatchDragEvent', type, ...target, data: clone(data) })),
+      { method: 'Input.dispatchMouseEvent', type: 'mouseReleased', ...target, buttons: 0, button: 'left', clickCount: 1 },
+    ])
+  }
+  for (const start of [report.clipboard.copy.inputStart, report.clipboard.paste.inputStart]) for (const [offset, type] of ['mousePressed', 'mouseReleased'].entries()) {
+    report.nativeInputs[start + offset] = { sequence: start + offset + 1, method: 'Input.dispatchMouseEvent', type, x: 30, y: 60 }
+  }
+  const query = 'LONG-80-3-value'
+  const searchView = visible => {
+    const rect = visible ? { left: 450, right: 590, top: 300, bottom: 320 } : { left: 660, right: 800, top: 21000, bottom: 21020 }
+    const points = [[(rect.left + rect.right) / 2, (rect.top + rect.bottom) / 2],
+      [rect.left + 1, rect.top + 1], [rect.right - 1, rect.top + 1],
+      [rect.left + 1, rect.bottom - 1], [rect.right - 1, rect.bottom - 1]]
+      .map(([x, y]) => ({ x, y, owned: visible, tag: visible ? 'SPAN' : null }))
+    return { source: visible ? 'css-highlight' : 'native-dom-range', connected: true, matches: 1, text: query,
+      start: { row: 79, column: 2, offset: 0, inTarget: true }, end: { row: 79, column: 2, offset: query.length, inTarget: true },
+      rect, rectCount: 1, viewport: { width: 1008, height: 655 }, clip: { left: 100, right: 650, top: 100, bottom: 430 },
+      clips: [{ table: true, x: true, y: true, left: 100, right: 650, top: 100, bottom: 500 },
+        { table: false, x: false, y: true, left: 80, right: 800, top: 80, bottom: 430 }],
+      points, inside: visible, visible, scrollTop: visible ? 21000 : 120, scrollLeft: visible ? 210 : 0,
+      query: visible ? query : null, queryFocused: visible, count: visible ? '1/1' : null }
+  }
+  const searchStart = report.nativeInputs.length, match = searchView(true)
+  report.searchNavigation = { query, before: searchView(false), last: clone(match), match, complete: true, closed: true,
+    inputStart: searchStart, openInputEnd: searchStart + 2, queryInputStart: searchStart + 2, queryInputEnd: searchStart + 3,
+    inputEnd: searchStart + 3, closeInputStart: searchStart + 3, closeInputEnd: searchStart + 5,
+    contentAfter: report.largeSeed.content, sha256: report.largeSeed.sha256,
+    statusCount: { expected: countLexicalCharacters(report.largeSeed.content),
+      actual: new Intl.NumberFormat('en-US').format(countLexicalCharacters(report.largeSeed.content)) + ' 字', locale: 'en-US' } }
+  putInputs(searchStart, [...keyInputs('f', 70, 2), { method: 'Input.insertText', text: query }, ...keyInputs('Escape', 27)])
+  return { report, expected: { commit: 'a'.repeat(40), sources } }
+}
+
+test('synthetic complete reports exercise the Table acceptance validator without claiming native execution', () => {
+  const { report, expected } = syntheticReport()
+  assert.equal(validateTableOperationsReport(report, expected), true)
+})
+
+test('displayed Table counts follow the renderer locale independently of the verifier process locale', () => {
+  const { report, expected } = syntheticReport()
+  for (const snapshot of Object.values(report.snapshots)) {
+    snapshot.ui.characterCount = { locale: 'de-DE', text: new Intl.NumberFormat('de-DE').format(countLexicalCharacters(snapshot.content)) + ' 字' }
+  }
+  report.searchNavigation.statusCount.locale = 'de-DE'
+  report.searchNavigation.statusCount.actual = new Intl.NumberFormat('de-DE').format(report.searchNavigation.statusCount.expected) + ' 字'
+  assert.equal(validateTableOperationsReport(report, expected), true)
+})
+
+// A DOM geometry model verifies the read-only observer and its source of
+// truth. These synthetic rectangles and highlights are not Windows evidence.
+function searchObservationFixture() {
+  const dom = new JSDOM('<div class="content"><div class="editor-shell"><div class="editor-input"><table></table></div><section class="document-search"><input aria-label="查找内容"><span class="search-count">1/1</span></section></div></div>', { runScripts: 'outside-only' })
+  const { window } = dom, { document } = window, table = document.querySelector('table'), root = document.querySelector('.editor-input')
+  const query = 'LONG-80-3-value'
+  for (let row = 0; row < 80; row++) {
+    const tr = table.insertRow()
+    for (let col = 0; col < 3; col++) tr.insertCell().innerHTML = `<p><span>LONG-${row + 1}-${col + 1}-value</span></p>`
+  }
+  const target = table.rows[79].cells[2].querySelector('span'), node = target.firstChild, range = document.createRange()
+  range.setStart(node, 0); range.setEnd(node, query.length)
+  const highlights = new Map(), input = document.querySelector('input'), panel = document.querySelector('section')
+  window.CSS = { highlights }; input.value = query; input.focus()
+  table.style.overflowX = 'auto'; table.style.overflowY = 'auto'; root.style.overflowX = 'visible'; root.style.overflowY = 'hidden'
+  for (const [element, values] of [[table, { clientWidth: 500, clientHeight: 400 }], [root, { clientWidth: 600, clientHeight: 400 }]]) {
+    for (const [key, value] of Object.entries(values)) Object.defineProperty(element, key, { value, configurable: true })
+  }
+  table.getBoundingClientRect = () => ({ left: 100, top: 100 })
+  root.getBoundingClientRect = () => ({ left: 80, top: 0 })
+  let boxes = [{ left: 600, right: 740, top: 21000, bottom: 21020, width: 140, height: 20 }], hit = target
+  window.Range.prototype.getClientRects = () => boxes
+  const hits = []
+  document.elementFromPoint = (x, y) => { hits.push([x, y]); return hit }
+  const observe = fromHighlight => JSON.parse(JSON.stringify(window.eval(`(${observeTableSearchRange.toString()})(${JSON.stringify(query)},${fromHighlight})`)))
+  const show = () => {
+    boxes = [{ left: 220, right: 360, top: 220, bottom: 240, width: 140, height: 20 }]
+    table.scrollTop = 21000; table.scrollLeft = 200; highlights.set('notepad-document-find', new Set([range]))
+  }
+  return { dom, window, document, table, input, target, range, highlights, hits, observe, show,
+    boxes: value => { boxes = value }, cover: () => { hit = panel } }
+}
+
+test('search observer records the actual offscreen Range before search without scrolling or changing focus/content', () => {
+  const f = searchObservationFixture()
+  try {
+    const content = f.document.body.innerHTML, view = f.observe(false)
+    assert.equal(view.source, 'native-dom-range'); assert.equal(view.text, 'LONG-80-3-value')
+    assert.deepEqual(view.start, { row: 79, column: 2, offset: 0, inTarget: true })
+    assert.deepEqual(view.end, { row: 79, column: 2, offset: 15, inTarget: true })
+    assert.equal(view.visible, false); assert.equal(view.inside, false); assert.equal(f.table.scrollTop, 0)
+    assert.equal(f.table.scrollLeft, 0); assert.equal(f.document.activeElement, f.input)
+    assert.equal(f.document.body.innerHTML, content); assert.equal(f.highlights.size, 0); assert.equal(f.hits.length, 0)
+  } finally { f.dom.window.close() }
+})
+
+test('search observer accepts only the product Highlight and measures its text fragment against each clipping ancestor', () => {
+  const f = searchObservationFixture()
+  try {
+    const missing = f.observe(true)
+    assert.equal(missing.source, 'css-highlight'); assert.equal(missing.matches, 0); assert.equal(missing.visible, false)
+    f.show()
+    const view = f.observe(true)
+    assert.equal(view.source, 'css-highlight'); assert.equal(view.matches, 1); assert.equal(view.visible, true)
+    assert.equal(view.queryFocused, true); assert.equal(view.count, '1/1')
+    assert.deepEqual(view.clip, { left: 100, right: 600, top: 100, bottom: 400 })
+    assert.deepEqual(view.points.map(point => [point.x, point.y]), [[290, 230], [221, 221], [359, 221], [221, 239], [359, 239]])
+    assert.deepEqual(f.hits, view.points.map(point => [point.x, point.y]))
+    assert.equal(f.document.activeElement, f.input); assert.equal(f.table.scrollTop, 21000)
+  } finally { f.dom.window.close() }
+})
+
+test('search observer retains frozen-cell/panel occlusion and outer clipping rather than trusting Table-only coordinates', () => {
+  const f = searchObservationFixture()
+  try {
+    f.show(); f.cover()
+    const covered = f.observe(true)
+    assert.equal(covered.inside, true); assert.equal(covered.visible, false)
+    assert.equal(covered.points.length, 5); assert.ok(covered.points.every(point => !point.owned && point.tag === 'SECTION'))
+    f.boxes([{ left: 220, right: 360, top: 420, bottom: 440, width: 140, height: 20 }])
+    const clipped = f.observe(true)
+    assert.equal(clipped.inside, false); assert.equal(clipped.visible, false)
+    assert.ok(clipped.rect.bottom < clipped.clips.find(clip => clip.table).bottom)
+    assert.ok(clipped.rect.top > clipped.clip.bottom)
+  } finally { f.dom.window.close() }
+})
+
+test('search observer exposes wrong-cell and ambiguous highlights for strict rejection', () => {
+  const f = searchObservationFixture()
+  try {
+    f.show()
+    const wrong = f.document.createRange(), text = f.table.rows[0].cells[2].querySelector('span').firstChild
+    wrong.setStart(text, 0); wrong.setEnd(text, text.textContent.length)
+    f.highlights.set('notepad-document-find', new Set([wrong]))
+    const view = f.observe(true)
+    assert.equal(view.start.row, 0); assert.equal(view.start.inTarget, false); assert.notEqual(view.text, 'LONG-80-3-value')
+    f.highlights.set('notepad-document-find', new Set([f.range, wrong]))
+    const ambiguous = f.observe(true)
+    assert.equal(ambiguous.matches, 2); assert.equal(ambiguous.rect, null); assert.equal(ambiguous.visible, false)
+  } finally { f.dom.window.close() }
+})
+
+const changeSearchMatch = mutate => report => {
+  mutate(report.searchNavigation.match, report)
+  report.searchNavigation.last = structuredClone(report.searchNavigation.match)
+}
+
+const refusals = [
+  ['missing Table check', report => report.checks.pop()],
+  ['old version', report => { report.version = '4.249.1' }],
+  ['Linux substituted for Windows', report => { report.platform = 'linux' }],
+  ['fixture substituted for packaged app', report => { report.app.packaged = false }],
+  ['mocked backend', report => { report.realBackend = false }],
+  ['bridge replacement', report => { report.bridgeOverridden = true }],
+  ['accelerated timer', report => { report.timerAccelerated = true }],
+  ['force terminated app', report => { report.forceTerminated = true }],
+  ['unconfirmed cleanup', report => { report.cleanupComplete = false }],
+  ['relaxed business budget', report => { report.businessBudgetMs += 1000 }],
+  ['exceeded business budget', report => { report.businessElapsedMs = TABLE_OPERATIONS_BUDGET_MS }],
+  ['missing exact persisted snapshot', report => { delete report.snapshots['resize-undo'] }],
+  ['missing displayed character count', report => { delete report.snapshots['delete-row'].ui.characterCount }],
+  ['stale displayed count after an edit', report => { report.snapshots.retried.ui.characterCount = report.snapshots.initial.ui.characterCount }],
+  ['stale displayed count after deleting cells', report => { report.snapshots['clipboard-cleared'].ui.characterCount = report.snapshots['clipboard-copied'].ui.characterCount }],
+  ['missing renderer locale for displayed count', report => { delete report.snapshots['large-saved'].ui.characterCount.locale }],
+  ['Node-locale formatting substituted for renderer-locale count', report => { report.snapshots['large-saved'].ui.characterCount.locale = 'de-DE' }],
+  ['unhashed persisted JSON', report => { report.snapshots.initial.content += ' ' }],
+  ['fake successful failed save', report => { report.failedSave.persisted = report.snapshots.retried.content }],
+  ['wrong row restored by undo', report => { report.snapshots['row-drag-undo'] = report.snapshots['row-dragged'] }],
+  ['missing native selection isolation workflow', report => { delete report.selectionIsolation }],
+  ['missing native selection handoff observations', report => { delete report.selectionIsolation.rangeStages }],
+  ['range observations skip the native pointer movement', report => { report.selectionIsolation.rangeStages.pop() }],
+  ['range observation is attributed to a later native input', report => { report.selectionIsolation.rangeStages[2].afterInput += 1 }],
+  ['range observation omits native focus ownership', report => { delete report.selectionIsolation.rangeStages[1].rootFocused }],
+  ['missing actual native selection outlines', report => { report.selectionIsolation.selected.selectionOutlineBackgrounds = [] }],
+  ['opaque selection overlay covers text despite intact cell data', report => { report.selectionIsolation.selected.selectionOutlineBackgrounds[0] = 'rgb(233, 223, 209)' }],
+  ['collapsed old source range', report => { report.selectionIsolation.source.text = '' }],
+  ['old source range points at a bulk-selected cell', report => { report.selectionIsolation.retainedRange.anchor.row = 1 }],
+  ['bulk selection without a native drag', report => { report.nativeInputs[report.selectionIsolation.rectangle.inputStart + 2].buttons = 0 }],
+  ['selection input bypassed editor-root focus', report => { report.selectionIsolation.operations[0].before.rootFocused = false }],
+  ['selection input lost the two selected cells', report => { report.selectionIsolation.operations[0].after.selection = '已选择 1 个单元格' }],
+  ['missing destructive native key case', report => { report.selectionIsolation.operations.pop() }],
+  ['text input was never actually sent', report => { report.nativeInputs[report.selectionIsolation.operations[0].inputStart].text = '' }],
+  ['cut key omitted the Control modifier', report => { report.nativeInputs[report.selectionIsolation.operations[4].inputStart].modifiers = 0 }],
+  ['selected cell changed after blocked native input', report => { report.selectionIsolation.operations[1].after.rows[1][0].text = '' }],
+  ['unselected cell changed after blocked native input', report => { report.selectionIsolation.operations[2].after.rows[0][2].text = '' }],
+  ['selection input was not followed by native Save', report => { report.nativeInputs[report.selectionIsolation.operations[3].saveInputStart].key = 'Escape' }],
+  ['blocked native cut changed persisted JSON despite a valid checksum', report => {
+    const snapshot = report.snapshots['selection-input-cut'], value = JSON.parse(snapshot.content)
+    value.root.children[0].children[0].children[2].children[0].children[0].text = ''
+    snapshot.content = JSON.stringify(value); snapshot.sha256 = tableOperationsHash(snapshot.content)
+  }],
+  ['missing native IME positive control', report => { delete report.imeControl }],
+  ['ordinary IME did not actually insert candidate text', report => { report.imeControl.composing.rows[2][2].text = '' }],
+  ['ordinary IME commit duplicated candidate text', report => { report.imeControl.committed.rows[2][2].text = 'R3C3R3C3' }],
+  ['missing bulk IME isolation', report => { delete report.selectionIsolation.ime }],
+  ['IME candidate has incorrect protocol selection range', report => { report.nativeInputs[report.selectionIsolation.ime.compositionInputStart].selectionEnd = 0 }],
+  ['IME retained editor focus during bulk selection', report => { report.selectionIsolation.ime.composing.rootFocused = true }],
+  ['IME moved focus outside bulk controls', report => { report.selectionIsolation.ime.composing.modebarFocused = false }],
+  ['IME composition erased the old unselected text range', report => { report.selectionIsolation.ime.composing.rows[0][2].text = '\u200b' }],
+  ['IME commit wrote into a selected cell', report => { report.selectionIsolation.ime.committed.rows[1][0].text += '表' }],
+  ['IME changed persisted JSON despite a valid checksum', report => {
+    const snapshot = report.snapshots['selection-input-ime'], value = JSON.parse(snapshot.content)
+    value.root.children[0].children[0].children[2].children[0].children[0].text = '\u200b'
+    snapshot.content = JSON.stringify(value); snapshot.sha256 = tableOperationsHash(snapshot.content)
+  }],
+  ['missing native command palette isolation', report => { delete report.selectionIsolation.palette }],
+  ['palette receipt overlaps the existing IME save', report => { report.selectionIsolation.palette.inputStart -= 1 }],
+  ['palette opened without an actual native toolbar click', report => { report.selectionIsolation.palette.openInputEnd -= 1 }],
+  ['palette click targets the wrong toolbar label', report => { report.selectionIsolation.palette.launcher.label = '插入内容' }],
+  ['palette click lands outside the observed launcher', report => { report.nativeInputs[report.selectionIsolation.palette.openInputStart].x = 1000 }],
+  ['palette opens without focusing its actual search input', report => { report.selectionIsolation.palette.opened.searchInputFocused = false }],
+  ['palette query was not sent by native text input', report => { report.nativeInputs[report.selectionIsolation.palette.queryInputStart].method = 'Input.dispatchKeyEvent' }],
+  ['palette native input sends the wrong query', report => { report.nativeInputs[report.selectionIsolation.palette.queryInputStart].text = 'image' }],
+  ['palette observed search input contains the wrong query', report => { report.selectionIsolation.palette.filtered.query = 'image' }],
+  ['palette query resolves to multiple options', report => { report.selectionIsolation.palette.filtered.options.push({ label: '图片', selected: false, disabled: false }) }],
+  ['palette query resolves to the wrong option', report => { report.selectionIsolation.palette.filtered.options[0].label = '图片' }],
+  ['palette divider option was not selected for Enter', report => { report.selectionIsolation.palette.filtered.options[0].selected = false }],
+  ['palette divider option was disabled instead of exercising refusal', report => { report.selectionIsolation.palette.filtered.options[0].disabled = true }],
+  ['palette command was never executed by native Enter', report => { report.nativeInputs[report.selectionIsolation.palette.executeInputStart].key = 'Escape' }],
+  ['palette dialog remains open after refused content command', report => { report.selectionIsolation.palette.after.dialogCount = 1 }],
+  ['palette reuses a previous warning instead of observing new refusal', report => { report.selectionIsolation.palette.before.warnings.push(report.selectionIsolation.palette.feedback) }],
+  ['palette refusal has no observed warning', report => { report.selectionIsolation.palette.after.warnings = [] }],
+  ['palette refusal reports the wrong warning', report => { report.selectionIsolation.palette.feedback = '成功' }],
+  ['palette command loses the two selected cells', report => { report.selectionIsolation.palette.after.selection = '已选择 1 个单元格' }],
+  ['palette command alters retained unselected R1C3', report => { report.selectionIsolation.palette.after.rows[0][2].text = '' }],
+  ['palette refusal is not followed by native Save', report => { report.nativeInputs[report.selectionIsolation.palette.saveInputStart].modifiers = 0 }],
+  ['palette receipt omits the final Save release', report => { report.selectionIsolation.palette.inputEnd -= 1 }],
+  ['palette command inserts outside the table despite a valid JSON checksum', report => {
+    const snapshot = report.snapshots['selection-input-palette'], value = JSON.parse(snapshot.content)
+    value.root.children.push({ type: 'divider', version: 1 })
+    snapshot.content = JSON.stringify(value); snapshot.sha256 = tableOperationsHash(snapshot.content)
+  }],
+  ['missing native clipboard workflow', report => { report.checks = report.checks.filter(check => check !== 'native-clipboard-copy-clear-paste-and-history') }],
+  ['copy without a native click receipt', report => { report.clipboard.copy.inputEnd = report.clipboard.copy.inputStart }],
+  ['paste without real success feedback', report => { report.clipboard.paste.feedback = '' }],
+  ['clipboard clear did not remove selected content', report => { report.snapshots['clipboard-cleared'] = report.snapshots['clipboard-copied'] }],
+  ['paste restored the wrong cells', report => { report.snapshots['clipboard-pasted'] = report.snapshots['clipboard-cleared'] }],
+  ['clipboard undo lost the cleared state', report => { report.snapshots['clipboard-paste-undo'] = report.snapshots['clipboard-pasted'] }],
+  ['clipboard redo lost copied content', report => { report.snapshots['clipboard-paste-redo'] = report.snapshots['clipboard-cleared'] }],
+  ['lost final large row', report => {
+    const value = JSON.parse(report.snapshots['large-saved'].content); value.root.children[0].children.pop()
+    report.snapshots['large-saved'].content = JSON.stringify(value); report.snapshots['large-saved'].sha256 = tableOperationsHash(report.snapshots['large-saved'].content)
+  }],
+  ['missing actual native Table search workflow', report => { delete report.searchNavigation }],
+  ['incomplete native Table search', report => { report.searchNavigation.complete = false }],
+  ['search panel was not closed', report => { report.searchNavigation.closed = false }],
+  ['native find omitted Control', report => { report.nativeInputs[report.searchNavigation.inputStart].modifiers = 0 }],
+  ['find receipt omits its key release', report => { report.searchNavigation.openInputEnd -= 1 }],
+  ['search query was not typed natively', report => { report.nativeInputs[report.searchNavigation.queryInputStart].method = 'Input.dispatchKeyEvent' }],
+  ['search typed a different row marker', report => { report.nativeInputs[report.searchNavigation.queryInputStart].text = 'LONG-1-3-value' }],
+  ['search closing input was not Escape', report => { report.nativeInputs[report.searchNavigation.closeInputStart].key = 'Enter' }],
+  ['extra native clicks can reveal the match during search', report => { report.searchNavigation.inputEnd += 1 }],
+  ['search mutates the complete persisted JSON despite a valid hash', report => {
+    report.searchNavigation.contentAfter += ' '; report.searchNavigation.sha256 = tableOperationsHash(report.searchNavigation.contentAfter)
+  }],
+  ['search content has no exact checksum', report => { report.searchNavigation.sha256 = '0'.repeat(64) }],
+  ['search status count differs from its original document', report => { report.searchNavigation.statusCount.expected += 1 }],
+  ['search displays a stale status count', report => { report.searchNavigation.statusCount.actual = '0 字' }],
+  ['initial search target has no real Range', report => { report.searchNavigation.before.rectCount = 0 }],
+  ['search was already visible before native find', report => {
+    report.searchNavigation.before = { ...structuredClone(report.searchNavigation.match), source: 'native-dom-range', query: null, queryFocused: false, count: null }
+  }],
+  ['search before receipt incorrectly claims viewport visibility', report => { report.searchNavigation.before.visible = true }],
+  ['search proof substitutes a manual range for the real highlight', changeSearchMatch((view, report) => { view.source = 'native-dom-range' })],
+  ['search has multiple actual highlight ranges', changeSearchMatch((view, report) => { view.matches = 2 })],
+  ['search highlight belongs to a disconnected editor', changeSearchMatch((view, report) => { view.connected = false })],
+  ['search highlight selects the wrong cell', changeSearchMatch((view, report) => { view.start.column = 0 })],
+  ['search highlight crosses cell boundaries', changeSearchMatch((view, report) => { view.end.row = 78 })],
+  ['search highlight does not cover the exact query', changeSearchMatch((view, report) => { view.end.offset -= 1 })],
+  ['search range outside the target cell', changeSearchMatch((view, report) => { view.start.inTarget = false })],
+  ['search receipt only records the paragraph instead of the highlighted text', changeSearchMatch((view, report) => { view.text += '-tail-saved' })],
+  ['missing clipped Table viewport', changeSearchMatch((view, report) => { view.clips[0].table = false })],
+  ['search ignores an outer clipping ancestor', changeSearchMatch((view, report) => { view.clip.bottom = 500 })],
+  ['search has a non-finite observed range', changeSearchMatch((view, report) => { view.rect.left = NaN })],
+  ['search claims visibility while its range is outside the horizontal clip', changeSearchMatch(view => { view.clip.right = 500; view.clips[0].right = 500 })],
+  ['search records no hit-test points', changeSearchMatch((view, report) => { view.points = [] })],
+  ['search hit tests the cell centre instead of the text fragment', changeSearchMatch((view, report) => { view.points[0].x += 30 })],
+  ['search highlight is covered by a frozen cell or panel', changeSearchMatch((view, report) => { view.points[0].owned = false })],
+  ['search highlight corner is covered', changeSearchMatch((view, report) => { view.points[4].owned = false })],
+  ['search moved focus away from its query', changeSearchMatch((view, report) => { view.queryFocused = false })],
+  ['search query changed after the native input', changeSearchMatch((view, report) => { view.query = 'LONG-1-3-value' })],
+  ['search count did not confirm the unique marker', changeSearchMatch((view, report) => { view.count = '0 处' })],
+  ['search did not move toward the distant row', changeSearchMatch((view, report) => { view.scrollTop = report.searchNavigation.before.scrollTop })],
+  ['search last observation differs from the accepted highlight', report => { report.searchNavigation.last.visible = false }],
+  ['stale current sources', report => { report.sourceFiles[TABLE_OPERATIONS_SOURCES[0]] = '0'.repeat(40) }],
+  ['missing floating toolbar source pin', report => { delete report.sourceFiles['src/components/Editor/plugins/FloatingTextToolbarPlugin.jsx'] }],
+  ['stale floating toolbar source pin', report => { report.sourceFiles['src/components/Editor/plugins/FloatingTextToolbarPlugin.jsx'] = '0'.repeat(40) }],
+  ['missing editor shortcut source pin', report => { delete report.sourceFiles['src/components/Editor/plugins/EditorShortcutPlugin.jsx'] }],
+  ['stale editor shortcut source pin', report => { report.sourceFiles['src/components/Editor/plugins/EditorShortcutPlugin.jsx'] = '0'.repeat(40) }],
+  ['missing image paste source pin', report => { delete report.sourceFiles['src/components/Editor/plugins/PasteImagePlugin.jsx'] }],
+  ['stale image paste source pin', report => { report.sourceFiles['src/components/Editor/plugins/PasteImagePlugin.jsx'] = '0'.repeat(40) }],
+  ['missing shared image ownership source pin', report => { delete report.sourceFiles['src/components/Editor/hooks/useImageUploadSession.js'] }],
+  ['stale shared image ownership source pin', report => { report.sourceFiles['src/components/Editor/hooks/useImageUploadSession.js'] = '0'.repeat(40) }],
+  ...[
+    'src/components/Editor/plugins/CommandPalettePlugin.jsx', 'src/components/Editor/plugins/SlashMenuPlugin.jsx',
+    'src/components/Editor/plugins/CodeBlockPlugin.jsx',
+    'src/components/Editor/plugins/BlockHandlePlugin.jsx', 'src/components/Editor/plugins/DragDropPlugin.jsx',
+    'src/components/Editor/plugins/WikiLinkPlugin.jsx', 'src/components/Editor/plugins/MentionPlugin.jsx',
+    'src/components/Editor/plugins/BlockReferencePlugin.jsx', 'src/components/Editor/utils/blockRegistry.js',
+    'src/components/Editor/plugins/SearchPlugin.jsx', 'src/components/Editor/plugins/documentSearchLexical.jsx',
+    'src/components/Editor/utils/tableSearchVisibility.js', 'src/services/documentSearch.mjs',
+    'src/components/Editor/plugins/DocumentSearch.css', 'src/utils/lexicalText.js',
+  ].flatMap(source => [
+    ['missing Table content-entry source pin: ' + source, report => { delete report.sourceFiles[source] }],
+    ['stale Table content-entry source pin: ' + source, report => { report.sourceFiles[source] = '0'.repeat(40) }],
+  ]),
+  ['missing native input', report => { report.nativeInputs = [] }],
+  ['invented drag data', report => { report.nativeInputs[report.nativeDrags[0].inputStart + 6].data.items = [] }],
+  ['old native drag movement omitted its left button', report => { delete report.nativeInputs[report.nativeDrags[0].inputStart + 3].button }],
+  ['missing actual native drag interception', report => { report.nativeDrags[0].intercepted = [] }],
+  ['native drag interception predates the movement', report => { report.nativeDrags[0].intercepted[0].afterInputSequence -= 1 }],
+  ['drop data differs from the native interception', report => { report.nativeInputs[report.nativeDrags[1].inputStart + 6].data.items[0].data = 'invented-token' }],
+  ['drag receipt falsely claims a missing release', report => { report.nativeDrags[0].inputEnd -= 1 }],
+  ['no actual failed request', report => { report.requests = report.requests.filter(request => !request.failure) }],
+  ['duplicate successful retry writes', report => { report.requests.push({ ...report.requests[2] }) }],
+  ['unowned note write', report => { report.requests.push({ path: '/api/files/user-note', method: 'PUT', status: 200 }) }],
+  ['menu below native viewport', report => { report.smallMenu.bottom = 600 }],
+  ['horizontal document overflow', report => { report.smallMenu.overflow = true }],
+  ['frozen header moves with scrolling', report => { report.frozenScroll.vertical.after.headTop -= 120 }],
+  ['frozen column moves with scrolling', report => { report.frozenScroll.horizontal.after.headLeft -= 120 }],
+  ['no real horizontal overflow', report => { report.frozenScroll.horizontal.before.scrollWidth = 500 }],
+  ['light text on a light custom background in dark mode', report => { report.darkCell.foreground = 'rgb(240, 238, 243)' }],
+  ['missing screenshot', report => { report.screenshots.pop() }],
+]
+for (const [label, mutate] of refusals) test('rejects ' + label, () => {
+  const { report, expected } = syntheticReport()
+  expected.sources = structuredClone(expected.sources)
+  mutate(report)
+  assert.throws(() => validateTableOperationsReport(report, expected))
+})
+
+test('Table native wait propagates an uncertain action immediately without replaying it', async () => {
+  let attempts = 0
+  await assert.rejects(tableOperationsUntil(() => { attempts++; throw new Error('native action uncertain') }, 'must not retry', 1000), /native action uncertain/)
+  assert.equal(attempts, 1)
+})
+
+test('new Table gate uses trusted native input and preserves existing native control matrix and budget', () => {
+  assert.equal(TABLE_OPERATIONS_CHECKS.length, 14)
+  assert.equal(TABLE_OPERATIONS_SCREENSHOTS.length, 9)
+  assert.equal(TABLE_OPERATIONS_BUDGET_MS, 180000)
+  assert.equal(TABLE_OPERATIONS_SOURCES.length, 47)
+  // Keep every original source and its order; only the six relevant search
+  // and character-count sources are appended to the acceptance boundary.
+  assert.equal(tableOperationsHash(JSON.stringify(TABLE_OPERATIONS_SOURCES.slice(0, 41))), '9afc3509437073f8ef333df404afeba773e97212d78efde19d3e0ced0ecff5c6')
+  const driver = readFileSync(new URL('./table-operations-desktop-driver.mjs', import.meta.url), 'utf8')
+  assert.doesNotMatch(driver, /new\s+(?:MouseEvent|DragEvent|KeyboardEvent)|\.setEditorState\(|\.dispatchCommand\(|Object\.defineProperty|Emulation\.setDeviceMetricsOverride/)
+  assert.match(driver, /Input\.dragIntercepted/); assert.match(driver, /Input\.dispatchMouseEvent/)
+  assert.match(driver, /Network\.setBlockedURLs/); assert.match(driver, /Page\.reload/)
+  const original = readFileSync(new URL('./check-ui-control-render.cjs', import.meta.url), 'utf8')
+  assert.match(original, /\[\[704, 455\], \[1280, 800\], \[1920, 1080\]\]/)
+  assert.match(original, /BUDGET_MS\s*=\s*90000/)
+  const snapshot = syntheticReport().report.snapshots.initial.content
+  assert.equal(tableFromContent(snapshot).children.length, 3)
+})

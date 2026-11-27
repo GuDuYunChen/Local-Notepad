@@ -8,10 +8,12 @@ import {
   $isRangeSelection,
   $isTextNode,
   COMMAND_PRIORITY_HIGH,
-  KEY_ESCAPE_COMMAND,
+  KEY_DOWN_COMMAND,
 } from 'lexical'
 import { api, searchFiles } from '~/services/api'
 import { $createWikiLinkNode, WikiLinkNode } from '../nodes/WikiLinkNode'
+import { useEditorWriteScope } from '../hooks/useEditorWriteScope'
+import { captureTableSelectionWrite, isTableEventForEditor, isTableSelectionActive } from '../utils/tableEvents'
 import {
   extractHeadingReferences,
   formatSectionPath,
@@ -143,8 +145,9 @@ export function $insertWikiLinkAtSelection(file) {
   return true
 }
 
-export default function WikiLinkPlugin() {
+export default function WikiLinkPlugin({ documentId } = {}) {
   const [editor] = useLexicalComposerContext()
+  const captureWrite = useEditorWriteScope(editor, documentId)
   const isEditable = useLexicalEditable()
   const [isOpen, setIsOpen] = useState(false)
   const [queryInfo, setQueryInfo] = useState({
@@ -158,8 +161,10 @@ export default function WikiLinkPlugin() {
   const [position, setPosition] = useState({ top: 0, left: 0 })
   const requestRef = useRef(0)
   const menuRef = useRef(null)
+  const completionWrite = useRef(null)
 
   const close = useCallback(() => {
+    completionWrite.current = null
     setIsOpen(false)
     setQueryInfo({
       query: '',
@@ -173,23 +178,31 @@ export default function WikiLinkPlugin() {
   }, [])
 
   const insertLink = useCallback((file) => {
-    if (!editor.isEditable()) return
-    let inserted = false
+    const ticket = completionWrite.current
+    if (!ticket?.canWrite()) { close(); return }
     editor.update(() => {
-      if (!editor.isEditable()) return
-      inserted = $insertWikiLinkAtSelection(file)
-    })
-
-    if (inserted) {
+      if (completionWrite.current !== ticket || !ticket.canWrite()) return
+      const selection = $getSelection()
+      if (!$isRangeSelection(selection) || !selection.is(ticket.selection)) return
+      if (!$insertWikiLinkAtSelection(file)) return
       rememberReference(file)
       close()
       editor.focus()
-    }
+    })
   }, [editor, close])
 
   useEffect(() => editor.registerEditableListener(editable => {
     if (!editable) close()
   }), [editor, close])
+
+  useEffect(() => { close() }, [documentId, close])
+  useEffect(() => {
+    const onTableMode = event => {
+      if (event.detail === true && isTableEventForEditor(editor, event)) close()
+    }
+    window.addEventListener('tableSelection:mode', onTableMode)
+    return () => window.removeEventListener('tableSelection:mode', onTableMode)
+  }, [editor, close])
 
   useEffect(() => {
     if (!editor.hasNodes([WikiLinkNode])) {
@@ -198,7 +211,7 @@ export default function WikiLinkPlugin() {
     }
 
     return editor.registerUpdateListener(({ editorState }) => {
-      if (!editor.isEditable()) { close(); return }
+      if (!editor.isEditable() || isTableSelectionActive(editor)) { close(); return }
       editorState.read(() => {
         const selection = $getSelection()
         if (!$isRangeSelection(selection) || !selection.isCollapsed()) {
@@ -222,6 +235,8 @@ export default function WikiLinkPlugin() {
         if (!domSelection || domSelection.rangeCount === 0) return
 
         const rect = domSelection.getRangeAt(0).getBoundingClientRect()
+        const canWrite = captureWrite(), canUseSelection = captureTableSelectionWrite(editor)
+        completionWrite.current = { canWrite: () => canWrite() && canUseSelection(), selection: selection.clone() }
         setQueryInfo({
           query: match.query,
           noteQuery: match.noteQuery,
@@ -235,14 +250,16 @@ export default function WikiLinkPlugin() {
         })
       })
     })
-  }, [editor, close])
+  }, [editor, close, captureWrite])
 
   useEffect(() => {
     if (!isOpen || !isEditable) return undefined
 
     const requestId = ++requestRef.current
+    const ticket = completionWrite.current
     const trimmedQuery = queryInfo.query.trim()
     const timer = window.setTimeout(async () => {
+      if (!ticket?.canWrite()) return
       try {
         let nextResults
 
@@ -266,11 +283,11 @@ export default function WikiLinkPlugin() {
           nextResults = mergeUniqueResults(recent, list)
         }
 
-        if (requestRef.current !== requestId) return
+        if (requestRef.current !== requestId || !ticket.canWrite()) return
         setResults(nextResults)
         setSelectedIndex(0)
       } catch (error) {
-        if (requestRef.current === requestId) {
+        if (requestRef.current === requestId && ticket.canWrite()) {
           console.error('WikiLink 搜索失败', error)
           setResults([])
         }
@@ -283,47 +300,36 @@ export default function WikiLinkPlugin() {
   useEffect(() => {
     if (!isOpen) return undefined
 
-    // RichText handles Escape at the editor root before document listeners
-    // and blurs its caret. The active completion owns dismissal first, so
-    // the next editing shortcut still reaches this editor and its history.
-    return editor.registerCommand(KEY_ESCAPE_COMMAND, event => {
-      const root = editor.getRootElement()
-      if (!editor.isEditable() || editor.isComposing() || !event || event.isComposing || event.keyCode === 229 ||
-        !root?.contains(event.target) || !root.contains(root.ownerDocument.activeElement)) return false
-      event.preventDefault()
-      event.stopPropagation()
-      close()
-      return true
-    }, COMMAND_PRIORITY_HIGH)
-  }, [editor, isOpen, close])
-
-  useEffect(() => {
-    if (!isOpen) return undefined
-
-    const handleKeyDown = (event) => {
-      if (!editor.isEditable()) { close(); return }
+    // RichText and Table handle Enter/Tab at the root before document bubble
+    // listeners. Only the owned prose caret may execute the visible completion;
+    // decorator controls and composition keep their own keyboard behavior.
+    const handleKeyDown = event => {
+      if (!editor.isEditable() || !completionWrite.current?.canWrite()) { close(); return false }
+      const root = editor.getRootElement(), focused = root?.ownerDocument.activeElement
+      const target = event?.target?.nodeType === 1 ? event.target : event?.target?.parentElement
+      const control = node => node?.closest?.('input,textarea,select,button,[contenteditable="false"]')
+      if (!event || editor.isComposing() || event.isComposing || event.keyCode === 229 ||
+        !root?.contains(target) || !root.contains(focused) || control(target) || control(focused)) return false
       if (event.key === 'Escape') {
-        event.preventDefault()
         close()
-        return
-      }
-
-      if (results.length === 0) return
-
-      if (event.key === 'ArrowDown') {
-        event.preventDefault()
+      } else if (results.length === 0) return false
+      else if (event.key === 'ArrowDown') {
         setSelectedIndex(index => (index + 1) % results.length)
       } else if (event.key === 'ArrowUp') {
-        event.preventDefault()
         setSelectedIndex(index => (index - 1 + results.length) % results.length)
       } else if (event.key === 'Enter' || event.key === 'Tab') {
-        event.preventDefault()
         insertLink(results[selectedIndex])
-      }
+      } else return false
+      event.preventDefault()
+      event.stopPropagation()
+      return true
     }
-
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
+    const dismiss = event => {
+      if (event.key === 'Escape' && !editor.isComposing() && !event.isComposing && event.keyCode !== 229) close()
+    }
+    const unregister = editor.registerCommand(KEY_DOWN_COMMAND, handleKeyDown, COMMAND_PRIORITY_HIGH)
+    document.addEventListener('keydown', dismiss)
+    return () => { unregister(); document.removeEventListener('keydown', dismiss) }
   }, [editor, isOpen, results, selectedIndex, insertLink, close])
 
   useEffect(() => {

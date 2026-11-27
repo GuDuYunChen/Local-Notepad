@@ -1,4 +1,26 @@
-# Current repair: focus and hover stability / 4.249.1 candidate
+# Current module: complete Notepad Table operations / 4.249.2 candidate
+
+The user explicitly selected the whole Notepad Table workflow. Accepted master
+is `2e7418a00ba02a5c0f6eb2e0e58b0664b2044ec7` (4.249.1, PR32 accepted).
+Work on `fix/notepad-table-operations-4-249-2`; read
+`docs/LOCAL_TABLE_OPERATIONS_4_249_2.md`. The older current headings below are
+retained history, not unfinished scope. Keep main at its accepted identity.
+
+Preserve the actual Lexical 0.51.0 and Ant Design architecture, schema14,
+dependency graph and whole-document save/draft/quit policy. Cover existing
+insertion, cell/row/column operations, selection, clipboard, merge/split,
+resize/reorder, presentation and session restoration. Do not invent row-level
+APIs or sorting/filter/pagination features without existing product entry points.
+Keep all original assertions and negative/failed evidence. The original default
+Vitest, test:ui, Electron, Go and build gates, current product CI, independent
+Windows installation lifecycle and all existing native matrices remain required.
+Add real Table workflows without replacing existing gates or raising budgets.
+Current upgrade starts from the accepted 4.249.1 installer; preserve historical
+4.248.0-to-4.248.1 upgrade and all old binary pins. Only exact current-source and
+current-binary evidence plus independent review permits PR merge. Record final
+acceptance in the PR/evidence, not a status-only source commit.
+
+# Historical repair: focus and hover stability / 4.249.1 candidate
 
 Accepted master is `e9da2419e073af155d9a8458c8508ce8d03b600b` (4.249.0).
 PR29/Issue28 are accepted history. New user-reported focus rings and sidebar/notebook

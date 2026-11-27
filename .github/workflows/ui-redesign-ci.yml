@@ -43,7 +43,7 @@ jobs:
         run: git diff --exit-code -- package.json package-lock.json
 
       - name: Verify real-control drivers and current upgrade identity refusals
-        run: node --test scripts/fixture-antd-node-imports.node.mjs scripts/current-upgrade-input.node.mjs scripts/native-ui-select.node.mjs scripts/ui-control-render-evidence.node.cjs
+        run: node --test scripts/fixture-antd-node-imports.node.mjs scripts/current-upgrade-input.node.mjs scripts/native-ui-select.node.mjs scripts/ui-control-render-evidence.node.cjs scripts/table-operations-evidence.node.mjs scripts/table-operations-cleanup.node.mjs scripts/dependency-lock.node.mjs
 
       - name: Build Electron main/preload
         run: npm run build:main
@@ -433,6 +433,21 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+      # This is an additional full-application check. The original six native
+      # shared-control scenes and their 90-second budget above stay unchanged.
+      - name: Verify real packaged Table operations and persisted JSON
+        timeout-minutes: 5
+        run: node scripts/run-table-operations-desktop.mjs
+
+      - name: Upload complete or failed native Table evidence
+        if: always() && hashFiles('test-results/table-operations/table-operations.json') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-notepad-table-operations-${{ github.sha }}
+          path: test-results/table-operations/
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Verify parent-pipe shutdown on Windows
         env:
           NOTEPAD_TEST_BACKEND: server/bin/notepad-server.exe
@@ -511,9 +526,17 @@ jobs:
           name: local-notepad-windows-cd5b6381f9e10ba08e38747bc0e1db450435b738
           path: .installer-input/4.249.0
 
+      - name: Download exact accepted 4.249.1 installer
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 44460582379
+          name: local-notepad-windows-0908e77d5e5820f107a8b8e694831baaa280e4b1
+          path: .installer-input/4.249.1
+
       # Check the actual PR installer before the flaky historical-version quit path.
       # Both independent upgrades remain required; neither failure permits installer upload.
-      - name: Verify accepted 4.249.0 to actual current package in-place upgrade
+      - name: Verify accepted 4.249.1 to actual current package in-place upgrade
         shell: pwsh
         run: .\.github\scripts\windows-in-place-upgrade.ps1 -CurrentCandidate
 
@@ -626,8 +649,15 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
 
+      - name: Verify candidate dependency lock
+        run: node scripts/verify-dependency-lock.mjs
+
       - name: Install candidate locked dependencies
         run: npm ci --no-audit --no-fund
+
+      - name: Verify baseline dependency lock
+        working-directory: baseline
+        run: node scripts/verify-dependency-lock.mjs
 
       - name: Install baseline locked dependencies
         working-directory: baseline

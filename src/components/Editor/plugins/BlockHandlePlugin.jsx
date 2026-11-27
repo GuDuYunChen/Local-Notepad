@@ -6,7 +6,6 @@ import { $isListNode } from '@lexical/list'
 import { $isCodeNode } from '@lexical/code'
 import { $isTableNode } from '@lexical/table'
 import { blockRegistry, getBlockByType } from '../utils/blockRegistry'
-import { $getNearestBlockElementAncestorOrThrow } from '@lexical/utils'
 import { $generateJSONFromSelectedNodes, $generateNodesFromSerializedNodes } from '@lexical/clipboard'
 import './BlockHandlePlugin.css'
 import { getBlockHandleLayout, getBlockMenuPosition } from '../utils/blockHandleLayout.mjs'
@@ -14,6 +13,9 @@ import { removeCopiedBlockIds } from '../../../services/blockReferenceModel.mjs'
 import { $blockId, $setBlockId } from '../utils/blockReferenceState.js'
 import { BLOCK_TYPES } from '../../../services/blockReferenceModel.mjs'
 import { UiButton } from '~/components/ui/ControlKit'
+import { useEditorWriteScope } from '../hooks/useEditorWriteScope'
+import { captureTableSelectionWrite, isTableSelectionActive } from '../utils/tableEvents'
+import { toast } from '~/services/toast'
 
 
 let internalBlockClipboard = null
@@ -62,8 +64,9 @@ function getBlockTypeFromNode(node) {
   return 'paragraph'
 }
 
-export default function BlockHandlePlugin() {
+export default function BlockHandlePlugin({ documentId }) {
   const [editor] = useLexicalComposerContext()
+  const beginWrite = useEditorWriteScope(editor, documentId)
   const [isVisible, setIsVisible] = useState(false)
   const [position, setPosition] = useState({ top: 0, left: 0 })
   const [blockType, setBlockType] = useState('paragraph')
@@ -72,6 +75,7 @@ export default function BlockHandlePlugin() {
   const menuRef = useRef(null)
   const handleRef = useRef(null)
   const activeBlockRef = useRef(null)
+  const menuSessionRef = useRef(null)
 
   const readLayout = useCallback((element) => {
     const editorRoot = editor.getRootElement()
@@ -139,22 +143,30 @@ export default function BlockHandlePlugin() {
       return
     }
 
-    const hasRootAnchor = editor.getEditorState().read(() => {
+    const invalidBlockTarget = editor.getEditorState().read(() => {
       const lexicalSelection = $getSelection()
-      if (!$isRangeSelection(lexicalSelection)) return
+      if (!$isRangeSelection(lexicalSelection)) return true
 
       const anchorNode = lexicalSelection.anchor.getNode()
       // Root selections do not identify one block, even while the DOM range
       // still points at the previously selected paragraph.
       if (anchorNode.getKey() === 'root') return true
-      const blockNode = $getNearestBlockElementAncestorOrThrow(anchorNode)
+      // A TableCell is a shadow root: nearest-block and getTopLevelElement
+      // stop at its paragraph, while the displayed handle belongs to the
+      // whole root-level Table. Follow physical parents to the same DOM block.
+      let blockNode = anchorNode, parent = blockNode.getParent()
+      while (parent && parent.getKey() !== 'root') {
+        blockNode = parent
+        parent = blockNode.getParent()
+      }
+      if (!parent || editor.getElementByKey(blockNode.getKey()) !== element) return true
       const type = getBlockTypeFromNode(blockNode)
       setBlockType(type || 'paragraph')
       setBlockKey(blockNode.getKey())
       return false
     })
 
-    if (hasRootAnchor) {
+    if (invalidBlockTarget) {
       activeBlockRef.current = null
       setBlockKey('')
       placeControls(null)
@@ -226,8 +238,27 @@ export default function BlockHandlePlugin() {
     return $getNodeByKey(blockKey)
   }
 
-  const convertBlock = (newType) => {
+  const toggleMenu = () => {
+    if (showMenu) { setShowMenu(false); return }
+    const canRead = beginWrite(), ownsSelection = captureTableSelectionWrite(editor)
+    menuSessionRef.current = { canRead, canWrite: () => canRead() && ownsSelection() }
+    setShowMenu(true)
+  }
+
+  const writeBlock = (action) => {
+    const canWrite = menuSessionRef.current?.canWrite
+    setShowMenu(false)
+    if (!canWrite?.()) {
+      toast.warning(isTableSelectionActive(editor) ? '请先完成单元格多选，再编辑块内容' : '块操作已失效，请重新打开菜单')
+      return
+    }
     editor.update(() => {
+      if (canWrite()) action()
+    })
+  }
+
+  const convertBlock = (newType) => {
+    writeBlock(() => {
       const blockNode = getBlockNode()
       const block = getBlockByType(newType)
       if (!blockNode || !block || !block.createNode) return
@@ -254,13 +285,17 @@ export default function BlockHandlePlugin() {
       if (typeof newNode.selectStart === 'function') newNode.selectStart()
       setBlockKey(newNode.getKey())
     })
-    setShowMenu(false)
   }
 
   const serializeBlock = () => $serializeBlockClipboard(editor, getBlockNode())
 
   const copyBlock = () => {
+    // The explicit copy-current-block command is read-only and keeps its
+    // existing target even while cell groups own content writes.
+    const canRead = menuSessionRef.current?.canRead
+    if (!canRead?.()) { setShowMenu(false); return }
     editor.update(() => {
+      if (!canRead()) return
       const payload = serializeBlock()
       if (!payload) return
       setInternalBlockClipboard(payload)
@@ -287,23 +322,21 @@ export default function BlockHandlePlugin() {
     const payload = getInternalBlockClipboard()
     if (!payload) return
 
-    editor.update(() => {
+    writeBlock(() => {
       insertSerializedNodesAfter(payload)
     })
-    setShowMenu(false)
   }
 
   const duplicateBlock = () => {
-    editor.update(() => {
+    writeBlock(() => {
       const payload = serializeBlock()
       if (!payload) return
       insertSerializedNodesAfter(payload)
     })
-    setShowMenu(false)
   }
 
   const insertSibling = (position) => {
-    editor.update(() => {
+    writeBlock(() => {
       const blockNode = getBlockNode()
       if (!blockNode) return
 
@@ -312,11 +345,10 @@ export default function BlockHandlePlugin() {
       else blockNode.insertAfter(paragraph)
       paragraph.selectStart()
     })
-    setShowMenu(false)
   }
 
   const deleteBlock = () => {
-    editor.update(() => {
+    writeBlock(() => {
       const blockNode = getBlockNode()
       if (!blockNode) return
 
@@ -335,7 +367,6 @@ export default function BlockHandlePlugin() {
         nextFocus.selectStart()
       }
     })
-    setShowMenu(false)
   }
 
   if (!isVisible) return null
@@ -350,7 +381,7 @@ export default function BlockHandlePlugin() {
         style={{ top: `${position.top}px`, left: `${position.left}px` }}
         draggable={Boolean(blockKey)}
         data-block-key={blockKey}
-        onClick={() => setShowMenu(!showMenu)}
+        onClick={toggleMenu}
         aria-label="块操作与拖动排序"
         title="拖动排序 · 点击打开块操作"
       >

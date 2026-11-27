@@ -1,9 +1,13 @@
 import { useEffect, useRef } from 'react'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { $getRoot } from 'lexical'
+import { useEditorWriteScope } from '../hooks/useEditorWriteScope'
+import { captureTableSelectionWrite } from '../utils/tableEvents'
 
-export default function DragDropPlugin() {
+export default function DragDropPlugin({ documentId }) {
   const [editor] = useLexicalComposerContext()
+  const beginWrite = useEditorWriteScope(editor, documentId)
+  const dragWriteRef = useRef(null)
   const dragKeyRef = useRef('')
   const dragElementRef = useRef(null)
   const dropTargetRef = useRef(null)
@@ -25,12 +29,20 @@ export default function DragDropPlugin() {
       dragElementRef.current = null
       dropTargetRef.current = null
       dropPositionRef.current = 'before'
+      dragWriteRef.current = null
     }
 
     const handleDragStart = (event) => {
       const handle = event.target.closest('.block-handle')
       if (!handle) return
 
+      const canWriteDocument = beginWrite(), ownsSelection = captureTableSelectionWrite(editor)
+      const canWrite = () => canWriteDocument() && ownsSelection()
+      if (!canWrite()) {
+        event.preventDefault()
+        cleanup()
+        return
+      }
       const blockKey = handle.dataset.blockKey
       const blockElement = blockKey ? editor.getElementByKey(blockKey) : null
       if (!blockKey || !blockElement) {
@@ -39,6 +51,7 @@ export default function DragDropPlugin() {
       }
 
       dragKeyRef.current = blockKey
+      dragWriteRef.current = canWrite
       dragElementRef.current = blockElement
       blockElement.classList.add('block-being-dragged')
 
@@ -49,6 +62,12 @@ export default function DragDropPlugin() {
 
     const handleDragOver = (event) => {
       if (!dragKeyRef.current) return
+      if (!dragWriteRef.current?.()) {
+        event.preventDefault()
+        event.stopPropagation()
+        cleanup()
+        return
+      }
 
       const target = event.target.closest('.editor-input > *')
       if (!target || target === dragElementRef.current) return
@@ -72,6 +91,12 @@ export default function DragDropPlugin() {
 
       event.preventDefault()
 
+      const canWrite = dragWriteRef.current
+      if (!canWrite?.()) {
+        event.stopPropagation()
+        cleanup()
+        return
+      }
       const dragKey = dragKeyRef.current
       const targetElement = dropTargetRef.current
       const position = dropPositionRef.current
@@ -82,6 +107,7 @@ export default function DragDropPlugin() {
       }
 
       editor.update(() => {
+        if (!canWrite()) return
         const children = $getRoot().getChildren()
         const dragNode = children.find(child => child.getKey() === dragKey)
         const targetNode = children.find(child => editor.getElementByKey(child.getKey()) === targetElement)
@@ -111,7 +137,7 @@ export default function DragDropPlugin() {
       editorContainer.removeEventListener('drop', handleDrop, true)
       editorContainer.removeEventListener('dragend', handleDragEnd, true)
     }
-  }, [editor])
+  }, [editor, beginWrite])
 
   return null
 }

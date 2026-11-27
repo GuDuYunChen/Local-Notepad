@@ -355,9 +355,8 @@
   vertical-align: top;
 }
 
-.editor-input .editor-table tr:first-child .editor-table-cell,
 .editor-input .editor-table-cell-header {
-  background: var(--document-table-head) !important;
+  background: var(--document-table-head);
   font-weight: 600;
 }
 

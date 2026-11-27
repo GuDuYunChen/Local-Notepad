@@ -38,6 +38,8 @@ jobs:
           node scripts/apply-ui-recovery-candidate.mjs > test-results/ui-contract-repair/applied.json
           git diff --check
           git diff --exit-code -- package.json package-lock.json server electron
+      - name: Verify committed dependency lock
+        run: node scripts/verify-dependency-lock.mjs
       - name: Install committed dependencies without changing the lock
         run: |
           npm ci --no-audit --no-fund

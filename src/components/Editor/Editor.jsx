@@ -27,6 +27,7 @@ import TableSelectionPlugin from "./plugins/TableSelectionPlugin";
 import TableActionMenuPlugin from "./plugins/TableActionMenuPlugin";
 import TableColumnResizePlugin from "./plugins/TableColumnResizePlugin";
 import TableReorderPlugin from "./plugins/TableReorderPlugin";
+import TablePresentationPlugin from "./plugins/TablePresentationPlugin";
 import CodeBlockPlugin from "./plugins/CodeBlockPlugin";
 import SearchPlugin from "./plugins/SearchPlugin";
 import FloatingTextToolbarPlugin from "./plugins/FloatingTextToolbarPlugin";
@@ -99,6 +100,8 @@ const theme = {
   tableCell: 'editor-table-cell',
   tableCellHeader: 'editor-table-cell-header',
   tableRowStriping: 'editor-table-row-striping',
+  tableFrozenRow: 'editor-table-frozen-row',
+  tableFrozenColumn: 'editor-table-frozen-column',
   image: 'editor-image',
   imageGrid: 'editor-image-grid',
   video: 'editor-video',
@@ -298,6 +301,7 @@ export default function Editor({ documentId, documentTitle, initialContent, onCh
           <HistoryPlugin />
           {!readOnly && <AutoFocusPlugin />}
           <TablePlugin />
+          <TablePresentationPlugin />
           <ListPlugin />
           <CheckListPlugin />
           <TabIndentationPlugin maxIndent={8} />
@@ -306,10 +310,10 @@ export default function Editor({ documentId, documentTitle, initialContent, onCh
           <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
           {!readOnly && <CodeBlockPlugin />}
           {!readOnly && <SlashMenuPlugin documentId={documentId} />}
-          {!readOnly && <BlockHandlePlugin />}
-          {!readOnly && <MentionPlugin />}
-          <WikiLinkPlugin />
-          {!readOnly && <DragDropPlugin />}
+          {!readOnly && <BlockHandlePlugin documentId={documentId} />}
+          {!readOnly && <MentionPlugin documentId={documentId} />}
+          <WikiLinkPlugin documentId={documentId} />
+          {!readOnly && <DragDropPlugin documentId={documentId} />}
           {!readOnly && <EditorShortcutPlugin documentId={documentId} />}
           {!readOnly && <FormulaShortcutPlugin />}
           {!readOnly && <ChecklistKeyboardPlugin />}
@@ -318,9 +322,9 @@ export default function Editor({ documentId, documentTitle, initialContent, onCh
           <DocumentSessionPlugin documentId={documentId} restoreSelection={!readOnly} />
           <EvidenceNavigationPlugin documentId={documentId} initialContent={initialContent} />
           {!readOnly && <TableSelectionPlugin documentId={documentId} />}
-          {!readOnly && <TableActionMenuPlugin />}
-          {!readOnly && <TableColumnResizePlugin />}
-          {!readOnly && <TableReorderPlugin />}
+          {!readOnly && <TableActionMenuPlugin documentId={documentId} />}
+          {!readOnly && <TableColumnResizePlugin documentId={documentId} />}
+          {!readOnly && <TableReorderPlugin documentId={documentId} />}
         </div>
       </div>
     </LexicalComposer>

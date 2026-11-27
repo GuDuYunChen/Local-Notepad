@@ -1,0 +1,449 @@
+import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
+import { lstatSync, readFileSync } from 'node:fs'
+import path from 'node:path'
+import { TABLE_OPERATIONS_BUDGET_MS, TABLE_OPERATIONS_CHECKS, nativeTableContrast, tableFromContent, tableTextRows } from './table-operations-desktop-driver.mjs'
+import { countLexicalCharacters } from '../src/utils/lexicalText.js'
+
+export const TABLE_OPERATIONS_VERSION = '4.249.2'
+export const TABLE_OPERATIONS_REPORT = 'table-operations.json'
+export const TABLE_OPERATIONS_SOURCES = Object.freeze([
+  'scripts/table-operations-desktop-driver.mjs', 'scripts/run-table-operations-desktop.mjs', 'scripts/table-operations-evidence.mjs',
+  'scripts/desktop-window-session.mjs', 'scripts/desktop-window-target.mjs', 'scripts/desktop-window-worker.ps1',
+  'scripts/local-export-directory-session.mjs', 'scripts/local-export-directory-worker.ps1',
+  'src/components/Editor/Editor.jsx', 'src/components/Editor/Editor.css',
+  'src/components/Editor/plugins/TableMenu.jsx', 'src/components/Editor/plugins/TableActionMenuPlugin.jsx',
+  'src/components/Editor/plugins/TableSelectionPlugin.jsx', 'src/components/Editor/plugins/TableColumnResizePlugin.jsx',
+  'src/components/Editor/plugins/TableReorderPlugin.jsx', 'src/components/Editor/plugins/ToolbarPlugin.jsx',
+  'src/components/Editor/plugins/FloatingTextToolbarPlugin.jsx',
+  'src/components/Editor/plugins/EditorShortcutPlugin.jsx', 'src/components/Editor/plugins/PasteImagePlugin.jsx',
+  'src/components/Editor/plugins/TablePresentationPlugin.jsx', 'src/components/Editor/plugins/DocumentSessionPlugin.jsx',
+  'src/components/Editor/plugins/CommandPalettePlugin.jsx',
+  'src/components/Editor/plugins/CodeBlockPlugin.jsx',
+  'src/components/Editor/plugins/SlashMenuPlugin.jsx', 'src/components/Editor/plugins/BlockHandlePlugin.jsx',
+  'src/components/Editor/plugins/DragDropPlugin.jsx', 'src/components/Editor/plugins/WikiLinkPlugin.jsx',
+  'src/components/Editor/plugins/MentionPlugin.jsx', 'src/components/Editor/plugins/BlockReferencePlugin.jsx',
+  'src/components/Editor/utils/blockRegistry.js',
+  'src/components/Editor/utils/tableModel.js', 'src/components/Editor/utils/tableEvents.js', 'src/components/Editor/hooks/useEditorWriteScope.js',
+  'src/components/Editor/hooks/useImageUploadSession.js',
+  'src/components/Editor/utils/excelTable.js', 'src/services/tableImportLimits.js', 'src/services/importContent.js',
+  'src/components/TextEditor.jsx', 'src/services/editorDraftCache.js', 'src/styles/editor-document.css', 'src/services/localAppearance.js',
+  'src/components/Editor/plugins/SearchPlugin.jsx', 'src/components/Editor/plugins/documentSearchLexical.jsx',
+  'src/components/Editor/utils/tableSearchVisibility.js', 'src/services/documentSearch.mjs',
+  'src/components/Editor/plugins/DocumentSearch.css', 'src/utils/lexicalText.js',
+])
+export const TABLE_OPERATIONS_SCREENSHOTS = Object.freeze([
+  'table-native-inserted.png', 'table-native-merged.png', 'table-native-clipboard-restored.png', 'table-native-styled.png',
+  'table-native-failed-save.png', 'table-native-reloaded.png', 'table-native-long.png',
+  'table-native-small.png', 'table-native-dark.png',
+])
+export const tableOperationsHash = bytes => createHash('sha256').update(bytes).digest('hex')
+export const tableOperationsBlob = source => createHash('sha1').update('blob ' + Buffer.byteLength(source) + '\0').update(source).digest('hex')
+const originalRows = Array.from({ length: 3 }, (_, row) => Array.from({ length: 3 }, (_, col) => `R${row + 1}C${col + 1}`))
+const sameJSON = (a, b) => assert.deepEqual(JSON.parse(a), JSON.parse(b))
+const formattedCount = (content, locale) => {
+  assert.equal(typeof locale, 'string'); assert.ok(locale.length > 0)
+  const formatter = new Intl.NumberFormat(locale)
+  assert.equal(formatter.resolvedOptions().locale, locale, 'The status count must use the observed renderer locale')
+  return formatter.format(countLexicalCharacters(content)) + ' 字'
+}
+
+export function validateTableOperationsReport(report, { commit, verifier = commit, scope = 'packaged', sources } = {}) {
+  for (const value of [commit, verifier]) assert.match(value || '', /^[a-f0-9]{40}$/)
+  assert.equal(report.schemaVersion, 1); assert.equal(report.module, 'notepad-table'); assert.equal(report.version, TABLE_OPERATIONS_VERSION)
+  assert.equal(report.productCommit, commit); assert.equal(report.verifierCommit, verifier); assert.equal(report.scope, scope)
+  assert.equal(report.platform, 'win32'); assert.equal(report.runnerEnvironment, 'github-hosted')
+  for (const field of ['complete', 'cleanupComplete', 'realBackend', 'realPreload', 'syntheticData', 'backendStopped']) assert.equal(report[field], true, field)
+  for (const field of ['bridgeOverridden', 'timerAccelerated', 'forceTerminated']) assert.equal(report[field], false, field)
+  assert.equal(report.error, undefined); assert.equal(report.cleanupError, undefined)
+  assert.equal(report.app.packaged, true); assert.equal(report.app.version, TABLE_OPERATIONS_VERSION)
+  assert.deepEqual(report.checks, TABLE_OPERATIONS_CHECKS)
+  assert.equal(report.businessBudgetMs, TABLE_OPERATIONS_BUDGET_MS)
+  assert.ok(report.businessElapsedMs > 0 && report.businessElapsedMs < TABLE_OPERATIONS_BUDGET_MS)
+  assert.ok(Number.isSafeInteger(report.pid) && report.pid > 0)
+  assert.ok(path.win32.isAbsolute(report.executable || ''))
+  for (const key of ['executableSHA256', 'asarSHA256', 'backendSHA256']) assert.match(report[key] || '', /^[a-f0-9]{64}$/)
+  assert.deepEqual(report.exit, { pid: report.pid, code: 0, signal: null, normalClose: true })
+  assert.deepEqual(Object.keys(report.sourceFiles).sort(), [...TABLE_OPERATIONS_SOURCES].sort())
+  assert.deepEqual(report.sourceFiles, sources, 'Table acceptance must match independently supplied source pins')
+  for (const value of Object.values(report.sourceFiles)) assert.match(value || '', /^[a-f0-9]{40}$/)
+  assert.equal(new Set([report.fixture.mainID, report.fixture.destinationID, report.fixture.largeID]).size, 3)
+  for (const id of [report.fixture.mainID, report.fixture.destinationID, report.fixture.largeID]) assert.match(id || '', /^[a-zA-Z0-9-]+$/)
+
+  const expectedSnapshots = [
+    'initial', 'insert-row', 'delete-row', 'insert-column', 'delete-column', 'menu-row-move', 'menu-row-undo',
+    'menu-column-move', 'menu-column-undo',
+    'selection-input-insert-text', 'selection-input-backspace', 'selection-input-delete', 'selection-input-enter', 'selection-input-cut', 'selection-input-ime', 'selection-input-palette',
+    'selected-background', 'merged', 'split', 'split-undo', 'merge-undo',
+    'clipboard-copied', 'clipboard-cleared', 'clipboard-pasted', 'clipboard-paste-undo', 'clipboard-clear-undo', 'clipboard-clear-redo', 'clipboard-paste-redo',
+    'styled', 'row-dragged', 'row-drag-undo', 'row-drag-redo', 'row-drag-restored',
+    'column-dragged', 'column-drag-undo', 'column-drag-redo', 'column-drag-restored',
+    'resize-cancelled', 'resized', 'resize-undo', 'resize-redo', 'autofit', 'autofit-repeat', 'autofit-undo', 'autofit-redo', 'retried', 'large-saved', 'large-dark-saved',
+  ]
+  assert.deepEqual(Object.keys(report.snapshots), expectedSnapshots)
+  for (const snapshot of Object.values(report.snapshots)) {
+    assert.equal(snapshot.sha256, tableOperationsHash(snapshot.content))
+    assert.equal(snapshot.ui.tables, 1)
+    assert.equal(snapshot.ui.characterCount.text, formattedCount(snapshot.content, snapshot.ui.characterCount.locale),
+      'The displayed status count must match the complete saved document')
+  }
+  const content = name => report.snapshots[name].content
+  assert.deepEqual(tableTextRows(content('initial')), originalRows)
+  assert.deepEqual(tableTextRows(content('insert-row')), [originalRows[0], ['', '', ''], originalRows[1], originalRows[2]])
+  assert.deepEqual(tableTextRows(content('insert-column')), originalRows.map(row => [row[0], '', row[1], row[2]]))
+  for (const name of ['delete-row', 'delete-column', 'menu-row-undo', 'menu-column-undo']) sameJSON(content(name), content('initial'))
+  assert.deepEqual(tableTextRows(content('menu-row-move')), [originalRows[1], originalRows[0], originalRows[2]])
+  assert.deepEqual(tableTextRows(content('menu-column-move')), originalRows.map(row => [row[1], row[0], row[2]]))
+  const inputRange = (record, prefix = 'input') => {
+    const start = record[prefix + 'Start'], end = record[prefix + 'End']
+    assert.ok(Number.isSafeInteger(start) && start >= 0)
+    assert.ok(Number.isSafeInteger(end) && end > start && end <= report.nativeInputs.length)
+    return report.nativeInputs.slice(start, end)
+  }
+  const keyInputs = (inputs, key, windowsVirtualKeyCode, modifiers = 0) => assert.deepEqual(
+    inputs.map(input => ({ method: input.method, type: input.type, key: input.key, windowsVirtualKeyCode: input.windowsVirtualKeyCode, modifiers: input.modifiers })),
+    ['rawKeyDown', 'keyUp'].map(type => ({ method: 'Input.dispatchKeyEvent', type, key, windowsVirtualKeyCode, modifiers })),
+  )
+  const compositionInput = (inputs, text, offset) => {
+    assert.equal(inputs.length, 1)
+    assert.deepEqual({ method: inputs[0].method, text: inputs[0].text, selectionStart: inputs[0].selectionStart, selectionEnd: inputs[0].selectionEnd },
+      { method: 'Input.imeSetComposition', text, selectionStart: offset, selectionEnd: offset })
+    assert.equal(inputs[0].replacementStart, undefined); assert.equal(inputs[0].replacementEnd, undefined)
+  }
+  const textInput = (inputs, text) => {
+    assert.equal(inputs.length, 1); assert.equal(inputs[0].method, 'Input.insertText'); assert.equal(inputs[0].text, text)
+  }
+  const imeControl = report.imeControl
+  assert.equal(imeControl.text, 'R3C3'); assert.equal(imeControl.snapshot, 'initial')
+  const beforeIME = originalRows.map(row => [...row]); beforeIME[2][2] = ''
+  assert.deepEqual(imeControl.before.rows.map(row => row.map(cell => cell.text)), beforeIME)
+  for (const view of [imeControl.before, imeControl.composing, imeControl.committed]) {
+    assert.equal(view.rootFocused, true); assert.equal(view.modebarFocused, false); assert.equal(view.editable, 'true'); assert.equal(view.tables, 1)
+  }
+  const composingRows = imeControl.composing.rows.map(row => row.map(cell => cell.text))
+  assert.match(composingRows[2][2], /^R3C3\u200b?$/)
+  composingRows[2][2] = 'R3C3' // only the in-flight Chromium composition sentinel is ignored
+  assert.deepEqual(composingRows, originalRows)
+  assert.deepEqual(imeControl.committed.rows.map(row => row.map(cell => cell.text)), originalRows)
+  compositionInput(inputRange(imeControl, 'compositionInput'), 'R3C3', 4)
+  assert.equal(imeControl.commitInputStart, imeControl.compositionInputEnd)
+  textInput(inputRange(imeControl, 'commitInput'), 'R3C3')
+  assert.equal(imeControl.saveInputStart, imeControl.commitInputEnd)
+  keyInputs(inputRange(imeControl, 'saveInput'), 's', 83, 2)
+  const selectedView = (view, rootFocused = true) => {
+    assert.equal(view.rootFocused, rootFocused, 'Selection isolation requires the expected native focus owner')
+    assert.equal(view.modebarFocused, !rootFocused)
+    assert.equal(view.editable, 'true'); assert.equal(view.tables, 1)
+    assert.match(view.selection, /已选择 2 个单元格/)
+    assert.deepEqual(view.selectionOutlineBackgrounds, ['rgba(0, 0, 0, 0)', 'rgba(0, 0, 0, 0)'], 'Selection outlines must leave cell text and saved colours visible')
+    assert.deepEqual(view.rows.map(row => row.map(cell => cell.text)), originalRows, 'Selection input changed a selected or unselected cell')
+  }
+  const isolation = report.selectionIsolation
+  // Native pointer events are emitted before their compatibility mouse events.
+  // Keep each observed transition so a failed range-retention gate identifies
+  // the actual handoff; these are read-only DOM observations, not test writes.
+  assert.deepEqual(isolation.rangeStages.map(stage => [stage.stage, stage.afterInput]), [
+    ['menu-opened', isolation.source.inputEnd + 2],
+    ['mode-entered', isolation.rectangle.inputStart],
+    ['rectangle-started', isolation.rectangle.inputStart + 2],
+    ['rectangle-moved', isolation.rectangle.inputStart + 3],
+  ])
+  for (const stage of isolation.rangeStages) {
+    assert.equal(typeof stage.rootFocused, 'boolean')
+    assert.equal(typeof stage.text, 'string')
+    for (const endpoint of [stage.anchor, stage.focus]) {
+      if (endpoint === null) continue
+      assert.ok(Number.isSafeInteger(endpoint.row) && endpoint.row >= 0)
+      assert.ok(Number.isSafeInteger(endpoint.column) && endpoint.column >= 0)
+      assert.equal(typeof endpoint.text, 'string')
+    }
+  }
+  for (const range of [isolation.source, isolation.retainedRange]) {
+    assert.equal(range.rootFocused, true); assert.equal(range.text, 'R1C3')
+    for (const endpoint of [range.anchor, range.focus]) assert.deepEqual(endpoint, { row: 0, column: 2, text: 'R1C3' })
+  }
+  const sourceInputs = inputRange(isolation.source)
+  assert.equal(sourceInputs.length, 6)
+  assert.deepEqual(sourceInputs.slice(0, 2).map(input => [input.method, input.type]), [
+    ['Input.dispatchMouseEvent', 'mousePressed'], ['Input.dispatchMouseEvent', 'mouseReleased'],
+  ])
+  keyInputs(sourceInputs.slice(2, 4), 'Home', 36); keyInputs(sourceInputs.slice(4), 'End', 35, 8)
+  const rectangleInputs = inputRange(isolation.rectangle)
+  assert.ok(isolation.rectangle.inputStart > isolation.source.inputEnd)
+  assert.deepEqual(rectangleInputs.map(input => [input.method, input.type, input.buttons, input.button]), [
+    ['Input.dispatchMouseEvent', 'mouseMoved', 0, 'none'], ['Input.dispatchMouseEvent', 'mousePressed', 1, 'left'],
+    ['Input.dispatchMouseEvent', 'mouseMoved', 1, 'left'], ['Input.dispatchMouseEvent', 'mouseReleased', 0, 'left'],
+  ])
+  assert.ok(rectangleInputs[2].x > rectangleInputs[0].x)
+  assert.equal(rectangleInputs[0].x, rectangleInputs[1].x); assert.equal(rectangleInputs[2].x, rectangleInputs[3].x)
+  assert.ok(rectangleInputs.every(input => Number.isFinite(input.x) && Number.isFinite(input.y) && Math.abs(input.y - rectangleInputs[0].y) <= 1))
+  selectedView(isolation.selected)
+  const isolationCases = [['insert-text'], ['backspace', 'Backspace', 8], ['delete', 'Delete', 46], ['enter', 'Enter', 13], ['cut', 'x', 88, 2]]
+  assert.deepEqual(isolation.operations.map(operation => operation.name), isolationCases.map(([name]) => name))
+  let priorInputEnd = isolation.rectangle.inputEnd
+  for (let index = 0; index < isolationCases.length; index++) {
+    const [name, key, code, modifiers] = isolationCases[index], operation = isolation.operations[index]
+    assert.equal(operation.inputStart, priorInputEnd, 'Each isolation action requires its own next native input receipt')
+    const inputs = inputRange(operation)
+    if (name === 'insert-text') {
+      assert.equal(inputs.length, 1); assert.equal(inputs[0].method, 'Input.insertText')
+      assert.equal(inputs[0].text, 'TABLE-SELECTION-INPUT-MUST-NOT-WRITE')
+    } else keyInputs(inputs, key, code, modifiers)
+    selectedView(operation.before); selectedView(operation.after)
+    assert.equal(operation.snapshot, 'selection-input-' + name)
+    assert.equal(operation.saveInputStart, operation.inputEnd)
+    keyInputs(inputRange(operation, 'saveInput'), 's', 83, 2)
+    sameJSON(content(operation.snapshot), content('initial')); selectedView(report.snapshots[operation.snapshot].ui)
+    priorInputEnd = operation.saveInputEnd
+  }
+  const ime = isolation.ime
+  assert.equal(ime.compositionInputStart, priorInputEnd)
+  selectedView(ime.before)
+  compositionInput(inputRange(ime, 'compositionInput'), '表', 1)
+  selectedView(ime.composing, false)
+  assert.equal(ime.commitInputStart, ime.compositionInputEnd)
+  textInput(inputRange(ime, 'commitInput'), '表'); selectedView(ime.committed, false)
+  assert.equal(ime.saveInputStart, ime.commitInputEnd)
+  keyInputs(inputRange(ime, 'saveInput'), 's', 83, 2)
+  assert.equal(ime.snapshot, 'selection-input-ime')
+  sameJSON(content(ime.snapshot), content('initial')); selectedView(report.snapshots[ime.snapshot].ui, false)
+  const palette = isolation.palette
+  const paletteWarning = '请先点击“完成”退出单元格多选，再输入或修改正文'
+  assert.equal(palette.label, '编辑器命令'); assert.equal(palette.query, 'divider'); assert.equal(palette.command, '分割线')
+  assert.equal(palette.inputStart, ime.saveInputEnd); assert.equal(palette.openInputStart, palette.inputStart)
+  const launcher = palette.launcher, openInputs = inputRange(palette, 'openInput')
+  assert.equal(launcher.label, palette.label); assert.equal(launcher.disabled, false)
+  for (const field of ['left', 'top', 'width', 'height']) assert.ok(Number.isFinite(launcher[field]))
+  assert.ok(launcher.left >= 0 && launcher.top >= 0 && launcher.width > 0 && launcher.height > 0)
+  assert.deepEqual(openInputs.map(input => [input.method, input.type, input.button, input.clickCount]), [
+    ['Input.dispatchMouseEvent', 'mousePressed', 'left', 1], ['Input.dispatchMouseEvent', 'mouseReleased', 'left', 1],
+  ])
+  assert.equal(openInputs[0].x, openInputs[1].x); assert.equal(openInputs[0].y, openInputs[1].y)
+  for (const input of openInputs) {
+    assert.ok(input.x >= launcher.left && input.x <= launcher.left + launcher.width)
+    assert.ok(input.y >= launcher.top && input.y <= launcher.top + launcher.height)
+  }
+  assert.equal(palette.before.dialogCount, 0); assert.equal(palette.before.searchInputFocused, false)
+  assert.ok(!palette.before.warnings.includes(paletteWarning), 'Refusal feedback must belong to this command action')
+  assert.equal(palette.opened.dialogCount, 1); assert.equal(palette.opened.searchInputFocused, true); assert.equal(palette.opened.query, '')
+  assert.equal(palette.queryInputStart, palette.openInputEnd); textInput(inputRange(palette, 'queryInput'), palette.query)
+  assert.equal(palette.filtered.dialogCount, 1); assert.equal(palette.filtered.searchInputFocused, true); assert.equal(palette.filtered.query, palette.query)
+  assert.deepEqual(palette.filtered.options, [{ label: palette.command, selected: true, disabled: false }])
+  assert.equal(palette.executeInputStart, palette.queryInputEnd); keyInputs(inputRange(palette, 'executeInput'), 'Enter', 13)
+  assert.equal(palette.after.dialogCount, 0); assert.equal(palette.after.searchInputFocused, false)
+  assert.equal(palette.after.query, null); assert.deepEqual(palette.after.options, [])
+  assert.equal(palette.feedback, paletteWarning); assert.ok(palette.after.warnings.includes(paletteWarning))
+  assert.equal(palette.saveInputStart, palette.executeInputEnd); keyInputs(inputRange(palette, 'saveInput'), 's', 83, 2)
+  assert.equal(palette.inputEnd, palette.saveInputEnd); assert.equal(inputRange(palette).length, 7)
+  assert.equal(palette.snapshot, 'selection-input-palette'); sameJSON(content(palette.snapshot), content('initial'))
+  for (const view of [palette.before, palette.opened, palette.filtered, palette.after, report.snapshots[palette.snapshot].ui]) {
+    // Closing a focused dialog may leave native focus on body. The selection
+    // and complete content remain mandatory without inventing a focus owner.
+    assert.equal(typeof view.rootFocused, 'boolean'); assert.equal(typeof view.modebarFocused, 'boolean')
+    assert.equal(view.editable, 'true'); assert.equal(view.tables, 1)
+    assert.match(view.selection, /已选择 2 个单元格/)
+    assert.deepEqual(view.selectionOutlineBackgrounds, ['rgba(0, 0, 0, 0)', 'rgba(0, 0, 0, 0)'])
+    assert.deepEqual(view.rows.map(row => row.map(cell => cell.text)), originalRows)
+  }
+  const colored = tableFromContent(content('selected-background'))
+  assert.ok(colored.children[1].children.slice(0, 2).every(cell => cell.backgroundColor === '#fff3cd'))
+  assert.equal(tableFromContent(content('merged')).children[1].children[0].colSpan, 2)
+  assert.deepEqual(tableTextRows(content('merged'))[1], ['R2C1R2C2', 'R2C3'])
+  assert.deepEqual(tableTextRows(content('split'))[1], ['R2C1R2C2', '', 'R2C3'])
+  sameJSON(content('split-undo'), content('merged')); sameJSON(content('merge-undo'), content('selected-background'))
+  assert.equal(report.clipboard.method, 'native-copy-and-paste-buttons')
+  assert.match(report.clipboard.selection, /已选择 2 个单元格/)
+  for (const [operation, label, feedback] of [['copy', '复制', '已复制所选单元格'], ['paste', '粘贴', '已粘贴到所选区域']]) {
+    const record = report.clipboard[operation]
+    assert.equal(record.label, label); assert.equal(record.feedback, feedback)
+    assert.ok(Number.isSafeInteger(record.inputStart) && record.inputStart >= 0)
+    assert.equal(record.inputEnd - record.inputStart, 2)
+    const input = report.nativeInputs.slice(record.inputStart, record.inputEnd)
+    assert.deepEqual(input.map(item => item.method), ['Input.dispatchMouseEvent', 'Input.dispatchMouseEvent'])
+    assert.deepEqual(input.map(item => item.type), ['mousePressed', 'mouseReleased'])
+    assert.equal(input[0].x, input[1].x); assert.equal(input[0].y, input[1].y)
+  }
+  assert.ok(report.clipboard.paste.inputStart > report.clipboard.copy.inputEnd)
+  const clearedRows = originalRows.map(row => [...row]); clearedRows[1][0] = ''; clearedRows[1][1] = ''
+  assert.deepEqual(tableTextRows(content('clipboard-cleared')), clearedRows)
+  assert.ok(tableFromContent(content('clipboard-cleared')).children[1].children.slice(0, 2).every(cell => cell.backgroundColor === '#fff3cd'))
+  for (const name of ['clipboard-copied', 'clipboard-pasted', 'clipboard-clear-undo', 'clipboard-paste-redo']) sameJSON(content(name), content('selected-background'))
+  for (const name of ['clipboard-paste-undo', 'clipboard-clear-redo']) sameJSON(content(name), content('clipboard-cleared'))
+  const styled = tableFromContent(content('styled'))
+  assert.equal(styled.rowStriping, true); assert.equal(styled.frozenRowCount, 1); assert.equal(styled.frozenColumnCount, 1)
+  assert.equal(styled.children[0].children[1].backgroundColor, '#cff4fc')
+  for (let row = 0; row < 3; row++) for (let col = 0; col < 3; col++) {
+    assert.equal(styled.children[row].children[col].headerState, colored.children[row].children[col].headerState ^ (row === 0 ? 1 : 0) ^ (col === 0 ? 2 : 0))
+  }
+  assert.equal(report.styledView.rows[0][1].background, 'rgb(207, 244, 252)')
+  assert.equal(report.styledView.rowStriping, true); assert.equal(report.styledView.frozenRow, 'true'); assert.equal(report.styledView.frozenColumn, 'true')
+  assert.deepEqual(tableTextRows(content('row-dragged')), [originalRows[1], originalRows[2], originalRows[0]])
+  assert.deepEqual(tableTextRows(content('column-dragged')), originalRows.map(row => [row[1], row[2], row[0]]))
+  for (const name of ['row-drag-undo', 'row-drag-restored', 'column-drag-undo', 'column-drag-restored', 'resize-cancelled', 'resize-undo']) sameJSON(content(name), content('styled'))
+  sameJSON(content('row-drag-redo'), content('row-dragged')); sameJSON(content('column-drag-redo'), content('column-dragged'))
+  sameJSON(content('resize-redo'), content('resized'))
+  const resized = tableFromContent(content('resized')), width = resized.colWidths[0]
+  assert.ok(width >= 70 && width <= 600); assert.ok(resized.children.every(row => row.children[0].width === width))
+  assert.notDeepEqual(resized, styled)
+  sameJSON(content('autofit-repeat'), content('autofit')); sameJSON(content('autofit-undo'), content('resized')); sameJSON(content('autofit-redo'), content('autofit'))
+  const fittedWidth = tableFromContent(content('autofit')).colWidths[0]
+  assert.ok(fittedWidth >= 70 && fittedWidth < width)
+  sameJSON(report.failedSave.persisted, content('autofit-redo'))
+  assert.equal(report.failedSave.duplicateSaveKeys, 2)
+  assert.ok(Number.isSafeInteger(report.failedSave.requestStartIndex) && report.failedSave.requestStartIndex >= 0)
+  const successfulRetries = report.requests.slice(report.failedSave.requestStartIndex).filter(request =>
+    request.path === '/api/files/' + report.fixture.mainID && request.method === 'PUT' && request.status === 200 && request.postData.includes('-offline-retry'))
+  assert.equal(successfulRetries.length, 1); assert.equal(report.failedSave.successfulWrites, successfulRetries.length)
+  assert.equal(report.failedSave.visible.rows[2][2].text, 'R3C3-offline-retry')
+  const retried = originalRows.map(row => [...row]); retried[2][2] += '-offline-retry'
+  assert.deepEqual(tableTextRows(content('retried')), retried)
+  sameJSON(report.reloaded.content, content('retried')); assert.equal(report.reloaded.sha256, tableOperationsHash(report.reloaded.content))
+  assert.notEqual(report.reloaded.originAfter, report.reloaded.originBefore)
+  assert.deepEqual(report.reloaded.ui.rows.map(row => row.map(cell => cell.text)), retried)
+  assert.equal(report.largeSeed.sha256, tableOperationsHash(report.largeSeed.content))
+  const largeExpected = tableTextRows(report.largeSeed.content)
+  assert.equal(largeExpected.length, 80); assert.ok(largeExpected.every(row => row.length === 3)); assert.ok(largeExpected.slice(1).every(row => row[0].length > 100))
+  const search = report.searchNavigation
+  assert.equal(search.query, 'LONG-80-3-value'); assert.equal(search.complete, true); assert.equal(search.closed, true)
+  assert.equal(search.before.source, 'native-dom-range'); assert.equal(search.match.source, 'css-highlight')
+  assert.deepEqual(search.last, search.match)
+  assert.equal(search.openInputEnd, search.inputStart + 2)
+  keyInputs(inputRange({ inputStart: search.inputStart, inputEnd: search.openInputEnd }), 'f', 70, 2)
+  assert.equal(search.queryInputStart, search.openInputEnd)
+  textInput(inputRange(search, 'queryInput'), search.query)
+  assert.equal(search.inputEnd, search.queryInputEnd); assert.equal(inputRange(search).length, 3)
+  assert.equal(search.closeInputStart, search.inputEnd); keyInputs(inputRange(search, 'closeInput'), 'Escape', 27)
+  assert.equal(search.contentAfter, report.largeSeed.content, 'Native search must preserve the entire saved JSON byte for byte')
+  assert.equal(search.sha256, tableOperationsHash(search.contentAfter))
+  assert.equal(search.statusCount.expected, countLexicalCharacters(report.largeSeed.content))
+  assert.equal(search.statusCount.actual, formattedCount(report.largeSeed.content, search.statusCount.locale))
+  const rect = value => {
+    for (const key of ['left', 'right', 'top', 'bottom']) assert.ok(Number.isFinite(value[key]))
+    assert.ok(value.right > value.left && value.bottom > value.top)
+  }
+  for (const view of [search.before, search.match]) {
+    assert.equal(view.connected, true); assert.equal(view.matches, 1); assert.equal(view.text, search.query)
+    assert.deepEqual(view.start, { row: 79, column: 2, offset: 0, inTarget: true })
+    assert.deepEqual(view.end, { row: 79, column: 2, offset: search.query.length, inTarget: true })
+    assert.ok(Number.isSafeInteger(view.rectCount) && view.rectCount > 0); rect(view.rect); rect(view.clip)
+    for (const key of ['width', 'height']) assert.ok(Number.isFinite(view.viewport[key]) && view.viewport[key] > 0)
+    for (const key of ['scrollTop', 'scrollLeft']) assert.ok(Number.isFinite(view[key]) && view[key] >= 0)
+    assert.ok(view.clips.some(boundary => boundary.table && boundary.x && boundary.y), 'The actual Table viewport must be included')
+    const clip = { left: 0, top: 0, right: view.viewport.width, bottom: view.viewport.height }
+    for (const boundary of view.clips) {
+      rect(boundary)
+      for (const key of ['table', 'x', 'y']) assert.equal(typeof boundary[key], 'boolean')
+      assert.ok(boundary.x || boundary.y)
+      if (boundary.x) { clip.left = Math.max(clip.left, boundary.left); clip.right = Math.min(clip.right, boundary.right) }
+      if (boundary.y) { clip.top = Math.max(clip.top, boundary.top); clip.bottom = Math.min(clip.bottom, boundary.bottom) }
+    }
+    assert.deepEqual(view.clip, clip, 'Search visibility must intersect all observed clipping ancestors and the viewport')
+    const r = view.rect, dx = Math.min(1, (r.right - r.left) / 4), dy = Math.min(1, (r.bottom - r.top) / 4)
+    assert.deepEqual(view.points.map(point => [point.x, point.y]), [
+      [(r.left + r.right) / 2, (r.top + r.bottom) / 2],
+      [r.left + dx, r.top + dy], [r.right - dx, r.top + dy],
+      [r.left + dx, r.bottom - dy], [r.right - dx, r.bottom - dy],
+    ])
+    for (const point of view.points) {
+      assert.equal(typeof point.owned, 'boolean')
+      if (point.owned) {
+        assert.ok(point.x >= 0 && point.x < view.viewport.width && point.y >= 0 && point.y < view.viewport.height)
+        assert.match(point.tag || '', /^[A-Z][A-Z0-9-]*$/)
+      }
+    }
+    const inside = r.left >= clip.left - 1 && r.right <= clip.right + 1 && r.top >= clip.top - 1 && r.bottom <= clip.bottom + 1
+    assert.equal(view.inside, inside); assert.equal(view.visible, inside && view.points.every(point => point.owned))
+  }
+  assert.equal(search.before.visible, false); assert.equal(search.before.inside, false)
+  assert.ok(search.before.rect.top > search.before.clip.bottom + 1, 'The search target must start below the real Table viewport')
+  assert.equal(search.before.query, null); assert.equal(search.before.queryFocused, false); assert.equal(search.before.count, null)
+  assert.equal(search.match.visible, true); assert.equal(search.match.inside, true)
+  assert.equal(search.match.query, search.query); assert.equal(search.match.queryFocused, true); assert.equal(search.match.count, '1/1')
+  assert.ok(search.match.scrollTop > search.before.scrollTop, 'The native search must actually reveal the distant row')
+  largeExpected[79][2] += '-tail-saved'
+  assert.deepEqual(tableTextRows(content('large-saved')), largeExpected)
+  assert.deepEqual(tableTextRows(content('large-dark-saved')), largeExpected)
+  assert.equal(tableFromContent(content('large-dark-saved')).children[79].children[1].backgroundColor, '#cff4fc')
+  for (const view of [report.smallMenu, report.darkMenu]) {
+    assert.ok(view.width >= 640 && view.width <= 720 && view.height >= 400)
+    assert.ok(view.left >= 0 && view.right <= view.width + 1 && view.top >= 0 && view.bottom <= view.height + 1)
+    assert.equal(view.overflow, false)
+  }
+  assert.equal(report.darkMenu.theme, 'dark')
+  assert.ok(report.darkCell.text.includes('LONG-80-2-'))
+  assert.ok(nativeTableContrast(report.darkCell.foreground, report.darkCell.background) >= 4.5)
+  const { vertical, horizontal } = report.frozenScroll
+  assert.ok(vertical.after.scrollTop - vertical.before.scrollTop > 20)
+  assert.ok(Math.abs(vertical.after.headTop - vertical.before.headTop) <= 1)
+  assert.ok(vertical.before.normalTop - vertical.after.normalTop > 20)
+  assert.ok(horizontal.before.scrollWidth - horizontal.before.clientWidth > 40)
+  assert.ok(horizontal.after.scrollLeft - horizontal.before.scrollLeft > 20)
+  assert.ok(Math.abs(horizontal.after.headLeft - horizontal.before.headLeft) <= 1)
+  assert.ok(horizontal.before.normalLeft - horizontal.after.normalLeft > 20)
+  assert.equal(report.minimumWindow.pid, report.pid); assert.equal(report.minimumWindow.applied, true)
+  assert.equal(report.minimumWindow.width, 720); assert.equal(report.minimumWindow.height, 520)
+  sameJSON(report.saved.main.content, content('retried')); sameJSON(report.saved.large.content, content('large-dark-saved'))
+  assert.equal(report.saved.main.id, report.fixture.mainID); assert.equal(report.saved.large.id, report.fixture.largeID); assert.equal(report.saved.destination.id, report.fixture.destinationID)
+  assert.ok(report.nativeInputs.length > 100)
+  report.nativeInputs.forEach((input, index) => {
+    assert.equal(input.sequence, index + 1)
+    assert.ok(['Input.dispatchKeyEvent', 'Input.insertText', 'Input.imeSetComposition', 'Input.dispatchMouseEvent', 'Input.dispatchDragEvent'].includes(input.method))
+    if (input.method === 'Input.dispatchMouseEvent' && input.type === 'mouseMoved' && input.buttons & 1) {
+      assert.equal(input.button, 'left', 'Chromium drag movement requires button:left in addition to buttons:1')
+    }
+  })
+  assert.deepEqual(report.nativeDrags.map(drag => drag.kind), ['row', 'col'])
+  for (const drag of report.nativeDrags) {
+    assert.equal(drag.completed, true)
+    const inputs = inputRange(drag)
+    assert.deepEqual(inputs.map(input => [input.method, input.type]), [
+      ['Input.dispatchMouseEvent', 'mouseMoved'], ['Input.dispatchMouseEvent', 'mouseMoved'],
+      ['Input.dispatchMouseEvent', 'mousePressed'], ['Input.dispatchMouseEvent', 'mouseMoved'],
+      ['Input.dispatchDragEvent', 'dragEnter'], ['Input.dispatchDragEvent', 'dragOver'], ['Input.dispatchDragEvent', 'drop'],
+      ['Input.dispatchMouseEvent', 'mouseReleased'],
+    ])
+    assert.deepEqual(inputs.slice(0, 4).map(input => [input.buttons, input.button]), [[0, 'none'], [0, 'none'], [1, 'left'], [1, 'left']])
+    assert.equal(inputs[1].x, drag.source.x); assert.equal(inputs[1].y, drag.source.y)
+    assert.equal(inputs[2].x, drag.source.x); assert.equal(inputs[2].y, drag.source.y)
+    assert.equal(inputs[3].x, drag.source.x + 9); assert.equal(inputs[3].y, drag.source.y + 9)
+    assert.equal(drag.intercepted.length, 1)
+    const intercepted = drag.intercepted[0]
+    assert.equal(intercepted.afterInputSequence, inputs[3].sequence)
+    assert.ok(intercepted.data.dragOperationsMask & 16, 'Native Table drag must allow a move')
+    assert.ok(intercepted.data.items.some(item => item.mimeType === 'application/x-local-notepad-table-reorder' && item.data))
+    for (const input of inputs.slice(4, 7)) assert.deepEqual(input.data, intercepted.data, 'Drop data must come from this native drag interception')
+    for (const input of inputs.slice(4)) { assert.equal(input.x, drag.target.x); assert.equal(input.y, drag.target.y) }
+    assert.equal(inputs[7].buttons, 0); assert.equal(inputs[7].button, 'left')
+  }
+  const drops = report.nativeInputs.filter(input => input.method === 'Input.dispatchDragEvent' && input.type === 'drop')
+  assert.equal(drops.length, 2)
+  for (const drop of drops) assert.ok(drop.data.items.some(item => item.mimeType === 'application/x-local-notepad-table-reorder' && item.data))
+  assert.ok(report.nativeInputs.some(input => input.method === 'Input.dispatchKeyEvent' && input.key === 'Escape'))
+  assert.ok(report.requests.some(request => request.path === '/api/files/' + report.fixture.mainID && request.method === 'PUT' && request.status === 200))
+  assert.ok(report.requests.some(request => request.path === '/api/files/' + report.fixture.mainID && request.method === 'PUT' && request.failure))
+  for (const request of report.requests.filter(item => item.path.startsWith('/api/files/'))) {
+    assert.ok([report.fixture.mainID, report.fixture.largeID, report.fixture.destinationID].some(id => request.path === '/api/files/' + id), 'Table test wrote an unowned note')
+  }
+  assert.deepEqual(report.screenshots.map(item => item.filename), TABLE_OPERATIONS_SCREENSHOTS)
+  for (const screenshot of report.screenshots) {
+    assert.equal(path.basename(screenshot.filename), screenshot.filename)
+    assert.ok(screenshot.bytes > 1000); assert.match(screenshot.sha256, /^[a-f0-9]{64}$/)
+  }
+  return true
+}
+
+export function verifyTableOperationsReport(directory, expected) {
+  const reportPath = path.join(directory, TABLE_OPERATIONS_REPORT)
+  assert.equal(lstatSync(reportPath).isSymbolicLink(), false)
+  const report = JSON.parse(readFileSync(reportPath, 'utf8'))
+  validateTableOperationsReport(report, expected)
+  for (const image of report.screenshots) {
+    const location = path.join(directory, image.filename)
+    assert.equal(lstatSync(location).isSymbolicLink(), false)
+    const bytes = readFileSync(location)
+    assert.equal(bytes.length, image.bytes); assert.equal(tableOperationsHash(bytes), image.sha256)
+    assert.equal(bytes.subarray(0, 8).toString('hex'), '89504e470d0a1a0a')
+    assert.ok(bytes.readUInt32BE(16) >= 640 && bytes.readUInt32BE(20) >= 400)
+  }
+  return report
+}

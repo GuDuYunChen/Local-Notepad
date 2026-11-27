@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import {
   $createTableCellNode,
   $createTableNode,
   $createTableRowNode,
+  $isTableSelection,
 } from '@lexical/table'
 import {
   INSERT_CHECK_LIST_COMMAND,
@@ -22,13 +23,16 @@ import {
 import {
   $createParagraphNode,
   $createTextNode,
+  $getRoot,
   $getSelection,
   $insertNodes,
   $isRangeSelection,
+  $setSelection,
   CAN_REDO_COMMAND,
   CAN_UNDO_COMMAND,
   FORMAT_ELEMENT_COMMAND,
   FORMAT_TEXT_COMMAND,
+  HISTORY_PUSH_TAG,
   INDENT_CONTENT_COMMAND,
   OUTDENT_CONTENT_COMMAND,
   REDO_COMMAND,
@@ -53,7 +57,9 @@ import { useImageUploadSession } from '../hooks/useImageUploadSession'
 import { toast } from '~/services/toast'
 import TableMenu from './TableMenu'
 import { normalizeLinkUrl } from '../utils/linkUtils'
+import { captureTableSelectionWrite, isTableSelectionActive } from '../utils/tableEvents'
 import { useEditorWriteScope } from '../hooks/useEditorWriteScope'
+import { readExcelTableRows } from '../utils/excelTable'
 import { isShortcutContextBlocked, shortcutFromEvent, shortcutLabel } from '~/services/localShortcuts'
 import useLocalShortcuts from '~/hooks/useLocalShortcuts'
 import './TextColorPlugin.css'
@@ -104,7 +110,11 @@ const BLOCK_OPTIONS = [
 export default function ToolbarPlugin({ documentId } = {}) {
   const [editor] = useLexicalComposerContext()
   const { bindings } = useLocalShortcuts()
-  const captureWrite = useEditorWriteScope(editor, documentId)
+  const captureDocumentWrite = useEditorWriteScope(editor, documentId)
+  const captureWrite = useCallback(() => {
+    const canWrite = captureDocumentWrite(), ownsSelection = captureTableSelectionWrite(editor)
+    return () => canWrite() && ownsSelection()
+  }, [captureDocumentWrite, editor])
   const imageUploads = useImageUploadSession(editor, documentId)
   const [canUndo, setCanUndo] = useState(false)
   const [canRedo, setCanRedo] = useState(false)
@@ -113,6 +123,8 @@ export default function ToolbarPlugin({ documentId } = {}) {
     localStorage.getItem('editor-font-family') || FontOptions[0].value
   ))
   const [isUploading, setIsUploading] = useState(false)
+  const [excelBusy, setExcelBusy] = useState(false)
+  const excelRequestRef = useRef(null)
   const [isBold, setIsBold] = useState(false)
   const [isItalic, setIsItalic] = useState(false)
   const [isUnderline, setIsUnderline] = useState(false)
@@ -137,6 +149,19 @@ export default function ToolbarPlugin({ documentId } = {}) {
   const insertMenuRef = useRef(null)
   const moreMenuRef = useRef(null)
   const linkRef = useRef(null)
+  const linkWriteRef = useRef(null)
+
+  useLayoutEffect(() => {
+    setExcelBusy(false)
+    const unregister = editor.registerEditableListener(() => {
+      excelRequestRef.current?.cancel()
+      setExcelBusy(false)
+    })
+    return () => {
+      unregister()
+      excelRequestRef.current?.cancel()
+    }
+  }, [editor, documentId])
 
   useEffect(() => {
     if (!moreOpen || !fontFocusRequestedRef.current) return
@@ -165,6 +190,9 @@ export default function ToolbarPlugin({ documentId } = {}) {
 
   useEffect(() => {
     const openLink = () => {
+      const canWrite = captureWrite()
+      if (!canWrite()) return
+      linkWriteRef.current = canWrite
       setLinkOpen(true)
       setInsertOpen(false)
       setMoreOpen(false)
@@ -172,7 +200,7 @@ export default function ToolbarPlugin({ documentId } = {}) {
 
     window.addEventListener('editor:open-link', openLink)
     return () => window.removeEventListener('editor:open-link', openLink)
-  }, [])
+  }, [captureWrite])
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -194,28 +222,45 @@ export default function ToolbarPlugin({ documentId } = {}) {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  const ensureFormattingAllowed = () => {
+    if (!editor.isEditable()) return false
+    if (isTableSelectionActive(editor)) {
+      toast.warning('请先点击“完成”退出单元格多选，再输入或修改正文')
+      return false
+    }
+    return true
+  }
+
+  const dispatchTextFormat = format => {
+    if (!ensureFormattingAllowed()) return false
+    return editor.dispatchCommand(FORMAT_TEXT_COMMAND, format)
+  }
+
   const applyStyle = (style, value) => {
+    if (!ensureFormattingAllowed()) return false
     editor.update(() => {
       const selection = $getSelection()
       if ($isRangeSelection(selection)) {
         $patchStyleText(selection, { [style]: value })
       }
     })
+    return true
   }
 
   const applyTextColor = (color) => {
-    applyStyle('color', color)
+    if (!applyStyle('color', color)) return
     setShowColorPicker(false)
     editor.focus()
   }
 
   const applyHighlight = (color) => {
-    applyStyle('background-color', color)
+    if (!applyStyle('background-color', color)) return
     setShowHighlightPicker(false)
     editor.focus()
   }
 
   const handleFontChange = (event) => {
+    if (!ensureFormattingAllowed()) return
     const value = event.target.value
     setFontFamily(value)
     localStorage.setItem('editor-font-family', value)
@@ -290,6 +335,7 @@ export default function ToolbarPlugin({ documentId } = {}) {
   ), [editor, updateToolbar])
 
   const formatBlock = (nextType) => {
+    if (!ensureFormattingAllowed()) return
     editor.dispatchCommand(REMOVE_LIST_COMMAND)
 
     editor.update(() => {
@@ -309,6 +355,7 @@ export default function ToolbarPlugin({ documentId } = {}) {
   }
 
   const toggleList = (type) => {
+    if (!ensureFormattingAllowed()) return
     const active = type === 'bullet'
       ? isBulletList
       : type === 'number'
@@ -325,15 +372,27 @@ export default function ToolbarPlugin({ documentId } = {}) {
     editor.focus()
   }
 
-  const insertNode = (node) => {
+  const insertNode = (createNode) => {
+    if (!ensureFormattingAllowed()) return
+    const canWrite = captureWrite()
     editor.update(() => {
-      $insertNodes([node])
+      if (canWrite()) $insertNodes([createNode()])
     })
     setInsertOpen(false)
     editor.focus()
   }
 
+  const canApplyLink = () => {
+    if (!ensureFormattingAllowed()) return false
+    if (linkWriteRef.current?.()) return true
+    linkWriteRef.current = null
+    setLinkOpen(false)
+    toast.warning('编辑选区已变化，请重新选中文字后设置链接')
+    return false
+  }
+
   const applyLink = () => {
+    if (!canApplyLink()) return
     const url = normalizeLinkUrl(linkUrl)
     if (!url || !hasSelection) {
       if (linkUrl.trim()) toast.warning('请输入有效网页链接或章节锚点')
@@ -346,6 +405,7 @@ export default function ToolbarPlugin({ documentId } = {}) {
   }
 
   const removeLink = () => {
+    if (!canApplyLink()) return
     editor.dispatchCommand(TOGGLE_LINK_COMMAND, null)
     setLinkOpen(false)
     setLinkUrl('')
@@ -362,6 +422,7 @@ export default function ToolbarPlugin({ documentId } = {}) {
   }
 
   const handleAttachment = async (event) => {
+    if (!ensureFormattingAllowed()) { event.target.value = ''; return }
     const canWrite = captureWrite()
     if (!canWrite()) return
     const file = event.target.files?.[0]
@@ -400,7 +461,7 @@ export default function ToolbarPlugin({ documentId } = {}) {
     const input = event.target
     const files = Array.from(input.files || [])
     input.value = '' // Selecting the same failed image again must dispatch change.
-    if (!files.length) return
+    if (!files.length || !ensureFormattingAllowed()) return
     const task = imageUploads.begin()
     if (!task) { toast.warning('图片正在处理中，请先完成或取消当前上传'); return }
     setInsertOpen(false)
@@ -440,6 +501,7 @@ export default function ToolbarPlugin({ documentId } = {}) {
   }
 
   const handleVideo = async (event) => {
+    if (!ensureFormattingAllowed()) { event.target.value = ''; return }
     const canWrite = captureWrite()
     if (!canWrite()) return
     const file = event.target.files?.[0]
@@ -485,32 +547,79 @@ export default function ToolbarPlugin({ documentId } = {}) {
   }
 
   const handleExcel = async (event) => {
+    if (excelRequestRef.current) return
+    if (!ensureFormattingAllowed()) { event.target.value = ''; return }
     const canWrite = captureWrite()
     if (!canWrite()) return
-    const file = event.target.files?.[0]
+    const input = event.target
+    const file = input.files?.[0]
     if (!file) return
 
-    if (file.size > 5 * 1024 * 1024) {
-      toast.warning('Excel 文件不能超过 5 MB')
-      event.target.value = ''
+    let insertionSelection = null, insideTable = false
+    editor.read('latest', () => {
+      const selection = $getSelection()
+      insertionSelection = selection?.clone() || null
+      insideTable = $isTableSelection(selection)
+      // A wiki-link selected by evidence navigation is a NodeSelection, not a
+      // range. Its insertion point still belongs to its containing table cell.
+      const nodes = $isRangeSelection(selection)
+        ? [selection.anchor.getNode(), selection.focus.getNode()]
+        : selection?.getNodes?.() || []
+      for (const selected of nodes) {
+        for (let node = selected; node; node = node.getParent()) {
+          if (node.getType() === 'table') insideTable = true
+        }
+      }
+    })
+    if (insideTable) {
+      toast.warning('请先将光标放到表格外的正文中，再插入 Excel 表格')
+      input.value = ''
       return
     }
 
-    setIsUploading(true)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.warning('Excel 文件不能超过 5 MB')
+      input.value = ''
+      return
+    }
+
+    setExcelBusy(true)
     const reader = new FileReader()
+    const task = {
+      changed: false,
+      cancel() {
+        if (excelRequestRef.current === task) excelRequestRef.current = null
+        task.unsubscribe?.()
+        reader.onload = reader.onerror = reader.onabort = null
+        if (reader.readyState === 1) reader.abort()
+        input.value = ''
+      },
+    }
+    excelRequestRef.current = task
+    task.unsubscribe = editor.registerUpdateListener(({ dirtyElements, dirtyLeaves }) => {
+      if (dirtyElements.size || dirtyLeaves.size) task.changed = true
+    })
+    const isCurrent = () => excelRequestRef.current === task && canWrite()
+    const finish = () => {
+      if (excelRequestRef.current !== task) return
+      task.cancel()
+      setExcelBusy(false)
+    }
 
     reader.onload = async (loadEvent) => {
       try {
-        if (!canWrite()) return
+        if (!isCurrent()) return
         const XLSX = await loadXLSX()
-        if (!canWrite()) return
+        if (!isCurrent()) return
+        if (task.changed) throw new Error('导入期间正文已变化，请重新选择 Excel 文件；未插入过期表格')
         const data = new Uint8Array(loadEvent.target.result)
-        const workbook = XLSX.read(data, { type: 'array' })
-        const sheet = workbook.Sheets[workbook.SheetNames[0]]
-        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
+        const rows = readExcelTableRows(XLSX, data)
 
+        let inserted = false
         editor.update(() => {
-          if (!canWrite()) return
+          if (!isCurrent()) return
+          if (insertionSelection) $setSelection(insertionSelection.clone())
+          else $getRoot().selectEnd()
           const table = $createTableNode()
           for (const rowData of rows) {
             const tableRow = $createTableRowNode()
@@ -524,23 +633,26 @@ export default function ToolbarPlugin({ documentId } = {}) {
             table.append(tableRow)
           }
           $insertNodes([table])
-        })
+          inserted = true
+        }, { tag: HISTORY_PUSH_TAG, discrete: true })
+        if (inserted && isCurrent()) {
+          setInsertOpen(false)
+          editor.focus()
+        }
       } catch (error) {
-        console.error('Excel 解析失败', error)
-        toast.error('Excel 解析失败')
+        if (isCurrent()) toast.error(error.message || 'Excel 解析失败')
       } finally {
-        setIsUploading(false)
-        event.target.value = ''
+        finish()
       }
     }
 
     reader.onerror = () => {
-      setIsUploading(false)
-      event.target.value = ''
-      if (canWrite()) toast.error('读取 Excel 文件失败')
+      if (isCurrent()) toast.error('读取 Excel 文件失败')
+      finish()
     }
-
-    reader.readAsArrayBuffer(file)
+    reader.onabort = finish
+    try { reader.readAsArrayBuffer(file) }
+    catch { reader.onerror() }
   }
 
   return (
@@ -587,7 +699,7 @@ export default function ToolbarPlugin({ documentId } = {}) {
       <div className="toolbar-group compact-format" aria-label="文字格式">
         <UiButton density="compact"
           type="button"
-          onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'bold')}
+          onClick={() => dispatchTextFormat('bold')}
           className={`btn fw-bold${isBold ? ' active' : ''}`}
           aria-label="加粗"
           title="加粗 (Ctrl+B)"
@@ -596,7 +708,7 @@ export default function ToolbarPlugin({ documentId } = {}) {
         </UiButton>
         <UiButton density="compact"
           type="button"
-          onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'italic')}
+          onClick={() => dispatchTextFormat('italic')}
           className={`btn fst-italic${isItalic ? ' active' : ''}`}
           aria-label="斜体"
           title="斜体 (Ctrl+I)"
@@ -605,7 +717,7 @@ export default function ToolbarPlugin({ documentId } = {}) {
         </UiButton>
         <UiButton density="compact"
           type="button"
-          onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'underline')}
+          onClick={() => dispatchTextFormat('underline')}
           className={`btn text-decoration-underline${isUnderline ? ' active' : ''}`}
           aria-label="下划线"
           title="下划线 (Ctrl+U)"
@@ -614,7 +726,7 @@ export default function ToolbarPlugin({ documentId } = {}) {
         </UiButton>
         <UiButton density="compact"
           type="button"
-          onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'code')}
+          onClick={() => dispatchTextFormat('code')}
           className={`btn toolbar-inline-code${isCode ? ' active' : ''}`}
           aria-label="行内代码"
           title="行内代码"
@@ -660,7 +772,13 @@ export default function ToolbarPlugin({ documentId } = {}) {
           type="button"
           className={`btn toolbar-text-btn${linkOpen ? ' active' : ''}`}
           disabled={!hasSelection}
-          onClick={() => setLinkOpen(prev => !prev)}
+          onClick={() => {
+            if (linkOpen) { linkWriteRef.current = null; setLinkOpen(false); return }
+            const canWrite = captureWrite()
+            if (!canWrite()) return
+            linkWriteRef.current = canWrite
+            setLinkOpen(true)
+          }}
           aria-label="添加链接"
           title={hasSelection ? '添加链接' : '先选中文字'}
         >
@@ -740,7 +858,7 @@ export default function ToolbarPlugin({ documentId } = {}) {
       </UiButton>
 
       <span className="toolbar-slash-hint">输入 / 快速插入</span>
-      {isUploading && <span className="toolbar-progress" role="status">处理中…</span>}
+      {(isUploading || excelBusy) && <span className="toolbar-progress" role="status">处理中…</span>}
       {imageUploads.busy && <div className="editor-image-upload-status" role="status" aria-label="图片上传进度">
         <span className="toolbar-progress">正在插入图片…</span>
         <UiButton density="compact" type="button" className="btn small" autoFocus onClick={() => { imageUploads.cancel(); toast.warning('已取消上传，未插入图片') }}>取消图片上传</UiButton>
@@ -781,35 +899,36 @@ export default function ToolbarPlugin({ documentId } = {}) {
                   type="button"
                   className="btn toolbar-menu-action"
                   onClick={() => {
+                    if (!ensureFormattingAllowed()) return
                     editor.dispatchCommand(INSERT_CODE_BLOCK_COMMAND)
                     setInsertOpen(false)
                   }}
                 >
                   代码块
                 </UiButton>
-                <UiButton density="compact" type="button" className="btn toolbar-menu-action" onClick={() => insertNode($createFormulaNode())} title={shortcutLabel('formula', bindings)}>
+                <UiButton density="compact" type="button" className="btn toolbar-menu-action" onClick={() => insertNode($createFormulaNode)} title={shortcutLabel('formula', bindings)}>
                   数学公式
                 </UiButton>
-                <UiButton density="compact" type="button" className="btn toolbar-menu-action" onClick={() => insertNode($createCalloutNode())}>
+                <UiButton density="compact" type="button" className="btn toolbar-menu-action" onClick={() => insertNode($createCalloutNode)}>
                   提示块
                 </UiButton>
-                <UiButton density="compact" type="button" className="btn toolbar-menu-action" onClick={() => insertNode($createToggleNode())}>
+                <UiButton density="compact" type="button" className="btn toolbar-menu-action" onClick={() => insertNode($createToggleNode)}>
                   折叠块
                 </UiButton>
-                <UiButton density="compact" type="button" className="btn toolbar-menu-action" onClick={() => insertNode($createDividerNode())}>
+                <UiButton density="compact" type="button" className="btn toolbar-menu-action" onClick={() => insertNode($createDividerNode)}>
                   分割线
                 </UiButton>
-                <UiButton density="compact" type="button" className="btn toolbar-menu-action" onClick={() => insertNode($createEmbedNode())}>
+                <UiButton density="compact" type="button" className="btn toolbar-menu-action" onClick={() => insertNode($createEmbedNode)}>
                   嵌入
                 </UiButton>
                 <label className="btn toolbar-menu-action">
                   Excel
-                  <input data-ui-native="file" type="file" accept=".xlsx,.xls" hidden onChange={handleExcel} />
+                  <input data-ui-native="file" type="file" accept=".xlsx,.xls" hidden disabled={excelBusy} onChange={handleExcel} />
                 </label>
               </div>
 
               <div className="toolbar-table-section">
-                <TableMenu />
+                <TableMenu documentId={documentId} onInsert={() => setInsertOpen(false)} />
               </div>
             </div>
           </div>
@@ -849,6 +968,7 @@ export default function ToolbarPlugin({ documentId } = {}) {
                 <UiSelect density="compact"
                   value={fontSize}
                   onChange={event => {
+                    if (!ensureFormattingAllowed()) return
                     setFontSize(event.target.value)
                     applyStyle('font-size', event.target.value)
                   }}
@@ -863,7 +983,7 @@ export default function ToolbarPlugin({ documentId } = {}) {
                 <UiButton density="compact"
                   type="button"
                   className={`btn${isStrikethrough ? ' active' : ''}`}
-                  onClick={() => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'strikethrough')}
+                  onClick={() => dispatchTextFormat('strikethrough')}
                 >
                   删除线
                 </UiButton>
@@ -943,31 +1063,31 @@ export default function ToolbarPlugin({ documentId } = {}) {
               <div className="toolbar-menu-row">
                 <UiButton density="compact"
                   type="button"
-                  onClick={() => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'left')}
+                  onClick={() => ensureFormattingAllowed() && editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'left')}
                   className={`btn${elementFormat === 'left' ? ' active' : ''}`}
                 >
                   左对齐
                 </UiButton>
                 <UiButton density="compact"
                   type="button"
-                  onClick={() => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'center')}
+                  onClick={() => ensureFormattingAllowed() && editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'center')}
                   className={`btn${elementFormat === 'center' ? ' active' : ''}`}
                 >
                   居中
                 </UiButton>
                 <UiButton density="compact"
                   type="button"
-                  onClick={() => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'right')}
+                  onClick={() => ensureFormattingAllowed() && editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'right')}
                   className={`btn${elementFormat === 'right' ? ' active' : ''}`}
                 >
                   右对齐
                 </UiButton>
               </div>
               <div className="toolbar-menu-row">
-                <UiButton density="compact" type="button" className="btn" onClick={() => editor.dispatchCommand(OUTDENT_CONTENT_COMMAND)}>
+                <UiButton density="compact" type="button" className="btn" onClick={() => ensureFormattingAllowed() && editor.dispatchCommand(OUTDENT_CONTENT_COMMAND)}>
                   减少缩进
                 </UiButton>
-                <UiButton density="compact" type="button" className="btn" onClick={() => editor.dispatchCommand(INDENT_CONTENT_COMMAND)}>
+                <UiButton density="compact" type="button" className="btn" onClick={() => ensureFormattingAllowed() && editor.dispatchCommand(INDENT_CONTENT_COMMAND)}>
                   增加缩进
                 </UiButton>
               </div>

@@ -16,6 +16,10 @@ import {
   restoreDocumentSelectionSnapshot,
   writeDocumentSession,
 } from './DocumentSessionPlugin'
+import {
+  $createTableCellNode, $createTableNode, $createTableRowNode,
+  TableCellNode, TableNode, TableRowNode,
+} from '@lexical/table'
 
 describe('document session persistence', () => {
   beforeEach(() => {
@@ -87,5 +91,56 @@ describe('document session persistence', () => {
       anchor: { blockIndex: 1, offset: 1 },
       focus: { blockIndex: 1, offset: 4 },
     })
+  })
+
+  it.each(['text', 'empty'])('restores the exact %s cell after serialized document reload', kind => {
+    const config = { namespace: 'TableSession', nodes: [TableNode, TableRowNode, TableCellNode], onError: error => { throw error } }
+    const editor = createEditor(config)
+    let snapshot
+    editor.update(() => {
+      const first = $createParagraphNode().append($createTextNode('first'))
+      const second = $createParagraphNode()
+      if (kind === 'text') second.append($createTextNode('second'))
+      $getRoot().append($createTableNode().append($createTableRowNode().append(
+        $createTableCellNode().append(first), $createTableCellNode().append(second),
+      )))
+      second.selectStart()
+      snapshot = captureDocumentSelectionSnapshot()
+    }, { discrete: true })
+    expect(snapshot).not.toBeNull()
+    writeDocumentSession('table-note', { scrollTop: 80, selection: snapshot })
+    const loaded = createEditor(config)
+    loaded.setEditorState(loaded.parseEditorState(JSON.stringify(editor.getEditorState())))
+    loaded.update(() => {
+      expect(restoreDocumentSelectionSnapshot(readDocumentSession('table-note').selection)).toBe(true)
+      const expected = $getRoot().getFirstChild().getFirstChild().getChildren()[1].getFirstChild()
+      const selection = $getSelection()
+      expect(selection.anchor.getNode().getKey()).toBe((kind === 'text' ? expected.getFirstChild() : expected).getKey())
+      expect(selection.anchor.offset).toBe(0)
+      expect(selection.anchor.type).toBe(kind === 'text' ? 'text' : 'element')
+    }, { discrete: true })
+  })
+
+  it('preserves both cell boundaries in a cross-cell range and refuses missing saved paths', () => {
+    const editor = createEditor({ namespace: 'TableSessionRange', nodes: [TableNode, TableRowNode, TableCellNode], onError: error => { throw error } })
+    editor.update(() => {
+      const first = $createTextNode('first'), second = $createTextNode('second')
+      const cells = [first, second].map(text => $createTableCellNode().append($createParagraphNode().append(text)))
+      $getRoot().append($createTableNode().append($createTableRowNode().append(...cells)))
+      const selection = $createRangeSelection()
+      selection.anchor.set(first.getKey(), 2, 'text')
+      selection.focus.set(second.getKey(), 0, 'text')
+      $setSelection(selection)
+      const snapshot = captureDocumentSelectionSnapshot()
+      expect(snapshot).not.toBeNull()
+      $setSelection(null)
+      expect(restoreDocumentSelectionSnapshot(snapshot)).toBe(true)
+      expect($getSelection().anchor.key).toBe(first.getKey())
+      expect($getSelection().focus.key).toBe(second.getKey())
+      cells[1].remove()
+      $setSelection(null)
+      expect(restoreDocumentSelectionSnapshot(snapshot)).toBe(false)
+      expect($getSelection()).toBeNull()
+    }, { discrete: true })
   })
 })
