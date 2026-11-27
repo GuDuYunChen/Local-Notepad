@@ -1,5 +1,5 @@
 {
-  "product": "944830e4777400a1a1755abf215c8c7bf6a02d49",
+  "product": "306eb6b5a4c93ce90b503077e12ebe48c4801e73",
   "quickBlob": "c1e8f40862b770f82af47c26a455b57efc853700",
   "tagsBlob": "54bb56864e58e2aa3f5ed08aedb52a00de5f0769",
   "templateBlob": "42378f13f71a03c3e91cdfdcb6dec44dbbb05f33",
@@ -16,8 +16,8 @@
   "importEvidenceTestsBlob": "ca42c12a3a70060d5c0dda26c7789759e854a700",
   "current": {
     "version": "4.249.2",
-    "bytes": 115612142,
-    "sha256": "87d3ba17e4be19d6a6decfe3a6b68e63aae3a722ed8018ca3ca187657a91aa3d"
+    "bytes": 115622551,
+    "sha256": "7028d386e3e90038b5eb4adfcae474278cf9c0307518ff1435e40def6134d6b8"
   },
   "previous": {
     "version": "4.232.0",
@@ -31,14 +31,14 @@
     "productSourceCommit": "1a8e17ba775312c359f4ac23851c8c365b57a9cb"
   },
   "currentSource": {
-    "run": 45767383262,
-    "artifact": 15093398135,
-    "name": "local-notepad-windows-944830e4777400a1a1755abf215c8c7bf6a02d49",
-    "headSha": "5a7846f0df403356feb55f72a6fef7d616799ba4",
+    "run": 45939600258,
+    "artifact": 15172937553,
+    "name": "local-notepad-windows-306eb6b5a4c93ce90b503077e12ebe48c4801e73",
+    "headSha": "adf6d4f6937782a388620750000edc554432e556",
     "branch": "fix/notepad-table-operations-4-249-2",
     "repositoryId": 1105107817,
-    "archiveBytes": 115619055,
-    "archiveSha256": "bd74dfa9707b2303b4eb6f3bff4b2397cb1a45539bcb37010592dcd9603db742"
+    "archiveBytes": 115629525,
+    "archiveSha256": "4b1dfe1bad1521b75e68a7c71231f1ad665042dd5278a377c39dee7c9b60b009"
   },
   "readingDriverBlob": "6924b128c1125424c91f71dbd1ecc415762e2f77",
   "readingFixtureBlob": "0c7ffadbb187dd33a7bc6b5aa8c69427eec5cc34",
@@ -96,9 +96,9 @@
     "src/components/Editor/utils/referenceUtils.js": "046ede7392ba863a82bd28c6857fc8b8cceaf30c"
   },
   "tableOperationsSources": {
-    "scripts/table-operations-desktop-driver.mjs": "fdef2c883c6a9faaa872f9a7df933a8385fe6e89",
+    "scripts/table-operations-desktop-driver.mjs": "4420cbd84b91cc7dc52200c6e804dc8347b7ce1d",
     "scripts/run-table-operations-desktop.mjs": "d0b252d1e5e66a7bb0a79db65c9d070869be583e",
-    "scripts/table-operations-evidence.mjs": "15d6f792e59db06625796a746b84d4abbcb3e27d",
+    "scripts/table-operations-evidence.mjs": "4f76541b7e26b9a932edfef9ca6ebaa63f926eb2",
     "scripts/desktop-window-session.mjs": "d298f7163131df889a1df491338457e17531d42f",
     "scripts/desktop-window-target.mjs": "a5e0f1e055fddb632723baec67ec09610e58a04d",
     "scripts/desktop-window-worker.ps1": "95f9ced7a00787536606e4bc846bf8ceeaf5fee0",
@@ -136,6 +136,12 @@
     "src/components/TextEditor.jsx": "4b3ed93ed2ee14492491a92a9ce9dda95c4a07c0",
     "src/services/editorDraftCache.js": "6efd02a6350a73efbd64118cc907e5d43559398c",
     "src/styles/editor-document.css": "5b454cc49bbaaaa85011bd3e524b1928475578a3",
-    "src/services/localAppearance.js": "1712f793874c892f9a1c0e7cfce7e3b4fd1c7459"
+    "src/services/localAppearance.js": "1712f793874c892f9a1c0e7cfce7e3b4fd1c7459",
+    "src/components/Editor/plugins/SearchPlugin.jsx": "d49d8a8b7017eb740a99302c7e49653184f6e787",
+    "src/components/Editor/plugins/documentSearchLexical.jsx": "29f559f03e37a3ce23f712d1259dd83822820a10",
+    "src/components/Editor/utils/tableSearchVisibility.js": "50736485b26c74dc1ae78533ff67de400ca53810",
+    "src/services/documentSearch.mjs": "508d8f6f31ff9c7d385dfacef2c3ffd296a5dfab",
+    "src/components/Editor/plugins/DocumentSearch.css": "3916a90328862b062ff76986cfac0173e9af70cd",
+    "src/utils/lexicalText.js": "a65c6fb38a5406494683686a6083a9079560f71c"
   }
 }

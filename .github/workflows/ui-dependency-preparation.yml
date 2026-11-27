@@ -16,19 +16,28 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
+      - name: Load reviewed dependency replay from workflow source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=2 origin "$GITHUB_SHA" 93fa4f9aaa0b806838833e02156e7bb2e2a7f36b 1c8ec5689847a580ce307b9157fbbc8c1ac43a8f
+          mkdir -p "$RUNNER_TEMP/ui-dependency-replay"
+          git show "${GITHUB_SHA}:scripts/apply-reviewed-ui-dependency.mjs" > "$RUNNER_TEMP/ui-dependency-replay/apply-reviewed-ui-dependency.mjs"
+          git show "${GITHUB_SHA}:scripts/verify-dependency-lock.mjs" > "$RUNNER_TEMP/ui-dependency-replay/verify-dependency-lock.mjs"
       - name: Generate deliberate dependency update then verify with npm ci
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p ui-dependency
           cp package-lock.json ui-dependency/baseline-package-lock.json
-          npm install --package-lock-only --ignore-scripts --save-exact antd@6.6.8 --no-audit --no-fund
+          node "$RUNNER_TEMP/ui-dependency-replay/apply-reviewed-ui-dependency.mjs" > ui-dependency/dependency-replay.json
+          node scripts/verify-dependency-lock.mjs
           npm ci --no-audit --no-fund
           git diff -- package.json package-lock.json > ui-dependency/dependency.patch
           cp package.json package-lock.json ui-dependency/
-          node -e "const p=require('./node_modules/antd/package.json'); if(p.version!=='6.6.8')throw Error('Wrong UI library'); console.log(JSON.stringify({node:process.version,antd:p.version,react:require('./node_modules/react/package.json').version,source:'1c8ec5689847a580ce307b9157fbbc8c1ac43a8f',run:process.env.GITHUB_RUN_ID}))" > ui-dependency/provenance.json
+          node -e "const p=require('./node_modules/antd/package.json'); if(p.version!=='6.6.8')throw Error('Wrong UI library'); console.log(JSON.stringify({node:process.version,antd:p.version,react:require('./node_modules/react/package.json').version,source:'1c8ec5689847a580ce307b9157fbbc8c1ac43a8f',run:process.env.GITHUB_RUN_ID,dependencyReplay:require('./ui-dependency/dependency-replay.json')}))" > ui-dependency/provenance.json
           tar -czf ui-dependency/node-modules.tar.gz node_modules
-          (cd ui-dependency && sha256sum baseline-package-lock.json dependency.patch package.json package-lock.json provenance.json node-modules.tar.gz > SHA256SUMS)
+          (cd ui-dependency && sha256sum baseline-package-lock.json dependency.patch package.json package-lock.json provenance.json node-modules.tar.gz dependency-replay.json > SHA256SUMS)
       - uses: actions/upload-artifact@v4
         with:
           name: ui-locked-antd-6-6-8

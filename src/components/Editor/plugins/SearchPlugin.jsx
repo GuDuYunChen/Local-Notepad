@@ -5,7 +5,8 @@ import { HISTORY_PUSH_TAG, SKIP_DOM_SELECTION_TAG } from 'lexical'
 import ConfirmDialog from '../../ConfirmDialog'
 import { SEARCH_LIMITS, assertSearchString } from '~/services/documentSearch.mjs'
 import { isShortcutContextBlocked, matchShortcut } from '~/services/localShortcuts'
-import { $readDocumentSearch, $replaceDocumentMatches, searchTopLevelKey, searchDOMRange } from './documentSearchLexical'
+import { $readDocumentSearch, $replaceDocumentMatches, searchTopLevelKey, searchDOMRange, scrollSearchMatchIntoView } from './documentSearchLexical'
+import { revealTableSearchRange } from '../utils/tableSearchVisibility'
 import './DocumentSearch.css'
 import { UiButton, UiInput } from '~/components/ui/ControlKit'
 
@@ -106,13 +107,18 @@ export default function SearchPlugin({ documentId = '' }) {
         const key=searchTopLevelKey(editor,match)
         window.dispatchEvent(new CustomEvent('editor:search-match',{detail:{documentId,topLevelKey:key}}))
         const element=editor.getElementByKey(key)
-        element?.scrollIntoView?.({block:'center',inline:'nearest',behavior:'auto'})
         if(match.kind==='code-block'){
+          element?.scrollIntoView?.({block:'center',inline:'nearest',behavior:'auto'})
           window.dispatchEvent(new CustomEvent('editor:code-search-match',{detail:{nodeKey:match.parts[0].key,offset:match.parts[0].start,length:match.length,focus:false}}))
           clearHighlight()
         }else{
           const range=searchDOMRange(editor,match)
-          if(range&&globalThis.Highlight&&globalThis.CSS?.highlights) CSS.highlights.set(HIGHLIGHT,new Highlight(range))
+          if(!range) throw new Error('匹配范围暂时不可见')
+          const root=editor.getRootElement(), start=range.startContainer.nodeType===1?range.startContainer:range.startContainer.parentElement
+          const table=start?.closest('td,th')?.closest('table')
+          if(table&&root?.contains(table)) revealTableSearchRange({range,table,root,panel:panelRef.current})
+          else if(!scrollSearchMatchIntoView(editor,match)) throw new Error('匹配范围暂时不可见')
+          if(globalThis.Highlight&&globalThis.CSS?.highlights) CSS.highlights.set(HIGHLIGHT,new Highlight(range))
         }
       }catch{clearHighlight();setError('匹配位置暂时不可用，请重新查找；正文未改动')}
     })

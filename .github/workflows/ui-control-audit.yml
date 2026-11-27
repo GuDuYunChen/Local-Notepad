@@ -21,6 +21,8 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '24'
+      - name: Verify committed dependency lock
+        run: node scripts/verify-dependency-lock.mjs
       - name: Install the committed dependency lock without adding a UI library
         run: npm ci --no-audit --no-fund
       - name: Verify manifest and lock are unchanged

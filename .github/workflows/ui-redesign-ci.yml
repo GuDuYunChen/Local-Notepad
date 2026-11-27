@@ -43,7 +43,7 @@ jobs:
         run: git diff --exit-code -- package.json package-lock.json
 
       - name: Verify real-control drivers and current upgrade identity refusals
-        run: node --test scripts/fixture-antd-node-imports.node.mjs scripts/current-upgrade-input.node.mjs scripts/native-ui-select.node.mjs scripts/ui-control-render-evidence.node.cjs scripts/table-operations-evidence.node.mjs scripts/table-operations-cleanup.node.mjs
+        run: node --test scripts/fixture-antd-node-imports.node.mjs scripts/current-upgrade-input.node.mjs scripts/native-ui-select.node.mjs scripts/ui-control-render-evidence.node.cjs scripts/table-operations-evidence.node.mjs scripts/table-operations-cleanup.node.mjs scripts/dependency-lock.node.mjs
 
       - name: Build Electron main/preload
         run: npm run build:main
@@ -649,8 +649,15 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
 
+      - name: Verify candidate dependency lock
+        run: node scripts/verify-dependency-lock.mjs
+
       - name: Install candidate locked dependencies
         run: npm ci --no-audit --no-fund
+
+      - name: Verify baseline dependency lock
+        working-directory: baseline
+        run: node scripts/verify-dependency-lock.mjs
 
       - name: Install baseline locked dependencies
         working-directory: baseline

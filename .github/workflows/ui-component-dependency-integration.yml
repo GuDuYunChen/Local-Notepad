@@ -19,8 +19,18 @@ jobs:
         with:
           node-version: 24
           cache: npm
+      - name: Load reviewed dependency replay from workflow source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=2 origin "$GITHUB_SHA" 93fa4f9aaa0b806838833e02156e7bb2e2a7f36b 1c8ec5689847a580ce307b9157fbbc8c1ac43a8f
+          mkdir -p "$RUNNER_TEMP/ui-dependency-replay"
+          git show "${GITHUB_SHA}:scripts/apply-reviewed-ui-dependency.mjs" > "$RUNNER_TEMP/ui-dependency-replay/apply-reviewed-ui-dependency.mjs"
+          git show "${GITHUB_SHA}:scripts/verify-dependency-lock.mjs" > "$RUNNER_TEMP/ui-dependency-replay/verify-dependency-lock.mjs"
       - name: Add exact Ant Design dependency and regenerate lockfile
-        run: npm install --package-lock-only --ignore-scripts --save-exact antd@6.6.8 --no-audit --no-fund
+        run: node "$RUNNER_TEMP/ui-dependency-replay/apply-reviewed-ui-dependency.mjs"
+      - name: Verify generated dependency lock
+        run: node scripts/verify-dependency-lock.mjs
       - name: Verify lockfile reproducibility
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Commit only dependency manifest and lockfile

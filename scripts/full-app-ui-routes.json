@@ -3,18 +3,18 @@
   "scope": "installed-actual-app-page-matrix",
   "sourceScope": "control-source entry coverage with declared states; not every possible failure combination",
   "productSource": {
-    "commit": "944830e4777400a1a1755abf215c8c7bf6a02d49",
-    "tree": "4111f3e2fe501b2a3077940aed9bb44c6d5989bf",
+    "commit": "306eb6b5a4c93ce90b503077e12ebe48c4801e73",
+    "tree": "3a2c189dfeea64cfb3e38d94df134bd539b53553",
     "dirty": false
   },
   "inventory": {
     "file": "inventory.json",
-    "sha256": "2daad73679ba971650fcc6d1e74988bad2bc8a62c6dcce75555b2e6cd57860d6",
+    "sha256": "7af8719817199fb2962f7ce4f5750c6351c5f03374d5f70852af78fd106a77d8",
     "originalDirty": false,
-    "currentCodeFilesHashRevalidated": 354,
+    "currentCodeFilesHashRevalidated": 355,
     "currentControlsFiles": 135,
-    "sourceCommit": "5a7846f0df403356feb55f72a6fef7d616799ba4",
-    "sourceTree": "4111f3e2fe501b2a3077940aed9bb44c6d5989bf",
+    "sourceCommit": "adf6d4f6937782a388620750000edc554432e556",
+    "sourceTree": "3a2c189dfeea64cfb3e38d94df134bd539b53553",
     "currentStylesheetsHashRevalidated": 98
   },
   "matrix": [
@@ -2247,9 +2247,9 @@
     },
     {
       "file": "src/components/Editor/plugins/SearchPlugin.jsx",
-      "bytes": 14970,
-      "sha256": "b79a621ccdd611539d11ea5365c1a9c2a33477a09014fd64b405597bdd5f9894",
-      "blob": "4882ffa80bfc27067271fc092bbcfe46a9c08c43",
+      "bytes": 15554,
+      "sha256": "e570f9efceddbc193bafce3894c69724424f9da30923baa1c14c75254cc71489",
+      "blob": "d49d8a8b7017eb740a99302c7e49653184f6e787",
       "classification": "planned-actual-route",
       "reason": "The installed driver declares this component root and exact states. Actual native completion is established only by the separate accepted report and PNGs, never by this manifest.",
       "routeIds": [

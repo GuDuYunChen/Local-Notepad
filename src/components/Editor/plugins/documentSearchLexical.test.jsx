@@ -2,7 +2,7 @@ import {beforeEach,test,expect} from 'vitest'
 import {createEditor,$getRoot,$createParagraphNode,$createTextNode,$getNodeByKey} from 'lexical'
 import {LinkNode,$createLinkNode} from '@lexical/link'
 import {CodeBlockNode,$createCodeBlockNode} from '../nodes/CodeBlockNode'
-import {$readDocumentSearch,$replaceDocumentMatches} from './documentSearchLexical'
+import {$readDocumentSearch,$replaceDocumentMatches,scrollSearchMatchIntoView} from './documentSearchLexical'
 let editor
 beforeEach(()=>{editor=createEditor({namespace:'document-search-test',nodes:[LinkNode,CodeBlockNode],onError:e=>{throw e}})})
 function update(fn){editor.update(fn,{discrete:true})}
@@ -21,3 +21,20 @@ test('code and paragraph results remain in document order',()=>{update(()=>$getR
 test('token text is excluded instead of rewriting protected inline identities',()=>{update(()=>{const t=$createTextNode('alpha');t.setMode('token');$getRoot().clear().append($createParagraphNode().append(t))});expect(read('alpha').matches).toHaveLength(0)})
 test('delete replacement does not remove the containing block',()=>{seed();const r=read('alpha');update(()=>$replaceDocumentMatches(r,'alpha',{},''));expect(body()).toBe(' ');editor.getEditorState().read(()=>expect($getRoot().getChildrenSize()).toBe(1))})
 test('replacement equal to old text remains a no-op',()=>{seed();const before=JSON.stringify(editor.getEditorState()),r=read('alpha');update(()=>expect($replaceDocumentMatches(r,'alpha',{},'alpha')).toBe(0));expect(JSON.stringify(editor.getEditorState())).toBe(before)})
+
+
+test('search navigation scrolls the matched paragraph inside a long Table cell', () => {
+  const table = document.createElement('table')
+  const row = table.insertRow(), cell = row.insertCell(), paragraph = document.createElement('p'), span = document.createElement('span')
+  span.textContent = 'LONG-80-3-value-tail-saved'; paragraph.append(span); cell.append(paragraph); table.append(row)
+  document.body.append(table)
+  const calls = []
+  paragraph.scrollIntoView = options => calls.push(options)
+  span.scrollIntoView = () => { throw new Error('Inline leaf must not be used as the scroll target') }
+  const fakeEditor = { getElementByKey: key => key === 'match-leaf' ? span : null }
+  const match = { kind: 'text', parts: [{ key: 'match-leaf', original: span.textContent, start: 0, end: span.textContent.length }] }
+  try {
+    expect(scrollSearchMatchIntoView(fakeEditor, match)).toBe(true)
+    expect(calls).toEqual([{ block: 'center', inline: 'nearest', behavior: 'auto' }])
+  } finally { table.remove() }
+})
