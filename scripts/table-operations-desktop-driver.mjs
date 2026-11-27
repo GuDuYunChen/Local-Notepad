@@ -97,6 +97,65 @@ export async function ensureTableDarkTheme({ evaluate, click, until, report, sav
   }
 }
 
+// Read the real browser Range and clipping/hit-test results. Creating the
+// before Range does not select, focus, scroll, or change the document. After
+// native Ctrl+F the only accepted Range is the product's CSS Highlight.
+export function observeTableSearchRange(query, fromHighlight) {
+  const root = document.querySelector('.editor-input'), table = root?.querySelector('table')
+  const target = table?.rows[79]?.cells[2], panel = root?.closest('.editor-shell')?.querySelector('.document-search')
+  const input = panel?.querySelector('input[aria-label="查找内容"]')
+  let ranges = []
+  if (fromHighlight) ranges = [...(globalThis.CSS?.highlights?.get('notepad-document-find') || [])]
+  else if (target) {
+    const walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT)
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      const offset = node.textContent.indexOf(query)
+      if (offset < 0) continue
+      const range = document.createRange()
+      range.setStart(node, offset); range.setEnd(node, offset + query.length); ranges.push(range)
+    }
+  }
+  const range = ranges.length === 1 ? ranges[0] : null
+  const start = range?.startContainer, element = start?.nodeType === Node.ELEMENT_NODE ? start : start?.parentElement
+  const endpoint = (node, offset) => {
+    const element = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement
+    const cell = element?.closest('td,th'), row = cell?.parentElement
+    return { row: table ? [...table.rows].indexOf(row) : -1, column: row?.cells ? [...row.cells].indexOf(cell) : -1,
+      offset, inTarget: !!target && target.contains(node) }
+  }
+  const rects = range ? [...range.getClientRects()].filter(rect => rect.width > 0 && rect.height > 0) : []
+  const box = rects[0], rect = box ? { left: box.left, right: box.right, top: box.top, bottom: box.bottom } : null
+  const viewport = { width: innerWidth, height: innerHeight }
+  const clip = { left: 0, top: 0, right: innerWidth, bottom: innerHeight }, clips = []
+  for (let node = element?.parentElement; node; node = node.parentElement) {
+    const style = getComputedStyle(node), x = /^(auto|scroll|hidden|clip)$/.test(style.overflowX), y = /^(auto|scroll|hidden|clip)$/.test(style.overflowY)
+    if (!x && !y) continue
+    const r = node.getBoundingClientRect(), left = r.left + node.clientLeft, top = r.top + node.clientTop
+    const boundary = { table: node === table, x, y, left, top, right: left + node.clientWidth, bottom: top + node.clientHeight }
+    clips.push(boundary)
+    if (x) { clip.left = Math.max(clip.left, boundary.left); clip.right = Math.min(clip.right, boundary.right) }
+    if (y) { clip.top = Math.max(clip.top, boundary.top); clip.bottom = Math.min(clip.bottom, boundary.bottom) }
+  }
+  const points = rect ? [
+    [(rect.left + rect.right) / 2, (rect.top + rect.bottom) / 2],
+    [rect.left + Math.min(1, (rect.right - rect.left) / 4), rect.top + Math.min(1, (rect.bottom - rect.top) / 4)],
+    [rect.right - Math.min(1, (rect.right - rect.left) / 4), rect.top + Math.min(1, (rect.bottom - rect.top) / 4)],
+    [rect.left + Math.min(1, (rect.right - rect.left) / 4), rect.bottom - Math.min(1, (rect.bottom - rect.top) / 4)],
+    [rect.right - Math.min(1, (rect.right - rect.left) / 4), rect.bottom - Math.min(1, (rect.bottom - rect.top) / 4)],
+  ].map(([x, y]) => {
+    const hit = x >= 0 && x < innerWidth && y >= 0 && y < innerHeight ? document.elementFromPoint(x, y) : null
+    return { x, y, owned: !!hit && !!element?.contains(hit), tag: hit?.tagName || null }
+  }) : []
+  const inside = !!rect && rect.left >= clip.left - 1 && rect.right <= clip.right + 1 && rect.top >= clip.top - 1 && rect.bottom <= clip.bottom + 1
+  return { source: fromHighlight ? 'css-highlight' : 'native-dom-range', matches: ranges.length, text: range?.toString() || null,
+    connected: !!root?.isConnected && !!table?.isConnected && !!element?.isConnected && !!table?.contains(element),
+    start: range ? endpoint(range.startContainer, range.startOffset) : null, end: range ? endpoint(range.endContainer, range.endOffset) : null,
+    rect, rectCount: rects.length, viewport, clip, clips, points, inside, visible: inside && points.length === 5 && points.every(point => point.owned),
+    scrollTop: table?.scrollTop ?? null, scrollLeft: table?.scrollLeft ?? null,
+    query: input?.value ?? null, queryFocused: !!input && document.activeElement === input,
+    count: panel?.querySelector('.search-count')?.textContent || null }
+}
+
 // This driver is shared by packaged and installed applications. It never reads
 // private Lexical state, dispatches synthetic Table/input events, sets input
 // values, or replaces transport/timers. Library refresh is the existing setup
@@ -135,6 +194,9 @@ export async function verifyTableOperationsDesktop(context) {
     return {editable:root?.getAttribute('contenteditable'),rootFocused:document.activeElement===root,
       modebarFocused:!!document.querySelector('.table-selection-modebar')?.contains(document.activeElement),width:innerWidth,height:innerHeight,
       overflow:document.documentElement.scrollWidth>innerWidth+1,
+      characterCount:{locale:new Intl.NumberFormat().resolvedOptions().locale,
+        text:[...(root?.closest('.content')?.querySelectorAll('.editor-status-bar .status-right > span')||[])]
+          .find(node=>!node.children.length&&node.textContent.trim().endsWith(' 字'))?.textContent.trim()||null},
       tables:root?.querySelectorAll('table').length||0,selection:document.querySelector('.table-selection-modebar')?.textContent||'',
       selectionOutlineBackgrounds:[...document.querySelectorAll('.table-selection-outline')].map(outline=>getComputedStyle(outline).backgroundColor),
       rows:table?[...table.rows].map(row=>[...row.cells].map(cell=>({text:cell.textContent,colSpan:cell.colSpan,rowSpan:cell.rowSpan,tag:cell.tagName,
@@ -199,6 +261,9 @@ export async function verifyTableOperationsDesktop(context) {
     }, 'Persisted Table JSON differs at ' + name)
     await clean()
     report.snapshots[name] = { content, sha256: hash(content), ui: await observe() }; save()
+    const count = report.snapshots[name].ui.characterCount
+    assert.equal(count.text, new Intl.NumberFormat(count.locale).format(countLexicalCharacters(content)) + ' 字',
+      'Actual editor status-bar character count differs from the saved document at ' + name)
     return content
   }
   const expectRows = expected => value => { try { assert.deepEqual(tableTextRows(value), expected); return true } catch { return false } }
@@ -606,32 +671,50 @@ export async function verifyTableOperationsDesktop(context) {
   assert.ok(Math.abs(verticalAfter.headTop - verticalBefore.headTop) <= 1)
   assert.ok(verticalBefore.normalTop - verticalAfter.normalTop > 20)
   assert.equal((await api(largeRoute)).content, large.content, 'Frozen scrolling changed persisted Table state')
+  // Exercise search before any target helper reveals row 80. The existing
+  // first-row native click owns keyboard focus; a fixed wheel distance cannot
+  // establish a top-of-table prerequisite for arbitrarily tall wrapped rows.
+  await click(cellSelector(0, 0) + ' p')
+  const searchQuery = 'LONG-80-3-value'
+  const searchView = fromHighlight => evaluate(`(${observeTableSearchRange.toString()})(${q(searchQuery)},${fromHighlight})`)
+  const search = report.searchNavigation = { query: searchQuery, before: await searchView(false), last: null,
+    inputStart: report.nativeInputs.length, inputEnd: null, match: null, complete: false }
+  save()
+  assert.equal(search.before.text, searchQuery); assert.equal(search.before.matches, 1)
+  assert.equal(search.before.visible, false, 'The last-row search must start outside the visible Table viewport')
+  assert.ok(search.before.rect.top > search.before.clip.bottom + 1, 'The search target was revealed before native search')
+  await key('f', 70, 2)
+  search.openInputEnd = report.nativeInputs.length
+  await until(() => evaluate(`(() => {
+    const root=document.querySelector('.editor-input'),input=root?.closest('.editor-shell')?.querySelector('.document-search input[aria-label="查找内容"]')
+    return !!input&&document.activeElement===input
+  })()`), 'Native document search did not focus its query input')
+  search.queryInputStart = report.nativeInputs.length
+  await type(searchQuery)
+  search.queryInputEnd = report.nativeInputs.length
+  search.match = await until(async () => {
+    const view = await searchView(true); search.last = view
+    return view.matches === 1 && view.text === searchQuery && view.count === '1/1' && view.query === searchQuery &&
+      view.queryFocused && view.connected && view.start?.row === 79 && view.start?.column === 2 && view.start?.inTarget &&
+      view.end?.row === 79 && view.end?.column === 2 && view.end?.inTarget && view.visible && view
+  }, 'Search found the final row but did not reveal its actual highlighted text')
+  search.inputEnd = report.nativeInputs.length
+  assert.ok(search.match.scrollTop > search.before.scrollTop)
+  const searchCount = (await observe()).characterCount
+  search.statusCount = { expected: countLexicalCharacters(large.content), actual: searchCount.text, locale: searchCount.locale }
+  assert.equal(search.statusCount.actual, new Intl.NumberFormat(search.statusCount.locale).format(search.statusCount.expected) + ' 字')
+  search.closeInputStart = report.nativeInputs.length
+  await key('Escape', 27)
+  search.closeInputEnd = report.nativeInputs.length
+  await until(() => evaluate("!document.querySelector('.document-search')"), 'Native Escape did not close document search')
+  search.closed = true
+  search.contentAfter = (await api(largeRoute)).content; search.sha256 = hash(search.contentAfter)
+  assert.equal(search.contentAfter, large.content, 'Searching the Table changed its persisted document')
+  await clean(); search.complete = true; save()
   await click(cellSelector(79, 2) + ' p'); await key('End', 35); await type('-tail-saved')
   const largeSaved = await checkpoint('large-saved', value => tableTextRows(value)[79][2].endsWith('-tail-saved'), largeRoute)
   const largeExpected = tableTextRows(large.content); largeExpected[79][2] += '-tail-saved'
   assert.deepEqual(tableTextRows(largeSaved), largeExpected)
-  const expectedStatusCount = countLexicalCharacters(largeSaved)
-  const statusCount = () => evaluate("document.querySelector('.status-right > span:last-child')?.textContent?.trim()||null")
-  await until(async () => await statusCount() === expectedStatusCount.toLocaleString() + ' 字', 'Actual editor status-bar character count did not match the saved long Table')
-  // Start from the top so the last-row result must drive native scroll navigation.
-  await wheel(await point('.editor-input table'), 0, -10000)
-  await until(async () => (await frozenView()).scrollTop <= 1, 'Long Table did not return to its first row before search')
-  const searchInputStart = report.nativeInputs.length
-  await key('f', 70, 2)
-  await until(() => evaluate("!!document.querySelector('.document-search input[aria-label=\"查找内容\"]')"), 'Native document search did not open')
-  await click('.document-search input[aria-label="查找内容"]')
-  await type('LONG-80-3-value-tail-saved')
-  await until(() => evaluate("document.querySelector('.document-search .search-count')?.textContent==='1/1'"), 'Native search did not find the unique final-row marker')
-  const searchVisible = await until(() => evaluate(`(() => {
-    const table=document.querySelector('.editor-input table'),target=table?.rows[79]?.cells[2]?.querySelector('p')
-    if(!table||!target)return null
-    const view=table.getBoundingClientRect(),match=target.getBoundingClientRect(),top=view.top+table.clientTop,bottom=top+table.clientHeight
-    return table.scrollTop>0&&match.height>0&&match.top>=top-1&&match.bottom<=bottom+1
-      ?{scrollTop:table.scrollTop,matchTop:match.top,matchBottom:match.bottom,viewportTop:top,viewportBottom:bottom,text:target.textContent}:null
-  })()`), 'Search found the final row but did not reveal its actual matching paragraph')
-  report.searchNavigation = { inputStart: searchInputStart, inputEnd: report.nativeInputs.length, match: searchVisible,
-    statusCount: { expected: expectedStatusCount, actual: await statusCount() } }; save()
-  await click('.document-search button[aria-label="关闭文内查找"]')
   await menu(79, 1)
   await capture('table-native-long.png'); await key('Escape', 27)
   mark('large-long-text-table-keeps-final-row-identity')

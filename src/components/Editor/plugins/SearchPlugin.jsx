@@ -6,6 +6,7 @@ import ConfirmDialog from '../../ConfirmDialog'
 import { SEARCH_LIMITS, assertSearchString } from '~/services/documentSearch.mjs'
 import { isShortcutContextBlocked, matchShortcut } from '~/services/localShortcuts'
 import { $readDocumentSearch, $replaceDocumentMatches, searchTopLevelKey, searchDOMRange, scrollSearchMatchIntoView } from './documentSearchLexical'
+import { revealTableSearchRange } from '../utils/tableSearchVisibility'
 import './DocumentSearch.css'
 import { UiButton, UiInput } from '~/components/ui/ControlKit'
 
@@ -112,7 +113,11 @@ export default function SearchPlugin({ documentId = '' }) {
           clearHighlight()
         }else{
           const range=searchDOMRange(editor,match)
-          if(!range||!scrollSearchMatchIntoView(editor,match)) throw new Error('匹配范围暂时不可见')
+          if(!range) throw new Error('匹配范围暂时不可见')
+          const root=editor.getRootElement(), start=range.startContainer.nodeType===1?range.startContainer:range.startContainer.parentElement
+          const table=start?.closest('td,th')?.closest('table')
+          if(table&&root?.contains(table)) revealTableSearchRange({range,table,root,panel:panelRef.current})
+          else if(!scrollSearchMatchIntoView(editor,match)) throw new Error('匹配范围暂时不可见')
           if(globalThis.Highlight&&globalThis.CSS?.highlights) CSS.highlights.set(HIGHLIGHT,new Highlight(range))
         }
       }catch{clearHighlight();setError('匹配位置暂时不可用，请重新查找；正文未改动')}

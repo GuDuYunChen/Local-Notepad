@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 import { lstatSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { TABLE_OPERATIONS_BUDGET_MS, TABLE_OPERATIONS_CHECKS, nativeTableContrast, tableFromContent, tableTextRows } from './table-operations-desktop-driver.mjs'
+import { countLexicalCharacters } from '../src/utils/lexicalText.js'
 
 export const TABLE_OPERATIONS_VERSION = '4.249.2'
 export const TABLE_OPERATIONS_REPORT = 'table-operations.json'
@@ -27,6 +28,9 @@ export const TABLE_OPERATIONS_SOURCES = Object.freeze([
   'src/components/Editor/hooks/useImageUploadSession.js',
   'src/components/Editor/utils/excelTable.js', 'src/services/tableImportLimits.js', 'src/services/importContent.js',
   'src/components/TextEditor.jsx', 'src/services/editorDraftCache.js', 'src/styles/editor-document.css', 'src/services/localAppearance.js',
+  'src/components/Editor/plugins/SearchPlugin.jsx', 'src/components/Editor/plugins/documentSearchLexical.jsx',
+  'src/components/Editor/utils/tableSearchVisibility.js', 'src/services/documentSearch.mjs',
+  'src/components/Editor/plugins/DocumentSearch.css', 'src/utils/lexicalText.js',
 ])
 export const TABLE_OPERATIONS_SCREENSHOTS = Object.freeze([
   'table-native-inserted.png', 'table-native-merged.png', 'table-native-clipboard-restored.png', 'table-native-styled.png',
@@ -37,6 +41,12 @@ export const tableOperationsHash = bytes => createHash('sha256').update(bytes).d
 export const tableOperationsBlob = source => createHash('sha1').update('blob ' + Buffer.byteLength(source) + '\0').update(source).digest('hex')
 const originalRows = Array.from({ length: 3 }, (_, row) => Array.from({ length: 3 }, (_, col) => `R${row + 1}C${col + 1}`))
 const sameJSON = (a, b) => assert.deepEqual(JSON.parse(a), JSON.parse(b))
+const formattedCount = (content, locale) => {
+  assert.equal(typeof locale, 'string'); assert.ok(locale.length > 0)
+  const formatter = new Intl.NumberFormat(locale)
+  assert.equal(formatter.resolvedOptions().locale, locale, 'The status count must use the observed renderer locale')
+  return formatter.format(countLexicalCharacters(content)) + ' 字'
+}
 
 export function validateTableOperationsReport(report, { commit, verifier = commit, scope = 'packaged', sources } = {}) {
   for (const value of [commit, verifier]) assert.match(value || '', /^[a-f0-9]{40}$/)
@@ -74,6 +84,8 @@ export function validateTableOperationsReport(report, { commit, verifier = commi
   for (const snapshot of Object.values(report.snapshots)) {
     assert.equal(snapshot.sha256, tableOperationsHash(snapshot.content))
     assert.equal(snapshot.ui.tables, 1)
+    assert.equal(snapshot.ui.characterCount.text, formattedCount(snapshot.content, snapshot.ui.characterCount.locale),
+      'The displayed status count must match the complete saved document')
   }
   const content = name => report.snapshots[name].content
   assert.deepEqual(tableTextRows(content('initial')), originalRows)
@@ -291,6 +303,63 @@ export function validateTableOperationsReport(report, { commit, verifier = commi
   assert.equal(report.largeSeed.sha256, tableOperationsHash(report.largeSeed.content))
   const largeExpected = tableTextRows(report.largeSeed.content)
   assert.equal(largeExpected.length, 80); assert.ok(largeExpected.every(row => row.length === 3)); assert.ok(largeExpected.slice(1).every(row => row[0].length > 100))
+  const search = report.searchNavigation
+  assert.equal(search.query, 'LONG-80-3-value'); assert.equal(search.complete, true); assert.equal(search.closed, true)
+  assert.equal(search.before.source, 'native-dom-range'); assert.equal(search.match.source, 'css-highlight')
+  assert.deepEqual(search.last, search.match)
+  assert.equal(search.openInputEnd, search.inputStart + 2)
+  keyInputs(inputRange({ inputStart: search.inputStart, inputEnd: search.openInputEnd }), 'f', 70, 2)
+  assert.equal(search.queryInputStart, search.openInputEnd)
+  textInput(inputRange(search, 'queryInput'), search.query)
+  assert.equal(search.inputEnd, search.queryInputEnd); assert.equal(inputRange(search).length, 3)
+  assert.equal(search.closeInputStart, search.inputEnd); keyInputs(inputRange(search, 'closeInput'), 'Escape', 27)
+  assert.equal(search.contentAfter, report.largeSeed.content, 'Native search must preserve the entire saved JSON byte for byte')
+  assert.equal(search.sha256, tableOperationsHash(search.contentAfter))
+  assert.equal(search.statusCount.expected, countLexicalCharacters(report.largeSeed.content))
+  assert.equal(search.statusCount.actual, formattedCount(report.largeSeed.content, search.statusCount.locale))
+  const rect = value => {
+    for (const key of ['left', 'right', 'top', 'bottom']) assert.ok(Number.isFinite(value[key]))
+    assert.ok(value.right > value.left && value.bottom > value.top)
+  }
+  for (const view of [search.before, search.match]) {
+    assert.equal(view.connected, true); assert.equal(view.matches, 1); assert.equal(view.text, search.query)
+    assert.deepEqual(view.start, { row: 79, column: 2, offset: 0, inTarget: true })
+    assert.deepEqual(view.end, { row: 79, column: 2, offset: search.query.length, inTarget: true })
+    assert.ok(Number.isSafeInteger(view.rectCount) && view.rectCount > 0); rect(view.rect); rect(view.clip)
+    for (const key of ['width', 'height']) assert.ok(Number.isFinite(view.viewport[key]) && view.viewport[key] > 0)
+    for (const key of ['scrollTop', 'scrollLeft']) assert.ok(Number.isFinite(view[key]) && view[key] >= 0)
+    assert.ok(view.clips.some(boundary => boundary.table && boundary.x && boundary.y), 'The actual Table viewport must be included')
+    const clip = { left: 0, top: 0, right: view.viewport.width, bottom: view.viewport.height }
+    for (const boundary of view.clips) {
+      rect(boundary)
+      for (const key of ['table', 'x', 'y']) assert.equal(typeof boundary[key], 'boolean')
+      assert.ok(boundary.x || boundary.y)
+      if (boundary.x) { clip.left = Math.max(clip.left, boundary.left); clip.right = Math.min(clip.right, boundary.right) }
+      if (boundary.y) { clip.top = Math.max(clip.top, boundary.top); clip.bottom = Math.min(clip.bottom, boundary.bottom) }
+    }
+    assert.deepEqual(view.clip, clip, 'Search visibility must intersect all observed clipping ancestors and the viewport')
+    const r = view.rect, dx = Math.min(1, (r.right - r.left) / 4), dy = Math.min(1, (r.bottom - r.top) / 4)
+    assert.deepEqual(view.points.map(point => [point.x, point.y]), [
+      [(r.left + r.right) / 2, (r.top + r.bottom) / 2],
+      [r.left + dx, r.top + dy], [r.right - dx, r.top + dy],
+      [r.left + dx, r.bottom - dy], [r.right - dx, r.bottom - dy],
+    ])
+    for (const point of view.points) {
+      assert.equal(typeof point.owned, 'boolean')
+      if (point.owned) {
+        assert.ok(point.x >= 0 && point.x < view.viewport.width && point.y >= 0 && point.y < view.viewport.height)
+        assert.match(point.tag || '', /^[A-Z][A-Z0-9-]*$/)
+      }
+    }
+    const inside = r.left >= clip.left - 1 && r.right <= clip.right + 1 && r.top >= clip.top - 1 && r.bottom <= clip.bottom + 1
+    assert.equal(view.inside, inside); assert.equal(view.visible, inside && view.points.every(point => point.owned))
+  }
+  assert.equal(search.before.visible, false); assert.equal(search.before.inside, false)
+  assert.ok(search.before.rect.top > search.before.clip.bottom + 1, 'The search target must start below the real Table viewport')
+  assert.equal(search.before.query, null); assert.equal(search.before.queryFocused, false); assert.equal(search.before.count, null)
+  assert.equal(search.match.visible, true); assert.equal(search.match.inside, true)
+  assert.equal(search.match.query, search.query); assert.equal(search.match.queryFocused, true); assert.equal(search.match.count, '1/1')
+  assert.ok(search.match.scrollTop > search.before.scrollTop, 'The native search must actually reveal the distant row')
   largeExpected[79][2] += '-tail-saved'
   assert.deepEqual(tableTextRows(content('large-saved')), largeExpected)
   assert.deepEqual(tableTextRows(content('large-dark-saved')), largeExpected)
