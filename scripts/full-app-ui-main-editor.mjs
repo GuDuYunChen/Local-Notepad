@@ -364,6 +364,202 @@ export async function finishFloatingToolbarKeyboardEntry(ctx, receipt) {
   }
 }
 
+// The current product deliberately focuses the first Table menu item when it
+// opens. Preserve that behavior and the original trigger-to-item Tab proof:
+// enter its trigger with one real reverse Tab, never DOM focus or a new click.
+export function observeTableActionMenuKeyboardEntry(ownerToken, action, readSaveState) {
+  const key = '__fullAppTableActionMenuKeyboardOwner'
+  const same = (selector, node) => {
+    const nodes = document.querySelectorAll(selector)
+    return nodes.length === 1 && nodes[0] === node && node.isConnected
+  }
+  const identities = owned => same('.editor-input[contenteditable="true"]', owned.editor) &&
+    same('.editor-container', owned.host) && owned.editor.closest('.editor-shell') === owned.shell &&
+    same('.editor-input table', owned.table) && same('.table-action-menu-trigger', owned.trigger) &&
+    same('.table-action-menu[role="menu"]', owned.menu) &&
+    same('.product-table-menu-section:first-child .table-action-menu-item:first-of-type', owned.first) &&
+    same('.workspace-title-button', owned.title) && owned.editor.__lexicalEditor === owned.lexical &&
+    owned.lexical.getRootElement() === owned.editor
+  const trace = owned => ({ rows: owned.events.map(event => ({ ...event })), truncated: owned.truncated,
+    captureErrors: owned.captureErrors })
+  const remove = owned => {
+    owned.closed = true
+    for (const listener of owned.listeners) if (!listener.attempted) {
+      listener.attempted = true
+      try { document.removeEventListener(listener.type, listener.callback, true); listener.removed = true }
+      catch (error) { listener.error = String(error.message || error) }
+    }
+    return { installed: owned.listeners.length, removed: owned.listeners.filter(item => item.removed).length,
+      remaining: owned.listeners.filter(item => !item.removed).length,
+      errors: owned.listeners.filter(item => item.error).map(item => item.error) }
+  }
+  if (action === 'dispose') {
+    const owned = window[key]
+    if (!owned) return { ownerToken, disposed: true, absent: true }
+    if (owned.ownerToken !== ownerToken) throw Error('Table keyboard observer token changed')
+    let identityRetained = false
+    try { identityRetained = identities(owned) } catch {}
+    const cleanup = remove(owned), nativeTrace = trace(owned)
+    if (cleanup.remaining === 0) delete window[key]
+    return { ownerToken, disposed: cleanup.remaining === 0, identityRetained, cleanup, nativeTrace }
+  }
+  if (!ownerToken || !['install', 'read'].includes(action) || typeof readSaveState !== 'function') throw Error('Invalid Table keyboard observer operation')
+  const one = selector => {
+    const nodes = document.querySelectorAll(selector)
+    if (nodes.length !== 1) throw Error('Table keyboard entry has missing or ambiguous ownership: ' + selector)
+    return nodes[0]
+  }
+  const editor = one('.editor-input[contenteditable="true"]'), host = one('.editor-container')
+  const table = one('.editor-input table'), trigger = one('.table-action-menu-trigger')
+  const menu = one('.table-action-menu[role="menu"]')
+  const first = one('.product-table-menu-section:first-child .table-action-menu-item:first-of-type')
+  const title = one('.workspace-title-button'), shell = editor.closest('.editor-shell'), lexical = editor.__lexicalEditor
+  if (!shell || editor.closest('.editor-container') !== host || menu.closest('.editor-container') !== host ||
+      trigger.closest('.editor-container') !== host || !editor.contains(table) || !menu.contains(first) ||
+      [editor, host, table, trigger, menu, first, title].some(node => !node.isConnected || node.ownerDocument !== document) ||
+      trigger.tagName !== 'BUTTON' || first.tagName !== 'BUTTON' || trigger.disabled || first.disabled ||
+      trigger.tabIndex < 0 || first.tabIndex < 0 || first.getAttribute('role') !== 'menuitem' ||
+      trigger.getAttribute('aria-expanded') !== 'true' || trigger.getAttribute('aria-haspopup') !== 'menu' ||
+      first !== menu.querySelector('button:not(:disabled)') ||
+      !(trigger.compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING) ||
+      typeof lexical?.getEditorState !== 'function' || typeof lexical?.getRootElement !== 'function' ||
+      typeof lexical?.isEditable !== 'function' || lexical.getRootElement() !== editor || !lexical.isEditable()) {
+    throw Error('Table keyboard entry does not own one live enabled editor and menu')
+  }
+  const documentJSON = JSON.stringify(lexical.getEditorState())
+  if (JSON.parse(documentJSON)?.root?.type !== 'root') throw Error('Complete Table editor state is unavailable')
+  let owned = window[key]
+  if (action === 'install') {
+    if (owned) throw Error('An earlier Table keyboard observer was not disposed')
+    owned = { ownerToken, editor, host, shell, table, trigger, menu, first, title, lexical,
+      events: [], truncated: false, captureErrors: 0, closed: false, listeners: [] }
+    window[key] = owned
+    const observe = event => {
+      if (owned.closed) return
+      if (owned.events.length >= 16) { owned.truncated = true; return }
+      try {
+        owned.events.push({ type: event.type, key: event.key === 'Tab' ? 'Tab' : 'other', trusted: event.isTrusted === true,
+          shift: !!event.shiftKey, ctrl: !!event.ctrlKey, alt: !!event.altKey, meta: !!event.metaKey,
+          composing: !!event.isComposing || event.keyCode === 229 || event.which === 229,
+          target: event.target === first ? 'first' : event.target === trigger ? 'trigger' : 'other',
+          ownerRetained: identities(owned) })
+      } catch { owned.captureErrors++ }
+    }
+    try {
+      for (const type of ['keydown', 'keyup']) {
+        document.addEventListener(type, observe, true)
+        owned.listeners.push({ type, callback: observe, attempted: false, removed: false })
+      }
+    } catch (error) {
+      const cleanup = remove(owned)
+      if (cleanup.remaining === 0) delete window[key]
+      throw error
+    }
+  } else if (!owned || owned.ownerToken !== ownerToken || !identities(owned)) {
+    throw Error('Table keyboard owner identity was replaced')
+  }
+  return { documentJSON, documentTitle: title.textContent.trim(), saveState: readSaveState(document),
+    active: document.activeElement === first ? 'first' : document.activeElement === trigger ? 'trigger' : 'other',
+    nativeTrace: trace(owned) }
+}
+
+function assertTableActionMenuEntryPreserved(before, current) {
+  for (const field of ['documentJSON', 'documentTitle', 'saveState']) {
+    assert.deepEqual(current[field], before[field], 'Table keyboard entry changed its original ' + field)
+  }
+  assert.equal(current.saveState.ready, true, 'Table keyboard entry changed the current draft/save state')
+}
+
+function assertTableActionMenuNativeTrace(trace, complete) {
+  assert.equal(trace.truncated, false, 'Table keyboard entry trace was truncated')
+  assert.equal(trace.captureErrors, 0, 'Table keyboard entry trace has an unavailable observation')
+  const expected = complete ? [true, false, true, false] : [true]
+  assert.equal(trace.rows.length, expected.length * 2, 'Table keyboard entry requires exact native keydown/keyup pairs')
+  expected.forEach((shift, index) => {
+    for (const [offset, type] of [[0, 'keydown'], [1, 'keyup']]) {
+      const event = trace.rows[index * 2 + offset]
+      assert.deepEqual(event, { type, key: 'Tab', trusted: true, shift, ctrl: false, alt: false, meta: false,
+        composing: false, target: offset === 0 ? (shift ? 'first' : 'trigger') : (shift ? 'trigger' : 'first'), ownerRetained: true },
+      'Table keyboard entry lacks trusted native direction and exact target ownership')
+    }
+  })
+}
+
+export async function disposeTableActionMenuKeyboardEntry(ctx, receipt, originalError = null) {
+  if (originalError) {
+    receipt.complete = false; receipt.stage = 'failed'
+    receipt.error ||= { name: originalError.name, message: originalError.message, stack: originalError.stack }
+  }
+  if (receipt.ownerDisposal?.disposed === true) return receipt.ownerDisposal
+  try {
+    receipt.ownerDisposal = await ctx.evaluate(`(${observeTableActionMenuKeyboardEntry.toString()})(${q(receipt.ownerToken)},'dispose')`)
+    assert.equal(receipt.ownerDisposal.disposed, true, 'Table keyboard observer was not disposed')
+    if (receipt.ownerInstalled) assert.equal(receipt.ownerDisposal.absent, undefined, 'Table keyboard observer disappeared before disposal')
+    if (!originalError) assert.equal(receipt.ownerDisposal.identityRetained, true, 'Table keyboard owner changed before observer disposal')
+    ctx.save(); return receipt.ownerDisposal
+  } catch (error) {
+    receipt.ownerCleanupError = { name: error.name, message: error.message, stack: error.stack }
+    try { ctx.save() } catch (diagnostic) { receipt.saveError = String(diagnostic.message) }
+    if (!originalError) throw error
+  }
+}
+
+export async function prepareTableActionMenuKeyboardEntry(ctx) {
+  const { evaluate, until, shared, report, save, api, fixture } = ctx
+  const note = fixture.notes['表格']
+  assert.ok(note?.id && typeof note.content === 'string', 'The current owned Table fixture is required')
+  const receipt = { group: report.fullAppUi.group, routeId: 'editor-table-actions', stateId: 'actions', ...ctx.matrix,
+    method: 'native-reverse-tab-from-product-autofocus', noteId: note.id, ownerToken: 'table-menu:' + randomUUID(),
+    ownerInstalled: false, entryComplete: false, complete: false, inputs: [], observations: [] }
+  ;(report.fullAppUi.tableActionMenuKeyboardEntries ||= []).push(receipt)
+  const read = async action => {
+    const current = await evaluate(`(${observeTableActionMenuKeyboardEntry.toString()})(${q(receipt.ownerToken)},${q(action)},${inspectEditorSwitchReadiness.toString()})`)
+    receipt.lastObservation = current
+    if (receipt.before) assertTableActionMenuEntryPreserved(receipt.before, current)
+    return current
+  }
+  try {
+    save()
+    receipt.savedBefore = await api('/api/files/' + encodeURIComponent(note.id))
+    assert.equal(receipt.savedBefore.id, note.id); assert.equal(receipt.savedBefore.title, note.title)
+    assert.equal(receipt.savedBefore.content, note.content, 'Table entry must start with its original saved body')
+    receipt.before = await read('install'); receipt.ownerInstalled = true
+    assert.equal(receipt.before.documentTitle, note.title, 'Table keyboard entry opened another note')
+    assert.equal(receipt.before.saveState.ready, true, 'Table entry requires the original settled draft/save state')
+    assert.equal(receipt.before.active, 'first', 'Current Table menu must start with its product-focused first item')
+    receipt.stage = 'before-native-entry'; receipt.observations.push({ stage: receipt.stage, value: receipt.before }); save()
+    const input = { key: 'Tab', modifiers: 8, completed: false }; receipt.inputs.push(input); save()
+    await shared.key('Tab', 8); input.completed = true; save()
+    const entered = await until(async () => {
+      const current = await read('read'); return current.active === 'trigger' && current
+    }, 'Actual reverse Tab did not reach the same open Table menu trigger')
+    assertTableActionMenuNativeTrace(entered.nativeTrace, false)
+    receipt.stage = 'ready-for-original-tab-proof'; receipt.observations.push({ stage: receipt.stage, value: entered })
+    receipt.entryComplete = true; save(); return receipt
+  } catch (error) {
+    await disposeTableActionMenuKeyboardEntry(ctx, receipt, error)
+    try { save() } catch (diagnostic) { receipt.saveError = String(diagnostic.message) }
+    throw error
+  }
+}
+
+export async function finishTableActionMenuKeyboardEntry(ctx, receipt) {
+  try {
+    receipt.afterNativeFocus = await ctx.evaluate(`(${observeTableActionMenuKeyboardEntry.toString()})(${q(receipt.ownerToken)},'read',${inspectEditorSwitchReadiness.toString()})`)
+    assertTableActionMenuEntryPreserved(receipt.before, receipt.afterNativeFocus)
+    assert.equal(receipt.afterNativeFocus.active, 'first', 'Original Table traversal did not return to its first menu item')
+    assertTableActionMenuNativeTrace(receipt.afterNativeFocus.nativeTrace, true)
+    receipt.savedAfter = await ctx.api('/api/files/' + encodeURIComponent(receipt.noteId))
+    assert.deepEqual(receipt.savedAfter, receipt.savedBefore, 'Table keyboard traversal changed its complete saved note')
+    await disposeTableActionMenuKeyboardEntry(ctx, receipt)
+    receipt.complete = true; receipt.stage = 'original-tab-proof-complete'; ctx.save()
+  } catch (error) {
+    await disposeTableActionMenuKeyboardEntry(ctx, receipt, error)
+    try { ctx.save() } catch (diagnostic) { receipt.saveError = String(diagnostic.message) }
+    throw error
+  }
+}
+
 export async function verifyMainEditorPages(ctx) {
   await verifyNavigationPages(ctx)
   const { api, evaluate, click, until, cdp, shared, setup } = ctx
@@ -819,7 +1015,14 @@ async function verifyEditorNodes(ctx) {
   await present('.table-action-menu-trigger'); await hit('.table-action-menu-trigger'); await present('.table-action-menu')
   const tableAction = '.product-table-menu-section:first-child .table-action-menu-item:first-of-type'
   await shot('editor-table-actions', 'actions', [tableAction])
-  await focus('editor-table-actions', 'actions', tableAction)
+  const tableEntry = await prepareTableActionMenuKeyboardEntry(ctx)
+  try {
+    await focus('editor-table-actions', 'actions', tableAction)
+    await finishTableActionMenuKeyboardEntry(ctx, tableEntry)
+  } catch (error) {
+    await disposeTableActionMenuKeyboardEntry(ctx, tableEntry, error)
+    throw error
+  }
   await press('.table-action-menu', '多选单元格…'); await absent('.table-action-menu'); await present('.table-selection-modebar')
   await shot('editor-table-actions', 'selection-mode', ['.table-selection-modebar .primary'], { root: '.table-selection-modebar' })
   await press('.table-selection-modebar', '完成'); await absent('.table-selection-modebar')
