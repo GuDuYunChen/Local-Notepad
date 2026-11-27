@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { createNativeUiSelect } from './native-ui-select.mjs'
 import controlEvidence from './check-ui-control-render.cjs'
 import { COLLAPSED_SIDEBAR_EXPAND, validateCollapsedSidebarObservation, validateCollapsedSidebarFocus } from './full-app-ui-evidence.mjs'
@@ -138,6 +138,112 @@ export function collectFullAppScrollOwners(area, fixedBoundaryFor = () => null) 
     }
   }
   return owners
+}
+
+// This observer is serialized into the real renderer. The per-scene record
+// retains actual DOM references; selectors or matching rectangles alone cannot
+// establish that a later capture still belongs to the same Table modebar.
+export function observeTableModebarPinnedOwner(ownerToken, action, page = null) {
+  const key = '__fullAppTableModebarPinnedOwner'
+  const need = (condition, message) => { if (!condition) throw Error('Table modebar pinned owner: ' + message) }
+  need(typeof ownerToken === 'string' && ownerToken.length > 0, 'missing token')
+  need(['install', 'read', 'dispose'].includes(action), 'invalid action')
+  const one = selector => {
+    const matches = document.querySelectorAll(selector)
+    need(matches.length === 1 && matches[0].isConnected, 'missing or ambiguous ' + selector)
+    return matches[0]
+  }
+  const nodes = () => {
+    const modebar = one('.table-selection-modebar'), overlay = one('.table-selection-overlay')
+    const owner = one('.editor-container'), editor = one('.editor-input[contenteditable="true"]')
+    const table = one('.editor-input table'), title = one('.workspace-title-button')
+    const lexical = editor.__lexicalEditor, ancestors = []
+    for (let node = owner; node; node = node.parentElement) ancestors.push(node)
+    need(modebar.parentElement === overlay && overlay.parentElement === owner && editor.parentElement === owner && editor.contains(table), 'different direct DOM ownership')
+    need(modebar.offsetParent === overlay && overlay.offsetParent === owner, 'different actual offset-parent chain')
+    need(lexical?.getRootElement() === editor && lexical.isEditable(), 'different editable document')
+    return { modebar, overlay, owner, editor, table, title, lexical, ancestors, buttons: [...modebar.querySelectorAll('button')] }
+  }
+  const sameNodes = (left, right) => ['modebar', 'overlay', 'owner', 'editor', 'table', 'title', 'lexical'].every(name => left[name] === right[name]) &&
+    ['ancestors', 'buttons'].every(name => left[name].length === right[name].length && left[name].every((node, index) => node === right[name][index]))
+  let owned = window[key]
+  if (action === 'dispose') {
+    if (!owned) return { ownerToken, disposed: true, absent: true }
+    need(owned.ownerToken === ownerToken, 'token changed before disposal')
+    let identityRetained = false
+    try { identityRetained = sameNodes(owned, nodes()) } catch {}
+    delete window[key]
+    return { ownerToken, disposed: !Object.hasOwn(window, key), identityRetained, observations: owned.observations }
+  }
+  const current = nodes()
+  if (action === 'install') {
+    need(!owned, 'previous scene was not disposed')
+    window[key] = { ...current, ownerToken, observations: 0 }
+    return { ownerToken, installed: true }
+  }
+  need(owned?.ownerToken === ownerToken && sameNodes(owned, current), 'DOM identity changed')
+  need(page?.root === '.table-selection-modebar', 'different registered root')
+  const { modebar, overlay, owner } = current
+  const rectangle = node => {
+    const box = node.getBoundingClientRect()
+    return Object.fromEntries(['left', 'top', 'right', 'bottom', 'width', 'height'].map(name => [name, box[name]]))
+  }
+  const modebarBounds = rectangle(modebar), overlayBounds = rectangle(overlay), ownerBounds = rectangle(owner)
+  const metrics = node => Object.fromEntries(['clientLeft', 'clientTop', 'clientWidth', 'clientHeight', 'scrollWidth', 'scrollHeight'].map(name => [name, node[name]]))
+  const modebarMetrics = metrics(modebar), overlayMetrics = metrics(overlay), ownerMetrics = metrics(owner)
+  const css = [modebar, overlay, owner].map(node => getComputedStyle(node))
+  need(css[0].position === 'absolute' && css[1].position === 'absolute' && css[2].position === 'relative', 'different positioning model')
+  need(/auto|scroll/.test(css[2].overflowY), 'different scrolling owner')
+  need(css[1].transform === 'none' && css[2].transform === 'none', 'transformed owner or overlay')
+  const transform = css[0].transform === 'none' ? [1, 0, 0, 1, 0, 0] : /^matrix\(([^)]+)\)$/.exec(css[0].transform)?.[1].split(',').map(Number)
+  need(transform?.length === 6 && transform.every(Number.isFinite) && transform[0] === 1 && transform[1] === 0 && transform[2] === 0 && transform[3] === 1 && transform[5] === 0, 'non-horizontal modebar transform')
+  const inlineTop = Number.parseFloat(modebar.style.top), computedTop = Number.parseFloat(css[0].top)
+  const close = (left, right) => Number.isFinite(left) && Number.isFinite(right) && Math.abs(left - right) <= 0.6
+  for (const box of [modebarBounds, overlayBounds, ownerBounds]) need(Object.values(box).every(Number.isFinite) && box.width > 0 && box.height > 0 && close(box.right - box.left, box.width) && close(box.bottom - box.top, box.height), 'invalid native rectangle')
+  for (const value of [modebarMetrics, overlayMetrics, ownerMetrics]) need(Object.values(value).every(number => Number.isFinite(number) && number >= 0), 'invalid client metrics')
+  const ownerClientPort = { left: ownerBounds.left + owner.clientLeft, top: ownerBounds.top + owner.clientTop,
+    right: ownerBounds.left + owner.clientLeft + owner.clientWidth, bottom: ownerBounds.top + owner.clientTop + owner.clientHeight,
+    width: owner.clientWidth, height: owner.clientHeight }
+  need(close(inlineTop, computedTop) && close(inlineTop - owner.scrollTop, 10), 'inline top did not follow the original scroll offset')
+  need(close(Number.parseFloat(css[1].top), 0) && close(Number.parseFloat(css[1].left), 0), 'overlay inset changed')
+  need(close(overlayBounds.top, ownerClientPort.top - owner.scrollTop) && close(overlayBounds.left, ownerClientPort.left - owner.scrollLeft) &&
+    close(overlayBounds.width, owner.clientWidth) && close(overlayBounds.height, owner.clientHeight), 'overlay no longer matches its native owner port')
+  need(close(modebarBounds.top, overlayBounds.top + overlay.clientTop + inlineTop) && close(modebarBounds.top - ownerClientPort.top, 10), 'modebar was not pinned in the actual viewport')
+  need(modebar.scrollHeight <= modebar.clientHeight + 1 && modebar.scrollWidth <= modebar.clientWidth + 1, 'modebar content exceeds its own client port')
+  for (const node of [modebar, overlay, ...current.ancestors]) {
+    const style = getComputedStyle(node)
+    need(style.display !== 'none' && style.visibility === 'visible' && Number(style.opacity) > 0, 'unpainted owner')
+  }
+  const viewport = page.overflowViewport.bounds
+  const inside = (box, port, horizontal = true, vertical = true) => (!horizontal || box.left >= port.left - 1 && box.right <= port.right + 1) &&
+    (!vertical || box.top >= port.top - 1 && box.bottom <= port.bottom + 1)
+  need(inside(modebarBounds, viewport) && inside(modebarBounds, ownerClientPort), 'modebar box is not fully in its real viewport')
+  const clips = []
+  for (const node of current.ancestors) {
+    const style = getComputedStyle(node), box = rectangle(node)
+    const x = /hidden|auto|scroll|clip/.test(style.overflowX), y = /hidden|auto|scroll|clip/.test(style.overflowY)
+    if (!x && !y) continue
+    const port = { left: box.left + node.clientLeft, top: box.top + node.clientTop,
+      right: box.left + node.clientLeft + node.clientWidth, bottom: box.top + node.clientTop + node.clientHeight }
+    need(inside(modebarBounds, port, x, y), 'modebar box is clipped by an ancestor')
+    clips.push({ tag: node.tagName, id: node.id, x, y, port })
+  }
+  const matches = page.scrollAreas.filter(surface => {
+    const found = document.querySelectorAll(surface.selector)
+    return found.length === 1 && found[0] === owner
+  })
+  const scrolling = owner.scrollHeight > owner.clientHeight + 1
+  need(matches.length === (scrolling ? 1 : 0), 'missing or ambiguous actual scroll surface')
+  if (scrolling) need(matches[0].ancestor && !matches[0].viewportScrollOwner && matches[0].contentTarget?.kind === 'route-content' &&
+    matches[0].contentTarget.selector === page.root, 'different content ownership')
+  const witness = { kind: 'table-selection-modebar-pinned-owner', ownerToken, identityRetained: true,
+    observation: ++owned.observations, root: page.root, ownerSelector: matches[0]?.selector ?? null, scrolling,
+    modebarBounds, overlayBounds, ownerBounds, ownerClientPort, modebarMetrics, overlayMetrics, ownerMetrics,
+    inlineTop, computedTop, scrollTop: owner.scrollTop, scrollLeft: owner.scrollLeft, viewport, clips,
+    text: modebar.textContent, documentTitle: current.title.textContent, buttonCount: current.buttons.length,
+    positions: css.map(value => value.position), horizontalTransform: transform[4] }
+  if (scrolling) { matches[0].contentTarget = { ...matches[0].contentTarget, kind: witness.kind }; matches[0].tableModebarOwner = witness }
+  return witness
 }
 
 export function observeFullAppPage({ root, anchors = [], editorExceptions = [], onlySelectors = [] }, withinClientPort, readOverflowViewport, fixedBoundaryFor = () => null) {
@@ -754,6 +860,78 @@ function pinnedNestedAncestorRange(surface, baseline, sample, actual) {
     Math.abs(actual.requiredContentEnd - surface.requiredContentEnd - delta) <= 1
 }
 
+function validateTableModebarPinnedSample(baseline, sample) {
+  const first = baseline.tableModebarOwner, current = sample.tableModebarOwner
+  const close = (left, right, tolerance = 0.6) => Number.isFinite(left) && Number.isFinite(right) && Math.abs(left - right) <= tolerance
+  const sameBounds = (left, right) => left && right && ['left', 'top', 'right', 'bottom', 'width', 'height'].every(key => close(left[key], right[key]))
+  const need = (condition, message) => assert.ok(condition, 'Table modebar pinned sample: ' + message)
+  for (const [page, witness] of [[baseline, first], [sample, current]]) {
+    need(page.root === '.table-selection-modebar' && witness?.root === page.root && witness.kind === 'table-selection-modebar-pinned-owner', 'missing exact DOM witness')
+    need(typeof witness.ownerToken === 'string' && witness.ownerToken.length > 0 && witness.identityRetained === true &&
+      Number.isSafeInteger(witness.observation) && witness.observation > 0, 'unproven DOM identity')
+    need(sameBounds(page.rootBounds, witness.modebarBounds), 'root rectangle differs from native page')
+    need(witness.positions?.join(',') === 'absolute,absolute,relative' && typeof witness.scrolling === 'boolean', 'different positioning model')
+    for (const box of [witness.modebarBounds, witness.overlayBounds, witness.ownerBounds, witness.ownerClientPort, witness.viewport]) {
+      need(box && ['left', 'top', 'right', 'bottom', 'width', 'height'].every(key => Number.isFinite(box[key])) && box.width > 0 && box.height > 0 &&
+        close(box.right - box.left, box.width) && close(box.bottom - box.top, box.height), 'invalid complete rectangle')
+    }
+    const { modebarBounds: root, overlayBounds: overlay, ownerBounds: owner, ownerClientPort: port, ownerMetrics: metrics } = witness
+    need(metrics && [witness.modebarMetrics, witness.overlayMetrics, metrics].every(value => value &&
+      ['clientLeft', 'clientTop', 'clientWidth', 'clientHeight', 'scrollWidth', 'scrollHeight'].every(key => Number.isFinite(value[key]) && value[key] >= 0)), 'invalid client metrics')
+    need(close(port.left, owner.left + metrics.clientLeft) && close(port.top, owner.top + metrics.clientTop) &&
+      close(port.width, metrics.clientWidth) && close(port.height, metrics.clientHeight), 'native owner port changed')
+    need(close(witness.inlineTop, witness.computedTop) && close(witness.inlineTop - witness.scrollTop, 10) &&
+      close(root.top - port.top, 10) && close(root.top, overlay.top + witness.overlayMetrics.clientTop + witness.inlineTop), 'unproven viewport pin')
+    need(close(overlay.top, port.top - witness.scrollTop) && close(overlay.left, port.left - witness.scrollLeft) &&
+      close(overlay.width, port.width) && close(overlay.height, port.height), 'overlay frame differs from its scrolling owner')
+    need(witness.modebarMetrics.scrollHeight <= witness.modebarMetrics.clientHeight + 1 && witness.modebarMetrics.scrollWidth <= witness.modebarMetrics.clientWidth + 1,
+      'modebar has unobserved internal content')
+    need(Array.isArray(witness.clips), 'missing actual clipping ports')
+    for (const [clip, x, y] of [[witness.viewport, true, true], [port, true, true], ...witness.clips.map(clip => [clip.port, clip.x, clip.y])]) {
+      need(clip && (!x || root.left >= clip.left - 1 && root.right <= clip.right + 1) && (!y || root.top >= clip.top - 1 && root.bottom <= clip.bottom + 1), 'incomplete visible modebar box')
+    }
+    const matches = page.scrollAreas?.filter(area => area.selector === witness.ownerSelector) || []
+    need(witness.scrolling === (metrics.scrollHeight > metrics.clientHeight + 1) && matches.length === (witness.scrolling ? 1 : 0), 'missing or ambiguous native owner surface')
+    if (!witness.scrolling) continue
+    const area = matches[0]
+    need(area.ancestor === true && area.viewportScrollOwner === false && area.contentTarget?.kind === witness.kind && area.contentTarget.selector === page.root,
+      'different native content ownership')
+    need(sameBounds(area.bounds, owner) && sameBounds(area.ownerBounds, owner) && area.scrollHeight === metrics.scrollHeight && area.clientHeight === metrics.clientHeight &&
+      area.scrollTop === witness.scrollTop, 'different surface geometry')
+    need(area.tableModebarOwner && JSON.stringify(area.tableModebarOwner) === JSON.stringify(witness), 'surface witness differs from the current DOM read')
+    const start = Math.max(0, Math.min(area.scrollHeight, area.scrollTop + root.top - port.top))
+    const end = Math.max(start, Math.min(area.scrollHeight, area.scrollTop + root.bottom - port.top))
+    const top = Math.max(witness.viewport.top, port.top, ...witness.clips.filter(clip => clip.y).map(clip => clip.port.top))
+    const bottom = Math.min(witness.viewport.bottom, port.bottom, ...witness.clips.filter(clip => clip.y).map(clip => clip.port.bottom))
+    const height = Math.max(0, bottom - top), visibleStart = Math.max(0, Math.min(area.scrollHeight, area.scrollTop + top - port.top))
+    const visibleEnd = Math.max(visibleStart, Math.min(area.scrollHeight, visibleStart + height))
+    need(close(area.requiredContentStart, start, 1) && close(area.requiredContentEnd, end, 1) && close(area.visibleHeight, height, 1) &&
+      close(area.visibleContentStart, visibleStart, 1) && close(area.visibleContentEnd, visibleEnd, 1), 'native content endpoints differ from actual clipping')
+  }
+  for (const key of ['ownerToken', 'kind', 'root', 'ownerSelector', 'scrolling', 'scrollLeft', 'modebarMetrics', 'overlayMetrics', 'ownerMetrics',
+    'text', 'documentTitle', 'buttonCount', 'positions', 'horizontalTransform']) {
+    assert.deepEqual(current[key], first[key], 'Table modebar pinned sample changed its original ' + key)
+  }
+  need(current.observation >= first.observation, 'observer sequence changed')
+  for (const key of ['modebarBounds', 'ownerBounds', 'ownerClientPort', 'viewport']) need(sameBounds(first[key], current[key]), 'screen geometry changed: ' + key)
+  need(first.clips.length === current.clips.length, 'ancestor clipping changed')
+  first.clips.forEach((clip, index) => {
+    const next = current.clips[index]
+    for (const key of ['tag', 'id', 'x', 'y']) need(next[key] === clip[key], 'ancestor clipping ownership changed')
+    for (const key of ['left', 'top', 'right', 'bottom']) need(close(next.port[key], clip.port[key]), 'ancestor client port changed')
+  })
+}
+
+function pinnedTableModebarRange(surface, baseline, sample, actual) {
+  if (!baseline.tableModebarOwner || !sample.tableModebarOwner || surface.contentTarget?.kind !== 'table-selection-modebar-pinned-owner' ||
+      actual.contentTarget?.kind !== surface.contentTarget.kind || surface.selector !== baseline.tableModebarOwner.ownerSelector ||
+      actual.selector !== sample.tableModebarOwner.ownerSelector) return false
+  const delta = actual.scrollTop - surface.scrollTop
+  return Number.isFinite(delta) && Math.abs(delta) > 1 &&
+    ['requiredContentStart', 'requiredContentEnd', 'visibleContentStart', 'visibleContentEnd'].every(key =>
+      Number.isFinite(actual[key]) && Number.isFinite(surface[key]) && Math.abs(actual[key] - surface[key] - delta) <= 1)
+}
+
 // Keep raw PNG observations and later sweep planning in the SAME first recorded
 // scene frame. Only a proven pinned ancestor changes coordinates; native scroll
 // offsets, sweep ranges, geometry and the original four endpoints remain intact.
@@ -761,6 +939,7 @@ function normalizePinnedSceneCoordinates(baseline, sample) {
   const areas = sample.scrollAreas || []
   for (const actual of areas) assert.ok(!Object.hasOwn(actual, 'nativeCoordinates') && !Object.hasOwn(actual, 'coordinateFrame'),
     'Native scroll coordinates are already normalized')
+  if (baseline.tableModebarOwner || sample.tableModebarOwner) validateTableModebarPinnedSample(baseline, sample)
   const scrollAreas = areas.map(actual => {
     const matches = baseline.scrollAreas?.filter(surface => surface.selector === actual.selector) || []
     if (matches.length !== 1 || areas.filter(surface => surface.selector === actual.selector).length !== 1) return actual
@@ -768,7 +947,7 @@ function normalizePinnedSceneCoordinates(baseline, sample) {
     const originalRange = Math.abs(actual.requiredContentStart - surface.requiredContentStart) <= 1 &&
       Math.abs(actual.requiredContentEnd - surface.requiredContentEnd) <= 1
     if (originalRange || !actual.ancestor || actual.scrollHeight !== surface.scrollHeight || actual.clientHeight !== surface.clientHeight ||
-        !pinnedNestedAncestorRange(surface, baseline, sample, actual)) return actual
+        !(pinnedNestedAncestorRange(surface, baseline, sample, actual) || pinnedTableModebarRange(surface, baseline, sample, actual))) return actual
     const delta = actual.scrollTop - surface.scrollTop
     const nativeCoordinates = Object.fromEntries(['requiredContentStart', 'requiredContentEnd', 'visibleContentStart', 'visibleContentEnd']
       .map(key => [key, actual[key]]))
@@ -882,7 +1061,7 @@ export function createFullAppUiShared(ctx) {
   }
   const nameFor = (meta, suffix) => `${slug(meta.group)}-${slug(meta.theme)}-${meta.viewport.width}x${meta.viewport.height}-${slug(meta.routeId)}-${slug(meta.stateId)}-${suffix}.png`
   const sidebarFocusExpression = `(${observeCollapsedSidebarFocus.toString()})(${q(COLLAPSED_SIDEBAR_EXPAND)},${observeFullAppFocus.toString()},${hasVisibleBoxShadow.toString()},${withinActualClientPort.toString()},${observeFullAppOverflowViewport.toString()},${viewportFixedClipBoundary.toString()})`
-  const samplePage = (route, root, anchors, onlySelectors = [], sidebarFocusRequired = false) => evaluate(`(()=>{const collectFullAppScrollOwners=${collectFullAppScrollOwners.toString()};const page=(${observeFullAppPage.toString()})(${q({ root, anchors, onlySelectors, editorExceptions: route.editorExceptions || [] })},${withinActualClientPort.toString()},${observeFullAppOverflowViewport.toString()},${viewportFixedClipBoundary.toString()});${sidebarFocusRequired ? `page.sidebarFocus=${sidebarFocusExpression};` : ''}return page;})()`)
+  const samplePage = (route, root, anchors, onlySelectors = [], sidebarFocusRequired = false, tableModebarOwnerToken = null) => evaluate(`(()=>{const collectFullAppScrollOwners=${collectFullAppScrollOwners.toString()};const page=(${observeFullAppPage.toString()})(${q({ root, anchors, onlySelectors, editorExceptions: route.editorExceptions || [] })},${withinActualClientPort.toString()},${observeFullAppOverflowViewport.toString()},${viewportFixedClipBoundary.toString()});${sidebarFocusRequired ? `page.sidebarFocus=${sidebarFocusExpression};` : ''}${tableModebarOwnerToken ? `page.tableModebarOwner=(${observeTableModebarPinnedOwner.toString()})(${q(tableModebarOwnerToken)},'read',page);` : ''}return page;})()`)
   const nativeSamplePage = samplePage
   const captureState = async ({ routeId, stateId, root, anchors = [], requiredText = [], allowHorizontalScroll = [], coverageMode = 'route-controls', onlySelectors = [] }) => {
     const route = routeFor(routeId), registeredRoot = route.stateRoots?.[stateId] || route.root
@@ -900,11 +1079,24 @@ export function createFullAppUiShared(ctx) {
     const seen = new Map(), wanted = new Map(), capturedAnchors = new Map()
     const syncReadiness = ['sync-presentation', 'settings-main', 'local-sync-activity'].includes(meta.routeId) ? createSyncActivityCaptureReadiness({ routeId: meta.routeId,
       ownerToken: JSON.stringify(meta), evaluate, until, receipt: (scene.syncActivityReadiness = {}), save }) : null
+    const tableModebarOwner = routeId === 'editor-table-actions' && stateId === 'selection-mode' ?
+      (scene.tableModebarPinnedOwner = { ownerToken: 'table-modebar:' + randomUUID(), installed: false, disposed: false, complete: false }) : null
     let captureFailure = null
+    const disposeTableModebarOwner = async () => {
+      if (!tableModebarOwner || tableModebarOwner.disposeAttempted) return
+      tableModebarOwner.disposeAttempted = true
+      tableModebarOwner.disposal = await evaluate(`(${observeTableModebarPinnedOwner.toString()})(${q(tableModebarOwner.ownerToken)},'dispose')`)
+      assert.equal(tableModebarOwner.disposal.disposed, true, 'Table modebar DOM owner was not disposed')
+      if (tableModebarOwner.installed) assert.equal(tableModebarOwner.disposal.absent, undefined, 'Table modebar DOM owner disappeared before disposal')
+      if (!captureFailure) assert.equal(tableModebarOwner.disposal.identityRetained, true, 'Table modebar DOM owner changed before disposal')
+      tableModebarOwner.disposed = true; tableModebarOwner.complete = !captureFailure; save()
+    }
     let coordinateBaseline = null
-    const samplePage = async (...args) => {
-      const sample = await nativeSamplePage(...args)
-      coordinateBaseline ||= structuredClone({ root: sample.root, rootBounds: sample.rootBounds, scrollAreas: sample.scrollAreas })
+    const samplePage = async (route, root, anchors, onlySelectors = [], sidebarFocusRequired = false) => {
+      const sample = await nativeSamplePage(route, root, anchors, onlySelectors, sidebarFocusRequired, tableModebarOwner?.ownerToken)
+      if (tableModebarOwner) assert.equal(sample.tableModebarOwner?.ownerToken, tableModebarOwner.ownerToken, 'Table modebar sample lost its actual DOM owner witness')
+      coordinateBaseline ||= structuredClone({ root: sample.root, rootBounds: sample.rootBounds, scrollAreas: sample.scrollAreas,
+        ...(sample.tableModebarOwner ? { tableModebarOwner: sample.tableModebarOwner } : {}) })
       return normalizePinnedSceneCoordinates(coordinateBaseline, sample)
     }
     let index = 0
@@ -958,6 +1150,12 @@ export function createFullAppUiShared(ctx) {
     }
     try {
       if (syncReadiness) await syncReadiness.install()
+      if (tableModebarOwner) {
+        tableModebarOwner.installation = await evaluate(`(${observeTableModebarPinnedOwner.toString()})(${q(tableModebarOwner.ownerToken)},'install')`)
+        assert.equal(tableModebarOwner.installation.ownerToken, tableModebarOwner.ownerToken)
+        assert.equal(tableModebarOwner.installation.installed, true)
+        tableModebarOwner.installed = true; save()
+      }
       if (anchors.length) { await ensureVisible(anchors[0]); await snap([anchors[0]]) }
       else {
         const initial = await nativeSamplePage(route, root, [])
@@ -1025,6 +1223,7 @@ export function createFullAppUiShared(ctx) {
       // Dispose before sealing the immutable successful scene. The failure
       // path below still disposes in finally and retains its complete trace.
       if (syncReadiness) await syncReadiness.close()
+      await disposeTableModebarOwner()
       scene.controlCoverage = { renderedCount: wanted.size, observedCount: seen.size, unobserved: [...wanted.keys()].filter(selector => !seen.has(selector)) }
       assert.deepEqual(scene.controlCoverage.unobserved, [])
       scene.geometry = { valid: true, failures: [] }; scene.complete = true; save()
@@ -1037,6 +1236,15 @@ export function createFullAppUiShared(ctx) {
       catch (diagnostic) { scene.failureImageError = String(diagnostic.message); save() }
       throw error
     } finally {
+      if (tableModebarOwner && !tableModebarOwner.disposeAttempted) {
+        try { await disposeTableModebarOwner() }
+        catch (error) {
+          tableModebarOwner.cleanupError = { name: error.name, message: error.message }
+          try { save() }
+          catch (diagnostic) { tableModebarOwner.cleanupSaveError = { name: diagnostic.name, message: diagnostic.message } }
+          if (!captureFailure) throw error
+        }
+      }
       if (syncReadiness && !syncReadiness.closed) {
         try { await syncReadiness.close() }
         catch (error) {

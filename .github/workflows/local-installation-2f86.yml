@@ -201,7 +201,7 @@ jobs:
           node scripts/run-reading-mode-installer.mjs prepare
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Refuse incomplete routes, screenshots, native bounds and cross-runner identity claims
-        run: node --test scripts/full-app-ui-evidence.node.mjs scripts/full-app-ui-shared.node.mjs scripts/full-app-ui-local-sync-seed.node.mjs scripts/full-app-ui-decorator-keyboard.node.mjs scripts/full-app-ui-capture-paint.node.mjs scripts/full-app-ui-table-menu-entry.node.mjs
+        run: node --test scripts/full-app-ui-evidence.node.mjs scripts/full-app-ui-shared.node.mjs scripts/full-app-ui-local-sync-seed.node.mjs scripts/full-app-ui-decorator-keyboard.node.mjs scripts/full-app-ui-capture-paint.node.mjs scripts/full-app-ui-table-menu-entry.node.mjs scripts/full-app-ui-table-modebar.node.mjs
       - name: Fresh install and actual application page matrix
         run: node scripts/run-full-app-ui-installed.mjs ${{ matrix.group }}
       - name: Retain successful or failed page-matrix evidence
